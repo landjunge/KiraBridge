@@ -52,17 +52,21 @@ class TaskManager:
                 "SELECT 1 FROM tasks WHERE id=?", (request.task_id,)
             ).fetchone():
                 raise BridgeError("task_id_conflict", "Task identifier is already reserved")
+            control = request.operation in {"process.list", "process.inspect", "process.terminate"}
+            comparison = "IN" if control else "NOT IN"
             count = self.store.db.execute(
-                "SELECT COUNT(*) FROM tasks WHERE state='queued'"
+                f"SELECT COUNT(*) FROM tasks WHERE state='queued' AND operation {comparison} "
+                "('process.list','process.inspect','process.terminate')"
             ).fetchone()[0]
-            if count >= self.config.max_queued:
+            capacity = self.config.max_control_queued if control else self.config.max_queued
+            if count >= capacity:
                 raise BridgeError("queue_full", "Queue capacity reached")
             if request.parent_id:
                 parent = self.store.get(request.parent_id, principal)
                 depth = 1
                 while parent["parent_id"]:
                     depth += 1
-                    if depth > 32:
+                    if depth >= 32:
                         raise BridgeError("delegation_limit", "Delegation chain exceeds 32 tasks")
                     parent = self.store.get(parent["parent_id"], principal)
             self.security.consume(principal, request, approval)

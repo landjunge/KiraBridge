@@ -32,6 +32,7 @@ class Config(BaseModel):
     data_dir: str = str(Path.home() / ".local/share/kirabridge")
     concurrency: int = Field(default=2, ge=1, le=32)
     max_queued: int = Field(default=1000, ge=1, le=100000)
+    max_control_queued: int = Field(default=32, ge=1, le=1000)
     max_task_bytes: int = Field(default=2097152, ge=1024, le=8388608)
     lease_seconds: float = Field(default=30, ge=2, le=600)
     host: str = "127.0.0.1"

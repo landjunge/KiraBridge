@@ -11,7 +11,7 @@ Datum: 17. Oktober 2026. Bezug: [ursprünglicher Entwicklungsplan](DEVELOPMENT_P
 | Agent adapter | Codex JSONL, Grok Build ACP v1, Grok API Streaming; Identitätsprüfung und Abschlussbelege; Protokolltests gegen kontrollierte Gegenstellen |
 | Desktop tools | Geschützte Dateioperationen, Terminal-/Prozessgruppensteuerung, begrenzte Ausgabe, Zeitlimits, Beenden unter Last, Unicode-Clipboard und Schreibbestätigung |
 | MCP connectivity | Echtes stdio und Streamable HTTP, mehrere HTTP-Clients mit getrennten Rechten, ausgehender Clientpool, TLS mit aktiver Zertifikatsprüfung |
-| Cross-platform | macOS Intel lokal geprüft; Linux-Implementierung und CI-Matrix vorhanden; Windows verweigert nicht implementierte native Operationen ausdrücklich |
+| Cross-platform | macOS Intel lokal geprüft; macOS 15 und Ubuntu 24.04 mit Python 3.11/3.13 in CI erfolgreich; Windows verweigert nicht implementierte native Operationen ausdrücklich |
 | Integration extensions | Versioniertes AgentAdapter-Register und PlatformAdapter-Protokoll; optionale externe Systeme nicht gekoppelt oder verändert |
 
 ## Abnahmekriterien und konkrete Tests
@@ -26,7 +26,9 @@ Datum: 17. Oktober 2026. Bezug: [ursprünglicher Entwicklungsplan](DEVELOPMENT_P
 - Clipboard-Tests nutzen einen isolierten Backend-Simulator; keine persönliche Zwischenablage wird gelesen oder verändert.
 - `test_real_tls_with_certificate_validation` verwendet einen temporären vertrauenswürdig eingebundenen Testaussteller. Es wird kein `verify=False` verwendet.
 
-Lokale Prüfung auf macOS 15.7.4, Intel x86_64, Python 3.11.15: **64 Tests bestanden in 15,59 Sekunden**, Ruff und Paketbau erfolgreich. Plattformübergreifende CI-Ergebnisse werden am Implementierungscommit festgehalten.
+Lokale Prüfung auf macOS 15.7.4, Intel x86_64, Python 3.11.15: **66 Tests bestanden in 14,69 Sekunden**, Ruff und Paketbau erfolgreich. Die abschließenden Grenzfalltests prüfen zusätzlich reservierte Steuerungsplätze bei voller Ausführungsqueue und die genaue Begrenzung von Delegationsketten.
+
+Der [erste vollständige CI-Nachweis](https://github.com/landjunge/KiraBridge/actions/runs/39048278911) für Commit `9cb2e0a` besteht auf allen drei Plattform-/Python-Kombinationen mit jeweils 64 Tests, Ruff und Paketbau. Ergebnisse der nachfolgenden Grenzfallkorrektur stehen unter [aktuellen Verify-Läufen](https://github.com/landjunge/KiraBridge/actions/workflows/ci.yml).
 
 ## Lokale Ressourcenmessung
 
