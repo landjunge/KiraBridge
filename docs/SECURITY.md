@@ -38,7 +38,7 @@ Die Audit-Kette erkennt Veränderungen in vorhandenen Einträgen. Ein lokaler Ad
 
 Die direkte TLS-Implementierung ist für authentifizierte private Verbindungen vorgesehen. Zertifikatsprüfung ist im Client aktiv; eine private CA kann als `Peer.ca_file` angegeben werden. Proxy-Umgebungsvariablen werden für ausgehende Provider-/MCP-HTTP-Verbindungen nicht übernommen. Weiterleitungen dürfen keine Entscheidung über neue fremde Ziele ersetzen.
 
-Dieser Threat Review ist eine interne Entwurfsprüfung, kein unabhängiges Penetrationstest-Zertifikat. Es wurde kein öffentlicher Dienst, Tunnel oder Portforwarding eingerichtet. Eine spätere Internetbereitstellung erfordert ausdrücklich freigegebene Infrastruktur und passende OAuth-/Netzwerkregeln.
+Dieser Threat Review ist eine interne Entwurfsprüfung, kein unabhängiges Penetrationstest-Zertifikat. Der autorisierte private OpenAI-Tunnel verbindet ausschließlich den MCP-Proxy. Es wurde kein öffentlicher HTTP-Dienst oder Portforwarding eingerichtet. Eine spätere öffentliche Internetbereitstellung erfordert ausdrücklich freigegebene Infrastruktur und passende OAuth-/Netzwerkregeln.
 
 
 ## Lokaler Betrieb 0.2.0
@@ -46,3 +46,11 @@ Dieser Threat Review ist eine interne Entwurfsprüfung, kein unabhängiges Penet
 Der eingerichtete Dienst lädt getrennte, zufällige Tokens aus einer eigenen Datei unter dem privaten Konfigurationsverzeichnis. Die Datei wird mit `O_NOFOLLOW` geöffnet, Eigentümer und Modus werden geprüft; ihr Inhalt wird nicht ausgegeben. MCP-Stdio-Proxies lesen nur ihre konfigurierte Identität aus diesem Store und verbinden sich ausschließlich zu einem Loopback-Endpunkt. Globale Codex-/Grok-Konfigurationen enthalten keine Tokens.
 
 Pending-Anfragen sind keine Genehmigungen. Sie werden anhand des Operationsrechts geprüft, zählen zur Queue-Grenze und starten erst nach lokalem `approve`. Die Freigabe wird mit dem ursprünglichen Anfragehash auditiert. Selbstfreigaben über MCP sind nicht implementiert. `pending` und `approve` sind lokale administrative Befehle und setzen das vertrauenswürdige OS-Konto voraus.
+
+## Lokale Freigabeoberfläche ab 0.3.0
+
+Der Browserzugang läuft als getrennte Anwendung ausschließlich auf `127.0.0.1:8766` und wird nicht an den MCP-Gateway oder Tunnel gemountet. Host und Clientadresse werden geprüft. Aufgaben und Entscheidungen erfordern eine signierte Browserberechtigung; Schreibanfragen benötigen zusätzlich die genaue lokale Origin und JSON. Es gibt kein CORS für fremde Seiten. CSP, Framing-Verbot, `no-store`, `no-referrer` und ausschließlich textbasierte Darstellung von Auftragsdaten begrenzen Browserangriffe.
+
+Der Launcher prüft einen zufälligen Health-Challenge über HMAC, damit ein fremder lokaler Listener keine Anmeldung erhält. Ein Anmeldeticket wird durch eine private HTML-Datei mit Modus 0600 als POST übermittelt. Es gilt höchstens zwei Minuten, nur für die aktuelle Dienstinstanz und nur einmal. Der langfristige lokale Schlüssel wird weder im Browser noch in URLs, argv oder Plists hinterlegt. Eine Browserberechtigung gilt maximal 30 Tage und wird im lokalen Speicher exakt dieser Origin einschließlich Port abgelegt. Das vertrauenswürdige lokale Betriebssystemkonto und sein Browserprofil gehören weiterhin zur administrativen Vertrauensgrenze.
+
+Eine Entscheidung enthält den Hash des vollständig dargestellten Auftrags. Hash und zulässiger Zustand werden innerhalb derselben SQLite-Transaktion geprüft. Doppelte Freigaben werden abgewiesen; ein inzwischen empfangener oder laufender Auftrag kann nicht über die Ablehnen-Funktion als wartender Auftrag abgebrochen werden. Freigaben tragen die Auditquelle `local_console`. Die Oberfläche startet keinen zweiten Dispatcher und erweitert keine Principal-Rechte.

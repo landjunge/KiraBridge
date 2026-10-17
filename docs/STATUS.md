@@ -1,4 +1,4 @@
-# Abnahmestand 0.2.0
+# Abnahmestand 0.3.0
 
 Stand: 17. Oktober 2026. Grundlage bleibt der [Entwicklungsplan](DEVELOPMENT_PLAN.md). Der frühere rein paketbezogene Stand ist in [STATUS-v0.1.md](STATUS-v0.1.md) archiviert.
 
@@ -15,11 +15,19 @@ Stand: 17. Oktober 2026. Grundlage bleibt der [Entwicklungsplan](DEVELOPMENT_PLA
 
 Die konkreten Task-IDs, Sitzungsbelege und Prüfergebnisse stehen im [Betriebsnachweis](evidence/local-operation-2026-10-17.json). Private Konfiguration, Zugangsdaten und persönliche Inhalte sind nicht Bestandteil dieses Repositories.
 
+## Freigaben auf diesem Mac
+
+[KiraBridge Freigaben öffnen](http://127.0.0.1:8766/). Der getrennte Benutzer-Dienst `com.kirabridge.approvals` bindet ausschließlich an Loopback. `kirabridge approvals` meldet den Browser über eine private, kurzlebige Einmal-Datei an; „KiraBridge Freigaben.command“ auf dem Schreibtisch öffnet die Seite erneut. Einmal angemeldet bleibt die Browserberechtigung 30 Tage gültig, auch bei einem Dienstneustart.
+
+Anfragen aus ChatGPT erscheinen automatisch. Die vollständigen Angaben werden vor einer Entscheidung geladen; die Freigabe ist atomar an den dargestellten Anfragehash gebunden. Auf der Seite werden danach der tatsächliche Zustand, Empfangsbestätigung, Ergebnis und Ausführungsbeleg angezeigt. Die Agenten erhalten den Link auch direkt in `task_request` und `bridge_health`. Es ist kein Kopieren von IDs zwischen Chats erforderlich.
+
+Ein echter Dateilistenauftrag wurde über MCP mit Principal `chatgpt` angefragt, über die lokale Browser-API freigegeben und vom vorhandenen Dispatcher abgeschlossen. Ein zusätzlicher Test in einem isolierten Chrome-Profil hat die lokale Anmeldung, das Öffnen der Angaben, den tatsächlichen Klick auf „Auftrag freigeben“, den automatischen Statuswechsel und das sichtbare Ergebnis geprüft; es gab keine JavaScript-Ausnahmen. Dieser lokale Browsertest ist kein zusätzlicher Aufruf aus einer ChatGPT-Unterhaltung. Die [konkreten Belege](evidence/local-console-2026-10-17.json) halten Herkunft und Grenzen fest. Es wurden keine Modell-API-Aufrufe ausgelöst.
+
 ## Automatische Prüfungen
 
-Lokal auf macOS 15.7.4, Intel x86_64, Python 3.11.15: **79 Tests bestanden in 18,89 Sekunden**. Ruff und Paketbau sind erfolgreich. Zusätzlich zu den bisherigen Sicherheits- und Wiederherstellungstests werden Pending-Freigaben, Zurückweisung, geschützte lokale Einrichtung, gemeinsam verwendete Stdio-Proxies und die Geheimnisbehandlung im Kontoverbindungsassistenten geprüft. Zusätzliche Regressionstests decken verzögerte Dispatcher-Bereitschaft und den ausbleibenden Tunnelstart bei einem nicht bereiten lokalen Dienst ab.
+Lokal auf macOS 15.7.4, Intel x86_64, Python 3.11.15: **87 Tests bestanden in 16,97 Sekunden**. Ruff und Paketbau sind erfolgreich. Zusätzlich zu den bisherigen Sicherheits- und Wiederherstellungstests werden Pending-Freigaben, Zurückweisung, geschützte lokale Einrichtung, gemeinsam verwendete Stdio-Proxies und die Geheimnisbehandlung im Kontoverbindungsassistenten geprüft. Zusätzliche Regressionstests decken verzögerte Dispatcher-Bereitschaft, Browserauthentifizierung, Origin-/Host-Schutz, Einmal-Anmeldung, falsche Anfragehashes, doppelte Freigaben, Ablehnung ohne Ausführung und den atomaren Schutz bereits aktiver Aufträge ab.
 
-Die [Verify-Pipeline](https://github.com/landjunge/KiraBridge/actions/workflows/ci.yml) prüft Codeänderungen auf Ubuntu 24.04 mit Python 3.11/3.13 sowie macOS 15 mit Python 3.11. Die Bereitschaftskorrektur `c259ffe` ist auf allen drei Kombinationen [erfolgreich geprüft](https://github.com/landjunge/KiraBridge/actions/runs/39054163072). Der anschließende reine Dokumentationsnachweis ändert keinen Programmcode.
+Die [Verify-Pipeline](https://github.com/landjunge/KiraBridge/actions/workflows/ci.yml) prüft Codeänderungen auf Ubuntu 24.04 mit Python 3.11/3.13 sowie macOS 15 mit Python 3.11. Die Bereitschaftskorrektur `c259ffe` ist auf allen drei Kombinationen [erfolgreich geprüft](https://github.com/landjunge/KiraBridge/actions/runs/39054163072). Die lokale Freigabeoberfläche ab 0.3.0 hat zusätzlich ihren eigenen Code- und Browsernachweis.
 
 Die Leerlaufmessung des Kerns lag auf diesem Intel-Mac bei etwa 56 MiB Spitzenspeicher und 0,03 % eines CPU-Kerns über fünf Sekunden. Das ist keine Lastmessung und enthält nicht den Speicher externer Agentenprozesse. Eine GPU wird nicht benötigt.
 

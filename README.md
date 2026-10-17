@@ -1,6 +1,6 @@
 # KiraBridge
 
-Privates, modulares Desktop- und Agenten-Gateway für macOS und Linux. Python 3.11+, asyncio, SQLite und das offizielle MCP Python SDK. Version **0.2.0** implementiert den Kern des [verbindlichen Entwicklungsplans](docs/DEVELOPMENT_PLAN.md).
+Privates, modulares Desktop- und Agenten-Gateway für macOS und Linux. Python 3.11+, asyncio, SQLite und das offizielle MCP Python SDK. Version **0.3.0** implementiert den Kern des [verbindlichen Entwicklungsplans](docs/DEVELOPMENT_PLAN.md) und eine lokale Freigabeoberfläche.
 
 ## Implementiert
 
@@ -14,7 +14,7 @@ Privates, modulares Desktop- und Agenten-Gateway für macOS und Linux. Python 3.
 - MCP über stdio und Streamable HTTP; authentifizierte parallele HTTP-Clients; ausgehender MCP-Clientpool mit getrennten Verbindungen.
 - Rollenrechte, konkrete einmalige Aufgabenfreigaben, Replay-Schutz, standardmäßig Loopback, TLS-Pflicht für andere Bindungen und verkettetes Audit-Protokoll ohne Befehlsinhalte oder Zugangsdaten.
 
-**Betriebsnachweis:** Codex und Grok haben echte, getrennt nachgewiesene Testaufträge abgeschlossen. Ein echter Codex-MCP-Aufruf und Groks MCP-Handshake wurden geprüft. Die ChatGPT-Kontoverbindung ist weiterhin offen. Windows hat definierte Erweiterungspunkte, noch keinen ausführbaren nativen Adapter. Bilder, Datei-Clipboard, PTY/interactive stdin, A2A und die optionalen externen Integrationen sind Erweiterungen; siehe [Status](docs/STATUS.md).
+**Betriebsnachweis:** Codex und Grok haben echte, getrennt nachgewiesene Testaufträge abgeschlossen. Ein echter Codex-MCP-Aufruf und Groks MCP-Handshake wurden geprüft. Der private ChatGPT-Tunnel läuft; der Nutzer meldet eine erfolgreiche Statusabfrage. Die neue lokale Freigabeseite wurde mit einem echten MCP-Dateilistenauftrag bis zum Abschluss geprüft. Windows hat definierte Erweiterungspunkte, noch keinen ausführbaren nativen Adapter. Bilder, Datei-Clipboard, PTY/interactive stdin, A2A und die optionalen externen Integrationen sind Erweiterungen; siehe [Status](docs/STATUS.md).
 
 ## Auf diesem Mac bereits eingerichtet
 
@@ -28,11 +28,14 @@ kirabridge ask codex "Beschreibe deine Aufgabe in einem Satz."
 kirabridge ask grok "Beschreibe deine Aufgabe in einem Satz."
 kirabridge clipboard info
 kirabridge pending
+kirabridge approvals
 kirabridge approve TASK_ID
 kirabridge deny TASK_ID
 ```
 
-Lokale Kurzbefehle genehmigen genau den vom Bediener angegebenen Auftrag. MCP-Clients können mit `task_request` eine Aufgabe vorlegen; sie bleibt bis `kirabridge approve TASK_ID` im Zustand `created`. Es gibt keine automatische Freigabe durch einen Agenten. `deny` verwirft wartende Anfragen.
+**Freigaben im Browser:** [KiraBridge auf diesem Mac](http://127.0.0.1:8766/). `kirabridge approvals` startet die getrennte lokale Oberfläche und meldet den Browser über eine private Einmal-Anmeldedatei an. Auf macOS liegt anschließend „KiraBridge Freigaben.command“ auf dem Schreibtisch. Neue Anfragen erscheinen automatisch; nach dem Öffnen der Auftragsdetails lassen sie sich per Klick freigeben oder ablehnen. Ergebnisse und echte Zustandswechsel erscheinen auf derselben Seite. Es müssen keine IDs zwischen Chats kopiert werden.
+
+Lokale Kurzbefehle genehmigen genau den vom Bediener angegebenen Auftrag. MCP-Clients können mit `task_request` eine Aufgabe vorlegen; die Antwort enthält `local_approval_url`. Die Aufgabe bleibt bis zur lokalen Freigabe im Zustand `created`. Die CLI-Befehle `approve` und `deny` stehen ebenfalls zur Verfügung. Es gibt keine Selbstfreigabe durch einen MCP-Agenten.
 
 Die einmalige ChatGPT-Kontoverbindung wird über `kirabridge chatgpt setup` eingerichtet. Der Assistent öffnet die offiziellen Kontoseiten und fragt einen eingeschränkten Runtime-Schlüssel unsichtbar im lokalen Terminal ab. `kirabridge chatgpt status` unterscheidet installierten Client, Tunnel-Bereitschaft und den weiterhin separat zu prüfenden ChatGPT-Toolaufruf.
 
@@ -42,6 +45,7 @@ Die einmalige ChatGPT-Kontoverbindung wird über `kirabridge chatgpt setup` eing
 uv sync --locked
 uv run kirabridge setup
 uv run kirabridge service install
+uv run kirabridge approvals
 ```
 
 `setup` erstellt neue private Dateien und überschreibt keine bestehende Policy. Der globale Befehl wird unter `~/.local/bin/kirabridge` angelegt. Für einen manuell begrenzten, einmaligen Betrieb:

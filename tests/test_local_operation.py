@@ -110,3 +110,19 @@ async def test_stdio_proxy_reaches_existing_daemon_without_second_dispatcher(htt
         tools = (await pool.sessions["proxy"].list_tools()).tools
         assert "task_request" in {tool.name for tool in tools}
         assert "approve" not in {tool.name for tool in tools}
+        pending = await pool.call(
+            "proxy",
+            "task_request",
+            {
+                "request": {
+                    "task_id": "proxy-console-link",
+                    "idempotency_key": "proxy-console-link",
+                    "operation": "file.list",
+                    "arguments": {"path": bridge.config.principals["local"].roots[0]},
+                }
+            },
+        )
+        assert pending.structuredContent["local_approval_url"] == "http://127.0.0.1:8766/"
+        assert pending.structuredContent["approval_required"] is True
+        assert pending.structuredContent["state"] == "created"
+        assert pending.structuredContent["receipt"] is None

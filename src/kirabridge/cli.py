@@ -58,6 +58,16 @@ async def execute(args) -> None:
         emit({"config": str(destination), "workspace": str(workspace)})
         return
     config = load_config(args.config)
+    if args.command in {"approvals", "approval-server"}:
+        from kirabridge.console_runtime import open_console, serve_console
+        from kirabridge.local_runtime import default_config
+
+        config_path = Path(args.config).absolute() if args.config else default_config()
+        if args.command == "approvals":
+            emit(open_console(config_path))
+        else:
+            await serve_console(config, config_path)
+        return
     if args.command == "chatgpt":
         from kirabridge.chatgpt_setup import wizard
         from kirabridge.local_runtime import default_config
@@ -197,7 +207,10 @@ async def execute(args) -> None:
             if task["state"] not in {State.CREATED, State.QUEUED}:
                 raise BridgeError("state_conflict", "Only pending or queued requests can be denied")
             bridge.store.transition(
-                args.task_id, State.CANCELLED, {"source": "local_operator_rejection"}
+                args.task_id,
+                State.CANCELLED,
+                {"source": "local_operator_rejection"},
+                expected_states={State.CREATED, State.QUEUED},
             )
             emit(bridge.store.get(args.task_id))
         elif args.command == "enqueue":
@@ -268,6 +281,8 @@ def main() -> None:
     setup.add_argument("--workspace", default=str(Path.home() / "workspace/KiraBridge"))
     sub.add_parser("status", help="Query the running local daemon")
     sub.add_parser("connect", help="Forward MCP stdio to the authenticated local daemon")
+    sub.add_parser("approvals", help="Open the private local approval page in your browser")
+    sub.add_parser("approval-server", help="Run the loopback-only local approval interface")
     chatgpt = sub.add_parser("chatgpt", help="Local account linking for a private ChatGPT tunnel")
     chatgpt.add_argument("action", choices=["setup", "status"])
     service = sub.add_parser("service")

@@ -7,6 +7,7 @@ from mcp.server.fastmcp import Context, FastMCP
 from mcp.server.transport_security import TransportSecuritySettings
 from mcp.types import ToolAnnotations
 
+from kirabridge import LOCAL_APPROVAL_URL
 from kirabridge.bridge_core.bridge import INPUTS, Bridge
 from kirabridge.bridge_core.models import BridgeError, TaskRequest
 
@@ -16,6 +17,8 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
     server = FastMCP(
         "KiraBridge",
         instructions="API v1. Every task needs a locally issued exact-task approval. "
+        "Send the operator to local_approval_url on their Mac; requests appear there "
+        "automatically. Do not ask them to copy task IDs between chats. "
         "Acceptance is a receipt, not execution. Query task_get and task_events for evidence.",
         stateless_http=True,
         json_response=True,
@@ -91,10 +94,20 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
     def task_request(request: TaskRequest, ctx: Context) -> dict[str, Any]:
         """Request local approval. This stores a pending request and executes nothing.
 
-        Ask the local operator to run `kirabridge approve TASK_ID`, then poll task_get.
+        Give the operator local_approval_url to approve in their Mac browser, then poll task_get.
+        Requests appear automatically; do not ask them to copy task IDs between chats.
         Never claim execution while the task remains created (awaiting approval).
         """
-        return safe(lambda: bridge.prepare(identity(ctx), request))
+
+        def action():
+            task = bridge.prepare(identity(ctx), request)
+            return {
+                **task,
+                "local_approval_url": LOCAL_APPROVAL_URL,
+                "approval_required": task["state"] == "created",
+            }
+
+        return safe(action)
 
     @server.tool(annotations=read)
     def task_events(task_id: str, ctx: Context, after: int = 0) -> dict[str, Any]:

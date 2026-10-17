@@ -1,0 +1,62 @@
+{
+  "task_id": "console-proof-d847792cb2854d67b1243f88029e37e8",
+  "principal": "chatgpt",
+  "operation": "file.list",
+  "request_via": "authenticated local MCP gateway, same principal as ChatGPT",
+  "approval_via": "separate loopback browser API with one-use local login",
+  "unauthenticated_http_status": 401,
+  "duplicate_approval_http_status": 409,
+  "states": [
+    "created",
+    "queued",
+    "accepted",
+    "running",
+    "completed"
+  ],
+  "final_state": "completed",
+  "receipt_present": true,
+  "finished": 1792259361.084363,
+  "model_api_calls": 0,
+  "external_chatgpt_conversation_triggered_this_probe": false,
+  "version": "0.3.0",
+  "browser_verification": {
+    "browser": "isolated Chrome headless",
+    "login": "passed",
+    "review": "passed",
+    "approval_click": "passed",
+    "live_completion": "passed",
+    "result_visible": true,
+    "javascript_exceptions": 0,
+    "task_id": "browser-proof-88878a48232f4e33935cffe8f2669940",
+    "states": [
+      "created",
+      "queued",
+      "accepted",
+      "running",
+      "completed"
+    ],
+    "external_chatgpt_conversation_triggered_this_probe": false
+  },
+  "automated_validation": {
+    "tests_passed": 87,
+    "local_test_seconds": 16.97,
+    "ruff": "passed",
+    "package_build": "passed"
+  },
+  "local_service": {
+    "url": "http://127.0.0.1:8766/",
+    "label": "com.kirabridge.approvals",
+    "run_at_load": true,
+    "restart_after_failure": true,
+    "credentials_mode": "0o600",
+    "bootstrap_mode": "0o600",
+    "desktop_launcher": true,
+    "browser_session_days": 30,
+    "publicly_exposed": false
+  },
+  "audit_verification": {
+    "valid": true,
+    "records": 56,
+    "head": "7cadfc19fdbc9b75f3d93e6aa1893675bcaa887527847580c20449da9df4c7a8"
+  }
+}

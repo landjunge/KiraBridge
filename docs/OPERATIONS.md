@@ -1,4 +1,4 @@
-# Eingerichteter Betrieb ab 0.2.0
+# Eingerichteter Betrieb ab 0.3.0
 
 Auf dem Ziel-Mac wurden `kirabridge setup` und `kirabridge service install` ausgeführt. Der Dienst `com.kirabridge.bridge` läuft unter dem angemeldeten Benutzer und startet nach einem Fehler automatisch neu. Er bindet ausschließlich an `127.0.0.1:8765`; jede HTTP-Anfrage benötigt Authentifizierung.
 
@@ -6,7 +6,11 @@ Standarddateien: `~/.config/kirabridge/config.toml` (0600), `credentials.json` d
 
 `kirabridge status` fragt den laufenden Dienst ab. `ls`, `read`, `write`, `exec`, `ask` und `clipboard` sind lokale Komfortbefehle. Sie geben für den konkret vom lokalen Bediener gewählten Inhalt eine auftragsgebundene Freigabe und warten auf den tatsächlichen Ausgang. Bestehende Dateiinhalte werden nur mit `write --overwrite` ersetzt. Zusätzliche Verzeichnisse werden ausdrücklich in der privaten Konfiguration freigegeben.
 
-MCP-Clients können statt des Token-Austauschs `task_request` nutzen. Diese Anfrage wird dauerhaft als `created` gespeichert und benötigt keine vorgetäuschte Empfangs- oder Ausführungsbestätigung. Der Bediener prüft `kirabridge pending` und entscheidet mit `kirabridge approve TASK_ID` oder `kirabridge deny TASK_ID`. Der Server bietet kein Tool zur Selbstfreigabe an. Pending-Anfragen zählen zur Queue-Quote und bleiben nach einem Neustart ungeprüft.
+MCP-Clients können statt des Token-Austauschs `task_request` nutzen. Diese Anfrage wird dauerhaft als `created` gespeichert und benötigt keine vorgetäuschte Empfangs- oder Ausführungsbestätigung. Die Antwort enthält den lokalen Freigabelink. Der Bediener öffnet [KiraBridge Freigaben](http://127.0.0.1:8766/), sieht dort automatisch die Anfrage, öffnet ihre vollständigen Angaben und entscheidet mit „Auftrag freigeben“ oder „Ablehnen“. Ergebnisse und Statuswechsel erscheinen anschließend auf derselben Seite. Als CLI-Alternative stehen `pending`, `approve TASK_ID` und `deny TASK_ID` bereit. Der MCP-Server bietet kein Tool zur Selbstfreigabe an. Pending-Anfragen zählen zur Queue-Quote und bleiben nach einem Neustart ungeprüft.
+
+`kirabridge approvals` richtet den getrennten lokalen Benutzer-Dienst `com.kirabridge.approvals` auf `127.0.0.1:8766` ein und öffnet den Browser. Der Launcher „KiraBridge Freigaben.command“ auf dem Schreibtisch öffnet dieselbe Seite und erneuert bei Bedarf die Browseranmeldung. Unter Linux kann `kirabridge approval-server` im Vordergrund gestartet werden; danach öffnet `kirabridge approvals` die lokale Anmeldung.
+
+Die Oberfläche bleibt außerhalb des MCP-Tunnels. Der lokale Launcher prüft den Dienst kryptografisch, bevor er eine private, kurzlebige Einmal-Anmeldedatei öffnet. Die langfristige lokale Anmeldeberechtigung bleibt mit Modus 0600 im Konfigurationsverzeichnis. Der Browser erhält eine auf diese Oberfläche beschränkte, signierte 30-Tage-Berechtigung in seinem origin-gebundenen lokalen Speicher. Es werden keine Zugangsdaten in Links, Prozessargumenten oder Logs ausgegeben. Bei gesperrten lokalen Browserdaten kann der Browser nicht angemeldet werden; die Seite erklärt dann den erneuten Start über den Schreibtisch.
 
 Echte Codex- und Grok-Aufträge, Codex als nativer MCP-Client, Groks MCP-Doctor sowie ein realer launchd-Neustart wurden geprüft; siehe [Betriebsnachweis](evidence/local-operation-2026-10-17.json).
 

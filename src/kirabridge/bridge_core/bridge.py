@@ -5,7 +5,7 @@ from typing import Any
 
 from pydantic import ValidationError
 
-from kirabridge import API_VERSION, __version__
+from kirabridge import API_VERSION, LOCAL_APPROVAL_URL, __version__
 from kirabridge.agent_manager import AgentManager
 from kirabridge.bridge_core.config import Config
 from kirabridge.bridge_core.models import (
@@ -89,6 +89,7 @@ class Bridge:
             "dispatcher_active": bool(self.tasks.workers)
             and all(not worker.done() for worker in self.tasks.workers),
             "chatgpt_integration": "unverified",
+            "local_approval_url": LOCAL_APPROVAL_URL,
         }
 
     def task(self, principal: str, task_id: str) -> dict:

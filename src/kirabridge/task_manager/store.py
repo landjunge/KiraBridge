@@ -117,11 +117,17 @@ class Store:
         result: dict | None = None,
         error: dict | None = None,
         owner: str | None = None,
+        expected_hash: str | None = None,
+        expected_states: set[State] | None = None,
     ) -> None:
         with self.transaction():
             row = self.db.execute("SELECT * FROM tasks WHERE id=?", (task_id,)).fetchone()
             if row is None:
                 raise BridgeError("not_found", "Task not found")
+            if expected_hash is not None and expected_hash != row["request_hash"]:
+                raise BridgeError("review_conflict", "The reviewed request does not match")
+            if expected_states is not None and row["state"] not in expected_states:
+                raise BridgeError("state_conflict", "Task is no longer awaiting this decision")
             if state not in TRANSITIONS[State(row["state"])]:
                 raise BridgeError("state_conflict", "Invalid task state transition")
             if owner and row["lease_owner"] != owner:

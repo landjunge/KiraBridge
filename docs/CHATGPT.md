@@ -19,6 +19,12 @@ Der Nutzer hat die Kontoschritte selbst im autorisierten Zielkonto durchgeführt
 
 Für diesen privaten Einzelbenutzer-Anschluss übernimmt der Tunnel die kontrollierte Workspace-Verbindung und der lokale Proxy die eigene KiraBridge-Authentifizierung. Das ist keine behauptete OAuth-Anbindung mit getrennten Identitäten für beliebige Workspace-Mitglieder. Eine solche Mehrbenutzer-Anbindung benötigt den zusätzlich beschriebenen Identity Provider.
 
+## Freigaben für ChatGPT-Aufträge
+
+Die lokale Freigabeseite ist [KiraBridge auf diesem Mac](http://127.0.0.1:8766/). Sie wird über `kirabridge approvals` oder „KiraBridge Freigaben.command“ auf dem Schreibtisch geöffnet und angemeldet. Anfragen erscheinen dort automatisch. `task_request` und `bridge_health` liefern die Adresse als `local_approval_url`. Der Agent soll diesen Link nennen und nach der lokalen Entscheidung mit `task_get` weiter prüfen; IDs müssen nicht zwischen Chats kopiert werden.
+
+Die Freigabeseite ist ein getrennter lokaler Dienst und wird nicht durch den OpenAI-Tunnel freigegeben. Ein lokaler Ende-zu-Ende-Test mit dem `chatgpt`-Principal hat MCP-Anfrage, Browserfreigabe, tatsächliche Dateilisten-Ausführung und Ergebnisabruf geprüft. Ein isolierter echter Browser hat auch den Freigabeklick und die Ergebnisanzeige erfolgreich durchlaufen. Für einen aus der ChatGPT-Unterhaltung selbst ausgelösten Ausführungsauftrag bleibt die Herkunft weiterhin getrennt nachzuweisen.
+
 ## Technische Voraussetzungen
 
 Die offiziellen OpenAI-Unterlagen beschreiben für ChatGPT einen erreichbaren MCP-Endpunkt und die zugehörige Workspace-/Developer-Mode-Berechtigung. Ein lokaler stdio-Eintrag allein verbindet keine ChatGPT-Cloudsitzung mit dem Mac. Für private Netze dokumentiert OpenAI einen Secure MCP Tunnel mit eigener Platform-Berechtigung, Tunnel-ID und Laufzeitschlüssel. Diese private Verbindung wurde mit dem vom Nutzer angelegten Tunnel eingerichtet. [Secure MCP Tunnel](https://developers.openai.com/api/docs/guides/secure-mcp-tunnels)

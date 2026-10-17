@@ -12,6 +12,8 @@ dist/
 .env
 config.local.toml
 credentials.json
+console-credentials.json
+approval-login.html
 openai-tunnel-runtime.key
 .kirabridge-state/
 demo-workspace/

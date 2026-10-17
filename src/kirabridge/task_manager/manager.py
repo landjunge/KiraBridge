@@ -113,10 +113,17 @@ class TaskManager:
         self.wake.set()
         return self.store.get(request.task_id, principal)
 
-    def approve(self, task_id: str) -> dict:
+    def approve(
+        self, task_id: str, *, expected_hash: str | None = None, source: str = "local_cli"
+    ) -> dict:
         """Local operator authority only; deliberately not an MCP tool."""
         with self.store.transaction():
             task = self.store.get(task_id)
+            actual_hash = self.store.db.execute(
+                "SELECT request_hash FROM tasks WHERE id=?", (task_id,)
+            ).fetchone()[0]
+            if expected_hash is not None and expected_hash != actual_hash:
+                raise BridgeError("review_conflict", "The reviewed request does not match")
             self.security.principal(task["principal"], task["operation"])
             if task["state"] != State.CREATED:
                 raise BridgeError("state_conflict", "Only pending requests can be approved")
@@ -134,11 +141,9 @@ class TaskManager:
                 task["principal"],
                 task_id,
                 {
-                    "source": "local_cli",
+                    "source": source,
                     "operation": task["operation"],
-                    "request_hash": self.store.db.execute(
-                        "SELECT request_hash FROM tasks WHERE id=?", (task_id,)
-                    ).fetchone()[0],
+                    "request_hash": actual_hash,
                 },
             )
         self.wake.set()
@@ -274,7 +279,12 @@ class TaskManager:
             raise BridgeError(
                 "state_conflict", "Only pending or queued tasks can be cancelled here"
             )
-        self.store.transition(task_id, State.CANCELLED, {"cancelled_by_owner": True})
+        self.store.transition(
+            task_id,
+            State.CANCELLED,
+            {"cancelled_by_owner": True},
+            expected_states={State.CREATED, State.QUEUED},
+        )
         return self.store.get(task_id, principal)
 
     def reconcile(self, task_id: str, state: State, reference: str) -> dict:

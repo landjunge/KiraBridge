@@ -13,7 +13,13 @@ from kirabridge.mcp_gateway.client import MCPClientPool
 async def connect_stdio(config, principal):
     async with MCPClientPool() as pool:
         await pool.connect(peer(config, principal))
-        server = Server("KiraBridge", version=__version__)
+        server = Server(
+            "KiraBridge",
+            version=__version__,
+            instructions="Use task_request and give the operator local_approval_url on their Mac. "
+            "Requests appear there automatically; no task-ID copying is needed. "
+            "Use task_get and task_events to verify execution after local approval.",
+        )
 
         @server.list_tools()
         async def list_tools():
