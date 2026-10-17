@@ -11,7 +11,7 @@ Stand: 17. Oktober 2026. Grundlage bleibt der [Entwicklungsplan](DEVELOPMENT_PLA
 - Codex hat `bridge_health` als nativer MCP-Client aufgerufen. Groks MCP-Doctor meldet einen erfolgreichen Handshake und zwölf erkannte Tools. Beide Konfigurationen verwenden tokenfreie Stdio-Proxies zum gemeinsamen Dienst.
 - Ein realer SIGKILL des neu installierten KiraBridge-Dienstes wurde durch launchd behoben. Eine offene MCP-Anfrage blieb nach dem Neustart gesperrt und lief erst nach lokaler Freigabe. Der andere Agent durfte das Ergebnis nicht lesen.
 - Datei-Schreiben/-Lesen und Terminalausführung wurden am echten Dienst geprüft. Clipboard-Fähigkeiten wurden ohne Auslesen oder Verändern persönlicher Inhalte abgefragt.
-- Der private OpenAI-Tunnel ist eingerichtet. Die lokale Prüfung bestätigt laufenden Prozess, Health und Readiness; OpenAI-Discovery-Anfragen wurden an KiraBridge weitergeleitet. Der Nutzer meldet eine erfolgreiche Statusabfrage aus seinem ChatGPT-Chat mit Version 0.2.0 und aktivem Dispatcher.
+- Der private OpenAI-Tunnel ist eingerichtet. Die lokale Prüfung bestätigt laufenden Prozess, Health und Readiness; OpenAI-Discovery-Anfragen wurden an KiraBridge weitergeleitet. Lokale Tunnel-Metriken belegen außerdem echte `tools/call`-Anfragen mit Transportstatus 200. Der Nutzer meldet eine erfolgreiche Statusabfrage aus seinem ChatGPT-Chat mit Version 0.2.0 und aktivem Dispatcher. Der genaue Werkzeugname und dessen Ergebnis werden durch die Metriken allein nicht belegt.
 
 Die konkreten Task-IDs, Sitzungsbelege und Prüfergebnisse stehen im [Betriebsnachweis](evidence/local-operation-2026-10-17.json). Private Konfiguration, Zugangsdaten und persönliche Inhalte sind nicht Bestandteil dieses Repositories.
 
@@ -19,7 +19,7 @@ Die konkreten Task-IDs, Sitzungsbelege und Prüfergebnisse stehen im [Betriebsna
 
 Lokal auf macOS 15.7.4, Intel x86_64, Python 3.11.15: **79 Tests bestanden in 18,89 Sekunden**. Ruff und Paketbau sind erfolgreich. Zusätzlich zu den bisherigen Sicherheits- und Wiederherstellungstests werden Pending-Freigaben, Zurückweisung, geschützte lokale Einrichtung, gemeinsam verwendete Stdio-Proxies und die Geheimnisbehandlung im Kontoverbindungsassistenten geprüft. Zusätzliche Regressionstests decken verzögerte Dispatcher-Bereitschaft und den ausbleibenden Tunnelstart bei einem nicht bereiten lokalen Dienst ab.
 
-Die [Verify-Pipeline](https://github.com/landjunge/KiraBridge/actions/workflows/ci.yml) prüft jeden Commit auf Ubuntu 24.04 mit Python 3.11/3.13 sowie macOS 15 mit Python 3.11. Die vorangegangenen Kernimplementierungen sind auf allen drei Kombinationen grün; der aktuelle Commit trägt seinen eigenen CI-Nachweis.
+Die [Verify-Pipeline](https://github.com/landjunge/KiraBridge/actions/workflows/ci.yml) prüft Codeänderungen auf Ubuntu 24.04 mit Python 3.11/3.13 sowie macOS 15 mit Python 3.11. Die Bereitschaftskorrektur `c259ffe` ist auf allen drei Kombinationen [erfolgreich geprüft](https://github.com/landjunge/KiraBridge/actions/runs/39054163072). Der anschließende reine Dokumentationsnachweis ändert keinen Programmcode.
 
 Die Leerlaufmessung des Kerns lag auf diesem Intel-Mac bei etwa 56 MiB Spitzenspeicher und 0,03 % eines CPU-Kerns über fünf Sekunden. Das ist keine Lastmessung und enthält nicht den Speicher externer Agentenprozesse. Eine GPU wird nicht benötigt.
 

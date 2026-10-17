@@ -1,6 +1,6 @@
 # ChatGPT-Anbindung: Tunnel aktiv, Statusabfrage zurückgemeldet
 
-Stand der Prüfung: 17. Oktober 2026. Der private OpenAI-Tunnel läuft; Prozess, Health und Readiness wurden lokal geprüft. OpenAI hat Discovery-Anfragen über den Tunnel an KiraBridge weitergeleitet. Der Nutzer hat eine erfolgreiche Statusabfrage aus seinem ChatGPT-Chat mit Version 0.2.0, aktivem Dispatcher und erkannten Codex-/Grok-Programmen zurückgemeldet. Diese Antwort ist ein Nutzerbericht; sie wurde in der Entwicklungssitzung nicht als eigener ChatGPT-Toolaufruf empfangen. Gemeinsame Ende-zu-Ende-Tests von Aufgabenfreigabe, Ausführung und Ergebnisabruf aus ChatGPT stehen noch aus. Der [Betriebsnachweis](evidence/local-operation-2026-10-17.json) unterscheidet diese Belegarten.
+Stand der Prüfung: 17. Oktober 2026. Der private OpenAI-Tunnel läuft; Prozess, Health und Readiness wurden lokal geprüft. OpenAI hat Discovery-Anfragen über den Tunnel an KiraBridge weitergeleitet. Die lokalen Tunnel-Metriken bestätigen zusätzlich echte `tools/call`-Anfragen mit Transportstatus 200. Der Nutzer hat eine erfolgreiche Statusabfrage aus seinem ChatGPT-Chat mit Version 0.2.0, aktivem Dispatcher und erkannten Codex-/Grok-Programmen zurückgemeldet. Der genaue Inhalt dieser Antwort ist ein Nutzerbericht; die Metriken geben keinen einzelnen Werkzeugnamen oder dessen Ergebnis wieder. Gemeinsame Ende-zu-Ende-Tests von Aufgabenfreigabe, Ausführung und Ergebnisabruf aus ChatGPT stehen noch aus. Der [Betriebsnachweis](evidence/local-operation-2026-10-17.json) unterscheidet diese Belegarten und hält auch zwei Transportantworten mit Status 409 fest. Aus diesen wird kein Ausführungsstatus abgeleitet und kein Auftrag automatisch wiederholt.
 
 `bridge_health` gibt derzeit fest `chatgpt_integration="unverified"` aus; `kirabridge chatgpt status` gibt unabhängig von der gemessenen Tunnelbereitschaft `chatgpt_tool_call="unverified"` aus. Diese Felder erkennen einen durchgeführten Kontotest nicht automatisch und werden nicht allein aufgrund eines laufenden Tunnels auf Erfolg gesetzt.
 
@@ -29,7 +29,7 @@ Ein öffentlich erreichbarer HTTPS-Endpunkt ist eine alternative Infrastrukturen
 
 ## Ausstehender Integrationsnachweis
 
-1. Einen tatsächlichen Toolaufruf aus dem Zielchat unabhängig mit einem entsprechenden Ergebnisbeleg abgleichen. Der bisherige Statusaufruf wurde vom Nutzer zurückgemeldet; die Tunnelprotokolle bestätigen Discovery und Weiterleitung, enthalten aber keinen eindeutigen Methodennachweis für diesen einzelnen Statusaufruf.
+1. Einen tatsächlichen Toolaufruf aus dem Zielchat unabhängig mit einem entsprechenden Ergebnisbeleg abgleichen. Der bisherige Statusaufruf wurde vom Nutzer zurückgemeldet; die Tunnelprotokolle bestätigen Discovery und Weiterleitung und die Metriken belegen `tools/call`. Der konkrete Werkzeugname und das Ergebnis dieses einzelnen Aufrufs sind darin nicht enthalten.
 2. Einen einzelnen harmlosen Testauftrag aus ChatGPT anfordern, lokal freigeben und Empfang, Ausführung und Ergebnisabruf anhand derselben Task-ID prüfen.
 3. Unberechtigte Aufrufe und Principal-Trennung zusätzlich über die konkrete ChatGPT-Verbindung prüfen.
 4. Falls eine Mehrbenutzer-Anbindung gewünscht wird: Identity Provider auswählen, OAuth-Resource-Server-Integration implementieren und Tokenziel, Scopes, Ablauf und Erneuerung testen.

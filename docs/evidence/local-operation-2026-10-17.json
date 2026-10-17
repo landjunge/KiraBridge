@@ -99,12 +99,68 @@
       "reported_changes": false
     },
     "health_field_currently_fixed": "unverified",
-    "authenticated_dispatcher_readiness_probe": "passed"
+    "authenticated_dispatcher_readiness_probe": "passed",
+    "tunnel_metrics": {
+      "observed_at_utc": "2026-10-17T17:33:15.351964+00:00",
+      "source": "loopback tunnel-client /metrics",
+      "metric": "command_end_to_end_latency_milliseconds_count",
+      "requests": [
+        {
+          "method": "initialize",
+          "channel": "main",
+          "transport_status": "200",
+          "count": 11
+        },
+        {
+          "method": "server/discover",
+          "channel": "main",
+          "transport_status": "200",
+          "count": 5
+        },
+        {
+          "method": "tools/call",
+          "channel": "main",
+          "transport_status": "200",
+          "count": 7
+        },
+        {
+          "method": "tools/call",
+          "channel": "main",
+          "transport_status": "409",
+          "count": 2
+        },
+        {
+          "method": "tools/list",
+          "channel": "main",
+          "transport_status": "200",
+          "count": 1
+        },
+        {
+          "method": "notifications/initialized",
+          "channel": "main",
+          "transport_status": "200",
+          "count": 8
+        }
+      ],
+      "scope": "MCP method and HTTP transport response; individual tool name and semantic success are not exposed",
+      "latency_type": "enqueue_to_response",
+      "conflicts": "Two tools/call responses had transport status 409; no automatic execution retry was performed and semantic outcomes are not inferred from transport status."
+    }
   },
   "automated_validation": {
     "tests_passed": 79,
     "local_test_seconds": 18.89,
     "ruff": "passed",
-    "package_build": "passed"
+    "package_build": "passed",
+    "ci": {
+      "commit": "c259ffe58dae05f6767dd86ef4351fe73056652b",
+      "url": "https://github.com/landjunge/KiraBridge/actions/runs/39054163072",
+      "conclusion": "success",
+      "matrix": [
+        "ubuntu-24.04 / Python 3.11",
+        "ubuntu-24.04 / Python 3.13",
+        "macos-15 / Python 3.11"
+      ]
+    }
   }
 }
