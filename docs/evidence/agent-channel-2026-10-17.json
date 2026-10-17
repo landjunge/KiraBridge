@@ -217,7 +217,26 @@
       "Payload/queue/depth/conversation/provider-budget limits",
       "Finite two-turn exchange with no response loop",
       "Bounded parent context delivered to receiving agent"
-    ]
+    ],
+    "github_actions": {
+      "head_sha": "a6604198a15b7841d854b1d8b2078bfa19f42946",
+      "url": "https://github.com/landjunge/KiraBridge/actions/runs/39062642733",
+      "conclusion": "success",
+      "jobs": [
+        {
+          "name": "verify (ubuntu-24.04, 3.11)",
+          "conclusion": "success"
+        },
+        {
+          "name": "verify (ubuntu-24.04, 3.13)",
+          "conclusion": "success"
+        },
+        {
+          "name": "verify (macos-15, 3.11)",
+          "conclusion": "success"
+        }
+      ]
+    }
   },
   "tunnel_runtime": {
     "connected": true,
@@ -234,5 +253,6 @@
     "Provider completion cannot be guaranteed exactly once after a crash; unknown turns are not blindly retried.",
     "Existing MCP clients may need to reload their tool list; the authenticated CLI and automatic receivers are already active.",
     "The live test invoked exactly two agent turns through the already configured CLIs. No new API key, paid service, public endpoint or subscription was created."
-  ]
+  ],
+  "repository_visibility_verified": "PRIVATE"
 }
