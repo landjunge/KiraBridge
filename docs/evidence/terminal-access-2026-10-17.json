@@ -1,0 +1,189 @@
+{
+  "recorded_at": "2026-10-17T18:30:41.611715+00:00",
+  "project": "KiraBridge",
+  "version": "0.3.0",
+  "scope": "Targeted local configuration repair and one read-only terminal verification; no product code changes.",
+  "active_configuration": {
+    "path": "/Users/landjunge/.config/kirabridge/config.toml",
+    "source": "LaunchAgent com.kirabridge.bridge ProgramArguments --config",
+    "mode": "0o600",
+    "changed_principal": "chatgpt",
+    "added_executable": "/usr/bin/osascript",
+    "only_this_setting_changed": true,
+    "before_sha256": "4417616338ccdc3c3b188a2055b98691356bed9dfe49cac259f8a4fa1ba11fb4",
+    "after_sha256": "9b2f29cc3c6e22ac91297a286930aa48bc6a6797a542cef0bf4db38eb3dd275f",
+    "private_backup_created": true,
+    "capabilities_roots_agents_other_principals_unchanged": true
+  },
+  "original_failed_request": {
+    "id": "codex-terminal-read-20261017-2016",
+    "principal": "chatgpt",
+    "state": "failed",
+    "started": null,
+    "finished": 1792261141.0015638,
+    "error": {
+      "code": "executable_denied"
+    },
+    "evidence": {
+      "exception_type": "BridgeError",
+      "last_observation": {
+        "receipt_id": "cd1fb2c1-5803-4af2-9b1d-2746dbe78ee0",
+        "receiver": "kirabridge.dispatcher",
+        "worker": "f064470a-995a-4a6f-8754-09008418652a"
+      },
+      "safe_to_retry": true
+    },
+    "approval_audit": [
+      {
+        "kind": "task.approved",
+        "metadata": {
+          "operation": "terminal.execute",
+          "request_hash": "8651a3dacd8e6bc9271a9bf0b83ca25e32a84cf44c735f7d9c217576bba7b60e",
+          "source": "local_console"
+        }
+      }
+    ]
+  },
+  "existing_repair_request": {
+    "id": "codex-fix-terminal-access-20261017-2022",
+    "principal": "chatgpt",
+    "state": "completed",
+    "operation": "agent.execute",
+    "started": 1792261436.502829,
+    "finished": 1792261516.820724,
+    "evidence": {
+      "adapter": "codex",
+      "agent": "codex",
+      "exit_code": 0,
+      "session_id": "01a14b1b-2ab8-7380-917a-e7bf70c233bf",
+      "timed_out": false,
+      "turn_completed": true,
+      "turn_failed": false
+    },
+    "agent_turn_success": true,
+    "configuration_changed_by_this_agent_turn": false,
+    "outcome": "Cause diagnosed; read-only session could not save the correction. No duplicate repair agent was started."
+  },
+  "terminal_verification": {
+    "task_id": "codex-terminal-read-jxa-20261017-2029",
+    "principal": "chatgpt",
+    "parent_id": "codex-terminal-read-20261017-2016",
+    "state": "completed",
+    "started": 1792261735.8588018,
+    "finished": 1792261750.760149,
+    "attempt": 1,
+    "error": null,
+    "evidence": {
+      "exit_code": 0,
+      "pid": 57477,
+      "terminated": false,
+      "timed_out": false
+    },
+    "exit_code": 0,
+    "stderr": "",
+    "approval_required_verified": true,
+    "approval_replay_rejected": true,
+    "duplicate_request_did_not_execute": true,
+    "events": [
+      "created",
+      "queued",
+      "accepted",
+      "running",
+      "completed"
+    ],
+    "terminal_text_returned": false,
+    "terminal_read": {
+      "terminal_running": true,
+      "matched_tabs": 1,
+      "content_read": true,
+      "tabs": [
+        {
+          "tty": "/dev/ttys000",
+          "characters_read": 893,
+          "truncated": false
+        }
+      ],
+      "read_limit_per_tab": 12000,
+      "total_read_limit": 48000,
+      "window_count": 2,
+      "characters_read": 893,
+      "terminal_text_returned": false
+    },
+    "transport": "New local MCP stdio proxy as chatgpt -> authenticated Streamable HTTP -> existing bridge dispatcher",
+    "approval_source": "local_operator_authorized_terminal_access_repair",
+    "local_operator_authority": "Explicit user instruction to repair and verify the read-only terminal access",
+    "script_language": "JavaScript for Automation",
+    "raw_terminal_contents_persisted": false,
+    "selection": "Only Terminal tabs whose custom title or process name contains codex; no claim about active agent work."
+  },
+  "preservation": {
+    "preexisting_task_count": 12,
+    "preexisting_tasks_unchanged": true,
+    "agent_processes": {
+      "codex": {
+        "before": [
+          34179,
+          53477
+        ],
+        "still_alive": [
+          34179,
+          53477
+        ]
+      },
+      "grok": {
+        "before": [
+          45185
+        ],
+        "still_alive": [
+          45185
+        ]
+      }
+    },
+    "main_bridge_service_restarted_only_when_idle": true,
+    "existing_agent_processes_and_sessions_not_restarted": true,
+    "tunnel_runtime_not_restarted": true,
+    "additional_agent_or_model_calls": 0
+  },
+  "security": {
+    "unauthenticated_http_status": 401,
+    "exact_task_approval_required_verified": true,
+    "approval_replay_rejected": true,
+    "duplicate_request_did_not_execute": true,
+    "audit": {
+      "valid": true,
+      "records": 73,
+      "head": "28679c1eb2310875718250bfbd20fd2393508127b9865220d76b57032e810fff"
+    },
+    "network_bind": "127.0.0.1:8765",
+    "public_deployment": false
+  },
+  "language_probes": [
+    {
+      "language": "AppleScript",
+      "exit_code": 1,
+      "stderr": "osascript: no such component \"AppleScript\".",
+      "probe_ok": false
+    },
+    {
+      "language": "JavaScript",
+      "exit_code": 0,
+      "stderr": "",
+      "probe_ok": true
+    }
+  ],
+  "tunnel_runtime": {
+    "connected": true,
+    "runtime_evidence": {
+      "healthy": true,
+      "process_running": true,
+      "ready": true
+    },
+    "chatgpt_tool_call": "unverified"
+  },
+  "limits": [
+    "AppleScript component is unavailable; the original AppleScript command was not rerun or silently rewritten. Use an explicitly approved JavaScript for Automation script.",
+    "This verification used a local MCP client with principal chatgpt. An additional end-to-end tool call from a ChatGPT conversation was not performed.",
+    "A matching Codex terminal tab does not prove an active agent task.",
+    "No macOS automation permission error occurred for the verified read."
+  ]
+}
