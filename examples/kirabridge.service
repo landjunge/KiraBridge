@@ -1,0 +1,16 @@
+[Unit]
+Description=KiraBridge private MCP bridge
+After=network.target
+
+[Service]
+Type=simple
+UMask=0077
+EnvironmentFile=%h/.config/kirabridge/secrets.env
+ExecStart=/absolute/path/to/KiraBridge/.venv/bin/kirabridge --config /absolute/path/to/config.local.toml serve --transport http
+Restart=on-failure
+RestartSec=3
+TimeoutStopSec=15
+NoNewPrivileges=true
+
+[Install]
+WantedBy=default.target

@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "kirabridge": {
+      "command": "/absolute/path/to/KiraBridge/.venv/bin/kirabridge",
+      "args": ["--config", "/absolute/path/to/config.local.toml", "serve"]
+    }
+  }
+}

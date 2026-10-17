@@ -1,0 +1,274 @@
+from __future__ import annotations
+
+import asyncio
+import time
+import uuid
+from typing import Awaitable, Callable
+
+from kirabridge.bridge_core.config import Config
+from kirabridge.bridge_core.models import (
+    BridgeError,
+    State,
+    TaskRequest,
+    UncertainExecution,
+    canonical,
+    digest,
+)
+from kirabridge.platform_adapters import RuntimeLock
+from kirabridge.security_manager import SecurityManager, request_hash
+from kirabridge.task_manager.store import Store
+
+Executor = Callable[[dict, Callable, Callable], Awaitable[dict]]
+
+
+class TaskManager:
+    def __init__(self, config: Config, store: Store, security: SecurityManager, executor: Executor):
+        self.config, self.store, self.security, self.executor = config, store, security, executor
+        self.owner = str(uuid.uuid4())
+        self.lock = RuntimeLock(config.state_path / "dispatcher.lock.runtime")
+        self.workers: list[asyncio.Task] = []
+        self.wake = asyncio.Event()
+
+    def enqueue(
+        self, principal: str, request: TaskRequest, approval: str, *, attempt: int = 1
+    ) -> dict:
+        self.security.principal(principal, request.operation)
+        if request.api_version != "1":
+            raise BridgeError("api_version", "Unsupported API version")
+        if len(canonical(request.model_dump()).encode()) > self.config.max_task_bytes:
+            raise BridgeError("payload_limit", "Task exceeds configured byte limit")
+        with self.store.transaction():
+            existing = self.store.db.execute(
+                "SELECT id,request_hash FROM tasks WHERE principal=? AND idem=?",
+                (principal, request.idempotency_key),
+            ).fetchone()
+            if existing:
+                if existing["request_hash"] != request_hash(request):
+                    raise BridgeError(
+                        "idempotency_conflict", "Idempotency key belongs to a different request"
+                    )
+                return self.store.get(existing["id"], principal)
+            if self.store.db.execute(
+                "SELECT 1 FROM tasks WHERE id=?", (request.task_id,)
+            ).fetchone():
+                raise BridgeError("task_id_conflict", "Task identifier is already reserved")
+            count = self.store.db.execute(
+                "SELECT COUNT(*) FROM tasks WHERE state='queued'"
+            ).fetchone()[0]
+            if count >= self.config.max_queued:
+                raise BridgeError("queue_full", "Queue capacity reached")
+            if request.parent_id:
+                parent = self.store.get(request.parent_id, principal)
+                depth = 1
+                while parent["parent_id"]:
+                    depth += 1
+                    if depth > 32:
+                        raise BridgeError("delegation_limit", "Delegation chain exceeds 32 tasks")
+                    parent = self.store.get(parent["parent_id"], principal)
+            self.security.consume(principal, request, approval)
+            now = time.time()
+            self.store.db.execute(
+                "INSERT INTO tasks(id,principal,idem,request_hash,operation,args,agent,parent_id,"
+                "state,created,updated,attempt) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)",
+                (
+                    request.task_id,
+                    principal,
+                    request.idempotency_key,
+                    request_hash(request),
+                    request.operation,
+                    canonical(request.arguments),
+                    request.arguments.get("agent")
+                    if request.operation == "agent.execute"
+                    else None,
+                    request.parent_id,
+                    State.QUEUED,
+                    now,
+                    now,
+                    attempt,
+                ),
+            )
+            for state in (State.CREATED, State.QUEUED):
+                self.store.db.execute(
+                    "INSERT INTO events(task_id,at,state,evidence) VALUES(?,?,?,?)",
+                    (request.task_id, now, state, '{"persisted":true}'),
+                )
+            self.store.audit(
+                "task.queued",
+                principal,
+                request.task_id,
+                {"operation": request.operation, "request_hash": request_hash(request)},
+            )
+        self.wake.set()
+        return self.store.get(request.task_id, principal)
+
+    async def start(self) -> None:
+        if self.workers:
+            return
+        self.lock.acquire()
+        try:
+            self.store.recover()
+            self.workers = [
+                asyncio.create_task(self._worker(False)) for _ in range(self.config.concurrency)
+            ]
+            # Cancellation stays reachable when all execution slots are occupied.
+            self.workers.append(asyncio.create_task(self._worker(True)))
+        except BaseException:
+            self.lock.release()
+            raise
+
+    async def stop(self) -> None:
+        for worker in self.workers:
+            worker.cancel()
+        await asyncio.gather(*self.workers, return_exceptions=True)
+        self.workers.clear()
+        self.lock.release()
+
+    async def _heartbeat(self, task_id: str) -> None:
+        while True:
+            await asyncio.sleep(self.config.lease_seconds / 3)
+            self.store.db.execute(
+                "UPDATE tasks SET lease_until=? WHERE id=? AND lease_owner=? "
+                "AND state IN ('accepted','running')",
+                (time.time() + self.config.lease_seconds, task_id, self.owner),
+            )
+
+    async def _worker(self, control: bool) -> None:
+        while True:
+            self.wake.clear()
+            task = self.store.claim(self.owner, self.config.lease_seconds, control)
+            if task is None:
+                try:
+                    await asyncio.wait_for(self.wake.wait(), 2.0)
+                except TimeoutError:
+                    pass
+                continue
+            await self._execute(task)
+
+    async def _execute(self, task: dict) -> None:
+        heartbeat = asyncio.create_task(self._heartbeat(task["id"]))
+        observed_effect = False
+        progress_count = 0
+
+        async def running(evidence):
+            nonlocal observed_effect
+            observed_effect = True
+            self.store.transition(task["id"], State.RUNNING, evidence, owner=self.owner)
+
+        async def progress(evidence):
+            nonlocal observed_effect, progress_count
+            observed_effect = True
+            progress_count += 1
+            if progress_count > 256:
+                raise UncertainExecution("progress_limit", "Task progress event limit reached")
+            with self.store.transaction():
+                now = time.time()
+                self.store.db.execute(
+                    "UPDATE tasks SET evidence=?,updated=? WHERE id=? AND lease_owner=?",
+                    (canonical(evidence), now, task["id"], self.owner),
+                )
+                self.store.db.execute(
+                    "INSERT INTO events(task_id,at,state,evidence) VALUES(?,?,?,?)",
+                    (task["id"], now, self.store.get(task["id"])["state"], canonical(evidence)),
+                )
+                self.store.audit(
+                    "task.progress",
+                    task["principal"],
+                    task["id"],
+                    {"evidence_hash": digest(evidence)},
+                )
+
+        try:
+            # Revalidate policy at dispatch time (config or grants may have changed).
+            self.security.principal(task["principal"], task["operation"])
+            result = await self.executor(task, running, progress)
+            state = State.COMPLETED if result.get("success", True) else State.FAILED
+            self.store.transition(
+                task["id"],
+                state,
+                result.get("evidence", {"operation_returned": True}),
+                result=result,
+                owner=self.owner,
+            )
+        except asyncio.CancelledError:
+            self.store.transition(
+                task["id"],
+                State.UNKNOWN,
+                {
+                    "reason": "dispatcher_shutdown",
+                    "side_effect_possible": observed_effect,
+                    "last_observation": self.store.get(task["id"])["evidence"],
+                },
+                owner=self.owner,
+            )
+            raise
+        except Exception as exc:
+            state = (
+                State.UNKNOWN
+                if observed_effect or isinstance(exc, UncertainExecution)
+                else State.FAILED
+            )
+            # Exception text from subprocesses, HTTP and validation may include secrets.
+            code = exc.code if isinstance(exc, BridgeError) else "execution_error"
+            self.store.transition(
+                task["id"],
+                state,
+                {
+                    "exception_type": type(exc).__name__,
+                    "safe_to_retry": state == State.FAILED and not observed_effect,
+                    "last_observation": self.store.get(task["id"])["evidence"],
+                },
+                error={"code": code},
+                owner=self.owner,
+            )
+        finally:
+            heartbeat.cancel()
+            await asyncio.gather(heartbeat, return_exceptions=True)
+
+    def cancel_queued(self, principal: str, task_id: str) -> dict:
+        self.security.principal(principal, "task.cancel")
+        task = self.store.get(task_id, principal)
+        if task["state"] != State.QUEUED:
+            raise BridgeError("state_conflict", "Only queued tasks can be cancelled here")
+        self.store.transition(task_id, State.CANCELLED, {"cancelled_by_owner": True})
+        return self.store.get(task_id, principal)
+
+    def reconcile(self, task_id: str, state: State, reference: str) -> dict:
+        if state not in {State.COMPLETED, State.FAILED, State.CANCELLED} or not reference.strip():
+            raise BridgeError(
+                "reconciliation", "A terminal state and evidence reference are required"
+            )
+        if self.store.get(task_id)["state"] != State.UNKNOWN:
+            raise BridgeError("state_conflict", "Only unknown tasks require reconciliation")
+        self.store.transition(
+            task_id, state, {"source": "local_operator_attestation", "reference": reference}
+        )
+        return self.store.get(task_id)
+
+    def retry(self, principal: str, original_id: str, request: TaskRequest, approval: str) -> dict:
+        original = self.store.get(original_id, principal)
+        if original["state"] != State.FAILED or not original["evidence"].get("safe_to_retry"):
+            raise BridgeError("unsafe_retry", "Retry requires proof that execution never started")
+        if original["attempt"] >= 3:
+            raise BridgeError("retry_limit", "At most three attempts are allowed")
+        if (
+            request.operation != original["operation"]
+            or request.arguments != original["args"]
+            or request.parent_id != original_id
+        ):
+            raise BridgeError(
+                "retry_conflict", "Retry must preserve operation/arguments and link its parent"
+            )
+        return self.enqueue(principal, request, approval, attempt=original["attempt"] + 1)
+
+    async def wait(self, principal: str, task_id: str, timeout: float = 30) -> dict:
+        async with asyncio.timeout(timeout):
+            while True:
+                task = self.store.get(task_id, principal)
+                if task["state"] not in {
+                    State.CREATED,
+                    State.QUEUED,
+                    State.ACCEPTED,
+                    State.RUNNING,
+                }:
+                    return task
+                await asyncio.sleep(0.05)

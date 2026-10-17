@@ -1,0 +1,38 @@
+# Copy to a private local file. Use existing canonical absolute workspace/binary paths.
+data_dir = "/absolute/path/to/private/kirabridge-state"
+host = "127.0.0.1"
+port = 8765
+concurrency = 2
+max_queued = 1000
+allow_remote = false
+
+[principals.local]
+capabilities = [
+  "bridge.health", "task.read", "task.cancel", "agent.inspect",
+  "terminal.execute", "file.read", "file.list", "file.write", "file.mkdir", "file.move",
+  "clipboard.info", "clipboard.read", "clipboard.write",
+  "process.list", "process.inspect", "process.terminate", "agent.execute",
+]
+roots = ["/absolute/path/to/workspace"]
+executables = ["/absolute/path/to/approved/executable"]
+agents = ["codex", "grok"]
+token_env = "KIRABRIDGE_TOKEN"
+
+# file.delete is deliberately absent: enable only for individually approved deletions.
+# More HTTP principals can have independent roots/capabilities and unique token_env values.
+# No wildcard capabilities or executable wildcards are supported.
+
+[agents.codex]
+kind = "codex"
+executable = "/absolute/path/to/codex"
+
+[agents.grok]
+kind = "grok_acp"
+executable = "/absolute/path/to/grok"
+
+# Alternatively, configure a separate text-only Grok API identity:
+# [agents.grok_text]
+# kind = "grok_api"
+# model = "your-approved-provider-model-id"
+# api_key_env = "XAI_API_KEY"
+

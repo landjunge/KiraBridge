@@ -1,45 +1,97 @@
 # KiraBridge
 
-Private, modular local desktop and multi-agent bridge. **Status: specification only; no implementation or agent assignment has been launched.**
+Privates, modulares Desktop- und Agenten-Gateway für macOS und Linux. Python 3.11+, asyncio, SQLite und das offizielle MCP Python SDK. Version **0.1.0** implementiert den Kern des [verbindlichen Entwicklungsplans](docs/DEVELOPMENT_PLAN.md).
 
-## Goal
+## Implementiert
 
-Provide secure local file, terminal and process capabilities to multiple authorized agent systems through interchangeable adapters and multiple MCP connections, without relying on Desktop Commander quotas. The ChatGPT connector requires separate supported integration and cannot be assumed operational.
+- Alle elf Module: `bridge_core`, `task_manager`, `agent_manager`, `mcp_gateway`, `terminal_manager`, `filesystem_manager`, `clipboard_manager`, `process_manager`, `security_manager`, `platform_adapters`, `audit_manager`.
+- Dauerhafte SQLite-WAL-Warteschlange mit atomarer Freigabeprüfung, Aufgaben- und Empfangs-IDs, Idempotenz, Delegationsketten, Leases, Ereignissen und nachvollziehbarer Wiederherstellung.
+- Getrennte Zustände für Empfang, laufende Ausführung und belegten Abschluss. Nach einem Dispatcher-Abbruch bleiben möglicherweise ausgeführte Aufträge `unknown`; sie werden nicht erneut gestartet.
+- Codex CLI mit JSONL-Nachweisen; Grok Build über ACP v1; zusätzlicher Grok-API-Adapter für reine Textantworten. Agentenidentitäten und Sitzungen bleiben getrennt.
+- Terminal mit expliziten ausführbaren Dateien, Arbeitsverzeichnisprüfung, begrenzter Ausgabe, Zeitlimits und Beendigung eigener Prozessgruppen. Kein implizites `shell=True`.
+- Dateioperationen mit POSIX-Dateideskriptoren und Schutz gegen Symlink-Pfadausbrüche; atomisches Schreiben; kein rekursives Löschen.
+- Unicode-Zwischenablage mit `pbcopy`/`pbpaste`, Wayland oder X11; einmalige Lesefreigaben und Schreibbestätigung durch sofortiges Rücklesen. Keine Überwachung.
+- MCP über stdio und Streamable HTTP; authentifizierte parallele HTTP-Clients; ausgehender MCP-Clientpool mit getrennten Verbindungen.
+- Rollenrechte, konkrete einmalige Aufgabenfreigaben, Replay-Schutz, standardmäßig Loopback, TLS-Pflicht für andere Bindungen und verkettetes Audit-Protokoll ohne Befehlsinhalte oder Zugangsdaten.
 
-## Architecture
+**Nachweisgrenzen:** Agentenprotokolle werden mit kontrollierten Gegenstellen getestet. Ein erfolgreicher echter Codex-/Grok-Providerauftrag oder eine ChatGPT-Anbindung wird damit nicht behauptet. Windows hat definierte Erweiterungspunkte, noch keinen ausführbaren nativen Adapter. Bilder, Datei-Clipboard, PTY/interactive stdin, A2A und die optionalen externen Integrationen sind Erweiterungen; siehe [Status](docs/STATUS.md).
 
-- **Core:** Python asyncio orchestration; versioned interfaces and structured errors.
-- **Task Manager:** SQLite WAL, durable jobs, idempotency keys, leases, acknowledgements, status reconciliation and crash recovery. Unknown is never silently treated as completed or retried.
-- **Agent adapters:** Codex and Grok first; extensible to other agent CLIs and A2A peers. Distinguish daemon presence, agent session, actual task and verified result.
-- **Protocol adapters:** MCP stdio and Streamable HTTP; separate transport from authorization and execution. SSH is an optional transport for remote hosts, not a blanket command authorization.
-- **System tools:** scoped file reads/writes, process inspection, bounded terminal execution; explicit permissions for mutating or destructive actions.
-- **Security:** local-only by default, authenticated remote access, least privilege, capability-scoped approvals, replay protection, redacted logs and auditable task receipts. No credentials in logs.
-- **Integrations:** ThreadDesk for coordination, Agent Authority for evidence/authority, Tollgate for budgets, each optional and independent.
+## Lokal beginnen
 
-## Delivery sequence
+```sh
+uv sync --locked
+mkdir -p demo-workspace
+uv run kirabridge init config.local.toml --workspace "$PWD/demo-workspace"
+```
 
-1. **Foundation:** package structure, configuration, typed API, SQLite schema/migrations, crash-safe durable task records.
-2. **Reliable dispatch:** receipt IDs, idempotency, state machine (`created`, `queued`, `accepted`, `running`, `completed`, `failed`, `blocked`, `unknown`), reconciliation after interruption; never blindly re-run a possibly executed command.
-3. **Agent adapters:** Codex/Grok integration and evidence-based state detection; distinguish tool/session completion from whole project completion.
-4. **Desktop tools:** path-scoped file operations, safe subprocess execution, bounded output, cancellation, timeouts, process inspection.
-5. **MCP connectivity:** local MCP server/client support and multiple concurrent connections; authenticate and scope every tool call. Add remote HTTPS transport only after threat review.
-6. **Cross-platform and integrations:** macOS first (older iMac resource budget), then Linux and Windows; optional A2A, SSH, ThreadDesk/Agent Authority/Tollgate.
+`init` erstellt eine neue Konfiguration mit Modus 0600 und wenigen Rechten. Es ersetzt keine vorhandene Datei. Ohne Konfiguration sind nur Health- und eigene Statusabfragen freigegeben.
 
-## Acceptance criteria
+Eine konkrete Datei `request.json` anlegen; `path` muss dem absoluten Workspace-Pfad aus `config.local.toml` entsprechen:
 
-- A task is durably stored before dispatch, received by the intended adapter and acknowledged with traceable evidence.
-- Disconnects and restarts preserve state without accidental duplicate execution.
-- Status distinguishes `unknown` from `running` and `completed` with evidence and timestamps.
-- Unauthenticated and unauthorized tool calls fail closed; destructive actions require specific approval.
-- Multiple independent MCP clients and agent adapters cannot cross task or authorization boundaries.
-- Targeted tests cover failure recovery, idempotency, authorization and protocol interoperability.
+```json
+{
+  "api_version": "1",
+  "task_id": "list-1",
+  "operation": "file.list",
+  "arguments": {"path": "/absolute/path/to/demo-workspace"},
+  "idempotency_key": "list-1",
+  "parent_id": null
+}
+```
 
-## Work division (not yet dispatched)
+Den Auftrag lokal ausdrücklich freigeben und ausführen:
 
-**Codex:** implement foundation, task lifecycle, adapters, desktop tools and MCP interfaces in isolated increments; document actual test results and remaining blockers.
+```sh
+uv run kirabridge --config config.local.toml run request.json --approve
+uv run kirabridge --config config.local.toml task list-1
+uv run kirabridge --config config.local.toml tasks --state completed
+uv run kirabridge --config config.local.toml audit
+```
 
-**Grok:** independently review architecture, threat model, crash/idempotency cases, multi-protocol interoperability and Codex evidence; report actionable findings without rewriting historical results.
+Die erneute Einreichung derselben Anfrage liefert denselben Auftrag zurück. Eine neue ID ist ein neuer Auftrag und benötigt eine neue Freigabe. CLI-Rückgabecodes: 0 abgeschlossener Auftrag, 1 Anfrage-/Konfigurationsfehler, 2 fehlgeschlagen/abgebrochen, 3 unbekannter Ausgang.
 
-## Operating constraints
+## MCP verwenden
 
-Keep the repository private. Do not alter existing Agent Authority, ThreadDesk, Tollgate or Help Center projects, publish a service, deploy to production, stop existing agents or grant external access without explicit authorization. Minimize tests but never omit necessary safety checks. Keep source and review evidence versioned.
+```sh
+uv run kirabridge --config config.local.toml serve
+```
+
+Ein MCP-Client startet diesen Befehl mit stdio; siehe [Client-Konfiguration](examples/mcp-client.json). stdout bleibt dem MCP-Protokoll vorbehalten. Ein Dispatcher besitzt exklusiv sein Zustandsverzeichnis. Für mehrere Clients mit derselben Warteschlange wird ein HTTP-Dispatcher verwendet.
+
+Für HTTP eine eindeutige Umgebungsvariable `token_env` je Principal konfigurieren, einen zufälligen Token mit mindestens 32 Zeichen im lokalen Secret Store hinterlegen und im Prozess bereitstellen. Dann:
+
+```sh
+uv run kirabridge --config config.local.toml serve --transport http
+```
+
+Endpunkt standardmäßig `http://127.0.0.1:8765/mcp`, Header `Authorization: Bearer …`. Fernbindung erfordert `allow_remote`, Zertifikat, privaten Schlüssel und passende `allowed_hosts`/`allowed_origins`. Eine Fernfreigabe oder Veröffentlichung wurde nicht vorgenommen.
+
+Werkzeuge: `bridge_health`, `operation_catalog`, `task_submit`, `task_get`, `task_list`, `task_events`, `task_cancel`, `agent_inventory`, `clipboard_read`, `clipboard_write`, `clipboard_info`.
+
+Für Ausführungs- und Leseaufträge stellt ein lokaler Bediener eine Freigabe für die **exakte Anfrage** aus:
+
+```sh
+uv run kirabridge --config config.local.toml grant request.json
+```
+
+Den ausgegebenen Token über einen privaten Kanal an den berechtigten Client geben. Kein MCP-Werkzeug kann Freigaben ausstellen oder Rechte erweitern. `task_submit` nimmt `request` und `approval` entgegen. Die Ausgabe quittiert zunächst die Speicherung; den Ausführungsnachweis liefern `task_get` und `task_events`.
+
+## Prüfen und erweitern
+
+```sh
+uv run ruff check .
+uv run ruff format --check .
+uv run pytest -q -W error::pytest.PytestUnraisableExceptionWarning
+uv build
+uv run python scripts/benchmark_idle.py --seconds 5
+```
+
+Tests nutzen temporäre Dateien, eigene Testprozesse und simulierte Agenten. Sie lesen keine persönliche Zwischenablage und führen keine kostenpflichtigen Provideraufträge aus. GitHub CI prüft macOS sowie Linux mit Python 3.11/3.13.
+
+- [Architektur und stabile Schnittstellen](docs/ARCHITECTURE.md)
+- [Berechtigungen und Bedrohungsmodell](docs/SECURITY.md)
+- [Betrieb, Wiederherstellung und Agentenkonfiguration](docs/OPERATIONS.md)
+- [ChatGPT-Anbindung: tatsächliche Anforderungen](docs/CHATGPT.md)
+- [Abnahmestand und Testnachweise](docs/STATUS.md)
+
+Alle Rechte verbleiben beim Repository-Inhaber; das Repository bleibt privat.

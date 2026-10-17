@@ -1,0 +1,8 @@
+{
+  "api_version": "1",
+  "task_id": "list-workspace-1",
+  "operation": "file.list",
+  "arguments": { "path": "/absolute/path/to/workspace" },
+  "idempotency_key": "list-workspace-1",
+  "parent_id": null
+}
