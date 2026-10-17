@@ -100,6 +100,7 @@ class CodexAdapter:
             "--ignore-user-config",
             "--ignore-rules",
             "--json",
+            "--skip-git-repo-check",
             "--sandbox",
             "read-only",
             "-c",
@@ -251,6 +252,7 @@ class GrokACPAdapter:
             "--deny",
             "WebSearch",
             "agent",
+            "--no-leader",
             "stdio",
         ]
         if config.model:

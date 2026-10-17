@@ -38,6 +38,7 @@ class Config(BaseModel):
     host: str = "127.0.0.1"
     port: int = Field(default=8765, ge=1, le=65535)
     allow_remote: bool = False
+    credentials_file: str | None = None
     tls_cert: str | None = None
     tls_key: str | None = None
     allowed_hosts: list[str] = Field(default_factory=lambda: ["localhost", "127.0.0.1", "[::1]"])
@@ -71,6 +72,9 @@ class Config(BaseModel):
 
 def load_config(path: str | None = None) -> Config:
     path = path or os.environ.get("KIRABRIDGE_CONFIG")
+    default = Path.home() / ".config/kirabridge/config.toml"
+    if path is None and default.is_file():
+        path = str(default)
     if path:
         with open(path, "rb") as source:
             return Config.model_validate(tomllib.load(source))

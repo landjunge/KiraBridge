@@ -31,7 +31,7 @@ class State(StrEnum):
 
 
 TRANSITIONS = {
-    State.CREATED: {State.QUEUED},
+    State.CREATED: {State.QUEUED, State.CANCELLED},
     State.QUEUED: {State.ACCEPTED, State.CANCELLED, State.BLOCKED},
     State.ACCEPTED: {State.RUNNING, State.FAILED, State.UNKNOWN, State.CANCELLED},
     State.RUNNING: {State.COMPLETED, State.FAILED, State.UNKNOWN, State.CANCELLED},

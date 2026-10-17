@@ -1,4 +1,18 @@
-# Betrieb und Wiederherstellung
+# Eingerichteter Betrieb ab 0.2.0
+
+Auf dem Ziel-Mac wurden `kirabridge setup` und `kirabridge service install` ausgeführt. Der Dienst `com.kirabridge.bridge` läuft unter dem angemeldeten Benutzer und startet nach einem Fehler automatisch neu. Er bindet ausschließlich an `127.0.0.1:8765`; jede HTTP-Anfrage benötigt Authentifizierung.
+
+Standarddateien: `~/.config/kirabridge/config.toml` (0600), `credentials.json` daneben (0600), Zustandsverzeichnis `~/.local/share/kirabridge` (0700), Arbeitsbereich `~/workspace/KiraBridge`. `local`, `codex` und `grok` haben getrennte Bearer-Identitäten. Agenten-MCP-Konfigurationen enthalten nur `kirabridge --principal NAME connect`, keine Token. Der Proxy verwendet den vorhandenen gemeinsamen Dispatcher.
+
+`kirabridge status` fragt den laufenden Dienst ab. `ls`, `read`, `write`, `exec`, `ask` und `clipboard` sind lokale Komfortbefehle. Sie geben für den konkret vom lokalen Bediener gewählten Inhalt eine auftragsgebundene Freigabe und warten auf den tatsächlichen Ausgang. Bestehende Dateiinhalte werden nur mit `write --overwrite` ersetzt. Zusätzliche Verzeichnisse werden ausdrücklich in der privaten Konfiguration freigegeben.
+
+MCP-Clients können statt des Token-Austauschs `task_request` nutzen. Diese Anfrage wird dauerhaft als `created` gespeichert und benötigt keine vorgetäuschte Empfangs- oder Ausführungsbestätigung. Der Bediener prüft `kirabridge pending` und entscheidet mit `kirabridge approve TASK_ID` oder `kirabridge deny TASK_ID`. Der Server bietet kein Tool zur Selbstfreigabe an. Pending-Anfragen zählen zur Queue-Quote und bleiben nach einem Neustart ungeprüft.
+
+Echte Codex- und Grok-Aufträge, Codex als nativer MCP-Client, Groks MCP-Doctor sowie ein realer launchd-Neustart wurden geprüft; siehe [Betriebsnachweis](evidence/local-operation-2026-10-17.json).
+
+Die folgende Referenz beschreibt zusätzlich manuelle Konfiguration und Betrieb auf weiteren Rechnern. Die Beispiel-Service-Dateien werden dadurch nicht automatisch auf anderen Rechnern installiert.
+
+# Referenz: Betrieb und Wiederherstellung
 
 ## Konfiguration
 
@@ -8,7 +22,7 @@ Terminal- und Agentenrechte sind mächtig: siehe [Vertrauensgrenzen](SECURITY.md
 
 Codex wird als absoluter CLI-Pfad konfiguriert. Der Adapter nutzt `exec --json`, stdin für Prompts, `--ignore-user-config`, `--ignore-rules` und `--sandbox read-only`. Grok Build nutzt `agent stdio` mit ACP v1; clientseitige Datei-/Terminalfähigkeiten werden nicht angeboten, Rechteanfragen abgelehnt und Subagenten deaktiviert. Vorhandene eigene CLI-Authentifizierung wird ausschließlich durch die entsprechende CLI verwendet. Alternativ benötigt `grok_api` eine explizite Modell-ID und eine Umgebungsvariable für den xAI-Schlüssel; dieser Adapter liefert Text und führt keine lokalen Tools aus.
 
-CLI-Flags und Protokolle können sich ändern. Ein unbekanntes Ereignis darf nicht zu erfundenem Erfolg führen. Nach einem CLI-Upgrade müssen die Adapter-Smokes mit dem freigegebenen Providerkonto separat nachgewiesen werden. Die automatischen Tests verursachen keine Provideraufrufe.
+CLI-Flags und Protokolle können sich ändern. Ein unbekanntes Ereignis darf nicht zu erfundenem Erfolg führen. Nach einem CLI-Upgrade müssen die Adapter-Smokes mit dem freigegebenen Providerkonto separat nachgewiesen werden. Die automatischen Tests verursachen keine Provideraufrufe. Die getrennten manuellen Betriebsprüfungen auf diesem Mac sind im Nachweis dokumentiert.
 
 ## Genehmigen und einreichen
 
@@ -49,7 +63,7 @@ Maximal drei Versuche pro Retry-Kette. Ein Exitcode ungleich null beweist keine 
 
 [launchd](../examples/com.kirabridge.bridge.plist) und [systemd](../examples/kirabridge.service) sind nicht installierte Vorlagen für automatischen Dienstneustart. Absolute Pfade und die lokale Secret-Bereitstellung müssen eingesetzt werden. Der macOS-Wrapper erwartet den vorhandenen Keychain-Dienst `KiraBridge`, Account `local`, mit einem starken Token und `token_env="KIRABRIDGE_TOKEN"` in der Konfiguration. Der Token wird nicht als Prozessargument weitergegeben. Für Linux gehört `secrets.env` ausschließlich dem Dienstkonto und hat Modus 0600; eine grafische Clipboard-Sitzung muss ausdrücklich erreichbar sein.
 
-Nur ein Dispatcher pro Datenverzeichnis; mehrere MCP-HTTP-Clients teilen denselben Dispatcher. Separate stdio-Prozesse benötigen eigene Zustandsverzeichnisse. `doctor` meldet Schema, Auditstatus und konfigurierte Identitäten, nicht erfundene aktive Agenten.
+Nur ein Dispatcher pro Datenverzeichnis; mehrere MCP-HTTP-Clients teilen denselben Dispatcher. Separate stdio-Prozesse benötigen eigene Zustandsverzeichnisse. `doctor` meldet Schema, Auditstatus und konfigurierte Identitäten, nicht erfundene aktive Agenten. `status` fragt dagegen den laufenden Dispatcher tatsächlich über MCP ab.
 
 Vor Sicherungen den Dienst kontrolliert stoppen oder die SQLite-Backup-API verwenden; eine einzelne Kopie der Datenbank bei aktivem WAL ist keine vollständige Sicherung. Es wird keine automatische Löschung historischer Aufgaben vorgenommen. Die Queue ist in der Anzahl begrenzt, historische Daten benötigen langfristig einen administrativen Archivierungsplan. Parallelität auf dem älteren iMac kann auf `concurrency=1` gesetzt werden.
 

@@ -1,0 +1,89 @@
+{
+  "date": "2026-10-17",
+  "platform": "macOS 15.7.4 x86_64",
+  "daemon": {
+    "label": "com.kirabridge.bridge",
+    "endpoint": "http://127.0.0.1:8765/mcp",
+    "autostart_installed": true,
+    "health_version_after_update": "0.2.0",
+    "unauthenticated_request_http_status": 401,
+    "config_mode": "0600",
+    "credentials_mode": "0600",
+    "state_directory_mode": "0700"
+  },
+  "live_agent_turns": [
+    {
+      "agent": "codex",
+      "cli_version": "0.163.0",
+      "task_id": "local-06bc190f3f474e439b2b2a4d5600a145",
+      "session_id": "01a14aae-2ab6-7580-b4fa-5d11bc51cc6a",
+      "state": "completed",
+      "exit_code": 0,
+      "turn_completed": true,
+      "result": "KIRABRIDGE_CODEX_OK",
+      "project_completion_verified": false
+    },
+    {
+      "agent": "grok",
+      "cli_version": "1.0.50",
+      "task_id": "local-6615308b8cb4483f9031dc9995ba0d75",
+      "session_id": "01a14aaf-0023-7cc1-bf68-5b72531cebdd",
+      "state": "completed",
+      "stop_reason": "end_turn",
+      "result": "KIRABRIDGE_GROK_OK",
+      "project_completion_verified": false
+    }
+  ],
+  "native_mcp_clients": {
+    "codex": {
+      "registered": true,
+      "server": "kirabridge",
+      "tool": "bridge_health",
+      "tool_status": "completed",
+      "turn_completed": true,
+      "result": "KIRABRIDGE_MCP_CODEX_OK"
+    },
+    "grok": {
+      "registered": true,
+      "doctor_healthy": true,
+      "protocol": "2025-11-25",
+      "tools_discovered": 12,
+      "agent_after_registration": {
+        "task_id": "local-d5fc9a8471bc4890a8a8f1fc68eb3144",
+        "session_id": "01a14ab8-b516-7932-83f8-948ab7499512",
+        "state": "completed",
+        "stop_reason": "end_turn",
+        "result": "KIRABRIDGE_GROK_WIRING_OK"
+      }
+    }
+  },
+  "recovery_and_approval": {
+    "task_id": "betrieb-15f5a07739874a4c831d304b0d425753",
+    "injected_failure": "SIGKILL of the newly installed KiraBridge launchd service",
+    "old_pid": 42826,
+    "new_pid": 43445,
+    "pending_survived_restart": true,
+    "executed_before_approval": false,
+    "executed_after_local_approval": true,
+    "foreign_agent_result_access": "denied"
+  },
+  "desktop": {
+    "terminal_marker": "KIRABRIDGE_TERMINAL_OK",
+    "file_write_read_marker": "KIRABRIDGE_FILE_OK",
+    "clipboard_info": "completed",
+    "personal_clipboard_read_or_changed": false
+  },
+  "chatgpt": {
+    "official_tunnel_client_installed": "v0.0.16",
+    "release_sha256_verified": true,
+    "tunnel_connected": false,
+    "chatgpt_tool_call": "unverified",
+    "remaining_requirement": "Authorized OpenAI account/workspace connection and a real ChatGPT tool call"
+  },
+  "automated_validation": {
+    "tests_passed": 77,
+    "local_test_seconds": 16.97,
+    "ruff": "passed",
+    "package_build": "passed"
+  }
+}

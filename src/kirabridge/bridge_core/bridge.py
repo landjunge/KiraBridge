@@ -76,6 +76,10 @@ class Bridge:
         self.validate(request)
         return self.tasks.enqueue(principal, request, approval)
 
+    def prepare(self, principal: str, request: TaskRequest) -> dict:
+        self.validate(request)
+        return self.tasks.enqueue(principal, request, "", pending=True)
+
     def health(self, principal: str) -> dict:
         self.security.principal(principal, "bridge.health")
         return {

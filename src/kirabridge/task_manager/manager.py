@@ -30,7 +30,13 @@ class TaskManager:
         self.wake = asyncio.Event()
 
     def enqueue(
-        self, principal: str, request: TaskRequest, approval: str, *, attempt: int = 1
+        self,
+        principal: str,
+        request: TaskRequest,
+        approval: str,
+        *,
+        attempt: int = 1,
+        pending: bool = False,
     ) -> dict:
         self.security.principal(principal, request.operation)
         if request.api_version != "1":
@@ -55,7 +61,8 @@ class TaskManager:
             control = request.operation in {"process.list", "process.inspect", "process.terminate"}
             comparison = "IN" if control else "NOT IN"
             count = self.store.db.execute(
-                f"SELECT COUNT(*) FROM tasks WHERE state='queued' AND operation {comparison} "
+                f"SELECT COUNT(*) FROM tasks WHERE state IN ('created','queued') "
+                f"AND operation {comparison} "
                 "('process.list','process.inspect','process.terminate')"
             ).fetchone()[0]
             capacity = self.config.max_control_queued if control else self.config.max_queued
@@ -69,7 +76,8 @@ class TaskManager:
                     if depth >= 32:
                         raise BridgeError("delegation_limit", "Delegation chain exceeds 32 tasks")
                     parent = self.store.get(parent["parent_id"], principal)
-            self.security.consume(principal, request, approval)
+            if not pending:
+                self.security.consume(principal, request, approval)
             now = time.time()
             self.store.db.execute(
                 "INSERT INTO tasks(id,principal,idem,request_hash,operation,args,agent,parent_id,"
@@ -85,25 +93,56 @@ class TaskManager:
                     if request.operation == "agent.execute"
                     else None,
                     request.parent_id,
-                    State.QUEUED,
+                    State.CREATED if pending else State.QUEUED,
                     now,
                     now,
                     attempt,
                 ),
             )
-            for state in (State.CREATED, State.QUEUED):
+            for state in (State.CREATED,) if pending else (State.CREATED, State.QUEUED):
                 self.store.db.execute(
                     "INSERT INTO events(task_id,at,state,evidence) VALUES(?,?,?,?)",
                     (request.task_id, now, state, '{"persisted":true}'),
                 )
             self.store.audit(
-                "task.queued",
+                "task.requested" if pending else "task.queued",
                 principal,
                 request.task_id,
                 {"operation": request.operation, "request_hash": request_hash(request)},
             )
         self.wake.set()
         return self.store.get(request.task_id, principal)
+
+    def approve(self, task_id: str) -> dict:
+        """Local operator authority only; deliberately not an MCP tool."""
+        with self.store.transaction():
+            task = self.store.get(task_id)
+            self.security.principal(task["principal"], task["operation"])
+            if task["state"] != State.CREATED:
+                raise BridgeError("state_conflict", "Only pending requests can be approved")
+            now = time.time()
+            self.store.db.execute(
+                "UPDATE tasks SET state='queued',updated=? WHERE id=?", (now, task_id)
+            )
+            evidence = {"local_operator_approved": True}
+            self.store.db.execute(
+                "INSERT INTO events(task_id,at,state,evidence) VALUES(?,?,?,?)",
+                (task_id, now, State.QUEUED, canonical(evidence)),
+            )
+            self.store.audit(
+                "task.approved",
+                task["principal"],
+                task_id,
+                {
+                    "source": "local_cli",
+                    "operation": task["operation"],
+                    "request_hash": self.store.db.execute(
+                        "SELECT request_hash FROM tasks WHERE id=?", (task_id,)
+                    ).fetchone()[0],
+                },
+            )
+        self.wake.set()
+        return self.store.get(task_id)
 
     async def start(self) -> None:
         if self.workers:
@@ -231,8 +270,10 @@ class TaskManager:
     def cancel_queued(self, principal: str, task_id: str) -> dict:
         self.security.principal(principal, "task.cancel")
         task = self.store.get(task_id, principal)
-        if task["state"] != State.QUEUED:
-            raise BridgeError("state_conflict", "Only queued tasks can be cancelled here")
+        if task["state"] not in {State.CREATED, State.QUEUED}:
+            raise BridgeError(
+                "state_conflict", "Only pending or queued tasks can be cancelled here"
+            )
         self.store.transition(task_id, State.CANCELLED, {"cancelled_by_owner": True})
         return self.store.get(task_id, principal)
 

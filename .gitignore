@@ -11,6 +11,8 @@ dist/
 *.lock.runtime
 .env
 config.local.toml
+credentials.json
+openai-tunnel-runtime.key
 .kirabridge-state/
 demo-workspace/
 coverage.xml

@@ -40,3 +40,9 @@ Die direkte TLS-Implementierung ist für authentifizierte private Verbindungen v
 
 Dieser Threat Review ist eine interne Entwurfsprüfung, kein unabhängiges Penetrationstest-Zertifikat. Es wurde kein öffentlicher Dienst, Tunnel oder Portforwarding eingerichtet. Eine spätere Internetbereitstellung erfordert ausdrücklich freigegebene Infrastruktur und passende OAuth-/Netzwerkregeln.
 
+
+## Lokaler Betrieb 0.2.0
+
+Der eingerichtete Dienst lädt getrennte, zufällige Tokens aus einer eigenen Datei unter dem privaten Konfigurationsverzeichnis. Die Datei wird mit `O_NOFOLLOW` geöffnet, Eigentümer und Modus werden geprüft; ihr Inhalt wird nicht ausgegeben. MCP-Stdio-Proxies lesen nur ihre konfigurierte Identität aus diesem Store und verbinden sich ausschließlich zu einem Loopback-Endpunkt. Globale Codex-/Grok-Konfigurationen enthalten keine Tokens.
+
+Pending-Anfragen sind keine Genehmigungen. Sie werden anhand des Operationsrechts geprüft, zählen zur Queue-Grenze und starten erst nach lokalem `approve`. Die Freigabe wird mit dem ursprünglichen Anfragehash auditiert. Selbstfreigaben über MCP sind nicht implementiert. `pending` und `approve` sind lokale administrative Befehle und setzen das vertrauenswürdige OS-Konto voraus.

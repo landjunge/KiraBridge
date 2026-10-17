@@ -1,6 +1,6 @@
 # KiraBridge
 
-Privates, modulares Desktop- und Agenten-Gateway für macOS und Linux. Python 3.11+, asyncio, SQLite und das offizielle MCP Python SDK. Version **0.1.0** implementiert den Kern des [verbindlichen Entwicklungsplans](docs/DEVELOPMENT_PLAN.md).
+Privates, modulares Desktop- und Agenten-Gateway für macOS und Linux. Python 3.11+, asyncio, SQLite und das offizielle MCP Python SDK. Version **0.2.0** implementiert den Kern des [verbindlichen Entwicklungsplans](docs/DEVELOPMENT_PLAN.md).
 
 ## Implementiert
 
@@ -14,9 +14,39 @@ Privates, modulares Desktop- und Agenten-Gateway für macOS und Linux. Python 3.
 - MCP über stdio und Streamable HTTP; authentifizierte parallele HTTP-Clients; ausgehender MCP-Clientpool mit getrennten Verbindungen.
 - Rollenrechte, konkrete einmalige Aufgabenfreigaben, Replay-Schutz, standardmäßig Loopback, TLS-Pflicht für andere Bindungen und verkettetes Audit-Protokoll ohne Befehlsinhalte oder Zugangsdaten.
 
-**Nachweisgrenzen:** Agentenprotokolle werden mit kontrollierten Gegenstellen getestet. Ein erfolgreicher echter Codex-/Grok-Providerauftrag oder eine ChatGPT-Anbindung wird damit nicht behauptet. Windows hat definierte Erweiterungspunkte, noch keinen ausführbaren nativen Adapter. Bilder, Datei-Clipboard, PTY/interactive stdin, A2A und die optionalen externen Integrationen sind Erweiterungen; siehe [Status](docs/STATUS.md).
+**Betriebsnachweis:** Codex und Grok haben echte, getrennt nachgewiesene Testaufträge abgeschlossen. Ein echter Codex-MCP-Aufruf und Groks MCP-Handshake wurden geprüft. Die ChatGPT-Kontoverbindung ist weiterhin offen. Windows hat definierte Erweiterungspunkte, noch keinen ausführbaren nativen Adapter. Bilder, Datei-Clipboard, PTY/interactive stdin, A2A und die optionalen externen Integrationen sind Erweiterungen; siehe [Status](docs/STATUS.md).
 
-## Lokal beginnen
+## Auf diesem Mac bereits eingerichtet
+
+Der lokale Dienst läuft automatisch über launchd auf `127.0.0.1:8765`. Die Standardkonfiguration liegt unter `~/.config/kirabridge/config.toml`; Zugangsdaten liegen separat mit Modus 0600. Als Arbeitsbereich ist `~/workspace/KiraBridge` freigegeben. Codex und Grok sind mit eigenen Identitäten als MCP-Clients registriert.
+
+```sh
+kirabridge status
+kirabridge ls
+kirabridge exec -- /bin/ls -la
+kirabridge ask codex "Beschreibe deine Aufgabe in einem Satz."
+kirabridge ask grok "Beschreibe deine Aufgabe in einem Satz."
+kirabridge clipboard info
+kirabridge pending
+kirabridge approve TASK_ID
+kirabridge deny TASK_ID
+```
+
+Lokale Kurzbefehle genehmigen genau den vom Bediener angegebenen Auftrag. MCP-Clients können mit `task_request` eine Aufgabe vorlegen; sie bleibt bis `kirabridge approve TASK_ID` im Zustand `created`. Es gibt keine automatische Freigabe durch einen Agenten. `deny` verwirft wartende Anfragen.
+
+Die einmalige ChatGPT-Kontoverbindung wird über `kirabridge chatgpt setup` eingerichtet. Der Assistent öffnet die offiziellen Kontoseiten und fragt einen eingeschränkten Runtime-Schlüssel unsichtbar im lokalen Terminal ab. `kirabridge chatgpt status` unterscheidet installierten Client, Tunnel-Bereitschaft und den weiterhin separat zu prüfenden ChatGPT-Toolaufruf.
+
+## Auf einem neuen Mac einrichten
+
+```sh
+uv sync --locked
+uv run kirabridge setup
+uv run kirabridge service install
+```
+
+`setup` erstellt neue private Dateien und überschreibt keine bestehende Policy. Der globale Befehl wird unter `~/.local/bin/kirabridge` angelegt. Für einen manuell begrenzten, einmaligen Betrieb:
+
+## Manuell beginnen
 
 ```sh
 uv sync --locked
@@ -66,7 +96,7 @@ uv run kirabridge --config config.local.toml serve --transport http
 
 Endpunkt standardmäßig `http://127.0.0.1:8765/mcp`, Header `Authorization: Bearer …`. Fernbindung erfordert `allow_remote`, Zertifikat, privaten Schlüssel und passende `allowed_hosts`/`allowed_origins`. Eine Fernfreigabe oder Veröffentlichung wurde nicht vorgenommen.
 
-Werkzeuge: `bridge_health`, `operation_catalog`, `task_submit`, `task_get`, `task_list`, `task_events`, `task_cancel`, `agent_inventory`, `clipboard_read`, `clipboard_write`, `clipboard_info`.
+Werkzeuge: `bridge_health`, `operation_catalog`, `task_submit`, `task_request`, `task_get`, `task_list`, `task_events`, `task_cancel`, `agent_inventory`, `clipboard_read`, `clipboard_write`, `clipboard_info`.
 
 Für Ausführungs- und Leseaufträge stellt ein lokaler Bediener eine Freigabe für die **exakte Anfrage** aus:
 

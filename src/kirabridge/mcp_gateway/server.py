@@ -87,6 +87,15 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
         """Read your task, receipt, timestamps, result and evidence-backed state."""
         return safe(lambda: bridge.task(identity(ctx), task_id))
 
+    @server.tool(annotations=write)
+    def task_request(request: TaskRequest, ctx: Context) -> dict[str, Any]:
+        """Request local approval. This stores a pending request and executes nothing.
+
+        Ask the local operator to run `kirabridge approve TASK_ID`, then poll task_get.
+        Never claim execution while the task remains created (awaiting approval).
+        """
+        return safe(lambda: bridge.prepare(identity(ctx), request))
+
     @server.tool(annotations=read)
     def task_events(task_id: str, ctx: Context, after: int = 0) -> dict[str, Any]:
         """Read up to 1000 task events after a cursor, only for your own task."""

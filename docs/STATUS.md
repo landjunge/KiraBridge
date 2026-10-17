@@ -1,61 +1,29 @@
-# Abnahmestand 0.1.0
+# Abnahmestand 0.2.0
 
-Datum: 17. Oktober 2026. Bezug: [ursprünglicher Entwicklungsplan](DEVELOPMENT_PLAN.md). Dieser Stand dokumentiert die tatsächlich vorhandene Implementierung; daraus folgt keine pauschale Produktionsfreigabe oder erfolgreiche externe Integration.
+Stand: 17. Oktober 2026. Grundlage bleibt der [Entwicklungsplan](DEVELOPMENT_PLAN.md). Der frühere rein paketbezogene Stand ist in [STATUS-v0.1.md](STATUS-v0.1.md) archiviert.
 
-## Planabdeckung
+## Auf dem Ziel-Mac eingerichtet und geprüft
 
-| Arbeitspaket | Stand |
-|---|---|
-| Foundation | Python-Paket, alle elf Module, typisierte API v1, TOML-Policy, SQLite-Schema v1, WAL/FULL, private Zustandsdateien |
-| Reliable dispatch | Persistenz vor Dispatch, Receipt-ID, getrennte Zustände, exakte Idempotenz, Leases, exklusiver Dispatcher, Ereignisse, Wiederherstellung nach echtem SIGKILL |
-| Agent adapter | Codex JSONL, Grok Build ACP v1, Grok API Streaming; Identitätsprüfung und Abschlussbelege; Protokolltests gegen kontrollierte Gegenstellen |
-| Desktop tools | Geschützte Dateioperationen, Terminal-/Prozessgruppensteuerung, begrenzte Ausgabe, Zeitlimits, Beenden unter Last, Unicode-Clipboard und Schreibbestätigung |
-| MCP connectivity | Echtes stdio und Streamable HTTP, mehrere HTTP-Clients mit getrennten Rechten, ausgehender Clientpool, TLS mit aktiver Zertifikatsprüfung |
-| Cross-platform | macOS Intel lokal geprüft; macOS 15 und Ubuntu 24.04 mit Python 3.11/3.13 in CI erfolgreich; Windows verweigert nicht implementierte native Operationen ausdrücklich |
-| Integration extensions | Versioniertes AgentAdapter-Register und PlatformAdapter-Protokoll; optionale externe Systeme nicht gekoppelt oder verändert |
+- KiraBridge ist als globaler CLI-Befehl verfügbar und läuft unter `com.kirabridge.bridge` im Benutzer-launchd. Autostart erfolgt bei Anmeldung, Wiederanlauf nach einem Fehler automatisch.
+- Der Dienst bindet ausschließlich an `127.0.0.1:8765`. Ein echter nicht authentifizierter HTTP-Aufruf wurde mit 401 abgewiesen. Konfiguration und separate Tokens haben Modus 0600, das Zustandsverzeichnis 0700.
+- `~/workspace/KiraBridge` ist der freigegebene Arbeitsbereich. Lokale Kurzbefehle für Dateien, Terminal, Clipboard und Agenten funktionieren ohne manuell erstellte JSON-Dateien.
+- Echte Codex- und Grok-Aufträge wurden erfolgreich abgeschlossen, mit jeweils eigener Agenten-/Sitzungsidentität und echtem Abschlussbeleg.
+- Codex hat `bridge_health` als nativer MCP-Client aufgerufen. Groks MCP-Doctor meldet einen erfolgreichen Handshake und zwölf erkannte Tools. Beide Konfigurationen verwenden tokenfreie Stdio-Proxies zum gemeinsamen Dienst.
+- Ein realer SIGKILL des neu installierten KiraBridge-Dienstes wurde durch launchd behoben. Eine offene MCP-Anfrage blieb nach dem Neustart gesperrt und lief erst nach lokaler Freigabe. Der andere Agent durfte das Ergebnis nicht lesen.
+- Datei-Schreiben/-Lesen und Terminalausführung wurden am echten Dienst geprüft. Clipboard-Fähigkeiten wurden ohne Auslesen oder Verändern persönlicher Inhalte abgefragt.
 
-## Abnahmekriterien und konkrete Tests
+Die konkreten Task-IDs, Sitzungsbelege und Prüfergebnisse stehen im [Betriebsnachweis](evidence/local-operation-2026-10-17.json). Private Konfiguration, Zugangsdaten und persönliche Inhalte sind nicht Bestandteil dieses Repositories.
 
-- Dauerhafte Speicherung vor Dispatch und belegte Zustandsfolge: `test_persist_before_dispatch_and_evidence`.
-- Doppelte Einreichung führt zu genau einer Ausführung: `test_idempotency_executes_once`.
-- Neustart und echter Prozessabbruch führen zu `unknown` ohne erneute Ausführung: `test_restart_preserves_queue_and_never_reexecutes_unknown`, `test_real_dispatcher_sigkill_never_duplicates`.
-- Empfang, Sitzung, Lauf und Abschluss werden unterschieden: `test_codex_requires_completion_event`, `test_grok_acp_session_and_completion`, `test_grok_api_requires_server_completion`.
-- Fehlende/fremde/verbrauchte/abgelaufene Freigaben scheitern; kein zweiter Principal erhält Ergebnisse: Security-Tests und `test_multiple_real_http_clients_do_not_cross_principals`.
-- Terminal-Metazeichen werden wörtlich übergeben; Pfad- und Symlink-Ausbrüche werden abgelehnt; eigene Prozesse bleiben kontrollierbar: Desktop-/Boundary-Tests.
-- Unbekannte Ausgänge werden nicht automatisch wiederholt: Grok-Transport- und MCP-Client-Timeout-Tests. Kontrollierte Retries benötigen einen nachgewiesenen Nichtstart und enden spätestens beim dritten Versuch.
-- Clipboard-Tests nutzen einen isolierten Backend-Simulator; keine persönliche Zwischenablage wird gelesen oder verändert.
-- `test_real_tls_with_certificate_validation` verwendet einen temporären vertrauenswürdig eingebundenen Testaussteller. Es wird kein `verify=False` verwendet.
+## Automatische Prüfungen
 
-Lokale Prüfung auf macOS 15.7.4, Intel x86_64, Python 3.11.15: **66 Tests bestanden in 14,69 Sekunden**, Ruff und Paketbau erfolgreich. Die abschließenden Grenzfalltests prüfen zusätzlich reservierte Steuerungsplätze bei voller Ausführungsqueue und die genaue Begrenzung von Delegationsketten.
+Lokal auf macOS 15.7.4, Intel x86_64, Python 3.11.15: **77 Tests bestanden in 16,97 Sekunden**. Ruff und Paketbau sind erfolgreich. Zusätzlich zu den bisherigen Sicherheits- und Wiederherstellungstests werden Pending-Freigaben, Zurückweisung, geschützte lokale Einrichtung, gemeinsam verwendete Stdio-Proxies und die Geheimnisbehandlung im Kontoverbindungsassistenten geprüft.
 
-Der [erste vollständige CI-Nachweis](https://github.com/landjunge/KiraBridge/actions/runs/39048278911) für Commit `9cb2e0a` besteht auf allen drei Plattform-/Python-Kombinationen mit jeweils 64 Tests, Ruff und Paketbau. Ergebnisse der nachfolgenden Grenzfallkorrektur stehen unter [aktuellen Verify-Läufen](https://github.com/landjunge/KiraBridge/actions/workflows/ci.yml).
+Die [Verify-Pipeline](https://github.com/landjunge/KiraBridge/actions/workflows/ci.yml) prüft jeden Commit auf Ubuntu 24.04 mit Python 3.11/3.13 sowie macOS 15 mit Python 3.11. Die vorangegangenen Kernimplementierungen sind auf allen drei Kombinationen grün; der aktuelle Commit trägt seinen eigenen CI-Nachweis.
 
-## Lokale Ressourcenmessung
+Die Leerlaufmessung des Kerns lag auf diesem Intel-Mac bei etwa 56 MiB Spitzenspeicher und 0,03 % eines CPU-Kerns über fünf Sekunden. Das ist keine Lastmessung und enthält nicht den Speicher externer Agentenprozesse. Eine GPU wird nicht benötigt.
 
-`uv run python scripts/benchmark_idle.py --seconds 5`, privates temporäres Datenverzeichnis, MCP-Werkzeugregister geladen, zwei Ausführungs- und ein Steuerungs-Worker:
+## Verbleibende Kontoverbindung und optionale Erweiterungen
 
-```json
-{
-  "os": "Darwin",
-  "architecture": "x86_64",
-  "python": "3.11.15",
-  "idle_seconds": 5.001,
-  "cpu_seconds": 0.001487,
-  "cpu_percent_one_core": 0.03,
-  "peak_rss_mib": 55.61,
-  "gpu_required": false
-}
-```
+Die direkte ChatGPT-Verbindung ist **noch nicht nachgewiesen**. Der offizielle Tunnel-Client v0.0.16 ist einschließlich Begleitprogramm installiert und anhand der Release-Prüfsummen geprüft. Es fehlen die autorisierte Tunnel-/Workspace-Verbindung und ein tatsächlicher Toolaufruf aus ChatGPT. `kirabridge chatgpt setup` führt die einmalige Kontoeinrichtung lokal durch; kein Schlüssel gehört in den Chat. Der Assistent und seine Geheimnis-/Statusprüfungen sind getestet, ein echtes Account-Linking ohne vorhandenen Zugang wird nicht behauptet.
 
-Das ist eine lokale Leerlaufmessung über fünf Sekunden, kein Last- oder Langzeitbenchmark. Agentenprozesse und deren Speicherverbrauch sind darin nicht enthalten.
-
-## Ausstehende oder bewusst optionale Nachweise
-
-- Echte authentifizierte Codex-/Grok-Providerläufe und deren konkrete CLI-Versionen: nicht ausgeführt. Automatische Tests verwenden Protokollsimulatoren.
-- ChatGPT-Verbindung im Zielworkspace sowie OAuth-/Tunnel-Einrichtung: nicht vorhanden; Voraussetzungen sind in [CHATGPT.md](CHATGPT.md) belegt.
-- Linux-Zwischenablage in einer echten grafischen Wayland-/X11-Sitzung: benötigt diese Sitzung; Routing und Textübertragungslogik sind getrennt getestet.
-- Windows-Nativadapter: Erweiterungspunkt, keine behauptete Windows-Laufzeitunterstützung.
-- Bilder, Datei-Clipboard, PTY/interactive stdin, Claude Code, Gemini CLI, OpenCode und A2A: künftige Adapter/Funktionen, nicht als funktionierend ausgewiesen.
-- ThreadDesk, Agent Authority, Tollgate und SSH: optionale Integrationen; keine vorhandenen Projekte, Dienste oder Agenten wurden verändert oder beendet.
-- Öffentliche Bereitstellung, produktiver Dienststart und unabhängiger Sicherheitstest: nicht durchgeführt. Service-Dateien sind nicht installierte Vorlagen.
-
+Windows-Nativadapter, Bilder/Dateien in der Zwischenablage, interaktive PTYs, zusätzliche Agentenprotokolle/A2A und die optionalen externen Systeme bleiben Erweiterungen. Linux-Clipboard benötigt eine echte grafische Sitzung. Es wurden keine öffentlichen Dienste oder fremden Agenten bereitgestellt beziehungsweise beendet. Bestehende Codex-/Grok-Konfigurationen wurden ausschließlich um KiraBridge ergänzt und zuvor privat gesichert.

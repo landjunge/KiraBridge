@@ -6,6 +6,7 @@ import json
 import logging
 import os
 import sys
+import uuid
 from pathlib import Path
 
 from pydantic import ValidationError
@@ -32,6 +33,11 @@ def parse_request(path: str) -> TaskRequest:
 
 
 async def execute(args) -> None:
+    if args.command == "setup":
+        from kirabridge.local_runtime import setup
+
+        emit(setup(args.workspace, Path(args.config) if args.config else None))
+        return
     if args.command == "init":
         destination = Path(args.destination).expanduser().absolute()
         workspace = Path(args.workspace).expanduser().resolve(strict=True)
@@ -52,7 +58,41 @@ async def execute(args) -> None:
         emit({"config": str(destination), "workspace": str(workspace)})
         return
     config = load_config(args.config)
+    if args.command == "chatgpt":
+        from kirabridge.chatgpt_setup import wizard
+        from kirabridge.local_runtime import default_config
+
+        emit(
+            wizard(
+                config,
+                Path(args.config).absolute() if args.config else default_config(),
+                args.action,
+            )
+        )
+        return
+    if args.command in {"status", "service", "connect"}:
+        from kirabridge.local_runtime import daemon_health, default_config, install_service
+
+        if args.command == "connect":
+            from kirabridge.mcp_gateway.proxy import connect_stdio
+
+            await connect_stdio(config, args.principal)
+        elif args.command == "service":
+            if args.action == "install":
+                emit(
+                    install_service(
+                        Path(args.config).absolute() if args.config else default_config()
+                    )
+                )
+            else:
+                emit(await daemon_health(config, args.principal))
+        else:
+            emit(await daemon_health(config, args.principal))
+        return
     if args.command == "serve" and args.transport == "http":
+        from kirabridge.local_runtime import load_service_credentials
+
+        load_service_credentials(config)
         config.validate_network()
     bridge = Bridge(config)
     try:
@@ -91,28 +131,75 @@ async def execute(args) -> None:
         elif args.command in {"run", "retry"}:
             request = parse_request(args.request)
             bridge.validate(request)
-            approval = os.environ.get("KIRABRIDGE_APPROVAL", "")
-            if args.approve:
-                approval = bridge.security.grant(args.principal, request)
-            if args.command == "retry":
-                bridge.tasks.retry(args.principal, args.original, request, approval)
+            await run_request(
+                bridge,
+                args.principal,
+                request,
+                args.wait,
+                args.approve,
+                args.original if args.command == "retry" else None,
+            )
+        elif args.command in {"ls", "read", "write", "exec", "ask", "clipboard"}:
+            policy = config.principals.get(args.principal)
+            if not policy or not policy.roots:
+                raise BridgeError("workspace_missing", "Configure an allowed workspace first")
+            root = policy.roots[0]
+            if args.command in {"ls", "read", "write"}:
+                path = str(Path(args.path or root).expanduser().absolute())
+                operation = {"ls": "file.list", "read": "file.read", "write": "file.write"}[
+                    args.command
+                ]
+                arguments = {"path": path}
+                if args.command == "write":
+                    arguments.update(text=args.text, overwrite=args.overwrite)
+            elif args.command == "exec":
+                argv = args.argv[1:] if args.argv[:1] == ["--"] else args.argv
+                operation, arguments = (
+                    "terminal.execute",
+                    {"argv": argv, "cwd": args.cwd or root, "timeout": args.timeout},
+                )
+            elif args.command == "ask":
+                operation, arguments = (
+                    "agent.execute",
+                    {
+                        "agent": args.agent,
+                        "prompt": args.prompt,
+                        "cwd": args.cwd or root,
+                        "timeout": args.timeout,
+                    },
+                )
             else:
-                bridge.submit(args.principal, request, approval)
-            owns_dispatcher = False
-            try:
-                await bridge.tasks.start()
-                owns_dispatcher = True
-            except BridgeError as exc:
-                if exc.code != "already_running":
-                    raise
-            try:
-                final = await bridge.tasks.wait(args.principal, request.task_id, args.wait)
-                emit(final)
-            finally:
-                if owns_dispatcher:
-                    await bridge.tasks.stop()
-            if final["state"] != State.COMPLETED:
-                raise SystemExit(3 if final["state"] == State.UNKNOWN else 2)
+                operation = "clipboard." + args.action
+                arguments = {"text": args.text} if args.action == "write" else {}
+            identifier = "local-" + uuid.uuid4().hex
+            request = TaskRequest(
+                task_id=identifier,
+                idempotency_key=identifier,
+                operation=operation,
+                arguments=arguments,
+            )
+            await run_request(bridge, args.principal, request, 3700, True)
+        elif args.command == "pending":
+            rows = bridge.store.db.execute(
+                "SELECT id FROM tasks WHERE state='created' ORDER BY created LIMIT 100"
+            )
+            emit(
+                {
+                    "requests": [bridge.store.get(row[0]) for row in rows],
+                    "approve_command": "kirabridge approve TASK_ID",
+                }
+            )
+        elif args.command == "approve":
+            approved = bridge.tasks.approve(args.task_id)
+            emit(approved)
+        elif args.command == "deny":
+            task = bridge.store.get(args.task_id)
+            if task["state"] not in {State.CREATED, State.QUEUED}:
+                raise BridgeError("state_conflict", "Only pending or queued requests can be denied")
+            bridge.store.transition(
+                args.task_id, State.CANCELLED, {"source": "local_operator_rejection"}
+            )
+            emit(bridge.store.get(args.task_id))
         elif args.command == "enqueue":
             request = parse_request(args.request)
             emit(bridge.submit(args.principal, request, os.environ.get("KIRABRIDGE_APPROVAL", "")))
@@ -144,11 +231,70 @@ async def execute(args) -> None:
         bridge.store.close()
 
 
+async def run_request(bridge, principal, request, wait, approve, original=None):
+    bridge.validate(request)
+    approval = (
+        bridge.security.grant(principal, request)
+        if approve
+        else os.environ.get("KIRABRIDGE_APPROVAL", "")
+    )
+    if original:
+        bridge.tasks.retry(principal, original, request, approval)
+    else:
+        bridge.submit(principal, request, approval)
+    owns_dispatcher = False
+    try:
+        await bridge.tasks.start()
+        owns_dispatcher = True
+    except BridgeError as exc:
+        if exc.code != "already_running":
+            raise
+    try:
+        final = await bridge.tasks.wait(principal, request.task_id, wait)
+        emit(final)
+    finally:
+        if owns_dispatcher:
+            await bridge.tasks.stop()
+    if final["state"] != State.COMPLETED:
+        raise SystemExit(3 if final["state"] == State.UNKNOWN else 2)
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="KiraBridge private desktop bridge")
     parser.add_argument("--config", help="TOML policy file (or KIRABRIDGE_CONFIG)")
     parser.add_argument("--principal", default="local", help="Local CLI/stdio policy identity")
     sub = parser.add_subparsers(dest="command", required=True)
+    setup = sub.add_parser("setup", help="Create private local policy, credentials and CLI command")
+    setup.add_argument("--workspace", default=str(Path.home() / "workspace/KiraBridge"))
+    sub.add_parser("status", help="Query the running local daemon")
+    sub.add_parser("connect", help="Forward MCP stdio to the authenticated local daemon")
+    chatgpt = sub.add_parser("chatgpt", help="Local account linking for a private ChatGPT tunnel")
+    chatgpt.add_argument("action", choices=["setup", "status"])
+    service = sub.add_parser("service")
+    service.add_argument("action", choices=["install", "status"])
+    sub.add_parser("pending", help="Review requests awaiting local approval")
+    approve = sub.add_parser("approve", help="Approve exactly one previously reviewed pending task")
+    approve.add_argument("task_id")
+    deny = sub.add_parser("deny", help="Reject one pending or queued request without executing it")
+    deny.add_argument("task_id")
+    for name in ("ls", "read", "write"):
+        command = sub.add_parser(name)
+        command.add_argument("path", nargs="?" if name == "ls" else None)
+        if name == "write":
+            command.add_argument("text")
+            command.add_argument("--overwrite", action="store_true")
+    command = sub.add_parser("exec", help="Locally approve and execute an exact argv list")
+    command.add_argument("--cwd")
+    command.add_argument("--timeout", type=float, default=60)
+    command.add_argument("argv", nargs=argparse.REMAINDER)
+    command = sub.add_parser("ask", help="Run a configured agent turn")
+    command.add_argument("agent")
+    command.add_argument("prompt")
+    command.add_argument("--cwd")
+    command.add_argument("--timeout", type=float, default=120)
+    command = sub.add_parser("clipboard")
+    command.add_argument("action", choices=["info", "read", "write"])
+    command.add_argument("text", nargs="?")
     serve = sub.add_parser("serve")
     serve.add_argument("--transport", choices=["stdio", "http"], default="stdio")
     init = sub.add_parser("init")
@@ -191,7 +337,8 @@ def main() -> None:
     except (BridgeError, ValidationError, OSError, ValueError, TimeoutError) as exc:
         code = exc.code if isinstance(exc, BridgeError) else "invalid_request"
         emit(
-            {"error": {"code": code}}, stream=sys.stderr if args.command == "serve" else sys.stdout
+            {"error": {"code": code}},
+            stream=sys.stderr if args.command in {"serve", "connect"} else sys.stdout,
         )
         raise SystemExit(1) from None
 
