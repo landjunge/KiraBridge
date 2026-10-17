@@ -41,7 +41,17 @@
     "tests_passed": 87,
     "local_test_seconds": 16.97,
     "ruff": "passed",
-    "package_build": "passed"
+    "package_build": "passed",
+    "ci": {
+      "commit": "56edbc8e825a4ae58d847721e8f187431a264ade",
+      "url": "https://github.com/landjunge/KiraBridge/actions/runs/39056070343",
+      "conclusion": "success",
+      "matrix": [
+        "macos-15 / Python 3.11",
+        "ubuntu-24.04 / Python 3.11",
+        "ubuntu-24.04 / Python 3.13"
+      ]
+    }
   },
   "local_service": {
     "url": "http://127.0.0.1:8766/",
