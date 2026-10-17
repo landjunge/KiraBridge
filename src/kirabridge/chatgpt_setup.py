@@ -11,6 +11,7 @@ import shlex
 import shutil
 import subprocess
 import sys
+import time
 import uuid
 import webbrowser
 from pathlib import Path
@@ -65,6 +66,43 @@ def runtime_status(binary: str) -> dict:
     }
 
 
+def wait_for_service(config_path: Path, *, timeout: float = 30) -> None:
+    """Wait for authenticated health after a restart; never retry an execution."""
+    deadline = time.monotonic() + timeout
+    while (remaining := deadline - time.monotonic()) > 0:
+        try:
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    "-m",
+                    "kirabridge.cli",
+                    "--config",
+                    str(config_path),
+                    "--principal",
+                    "chatgpt",
+                    "status",
+                ],
+                capture_output=True,
+                text=True,
+                timeout=min(6, remaining),
+            )
+            if result.returncode == 0:
+                health = json.loads(result.stdout)
+                if (
+                    isinstance(health, dict)
+                    and health.get("name") == "KiraBridge"
+                    and health.get("api_version") == "1"
+                    and health.get("dispatcher_active") is True
+                ):
+                    return
+        except (subprocess.TimeoutExpired, ValueError):
+            pass
+        time.sleep(min(0.25, max(0, deadline - time.monotonic())))
+    raise BridgeError(
+        "service_not_ready", "Local service is not ready; check kirabridge service status"
+    )
+
+
 def configure_tunnel(
     config: Config, config_path: Path, tunnel_id: str, runtime_key: str, binary: str
 ) -> dict:
@@ -105,6 +143,7 @@ def configure_tunnel(
             )
             if restarted.returncode:
                 raise BridgeError("service_restart", "Restart the local KiraBridge service")
+    wait_for_service(config_path)
     key_path = config_path.parent / "openai-tunnel-runtime.key"
     replace_private(key_path, runtime_key)
     command = shlex.join(

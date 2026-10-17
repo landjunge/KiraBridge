@@ -1,4 +1,5 @@
 import json
+import subprocess
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -6,7 +7,7 @@ import pytest
 
 from kirabridge.bridge_core.config import load_config
 from kirabridge.bridge_core.models import BridgeError
-from kirabridge.chatgpt_setup import configure_tunnel, runtime_status
+from kirabridge.chatgpt_setup import configure_tunnel, runtime_status, wait_for_service
 from kirabridge.local_runtime import private_json, setup
 
 
@@ -59,6 +60,13 @@ def test_account_setup_keeps_literal_key_out_of_commands_and_policy(tmp_path, mo
 
     def run(argv, **kwargs):
         calls.append(argv)
+        if argv[-1] == "status":
+            return SimpleNamespace(
+                returncode=0,
+                stdout=json.dumps(
+                    {"name": "KiraBridge", "api_version": "1", "dispatcher_active": True}
+                ),
+            )
         return SimpleNamespace(
             returncode=0,
             stdout=json.dumps({"process_running": True, "healthy": True, "ready": True}),
@@ -76,3 +84,64 @@ def test_account_setup_keeps_literal_key_out_of_commands_and_policy(tmp_path, mo
     credentials = private_json(Path(updated.credentials_file))
     assert all(credentials[name] == token for name, token in original.items())
     assert credentials["chatgpt"] not in original.values()
+    probe = next(i for i, argv in enumerate(calls) if argv[-1] == "status")
+    connect = next(i for i, argv in enumerate(calls) if "connect" in argv)
+    assert probe < connect
+
+
+def test_restart_waits_for_authenticated_dispatcher_health(tmp_path, monkeypatch):
+    responses = iter(
+        [
+            SimpleNamespace(returncode=1, stdout='{"error":{"code":"peer_connection"}}'),
+            SimpleNamespace(
+                returncode=0,
+                stdout=json.dumps(
+                    {"name": "KiraBridge", "api_version": "1", "dispatcher_active": False}
+                ),
+            ),
+            SimpleNamespace(
+                returncode=0,
+                stdout=json.dumps(
+                    {"name": "KiraBridge", "api_version": "1", "dispatcher_active": True}
+                ),
+            ),
+        ]
+    )
+    calls, delays = [], []
+
+    def run(argv, **kwargs):
+        calls.append(argv)
+        return next(responses)
+
+    monkeypatch.setattr("kirabridge.chatgpt_setup.subprocess.run", run)
+    monkeypatch.setattr("kirabridge.chatgpt_setup.time.sleep", delays.append)
+    path = tmp_path / "config.toml"
+    wait_for_service(path)
+    assert len(calls) == 3 and len(delays) == 2
+    assert all(
+        argv[-5:] == ["--config", str(path), "--principal", "chatgpt", "status"] for argv in calls
+    )
+
+
+def test_unready_service_does_not_start_tunnel(tmp_path, monkeypatch):
+    monkeypatch.setattr(Path, "home", lambda: tmp_path)
+    configured = setup(str(tmp_path / "workspace"))
+    path = Path(configured["config"])
+    config = load_config(str(path))
+    clock = [0.0]
+    calls = []
+
+    def run(argv, **kwargs):
+        calls.append(argv)
+        if argv[-1] == "status":
+            clock[0] += 10
+            raise subprocess.TimeoutExpired(argv, kwargs["timeout"])
+        return SimpleNamespace(returncode=0, stdout="")
+
+    monkeypatch.setattr("kirabridge.chatgpt_setup.subprocess.run", run)
+    monkeypatch.setattr("kirabridge.chatgpt_setup.time.monotonic", lambda: clock[0])
+    monkeypatch.setattr("kirabridge.chatgpt_setup.time.sleep", lambda delay: None)
+    with pytest.raises(BridgeError, match="Local service is not ready"):
+        configure_tunnel(config, path, "tunnel_testonly12345678", "x" * 40, "fake-client")
+    assert not any("runtimes" in argv for argv in calls)
+    assert not (path.parent / "openai-tunnel-runtime.key").exists()

@@ -1,25 +1,27 @@
-# ChatGPT-Anbindung: geprüft, nicht aktiviert
+# ChatGPT-Anbindung: Tunnel aktiv, Statusabfrage zurückgemeldet
 
-Stand der Prüfung: 17. Oktober 2026. KiraBridge implementiert MCP-Transporte und lokale Bearer-Authentifizierung. Eine funktionierende Integration im konkreten ChatGPT-Konto wurde **nicht** nachgewiesen. `bridge_health` meldet deshalb `chatgpt_integration="unverified"`.
+Stand der Prüfung: 17. Oktober 2026. Der private OpenAI-Tunnel läuft; Prozess, Health und Readiness wurden lokal geprüft. OpenAI hat Discovery-Anfragen über den Tunnel an KiraBridge weitergeleitet. Der Nutzer hat eine erfolgreiche Statusabfrage aus seinem ChatGPT-Chat mit Version 0.2.0, aktivem Dispatcher und erkannten Codex-/Grok-Programmen zurückgemeldet. Diese Antwort ist ein Nutzerbericht; sie wurde in der Entwicklungssitzung nicht als eigener ChatGPT-Toolaufruf empfangen. Gemeinsame Ende-zu-Ende-Tests von Aufgabenfreigabe, Ausführung und Ergebnisabruf aus ChatGPT stehen noch aus. Der [Betriebsnachweis](evidence/local-operation-2026-10-17.json) unterscheidet diese Belegarten.
+
+`bridge_health` gibt derzeit fest `chatgpt_integration="unverified"` aus; `kirabridge chatgpt status` gibt unabhängig von der gemessenen Tunnelbereitschaft `chatgpt_tool_call="unverified"` aus. Diese Felder erkennen einen durchgeführten Kontotest nicht automatisch und werden nicht allein aufgrund eines laufenden Tunnels auf Erfolg gesetzt.
 
 ## Vorbereitet auf diesem Mac
 
-Der offizielle `tunnel-client` v0.0.16 ist einschließlich Begleitprogramm installiert; das Release-Archiv wurde gegen die veröffentlichten SHA-256-Summen geprüft. Es existiert noch kein lokales Tunnelprofil und keine Runtime-Alias-Verbindung. Ein Tunnel wird nicht mit einer erfundenen ID gestartet.
+Der offizielle `tunnel-client` v0.0.16 ist einschließlich Begleitprogramm installiert; das Release-Archiv wurde gegen die veröffentlichten SHA-256-Summen geprüft. Der Nutzer hat den Tunnel `kira` angelegt. Das lokale Profil und der Runtime-Alias heißen `kirabridge`. Der getrennte lokale Principal `chatgpt` verbindet den Stdio-Proxy mit dem authentifizierten KiraBridge-Dienst. Laufzeitschlüssel und lokale Zugangsdaten werden mit Modus 0600 gespeichert; ihre Werte gehören nicht ins Repository.
 
 ```sh
 kirabridge chatgpt status
 kirabridge chatgpt setup
 ```
 
-`setup` ist ein lokaler interaktiver Assistent. Er öffnet die offiziellen OpenAI-Kontoseiten, nimmt die vorhandene Tunnel-ID entgegen und liest einen eingeschränkten Runtime-Schlüssel mit `getpass`, ohne ihn auszugeben oder als Prozessargument weiterzureichen. Der Schlüssel wird ausschließlich in einer separaten lokalen Datei mit Modus 0600 gespeichert. Die native Tunnel-Verwaltung erhält eine `file:`-Referenz. Der Assistent ergänzt eine eigene `chatgpt`-Identität, startet den lokalen Dienst neu und nutzt `tunnel-client runtimes connect`. Erfolg wird nur bei nachgewiesenem Prozess, Health und Readiness gemeldet; die tatsächliche ChatGPT-Toolausführung bleibt eine eigene Prüfung.
+`status` prüft die vorhandene Verbindung. `setup` dient der einmaligen Kontoeinrichtung und muss für eine gesunde bestehende Verbindung nicht erneut durchlaufen werden. Der lokale interaktive Assistent öffnet die offiziellen OpenAI-Kontoseiten, nimmt die vorhandene Tunnel-ID entgegen und liest einen eingeschränkten Runtime-Schlüssel mit `getpass`, ohne ihn auszugeben oder als Prozessargument weiterzureichen. Der Schlüssel wird ausschließlich in einer separaten lokalen Datei mit Modus 0600 gespeichert. Die native Tunnel-Verwaltung erhält eine `file:`-Referenz. Der Assistent ergänzt eine eigene `chatgpt`-Identität, startet den lokalen Dienst neu und wartet auf dessen authentifizierte Dispatcher-Statusantwort, bevor er `tunnel-client runtimes connect` startet. Diese begrenzte Wiederholung betrifft ausschließlich die Statusabfrage. Erfolg wird nur bei nachgewiesenem Tunnelprozess, Health und Readiness gemeldet; die tatsächliche ChatGPT-Toolausführung bleibt eine eigene Prüfung.
 
-Die Kontoschritte können hier nicht automatisch durchgeführt werden: Es liegen weder eine Tunnel-ID noch eine geeignete Runtime-Berechtigung vor. Der Codex-CLI-Login ist kein dafür ausgegebener Platform-Runtime-Schlüssel. Schlüssel gehören nicht in den Chat. Das Auswählen/Anlegen des privaten Tunnels und die Plugin-Freigabe erfolgen im autorisierten Zielkonto.
+Der Nutzer hat die Kontoschritte selbst im autorisierten Zielkonto durchgeführt. Sein eigener eingeschränkter Laufzeitschlüssel wurde lokal eingegeben. Der Codex-CLI-Login wurde nicht als Platform-Runtime-Schlüssel umgedeutet. Das ChatGPT-Plugin verwendet die Verbindungsmethode Tunnel und keine zusätzliche OAuth-Anmeldung.
 
 Für diesen privaten Einzelbenutzer-Anschluss übernimmt der Tunnel die kontrollierte Workspace-Verbindung und der lokale Proxy die eigene KiraBridge-Authentifizierung. Das ist keine behauptete OAuth-Anbindung mit getrennten Identitäten für beliebige Workspace-Mitglieder. Eine solche Mehrbenutzer-Anbindung benötigt den zusätzlich beschriebenen Identity Provider.
 
 ## Technische Voraussetzungen
 
-Die offiziellen OpenAI-Unterlagen beschreiben für ChatGPT einen erreichbaren MCP-Endpunkt und die zugehörige Workspace-/Developer-Mode-Berechtigung. Ein lokaler stdio-Eintrag allein verbindet keine ChatGPT-Cloudsitzung mit dem Mac. Für private Netze dokumentiert OpenAI einen Secure MCP Tunnel mit eigener Platform-Berechtigung, Tunnel-ID und Laufzeitschlüssel. Diese Infrastruktur wurde nicht angelegt. [Secure MCP Tunnel](https://developers.openai.com/api/docs/guides/secure-mcp-tunnels)
+Die offiziellen OpenAI-Unterlagen beschreiben für ChatGPT einen erreichbaren MCP-Endpunkt und die zugehörige Workspace-/Developer-Mode-Berechtigung. Ein lokaler stdio-Eintrag allein verbindet keine ChatGPT-Cloudsitzung mit dem Mac. Für private Netze dokumentiert OpenAI einen Secure MCP Tunnel mit eigener Platform-Berechtigung, Tunnel-ID und Laufzeitschlüssel. Diese private Verbindung wurde mit dem vom Nutzer angelegten Tunnel eingerichtet. [Secure MCP Tunnel](https://developers.openai.com/api/docs/guides/secure-mcp-tunnels)
 
 OpenAI beschreibt OAuth für personenbezogene Daten und Schreibzugriffe. Ein eigener statischer Bearer-Token des jetzigen KiraBridge-HTTP-Servers ist kein nachgewiesenes ChatGPT-Anmeldeverfahren. Für einen direkten OAuth-Anschluss fehlen hier noch ein ausgewählter Authorization Server, dessen geprüfte Token-/Audience-Validierung, Discovery/Protected-Resource-Metadaten und die Freigabe im Zielworkspace. ChatGPT unterstützt laut offizieller Auth-Dokumentation keine beliebigen kundeneigenen API-Keys als Ersatz für diesen Flow. [Offizielle Authentifizierungsanforderungen](https://developers.openai.com/plugins/build/auth)
 
@@ -27,13 +29,12 @@ Ein öffentlich erreichbarer HTTPS-Endpunkt ist eine alternative Infrastrukturen
 
 ## Ausstehender Integrationsnachweis
 
-1. Zielworkspace, Developer Mode, Benutzer-/Adminrechte und zugelassenes Transport-/Authentifizierungsverfahren feststellen.
-2. Privaten Tunnel oder ausdrücklich genehmigte HTTPS-Infrastruktur bereitstellen; Authentifizierung und Netzgrenzen prüfen.
-3. Falls OAuth nötig: Resource-Server-Integration gegen den gewählten Identity Provider implementieren und Tokenziel, Scopes, Ablauf und Erneuerung testen.
-4. Tools im Zielkonto einlesen; unberechtigte Aufrufe und Principal-Trennung testen.
-5. Einen einzeln freigegebenen Testauftrag senden und Empfang, Ausführung und Ergebnis in KiraBridge unabhängig prüfen.
+1. Einen tatsächlichen Toolaufruf aus dem Zielchat unabhängig mit einem entsprechenden Ergebnisbeleg abgleichen. Der bisherige Statusaufruf wurde vom Nutzer zurückgemeldet; die Tunnelprotokolle bestätigen Discovery und Weiterleitung, enthalten aber keinen eindeutigen Methodennachweis für diesen einzelnen Statusaufruf.
+2. Einen einzelnen harmlosen Testauftrag aus ChatGPT anfordern, lokal freigeben und Empfang, Ausführung und Ergebnisabruf anhand derselben Task-ID prüfen.
+3. Unberechtigte Aufrufe und Principal-Trennung zusätzlich über die konkrete ChatGPT-Verbindung prüfen.
+4. Falls eine Mehrbenutzer-Anbindung gewünscht wird: Identity Provider auswählen, OAuth-Resource-Server-Integration implementieren und Tokenziel, Scopes, Ablauf und Erneuerung testen.
 
-Es wurden weder eine ChatGPT-App erstellt noch ein Tunnel, OAuth-Dienst oder öffentliches Deployment gestartet.
+Der Nutzer meldet das angelegte ChatGPT-Plugin und eine erfolgreiche Statusantwort. Die private Tunnel-Runtime läuft. Es wurden kein zusätzlicher OAuth-Dienst und kein öffentliches Deployment eingerichtet. Für die Kosten der OpenAI-Dienste liegt hier keine verbindliche Kostenfreiheitsbestätigung vor; die Kontoverbindung ist kein Nachweis unbegrenzter oder kostenloser KI-Nutzung.
 
 ## Adapterquellen
 

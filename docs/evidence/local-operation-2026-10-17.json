@@ -76,13 +76,34 @@
   "chatgpt": {
     "official_tunnel_client_installed": "v0.0.16",
     "release_sha256_verified": true,
-    "tunnel_connected": false,
-    "chatgpt_tool_call": "unverified",
-    "remaining_requirement": "Authorized OpenAI account/workspace connection and a real ChatGPT tool call"
+    "tunnel_connected": true,
+    "chatgpt_tool_call": "user_reported_success",
+    "remaining_requirement": "Independently correlate the reported ChatGPT tool call; verify task approval, execution and result retrieval from ChatGPT",
+    "checked_at_utc": "2026-10-17T17:30:38.722061+00:00",
+    "runtime_alias": "kirabridge",
+    "runtime_evidence": {
+      "healthy": true,
+      "process_running": true,
+      "ready": true
+    },
+    "independently_correlated_tool_call": false,
+    "openai_discovery_forwarded": true,
+    "user_report": {
+      "reported_version": "0.2.0",
+      "reported_dispatcher_active": true,
+      "reported_agent_executables": [
+        "codex",
+        "grok"
+      ],
+      "running_agent_sessions_verified": false,
+      "reported_changes": false
+    },
+    "health_field_currently_fixed": "unverified",
+    "authenticated_dispatcher_readiness_probe": "passed"
   },
   "automated_validation": {
-    "tests_passed": 77,
-    "local_test_seconds": 16.97,
+    "tests_passed": 79,
+    "local_test_seconds": 18.89,
     "ruff": "passed",
     "package_build": "passed"
   }
