@@ -21,7 +21,10 @@ async def connect_stdio(config, principal):
             "Only when approval_required is true, give the operator local_approval_url. "
             "Do not ask for approval when approval_required is false. "
             "Use task_get and task_events to verify actual execution; "
-            "no task-ID copying is needed.",
+            "no task-ID copying is needed. "
+            "Use message_send/message_receive for addressed peer communication, not shared files. "
+            "message_channel_status reports peers and the separate managed receiver; "
+            "existing interactive sessions are not attached.",
         )
 
         @server.list_tools()

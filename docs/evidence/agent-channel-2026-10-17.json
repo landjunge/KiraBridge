@@ -1,0 +1,238 @@
+{
+  "recorded_at": "2026-10-17T19:27:52.061868+00:00",
+  "version": "0.5.0",
+  "message_api_version": "1",
+  "database_schema": 2,
+  "effective_configuration": {
+    "path": "/Users/landjunge/.config/kirabridge/config.toml",
+    "message_peers": {
+      "codex": [
+        "grok"
+      ],
+      "grok": [
+        "codex"
+      ]
+    },
+    "approval_modes": {
+      "local": "automatic",
+      "codex": "automatic",
+      "grok": "automatic",
+      "chatgpt": "automatic"
+    },
+    "receivers": {
+      "codex": {
+        "cwd": "/Users/landjunge/workspace/KiraBridge/kanal-agenten/codex",
+        "timeout": 90.0
+      },
+      "grok": {
+        "cwd": "/Users/landjunge/workspace/KiraBridge/kanal-agenten/grok",
+        "timeout": 90.0
+      }
+    },
+    "limits": {
+      "max_body_bytes": 16384,
+      "max_pending_per_recipient": 100,
+      "max_total": 10000,
+      "max_conversation_messages": 16,
+      "max_reply_depth": 8,
+      "max_runs_per_conversation": 4,
+      "max_runs_per_hour": 24
+    },
+    "private_configuration_and_sqlite_backup_created": true,
+    "credentials_changed": false
+  },
+  "live_roundtrip": {
+    "recorded_at": "2026-10-17T19:21:36.705589+00:00",
+    "conversation_id": "channel-proof-20261017-f9183b6d3272",
+    "nonce": "f9183b6d3272",
+    "authenticated_principals": [
+      "codex",
+      "grok"
+    ],
+    "transport": "existing role credentials -> stdio proxies -> authenticated MCP HTTP",
+    "messages": [
+      {
+        "api_version": "1",
+        "seq": 1,
+        "id": "bb642715-78b0-4d2f-bd3c-ec5246b54f1a",
+        "conversation_id": "channel-proof-20261017-f9183b6d3272",
+        "position": 1,
+        "sender": "codex",
+        "recipient": "grok",
+        "kind": "question",
+        "body": "Harmloser KiraBridge-Verbindungstest. Antworte ausschliesslich mit GROK_ACK_f9183b6d3272. Keine Dateiaktionen, keine weiteren Auftraege.",
+        "reply_to": null,
+        "task_id": null,
+        "depth": 0,
+        "request_reply": true,
+        "created": 1792264870.066658,
+        "delivered": 1792264870.11612,
+        "receipt": "9b474c5f-a92f-40ed-9949-71747d4c66fc",
+        "acknowledged": 1792264880.62238,
+        "processing": {
+          "message_id": "bb642715-78b0-4d2f-bd3c-ec5246b54f1a",
+          "state": "completed",
+          "run_id": "channel-15803483739e4610986f54be925b8355",
+          "claimed": 1792264870.1070678,
+          "started": 1792264875.380325,
+          "finished": 1792264880.6417851,
+          "reply_id": "4821f4c0-2780-44cb-9a74-db83d9a0bf9d",
+          "evidence": {
+            "adapter": "grok_acp",
+            "agent": "grok",
+            "response_sha256": "ef173d7e44302f70ff16b0025e87699f007977155c2861a9ed63222bce70485f",
+            "response_truncated": false,
+            "run_id": "channel-15803483739e4610986f54be925b8355",
+            "session_id": "01a14b4f-9bd0-7170-815b-145e3a692ebb",
+            "session_scope": "separate_managed_session",
+            "stop_reason": "end_turn"
+          },
+          "error": null
+        }
+      },
+      {
+        "api_version": "1",
+        "seq": 2,
+        "id": "4821f4c0-2780-44cb-9a74-db83d9a0bf9d",
+        "conversation_id": "channel-proof-20261017-f9183b6d3272",
+        "position": 2,
+        "sender": "grok",
+        "recipient": "codex",
+        "kind": "answer",
+        "body": "GROK_ACK_f9183b6d3272",
+        "reply_to": "bb642715-78b0-4d2f-bd3c-ec5246b54f1a",
+        "task_id": null,
+        "depth": 1,
+        "request_reply": false,
+        "created": 1792264880.459313,
+        "delivered": 1792264880.673105,
+        "receipt": "7914cb40-1090-4d15-ba49-a85e6e58d867",
+        "acknowledged": 1792264895.997709,
+        "processing": {
+          "message_id": "4821f4c0-2780-44cb-9a74-db83d9a0bf9d",
+          "state": "completed",
+          "run_id": "channel-059321690e234d4c81932151d134f1c2",
+          "claimed": 1792264880.66148,
+          "started": 1792264883.0604968,
+          "finished": 1792264896.097769,
+          "reply_id": null,
+          "evidence": {
+            "adapter": "codex",
+            "agent": "codex",
+            "exit_code": 0,
+            "response_sha256": "cc85b87e2c78861ea531d30cd4e296bbdf17e3c33045a890d63d19c829e6bb9d",
+            "run_id": "channel-059321690e234d4c81932151d134f1c2",
+            "session_id": "01a14b4f-c38f-78d3-9da2-948d9f055feb",
+            "session_scope": "separate_managed_session",
+            "timed_out": false,
+            "turn_completed": true,
+            "turn_failed": false
+          },
+          "error": null
+        }
+      }
+    ],
+    "idempotent_send_verified": true,
+    "idempotent_ack_verified": true,
+    "automatic_agent_turns": 2,
+    "existing_interactive_sessions_attached": false,
+    "separate_managed_sessions": true,
+    "manual_copy_or_approval_required": false
+  },
+  "actual_restart_test": {
+    "recorded_at": "2026-10-17T19:23:03.289768+00:00",
+    "conversation_id": "restart-proof-5e9a28267fe0",
+    "message_id": "c22be2e7-22ed-4a46-b0ca-907ff40625b2",
+    "before_service_pid": 63612,
+    "after_service_pid": 63963,
+    "actual_daemon_restart": true,
+    "existing_work_idle_before_restart": true,
+    "receipt_preserved": true,
+    "unacknowledged_delivery_recovered": true,
+    "idempotent_message_count": 1,
+    "idempotent_ack_verified": true,
+    "cross_principal_read": "chatgpt denied: forbidden",
+    "sender_cannot_ack_recipient": "not_found",
+    "sender_spoof_rejected": true,
+    "unauthenticated_http": 401,
+    "model_calls_for_restart_test": 0,
+    "receiver_active_after_restart": true
+  },
+  "preservation": {
+    "existing_task_rows_unchanged": 46,
+    "protected_grok_job": "/Users/landjunge/workspace/KiraBridge/auftraege/grok-restpunkte-20261017-2103",
+    "protected_control_file_hashes_before": {
+      "run.py": "a833bf3470f7f6c06e92092befc58df7ca25e53e889d182e5d910dc4804b9786",
+      "auftrag.txt": "210c6774fc5bdfb9f648a29013edfa33229ac0aff75902bc70b8fcd7c28162d4",
+      "start.json": "c3d3400520d1ef3e4135a0baf0f0532022dd467c1dae2556e0dcaf17d92aa891"
+    },
+    "protected_control_file_hashes_after": {
+      "run.py": "a833bf3470f7f6c06e92092befc58df7ca25e53e889d182e5d910dc4804b9786",
+      "auftrag.txt": "210c6774fc5bdfb9f648a29013edfa33229ac0aff75902bc70b8fcd7c28162d4",
+      "start.json": "c3d3400520d1ef3e4135a0baf0f0532022dd467c1dae2556e0dcaf17d92aa891"
+    },
+    "protected_job_exit_code": 0,
+    "protected_job_finished_at": "2026-10-17T19:18:42.141538+00:00",
+    "protected_job_finished_independently_before_channel_activation": true,
+    "original_pids": {
+      "codex": [
+        34179,
+        53477
+      ],
+      "grok": [
+        45185,
+        61402
+      ]
+    },
+    "still_alive": {
+      "codex": [
+        34179,
+        53477
+      ],
+      "grok": [
+        45185
+      ]
+    },
+    "native_sessions_not_restarted": true,
+    "protected_job_not_restarted_or_duplicated": true
+  },
+  "verification": {
+    "local_tests": "107 passed in 24.55s",
+    "ruff_check": "passed",
+    "ruff_format": "passed",
+    "package_build": "passed",
+    "audit": {
+      "valid": true,
+      "records": 263,
+      "head": "c962592b9919e8cbf4f79519275ff4fbed3f846f4c366decebd4574154c889dd"
+    },
+    "targeted_cases": [
+      "Authenticated sender and real Codex/Grok adapter turns",
+      "Idempotent send and acknowledgement",
+      "Actual daemon restart preserves unacknowledged receipt",
+      "Concurrent migration preserves existing tasks",
+      "Persisted queued receiver job resumes",
+      "Interrupted receiver becomes unknown, retaining prior session evidence; no reexecution",
+      "Recipient/conversation/ack ownership and spoof rejection",
+      "Payload/queue/depth/conversation/provider-budget limits",
+      "Finite two-turn exchange with no response loop",
+      "Bounded parent context delivered to receiving agent"
+    ]
+  },
+  "tunnel_runtime": {
+    "connected": true,
+    "runtime_evidence": {
+      "healthy": true,
+      "process_running": true,
+      "ready": true
+    },
+    "chatgpt_tool_call": "unverified"
+  },
+  "limits": [
+    "Automatic delivery addresses separate managed sessions, not existing interactive terminal sessions.",
+    "Managed adapters retain read-only/tool-denial restrictions; messages are not arbitrary shell execution.",
+    "Provider completion cannot be guaranteed exactly once after a crash; unknown turns are not blindly retried.",
+    "Existing MCP clients may need to reload their tool list; the authenticated CLI and automatic receivers are already active.",
+    "The live test invoked exactly two agent turns through the already configured CLIs. No new API key, paid service, public endpoint or subscription was created."
+  ]
+}

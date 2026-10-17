@@ -58,6 +58,47 @@ async def execute(args) -> None:
         emit({"config": str(destination), "workspace": str(workspace)})
         return
     config = load_config(args.config)
+    if args.command == "message":
+        from kirabridge.local_runtime import peer
+        from kirabridge.mcp_gateway.client import MCPClientPool
+        from kirabridge.message_manager import MessageSend
+
+        tool = {
+            "send": "message_send",
+            "receive": "message_receive",
+            "ack": "message_ack",
+            "get": "message_get",
+            "conversation": "conversation_get",
+            "status": "message_channel_status",
+        }[args.action]
+        payload = {}
+        if args.action == "send":
+            payload["message"] = MessageSend(
+                recipient=args.recipient,
+                conversation_id=args.conversation,
+                idempotency_key=args.key,
+                body=args.text,
+                kind=args.kind,
+                reply_to=args.reply_to,
+                task_id=args.task_id,
+                dispatch=not args.inbox_only,
+                request_reply=False if args.no_reply else None,
+            ).model_dump()
+        elif args.action in {"get", "ack"}:
+            payload["message_id"] = args.message_id
+            if args.action == "ack":
+                payload["receipt"] = args.receipt
+        elif args.action == "receive":
+            payload = {"after": args.after, "limit": args.limit, "wait_seconds": args.wait}
+        elif args.action == "conversation":
+            payload["conversation_id"] = args.conversation
+        async with MCPClientPool(call_timeout=30) as pool:
+            await pool.connect(peer(config, args.principal))
+            result = await pool.call("daemon", tool, payload)
+            emit(result.structuredContent or {"error": {"code": "invalid_channel_response"}})
+            if result.isError or (result.structuredContent or {}).get("error"):
+                raise SystemExit(1)
+        return
     if args.command in {"approvals", "approval-server"}:
         from kirabridge.console_runtime import open_console, serve_console
         from kirabridge.local_runtime import default_config
@@ -233,7 +274,7 @@ async def execute(args) -> None:
                     "python": sys.version.split()[0],
                     "platform": current_platform().name,
                     "database": "ok",
-                    "schema": 1,
+                    "schema": 2,
                     "audit": verify(bridge.store),
                     "agents": bridge.agents.inventory(list(config.agents)),
                     "chatgpt_integration": "unverified",
@@ -281,6 +322,32 @@ def main() -> None:
     setup.add_argument("--workspace", default=str(Path.home() / "workspace/KiraBridge"))
     sub.add_parser("status", help="Query the running local daemon")
     sub.add_parser("connect", help="Forward MCP stdio to the authenticated local daemon")
+    message = sub.add_parser("message", help="Authenticated addressed agent messaging")
+    message_actions = message.add_subparsers(dest="action", required=True)
+    send = message_actions.add_parser("send")
+    send.add_argument("recipient")
+    send.add_argument("text")
+    send.add_argument("--conversation", required=True)
+    send.add_argument("--key", required=True, help="Stable idempotency key for this exact message")
+    send.add_argument(
+        "--kind", choices=["question", "answer", "work", "result", "note"], default="question"
+    )
+    send.add_argument("--reply-to")
+    send.add_argument("--task-id")
+    send.add_argument("--inbox-only", action="store_true", help="Do not invoke a managed agent")
+    send.add_argument("--no-reply", action="store_true")
+    receive = message_actions.add_parser("receive")
+    receive.add_argument("--after", type=int, default=0)
+    receive.add_argument("--limit", type=int, default=20)
+    receive.add_argument("--wait", type=float, default=0)
+    get = message_actions.add_parser("get")
+    get.add_argument("message_id")
+    ack = message_actions.add_parser("ack")
+    ack.add_argument("message_id")
+    ack.add_argument("--receipt", required=True)
+    conversation = message_actions.add_parser("conversation")
+    conversation.add_argument("conversation")
+    message_actions.add_parser("status")
     sub.add_parser("approvals", help="Open the private local approval page in your browser")
     sub.add_parser("approval-server", help="Run the loopback-only local approval interface")
     chatgpt = sub.add_parser("chatgpt", help="Local account linking for a private ChatGPT tunnel")

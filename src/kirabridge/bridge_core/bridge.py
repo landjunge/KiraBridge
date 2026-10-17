@@ -25,6 +25,8 @@ from kirabridge.bridge_core.models import (
 )
 from kirabridge.clipboard_manager import ClipboardManager
 from kirabridge.filesystem_manager import FilesystemManager, PathScope
+from kirabridge.message_manager import MessageManager
+from kirabridge.message_manager.receiver import MessageReceiver
 from kirabridge.process_manager import ProcessManager
 from kirabridge.security_manager import SecurityManager
 from kirabridge.task_manager.manager import TaskManager
@@ -60,6 +62,8 @@ class Bridge:
         self.processes = ProcessManager(self.terminal)
         self.agents = AgentManager(config, self.terminal)
         self.tasks = TaskManager(config, self.store, self.security, self.execute)
+        self.messages = MessageManager(config, self.store, self.security)
+        self.message_receiver = MessageReceiver(self)
 
     def validate(self, request: TaskRequest) -> None:
         model = INPUTS.get(request.operation)
@@ -92,6 +96,10 @@ class Bridge:
             "local_approval_url": LOCAL_APPROVAL_URL,
             "approval_mode": policy.approval_mode,
             "approval_required": policy.approval_mode == "manual",
+            "message_peers": policy.message_peers,
+            "message_receiver_active": bool(
+                self.message_receiver.worker and not self.message_receiver.worker.done()
+            ),
         }
 
     def task(self, principal: str, task_id: str) -> dict:
@@ -189,8 +197,16 @@ class Bridge:
 
     async def __aenter__(self):
         await self.tasks.start()
+        try:
+            await self.message_receiver.start()
+        except BaseException:
+            await self.tasks.stop()
+            raise
         return self
 
     async def __aexit__(self, *exc):
-        await self.tasks.stop()
-        self.store.close()
+        try:
+            await self.message_receiver.stop()
+        finally:
+            await self.tasks.stop()
+            self.store.close()

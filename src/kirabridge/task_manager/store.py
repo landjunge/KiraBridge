@@ -12,6 +12,35 @@ from typing import Any
 from kirabridge.bridge_core.config import private_directory
 from kirabridge.bridge_core.models import TRANSITIONS, BridgeError, State, canonical, digest
 
+SCHEMA_VERSION = 2
+
+MESSAGE_SCHEMA = """
+CREATE TABLE conversations (
+ id TEXT PRIMARY KEY, party_a TEXT NOT NULL, party_b TEXT NOT NULL, created REAL NOT NULL
+);
+CREATE TABLE messages (
+ seq INTEGER PRIMARY KEY AUTOINCREMENT, id TEXT UNIQUE NOT NULL,
+ conversation_id TEXT NOT NULL REFERENCES conversations(id), position INTEGER NOT NULL,
+ sender TEXT NOT NULL, recipient TEXT NOT NULL, kind TEXT NOT NULL, body TEXT NOT NULL,
+ idem TEXT NOT NULL, request_hash TEXT NOT NULL, reply_to TEXT REFERENCES messages(id),
+ task_id TEXT REFERENCES tasks(id), depth INTEGER NOT NULL, request_reply INTEGER NOT NULL,
+ created REAL NOT NULL, delivered REAL, receipt TEXT, acknowledged REAL,
+ UNIQUE(sender,idem), UNIQUE(conversation_id,position)
+);
+CREATE INDEX message_inbox ON messages(recipient,acknowledged,seq);
+CREATE TABLE message_jobs (
+ message_id TEXT PRIMARY KEY REFERENCES messages(id), state TEXT NOT NULL,
+ run_id TEXT UNIQUE, claimed REAL, started REAL, finished REAL,
+ reply_id TEXT REFERENCES messages(id), evidence TEXT NOT NULL DEFAULT '{}', error TEXT
+);
+CREATE INDEX message_queue ON message_jobs(state);
+CREATE TABLE message_events (
+ seq INTEGER PRIMARY KEY AUTOINCREMENT, message_id TEXT NOT NULL REFERENCES messages(id),
+ at REAL NOT NULL, kind TEXT NOT NULL, evidence TEXT NOT NULL
+);
+PRAGMA user_version=2;
+"""
+
 SCHEMA = """
 CREATE TABLE tasks (
  id TEXT PRIMARY KEY, principal TEXT NOT NULL, idem TEXT NOT NULL,
@@ -56,12 +85,25 @@ class Store:
         self.db.execute("PRAGMA journal_mode=WAL")
         self.db.execute("PRAGMA synchronous=FULL")
         self.db.execute("PRAGMA foreign_keys=ON")
-        version = self.db.execute("PRAGMA user_version").fetchone()[0]
-        if version == 0:
-            self.db.executescript("BEGIN IMMEDIATE;" + SCHEMA + "COMMIT;")
-        elif version != 1:
+        try:
+            # Re-read under the write lock: concurrent daemon/client starts must not migrate twice.
+            with self.transaction():
+                version = self.db.execute("PRAGMA user_version").fetchone()[0]
+                scripts = []
+                if version == 0:
+                    scripts.append(SCHEMA)
+                    version = 1
+                if version == 1:
+                    scripts.append(MESSAGE_SCHEMA)
+                elif version != SCHEMA_VERSION:
+                    raise BridgeError("schema_version", "Unsupported database schema")
+                for script in scripts:
+                    for statement in script.split(";"):
+                        if statement.strip():
+                            self.db.execute(statement)
+        except BaseException:
             self.db.close()
-            raise BridgeError("schema_version", "Unsupported database schema")
+            raise
 
     @contextmanager
     def transaction(self):

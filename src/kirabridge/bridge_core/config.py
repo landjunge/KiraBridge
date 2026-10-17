@@ -19,6 +19,25 @@ class PrincipalConfig(BaseModel):
     executables: list[str] = Field(default_factory=list)
     agents: list[str] = Field(default_factory=list)
     token_env: str | None = None
+    message_peers: list[str] = Field(default_factory=list, max_length=16)
+
+
+class ReceiverConfig(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    cwd: str
+    timeout: float = Field(default=90, gt=0, le=300)
+
+
+class MessagingConfig(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    max_body_bytes: int = Field(default=16384, ge=256, le=65536)
+    max_pending_per_recipient: int = Field(default=100, ge=1, le=1000)
+    max_total: int = Field(default=10000, ge=1, le=1000000)
+    max_conversation_messages: int = Field(default=16, ge=2, le=128)
+    max_reply_depth: int = Field(default=8, ge=1, le=32)
+    max_runs_per_conversation: int = Field(default=4, ge=1, le=16)
+    max_runs_per_hour: int = Field(default=24, ge=1, le=1000)
+    receivers: dict[str, ReceiverConfig] = Field(default_factory=dict)
 
 
 class AgentConfig(BaseModel):
@@ -50,6 +69,7 @@ class Config(BaseModel):
         default_factory=lambda: {"local": PrincipalConfig()}
     )
     agents: dict[str, AgentConfig] = Field(default_factory=dict)
+    messaging: MessagingConfig = Field(default_factory=MessagingConfig)
 
     @property
     def state_path(self) -> Path:

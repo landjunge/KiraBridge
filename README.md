@@ -1,6 +1,6 @@
 # KiraBridge
 
-Privates, modulares Desktop- und Agenten-Gateway für macOS und Linux. Python 3.11+, asyncio, SQLite und das offizielle MCP Python SDK. Version **0.4.0** implementiert den Kern des [verbindlichen Entwicklungsplans](docs/DEVELOPMENT_PLAN.md), eine lokale Auftragsoberfläche und einen einstellbaren Freigabemodus.
+Privates, modulares Desktop- und Agenten-Gateway für macOS und Linux. Python 3.11+, asyncio, SQLite und das offizielle MCP Python SDK. Version **0.5.0** ergänzt den direkten, dauerhaften [Agentenkanal Codex ↔ Grok](docs/AGENT_CHANNEL.md) mit automatischer Empfängeranbindung. Grundlage bleibt der [Entwicklungsplan](docs/DEVELOPMENT_PLAN.md).
 
 ## Implementiert
 
@@ -12,6 +12,7 @@ Privates, modulares Desktop- und Agenten-Gateway für macOS und Linux. Python 3.
 - Dateioperationen mit POSIX-Dateideskriptoren und Schutz gegen Symlink-Pfadausbrüche; atomisches Schreiben; kein rekursives Löschen.
 - Unicode-Zwischenablage mit `pbcopy`/`pbpaste`, Wayland oder X11; konfigurierbare Lesefreigaben und Schreibbestätigung durch sofortiges Rücklesen. Keine Überwachung.
 - MCP über stdio und Streamable HTTP; authentifizierte parallele HTTP-Clients; ausgehender MCP-Clientpool mit getrennten Verbindungen.
+- Adressierte Nachrichten über sieben eigene MCP-Werkzeuge: SQLite-Postfächer, authentifizierte Absender, Gespräche, Quittungen, Idempotenz, begrenzte automatische Empfänger-Turns und keine blinden Wiederholungen nach Neustarts. Bestehende interaktive Sitzungen werden nicht übernommen; verwendet werden separate verwaltete Arbeitssitzungen.
 - Rollenrechte, wahlweise Einzelauftragsfreigaben oder dauerhafte Freigabe erlaubter Funktionen je Zugang, Replay-Schutz, standardmäßig Loopback, TLS-Pflicht für andere Bindungen und verkettetes Audit-Protokoll ohne Befehlsinhalte oder Zugangsdaten.
 
 **Betriebsnachweis:** Codex und Grok haben echte, getrennt nachgewiesene Testaufträge abgeschlossen. Ein echter Codex-MCP-Aufruf und Groks MCP-Handshake wurden geprüft. Der private ChatGPT-Tunnel läuft; der Nutzer meldet eine erfolgreiche Statusabfrage. Die neue lokale Freigabeseite wurde mit einem echten MCP-Dateilistenauftrag bis zum Abschluss geprüft. Windows hat definierte Erweiterungspunkte, noch keinen ausführbaren nativen Adapter. Bilder, Datei-Clipboard, PTY/interactive stdin, A2A und die optionalen externen Integrationen sind Erweiterungen; siehe [Status](docs/STATUS.md).

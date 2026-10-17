@@ -10,6 +10,7 @@ from mcp.types import ToolAnnotations
 from kirabridge import LOCAL_APPROVAL_URL
 from kirabridge.bridge_core.bridge import INPUTS, Bridge
 from kirabridge.bridge_core.models import BridgeError, TaskRequest
+from kirabridge.message_manager import MessageSend
 
 
 def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = "local") -> FastMCP:
@@ -21,7 +22,10 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
         "Only when approval_required is true, send the operator to local_approval_url. "
         "Do not ask for approval when approval_required is false. "
         "Do not ask them to copy task IDs between chats. "
-        "Acceptance is a receipt, not execution. Query task_get and task_events for evidence.",
+        "Acceptance is a receipt, not execution. Query task_get and task_events for evidence. "
+        "Use message_send/message_receive for addressed peer communication. "
+        "Automatic message receivers use separate managed sessions, not existing interactive ones; "
+        "check message_channel_status and message_get for actual evidence.",
         stateless_http=True,
         json_response=True,
         log_level="CRITICAL",
@@ -190,6 +194,101 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
         def action():
             bridge.security.principal(identity(ctx), "clipboard.info")
             return bridge.clipboard.info()
+
+        return safe(action)
+
+    delivery = ToolAnnotations(
+        readOnlyHint=False, destructiveHint=False, idempotentHint=True, openWorldHint=False
+    )
+
+    @server.tool(annotations=write)
+    def message_send(message: MessageSend, ctx: Context) -> dict[str, Any]:
+        """Send an addressed durable message; sender is your authenticated identity.
+
+        Kinds: question, answer, work, result, note. Reuse the idempotency_key only for the
+        exact same message. dispatch=true invokes the configured separate managed receiver;
+        existing interactive sessions are not attached. Questions/work request one response
+        by default. Answers/results never request another response. No shell interpolation.
+        """
+        return safe(lambda: bridge.messages.send(identity(ctx), message))
+
+    @server.tool(annotations=read)
+    def message_get(message_id: str, ctx: Context) -> dict[str, Any]:
+        """Read your message, delivery receipt, acknowledgement and worker evidence."""
+        return safe(lambda: bridge.messages.get(identity(ctx), message_id))
+
+    @server.tool(annotations=delivery)
+    async def message_receive(
+        ctx: Context,
+        after: int = 0,
+        limit: int = 20,
+        conversation_id: str | None = None,
+        wait_seconds: float = 0,
+    ) -> dict[str, Any]:
+        """Receive your unacknowledged messages in sequence; long polling is bounded to 20s.
+
+        Reconnect with after=0 to recover unacknowledged messages, retaining IDs/receipts.
+        Receipt proves delivery to this client, not completion of an agent task.
+        """
+        try:
+            return await bridge.messages.wait(
+                identity(ctx), after, limit, conversation_id, wait_seconds
+            )
+        except BridgeError as exc:
+            return {"error": {"code": exc.code, "message": str(exc)}}
+        except Exception:
+            return {"error": {"code": "internal_error", "message": "Message receive failed"}}
+
+    @server.tool(annotations=delivery)
+    def message_ack(message_id: str, receipt: str, ctx: Context) -> dict[str, Any]:
+        """Idempotently acknowledge an incoming message using its delivery receipt."""
+        return safe(lambda: bridge.messages.ack(identity(ctx), message_id, receipt))
+
+    @server.tool(annotations=read)
+    def conversation_get(
+        conversation_id: str,
+        ctx: Context,
+        after: int = 0,
+        limit: int = 50,
+    ) -> dict[str, Any]:
+        """Read a conversation you participate in, including replies and processing evidence."""
+        return safe(
+            lambda: bridge.messages.conversation(identity(ctx), conversation_id, after, limit)
+        )
+
+    @server.tool(annotations=read)
+    def message_events(message_id: str, ctx: Context, after: int = 0) -> dict[str, Any]:
+        """Read ordered delivery/acknowledgement/processing events for your own message."""
+        return safe(lambda: bridge.messages.events(identity(ctx), message_id, after))
+
+    @server.tool(annotations=read)
+    def message_channel_status(ctx: Context) -> dict[str, Any]:
+        """Report peers and the separate receiver's state; never claim active UI access."""
+
+        def action():
+            principal = identity(ctx)
+            policy = bridge.security.principal(principal, "message.read")
+            states = bridge.store.db.execute(
+                "SELECT j.state,count(*) AS count FROM message_jobs j JOIN messages m "
+                "ON m.id=j.message_id WHERE m.recipient=? GROUP BY j.state",
+                (principal,),
+            ).fetchall()
+            return {
+                "api_version": "1",
+                "principal": principal,
+                "peers": policy.message_peers,
+                "approval_mode": policy.approval_mode,
+                "receiver_configured": principal in config.messaging.receivers,
+                "receiver_active": bool(
+                    principal in config.messaging.receivers
+                    and bridge.message_receiver.worker
+                    and not bridge.message_receiver.worker.done()
+                ),
+                "session_scope": "separate_managed_session",
+                "existing_session_attached": False,
+                "jobs": {row["state"]: row["count"] for row in states},
+                "limits": config.messaging.model_dump(exclude={"receivers"}),
+            }
 
         return safe(action)
 

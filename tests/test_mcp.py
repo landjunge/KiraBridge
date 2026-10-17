@@ -26,6 +26,7 @@ async def http_bridge(bridge, monkeypatch):
     sock.bind(("127.0.0.1", 0))
     sock.listen(64)
     port = sock.getsockname()[1]
+    bridge.config.port = port
     server = uvicorn.Server(
         uvicorn.Config(create_http_app(bridge), log_level="critical", access_log=False)
     )

@@ -1,6 +1,12 @@
-# Abnahmestand 0.4.0
+# Abnahmestand 0.5.0
 
 Stand: 17. Oktober 2026. Grundlage bleibt der [Entwicklungsplan](DEVELOPMENT_PLAN.md). Der frühere rein paketbezogene Stand ist in [STATUS-v0.1.md](STATUS-v0.1.md) archiviert.
+
+## Direkter Agentenkanal
+
+Version 0.5.0 stellt `message_send`, `message_receive`, `message_ack`, `message_get`, `conversation_get`, `message_events` und `message_channel_status` bereit. Die vorhandenen Zugänge `codex` und `grok` sind gegenseitig freigeschaltet; beide behalten den automatischen Freigabemodus. SQLite-Schema 2 speichert adressierte Nachrichten, Reihenfolge, Quittungen und begrenzte Empfängerjobs getrennt von bestehenden Aufgaben. Die frühere Aufgabenhistorie wird bei der atomaren Migration nicht umgeschrieben.
+
+Ein echter authentifizierter Austausch Codex → Grok → Codex ist mit zwei separaten CLI-Arbeitssitzungen und beiden Empfangsquittungen nachgewiesen. Ein tatsächlicher Dienstneustart erhält eine zusätzliche unquittierte Nachricht samt ID und Quittung; wiederholtes Senden erzeugt keine zweite Nachricht. Unauthentifizierter Zugriff, Zugriff durch `chatgpt`, gefälschte Absender und falsche Quittierungen wurden zurückgewiesen. Die bestehende Grok-Hilfezentrum-Arbeit wurde nicht angesprochen oder dupliziert. Die neue Anbindung greift nicht auf bereits laufende interaktive Sitzungen zu. [Bedienung und tatsächliche Grenzen](AGENT_CHANNEL.md), [konkrete Belege](evidence/agent-channel-2026-10-17.json).
 
 ## Auf dem Ziel-Mac eingerichtet und geprüft
 
@@ -31,7 +37,7 @@ Der anschließend gemeldete Fehler `executable_denied` beim Codex-Terminalabruf 
 
 ## Automatische Prüfungen
 
-Lokal auf macOS 15.7.4, Intel x86_64, Python 3.11.15: **96 Tests bestanden in 19,97 Sekunden**. Ruff und Paketbau sind erfolgreich. Zusätzlich zu den bisherigen Sicherheits- und Wiederherstellungstests werden Pending-Freigaben, Zurückweisung, geschützte lokale Einrichtung, gemeinsam verwendete Stdio-Proxies und die Geheimnisbehandlung im Kontoverbindungsassistenten geprüft. Weitere Regressionstests decken automatische Freigaben über echte stdio-/HTTP-Verbindungen und Proxies, optionale MCP-Freigabetoken, Rollen-/Pfad-/Programmbegrenzungen, Idempotenz, Auditbelege und unveränderte Wiederherstellung unbekannter Zustände ab. Der manuelle Modus mit browsergebundenen, atomaren Entscheidungen wird weiterhin geprüft.
+Lokal auf macOS 15.7.4, Intel x86_64, Python 3.11.15: **107 Tests bestanden in 24,55 Sekunden**. Ruff und Paketbau sind erfolgreich. Zusätzlich zu den bisherigen Sicherheits- und Wiederherstellungstests werden Pending-Freigaben, Zurückweisung, geschützte lokale Einrichtung, gemeinsam verwendete Stdio-Proxies und die Geheimnisbehandlung im Kontoverbindungsassistenten geprüft. Weitere Regressionstests decken automatische Freigaben über echte stdio-/HTTP-Verbindungen und Proxies, optionale MCP-Freigabetoken, Rollen-/Pfad-/Programmbegrenzungen, Idempotenz, Auditbelege und unveränderte Wiederherstellung unbekannter Zustände ab. Elf gezielte Kanaltests prüfen den authentifizierten Austausch mit isolierten Testagenten, Quittungen, Eigentümergrenzen, Payload-/Queue-/Schleifengrenzen, parallele Migration, Wiederaufnahme wartender Empfängerjobs und erhaltene Belege unterbrochener Turns. Der manuelle Modus mit browsergebundenen, atomaren Entscheidungen wird weiterhin geprüft.
 
 Die [Verify-Pipeline](https://github.com/landjunge/KiraBridge/actions/workflows/ci.yml) prüft Codeänderungen auf Ubuntu 24.04 mit Python 3.11/3.13 sowie macOS 15 mit Python 3.11. Version 0.4.0 einschließlich automatischem Freigabemodus, MCP-Anpassungen und Oberfläche ist im Commit `78e3667` auf allen drei Kombinationen [erfolgreich geprüft](https://github.com/landjunge/KiraBridge/actions/runs/39060404475). Der anschließende reine Nachweis-Commit ändert keinen Programmcode.
 
