@@ -173,7 +173,26 @@
     "ruff_check": "passed",
     "ruff_format": "passed",
     "package_build": "passed; sdist and wheel",
-    "dependencies_changed": false
+    "dependencies_changed": false,
+    "github_actions": {
+      "head_sha": "78e3667d142c12117858f7f7e5fe710a5bab92c7",
+      "url": "https://github.com/landjunge/KiraBridge/actions/runs/39060404475",
+      "conclusion": "success",
+      "jobs": [
+        {
+          "name": "verify (macos-15, 3.11)",
+          "conclusion": "success"
+        },
+        {
+          "name": "verify (ubuntu-24.04, 3.13)",
+          "conclusion": "success"
+        },
+        {
+          "name": "verify (ubuntu-24.04, 3.11)",
+          "conclusion": "success"
+        }
+      ]
+    }
   },
   "limits": [
     "Verification uses local authenticated MCP clients and stdio proxies, not additional Codex/Grok model turns or an additional ChatGPT conversation.",
