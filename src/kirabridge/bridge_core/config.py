@@ -4,6 +4,7 @@ import os
 import sys
 import tomllib
 from pathlib import Path
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -12,6 +13,7 @@ from kirabridge.bridge_core.models import BridgeError
 
 class PrincipalConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
+    approval_mode: Literal["manual", "automatic"] = "manual"
     capabilities: list[str] = Field(default_factory=lambda: ["bridge.health", "task.read"])
     roots: list[str] = Field(default_factory=list)
     executables: list[str] = Field(default_factory=list)

@@ -54,6 +54,7 @@ def test_account_setup_keeps_literal_key_out_of_commands_and_policy(tmp_path, mo
     configured = setup(str(tmp_path / "workspace"))
     path = Path(configured["config"])
     config = load_config(str(path))
+    config.principals["local"].approval_mode = "automatic"
     original = private_json(Path(config.credentials_file))
     key = "test-runtime-key-" + "x" * 40
     calls = []
@@ -81,6 +82,7 @@ def test_account_setup_keeps_literal_key_out_of_commands_and_policy(tmp_path, mo
     assert stored_key.read_text() == key and stored_key.stat().st_mode & 0o077 == 0
     updated = load_config(str(path))
     assert "chatgpt" in updated.principals
+    assert updated.principals["chatgpt"].approval_mode == "automatic"
     credentials = private_json(Path(updated.credentials_file))
     assert all(credentials[name] == token for name, token in original.items())
     assert credentials["chatgpt"] not in original.values()

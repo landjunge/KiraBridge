@@ -1,6 +1,6 @@
 # KiraBridge
 
-Privates, modulares Desktop- und Agenten-Gateway für macOS und Linux. Python 3.11+, asyncio, SQLite und das offizielle MCP Python SDK. Version **0.3.0** implementiert den Kern des [verbindlichen Entwicklungsplans](docs/DEVELOPMENT_PLAN.md) und eine lokale Freigabeoberfläche.
+Privates, modulares Desktop- und Agenten-Gateway für macOS und Linux. Python 3.11+, asyncio, SQLite und das offizielle MCP Python SDK. Version **0.4.0** implementiert den Kern des [verbindlichen Entwicklungsplans](docs/DEVELOPMENT_PLAN.md), eine lokale Auftragsoberfläche und einen einstellbaren Freigabemodus.
 
 ## Implementiert
 
@@ -10,9 +10,9 @@ Privates, modulares Desktop- und Agenten-Gateway für macOS und Linux. Python 3.
 - Codex CLI mit JSONL-Nachweisen; Grok Build über ACP v1; zusätzlicher Grok-API-Adapter für reine Textantworten. Agentenidentitäten und Sitzungen bleiben getrennt.
 - Terminal mit expliziten ausführbaren Dateien, Arbeitsverzeichnisprüfung, begrenzter Ausgabe, Zeitlimits und Beendigung eigener Prozessgruppen. Kein implizites `shell=True`.
 - Dateioperationen mit POSIX-Dateideskriptoren und Schutz gegen Symlink-Pfadausbrüche; atomisches Schreiben; kein rekursives Löschen.
-- Unicode-Zwischenablage mit `pbcopy`/`pbpaste`, Wayland oder X11; einmalige Lesefreigaben und Schreibbestätigung durch sofortiges Rücklesen. Keine Überwachung.
+- Unicode-Zwischenablage mit `pbcopy`/`pbpaste`, Wayland oder X11; konfigurierbare Lesefreigaben und Schreibbestätigung durch sofortiges Rücklesen. Keine Überwachung.
 - MCP über stdio und Streamable HTTP; authentifizierte parallele HTTP-Clients; ausgehender MCP-Clientpool mit getrennten Verbindungen.
-- Rollenrechte, konkrete einmalige Aufgabenfreigaben, Replay-Schutz, standardmäßig Loopback, TLS-Pflicht für andere Bindungen und verkettetes Audit-Protokoll ohne Befehlsinhalte oder Zugangsdaten.
+- Rollenrechte, wahlweise Einzelauftragsfreigaben oder dauerhafte Freigabe erlaubter Funktionen je Zugang, Replay-Schutz, standardmäßig Loopback, TLS-Pflicht für andere Bindungen und verkettetes Audit-Protokoll ohne Befehlsinhalte oder Zugangsdaten.
 
 **Betriebsnachweis:** Codex und Grok haben echte, getrennt nachgewiesene Testaufträge abgeschlossen. Ein echter Codex-MCP-Aufruf und Groks MCP-Handshake wurden geprüft. Der private ChatGPT-Tunnel läuft; der Nutzer meldet eine erfolgreiche Statusabfrage. Die neue lokale Freigabeseite wurde mit einem echten MCP-Dateilistenauftrag bis zum Abschluss geprüft. Windows hat definierte Erweiterungspunkte, noch keinen ausführbaren nativen Adapter. Bilder, Datei-Clipboard, PTY/interactive stdin, A2A und die optionalen externen Integrationen sind Erweiterungen; siehe [Status](docs/STATUS.md).
 
@@ -33,9 +33,11 @@ kirabridge approve TASK_ID
 kirabridge deny TASK_ID
 ```
 
-**Freigaben im Browser:** [KiraBridge auf diesem Mac](http://127.0.0.1:8766/). `kirabridge approvals` startet die getrennte lokale Oberfläche und meldet den Browser über eine private Einmal-Anmeldedatei an. Auf macOS liegt anschließend „KiraBridge Freigaben.command“ auf dem Schreibtisch. Neue Anfragen erscheinen automatisch; nach dem Öffnen der Auftragsdetails lassen sie sich per Klick freigeben oder ablehnen. Ergebnisse und echte Zustandswechsel erscheinen auf derselben Seite. Es müssen keine IDs zwischen Chats kopiert werden.
+**Aufträge im Browser:** [KiraBridge auf diesem Mac](http://127.0.0.1:8766/). `kirabridge approvals` startet die getrennte lokale Oberfläche und meldet den Browser über eine private Einmal-Anmeldedatei an. Auf macOS liegt anschließend „KiraBridge Freigaben.command“ auf dem Schreibtisch. Anfragen, Ergebnisse und echte Zustandswechsel erscheinen automatisch. Im manuellen Modus lassen sich wartende Anfragen nach dem Öffnen der Auftragsdetails freigeben oder ablehnen; im automatischen Modus ist dieser Schritt nicht nötig. Es müssen keine IDs zwischen Chats kopiert werden.
 
-Lokale Kurzbefehle genehmigen genau den vom Bediener angegebenen Auftrag. MCP-Clients können mit `task_request` eine Aufgabe vorlegen; die Antwort enthält `local_approval_url`. Die Aufgabe bleibt bis zur lokalen Freigabe im Zustand `created`. Die CLI-Befehle `approve` und `deny` stehen ebenfalls zur Verfügung. Es gibt keine Selbstfreigabe durch einen MCP-Agenten.
+**Ohne wiederholte Freigabeklicks:** Auf diesem Mac ist für `chatgpt`, `codex`, `grok` und `local` ausdrücklich `approval_mode = "automatic"` eingerichtet. Erlaubte MCP-Anfragen über `task_request` oder `task_submit` kommen direkt in die Warteschlange, ohne Browserklick oder Freigabetoken. `bridge_health` und `operation_catalog` melden den tatsächlich eingerichteten Modus. Die Oberfläche zeigt Aufträge und Ergebnisse weiter an.
+
+Neu angelegte Zugänge verwenden standardmäßig `approval_mode = "manual"`: Ihre Anfragen bleiben bis zur lokalen Freigabe im Zustand `created`. Der Modus wird ausschließlich in der privaten Konfiguration unter `[principals.<zugang>]` gesetzt; `"manual"` stellt die Einzelauftragsfreigabe wieder her. Nach einer Änderung wird der Dienst ohne laufende Aufträge kontrolliert neu gestartet. Anmeldung, Funktionsrechte, erlaubte Programme und Verzeichnisse, Ressourcenlimits und Schutz vor doppelter Ausführung gelten in beiden Modi. MCP-Agenten können den Modus nicht selbst ändern.
 
 Die einmalige ChatGPT-Kontoverbindung wird über `kirabridge chatgpt setup` eingerichtet. Der Assistent öffnet die offiziellen Kontoseiten und fragt einen eingeschränkten Runtime-Schlüssel unsichtbar im lokalen Terminal ab. `kirabridge chatgpt status` unterscheidet installierten Client, Tunnel-Bereitschaft und den weiterhin separat zu prüfenden ChatGPT-Toolaufruf.
 

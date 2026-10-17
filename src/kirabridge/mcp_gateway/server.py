@@ -16,9 +16,11 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
     config = bridge.config
     server = FastMCP(
         "KiraBridge",
-        instructions="API v1. Every task needs a locally issued exact-task approval. "
-        "Send the operator to local_approval_url on their Mac; requests appear there "
-        "automatically. Do not ask them to copy task IDs between chats. "
+        instructions="API v1. Check bridge_health or operation_catalog for approval_mode. "
+        "Use task_request: automatic mode queues permitted work without a browser click. "
+        "Only when approval_required is true, send the operator to local_approval_url. "
+        "Do not ask for approval when approval_required is false. "
+        "Do not ask them to copy task IDs between chats. "
         "Acceptance is a receipt, not execution. Query task_get and task_events for evidence.",
         stateless_http=True,
         json_response=True,
@@ -71,8 +73,12 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
             policy = bridge.security.principal(identity(ctx))
             return {
                 "api_version": "1",
+                "approval_mode": policy.approval_mode,
                 "operations": {
-                    name: {"arguments": model.model_json_schema(), "approval_required": True}
+                    name: {
+                        "arguments": model.model_json_schema(),
+                        "approval_required": policy.approval_mode == "manual",
+                    }
                     for name, model in INPUTS.items()
                     if name in policy.capabilities
                 },
@@ -81,8 +87,11 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
         return safe(action)
 
     @server.tool(annotations=write)
-    def task_submit(request: TaskRequest, approval: str, ctx: Context) -> dict[str, Any]:
-        """Persist an exact approved task; repeating its idempotency key never executes it twice."""
+    def task_submit(request: TaskRequest, ctx: Context, approval: str = "") -> dict[str, Any]:
+        """Queue a task; automatic mode needs no token, manual mode requires an exact-task grant.
+
+        Repeating its idempotency key never executes it twice.
+        """
         return safe(lambda: bridge.submit(identity(ctx), request, approval))
 
     @server.tool(annotations=read)
@@ -92,19 +101,21 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
 
     @server.tool(annotations=write)
     def task_request(request: TaskRequest, ctx: Context) -> dict[str, Any]:
-        """Request local approval. This stores a pending request and executes nothing.
+        """Queue permitted work automatically, or request approval if this identity is manual.
 
-        Give the operator local_approval_url to approve in their Mac browser, then poll task_get.
-        Requests appear automatically; do not ask them to copy task IDs between chats.
-        Never claim execution while the task remains created (awaiting approval).
+        Check approval_required: false means no browser click is needed; poll task_get.
+        Only when true, give the operator local_approval_url to approve in their Mac browser.
+        Do not ask them to copy task IDs between chats. A queued receipt is not proof of execution.
         """
 
         def action():
-            task = bridge.prepare(identity(ctx), request)
+            principal = identity(ctx)
+            task = bridge.prepare(principal, request)
             return {
                 **task,
                 "local_approval_url": LOCAL_APPROVAL_URL,
                 "approval_required": task["state"] == "created",
+                "approval_mode": config.principals[principal].approval_mode,
             }
 
         return safe(action)
@@ -123,7 +134,7 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
 
     @server.tool(annotations=write)
     def task_cancel(task_id: str, ctx: Context) -> dict[str, Any]:
-        """Cancel your queued task. Active process termination needs a separate approved task."""
+        """Cancel your queued task. Active process termination needs a separate authorized task."""
         return safe(lambda: bridge.tasks.cancel_queued(identity(ctx), task_id))
 
     @server.tool(annotations=read)
@@ -138,9 +149,9 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
 
     @server.tool(annotations=write)
     def clipboard_read(
-        task_id: str, idempotency_key: str, approval: str, ctx: Context, max_bytes: int = 65536
+        task_id: str, idempotency_key: str, ctx: Context, approval: str = "", max_bytes: int = 65536
     ) -> dict[str, Any]:
-        """Queue one explicitly approved clipboard read. Fetch its result with task_get."""
+        """Queue one clipboard read under the configured approval mode; fetch with task_get."""
         return safe(
             lambda: bridge.submit(
                 identity(ctx),
@@ -156,9 +167,9 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
 
     @server.tool(annotations=write)
     def clipboard_write(
-        task_id: str, idempotency_key: str, approval: str, text: str, ctx: Context
+        task_id: str, idempotency_key: str, text: str, ctx: Context, approval: str = ""
     ) -> dict[str, Any]:
-        """Queue an approved text write with content digest and immediate readback confirmation."""
+        """Queue a text write under the configured approval mode, with immediate readback proof."""
         return safe(
             lambda: bridge.submit(
                 identity(ctx),

@@ -7,6 +7,9 @@ max_queued = 1000
 allow_remote = false
 
 [principals.local]
+# "automatic" queues permitted tasks without individual browser clicks or approval tokens.
+# Authentication, capabilities, allowed executables/roots and duplicate protection still apply.
+approval_mode = "manual"
 capabilities = [
   "bridge.health", "task.read", "task.cancel", "agent.inspect",
   "terminal.execute", "file.read", "file.list", "file.write", "file.mkdir", "file.move",

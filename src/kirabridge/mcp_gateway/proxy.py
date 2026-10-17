@@ -16,9 +16,12 @@ async def connect_stdio(config, principal):
         server = Server(
             "KiraBridge",
             version=__version__,
-            instructions="Use task_request and give the operator local_approval_url on their Mac. "
-            "Requests appear there automatically; no task-ID copying is needed. "
-            "Use task_get and task_events to verify execution after local approval.",
+            instructions="Check bridge_health or operation_catalog for approval_mode. "
+            "Use task_request; automatic mode queues permitted work without a browser click. "
+            "Only when approval_required is true, give the operator local_approval_url. "
+            "Do not ask for approval when approval_required is false. "
+            "Use task_get and task_events to verify actual execution; "
+            "no task-ID copying is needed.",
         )
 
         @server.list_tools()

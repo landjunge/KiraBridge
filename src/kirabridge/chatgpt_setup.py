@@ -126,6 +126,7 @@ def configure_tunnel(
         policy = config.principals["local"]
         section = (
             "\n[principals.chatgpt]\n"
+            f"approval_mode = {json.dumps(policy.approval_mode)}\n"
             f"capabilities = {json.dumps(policy.capabilities)}\n"
             f"roots = {json.dumps(policy.roots)}\n"
             f"executables = {json.dumps(policy.executables)}\n"

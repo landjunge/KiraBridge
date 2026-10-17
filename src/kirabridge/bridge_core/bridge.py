@@ -72,7 +72,7 @@ class Bridge:
                 "invalid_arguments", "Arguments do not match the operation schema"
             ) from None
 
-    def submit(self, principal: str, request: TaskRequest, approval: str) -> dict:
+    def submit(self, principal: str, request: TaskRequest, approval: str = "") -> dict:
         self.validate(request)
         return self.tasks.enqueue(principal, request, approval)
 
@@ -81,7 +81,7 @@ class Bridge:
         return self.tasks.enqueue(principal, request, "", pending=True)
 
     def health(self, principal: str) -> dict:
-        self.security.principal(principal, "bridge.health")
+        policy = self.security.principal(principal, "bridge.health")
         return {
             "name": "KiraBridge",
             "version": __version__,
@@ -90,6 +90,8 @@ class Bridge:
             and all(not worker.done() for worker in self.tasks.workers),
             "chatgpt_integration": "unverified",
             "local_approval_url": LOCAL_APPROVAL_URL,
+            "approval_mode": policy.approval_mode,
+            "approval_required": policy.approval_mode == "manual",
         }
 
     def task(self, principal: str, task_id: str) -> dict:

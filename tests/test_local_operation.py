@@ -86,8 +86,14 @@ def test_insecure_or_symlinked_credentials_fail_closed(tmp_path):
         private_json(link)
 
 
-async def test_stdio_proxy_reaches_existing_daemon_without_second_dispatcher(http_bridge, tmp_path):  # noqa: F811
+@pytest.mark.parametrize("mode", ["manual", "automatic"])
+async def test_stdio_proxy_reaches_existing_daemon_without_second_dispatcher(
+    http_bridge,  # noqa: F811
+    tmp_path,
+    mode,
+):
     bridge, endpoint = http_bridge
+    bridge.config.principals["local"].approval_mode = mode
     credentials = tmp_path / "credentials.json"
     credentials.write_text(json.dumps({"local": "local-test-" + "a" * 40}))
     credentials.chmod(0o600)
@@ -123,6 +129,9 @@ async def test_stdio_proxy_reaches_existing_daemon_without_second_dispatcher(htt
             },
         )
         assert pending.structuredContent["local_approval_url"] == "http://127.0.0.1:8766/"
-        assert pending.structuredContent["approval_required"] is True
-        assert pending.structuredContent["state"] == "created"
-        assert pending.structuredContent["receipt"] is None
+        assert pending.structuredContent["approval_required"] is (mode == "manual")
+        assert pending.structuredContent["state"] == ("created" if mode == "manual" else "queued")
+        if mode == "automatic":
+            assert (await bridge.tasks.wait("local", "proxy-console-link"))["state"] == "completed"
+        else:
+            assert pending.structuredContent["receipt"] is None

@@ -100,6 +100,33 @@ async def test_multiple_real_http_clients_do_not_cross_principals(http_bridge, c
             await clients.connect(Peer("local", url=endpoint))
 
 
+async def test_http_automatic_mode_is_per_identity_and_requires_authentication(http_bridge, config):
+    bridge, endpoint = http_bridge
+    config.principals["local"].approval_mode = "automatic"
+    async with MCPClientPool() as clients:
+        await clients.connect(Peer("local", url=endpoint, token="local-test-" + "a" * 40))
+        await clients.connect(Peer("other", url=endpoint, token="other-test-" + "b" * 40))
+        for principal in ["local", "other"]:
+            automatic = principal == "local"
+            health = (await clients.call(principal, "bridge_health", {})).structuredContent
+            assert health["approval_required"] is not automatic
+            catalog = (await clients.call(principal, "operation_catalog", {})).structuredContent
+            assert catalog["operations"]["file.list"]["approval_required"] is not automatic
+            value = request(
+                arguments={"path": config.principals[principal].roots[0]}, task_id=principal
+            )
+            result = (
+                await clients.call(principal, "task_request", {"request": value.model_dump()})
+            ).structuredContent
+            assert result["approval_required"] is not automatic
+            if automatic:
+                assert (await bridge.tasks.wait(principal, value.task_id))["state"] == "completed"
+            else:
+                assert result["state"] == "created" and result["started"] is None
+        async with httpx.AsyncClient(trust_env=False) as client:
+            assert (await client.post(endpoint, json={})).status_code == 401
+
+
 async def test_real_stdio_roundtrip(tmp_path):
     config = tmp_path / "bridge.toml"
     config.write_text("data_dir = " + json.dumps(str(tmp_path / "stdio-state")) + "\n")

@@ -38,7 +38,9 @@ class TaskManager:
         attempt: int = 1,
         pending: bool = False,
     ) -> dict:
-        self.security.principal(principal, request.operation)
+        policy = self.security.principal(principal, request.operation)
+        automatic = policy.approval_mode == "automatic" and not approval
+        pending = pending and not automatic
         if request.api_version != "1":
             raise BridgeError("api_version", "Unsupported API version")
         if len(canonical(request.model_dump()).encode()) > self.config.max_task_bytes:
@@ -76,7 +78,7 @@ class TaskManager:
                     if depth >= 32:
                         raise BridgeError("delegation_limit", "Delegation chain exceeds 32 tasks")
                     parent = self.store.get(parent["parent_id"], principal)
-            if not pending:
+            if not pending and not automatic:
                 self.security.consume(principal, request, approval)
             now = time.time()
             self.store.db.execute(
@@ -100,9 +102,12 @@ class TaskManager:
                 ),
             )
             for state in (State.CREATED,) if pending else (State.CREATED, State.QUEUED):
+                evidence = {"persisted": True}
+                if state == State.QUEUED and automatic:
+                    evidence["approval_source"] = "principal_policy"
                 self.store.db.execute(
                     "INSERT INTO events(task_id,at,state,evidence) VALUES(?,?,?,?)",
-                    (request.task_id, now, state, '{"persisted":true}'),
+                    (request.task_id, now, state, canonical(evidence)),
                 )
             self.store.audit(
                 "task.requested" if pending else "task.queued",
@@ -110,6 +115,18 @@ class TaskManager:
                 request.task_id,
                 {"operation": request.operation, "request_hash": request_hash(request)},
             )
+            if automatic:
+                self.store.audit(
+                    "task.auto_approved",
+                    principal,
+                    request.task_id,
+                    {
+                        "source": "principal_policy",
+                        "approval_mode": policy.approval_mode,
+                        "operation": request.operation,
+                        "request_hash": request_hash(request),
+                    },
+                )
         self.wake.set()
         return self.store.get(request.task_id, principal)
 

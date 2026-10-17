@@ -182,7 +182,16 @@ class ApprovalConsole:
         count = self.bridge.store.db.execute(
             "SELECT count(*) FROM tasks WHERE state='created'"
         ).fetchone()[0]
-        return JSONResponse({"tasks": [dict(row) for row in rows], "pending": count})
+        return JSONResponse(
+            {
+                "tasks": [dict(row) for row in rows],
+                "pending": count,
+                "approval_modes": {
+                    name: policy.approval_mode
+                    for name, policy in self.bridge.config.principals.items()
+                },
+            }
+        )
 
     async def task(self, request: Request):
         self.authenticate(request)

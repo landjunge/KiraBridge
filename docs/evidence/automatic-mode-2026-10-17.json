@@ -1,0 +1,184 @@
+{
+  "recorded_at": "2026-10-17T18:58:07.327471+00:00",
+  "project": "KiraBridge",
+  "version": "0.4.0",
+  "authorization": "Explicit user instruction to change the code so repeated approvals are no longer required; Grok explicitly included.",
+  "configuration": {
+    "path": "/Users/landjunge/.config/kirabridge/config.toml",
+    "principals": [
+      "local",
+      "codex",
+      "grok",
+      "chatgpt"
+    ],
+    "approval_mode": "automatic",
+    "private_backup_created": true,
+    "mode": "0600",
+    "before_sha256": "9b2f29cc3c6e22ac91297a286930aa48bc6a6797a542cef0bf4db38eb3dd275f",
+    "after_sha256": "99187ca6564d4fd471deaa846a68d8107d8853252583323843418fbc4cf7bf30",
+    "other_capabilities_roots_executables_agents_unchanged": true,
+    "new_principal_default": "manual",
+    "operator_can_restore": "Set approval_mode to manual for the principal and restart while idle.",
+    "remote_policy_change_tool": false
+  },
+  "live_mcp_verification": {
+    "version": "0.4.0",
+    "recorded_at": "2026-10-17T18:55:48.193255+00:00",
+    "principals": {
+      "chatgpt": {
+        "task_id": "automatic-proof-chatgpt-f829053281f0",
+        "transport": "authenticated Streamable HTTP",
+        "tool": "task_request",
+        "approval_mode": "automatic",
+        "approval_required": false,
+        "initial_state": "queued",
+        "state": "completed",
+        "started": 1792263350.200572,
+        "finished": 1792263350.305089,
+        "exit_code": 0,
+        "output_matches_probe": true,
+        "duplicate_request_did_not_execute": true,
+        "attempt": 1,
+        "events": [
+          "created",
+          "queued",
+          "accepted",
+          "running",
+          "completed"
+        ]
+      },
+      "codex": {
+        "task_id": "automatic-proof-codex-f829053281f0",
+        "transport": "stdio proxy -> authenticated HTTP",
+        "tool": "task_request",
+        "approval_mode": "automatic",
+        "approval_required": false,
+        "initial_state": "queued",
+        "state": "completed",
+        "started": 1792263350.6474931,
+        "finished": 1792263350.7174761,
+        "exit_code": 0,
+        "output_matches_probe": true,
+        "duplicate_request_did_not_execute": true,
+        "attempt": 1,
+        "events": [
+          "created",
+          "queued",
+          "accepted",
+          "running",
+          "completed"
+        ]
+      },
+      "grok": {
+        "task_id": "automatic-proof-grok-f829053281f0",
+        "transport": "stdio proxy -> authenticated HTTP",
+        "tool": "task_submit",
+        "approval_mode": "automatic",
+        "approval_required": false,
+        "initial_state": "queued",
+        "state": "completed",
+        "started": 1792263351.083515,
+        "finished": 1792263351.1490738,
+        "exit_code": 0,
+        "output_matches_probe": true,
+        "duplicate_request_did_not_execute": true,
+        "attempt": 1,
+        "events": [
+          "created",
+          "queued",
+          "accepted",
+          "running",
+          "completed"
+        ]
+      },
+      "local": {
+        "task_id": "automatic-proof-local-f829053281f0",
+        "transport": "authenticated Streamable HTTP",
+        "tool": "task_submit",
+        "approval_mode": "automatic",
+        "approval_required": false,
+        "initial_state": "queued",
+        "state": "completed",
+        "started": 1792263351.387635,
+        "finished": 1792263351.4546719,
+        "exit_code": 0,
+        "output_matches_probe": true,
+        "duplicate_request_did_not_execute": true,
+        "attempt": 1,
+        "events": [
+          "created",
+          "queued",
+          "accepted",
+          "running",
+          "completed"
+        ]
+      }
+    },
+    "agent_or_model_calls": 0,
+    "manual_approvals_issued_for_these_proofs": 0,
+    "cross_principal_task_access_denied": true,
+    "unauthenticated_mcp_http": 401,
+    "console_approval_modes": {
+      "local": "automatic",
+      "codex": "automatic",
+      "grok": "automatic",
+      "chatgpt": "automatic"
+    },
+    "pending": 0,
+    "preexisting_tasks_unchanged": 16,
+    "audit": {
+      "valid": true,
+      "records": 109,
+      "head": "713c1b481fa53e31014f8993e059d012f4ea2fbf9c35500448649bfa0c3263e3"
+    },
+    "agent_processes": {
+      "codex": {
+        "before": [
+          34179,
+          53477
+        ],
+        "still_alive": [
+          34179,
+          53477
+        ]
+      },
+      "grok": {
+        "before": [
+          45185
+        ],
+        "still_alive": [
+          45185
+        ]
+      }
+    },
+    "tunnel": {
+      "connected": true,
+      "runtime_evidence": {
+        "healthy": true,
+        "process_running": true,
+        "ready": true
+      },
+      "chatgpt_tool_call": "unverified"
+    }
+  },
+  "browser_verification": {
+    "rendered": true,
+    "automatic_mode_summary": "Ohne Freigabeklick: diesem Mac, Codex, Grok, ChatGPT. Erlaubte Aufträge starten automatisch.",
+    "pending": "0",
+    "javascript_exceptions": 0,
+    "isolated_browser_profile": true
+  },
+  "local_checks": {
+    "pytest": "96 passed in 19.97s",
+    "ruff_check": "passed",
+    "ruff_format": "passed",
+    "package_build": "passed; sdist and wheel",
+    "dependencies_changed": false
+  },
+  "limits": [
+    "Verification uses local authenticated MCP clients and stdio proxies, not additional Codex/Grok model turns or an additional ChatGPT conversation.",
+    "Automatic mode removes KiraBridge per-task confirmation within configured capabilities; host OS and client application permissions remain independent.",
+    "Managed agent adapter sandboxes, authentication, program and path lists, resource limits, idempotency and conservative unknown-state handling remain active.",
+    "Historical failed, cancelled, unknown or pending tasks are not automatically rerun by changing the mode."
+  ]
+}

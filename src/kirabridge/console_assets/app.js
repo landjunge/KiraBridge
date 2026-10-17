@@ -113,6 +113,12 @@ async function refresh(announce = true, force = false) {
   loading = true;
   try {
     const data = await api("/api/tasks");
+    const automatic = Object.entries(data.approval_modes || {})
+      .filter(([, mode]) => mode === "automatic")
+      .map(([name]) => principals[name] || name);
+    document.getElementById("approval-mode").textContent = automatic.length
+      ? "Ohne Freigabeklick: " + automatic.join(", ") + ". Erlaubte Aufträge starten automatisch."
+      : "Neue Aufträge benötigen eine Freigabe.";
     document.getElementById("count").textContent = data.pending;
     const pending = document.getElementById("pending");
     const recent = document.getElementById("recent");
