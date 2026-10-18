@@ -70,12 +70,18 @@ class TaskManager:
                 "SELECT 1 FROM tasks WHERE id=?", (request.task_id,)
             ).fetchone():
                 raise BridgeError("task_id_conflict", "Task identifier is already reserved")
-            control = request.operation in {"process.list", "process.inspect", "process.terminate"}
+            control = request.operation in {
+                "process.list",
+                "process.inspect",
+                "process.terminate",
+                "agent.status",
+                "policy.inspect",
+            }
             comparison = "IN" if control else "NOT IN"
             count = self.store.db.execute(
                 f"SELECT COUNT(*) FROM tasks WHERE state IN ('created','queued') "
                 f"AND operation {comparison} "
-                "('process.list','process.inspect','process.terminate')"
+                "('process.list','process.inspect','process.terminate','agent.status','policy.inspect')"
             ).fetchone()[0]
             capacity = self.config.max_control_queued if control else self.config.max_queued
             if count >= capacity:

@@ -230,3 +230,15 @@ for line in sys.stdin:
     assert (("--allow", "Bash") in pairs) is opt_in
     assert (("--deny", "Bash") in pairs) is not opt_in
     assert ("--deny", "MCPTool") in pairs
+
+
+@pytest.mark.parametrize("operation", ["agent.status", "policy.inspect"])
+def test_status_keeps_reserved_capacity_and_can_be_claimed_during_work(bridge, config, operation):
+    config.max_queued = 1
+    submit(
+        bridge, request("file.list", {"path": config.principals["local"].roots[0]}, task_id="busy")
+    )
+    submit(bridge, request(operation, {}, task_id="status"))
+    status = bridge.store.claim("control-worker", 30, control=True)
+    assert status["id"] == "status"
+    assert bridge.store.claim("normal-worker", 30, control=False)["id"] == "busy"

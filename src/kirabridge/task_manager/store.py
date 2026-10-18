@@ -215,7 +215,9 @@ class Store:
             comparison = "IN" if control else "NOT IN"
             row = self.db.execute(
                 f"SELECT id,principal FROM tasks WHERE state='queued' AND operation {comparison} "
-                "('process.list','process.inspect','process.terminate') ORDER BY created,id LIMIT 1"
+                "('process.list','process.inspect','process.terminate',"
+                "'agent.status','policy.inspect') "
+                "ORDER BY created,id LIMIT 1"
             ).fetchone()
             if row is None:
                 return None
