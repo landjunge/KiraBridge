@@ -20,5 +20,6 @@ demo-workspace/
 coverage.xml
 .coverage
 .ci-threaddesk/
+.ci-tollgate/
 
 .worktrees/

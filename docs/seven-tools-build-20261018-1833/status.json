@@ -28,14 +28,14 @@
   },
   "workers": {
     "/root/threaddesk_m1": {
-      "state": "worker_stands_git_resource_bound_fix",
+      "state": "worker_stands_main_integrated_ci_green",
       "worktree": "/Users/landjunge/gnom-hub-v1/.worktrees/seven-tools-worker-stands-20261018",
       "packages": [
         "GH-C04"
       ]
     },
     "/root/tollgate_control": {
-      "state": "workflow_stop_final_review",
+      "state": "atomic_journal_and_legacy_guard_source_integrated",
       "worktree": "/Users/landjunge/KiraBridge/.worktrees/seven-tools-workflow-stop-20261018",
       "packages": [
         "KB-C04",
@@ -43,7 +43,7 @@
       ]
     },
     "/root/fourallpass_protected": {
-      "state": "design_handoff_final_review_and_browser_acceptance",
+      "state": "queued_first_start_stop_countertests_passed",
       "worktree": "/Users/landjunge/blockdesigner/.worktrees/seven-tools-handoff-20261018",
       "packages": [
         "BD-C04"
@@ -105,7 +105,7 @@
       "checks": [],
       "delivered": true,
       "user_accepted": false,
-      "next_step": "Review fixed source and CI; knowledge adapter not yet live",
+      "next_step": null,
       "blocker": null,
       "evidence": "docs/evidence/workflow-reads-chatgpt-20261018.json",
       "merge_commit": "c43e078aba618ada41f1ffcf012b24fc38f4492f"
@@ -221,7 +221,7 @@
     "KB-C04": {
       "title": "Stopp / KB-04",
       "owner": "/root",
-      "state": "targeted_source_tests_complete_final_review_in_progress",
+      "state": "configured_assembly_countertests_in_progress",
       "dependencies": [
         "TG-C02"
       ],
@@ -231,7 +231,7 @@
       "checks": [],
       "delivered": false,
       "user_accepted": false,
-      "next_step": null,
+      "next_step": "Finish queued first-start stop checks, fixed-source CI, controlled runtime activation and actual App proof",
       "blocker": null,
       "evidence": "docs/evidence/workflow-stop-20261018/PAUSE-CHECKPOINT.md"
     },
@@ -420,23 +420,22 @@
     "TG-C02": {
       "title": "Auftragsstopp / TG-02–03",
       "owner": "/root/tollgate_control",
-      "state": "bounded_source_and_ci_checked",
+      "state": "main_integrated_atomic_stop_only_source_and_ci_checked",
       "dependencies": [
         "TG-C01"
       ],
       "source_commit": null,
-      "commit": "e8e66430fb64def027abdee2063a7a774a763883",
+      "commit": "53fc57cc2e082d022e65e5929cb2a1e186fba852",
       "pr": "https://github.com/landjunge/tollgate/pull/34",
       "checks": [
-        "23 new cases; earlier90 relevant checks",
-        "existing Python3.11/3.12 CI green",
-        "real isolated DE/EN zoom/focus/reduced-motion browser"
+        "CI39172804049: Python3.11/3.12 passed",
+        "8 new atomic expected-journal dispatch/stop cases"
       ],
       "delivered": false,
       "user_accepted": false,
-      "next_step": "Actual product/runtime assembly and applicable remaining package criteria remain separate",
-      "blocker": "actual registered provider/identity/dispatch integration remains separate; not arbitrary CLI stop",
-      "merge_commit": "c1aa2472444032c87b38139a8fb3715cd688465f",
+      "next_step": "Configured Bridge assembly and actual App proof in progress",
+      "blocker": "CLI cost remains unknown; no global dollar cap",
+      "merge_commit": "a242683383bc8a5930985f9469d7a5e4cec81b1c",
       "integration_scope": "source main/master; not a new installed/download release"
     },
     "TG-C03": {
@@ -597,18 +596,22 @@
     "GH-C04": {
       "title": "Arbeitsstände / GH-03",
       "owner": "/root",
-      "state": "source_and_ci_checked_one_resource_bound_review_fix_pending",
+      "state": "main_integrated_source_and_ci_checked",
       "dependencies": [
         "GH-C01"
       ],
       "source_commit": null,
-      "commit": "b24a59d0d28204150b038b36ebda0f10ad09d810",
+      "commit": "2c86ef004e1491f15393b59fea2cc466de662cca",
       "pr": "https://github.com/landjunge/gnom-hub-v1/pull/176",
-      "checks": [],
+      "checks": [
+        "CI39171300944: Py3.10/3.11/3.12, lint and aggregate passed",
+        "actual independent worker/exact-review/artifact checks; bounded Git I/O checked with both available Git versions"
+      ],
       "delivered": false,
       "user_accepted": false,
-      "next_step": null,
-      "blocker": null
+      "next_step": "Registered production worker/issuer/controller assembly remains separate",
+      "blocker": null,
+      "merge_commit": "6cb28cccfea60a1a3b604872ed09ea17ce23965b"
     },
     "GH-C05": {
       "title": "Browseradapter",
@@ -819,21 +822,28 @@
     "BD-C04": {
       "title": "Übergabe / BD-I04–05",
       "owner": "/root",
-      "state": "isolated_actual_contract_path_implemented_final_browser_review_pending",
+      "state": "main_integrated_synthetic_contract_and_profile_drift_checked",
       "dependencies": [
         "TD-C02",
         "KB-C02",
         "KB-C05"
       ],
       "source_commit": null,
-      "commit": "cdf439abd27b09596901a33ee5a70fdbbcbf68fc",
+      "commit": "b0b63aa83b74592150686123275dc63c2260004e",
       "pr": null,
-      "checks": [],
+      "checks": [
+        "Actual local Bridge MCP/ThreadDesk and synthetic Codex CLI contract; independent real Chrome returned HTML/PNG",
+        "DE/EN browser and focused layout correction",
+        "45 profile-binding cases and 6 adapted countercases",
+        "10 focused legacy-execution marker/overlap guard cases"
+      ],
       "delivered": false,
       "user_accepted": false,
-      "next_step": null,
+      "next_step": "Trusted normal operator embedding and actual product acceptance remain separate",
       "blocker": null,
-      "evidence": "docs/acceptance/HANDOFF-WIP-20261018.md"
+      "evidence": "docs/acceptance/HANDOFF-WIP-20261018.md",
+      "merge_commit": "e6e81b0bf75161d035dc572c1e27726ee794baae",
+      "legacy_followup_commit": "07daac7bda01a665dc6aeaeeac4b4c6242f03953"
     },
     "BD-D01": {
       "title": "Design",

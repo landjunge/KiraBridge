@@ -32,6 +32,7 @@ from kirabridge.bridge_core.models import (
     ThreadDeskKnowledgeInput,
     ThreadDeskManageInput,
     ThreadDeskReadInput,
+    WorkflowStopInput,
     WriteInput,
 )
 from kirabridge.clipboard_manager import ClipboardManager
@@ -72,6 +73,7 @@ INPUTS = {
     "threaddesk.manage": ThreadDeskManageInput,
     "threaddesk.knowledge": ThreadDeskKnowledgeInput,
     "observations.read": ObservationReadInput,
+    "workflow.stop": WorkflowStopInput,
     "agent.status": EmptyInput,
     "policy.inspect": EmptyInput,
     "admin.execute": TerminalInput,
@@ -106,6 +108,9 @@ class Bridge:
         self.clipboard = ClipboardManager()
         self.processes = ProcessManager(self.terminal)
         self.agents = AgentManager(config, self.terminal)
+        from kirabridge.configured_workflow import configured_workflow_control
+
+        self.workflow_control = configured_workflow_control(self)
         self.tasks = TaskManager(
             config,
             self.store,
@@ -258,6 +263,28 @@ class Bridge:
             return await self.agents.execute(task, args, policy, running, progress)
         if operation.startswith("handoff."):
             return await self.handoffs.execute(task, args, policy, running, progress)
+        if operation == "workflow.stop":
+            await running({"evidence_type": "local_operation_entered", "operation": operation})
+            if self.workflow_control is None:
+                from kirabridge.workflow_control_adapter import owned_stop
+
+                return await owned_stop(
+                    self,
+                    principal,
+                    args.handoff_id,
+                    args.revision,
+                    args.stop_id,
+                    task_id=task["id"],
+                    barrier={
+                        "status": "UNKNOWN",
+                        "further_dispatch_blocked": False,
+                        "abort_confirmed": False,
+                    },
+                    control_error="workflow_control_disabled",
+                )
+            return await self.workflow_control.stop(
+                principal, args.handoff_id, args.revision, args.stop_id, task_id=task["id"]
+            )
         if operation.startswith("threaddesk."):
             return await self.threaddesk.execute(task, args, running)
         if operation == "observations.read":

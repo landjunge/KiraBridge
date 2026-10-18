@@ -75,6 +75,20 @@ class ThreadDeskConfig(BaseModel):
     max_result_bytes: int = Field(default=524288, ge=1024, le=1048576)
 
 
+class WorkflowControlConfig(BaseModel):
+    """Explicit operator-owned CLI stop scope; never a hard money budget."""
+
+    model_config = ConfigDict(extra="forbid")
+    enabled: bool = False
+    mode: Literal["stop_only"] = "stop_only"
+    state_root: str | None = None
+    projects: dict[str, list[str]] = Field(default_factory=dict, max_length=32)
+    actor_id: str = Field(default="kirabridge-cli", pattern=r"^[A-Za-z0-9_.:-]{1,128}$")
+    consumer_id: str = Field(default="kirabridge-cli", pattern=r"^[A-Za-z0-9_.:-]{1,128}$")
+    source_commit: str | None = Field(default=None, pattern=r"^[a-f0-9]{40}$")
+    source_package_sha256: str | None = Field(default=None, pattern=r"^[a-f0-9]{64}$")
+
+
 class TerminalConfig(BaseModel):
     """Operator-owned tool discovery; never inherit the daemon's secret environment."""
 
@@ -109,6 +123,7 @@ class Config(BaseModel):
     messaging: MessagingConfig = Field(default_factory=MessagingConfig)
     diagnostics: DiagnosticsConfig = Field(default_factory=DiagnosticsConfig)
     threaddesk: ThreadDeskConfig = Field(default_factory=ThreadDeskConfig)
+    workflow_control: WorkflowControlConfig = Field(default_factory=WorkflowControlConfig)
 
     terminal: TerminalConfig = Field(default_factory=TerminalConfig)
 

@@ -115,6 +115,9 @@ def readiness(bridge, principal: str, requirements: ReadinessInput) -> dict:
         if name not in INPUTS:
             raise BridgeError("unknown_operation", "Unknown operation")
         bridge.security.principal(principal, name)
+        if name == "workflow.stop":
+            bridge.security.principal(principal, "task.cancel")
+            bridge.security.principal(principal, "process.terminate")
         if name.startswith(("threaddesk.", "handoff.")) and name != "handoff.status":
             bridge.threaddesk.check_configuration()
         if name in {"clipboard.read", "clipboard.write"}:
@@ -130,6 +133,18 @@ def readiness(bridge, principal: str, requirements: ReadinessInput) -> dict:
     operations = [
         {"operation": p, **_probe(lambda p=p: operation(p))} for p in requirements.operations
     ]
+    for item in operations:
+        if item["operation"] == "workflow.stop" and item["ok"]:
+
+            def barrier_prerequisites():
+                if bridge.workflow_control is None:
+                    raise BridgeError("workflow_control_unavailable", "Control disabled")
+                if checker := getattr(bridge.workflow_control, "check_configuration", None):
+                    checker()
+
+            item["owned_abort_available"] = True
+            item["durable_barrier_prerequisites"] = _probe(barrier_prerequisites)
+            item["barrier_confirmed"] = False
     roots = [
         {"path": p, **_probe(lambda p=p: directory(p))}
         for p in dict.fromkeys(policy.roots + policy.read_roots)
@@ -234,9 +249,25 @@ def task_preflight(bridge, task: dict) -> dict:
                     pass
 
             check("mutation_parent", path, parent)
+    elif operation == "workflow.stop":
+
+        def owned_control():
+            from kirabridge.workflow_control_adapter import validate_owned_stop
+
+            validate_owned_stop(
+                bridge, principal, args["handoff_id"], args["revision"], args["stop_id"]
+            )
+
+        check("workflow_control", "owned_project_control", owned_control)
     elif operation.startswith(("threaddesk.", "handoff.")) and operation != "handoff.status":
         check("threaddesk_endpoint", "configured_threaddesk", bridge.threaddesk.check_configuration)
         if operation == "handoff.start":
+            if selector := getattr(bridge.workflow_control, "select", None):
+                check(
+                    "workflow_control",
+                    "configured_project",
+                    lambda: selector({"cwd": args["cwd"]}),
+                )
             check(
                 "agent_workflow",
                 args.get("agent", "codex"),
@@ -248,6 +279,8 @@ def task_preflight(bridge, task: dict) -> dict:
 
             def waiting_agent():
                 binding = bridge.handoffs.get(principal, args["handoff_id"], args["revision"])
+                if selector := getattr(bridge.workflow_control, "select", None):
+                    selector(binding)
                 bridge.handoffs.agent_preflight(principal, binding["agent"], binding["cwd"])
 
             check("agent_workflow", "owned_waiting_session", waiting_agent)

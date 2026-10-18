@@ -2,6 +2,12 @@
 
 ## Stand und Grenzen / State and limits
 
+Nachtrag 19.10.: Das konkrete optionale Config-/Kontrollworker-/Readiness-Wiring
+ist jetzt in [WORKFLOW-CONTROL-CONFIGURATION](WORKFLOW-CONTROL-CONFIGURATION.md)
+beschrieben, einschließlich aktueller Journal-Epochenprüfung aus TG-PR37.
+Der folgende ursprüngliche Hostadapter-/PR35-Bezug bleibt als abgegrenzter
+Quellbeleg erhalten; neue Runtime-Abnahmen werden separat dokumentiert.
+
 Quellpaket KB-C04/TG-C02, nicht automatisch aktivierte Laufzeit. KiraBridge bleibt
 privat; das unverändert öffentliche TollGate-Repository enthält den nötigen Core
 in [PR35](https://github.com/landjunge/tollgate/pull/35), Commit

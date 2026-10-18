@@ -67,6 +67,38 @@ def read(bridge, **changes):
     return export_workflow_observations(bridge, "local", task_ids=["owned-task"], **changes)
 
 
+@pytest.mark.parametrize(
+    "status,blocked,expected,state",
+    [
+        ("EFFECTIVE", True, "control.stop_effective", "effective"),
+        ("EFFECTIVE", False, "control.stop_requested", "unknown"),
+        ("EFFECTIVE", "true", "control.stop_requested", "unknown"),
+        ("PENDING", False, "control.stop_pending", "pending"),
+        ("UNKNOWN", False, "control.stop_requested", "unknown"),
+    ],
+)
+def test_stop_projection_preserves_uncertainty_and_requires_actual_barrier(
+    bridge, status, blocked, expected, state
+):
+    queued(bridge)
+    audit(
+        bridge,
+        "workflow.stop",
+        {
+            "status": status,
+            "further_dispatch_blocked": blocked,
+            "project_id": "observed-project",
+            "control_ref": "b" * 64,
+            "barrier_seq": 7,
+            "private_payload": SECRET,
+        },
+    )
+    event = read(bridge)["events"][-1]
+    assert event["event_type"] == expected and event["stop_state"] == state
+    assert event["cost_kind"] == "unknown" and event["barrier_seq"] == 7
+    assert event["control_ref"] == "b" * 64 and SECRET not in canonical(event)
+
+
 def test_existing_historical_states_and_runtime_not_current_reader_and_no_sensitive_columns(
     bridge, monkeypatch
 ):

@@ -83,11 +83,12 @@ class _Binding:
     task_id: str
     identity: object
     owner_task: object
+    expected_journal_id: str | None = None
 
 
-async def _finish_thread(function, *args):
+async def _finish_thread(function, *args, **kwargs):
     """Do not abandon a thread holding a file lock when the coroutine is cancelled."""
-    pending = asyncio.create_task(asyncio.to_thread(function, *args))
+    pending = asyncio.create_task(asyncio.to_thread(function, *args, **kwargs))
     cancelled = False
     while not pending.done():
         try:
@@ -112,7 +113,12 @@ async def process_dispatch(task_id, principal):
         or binding.owner_task is not asyncio.current_task()
     ):
         raise BridgeError("workflow_process_owner", "Dispatch does not match the owned turn")
-    manager = binding.controller.control.process_start(binding.identity)
+    expected = (
+        {"expected_journal_id": binding.expected_journal_id}
+        if binding.expected_journal_id is not None
+        else {}
+    )
+    manager = binding.controller.control.process_start(binding.identity, **expected)
     entry = asyncio.create_task(asyncio.to_thread(manager.__enter__))
     try:
         admission = await asyncio.shield(entry)
@@ -228,7 +234,14 @@ class WorkflowControlAdapter:
                 metadata, task_id=task["id"], event="handoff.control_attached"
             )
         token = _BINDING.set(
-            _Binding(self, principal, task["id"], identity, asyncio.current_task())
+            _Binding(
+                self,
+                principal,
+                task["id"],
+                identity,
+                asyncio.current_task(),
+                metadata.get("control_journal_id"),
+            )
         )
         try:
             yield
@@ -239,9 +252,15 @@ class WorkflowControlAdapter:
         metadata = validate_owned_stop(
             self.bridge, principal, handoff_id, revision, stop_id, task_id=task_id
         )
+        record_owned_stop_request(self.bridge, metadata, stop_id, task_id=task_id)
         scope = self.scope(metadata)
         try:
-            barrier = await asyncio.to_thread(self.control.stop, scope, stop_id)
+            expected = (
+                {"expected_journal_id": metadata["control_journal_id"]}
+                if metadata.get("control_journal_id") is not None
+                else {}
+            )
+            barrier = await _finish_thread(self.control.stop, scope, stop_id, **expected)
             control_error = None
         except Exception:
             barrier = {
@@ -286,8 +305,60 @@ def validate_owned_stop(bridge, principal, handoff_id, revision, stop_id, *, tas
             )
         ):
             raise BridgeError("invalid_workflow_stop", "No exact active owned stop task")
-    metadata = bridge.handoffs.get(principal, handoff_id, revision)
-    return metadata
+    try:
+        return bridge.handoffs.get(principal, handoff_id, revision)
+    except BridgeError as exc:
+        if exc.code != "handoff_not_found":
+            raise
+    # An accepted/queued first start has no run binding yet. Its actual owned
+    # task is sufficient to cancel it, not to invent ThreadDesk/run identities.
+    target = bridge.store.db.execute(
+        "SELECT id FROM tasks WHERE principal=? AND operation='handoff.start' "
+        "AND state IN ('created','queued','accepted','running','unknown') "
+        "AND json_extract(args,'$.handoff_id')=? AND json_extract(args,'$.revision')=? "
+        "ORDER BY created,id LIMIT 1",
+        (principal, handoff_id, revision),
+    ).fetchone()
+    if target is None:
+        raise BridgeError("handoff_not_found", "No owned workflow or pending first start")
+    return {
+        "id": bridge.handoffs.identity(principal, handoff_id, revision),
+        "principal": principal,
+        "handoff_id": handoff_id,
+        "revision": revision,
+        "prebinding": True,
+    }
+
+
+def record_owned_stop_request(bridge, metadata, stop_id, *, task_id=None):
+    """Latch intent in the existing audit before any asynchronous control wait.
+
+    This is a local no-new-turn intent, not a committed TollGate barrier or an
+    exit observation. Missing first-run source identities are never inferred.
+    """
+    with bridge.store.transaction():
+        existing = bridge.store.db.execute(
+            "SELECT 1 FROM audit WHERE kind='workflow.stop' AND principal=? "
+            "AND json_extract(metadata,'$.binding_ref')=? "
+            "AND json_extract(metadata,'$.stop_id')=? LIMIT 1",
+            (metadata["principal"], metadata["id"], stop_id),
+        ).fetchone()
+        if existing is None:
+            bridge.store.audit(
+                "workflow.stop",
+                metadata["principal"],
+                task_id,
+                {
+                    "binding_ref": metadata["id"],
+                    "stop_id": stop_id,
+                    "control_mode": "abort_only",
+                    "status": "UNKNOWN",
+                    "further_dispatch_blocked": False,
+                    "basis": "owned_stop_requested_before_control_wait",
+                    "cost_kind": "unknown",
+                    "hard_cost_cap": False,
+                },
+            )
 
 
 async def owned_stop(
@@ -310,6 +381,7 @@ async def owned_stop(
     metadata = validate_owned_stop(
         bridge, principal, handoff_id, revision, stop_id, task_id=task_id
     )
+    record_owned_stop_request(bridge, metadata, stop_id, task_id=task_id)
     if scope is None:
         barrier = {
             "status": "UNKNOWN",
@@ -403,14 +475,16 @@ async def owned_stop(
         evidence = {
             "binding_ref": metadata["id"],
             "control_mode": mode,
-            "original_task_id": metadata["original_task_id"],
             "status": barrier["status"],
             "stop_state": barrier["status"],
             "further_dispatch_blocked": barrier["further_dispatch_blocked"],
             "owned_process_exits_observed": sum(p["status"] == "exit_observed" for p in processes),
             "cost_kind": "unknown",
             "hard_cost_cap": False,
+            "stop_id": stop_id,
         }
+        if metadata.get("original_task_id") is not None:
+            evidence["original_task_id"] = metadata["original_task_id"]
         if scope is not None:
             evidence.update(
                 project_id=scope.project_id,
@@ -419,6 +493,16 @@ async def owned_stop(
                     {"project_id": scope.project_id, "workflow_id": scope.workflow_id}
                 ),
             )
+            assembly_ref = metadata.get("control_assembly_ref")
+            if (
+                metadata.get("control_project_id") == scope.project_id
+                and type(assembly_ref) is str
+                and re.fullmatch(r"[a-f0-9]{64}", assembly_ref)
+            ):
+                evidence["control_ref"] = assembly_ref
+                evidence["control_ref_basis"] = "bound_journal_assembly"
+            else:
+                evidence["control_ref_basis"] = "scope_only_not_journal_epoch"
         if control_error is not None:
             evidence["control_error"] = control_error
         if task_id is not None:

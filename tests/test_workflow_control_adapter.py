@@ -564,7 +564,8 @@ async def test_owned_abort_without_assembly_ends_only_owned_process_without_scop
         assert "SECRET_SHAPED_LIKE_AN_ERROR_CODE" not in canonical(value)
         assert (await own)["terminated"] and not other.done()
         row = bridge.store.db.execute(
-            "SELECT task_id,metadata FROM audit WHERE kind='workflow.stop'"
+            "SELECT task_id,metadata FROM audit WHERE kind='workflow.stop' "
+            "ORDER BY seq DESC LIMIT 1"
         ).fetchone()
         record = json.loads(row["metadata"])
         assert row["task_id"] is None and record["original_task_id"] == "thread:task"

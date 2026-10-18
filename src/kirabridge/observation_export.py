@@ -35,6 +35,8 @@ BINDINGS = (
     "principal_ref",
     "operator_scope",
     "binding_event_id",
+    "control_ref",
+    "consumer_id",
 )
 REVISIONS = ("handoff_revision", "source_revision", "task_revision")
 STATES = {
@@ -173,6 +175,19 @@ def _project(row, principal, source_id):
         event_type = "task.accepted"
     elif kind == "task.transition":
         event_type = STATES.get(metadata.get("to"))
+    elif kind == "workflow.stop":
+        # Only the actual scope barrier can establish EFFECTIVE; an owned abort
+        # with missing assembly remains a request with unknown broader effect.
+        event_type = {
+            "EFFECTIVE": "control.stop_effective",
+            "PENDING": "control.stop_pending",
+            "UNKNOWN": "control.stop_requested",
+        }.get(metadata.get("status"))
+        if (
+            metadata.get("status") == "EFFECTIVE"
+            and metadata.get("further_dispatch_blocked") is not True
+        ):
+            event_type = "control.stop_requested"
     if event_type is None:
         return None, metadata
     at = row["at"]
@@ -198,6 +213,14 @@ def _project(row, principal, source_id):
     for key in REVISIONS:
         if _integer(metadata.get(key)):
             record[key] = metadata[key]
+    if kind == "workflow.stop":
+        record["stop_state"] = {
+            "control.stop_effective": "effective",
+            "control.stop_pending": "pending",
+        }.get(event_type, "unknown")
+        record["cost_kind"] = "unknown"
+        if _integer(metadata.get("barrier_seq")):
+            record["barrier_seq"] = metadata["barrier_seq"]
     for key in ("source_hash", "request_hash"):
         if _hash(metadata.get(key)):
             record[key] = metadata[key]
