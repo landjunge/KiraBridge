@@ -1,5 +1,10 @@
 # Konfigurierter eigener Stopp / Configured owned stop
 
+Tatsächlich auf dem Betreiber-Mac geladen und aus ChatGPT geprüft:
+[Fortsetzungsbericht](SEVEN-TOOLS-FORTSETZUNG-20261019.md) und
+[minimierte Belege](evidence/workflow-stop-chatgpt-20261019.json). Das ist kein
+neuer RC2-Download und keine automatische Nutzer-/Gesamtprojektabnahme.
+
 ## Konkreter Vertrag
 
 Dieses additive Wiring ergänzt den [Hostadapter](WORKFLOW-STOP-ADAPTER.md).

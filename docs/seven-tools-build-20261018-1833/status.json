@@ -35,18 +35,17 @@
       ]
     },
     "/root/tollgate_control": {
-      "state": "atomic_journal_and_legacy_guard_source_integrated",
-      "worktree": "/Users/landjunge/KiraBridge/.worktrees/seven-tools-workflow-stop-20261018",
+      "state": "blockdesigner_normal_start_profile_loader",
+      "worktree": "/Users/landjunge/blockdesigner/.worktrees/seven-tools-operator-profile-20261019",
       "packages": [
-        "KB-C04",
-        "TG-C02"
+        "BD-C04"
       ]
     },
     "/root/fourallpass_protected": {
-      "state": "queued_first_start_stop_countertests_passed",
+      "state": "package_guard_main_integrated",
       "worktree": "/Users/landjunge/blockdesigner/.worktrees/seven-tools-handoff-20261018",
       "packages": [
-        "BD-C04"
+        "FP-V01"
       ]
     }
   },
@@ -113,7 +112,7 @@
     "TD-C04": {
       "title": "Separater Ausbau",
       "owner": "/root/threaddesk_m1",
-      "state": "open",
+      "state": "requires_separate_server_operating_decision",
       "dependencies": [
         "operator_server_scope"
       ],
@@ -123,8 +122,8 @@
       "checks": [],
       "delivered": false,
       "user_accepted": false,
-      "next_step": null,
-      "blocker": null
+      "next_step": "Choose concrete server/transport/authentication and synthetic participants before deployment",
+      "blocker": "No selected authorized test server, remote identity/role/revocation policy or two distinct test installations. Local room/UI is not an Internet-team service."
     },
     "TD-D01": {
       "title": "Design",
@@ -221,19 +220,26 @@
     "KB-C04": {
       "title": "Stopp / KB-04",
       "owner": "/root",
-      "state": "configured_assembly_countertests_in_progress",
+      "state": "main_runtime_and_actual_chatgpt_stop_checked",
       "dependencies": [
         "TG-C02"
       ],
       "source_commit": null,
-      "commit": "a50d77592ccf5739debf8bd7f20914fd9eec7f19",
+      "commit": "f731f65d6422b08c511220689e42200e28cf39ae",
       "pr": null,
-      "checks": [],
-      "delivered": false,
+      "checks": [
+        "CI39173199790 and39173697982 all three macOS/Linux variants passed",
+        "Actual ChatGPT new owned Codex question, effective stop, blocked start/answer, same single turn after service restart",
+        "12 App tasks; narrower native Codex stop denied before submission",
+        "409 old task rows,2 bindings,5 messages,4 jobs identical across restart",
+        "Actual selected14 event export and AA observer report read via App"
+      ],
+      "delivered": true,
       "user_accepted": false,
-      "next_step": "Finish queued first-start stop checks, fixed-source CI, controlled runtime activation and actual App proof",
-      "blocker": null,
-      "evidence": "docs/evidence/workflow-stop-20261018/PAUSE-CHECKPOINT.md"
+      "next_step": null,
+      "blocker": "stop_only: no hard dollar cap or authenticated external effect/identity claim",
+      "evidence": "docs/evidence/workflow-stop-20261018/PAUSE-CHECKPOINT.md",
+      "installed_commit": "1dee506d1a849380e7983aa806b737aedecbf39c"
     },
     "KB-C05": {
       "title": "Rückkanal",
@@ -273,15 +279,18 @@
     "KB-R01": {
       "title": "README / Dokumentation",
       "owner": "/root",
-      "state": "open",
+      "state": "main_integrated_DE_EN_instructions_checked",
       "dependencies": [],
       "source_commit": null,
-      "commit": null,
+      "commit": "f19797b2e1b7e34b73de1180734a6b9c93ab07e5",
       "pr": null,
-      "checks": [],
+      "checks": [
+        "41 local links,2 strict JSON examples,12 actual CLI parser cases",
+        "App-catalog fallback and historical installation/version distinction documented"
+      ],
       "delivered": false,
       "user_accepted": false,
-      "next_step": null,
+      "next_step": "Included in private main; frozen RC2 artifacts not rewritten",
       "blocker": null
     },
     "FP-C01": {
@@ -329,7 +338,7 @@
     "FP-C03": {
       "title": "Browser-/Sitzungsgrenze / FP-03–04",
       "owner": "/root/fourallpass_protected",
-      "state": "open",
+      "state": "blocked_production_secret_boundary",
       "dependencies": [
         "FP-C02",
         "TG-C02",
@@ -341,8 +350,8 @@
       "checks": [],
       "delivered": false,
       "user_accepted": false,
-      "next_step": null,
-      "blocker": null
+      "next_step": "Specify protected host identity and secret boundary plus an allowed target/action; requires actual local OS authorization before provisioning",
+      "blocker": "No trusted production ProtectedHost/Vault transfer/consent and revocation source; no independent OS secret/browser-debug boundary or concrete allowed account action. Same-UID unrestricted terminal is not isolation."
     },
     "FP-D01": {
       "title": "Design",
@@ -381,19 +390,23 @@
     "FP-V01": {
       "title": "Abnahme / bestehende Produktarbeit",
       "owner": "/root/fourallpass_protected",
-      "state": "open",
+      "state": "main_package_guard_source_and_targeted_checks_complete_remaining_platform_acceptance",
       "dependencies": [
         "FP-C02",
         "FP-C03"
       ],
       "source_commit": null,
-      "commit": null,
+      "commit": "4295599bcc5f60b731f8576da780b2a9c107e9c9",
       "pr": null,
-      "checks": [],
+      "checks": [
+        "23 focused new package-deny cases;8 changed exception-path cases",
+        "All10 existing CI checks passed; no new desktop release build"
+      ],
       "delivered": false,
       "user_accepted": false,
-      "next_step": null,
-      "blocker": null
+      "next_step": "Next explicitly authorized package candidate must exercise the new startup-deny guard; retain historical artifacts",
+      "blocker": "Current downloaded RC2 remains60eef0a; no new binary acceptance. Foreign-Mac test (#120), Apple credentials/payment decision (#112), actual independent audit (#38) remain absent.",
+      "merge_commit": "7cc228d247883e1773a0adbd47a4a38dc8a963ec"
     },
     "TG-C01": {
       "title": "Kontrollvertrag / TG-01–02",
@@ -420,7 +433,7 @@
     "TG-C02": {
       "title": "Auftragsstopp / TG-02–03",
       "owner": "/root/tollgate_control",
-      "state": "main_integrated_atomic_stop_only_source_and_ci_checked",
+      "state": "main_and_registered_bridge_runtime_stop_only_checked",
       "dependencies": [
         "TG-C01"
       ],
@@ -431,10 +444,10 @@
         "CI39172804049: Python3.11/3.12 passed",
         "8 new atomic expected-journal dispatch/stop cases"
       ],
-      "delivered": false,
+      "delivered": true,
       "user_accepted": false,
-      "next_step": "Configured Bridge assembly and actual App proof in progress",
-      "blocker": "CLI cost remains unknown; no global dollar cap",
+      "next_step": null,
+      "blocker": "CLI cost remains unknown; production bounded provider control is separate",
       "merge_commit": "a242683383bc8a5930985f9469d7a5e4cec81b1c",
       "integration_scope": "source main/master; not a new installed/download release"
     },
@@ -616,7 +629,7 @@
     "GH-C05": {
       "title": "Browseradapter",
       "owner": "/root",
-      "state": "open",
+      "state": "blocked_protected_account_browser_path",
       "dependencies": [
         "FP-C03",
         "TG-C01"
@@ -627,8 +640,8 @@
       "checks": [],
       "delivered": false,
       "user_accepted": false,
-      "next_step": null,
-      "blocker": null
+      "next_step": "Resolve FP-C03 and register actual controlled browser adapter; no arbitrary JS read-only claim",
+      "blocker": "FP-C03 production secret/debug/session boundary and controlled allowed browser action unavailable; legacy unprotected standalone browsing is not protected account handling."
     },
     "GH-D01": {
       "title": "Design",
@@ -703,26 +716,29 @@
       "checks": [],
       "delivered": false,
       "user_accepted": false,
-      "next_step": "Actual product/runtime assembly and applicable remaining package criteria remain separate",
-      "blocker": "Source integration pending; findings remain reported/unknown, not proven violations",
+      "next_step": null,
+      "blocker": "Reported-claim consistency only; no independently authenticated producer identity/effect",
       "merge_commit": "932b33f363a9d8c6811b09074c15b8ad7a6cd8b5",
       "integration_scope": "source main/master; not a new installed/download release"
     },
     "AA-C03": {
       "title": "Betrieb / AA-04",
       "owner": "/root",
-      "state": "open",
+      "state": "actual_selected_report_conversation_read_checked_web_scope_pending",
       "dependencies": [
         "operator_transport_scope"
       ],
       "source_commit": null,
       "commit": null,
       "pr": null,
-      "checks": [],
-      "delivered": false,
+      "checks": [
+        "14 actual Bridge producer events read by existing neutral AA reader",
+        "Actual ChatGPT file.read of neutral29875-byte report completed; identity/effect remain UNBEKANNT and observer_only"
+      ],
+      "delivered": true,
       "user_accepted": false,
-      "next_step": null,
-      "blocker": null
+      "next_step": "Choose separate service operating scope only if desired; existing selected local report remains usable",
+      "blocker": "No concrete separate web-service transport/operator/authentication/retention scope; local selected snapshot is not live service coverage."
     },
     "AA-D01": {
       "title": "Design",
@@ -822,7 +838,7 @@
     "BD-C04": {
       "title": "Übergabe / BD-I04–05",
       "owner": "/root",
-      "state": "main_integrated_synthetic_contract_and_profile_drift_checked",
+      "state": "main_contract_checked_normal_start_profile_wiring_in_progress",
       "dependencies": [
         "TD-C02",
         "KB-C02",
@@ -839,11 +855,12 @@
       ],
       "delivered": false,
       "user_accepted": false,
-      "next_step": "Trusted normal operator embedding and actual product acceptance remain separate",
+      "next_step": "Minimal existing-start operator-profile loader, then targeted configuration acceptance",
       "blocker": null,
       "evidence": "docs/acceptance/HANDOFF-WIP-20261018.md",
       "merge_commit": "e6e81b0bf75161d035dc572c1e27726ee794baae",
-      "legacy_followup_commit": "07daac7bda01a665dc6aeaeeac4b4c6242f03953"
+      "legacy_followup_commit": "07daac7bda01a665dc6aeaeeac4b4c6242f03953",
+      "legacy_followup_merge": "eb3df8d1c556a8355ff28667d061e3e02d1a8670"
     },
     "BD-D01": {
       "title": "Design",
@@ -893,13 +910,13 @@
     }
   },
   "milestones": {
-    "M0": "in_progress",
+    "M0": "selected_G01_G02_contracts_and_source_runtime_pins_recorded",
     "M1": "operator_profile_runtime_and_chatgpt_checked_existing_default_profile_unchanged",
     "M2": "bounded_Codex_runtime_and_actual_ChatGPT_roundtrip_checked_not_overall_project_acceptance",
-    "M3": "open",
-    "M4": "open",
-    "M5": "open",
-    "M6": "requires_concrete_operator_scope"
+    "M3": "actual_owned_CLI_stop_only_live_protected_API_and_hard_money_control_remain_blocked",
+    "M4": "source_and_independent_local_worker_contract_checked_no_production_team_assembly",
+    "M5": "source_synthetic_CLI_browser_roundtrip_checked_operator_start_loader_in_progress",
+    "M6": "selected_local_AA_report_read_from_chat_separate_Internet_services_need_operator_scope"
   },
   "limits": [
     "No public KiraBridge release/Discussion, visibility changes, paid provider calls, real account tests, foreign-session stops.",
@@ -907,21 +924,21 @@
     "No new competing task queue; existing stores/contracts and standalone products preserved.",
     "Source, runtime, package, delivery and user acceptance remain separate."
   ],
-  "updated_at": "2026-10-18T21:46:12.756128+00:00",
+  "updated_at": "2026-10-18T22:54:08.985927+00:00",
   "active_focus": {
-    "task": "M2 actual image/knowledge/observation proof complete; M3 stop assembly and bounded M4/M5 source integration",
-    "critical_permissions": "Completed in private main 8226763 and actual runtime c6f1eab; docs/DEVELOPMENT-ACCESS-20261018.md",
-    "remaining_permissions_gate": "Local macOS administrator confirmation; unknown test never replayed",
-    "next_gate": "M3 actual controller assembly must preserve trusted scope/quote/secret boundaries; no synthetic production authority",
-    "loaded_runtime": "df995f6 / 0.5.2; instance748efc8b8ee341f5858d915abb1fb131; config04637ceeb2fdc4a645ba25d5ff4e8867b11068cd24eb991b7badd5b29e12405c"
+    "task": "Finish normal BlockDesigner operator startup and preserve final per-package evidence",
+    "critical_permissions": "Implemented with actual App probes; native Codex principal intentionally narrower; administrator confirmation remains local",
+    "loaded_runtime": "1dee506 /0.5.2; instance909ceb813e1f45f0bc492ba49299cb82; configf0a8b0f5dc6554bc7d8f706b42d01e7ccde88866ec0c05a05c0bbc718b3cfa1b",
+    "source_commit": "f731f65d6422b08c511220689e42200e28cf39ae",
+    "next_gate": "No production secret host or hard CLI money cap invented; no public release/Discussion"
   },
   "user_pause": {
     "requested": false,
     "reason": "User temporarily disconnecting internet; await explicit OK",
     "new_work_allowed": true,
-    "service": "KiraBridge left healthy and running; no further restart",
+    "service": "Resumed; controlled stop assembly reload and persistence proof completed",
     "checkpoint": "docs/evidence/workflow-reads-chatgpt-20261018.json",
-    "next_step_after_ok": "Finish preservation comparison and documentation of actual image/knowledge/observation acceptance; then review pending stop/BD/Gnom packages",
+    "next_step_after_ok": null,
     "resumed_at": "2026-10-18T21:46:12.755827+00:00"
   }
 }
