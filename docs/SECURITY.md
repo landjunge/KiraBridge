@@ -4,7 +4,23 @@
 
 Das lokale Betriebssystemkonto, die Installation, Konfiguration, Agentenbinärdateien und der lokale Bediener sind vertrauenswürdig. MCP-Clients und ihre Eingaben erhalten ausschließlich konfigurierte Rechte. Agentenrückgaben sind Belege eines konkreten Protokolls, keine allgemeine Autorität. Zugang zum lokalen Konto oder die Möglichkeit, den installierten Python-Code zu ersetzen, liegt außerhalb der Isolation dieses Dienstes.
 
-Ein `terminal.execute`- oder `agent.execute`-Grant beziehungsweise eine dauerhafte automatische Freigabe ist eine bewusste Berechtigung für die Fähigkeiten des gestarteten Programms. KiraBridge ist **kein OS-Sandbox-Ersatz**: Ein erlaubter Interpreter kann andere Dateien lesen oder Programme starten, und ein Kindprozess kann sich einer Prozessgruppe entziehen. `roots` begrenzt Dateiwerkzeuge und das Startverzeichnis; es ist keine behauptete Dateisystem-Isolation für beliebigen Kindcode. Für fremden Code werden ein separates eingeschränktes OS-Konto oder ein Container und eine eigene Agenten-Sandbox benötigt. Der verwaltete Codex-Adapter startet hier im `read-only`-Modus; der verwaltete Grok-Adapter verweigert angefragte Schreib-/Terminal-/MCP-Berechtigungen. Diese Adaptergrenzen sind von Grok/Codex als authentifizierten MCP-Clients zu unterscheiden und ersetzen keine externe Sandbox-Prüfung.
+Ein `terminal.execute`- oder `agent.execute`-Grant beziehungsweise eine dauerhafte automatische Freigabe ist eine bewusste Berechtigung für die Fähigkeiten des gestarteten Programms. KiraBridge ist **kein OS-Sandbox-Ersatz**: Ein erlaubter Interpreter kann andere Dateien lesen oder Programme starten, und ein Kindprozess kann sich einer Prozessgruppe entziehen. `roots` begrenzt Dateiwerkzeuge und das Startverzeichnis; es ist keine behauptete Dateisystem-Isolation für beliebigen Kindcode. Für fremden Code werden ein separates eingeschränktes OS-Konto oder ein Container und eine eigene Agenten-Sandbox benötigt. Der strukturierte Codex-Adapter verwendet im aktuellen Quellstand standardmäßig
+`agents.codex.sandbox_mode="read-only"`; ausschließlich der lokale Betreiber kann
+`workspace-write` wählen. Er setzt den Modus beim Kindstart ausdrücklich, übernimmt
+keine User-Konfiguration und schaltet Kind-MCP sowie seine automatische Multiagent-
+Funktion ab. Projektanweisungen bleiben aktiv. Ein vorhandener interaktiver Codex
+oder nativer MCP-Principal wird dadurch nicht umkonfiguriert. Die native Codex-
+Identität kann enger berechtigt sein als der ausdrücklich freigegebene ChatGPT-App-
+Zugang; ein dortiges forbidden ist kein Nachweis über die Rechte anderer Principals.
+
+Grok ACP verweigert standardmäßig lokale Schreib-/Terminalrechte. Lokale Werkzeuge
+benötigen gleichzeitig Betreiberoption `allow_local_tools`, Principal-Capability
+`agent.local_tools` und Taskargument `local_tools=true`. Beliebige MCP-Anbindung und
+Webtools bleiben im verwalteten ACP-Start abgeschaltet; Empfängerturns setzen das
+Task-Opt-in nicht aus Nachrichtentext. Der Grok-API-Adapter ist dagegen ein begrenzter
+HTTP-Textturn, kein lokaler CLI-Prozess. Keine dieser Grenzen beweist vollständige
+externe Kostenkontrolle oder OS-Isolation. Authentifizierte native MCP-Clients,
+verwaltete Kindprozesse und bestehende interaktive Sitzungen sind getrennte Kontexte.
 
 ## Umgesetzte Kontrollen
 
@@ -21,12 +37,70 @@ Ein `terminal.execute`- oder `agent.execute`-Grant beziehungsweise eine dauerhaf
 | Entwurfsbilder | Separate `file.image`-Capability; descriptorbasierter Snapshot, begrenzte tatsächliche PNG-Dekompression und komplette MCP-Antwort. Bildbytes liegen nur als autorisiertes Ergebnis in der bestehenden privaten Task-Datenbank; nicht in Audit oder Events. Nur eigene abgeschlossene Bildaufträge erzeugen MCP-`ImageContent`. [Grenzen und Abnahme](IMAGE-READ-20261018.md). |
 | Zugriff auf Bridge-Datenbank | Zustandsverzeichnis vom Dateigateway ausgeschlossen, auch wenn eine konfigurierte Root darüber liegt |
 | Unbeabsichtigtes Löschen | `file.delete` als separate, standardmäßig fehlende Capability; konfigurierter Freigabemodus, kein rekursives Löschen und keine automatischen Datenbereinigungen |
-| Implizite Shell-Injection | Argumentlisten, keine Shell-Interpretation; absolute erlaubte Executables; Tests mit Shell-Metazeichen |
+| Implizite Shell-Injection | Argumentlisten ohne implizite Shell; standardmäßig explizite Executables. `allow_any_executable` ist eine gesonderte lokale Principal-Freigabe, keine Sandbox. Ein ausdrücklich erlaubter Shellaufruf kann Shellsyntax selbst interpretieren. |
 | Hängende oder laute Prozesse | Zeit-/Ausgabelimits, getrennte Prozessgruppen, reservierter Steuerungs-Worker, Stream-Cleanup |
 | Secrets in Umgebung/Logs | Terminalumgebung wird neu aufgebaut; Agenten erhalten nur notwendige Auth-Variablen; keine Payloads, Token, Header oder rohen Exception-Texte im Audit |
 | Stiller falscher Abschluss | Abschluss nur mit Rückgabebeleg; unbekannte Providerantworten und Verbindungsabbrüche werden nicht automatisch erneut ausgeführt |
 | Clipboard-Ausspähung | Inhaltslesung nur mit Capability und manuellem Grant oder ausdrücklicher dauerhafter Freigabe; `clipboard_info` liest keine Inhalte; kein Polling |
 | Ressourcenüberlastung | Eingabe-, Ausgabe-, Queue-, Verbindungs- und HTTP-Limits |
+
+## Aktuelle optionale Workflowgrenzen
+
+Dokumentationsbasis ist Quellstand `7af39cd`, Versionskennung0.6.0rc2. Die
+[0.5.2-Backports des Betreiber-Macs](PROJECT-CONTROL-20261018.md), der aktuelle
+Quellstand und [eingefrorene private RC2-Artefakte](RELEASE-ABNAHME-20261018.md)
+sind verschiedene Stände. Diese Dokumentation installiert, erweitert oder lädt
+keine Rechte. Den tatsächlichen Principal/Quell-/Configstand aus Status und
+konkreter Readiness ermitteln; Health ist kein Vollzugriffsnachweis.
+
+- `terminal_roots` begrenzt den Terminal-CWD, mit `roots` als Rückfall. Die
+  explizite Betreiberfreigabe `allow_any_executable=true` ist pro Principal;
+  Standard false. Sie verleiht weitreichende Benutzerrechte und wird nicht als
+  Schutz vor beliebigem Kindcode ausgegeben. `admin.execute` ist davon getrennt:
+  macOS benötigt zusätzlich die eigene Capability und lokalen OS-Autorisierungsdialog.
+  Keine Passworteingabe über Bridge, keine sudoers-Änderung; unbekannter Dialogausgang
+  ist keine Erlaubnis zur automatischen Wiederholung.
+- [ThreadDesk und Wissen](THREADDESK-KNOWLEDGE-20261018.md) verwenden einen festen
+  Betreiberpeer, eigene Rechte und revisionsgebundene Mutationen. Normale Bot-
+  oder Fremdprincipals erben keine Gesprächsrechte. Kontext/Quelle bleibt untrusted;
+  Wissenseintrag oder Referenz ist keine Ausführungs- oder Secretfreigabe.
+- [observations.read](WORKFLOW-OBSERVATION-EXPORT.md) benötigt zusätzlich task.read
+  und genau ausgewählte eigene Tasks. Der begrenzte readonly-Export verwendet die
+  bestehenden Audit-/Taskbelege, keine Payloads, Prompts, Dateiinhalte oder Secrets.
+  Historische Runtime stammt nur aus passendem damaligem Preflight; Beobachtung
+  verleiht keine Rechte, kein Budget und keine verifizierte Projektabnahme.
+- [Workflowkontrolle](WORKFLOW-CONTROL-CONFIGURATION.md) ist optional und standardmäßig
+  deaktiviert. Der Betreiber pinnt die getrennte TollGate-Assembly und tatsächliche
+  Journalzuordnung. Die erwartete Journal-ID wird am tatsächlichen Start/Stop unter
+  derselben Sperre geprüft. Keine stillen Journal-/Consumer-/Projektwechsel und keine
+  Wiederholung unbekannter Versuche. Journale und Auditbelege bei Updates erhalten.
+- Dieser angeschlossene CLI-Weg ist **stop_only**: Kosten unbekannt, kein harter
+  Dollarcap, keine Nullkostenquote und kein Rückfall aus bindenden Budgetprofilen.
+  Fehlende Assembly kann nur eigenen Abort mit UNKNOWN melden. EFFECTIVE bedeutet
+  weitere angeschlossene Starts gesperrt, nicht Prozessende oder rückgängig gemachte
+  Außenwirkung. Nicht angeschlossene Grok-API-/CLI-/Browserwege sind damit nicht
+  pauschal kontrolliert; keine globale Stopp-/Kostenbehauptung.
+
+## English: scope before authority
+
+The native MCP principal, managed Codex/Grok child and an existing interactive
+session are separate permission contexts. Codex defaults to read-only; explicit
+operator workspace-write does not enable child MCP or expand principal roots.
+Grok ACP local tools require configuration, principal and task opt-ins together;
+its API adapter remains a separate text HTTP path. Automatic approval grants only
+the configured scope and is not operating-system isolation.
+
+Full terminal authorization is principal-specific and broad by nature; macOS admin
+execution additionally needs its own right and local OS authorization. No password
+or sudoers shortcut is supplied. Separate PNG, ThreadDesk knowledge and observation
+rights do not grant each other or authenticate imported context. Observer exports
+retain historical evidence and unknown coverage; they grant no rights or budgets.
+Optional pinned workflow control is stop_only, cost unknown, without a hard dollar
+cap or universal control over unrelated processes/providers. A durable barrier,
+owned process exit and unknown external effect are distinct. Preserve task/audit/
+credential/control-journal data on updates; inspect actual loaded service state.
+The recorded0.5.2 backport, current0.6.0rc2 source and frozen private RC2 package
+are separate versions of behavior; no new release or live approval follows here.
 
 ## Daten und Zugangsdaten
 
@@ -43,7 +117,7 @@ Die direkte TLS-Implementierung ist für authentifizierte private Verbindungen v
 Dieser Threat Review ist eine interne Entwurfsprüfung, kein unabhängiges Penetrationstest-Zertifikat. Der autorisierte private OpenAI-Tunnel verbindet ausschließlich den MCP-Proxy. Es wurde kein öffentlicher HTTP-Dienst oder Portforwarding eingerichtet. Eine spätere öffentliche Internetbereitstellung erfordert ausdrücklich freigegebene Infrastruktur und passende OAuth-/Netzwerkregeln.
 
 
-## Lokaler Betrieb 0.2.0
+## Historischer lokaler Betrieb 0.2.0
 
 Der eingerichtete Dienst lädt getrennte, zufällige Tokens aus einer eigenen Datei unter dem privaten Konfigurationsverzeichnis. Die Datei wird mit `O_NOFOLLOW` geöffnet, Eigentümer und Modus werden geprüft; ihr Inhalt wird nicht ausgegeben. MCP-Stdio-Proxies lesen nur ihre konfigurierte Identität aus diesem Store und verbinden sich ausschließlich zu einem Loopback-Endpunkt. Globale Codex-/Grok-Konfigurationen enthalten keine Tokens.
 
@@ -55,7 +129,7 @@ Ein lokaler Administrator kann pro Zugang ausdrücklich `approval_mode = "automa
 
 Anmeldung, Fähigkeitsprüfung, Programmlisten, Verzeichnisgrenzen, Eingabe-/Ausgabegrenzen und Ressourcenlimits bleiben in Kraft. Jede automatisch genehmigte Aufgabe wird innerhalb derselben Transaktion mit dem exakten Anfragehash unter `task.auto_approved`, Quelle `principal_policy`, auditiert. Empfang und Start werden erst mit dem tatsächlichen Dispatcher- beziehungsweise Prozessbeleg gemeldet. Idempotenz und die konservative Wiederherstellung unbekannter Zustände gelten unverändert. Ein ausdrücklich übergebener Freigabetoken muss auch in diesem Modus gültig sein. Eine MCP-Anfrage kann weder den Freigabemodus ändern noch einen anderen Zugang oder dessen Aufgaben übernehmen.
 
-Neue Konfigurationen und Zugänge bleiben standardmäßig `manual`; ein ungültiger Modus wird zurückgewiesen. Auf diesem Mac wurde `automatic` auf ausdrücklichen Nutzerwunsch für die vier bestehenden Zugänge eingerichtet. Der Modus kann in der privaten Konfiguration zurückgenommen werden. Das ist eine Änderung der lokalen Vertrauensentscheidung, keine Aufhebung von Authentifizierung oder Plattformrechten.
+Neue Konfigurationen und Zugänge bleiben standardmäßig `manual`; ein ungültiger Modus wird zurückgewiesen. Der historische Betreiberbeleg dieses Macs dokumentiert `automatic` auf ausdrücklichen Nutzerwunsch für vier bestehende Zugänge. Das ist keine allgemeine Setup-Vorgabe; aktuelle Rechte am geladenen Dienst prüfen. Der Modus kann in der privaten Konfiguration zurückgenommen werden. Das ist eine Änderung der lokalen Vertrauensentscheidung, keine Aufhebung von Authentifizierung oder Plattformrechten.
 
 ## Lokale Freigabeoberfläche ab 0.3.0
 

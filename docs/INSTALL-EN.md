@@ -13,6 +13,24 @@ ChatGPT passes tasks through KiraBridge to Codex or Grok on your computer. Both
 can collaborate on the same project with configured permissions. Further CLI
 integrations are planned.
 
+## Choose the right source, service and package first
+
+| State | Meaning |
+| --- | --- |
+| Reviewed source `7af39cd`, version label `0.6.0rc2` | Includes newer project controls and optional adapters; the same version string does not identify the same package. |
+| Documented operator Mac `0.5.2` with selected backports | A separate installed service with its own source/config/runtime evidence, not defaults for new users. |
+| Frozen private RC2 draft `57bee99` | Historical packages with original hashes. They lack `agents.codex.sandbox_mode` and the later integrations. |
+
+[Release acceptance and publication gates](RELEASE-ABNAHME-20261018.md) remain
+separate. Do not start the old RC2 against the current operator configuration: its
+strict model rejects newer settings. Do not reset policy to fit an old package.
+A later release requires a newly pinned and checked package; this guide neither
+builds nor publishes one. Inspect the loaded service with `kirabridge status` and
+concrete readiness instead of inferring it from a checkout or filename.
+
+The package/platform statements below describe the **frozen RC2**. Identify the
+existing installation's update path first; do not rerun initial setup on it.
+
 ## Normal quick start
 
 Obtain the approved original package for your computer. This RC supplies packages
@@ -77,6 +95,34 @@ Setup does not publish a public plugin. Existing incomplete/unready tunnel
 configuration is preserved with a concrete next inspection step; keys are not
 replaced. Connection errors never justify blindly resubmitting uncertain writes.
 
+## First confirmed task and explicit agent permissions
+
+After local status and ChatGPT connection, select an existing authorized project
+file. The [DE/EN ChatGPT guide](CHATGPT.md) shows one harmless read with a stable
+task ID, manual approval when required and subsequent `task_get`. Only the actual
+result proves that path; health alone proves neither file access nor agent writes.
+
+In current source, `agents.codex.sandbox_mode` defaults to `read-only`; the operator
+must explicitly choose `workspace-write` for the structured adapter. This is not an
+extra `kirabridge ask` flag. Principal/CWD checks remain, and child MCP is disabled.
+The native Codex MCP identity, ChatGPT App principal and a managed Codex child are
+separate contexts. The broader authorized App profile on the operator Mac is not
+a new installation default.
+
+Grok ACP local tools need all three opt-ins: `agents.<name>.allow_local_tools`,
+principal capability `agent.local_tools` and task argument `local_tools=true`. A Grok
+API text turn gains no local tools or complete budget/stop control from this.
+Neither adapter takes over an existing interactive session.
+
+Separate grants cover [PNG images](IMAGE-READ-20261018.md),
+[ThreadDesk management](THREADDESK-ADAPTER-20261018.md),
+[knowledge](THREADDESK-KNOWLEDGE-20261018.md) and
+[observer-only audit export](WORKFLOW-OBSERVATION-EXPORT.md). New setup profiles
+do not automatically receive all of them. Optional
+[owned workflow control](WORKFLOW-CONTROL-CONFIGURATION.md) is `stop_only`: cost
+unknown, no hard dollar cap or universal control over arbitrary programs.
+Installation alone does not enable it. See [security limits](SECURITY.md).
+
 ## Rerun and update
 
 Rerun the same start command. Existing settings, credentials, permissions and
@@ -140,5 +186,7 @@ Custom installations follow their own recorded service paths.
 
 In an authorized private checkout: `uv sync --locked`, then `uv run kirabridge setup`
 and on macOS `uv run kirabridge service install`. Manual Linux templates/configuration
-remain in the private operations guide. The normal release path needs no repository
+remain in the private operations guide. The setup command refuses to overwrite
+existing configuration (`already_configured`); inspect status/readiness instead of
+repeating initial setup. The normal release path needs no repository
 layout knowledge or developer commands.
