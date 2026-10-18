@@ -45,8 +45,8 @@ class AgentAdapter(Protocol):
     ) -> dict: ...
 
 
-def agent_environment(config: AgentConfig) -> dict:
-    env = minimal_environment()
+def agent_environment(config: AgentConfig, terminal: TerminalManager | None = None) -> dict:
+    env = terminal.environment.copy() if terminal else minimal_environment()
     env["HOME"] = str(Path.home())
     for key in (config.api_key_env, "CODEX_API_KEY"):
         if key in os.environ:
@@ -123,7 +123,7 @@ class CodexAdapter:
             roots,
             [config.executable],
             spawned,
-            env=agent_environment(config),
+            env=agent_environment(config, self.terminal),
             stdin=args.prompt.encode(),
             line_callback=event,
         )
@@ -232,23 +232,20 @@ class GrokAPIAdapter:
 
 
 class GrokACPAdapter:
-    """ACP v1: no fs/terminal client capabilities, deny every permission request."""
+    """ACP v1: text by default; local tools require config, principal and task opt-in."""
 
     interface_version = "1"
 
     async def execute(self, task, args, config, roots, running, progress) -> dict:
         if not config.executable:
             raise BridgeError("agent_config", "Grok executable must be configured explicitly")
+        local_tools = config.allow_local_tools and args.local_tools
         command = [
             config.executable,
             "--no-subagents",
             "--disable-web-search",
             "--permission-mode",
             "dontAsk",
-            "--deny",
-            "Bash",
-            "--deny",
-            "Edit",
             "--deny",
             "MCPTool",
             "--deny",
@@ -259,6 +256,12 @@ class GrokACPAdapter:
             "--no-leader",
             "stdio",
         ]
+        # No arbitrary MCP attachment, even for a development task. Receivers never
+        # opt in through message text; their AgentInput keeps local_tools=False.
+        if local_tools:
+            command[1:1] = ["--allow", "Bash", "--allow", "Edit", "--allow", "Read"]
+        else:
+            command[1:1] = ["--deny", "Bash", "--deny", "Edit"]
         if config.model:
             command[1:1] = ["--model", config.model]
         with PathScope(roots).directory(args.cwd) as fd:
@@ -303,11 +306,25 @@ class GrokACPAdapter:
                             )
                 elif "method" in value and "id" in value:
                     if value["method"] == "session/request_permission":
+                        selected = next(
+                            (
+                                option.get("optionId")
+                                for option in value.get("params", {}).get("options", [])
+                                if isinstance(option, dict)
+                                and option.get("kind") == "allow_once"
+                                and isinstance(option.get("optionId"), str)
+                            ),
+                            None,
+                        )
                         await send(
                             {
                                 "jsonrpc": "2.0",
                                 "id": value["id"],
-                                "result": {"outcome": {"outcome": "cancelled"}},
+                                "result": {
+                                    "outcome": {"outcome": "selected", "optionId": selected}
+                                    if local_tools and selected
+                                    else {"outcome": "cancelled"}
+                                },
                             }
                         )
                     else:
@@ -367,6 +384,7 @@ class GrokACPAdapter:
                         "adapter": "grok_acp",
                         "session_id": session,
                         "stop_reason": stop,
+                        "local_tools": local_tools,
                     },
                     "scope": "agent_turn",
                     "project_completion_verified": False,
@@ -428,6 +446,15 @@ class AgentManager:
         config = self.config.agents.get(args.agent)
         if config is None or config.kind not in self.adapters:
             raise BridgeError("agent_unavailable", "Agent adapter is not configured")
+        if args.local_tools and (
+            config.kind != "grok_acp"
+            or not config.allow_local_tools
+            or "agent.local_tools" not in principal.capabilities
+        ):
+            raise BridgeError(
+                "agent_tools_denied",
+                "Local agent tools require explicit operator and principal permission",
+            )
         try:
             async with asyncio.timeout(args.timeout):
                 return await self.adapters[config.kind].execute(
