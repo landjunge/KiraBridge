@@ -12,8 +12,8 @@ Projekt arbeiten. Weitere CLI-Anbindungen sind geplant.
 ## Normaler Schnellstart
 
 Du brauchst das freigegebene Originalpaket für deinen Rechner. Dieser RC enthält
-Pakete für **macOS15 Intel x86_64** und **Ubuntu24.04 x86_64 mit systemd-Benutzersitzung**.
-Windows, Apple Silicon, andere Distributionen und Server ohne Benutzersitzung
+Pakete für **macOS15 Intel x86_64 / Apple Silicon arm64** und **Ubuntu24.04 x86_64 mit systemd-Benutzersitzung**.
+Windows, andere Distributionen und Server ohne Benutzersitzung
 haben damit keinen vollständigen Installationsnachweis. Netzwerkzugriff auf
 GitHub, PyPI und die von uv verwendete Python-Distribution wird benötigt.
 Codex/Grok müssen für Agentenaufträge separat installiert und angemeldet sein;

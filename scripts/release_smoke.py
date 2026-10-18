@@ -62,6 +62,8 @@ def smoke(artifacts: Path):
             "p.write_text(p.read_text().replace('port = 8765','port = '+sys.argv[3]))"
         )
         run([python, "-c", script, str(config), str(workspace), str(port)])
+        probe = workspace / "release-probe.txt"
+        probe.write_text("Synthetic isolated release prerequisite\n")
         config_before = hashlib.sha256(config.read_bytes()).hexdigest()
         credentials_before = hashlib.sha256(
             (config.parent / "credentials.json").read_bytes()
@@ -93,9 +95,9 @@ def smoke(artifacts: Path):
                         "--workflow-id",
                         "release-package-smoke",
                         "--operation",
-                        "file.list",
+                        "file.read",
                         "--read-path",
-                        str(workspace),
+                        str(probe),
                     ]
                 ).stdout
             )

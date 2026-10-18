@@ -18,6 +18,10 @@ from kirabridge.local_runtime import write_private
 
 CLIENT_RELEASE = "https://github.com/openai/tunnel-client/releases/latest"
 CLIENTS = {
+    ("Darwin", "arm64"): (
+        "darwin-arm64",
+        "a160820d45089b5253d8d671fe2a689bde0f73d78c135d1497a7b33f28a3ac62",
+    ),
     ("Darwin", "x86_64"): (
         "darwin-amd64",
         "57b3dd73f2d042c7aeb5664681f7538078359f55538b9e048640f1df71a0c83f",

@@ -21,7 +21,7 @@ bundle=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)
 platform="$(uname -s)-$(uname -m)"
 [ "$platform" = '@PLATFORM@' ] || fail 'Dieses Paket passt nicht zum Rechner. Passendes Release-Paket wählen.' 'This package does not match your computer. Choose the matching release package.'
 case "$platform" in
-  Darwin-x86_64) case "$(sw_vers -productVersion)" in 15.*) ;; *) fail 'RC geprüft auf macOS 15 Intel.' 'RC tested on macOS 15 Intel.' ;; esac ;;
+  Darwin-x86_64|Darwin-arm64) case "$(sw_vers -productVersion)" in 15.*) ;; *) fail 'RC geprüft auf macOS 15.' 'RC tested on macOS 15.' ;; esac ;;
   Linux-x86_64) [ -f /etc/os-release ] && grep -q '^ID=ubuntu$' /etc/os-release && grep -q '^VERSION_ID="24.04"$' /etc/os-release || fail 'RC geprüft auf Ubuntu 24.04 x86_64.' 'RC tested on Ubuntu 24.04 x86_64.' ;;
   *) exit 1 ;;
 esac
@@ -50,6 +50,7 @@ if [ -z "$uv_bin" ] || [ "$("$uv_bin" --version)" != 'uv 0.11.6' ]; then
   command -v curl >/dev/null 2>&1 || fail 'curl fehlt. Bitte curl bereitstellen und erneut starten.' 'curl is missing. Provide curl and retry.'
   case "$platform" in
     Darwin-x86_64) target=x86_64-apple-darwin; uv_sha=8e0ed5035eaa28c7c8cd2a46b5b9a05bfff1ef01dbdc090a010eb8fdf193a457 ;;
+    Darwin-arm64) target=aarch64-apple-darwin; uv_sha=4b69a4e366ec38cd5f305707de95e12951181c448679a00dce2a78868dfc9f5b ;;
     Linux-x86_64) target=x86_64-unknown-linux-gnu; uv_sha=0c6bab77a67a445dc849ed5e8ee8d3cb333b6e2eba863643ce1e228075f27943 ;;
   esac
   say 'uv 0.11.6 vom Originalanbieter laden und SHA-256 prüfen …' 'Downloading uv 0.11.6 from its original publisher and checking SHA-256 …'

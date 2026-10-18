@@ -12,7 +12,7 @@ import subprocess
 import tarfile
 from pathlib import Path
 
-PLATFORMS = ("Darwin-x86_64", "Linux-x86_64")
+PLATFORMS = ("Darwin-x86_64", "Darwin-arm64", "Linux-x86_64")
 
 
 def git(*args):

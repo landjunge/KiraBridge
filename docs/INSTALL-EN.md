@@ -12,8 +12,8 @@ integrations are planned.
 ## Normal quick start
 
 Obtain the approved original package for your computer. This RC supplies packages
-for **macOS15 Intel x86_64** and **Ubuntu24.04 x86_64 with a systemd user session**.
-Windows, Apple Silicon, other distributions and servers without user sessions do
+for **macOS15 Intel x86_64 / Apple Silicon arm64** and **Ubuntu24.04 x86_64 with a systemd user session**.
+Windows, other distributions and servers without user sessions do
 not have a complete installation acceptance claim. Network access to GitHub,
 PyPI and uv's Python distribution is required. Agent tasks require separately
 installed, signed-in Codex/Grok CLIs. KiraBridge creates no accounts and does not

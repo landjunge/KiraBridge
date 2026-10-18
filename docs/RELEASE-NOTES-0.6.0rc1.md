@@ -15,7 +15,7 @@ strukturierte Fehler in vorhandener Auditkette, beobachtbare MCP-Verbindungsphas
 und keine automatischen Wiederholungen unklarer Schreibaufträge.
 
 Dies ist **keine stabile1.0** und keine öffentliche Veröffentlichung. Pakete für
-macOS15 Intel und Ubuntu24.04 x86_64 werden gezielt geprüft; ein Linux-Desktop-/
+macOS15 Intel/Apple Silicon und Ubuntu24.04 x86_64 werden gezielt geprüft; ein Linux-Desktop-/
 systemd-Benutzersitzungsnachweis und die Bedienabnahme auf einem frischen fremden
 Rechner sind gesonderte Kriterien. Ein bestehender bestätigter ChatGPT-Dateiaufruf
 belegt die aktuelle eigene Installation, nicht jedes neue Konto oder den RC-Assistenten.
@@ -42,7 +42,7 @@ queues. Earlier repairs provide scoped read paths, concrete preflight, structure
 diagnostics in the existing audit chain, observable MCP lifecycle phases and no
 automatic replay of uncertain writes.
 
-**Not stable1.0 or a public release.** Targeted checks cover macOS15 Intel and
+**Not stable1.0 or a public release.** Targeted checks cover macOS15 Intel/Apple Silicon and
 Ubuntu24.04 x86_64 packages. Real Linux desktop/user-systemd acceptance and usability
 on a fresh external machine remain separate criteria. Existing user-confirmed
 ChatGPT file access proves the current private installation, not every account
