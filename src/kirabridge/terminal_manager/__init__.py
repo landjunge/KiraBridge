@@ -11,6 +11,7 @@ from kirabridge.bridge_core.config import TerminalConfig
 from kirabridge.bridge_core.models import BridgeError, TerminalInput
 from kirabridge.filesystem_manager import PathScope
 from kirabridge.platform_adapters import reap_process, spawn_process, stop_process
+from kirabridge.workflow_control_adapter import process_dispatch
 
 EvidenceCallback = Callable[[dict], Awaitable[None]]
 
@@ -86,18 +87,38 @@ class TerminalManager:
             raise BridgeError("invalid_command", "NUL in command argument")
         scope = PathScope(roots)
         # Pin cwd, then fchdir in a separate exec trampoline (macOS has no directory /dev/fd).
-        with scope.directory(args.cwd) as cwd_fd:
-            process = await spawn_process(
-                [executable, *args.argv[1:]],
-                cwd_fd,
-                env=env if env is not None else self.environment.copy(),
-                stdin=asyncio.subprocess.PIPE if stdin is not None else asyncio.subprocess.DEVNULL,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE,
-                limit=1048576,
-            )
-        session = Session(task_id, principal, process)
-        self.sessions[task_id] = session
+        process = None
+        try:
+            async with process_dispatch(task_id, principal):
+                if task_id in self.sessions:
+                    raise BridgeError(
+                        "process_state_conflict", "Task already has an active process"
+                    )
+                with scope.directory(args.cwd) as cwd_fd:
+                    process = await spawn_process(
+                        [executable, *args.argv[1:]],
+                        cwd_fd,
+                        env=env if env is not None else self.environment.copy(),
+                        stdin=asyncio.subprocess.PIPE
+                        if stdin is not None
+                        else asyncio.subprocess.DEVNULL,
+                        stdout=asyncio.subprocess.PIPE,
+                        stderr=asyncio.subprocess.PIPE,
+                        limit=1048576,
+                    )
+                session = Session(task_id, principal, process)
+                self.sessions[task_id] = session
+        except BaseException:
+            if process is not None:
+                cleanup = asyncio.create_task(reap_process(process))
+                while not cleanup.done():
+                    try:
+                        await asyncio.shield(cleanup)
+                    except asyncio.CancelledError:
+                        pass
+                self.sessions.pop(task_id, None)
+                cleanup.result()
+            raise
 
         async def drain(reader, buffer, events=False):
             pending = bytearray()

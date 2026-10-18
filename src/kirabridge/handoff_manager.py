@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 import uuid
+from contextlib import AsyncExitStack
 from datetime import datetime, timezone
 
 from pydantic import ValidationError
@@ -22,6 +23,7 @@ from kirabridge.bridge_core.models import (
 )
 from kirabridge.filesystem_manager import PathScope
 from kirabridge.terminal_manager import check_executable
+from kirabridge.workflow_control_adapter import stop_observation
 
 TOOLS = {
     "issue_handoff",
@@ -56,6 +58,17 @@ class HandoffManager:
             raise BridgeError("handoff_not_found", "No owned workflow for this exact handoff")
         return json.loads(row[0])
 
+    def ensure_not_stopped(self, principal, handoff_id, revision):
+        observation = stop_observation(
+            self.store,
+            {
+                "id": self.identity(principal, handoff_id, revision),
+                "principal": principal,
+            },
+        )
+        if observation.get("control_mode") in {"stop_only", "abort_only"}:
+            raise BridgeError("workflow_stopped", "Owned stop intent blocks further turns")
+
     def save(self, metadata, *, task_id, event):
         # Called inside an existing Store transaction; audit contains references, not context.
         self.store.db.execute(
@@ -88,6 +101,7 @@ class HandoffManager:
         )
 
     def view(self, metadata, **extra):
+        stop = stop_observation(self.store, metadata)
         return {
             key: metadata.get(key)
             for key in (
@@ -107,9 +121,15 @@ class HandoffManager:
                 "turn_count",
                 "decision",
                 "failure_code",
+                "control_project_id",
+                "control_source",
             )
         } | {
             "phase": self.phase(metadata),
+            "control_mode": stop.get("control_mode", metadata.get("control_mode", "standalone")),
+            "hard_cost_cap": False,
+            "cost_kind": "unknown",
+            "stop_observation": stop,
             "project_completion_verified": False,
             "automatic_retry": False,
             "last_task_state": self.store.get(metadata["last_task_id"], metadata["principal"])[
@@ -182,8 +202,10 @@ class HandoffManager:
         return policy, configured
 
     async def start(self, task, args, running, progress):
+        self.ensure_not_stopped(task["principal"], args.handoff_id, args.revision)
         policy, configured = self.agent_preflight(task["principal"], args.agent, args.cwd)
         record = await self.issued(task, args.handoff_id, args.revision)
+        self.ensure_not_stopped(task["principal"], args.handoff_id, args.revision)
         packet = record["handoff"]
         if packet.get("target_system") not in {"generic", "codex"}:
             raise BridgeError("handoff_target", "Issued target is not this Codex workflow")
@@ -343,6 +365,7 @@ class HandoffManager:
     async def turn(
         self, task, metadata, prompt, timeout, policy, running, progress, *, resume_session=None
     ):
+        self.ensure_not_stopped(task["principal"], metadata["handoff_id"], metadata["revision"])
 
         async def agent_running(evidence):
             metadata["phase"] = "agent_running"
@@ -350,17 +373,35 @@ class HandoffManager:
                 self.save(metadata, task_id=task["id"], event="handoff.agent_started")
             await progress({**evidence, "agent_turn_started": True})
 
-        result = await self.bridge.agents.execute(
-            task,
-            AgentInput(
-                agent=metadata["agent"], cwd=metadata["cwd"], prompt=prompt, timeout=timeout
-            ),
-            policy,
-            agent_running,
-            progress,
-            owned_resume_session=resume_session,
-            handoff_reply=True,
-        )
+        controller = getattr(self.bridge, "workflow_control", None)
+        async with AsyncExitStack() as contexts:
+            if controller is not None:
+                manager = controller.bind_turn(task, metadata)
+                if hasattr(manager, "__aenter__"):
+                    await contexts.enter_async_context(manager)
+                else:
+                    contexts.enter_context(manager)
+            if controller is None and (
+                metadata.get("control_mode", "standalone") != "standalone"
+                or metadata.get("control_project_id") is not None
+                or stop_observation(self.store, metadata).get("control_mode")
+                in {"stop_only", "abort_only"}
+            ):
+                raise BridgeError(
+                    "workflow_control_unavailable",
+                    "Previously controlled turn requires its assembly",
+                )
+            result = await self.bridge.agents.execute(
+                task,
+                AgentInput(
+                    agent=metadata["agent"], cwd=metadata["cwd"], prompt=prompt, timeout=timeout
+                ),
+                policy,
+                agent_running,
+                progress,
+                owned_resume_session=resume_session,
+                handoff_reply=True,
+            )
         session = result.get("evidence", {}).get("session_id")
         if (
             not result.get("success")

@@ -176,6 +176,10 @@ class HandoffReference(Input):
     revision: int = Field(ge=1)
 
 
+class WorkflowStopInput(HandoffReference):
+    stop_id: str = Field(pattern=r"^[A-Za-z0-9_.:-]{1,128}$")
+
+
 class HandoffStartInput(HandoffReference):
     agent: str = Field(default="codex", pattern=r"^[a-z][a-z0-9_-]{0,40}$")
     cwd: str

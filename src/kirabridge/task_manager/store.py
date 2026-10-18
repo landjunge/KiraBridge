@@ -224,7 +224,7 @@ class Store:
             row = self.db.execute(
                 f"SELECT id,principal FROM tasks WHERE state='queued' AND operation {comparison} "
                 "('process.list','process.inspect','process.terminate',"
-                "'agent.status','policy.inspect','handoff.status') "
+                "'agent.status','policy.inspect','handoff.status','workflow.stop') "
                 "ORDER BY created,id LIMIT 1"
             ).fetchone()
             if row is None:
