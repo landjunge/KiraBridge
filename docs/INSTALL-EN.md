@@ -1,4 +1,4 @@
-# Install KiraBridge · 0.6.0rc2
+# Install KiraBridge · 0.6.0rc3
 
 **Private release candidate for acceptance. No public installation yet.**
 The included `LICENSE` is the Netzwerkpunkt Personal Use License1.0. German
@@ -17,19 +17,13 @@ integrations are planned.
 
 | State | Meaning |
 | --- | --- |
-| Reviewed source `7af39cd`, version label `0.6.0rc2` | Includes newer project controls and optional adapters; the same version string does not identify the same package. |
+| New private RC3 `0.6.0rc3` | The full source pin is in `release.json` and the evidence manifest; includes project/workflow code through reviewed base `612a5c8`. |
 | Documented operator Mac `0.5.2` with selected backports | A separate installed service with its own source/config/runtime evidence, not defaults for new users. |
-| Frozen private RC2 draft `57bee99` | Historical packages with original hashes. They lack `agents.codex.sandbox_mode` and the later integrations. |
+| Frozen private RC2 `57bee99` | Historical artifacts remain unchanged. Newer options are absent; do not use it with today's operator configuration. |
 
-[Release acceptance and publication gates](RELEASE-ABNAHME-20261018.md) remain
-separate. Do not start the old RC2 against the current operator configuration: its
-strict model rejects newer settings. Do not reset policy to fit an old package.
-A later release requires a newly pinned and checked package; this guide neither
-builds nor publishes one. Inspect the loaded service with `kirabridge status` and
-concrete readiness instead of inferring it from a checkout or filename.
-
-The package/platform statements below describe the **frozen RC2**. Identify the
-existing installation's update path first; do not rerun initial setup on it.
+[RC3 acceptance and publication gates](RELEASE-ABNAHME-20261019-RC3.md) remain
+separate. A source pin is not usability acceptance. Inspect the loaded service
+with `kirabridge status` and concrete readiness. Preserve healthy existing setup.
 
 ## Normal quick start
 
@@ -121,7 +115,9 @@ Separate grants cover [PNG images](IMAGE-READ-20261018.md),
 do not automatically receive all of them. Optional
 [owned workflow control](WORKFLOW-CONTROL-CONFIGURATION.md) is `stop_only`: cost
 unknown, no hard dollar cap or universal control over arbitrary programs.
-Installation alone does not enable it. See [security limits](SECURITY.md).
+Installation alone does not enable it. TollGate and ThreadDesk are not bundled
+or automatically installed; they need separately reviewed source pins, local
+setup and explicit operator configuration. See [security limits](SECURITY.md).
 
 ## Rerun and update
 

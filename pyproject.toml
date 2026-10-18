@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "kirabridge"
-version = "0.6.0rc2"
+version = "0.6.0rc3"
 description = "Private, permission-scoped desktop and agent bridge"
 license = "LicenseRef-Netzwerkpunkt-Personal-Use-1.0"
 license-files = ["LICENSE"]
@@ -19,7 +19,7 @@ kirabridge = "kirabridge.cli:main"
 dev = ["pytest>=8,<10", "pytest-asyncio>=1,<2", "ruff>=0.14,<1"]
 
 [tool.hatch.build.targets.sdist]
-include = ["LICENSE", "src/", "pyproject.toml", "uv.lock", "docs/INSTALL-DE.md", "docs/INSTALL-EN.md", "docs/RELEASE-NOTES-0.6.0rc2.md"]
+include = ["LICENSE", "src/", "pyproject.toml", "uv.lock", "docs/INSTALL-DE.md", "docs/INSTALL-EN.md", "docs/RELEASE-NOTES-0.6.0rc3.md", "docs/CHATGPT.md", "docs/SECURITY.md", "docs/IMAGE-READ-20261018.md", "docs/THREADDESK-ADAPTER-20261018.md", "docs/THREADDESK-KNOWLEDGE-20261018.md", "docs/WORKFLOW-OBSERVATION-EXPORT.md", "docs/WORKFLOW-CONTROL-CONFIGURATION.md", "docs/WORKFLOW-STOP-ADAPTER.md", "docs/RELEASE-ABNAHME-20261019-RC3.md"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"

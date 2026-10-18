@@ -1,4 +1,4 @@
-# KiraBridge installieren · 0.6.0rc2
+# KiraBridge installieren · 0.6.0rc3
 
 **Privater Release Candidate zur Abnahme. Noch keine öffentliche Installation.**
 Es gilt die beiliegende `LICENSE`: Netzwerkpunkt Personal Use License1.0,
@@ -18,20 +18,13 @@ Projekt arbeiten. Weitere CLI-Anbindungen sind geplant.
 
 | Stand | Bedeutung |
 | --- | --- |
-| Aktueller Quellstand `7af39cd`, Versionskennung `0.6.0rc2` | Enthält die neuere Projektsteuerung und optionalen Adapter; eine gleiche Versionsnummer belegt kein identisches Paket. |
-| Dokumentierter Betreiber-Mac `0.5.2` mit gezielten Backports | Eigene laufende Installation mit eigenen Quell-/Config-/Runtimebelegen, keine allgemeine Voreinstellung für neue Nutzer. |
-| Eingefrorener privater RC2-Entwurf `57bee99` | Historische Pakete mit damaligen Hashes. Enthält insbesondere `agents.codex.sandbox_mode` und die späteren Integrationen **nicht**. |
+| Neuer privater RC3 `0.6.0rc3` | Der vollständige Quellpin steht in `release.json` und im beigefügten Prüfmanifest; enthält die Projekt-/Workflowfunktionen bis zum geprüften Basisstand `612a5c8`. |
+| Dokumentierter Betreiber-Mac `0.5.2` mit gezielten Backports | Getrennte laufende Installation mit eigenen Quell-/Config-/Runtimebelegen, keine Voreinstellung für neue Nutzer. |
+| Eingefrorener privater RC2 `57bee99` | Historische Pakete bleiben unverändert. Ihnen fehlen neuere Optionen; nicht mit heutiger Betreiberkonfiguration starten. |
 
-[Releaseabnahme und offene Freigaben](RELEASE-ABNAHME-20261018.md) bleiben maßgeblich.
-Die aktuelle Betreiberkonfiguration darf nicht mit dem alten RC2 gestartet werden:
-sein striktes Modell lehnt neue Einstellungen ab. Keine Policy zurücksetzen, um ein
-altes Paket passend zu machen. Vor neuer Veröffentlichung braucht es einen neuen
-belegten Paketpin; diese Anleitung baut oder veröffentlicht keinen Kandidaten.
-Den tatsächlich geladenen Stand mit `kirabridge status` und konkreter Readiness
-prüfen, nicht aus einem Checkout oder Dateinamen ableiten.
-
-Die folgenden Paket-/Plattformangaben betreffen den **eingefrorenen RC2**. Für eine
-bestehende Installation zuerst ihren Updateweg bestimmen, nicht neu einrichten.
+[RC3-Abnahme und offene Freigaben](RELEASE-ABNAHME-20261019-RC3.md) sind maßgeblich.
+Ein Quellpin ist keine Bedienabnahme. Geladenen Stand mit `kirabridge status`
+und konkreter Readiness prüfen. Bestehende gesunde Einrichtung nicht neu anlegen.
 
 ## Normaler Schnellstart
 
@@ -131,7 +124,9 @@ Neue Funktionen erhalten jeweils eigene Rechte: [PNG-Bilder](IMAGE-READ-20261018
 Profile erhalten diese Capabilities nicht pauschal. Der optionale
 [auftragseigene Stopp](WORKFLOW-CONTROL-CONFIGURATION.md) bleibt `stop_only`:
 Kosten unbekannt, keine harte Dollarquote und kein universeller Stopp beliebiger
-Programme. Installation allein aktiviert ihn nicht. [Sicherheitsgrenzen](SECURITY.md).
+Programme. Installation allein aktiviert ihn nicht. TollGate und ThreadDesk werden
+nicht mitgeliefert oder automatisch installiert; sie brauchen separat geprüfte
+Quellpins, lokale Einrichtung und ausdrückliche Betreiberkonfiguration. [Sicherheitsgrenzen](SECURITY.md).
 
 ## Erneuter Aufruf und Update
 

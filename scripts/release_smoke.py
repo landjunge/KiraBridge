@@ -6,6 +6,7 @@ import argparse
 import email
 import hashlib
 import json
+import os
 import platform
 import shutil
 import socket
@@ -58,6 +59,22 @@ def smoke(artifacts: Path):
         extracted = next(folder.glob("KiraBridge-*"))
         pin = json.loads((extracted / "release.json").read_text())
         license_bytes = (artifacts / "LICENSE").read_bytes()
+        assert pin["version"] == "0.6.0rc3"
+        assert pin["optional_integrations_bundled"] == {"threaddesk": False, "tollgate": False}
+        for guide in pin["operator_guides"]:
+            assert (extracted / guide).is_file()
+        assert "@VERSION@" not in (extracted / "install.sh").read_text()
+        assert pin["version"] in (extracted / "install.sh").read_text()
+        with tarfile.open(next(artifacts.glob("kirabridge-*.tar.gz"))) as source:
+            source_license = next(m for m in source.getmembers() if m.name.endswith("/LICENSE"))
+            assert source.extractfile(source_license).read() == license_bytes
+            package_info = email.message_from_bytes(
+                source.extractfile(
+                    next(m for m in source.getmembers() if m.name.endswith("/PKG-INFO"))
+                ).read()
+            )
+            assert package_info["Version"] == pin["version"]
+            assert package_info["License-Expression"] == pin["license"]
         assert (extracted / "LICENSE").read_bytes() == license_bytes
         assert (extracted / "payload/LICENSE").read_bytes() == license_bytes
         assert hashlib.sha256(license_bytes).hexdigest() == pin["license_sha256"]
@@ -67,6 +84,7 @@ def smoke(artifacts: Path):
                 wheel.read(next(n for n in names if n.endswith("/METADATA")))
             )
             assert metadata["License-Expression"] == pin["license"]
+            assert metadata["Version"] == pin["version"]
             assert (
                 wheel.read(next(n for n in names if n.endswith("/licenses/LICENSE")))
                 == license_bytes
@@ -100,6 +118,60 @@ def smoke(artifacts: Path):
         credentials_before = hashlib.sha256(
             (config.parent / "credentials.json").read_bytes()
         ).hexdigest()
+        # Re-running the actual packaged start command must retain this isolated setup.
+        run(command, input="yes\n")
+        assert hashlib.sha256(config.read_bytes()).hexdigest() == config_before
+        assert (
+            hashlib.sha256((config.parent / "credentials.json").read_bytes()).hexdigest()
+            == credentials_before
+        )
+        # Exercise the existing managed launcher upgrade without installing an OS service.
+        # HOME and all paths are synthetic. This is not a fresh OS-user-service acceptance.
+        upgrade_script = """
+import json, sys
+from pathlib import Path
+from kirabridge.bridge_core.config import load_config
+from kirabridge.bridge_core.models import BridgeError, TaskRequest
+from kirabridge.bridge_core.bridge import Bridge
+from kirabridge.installation import activate_managed
+config_path, current, home = map(Path, sys.argv[1:])
+assert Path.home() == home
+previous = home / "previous-release"
+(previous / ".venv/bin").mkdir(parents=True)
+(previous / ".venv/bin/python3").symlink_to(current / ".venv/bin/python3")
+activate_managed(config_path, previous, service=False)
+launcher = home / ".local/bin/kirabridge"
+old = launcher.read_bytes()
+config = load_config(str(config_path))
+bridge = Bridge(config)
+request = TaskRequest(
+    task_id="release-upgrade-pending", idempotency_key="release-upgrade-pending",
+    operation="file.list", arguments={"path": config.principals["local"].roots[0]}
+)
+bridge.prepare("local", request)
+try:
+    activate_managed(config_path, current, service=False)
+except BridgeError as exc:
+    assert exc.code == "service_busy"
+else:
+    raise AssertionError("Busy upgrade accepted")
+assert launcher.read_bytes() == old
+bridge.store.transition(request.task_id, "cancelled", {"source":"isolated_release_probe"})
+row = dict(bridge.store.db.execute("SELECT * FROM tasks WHERE id=?", (request.task_id,)).fetchone())
+activate_managed(config_path, current, service=False)
+assert launcher.read_bytes() != old
+assert json.loads((config_path.parent / "installation.json").read_text())["version"] == "0.6.0rc3"
+assert dict(bridge.store.db.execute(
+    "SELECT * FROM tasks WHERE id=?", (request.task_id,)
+).fetchone()) == row
+bridge.store.close()
+"""
+        home = folder / "synthetic-home"
+        home.mkdir()
+        run(
+            [python, "-c", upgrade_script, str(config), str(installed), str(home)],
+            env={**os.environ, "HOME": str(home)},
+        )
         base = [python, "-m", "kirabridge.cli", "--config", str(config)]
         check = json.loads(run([*base, "install", "--check"]).stdout)
         assert check["changes"] is False and check["chatgpt_call"] == "unverified"
@@ -178,7 +250,13 @@ def smoke(artifacts: Path):
             "concrete_preflight_and_loaded_source_match": True,
             "corrupt_package_rejected_before_install": True,
             "config_and_credentials_preserved": True,
-            "license_in_bundle_payload_wheel_and_separate_asset": True,
+            "packaged_installer_rerun_preserves_configuration": True,
+            "managed_launcher_upgrade_and_pending_task_gate": True,
+            "operator_guides_in_bundle": pin["operator_guides"],
+            "optional_integrations_not_automatically_installed": pin[
+                "optional_integrations_bundled"
+            ],
+            "license_in_bundle_payload_wheel_sdist_and_separate_asset": True,
             "license_sha256": pin["license_sha256"],
             "license_expression": pin["license"],
             "real_user_setup_service_tunnel_changed": False,
