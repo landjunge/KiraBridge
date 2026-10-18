@@ -103,3 +103,14 @@ Diese neue Adapteroption ist nicht in dessen bereits gebauten Artefakten;
 kein neuer Releasebau oder öffentliche Veröffentlichung durch diesen Auftrag.
 Rückweg: nur gesicherte passende Policy und vorherigen Quellpin bei ruhenden
 Queues laden; keine Task-/DB-/Zugangsdatenrücksicherung.
+
+## Zusätzlicher tatsächlicher App-Abruf
+
+Auch die verbundene KiraBridge-App dieser Codex-Sitzung erreicht Runtime193c9176.
+Die Tasks `plugin-project-control-20261018-write` und
+`plugin-project-control-20261018-read` sind als chatgpt jeweils completed,
+Versuch1:54Bytes im neu freigegebenen TollGate-Projekt geschrieben und vollständig
+zurückgelesen. Exakter Hash9f60db9d…794f; ausschließlich diese synthetische Datei
+anschließend entfernt. Damit bleibt es nicht bei der Loopback-Probe. Das ist
+kein neuer Abnahmenachweis aus der separaten iPhone-Sprachsitzung; deren bereits
+bestätigten Dateiabruf1311 unverändert berücksichtigen.
