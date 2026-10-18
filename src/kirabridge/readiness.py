@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import os
 import stat
+import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -20,6 +21,8 @@ from kirabridge.terminal_manager import check_executable
 class ReadinessInput(Input):
     read_paths: list[str] = Field(default_factory=list, max_length=16)
     executables: list[str] = Field(default_factory=list, max_length=16)
+    operations: list[str] = Field(default_factory=list, max_length=16)
+    workflow_id: str | None = Field(default=None, max_length=128, pattern=r"^[a-zA-Z0-9_-]+$")
 
 
 def runtime_snapshot(config: Config) -> dict:
@@ -31,6 +34,7 @@ def runtime_snapshot(config: Config) -> dict:
         for p in sorted(root.rglob("*.py"))
     }
     return {
+        "instance_id": uuid.uuid4().hex,
         "version": __version__,
         "pid": os.getpid(),
         "started_at": datetime.now(timezone.utc).isoformat(),
@@ -90,15 +94,27 @@ def readiness(bridge, principal: str, requirements: ReadinessInput) -> dict:
         bridge.security.principal(principal, "terminal.execute")
         check_executable(path, policy.executables)
 
+    def operation(name):
+        from kirabridge.bridge_core.bridge import INPUTS
+
+        if name not in INPUTS:
+            raise BridgeError("unknown_operation", "Unknown operation")
+        bridge.security.principal(principal, name)
+        if name in {"clipboard.read", "clipboard.write"}:
+            bridge.clipboard.platform.clipboard_command(write=name == "clipboard.write")
+
     paths = [{"path": p, **_probe(lambda p=p: file(p))} for p in requirements.read_paths]
     programs = [{"path": p, **_probe(lambda p=p: executable(p))} for p in requirements.executables]
+    operations = [
+        {"operation": p, **_probe(lambda p=p: operation(p))} for p in requirements.operations
+    ]
     roots = [
         {"path": p, **_probe(lambda p=p: directory(p))}
         for p in dict.fromkeys(policy.roots + policy.read_roots)
     ]
     health = bridge.health(principal)
-    requested = bool(paths or programs)
-    return {
+    requested = bool(paths or programs or operations)
+    result = {
         "principal": principal,
         "runtime": bridge.runtime,
         "dispatcher_active": health["dispatcher_active"],
@@ -109,8 +125,10 @@ def readiness(bridge, principal: str, requirements: ReadinessInput) -> dict:
         "root_checks": roots,
         "read_path_checks": paths,
         "executable_checks": programs,
+        "operation_checks": operations,
+        "workflow_id": requirements.workflow_id,
         "requested_prerequisites_ready": (
-            health["dispatcher_active"] and all(x["ok"] for x in paths + programs)
+            health["dispatcher_active"] and all(x["ok"] for x in paths + programs + operations)
         )
         if requested
         else None,
@@ -120,4 +138,83 @@ def readiness(bridge, principal: str, requirements: ReadinessInput) -> dict:
         "remediation": "path_denied: use file.read inside configured roots/read_roots; "
         "missing roots/config drift: local operator must correct policy and reload safely. "
         "executable_denied: use file tools for file access; no interpreter workaround.",
+    }
+    if requested and not result["requested_prerequisites_ready"]:
+        from kirabridge.diagnostics import rejection_report
+
+        failures = [x for x in paths + programs + operations if not x["ok"]]
+        code = failures[0]["code"] if failures else "dispatcher_unavailable"
+        result["diagnostic"] = rejection_report(
+            bridge.runtime,
+            "workflow.preflight",
+            code,
+            workflow_id=requirements.workflow_id,
+        )
+    if requirements.workflow_id:
+        from kirabridge.diagnostics import AuditObserver, compact_checks
+
+        observer = AuditObserver(bridge.config, principal, bridge.runtime, bridge.store)
+        result["audit_recorded"] = observer(
+            "workflow.preflight",
+            {
+                "workflow_id": requirements.workflow_id,
+                "checks": compact_checks(paths + programs + operations),
+                "outcome": "ready" if result["requested_prerequisites_ready"] else "not_ready",
+            },
+        )
+        result["audit_storage"] = observer.status()
+        if not result["audit_recorded"]:
+            from kirabridge.diagnostics import rejection_report
+
+            result["requested_prerequisites_ready"] = False
+            result["diagnostic"] = rejection_report(
+                bridge.runtime,
+                "workflow.preflight",
+                "diagnostic_recording_unavailable",
+                workflow_id=requirements.workflow_id,
+            )
+    return result
+
+
+def task_preflight(bridge, task: dict) -> dict:
+    """Actual task prerequisites, before any content access or process start.
+
+    The real manager still repeats its descriptor/permission checks at use time.
+    No change to request hashes, grants, task states or historical idempotency.
+    """
+    from kirabridge.diagnostics import compact_checks, runtime_ref
+
+    operation, args, principal = task["operation"], task["args"], task["principal"]
+    policy = bridge.security.principal(principal, operation)
+    roots = policy.roots + (policy.read_roots if operation in {"file.read", "file.list"} else [])
+    scope = PathScope(roots, excluded=[str(bridge.config.state_path)])
+    checks = []
+
+    def check(kind, path, action):
+        checks.append({"kind": kind, "path": path, **_probe(action)})
+
+    if operation == "file.read":
+        check("read_path", args["path"], lambda: _file(scope, args["path"]))
+    elif operation == "file.list":
+        check("directory", args["path"], lambda: _directory(scope, args["path"]))
+    elif operation.startswith("file."):
+        for path in [args["path"]] + ([args["destination"]] if operation == "file.move" else []):
+
+            def parent(path=path):
+                with scope.parent(path):
+                    pass
+
+            check("mutation_parent", path, parent)
+    elif operation in {"terminal.execute", "agent.execute"}:
+        if operation == "terminal.execute":
+            executable = args["argv"][0]
+            check(
+                "executable", executable, lambda: check_executable(executable, policy.executables)
+            )
+        check("cwd", args["cwd"], lambda: _directory(scope, args["cwd"]))
+    return {
+        "ready": all(c["ok"] for c in checks),
+        "checks": compact_checks(checks),
+        "operation": operation,
+        "runtime": runtime_ref(bridge.runtime),
     }

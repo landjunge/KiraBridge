@@ -50,6 +50,13 @@ class AgentConfig(BaseModel):
     api_key_env: str = "XAI_API_KEY"
 
 
+class DiagnosticsConfig(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    enabled: bool = True
+    max_events_per_day: int = Field(default=2000, ge=10, le=100000)
+    max_records: int = Field(default=20000, ge=10, le=1000000)
+
+
 class Config(BaseModel):
     model_config = ConfigDict(extra="forbid")
     _source_path: str | None = PrivateAttr(default=None)
@@ -74,6 +81,7 @@ class Config(BaseModel):
     )
     agents: dict[str, AgentConfig] = Field(default_factory=dict)
     messaging: MessagingConfig = Field(default_factory=MessagingConfig)
+    diagnostics: DiagnosticsConfig = Field(default_factory=DiagnosticsConfig)
 
     @property
     def state_path(self) -> Path:

@@ -1,3 +1,5 @@
+Fortschreibung0.5.2: [Workflow-Vorabprüfung, Diagnose und Audit-Rotation](DIAGNOSTICS-20261018.md).
+
 # Eingerichteter Betrieb ab 0.3.0
 
 Auf dem Ziel-Mac wurden `kirabridge setup` und `kirabridge service install` ausgeführt. Der Dienst `com.kirabridge.bridge` läuft unter dem angemeldeten Benutzer und startet nach einem Fehler automatisch neu. Er bindet ausschließlich an `127.0.0.1:8765`; jede HTTP-Anfrage benötigt Authentifizierung.

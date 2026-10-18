@@ -68,10 +68,19 @@ def peer(config: Config, principal: str) -> Peer:
 
 
 async def daemon_health(config: Config, principal: str) -> dict:
-    async with MCPClientPool(call_timeout=5) as pool:
+    async with MCPClientPool(
+        call_timeout=5, observer=connection_observer(config, principal)
+    ) as pool:
         await pool.connect(peer(config, principal))
         result = await pool.call("daemon", "bridge_health", {})
         return result.structuredContent or {"error": {"code": "invalid_health"}}
+
+
+def connection_observer(config: Config, principal: str):
+    from kirabridge.diagnostics import AuditObserver
+    from kirabridge.readiness import runtime_snapshot
+
+    return AuditObserver(config, principal, runtime_snapshot(config))
 
 
 def write_private(path: Path, text: str | bytes, *, mode: int = 0o600) -> None:

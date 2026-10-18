@@ -59,12 +59,19 @@ async def execute(args) -> None:
         return
     config = load_config(args.config)
     if args.command == "readiness":
-        from kirabridge.local_runtime import peer
+        from kirabridge.local_runtime import connection_observer, peer
         from kirabridge.mcp_gateway.client import MCPClientPool
         from kirabridge.readiness import ReadinessInput, runtime_snapshot
 
-        requirements = ReadinessInput(read_paths=args.read_path, executables=args.executable)
-        async with MCPClientPool(call_timeout=10) as pool:
+        requirements = ReadinessInput(
+            read_paths=args.read_path,
+            executables=args.executable,
+            operations=args.operation,
+            workflow_id=args.workflow_id,
+        )
+        async with MCPClientPool(
+            call_timeout=10, observer=connection_observer(config, args.principal)
+        ) as pool:
             await pool.connect(peer(config, args.principal))
             response = await pool.call("daemon", "bridge_readiness", requirements.model_dump())
         result = response.structuredContent or {"error": {"code": "invalid_readiness"}}
@@ -80,6 +87,26 @@ async def execute(args) -> None:
             ]
         )
         result["service_matches_local_config_and_source"] = matches
+        if not matches:
+            from kirabridge.diagnostics import rejection_report, runtime_ref
+
+            observer = connection_observer(config, args.principal)
+            observer(
+                "config.observed_drift",
+                {
+                    "previous_runtime": actual,
+                    "outcome": "loaded_service_differs_from_local_snapshot",
+                },
+            )
+            observer.close()
+            result["requested_prerequisites_ready"] = False
+            result["diagnostic"] = rejection_report(
+                expected,
+                "workflow.preflight",
+                "loaded_service_drift",
+                workflow_id=args.workflow_id,
+            )
+            result["diagnostic"]["loaded_service_runtime"] = runtime_ref(actual)
         emit(result)
         if (
             not matches
@@ -89,7 +116,7 @@ async def execute(args) -> None:
             raise SystemExit(1)
         return
     if args.command == "message":
-        from kirabridge.local_runtime import peer
+        from kirabridge.local_runtime import connection_observer, peer
         from kirabridge.mcp_gateway.client import MCPClientPool
         from kirabridge.message_manager import MessageSend
 
@@ -122,7 +149,9 @@ async def execute(args) -> None:
             payload = {"after": args.after, "limit": args.limit, "wait_seconds": args.wait}
         elif args.action == "conversation":
             payload["conversation_id"] = args.conversation
-        async with MCPClientPool(call_timeout=30) as pool:
+        async with MCPClientPool(
+            call_timeout=30, observer=connection_observer(config, args.principal)
+        ) as pool:
             await pool.connect(peer(config, args.principal))
             result = await pool.call("daemon", tool, payload)
             emit(result.structuredContent or {"error": {"code": "invalid_channel_response"}})
@@ -292,7 +321,16 @@ async def execute(args) -> None:
         elif args.command == "tasks":
             emit(bridge.list_tasks(args.principal, args.after, args.limit, args.state))
         elif args.command == "audit":
-            emit(verify(bridge.store))
+            if args.export:
+                from kirabridge.diagnostics import export_audit
+
+                emit(export_audit(bridge.store, Path(args.export), args.after, args.limit))
+            else:
+                emit(verify(bridge.store))
+        elif args.command == "diagnose":
+            from kirabridge.diagnostics import task_report
+
+            emit(task_report(bridge, args.principal, args.task_id))
         elif args.command == "reconcile":
             # A local operator attests an inspected external result. Does not execute or retry.
             emit(bridge.tasks.reconcile(args.task_id, State(args.state), args.evidence))
@@ -335,6 +373,8 @@ async def run_request(bridge, principal, request, wait, approve, original=None):
             raise
     try:
         final = await bridge.tasks.wait(principal, request.task_id, wait)
+        if final["state"] in {State.FAILED, State.UNKNOWN, State.BLOCKED}:
+            final = bridge.task(principal, request.task_id)
         emit(final)
     finally:
         if owns_dispatcher:
@@ -356,6 +396,8 @@ def main() -> None:
     )
     readiness.add_argument("--read-path", action="append", default=[])
     readiness.add_argument("--executable", action="append", default=[])
+    readiness.add_argument("--operation", action="append", default=[])
+    readiness.add_argument("--workflow-id")
     sub.add_parser("connect", help="Forward MCP stdio to the authenticated local daemon")
     message = sub.add_parser("message", help="Authenticated addressed agent messaging")
     message_actions = message.add_subparsers(dest="action", required=True)
@@ -439,7 +481,12 @@ def main() -> None:
     tasks.add_argument("--after", type=int, default=0)
     tasks.add_argument("--limit", type=int, default=100)
     tasks.add_argument("--state", choices=[state.value for state in State])
-    sub.add_parser("audit")
+    audit = sub.add_parser("audit")
+    audit.add_argument("--export", help="New private bounded segment of the existing audit chain")
+    audit.add_argument("--after", type=int, default=0)
+    audit.add_argument("--limit", type=int, default=500)
+    diagnose = sub.add_parser("diagnose", help="Compact own task diagnostic without raw arguments")
+    diagnose.add_argument("task_id")
     sub.add_parser("doctor")
     reconcile = sub.add_parser("reconcile")
     reconcile.add_argument("task_id")
@@ -453,8 +500,11 @@ def main() -> None:
         asyncio.run(execute(args))
     except (BridgeError, ValidationError, OSError, ValueError, TimeoutError) as exc:
         code = exc.code if isinstance(exc, BridgeError) else "invalid_request"
+        output = {"error": {"code": code}}
+        if hasattr(exc, "diagnostic"):
+            output["diagnostic"] = exc.diagnostic
         emit(
-            {"error": {"code": code}},
+            output,
             stream=sys.stderr if args.command in {"serve", "connect"} else sys.stdout,
         )
         raise SystemExit(1) from None

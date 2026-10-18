@@ -22,12 +22,22 @@ Executor = Callable[[dict, Callable, Callable], Awaitable[dict]]
 
 
 class TaskManager:
-    def __init__(self, config: Config, store: Store, security: SecurityManager, executor: Executor):
+    def __init__(
+        self,
+        config: Config,
+        store: Store,
+        security: SecurityManager,
+        executor: Executor,
+        preflight=None,
+        runtime=None,
+    ):
         self.config, self.store, self.security, self.executor = config, store, security, executor
         self.owner = str(uuid.uuid4())
         self.lock = RuntimeLock(config.state_path / "dispatcher.lock.runtime")
         self.workers: list[asyncio.Task] = []
         self.wake = asyncio.Event()
+        self.preflight = preflight
+        self.runtime = runtime
 
     def enqueue(
         self,
@@ -244,7 +254,31 @@ class TaskManager:
 
         try:
             # Revalidate policy at dispatch time (config or grants may have changed).
-            self.security.principal(task["principal"], task["operation"])
+            if self.preflight:
+                try:
+                    self.security.principal(task["principal"], task["operation"])
+                    report = self.preflight(task)
+                except BridgeError as exc:
+                    report = {
+                        "ready": False,
+                        "operation": task["operation"],
+                        "runtime": self.runtime,
+                        "checks": [
+                            {
+                                "kind": "operation",
+                                "resource_ref": digest(task["operation"]),
+                                "ok": False,
+                                "code": exc.code,
+                            }
+                        ],
+                    }
+                with self.store.transaction():
+                    self.store.audit("task.preflight", task["principal"], task["id"], report)
+                if not report["ready"]:
+                    code = next(c["code"] for c in report["checks"] if not c["ok"])
+                    raise BridgeError(code, "Task prerequisites missing; inspect diagnostic report")
+            else:
+                self.security.principal(task["principal"], task["operation"])
             result = await self.executor(task, running, progress)
             state = State.COMPLETED if result.get("success", True) else State.FAILED
             self.store.transition(

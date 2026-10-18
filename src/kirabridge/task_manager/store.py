@@ -101,6 +101,13 @@ class Store:
                     for statement in script.split(";"):
                         if statement.strip():
                             self.db.execute(statement)
+                self.db.execute(
+                    "CREATE INDEX IF NOT EXISTS audit_kind_at ON audit(kind COLLATE NOCASE,at)"
+                )
+                self.db.execute(
+                    "CREATE INDEX IF NOT EXISTS audit_task_kind "
+                    "ON audit(principal,task_id,kind,seq)"
+                )
         except BaseException:
             self.db.close()
             raise

@@ -58,13 +58,24 @@ class Bridge:
 
         self.runtime = runtime_snapshot(config)
         self.store = Store(config.state_path / "bridge.sqlite3")
+        from kirabridge.diagnostics import AuditObserver, runtime_ref
+        from kirabridge.readiness import task_preflight
+
+        self.diagnostics = AuditObserver(config, "service", self.runtime, self.store)
         self.security = SecurityManager(config, self.store)
         self.terminal = TerminalManager()
         self.filesystem = FilesystemManager()
         self.clipboard = ClipboardManager()
         self.processes = ProcessManager(self.terminal)
         self.agents = AgentManager(config, self.terminal)
-        self.tasks = TaskManager(config, self.store, self.security, self.execute)
+        self.tasks = TaskManager(
+            config,
+            self.store,
+            self.security,
+            self.execute,
+            preflight=lambda task: task_preflight(self, task),
+            runtime=runtime_ref(self.runtime),
+        )
         self.messages = MessageManager(config, self.store, self.security)
         self.message_receiver = MessageReceiver(self)
 
@@ -80,12 +91,38 @@ class Bridge:
             ) from None
 
     def submit(self, principal: str, request: TaskRequest, approval: str = "") -> dict:
-        self.validate(request)
-        return self.tasks.enqueue(principal, request, approval)
+        try:
+            self.validate(request)
+            return self.tasks.enqueue(principal, request, approval)
+        except BridgeError as exc:
+            self.rejection(principal, request, exc)
+            raise
 
     def prepare(self, principal: str, request: TaskRequest) -> dict:
-        self.validate(request)
-        return self.tasks.enqueue(principal, request, "", pending=True)
+        try:
+            self.validate(request)
+            return self.tasks.enqueue(principal, request, "", pending=True)
+        except BridgeError as exc:
+            self.rejection(principal, request, exc)
+            raise
+
+    def rejection(self, principal, request, exc):
+        from kirabridge.diagnostics import AuditObserver, rejection_report, task_report
+
+        try:
+            self.security.principal(principal, "task.read")
+            self.store.get(request.task_id, principal)
+            report = task_report(self, principal, request.task_id)
+            report["submission_error_code"] = exc.code
+        except Exception:
+            report = rejection_report(self.runtime, request.operation, exc.code, request.task_id)
+        exc.diagnostic = report
+        if principal in self.config.principals:
+            AuditObserver(self.config, principal, self.runtime, self.store)(
+                "request.rejected",
+                {"operation": report["operation"], "error_code": exc.code},
+                task_id=request.task_id,
+            )
 
     def health(self, principal: str) -> dict:
         policy = self.security.principal(principal, "bridge.health")
@@ -101,6 +138,7 @@ class Bridge:
             "approval_required": policy.approval_mode == "manual",
             "health_scope": "dispatcher and authentication; use bridge_readiness for prerequisites",
             "runtime": self.runtime,
+            "diagnostics_storage": self.diagnostics.status(),
             "message_peers": policy.message_peers,
             "message_receiver_active": bool(
                 self.message_receiver.worker and not self.message_receiver.worker.done()
@@ -112,6 +150,10 @@ class Bridge:
         task = self.store.get(task_id, principal)
         for key in ("lease_owner", "lease_until", "idem"):
             task.pop(key, None)
+        if task["state"] in {State.FAILED, State.UNKNOWN, State.BLOCKED}:
+            from kirabridge.diagnostics import task_report
+
+            task["diagnostic"] = task_report(self, principal, task_id)
         return {"api_version": API_VERSION, **task}
 
     def events(self, principal: str, task_id: str, after: int = 0) -> dict:
@@ -203,9 +245,39 @@ class Bridge:
             return await self.terminal.terminate(principal, args.task_id)
         raise BridgeError("unknown_operation", "Operation is not supported")
 
+    def record_runtime_load(self):
+        previous = self.store.db.execute(
+            "SELECT metadata FROM audit WHERE kind='diagnostic.runtime.loaded' "
+            "ORDER BY seq DESC LIMIT 1"
+        ).fetchone()
+        import json
+
+        old = json.loads(previous[0])["runtime"] if previous else None
+        self.diagnostics(
+            "runtime.loaded",
+            {
+                "previous_runtime": old,
+                "config_changed": old.get("config_sha256") != self.runtime["config_sha256"]
+                if old
+                else None,
+                "source_changed": old.get("source_tree_sha256")
+                != self.runtime["source_tree_sha256"]
+                if old
+                else None,
+                "effective_config_changed": old.get("effective_config_sha256")
+                != self.runtime["effective_config_sha256"]
+                if old
+                else None,
+                "change_actor": "unknown; edits outside loader are not observed",
+                "observer": "dispatcher",
+                "external_tunnel": "unknown",
+            },
+        )
+
     async def __aenter__(self):
         await self.tasks.start()
         try:
+            self.record_runtime_load()
             await self.message_receiver.start()
         except BaseException:
             await self.tasks.stop()

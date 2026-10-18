@@ -1,6 +1,7 @@
 """Stdio connection to the shared daemon; tokens stay out of agent configuration files."""
 
 import asyncio
+import json
 
 from mcp.server.lowlevel import Server
 from mcp.server.stdio import stdio_server
@@ -8,7 +9,7 @@ from mcp.types import CallToolResult, TextContent
 
 from kirabridge import __version__
 from kirabridge.bridge_core.models import BridgeError
-from kirabridge.local_runtime import peer
+from kirabridge.local_runtime import connection_observer, peer
 from kirabridge.mcp_gateway.client import MCPClientPool
 
 
@@ -35,7 +36,7 @@ class DaemonConnection:
 
 
 async def connect_stdio(config, principal):
-    async with MCPClientPool() as pool:
+    async with MCPClientPool(observer=connection_observer(config, principal)) as pool:
         await pool.connect(peer(config, principal))
         connection = DaemonConnection(pool, peer(config, principal))
 
@@ -62,8 +63,13 @@ async def connect_stdio(config, principal):
             try:
                 return await connection.call_tool(name, arguments)
             except BridgeError as exc:
+                data = {"error": {"code": exc.code}}
+                if hasattr(exc, "diagnostic"):
+                    data["diagnostic"] = exc.diagnostic
                 return CallToolResult(
-                    isError=True, content=[TextContent(type="text", text=exc.code)]
+                    isError=True,
+                    content=[TextContent(type="text", text=json.dumps(data))],
+                    structuredContent=data,
                 )
 
         async with stdio_server() as (read, write):

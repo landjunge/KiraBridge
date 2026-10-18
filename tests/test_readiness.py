@@ -50,8 +50,8 @@ async def test_readiness_reports_specific_denials_without_contents_or_execution(
     outside.write_text("OUTSIDE")
     (root / "escape").symlink_to(outside)
     policy.executables = ["/missing/allowed-program"]
-    before = bridge.store.db.total_changes
     async with bridge:
+        before = bridge.store.db.total_changes  # The dispatcher has recorded its actual load.
         result = readiness(
             bridge,
             "local",

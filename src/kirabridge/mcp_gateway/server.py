@@ -55,7 +55,10 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
         try:
             return action()
         except BridgeError as exc:
-            return {"error": {"code": exc.code, "message": str(exc)}}
+            result = {"error": {"code": exc.code, "message": str(exc)}}
+            if hasattr(exc, "diagnostic"):
+                result["diagnostic"] = exc.diagnostic
+            return result
         except ValidationError:
             return {"error": {"code": "invalid_arguments", "message": "Invalid tool arguments"}}
         except Exception:
@@ -75,7 +78,11 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
 
     @server.tool(annotations=read)
     def bridge_readiness(
-        ctx: Context, read_paths: list[str] | None = None, executables: list[str] | None = None
+        ctx: Context,
+        read_paths: list[str] | None = None,
+        executables: list[str] | None = None,
+        operations: list[str] | None = None,
+        workflow_id: str | None = None,
     ) -> dict[str, Any]:
         """Check this identity's requested file/program prerequisites and loaded daemon snapshot.
 
@@ -86,7 +93,12 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
             lambda: readiness(
                 bridge,
                 identity(ctx),
-                ReadinessInput(read_paths=read_paths or [], executables=executables or []),
+                ReadinessInput(
+                    read_paths=read_paths or [],
+                    executables=executables or [],
+                    operations=operations or [],
+                    workflow_id=workflow_id,
+                ),
             )
         )
 
@@ -123,6 +135,16 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
     def task_get(task_id: str, ctx: Context) -> dict[str, Any]:
         """Read your task, receipt, timestamps, result and evidence-backed state."""
         return safe(lambda: bridge.task(identity(ctx), task_id))
+
+    @server.tool(annotations=read)
+    def task_diagnose(task_id: str, ctx: Context) -> dict[str, Any]:
+        """Compact owner-only failure/preflight/runtime view of existing task and audit evidence.
+
+        No contents, prompts, arguments or implicit retries. Historical unknowns stay unknown.
+        """
+        from kirabridge.diagnostics import task_report
+
+        return safe(lambda: task_report(bridge, identity(ctx), task_id))
 
     @server.tool(annotations=write)
     def task_request(request: TaskRequest, ctx: Context) -> dict[str, Any]:
