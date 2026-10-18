@@ -1,0 +1,249 @@
+{
+  "schema_version": "agent-authority-workflow-report-v1",
+  "role": "observer_only",
+  "source_authenticated": false,
+  "identity": "UNBEKANNT",
+  "effect": "UNBEKANNT",
+  "observation_report": {
+    "schema_version": "agent-authority-observation-report-v1",
+    "role": "observer_only",
+    "source": {
+      "scope": "selected_local_observations",
+      "kind": "workflow-jsonl",
+      "source_id": "kb-audit-5efb6a1f3ca1cf6416350d668f03380c",
+      "files_seen": 1,
+      "files_examined": 1,
+      "files_seen_is_lower_bound": false,
+      "directory_entries_seen": 1,
+      "directory_scan_complete": true,
+      "bytes_read": 2193,
+      "entries_read": 3,
+      "complete_observed_read": false,
+      "coverage_of_all_agent_activity": "UNBEKANNT",
+      "source_authenticated": false,
+      "identity": "UNBEKANNT",
+      "effect": "UNBEKANNT"
+    },
+    "summary": {
+      "reported_kind_counts": {
+        "claimed": 1,
+        "progress": 1,
+        "result": 1
+      },
+      "tasks_with_reported_association": 1,
+      "claims_without_later_result_in_read_entries": 0,
+      "structural_warning_count": 0
+    },
+    "tasks": [
+      {
+        "task_alias": "A1",
+        "association_basis": "reported_task_id_only",
+        "last_reported_kind": "result",
+        "order_ambiguous": false,
+        "entry_count": 3,
+        "reported_kind_counts": {
+          "claimed": 1,
+          "progress": 1,
+          "result": 1
+        },
+        "claim_without_later_result": false,
+        "evidence": [
+          {
+            "entry_id": "wf-7ed948e4cac51d0d40809d36f12c4fde",
+            "ordinal": 1,
+            "file_sha256": "1738a7f87a5194cde2b6612591ea11df5c6fa03bc3394b37045e51d5f46c3535"
+          },
+          {
+            "entry_id": "wf-4ebb6d4b47dd1e59659413a1243f1ff0",
+            "ordinal": 2,
+            "file_sha256": "1738a7f87a5194cde2b6612591ea11df5c6fa03bc3394b37045e51d5f46c3535"
+          },
+          {
+            "entry_id": "wf-e00bcbd63bd20b97ea626a926b4ba1f6",
+            "ordinal": 3,
+            "file_sha256": "1738a7f87a5194cde2b6612591ea11df5c6fa03bc3394b37045e51d5f46c3535"
+          }
+        ]
+      }
+    ],
+    "recent_entries": [
+      {
+        "entry_id": "wf-e00bcbd63bd20b97ea626a926b4ba1f6",
+        "ordinal": 3,
+        "file_sha256": "1738a7f87a5194cde2b6612591ea11df5c6fa03bc3394b37045e51d5f46c3535",
+        "reported_kind": "result",
+        "reported_actor_type": "kirabridge"
+      },
+      {
+        "entry_id": "wf-4ebb6d4b47dd1e59659413a1243f1ff0",
+        "ordinal": 2,
+        "file_sha256": "1738a7f87a5194cde2b6612591ea11df5c6fa03bc3394b37045e51d5f46c3535",
+        "reported_kind": "progress",
+        "reported_actor_type": "kirabridge"
+      },
+      {
+        "entry_id": "wf-7ed948e4cac51d0d40809d36f12c4fde",
+        "ordinal": 1,
+        "file_sha256": "1738a7f87a5194cde2b6612591ea11df5c6fa03bc3394b37045e51d5f46c3535",
+        "reported_kind": "claimed",
+        "reported_actor_type": "kirabridge"
+      }
+    ],
+    "warnings": [],
+    "display": {
+      "limit": 20,
+      "tasks_omitted": 0,
+      "entries_omitted": 0,
+      "warnings_omitted": 0
+    },
+    "task_completion_proven": false,
+    "rights_inherited": false
+  },
+  "events": [
+    {
+      "event_id": "audit-3-3a427fb31079fd8281db93e9072c03d2cfd4c6304456056dfebe510659b1bef1",
+      "source_tool": "kirabridge",
+      "source_id": "kb-audit-5efb6a1f3ca1cf6416350d668f03380c",
+      "segment_id": "segment-1",
+      "event_type": "task.accepted",
+      "producer_ordinal": 3,
+      "timestamp": "2026-10-18T19:03:25.534347+00:00",
+      "binding": {
+        "bridge_task_id": "synthetic-observation-task",
+        "principal_ref": "5db180b56a844ce3d646b1df7d1d99a0ce4b22effbae5d01fbdf0c3f5937c86e",
+        "request_hash": "4ba1c29c5f285a7fc3ed333bf80981e43508aa0cac2fb961f84195dbee9d4b51",
+        "task_id": "synthetic-observation-task"
+      },
+      "entry_id": "wf-7ed948e4cac51d0d40809d36f12c4fde",
+      "file_sha256": "1738a7f87a5194cde2b6612591ea11df5c6fa03bc3394b37045e51d5f46c3535",
+      "record_sha256": "411825727dccca38675ecf3a4d118bece299decee0011a83a5ec5383b9b49a64",
+      "assertion_basis": "producer_report_only",
+      "identity_authenticated": false,
+      "effect_verified": false
+    },
+    {
+      "event_id": "audit-5-1c775755e8356c076c7ba17f7ad912a0945caf5ac1289f1765aaaf753dd7ffd6",
+      "source_tool": "kirabridge",
+      "source_id": "kb-audit-5efb6a1f3ca1cf6416350d668f03380c",
+      "segment_id": "segment-1",
+      "event_type": "task.running",
+      "producer_ordinal": 5,
+      "timestamp": "2026-10-18T19:03:25.535320+00:00",
+      "binding": {
+        "bridge_task_id": "synthetic-observation-task",
+        "principal_ref": "5db180b56a844ce3d646b1df7d1d99a0ce4b22effbae5d01fbdf0c3f5937c86e",
+        "request_hash": "4ba1c29c5f285a7fc3ed333bf80981e43508aa0cac2fb961f84195dbee9d4b51",
+        "task_id": "synthetic-observation-task"
+      },
+      "entry_id": "wf-4ebb6d4b47dd1e59659413a1243f1ff0",
+      "file_sha256": "1738a7f87a5194cde2b6612591ea11df5c6fa03bc3394b37045e51d5f46c3535",
+      "record_sha256": "7d181b305847e008fc642edef9cd770159aac7e71818eb5ace7fca77b7dd953e",
+      "assertion_basis": "producer_report_only",
+      "identity_authenticated": false,
+      "effect_verified": false
+    },
+    {
+      "event_id": "audit-6-537e3f099ab6c245ae85d4b13ca366908cdb55fc4b7c4b2962472c51e7593284",
+      "source_tool": "kirabridge",
+      "source_id": "kb-audit-5efb6a1f3ca1cf6416350d668f03380c",
+      "segment_id": "segment-1",
+      "event_type": "task.completed",
+      "producer_ordinal": 6,
+      "timestamp": "2026-10-18T19:03:25.535744+00:00",
+      "binding": {
+        "bridge_task_id": "synthetic-observation-task",
+        "principal_ref": "5db180b56a844ce3d646b1df7d1d99a0ce4b22effbae5d01fbdf0c3f5937c86e",
+        "request_hash": "4ba1c29c5f285a7fc3ed333bf80981e43508aa0cac2fb961f84195dbee9d4b51",
+        "task_id": "synthetic-observation-task"
+      },
+      "entry_id": "wf-e00bcbd63bd20b97ea626a926b4ba1f6",
+      "file_sha256": "1738a7f87a5194cde2b6612591ea11df5c6fa03bc3394b37045e51d5f46c3535",
+      "record_sha256": "0ee2cd67d97344f6dcfb4f7fcfa3470a83932351a0f2ac31c5e75782f891a817",
+      "assertion_basis": "producer_report_only",
+      "identity_authenticated": false,
+      "effect_verified": false
+    }
+  ],
+  "read": {
+    "segments_seen": 1,
+    "records_seen": 3,
+    "duplicates_ignored": 0,
+    "events_omitted": 0,
+    "complete_selected_read": true,
+    "workflow_evidence_complete": false,
+    "coverage_of_all_activity": "UNBEKANNT"
+  },
+  "analysis": {
+    "schema_version": "agent-authority-workflow-findings-v1",
+    "assessment_scope": "producer_claim_consistency",
+    "findings": [
+      {
+        "finding_id": "finding-21ad748fd71827ad34f02095d03fa3dc",
+        "rule_id": "artifact_evidence",
+        "code": "workflow_result_artifact_missing",
+        "classification": "missing_evidence",
+        "severity": "unknown",
+        "entry_id": "wf-e00bcbd63bd20b97ea626a926b4ba1f6",
+        "evidence_refs": [
+          {
+            "source_tool": "kirabridge",
+            "source_id": "kb-audit-5efb6a1f3ca1cf6416350d668f03380c",
+            "event_id": "audit-6-537e3f099ab6c245ae85d4b13ca366908cdb55fc4b7c4b2962472c51e7593284",
+            "entry_id": "wf-e00bcbd63bd20b97ea626a926b4ba1f6",
+            "record_sha256": "0ee2cd67d97344f6dcfb4f7fcfa3470a83932351a0f2ac31c5e75782f891a817",
+            "file_sha256": "1738a7f87a5194cde2b6612591ea11df5c6fa03bc3394b37045e51d5f46c3535"
+          }
+        ],
+        "reported_scope": {
+          "task_id": "synthetic-observation-task",
+          "bridge_task_id": "synthetic-observation-task"
+        },
+        "assessment_scope": "producer_claim_consistency",
+        "fields": [
+          "artifact_ref"
+        ],
+        "identity_authenticated": false,
+        "actual_violation_verified": false
+      }
+    ],
+    "counts": {
+      "missing_evidence": 1
+    },
+    "rule_results": {
+      "artifact_evidence": {
+        "reported_results": 1,
+        "missing_evidence": 1
+      }
+    },
+    "findings_omitted": 0,
+    "claims_examined": 3,
+    "selected_read_complete": false,
+    "coverage_of_all_activity": "UNBEKANNT",
+    "source_authenticated": false,
+    "actual_violation_verified": false,
+    "task_completion_proven": false,
+    "gate_authorization_proven": false
+  },
+  "warnings": [
+    {
+      "code": "workflow_sequence_gap",
+      "entry_id": null,
+      "classification": "missing_evidence"
+    },
+    {
+      "code": "workflow_prefix_unobserved",
+      "entry_id": "wf-7ed948e4cac51d0d40809d36f12c4fde",
+      "classification": "missing_evidence"
+    },
+    {
+      "code": "workflow_chain_gap",
+      "entry_id": "wf-4ebb6d4b47dd1e59659413a1243f1ff0",
+      "classification": "missing_evidence"
+    }
+  ],
+  "warnings_omitted": 0,
+  "rights_granted": false,
+  "budget_released": false,
+  "stop_enforced": false,
+  "task_completion_proven": false
+}

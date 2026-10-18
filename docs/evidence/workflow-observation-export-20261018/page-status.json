@@ -1,0 +1,16 @@
+{
+  "audit_rows_examined": 6,
+  "coverage": {
+    "all_activity": "unknown",
+    "basis": "selected_owned_tasks_existing_audit_only",
+    "business_project_scope": "unknown_unless_recorded",
+    "external_tunnel": "unknown",
+    "filtered_or_missing_sequence": true,
+    "runtime_outside_recorded_preflight": "unknown"
+  },
+  "diagnostics": [],
+  "has_more": false,
+  "next_cursor": 6,
+  "page_event_bytes": 2193,
+  "through_seq": 6
+}
