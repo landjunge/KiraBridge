@@ -41,9 +41,10 @@ async def execute_admin(bridge, task, args, policy, running):
         ["/usr/bin/osascript"],
         running,
     )
-    if result["timed_out"]:
+    if result["timed_out"] or result.get("terminated"):
         raise UncertainExecution(
-            "admin_timeout", "Administrator command outcome is unknown; do not retry blindly"
+            "admin_timeout" if result["timed_out"] else "admin_interrupted",
+            "Administrator command outcome is unknown; do not retry blindly",
         )
     return {
         **result,
