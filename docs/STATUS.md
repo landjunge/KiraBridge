@@ -1,5 +1,10 @@
 # Abnahmestand 0.5.2
 
+Privater Release Candidate0.6.0rc2 mit übernommener gemeinsamer LICENSE ist
+zusätzlich gebaut und als GitHub-Entwurf gesichert. Die Nutzerinstallation wurde
+dafür nicht neu eingerichtet. [Artefakte, Quellpin, Plattformproben und offene
+Veröffentlichungskriterien](RELEASE-ABNAHME-20261018.md).
+
 18.10.2026: Konkrete Workflow-Vorabprüfung, strukturierte eigene Fehlerberichte,
 zuordenbare Verbindungsphasen und geladene Runtimefingerabdrücke sind aktiviert.
 Begrenzte Metadaten verwenden die bestehende Auditkette. Alle bisherigen Daten
