@@ -1,0 +1,58 @@
+"""Explicit macOS Authorization Services path; no passwords or sudoers changes."""
+
+from __future__ import annotations
+
+import json
+import shlex
+import sys
+
+from kirabridge.bridge_core.models import BridgeError, TerminalInput, UncertainExecution
+from kirabridge.terminal_manager import check_executable
+
+
+def authorization_script(argv: list[str], cwd: str) -> str:
+    if not argv or any("\x00" in value for value in [cwd, *argv]):
+        raise BridgeError("invalid_command", "Invalid administrator command")
+    # All words are quoted as data, then the complete command as an AppleScript string.
+    # The sole shell here is the documented, visible macOS privileged-command API.
+    command = "cd " + shlex.quote(cwd) + " && exec " + shlex.join(argv)
+    return (
+        "do shell script "
+        + json.dumps(command, ensure_ascii=False)
+        + " with administrator privileges"
+    )
+
+
+async def execute_admin(bridge, task, args, policy, running):
+    if sys.platform != "darwin":
+        raise BridgeError("unsupported_platform", "Local administrator authorization needs macOS")
+    check_executable(args.argv[0], policy.executables, policy.allow_any_executable)
+    script = authorization_script(args.argv, args.cwd)
+    result = await bridge.terminal.execute(
+        task["id"],
+        task["principal"],
+        TerminalInput(
+            argv=["/usr/bin/osascript", "-e", script],
+            cwd=args.cwd,
+            timeout=args.timeout,
+            max_output=args.max_output,
+        ),
+        policy.terminal_roots or policy.roots,
+        ["/usr/bin/osascript"],
+        running,
+    )
+    if result["timed_out"]:
+        raise UncertainExecution(
+            "admin_timeout", "Administrator command outcome is unknown; do not retry blindly"
+        )
+    return {
+        **result,
+        "success": result["exit_code"] == 0 and not result["timed_out"],
+        "evidence": {
+            "authorization": "macos_local_dialog",
+            "password_stored": False,
+            "exit_code": result["exit_code"],
+            "timed_out": result["timed_out"],
+        },
+        "scope": "one explicitly requested administrator command; local approval may be required",
+    }
