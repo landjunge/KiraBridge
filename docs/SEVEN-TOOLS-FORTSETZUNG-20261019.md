@@ -6,7 +6,29 @@ bleibt ausschließlich [status.json](seven-tools-build-20261018-1833/status.json
 mit daraus gerendertem [MASTERPLAN](seven-tools-build-20261018-1833/MASTERPLAN.md).
 Kein technischer Prüfnachweis setzt `user_accepted=true`.
 
-## Tatsächlich laufender Bridge-Anschluss
+## Aktuell nach zusätzlichem Wiederanlauf-Gegenfall
+
+Quellstand `612a5c8`, CI39174736045 auf allen drei Varianten erfolgreich,
+installierter0.5.2-Backport `f3f1302`. Aktuelle Runtime
+`74e26c460e464de697be4920106f6189`, Quell-SHA256
+`250ad1efc3b00c755d680ff141bc0c5ae99ef5c413aa2abb489c3cd40ad7b559`;
+Konfiguration unverändert `f0a8b0f5…cfa1b`.
+[Gesonderter Folgebeleg](evidence/workflow-stop-worktree-restart-20261019.json).
+
+Ein echter weiterer Gegenfall zeigte: Nach Umbenennen des konfigurierten
+Arbeitsordners **und Rekonstruktion des Routers** verlor die vorherige Version
+den Kontrollanschluss. Jetzt bleiben gespeicherte Journalbereiche zum Stoppen
+erreichbar; neue Starts verlangen weiterhin vorhandene CWD-/Rootidentität.
+Drei direkt betroffene lokale Fälle bestanden. Kein produktiver Ordner umbenannt.
+Nach kontrolliertem Laden blieben413 vorherige Tasks,2 Bindungen,5 Nachrichten und4
+Jobs identisch; Schlüssel/Dateirechte erhalten. Lokale authentifizierte Readiness
+trennt verfügbaren eigenen Abort von Barrierenvoraussetzungen und bestätigt keine
+Barriere vorab. Ein zusätzlicher tatsächlicher App-Statusabruf zeigte denselben
+einzigen Lauf und die bestehende EFFECTIVE-Sperre. Kein Agenten-, Stop- oder
+Antwort-Schreibauftrag wurde dafür wiederholt. Die folgenden zwölf ursprünglichen
+App-Belege bleiben beim damaligen Quell-/Runtimezustand, ohne Rückdatierung.
+
+## Erster belegter Bridge-Anschluss dieser Fortsetzung
 
 Geprüfter Quellstand `f731f65d6422b08c511220689e42200e28cf39ae`, normale CI
 [39173697982](https://github.com/landjunge/KiraBridge/actions/runs/39173697982):

@@ -1,0 +1,63 @@
+{
+  "schema": "kirabridge-workflow-stop-worktree-restart-followup-v1",
+  "source_commit": "612a5c8f34a01d4280ce665dbf9d380a9e45a2c3",
+  "installed_commit": "f3f13026f708c5373df0f8098219a2b98b2f56dd",
+  "ci": "https://github.com/landjunge/KiraBridge/actions/runs/39174736045",
+  "runtime": {
+    "instance_id": "74e26c460e464de697be4920106f6189",
+    "version": "0.5.2",
+    "pid": 70273,
+    "started_at": "2026-10-18T23:03:58.865234+00:00",
+    "config_path": "/Users/landjunge/.config/kirabridge/config.toml",
+    "config_sha256": "f0a8b0f5dc6554bc7d8f706b42d01e7ccde88866ec0c05a05c0bbc718b3cfa1b",
+    "effective_config_sha256": "63d3eb1f56ce5f696b78f359dad13cc8eb51bf31e8da2d533c18db90b7236afd",
+    "source_tree_sha256": "250ad1efc3b00c755d680ff141bc0c5ae99ef5c413aa2abb489c3cd40ad7b559",
+    "source_file_count": 39,
+    "source_package_path": "/Users/landjunge/KiraBridge/src/kirabridge",
+    "source_scope": "package Python files observed at startup; no remote attestation"
+  },
+  "new_countercase": {
+    "before_fix": "Reconstructed router after configured CWD/root rename returned UNKNOWN",
+    "after_fix": "Stored scope remains stoppable after reconstruction;3 targeted removed-root/directory-binding cases passed",
+    "new_turns_require_present_cwd": true,
+    "roots_or_capabilities_widened": false
+  },
+  "actual_status": {
+    "task_id": "seven-stop-20261019-status-worktree-restart",
+    "principal": "chatgpt",
+    "state": "completed",
+    "attempt": 1,
+    "receipt": "5a41c403-3ab7-4936-ac03-46ca2f9384bd",
+    "accepted": 1792364665.013098,
+    "started": 1792364665.014883,
+    "finished": 1792364665.0228648,
+    "run_id": "04501986-7bba-4bd6-a339-d71901a98c70",
+    "session_id": "01a1512f-b4f0-75c0-af0e-f13f3a194608",
+    "turn_count": 1,
+    "phase": "awaiting_answer",
+    "stop": "EFFECTIVE"
+  },
+  "local_readiness": {
+    "operation": "workflow.stop",
+    "requested_prerequisites_ready": true,
+    "owned_abort_available": true,
+    "durable_barrier_prerequisites_available": true,
+    "barrier_confirmed": false,
+    "scope": "Local authenticated CLI check, separate from actual App status task"
+  },
+  "preservation": {
+    "previous_tasks": 413,
+    "bindings": 2,
+    "messages": 5,
+    "message_jobs": 4,
+    "all_previous_rows_identical": true,
+    "credentials_launchagents_unchanged": true,
+    "config_mode": "0600",
+    "changed_python_files_match_checked_main": 12,
+    "private_proof": "~/.local/share/kirabridge/workflow-control-20261019/worktree-restart-preservation.json"
+  },
+  "no_new_agent_turn": true,
+  "no_repeat_stop_or_answer_write": true,
+  "whole_mac_reboot": false,
+  "earlier_actual_app_proof": "workflow-stop-chatgpt-20261019.json"
+}

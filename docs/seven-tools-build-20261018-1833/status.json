@@ -225,21 +225,22 @@
         "TG-C02"
       ],
       "source_commit": null,
-      "commit": "f731f65d6422b08c511220689e42200e28cf39ae",
+      "commit": "612a5c8f34a01d4280ce665dbf9d380a9e45a2c3",
       "pr": null,
       "checks": [
         "CI39173199790 and39173697982 all three macOS/Linux variants passed",
         "Actual ChatGPT new owned Codex question, effective stop, blocked start/answer, same single turn after service restart",
         "12 App tasks; narrower native Codex stop denied before submission",
         "409 old task rows,2 bindings,5 messages,4 jobs identical across restart",
-        "Actual selected14 event export and AA observer report read via App"
+        "Actual selected14 event export and AA observer report read via App",
+        "CI39174736045 all3 variants; reconstructed-router after deleted root now works;413 old task rows preserved and actual App reads same single stopped turn"
       ],
       "delivered": true,
       "user_accepted": false,
       "next_step": null,
       "blocker": "stop_only: no hard dollar cap or authenticated external effect/identity claim",
       "evidence": "docs/evidence/workflow-stop-20261018/PAUSE-CHECKPOINT.md",
-      "installed_commit": "1dee506d1a849380e7983aa806b737aedecbf39c"
+      "installed_commit": "f3f13026f708c5373df0f8098219a2b98b2f56dd"
     },
     "KB-C05": {
       "title": "Rückkanal",
@@ -924,13 +925,13 @@
     "No new competing task queue; existing stores/contracts and standalone products preserved.",
     "Source, runtime, package, delivery and user acceptance remain separate."
   ],
-  "updated_at": "2026-10-18T22:54:08.985927+00:00",
+  "updated_at": "2026-10-18T23:07:11.536662+00:00",
   "active_focus": {
     "task": "Finish normal BlockDesigner operator startup and preserve final per-package evidence",
     "critical_permissions": "Implemented with actual App probes; native Codex principal intentionally narrower; administrator confirmation remains local",
-    "loaded_runtime": "1dee506 /0.5.2; instance909ceb813e1f45f0bc492ba49299cb82; configf0a8b0f5dc6554bc7d8f706b42d01e7ccde88866ec0c05a05c0bbc718b3cfa1b",
-    "source_commit": "f731f65d6422b08c511220689e42200e28cf39ae",
-    "next_gate": "No production secret host or hard CLI money cap invented; no public release/Discussion"
+    "loaded_runtime": "f3f1302 /0.5.2; instance74e26c460e464de697be4920106f6189; configf0a8b0f5dc6554bc7d8f706b42d01e7ccde88866ec0c05a05c0bbc718b3cfa1b",
+    "source_commit": "612a5c8f34a01d4280ce665dbf9d380a9e45a2c3",
+    "next_gate": "BD startup operator-file static HTTP exposure review fix before source integration; no product runtime activation"
   },
   "user_pause": {
     "requested": false,

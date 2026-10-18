@@ -15,7 +15,7 @@ Koordinator: /root. Originalauftrag und acht Pläne: SOURCE.md, unverändert und
 | KB-C01 | /root | integrated_runtime_and_actual_chatgpt_checked | TD-C01, G-01 | 4d59e7081d62c5e4e9924e9e710382d8d8772c43 |
 | KB-C02 | /root | integrated_runtime_and_actual_chatgpt_checked | TD-C02, KB-C01 | 583c000a8f226d5d9e71c51310fb0a81a3bafb49 |
 | KB-C03 | /root | integrated_runtime_and_actual_chatgpt_checked |  | 8226763 |
-| KB-C04 | /root | main_runtime_and_actual_chatgpt_stop_checked | TG-C02 | f731f65d6422b08c511220689e42200e28cf39ae |
+| KB-C04 | /root | main_runtime_and_actual_chatgpt_stop_checked | TG-C02 | 612a5c8f34a01d4280ce665dbf9d380a9e45a2c3 |
 | KB-C05 | /root | bounded_image_and_selected_observations_actual_chatgpt_checked | KB-C02 | 9d6e1a86c7719d1755508f9d3e51a625d6660c1c |
 | KB-D01 | /root | integrated_runtime_assets_and_isolated_browser_checked |  | 19660bf98ad1c373e5ba791a57ec1752860ca8e2 |
 | KB-R01 | /root | main_integrated_DE_EN_instructions_checked |  | f19797b2e1b7e34b73de1180734a6b9c93ab07e5 |
