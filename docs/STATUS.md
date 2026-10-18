@@ -1,5 +1,12 @@
 # Abnahmestand 0.5.2
 
+18.10.2026, Projektsteuerung: sechs Projektwurzeln und registrierte Worktrees
+gezielt freigegeben; direkter Codex-Adapter ausdrücklich workspace-write,
+Projektregeln aktiv. Echter Dienst-/Codex-Schreibnachweis, Gegenfälle und
+Erhaltungsgrenzen: [Projektsteuerung](PROJECT-CONTROL-20261018.md). Keine neue
+Paketversion und keine Umsetzung der geplanten Gesamtintegration.
+[Analyse der sechs Verbindungen mit Quellpins, Lücken und Aufwand](INTEGRATIONSANALYSE-SECHS-TOOLS-20261018.md).
+
 Privater Release Candidate0.6.0rc2 mit übernommener gemeinsamer LICENSE ist
 zusätzlich gebaut und als GitHub-Entwurf gesichert. Die Nutzerinstallation wurde
 dafür nicht neu eingerichtet. [Artefakte, Quellpin, Plattformproben und offene

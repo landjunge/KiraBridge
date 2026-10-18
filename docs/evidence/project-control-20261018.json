@@ -1,0 +1,268 @@
+{
+  "schema": "1",
+  "runtime": {
+    "instance_id": "193c91766e444f06827de90256a7a328",
+    "version": "0.5.2",
+    "pid": 6413,
+    "started_at": "2026-10-18T15:55:00.073017+00:00",
+    "config_sha256": "4507332a24d78c7bb5d399ad37f6e229536907ead55a00c78852a5887cd140b5",
+    "effective_config_sha256": "e63cf828b049e22e504c3bf9fb20faac055093ce4d3e11aa81e38de75a6b1818",
+    "source_tree_sha256": "0ca2386dac459addcce2d6380f8e832402b7e73b72eb7375ffdcfbb6cafe5065",
+    "source_file_count": 31,
+    "source_scope": "package Python files observed at startup; no remote attestation"
+  },
+  "runtime_source_commit": "55046b0100c5cb1e6ececc28a273164dee8ebe17",
+  "main_patch_commit": "71ab97b135576ecda14eb98d66d472f5f0c83677",
+  "config_before_sha256": "c95c79de984966f39e57a073df1304d82262a5eb52768a5892e2a0c84cdcc519",
+  "config_mode": "0600",
+  "sandbox_mode": "workspace-write",
+  "idle_barrier": true,
+  "project_scope": [
+    "KiraBridge",
+    "ThreadDesk",
+    "4AllPass",
+    "TollGate",
+    "Gnom-Hub-v1",
+    "Agent Authority"
+  ],
+  "registered_existing_worktree_roots": 18,
+  "principal_capabilities_program_lists_unchanged": true,
+  "transport": "authenticated loopback MCP using existing chatgpt principal; not a new external ChatGPT acceptance",
+  "checks": [
+    {
+      "task_id": "20261018-project-control-write-0",
+      "operation": "file.write",
+      "state": "completed",
+      "error_code": null,
+      "attempt": 1
+    },
+    {
+      "task_id": "20261018-project-control-read-0",
+      "operation": "file.read",
+      "state": "completed",
+      "error_code": null,
+      "attempt": 1
+    },
+    {
+      "task_id": "20261018-project-control-git-0",
+      "operation": "terminal.execute",
+      "state": "completed",
+      "error_code": null,
+      "attempt": 1
+    },
+    {
+      "task_id": "20261018-project-control-write-1",
+      "operation": "file.write",
+      "state": "completed",
+      "error_code": null,
+      "attempt": 1
+    },
+    {
+      "task_id": "20261018-project-control-read-1",
+      "operation": "file.read",
+      "state": "completed",
+      "error_code": null,
+      "attempt": 1
+    },
+    {
+      "task_id": "20261018-project-control-git-1",
+      "operation": "terminal.execute",
+      "state": "completed",
+      "error_code": null,
+      "attempt": 1
+    },
+    {
+      "task_id": "20261018-project-control-write-2",
+      "operation": "file.write",
+      "state": "completed",
+      "error_code": null,
+      "attempt": 1
+    },
+    {
+      "task_id": "20261018-project-control-read-2",
+      "operation": "file.read",
+      "state": "completed",
+      "error_code": null,
+      "attempt": 1
+    },
+    {
+      "task_id": "20261018-project-control-git-2",
+      "operation": "terminal.execute",
+      "state": "completed",
+      "error_code": null,
+      "attempt": 1
+    },
+    {
+      "task_id": "20261018-project-control-write-3",
+      "operation": "file.write",
+      "state": "completed",
+      "error_code": null,
+      "attempt": 1
+    },
+    {
+      "task_id": "20261018-project-control-read-3",
+      "operation": "file.read",
+      "state": "completed",
+      "error_code": null,
+      "attempt": 1
+    },
+    {
+      "task_id": "20261018-project-control-git-3",
+      "operation": "terminal.execute",
+      "state": "completed",
+      "error_code": null,
+      "attempt": 1
+    },
+    {
+      "task_id": "20261018-project-control-write-4",
+      "operation": "file.write",
+      "state": "completed",
+      "error_code": null,
+      "attempt": 1
+    },
+    {
+      "task_id": "20261018-project-control-read-4",
+      "operation": "file.read",
+      "state": "completed",
+      "error_code": null,
+      "attempt": 1
+    },
+    {
+      "task_id": "20261018-project-control-git-4",
+      "operation": "terminal.execute",
+      "state": "completed",
+      "error_code": null,
+      "attempt": 1
+    },
+    {
+      "task_id": "20261018-project-control-write-5",
+      "operation": "file.write",
+      "state": "completed",
+      "error_code": null,
+      "attempt": 1
+    },
+    {
+      "task_id": "20261018-project-control-read-5",
+      "operation": "file.read",
+      "state": "completed",
+      "error_code": null,
+      "attempt": 1
+    },
+    {
+      "task_id": "20261018-project-control-git-5",
+      "operation": "terminal.execute",
+      "state": "completed",
+      "error_code": null,
+      "attempt": 1
+    },
+    {
+      "task_id": "20261018-project-control-outside-write",
+      "operation": "file.write",
+      "state": "failed",
+      "error_code": "path_denied",
+      "attempt": 1
+    },
+    {
+      "task_id": "20261018-project-control-outside-cwd",
+      "operation": "terminal.execute",
+      "state": "failed",
+      "error_code": "path_denied",
+      "attempt": 1
+    },
+    {
+      "task_id": "20261018-project-control-cat",
+      "operation": "terminal.execute",
+      "state": "failed",
+      "error_code": "executable_denied",
+      "attempt": 1
+    },
+    {
+      "task_id": "20261018-project-control-python",
+      "operation": "terminal.execute",
+      "state": "failed",
+      "error_code": "executable_denied",
+      "attempt": 1
+    },
+    {
+      "task_id": "20261018-project-control-codex-write",
+      "operation": "agent.execute",
+      "state": "completed",
+      "error_code": null,
+      "attempt": 1,
+      "actual_file_written_and_read": true
+    }
+  ],
+  "actual_codex_file_write": true,
+  "all_own_probe_files_removed": true,
+  "preservation": {
+    "at": 1792339183.6190012,
+    "rows": {
+      "tasks": {
+        "rows": 265,
+        "changed_ids": []
+      },
+      "messages": {
+        "rows": 5,
+        "changed_ids": []
+      }
+    },
+    "files": {
+      "credentials.json": {
+        "sha256_unchanged": true,
+        "mode_unchanged": true
+      },
+      "openai-tunnel-runtime.key": {
+        "sha256_unchanged": true,
+        "mode_unchanged": true
+      },
+      "config.toml-codex": {
+        "sha256_unchanged": false,
+        "mode_unchanged": true
+      },
+      "com.kirabridge.bridge.plist": {
+        "sha256_unchanged": true,
+        "mode_unchanged": true
+      }
+    },
+    "audit": {
+      "valid": true,
+      "records": 2131,
+      "head": "925ae26f457b2996d363bdca47f2609f1b8ae2281448a87cd0be86f8f2126d2d"
+    },
+    "queues": {
+      "tasks": [
+        {
+          "state": "completed",
+          "count": 250
+        },
+        {
+          "state": "failed",
+          "count": 37
+        },
+        {
+          "state": "unknown",
+          "count": 1
+        }
+      ],
+      "message_jobs": [
+        {
+          "state": "completed",
+          "count": 2
+        },
+        {
+          "state": "unknown",
+          "count": 2
+        }
+      ]
+    },
+    "codex_global_config_observation": "Hash changed during interval; mtime 17:56:09; cause not established. This task did not write/reset it. Explicit adapter workspace-write argument applies independently. Foreign changes not restored."
+  },
+  "prior_chatgpt_acceptance_reused": "chatgpt-file-verification-20261018-1311",
+  "prior_chatgpt_writecheck_preserved": true,
+  "limits": [
+    "Six projects: actual authenticated MCP file write/read and git process each.",
+    "One real structured Codex write in KiraBridge; other five model turns not repeated.",
+    "Loopback client uses chatgpt principal; not a new call from external ChatGPT conversation.",
+    "No new Grok task, builds, releases or tool integration."
+  ]
+}
