@@ -1,7 +1,12 @@
-# KiraBridge installieren · 0.6.0rc1
+# KiraBridge installieren · 0.6.0rc2
 
-**Privater Release Candidate zur Abnahme. Noch keine öffentliche Installation oder
-endgültige Lizenz.** Die spätere Projektseite `kirabridge.netzwerkpunkt.de` ist
+**Privater Release Candidate zur Abnahme. Noch keine öffentliche Installation.**
+Es gilt die beiliegende `LICENSE`: Netzwerkpunkt Personal Use License1.0,
+Deutsch maßgeblich, englische Übersetzung. Private nicht geschäftliche Nutzung
+ist kostenlos erlaubt; geschäftliche Nutzung/Weiterverkauf/kostenpflichtige
+Dienste benötigen gesonderte schriftliche Erlaubnis. Keine allgemeine
+Weiterverteilungserlaubnis. Individuelle Source-available-Lizenz, kein OSI-Standard
+und nicht anwaltlich geprüft. Fremdlizenzen und historische Rechte bleiben erhalten. Die spätere Projektseite `kirabridge.netzwerkpunkt.de` ist
 geplant. Keine DNS-/Hostingfreigabe ist daraus abzuleiten.
 
 KiraBridge ist speziell für Vibe Coding entwickelt: Du besprichst mit ChatGPT,

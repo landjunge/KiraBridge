@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import email
 import hashlib
 import json
 import platform
@@ -12,6 +13,7 @@ import subprocess
 import tarfile
 import tempfile
 import time
+import zipfile
 from pathlib import Path
 
 
@@ -55,6 +57,20 @@ def smoke(artifacts: Path):
             archive.extractall(folder)
         extracted = next(folder.glob("KiraBridge-*"))
         pin = json.loads((extracted / "release.json").read_text())
+        license_bytes = (artifacts / "LICENSE").read_bytes()
+        assert (extracted / "LICENSE").read_bytes() == license_bytes
+        assert (extracted / "payload/LICENSE").read_bytes() == license_bytes
+        assert hashlib.sha256(license_bytes).hexdigest() == pin["license_sha256"]
+        with zipfile.ZipFile(next(artifacts.glob("*.whl"))) as wheel:
+            names = wheel.namelist()
+            metadata = email.message_from_bytes(
+                wheel.read(next(n for n in names if n.endswith("/METADATA")))
+            )
+            assert metadata["License-Expression"] == pin["license"]
+            assert (
+                wheel.read(next(n for n in names if n.endswith("/licenses/LICENSE")))
+                == license_bytes
+            )
         installed = folder / "isolated-runtime"
         command = [
             "sh",
@@ -162,6 +178,9 @@ def smoke(artifacts: Path):
             "concrete_preflight_and_loaded_source_match": True,
             "corrupt_package_rejected_before_install": True,
             "config_and_credentials_preserved": True,
+            "license_in_bundle_payload_wheel_and_separate_asset": True,
+            "license_sha256": pin["license_sha256"],
+            "license_expression": pin["license"],
             "real_user_setup_service_tunnel_changed": False,
             "new_chatgpt_account_call": "not performed",
             "real_user_service_manager": "not exercised",

@@ -1,7 +1,11 @@
-# Install KiraBridge · 0.6.0rc1
+# Install KiraBridge · 0.6.0rc2
 
-**Private release candidate for acceptance. No public installation or final
-license yet.** The project site `kirabridge.netzwerkpunkt.de` is planned;
+**Private release candidate for acceptance. No public installation yet.**
+The included `LICENSE` is the Netzwerkpunkt Personal Use License1.0. German
+text governs; English is a translation. Private non-business use is free;
+business use, resale and paid services need separate written permission.
+No general redistribution permission. Custom source-available terms, not an
+OSI standard or legal review. Third-party licenses and historical rights remain. The project site `kirabridge.netzwerkpunkt.de` is planned;
 this does not establish DNS, hosting or publication.
 
 Built specifically for Vibe Coding: discuss what to build or change with ChatGPT;

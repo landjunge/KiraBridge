@@ -9,7 +9,7 @@
 
 **[Zur Installation](docs/INSTALL-DE.md)** · **[ChatGPT verbinden](docs/CHATGPT.md)** · **[Versionsübersicht](https://github.com/landjunge/KiraBridge/releases)**
 
-Noch kein Release-Download veröffentlicht. Der vereinfachte CLI-Weg ist als privater0.6.0rc1 zur Abnahme vorbereitet. Sobald geprüfte Pakete veröffentlicht sind, stehen die direkten Downloads hier oben.
+Noch kein Release-Download veröffentlicht. Der vereinfachte CLI-Weg ist als privater0.6.0rc2 zur Abnahme vorbereitet. Sobald geprüfte Pakete veröffentlicht sind, stehen die direkten Downloads hier oben.
 
 | Weg | Stand |
 |---|---|
@@ -22,7 +22,7 @@ Noch kein Release-Download veröffentlicht. Der vereinfachte CLI-Weg ist als pri
 
 **[Installation](docs/INSTALL-EN.md)** · **[Connect ChatGPT](docs/CHATGPT.md)** · **[Releases](https://github.com/landjunge/KiraBridge/releases)**
 
-No release download has been published yet. The simpler CLI flow is prepared as a private0.6.0rc1 for acceptance. Direct downloads will appear here at the top when verified packages are published.
+No release download has been published yet. The simpler CLI flow is prepared as a private0.6.0rc2 for acceptance. Direct downloads will appear here at the top when verified packages are published.
 
 | Option | Status |
 |---|---|
@@ -43,8 +43,8 @@ ChatGPT delegates through KiraBridge to Codex or Grok on your computer. Both can
 collaborate on the same project with configured permissions. More CLI integrations
 are planned.
 
-**0.6.0rc1 · private Release-Vorbereitung:** [Installieren DE](docs/INSTALL-DE.md) ·
-[Install EN](docs/INSTALL-EN.md) · [Release Notes](docs/RELEASE-NOTES-0.6.0rc1.md).
+**0.6.0rc2 · private Release-Vorbereitung:** [Installieren DE](docs/INSTALL-DE.md) ·
+[Install EN](docs/INSTALL-EN.md) · [Release Notes](docs/RELEASE-NOTES-0.6.0rc2.md).
 ## Lizenz / License
 
 **Deutsch:** Es gilt die **Netzwerkpunkt Personal Use License 1.0**, eine individuelle Source-available-Lizenz. Private, nicht geschäftliche Nutzung ist kostenlos erlaubt, einschließlich privater Anpassungen und privatem Self-Hosting. Interner Firmeneinsatz, berufliche Nutzung, Weiterverkauf und kostenpflichtige Dienste benötigen eine vorherige schriftliche Erlaubnis beziehungsweise gesonderte Lizenz. Es gibt keine allgemeine Weiterverteilungserlaubnis. Historische Rechte und gesonderte Drittanbieter-Lizenzen bleiben erhalten. [Vollständige Bedingungen](LICENSE).

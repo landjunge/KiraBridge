@@ -27,7 +27,7 @@ def build(destination: Path):
     files = {
         name: subprocess.check_output(["git", "show", f"{commit}:{name}"])
         for name in git("ls-files").splitlines()
-        if name.startswith("src/") or name in {"pyproject.toml", "uv.lock"}
+        if name.startswith("src/") or name in {"LICENSE", "pyproject.toml", "uv.lock"}
     }
     subprocess.run(
         ["uv", "build", "--out-dir", str(destination)],
@@ -37,6 +37,7 @@ def build(destination: Path):
     for target in PLATFORMS:
         prefix = f"KiraBridge-{version}-{target}"
         contents = {"payload/" + name: data for name, data in files.items()}
+        contents["LICENSE"] = files["LICENSE"]
         contents["install.sh"] = (
             Path("scripts/release-install.sh")
             .read_bytes()
@@ -46,7 +47,7 @@ def build(destination: Path):
         )
         for language in ("DE", "EN"):
             contents[f"INSTALL-{language}.md"] = Path(f"docs/INSTALL-{language}.md").read_bytes()
-        contents["RELEASE-NOTES.md"] = Path("docs/RELEASE-NOTES-0.6.0rc1.md").read_bytes()
+        contents["RELEASE-NOTES.md"] = Path("docs/RELEASE-NOTES-0.6.0rc2.md").read_bytes()
         contents["release.json"] = (
             json.dumps(
                 {
@@ -55,7 +56,9 @@ def build(destination: Path):
                     "source_commit": commit,
                     "platform": target,
                     "maturity": "release candidate",
-                    "license": "undecided; private preparation only",
+                    "license": "LicenseRef-Netzwerkpunkt-Personal-Use-1.0",
+                    "license_sha256": hashlib.sha256(files["LICENSE"]).hexdigest(),
+                    "distribution": "private preparation; no public release approval",
                     "python": "3.11.15",
                     "uv": "0.11.6",
                     "network_install": True,
@@ -84,10 +87,11 @@ def build(destination: Path):
                         0,
                     )
                     archive.addfile(item, io.BytesIO(data))
+    (destination / "LICENSE").write_bytes(files["LICENSE"])
     outputs = sorted(
         p
         for p in destination.iterdir()
-        if p.is_file() and (p.name.endswith(".tar.gz") or p.suffix == ".whl")
+        if p.is_file() and (p.name == "LICENSE" or p.name.endswith(".tar.gz") or p.suffix == ".whl")
     )
     (destination / "SHA256SUMS").write_text(
         "".join(hashlib.sha256(p.read_bytes()).hexdigest() + "  " + p.name + "\n" for p in outputs)

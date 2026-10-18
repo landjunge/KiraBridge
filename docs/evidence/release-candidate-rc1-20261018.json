@@ -1,0 +1,61 @@
+{
+  "version": "0.6.0rc1",
+  "source_commit": "598bc1b15f8e84fd8551b5205d9af26f19c834a7",
+  "code_verification_run": "https://github.com/landjunge/KiraBridge/actions/runs/39126104619",
+  "package_verification_run": "https://github.com/landjunge/KiraBridge/actions/runs/39126331074",
+  "code_vs_source_note": "Only scripts/build_release.py and scripts/release_smoke.py changed after verified application commit14b3cf4. Their package checks ran at598bc1b.",
+  "platform_checks": [
+    {
+      "platform": "Darwin-x86_64",
+      "version": "0.6.0rc1",
+      "source_commit": "598bc1b15f8e84fd8551b5205d9af26f19c834a7",
+      "archive_sha256": "f4f9a942152babc0b9133c3ff6c9d1b5bff729ae63f1aa8f2d0c1f2a633ea95a",
+      "packaged_start_command": "passed --prepare-only in isolated path",
+      "installed_authenticated_dispatcher": true,
+      "concrete_preflight_and_loaded_source_match": true,
+      "corrupt_package_rejected_before_install": true,
+      "config_and_credentials_preserved": true,
+      "real_user_setup_service_tunnel_changed": false,
+      "new_chatgpt_account_call": "not performed",
+      "real_user_service_manager": "not exercised"
+    },
+    {
+      "platform": "Linux-x86_64",
+      "version": "0.6.0rc1",
+      "source_commit": "598bc1b15f8e84fd8551b5205d9af26f19c834a7",
+      "archive_sha256": "b122120a86667a76d6437e8e63939667132ab290280bfb697a2e5ad6e8f3b846",
+      "packaged_start_command": "passed --prepare-only in isolated path",
+      "installed_authenticated_dispatcher": true,
+      "concrete_preflight_and_loaded_source_match": true,
+      "corrupt_package_rejected_before_install": true,
+      "config_and_credentials_preserved": true,
+      "real_user_setup_service_tunnel_changed": false,
+      "new_chatgpt_account_call": "not performed",
+      "real_user_service_manager": "not exercised"
+    },
+    {
+      "platform": "Darwin-arm64",
+      "version": "0.6.0rc1",
+      "source_commit": "598bc1b15f8e84fd8551b5205d9af26f19c834a7",
+      "archive_sha256": "be6f54485c58fd414e0c2382a4dbdbbebd48742aa99b7a5ba07080b98d1825b9",
+      "packaged_start_command": "passed --prepare-only in isolated path",
+      "installed_authenticated_dispatcher": true,
+      "concrete_preflight_and_loaded_source_match": true,
+      "corrupt_package_rejected_before_install": true,
+      "config_and_credentials_preserved": true,
+      "real_user_setup_service_tunnel_changed": false,
+      "new_chatgpt_account_call": "not performed",
+      "real_user_service_manager": "not exercised"
+    }
+  ],
+  "comparison": {
+    "kirabridge-0.6.0rc1.tar.gz": true,
+    "KiraBridge-0.6.0rc1-Darwin-arm64.tar.gz": true,
+    "KiraBridge-0.6.0rc1-Linux-x86_64.tar.gz": true,
+    "KiraBridge-0.6.0rc1-Darwin-x86_64.tar.gz": true
+  },
+  "public_release": false,
+  "license_decided": false,
+  "native_user_service_test": "not performed on fresh macOS/Linux user session",
+  "new_chatgpt_setup_acceptance": "not performed; existing confirmed file-read evidence retained"
+}
