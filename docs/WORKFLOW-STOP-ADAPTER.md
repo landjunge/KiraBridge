@@ -177,3 +177,38 @@ identity authentication or project acceptance.
 Keep journals/audit evidence on rollback. No second queue/control log, provider
 call, release, visibility change or live activation is introduced here. The
 specific acceptance record is [STATUS](evidence/workflow-stop-20261018/STATUS.md).
+
+## Ergänzung: eigener Abbruch bei fehlender Assembly / Owned abort without assembly
+
+`validate_owned_stop(bridge, principal, handoff_id, revision, stop_id, *, task_id=None)`
+prüft Rechte, Eigentümer und tatsächliche Stop-Taskargumente vor jeder Wirkung.
+Der Adapter ruft dies auch **vor** dem TollGate-Stop auf. Derselbe einzelne
+`async owned_stop(..., *, task_id=None, barrier, scope=None, control_error=None)`-
+Pfad übernimmt danach Queuecancel, eigenen registrierten Prozessabbruch und Audit.
+Root kann ihn bei fehlender/geänderter Assembly nutzen; kein zweiter Abbruchpfad.
+
+Ohne gesicherten Scope erzwingt der Helper abort_only, UNKNOWN und
+further_dispatch_blocked=false, selbst bei versehentlich übergebenem EFFECTIVE.
+Er erfindet keine Projekt-/Workflow-/control_ref-/Barrierereferenz und behält die
+Zuordnung zur tatsächlichen Stop-Task bzw. None bei. Beobachtetes eigenes Prozessende
+ist weiterhin getrennt von der unbekannten dauerhaften Startsperre. Fehler werden
+nur aus einer festen statischen Codewhitelist übernommen, einschließlich
+workflow_assembly_changed/unknown; beliebiger Exceptiontext wird nicht ausgegeben.
+Eine frühere gültige EFFECTIVE-Auditbeobachtung bleibt gegenüber späterem abort_only
+vorrangig. Root behandelt gespeicherte Abbruchwünsche bei Fortsetzung separat;
+UNKNOWN wird dadurch nicht nachträglich zu einer wirksamen TG-Sperre.
+
+`validate_owned_stop(...)` runs before any gate/cancel/terminate effect. The single
+`owned_stop(..., barrier, scope=None, control_error=None)` helper is reusable by the
+trusted router when its assembly is unavailable/changed. Without a verified scope
+it forces abort_only/UNKNOWN and no durable-barrier claim. No project/control scope
+is fabricated; actual stop task versus original turn identity remains separate.
+Only static known error codes are exposed. This is an owned process-abort fallback,
+not proof of an effective persistent stop, cost cap or retroactive gating.
+
+The new journal identity source is public TG PR36, commit
+`a8fe638fe2ee2fffd5909ac2f6474e5614d97f8d`; workflow_control.py SHA256
+`a1d049befd1b20c342e4021c4aad51d61fd8afdc4ab33444e43277f28cfe41c9`.
+It adds control_identity(scope) to the same journal, without resetting stop/budget
+facts. The original PR35 source/proofs above remain historical acceptance evidence.
+Root separately pins the installed package and binds its actual journal identity.

@@ -76,3 +76,26 @@ VierPythondateien waren lokal formatiert; die Markdown-Codeblockprüfung wurde
 jetzt gezielt ergänzt und die verlangte Aufteilung übernommen. Kein erneuter
 Funktionslauf für diese reine Beispiel-Formatkorrektur. Frühere fehlgeschlagene
 CI wird nicht als bestanden ausgegeben; neuer Commit startet reguläre CI.
+
+## Ergänzung nach Review: gemeinsamer Abort-Fallback
+
+validate_owned_stop und owned_stop faktorisieren denselben Rechte-/Owner-/Task-/
+Queuecancel-/registrierten Prozessabbruch-/Auditpfad. Adapter validiert vorTGStop;
+Root-Router kann bei fehlender/geänderterAssembly denselben Helper ohne Scope
+verwenden. Dann abort_only/UNKNOWN/False, keine erfundenen Scope-/Barrieren-/Runtime-
+Nachweise. stop_observation erkennt abort_only als Beobachtung und bewahrt frühere
+EFFECTIVE-Records. Statische Fehlercodewhitelist bewahrt Root-Codes, kein Exceptiontext.
+
+Zwei neue Gegenfälle plus2 unmittelbar betroffene bestehende Stop-Fälle:
+4 bestanden14 deselected0.59s. Nach enger Fehlercodewhitelist wurde ausschließlich
+der geänderte Fallbackfall nochmals geprüft:1 bestanden17 deselected0.31s, ohne
+TollGate-Testinstallation. Insgesamt18 spezifische neue Fälle in gezielten Runden.
+Keine alte Vollsuite erneut lokal gestartet. Ruff/Format/diff für die geänderten
+Dateien bestanden. Neue Hashes/Teilnachweise in owned-abort-helper-check.json;
+frühere proof/source-check-/Pausenbelege unverändert.
+
+TG-Journalidentität separat:10 neue Fälle bestanden0.24s, öffentlicher PR36 bei
+Pin a8fe638fe2ee2fffd5909ac2f6474e5614d97f8d; tatsächlicher CI-run39170219966
+mitPython3.11/3.12 SUCCESS. Kein Betriebsjournal verändert. TG-Merge/Root-Runtime-
+Aktivierung nicht Teil dieser Workeränderung. KB-Handoff-/Terminal-/Config-/Bridge-
+Wiring seitRootübernahme nicht mehr geändert.

@@ -13,6 +13,20 @@ from dataclasses import dataclass
 from kirabridge.bridge_core.models import BridgeError, UncertainExecution, digest
 
 _BINDING = ContextVar("owned_workflow_process_binding", default=None)
+_CONTROL_ERRORS = frozenset(
+    {
+        "workflow_control_unavailable",
+        "workflow_control_changed",
+        "workflow_assembly_changed",
+        "workflow_assembly_unknown",
+        "workflow_project_changed",
+        "workflow_project_unavailable",
+        "workflow_project_unconfigured",
+        "workflow_source_changed",
+        "workflow_journal_changed",
+        "workflow_control_identity_changed",
+    }
+)
 
 
 def stop_observation(store, metadata):
@@ -55,8 +69,8 @@ def stop_observation(store, metadata):
             process_exit_current="unknown",
             external_effect="unknown",
         )
-        if record.get("control_mode") == "stop_only":
-            result["control_mode"] = "stop_only"
+        if record.get("control_mode") in {"stop_only", "abort_only"}:
+            result["control_mode"] = record["control_mode"]
     except (sqlite3.Error, ValueError, TypeError):
         return result
     return result
@@ -222,125 +236,199 @@ class WorkflowControlAdapter:
             _BINDING.reset(token)
 
     async def stop(self, principal, handoff_id, revision, stop_id, *, task_id=None):
-        self.bridge.security.principal(principal, "task.cancel")
-        self.bridge.security.principal(principal, "process.terminate")
-        if type(stop_id) is not str or re.fullmatch(r"[A-Za-z0-9_.:-]{1,128}", stop_id) is None:
-            raise BridgeError("invalid_workflow_stop", "Use a bounded stop identifier")
-        if task_id is not None:
-            if type(task_id) is not str or re.fullmatch(r"[A-Za-z0-9_-]{1,128}", task_id) is None:
-                raise BridgeError("invalid_workflow_stop", "Use an owned stop task identifier")
-            stop_task = self.bridge.store.get(task_id, principal)
-            if (
-                stop_task["operation"] != "workflow.stop"
-                or stop_task["state"] not in {"accepted", "running"}
-                or any(
-                    stop_task["args"].get(key) != value
-                    for key, value in (
-                        ("handoff_id", handoff_id),
-                        ("revision", revision),
-                        ("stop_id", stop_id),
-                    )
-                )
-            ):
-                raise BridgeError("invalid_workflow_stop", "No exact active owned stop task")
-        metadata = self.bridge.handoffs.get(principal, handoff_id, revision)
+        metadata = validate_owned_stop(
+            self.bridge, principal, handoff_id, revision, stop_id, task_id=task_id
+        )
         scope = self.scope(metadata)
         try:
             barrier = await asyncio.to_thread(self.control.stop, scope, stop_id)
+            control_error = None
         except Exception:
             barrier = {
                 "status": "UNKNOWN",
                 "further_dispatch_blocked": False,
                 "abort_confirmed": False,
             }
-        pending = self.bridge.store.db.execute(
-            "SELECT id FROM tasks WHERE principal=? AND state IN ('created','queued') "
-            "AND operation IN ('handoff.start','handoff.answer') "
-            "AND json_extract(args,'$.handoff_id')=? AND json_extract(args,'$.revision')=? "
-            "ORDER BY created,id LIMIT 101",
-            (principal, handoff_id, revision),
-        ).fetchall()
-        cancelled, conflicts = 0, 0
-        for row in pending[:100]:
-            try:
-                self.bridge.tasks.cancel_queued(principal, row[0])
-                cancelled += 1
-            except BridgeError:
-                conflicts += 1
-        processes, inspection_failures = [], 0
-        owned_sessions = [
-            (task_id, session)
-            for task_id, session in self.bridge.terminal.sessions.items()
-            if session.principal == principal
-        ]
-        for process_task_id, _session in owned_sessions[:256]:
-            try:
-                task = self.bridge.store.get(process_task_id, principal)
-            except BridgeError:
-                inspection_failures += 1
-                continue
-            args = task["args"]
-            if (
-                task["operation"] not in {"handoff.start", "handoff.answer"}
-                or args.get("handoff_id") != handoff_id
-                or args.get("revision") != revision
-            ):
-                continue
-            try:
-                receipt = await self.bridge.terminal.terminate(principal, process_task_id)
-                processes.append(
-                    {
-                        "task_id": process_task_id,
-                        "status": "exit_observed"
-                        if receipt["exit_code"] is not None
-                        else "termination_requested",
-                    }
+            control_error = "workflow_control_unavailable"
+        return await owned_stop(
+            self.bridge,
+            principal,
+            handoff_id,
+            revision,
+            stop_id,
+            task_id=task_id,
+            barrier=barrier,
+            scope=scope,
+            control_error=control_error,
+        )
+
+
+def validate_owned_stop(bridge, principal, handoff_id, revision, stop_id, *, task_id=None):
+    """Validate owner, rights and actual stop request before any control effect."""
+    bridge.security.principal(principal, "task.cancel")
+    bridge.security.principal(principal, "process.terminate")
+    if type(stop_id) is not str or re.fullmatch(r"[A-Za-z0-9_.:-]{1,128}", stop_id) is None:
+        raise BridgeError("invalid_workflow_stop", "Use a bounded stop identifier")
+    if task_id is not None:
+        if type(task_id) is not str or re.fullmatch(r"[A-Za-z0-9_-]{1,128}", task_id) is None:
+            raise BridgeError("invalid_workflow_stop", "Use an owned stop task identifier")
+        stop_task = bridge.store.get(task_id, principal)
+        if (
+            stop_task["operation"] != "workflow.stop"
+            or stop_task["state"] not in {"accepted", "running"}
+            or any(
+                stop_task["args"].get(key) != value
+                for key, value in (
+                    ("handoff_id", handoff_id),
+                    ("revision", revision),
+                    ("stop_id", stop_id),
                 )
-            except Exception:
-                processes.append({"task_id": process_task_id, "status": "unknown"})
-        result = {
-            "control_mode": "stop_only",
+            )
+        ):
+            raise BridgeError("invalid_workflow_stop", "No exact active owned stop task")
+    metadata = bridge.handoffs.get(principal, handoff_id, revision)
+    return metadata
+
+
+async def owned_stop(
+    bridge,
+    principal,
+    handoff_id,
+    revision,
+    stop_id,
+    *,
+    task_id=None,
+    barrier,
+    scope=None,
+    control_error=None,
+):
+    """One owned cancel/abort/audit path, also without an available TG assembly.
+
+    barrier/scope are trusted-host observations, never caller authorization. With
+    no verified scope only abort_only/UNKNOWN is possible; no scope is invented.
+    """
+    metadata = validate_owned_stop(
+        bridge, principal, handoff_id, revision, stop_id, task_id=task_id
+    )
+    if scope is None:
+        barrier = {
+            "status": "UNKNOWN",
+            "further_dispatch_blocked": False,
+            "abort_confirmed": False,
+            "external_effect": "unknown",
+        }
+        control_error = control_error or "workflow_control_unavailable"
+    elif (
+        type(barrier) is not dict
+        or barrier.get("status") not in {"EFFECTIVE", "PENDING", "UNKNOWN"}
+        or type(barrier.get("further_dispatch_blocked")) is not bool
+        or (barrier["status"] == "EFFECTIVE") != barrier["further_dispatch_blocked"]
+    ):
+        barrier = {
+            "status": "UNKNOWN",
+            "further_dispatch_blocked": False,
+            "abort_confirmed": False,
+            "external_effect": "unknown",
+        }
+        control_error = "workflow_control_unavailable"
+    mode = "abort_only" if scope is None else "stop_only"
+    if control_error is not None and (
+        type(control_error) is not str or control_error not in _CONTROL_ERRORS
+    ):
+        control_error = "workflow_control_unavailable"
+    pending = bridge.store.db.execute(
+        "SELECT id FROM tasks WHERE principal=? AND state IN ('created','queued') "
+        "AND operation IN ('handoff.start','handoff.answer') "
+        "AND json_extract(args,'$.handoff_id')=? AND json_extract(args,'$.revision')=? "
+        "ORDER BY created,id LIMIT 101",
+        (principal, handoff_id, revision),
+    ).fetchall()
+    cancelled, conflicts = 0, 0
+    for row in pending[:100]:
+        try:
+            bridge.tasks.cancel_queued(principal, row[0])
+            cancelled += 1
+        except BridgeError:
+            conflicts += 1
+    processes, inspection_failures = [], 0
+    owned_sessions = [
+        (task_id, session)
+        for task_id, session in bridge.terminal.sessions.items()
+        if session.principal == principal
+    ]
+    for process_task_id, _session in owned_sessions[:256]:
+        try:
+            task = bridge.store.get(process_task_id, principal)
+        except BridgeError:
+            inspection_failures += 1
+            continue
+        args = task["args"]
+        if (
+            task["operation"] not in {"handoff.start", "handoff.answer"}
+            or args.get("handoff_id") != handoff_id
+            or args.get("revision") != revision
+        ):
+            continue
+        try:
+            receipt = await bridge.terminal.terminate(principal, process_task_id)
+            processes.append(
+                {
+                    "task_id": process_task_id,
+                    "status": "exit_observed"
+                    if receipt["exit_code"] is not None
+                    else "termination_requested",
+                }
+            )
+        except Exception:
+            processes.append({"task_id": process_task_id, "status": "unknown"})
+    result = {
+        "control_mode": mode,
+        "cost_kind": "unknown",
+        "hard_cost_cap": False,
+        "barrier": barrier,
+        "queued": {"cancelled": cancelled, "raced": conflicts, "truncated": len(pending) > 100},
+        "process": {
+            "items": processes,
+            "coverage": "owned_registered_processes_only",
+            "status": "observed" if processes else "not_observed",
+            "inspection_failures": inspection_failures,
+            "truncated": len(owned_sessions) > 256,
+        },
+        "external_effect": "unknown",
+        "project_completion_verified": False,
+    }
+    if control_error is not None:
+        result["control_error"] = control_error
+    with bridge.store.transaction():
+        evidence = {
+            "binding_ref": metadata["id"],
+            "control_mode": mode,
+            "original_task_id": metadata["original_task_id"],
+            "status": barrier["status"],
+            "stop_state": barrier["status"],
+            "further_dispatch_blocked": barrier["further_dispatch_blocked"],
+            "owned_process_exits_observed": sum(p["status"] == "exit_observed" for p in processes),
             "cost_kind": "unknown",
             "hard_cost_cap": False,
-            "barrier": barrier,
-            "queued": {"cancelled": cancelled, "raced": conflicts, "truncated": len(pending) > 100},
-            "process": {
-                "items": processes,
-                "coverage": "owned_registered_processes_only",
-                "status": "observed" if processes else "not_observed",
-                "inspection_failures": inspection_failures,
-                "truncated": len(owned_sessions) > 256,
-            },
-            "external_effect": "unknown",
-            "project_completion_verified": False,
         }
-        with self.bridge.store.transaction():
-            evidence = {
-                "binding_ref": metadata["id"],
-                "control_mode": "stop_only",
-                "project_id": scope.project_id,
-                "workflow_id": scope.workflow_id,
-                "control_ref": digest(
+        if scope is not None:
+            evidence.update(
+                project_id=scope.project_id,
+                workflow_id=scope.workflow_id,
+                control_ref=digest(
                     {"project_id": scope.project_id, "workflow_id": scope.workflow_id}
                 ),
-                "original_task_id": metadata["original_task_id"],
-                "status": barrier["status"],
-                "stop_state": barrier["status"],
-                "further_dispatch_blocked": barrier["further_dispatch_blocked"],
-                "owned_process_exits_observed": sum(
-                    p["status"] == "exit_observed" for p in processes
-                ),
-                "cost_kind": "unknown",
-                "hard_cost_cap": False,
-            }
-            if task_id is not None:
-                evidence["bridge_task_id"] = task_id
-            if type(barrier.get("barrier_seq")) is int and barrier["barrier_seq"] >= 0:
-                evidence["barrier_seq"] = barrier["barrier_seq"]
-            self.bridge.store.audit(
-                "workflow.stop",
-                principal,
-                task_id,
-                evidence,
             )
-        return result
+        if control_error is not None:
+            evidence["control_error"] = control_error
+        if task_id is not None:
+            evidence["bridge_task_id"] = task_id
+        if type(barrier.get("barrier_seq")) is int and barrier["barrier_seq"] >= 0:
+            evidence["barrier_seq"] = barrier["barrier_seq"]
+        bridge.store.audit(
+            "workflow.stop",
+            principal,
+            task_id,
+            evidence,
+        )
+    return result

@@ -532,3 +532,89 @@ async def test_invalid_stop_id_does_not_cancel_queued_work(bridge, control):
     assert not bridge.store.db.execute(
         "SELECT seq FROM audit WHERE kind='workflow.stop'"
     ).fetchall()
+
+
+async def test_owned_abort_without_assembly_ends_only_owned_process_without_scope_claim(bridge):
+    from kirabridge.workflow_control_adapter import owned_stop
+
+    task, metadata = binding(bridge)
+    foreign, _ = binding(bridge, "foreign-abort", "other")
+    own = asyncio.create_task(terminal(bridge, task, 30))
+    other = asyncio.create_task(terminal(bridge, foreign, 30))
+    try:
+        await wait_session(bridge, task["id"])
+        await wait_session(bridge, foreign["id"])
+        value = await owned_stop(
+            bridge,
+            "local",
+            "h-synthetic",
+            1,
+            "no-assembly",
+            scope=None,
+            barrier={"status": "EFFECTIVE", "further_dispatch_blocked": True},
+            control_error="SECRET_SHAPED_LIKE_AN_ERROR_CODE",
+        )
+        assert value["control_mode"] == "abort_only"
+        assert (
+            value["barrier"]["status"] == "UNKNOWN"
+            and not value["barrier"]["further_dispatch_blocked"]
+        )
+        assert value["process"]["items"] == [{"task_id": "turn1", "status": "exit_observed"}]
+        assert value["control_error"] == "workflow_control_unavailable"
+        assert "SECRET_SHAPED_LIKE_AN_ERROR_CODE" not in canonical(value)
+        assert (await own)["terminated"] and not other.done()
+        row = bridge.store.db.execute(
+            "SELECT task_id,metadata FROM audit WHERE kind='workflow.stop'"
+        ).fetchone()
+        record = json.loads(row["metadata"])
+        assert row["task_id"] is None and record["original_task_id"] == "thread:task"
+        assert not {
+            "project_id",
+            "workflow_id",
+            "control_ref",
+            "barrier_seq",
+            "bridge_task_id",
+        }.intersection(record)
+        assert bridge.handoffs.view(metadata)["stop_observation"]["control_mode"] == "abort_only"
+    finally:
+        if "foreign-abort" in bridge.terminal.sessions:
+            await bridge.terminal.terminate("other", "foreign-abort")
+        await asyncio.gather(own, other, return_exceptions=True)
+
+
+async def test_owned_abort_helper_foreign_missing_rights_or_wrong_task_has_no_effect(bridge):
+    from kirabridge.workflow_control_adapter import owned_stop
+
+    task, _ = binding(bridge)
+    submit(
+        bridge,
+        request(
+            "handoff.start",
+            {
+                "handoff_id": "h-synthetic",
+                "revision": 1,
+                "cwd": bridge.config.principals["local"].roots[0],
+            },
+            task_id="pending-abort",
+        ),
+    )
+    for principal, task_id in [("other", None), ("local", task["id"])]:
+        with pytest.raises(BridgeError):
+            await owned_stop(
+                bridge,
+                principal,
+                "h-synthetic",
+                1,
+                "invalid-owner",
+                task_id=task_id,
+                barrier={"status": "UNKNOWN"},
+            )
+    bridge.config.principals["local"].capabilities.remove("process.terminate")
+    with pytest.raises(BridgeError):
+        await owned_stop(
+            bridge, "local", "h-synthetic", 1, "invalid-rights", barrier={"status": "UNKNOWN"}
+        )
+    assert bridge.store.get("pending-abort")["state"] == "queued"
+    assert not bridge.store.db.execute(
+        "SELECT seq FROM audit WHERE kind='workflow.stop'"
+    ).fetchall()
