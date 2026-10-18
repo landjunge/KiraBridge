@@ -30,7 +30,7 @@ unterschiedliche Felder. Ein Hash bestätigt keine externe Identität.
 Benötigte Capabilities werden nur dem ausdrücklich autorisierten Betreiber
 zugeordnet. handoff.start/answer benötigen zusätzlich agent.execute, eine
 erlaubte Codex-Identität, ein vorhandenes Programm und autorisierten Projekt-CWD.
-Alle Fachoperationen benötigen threaddesk.read, Ausgabe zusätzlich
+Alle Fachoperationen benötigen threaddesk.read, Ausstellen einer Übergabe zusätzlich
 threaddesk.manage. Normale Bot-Identitäten erben diese Rechte nicht.
 Der feste lokale Peer und das gemeinsame Betreiberprofil sind kein öffentlicher
 Mehrmandantendienst. Clientpayloads können keinen Peer, Speicher, Quellpfad,

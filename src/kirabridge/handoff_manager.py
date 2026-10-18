@@ -566,6 +566,15 @@ class HandoffManager:
                 metadata["phase"] = "delivered_unverified"
             metadata["receipt_confirmed_for_task"] = metadata["last_task_id"]
             with self.store.transaction():
+                current = self.get(task["principal"], args.handoff_id, args.revision)
+                if (
+                    current["last_task_id"] != metadata["last_task_id"]
+                    or current["phase"] not in {"delivering", "deciding"}
+                    or current.get("pending_decision") != metadata.get("pending_decision")
+                ):
+                    raise BridgeError(
+                        "handoff_reconcile_changed", "Workflow changed during receipt lookup"
+                    )
                 self.save(metadata, task_id=task["id"], event="handoff.receipt_observed")
             return {
                 "success": True,

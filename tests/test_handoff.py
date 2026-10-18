@@ -67,7 +67,11 @@ async def call(bridge, identity, operation, arguments, *, principal="local", exp
         ),
     )
     result = await bridge.tasks.wait(principal, identity)
-    assert result["state"] == expected, result
+    assert result["state"] == expected, {
+        "state": result["state"],
+        "error": result["error"],
+        "operation_error": (result.get("result") or {}).get("value", {}).get("error"),
+    }
     assert result["attempt"] == 1
     return result
 
@@ -470,3 +474,129 @@ async def test_question_answer_receipt_loss_never_resumes_the_session(config, tm
         assert failed["result"]["value"]["error"]["code"] == "handoff_unknown"
         assert len(writes) == 1
     assert len(counter.read_text().splitlines()) == 1
+
+
+async def test_resume_cannot_adopt_another_reported_session(config, tmp_path):
+    counter = configure(config, tmp_path)
+    bridge = Bridge(config)
+    async with bridge:
+        _, packet, _ = await issued(bridge)
+        reference = {"handoff_id": packet["handoff_id"], "revision": 1}
+        started = await call(
+            bridge,
+            "start",
+            "handoff.start",
+            {**reference, "cwd": config.principals["local"].roots[0]},
+        )
+        # The untrusted test executable now reports a different session on continuation.
+        executable = Path(config.agents["codex"].executable)
+        executable.write_text(
+            executable.read_text().replace(SESSION, "f0200000-0000-4000-8000-000000000002")
+        )
+        answer = {
+            **reference,
+            "question_id": started["result"]["value"]["question_id"],
+            "answer_id": "answer",
+            "text": "blue",
+        }
+        unknown = await call(bridge, "answer", "handoff.answer", answer, expected="unknown")
+        assert unknown["error"]["code"] == "agent_identity"
+        await call(bridge, "another-key", "handoff.answer", answer, expected="failed")
+        inbox = await call(bridge, "inbox", "handoff.inbox", {})
+        assert inbox["result"]["value"]["items"] == []
+    assert len(counter.read_text().splitlines()) == 2
+
+
+async def test_inbox_paginates_only_owned_exact_receipts(config, tmp_path):
+    configure(config, tmp_path, question=False)
+    bridge = Bridge(config)
+    async with bridge:
+        for suffix in ["-one", "-two"]:
+            if suffix == "-two":
+                # Respect the real peer's existing 15s loop gate; never alter its policy.
+                await asyncio.sleep(15.1)
+            _, packet, _ = await issued(bridge, suffix)
+            await call(
+                bridge,
+                "start" + suffix,
+                "handoff.start",
+                {
+                    "handoff_id": packet["handoff_id"],
+                    "revision": 1,
+                    "cwd": config.principals["local"].roots[0],
+                },
+            )
+        original = bridge.handoffs.rpc
+        reads = []
+
+        async def exact_reads(task, tool, arguments):
+            assert tool != "list_returns"
+            if tool == "get_return":
+                reads.append(arguments["return_id"])
+            return await original(task, tool, arguments)
+
+        bridge.handoffs.rpc = exact_reads
+        first = await call(bridge, "page1", "handoff.inbox", {"limit": 1})
+        second = await call(bridge, "page2", "handoff.inbox", {"limit": 1, "offset": 1})
+        foreign = await call(bridge, "foreign-page", "handoff.inbox", {}, principal="other")
+        assert first["result"]["value"]["next_offset"] == 1
+        assert second["result"]["value"]["next_offset"] is None
+        assert foreign["result"]["value"]["items"] == []
+        assert len(reads) == len(set(reads)) == 2
+
+
+async def test_late_receipt_read_cannot_overwrite_a_newer_explicit_decision(config, tmp_path):
+    configure(config, tmp_path, question=False)
+    bridge = Bridge(config)
+    async with bridge:
+        _, packet, _ = await issued(bridge)
+        reference = {"handoff_id": packet["handoff_id"], "revision": 1}
+        original = bridge.handoffs.rpc
+        stored, allow_ack, read, allow_read = (asyncio.Event() for _ in range(4))
+
+        async def controlled_latency(task, tool, arguments):
+            result = await original(task, tool, arguments)
+            if tool == "import_return":
+                stored.set()
+                await asyncio.wait_for(allow_ack.wait(), 5)
+            elif tool == "get_return":
+                read.set()
+                await asyncio.wait_for(allow_read.wait(), 5)
+            return result
+
+        bridge.handoffs.rpc = controlled_latency
+        start = asyncio.create_task(
+            call(
+                bridge,
+                "start",
+                "handoff.start",
+                {
+                    **reference,
+                    "cwd": config.principals["local"].roots[0],
+                },
+            )
+        )
+        await asyncio.wait_for(stored.wait(), 5)
+        reconcile = asyncio.create_task(
+            call(bridge, "receipt-read", "handoff.reconcile", reference, expected="failed")
+        )
+        await asyncio.wait_for(read.wait(), 5)
+        allow_ack.set()
+        result = await start
+        await call(
+            bridge,
+            "decision",
+            "handoff.decide",
+            {
+                **reference,
+                "return_id": result["result"]["value"]["return_id"],
+                "choice": "accepted",
+                "note": "Newer deliberate synthetic decision",
+            },
+        )
+        allow_read.set()
+        conflict = await reconcile
+        assert conflict["result"]["value"]["error"]["code"] == "handoff_reconcile_changed"
+        current = await call(bridge, "status", "handoff.status", reference)
+        assert current["result"]["value"]["phase"] == "accepted"
+        assert current["result"]["value"]["last_task_id"] == "decision"

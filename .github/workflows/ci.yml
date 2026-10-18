@@ -35,7 +35,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: landjunge/threaddesk
-          ref: a99afa8b4ddfdc4396521bad11d6868b2069d9b0
+          ref: 16b2ccb2da8fc1a6953fd830970bbb19139b0635
           path: .ci-threaddesk
           persist-credentials: false
       - run: uv run pytest -q -W error::pytest.PytestUnraisableExceptionWarning
