@@ -20,6 +20,7 @@ from kirabridge.bridge_core.models import (
     HandoffIssueInput,
     HandoffReference,
     HandoffStartInput,
+    ImageInput,
     MoveInput,
     PathInput,
     ProcessInput,
@@ -33,6 +34,7 @@ from kirabridge.bridge_core.models import (
 )
 from kirabridge.clipboard_manager import ClipboardManager
 from kirabridge.filesystem_manager import FilesystemManager, PathScope
+from kirabridge.image_manager import ImageManager
 from kirabridge.message_manager import MessageManager
 from kirabridge.message_manager.receiver import MessageReceiver
 from kirabridge.process_manager import ProcessManager
@@ -44,6 +46,7 @@ from kirabridge.terminal_manager import TerminalManager
 INPUTS = {
     "terminal.execute": TerminalInput,
     "file.read": ReadInput,
+    "file.image": ImageInput,
     "file.list": PathInput,
     "file.write": WriteInput,
     "file.mkdir": PathInput,
@@ -95,6 +98,7 @@ class Bridge:
         self.security = SecurityManager(config, self.store)
         self.terminal = TerminalManager(config.terminal)
         self.filesystem = FilesystemManager()
+        self.images = ImageManager()
         self.clipboard = ClipboardManager()
         self.processes = ProcessManager(self.terminal)
         self.agents = AgentManager(config, self.terminal)
@@ -221,7 +225,7 @@ class Bridge:
         args = INPUTS[operation].model_validate(arguments)
         policy = self.security.principal(principal, operation)
         roots = policy.roots + (
-            policy.read_roots if operation in {"file.read", "file.list"} else []
+            policy.read_roots if operation in {"file.read", "file.image", "file.list"} else []
         )
         scope = PathScope(roots, excluded=[str(self.config.state_path)])
         if operation == "terminal.execute":
@@ -269,6 +273,8 @@ class Bridge:
             if operation == "file.move":
                 scope.split(args.destination)
             await running({"evidence_type": "local_operation_entered", "operation": operation})
+            if operation == "file.image":
+                return await asyncio.to_thread(self.images.read, scope, args.path)
             method = getattr(self.filesystem, operation.split(".")[1])
             return await asyncio.to_thread(method, scope, **args.model_dump())
         if operation.startswith("clipboard."):
