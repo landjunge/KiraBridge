@@ -83,3 +83,13 @@ Der offizielle Tunnel-Client v0.0.16 ist einschließlich Begleitprogramm install
 Der Kontoverbindungsassistent wartet vor dem Tunnelstart auf eine authentifizierte Antwort des lokalen Dispatchers. So wird die nach einem Dienstneustart noch nicht bereite Bridge nicht sofort als ausgefallener MCP-Prozess behandelt. Die Bereitschaftsprüfung wiederholt ausschließlich die Statusabfrage und führt keine Aufträge aus.
 
 Windows-Nativadapter, Bilder/Dateien in der Zwischenablage, interaktive PTYs, zusätzliche Agentenprotokolle/A2A und die optionalen externen Systeme bleiben Erweiterungen. Linux-Clipboard benötigt eine echte grafische Sitzung. Es wurden keine öffentlichen Dienste oder fremden Agenten bereitgestellt beziehungsweise beendet. Bestehende Codex-/Grok-Konfigurationen wurden ausschließlich um KiraBridge ergänzt und zuvor privat gesichert.
+# Fortschreibung Betreiberrechte · 18.10.2026
+
+Regulärer Terminal-Vollzugriff für chatgpt/local ist ausdrücklich konfiguriert
+und über die verbundene ChatGPT-App einschließlich Codex-Schreiben/Rücklesen,
+ps/Git, isolierter Paketinstallation/-entfernung und eigenem Prozessabbruch
+geprüft. Administratoradapter mit lokalem macOS-Dialog implementiert; die echte
+Root-Abnahme bleibt nach Timeout unbekannt. Historische Belege unten bleiben
+unverändert; insbesondere frühere Aussagen zur fehlenden App-Schnittstelle sind
+historisch. [Aktueller Stand DE/EN und konkrete Taskbelege](DEVELOPMENT-ACCESS-20261018.md).
+

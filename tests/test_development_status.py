@@ -135,6 +135,7 @@ def test_permissions_snapshot_is_explicit_whitelist_and_checks_disk_drift(
             "kind": "codex",
             "sandbox_mode": "workspace-write",
             "executable": "/opt/bin/codex",
+            "local_tools_available": False,
         }
     ]
     assert not first["allow_any_executable"]
