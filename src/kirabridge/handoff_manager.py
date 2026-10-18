@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 import uuid
+from contextlib import nullcontext
 from datetime import datetime, timezone
 
 from pydantic import ValidationError
@@ -22,6 +23,7 @@ from kirabridge.bridge_core.models import (
 )
 from kirabridge.filesystem_manager import PathScope
 from kirabridge.terminal_manager import check_executable
+from kirabridge.workflow_control_adapter import stop_observation
 
 TOOLS = {
     "issue_handoff",
@@ -88,6 +90,7 @@ class HandoffManager:
         )
 
     def view(self, metadata, **extra):
+        stop = stop_observation(self.store, metadata)
         return {
             key: metadata.get(key)
             for key in (
@@ -110,6 +113,10 @@ class HandoffManager:
             )
         } | {
             "phase": self.phase(metadata),
+            "control_mode": stop.get("control_mode", metadata.get("control_mode", "standalone")),
+            "hard_cost_cap": False,
+            "cost_kind": "unknown",
+            "stop_observation": stop,
             "project_completion_verified": False,
             "automatic_retry": False,
             "last_task_state": self.store.get(metadata["last_task_id"], metadata["principal"])[
@@ -350,17 +357,24 @@ class HandoffManager:
                 self.save(metadata, task_id=task["id"], event="handoff.agent_started")
             await progress({**evidence, "agent_turn_started": True})
 
-        result = await self.bridge.agents.execute(
-            task,
-            AgentInput(
-                agent=metadata["agent"], cwd=metadata["cwd"], prompt=prompt, timeout=timeout
-            ),
-            policy,
-            agent_running,
-            progress,
-            owned_resume_session=resume_session,
-            handoff_reply=True,
-        )
+        controller = getattr(self.bridge, "workflow_control", None)
+        with controller.bind_turn(task, metadata) if controller is not None else nullcontext():
+            if controller is None and metadata.get("control_mode", "standalone") != "standalone":
+                raise BridgeError(
+                    "workflow_control_unavailable",
+                    "Previously controlled turn requires its assembly",
+                )
+            result = await self.bridge.agents.execute(
+                task,
+                AgentInput(
+                    agent=metadata["agent"], cwd=metadata["cwd"], prompt=prompt, timeout=timeout
+                ),
+                policy,
+                agent_running,
+                progress,
+                owned_resume_session=resume_session,
+                handoff_reply=True,
+            )
         session = result.get("evidence", {}).get("session_id")
         if (
             not result.get("success")
