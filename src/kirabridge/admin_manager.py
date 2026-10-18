@@ -13,13 +13,14 @@ from kirabridge.terminal_manager import check_executable
 def authorization_script(argv: list[str], cwd: str) -> str:
     if not argv or any("\x00" in value for value in [cwd, *argv]):
         raise BridgeError("invalid_command", "Invalid administrator command")
-    # All words are quoted as data, then the complete command as an AppleScript string.
+    # All words are quoted as data, then the complete command as a JavaScript string.
     # The sole shell here is the documented, visible macOS privileged-command API.
     command = "cd " + shlex.quote(cwd) + " && exec " + shlex.join(argv)
     return (
-        "do shell script "
-        + json.dumps(command, ensure_ascii=False)
-        + " with administrator privileges"
+        "const app = Application.currentApplication(); app.includeStandardAdditions = true; "
+        "app.doShellScript(" + json.dumps(command) + ", {administratorPrivileges:true, "
+        'withPrompt:"KiraBridge: angeforderter Administratorbefehl / requested admin command", '
+        "alteringLineEndings:false});"
     )
 
 
@@ -32,7 +33,7 @@ async def execute_admin(bridge, task, args, policy, running):
         task["id"],
         task["principal"],
         TerminalInput(
-            argv=["/usr/bin/osascript", "-e", script],
+            argv=["/usr/bin/osascript", "-l", "JavaScript", "-e", script],
             cwd=args.cwd,
             timeout=args.timeout,
             max_output=args.max_output,

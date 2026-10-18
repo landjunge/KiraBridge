@@ -82,9 +82,11 @@ def test_loaded_configuration_keeps_authorization_across_reloads(tmp_path):
 
 def test_admin_command_quotes_data_and_requires_no_password():
     script = authorization_script(["/usr/bin/printf", "%s", "$(touch nope); ' \""], "/owned space")
-    assert script.startswith("do shell script ")
-    assert script.endswith(" with administrator privileges")
-    command = json.loads(script[len("do shell script ") : -len(" with administrator privileges")])
+    assert script.startswith("const app = Application.currentApplication();")
+    assert "administratorPrivileges:true" in script
+    command = json.loads(
+        script.split("app.doShellScript(", 1)[1].split(", {administratorPrivileges", 1)[0]
+    )
     import shlex
 
     assert shlex.split(command.split(" && exec ", 1)[1]) == [
