@@ -14,6 +14,25 @@ was gebaut oder geändert werden soll; ChatGPT übergibt Aufträge an Codex oder
 Grok auf deinem Rechner. Beide können mit eingerichteten Berechtigungen am selben
 Projekt arbeiten. Weitere CLI-Anbindungen sind geplant.
 
+## Zuerst den richtigen Stand wählen
+
+| Stand | Bedeutung |
+| --- | --- |
+| Aktueller Quellstand `7af39cd`, Versionskennung `0.6.0rc2` | Enthält die neuere Projektsteuerung und optionalen Adapter; eine gleiche Versionsnummer belegt kein identisches Paket. |
+| Dokumentierter Betreiber-Mac `0.5.2` mit gezielten Backports | Eigene laufende Installation mit eigenen Quell-/Config-/Runtimebelegen, keine allgemeine Voreinstellung für neue Nutzer. |
+| Eingefrorener privater RC2-Entwurf `57bee99` | Historische Pakete mit damaligen Hashes. Enthält insbesondere `agents.codex.sandbox_mode` und die späteren Integrationen **nicht**. |
+
+[Releaseabnahme und offene Freigaben](RELEASE-ABNAHME-20261018.md) bleiben maßgeblich.
+Die aktuelle Betreiberkonfiguration darf nicht mit dem alten RC2 gestartet werden:
+sein striktes Modell lehnt neue Einstellungen ab. Keine Policy zurücksetzen, um ein
+altes Paket passend zu machen. Vor neuer Veröffentlichung braucht es einen neuen
+belegten Paketpin; diese Anleitung baut oder veröffentlicht keinen Kandidaten.
+Den tatsächlich geladenen Stand mit `kirabridge status` und konkreter Readiness
+prüfen, nicht aus einem Checkout oder Dateinamen ableiten.
+
+Die folgenden Paket-/Plattformangaben betreffen den **eingefrorenen RC2**. Für eine
+bestehende Installation zuerst ihren Updateweg bestimmen, nicht neu einrichten.
+
 ## Normaler Schnellstart
 
 Du brauchst das freigegebene Originalpaket für deinen Rechner. Dieser RC enthält
@@ -84,6 +103,36 @@ oder nicht bereites bestehendes Tunnelprofil wird erhalten und mit nächstem
 Prüfschritt gemeldet, statt durch neue Schlüssel ersetzt zu werden. Ein
 Verbindungsfehler ist kein Anlass, unklare Schreibaufträge neu einzureichen.
 
+## Erster bestätigter Auftrag und gezielte Agentenrechte
+
+Nach lokalem Status und ChatGPT-Anbindung einen vorhandenen erlaubten Projektpfad
+wählen. Der [DE/EN-ChatGPT-Leitfaden](CHATGPT.md) zeigt eine einmalige harmlose
+Dateilesung mit stabiler Task-ID, manueller Freigabe falls erforderlich und
+anschließendem `task_get`. Erst deren tatsächliches Ergebnis belegt diesen Weg.
+`bridge_health` allein belegt weder Dateirechte noch Agentenschreibfähigkeit.
+
+Im aktuellen Quellstand ist `agents.codex.sandbox_mode` standardmäßig `read-only`;
+`workspace-write` muss der Betreiber ausdrücklich für den strukturierten Adapter
+wählen. Das ist kein zusätzlicher `kirabridge ask`-Schalter. CWD und Principalrechte
+bleiben begrenzt; Kind-MCP ist deaktiviert. Die native Codex-MCP-Identität, der
+ChatGPT-App-Zugang und ein gestarteter Codex-Kindprozess sind verschiedene Kontexte.
+Der auf dem Betreiber-Mac weiter freigegebene App-Zugang ist kein neuer Standard.
+
+Grok ACP erlaubt lokale Werkzeuge nur mit drei ausdrücklichen Opt-ins:
+`agents.<name>.allow_local_tools`, Principal-Capability `agent.local_tools` und
+Auftragsargument `local_tools=true`. Ein Grok-API-Textturn besitzt dadurch keine
+lokalen Werkzeuge und keine vollständige Budget-/Stoppkontrolle. Bestehende
+interaktive Sitzungen werden durch keinen Adapter übernommen.
+
+Neue Funktionen erhalten jeweils eigene Rechte: [PNG-Bilder](IMAGE-READ-20261018.md),
+[ThreadDesk-Verwaltung](THREADDESK-ADAPTER-20261018.md),
+[Wissen](THREADDESK-KNOWLEDGE-20261018.md) und
+[beobachtender Auditexport](WORKFLOW-OBSERVATION-EXPORT.md). Neue Standard-Setup-
+Profile erhalten diese Capabilities nicht pauschal. Der optionale
+[auftragseigene Stopp](WORKFLOW-CONTROL-CONFIGURATION.md) bleibt `stop_only`:
+Kosten unbekannt, keine harte Dollarquote und kein universeller Stopp beliebiger
+Programme. Installation allein aktiviert ihn nicht. [Sicherheitsgrenzen](SECURITY.md).
+
 ## Erneuter Aufruf und Update
 
 Denselben Startbefehl erneut verwenden. Vorhandene Konfiguration, Schlüssel,
@@ -153,4 +202,6 @@ Dienstpfad, nicht blind diese Release-Anleitung.
 Nur im autorisierten privaten Checkout: `uv sync --locked`, dann
 `uv run kirabridge setup` und auf macOS `uv run kirabridge service install`.
 Linux-Vorlagen und manuelle Konfiguration stehen im privaten Betriebsleitfaden.
+`setup` überschreibt keine vorhandene Konfiguration (`already_configured`); eine
+Gesundprüfung erfolgt mit `status`/`readiness`, nicht durch erneutes Erstsetup.
 Der normale Release-Schnellstart benötigt diese Repositoryschritte nicht.
