@@ -261,3 +261,16 @@ async def test_initialize_timeout_reports_unknown_remote_state_without_retry(
         assert report["automatic_retry"] is False and report["connection_id"]
         assert endpoint not in json.dumps(report)
         assert bridge.store.db.execute("SELECT count(*) FROM tasks").fetchone()[0] == 0
+
+
+async def test_workflow_rejection_report_reads_existing_bounded_evidence_code(bridge):
+    bridge.config.principals["local"].approval_mode = "automatic"
+    value = request("handoff.status", {"handoff_id": "not-bound", "revision": 1})
+    async with bridge:
+        bridge.prepare("local", value)
+        rejected = await bridge.tasks.wait("local", value.task_id)
+        assert rejected["state"] == "failed" and rejected["error"] is None
+        report = bridge.task("local", value.task_id)["diagnostic"]
+        assert report["error_code"] == "handoff_not_found"
+        assert report["accepted"] and report["started"] and not report["completed"]
+        assert not report["automatic_retry"]
