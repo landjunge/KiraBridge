@@ -1,0 +1,275 @@
+{
+  "schema": "kirabridge-threaddesk-acceptance-v1",
+  "at": "2026-10-18T18:06:25.767Z",
+  "source_commit": "4d59e7081d62c5e4e9924e9e710382d8d8772c43",
+  "runtime_source_commit": "bf3e89f",
+  "threaddesk_source_commit": "a99afa8b4ddfdc4396521bad11d6868b2069d9b0",
+  "runtime": {
+    "instance_id": "ded60ba1623f465383193a09b47f2c7f",
+    "version": "0.5.2",
+    "pid": 27282,
+    "started_at": "2026-10-18T18:03:43.701999+00:00",
+    "config_path": "/Users/landjunge/.config/kirabridge/config.toml",
+    "config_sha256": "a467f4840036ebaaaa8fdbfb48d6166c7eee92bee0722720e6ee944960eb070c",
+    "effective_config_sha256": "ee47b9434688319da81073e7335beaee515e6ba55d14b118f41b9d114ef9aadb",
+    "source_tree_sha256": "1ff90821b9f0b5e0d418df13ab67cb221ba3599a784b75e77c80cce5eb1079bf",
+    "source_file_count": 34,
+    "source_package_path": "/Users/landjunge/KiraBridge/src/kirabridge",
+    "source_scope": "package Python files observed at startup; no remote attestation"
+  },
+  "transport": "Actual connected ChatGPT App KiraBridge tool calls; principal chatgpt",
+  "profile": "New separate operator profile, existing default ThreadDesk data untouched",
+  "tasks": [
+    {
+      "task_id": "seven-m1-20261018-create",
+      "operation": "threaddesk.manage",
+      "state": "completed",
+      "attempt": 1,
+      "receipt": "02cac5ca-2edd-448d-97b5-3fa8bd96fe1c",
+      "error_code": null,
+      "created": 1792346645.618691,
+      "started": 1792346646.046987,
+      "finished": 1792346646.060075
+    },
+    {
+      "task_id": "seven-m1-20261018-replay",
+      "operation": "threaddesk.manage",
+      "state": "completed",
+      "attempt": 1,
+      "receipt": "b0d377d0-5928-4a31-b642-3d79fe34cc4b",
+      "error_code": null,
+      "created": 1792346675.428349,
+      "started": 1792346675.5387352,
+      "finished": 1792346675.5654888
+    },
+    {
+      "task_id": "seven-m1-20261018-conflict",
+      "operation": "threaddesk.manage",
+      "state": "failed",
+      "attempt": 1,
+      "receipt": "0eb1ec84-e623-47cc-a842-6313ec27b4bb",
+      "error_code": "operation_conflict",
+      "created": 1792346677.6285272,
+      "started": 1792346677.6786802,
+      "finished": 1792346677.727906
+    },
+    {
+      "task_id": "seven-m1-20261018-parent",
+      "operation": "threaddesk.manage",
+      "state": "completed",
+      "attempt": 1,
+      "receipt": "cd2ac5b7-0d1b-4420-91e9-e8b7fd4de54f",
+      "error_code": null,
+      "created": 1792346680.542777,
+      "started": 1792346680.5938401,
+      "finished": 1792346680.728182
+    },
+    {
+      "task_id": "seven-m1-20261018-update",
+      "operation": "threaddesk.manage",
+      "state": "completed",
+      "attempt": 1,
+      "receipt": "7a97f3a9-0188-4339-8907-c0db063bf89a",
+      "error_code": null,
+      "created": 1792346682.773526,
+      "started": 1792346682.8548322,
+      "finished": 1792346682.9918048
+    },
+    {
+      "task_id": "seven-m1-20261018-set_note",
+      "operation": "threaddesk.manage",
+      "state": "completed",
+      "attempt": 1,
+      "receipt": "39573f74-2f7f-49cf-a857-c9306b27e832",
+      "error_code": null,
+      "created": 1792346685.647651,
+      "started": 1792346685.7457652,
+      "finished": 1792346685.8313758
+    },
+    {
+      "task_id": "seven-m1-20261018-add_file",
+      "operation": "threaddesk.manage",
+      "state": "completed",
+      "attempt": 1,
+      "receipt": "04bf5d9f-d236-42d5-afe7-bfa976efcb05",
+      "error_code": null,
+      "created": 1792346688.18129,
+      "started": 1792346688.232522,
+      "finished": 1792346688.349483
+    },
+    {
+      "task_id": "seven-m1-20261018-remove_file",
+      "operation": "threaddesk.manage",
+      "state": "completed",
+      "attempt": 1,
+      "receipt": "f7e6c3fe-563e-4820-bd3f-c8b0f7e50d64",
+      "error_code": null,
+      "created": 1792346690.649653,
+      "started": 1792346690.700165,
+      "finished": 1792346690.816931
+    },
+    {
+      "task_id": "seven-m1-20261018-organize",
+      "operation": "threaddesk.manage",
+      "state": "completed",
+      "attempt": 1,
+      "receipt": "cc2aa8ca-928a-4f97-b98f-9f6d5a65dfaa",
+      "error_code": null,
+      "created": 1792346694.519503,
+      "started": 1792346694.617861,
+      "finished": 1792346694.733242
+    },
+    {
+      "task_id": "seven-m1-20261018-stale",
+      "operation": "threaddesk.manage",
+      "state": "failed",
+      "attempt": 1,
+      "receipt": "7674b325-b018-4fba-aeae-5430b2ebde08",
+      "error_code": "revision_conflict",
+      "created": 1792346696.7225358,
+      "started": 1792346696.775649,
+      "finished": 1792346696.825726
+    },
+    {
+      "task_id": "seven-m1-20261018-read",
+      "operation": "threaddesk.read",
+      "state": "completed",
+      "attempt": 1,
+      "receipt": "a4220bd9-44ff-40af-82a7-929a8b08784e",
+      "error_code": null,
+      "created": 1792346699.610174,
+      "started": 1792346699.6608121,
+      "finished": 1792346699.7110322
+    },
+    {
+      "task_id": "seven-m1-20261018-switch",
+      "operation": "threaddesk.manage",
+      "state": "completed",
+      "attempt": 1,
+      "receipt": "741ee486-533e-4e4f-b9c1-af6f36d8bd6b",
+      "error_code": null,
+      "created": 1792346719.51393,
+      "started": 1792346719.5640929,
+      "finished": 1792346719.663761
+    },
+    {
+      "task_id": "seven-m1-20261018-current",
+      "operation": "threaddesk.read",
+      "state": "completed",
+      "attempt": 1,
+      "receipt": "d3a09fbf-c6f7-4980-a6ae-6be1c3c1c49c",
+      "error_code": null,
+      "created": 1792346721.935766,
+      "started": 1792346721.986686,
+      "finished": 1792346722.036763
+    },
+    {
+      "task_id": "seven-m1-20261018-archive",
+      "operation": "threaddesk.manage",
+      "state": "completed",
+      "attempt": 1,
+      "receipt": "eaa0510e-cf74-4b6a-b549-ad5119d8dfd2",
+      "error_code": null,
+      "created": 1792346725.025702,
+      "started": 1792346725.0764768,
+      "finished": 1792346725.208098
+    },
+    {
+      "task_id": "seven-m1-20261018-unarchive",
+      "operation": "threaddesk.manage",
+      "state": "completed",
+      "attempt": 1,
+      "receipt": "68c51bbc-06ca-4070-9837-a3e55591e333",
+      "error_code": null,
+      "created": 1792346727.263368,
+      "started": 1792346727.314018,
+      "finished": 1792346727.435097
+    },
+    {
+      "task_id": "seven-m1-20261018-archive-final",
+      "operation": "threaddesk.manage",
+      "state": "completed",
+      "attempt": 1,
+      "receipt": "f9a01fac-f853-41e2-bf4e-c6ab73d9870f",
+      "error_code": null,
+      "created": 1792346730.0180821,
+      "started": 1792346730.068694,
+      "finished": 1792346730.185778
+    },
+    {
+      "task_id": "seven-m1-20261018-delete",
+      "operation": "threaddesk.manage",
+      "state": "completed",
+      "attempt": 1,
+      "receipt": "8d1693eb-d03c-47ee-b9da-39c4d9591a5f",
+      "error_code": null,
+      "created": 1792346732.362727,
+      "started": 1792346732.413362,
+      "finished": 1792346732.498469
+    },
+    {
+      "task_id": "seven-m1-20261018-parent-archive",
+      "operation": "threaddesk.manage",
+      "state": "completed",
+      "attempt": 1,
+      "receipt": "cf73f241-ce0f-4c24-b288-f33f612b8841",
+      "error_code": null,
+      "created": 1792346736.581534,
+      "started": 1792346736.6314728,
+      "finished": 1792346736.787746
+    },
+    {
+      "task_id": "seven-m1-20261018-parent-delete",
+      "operation": "threaddesk.manage",
+      "state": "completed",
+      "attempt": 1,
+      "receipt": "b86471bd-05ff-4e8e-803c-4971f349a43f",
+      "error_code": null,
+      "created": 1792346738.857246,
+      "started": 1792346738.9072719,
+      "finished": 1792346738.9910011
+    },
+    {
+      "task_id": "seven-m1-20261018-list-clean",
+      "operation": "threaddesk.read",
+      "state": "completed",
+      "attempt": 1,
+      "receipt": "2098c0dc-2dcf-4842-bedc-7559abeee326",
+      "error_code": null,
+      "created": 1792346741.6111429,
+      "started": 1792346741.6611352,
+      "finished": 1792346741.7092018
+    },
+    {
+      "task_id": "seven-m1-20261018-lookup",
+      "operation": "threaddesk.read",
+      "state": "completed",
+      "attempt": 1,
+      "receipt": "475ff690-bfcb-4b40-a07c-d425bd1a2c49",
+      "error_code": null,
+      "created": 1792346744.4039109,
+      "started": 1792346744.454517,
+      "finished": 1792346744.504123
+    }
+  ],
+  "same_task_receipt_preserved": true,
+  "original_create_operation_replayed": true,
+  "foreign_codex_capability_denied_before_submission": true,
+  "synthetic_threads_removed": true,
+  "final_list_count": 0,
+  "ci": {
+    "run_id": 39152246949,
+    "platforms": [
+      "ubuntu-24.04 Python3.11",
+      "ubuntu-24.04 Python3.13",
+      "macos-15 Python3.11"
+    ],
+    "conclusion": "success"
+  },
+  "limits": [
+    "Management only; does not start agent or referenced files",
+    "No existing default profile migration",
+    "M2 handoff/return integration remains separate",
+    "Root/admin execution still not confirmed; prior unknown admin operation not replayed"
+  ]
+}

@@ -6,13 +6,13 @@ Koordinator: /root. Originalauftrag und acht Pläne: SOURCE.md, unverändert und
 
 | Paket | Verantwortlich | Status | Abhängigkeiten | Commit / PR / Grenze |
 |---|---|---|---|---|
-| TD-C01 | /root/threaddesk_m1 | main_integrated_bridge_roundtrip_checked | G-01 | a99afa8b4ddfdc4396521bad11d6868b2069d9b0 |
+| TD-C01 | /root/threaddesk_m1 | main_and_bridge_operator_profile_integrated | G-01 | a99afa8b4ddfdc4396521bad11d6868b2069d9b0 |
 | TD-C02 | /root/threaddesk_m1 | source_and_ci_checked | G-01 | 05403916e549e1060f839ccbaf36a5cb90413776 |
 | TD-C03 | /root/threaddesk_m1 | open | TD-C01 |  |
 | TD-C04 | /root/threaddesk_m1 | open | operator_server_scope |  |
 | TD-D01 | /root/threaddesk_m1 | open |  |  |
 | TD-R01 | /root/threaddesk_m1 | open |  |  |
-| KB-C01 | /root | source_and_real_stdio_checked | TD-C01, G-01 | 5c91651 |
+| KB-C01 | /root | integrated_runtime_and_actual_chatgpt_checked | TD-C01, G-01 | 4d59e7081d62c5e4e9924e9e710382d8d8772c43 |
 | KB-C02 | /root | open | TD-C02, KB-C01 |  |
 | KB-C03 | /root | implemented_prior_current_runtime_to_verify |  |  |
 | KB-C04 | /root | open | TG-C02 |  |

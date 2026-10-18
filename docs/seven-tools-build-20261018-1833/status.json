@@ -61,7 +61,7 @@
     "TD-C01": {
       "title": "Bau / TD-01–03",
       "owner": "/root/threaddesk_m1",
-      "state": "main_integrated_bridge_roundtrip_checked",
+      "state": "main_and_bridge_operator_profile_integrated",
       "dependencies": [
         "G-01"
       ],
@@ -72,9 +72,9 @@
         "targeted JSON/SQLite/migration/MCP checks",
         "required CI: twice573 + three native builds"
       ],
-      "delivered": false,
+      "delivered": true,
       "user_accepted": false,
-      "next_step": "Activate separate operator profile through fixed Bridge adapter; existing user profile unchanged",
+      "next_step": null,
       "blocker": null,
       "merge_commit": "a40ed8e0b9359d81d30479ceebfbe196d71f5c4b"
     },
@@ -160,22 +160,25 @@
     "KB-C01": {
       "title": "Bau / KB-01–02",
       "owner": "/root",
-      "state": "source_and_real_stdio_checked",
+      "state": "integrated_runtime_and_actual_chatgpt_checked",
       "dependencies": [
         "TD-C01",
         "G-01"
       ],
       "source_commit": null,
-      "commit": "5c91651",
+      "commit": "4d59e7081d62c5e4e9924e9e710382d8d8772c43",
       "pr": null,
       "checks": [
         "All declared actions against exact reviewed ThreadDesk source",
-        "Replay/conflict/stale revision and complete correlated receipts"
+        "Replay/conflict/stale revision and complete correlated receipts",
+        "Three-platform CI39152246949 success",
+        "Actual ChatGPT App all actions; exact synthetic cleanup; old records/credentials unchanged"
       ],
-      "delivered": false,
+      "delivered": true,
       "user_accepted": false,
-      "next_step": "Three-platform CI then controlled runtime activation and actual ChatGPT tasks",
-      "blocker": null
+      "next_step": null,
+      "blocker": null,
+      "evidence": "docs/evidence/threaddesk-m1-20261018.json"
     },
     "KB-C02": {
       "title": "Bau / KB-03",
@@ -783,7 +786,7 @@
   },
   "milestones": {
     "M0": "in_progress",
-    "M1": "in_progress",
+    "M1": "operator_profile_runtime_and_chatgpt_checked_existing_default_profile_unchanged",
     "M2": "open",
     "M3": "open",
     "M4": "open",
@@ -796,11 +799,11 @@
     "No new competing task queue; existing stores/contracts and standalone products preserved.",
     "Source, runtime, package, delivery and user acceptance remain separate."
   ],
-  "updated_at": "2026-10-18T18:01:18.975619+00:00",
+  "updated_at": "2026-10-18T18:06:57.219107+00:00",
   "active_focus": {
     "task": "seven-tools M1 actual ThreadDesk/Bridge integration, independent console/observation/controlled-run packages",
     "critical_permissions": "Completed in private main 8226763 and actual runtime c6f1eab; docs/DEVELOPMENT-ACCESS-20261018.md",
     "remaining_permissions_gate": "Local macOS administrator confirmation; unknown test never replayed",
-    "next_gate": "Actual ChatGPT ThreadDesk CRUD in new isolated operator profile; do not migrate real default profile"
+    "next_gate": "M2 strict issued-handoff/run/return integration; independent reviewed packages progress"
   }
 }

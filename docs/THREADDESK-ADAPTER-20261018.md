@@ -109,8 +109,41 @@ Die vorhandene CI checkt exakt denselben öffentlichen eigenen ThreadDesk-Quellp
 zusätzlich aus, installiert/führt keine beliebigen Fremdrepositories aus und
 führt den echten MCP-Test auch auf Linux/macOS aus. Das ist kein neuer
 Desktopdownload und keine automatische Migration laufender Benutzerinstallationen.
-Aktivierung und konkrete ChatGPT-Taskbelege werden nach tatsächlichem Lauf ergänzt;
-der lokale isolierte Test allein wird nicht als ChatGPT-Abnahme ausgegeben.
+## Tatsächlich geladen und aus ChatGPT geprüft · 18.10.2026
+
+Privater Main-Stand `4d59e7081d62c5e4e9924e9e710382d8d8772c43`; bestehende
+0.5.2-Installation mit Quell-Backport `bf3e89f`. Bridge-Runtime
+`ded60ba1623f465383193a09b47f2c7f`, Konfigurations-SHA256
+`a467f4840036ebaaaa8fdbfb48d6166c7eee92bee0722720e6ee944960eb070c`,
+Python-Quellfingerabdruck
+`1ff90821b9f0b5e0d418df13ab67cb221ba3599a784b75e77c80cce5eb1079bf`.
+[Minimierte Task-/CI-Belege](evidence/threaddesk-m1-20261018.json).
+
+Der tatsächliche ChatGPT-App-Kanal hat im neuen getrennten Profil
+`~/.local/share/threaddesk/kirabridge-operator` beide synthetischen Threads
+angelegt und alle oben genannten Aktionsarten ausgeführt. Wiederverwendung
+derselben Bridge-Taskkennung behielt Quittung/attempt=1; erneute fachliche
+Operation lieferte duplicate=true. Geänderter Inhalt kollidierte, Revision0
+überschrieb den geänderten Thread nicht. Archiv/Rücknahme und abschließende
+Löschung beider Testobjekte waren bestätigt; `seven-m1-20261018-list-clean`
+lieferte einschließlich archivierter Threads eine leere Liste. Der rein lesende
+Operationslookup blieb danach verfügbar. `seven-m1-20261018-denied` über die
+separate Codex-MCP-Identität wurde vor Annahme mit forbidden abgewiesen.
+
+Alle352 vorherigen Tasks,5 Nachrichten und4 Empfängerjobs sind zeilenweise
+hash-identisch erhalten. Zugangsdaten, Tunnelkey und LaunchAgent ebenfalls
+unverändert. Config vorher mit0600 gesichert, nach Änderung weiterhin0600;
+privater Rückweg unter `~/.local/share/kirabridge/threaddesk-m1-20261018/`.
+Vor Wiederherstellung Queue leeren/prüfen, gesicherte Config atomar mit0600
+zurücksetzen und ausschließlich Bridge kontrolliert neu laden. Keine alten
+unknown-Aufträge neu starten. Das getrennte neue Profil dabei erhalten.
+
+Bedienweg: über task_request zunächst `threaddesk.read/list_threads`; neue Threads
+mit create wie oben. Dieser feste Betreiberzugang zeigt bewusst das neue Profil,
+nicht ungeprüft den alten Defaultbestand. Auswahl/Migration eines bestehenden
+Profils bleibt ein gesondert zu prüfender Daten-/Writerwechsel. MCP-Clients dürfen
+Pfad oder Writer nicht bestimmen. Keine neuen öffentlichen Downloads, keine
+automatische Desktopaktualisierung.
 
 ## English
 
@@ -127,3 +160,11 @@ write receipts remain unknown and are not automatically retried. Read the stored
 operation status first. Management never executes an agent or referenced files.
 The real pinned-peer roundtrip covers all declared actions; source/local test,
 runtime activation and actual ChatGPT acceptance remain separate evidence.
+The actual connected ChatGPT App has now completed all declared management
+actions in a new isolated operator profile, including replay/conflict/stale cases,
+archive/unarchive and verified deletion of both synthetic threads. The final list
+including archives was empty; a separate Codex identity was denied before
+submission. Existing352 tasks,5 messages,4 receiver jobs and credentials were
+preserved unchanged. See the linked minimized receipts. The old default user
+profile and historical desktop downloads remain unchanged. M2 handoff/return and
+administrator/root acceptance are separate gates.
