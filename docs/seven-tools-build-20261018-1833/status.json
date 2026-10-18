@@ -28,7 +28,7 @@
   },
   "workers": {
     "/root/threaddesk_m1": {
-      "state": "source_finished_PR77_ci_pending",
+      "state": "pause_requested_no_new_steps_until_user_ok",
       "worktree": "/Users/landjunge/threaddesk-worktrees/seven-tools-knowledge-design-20261018",
       "packages": [
         "TD-C03",
@@ -37,7 +37,7 @@
       ]
     },
     "/root/tollgate_control": {
-      "state": "bounded_readonly_observation_export",
+      "state": "pause_requested_no_new_steps_until_user_ok",
       "worktree": "/Users/landjunge/KiraBridge/.worktrees/seven-tools-observations-20261018",
       "packages": [
         "AA-C01",
@@ -45,7 +45,7 @@
       ]
     },
     "/root/fourallpass_protected": {
-      "state": "bounded_image_read_implementation",
+      "state": "pause_requested_no_new_steps_until_user_ok",
       "worktree": "/Users/landjunge/KiraBridge/.worktrees/seven-tools-image-read-20261018",
       "packages": [
         "KB-C05"
@@ -97,19 +97,20 @@
     "TD-C03": {
       "title": "Bau / Wissensführung",
       "owner": "/root/threaddesk_m1",
-      "state": "source_and_local_checks_complete_ci_pending",
+      "state": "main_and_operator_runtime_actual_chatgpt_checked",
       "dependencies": [
         "TD-C01"
       ],
       "source_commit": null,
-      "commit": "502f0db8a65d9701a44f956d5c56b3efbd748cf6",
+      "commit": "6c7d578a1edb612d0e8e6d99faa2953888d69bfb",
       "pr": "https://github.com/landjunge/threaddesk/pull/77",
       "checks": [],
-      "delivered": false,
+      "delivered": true,
       "user_accepted": false,
       "next_step": "Review fixed source and CI; knowledge adapter not yet live",
       "blocker": null,
-      "evidence": "docs/evidence/seven-tools-20261018/TD-D01-R01.md"
+      "evidence": "docs/evidence/workflow-reads-chatgpt-20261018.json",
+      "merge_commit": "c43e078aba618ada41f1ffcf012b24fc38f4492f"
     },
     "TD-C04": {
       "title": "Separater Ausbau",
@@ -236,18 +237,19 @@
     "KB-C05": {
       "title": "Rückkanal",
       "owner": "/root",
-      "state": "open",
+      "state": "bounded_image_and_selected_observations_actual_chatgpt_checked",
       "dependencies": [
         "KB-C02"
       ],
       "source_commit": null,
-      "commit": null,
+      "commit": "9d6e1a86c7719d1755508f9d3e51a625d6660c1c",
       "pr": null,
       "checks": [],
-      "delivered": false,
+      "delivered": true,
       "user_accepted": false,
       "next_step": null,
-      "blocker": null
+      "blocker": "Automatic voice-session push not demonstrated; no claim of overall project acceptance",
+      "evidence": "docs/evidence/workflow-reads-chatgpt-20261018.json"
     },
     "KB-D01": {
       "title": "Design",
@@ -845,11 +847,20 @@
     "No new competing task queue; existing stores/contracts and standalone products preserved.",
     "Source, runtime, package, delivery and user acceptance remain separate."
   ],
-  "updated_at": "2026-10-18T19:06:47.159770+00:00",
+  "updated_at": "2026-10-18T19:31:46.827933+00:00",
   "active_focus": {
-    "task": "M2 proven; sequential source integration, exact knowledge and bounded image/observation return paths",
+    "task": "Paused at explicit user request; current real App acceptance saved locally",
     "critical_permissions": "Completed in private main 8226763 and actual runtime c6f1eab; docs/DEVELOPMENT-ACCESS-20261018.md",
     "remaining_permissions_gate": "Local macOS administrator confirmation; unknown test never replayed",
-    "next_gate": "M3 actual controller assembly must preserve trusted scope/quote/secret boundaries; no synthetic production authority"
+    "next_gate": "M3 actual controller assembly must preserve trusted scope/quote/secret boundaries; no synthetic production authority",
+    "loaded_runtime": "df995f6 / 0.5.2; instance748efc8b8ee341f5858d915abb1fb131; config04637ceeb2fdc4a645ba25d5ff4e8867b11068cd24eb991b7badd5b29e12405c"
+  },
+  "user_pause": {
+    "requested": true,
+    "reason": "User temporarily disconnecting internet; await explicit OK",
+    "new_work_allowed": false,
+    "service": "KiraBridge left healthy and running; no further restart",
+    "checkpoint": "docs/evidence/workflow-reads-chatgpt-20261018.json",
+    "next_step_after_ok": "Finish preservation comparison and documentation of actual image/knowledge/observation acceptance; then review pending stop/BD/Gnom packages"
   }
 }

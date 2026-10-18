@@ -8,7 +8,7 @@ Koordinator: /root. Originalauftrag und acht Pläne: SOURCE.md, unverändert und
 |---|---|---|---|---|
 | TD-C01 | /root/threaddesk_m1 | main_and_bridge_operator_profile_integrated | G-01 | a99afa8b4ddfdc4396521bad11d6868b2069d9b0 |
 | TD-C02 | /root/threaddesk_m1 | integrated_runtime_and_actual_chatgpt_checked | G-01 | 583c000a8f226d5d9e71c51310fb0a81a3bafb49 |
-| TD-C03 | /root/threaddesk_m1 | source_and_local_checks_complete_ci_pending | TD-C01 | 502f0db8a65d9701a44f956d5c56b3efbd748cf6 |
+| TD-C03 | /root/threaddesk_m1 | main_and_operator_runtime_actual_chatgpt_checked | TD-C01 | 6c7d578a1edb612d0e8e6d99faa2953888d69bfb |
 | TD-C04 | /root/threaddesk_m1 | open | operator_server_scope |  |
 | TD-D01 | /root/threaddesk_m1 | source_and_local_checks_complete_ci_pending |  | 502f0db8a65d9701a44f956d5c56b3efbd748cf6 |
 | TD-R01 | /root/threaddesk_m1 | source_and_local_checks_complete_ci_pending |  | 502f0db8a65d9701a44f956d5c56b3efbd748cf6 |
@@ -16,7 +16,7 @@ Koordinator: /root. Originalauftrag und acht Pläne: SOURCE.md, unverändert und
 | KB-C02 | /root | integrated_runtime_and_actual_chatgpt_checked | TD-C02, KB-C01 | 583c000a8f226d5d9e71c51310fb0a81a3bafb49 |
 | KB-C03 | /root | integrated_runtime_and_actual_chatgpt_checked |  | 8226763 |
 | KB-C04 | /root | open | TG-C02 |  |
-| KB-C05 | /root | open | KB-C02 |  |
+| KB-C05 | /root | bounded_image_and_selected_observations_actual_chatgpt_checked | KB-C02 | 9d6e1a86c7719d1755508f9d3e51a625d6660c1c |
 | KB-D01 | /root | integrated_runtime_assets_and_isolated_browser_checked |  | 19660bf98ad1c373e5ba791a57ec1752860ca8e2 |
 | KB-R01 | /root | open |  |  |
 | FP-C01 | /root/fourallpass_protected | source_and_ci_checked |  | 3fd6ed2 |
