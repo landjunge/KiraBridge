@@ -84,9 +84,12 @@ class ConfiguredWorkflowControl:
                 raise ValueError("invalid project registry")
             for value in paths:
                 path = Path(value)
-                if not path.is_absolute() or not path.is_dir():
+                if not path.is_absolute() or (path.exists() and not path.is_dir()):
                     raise ValueError("project root unavailable")
-                root = path.resolve(strict=True)
+                # Retired/renamed worktrees must not disable other projects or
+                # the stored journal scope needed to stop their existing runs.
+                # New turns still require the actual CWD/root identity below.
+                root = path.resolve(strict=False)
                 if root in {Path(root.anchor), Path.home()}:
                     raise ValueError("project root too broad")
                 if root in roots and roots[root] != project:

@@ -92,6 +92,9 @@ async def test_stop_routes_stored_scope_after_cwd_removed_and_disabled_history_c
             assert (await terminal(bridge, task))["exit_code"] == 0
         cwd = Path(metadata["cwd"])
         cwd.rename(cwd.with_name("renamed-workspace"))
+        # A service restart reconstructs the router after the configured root
+        # disappeared; existing journal scopes must remain stoppable.
+        bridge.workflow_control = ConfiguredWorkflowControl(bridge)
         result = await bridge.workflow_control.stop("local", "h-synthetic", 1, "stop-missing-cwd")
         assert result["barrier"]["status"] == "EFFECTIVE"
         stored = bridge.handoffs.get("local", "h-synthetic", 1)
