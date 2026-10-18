@@ -236,6 +236,9 @@ class GrokACPAdapter:
 
     interface_version = "1"
 
+    def __init__(self, terminal: TerminalManager | None = None):
+        self.terminal = terminal
+
     async def execute(self, task, args, config, roots, running, progress) -> dict:
         if not config.executable:
             raise BridgeError("agent_config", "Grok executable must be configured explicitly")
@@ -268,7 +271,7 @@ class GrokACPAdapter:
             process = await spawn_process(
                 command,
                 fd,
-                env=agent_environment(config),
+                env=agent_environment(config, self.terminal),
                 stdin=asyncio.subprocess.PIPE,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.DEVNULL,
@@ -306,6 +309,13 @@ class GrokACPAdapter:
                             )
                 elif "method" in value and "id" in value:
                     if value["method"] == "session/request_permission":
+                        permission = value.get("params", {})
+                        bound_permission = (
+                            bool(session)
+                            and permission.get("sessionId") == session
+                            and permission.get("toolCall", {}).get("kind")
+                            in {"read", "edit", "delete", "move", "search", "execute"}
+                        )
                         selected = next(
                             (
                                 option.get("optionId")
@@ -322,7 +332,7 @@ class GrokACPAdapter:
                                 "id": value["id"],
                                 "result": {
                                     "outcome": {"outcome": "selected", "optionId": selected}
-                                    if local_tools and selected
+                                    if local_tools and bound_permission and selected
                                     else {"outcome": "cancelled"}
                                 },
                             }
@@ -403,7 +413,7 @@ class AgentManager:
         self.adapters: dict[str, AgentAdapter] = {
             "codex": CodexAdapter(terminal),
             "grok_api": GrokAPIAdapter(),
-            "grok_acp": GrokACPAdapter(),
+            "grok_acp": GrokACPAdapter(terminal),
         }
 
     def register(self, kind: str, adapter: AgentAdapter) -> None:
