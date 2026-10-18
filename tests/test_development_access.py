@@ -17,7 +17,8 @@ def test_full_terminal_is_explicit_and_still_checks_executable():
         check_executable(sys.executable, [])
     check_executable(sys.executable, [], True)
     with pytest.raises(BridgeError):
-        check_executable("python", [], True)
+        check_executable("./python", [], True)
+    assert check_executable("sh", [], True).endswith("/sh")
     with pytest.raises(BridgeError):
         check_executable("/does/not/exist", [], True)
 
