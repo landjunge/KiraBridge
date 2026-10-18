@@ -66,7 +66,7 @@ Privates, modulares Desktop- und Agenten-Gateway für macOS und Linux. Python 3.
 - Dauerhafte SQLite-WAL-Warteschlange mit atomarer Freigabeprüfung, Aufgaben- und Empfangs-IDs, Idempotenz, Delegationsketten, Leases, Ereignissen und nachvollziehbarer Wiederherstellung.
 - Getrennte Zustände für Empfang, laufende Ausführung und belegten Abschluss. Nach einem Dispatcher-Abbruch bleiben möglicherweise ausgeführte Aufträge `unknown`; sie werden nicht erneut gestartet.
 - Codex CLI mit JSONL-Nachweisen; Grok Build über ACP v1; zusätzlicher Grok-API-Adapter für reine Textantworten. Agentenidentitäten und Sitzungen bleiben getrennt.
-- Terminal mit expliziten ausführbaren Dateien, Arbeitsverzeichnisprüfung, begrenzter Ausgabe, Zeitlimits und Beendigung eigener Prozessgruppen. Kein implizites `shell=True`.
+- Terminal mit sicherem Programmlisten-Standard und ausdrücklich aktivierbarem Betreiber-Vollzugriff, Arbeitsverzeichnisprüfung, begrenzter Ausgabe, Zeitlimits und Beendigung eigener Prozessgruppen. Administratoraktionen verwenden einen gesonderten sichtbaren lokalen macOS-Freigabeweg. [Berechtigungen und Nachweise DE/EN](docs/DEVELOPMENT-ACCESS-20261018.md).
 - Dateioperationen mit POSIX-Dateideskriptoren und Schutz gegen Symlink-Pfadausbrüche; atomisches Schreiben; kein rekursives Löschen.
 - Unicode-Zwischenablage mit `pbcopy`/`pbpaste`, Wayland oder X11; konfigurierbare Lesefreigaben und Schreibbestätigung durch sofortiges Rücklesen. Keine Überwachung.
 - MCP über stdio und Streamable HTTP; authentifizierte parallele HTTP-Clients; ausgehender MCP-Clientpool mit getrennten Verbindungen.
@@ -81,12 +81,22 @@ Der lokale Dienst läuft automatisch über launchd auf `127.0.0.1:8765`. Die Sta
 
 Der Workspace ist ein Arbeits-/Austauschordner, **kein Git-Checkout**. Der auf
 diesem Mac installierte bearbeitbare Quellstand liegt in `~/KiraBridge`.
-Für `chatgpt` sind zusätzlich genau `~/KiraBridge` und
-`~/Projects` einschließlich Hilfezentrum-Worktrees als `read_roots`
-freigegeben. Das erweitert ausschließlich `file.read`/`file.list`, keine Schreib-,
-Lösch-, Terminal- oder fremden Principal-Rechte. Konfiguration und geladener
-Dienststand sind über [die Bereitschaftsprüfung](docs/OPERATIONS.md#bereitschaft-und-projektdateien)
-abzugleichen; Health allein bestätigt keine Arbeitsfähigkeit.
+Nach ausdrücklicher Betreiberfreigabe vom18.10.2026 besitzen `chatgpt` und `local`
+regulären Terminal-Vollzugriff mit konfiguriertem PATH und automatischer
+Auftragsgenehmigung. Dateiwerkzeuge bleiben auf die vorhandenen Projekte,
+`~/Projects`, `~/threaddesk-worktrees` und registrierte Arbeitsstände begrenzt.
+`policy.inspect` zeigt die tatsächlich geladene eigene Policy ohne Zugangsdaten;
+`agent.status` unterscheidet eigene Bridge-Aufträge und nur beobachtete Prozesse.
+Andere Identitäten erhalten dadurch keine globale Terminalfreigabe. Der sichtbare
+Administratorweg ist implementiert; bestätigte Root-Ausführung steht noch aus.
+[Bedienung, genaue Abnahme und Grenzen DE/EN](docs/DEVELOPMENT-ACCESS-20261018.md).
+Dies gilt für den lokalen Quellstand, nicht für den eingefrorenen RC2-Downloadentwurf.
+
+On this Mac, the owner explicitly enabled full regular terminal access for
+`chatgpt` and `local`. File-tool roots and other identities remain separately
+configured. Safe policy/status operations expose actual loaded settings and
+observations. Administrator execution requires local macOS authorization; root
+execution has not yet been confirmed. See the linked DE/EN evidence and limitations.
 
 ```sh
 kirabridge status
