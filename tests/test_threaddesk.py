@@ -92,6 +92,30 @@ def test_unparseable_write_response_is_unknown_not_retryable_failure(bridge):
         bridge.threaddesk.decode(result, mutation=True)
 
 
+@pytest.mark.parametrize(
+    "change", [{}, {"operation_id": "foreign"}, {"thread_id": "foreign"}, {"revision": True}]
+)
+def test_mutation_receipt_is_complete_and_matches_the_actual_operation(bridge, change):
+    expected = {"operation_id": "kb_op", "action": "update", "id": "thread_1"}
+    value = (
+        {
+            "operation_id": "kb_op",
+            "action": "update",
+            "thread_id": "thread_1",
+            "revision": 2,
+            "duplicate": False,
+            "deleted": False,
+            "thread": {"id": "thread_1", "revision": 2},
+        }
+        if change
+        else {}
+    )
+    value.update(change)
+    result = CallToolResult(content=[], structuredContent=value)
+    with pytest.raises(UncertainExecution):
+        bridge.threaddesk.decode(result, mutation=True, expected=expected)
+
+
 @pytest.mark.skipif(
     not os.environ.get("KIRABRIDGE_TEST_THREADDESK_SOURCE"),
     reason="Pinned external ThreadDesk source required for real integration",

@@ -135,7 +135,7 @@ class ThreadDeskManager:
                 "threaddesk_unavailable", "ThreadDesk initialization failed"
             ) from None
 
-    def decode(self, result, *, mutation: bool):
+    def decode(self, result, *, mutation: bool, expected: dict | None = None):
         def invalid(code):
             cls = UncertainExecution if mutation else BridgeError
             raise cls(code, "ThreadDesk response cannot be confirmed; read the known operation ID")
@@ -166,6 +166,35 @@ class ThreadDeskManager:
                 else {}
             )
             return False, {"error": {"code": code, "details": safe_details}}
+        if mutation:
+            if (
+                not isinstance(value, dict)
+                or not isinstance(value.get("operation_id"), str)
+                or not isinstance(value.get("thread_id"), str)
+                or not re.fullmatch(r"[A-Za-z0-9_-]{1,128}", value["thread_id"])
+                or type(value.get("revision")) is not int
+                or value["revision"] < 0
+                or type(value.get("deleted")) is not bool
+                or type(value.get("duplicate")) is not bool
+            ):
+                invalid("threaddesk_receipt")
+            if expected and (
+                value["operation_id"] != expected["operation_id"]
+                or value.get("action") != expected["action"]
+                or (expected.get("id") and value["thread_id"] != expected["id"])
+                or value["deleted"] != (expected["action"] == "delete")
+            ):
+                invalid("threaddesk_receipt")
+            thread = value.get("thread")
+            if value["deleted"]:
+                if thread is not None:
+                    invalid("threaddesk_receipt")
+            elif (
+                not isinstance(thread, dict)
+                or thread.get("id") != value["thread_id"]
+                or thread.get("revision") != value["revision"]
+            ):
+                invalid("threaddesk_receipt")
         return True, value
 
     async def execute(self, task, args, running):
@@ -195,7 +224,9 @@ class ThreadDeskManager:
                         "threaddesk_unknown", "Read original task and operation receipt"
                     ) from None
                 raise
-            success, value = self.decode(result, mutation=mutation)
+            success, value = self.decode(
+                result, mutation=mutation, expected=values if mutation else None
+            )
         return {
             "success": success,
             "value": value,
@@ -206,6 +237,7 @@ class ThreadDeskManager:
                 "tool": tool,
                 "response_received": True,
                 "success": success,
+                "mutation_receipt_validated": mutation and success,
             },
         }
 
