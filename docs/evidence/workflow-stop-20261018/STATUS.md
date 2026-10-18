@@ -67,3 +67,12 @@ KiraBridge PRIVATE, TollGate PUBLIC; keine Sichtbarkeitsänderung, keine Secrets
 öffentlichen TG-Diff. Keine neuen Konten/Dienste, Rechteausweitung, Builds, Releases
 oder Konfigurationsänderungen. Rückweg und DE/EN-Anschlussvertrag:
 [WORKFLOW-STOP-ADAPTER](../../WORKFLOW-STOP-ADAPTER.md). Journale/Belege erhalten.
+
+## CI-Formatkorrektur nach erstem Push
+
+KB-Verify39169593857 am Pin8d4cc3b scheiterte vorTests ausschließlich am Python-
+Beispiel im neuen Markdownvertrag (CI-Ruff formatiert auch diese Codeblöcke).
+VierPythondateien waren lokal formatiert; die Markdown-Codeblockprüfung wurde
+jetzt gezielt ergänzt und die verlangte Aufteilung übernommen. Kein erneuter
+Funktionslauf für diese reine Beispiel-Formatkorrektur. Frühere fehlgeschlagene
+CI wird nicht als bestanden ausgegeben; neuer Commit startet reguläre CI.

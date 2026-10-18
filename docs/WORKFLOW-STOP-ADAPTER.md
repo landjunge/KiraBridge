@@ -38,9 +38,11 @@ control = WorkflowControl(
     lock_timeout_s=1.0,
 )
 bridge.workflow_control = WorkflowControlAdapter(
-    bridge, control,
+    bridge,
+    control,
     project_id=explicitly_configured_project_id,
-    actor_id="codex", consumer_id="existing-codex-consumer",
+    actor_id="codex",
+    consumer_id="existing-codex-consumer",
 )
 ```
 
