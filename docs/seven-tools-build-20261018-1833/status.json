@@ -28,33 +28,28 @@
   },
   "workers": {
     "/root/threaddesk_m1": {
-      "worktree": "/Users/landjunge/KiraBridge/.worktrees/seven-tools-console-20261018",
+      "state": "source_finished_PR77_ci_pending",
+      "worktree": "/Users/landjunge/threaddesk-worktrees/seven-tools-knowledge-design-20261018",
       "packages": [
-        "KB-D01"
-      ],
-      "state": "console_design_implementation"
+        "TD-C03",
+        "TD-D01",
+        "TD-R01"
+      ]
     },
     "/root/tollgate_control": {
-      "worktree": "/Users/landjunge/agent-authority-lab/.worktrees/seven-tools-20261018",
+      "state": "bounded_readonly_observation_export",
+      "worktree": "/Users/landjunge/KiraBridge/.worktrees/seven-tools-observations-20261018",
       "packages": [
         "AA-C01",
-        "AA-C02",
-        "AA-C03",
-        "AA-D01",
-        "AA-R01"
-      ],
-      "state": "observation_projection_native_verification"
+        "KB-C05"
+      ]
     },
     "/root/fourallpass_protected": {
-      "worktree": "/Users/landjunge/gnom-hub-v1/.worktrees/seven-tools-20261018",
+      "state": "bounded_image_read_implementation",
+      "worktree": "/Users/landjunge/KiraBridge/.worktrees/seven-tools-image-read-20261018",
       "packages": [
-        "GH-C01",
-        "GH-C02",
-        "GH-C03",
-        "GH-D01",
-        "GH-R01"
-      ],
-      "state": "controlled_execution_and_binding"
+        "KB-C05"
+      ]
     }
   },
   "packages": {
@@ -81,37 +76,40 @@
     "TD-C02": {
       "title": "Bau / TD-04",
       "owner": "/root/threaddesk_m1",
-      "state": "source_and_ci_checked",
+      "state": "integrated_runtime_and_actual_chatgpt_checked",
       "dependencies": [
         "G-01"
       ],
       "source_commit": null,
-      "commit": "05403916e549e1060f839ccbaf36a5cb90413776",
+      "commit": "583c000a8f226d5d9e71c51310fb0a81a3bafb49",
       "pr": "https://github.com/landjunge/threaddesk/pull/76",
       "checks": [
-        "issuance/source/first-stale-return/runbinding/questions negative checks",
-        "required CI: twice590 + three native builds"
+        "Actual ChatGPT App: issued handoff, real Codex question and same-session explicit answer, unverified return, independent 5-byte read, separate technical decision",
+        "Duplicate start did not run; binding survived controlled restart",
+        "CI39155285485 three platforms success; stale/foreign receipt, uncertain transport and concurrency negative cases"
       ],
-      "delivered": false,
+      "delivered": true,
       "user_accepted": false,
       "next_step": null,
-      "blocker": "strict Bridge binding and actual waiting-adapter answer delivery pending"
+      "blocker": null,
+      "evidence": "docs/evidence/handoff-m2-20261018.json"
     },
     "TD-C03": {
       "title": "Bau / Wissensführung",
       "owner": "/root/threaddesk_m1",
-      "state": "open",
+      "state": "source_and_local_checks_complete_ci_pending",
       "dependencies": [
         "TD-C01"
       ],
       "source_commit": null,
-      "commit": null,
-      "pr": null,
+      "commit": "502f0db8a65d9701a44f956d5c56b3efbd748cf6",
+      "pr": "https://github.com/landjunge/threaddesk/pull/77",
       "checks": [],
       "delivered": false,
       "user_accepted": false,
-      "next_step": null,
-      "blocker": null
+      "next_step": "Review fixed source and CI; knowledge adapter not yet live",
+      "blocker": null,
+      "evidence": "docs/evidence/seven-tools-20261018/TD-D01-R01.md"
     },
     "TD-C04": {
       "title": "Separater Ausbau",
@@ -132,30 +130,32 @@
     "TD-D01": {
       "title": "Design",
       "owner": "/root/threaddesk_m1",
-      "state": "open",
+      "state": "source_and_local_checks_complete_ci_pending",
       "dependencies": [],
       "source_commit": null,
-      "commit": null,
-      "pr": null,
+      "commit": "502f0db8a65d9701a44f956d5c56b3efbd748cf6",
+      "pr": "https://github.com/landjunge/threaddesk/pull/77",
       "checks": [],
       "delivered": false,
       "user_accepted": false,
-      "next_step": null,
-      "blocker": null
+      "next_step": "Review fixed source and CI; knowledge adapter not yet live",
+      "blocker": null,
+      "evidence": "docs/evidence/seven-tools-20261018/TD-D01-R01.md"
     },
     "TD-R01": {
       "title": "README / Dokumentation",
       "owner": "/root/threaddesk_m1",
-      "state": "open",
+      "state": "source_and_local_checks_complete_ci_pending",
       "dependencies": [],
       "source_commit": null,
-      "commit": null,
-      "pr": null,
+      "commit": "502f0db8a65d9701a44f956d5c56b3efbd748cf6",
+      "pr": "https://github.com/landjunge/threaddesk/pull/77",
       "checks": [],
       "delivered": false,
       "user_accepted": false,
-      "next_step": null,
-      "blocker": null
+      "next_step": "Review fixed source and CI; knowledge adapter not yet live",
+      "blocker": null,
+      "evidence": "docs/evidence/seven-tools-20261018/TD-D01-R01.md"
     },
     "KB-C01": {
       "title": "Bau / KB-01–02",
@@ -183,33 +183,39 @@
     "KB-C02": {
       "title": "Bau / KB-03",
       "owner": "/root",
-      "state": "open",
+      "state": "integrated_runtime_and_actual_chatgpt_checked",
       "dependencies": [
         "TD-C02",
         "KB-C01"
       ],
       "source_commit": null,
-      "commit": null,
+      "commit": "583c000a8f226d5d9e71c51310fb0a81a3bafb49",
       "pr": null,
-      "checks": [],
-      "delivered": false,
+      "checks": [
+        "Actual ChatGPT App: issued handoff, real Codex question and same-session explicit answer, unverified return, independent 5-byte read, separate technical decision",
+        "Duplicate start did not run; binding survived controlled restart",
+        "CI39155285485 three platforms success; stale/foreign receipt, uncertain transport and concurrency negative cases"
+      ],
+      "delivered": true,
       "user_accepted": false,
       "next_step": null,
-      "blocker": null
+      "blocker": null,
+      "evidence": "docs/evidence/handoff-m2-20261018.json"
     },
     "KB-C03": {
       "title": "Ausführungsprofil / schon implementiert",
       "owner": "/root",
-      "state": "implemented_prior_current_runtime_to_verify",
+      "state": "integrated_runtime_and_actual_chatgpt_checked",
       "dependencies": [],
       "source_commit": null,
-      "commit": null,
+      "commit": "8226763",
       "pr": null,
       "checks": [],
-      "delivered": false,
+      "delivered": true,
       "user_accepted": false,
       "next_step": null,
-      "blocker": null
+      "blocker": "Root authorization remains unconfirmed; no complete Mac reboot or Grok model test",
+      "evidence": "docs/evidence/development-permissions-20261018.json"
     },
     "KB-C04": {
       "title": "Stopp / KB-04",
@@ -246,16 +252,20 @@
     "KB-D01": {
       "title": "Design",
       "owner": "/root",
-      "state": "open",
+      "state": "integrated_runtime_assets_and_isolated_browser_checked",
       "dependencies": [],
       "source_commit": null,
-      "commit": null,
+      "commit": "19660bf98ad1c373e5ba791a57ec1752860ca8e2",
       "pr": null,
-      "checks": [],
-      "delivered": false,
+      "checks": [
+        "Nine ASGI/security checks; isolated real Chrome DE/EN/light/dark/mobile/error-state proof",
+        "Exact NP CSS served by actual local service; no live browser takeover"
+      ],
+      "delivered": true,
       "user_accepted": false,
       "next_step": null,
-      "blocker": null
+      "blocker": null,
+      "evidence": "docs/acceptance/CONSOLE-DESIGN-20261018.md"
     },
     "KB-R01": {
       "title": "README / Dokumentation",
@@ -299,15 +309,15 @@
         "secret_os_boundary"
       ],
       "source_commit": null,
-      "commit": "3fd6ed2",
-      "pr": "https://github.com/landjunge/4AllPass/pull/222",
+      "commit": "014597b1fc85c1b633f911c3d3fdf6ef4bbd9a3a",
+      "pr": "https://github.com/landjunge/4AllPass/pull/224",
       "checks": [
         "protected core17 +3 actual TG adapter/Dummy checks"
       ],
       "delivered": false,
       "user_accepted": false,
       "next_step": null,
-      "blocker": "real OS secret boundary/secret handoff + KB-C02 identity + provider executor missing; no real vault secret transferred"
+      "blocker": "Trusted production ProtectedHost, consent/version history, OS secret boundary and browser isolation absent; synthetic test host only; fails closed"
     },
     "FP-C03": {
       "title": "Browser-/Sitzungsgrenze / FP-03–04",
@@ -330,7 +340,7 @@
     "FP-D01": {
       "title": "Design",
       "owner": "/root/fourallpass_protected",
-      "state": "source_and_browser_checked",
+      "state": "source_browser_and_ci_checked",
       "dependencies": [],
       "source_commit": null,
       "commit": "fd5473203abc8fdc3fab4fff2e2331882d5f2dde",
@@ -340,21 +350,21 @@
       ],
       "delivered": false,
       "user_accepted": false,
-      "next_step": null,
-      "blocker": "stacked on222; final current CI not yet read by coordinator"
+      "next_step": "Sequential source integration; published RC2 unchanged",
+      "blocker": null
     },
     "FP-R01": {
       "title": "README / Boundary",
       "owner": "/root/fourallpass_protected",
-      "state": "in_progress",
+      "state": "source_browser_and_ci_checked",
       "dependencies": [],
       "source_commit": null,
-      "commit": null,
-      "pr": null,
+      "commit": "fd5473203abc8fdc3fab4fff2e2331882d5f2dde",
+      "pr": "https://github.com/landjunge/4AllPass/pull/223",
       "checks": [],
       "delivered": false,
       "user_accepted": false,
-      "next_step": null,
+      "next_step": "Sequential source integration; published RC2 unchanged",
       "blocker": null
     },
     "FP-V01": {
@@ -382,7 +392,7 @@
         "G-01"
       ],
       "source_commit": null,
-      "commit": "c3a062d89cd3be449cb61976149ee5d455d67b8a",
+      "commit": "e8e66430fb64def027abdee2063a7a774a763883",
       "pr": "https://github.com/landjunge/tollgate/pull/34",
       "checks": [
         "23 new cases; earlier90 relevant checks",
@@ -391,7 +401,7 @@
       ],
       "delivered": false,
       "user_accepted": false,
-      "next_step": null,
+      "next_step": "Integrate reviewed source; actual Bridge execution-controller assembly pending",
       "blocker": "actual registered provider/identity/dispatch integration remains separate; not arbitrary CLI stop"
     },
     "TG-C02": {
@@ -402,7 +412,7 @@
         "TG-C01"
       ],
       "source_commit": null,
-      "commit": "c3a062d89cd3be449cb61976149ee5d455d67b8a",
+      "commit": "e8e66430fb64def027abdee2063a7a774a763883",
       "pr": "https://github.com/landjunge/tollgate/pull/34",
       "checks": [
         "23 new cases; earlier90 relevant checks",
@@ -411,7 +421,7 @@
       ],
       "delivered": false,
       "user_accepted": false,
-      "next_step": null,
+      "next_step": "Integrate reviewed source; actual Bridge execution-controller assembly pending",
       "blocker": "actual registered provider/identity/dispatch integration remains separate; not arbitrary CLI stop"
     },
     "TG-C03": {
@@ -423,7 +433,7 @@
         "G-02"
       ],
       "source_commit": null,
-      "commit": "c3a062d89cd3be449cb61976149ee5d455d67b8a",
+      "commit": "e8e66430fb64def027abdee2063a7a774a763883",
       "pr": "https://github.com/landjunge/tollgate/pull/34",
       "checks": [
         "23 new cases; earlier90 relevant checks",
@@ -432,7 +442,7 @@
       ],
       "delivered": false,
       "user_accepted": false,
-      "next_step": null,
+      "next_step": "Integrate reviewed source; actual Bridge execution-controller assembly pending",
       "blocker": "actual registered provider/identity/dispatch integration remains separate; not arbitrary CLI stop"
     },
     "TG-C04": {
@@ -444,7 +454,7 @@
         "TG-C03"
       ],
       "source_commit": null,
-      "commit": "c3a062d89cd3be449cb61976149ee5d455d67b8a",
+      "commit": "e8e66430fb64def027abdee2063a7a774a763883",
       "pr": "https://github.com/landjunge/tollgate/pull/34",
       "checks": [
         "23 new cases; earlier90 relevant checks",
@@ -453,7 +463,7 @@
       ],
       "delivered": false,
       "user_accepted": false,
-      "next_step": null,
+      "next_step": "Integrate reviewed source; actual Bridge execution-controller assembly pending",
       "blocker": "actual registered provider/identity/dispatch integration remains separate; not arbitrary CLI stop"
     },
     "TG-D01": {
@@ -462,7 +472,7 @@
       "state": "bounded_source_and_ci_checked",
       "dependencies": [],
       "source_commit": null,
-      "commit": "c3a062d89cd3be449cb61976149ee5d455d67b8a",
+      "commit": "e8e66430fb64def027abdee2063a7a774a763883",
       "pr": "https://github.com/landjunge/tollgate/pull/34",
       "checks": [
         "23 new cases; earlier90 relevant checks",
@@ -471,7 +481,7 @@
       ],
       "delivered": false,
       "user_accepted": false,
-      "next_step": null,
+      "next_step": "Integrate reviewed source; actual Bridge execution-controller assembly pending",
       "blocker": "actual registered provider/identity/dispatch integration remains separate; not arbitrary CLI stop"
     },
     "TG-R01": {
@@ -480,7 +490,7 @@
       "state": "bounded_source_and_ci_checked",
       "dependencies": [],
       "source_commit": null,
-      "commit": "c3a062d89cd3be449cb61976149ee5d455d67b8a",
+      "commit": "e8e66430fb64def027abdee2063a7a774a763883",
       "pr": "https://github.com/landjunge/tollgate/pull/34",
       "checks": [
         "23 new cases; earlier90 relevant checks",
@@ -489,59 +499,71 @@
       ],
       "delivered": false,
       "user_accepted": false,
-      "next_step": null,
+      "next_step": "Integrate reviewed source; actual Bridge execution-controller assembly pending",
       "blocker": "actual registered provider/identity/dispatch integration remains separate; not arbitrary CLI stop"
     },
     "GH-C01": {
       "title": "Handoff/Rückgabe / GH-01–02/05",
       "owner": "/root",
-      "state": "open",
+      "state": "bounded_source_browser_and_ci_checked",
       "dependencies": [
         "TD-C02",
         "KB-C02"
       ],
       "source_commit": null,
-      "commit": null,
-      "pr": null,
-      "checks": [],
+      "commit": "875cabd82d8b74f6de78e9577237291e0d08cb1c",
+      "pr": "https://github.com/landjunge/gnom-hub-v1/pull/175",
+      "checks": [
+        "Actual controlled-profile denial before provider/key lookup",
+        "CI39153361118 green; optional real-provider smoke skipped",
+        "Isolated real Chrome bilingual return/question/control-state proof"
+      ],
       "delivered": false,
       "user_accepted": false,
-      "next_step": null,
-      "blocker": null
+      "next_step": "Integrate source; no provider execution claim",
+      "blocker": "Production G01/G02 controller/issuer/provider/ProtectedHost assembly and genuine user/team acceptance absent"
     },
     "GH-C02": {
       "title": "Abbruch / GH-04",
       "owner": "/root",
-      "state": "open",
+      "state": "bounded_source_browser_and_ci_checked",
       "dependencies": [
         "TG-C02",
         "KB-C04"
       ],
       "source_commit": null,
-      "commit": null,
-      "pr": null,
-      "checks": [],
+      "commit": "875cabd82d8b74f6de78e9577237291e0d08cb1c",
+      "pr": "https://github.com/landjunge/gnom-hub-v1/pull/175",
+      "checks": [
+        "Actual controlled-profile denial before provider/key lookup",
+        "CI39153361118 green; optional real-provider smoke skipped",
+        "Isolated real Chrome bilingual return/question/control-state proof"
+      ],
       "delivered": false,
       "user_accepted": false,
-      "next_step": null,
-      "blocker": null
+      "next_step": "Integrate source; no provider execution claim",
+      "blocker": "Production G01/G02 controller/issuer/provider/ProtectedHost assembly and genuine user/team acceptance absent"
     },
     "GH-C03": {
       "title": "Kosten-/Zugangsgrenze / GH-04",
       "owner": "/root",
-      "state": "open",
+      "state": "bounded_source_browser_and_ci_checked",
       "dependencies": [
         "TG-C03",
         "FP-C02"
       ],
       "source_commit": null,
-      "commit": null,
-      "pr": null,
-      "checks": [],
+      "commit": "875cabd82d8b74f6de78e9577237291e0d08cb1c",
+      "pr": "https://github.com/landjunge/gnom-hub-v1/pull/175",
+      "checks": [
+        "Actual controlled-profile denial before provider/key lookup",
+        "CI39153361118 green; optional real-provider smoke skipped",
+        "Isolated real Chrome bilingual return/question/control-state proof"
+      ],
       "delivered": false,
       "user_accepted": false,
-      "next_step": null,
-      "blocker": null
+      "next_step": "Integrate source; no provider execution claim",
+      "blocker": "Production G01/G02 controller/issuer/provider/ProtectedHost assembly and genuine user/team acceptance absent"
     },
     "GH-C04": {
       "title": "Arbeitsstände / GH-03",
@@ -579,64 +601,72 @@
     "GH-D01": {
       "title": "Design",
       "owner": "/root",
-      "state": "open",
+      "state": "bounded_source_browser_and_ci_checked",
       "dependencies": [],
       "source_commit": null,
-      "commit": null,
-      "pr": null,
-      "checks": [],
+      "commit": "875cabd82d8b74f6de78e9577237291e0d08cb1c",
+      "pr": "https://github.com/landjunge/gnom-hub-v1/pull/175",
+      "checks": [
+        "Actual controlled-profile denial before provider/key lookup",
+        "CI39153361118 green; optional real-provider smoke skipped",
+        "Isolated real Chrome bilingual return/question/control-state proof"
+      ],
       "delivered": false,
       "user_accepted": false,
-      "next_step": null,
-      "blocker": null
+      "next_step": "Integrate source; no provider execution claim",
+      "blocker": "Production G01/G02 controller/issuer/provider/ProtectedHost assembly and genuine user/team acceptance absent"
     },
     "GH-R01": {
       "title": "README / Dokumentation",
       "owner": "/root",
-      "state": "open",
+      "state": "bounded_source_browser_and_ci_checked",
       "dependencies": [],
       "source_commit": null,
-      "commit": null,
-      "pr": null,
-      "checks": [],
+      "commit": "875cabd82d8b74f6de78e9577237291e0d08cb1c",
+      "pr": "https://github.com/landjunge/gnom-hub-v1/pull/175",
+      "checks": [
+        "Actual controlled-profile denial before provider/key lookup",
+        "CI39153361118 green; optional real-provider smoke skipped",
+        "Isolated real Chrome bilingual return/question/control-state proof"
+      ],
       "delivered": false,
       "user_accepted": false,
-      "next_step": null,
-      "blocker": null
+      "next_step": "Integrate source; no provider execution claim",
+      "blocker": "Production G01/G02 controller/issuer/provider/ProtectedHost assembly and genuine user/team acceptance absent"
     },
     "AA-C01": {
       "title": "Ereignisprojektion / AA-01–02",
       "owner": "/root",
-      "state": "implementation_in_progress",
+      "state": "source_native_and_python_checks_complete",
       "dependencies": [
         "G-01",
         "TD-C02",
         "KB-C02"
       ],
       "source_commit": null,
-      "commit": "7e2758b",
-      "pr": null,
+      "commit": "9a0bd2acfbef64af0b56d0e566ee07d62adf05de",
+      "pr": "https://github.com/landjunge/agent-authority-lab/pull/50",
       "checks": [],
       "delivered": false,
       "user_accepted": false,
-      "next_step": "Finish native report projection and independent review",
-      "blocker": null
+      "next_step": "Integrate reviewed source; no repository security-setting change",
+      "blocker": "CodeQL upload blocked by repository code-scanning setting; native and Python tests passed"
     },
     "AA-C02": {
       "title": "Warnungen / AA-03",
       "owner": "/root",
-      "state": "open",
+      "state": "source_native_and_targeted_checks_complete",
       "dependencies": [
         "AA-C01"
       ],
       "source_commit": null,
-      "commit": null,
-      "pr": null,
+      "commit": "c62149b567ce090df44fa8e942906c3025e879be",
+      "pr": "https://github.com/landjunge/agent-authority-lab/pull/51",
       "checks": [],
       "delivered": false,
       "user_accepted": false,
-      "next_step": null,
-      "blocker": null
+      "next_step": "Retarget after PR50; regular Python CI on actual base",
+      "blocker": "Source integration pending; findings remain reported/unknown, not proven violations"
     },
     "AA-C03": {
       "title": "Betrieb / AA-04",
@@ -657,30 +687,30 @@
     "AA-D01": {
       "title": "Design",
       "owner": "/root",
-      "state": "open",
+      "state": "source_native_and_python_checks_complete",
       "dependencies": [],
       "source_commit": null,
-      "commit": null,
-      "pr": null,
+      "commit": "9a0bd2acfbef64af0b56d0e566ee07d62adf05de",
+      "pr": "https://github.com/landjunge/agent-authority-lab/pull/50",
       "checks": [],
       "delivered": false,
       "user_accepted": false,
-      "next_step": null,
-      "blocker": null
+      "next_step": "Integrate reviewed source; no repository security-setting change",
+      "blocker": "CodeQL upload blocked by repository code-scanning setting; native and Python tests passed"
     },
     "AA-R01": {
       "title": "README / Dokumentation",
       "owner": "/root",
-      "state": "open",
+      "state": "source_native_and_python_checks_complete",
       "dependencies": [],
       "source_commit": null,
-      "commit": null,
-      "pr": null,
+      "commit": "9a0bd2acfbef64af0b56d0e566ee07d62adf05de",
+      "pr": "https://github.com/landjunge/agent-authority-lab/pull/50",
       "checks": [],
       "delivered": false,
       "user_accepted": false,
-      "next_step": null,
-      "blocker": null
+      "next_step": "Integrate reviewed source; no repository security-setting change",
+      "blocker": "CodeQL upload blocked by repository code-scanning setting; native and Python tests passed"
     },
     "BD-C01": {
       "title": "Quellstand / BD-I01",
@@ -702,34 +732,42 @@
     "BD-C02": {
       "title": "Import / BD-I02–03",
       "owner": "/root",
-      "state": "open",
+      "state": "source_and_isolated_browser_checked",
       "dependencies": [
         "BD-C01"
       ],
       "source_commit": null,
-      "commit": null,
-      "pr": null,
-      "checks": [],
+      "commit": "5a9b2925af7f0415185bae2ef807fd65166bbc54",
+      "pr": "https://github.com/landjunge/blockdesign/pull/2",
+      "checks": [
+        "Targeted parser/import/schema/store tests; real isolated Chrome DE/EN, reload/zoom/foreign-origin/uncertain state cases",
+        "Foreign HTML never executed; future design version blocks writes"
+      ],
       "delivered": false,
       "user_accepted": false,
-      "next_step": null,
-      "blocker": null
+      "next_step": "Sequential reviewed source integration; no default-port runtime confirmation",
+      "blocker": null,
+      "evidence": "docs/acceptance/IMPORT-20261018.md"
     },
     "BD-C03": {
       "title": "Elementzuordnung / BD-I03",
       "owner": "/root",
-      "state": "open",
+      "state": "source_and_isolated_browser_checked",
       "dependencies": [
         "BD-C02"
       ],
       "source_commit": null,
-      "commit": null,
-      "pr": null,
-      "checks": [],
+      "commit": "5a9b2925af7f0415185bae2ef807fd65166bbc54",
+      "pr": "https://github.com/landjunge/blockdesign/pull/2",
+      "checks": [
+        "Targeted parser/import/schema/store tests; real isolated Chrome DE/EN, reload/zoom/foreign-origin/uncertain state cases",
+        "Foreign HTML never executed; future design version blocks writes"
+      ],
       "delivered": false,
       "user_accepted": false,
-      "next_step": null,
-      "blocker": null
+      "next_step": "Sequential reviewed source integration; no default-port runtime confirmation",
+      "blocker": null,
+      "evidence": "docs/acceptance/IMPORT-20261018.md"
     },
     "BD-C04": {
       "title": "Übergabe / BD-I04–05",
@@ -752,42 +790,50 @@
     "BD-D01": {
       "title": "Design",
       "owner": "/root",
-      "state": "open",
+      "state": "source_and_isolated_browser_checked",
       "dependencies": [
         "BD-C02",
         "BD-C03",
         "BD-C04"
       ],
       "source_commit": null,
-      "commit": null,
-      "pr": null,
-      "checks": [],
+      "commit": "5a9b2925af7f0415185bae2ef807fd65166bbc54",
+      "pr": "https://github.com/landjunge/blockdesign/pull/2",
+      "checks": [
+        "Targeted parser/import/schema/store tests; real isolated Chrome DE/EN, reload/zoom/foreign-origin/uncertain state cases",
+        "Foreign HTML never executed; future design version blocks writes"
+      ],
       "delivered": false,
       "user_accepted": false,
-      "next_step": null,
-      "blocker": null
+      "next_step": "Sequential reviewed source integration; no default-port runtime confirmation",
+      "blocker": null,
+      "evidence": "docs/acceptance/IMPORT-20261018.md"
     },
     "BD-R01": {
       "title": "README / Konzept",
       "owner": "/root",
-      "state": "open",
+      "state": "source_and_isolated_browser_checked",
       "dependencies": [
         "BD-C01"
       ],
       "source_commit": null,
-      "commit": null,
-      "pr": null,
-      "checks": [],
+      "commit": "5a9b2925af7f0415185bae2ef807fd65166bbc54",
+      "pr": "https://github.com/landjunge/blockdesign/pull/2",
+      "checks": [
+        "Targeted parser/import/schema/store tests; real isolated Chrome DE/EN, reload/zoom/foreign-origin/uncertain state cases",
+        "Foreign HTML never executed; future design version blocks writes"
+      ],
       "delivered": false,
       "user_accepted": false,
-      "next_step": null,
-      "blocker": null
+      "next_step": "Sequential reviewed source integration; no default-port runtime confirmation",
+      "blocker": null,
+      "evidence": "docs/acceptance/IMPORT-20261018.md"
     }
   },
   "milestones": {
     "M0": "in_progress",
     "M1": "operator_profile_runtime_and_chatgpt_checked_existing_default_profile_unchanged",
-    "M2": "open",
+    "M2": "bounded_Codex_runtime_and_actual_ChatGPT_roundtrip_checked_not_overall_project_acceptance",
     "M3": "open",
     "M4": "open",
     "M5": "open",
@@ -799,11 +845,11 @@
     "No new competing task queue; existing stores/contracts and standalone products preserved.",
     "Source, runtime, package, delivery and user acceptance remain separate."
   ],
-  "updated_at": "2026-10-18T18:06:57.219107+00:00",
+  "updated_at": "2026-10-18T19:06:47.159770+00:00",
   "active_focus": {
-    "task": "seven-tools M1 actual ThreadDesk/Bridge integration, independent console/observation/controlled-run packages",
+    "task": "M2 proven; sequential source integration, exact knowledge and bounded image/observation return paths",
     "critical_permissions": "Completed in private main 8226763 and actual runtime c6f1eab; docs/DEVELOPMENT-ACCESS-20261018.md",
     "remaining_permissions_gate": "Local macOS administrator confirmation; unknown test never replayed",
-    "next_gate": "M2 strict issued-handoff/run/return integration; independent reviewed packages progress"
+    "next_gate": "M3 actual controller assembly must preserve trusted scope/quote/secret boundaries; no synthetic production authority"
   }
 }

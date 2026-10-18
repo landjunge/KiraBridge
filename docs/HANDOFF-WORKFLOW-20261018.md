@@ -1,10 +1,44 @@
 # Zugeordneter Arbeitsablauf / correlated workflow · M2
 
-Quellimplementierung im privaten Sieben-Tools-Branch, noch nicht als aktuelle
-Runtime oder Download ausgegeben. ThreadDesk-Quellpin für die Rundreise:
+Privater Quellstand `583c000` ist integriert. Der lokale0.5.2-Backport `c7a00e0`
+ist kontrolliert geladen und über die tatsächlich verbundene ChatGPT-App geprüft.
+Dies ist keine neue Downloadversion. ThreadDesk-Quellpin für die Rundreise:
 `16b2ccb2da8fc1a6953fd830970bbb19139b0635` (M2 plus exakter get_return-Leseweg).
-Die installierte M1-Runtime und ihr getrenntes Profil bleiben bis zum
-kontrollierten Integrationslauf unverändert.
+Das getrennte Betreiberprofil bleibt erhalten; M2 ergänzt dessen vorhandenen
+Arbeitsablauf und setzt weder Daten noch Queue zurück.
+
+## Tatsächliche Rundreise und Betriebsnachweis
+
+Elf tatsächliche App-Tasks als chatgpt, jeweils Versuch1, dokumentieren Anlegen,
+Ausstellen, Start, Rückfrage, ausdrückliche Antwort, Lieferung, unabhängiges
+Dateilesen, Inbox, getrennte Entscheidung, Wiederholschutz und Status nach Neustart.
+Der echte Codex-Durchgang fragte zunächst nach einer Farbe. Die synthetische
+Betreiberantwort blue setzte ausschließlich dieselbe aufgezeichnete Sitzung fort.
+Die neue eigene Datei m2-proof.txt wurde danach unabhängig über file.read mit
+exakt5Bytes vollständig gelesen. Vor der Antwort enthielt das Testverzeichnis
+noch keine Ergebnisdatei. Der Agent behauptete ausdrücklich keinen separaten Test.
+
+Die Lieferung ging zunächst delivered/unverified in ThreadDesk ein. Erst danach
+wurde dieser eng begrenzte synthetische Techniktest explizit accepted entschieden;
+project_completion_verified bleibt false. Eine neue Bridge-Taskkennung für denselben
+Start gab duplicate=true und denselben Lauf zurück. Nach kontrolliertem Neustart
+blieben Lauf, Sitzung und Entscheidung unverändert; kein dritter Turn startete.
+Der klar synthetische Thread und die eigene Ergebnisdatei bleiben privat zur
+Nachprüfung erhalten. Kein fremder Thread und keine offene Sitzung wurden verändert.
+
+Belege: [minimierte Task-/Laufquittungen](evidence/handoff-m2-20261018.json),
+[drei bestandene CI-Plattformen](https://github.com/landjunge/KiraBridge/actions/runs/39155285485).
+Konfig-SHA256 e6dd7af8ded9f98098fe59e232a8fe5d0711189782a08c7790552efc266219a0;
+Python-Quellfingerabdruck c034dc9eb7f02f1ac1ed2b90b3885ace27896de723ebb08fe5074f4f19394391.
+Neustartinstanz f9cf3308086544079731f2aeb9daa2b2, lokaleVersion0.5.2.
+Alle373 vorherigen Tasks, fünf Nachrichten und vier Empfängerjobs sowie Zugangs-
+und Dienstdateien sind unverändert. Die unbekannte Adminprobe bleibt Versuch1.
+
+Rückweg bei nachweislich ruhender Queue: vorherige M1-Konfiguration aus
+~/.local/share/kirabridge/handoff-m2-20261018/config.before.toml mit0600 und
+passenden vorherigen Quellstand85ac7da laden. Den alten unveränderten M1-Peerpin
+a99afa8 erhalten; keine Datenbank oder Zugangsdaten zurücksetzen. Beide Dienste
+kontrolliert neu laden. Bereits angenommene Aufträge niemals erneut ausstellen.
 
 ## Vertrag und Bedienweg
 
@@ -87,7 +121,7 @@ werden dadurch nicht verändert.
 
 ## English
 
-This source-stage M2 adapter reuses existing tasks, audit, MCP and ThreadDesk
+This privately integrated, locally loaded M2 adapter reuses existing tasks, audit, MCP and ThreadDesk
 contracts. Its additive binding table is not an execution queue. Preserve the
 original task ID, including colons; Bridge task IDs, receipt-based run IDs,
 observed session IDs, handoff revisions and source revisions remain separate.
@@ -106,3 +140,13 @@ Read-only reconciliation can recognize an exact already-stored return/decision
 after a lost reply; it neither repeats writes nor rewrites the original unknown
 task. The fixed local profile is not a multitenant service. Existing data,
 credentials, release artifacts and foreign sessions remain unchanged.
+
+The connected ChatGPT App completed eleven real synthetic acceptance tasks. An
+actual Codex question was answered explicitly, resuming the exact same owned
+session. The five-byte result was independently read through the Bridge. Delivery
+was initially unverified; a later technical operator decision is not overall
+project or user acceptance. A duplicate start did not execute again, and the same
+binding survived a controlled service restart. The synthetic demo is retained
+privately. The evidence file records source/config/runtime fingerprints and task
+receipts without raw prompts or credentials. This is a local0.5.2 backport, not an
+updated frozen RC2 download; no complete Mac reboot or Grok model test is claimed.

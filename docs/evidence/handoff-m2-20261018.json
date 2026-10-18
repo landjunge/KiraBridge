@@ -1,0 +1,187 @@
+{
+  "schema": "kirabridge-handoff-acceptance-v1",
+  "scope": "actual connected ChatGPT App; synthetic operator workflow; not overall project/user acceptance",
+  "source_commit": "583c000a8f226d5d9e71c51310fb0a81a3bafb49",
+  "installed_commit": "c7a00e0",
+  "threaddesk_source_commit": "16b2ccb2da8fc1a6953fd830970bbb19139b0635",
+  "ci": "https://github.com/landjunge/KiraBridge/actions/runs/39155285485",
+  "tasks": [
+    {
+      "task_id": "seven-m2-20261018-mkdir",
+      "principal": "chatgpt",
+      "operation": "file.mkdir",
+      "state": "completed",
+      "attempt": 1,
+      "receipt": "c04a4b87-2679-42f4-9022-835864feff03",
+      "accepted": 1792349224.3898802,
+      "started": 1792349224.421969,
+      "finished": 1792349224.425339
+    },
+    {
+      "task_id": "seven-m2-20261018-create",
+      "principal": "chatgpt",
+      "operation": "threaddesk.manage",
+      "state": "completed",
+      "attempt": 1,
+      "receipt": "2c38c853-5d78-43eb-a55b-9cc542d4cbb0",
+      "accepted": 1792349225.5814002,
+      "started": 1792349226.029407,
+      "finished": 1792349226.0451999
+    },
+    {
+      "task_id": "seven-m2-20261018-issue",
+      "principal": "chatgpt",
+      "operation": "handoff.issue",
+      "state": "completed",
+      "attempt": 1,
+      "receipt": "598b1685-a7a3-46c9-b8bc-d65faec5317e",
+      "accepted": 1792349235.990104,
+      "started": 1792349236.080138,
+      "finished": 1792349236.2291908
+    },
+    {
+      "task_id": "seven-m2-20261018-start",
+      "principal": "chatgpt",
+      "operation": "handoff.start",
+      "state": "completed",
+      "attempt": 1,
+      "receipt": "60cfc778-23c9-4425-b16e-3aee177157fa",
+      "accepted": 1792349248.207484,
+      "started": 1792349248.2165608,
+      "finished": 1792349271.149424
+    },
+    {
+      "task_id": "seven-m2-20261018-before-answer",
+      "principal": "chatgpt",
+      "operation": "file.list",
+      "state": "completed",
+      "attempt": 1,
+      "receipt": "82148db4-a324-4d21-8a03-1ec470e7527e",
+      "accepted": 1792349341.375176,
+      "started": 1792349341.460904,
+      "finished": 1792349341.514268
+    },
+    {
+      "task_id": "seven-m2-20261018-answer",
+      "principal": "chatgpt",
+      "operation": "handoff.answer",
+      "state": "completed",
+      "attempt": 1,
+      "receipt": "b429a05e-9728-4857-9b84-f48613251d78",
+      "accepted": 1792349342.506869,
+      "started": 1792349342.574847,
+      "finished": 1792349371.96171
+    },
+    {
+      "task_id": "seven-m2-20261018-read-proof",
+      "principal": "chatgpt",
+      "operation": "file.read",
+      "state": "completed",
+      "attempt": 1,
+      "receipt": "49839cdc-1df8-4105-9d06-4cb894e6e211",
+      "accepted": 1792349506.54652,
+      "started": 1792349506.6924002,
+      "finished": 1792349506.714858
+    },
+    {
+      "task_id": "seven-m2-20261018-inbox",
+      "principal": "chatgpt",
+      "operation": "handoff.inbox",
+      "state": "completed",
+      "attempt": 1,
+      "receipt": "563fc73c-f470-4258-92b7-fe642184b0e0",
+      "accepted": 1792349507.9008482,
+      "started": 1792349513.532744,
+      "finished": 1792349519.794264
+    },
+    {
+      "task_id": "seven-m2-20261018-decision",
+      "principal": "chatgpt",
+      "operation": "handoff.decide",
+      "state": "completed",
+      "attempt": 1,
+      "receipt": "bc76476a-2463-48ae-ba53-60d4ac912994",
+      "accepted": 1792349576.883769,
+      "started": 1792349576.938316,
+      "finished": 1792349577.326647
+    },
+    {
+      "task_id": "seven-m2-20261018-replay",
+      "principal": "chatgpt",
+      "operation": "handoff.start",
+      "state": "completed",
+      "attempt": 1,
+      "receipt": "fc66dc12-fe31-4de2-afbd-3931d1cdeb93",
+      "accepted": 1792349675.229551,
+      "started": 1792349675.29896,
+      "finished": 1792349675.393801
+    },
+    {
+      "task_id": "seven-m2-20261018-status-after-restart",
+      "principal": "chatgpt",
+      "operation": "handoff.status",
+      "state": "completed",
+      "attempt": 1,
+      "receipt": "df5b36fd-688d-4b1f-9e7d-ca90cf3d2d7c",
+      "accepted": 1792349774.89813,
+      "started": 1792349774.930045,
+      "finished": 1792349774.9307709
+    }
+  ],
+  "correlation": {
+    "thread_id": "4de1f7c607ec",
+    "original_task_id": "4de1f7c607ec:task",
+    "handoff_id": "d9290b1828c1",
+    "revision": 1,
+    "binding_ref": "hw_ac65a77a3b2cf6e5cbce8d11df3fa78b5b99aed0e16a1f92a4af486b17554cd9",
+    "run_id": "60cfc778-23c9-4425-b16e-3aee177157fa",
+    "session_id": "01a15057-21c8-7331-a1d1-9712e47c7810",
+    "return_id": "ret_2b134c237925a781ab7e4221c8888b3f7a5223e0765eb34831eb9876f4b59dd9",
+    "issued_content_hash": "ee00cc24eac0de6eb0d48aa9036193be51d4296a62d34b52718fdb70a63ef681"
+  },
+  "checks": {
+    "real_codex_question": true,
+    "explicit_synthetic_answer": true,
+    "same_owned_session_two_turns": true,
+    "unverified_delivery": true,
+    "independent_file_read": {
+      "bytes": 5,
+      "complete": true,
+      "exact_expected_content": true
+    },
+    "listing_finished_before_answer_started": true,
+    "replay_duplicate": true,
+    "accepted_after_explicit_technical_decision": true,
+    "project_completion_verified": false,
+    "after_restart_same_run": true,
+    "after_restart_same_session": true,
+    "retained_synthetic_demo": true,
+    "whole_mac_reboot": false
+  },
+  "runtime_after_restart": {
+    "instance_id": "f9cf3308086544079731f2aeb9daa2b2",
+    "version": "0.5.2",
+    "started_at": "2026-10-18T18:56:00.285367+00:00",
+    "config_sha256": "e6dd7af8ded9f98098fe59e232a8fe5d0711189782a08c7790552efc266219a0",
+    "effective_config_sha256": "c53489e180b9de24cbbf82c475340fed772b36e22375eceb1066e71a408dfb6f",
+    "source_tree_sha256": "c034dc9eb7f02f1ac1ed2b90b3885ace27896de723ebb08fe5074f4f19394391",
+    "source_file_count": 35
+  },
+  "preservation": {
+    "old_tasks": 373,
+    "old_tasks_unchanged": true,
+    "messages": 5,
+    "message_jobs": 4,
+    "credentials_service_files_unchanged": true,
+    "unknown_admin_attempt": 1,
+    "config_mode": "0600",
+    "private_proof": "~/.local/share/kirabridge/handoff-m2-20261018/preservation.json"
+  },
+  "limits": [
+    "Codex continuation only; no Grok model request",
+    "No automatic resumption/retry for unknown writes",
+    "Operator decision is not project completion verification",
+    "Synthetic file retained only in own M2 acceptance directory",
+    "No new public release; frozen RC2 unchanged"
+  ]
+}
