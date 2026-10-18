@@ -3,7 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 from enum import StrEnum
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -111,3 +111,29 @@ class AgentInput(Input):
     prompt: str = Field(min_length=1, max_length=262144)
     cwd: str
     timeout: float = Field(default=300.0, gt=0, le=3600)
+
+
+class ThreadDeskReadInput(Input):
+    tool: Literal[
+        "list_threads", "get_thread", "current_thread", "list_snapshots", "thread_operation_status"
+    ]
+    arguments: dict[str, Any] = Field(default_factory=dict)
+
+
+class ThreadDeskManageInput(Input):
+    operation_id: str = Field(min_length=1, max_length=128, pattern=r"^[a-zA-Z0-9_-]+$")
+    action: Literal[
+        "create",
+        "update",
+        "set_note",
+        "add_file",
+        "remove_file",
+        "organize",
+        "archive",
+        "unarchive",
+        "delete",
+        "switch",
+    ]
+    id: str | None = Field(default=None, min_length=1, max_length=128)
+    expected_revision: int = Field(ge=0)
+    data: dict[str, Any] = Field(default_factory=dict)

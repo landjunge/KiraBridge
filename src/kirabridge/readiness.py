@@ -100,6 +100,8 @@ def readiness(bridge, principal: str, requirements: ReadinessInput) -> dict:
         if name not in INPUTS:
             raise BridgeError("unknown_operation", "Unknown operation")
         bridge.security.principal(principal, name)
+        if name.startswith("threaddesk."):
+            bridge.threaddesk.check_configuration()
         if name in {"clipboard.read", "clipboard.write"}:
             bridge.clipboard.platform.clipboard_command(write=name == "clipboard.write")
 
@@ -205,6 +207,8 @@ def task_preflight(bridge, task: dict) -> dict:
                     pass
 
             check("mutation_parent", path, parent)
+    elif operation.startswith("threaddesk."):
+        check("threaddesk_endpoint", "configured_threaddesk", bridge.threaddesk.check_configuration)
     elif operation in {"terminal.execute", "agent.execute"}:
         if operation == "terminal.execute":
             executable = args["argv"][0]
