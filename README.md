@@ -1,5 +1,38 @@
 # KiraBridge
 
+**Vibe Coding mit ChatGPT, Codex und Grok.**  
+**Vibe coding with ChatGPT, Codex and Grok.**
+
+## Download & Installation
+
+### Deutsch
+
+**[Zur Installation](docs/INSTALL-DE.md)** · **[ChatGPT verbinden](docs/CHATGPT.md)** · **[Versionsübersicht](https://github.com/landjunge/KiraBridge/releases)**
+
+Noch kein Release-Download veröffentlicht. Der vereinfachte CLI-Weg ist als privater0.6.0rc1 zur Abnahme vorbereitet. Sobald geprüfte Pakete veröffentlicht sind, stehen die direkten Downloads hier oben.
+
+| Weg | Stand |
+|---|---|
+| Terminal / CLI | Geführte CLI-Installation im privaten RC; kein öffentlicher Download. |
+| macOS-App mit Tauri | Geplant; noch kein App-Download verfügbar. |
+| Windows-App | Mögliche spätere Erweiterung; noch nicht zugesagt. |
+| Linux-App | Mögliche spätere Erweiterung; noch nicht zugesagt. Der vorhandene Linux-CLI-Betrieb ist davon getrennt. |
+
+### English
+
+**[Installation](docs/INSTALL-EN.md)** · **[Connect ChatGPT](docs/CHATGPT.md)** · **[Releases](https://github.com/landjunge/KiraBridge/releases)**
+
+No release download has been published yet. The simpler CLI flow is prepared as a private0.6.0rc1 for acceptance. Direct downloads will appear here at the top when verified packages are published.
+
+| Option | Status |
+|---|---|
+| Terminal / CLI | Guided CLI installation in private RC; no public download. |
+| macOS app with Tauri | Planned; no app download available yet. |
+| Windows app | Possible future extension; not committed yet. |
+| Linux app | Possible future extension; not committed yet. Existing Linux CLI operation is separate. |
+
+---
+
 **Vibe Coding:** Du besprichst mit ChatGPT, was gebaut oder geändert werden soll.
 ChatGPT übergibt die Aufträge über KiraBridge an Codex oder Grok auf deinem
 Rechner. Beide können mit eingerichteten Berechtigungen am selben Projekt
