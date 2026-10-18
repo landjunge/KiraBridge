@@ -6,13 +6,13 @@ Koordinator: /root. Originalauftrag und acht Pläne: SOURCE.md, unverändert und
 
 | Paket | Verantwortlich | Status | Abhängigkeiten | Commit / PR / Grenze |
 |---|---|---|---|---|
-| TD-C01 | /root/threaddesk_m1 | source_and_ci_checked | G-01 | a99afa8b4ddfdc4396521bad11d6868b2069d9b0 |
+| TD-C01 | /root/threaddesk_m1 | main_integrated_bridge_roundtrip_checked | G-01 | a99afa8b4ddfdc4396521bad11d6868b2069d9b0 |
 | TD-C02 | /root/threaddesk_m1 | source_and_ci_checked | G-01 | 05403916e549e1060f839ccbaf36a5cb90413776 |
 | TD-C03 | /root/threaddesk_m1 | open | TD-C01 |  |
 | TD-C04 | /root/threaddesk_m1 | open | operator_server_scope |  |
 | TD-D01 | /root/threaddesk_m1 | open |  |  |
 | TD-R01 | /root/threaddesk_m1 | open |  |  |
-| KB-C01 | /root | implemented_unverified_adapter_worktree | TD-C01, G-01 |  |
+| KB-C01 | /root | source_and_real_stdio_checked | TD-C01, G-01 | 5c91651 |
 | KB-C02 | /root | open | TD-C02, KB-C01 |  |
 | KB-C03 | /root | implemented_prior_current_runtime_to_verify |  |  |
 | KB-C04 | /root | open | TG-C02 |  |
@@ -38,12 +38,12 @@ Koordinator: /root. Originalauftrag und acht Pläne: SOURCE.md, unverändert und
 | GH-C05 | /root | open | FP-C03, TG-C01 |  |
 | GH-D01 | /root | open |  |  |
 | GH-R01 | /root | open |  |  |
-| AA-C01 | /root | open | G-01, TD-C02, KB-C02 |  |
+| AA-C01 | /root | implementation_in_progress | G-01, TD-C02, KB-C02 | 7e2758b |
 | AA-C02 | /root | open | AA-C01 |  |
 | AA-C03 | /root | open | operator_transport_scope |  |
 | AA-D01 | /root | open |  |  |
 | AA-R01 | /root | open |  |  |
-| BD-C01 | /root | open |  |  |
+| BD-C01 | /root | source_and_browser_checked |  | b875912e477523059671849f856a4b6dac8270e6 |
 | BD-C02 | /root | open | BD-C01 |  |
 | BD-C03 | /root | open | BD-C02 |  |
 | BD-C04 | /root | open | TD-C02, KB-C02, KB-C05 |  |

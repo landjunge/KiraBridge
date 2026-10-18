@@ -28,46 +28,40 @@
   },
   "workers": {
     "/root/threaddesk_m1": {
-      "worktree": "/Users/landjunge/threaddesk-worktrees/seven-tools-m1-20261018",
+      "worktree": "/Users/landjunge/KiraBridge/.worktrees/seven-tools-console-20261018",
       "packages": [
-        "TD-C01",
-        "TD-C02",
-        "TD-C03",
-        "TD-D01",
-        "TD-R01"
+        "KB-D01"
       ],
-      "state": "package_saved_no_next_stage_started_during_critical_repair"
+      "state": "console_design_implementation"
     },
     "/root/tollgate_control": {
-      "worktree": "/Users/landjunge/tollgate/.worktrees/seven-tools-control-20261018",
+      "worktree": "/Users/landjunge/agent-authority-lab/.worktrees/seven-tools-20261018",
       "packages": [
-        "TG-C01",
-        "TG-C02",
-        "TG-C03",
-        "TG-C04",
-        "TG-D01",
-        "TG-R01"
+        "AA-C01",
+        "AA-C02",
+        "AA-C03",
+        "AA-D01",
+        "AA-R01"
       ],
-      "state": "package_saved_no_next_stage_started_during_critical_repair"
+      "state": "observation_projection_native_verification"
     },
     "/root/fourallpass_protected": {
-      "worktree": "/Users/landjunge/4AllPass/.worktrees/seven-tools-protected-20261018",
+      "worktree": "/Users/landjunge/gnom-hub-v1/.worktrees/seven-tools-20261018",
       "packages": [
-        "FP-C01",
-        "FP-C02",
-        "FP-C03",
-        "FP-D01",
-        "FP-R01",
-        "FP-V01"
+        "GH-C01",
+        "GH-C02",
+        "GH-C03",
+        "GH-D01",
+        "GH-R01"
       ],
-      "state": "package_saved_no_next_stage_started_during_critical_repair"
+      "state": "controlled_execution_and_binding"
     }
   },
   "packages": {
     "TD-C01": {
       "title": "Bau / TD-01–03",
       "owner": "/root/threaddesk_m1",
-      "state": "source_and_ci_checked",
+      "state": "main_integrated_bridge_roundtrip_checked",
       "dependencies": [
         "G-01"
       ],
@@ -80,8 +74,9 @@
       ],
       "delivered": false,
       "user_accepted": false,
-      "next_step": null,
-      "blocker": "Bridge M1 integration/readback still pending"
+      "next_step": "Activate separate operator profile through fixed Bridge adapter; existing user profile unchanged",
+      "blocker": null,
+      "merge_commit": "a40ed8e0b9359d81d30479ceebfbe196d71f5c4b"
     },
     "TD-C02": {
       "title": "Bau / TD-04",
@@ -165,18 +160,21 @@
     "KB-C01": {
       "title": "Bau / KB-01–02",
       "owner": "/root",
-      "state": "implemented_unverified_adapter_worktree",
+      "state": "source_and_real_stdio_checked",
       "dependencies": [
         "TD-C01",
         "G-01"
       ],
       "source_commit": null,
-      "commit": null,
+      "commit": "5c91651",
       "pr": null,
-      "checks": [],
+      "checks": [
+        "All declared actions against exact reviewed ThreadDesk source",
+        "Replay/conflict/stale revision and complete correlated receipts"
+      ],
       "delivered": false,
       "user_accepted": false,
-      "next_step": "Resume targeted real stdio test against pinned ThreadDesk M1; no live TD profile migration yet",
+      "next_step": "Three-platform CI then controlled runtime activation and actual ChatGPT tasks",
       "blocker": null
     },
     "KB-C02": {
@@ -606,19 +604,19 @@
     "AA-C01": {
       "title": "Ereignisprojektion / AA-01–02",
       "owner": "/root",
-      "state": "open",
+      "state": "implementation_in_progress",
       "dependencies": [
         "G-01",
         "TD-C02",
         "KB-C02"
       ],
       "source_commit": null,
-      "commit": null,
+      "commit": "7e2758b",
       "pr": null,
       "checks": [],
       "delivered": false,
       "user_accepted": false,
-      "next_step": null,
+      "next_step": "Finish native report projection and independent review",
       "blocker": null
     },
     "AA-C02": {
@@ -684,15 +682,18 @@
     "BD-C01": {
       "title": "Quellstand / BD-I01",
       "owner": "/root",
-      "state": "open",
+      "state": "source_and_browser_checked",
       "dependencies": [],
       "source_commit": null,
-      "commit": null,
-      "pr": null,
-      "checks": [],
+      "commit": "b875912e477523059671849f856a4b6dac8270e6",
+      "pr": "https://github.com/landjunge/blockdesign/pull/1",
+      "checks": [
+        "five targeted startup/host tests",
+        "14 isolated real Chrome check groups"
+      ],
       "delivered": false,
       "user_accepted": false,
-      "next_step": null,
+      "next_step": "Review and integrate private source; no standard-port runtime confirmed",
       "blocker": null
     },
     "BD-C02": {
@@ -795,12 +796,11 @@
     "No new competing task queue; existing stores/contracts and standalone products preserved.",
     "Source, runtime, package, delivery and user acceptance remain separate."
   ],
-  "updated_at": "2026-10-18T17:30:54.959973+00:00",
+  "updated_at": "2026-10-18T18:01:18.975619+00:00",
   "active_focus": {
-    "task": "critical persistent KiraBridge operator permissions, subsequent full-terminal/admin expansion",
-    "runtime_commit": "c6f1eab91f4102fcfaa3d8503141fd18274bb45d",
-    "report": "docs/DEVELOPMENT-ACCESS-20261018.md in permissions-main branch",
-    "remaining_gate": "local macOS administrator confirmation; unknown test not replayed",
-    "seven_tools_work_preserved": true
+    "task": "seven-tools M1 actual ThreadDesk/Bridge integration, independent console/observation/controlled-run packages",
+    "critical_permissions": "Completed in private main 8226763 and actual runtime c6f1eab; docs/DEVELOPMENT-ACCESS-20261018.md",
+    "remaining_permissions_gate": "Local macOS administrator confirmation; unknown test never replayed",
+    "next_gate": "Actual ChatGPT ThreadDesk CRUD in new isolated operator profile; do not migrate real default profile"
   }
 }

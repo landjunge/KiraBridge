@@ -31,5 +31,14 @@ jobs:
       - run: uv sync --locked --dev
       - run: uv run ruff check .
       - run: uv run ruff format --check .
+      - name: Check out fixed reviewed ThreadDesk source for the actual MCP roundtrip
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: landjunge/threaddesk
+          ref: a99afa8b4ddfdc4396521bad11d6868b2069d9b0
+          path: .ci-threaddesk
+          persist-credentials: false
       - run: uv run pytest -q -W error::pytest.PytestUnraisableExceptionWarning
+        env:
+          KIRABRIDGE_TEST_THREADDESK_SOURCE: ${{ github.workspace }}/.ci-threaddesk/src
       - run: uv build

@@ -169,11 +169,34 @@ async def test_real_threaddesk_roundtrip_and_reconnect(bridge, config, tmp_path)
             "threaddesk.manage", {**create, "data": {"title": "changed"}}, expected="failed"
         )
         assert conflict["error"]["code"] == "operation_conflict"
+        second = await call(
+            "threaddesk.manage",
+            {
+                "operation_id": "parent-create",
+                "action": "create",
+                "expected_revision": 0,
+                "data": {"title": "Synthetic parent for organization"},
+            },
+        )
         for action, data in [
-            ("update", {"title": "Updated synthetic thread"}),
+            (
+                "update",
+                {
+                    "title": "Updated synthetic thread",
+                    "description": "Synthetic description",
+                    "status": "paused",
+                },
+            ),
             ("set_note", {"text": "Synthetic note"}),
             ("add_file", {"path": "synthetic-reference.txt"}),
-            ("organize", {"related_thread_ids": []}),
+            ("remove_file", {"path": "synthetic-reference.txt"}),
+            (
+                "organize",
+                {
+                    "parent_thread_id": second["thread_id"],
+                    "related_thread_ids": [second["thread_id"]],
+                },
+            ),
             ("archive", {}),
             ("unarchive", {}),
         ]:
@@ -203,6 +226,23 @@ async def test_real_threaddesk_roundtrip_and_reconnect(bridge, config, tmp_path)
         assert stale["error"]["code"] == "revision_conflict"
         read = await call("threaddesk.read", {"tool": "get_thread", "arguments": {"id": thread_id}})
         assert read["title"] == "Updated synthetic thread" and "Synthetic note" in read["notes"]
+        assert "Synthetic description" in read["description"] and not read["files"]
+        switched = await call(
+            "threaddesk.manage",
+            {
+                "operation_id": "switch",
+                "action": "switch",
+                "id": thread_id,
+                "expected_revision": revision,
+            },
+        )
+        assert switched["thread_id"] == thread_id
+        current = await call("threaddesk.read", {"tool": "current_thread"})
+        assert current["id"] == thread_id
+        listing = await call(
+            "threaddesk.read", {"tool": "list_threads", "arguments": {"include_archived": True}}
+        )
+        assert {thread_id, second["thread_id"]}.issubset({r["id"] for r in listing})
         await bridge.threaddesk.pool.disconnect("threaddesk")
         receipt = await call(
             "threaddesk.read",
@@ -230,6 +270,25 @@ async def test_real_threaddesk_roundtrip_and_reconnect(bridge, config, tmp_path)
             },
         )
         assert deleted["deleted"]
+        parent_archived = await call(
+            "threaddesk.manage",
+            {
+                "operation_id": "parent-archive",
+                "action": "archive",
+                "id": second["thread_id"],
+                "expected_revision": second["revision"],
+            },
+        )
+        parent_deleted = await call(
+            "threaddesk.manage",
+            {
+                "operation_id": "parent-delete",
+                "action": "delete",
+                "id": second["thread_id"],
+                "expected_revision": parent_archived["revision"],
+            },
+        )
+        assert parent_deleted["deleted"]
         config.principals["other"].capabilities.remove("threaddesk.manage")
         with pytest.raises(BridgeError):
             bridge.prepare(
