@@ -1,4 +1,12 @@
-# Abnahmestand 0.5.1
+# Abnahmestand 0.5.2
+
+18.10.2026: Konkrete Workflow-Vorabprüfung, strukturierte eigene Fehlerberichte,
+zuordenbare Verbindungsphasen und geladene Runtimefingerabdrücke sind aktiviert.
+Begrenzte Metadaten verwenden die bestehende Auditkette. Alle bisherigen Daten
+und Zugangseinstellungen erhalten; kein automatischer Wiederholungsauftrag.
+[Prüfumfang, aktive Quelle und Grenzen](DIAGNOSTICS-20261018.md).
+
+## Vorheriger Reparaturstand 0.5.1
 
 Fortschreibung18.10.2026: Geladener lokaler Quell-/Konfigurationsstand geprüft,
 Projektlesen für `chatgpt` korrigiert, zusätzliche reine Lesepfade ohne neue

@@ -143,4 +143,28 @@ Task-/Empfängerqueue über den gesicherten vorherigen Quellstand. Falls später
 ein `[diagnostics]`-Block ausdrücklich ergänzt wurde, vor alter Software nur
 diesen unbekannten Block zurücknehmen. Keine DB-/Credentialrücksicherung;
 Lesefreigaben und der bestehende Tunnel-Initialisierungsadapter bleiben erhalten.
-Auslieferungs-/Prüfbelege werden nach der gezielten Aktivierung hier verlinkt.
+## Aktiviert und belegt
+
+Quellpin `500693049f3ce28873f2df24f9280248c9d8b9a6` (enthält die neuen
+Betreiberanforderungen unverändert). Die vorhandene [CI, Lauf39124594540](https://github.com/landjunge/KiraBridge/actions/runs/39124594540)
+hat alle drei macOS-/Ubuntu-/Python-Kombinationen einschließlich Paketbau bestanden.
+Die zehn neuen gezielten Diagnosefälle und acht betroffenen Kompatibilitätsfälle
+sind lokal bestanden; kein erneuter unveränderter Gesamtlauf.
+
+Dispatcher0.5.2 und der eigene bestehende Tunnel-Proxy wurden bei leerer Task-/
+Empfängerqueue aktiviert. Laufender Quellhash und geladene Konfiguration stimmen
+mit dem lokalen Pin überein. Positiver konkreter Workflow-Preflight für README,
+`file.read` und vorhandenes `osascript` ist auditbelegt. Ein neuer negativer
+Aufruf über die verbundene App (`diagnostic-denied-read-20261018`) wurde angenommen,
+aber vor dem Start mit `path_denied` zurückgewiesen: Versuch1, Runtimefingerabdruck
+und gemeinsame Verbindungs-/Initialize-Referenzen in [der reduzierten Diagnose](evidence/diagnostics-2026-10-18.json).
+Das ist kein neuer ChatGPT-Dateiabnahmelauf; dessen bestehender bestätigter
+Datensatz bleibt unverändert.
+
+[Erhaltungsbeleg](evidence/diagnostics-preservation-2026-10-18.json): alle229
+vorherigen Taskzeilen unverändert, Konfiguration/Credentials/Runtime-Key/
+Tunnelprofil bytegleich, Auditkette gültig. Historische cat-Ablehnung nur gelesen,
+nicht wieder ausgeführt; damalige Runtime korrekt unbekannt. Unterbrechung und
+verlorene Antwort nach Annahme wurden isoliert geprüft, nicht durch absichtliches
+Abbrechen fremder realer Aufträge. Budget/Export isoliert geprüft; kein produktiver
+Beleg gelöscht. Keine Garantie dauerhafter Tunnel- oder Kontoverfügbarkeit.

@@ -1,0 +1,140 @@
+{
+  "task_id": "diagnostic-denied-read-20261018",
+  "state": "failed",
+  "started": null,
+  "attempt": 1,
+  "diagnostic": {
+    "schema": "1",
+    "diagnostic_id": "task-7addce7e7b27529471d39ddc",
+    "task_id": "diagnostic-denied-read-20261018",
+    "at": 1792324084.1394691,
+    "operation": "file.read",
+    "error_code": "path_denied",
+    "state": "failed",
+    "accepted": true,
+    "accepted_at": 1792324073.761098,
+    "started": false,
+    "started_at": null,
+    "finished_at": 1792324073.793458,
+    "created_at": 1792324073.743567,
+    "completed": false,
+    "receipt": "b9c2dbd5-0471-4ef3-a6e8-a346e1a6146a",
+    "execution_runtime": {
+      "config_sha256": "c95c79de984966f39e57a073df1304d82262a5eb52768a5892e2a0c84cdcc519",
+      "effective_config_sha256": "07222817791808e160368fb1aba326a7e4c6bc8d91b27d3a6e7a55aa206de8d3",
+      "instance_id": "8e79b3b91a274677996a0fe187b07a7e",
+      "source_tree_sha256": "0e0c346567d5e6727d3371af16c629bcd5b69de28c7af4159ae2b04287101203",
+      "started_at": "2026-10-18T11:47:01.557862+00:00",
+      "version": "0.5.2"
+    },
+    "reader_runtime": {
+      "instance_id": "8e79b3b91a274677996a0fe187b07a7e",
+      "version": "0.5.2",
+      "started_at": "2026-10-18T11:47:01.557862+00:00",
+      "config_sha256": "c95c79de984966f39e57a073df1304d82262a5eb52768a5892e2a0c84cdcc519",
+      "effective_config_sha256": "07222817791808e160368fb1aba326a7e4c6bc8d91b27d3a6e7a55aa206de8d3",
+      "source_tree_sha256": "0e0c346567d5e6727d3371af16c629bcd5b69de28c7af4159ae2b04287101203"
+    },
+    "preflight": {
+      "checks": [
+        {
+          "code": "path_denied",
+          "kind": "read_path",
+          "ok": false,
+          "resource_ref": "185e371791332ed5aaf5e45027ef3ddd22c561d5004e7bd0b93abfdcdaf2d761"
+        }
+      ],
+      "operation": "file.read",
+      "ready": false,
+      "runtime": {
+        "config_sha256": "c95c79de984966f39e57a073df1304d82262a5eb52768a5892e2a0c84cdcc519",
+        "effective_config_sha256": "07222817791808e160368fb1aba326a7e4c6bc8d91b27d3a6e7a55aa206de8d3",
+        "instance_id": "8e79b3b91a274677996a0fe187b07a7e",
+        "source_tree_sha256": "0e0c346567d5e6727d3371af16c629bcd5b69de28c7af4159ae2b04287101203",
+        "started_at": "2026-10-18T11:47:01.557862+00:00",
+        "version": "0.5.2"
+      }
+    },
+    "connection_evidence": [
+      {
+        "audit_seq": 1222,
+        "at": 1792324055.904423,
+        "connection_id": "b1617bd769bf426d99df806d01db5a7a",
+        "previous_connection_id": null,
+        "phase": "connect.started",
+        "external_tunnel": "unknown"
+      },
+      {
+        "audit_seq": 1223,
+        "at": 1792324055.9517372,
+        "connection_id": "b1617bd769bf426d99df806d01db5a7a",
+        "phase": "transport.context_opened",
+        "external_tunnel": "unknown"
+      },
+      {
+        "audit_seq": 1224,
+        "at": 1792324055.9524438,
+        "connection_id": "b1617bd769bf426d99df806d01db5a7a",
+        "phase": "initialize.started",
+        "external_tunnel": "unknown"
+      },
+      {
+        "audit_seq": 1225,
+        "at": 1792324055.960563,
+        "connection_id": "b1617bd769bf426d99df806d01db5a7a",
+        "phase": "initialize.response",
+        "external_tunnel": "unknown"
+      },
+      {
+        "audit_seq": 1226,
+        "at": 1792324055.961232,
+        "connection_id": "b1617bd769bf426d99df806d01db5a7a",
+        "phase": "initialized.sent",
+        "notification_receipt": "unknown; queued to SDK stream",
+        "external_tunnel": "unknown"
+      },
+      {
+        "audit_seq": 1227,
+        "at": 1792324055.961657,
+        "connection_id": "b1617bd769bf426d99df806d01db5a7a",
+        "phase": "connection.ready",
+        "external_tunnel": "unknown"
+      },
+      {
+        "audit_seq": 1239,
+        "at": 1792324073.7391832,
+        "connection_id": "b1617bd769bf426d99df806d01db5a7a",
+        "phase": "call.started",
+        "external_tunnel": "unknown"
+      },
+      {
+        "audit_seq": 1245,
+        "at": 1792324073.81218,
+        "connection_id": "b1617bd769bf426d99df806d01db5a7a",
+        "phase": "call.returned",
+        "external_tunnel": "unknown"
+      },
+      {
+        "audit_seq": 1246,
+        "at": 1792324084.1338098,
+        "connection_id": "b1617bd769bf426d99df806d01db5a7a",
+        "phase": "call.started",
+        "external_tunnel": "unknown"
+      }
+    ],
+    "external_tunnel_lifecycle": "unknown; not observed by task dispatcher",
+    "automatic_retry": false,
+    "safe_to_retry_proven_before_start": true,
+    "guidance": "Read original task/events first. Do not repeat an unknown write. For denials, correct explicit policy or use file tools; no interpreter workaround.",
+    "storage": {
+      "recording": "available",
+      "records": 61,
+      "today": 61,
+      "max_records": 20000,
+      "max_events_per_day": 2000,
+      "dropped_by_this_observer": 0,
+      "retention": "existing audit preserved; bounded explicit export, no automatic deletion"
+    }
+  },
+  "origin": "Codex connected ChatGPT-app MCP tool; previously user-confirmed ChatGPT file-read acceptance reused, not rerun"
+}
