@@ -81,6 +81,10 @@ class ReadInput(PathInput):
     max_bytes: int = Field(default=65536, ge=1, le=1048576)
 
 
+class ImageInput(Input):
+    path: str = Field(min_length=1, max_length=4096)
+
+
 class WriteInput(PathInput):
     text: str = Field(max_length=1048576)
     overwrite: bool = False
