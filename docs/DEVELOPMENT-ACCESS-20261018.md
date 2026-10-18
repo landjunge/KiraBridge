@@ -183,3 +183,11 @@ message receivers remain text-only. No real Grok/model-provider test was started
 and no control of an already-open interactive session is claimed. macOS TCC and
 other OS controls remain authoritative. The frozen private RC2 artifact was not
 rebuilt or relabeled; public release and Discussion remain pending separately.
+
+## Private Quellsicherung und CI
+
+Der vollständige Integrationsstand1591f735dab35ef0f096308a2e65e4c2fbbc98d8
+besteht die vorhandene [Verify-CI](https://github.com/landjunge/KiraBridge/actions/runs/39150150992)
+auf macOS15/Python3.11 sowie Ubuntu24.04/Python3.11 und3.13 einschließlich
+Prüfungen, Format/Lint und Paketbau. Keine Veröffentlichung oder Aktualisierung
+des eingefrorenen RC2-Downloads. Der lokale0.5.2-Backport ist oben getrennt gepinnt.

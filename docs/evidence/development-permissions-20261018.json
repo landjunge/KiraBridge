@@ -893,5 +893,16 @@
   "real_grok_provider_test": false,
   "public_release_or_discussion": false,
   "real_grok_acp_initialize": true,
-  "grok_authentication_tested": false
+  "grok_authentication_tested": false,
+  "ci": {
+    "source_commit": "1591f735dab35ef0f096308a2e65e4c2fbbc98d8",
+    "run": "https://github.com/landjunge/KiraBridge/actions/runs/39150150992",
+    "status": "success",
+    "platforms": [
+      "macos-15 Python3.11",
+      "ubuntu-24.04 Python3.11",
+      "ubuntu-24.04 Python3.13"
+    ],
+    "scope": "existing Verify pipeline: locked install, Ruff, pytest and package build; no release upload"
+  }
 }
