@@ -22,7 +22,7 @@ Administratoradapter verwendet nun transparent `osascript -l JavaScript` und
 `doShellScript(..., {administratorPrivileges:true})`, ohne Passwortparameter.
 Das ist derselbe lokale macOS-Autorisierungsweg; kein Abschalten seiner Prüfung.
 
-Geladen: lokale0.5.2 mit Quellcommit
+Bei der Rechteabnahme geladen: lokale0.5.2 mit Quellcommit
 `c6f1eab91f4102fcfaa3d8503141fd18274bb45d`, Runtime
 `3cd8af3837174d70a19b1b87281695a1`, Konfig-SHA256
 `a5faefcf23380718c4093c5bf48955dc928a2d3b2bc9961d61cb7f5b3005031f`.
@@ -185,6 +185,17 @@ other OS controls remain authoritative. The frozen private RC2 artifact was not
 rebuilt or relabeled; public release and Discussion remain pending separately.
 
 ## Private Quellsicherung und CI
+
+Fortgeführter Stand: M1 und M2 wurden anschließend unter Erhalt dieser Rechte
+integriert. Aktuelle lokale0.5.2: Quellcommit c7a00e0, Runtime
+f9cf3308086544079731f2aeb9daa2b2, Konfig-SHA256
+e6dd7af8ded9f98098fe59e232a8fe5d0711189782a08c7790552efc266219a0.
+Die spätere M2-Rundreise ist in
+[HANDOFF-WORKFLOW-20261018.md](HANDOFF-WORKFLOW-20261018.md) mit echten
+ChatGPT-App-Quittungen dokumentiert. Die historische Rechteabnahme und ihre
+Fingerabdrücke oben bleiben unverändert erhalten; sie sind keine Behauptung über
+den später geladenen Gesamtquellstand. Administratorausführung bleibt mangels
+lokaler Bestätigung unbestätigt; der unbekannte Versuch wurde nicht wiederholt.
 
 Der vollständige Integrationsstand1591f735dab35ef0f096308a2e65e4c2fbbc98d8
 besteht die vorhandene [Verify-CI](https://github.com/landjunge/KiraBridge/actions/runs/39150150992)
