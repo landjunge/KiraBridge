@@ -1,5 +1,38 @@
 # KiraBridge
 
+**Vibe Coding mit ChatGPT, Codex und Grok.**  
+**Vibe coding with ChatGPT, Codex and Grok.**
+
+## Download & Installation
+
+### Deutsch
+
+**[Zur Installation](#auf-einem-neuen-mac-einrichten)** · **[ChatGPT verbinden](docs/CHATGPT.md)** · **[Versionsübersicht](https://github.com/landjunge/KiraBridge/releases)**
+
+Noch kein Release-Download veröffentlicht. Der vereinfachte Installationsweg wird vorbereitet. Sobald geprüfte Pakete veröffentlicht sind, stehen die direkten Downloads hier oben.
+
+| Weg | Stand |
+|---|---|
+| Terminal / CLI | Vorhandener Einrichtungsweg; vereinfachte Installation in Vorbereitung. |
+| macOS-App mit Tauri | Geplant; noch kein App-Download verfügbar. |
+| Windows-App | Mögliche spätere Erweiterung; noch nicht zugesagt. |
+| Linux-App | Mögliche spätere Erweiterung; noch nicht zugesagt. Der vorhandene Linux-CLI-Betrieb ist davon getrennt. |
+
+### English
+
+**[Installation](#auf-einem-neuen-mac-einrichten)** · **[Connect ChatGPT](docs/CHATGPT.md)** · **[Releases](https://github.com/landjunge/KiraBridge/releases)**
+
+No release download has been published yet. A simpler installation flow is being prepared. Direct downloads will appear here at the top when verified packages are published.
+
+| Option | Status |
+|---|---|
+| Terminal / CLI | Existing setup flow; simpler installation in preparation. |
+| macOS app with Tauri | Planned; no app download available yet. |
+| Windows app | Possible future extension; not committed yet. |
+| Linux app | Possible future extension; not committed yet. Existing Linux CLI operation is separate. |
+
+---
+
 Privates, modulares Desktop- und Agenten-Gateway für macOS und Linux. Python 3.11+, asyncio, SQLite und das offizielle MCP Python SDK. Version **0.5.2** ergänzt [konkrete Vorabprüfung und reduzierte Fehlerdiagnose](docs/DIAGNOSTICS-20261018.md) in der bestehenden Audit-Kette. Version0.5.1 ergänzte die begrenzte Bereitschaftsprüfung und zusätzliche reine Lesepfade; Version0.5.0 ergänzte den direkten, dauerhaften [Agentenkanal Codex ↔ Grok](docs/AGENT_CHANNEL.md) mit automatischer Empfängeranbindung. Grundlage bleibt der [Entwicklungsplan](docs/DEVELOPMENT_PLAN.md).
 
 ## Implementiert
