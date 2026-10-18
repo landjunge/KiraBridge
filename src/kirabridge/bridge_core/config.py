@@ -1,12 +1,13 @@
 from __future__ import annotations
 
+import hashlib
 import os
 import sys
 import tomllib
 from pathlib import Path
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, PrivateAttr
 
 from kirabridge.bridge_core.models import BridgeError
 
@@ -16,6 +17,7 @@ class PrincipalConfig(BaseModel):
     approval_mode: Literal["manual", "automatic"] = "manual"
     capabilities: list[str] = Field(default_factory=lambda: ["bridge.health", "task.read"])
     roots: list[str] = Field(default_factory=list)
+    read_roots: list[str] = Field(default_factory=list)
     executables: list[str] = Field(default_factory=list)
     agents: list[str] = Field(default_factory=list)
     token_env: str | None = None
@@ -50,6 +52,8 @@ class AgentConfig(BaseModel):
 
 class Config(BaseModel):
     model_config = ConfigDict(extra="forbid")
+    _source_path: str | None = PrivateAttr(default=None)
+    _source_sha256: str | None = PrivateAttr(default=None)
     data_dir: str = str(Path.home() / ".local/share/kirabridge")
     concurrency: int = Field(default=2, ge=1, le=32)
     max_queued: int = Field(default=1000, ge=1, le=100000)
@@ -98,8 +102,12 @@ def load_config(path: str | None = None) -> Config:
     if path is None and default.is_file():
         path = str(default)
     if path:
-        with open(path, "rb") as source:
-            return Config.model_validate(tomllib.load(source))
+        source_path = Path(path).expanduser().absolute()
+        raw = source_path.read_bytes()
+        config = Config.model_validate(tomllib.loads(raw.decode("utf-8")))
+        config._source_path = str(source_path)
+        config._source_sha256 = hashlib.sha256(raw).hexdigest()
+        return config
     return Config()
 
 

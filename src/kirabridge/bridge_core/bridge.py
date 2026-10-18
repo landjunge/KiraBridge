@@ -54,6 +54,9 @@ INPUTS = {
 class Bridge:
     def __init__(self, config: Config):
         self.config = config
+        from kirabridge.readiness import runtime_snapshot
+
+        self.runtime = runtime_snapshot(config)
         self.store = Store(config.state_path / "bridge.sqlite3")
         self.security = SecurityManager(config, self.store)
         self.terminal = TerminalManager()
@@ -96,6 +99,8 @@ class Bridge:
             "local_approval_url": LOCAL_APPROVAL_URL,
             "approval_mode": policy.approval_mode,
             "approval_required": policy.approval_mode == "manual",
+            "health_scope": "dispatcher and authentication; use bridge_readiness for prerequisites",
+            "runtime": self.runtime,
             "message_peers": policy.message_peers,
             "message_receiver_active": bool(
                 self.message_receiver.worker and not self.message_receiver.worker.done()
@@ -143,7 +148,10 @@ class Bridge:
         operation, arguments, principal = task["operation"], task["args"], task["principal"]
         args = INPUTS[operation].model_validate(arguments)
         policy = self.security.principal(principal, operation)
-        scope = PathScope(policy.roots, excluded=[str(self.config.state_path)])
+        roots = policy.roots + (
+            policy.read_roots if operation in {"file.read", "file.list"} else []
+        )
+        scope = PathScope(roots, excluded=[str(self.config.state_path)])
         if operation == "terminal.execute":
             result = await self.terminal.execute(
                 task["id"], principal, args, policy.roots, policy.executables, running

@@ -14,6 +14,7 @@ from mcp.client.stdio import stdio_client
 from kirabridge.bridge_core.models import BridgeError
 from kirabridge.mcp_gateway.client import MCPClientPool, Peer
 from kirabridge.mcp_gateway.http import create_http_app
+from kirabridge.mcp_gateway.proxy import DaemonConnection
 
 
 @pytest_asyncio.fixture
@@ -173,3 +174,73 @@ async def test_client_refuses_insecure_remote_transport():
         ):
             with pytest.raises(BridgeError):
                 await clients.connect(Peer("bad", url=url))
+
+
+async def test_reconnect_reconciles_accepted_task_without_replaying_uncertain_call(
+    http_bridge, monkeypatch
+):
+    bridge, endpoint = http_bridge
+    bridge.config.principals["local"].approval_mode = "automatic"
+    root = bridge.config.principals["local"].roots[0]
+    value = request("file.write", {"path": root + "/one-write", "text": "once"})
+    async with MCPClientPool() as clients:
+        proxy = DaemonConnection(
+            clients, Peer("daemon", url=endpoint, token="local-test-" + "a" * 40)
+        )
+        await proxy.ensure_connection()
+        original = clients.call
+        calls = []
+
+        async def lose_response(*args):
+            calls.append(args[1])
+            await original(*args)  # The request has actually been persisted before response loss.
+            raise BridgeError("peer_unknown", "Response lost after acceptance")
+
+        monkeypatch.setattr(clients, "call", lose_response)
+        with pytest.raises(BridgeError, match="Response lost"):
+            await proxy.call_tool("task_request", {"request": value.model_dump()})
+        assert calls == ["task_request"]
+        monkeypatch.setattr(clients, "call", original)
+        await bridge.tasks.wait("local", value.task_id)
+        await clients.disconnect("daemon")
+        # New owner/initialize, then read the original task ID. Never mint a retry ID.
+        result = await proxy.call_tool("task_get", {"task_id": value.task_id})
+        assert result.structuredContent["state"] == "completed"
+        await proxy.call_tool("task_request", {"request": value.model_dump()})
+        assert bridge.store.db.execute("SELECT count(*) FROM tasks").fetchone()[0] == 1
+        events = bridge.events("local", value.task_id)["events"]
+        assert sum(x["state"] == "running" for x in events) == 1
+        assert sum(x["state"] == "completed" for x in events) == 1
+        assert {tool.name for tool in await proxy.list_tools()} >= {"bridge_readiness"}
+
+
+async def test_http_readiness_checks_authenticated_identity_and_loaded_snapshot(http_bridge):
+    bridge, endpoint = http_bridge
+    root = bridge.config.principals["local"].roots[0]
+    async with MCPClientPool() as clients:
+        await clients.connect(Peer("daemon", url=endpoint, token="local-test-" + "a" * 40))
+        result = (
+            await clients.call(
+                "daemon",
+                "bridge_readiness",
+                {
+                    "read_paths": [root + "/not-created"],
+                    "executables": ["/bin/cat"],
+                },
+            )
+        ).structuredContent
+        assert result["principal"] == "local"
+        assert result["runtime"]["source_tree_sha256"] == bridge.runtime["source_tree_sha256"]
+        assert result["read_path_checks"][0]["code"] == "path_missing"
+        assert result["executable_checks"][0]["code"] == "executable_denied"
+        assert result["requested_prerequisites_ready"] is False
+        excessive = (
+            await clients.call(
+                "daemon",
+                "bridge_readiness",
+                {
+                    "read_paths": [root + "/not-created"] * 17,
+                },
+            )
+        ).structuredContent
+        assert excessive["error"]["code"] == "invalid_arguments"

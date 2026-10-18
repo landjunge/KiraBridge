@@ -1,5 +1,7 @@
 """Stdio connection to the shared daemon; tokens stay out of agent configuration files."""
 
+import asyncio
+
 from mcp.server.lowlevel import Server
 from mcp.server.stdio import stdio_server
 from mcp.types import CallToolResult, TextContent
@@ -10,9 +12,33 @@ from kirabridge.local_runtime import peer
 from kirabridge.mcp_gateway.client import MCPClientPool
 
 
+class DaemonConnection:
+    """Reconnect a known closed owner before a call, never replay an in-flight call."""
+
+    def __init__(self, pool, endpoint):
+        self.pool, self.endpoint = pool, endpoint
+        self.lock = asyncio.Lock()
+
+    async def ensure_connection(self):
+        async with self.lock:
+            if self.endpoint.id not in self.pool.sessions:
+                await self.pool.disconnect(self.endpoint.id)
+                await self.pool.connect(self.endpoint)
+
+    async def call_tool(self, name, arguments):
+        await self.ensure_connection()
+        return await self.pool.call(self.endpoint.id, name, arguments)
+
+    async def list_tools(self):
+        await self.ensure_connection()
+        return (await self.pool.sessions[self.endpoint.id].list_tools()).tools
+
+
 async def connect_stdio(config, principal):
     async with MCPClientPool() as pool:
         await pool.connect(peer(config, principal))
+        connection = DaemonConnection(pool, peer(config, principal))
+
         server = Server(
             "KiraBridge",
             version=__version__,
@@ -29,12 +55,12 @@ async def connect_stdio(config, principal):
 
         @server.list_tools()
         async def list_tools():
-            return (await pool.sessions["daemon"].list_tools()).tools
+            return await connection.list_tools()
 
         @server.call_tool()
         async def call_tool(name, arguments):
             try:
-                return await pool.call("daemon", name, arguments)
+                return await connection.call_tool(name, arguments)
             except BridgeError as exc:
                 return CallToolResult(
                     isError=True, content=[TextContent(type="text", text=exc.code)]

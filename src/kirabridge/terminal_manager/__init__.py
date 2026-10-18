@@ -29,6 +29,17 @@ def minimal_environment() -> dict[str, str]:
     return {"PATH": os.defpath, "LANG": "en_US.UTF-8", "LC_CTYPE": "UTF-8", "TERM": "dumb"}
 
 
+def check_executable(value: str, executables: list[str]) -> None:
+    executable = Path(value)
+    allowed = {str(Path(p).resolve()) for p in executables}
+    if not executable.is_absolute() or str(executable.resolve()) not in allowed:
+        raise BridgeError("executable_denied", "Executable is not explicitly allowed")
+    if not executable.is_file() or not os.access(executable, os.X_OK):
+        raise BridgeError(
+            "executable_unavailable", "Allowed executable is missing or not executable"
+        )
+
+
 class TerminalManager:
     def __init__(self):
         self.sessions: dict[str, Session] = {}
@@ -46,10 +57,7 @@ class TerminalManager:
         stdin: bytes | None = None,
         line_callback: Callable[[str], Awaitable[None]] | None = None,
     ) -> dict:
-        executable = Path(args.argv[0])
-        allowed = {str(Path(p).resolve()) for p in executables}
-        if not executable.is_absolute() or str(executable.resolve()) not in allowed:
-            raise BridgeError("executable_denied", "Executable is not explicitly allowed")
+        check_executable(args.argv[0], executables)
         if any("\x00" in part for part in args.argv):
             raise BridgeError("invalid_command", "NUL in command argument")
         scope = PathScope(roots)

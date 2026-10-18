@@ -1,6 +1,6 @@
 # KiraBridge
 
-Privates, modulares Desktop- und Agenten-Gateway für macOS und Linux. Python 3.11+, asyncio, SQLite und das offizielle MCP Python SDK. Version **0.5.0** ergänzt den direkten, dauerhaften [Agentenkanal Codex ↔ Grok](docs/AGENT_CHANNEL.md) mit automatischer Empfängeranbindung. Grundlage bleibt der [Entwicklungsplan](docs/DEVELOPMENT_PLAN.md).
+Privates, modulares Desktop- und Agenten-Gateway für macOS und Linux. Python 3.11+, asyncio, SQLite und das offizielle MCP Python SDK. Version **0.5.1** ergänzt die begrenzte Bereitschaftsprüfung und zusätzliche reine Lesepfade; Version0.5.0 ergänzte den direkten, dauerhaften [Agentenkanal Codex ↔ Grok](docs/AGENT_CHANNEL.md) mit automatischer Empfängeranbindung. Grundlage bleibt der [Entwicklungsplan](docs/DEVELOPMENT_PLAN.md).
 
 ## Implementiert
 
@@ -20,6 +20,15 @@ Privates, modulares Desktop- und Agenten-Gateway für macOS und Linux. Python 3.
 ## Auf diesem Mac bereits eingerichtet
 
 Der lokale Dienst läuft automatisch über launchd auf `127.0.0.1:8765`. Die Standardkonfiguration liegt unter `~/.config/kirabridge/config.toml`; Zugangsdaten liegen separat mit Modus 0600. Als Arbeitsbereich ist `~/workspace/KiraBridge` freigegeben. Codex und Grok sind mit eigenen Identitäten als MCP-Clients registriert.
+
+Der Workspace ist ein Arbeits-/Austauschordner, **kein Git-Checkout**. Der auf
+diesem Mac installierte bearbeitbare Quellstand liegt in `~/KiraBridge`.
+Für `chatgpt` sind zusätzlich genau `~/KiraBridge` und
+`~/Projects/ki-hilfezentrum` einschließlich dessen Worktrees als `read_roots`
+freigegeben. Das erweitert ausschließlich `file.read`/`file.list`, keine Schreib-,
+Lösch-, Terminal- oder fremden Principal-Rechte. Konfiguration und geladener
+Dienststand sind über [die Bereitschaftsprüfung](docs/OPERATIONS.md#bereitschaft-und-projektdateien)
+abzugleichen; Health allein bestätigt keine Arbeitsfähigkeit.
 
 ```sh
 kirabridge status

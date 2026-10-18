@@ -17,6 +17,7 @@ Ein `terminal.execute`- oder `agent.execute`-Grant beziehungsweise eine dauerhaf
 | Unauthentifizierte Fernsteuerung | Loopback als Standard; andere Bindung nur mit explizitem `allow_remote`, TLS-Zertifikat und Schlüssel |
 | DNS-Rebinding/Browseraufrufe | Host- und Origin-Prüfung des MCP SDK; unbekannte Origins werden abgelehnt |
 | Symlink-/Traversal-Ausbruch | Absolute erlaubte Pfade, kein `..`, `O_NOFOLLOW` an jedem Traversierungsschritt; Operationen relativ zu offenen Verzeichnisdeskriptoren |
+| Zusätzlich lesbare Projekte | `read_roots` ergänzt ausschließlich `file.read`/`file.list`; Dateiänderungen und Terminal-CWD verwenden weiterhin nur `roots`. Andere Principals erben diese Freigaben nicht. |
 | Zugriff auf Bridge-Datenbank | Zustandsverzeichnis vom Dateigateway ausgeschlossen, auch wenn eine konfigurierte Root darüber liegt |
 | Unbeabsichtigtes Löschen | `file.delete` als separate, standardmäßig fehlende Capability; konfigurierter Freigabemodus, kein rekursives Löschen und keine automatischen Datenbereinigungen |
 | Implizite Shell-Injection | Argumentlisten, keine Shell-Interpretation; absolute erlaubte Executables; Tests mit Shell-Metazeichen |

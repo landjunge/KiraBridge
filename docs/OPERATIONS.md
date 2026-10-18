@@ -83,3 +83,79 @@ Nur ein Dispatcher pro Datenverzeichnis; mehrere MCP-HTTP-Clients teilen denselb
 
 Vor Sicherungen den Dienst kontrolliert stoppen oder die SQLite-Backup-API verwenden; eine einzelne Kopie der Datenbank bei aktivem WAL ist keine vollständige Sicherung. Es wird keine automatische Löschung historischer Aufgaben vorgenommen. Die Queue ist in der Anzahl begrenzt, historische Daten benötigen langfristig einen administrativen Archivierungsplan. Parallelität auf dem älteren iMac kann auf `concurrency=1` gesetzt werden.
 
+# Bereitschaft und Projektdateien
+
+`bridge_health` zeigt Dispatcher/Authentifizierung/Freigabemodus. `automatic`
+bedeutet keine Erweiterung der Pfade oder Programme. Der neue authentifizierte
+MCP-Aufruf `bridge_readiness` prüft nur die anfragende Identität, beispielsweise:
+
+```json
+{
+  "read_paths": ["/Users/landjunge/Projects/ki-hilfezentrum/.worktrees/codex-abschluss-20261017T2335/docs/MORGENUEBERGABE-20261018.md"],
+  "executables": ["/usr/bin/osascript"]
+}
+```
+
+Der lokale Abgleich fragt denselben laufenden Dienst ab und vergleicht zusätzlich
+geladene Konfiguration und Quellfingerabdruck mit der lokalen Installation:
+
+```sh
+kirabridge --principal chatgpt readiness --read-path /Users/landjunge/Projects/ki-hilfezentrum/.worktrees/codex-abschluss-20261017T2335/docs/MORGENUEBERGABE-20261018.md --executable /usr/bin/osascript
+```
+
+`path_denied` verlangt einen Pfad innerhalb der expliziten `roots`/`read_roots`.
+`path_missing` bezeichnet eine fehlende Datei unter einem zugänglichen Elternpfad;
+`path_unavailable`/`path_denied` können auch eine nicht sicher traversierbare
+Verzeichniskette oder Symlinks bezeichnen. `forbidden` bedeutet ein fehlendes
+Operationsrecht. `executable_denied` ist die beabsichtigte Programmliste;
+`executable_unavailable` meldet einen fehlenden/nicht ausführbaren erlaubten Pfad.
+`service_matches_local_config_and_source=false` verlangt einen kontrollierten
+Abgleich/Reload, keine neue Zugangsdatenvergabe. Ohne konkrete Anforderungen ist
+`requested_prerequisites_ready=null`, keine grüne Arbeitsfähigkeitsbescheinigung.
+Maximal16 Dateipfade und16 Programme pro Abfrage. Kein Dateiinhalt, Prozessstart,
+Auftrag oder Freigabeschreiben entsteht bei dieser Prüfung. Zeitpunktbezogene
+Prüfung, keine Funktions-/Tunnel-/ChatGPT-/Dauerhaftigkeitsgarantie.
+
+`roots` bleibt die bestehende allgemeine Dateigrenze und Terminal-CWD-Grenze.
+Die additive Principal-Option `read_roots` erweitert nur Lesen/Listen. Auf diesem
+Mac wurden am18.10.2026 ausschließlich beim bestehenden Principal `chatgpt`
+`/Users/landjunge/KiraBridge` und `/Users/landjunge/Projects/ki-hilfezentrum`
+ergänzt. Nicht das gesamte Home, `/`, `/Users/landjunge/Projects` oder sämtliche
+Projekte. Die alte Konfiguration liegt lokal in
+`~/.config/kirabridge/backups/config-before-project-read-roots-20261018.toml`,
+ebenfalls0600. Tokens, Programme und fremde Principals sind unverändert.
+
+Zum Lesen **`task_request` mit `operation="file.read"`** verwenden, anschließend
+`task_get`/`task_events`. Der genaue freigegebene Abruf steht in
+[examples/project-handoff-read.json](../examples/project-handoff-read.json).
+`cat` und `/usr/bin/python3` sind dafür nicht erforderlich und wurden nicht
+ergänzt. Bereits bestehende Interpreter-/Shellrechte wurden nicht geändert.
+`osascript` ist eine eigenständige bereits erlaubte Terminalfunktion; sein Erfolg
+belegt keine Dateiwerkzeug-Freigabe und ist kein empfohlener Umgehungsweg.
+
+## Wiederverbindung und unklarer Ausgang
+
+Der eigene Proxy initialisiert eine nachweislich verlorene lokale MCP-Sitzung
+**vor** dem nächsten Toolaufruf einmal neu, unter einem gemeinsamen Lock. Ein
+bereits gesendeter Aufruf mit unklarem Ausgang wird nie automatisch wiederholt.
+Nach Wiederverbindung zuerst `task_get`/`task_events` mit der ursprünglichen ID
+lesen. Falls eine Einreichung erneut erforderlich ist, nur die unveränderte
+Anfrage mit derselben ID und demselben Idempotenzschlüssel verwenden.
+
+Der beobachtete Tunnel-HTTP409 `mcp_initialization_required` ist getrennt von
+`path_denied`/`executable_denied`. Der eigene MCP-HTTP-Dienst läuft stateless;
+er definiert diesen409-Code nicht. Die erhaltenen Tunnel-Metriken zählen409,
+enthalten aber weder Task-ID noch exakten Auslöser. Im Zielclient muss eine neue
+MCP-Verbindung ordnungsgemäß initialisiert werden, bevor wieder Tools gerufen
+werden. Das ist keine Aufforderung zur Wiederholung einer Schreibaktion.
+Der lokale Proxy-Fix ist kein Beweis, dass damit jeder Cloud-/Tunnel409 beseitigt
+wäre. [Offizielle OpenAI-Tunneldokumentation](https://developers.openai.com/api/docs/guides/secure-mcp-tunnels)
+trennt `/healthz`, `/readyz`, `/metrics` und den tatsächlichen Aufruf aus ChatGPT;
+sie spezifiziert dort keinen genauen Auslöser dieses Fehlercodes.
+
+Vor einem Reload aktive/wartende Tasks **und** `message_jobs` prüfen. Bei Arbeit
+warten statt Prozesse/Aufträge abzubrechen. Queue/Belege/Credentials beibehalten;
+keine Datenbank oder alten Ergebnisse zurückspielen. Ein Quell-Rückweg auf die
+vorherige Fassung erfordert zuerst Rücknahme der neuen `read_roots`-Option in
+der Konfiguration, weil alte Versionen unbekannte Felder absichtlich ablehnen.
+

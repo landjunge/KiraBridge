@@ -58,6 +58,36 @@ async def execute(args) -> None:
         emit({"config": str(destination), "workspace": str(workspace)})
         return
     config = load_config(args.config)
+    if args.command == "readiness":
+        from kirabridge.local_runtime import peer
+        from kirabridge.mcp_gateway.client import MCPClientPool
+        from kirabridge.readiness import ReadinessInput, runtime_snapshot
+
+        requirements = ReadinessInput(read_paths=args.read_path, executables=args.executable)
+        async with MCPClientPool(call_timeout=10) as pool:
+            await pool.connect(peer(config, args.principal))
+            response = await pool.call("daemon", "bridge_readiness", requirements.model_dump())
+        result = response.structuredContent or {"error": {"code": "invalid_readiness"}}
+        expected = runtime_snapshot(config)
+        actual = result.get("runtime", {})
+        matches = bool(actual) and all(
+            actual.get(key) == expected[key]
+            for key in [
+                "config_path",
+                "config_sha256",
+                "effective_config_sha256",
+                "source_tree_sha256",
+            ]
+        )
+        result["service_matches_local_config_and_source"] = matches
+        emit(result)
+        if (
+            not matches
+            or result.get("requested_prerequisites_ready") is False
+            or result.get("error")
+        ):
+            raise SystemExit(1)
+        return
     if args.command == "message":
         from kirabridge.local_runtime import peer
         from kirabridge.mcp_gateway.client import MCPClientPool
@@ -321,6 +351,11 @@ def main() -> None:
     setup = sub.add_parser("setup", help="Create private local policy, credentials and CLI command")
     setup.add_argument("--workspace", default=str(Path.home() / "workspace/KiraBridge"))
     sub.add_parser("status", help="Query the running local daemon")
+    readiness = sub.add_parser(
+        "readiness", help="Check requested prerequisites on the loaded daemon"
+    )
+    readiness.add_argument("--read-path", action="append", default=[])
+    readiness.add_argument("--executable", action="append", default=[])
     sub.add_parser("connect", help="Forward MCP stdio to the authenticated local daemon")
     message = sub.add_parser("message", help="Authenticated addressed agent messaging")
     message_actions = message.add_subparsers(dest="action", required=True)

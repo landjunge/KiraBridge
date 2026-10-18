@@ -6,11 +6,13 @@ from typing import Any
 from mcp.server.fastmcp import Context, FastMCP
 from mcp.server.transport_security import TransportSecuritySettings
 from mcp.types import ToolAnnotations
+from pydantic import ValidationError
 
 from kirabridge import LOCAL_APPROVAL_URL
 from kirabridge.bridge_core.bridge import INPUTS, Bridge
 from kirabridge.bridge_core.models import BridgeError, TaskRequest
 from kirabridge.message_manager import MessageSend
+from kirabridge.readiness import ReadinessInput, readiness
 
 
 def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = "local") -> FastMCP:
@@ -54,6 +56,8 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
             return action()
         except BridgeError as exc:
             return {"error": {"code": exc.code, "message": str(exc)}}
+        except ValidationError:
+            return {"error": {"code": "invalid_arguments", "message": "Invalid tool arguments"}}
         except Exception:
             return {
                 "error": {"code": "internal_error", "message": "Request could not be completed"}
@@ -68,6 +72,23 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
     def bridge_health(ctx: Context) -> dict[str, Any]:
         """Version and dispatcher health. Never claims ChatGPT integration."""
         return safe(lambda: bridge.health(identity(ctx)))
+
+    @server.tool(annotations=read)
+    def bridge_readiness(
+        ctx: Context, read_paths: list[str] | None = None, executables: list[str] | None = None
+    ) -> dict[str, Any]:
+        """Check this identity's requested file/program prerequisites and loaded daemon snapshot.
+
+        Does not read file contents, execute programs, submit tasks, or certify a workflow.
+        Use file.read via task_request for actual content; no cat/Python workaround needed.
+        """
+        return safe(
+            lambda: readiness(
+                bridge,
+                identity(ctx),
+                ReadinessInput(read_paths=read_paths or [], executables=executables or []),
+            )
+        )
 
     @server.tool(annotations=read)
     def operation_catalog(ctx: Context) -> dict[str, Any]:
