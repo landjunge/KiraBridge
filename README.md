@@ -45,10 +45,15 @@ are planned.
 
 **0.6.0rc1 · private Release-Vorbereitung:** [Installieren DE](docs/INSTALL-DE.md) ·
 [Install EN](docs/INSTALL-EN.md) · [Release Notes](docs/RELEASE-NOTES-0.6.0rc1.md).
-Noch keine öffentliche Installation oder endgültige Lizenz. Betreiberwunsch:
-kostenlose private Nutzung, Firmeneinsatz/Weiterverkauf/kostenpflichtiger Dienst
-nur mit gesonderter Erlaubnis; dies ist noch keine erteilte Lizenz. Die Projektseite
-`kirabridge.netzwerkpunkt.de` ist geplant. Keine Sichtbarkeitsänderung.
+## Lizenz / License
+
+**Deutsch:** Es gilt die **Netzwerkpunkt Personal Use License 1.0**, eine individuelle Source-available-Lizenz. Private, nicht geschäftliche Nutzung ist kostenlos erlaubt, einschließlich privater Anpassungen und privatem Self-Hosting. Interner Firmeneinsatz, berufliche Nutzung, Weiterverkauf und kostenpflichtige Dienste benötigen eine vorherige schriftliche Erlaubnis beziehungsweise gesonderte Lizenz. Es gibt keine allgemeine Weiterverteilungserlaubnis. Historische Rechte und gesonderte Drittanbieter-Lizenzen bleiben erhalten. [Vollständige Bedingungen](LICENSE).
+
+**English:** The **Netzwerkpunkt Personal Use License 1.0** provides custom source-available terms. Private, non-business use is free, including private modifications and private self-hosting. Internal business or professional use, resale and paid services require prior written permission or a separate license. No general redistribution permission is granted. Historical rights and separate third-party licenses remain intact. [Full terms](LICENSE); the German text governs.
+
+Dies ist keine Open-Source-Standardlizenz; eine anwaltliche Prüfung wurde nicht durchgeführt. / This is not a standard open-source license and has not undergone legal review.
+
+Die Projektseite `kirabridge.netzwerkpunkt.de` bleibt geplant. Noch kein öffentlicher Download und keine Sichtbarkeitsänderung. / The project site remains planned; there is no public download or visibility change.
 
 Die nachfolgenden Betriebsdetails dokumentieren die vorhandene Entwicklerinstallation;
 der neue normale Schnellstart verwendet das geprüfte Release-Paket.
@@ -193,4 +198,4 @@ Tests nutzen temporäre Dateien, eigene Testprozesse und simulierte Agenten. Sie
 - [ChatGPT-Anbindung: tatsächliche Anforderungen](docs/CHATGPT.md)
 - [Abnahmestand und Testnachweise](docs/STATUS.md)
 
-Alle Rechte verbleiben beim Repository-Inhaber; das Repository bleibt privat.
+Es gelten die Nutzungsrechte und Vorbehalte der [LICENSE](LICENSE); das Repository bleibt privat.
