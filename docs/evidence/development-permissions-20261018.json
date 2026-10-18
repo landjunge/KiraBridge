@@ -1,0 +1,897 @@
+{
+  "schema": "1",
+  "at": 1792344474.670277,
+  "transport": "connected ChatGPT app, authenticated chatgpt; negative test through separate codex MCP principal",
+  "source_commit_live": "c6f1eab91f4102fcfaa3d8503141fd18274bb45d",
+  "first_activation": {
+    "config_before_sha256": "4507332a24d78c7bb5d399ad37f6e229536907ead55a00c78852a5887cd140b5",
+    "config_after_sha256": "a5faefcf23380718c4093c5bf48955dc928a2d3b2bc9961d61cb7f5b3005031f",
+    "mode": "0o600",
+    "principals": [
+      "local",
+      "chatgpt"
+    ],
+    "full_terminal": true,
+    "restart_required": true,
+    "at": 1792343749.96105,
+    "idle_barrier": true,
+    "runtime_source_commit": "f5db29dbb6e5cf6403df07c9cc6d54dc49c32f98",
+    "added_project_roots": 43,
+    "queue_restored": false
+  },
+  "second_start": {
+    "at": 1792344126.5474281,
+    "unchanged_config_sha256": "a5faefcf23380718c4093c5bf48955dc928a2d3b2bc9961d61cb7f5b3005031f",
+    "source_commit": "c6f1eab91f4102fcfaa3d8503141fd18274bb45d",
+    "idle_barrier": true,
+    "reason": "Apply actual AppleScript-component fix and short process metadata; verify same persistent policy on second startup"
+  },
+  "preservation": {
+    "historical_records": {
+      "tasks": {
+        "previous": 299,
+        "retained_identical": 299,
+        "different": []
+      },
+      "messages": {
+        "previous": 5,
+        "retained_identical": 5,
+        "different": []
+      },
+      "message_jobs": {
+        "previous": 4,
+        "retained_identical": 4,
+        "different": []
+      }
+    },
+    "protected_files": {
+      ".config/kirabridge/credentials.json": {
+        "same_sha256": true,
+        "same_mode": true
+      },
+      "Library/LaunchAgents/com.kirabridge.bridge.plist": {
+        "same_sha256": true,
+        "same_mode": true
+      },
+      ".config/kirabridge/console-credentials.json": {
+        "same_sha256": true,
+        "same_mode": true
+      },
+      ".config/kirabridge/openai-tunnel-runtime.key": {
+        "same_sha256": true,
+        "same_mode": true
+      }
+    },
+    "config_mode": "0o600",
+    "unknown_admin_not_retried": {
+      "id": "permissions-20261018-admin-jxa",
+      "state": "unknown",
+      "attempt": 1
+    }
+  },
+  "checks": [
+    {
+      "id": "permissions-20261018-policy",
+      "principal": "chatgpt",
+      "operation": "policy.inspect",
+      "state": "completed",
+      "attempt": 1,
+      "created": 1792343770.537668,
+      "accepted": 1792343770.602324,
+      "started": 1792343770.622963,
+      "finished": 1792343770.627997,
+      "receipt": "0a5446e0-b3c4-4a5d-9bb0-88487431f9fc",
+      "error_code": null,
+      "success": true,
+      "evidence": {},
+      "policy": {
+        "principal": "chatgpt",
+        "allow_any_executable": true,
+        "approval_mode": "automatic",
+        "effective_terminal_roots": [
+          "/"
+        ],
+        "configuration_file": {
+          "changed_on_disk": false,
+          "disk_sha256": "a5faefcf23380718c4093c5bf48955dc928a2d3b2bc9961d61cb7f5b3005031f",
+          "loaded_sha256": "a5faefcf23380718c4093c5bf48955dc928a2d3b2bc9961d61cb7f5b3005031f",
+          "status": "matches_loaded"
+        },
+        "source_files": {
+          "changed_on_disk": false,
+          "disk_sha256": "82c93aa795e0c37dcd4fc470aac9cbeed72beccee7c1f16e3786ae2d94aa272a",
+          "loaded_sha256": "82c93aa795e0c37dcd4fc470aac9cbeed72beccee7c1f16e3786ae2d94aa272a",
+          "status": "matches_loaded"
+        },
+        "runtime": {
+          "config_path": "/Users/landjunge/.config/kirabridge/config.toml",
+          "config_sha256": "a5faefcf23380718c4093c5bf48955dc928a2d3b2bc9961d61cb7f5b3005031f",
+          "effective_config_sha256": "a4784a2aba06d1e098e5a4fbb1ffca890dd007508953d630c2d63a22d47e13e8",
+          "instance_id": "7a003e5444d54d3a8e9575fef651e9ff",
+          "pid": 19707,
+          "source_file_count": 33,
+          "source_package_path": "/Users/landjunge/KiraBridge/src/kirabridge",
+          "source_scope": "package Python files observed at startup; no remote attestation",
+          "source_tree_sha256": "82c93aa795e0c37dcd4fc470aac9cbeed72beccee7c1f16e3786ae2d94aa272a",
+          "started_at": "2026-10-18T17:15:51.782920+00:00",
+          "version": "0.5.2"
+        }
+      }
+    },
+    {
+      "id": "permissions-20261018-status",
+      "principal": "chatgpt",
+      "operation": "agent.status",
+      "state": "completed",
+      "attempt": 1,
+      "created": 1792343772.602819,
+      "accepted": 1792343772.620575,
+      "started": 1792343772.653374,
+      "finished": 1792343772.861126,
+      "receipt": "3a43dfd2-4dec-4059-95f4-659de39735f2",
+      "error_code": null,
+      "success": true,
+      "evidence": {},
+      "observation": {
+        "managed_tasks": [
+          {
+            "accepted": 1792343772.620575,
+            "agent": null,
+            "created": 1792343772.602819,
+            "finished": null,
+            "id": "permissions-20261018-status",
+            "operation": "agent.status",
+            "parent_id": null,
+            "started": 1792343772.653374,
+            "state": "running",
+            "updated": 1792343772.653374
+          },
+          {
+            "accepted": 1792270503.206683,
+            "agent": null,
+            "created": 1792270503.126436,
+            "finished": null,
+            "id": "channel-doc-canonical-read-20261017-2255",
+            "operation": "file.read",
+            "parent_id": null,
+            "started": 1792270503.207602,
+            "state": "unknown",
+            "updated": 1792270503.2179499
+          }
+        ],
+        "managed_terminal_sessions": [],
+        "process_observation": {
+          "byte_limit": 65536,
+          "discovery_scope": "exact names only; generic interpreter children are not inferred",
+          "fields": [
+            "pid",
+            "ppid",
+            "comm",
+            "name"
+          ],
+          "own_os_uid_only": true,
+          "record_limit": 256,
+          "status": "byte_limit",
+          "timeout_seconds": 3.0,
+          "truncated": true
+        }
+      },
+      "observed_agent_process_count": 3
+    },
+    {
+      "id": "permissions-20261018-file-write",
+      "principal": "chatgpt",
+      "operation": "file.write",
+      "state": "completed",
+      "attempt": 1,
+      "created": 1792343809.77381,
+      "accepted": 1792343809.8078332,
+      "started": 1792343809.8769522,
+      "finished": 1792343809.882285,
+      "receipt": "e6bd141e-4510-4980-b7a1-43e899cfe9d9",
+      "error_code": null,
+      "success": true,
+      "evidence": {}
+    },
+    {
+      "id": "permissions-20261018-ps",
+      "principal": "chatgpt",
+      "operation": "terminal.execute",
+      "state": "completed",
+      "attempt": 1,
+      "created": 1792343812.12289,
+      "accepted": 1792343812.434277,
+      "started": 1792343812.898174,
+      "finished": 1792343813.313218,
+      "receipt": "3c5fc3dd-b27e-4d1e-b103-079b8606469f",
+      "error_code": null,
+      "success": true,
+      "evidence": {
+        "exit_code": 0,
+        "pid": 19830,
+        "terminated": false,
+        "timed_out": false
+      },
+      "exit_code": 0
+    },
+    {
+      "id": "permissions-20261018-codex",
+      "principal": "chatgpt",
+      "operation": "agent.execute",
+      "state": "completed",
+      "attempt": 1,
+      "created": 1792343814.35168,
+      "accepted": 1792343814.623468,
+      "started": 1792343818.5873768,
+      "finished": 1792343838.260177,
+      "receipt": "d2320f76-4d50-41b1-9c2d-b66e990fd260",
+      "error_code": null,
+      "success": true,
+      "evidence": {
+        "adapter": "codex",
+        "agent": "codex",
+        "exit_code": 0,
+        "mcp_servers_enabled": false,
+        "project_rules_enabled": true,
+        "sandbox_mode": "workspace-write",
+        "session_id": "01a15004-3482-7593-85f6-6baf60c23f3d",
+        "timed_out": false,
+        "turn_completed": true,
+        "turn_failed": false
+      }
+    },
+    {
+      "id": "permissions-20261018-file-read",
+      "principal": "chatgpt",
+      "operation": "file.read",
+      "state": "completed",
+      "attempt": 1,
+      "created": 1792343834.518105,
+      "accepted": 1792343838.26144,
+      "started": 1792343838.2656078,
+      "finished": 1792343838.266955,
+      "receipt": "0d5de7ba-208b-430d-b8c6-b59308f2c976",
+      "error_code": null,
+      "success": true,
+      "evidence": {},
+      "bytes": 57,
+      "truncated": false,
+      "content_sha256": "7632173439a8e24110a9140a6de7bfa08bdf61c5fc29bd3bbc5d392d18df024c"
+    },
+    {
+      "id": "permissions-20261018-status-during-codex",
+      "principal": "chatgpt",
+      "operation": "agent.status",
+      "state": "completed",
+      "attempt": 1,
+      "created": 1792343844.68809,
+      "accepted": 1792343844.721757,
+      "started": 1792343844.7928782,
+      "finished": 1792343845.105697,
+      "receipt": "d416ebfa-86af-4970-a9aa-830be1b234f1",
+      "error_code": null,
+      "success": true,
+      "evidence": {},
+      "observation": {
+        "managed_tasks": [
+          {
+            "accepted": 1792343844.721757,
+            "agent": null,
+            "created": 1792343844.68809,
+            "finished": null,
+            "id": "permissions-20261018-status-during-codex",
+            "operation": "agent.status",
+            "parent_id": null,
+            "started": 1792343844.7928782,
+            "state": "running",
+            "updated": 1792343844.7928782
+          },
+          {
+            "accepted": 1792270503.206683,
+            "agent": null,
+            "created": 1792270503.126436,
+            "finished": null,
+            "id": "channel-doc-canonical-read-20261017-2255",
+            "operation": "file.read",
+            "parent_id": null,
+            "started": 1792270503.207602,
+            "state": "unknown",
+            "updated": 1792270503.2179499
+          }
+        ],
+        "managed_terminal_sessions": [],
+        "process_observation": {
+          "byte_limit": 65536,
+          "discovery_scope": "exact names only; generic interpreter children are not inferred",
+          "fields": [
+            "pid",
+            "ppid",
+            "comm",
+            "name"
+          ],
+          "own_os_uid_only": true,
+          "record_limit": 256,
+          "status": "byte_limit",
+          "timeout_seconds": 3.0,
+          "truncated": true
+        }
+      },
+      "observed_agent_process_count": 2
+    },
+    {
+      "id": "permissions-20261018-install-dir",
+      "principal": "chatgpt",
+      "operation": "file.mkdir",
+      "state": "completed",
+      "attempt": 1,
+      "created": 1792343874.929313,
+      "accepted": 1792343874.9463522,
+      "started": 1792343875.011455,
+      "finished": 1792343875.029459,
+      "receipt": "b0ca243c-b29f-4b1d-b8de-cfe9285292ac",
+      "error_code": null,
+      "success": true,
+      "evidence": {}
+    },
+    {
+      "id": "permissions-20261018-sudo-preflight",
+      "principal": "chatgpt",
+      "operation": "terminal.execute",
+      "state": "failed",
+      "attempt": 1,
+      "created": 1792343877.251369,
+      "accepted": 1792343877.268418,
+      "started": 1792343877.466976,
+      "finished": 1792343877.566632,
+      "receipt": "bacc7072-f9c0-4c00-a275-508a107146e7",
+      "error_code": null,
+      "success": false,
+      "evidence": {
+        "exit_code": 1,
+        "pid": 19989,
+        "terminated": false,
+        "timed_out": false
+      },
+      "exit_code": 1
+    },
+    {
+      "id": "permissions-20261018-codex-readback",
+      "principal": "chatgpt",
+      "operation": "file.read",
+      "state": "completed",
+      "attempt": 1,
+      "created": 1792343893.510327,
+      "accepted": 1792343893.614531,
+      "started": 1792343893.6530309,
+      "finished": 1792343893.658645,
+      "receipt": "81d07a2e-1cb1-44ca-8308-943d47827bb3",
+      "error_code": null,
+      "success": true,
+      "evidence": {},
+      "bytes": 36,
+      "truncated": false,
+      "content_sha256": "448c2da16dd40063c812b1c32cb2a813d27f684bcb1d9c7a8e26dd4330502642"
+    },
+    {
+      "id": "permissions-20261018-install",
+      "principal": "chatgpt",
+      "operation": "terminal.execute",
+      "state": "completed",
+      "attempt": 1,
+      "created": 1792343896.097846,
+      "accepted": 1792343896.2126489,
+      "started": 1792343896.53389,
+      "finished": 1792343897.2676759,
+      "receipt": "1d182fcb-1783-413e-8b73-44fea8dc8ef4",
+      "error_code": null,
+      "success": true,
+      "evidence": {
+        "exit_code": 0,
+        "pid": 20029,
+        "terminated": false,
+        "timed_out": false
+      },
+      "exit_code": 0
+    },
+    {
+      "id": "permissions-20261018-git",
+      "principal": "chatgpt",
+      "operation": "terminal.execute",
+      "state": "completed",
+      "attempt": 1,
+      "created": 1792343898.4493551,
+      "accepted": 1792343898.526884,
+      "started": 1792343898.8032708,
+      "finished": 1792343899.06206,
+      "receipt": "2cf41259-6007-41bc-91ea-a377a090f9f5",
+      "error_code": null,
+      "success": true,
+      "evidence": {
+        "exit_code": 0,
+        "pid": 20035,
+        "terminated": false,
+        "timed_out": false
+      },
+      "exit_code": 0
+    },
+    {
+      "id": "permissions-20261018-admin",
+      "principal": "chatgpt",
+      "operation": "admin.execute",
+      "state": "failed",
+      "attempt": 1,
+      "created": 1792343925.791602,
+      "accepted": 1792343925.8411672,
+      "started": 1792343926.270404,
+      "finished": 1792343926.93942,
+      "receipt": "5e8b54fe-0845-487b-bc7b-d490cf620995",
+      "error_code": null,
+      "success": false,
+      "evidence": {
+        "authorization": "macos_local_dialog",
+        "exit_code": 1,
+        "password_stored": false,
+        "timed_out": false
+      },
+      "exit_code": 1
+    },
+    {
+      "id": "permissions-20261018-uninstall",
+      "principal": "chatgpt",
+      "operation": "terminal.execute",
+      "state": "completed",
+      "attempt": 1,
+      "created": 1792343953.6977742,
+      "accepted": 1792343953.8690162,
+      "started": 1792343954.126805,
+      "finished": 1792343954.5213099,
+      "receipt": "b56adb97-0897-469a-8894-be6ed63fd696",
+      "error_code": null,
+      "success": true,
+      "evidence": {
+        "exit_code": 0,
+        "pid": 20137,
+        "terminated": false,
+        "timed_out": false
+      },
+      "exit_code": 0
+    },
+    {
+      "id": "permissions-20261018-tests-file",
+      "principal": "chatgpt",
+      "operation": "file.write",
+      "state": "completed",
+      "attempt": 1,
+      "created": 1792343956.508647,
+      "accepted": 1792343956.528033,
+      "started": 1792343956.562638,
+      "finished": 1792343956.595927,
+      "receipt": "dcb837e3-aa34-470d-92e2-fbe8ba69e00c",
+      "error_code": null,
+      "success": true,
+      "evidence": {}
+    },
+    {
+      "id": "permissions-20261018-makefile",
+      "principal": "chatgpt",
+      "operation": "file.write",
+      "state": "completed",
+      "attempt": 1,
+      "created": 1792343959.5803452,
+      "accepted": 1792343959.600045,
+      "started": 1792343959.648683,
+      "finished": 1792343959.6929789,
+      "receipt": "403ea9db-22c7-4bda-861f-9c147c403b0e",
+      "error_code": null,
+      "success": true,
+      "evidence": {}
+    },
+    {
+      "id": "permissions-20261018-tests",
+      "principal": "chatgpt",
+      "operation": "terminal.execute",
+      "state": "completed",
+      "attempt": 1,
+      "created": 1792344019.509405,
+      "accepted": 1792344019.5497952,
+      "started": 1792344020.217793,
+      "finished": 1792344021.0315058,
+      "receipt": "8c0820b3-4eed-467d-ac99-06609dc18740",
+      "error_code": null,
+      "success": true,
+      "evidence": {
+        "exit_code": 0,
+        "pid": 20260,
+        "terminated": false,
+        "timed_out": false
+      },
+      "exit_code": 0
+    },
+    {
+      "id": "permissions-20261018-build",
+      "principal": "chatgpt",
+      "operation": "terminal.execute",
+      "state": "completed",
+      "attempt": 1,
+      "created": 1792344021.948559,
+      "accepted": 1792344022.048975,
+      "started": 1792344022.2346199,
+      "finished": 1792344022.57132,
+      "receipt": "0a34ed74-e6bd-4089-9b92-e982f0b25631",
+      "error_code": null,
+      "success": true,
+      "evidence": {
+        "exit_code": 0,
+        "pid": 20267,
+        "terminated": false,
+        "timed_out": false
+      },
+      "exit_code": 0
+    },
+    {
+      "id": "permissions-20261018-install-removed",
+      "principal": "chatgpt",
+      "operation": "file.list",
+      "state": "completed",
+      "attempt": 1,
+      "created": 1792344025.032094,
+      "accepted": 1792344025.0675352,
+      "started": 1792344025.116229,
+      "finished": 1792344025.226569,
+      "receipt": "5353bd4f-8142-4123-aeea-19ebff203f01",
+      "error_code": null,
+      "success": true,
+      "evidence": {}
+    },
+    {
+      "id": "permissions-20261018-admin-jxa",
+      "principal": "chatgpt",
+      "operation": "admin.execute",
+      "state": "unknown",
+      "attempt": 1,
+      "created": 1792344134.693871,
+      "accepted": 1792344134.8468869,
+      "started": 1792344135.714588,
+      "finished": null,
+      "receipt": "3ee49d9b-4bdd-4d75-b77b-4212cc376268",
+      "error_code": "admin_timeout"
+    },
+    {
+      "id": "permissions-20261018-status-second-start",
+      "principal": "chatgpt",
+      "operation": "agent.status",
+      "state": "completed",
+      "attempt": 1,
+      "created": 1792344137.4806862,
+      "accepted": 1792344137.514239,
+      "started": 1792344137.587605,
+      "finished": 1792344138.072883,
+      "receipt": "e8e60f3e-96e0-40d3-96bd-b9948772af62",
+      "error_code": null,
+      "success": true,
+      "evidence": {},
+      "observation": {
+        "managed_tasks": [
+          {
+            "accepted": 1792344137.514239,
+            "agent": null,
+            "created": 1792344137.4806862,
+            "finished": null,
+            "id": "permissions-20261018-status-second-start",
+            "operation": "agent.status",
+            "parent_id": null,
+            "started": 1792344137.587605,
+            "state": "running",
+            "updated": 1792344137.587605
+          },
+          {
+            "accepted": 1792344134.8468869,
+            "agent": null,
+            "created": 1792344134.693871,
+            "finished": null,
+            "id": "permissions-20261018-admin-jxa",
+            "operation": "admin.execute",
+            "parent_id": null,
+            "started": 1792344135.714588,
+            "state": "running",
+            "updated": 1792344135.714588
+          },
+          {
+            "accepted": 1792270503.206683,
+            "agent": null,
+            "created": 1792270503.126436,
+            "finished": null,
+            "id": "channel-doc-canonical-read-20261017-2255",
+            "operation": "file.read",
+            "parent_id": null,
+            "started": 1792270503.207602,
+            "state": "unknown",
+            "updated": 1792270503.2179499
+          }
+        ],
+        "managed_terminal_sessions": [
+          {
+            "alive": true,
+            "ownership": "bridge_managed",
+            "pid": 20488,
+            "task_id": "permissions-20261018-admin-jxa",
+            "termination_requested": false,
+            "timed_out": false
+          }
+        ],
+        "process_observation": {
+          "byte_limit": 65536,
+          "discovery_scope": "exact names only; generic interpreter children are not inferred",
+          "fields": [
+            "pid",
+            "ppid",
+            "comm",
+            "name"
+          ],
+          "own_os_uid_only": true,
+          "record_limit": 256,
+          "status": "observed",
+          "timeout_seconds": 3.0,
+          "truncated": false
+        }
+      },
+      "observed_agent_process_count": 5
+    },
+    {
+      "id": "permissions-20261018-ps-name",
+      "principal": "chatgpt",
+      "operation": "terminal.execute",
+      "state": "completed",
+      "attempt": 1,
+      "created": 1792344172.793865,
+      "accepted": 1792344180.8834538,
+      "started": 1792344181.0960698,
+      "finished": 1792344181.1648939,
+      "receipt": "27b66802-1120-488b-b889-d2242b5ef34c",
+      "error_code": null,
+      "success": true,
+      "evidence": {
+        "exit_code": 0,
+        "pid": 20570,
+        "terminated": false,
+        "timed_out": false
+      },
+      "exit_code": 0
+    },
+    {
+      "id": "permissions-20261018-synthetic-process",
+      "principal": "chatgpt",
+      "operation": "terminal.execute",
+      "state": "failed",
+      "attempt": 1,
+      "created": 1792344176.9585438,
+      "accepted": 1792344181.165569,
+      "started": 1792344181.3395772,
+      "finished": 1792344197.4903512,
+      "receipt": "6779da4a-e65e-403e-b4a7-88888e25a08e",
+      "error_code": null,
+      "success": false,
+      "evidence": {
+        "exit_code": -15,
+        "pid": 20571,
+        "terminated": true,
+        "timed_out": false
+      },
+      "exit_code": -15
+    },
+    {
+      "id": "permissions-20261018-processes-active",
+      "principal": "chatgpt",
+      "operation": "process.list",
+      "state": "completed",
+      "attempt": 1,
+      "created": 1792344193.3652768,
+      "accepted": 1792344193.524043,
+      "started": 1792344193.5872982,
+      "finished": 1792344193.587931,
+      "receipt": "c8ac272d-9a66-4950-894e-0380f54e3605",
+      "error_code": null,
+      "success": true,
+      "evidence": {},
+      "managed_processes": [
+        {
+          "task_id": "permissions-20261018-synthetic-process",
+          "pid": 20571,
+          "alive": true
+        }
+      ]
+    },
+    {
+      "id": "permissions-20261018-process-stop",
+      "principal": "chatgpt",
+      "operation": "process.terminate",
+      "state": "completed",
+      "attempt": 1,
+      "created": 1792344197.355835,
+      "accepted": 1792344197.373714,
+      "started": 1792344197.454008,
+      "finished": 1792344197.456918,
+      "receipt": "5e6f10a0-a099-4bec-a2f6-2291f2de031a",
+      "error_code": null,
+      "success": true,
+      "evidence": {},
+      "exit_code": -15
+    },
+    {
+      "id": "permissions-20261018-new-project-read",
+      "principal": "chatgpt",
+      "operation": "file.read",
+      "state": "completed",
+      "attempt": 1,
+      "created": 1792344248.078478,
+      "accepted": 1792344248.146488,
+      "started": 1792344248.150662,
+      "finished": 1792344248.1552289,
+      "receipt": "b32d563a-b2ed-4596-84d2-10a0054a532b",
+      "error_code": null,
+      "success": true,
+      "evidence": {},
+      "bytes": 256,
+      "truncated": true,
+      "content_sha256": "2778339988d8da6da99098bc0e3d3665fd619d7c1d651a74ede1c99e33167996"
+    },
+    {
+      "id": "permissions-20261018-file-boundary",
+      "principal": "chatgpt",
+      "operation": "file.read",
+      "state": "failed",
+      "attempt": 1,
+      "created": 1792344431.939067,
+      "accepted": 1792344431.957119,
+      "started": null,
+      "finished": 1792344431.9896,
+      "receipt": "df32474c-c229-41f0-96f9-ff3b9746cedb",
+      "error_code": "path_denied"
+    },
+    {
+      "id": "permissions-20261018-policy-second-start",
+      "principal": "chatgpt",
+      "operation": "policy.inspect",
+      "state": "completed",
+      "attempt": 1,
+      "created": 1792344433.2283242,
+      "accepted": 1792344433.245672,
+      "started": 1792344433.372455,
+      "finished": 1792344433.38495,
+      "receipt": "1811b252-006f-45f8-b9ac-60d0b2e9252f",
+      "error_code": null,
+      "success": true,
+      "evidence": {},
+      "policy": {
+        "principal": "chatgpt",
+        "allow_any_executable": true,
+        "approval_mode": "automatic",
+        "effective_terminal_roots": [
+          "/"
+        ],
+        "configuration_file": {
+          "changed_on_disk": false,
+          "disk_sha256": "a5faefcf23380718c4093c5bf48955dc928a2d3b2bc9961d61cb7f5b3005031f",
+          "loaded_sha256": "a5faefcf23380718c4093c5bf48955dc928a2d3b2bc9961d61cb7f5b3005031f",
+          "status": "matches_loaded"
+        },
+        "source_files": {
+          "changed_on_disk": false,
+          "disk_sha256": "deadc7ba4ae21292dd01ae2430bdfe6aa45acdd4bce76dda5a41e45864dc7381",
+          "loaded_sha256": "deadc7ba4ae21292dd01ae2430bdfe6aa45acdd4bce76dda5a41e45864dc7381",
+          "status": "matches_loaded"
+        },
+        "runtime": {
+          "config_path": "/Users/landjunge/.config/kirabridge/config.toml",
+          "config_sha256": "a5faefcf23380718c4093c5bf48955dc928a2d3b2bc9961d61cb7f5b3005031f",
+          "effective_config_sha256": "a4784a2aba06d1e098e5a4fbb1ffca890dd007508953d630c2d63a22d47e13e8",
+          "instance_id": "3cd8af3837174d70a19b1b87281695a1",
+          "pid": 20472,
+          "source_file_count": 33,
+          "source_package_path": "/Users/landjunge/KiraBridge/src/kirabridge",
+          "source_scope": "package Python files observed at startup; no remote attestation",
+          "source_tree_sha256": "deadc7ba4ae21292dd01ae2430bdfe6aa45acdd4bce76dda5a41e45864dc7381",
+          "started_at": "2026-10-18T17:22:08.237521+00:00",
+          "version": "0.5.2"
+        }
+      }
+    },
+    {
+      "id": "permissions-20261018-cleanup",
+      "principal": "chatgpt",
+      "operation": "terminal.execute",
+      "state": "completed",
+      "attempt": 1,
+      "created": 1792344434.5221791,
+      "accepted": 1792344434.7028139,
+      "started": 1792344434.8810298,
+      "finished": 1792344434.954716,
+      "receipt": "1c810df1-fff0-46ac-8068-d99479e9e7bf",
+      "error_code": null,
+      "success": true,
+      "evidence": {
+        "exit_code": 0,
+        "pid": 21088,
+        "terminated": false,
+        "timed_out": false
+      },
+      "exit_code": 0
+    },
+    {
+      "id": "permissions-20261018-negative-codex",
+      "principal": "codex",
+      "operation": "terminal.execute",
+      "state": "failed",
+      "attempt": 1,
+      "created": 1792344436.364921,
+      "accepted": 1792344436.3826718,
+      "started": null,
+      "finished": 1792344436.447275,
+      "receipt": "01619a3a-ff9d-4e2e-a965-dadb8feab133",
+      "error_code": "executable_denied"
+    },
+    {
+      "id": "permissions-20261018-github",
+      "principal": "chatgpt",
+      "operation": "terminal.execute",
+      "state": "completed",
+      "attempt": 1,
+      "created": 1792344613.00496,
+      "accepted": 1792344613.040504,
+      "started": 1792344613.338437,
+      "finished": 1792344614.312006,
+      "receipt": "5dc5d2cd-d99e-49b9-8c30-b3101ce3d1b0",
+      "error_code": null,
+      "success": true,
+      "exit_code": 0,
+      "evidence": {
+        "exit_code": 0,
+        "pid": 21499,
+        "terminated": false,
+        "timed_out": false
+      },
+      "safe_json_output": {
+        "isPrivate": true
+      }
+    },
+    {
+      "id": "permissions-20261018-grok-protocol",
+      "principal": "chatgpt",
+      "operation": "terminal.execute",
+      "state": "completed",
+      "attempt": 1,
+      "created": 1792344705.5845299,
+      "accepted": 1792344705.666295,
+      "started": 1792344705.95557,
+      "finished": 1792344712.01664,
+      "receipt": "1be591c1-c0da-47d4-b209-c35a30c13684",
+      "error_code": null,
+      "success": true,
+      "exit_code": 0,
+      "evidence": {
+        "exit_code": 0,
+        "pid": 21696,
+        "terminated": false,
+        "timed_out": false
+      },
+      "safe_json_output": {
+        "ok": true,
+        "protocol_version": 1,
+        "auth_methods_declared": [
+          "cached_token"
+        ],
+        "authentication_tested": false,
+        "model_prompt_sent": false,
+        "existing_session_attached": false,
+        "scope": "ACP initialization only"
+      }
+    }
+  ],
+  "synthetic_objects_removed": true,
+  "mac_reboot_performed": false,
+  "root_execution_confirmed": false,
+  "real_grok_provider_test": false,
+  "public_release_or_discussion": false,
+  "real_grok_acp_initialize": true,
+  "grok_authentication_tested": false
+}
