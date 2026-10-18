@@ -20,6 +20,7 @@ from kirabridge.terminal_manager import check_executable
 
 class ReadinessInput(Input):
     read_paths: list[str] = Field(default_factory=list, max_length=16)
+    working_directories: list[str] = Field(default_factory=list, max_length=16)
     executables: list[str] = Field(default_factory=list, max_length=16)
     operations: list[str] = Field(default_factory=list, max_length=16)
     workflow_id: str | None = Field(default=None, max_length=128, pattern=r"^[a-zA-Z0-9_-]+$")
@@ -92,7 +93,16 @@ def readiness(bridge, principal: str, requirements: ReadinessInput) -> dict:
 
     def executable(path):
         bridge.security.principal(principal, "terminal.execute")
-        check_executable(path, policy.executables)
+        check_executable(
+            path,
+            policy.executables,
+            policy.allow_any_executable,
+            bridge.terminal.environment["PATH"],
+        )
+
+    def working_directory(path):
+        bridge.security.principal(principal, "terminal.execute")
+        _directory(PathScope(policy.terminal_roots or policy.roots), path)
 
     def operation(name):
         from kirabridge.bridge_core.bridge import INPUTS
@@ -107,6 +117,10 @@ def readiness(bridge, principal: str, requirements: ReadinessInput) -> dict:
 
     paths = [{"path": p, **_probe(lambda p=p: file(p))} for p in requirements.read_paths]
     programs = [{"path": p, **_probe(lambda p=p: executable(p))} for p in requirements.executables]
+    working_dirs = [
+        {"path": p, **_probe(lambda p=p: working_directory(p))}
+        for p in requirements.working_directories
+    ]
     operations = [
         {"operation": p, **_probe(lambda p=p: operation(p))} for p in requirements.operations
     ]
@@ -115,7 +129,8 @@ def readiness(bridge, principal: str, requirements: ReadinessInput) -> dict:
         for p in dict.fromkeys(policy.roots + policy.read_roots)
     ]
     health = bridge.health(principal)
-    requested = bool(paths or programs or operations)
+    requested = bool(paths or programs or operations or working_dirs)
+    checks = paths + programs + operations + working_dirs
     result = {
         "principal": principal,
         "runtime": bridge.runtime,
@@ -124,13 +139,16 @@ def readiness(bridge, principal: str, requirements: ReadinessInput) -> dict:
         "roots": policy.roots,
         "read_roots": policy.read_roots,
         "allowed_executables": policy.executables,
+        "allow_any_executable": policy.allow_any_executable,
+        "terminal_roots": policy.terminal_roots or policy.roots,
         "root_checks": roots,
         "read_path_checks": paths,
         "executable_checks": programs,
+        "working_directory_checks": working_dirs,
         "operation_checks": operations,
         "workflow_id": requirements.workflow_id,
         "requested_prerequisites_ready": (
-            health["dispatcher_active"] and all(x["ok"] for x in paths + programs + operations)
+            health["dispatcher_active"] and all(x["ok"] for x in checks)
         )
         if requested
         else None,
@@ -144,7 +162,7 @@ def readiness(bridge, principal: str, requirements: ReadinessInput) -> dict:
     if requested and not result["requested_prerequisites_ready"]:
         from kirabridge.diagnostics import rejection_report
 
-        failures = [x for x in paths + programs + operations if not x["ok"]]
+        failures = [x for x in checks if not x["ok"]]
         code = failures[0]["code"] if failures else "dispatcher_unavailable"
         result["diagnostic"] = rejection_report(
             bridge.runtime,
@@ -160,7 +178,7 @@ def readiness(bridge, principal: str, requirements: ReadinessInput) -> dict:
             "workflow.preflight",
             {
                 "workflow_id": requirements.workflow_id,
-                "checks": compact_checks(paths + programs + operations),
+                "checks": compact_checks(checks),
                 "outcome": "ready" if result["requested_prerequisites_ready"] else "not_ready",
             },
         )
@@ -209,13 +227,39 @@ def task_preflight(bridge, task: dict) -> dict:
             check("mutation_parent", path, parent)
     elif operation.startswith("threaddesk."):
         check("threaddesk_endpoint", "configured_threaddesk", bridge.threaddesk.check_configuration)
-    elif operation in {"terminal.execute", "agent.execute"}:
-        if operation == "terminal.execute":
+    elif operation in {"terminal.execute", "admin.execute", "agent.execute"}:
+        if operation in {"terminal.execute", "admin.execute"}:
             executable = args["argv"][0]
             check(
-                "executable", executable, lambda: check_executable(executable, policy.executables)
+                "executable",
+                executable,
+                lambda: check_executable(
+                    executable,
+                    policy.executables,
+                    policy.allow_any_executable,
+                    bridge.terminal.environment["PATH"],
+                ),
             )
-        check("cwd", args["cwd"], lambda: _directory(scope, args["cwd"]))
+        else:
+
+            def agent():
+                if args["agent"] not in policy.agents:
+                    raise BridgeError("agent_denied", "Agent identity not granted")
+                configured = bridge.config.agents.get(args["agent"])
+                if configured is None or configured.kind not in bridge.agents.adapters:
+                    raise BridgeError("agent_unavailable", "Agent adapter is not configured")
+                if configured.kind != "grok_api":
+                    if not configured.executable:
+                        raise BridgeError("agent_config", "Agent executable is not configured")
+                    check_executable(configured.executable, [configured.executable])
+
+            check("agent", args["agent"], agent)
+        cwd_scope = (
+            PathScope(policy.terminal_roots or policy.roots)
+            if operation != "agent.execute"
+            else scope
+        )
+        check("cwd", args["cwd"], lambda: _directory(cwd_scope, args["cwd"]))
     return {
         "ready": all(c["ok"] for c in checks),
         "checks": compact_checks(checks),

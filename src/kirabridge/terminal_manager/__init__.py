@@ -2,10 +2,12 @@ from __future__ import annotations
 
 import asyncio
 import os
+import shutil
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Awaitable, Callable
 
+from kirabridge.bridge_core.config import TerminalConfig
 from kirabridge.bridge_core.models import BridgeError, TerminalInput
 from kirabridge.filesystem_manager import PathScope
 from kirabridge.platform_adapters import reap_process, spawn_process, stop_process
@@ -29,20 +31,39 @@ def minimal_environment() -> dict[str, str]:
     return {"PATH": os.defpath, "LANG": "en_US.UTF-8", "LC_CTYPE": "UTF-8", "TERM": "dumb"}
 
 
-def check_executable(value: str, executables: list[str]) -> None:
+def check_executable(
+    value: str, executables: list[str], allow_any: bool = False, search_path: str | None = None
+) -> str:
+    if "\x00" in value:
+        raise BridgeError("invalid_command", "NUL in executable")
+    if allow_any and not Path(value).is_absolute() and "/" not in value:
+        resolved = shutil.which(value, path=search_path or os.defpath)
+        if not resolved:
+            raise BridgeError("executable_unavailable", "Command not found in configured PATH")
+        value = resolved
     executable = Path(value)
     allowed = {str(Path(p).resolve()) for p in executables}
-    if not executable.is_absolute() or str(executable.resolve()) not in allowed:
+    if not executable.is_absolute() or (not allow_any and str(executable.resolve()) not in allowed):
         raise BridgeError("executable_denied", "Executable is not explicitly allowed")
     if not executable.is_file() or not os.access(executable, os.X_OK):
         raise BridgeError(
             "executable_unavailable", "Allowed executable is missing or not executable"
         )
+    return str(executable)
 
 
 class TerminalManager:
-    def __init__(self):
+    def __init__(self, settings: TerminalConfig | None = None):
         self.sessions: dict[str, Session] = {}
+        self.environment = minimal_environment()
+        if settings:
+            for value in settings.search_path + ([settings.home] if settings.home else []):
+                if not Path(value).is_absolute() or "\x00" in value or ":" in value:
+                    raise BridgeError("terminal_config", "Use absolute HOME and search directories")
+            if settings.search_path:
+                self.environment["PATH"] = os.pathsep.join(settings.search_path)
+            if settings.home:
+                self.environment["HOME"] = settings.home
 
     async def execute(
         self,
@@ -56,17 +77,20 @@ class TerminalManager:
         env: dict | None = None,
         stdin: bytes | None = None,
         line_callback: Callable[[str], Awaitable[None]] | None = None,
+        allow_any_executable: bool = False,
     ) -> dict:
-        check_executable(args.argv[0], executables)
+        executable = check_executable(
+            args.argv[0], executables, allow_any_executable, self.environment["PATH"]
+        )
         if any("\x00" in part for part in args.argv):
             raise BridgeError("invalid_command", "NUL in command argument")
         scope = PathScope(roots)
         # Pin cwd, then fchdir in a separate exec trampoline (macOS has no directory /dev/fd).
         with scope.directory(args.cwd) as cwd_fd:
             process = await spawn_process(
-                args.argv,
+                [executable, *args.argv[1:]],
                 cwd_fd,
-                env=env if env is not None else minimal_environment(),
+                env=env if env is not None else self.environment.copy(),
                 stdin=asyncio.subprocess.PIPE if stdin is not None else asyncio.subprocess.DEVNULL,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,

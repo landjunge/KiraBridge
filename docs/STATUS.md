@@ -1,3 +1,15 @@
+# Fortschreibung Betreiberrechte · 18.10.2026
+
+Regulärer Terminal-Vollzugriff für chatgpt/local ist ausdrücklich konfiguriert
+und über die verbundene ChatGPT-App einschließlich Codex-Schreiben/Rücklesen,
+ps/Git, isolierter Paketinstallation/-entfernung und eigenem Prozessabbruch
+geprüft. Administratoradapter mit lokalem macOS-Dialog implementiert; die echte
+Root-Abnahme bleibt nach Timeout unbekannt. Historische Belege unten bleiben
+unverändert; insbesondere frühere Aussagen zur fehlenden App-Schnittstelle sind
+historisch. [Aktueller Stand DE/EN und konkrete Taskbelege](DEVELOPMENT-ACCESS-20261018.md).
+
+---
+
 # Abnahmestand 0.5.2
 
 18.10.2026, Projektsteuerung: sechs Projektwurzeln und registrierte Worktrees

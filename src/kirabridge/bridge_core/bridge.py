@@ -52,6 +52,9 @@ INPUTS = {
     "agent.execute": AgentInput,
     "threaddesk.read": ThreadDeskReadInput,
     "threaddesk.manage": ThreadDeskManageInput,
+    "agent.status": EmptyInput,
+    "policy.inspect": EmptyInput,
+    "admin.execute": TerminalInput,
 }
 
 
@@ -74,7 +77,7 @@ class Bridge:
             lambda principal: AuditObserver(config, principal, self.runtime, self.store),
         )
         self.security = SecurityManager(config, self.store)
-        self.terminal = TerminalManager()
+        self.terminal = TerminalManager(config.terminal)
         self.filesystem = FilesystemManager()
         self.clipboard = ClipboardManager()
         self.processes = ProcessManager(self.terminal)
@@ -207,7 +210,13 @@ class Bridge:
         scope = PathScope(roots, excluded=[str(self.config.state_path)])
         if operation == "terminal.execute":
             result = await self.terminal.execute(
-                task["id"], principal, args, policy.roots, policy.executables, running
+                task["id"],
+                principal,
+                args,
+                policy.terminal_roots or policy.roots,
+                policy.executables,
+                running,
+                allow_any_executable=policy.allow_any_executable,
             )
             return {
                 **result,
@@ -225,6 +234,18 @@ class Bridge:
             return await self.agents.execute(task, args, policy, running, progress)
         if operation.startswith("threaddesk."):
             return await self.threaddesk.execute(task, args, running)
+
+        if operation == "admin.execute":
+            from kirabridge.admin_manager import execute_admin
+
+            return await execute_admin(self, task, args, policy, running)
+        if operation in {"policy.inspect", "agent.status"}:
+            from kirabridge.development_status import agent_status, permissions_snapshot
+
+            await running({"evidence_type": "local_operation_entered", "operation": operation})
+            if operation == "policy.inspect":
+                return permissions_snapshot(self, principal)
+            return await agent_status(self, principal)
         if operation.startswith("file."):
             scope.split(args.path)
             if operation == "file.move":

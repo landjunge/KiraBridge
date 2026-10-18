@@ -19,6 +19,8 @@ class PrincipalConfig(BaseModel):
     roots: list[str] = Field(default_factory=list)
     read_roots: list[str] = Field(default_factory=list)
     executables: list[str] = Field(default_factory=list)
+    allow_any_executable: bool = False
+    terminal_roots: list[str] = Field(default_factory=list)
     agents: list[str] = Field(default_factory=list)
     token_env: str | None = None
     message_peers: list[str] = Field(default_factory=list, max_length=16)
@@ -49,6 +51,7 @@ class AgentConfig(BaseModel):
     model: str | None = None
     api_key_env: str = "XAI_API_KEY"
     sandbox_mode: Literal["read-only", "workspace-write"] = "read-only"
+    allow_local_tools: bool = False
 
 
 class DiagnosticsConfig(BaseModel):
@@ -70,6 +73,14 @@ class ThreadDeskConfig(BaseModel):
     storage: Literal["json", "sqlite"] = "json"
     timeout: float = Field(default=15, gt=0, le=60)
     max_result_bytes: int = Field(default=524288, ge=1024, le=1048576)
+
+
+class TerminalConfig(BaseModel):
+    """Operator-owned tool discovery; never inherit the daemon's secret environment."""
+
+    model_config = ConfigDict(extra="forbid")
+    search_path: list[str] = Field(default_factory=list, max_length=32)
+    home: str | None = None
 
 
 class Config(BaseModel):
@@ -98,6 +109,8 @@ class Config(BaseModel):
     messaging: MessagingConfig = Field(default_factory=MessagingConfig)
     diagnostics: DiagnosticsConfig = Field(default_factory=DiagnosticsConfig)
     threaddesk: ThreadDeskConfig = Field(default_factory=ThreadDeskConfig)
+
+    terminal: TerminalConfig = Field(default_factory=TerminalConfig)
 
     @property
     def state_path(self) -> Path:
