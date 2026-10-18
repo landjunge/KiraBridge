@@ -19,6 +19,8 @@ Transport oder Queue. [Vollständiger DE/EN-Vertrag](../../WORKFLOW-OBSERVATION-
 - Aktuelle Handoffkorrelation separat; keine erfundenen historischen Projekt-
   oder Workflowkennungen. Keine Step-Requesthash-/Workflowhash-Verwechslung.
 - Begrenzung:16Tasks,500Auditzeilen,4KiB/Record,64KiB Ereignisdaten/Seite,
+  256KiB vollständige kanonische Antwort einschließlich Provenienz/Korrelation/
+  Diagnosen und Zeilenumbruch; verlustfreies Zurücksetzen des Folgecursors.
  16KiB Metadaten/Quellrecord,64Diagnosen/16Korrelationen und SQL-Zeitgrenzen.
   Filter-, Daten-/Vorverlaufs- und Anzeigegrenzen bleiben UNKNOWN.
 - Args/Result/Error/Event-Payloads/Prompts/Dateiinhalte/Pfade/Secrets werden nicht
@@ -28,7 +30,7 @@ Transport oder Queue. [Vollständiger DE/EN-Vertrag](../../WORKFLOW-OBSERVATION-
 
 ## Tatsächliche Prüfungen
 
-35 spezifische Fälle in gezielten Teilrunden:
+36 spezifische Fälle in gezielten Teilrunden:
 
 - Erster enger Lauf:27 bestanden in0.66s, einschließlich vorhandener Eigentümer-
   und Cap-Prüfung, Historie/Minimierung, Cursor/Fremdscope, Hashfehler, Bytegrenze,
@@ -50,6 +52,12 @@ Transport oder Queue. [Vollständiger DE/EN-Vertrag](../../WORKFLOW-OBSERVATION-
   Sequenzlücke endet nach tatsächlich vorhandenen Auswahlzeilen. has_more wird
   nicht bloß aus numerisch größerer Grenzsequenz abgeleitet; kein leerer
   Endlosfolgelauf. Neue Quelle/Teilchecks in followup-source-checks.json.
+-1 zusätzlicher Gesamtbudgetfall bestanden in0.18s: bewusst auf8KiB verkleinertes
+  Budget erzwingt mehrere Seiten, einschließlich historischer Laufzeit-Provenienz.
+  Alle Ereignisse einmalig in identischer Reihenfolge, gesamte Antwort je Seite
+  innerhalb Budget; unbrauchbares1Byte-Budget meldet Fehler statt Endlosschleife.
+  Produktionsgrenze256KiB;64KiB page_event_bytes zählt ausschließlich Events.
+  Neue Quellhashes und enger Lauf in total-response-budget-check.json.
 
 Keine alte allgemeine Suite nochmals lokal wiederholt. Ruff/Format/diff Checks
 beziehen sich auf die neue Exportfunktion und deren Tests/Skript; reguläre

@@ -1,0 +1,22 @@
+{
+  "observed_at": "2026-10-18T19:18:27.216347+00:00",
+  "prior_source_commit": "f8d91a9692cf7d0ee6a62b9d372cbf78b4fe6bbd",
+  "production_max_response_bytes": 262144,
+  "event_only_max_page_bytes": 65536,
+  "check": "pytest -q tests/test_observation_export.py -k total_response_budget",
+  "result": "1 passed, 35 deselected in 0.18s",
+  "asserted": [
+    "entire canonical JSON response plus newline within 8192-byte exercised budget",
+    "stable through_seq and advancing cursor",
+    "all baseline event records once, unchanged and ordered",
+    "matching provenance and counters after rewind",
+    "unusable 1-byte budget fails without empty endless continuation"
+  ],
+  "source_sha256": {
+    "src/kirabridge/observation_export.py": "63d8229fe0a86b203a38de24bd5f787e2e8b8d314f952369d129e9880df9fd44",
+    "scripts/export_workflow_observations.py": "2dda9ec1d455c96e516d7f7b6205ae9b6efe891b93e2bdb6592cd158cd258393",
+    "tests/test_observation_export.py": "c42da501cdfed24ffbc884184604cb4544ceea974f2eba10598baf83438963b9"
+  },
+  "production_runtime_or_data_used": false,
+  "original_probe_outputs_overwritten": false
+}

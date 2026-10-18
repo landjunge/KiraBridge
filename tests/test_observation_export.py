@@ -325,6 +325,44 @@ def test_page_byte_cap_advances_and_individual_record_bound(bridge):
     )
 
 
+def test_total_response_budget_includes_proofs_and_rewinds_without_loss(bridge, monkeypatch):
+    from kirabridge import observation_export
+
+    assert observation_export.MAX_RESPONSE_BYTES == 262144
+    completed(bridge)
+    for index in range(20):
+        audit(bridge, "task.transition", {"to": "running", "attempt_id": str(index)})
+        audit(bridge, "not_projected", {})
+    expected = read(bridge, limit=500)
+    assert len((canonical(expected) + "\n").encode()) > 8192
+    monkeypatch.setattr(observation_export, "MAX_RESPONSE_BYTES", 8192)
+    events, cursor, trimmed = [], 0, False
+    for _ in range(30):
+        page = read(bridge, cursor=cursor, through_seq=expected["through_seq"], limit=500)
+        assert len((canonical(page) + "\n").encode()) <= 8192
+        assert page["max_response_bytes"] == 8192
+        assert page["page_event_bytes"] == sum(
+            len((canonical(event) + "\n").encode()) for event in page["events"]
+        )
+        assert len(page["events"]) == len(page["provenance"])
+        assert all(item["audit_seq"] <= page["next_cursor"] for item in page["diagnostics"])
+        events.extend(page["events"])
+        if not page["has_more"]:
+            break
+        trimmed = True
+        assert cursor < page["next_cursor"]
+        cursor = page["next_cursor"]
+    else:
+        pytest.fail("bounded response pagination did not terminate")
+    assert trimmed and events == expected["events"]
+    assert len({event["event_id"] for event in events}) == len(events)
+    # An unusably small budget reports a prerequisite error, never endless pages.
+    monkeypatch.setattr(observation_export, "MAX_RESPONSE_BYTES", 1)
+    with pytest.raises(BridgeError) as failure:
+        read(bridge)
+    assert failure.value.code == "observation_response_budget"
+
+
 @pytest.mark.skipif(os.name == "nt", reason="Unix owner/mode semantics")
 def test_world_readable_or_symlink_state_refused(bridge, tmp_path):
     queued(bridge)

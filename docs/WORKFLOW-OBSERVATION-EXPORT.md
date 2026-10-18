@@ -112,7 +112,13 @@ Tunnelereignisse bleiben UNKNOWN; auch null Ereignisse ist kein Sicherheitsbewei
 
 `limit` zählt untersuchte Auditzeilen (1–500), plus eine begrenzte Vorschauzeile
 zur Fortsetzungserkennung; nicht ausschließlich projizierte
-Ereignisse. Maximal4096Byte je JSONL-Record, 65536Byte Ereignisdaten je Seite;
+Ereignisse. Maximal4096Byte je JSONL-Record, 65536Byte Ereignisdaten je Seite
+(`page_event_bytes`); die vollständige kanonische JSON-Antwort einschließlich
+Provenienz, aktueller Korrelationen und Diagnosen ist auf262144Byte begrenzt
+(inklusive abschließendem Zeilenumbruch). Bei Erreichen der Gesamtgrenze wird der
+Cursor vor das erste nicht ausgelieferte Ereignis zurückgesetzt; dieses wird
+auf der nächsten Seite erneut gelesen und geht nicht verloren. Ein zu kleines
+internes Budget meldet `observation_response_budget`, statt leer endlos fortzusetzen.
 64 Diagnosen und16 aktuelle Korrelationen, weitere Diagnosen/Bezüge sind begrenzt
 bzw. als ausgelassen erkennbar. Audits/Preflights werden bis16KiB aufgenommen;
 größere/ungültige Records werden mit stabiler Diagnose übersprungen. Kein
@@ -195,7 +201,11 @@ effect proof is fabricated. Overall activity, identity and external tunnel
 lifecycle remain unknown even with no findings.
 
 Bounds: 500 examined audit rows plus one bounded lookahead,16 owned tasks,4KiB per event,64KiB event bytes per
-page,64 displayed diagnostics and16 current correlations; oversized/invalid input
+page (`page_event_bytes`). The entire canonical JSON response, including proofs,
+current correlations, diagnostics and final newline, is capped at256KiB. Trimming
+rewinds the cursor before the first omitted event for lossless continuation; an
+unusable internal budget fails with observation_response_budget rather than an
+empty endless page. There are64 displayed diagnostics and16 current correlations; oversized/invalid input
 is diagnosed with advancing cursor. Metadata input is bounded to16KiB/record.
 Existing source audit retention is untouched; no second accumulating store.
 SQLite wait is0.2s with a2s VM progress check, not a hard OS-I/O deadline. Reuse

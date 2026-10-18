@@ -16,6 +16,7 @@ from kirabridge.bridge_core.models import BridgeError, canonical, digest
 EVENT_SCHEMA = "agent-authority-workflow-event-v1"
 MAX_TASKS, MAX_ROWS, MAX_RECORD_BYTES, MAX_PAGE_BYTES = 16, 500, 4096, 65536
 MAX_METADATA_BYTES = 16384
+MAX_RESPONSE_BYTES = 262144
 REF = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.:-]{0,255}\Z")
 HASH = re.compile(r"[a-f0-9]{64}\Z")
 TASK_ID = re.compile(r"[A-Za-z0-9_-]{1,128}\Z")
@@ -326,9 +327,11 @@ def export_configured_observations(
 
 def _page(db, rows, principal, source_id, task_ids, cursor, through, limit):
     events, provenance, diagnostics, refs = [], [], [], set()
+    checkpoints = []
     next_cursor, page_bytes, scanned, skipped, invalid = cursor, 0, 0, 0, 0
     gaps = False
     for row in rows[:limit]:
+        checkpoint = (next_cursor, page_bytes, scanned, skipped, invalid, gaps, len(diagnostics))
         try:
             event, metadata = _project(row, principal, source_id)
         except (ValueError, TypeError, OverflowError, OSError, RecursionError):
@@ -341,6 +344,7 @@ def _page(db, rows, principal, source_id, task_ids, cursor, through, limit):
             if page_bytes + size > MAX_PAGE_BYTES:
                 break
             page_bytes += size
+            checkpoints.append(checkpoint)
             events.append(event)
             proof = {
                 "event_id": event["event_id"],
@@ -361,7 +365,7 @@ def _page(db, rows, principal, source_id, task_ids, cursor, through, limit):
         gaps |= row["seq"] != next_cursor + 1
         next_cursor, scanned = row["seq"], scanned + 1
     correlations = _correlations(db, principal, task_ids, refs)
-    return {
+    response = {
         "event_schema": EVENT_SCHEMA,
         "role": "observer_only",
         "source_tool": "kirabridge",
@@ -375,6 +379,7 @@ def _page(db, rows, principal, source_id, task_ids, cursor, through, limit):
         "audit_rows_examined": scanned,
         "audit_rows_without_workflow_projection": skipped,
         "page_event_bytes": page_bytes,
+        "max_response_bytes": MAX_RESPONSE_BYTES,
         "diagnostics": diagnostics,
         "diagnostics_omitted": max(0, invalid - len(diagnostics)),
         "current_correlations": correlations,
@@ -392,6 +397,31 @@ def _page(db, rows, principal, source_id, task_ids, cursor, through, limit):
         "stop_enforced": False,
         "project_completion_verified": False,
     }
+    while len((canonical(response) + "\n").encode()) > MAX_RESPONSE_BYTES:
+        if not checkpoints:
+            raise _error("observation_response_budget")
+        next_cursor, page_bytes, scanned, skipped, invalid, gaps, diagnostic_count = (
+            checkpoints.pop()
+        )
+        # Revisit the omitted event and every later row on the next page. Current
+        # correlations remain explicitly current, never historical event evidence.
+        del events[len(checkpoints) :]
+        del provenance[len(checkpoints) :]
+        del diagnostics[diagnostic_count:]
+        response.update(
+            next_cursor=next_cursor,
+            has_more=True,
+            audit_rows_examined=scanned,
+            audit_rows_without_workflow_projection=skipped,
+            page_event_bytes=page_bytes,
+            diagnostics_omitted=max(0, invalid - len(diagnostics)),
+        )
+        response["coverage"]["filtered_or_missing_sequence"] = gaps or skipped > 0 or cursor > 0
+        if next_cursor == cursor:
+            # A configured budget too small for the first event must fail, rather
+            # than promise an empty continuation which can never make progress.
+            raise _error("observation_response_budget")
+    return response
 
 
 def _correlations(db, principal, task_ids, refs):
