@@ -1,0 +1,1398 @@
+{
+  "scope": "static code review only; no six-tool end-to-end execution",
+  "projects": {
+    "KiraBridge": {
+      "reviewed_ref": "HEAD",
+      "reviewed_commit": "71ab97b135576ecda14eb98d66d472f5f0c83677",
+      "local_head": "71ab97b135576ecda14eb98d66d472f5f0c83677",
+      "local_working_changes_present": true,
+      "source_files": [
+        {
+          "path": "src/kirabridge/bridge_core/models.py",
+          "sha256": "0ae3b538b7ce989cb48e6c5a1ca4b2d92fc7ca27c4222f7813b2e21ffa285c11",
+          "anchors": [
+            {
+              "line": 11,
+              "text": "class BridgeError(Exception):"
+            },
+            {
+              "line": 12,
+              "text": "    def __init__(self, code: str, message: str):"
+            },
+            {
+              "line": 17,
+              "text": "class UncertainExecution(BridgeError):"
+            },
+            {
+              "line": 21,
+              "text": "class State(StrEnum):"
+            },
+            {
+              "line": 46,
+              "text": "def canonical(value: Any) -> str:"
+            },
+            {
+              "line": 52,
+              "text": "def digest(value: Any) -> str:"
+            },
+            {
+              "line": 56,
+              "text": "class Input(BaseModel):"
+            },
+            {
+              "line": 60,
+              "text": "class TaskRequest(Input):"
+            },
+            {
+              "line": 69,
+              "text": "class TerminalInput(Input):"
+            },
+            {
+              "line": 76,
+              "text": "class PathInput(Input):"
+            },
+            {
+              "line": 80,
+              "text": "class ReadInput(PathInput):"
+            },
+            {
+              "line": 84,
+              "text": "class WriteInput(PathInput):"
+            },
+            {
+              "line": 89,
+              "text": "class MoveInput(PathInput):"
+            },
+            {
+              "line": 93,
+              "text": "class ClipboardRead(Input):"
+            },
+            {
+              "line": 97,
+              "text": "class ClipboardWrite(Input):"
+            },
+            {
+              "line": 101,
+              "text": "class EmptyInput(Input):"
+            },
+            {
+              "line": 105,
+              "text": "class ProcessInput(Input):"
+            },
+            {
+              "line": 109,
+              "text": "class AgentInput(Input):"
+            }
+          ]
+        },
+        {
+          "path": "src/kirabridge/agent_manager/__init__.py",
+          "sha256": "d2e387c8d990c4b00aecc5f502ffd1291021e82dcd1e472e59dc970159619b08",
+          "anchors": [
+            {
+              "line": 34,
+              "text": "class AgentAdapter(Protocol):"
+            },
+            {
+              "line": 37,
+              "text": "    async def execute("
+            },
+            {
+              "line": 48,
+              "text": "def agent_environment(config: AgentConfig) -> dict:"
+            },
+            {
+              "line": 57,
+              "text": "class CodexAdapter:"
+            },
+            {
+              "line": 60,
+              "text": "    def __init__(self, terminal: TerminalManager):"
+            },
+            {
+              "line": 63,
+              "text": "    async def execute(self, task, args, config, roots, running, progress) -> dict:"
+            },
+            {
+              "line": 104,
+              "text": "            config.sandbox_mode,"
+            },
+            {
+              "line": 106,
+              "text": "            'approval_policy=\"never\"',"
+            },
+            {
+              "line": 133,
+              "text": "            \"sandbox_mode\": config.sandbox_mode,"
+            },
+            {
+              "line": 151,
+              "text": "            \"project_completion_verified\": False,"
+            },
+            {
+              "line": 155,
+              "text": "class GrokAPIAdapter:"
+            },
+            {
+              "line": 160,
+              "text": "    async def execute(self, task, args, config, roots, running, progress) -> dict:"
+            },
+            {
+              "line": 230,
+              "text": "            \"project_completion_verified\": False,"
+            },
+            {
+              "line": 234,
+              "text": "class GrokACPAdapter:"
+            },
+            {
+              "line": 239,
+              "text": "    async def execute(self, task, args, config, roots, running, progress) -> dict:"
+            },
+            {
+              "line": 372,
+              "text": "                    \"project_completion_verified\": False,"
+            },
+            {
+              "line": 382,
+              "text": "class AgentManager:"
+            },
+            {
+              "line": 383,
+              "text": "    def __init__(self, config: Config, terminal: TerminalManager):"
+            },
+            {
+              "line": 391,
+              "text": "    def register(self, kind: str, adapter: AgentAdapter) -> None:"
+            },
+            {
+              "line": 398,
+              "text": "    def inventory(self, allowed: list[str]) -> dict:"
+            },
+            {
+              "line": 406,
+              "text": "                            \"sandbox_mode\": config.sandbox_mode,"
+            },
+            {
+              "line": 425,
+              "text": "    async def execute(self, task, args, principal, running, progress):"
+            }
+          ]
+        },
+        {
+          "path": "src/kirabridge/task_manager/store.py",
+          "sha256": "a37b00c919704315f28e33201987db9d44e10f7daafa9262d52afb8cdd8be406",
+          "anchors": [
+            {
+              "line": 44,
+              "text": "SCHEMA = \"\"\""
+            },
+            {
+              "line": 72,
+              "text": "class Store:"
+            },
+            {
+              "line": 75,
+              "text": "    def __init__(self, path: Path):"
+            },
+            {
+              "line": 116,
+              "text": "    def transaction(self):"
+            },
+            {
+              "line": 125,
+              "text": "    def audit(self, kind: str, principal: str, task_id: str | None, metadata: dict) -> None:"
+            },
+            {
+              "line": 150,
+              "text": "    def get(self, task_id: str, principal: str | None = None) -> dict[str, Any]:"
+            },
+            {
+              "line": 160,
+              "text": "    def transition("
+            },
+            {
+              "line": 213,
+              "text": "    def claim(self, owner: str, lease_seconds: float, control: bool = False) -> dict | None:"
+            },
+            {
+              "line": 236,
+              "text": "    def recover(self) -> int:"
+            },
+            {
+              "line": 250,
+              "text": "    def close(self) -> None:"
+            }
+          ]
+        },
+        {
+          "path": "src/kirabridge/mcp_gateway/client.py",
+          "sha256": "ea169bb239fb9cce1c8d4bc49ef7ee1ecad6cb812b9b117a3a2bf940c5e7be20",
+          "anchors": [
+            {
+              "line": 19,
+              "text": "class ObservedClientSession(ClientSession):"
+            },
+            {
+              "line": 20,
+              "text": "    def __init__(self, *args, notice, **kwargs):"
+            },
+            {
+              "line": 24,
+              "text": "    async def send_request(self, request, *args, **kwargs):"
+            },
+            {
+              "line": 33,
+              "text": "    async def send_notification(self, notification, *args, **kwargs):"
+            },
+            {
+              "line": 41,
+              "text": "class Peer:"
+            },
+            {
+              "line": 52,
+              "text": "class MCPClientPool:"
+            },
+            {
+              "line": 57,
+              "text": "    def __init__(self, max_connections: int = 8, call_timeout: float = 30, observer=None):"
+            },
+            {
+              "line": 69,
+              "text": "    def notice(self, peer_id, phase, **metadata):"
+            },
+            {
+              "line": 88,
+              "text": "    def failure(self, peer_id, code, message, *, task_id=None, operation=\"mcp.connect\"):"
+            },
+            {
+              "line": 113,
+              "text": "    async def connect(self, peer: Peer) -> None:"
+            },
+            {
+              "line": 207,
+              "text": "    async def call(self, peer_id: str, tool: str, arguments: dict):"
+            },
+            {
+              "line": 209,
+              "text": "        task_id = arguments.get(\"task_id\") or ("
+            },
+            {
+              "line": 213,
+              "text": "            task_id = None"
+            },
+            {
+              "line": 272,
+              "text": "    async def disconnect(self, peer_id: str) -> None:"
+            },
+            {
+              "line": 290,
+              "text": "    async def close(self) -> None:"
+            },
+            {
+              "line": 299,
+              "text": "    async def __aenter__(self):"
+            },
+            {
+              "line": 302,
+              "text": "    async def __aexit__(self, *exc):"
+            }
+          ]
+        },
+        {
+          "path": "src/kirabridge/readiness.py",
+          "sha256": "75eed095e9eb9bddc1481769c91c52698f779255eefd948a89136e2bb7e33567",
+          "anchors": [
+            {
+              "line": 21,
+              "text": "class ReadinessInput(Input):"
+            },
+            {
+              "line": 28,
+              "text": "def runtime_snapshot(config: Config) -> dict:"
+            },
+            {
+              "line": 51,
+              "text": "def _probe(action) -> dict:"
+            },
+            {
+              "line": 63,
+              "text": "def _file(scope: PathScope, path: str) -> None:"
+            },
+            {
+              "line": 75,
+              "text": "def _directory(scope: PathScope, path: str) -> None:"
+            },
+            {
+              "line": 80,
+              "text": "def readiness(bridge, principal: str, requirements: ReadinessInput) -> dict:"
+            },
+            {
+              "line": 84,
+              "text": "    def file(path):"
+            },
+            {
+              "line": 88,
+              "text": "    def directory(path):"
+            },
+            {
+              "line": 93,
+              "text": "    def executable(path):"
+            },
+            {
+              "line": 97,
+              "text": "    def operation(name):"
+            },
+            {
+              "line": 179,
+              "text": "def task_preflight(bridge, task: dict) -> dict:"
+            },
+            {
+              "line": 193,
+              "text": "    def check(kind, path, action):"
+            }
+          ]
+        }
+      ]
+    },
+    "ThreadDesk": {
+      "reviewed_ref": "origin/main",
+      "reviewed_commit": "f67fb59124bc7a0c8343ca8602459094c2962a42",
+      "local_head": "65aafdf54c6bd0997ea9904dedcf2493eacefd13",
+      "local_working_changes_present": true,
+      "source_files": [
+        {
+          "path": "src/threaddesk/services/mcp.py",
+          "sha256": "927de8b1b774686b65c5466308364413a652cf05f8681077bde42bac735f355a",
+          "anchors": [
+            {
+              "line": 180,
+              "text": "def wrap_untrusted(label: str, text: str) -> str:"
+            },
+            {
+              "line": 185,
+              "text": "def _public(thread: Thread) -> dict[str, Any]:"
+            },
+            {
+              "line": 199,
+              "text": "class McpBridge:"
+            },
+            {
+              "line": 200,
+              "text": "    def __init__(self, svc: ThreadService) -> None:"
+            },
+            {
+              "line": 203,
+              "text": "    def list_tools(self) -> list[dict[str, Any]]:"
+            },
+            {
+              "line": 206,
+              "text": "    def call(self, name: str, arguments: dict[str, Any] | None = None) -> dict[str, Any]:"
+            },
+            {
+              "line": 216,
+              "text": "    def _dispatch(self, name: str, args: dict[str, Any]) -> Any:"
+            }
+          ]
+        },
+        {
+          "path": "src/threaddesk/api/service.py",
+          "sha256": "0d95b4421c078a415e37d562ec966ccf6a004f2f9bf30cd7f2796ca2485e2515",
+          "anchors": [
+            {
+              "line": 44,
+              "text": "class ThreadService:"
+            },
+            {
+              "line": 45,
+              "text": "    def __init__(self, store: Store | None = None, bus: EventBus | None = None) -> None:"
+            },
+            {
+              "line": 57,
+              "text": "    def create(self, title: str, description: str = \"\") -> Thread:"
+            },
+            {
+              "line": 69,
+              "text": "    def create_node("
+            },
+            {
+              "line": 119,
+              "text": "    def get_node(self, node_id: str) -> KnowledgeNode:"
+            },
+            {
+              "line": 122,
+              "text": "    def list_nodes(self) -> list[KnowledgeNode]:"
+            },
+            {
+              "line": 125,
+              "text": "    def list_graph_events(self) -> list[GraphEvent]:"
+            },
+            {
+              "line": 128,
+              "text": "    def allowed_node_transitions(self, node_id: str) -> tuple[str, ...]:"
+            },
+            {
+              "line": 132,
+              "text": "    def _record_graph_event("
+            },
+            {
+              "line": 152,
+              "text": "    def transition_node("
+            },
+            {
+              "line": 191,
+              "text": "    def connect("
+            },
+            {
+              "line": 236,
+              "text": "    def _creates_dependency_cycle(self, source_id: str, target_id: str) -> bool:"
+            },
+            {
+              "line": 257,
+              "text": "    def list_relations(self) -> list[Relation]:"
+            },
+            {
+              "line": 260,
+              "text": "    def relations_for(self, node_id: str) -> list[Relation]:"
+            },
+            {
+              "line": 268,
+              "text": "    def graph(self, *, kind: str | None = None, status: str | None = None) -> dict:"
+            },
+            {
+              "line": 295,
+              "text": "    def list(self, include_archived: bool = False) -> list[Thread]:"
+            },
+            {
+              "line": 298,
+              "text": "    def get(self, key: str) -> Thread:"
+            },
+            {
+              "line": 301,
+              "text": "    def current(self) -> Thread | None:"
+            },
+            {
+              "line": 304,
+              "text": "    def switch(self, key: str) -> Thread:"
+            },
+            {
+              "line": 310,
+              "text": "    def rename(self, key: str, title: str) -> Thread:"
+            },
+            {
+              "line": 321,
+              "text": "    def _target(self, key: str | None = None) -> Thread:"
+            },
+            {
+              "line": 327,
+              "text": "    def set_note(self, text: str, key: str | None = None, append: bool = False) -> Thread:"
+            },
+            {
+              "line": 339,
+              "text": "    def set_description(self, text: str, key: str | None = None) -> Thread:"
+            },
+            {
+              "line": 348,
+              "text": "    def set_status(self, status: str, key: str | None = None) -> Thread:"
+            }
+          ]
+        },
+        {
+          "path": "src/threaddesk/services/handoff_contract.py",
+          "sha256": "0452bc821a9a0b68cbcb2403ee28d1da69f9af8d12e2e1aa0882d81ba1d20ca2",
+          "anchors": [
+            {
+              "line": 10,
+              "text": "FORMAT = \"threaddesk.handoff.v1\""
+            },
+            {
+              "line": 26,
+              "text": "def _whiteboard(value: list[Mapping[str, Any]] | None) -> list[dict[str, Any]]:"
+            },
+            {
+              "line": 48,
+              "text": "def _string_list(value: Any) -> list[str]:"
+            },
+            {
+              "line": 56,
+              "text": "def build("
+            },
+            {
+              "line": 66,
+              "text": "    task_id = str(extra.get(\"task_id\") or f\"{thread.id}:task\")"
+            },
+            {
+              "line": 103,
+              "text": "def validate(value: Mapping[str, Any]) -> dict[str, Any]:"
+            }
+          ]
+        },
+        {
+          "path": "src/threaddesk/services/return_contract.py",
+          "sha256": "84e09a614fa5e9abed8c75f0f0970b744e55d4528108790124653b55b940da44",
+          "anchors": [
+            {
+              "line": 10,
+              "text": "FORMAT = \"threaddesk.return.v1\""
+            },
+            {
+              "line": 18,
+              "text": "def _strings(value: Any, field: str) -> list[str]:"
+            },
+            {
+              "line": 24,
+              "text": "def build("
+            },
+            {
+              "line": 51,
+              "text": "def validate(value: Mapping[str, Any]) -> dict[str, Any]:"
+            }
+          ]
+        },
+        {
+          "path": "src/threaddesk/services/return_inbox.py",
+          "sha256": "69a926deda639a704bfe90108f91a2fedb29bbf624dadf02f2febfe6dc4ef382",
+          "anchors": [
+            {
+              "line": 17,
+              "text": "class ReturnInbox:"
+            },
+            {
+              "line": 18,
+              "text": "    def __init__(self, store: Any) -> None:"
+            },
+            {
+              "line": 22,
+              "text": "    def _read(self) -> dict[str, Any]:"
+            },
+            {
+              "line": 30,
+              "text": "    def list(self) -> list[dict[str, Any]]:"
+            },
+            {
+              "line": 33,
+              "text": "    def receive(self, value: Mapping[str, Any]) -> dict[str, Any]:"
+            },
+            {
+              "line": 53,
+              "text": "    def decide(self, return_id: str, choice: str, note: str = \"\") -> dict[str, Any]:"
+            }
+          ]
+        },
+        {
+          "path": "src/threaddesk/services/gnom_callback.py",
+          "sha256": "eebed65f4cdc1c55b4b826f187663210806361fbb75199ff54217db63aafa3ae",
+          "anchors": [
+            {
+              "line": 14,
+              "text": "FORMAT = \"threaddesk.gnom-callback.v1\""
+            },
+            {
+              "line": 21,
+              "text": "def receive(store: Any, value: Mapping[str, Any]) -> dict[str, Any]:"
+            }
+          ]
+        },
+        {
+          "path": "src/threaddesk/services/gnom_jobs.py",
+          "sha256": "d4834ae0bf8a2d7a9dd67402495e936541b4b2b5179ea0b2c5131a6d1d8bf33d",
+          "anchors": [
+            {
+              "line": 17,
+              "text": "class GnomJobRegistry:"
+            },
+            {
+              "line": 18,
+              "text": "    def __init__(self, store: Any) -> None:"
+            },
+            {
+              "line": 22,
+              "text": "    def _read(self) -> dict[str, Any]:"
+            },
+            {
+              "line": 30,
+              "text": "    def list(self) -> list[dict[str, Any]]:"
+            },
+            {
+              "line": 33,
+              "text": "    def get(self, job_id: str) -> dict[str, Any]:"
+            },
+            {
+              "line": 39,
+              "text": "    def bind(self, job_id: str, packet: Mapping[str, Any]) -> dict[str, Any]:"
+            },
+            {
+              "line": 64,
+              "text": "    def record("
+            }
+          ]
+        },
+        {
+          "path": "src/threaddesk/services/tollgate.py",
+          "sha256": "f8bd5ac04f9900b8ba3e7bb6735803f22cc8dd74857b25bc534e42970968f819",
+          "anchors": [
+            {
+              "line": 32,
+              "text": "def _utc_now() -> datetime:"
+            },
+            {
+              "line": 36,
+              "text": "class LocalGate:"
+            },
+            {
+              "line": 37,
+              "text": "    def __init__(self, root: Path, now: Callable[[], datetime] | None = None) -> None:"
+            },
+            {
+              "line": 41,
+              "text": "    def status(self) -> dict[str, Any]:"
+            },
+            {
+              "line": 59,
+              "text": "    def check(self, action: str, thread_id: str) -> dict[str, Any]:"
+            },
+            {
+              "line": 80,
+              "text": "    def record(self, action: str, thread_id: str) -> dict[str, Any]:"
+            },
+            {
+              "line": 101,
+              "text": "    def set_policy(self, **updates: Any) -> dict[str, Any]:"
+            },
+            {
+              "line": 119,
+              "text": "    def freeze(self, frozen: bool = True) -> dict[str, Any]:"
+            },
+            {
+              "line": 122,
+              "text": "    def _blocked(self, data: dict[str, Any], action: str, thread_id: str, now: datetime) -> str | None:"
+            },
+            {
+              "line": 152,
+              "text": "    def _load(self) -> dict[str, Any]:"
+            },
+            {
+              "line": 177,
+              "text": "    def _save(self, data: dict[str, Any]) -> None:"
+            },
+            {
+              "line": 189,
+              "text": "def _action(action: str) -> str:"
+            },
+            {
+              "line": 196,
+              "text": "def _day_key(now: datetime) -> str:"
+            },
+            {
+              "line": 200,
+              "text": "def _empty_day() -> dict[str, Any]:"
+            }
+          ]
+        }
+      ]
+    },
+    "4AllPass": {
+      "reviewed_ref": "origin/main",
+      "reviewed_commit": "83d111d59fe8048950959797666704b47ece2ef2",
+      "local_head": "60eef0a7cc522c83dd13842c82c63a4430eb256f",
+      "local_working_changes_present": false,
+      "source_files": [
+        {
+          "path": "packages/access/src/client.ts",
+          "sha256": "1189f8a81314f165f703fe161dba303c5bec46aa34caf8b58bcb7b3e2d47a6e7",
+          "anchors": [
+            {
+              "line": 8,
+              "text": "export const DEFAULT_BROKER_URL = \"http://127.0.0.1:8788\";"
+            },
+            {
+              "line": 9,
+              "text": "export const DEFAULT_TIMEOUT_MS = 70_000;"
+            },
+            {
+              "line": 11,
+              "text": "export interface ClientOptions {"
+            },
+            {
+              "line": 19,
+              "text": "export interface AccessRequestInput {"
+            },
+            {
+              "line": 26,
+              "text": "  /** Omitted = v1 raw_secret. `mediated` is sent as asked; policy denies until a proxy exists. */"
+            },
+            {
+              "line": 27,
+              "text": "  handoff?: \"raw_secret\" | \"mediated\";"
+            },
+            {
+              "line": 34,
+              "text": "export interface FourAllPassClient {"
+            },
+            {
+              "line": 52,
+              "text": "export function assertLoopbackUrl(url: string): URL {"
+            },
+            {
+              "line": 98,
+              "text": "export function fourAllPass(options: ClientOptions = {}): FourAllPassClient {"
+            }
+          ]
+        },
+        {
+          "path": "packages/core/src/access/handoff.ts",
+          "sha256": "4d9219531e7d1565250400de2d9803d46847d908ffc04079db20cb8a4180375d",
+          "anchors": [
+            {
+              "line": 4,
+              "text": " * v1 can only copy bytes (`raw_secret`). A mediated proxy \u2014 4AllPass uses the"
+            },
+            {
+              "line": 6,
+              "text": " * be denied honestly. Do not silently fall back from mediated to raw_secret."
+            },
+            {
+              "line": 8,
+              "text": "export const HANDOFF_MODES = [\"raw_secret\", \"mediated\"] as const;"
+            },
+            {
+              "line": 12,
+              "text": "export const AVAILABLE_HANDOFF: readonly HandoffMode[] = [\"raw_secret\"];"
+            },
+            {
+              "line": 14,
+              "text": "export function parseHandoff(value: unknown): HandoffMode | \"invalid\" {"
+            },
+            {
+              "line": 15,
+              "text": "  if (value === undefined || value === null || value === \"\") return \"raw_secret\";"
+            },
+            {
+              "line": 16,
+              "text": "  if (value === \"raw_secret\" || value === \"mediated\") return value;"
+            },
+            {
+              "line": 20,
+              "text": "export function handoffIsAvailable(mode: HandoffMode): boolean {"
+            }
+          ]
+        },
+        {
+          "path": "packages/broker/src/relay.mjs",
+          "sha256": "a620a3bffc750f92965a4dc100f163493bd8886359b008ef34b060c5070b6fee",
+          "anchors": [
+            {
+              "line": 10,
+              "text": "export const DEFAULT_HOST = \"127.0.0.1\";"
+            },
+            {
+              "line": 11,
+              "text": "export const DEFAULT_PORT = 8787;"
+            },
+            {
+              "line": 12,
+              "text": "export const DEFAULT_PWA_ORIGINS = ["
+            },
+            {
+              "line": 21,
+              "text": "export function originsFromEnv(raw = process.env.FOURALLPASS_BROKER_PWA_ORIGINS) {"
+            },
+            {
+              "line": 34,
+              "text": "export function newBrokerToken() {"
+            },
+            {
+              "line": 38,
+              "text": "export function pwaOriginAllowed(origin, allowlist = DEFAULT_PWA_ORIGINS) {"
+            },
+            {
+              "line": 44,
+              "text": "export function browserGrantOrigin(origin) {"
+            },
+            {
+              "line": 58,
+              "text": "export function tokenMatches(got, expected) {"
+            },
+            {
+              "line": 107,
+              "text": "export function createBroker(opts) {"
+            }
+          ]
+        },
+        {
+          "path": "backend/app/authority_emit.py",
+          "sha256": "12713b97534c7ab160aef04a6449ee1e4d99fcb85b29a238ffe45db4cdbf2e29",
+          "anchors": [
+            {
+              "line": 13,
+              "text": "SOURCE = \"4allpass\""
+            },
+            {
+              "line": 33,
+              "text": "        \"raw_secret\","
+            },
+            {
+              "line": 38,
+              "text": "def enabled() -> bool:"
+            },
+            {
+              "line": 45,
+              "text": "def events_path() -> Path:"
+            },
+            {
+              "line": 54,
+              "text": "def _iso() -> str:"
+            },
+            {
+              "line": 58,
+              "text": "def _canonical(event: dict[str, Any]) -> bytes:"
+            },
+            {
+              "line": 65,
+              "text": "def _hash(event: dict[str, Any]) -> str:"
+            },
+            {
+              "line": 69,
+              "text": "def _last_hash(path: Path) -> str | None:"
+            },
+            {
+              "line": 85,
+              "text": "def emit_from_decide(req_id: str, body: dict[str, Any] | None) -> dict[str, Any] | None:"
+            }
+          ]
+        }
+      ]
+    },
+    "TollGate": {
+      "reviewed_ref": "origin/main",
+      "reviewed_commit": "114cdaee1d3fa39aeaf744c67d2ac1352959fa5e",
+      "local_head": "aead5d00a75acd32641b766bb6f215a1fe3c8dc1",
+      "local_working_changes_present": true,
+      "source_files": [
+        {
+          "path": "src/tollgate/client.py",
+          "sha256": "9d26a877b97811e33ba4d2698eb152380656dee9e5a4018744324a7fb39913dc",
+          "anchors": [
+            {
+              "line": 12,
+              "text": "class TollgateClient:"
+            },
+            {
+              "line": 15,
+              "text": "    def __init__("
+            },
+            {
+              "line": 34,
+              "text": "    def _headers(self) -> dict[str, str]:"
+            },
+            {
+              "line": 43,
+              "text": "    def _request(self, method: str, path: str, body: dict[str, Any] | None = None) -> dict[str, Any]:"
+            },
+            {
+              "line": 65,
+              "text": "    def health(self) -> dict[str, Any]:"
+            },
+            {
+              "line": 68,
+              "text": "    def route("
+            },
+            {
+              "line": 87,
+              "text": "    def invoke("
+            },
+            {
+              "line": 103,
+              "text": "    def chat("
+            },
+            {
+              "line": 157,
+              "text": "    def budget(self, provider: str = \"\") -> dict[str, Any]:"
+            },
+            {
+              "line": 161,
+              "text": "    def providers(self, *, live: bool = False) -> dict[str, Any]:"
+            }
+          ]
+        },
+        {
+          "path": "src/tollgate/gateway/entry.py",
+          "sha256": "30e757ae71ef08e206dc773a6a2c26905e3787ea18c6265f9b084a28062bde11",
+          "anchors": [
+            {
+              "line": 24,
+              "text": "def _stage_prove_availability("
+            },
+            {
+              "line": 60,
+              "text": "def _build_deny_response("
+            },
+            {
+              "line": 97,
+              "text": "def _stage_protect_admit("
+            },
+            {
+              "line": 132,
+              "text": "def _stage_protect_rates("
+            },
+            {
+              "line": 172,
+              "text": "def _stage_cache_lookup("
+            },
+            {
+              "line": 209,
+              "text": "def _stage_execute("
+            },
+            {
+              "line": 275,
+              "text": "def _stage_route_feedback("
+            },
+            {
+              "line": 324,
+              "text": "def gateway_call("
+            },
+            {
+              "line": 397,
+              "text": "def gateway_search("
+            }
+          ]
+        },
+        {
+          "path": "src/tollgate/chat_stream.py",
+          "sha256": "1fd0e9245e267ced3e5575f559fc08c5819693bf1441b4afcdd4b8e511334c05",
+          "anchors": [
+            {
+              "line": 34,
+              "text": "def can_upstream_stream(provider: str) -> bool:"
+            },
+            {
+              "line": 44,
+              "text": "def force_synthetic() -> bool:"
+            },
+            {
+              "line": 53,
+              "text": "def _build_upstream("
+            },
+            {
+              "line": 150,
+              "text": "def start_chat_stream("
+            },
+            {
+              "line": 438,
+              "text": "    def gen() -> Iterator[str]:"
+            }
+          ]
+        },
+        {
+          "path": "src/tollgate/authority_emit.py",
+          "sha256": "eebb529be25f09068fcc96bde484167439cab91265290a3377999cde551f68e4",
+          "anchors": [
+            {
+              "line": 13,
+              "text": "SOURCE = \"tollgate\""
+            },
+            {
+              "line": 16,
+              "text": "def enabled() -> bool:"
+            },
+            {
+              "line": 23,
+              "text": "def events_path() -> Path:"
+            },
+            {
+              "line": 30,
+              "text": "def _iso() -> str:"
+            },
+            {
+              "line": 34,
+              "text": "def _canonical(event: dict[str, Any]) -> bytes:"
+            },
+            {
+              "line": 41,
+              "text": "def _hash(event: dict[str, Any]) -> str:"
+            },
+            {
+              "line": 45,
+              "text": "def _last_hash(path: Path) -> str | None:"
+            },
+            {
+              "line": 61,
+              "text": "def emit("
+            },
+            {
+              "line": 110,
+              "text": "def emit_from_decision(decision: Any) -> None:"
+            }
+          ]
+        }
+      ]
+    },
+    "Gnom-Hub": {
+      "reviewed_ref": "origin/main",
+      "reviewed_commit": "8108c64563694e46e813a807174b238d7e2c5b6c",
+      "local_head": "6d2e5966163bec97440aa4cff2f25d197c6ad1f5",
+      "local_working_changes_present": true,
+      "source_files": [
+        {
+          "path": "src/gnom_hub/jobs.py",
+          "sha256": "006aa43a5b774d1fd27ba648886bf8fca7e156a77202b2df08f7fcba5fe93e8d",
+          "anchors": [
+            {
+              "line": 12,
+              "text": "def _job_timeout_s() -> float:"
+            },
+            {
+              "line": 21,
+              "text": "class JobsMixin:"
+            },
+            {
+              "line": 24,
+              "text": "    def _find_busy_job(self) -> dict[str, Any] | None:"
+            },
+            {
+              "line": 54,
+              "text": "    def _start_job("
+            },
+            {
+              "line": 391,
+              "text": "    def chat_async("
+            },
+            {
+              "line": 413,
+              "text": "    def execute_async(self) -> dict[str, Any]:"
+            },
+            {
+              "line": 422,
+              "text": "    def rerun_worker_async(self, worker_id: str) -> dict[str, Any]:"
+            },
+            {
+              "line": 430,
+              "text": "    def get_job(self, job_id: str) -> dict[str, Any] | None:"
+            },
+            {
+              "line": 460,
+              "text": "    def cancel_job(self, job_id: str, *, as_timeout: bool = False) -> dict[str, Any]:"
+            },
+            {
+              "line": 515,
+              "text": "    def cancel_busy_job(self) -> dict[str, Any]:"
+            },
+            {
+              "line": 524,
+              "text": "    def list_jobs(self, limit: int = 20) -> list[dict[str, Any]]:"
+            },
+            {
+              "line": 544,
+              "text": "    def clarify_async(self, option: str) -> dict[str, Any]:"
+            }
+          ]
+        },
+        {
+          "path": "src/gnom_hub/api/routers/jobs.py",
+          "sha256": "8d19f699cd90da0c54b76d55d664b8056a375df029374cd0beb640d3735ef85c",
+          "anchors": [
+            {
+              "line": 15,
+              "text": "def jobs_list(limit: int = Query(20, ge=1, le=50)) -> dict[str, Any]:"
+            },
+            {
+              "line": 39,
+              "text": "def jobs_busy() -> dict[str, Any]:"
+            },
+            {
+              "line": 57,
+              "text": "def job_status(job_id: str) -> dict[str, Any]:"
+            },
+            {
+              "line": 65,
+              "text": "def job_cancel_busy() -> dict[str, Any]:"
+            },
+            {
+              "line": 71,
+              "text": "def job_cancel("
+            }
+          ]
+        },
+        {
+          "path": "src/gnom_hub/llm/manager.py",
+          "sha256": "e46cfa337665f7d006e029f1bf19445423734e81108478128cf6b7a2124fe802",
+          "anchors": [
+            {
+              "line": 66,
+              "text": "def raise_tollgate_chat_error(out: dict) -> None:"
+            },
+            {
+              "line": 89,
+              "text": "class LLMManager:"
+            },
+            {
+              "line": 99,
+              "text": "    def __init__("
+            },
+            {
+              "line": 133,
+              "text": "    def spent_usd(self) -> float:"
+            },
+            {
+              "line": 137,
+              "text": "    def prompt_tokens(self) -> int:"
+            },
+            {
+              "line": 141,
+              "text": "    def completion_tokens(self) -> int:"
+            },
+            {
+              "line": 144,
+              "text": "    def usage_snapshot(self) -> dict:"
+            },
+            {
+              "line": 153,
+              "text": "    def reset_usage(self) -> dict:"
+            },
+            {
+              "line": 161,
+              "text": "    def _usable_or_empty(self, raw: str) -> str:"
+            },
+            {
+              "line": 170,
+              "text": "    def deepseek_key(self, override: str | None = None) -> str:"
+            },
+            {
+              "line": 175,
+              "text": "    def worker_key(self, override: str | None = None) -> str:"
+            },
+            {
+              "line": 184,
+              "text": "    def note_auth_failure(self, key: str | None = None) -> None:"
+            },
+            {
+              "line": 199,
+              "text": "    def clear_auth_blocks(self) -> None:"
+            },
+            {
+              "line": 202,
+              "text": "    def auth_snapshot(self) -> dict:"
+            },
+            {
+              "line": 210,
+              "text": "    def ollama_available(self, *, force: bool = False) -> bool:"
+            },
+            {
+              "line": 216,
+              "text": "    def has_provider(self, name: str = \"deepseek\") -> bool:"
+            },
+            {
+              "line": 225,
+              "text": "    def providers_snapshot(self) -> dict:"
+            },
+            {
+              "line": 240,
+              "text": "    def list_ollama_models(self) -> list[str]:"
+            },
+            {
+              "line": 248,
+              "text": "    def chat("
+            },
+            {
+              "line": 446,
+              "text": "    def _account(self, result: LLMResult, agent_key: str) -> LLMResult:"
+            },
+            {
+              "line": 460,
+              "text": "    def _chat_via_tollgate("
+            },
+            {
+              "line": 531,
+              "text": "    def _tollgate_admit(self, provider: str, model: str, *, agent: str) -> None:"
+            },
+            {
+              "line": 564,
+              "text": "    def _tollgate_record("
+            },
+            {
+              "line": 588,
+              "text": "    def _resolve_route(self, model: str, provider: str | None) -> tuple[str, str]:"
+            }
+          ]
+        },
+        {
+          "path": "src/gnom_hub/threaddesk_ops.py",
+          "sha256": "c0430dd08298f5580c338ab8e435dfcf1b775638b24683e9779cec69502489ff",
+          "anchors": [
+            {
+              "line": 18,
+              "text": "def store_root() -> Path:"
+            },
+            {
+              "line": 23,
+              "text": "def handoff_path() -> Path:"
+            },
+            {
+              "line": 27,
+              "text": "def _utc_now() -> datetime:"
+            },
+            {
+              "line": 31,
+              "text": "def _iso(dt: datetime) -> str:"
+            },
+            {
+              "line": 35,
+              "text": "def existing_handoff() -> dict[str, Any] | None:"
+            },
+            {
+              "line": 43,
+              "text": "def build_packet("
+            },
+            {
+              "line": 81,
+              "text": "def write_handoff("
+            },
+            {
+              "line": 121,
+              "text": "def peek() -> dict[str, Any]:"
+            },
+            {
+              "line": 170,
+              "text": "def _read_json(path: Path) -> dict[str, Any]:"
+            }
+          ]
+        },
+        {
+          "path": "src/gnom_hub/authority_emit.py",
+          "sha256": "a5f55d3cbecb5d8a5838f689eb98ecf0eeae7b18373035c40a62b1d15b1a7df5",
+          "anchors": [
+            {
+              "line": 15,
+              "text": "SOURCE = \"gnom-hub-v1\""
+            },
+            {
+              "line": 28,
+              "text": "def enabled() -> bool:"
+            },
+            {
+              "line": 35,
+              "text": "def events_path() -> Path:"
+            },
+            {
+              "line": 42,
+              "text": "def _iso() -> str:"
+            },
+            {
+              "line": 46,
+              "text": "def _workflow_id() -> str:"
+            },
+            {
+              "line": 59,
+              "text": "def _canonical(event: dict[str, Any]) -> bytes:"
+            },
+            {
+              "line": 66,
+              "text": "def _hash(event: dict[str, Any]) -> str:"
+            },
+            {
+              "line": 70,
+              "text": "def _last_hash(path: Path) -> str | None:"
+            },
+            {
+              "line": 86,
+              "text": "def emit("
+            }
+          ]
+        }
+      ]
+    },
+    "Agent Authority": {
+      "reviewed_ref": "origin/master",
+      "reviewed_commit": "edd40b959fc898edc06e790fe3672e748d7dbb2c",
+      "local_head": "09cbf153ed07f01492ccbe884e744e7f50911408",
+      "local_working_changes_present": true,
+      "source_files": [
+        {
+          "path": "agent_authority/observations.py",
+          "sha256": "1b7eba40bd683da462599f5ba957957060bac7ad2d6abc8cea9eb083eb10c4f0",
+          "anchors": [
+            {
+              "line": 28,
+              "text": "class Source:"
+            },
+            {
+              "line": 32,
+              "text": "    def __post_init__(self) -> None:"
+            },
+            {
+              "line": 40,
+              "text": "class Entry:"
+            },
+            {
+              "line": 48,
+              "text": "    def __post_init__(self) -> None:"
+            },
+            {
+              "line": 69,
+              "text": "    def reference(self) -> dict[str, Any]:"
+            },
+            {
+              "line": 78,
+              "text": "class Diagnostic:"
+            },
+            {
+              "line": 84,
+              "text": "class Snapshot:"
+            }
+          ]
+        },
+        {
+          "path": "agent_authority/json_source.py",
+          "sha256": "ec80c47873a80432403d9e8ca45b4550616032c4cd0bd4f1a54a1bbef6db55e4",
+          "anchors": [
+            {
+              "line": 16,
+              "text": "SCHEMA = \"agent-authority-observation-v1\""
+            },
+            {
+              "line": 19,
+              "text": "def _read_entry("
+            },
+            {
+              "line": 43,
+              "text": "def read_observations(path: Path, source_id: str) -> Snapshot:"
+            }
+          ]
+        },
+        {
+          "path": "agent_authority/report.py",
+          "sha256": "dbd78d06892769e9ea84cf8738d84c4f89d954f9163fb0b87af24ff5bee080c3",
+          "anchors": [
+            {
+              "line": 43,
+              "text": "def build_report(snapshot: Snapshot, limit: int = 20) -> dict[str, Any]:"
+            },
+            {
+              "line": 137,
+              "text": "def render_text(report: dict[str, Any]) -> str:"
+            }
+          ]
+        },
+        {
+          "path": "agent_authority/whiteboard.py",
+          "sha256": "6afb5e94c45810a634a28e590f2c535b63cf066f8e2bffbf209872870a220f91",
+          "anchors": [
+            {
+              "line": 24,
+              "text": "def _read_entry("
+            },
+            {
+              "line": 49,
+              "text": "def read_whiteboard(store: Path, thread_id: str) -> Snapshot:"
+            }
+          ]
+        },
+        {
+          "path": "docs/PRODUCT-OBSERVATION-CONTRACT.md",
+          "sha256": "d5e8b2ecaaf25aebb0f83f3f1d03c58723357ac02d91c0e05395e50500a47227",
+          "anchors": []
+        }
+      ]
+    }
+  }
+}

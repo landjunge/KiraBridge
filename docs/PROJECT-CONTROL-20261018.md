@@ -56,10 +56,47 @@ Konfiguration wurde vor jeder Änderung mit erhaltenem0600-Modus privat gesicher
 265 Taskzeilen und vorhandene Nachrichten sind gehasht, keine aktive/wartende
 Task-/Empfängerqueue. Historische unknown-Zustände werden nicht neu gestartet.
 
-**Stand dieses Commit: Quellkorrektur vorbereitet; aktive Konfiguration noch
-unverändert.** Tatsächliche Aktivierung, Probeaufträge, Erhaltung und verbleibende
-Grenzen werden nach dem kontrollierten Laden hier ergänzt. Ein positiver Health-
-Status allein ist keine Schreib-/Agentenabnahme.
+Aktiviert am18.10.2026 bei ruhender Task-/Empfängerqueue mit SQLite-
+Schreibbarriere. Laufende Quelle bleibt0.5.2 mit gezieltem Backport55046b0;
+keine Umstellung auf den kompletten privaten0.6-Releasekandidaten. Runtime
+193c91766e444f06827de90256a7a328 lädt Config4507332a…140b5 und
+Python-Quellfingerabdruck0ca2386d…e5065. Originalpolicy liegt lokal geschützt
+unter `~/.local/share/kirabridge/project-control-20261018/config.before.toml`.
+Config0600 erhalten. Nur bestehende Wurzeln/registrierte Worktrees ergänzt,
+Capabilities und Programmlisten unverändert.
+
+Je sechs echte Datei-Schreib-/Leseproben und Git-Prozesse im jeweiligen Projekt
+bestehen über authentifiziertes MCP mit bestehendem chatgpt-Principal. Eine echte
+strukturierte Codex-Probe in KiraBridge schreibt die vereinbarte Datei; Inhalt
+unabhängig zurückgelesen. Alle eigenen synthetischen Prüfdateien anschließend
+entfernt. Vier Gegenfälle bleiben gesperrt: Home-Schreibpfad, Home-Terminal-CWD,
+cat und System-Python. Die fünf anderen Projekte erhalten keine zusätzlichen
+Modellläufe: deren Datei-/Prozessrechte und gemeinsamer Adaptermodus sind belegt,
+keine sechs vollständigen Entwicklungsabnahmen behauptet.
+
+Alle265 alten Taskzeilen und fünf Nachrichten byteinhaltlich per Zeilenhash
+erhalten; beide unbekannten Empfängerjobs bleiben unbekannt, nicht wiederholt.
+Zugangsdatei, Runtime-Key und LaunchAgent unverändert; Auditkette gültig.
+Die globale Codex-Konfigurationsdatei hat während des Beobachtungsintervalls
+allerdings einen anderen Hash/mtime17:56:09. Ursache nicht belegt; dieser Auftrag
+hat sie nicht geschrieben und setzt fremde Änderungen nicht zurück. Der explizite
+Adapterparameter workspace-write gilt unabhängig davon. Kein behaupteter
+vollständiger Erhalt ihres Inhalts. Dateimodus bleibt0600.
+
+[Konkrete Taskkennungen und Erhaltungsbelege](evidence/project-control-20261018.json).
+Der Client läuft lokal über den echten Dienst, nicht als neue externe ChatGPT-
+Unterhaltung. Die bereits bestandene externe ChatGPT-Dateiabnahme1311 und der
+Writecheck1528 bleiben erhalten und werden nicht neu ausgeführt.
+
+Bedienung: `bridge_readiness` mit benötigten read_paths, operations und
+executables aufrufen; anschließend `task_request` mit stabiler task_id und
+idempotency_key, Operation agent.execute, agent=codex und cwd im konkreten
+Projekt. Annahme ist kein Laufabschluss: task_get/task_events abfragen. Bei
+Verbindungsabbruch zuerst dieselbe Taskkennung lesen, Schreibauftrag nicht mit
+neuer Kennung doppelt starten. Neue Worktrees außerhalb freigegebener Eltern
+benötigen weiterhin gezielte lokale Ergänzung. Kindprozess-Netz-/Git-Metadaten-
+Grenzen können weitere konkrete Schritte begrenzen; keine globale Freigabe.
+Ein positiver Health-Status allein ist keine Schreib-/Agentenabnahme.
 
 Der bestehende private RC2-Entwurf bleibt auf seinem ursprünglichen Quellpin.
 Diese neue Adapteroption ist nicht in dessen bereits gebauten Artefakten;
