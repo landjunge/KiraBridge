@@ -135,7 +135,7 @@ async def _observe_processes(excluded_pids: set[int]) -> dict:
                 "-U",
                 str(os.getuid()),
                 "-o",
-                "uid=,pid=,ppid=,comm=",
+                "uid=,pid=,ppid=,ucomm=" if sys.platform == "darwin" else "uid=,pid=,ppid=,comm=",
                 stdin=asyncio.subprocess.DEVNULL,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.DEVNULL,
