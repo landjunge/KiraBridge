@@ -62,7 +62,8 @@ kirabridge --principal chatgpt readiness --operation file.read --read-path /abso
 
 Anschließend **aus dem vorgesehenen Chat**, über dessen verbundene KiraBridge-App:
 
-1. `bridge_health` aufrufen. Geladene Version, Principal und Freigabemodus beachten.
+1. `bridge_health` aufrufen. Geladene Version und Freigabemodus beachten;
+   der authentifizierte Principal steht in der verfügbaren Readiness-Antwort.
 2. `bridge_readiness` mit diesen Parametern aufrufen. Readiness liest keinen
    Dateiinhalt und beweist noch keine Ausführung:
 
@@ -104,6 +105,13 @@ Eine Wiederverbindung ist keine Wiederholungsfreigabe. Der echte ChatGPT-Dateibe
 `chatgpt-file-verification-20261018-1311` ist bereits bestanden (9117Bytes); ihn
 nicht erneut ausführen. Er belegt seinen damaligen Pfad/Principal, keine beliebigen
 Schreib-/Terminal-/Agentenrechte. [Bestehender Reparaturbeleg](REPAIR-PROJECT-ACCESS-20261018.md).
+
+Ein älterer App-Katalog kann `bridge_readiness` und `task_diagnose` noch nicht
+anbieten, obwohl der Dienst sie enthält. Dann die gezeigte lokale Readiness des
+konkreten Principals verwenden. `task_get` enthält bei Fehlern bereits die
+vorhandene Diagnose samt tatsächlichem Task-Preflight. Fehlende Toolnamen nicht
+als Taskoperationen erfinden; keine Aufträge zur Katalogaktualisierung wiederholen.
+Eine Aktualisierung des App-Katalogs ist vom laufenden Dienst getrennt.
 
 ### Für den nächsten Ablauf nur dessen Fähigkeiten freigeben
 
@@ -158,6 +166,12 @@ Use `task_diagnose` with that ID for failure evidence. After a disconnect or 409
 inspect the existing task first; never replay an uncertain write/agent task under a
 new ID. The already confirmed ChatGPT read `chatgpt-file-verification-20261018-1311`
 (9117Bytes) is retained evidence, not a test to repeat.
+
+Older App catalogs may omit `bridge_readiness` and `task_diagnose` despite server
+support. Use the shown local readiness for the actual principal; failed-task
+`task_get` already includes its existing diagnosis and execution preflight.
+Do not invent task operations for missing tool names or replay work to refresh a
+catalog. App-catalog updates and service reloads are separate.
 
 Codex defaults to read-only; only the operator's explicit
 `agents.codex.sandbox_mode="workspace-write"` enables the managed adapter's write
