@@ -4,6 +4,7 @@ import sys
 import httpx
 import pytest
 from conftest import request, submit
+from pydantic import ValidationError
 
 from kirabridge.bridge_core.config import AgentConfig
 from kirabridge.bridge_core.models import BridgeError
@@ -14,6 +15,58 @@ def fake_cli(tmp_path, body):
     path.write_text(f"#!{sys.executable}\n" + body)
     path.chmod(0o700)
     return str(path)
+
+
+@pytest.mark.parametrize("mode", ["read-only", "workspace-write"])
+async def test_codex_uses_explicit_bounded_mode_and_preserves_project_rules(
+    bridge, config, tmp_path, mode
+):
+    body = """import json,sys
+sys.stdin.read()
+print(json.dumps({'type':'thread.started','thread_id':'bounded-test'}),flush=True)
+print(json.dumps({'type':'turn.started'}),flush=True)
+print(json.dumps({'type':'item.completed','item':{'type':'agent_message','text':json.dumps(sys.argv[1:])}}),flush=True)
+print(json.dumps({'type':'turn.completed'}),flush=True)
+"""
+    config.agents["codex"] = AgentConfig(
+        kind="codex", executable=fake_cli(tmp_path, body), sandbox_mode=mode
+    )
+    value = agent_request(config)
+    submit(bridge, value)
+    async with bridge:
+        final = await bridge.tasks.wait("local", value.task_id)
+    assert final["state"] == "completed"
+    argv = json.loads(final["result"]["text"])
+    assert argv[argv.index("--sandbox") + 1] == mode
+    assert "--ignore-rules" not in argv and "--ignore-user-config" in argv
+    assert 'approval_policy="never"' in argv and "mcp_servers={}" in argv
+    assert "--add-dir" not in argv and "danger-full-access" not in argv
+    assert final["result"]["evidence"]["sandbox_mode"] == mode
+    assert not final["result"]["project_completion_verified"]
+    assert bridge.agents.inventory(["codex"])["agents"][0]["sandbox_mode"] == mode
+
+
+def test_codex_default_stays_read_only_and_global_bypass_is_rejected():
+    assert AgentConfig(kind="codex").sandbox_mode == "read-only"
+    with pytest.raises(ValidationError):
+        AgentConfig(kind="codex", sandbox_mode="danger-full-access")
+
+
+async def test_codex_write_mode_does_not_grant_a_foreign_working_directory(
+    bridge, config, tmp_path
+):
+    config.agents["codex"] = AgentConfig(
+        kind="codex",
+        executable=fake_cli(tmp_path, "raise RuntimeError('must not start')"),
+        sandbox_mode="workspace-write",
+    )
+    value = agent_request(config)
+    value.arguments["cwd"] = str(tmp_path.parent)
+    submit(bridge, value)
+    async with bridge:
+        final = await bridge.tasks.wait("local", value.task_id)
+    assert final["state"] == "failed" and final["started"] is None
+    assert final["error"]["code"] == "path_denied"
 
 
 def agent_request(config, name="codex", task_id="agent-task"):

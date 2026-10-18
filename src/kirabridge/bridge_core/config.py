@@ -48,6 +48,7 @@ class AgentConfig(BaseModel):
     executable: str | None = None
     model: str | None = None
     api_key_env: str = "XAI_API_KEY"
+    sandbox_mode: Literal["read-only", "workspace-write"] = "read-only"
 
 
 class DiagnosticsConfig(BaseModel):

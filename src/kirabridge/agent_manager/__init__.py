@@ -98,11 +98,12 @@ class CodexAdapter:
             config.executable,
             "exec",
             "--ignore-user-config",
-            "--ignore-rules",
             "--json",
             "--skip-git-repo-check",
             "--sandbox",
-            "read-only",
+            config.sandbox_mode,
+            "-c",
+            'approval_policy="never"',
             "-c",
             "mcp_servers={}",
             "-c",
@@ -129,6 +130,9 @@ class CodexAdapter:
         evidence = {
             "agent": args.agent,
             "adapter": "codex",
+            "sandbox_mode": config.sandbox_mode,
+            "project_rules_enabled": True,
+            "mcp_servers_enabled": False,
             "session_id": session,
             "exit_code": result["exit_code"],
             "turn_completed": completed,
@@ -397,6 +401,15 @@ class AgentManager:
                 {
                     "id": name,
                     "kind": config.kind,
+                    **(
+                        {
+                            "sandbox_mode": config.sandbox_mode,
+                            "project_rules_enabled": True,
+                            "mcp_servers_enabled": False,
+                        }
+                        if config.kind == "codex"
+                        else {}
+                    ),
                     "executable_present": bool(
                         config.executable and Path(config.executable).is_file()
                     ),
