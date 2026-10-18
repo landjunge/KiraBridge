@@ -119,9 +119,9 @@ Prüfung, keine Funktions-/Tunnel-/ChatGPT-/Dauerhaftigkeitsgarantie.
 `roots` bleibt die bestehende allgemeine Dateigrenze und Terminal-CWD-Grenze.
 Die additive Principal-Option `read_roots` erweitert nur Lesen/Listen. Auf diesem
 Mac wurden am18.10.2026 ausschließlich beim bestehenden Principal `chatgpt`
-`/Users/landjunge/KiraBridge` und `/Users/landjunge/Projects/ki-hilfezentrum`
-ergänzt. Nicht das gesamte Home, `/`, `/Users/landjunge/Projects` oder sämtliche
-Projekte. Die alte Konfiguration liegt lokal in
+`/Users/landjunge/KiraBridge` und `/Users/landjunge/Projects`
+ergänzt. Damit sind die bestehenden Projektbäume unter `Projects` lesbar,
+einschließlich der Hilfezentrum-Worktrees. Nicht das gesamte Home oder `/`. Die alte Konfiguration liegt lokal in
 `~/.config/kirabridge/backups/config-before-project-read-roots-20261018.toml`,
 ebenfalls0600. Tokens, Programme und fremde Principals sind unverändert.
 

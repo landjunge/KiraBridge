@@ -1,0 +1,183 @@
+{
+  "at": "2026-10-18T11:15:38.062359+00:00",
+  "source_commit": "eddb0b80cf8792bc495dbe16274350f39e38618b",
+  "runtime": {
+    "version": "0.5.1",
+    "pid": 71410,
+    "started_at": "2026-10-18T11:12:28.797431+00:00",
+    "config_path": "/Users/landjunge/.config/kirabridge/config.toml",
+    "config_sha256": "c95c79de984966f39e57a073df1304d82262a5eb52768a5892e2a0c84cdcc519",
+    "effective_config_sha256": "9b77bee53c49dd1742c74718d2929aae3fc848f71967dd2733ca9bd6d37a0f93",
+    "source_tree_sha256": "86f0474f3804a83e5a8241e81dad6f010ccdbe80baa0bf6532a724c5e65267a2",
+    "source_file_count": 30,
+    "source_package_path": "/Users/landjunge/KiraBridge/src/kirabridge",
+    "source_scope": "package Python files observed at startup; no remote attestation"
+  },
+  "configuration_change": {
+    "principal": "chatgpt",
+    "only_field": "read_roots",
+    "value": [
+      "/Users/landjunge/Projects",
+      "/Users/landjunge/KiraBridge"
+    ],
+    "original_policy_otherwise_unchanged": true,
+    "mode": "0600",
+    "backup": "~/.config/kirabridge/backups/config-before-project-read-roots-20261018.toml"
+  },
+  "tunnel_change": {
+    "only_profile_field": "mcp.stdio_send_initialized_notification",
+    "value": true,
+    "original_profile_otherwise_unchanged": true,
+    "startup_env_enabled": true,
+    "same_existing_alias_tunnel_and_key": true,
+    "native_generator_drops_option_without_own_persistence_fix": true
+  },
+  "tool_probe_origin": "Connected codex_apps/kirabridge tools in this Codex session; separate target ChatGPT/iPhone UI not operated",
+  "tool_probes": [
+    {
+      "id": "project-handoff-repair-20261018",
+      "principal": "chatgpt",
+      "operation": "file.read",
+      "state": "completed",
+      "attempt": 1,
+      "receipt": "8a0fc58b-80da-43ce-97de-87f8e8542c07",
+      "started": 1792321205.650017,
+      "error": null,
+      "event_counts": {
+        "accepted": 1,
+        "completed": 1,
+        "created": 1,
+        "queued": 1,
+        "running": 1
+      },
+      "created_by_this_codex_turn": true,
+      "bytes": 9117,
+      "truncated": false,
+      "content_sha256": "186f0ca668081c763ae063436dacabd384ece27d439d95dc47814fae423341cf"
+    },
+    {
+      "id": "project-path-denied-repair-20261018",
+      "principal": "chatgpt",
+      "operation": "file.read",
+      "state": "failed",
+      "attempt": 1,
+      "receipt": "f18f86b1-d363-4840-b0eb-ea3109edc1a4",
+      "started": null,
+      "error": {
+        "code": "path_denied"
+      },
+      "event_counts": {
+        "accepted": 1,
+        "created": 1,
+        "failed": 1,
+        "queued": 1
+      },
+      "created_by_this_codex_turn": true
+    },
+    {
+      "id": "project-directory-readiness-20261018",
+      "principal": "chatgpt",
+      "operation": "file.list",
+      "state": "completed",
+      "attempt": 1,
+      "receipt": "ebebb0f5-ad25-49ab-b992-cb3d046883b3",
+      "started": 1792321979.9062028,
+      "error": null,
+      "event_counts": {
+        "accepted": 1,
+        "completed": 1,
+        "created": 1,
+        "queued": 1,
+        "running": 1
+      },
+      "created_by_this_codex_turn": true,
+      "entry_count": 17,
+      "truncated": false
+    },
+    {
+      "id": "chatgpt-file-verification-20261018-1311",
+      "principal": "chatgpt",
+      "operation": "file.read",
+      "state": "completed",
+      "attempt": 1,
+      "receipt": "2b86fa65-0d1b-44a3-b003-7974da25732e",
+      "started": 1792321850.4306161,
+      "error": null,
+      "event_counts": {
+        "accepted": 1,
+        "completed": 1,
+        "created": 1,
+        "queued": 1,
+        "running": 1
+      },
+      "created_by_this_codex_turn": false,
+      "bytes": 9117,
+      "truncated": false,
+      "content_sha256": "186f0ca668081c763ae063436dacabd384ece27d439d95dc47814fae423341cf"
+    }
+  ],
+  "readiness": {
+    "service_matches_local_config_and_source": true,
+    "requested_prerequisites_ready": true,
+    "cat_and_system_python_remain_denied": true,
+    "no_program_started_by_readiness": true
+  },
+  "preservation": {
+    "initial_task_rows_hash_equal": 199,
+    "credential_file_hash_equal": true,
+    "database_integrity": "ok",
+    "message_job_counts": {
+      "completed": 2,
+      "unknown": 2
+    },
+    "old_unknown_not_retried": true,
+    "no_database_reset_or_old_result_restore": true,
+    "foreign_sessions_stopped": false
+  },
+  "transient_observations_retained": {
+    "app_error": "MCP server is not initialized; send initialize and notifications/initialized before operational requests",
+    "pre_repair_tunnel_tools_call_409_count": 7,
+    "before_shim_later_409_count": 10,
+    "first_post_tunnel_restart_result_fetch": "MCP request timed out; no execution resubmission",
+    "exact_earlier_timing_causality": "not fully correlated; no per-task identity in metrics"
+  },
+  "bounded_post_shim_metrics": [
+    {
+      "request_method": "initialize",
+      "tunnel_service_status": "200",
+      "count": 16
+    },
+    {
+      "request_method": "server/discover",
+      "tunnel_service_status": "200",
+      "count": 11
+    },
+    {
+      "request_method": "tools/call",
+      "tunnel_service_status": "200",
+      "count": 16
+    },
+    {
+      "request_method": "notifications/initialized",
+      "tunnel_service_status": "200",
+      "count": 16
+    }
+  ],
+  "verification": {
+    "local_unique_targeted_tests_passed": 15,
+    "lint_and_format": "passed",
+    "ci_run": "https://github.com/landjunge/KiraBridge/actions/runs/39122131826",
+    "ci_source_commit": "eddb0b80cf8792bc495dbe16274350f39e38618b",
+    "ci_conclusion": "success",
+    "ci_jobs": [
+      "macos-15 Python3.11",
+      "ubuntu-24.04 Python3.11",
+      "ubuntu-24.04 Python3.13"
+    ]
+  },
+  "outstanding": [
+    "Exact final read from separate target ChatGPT/iPhone chat; request and existing task_get ID prepared",
+    "Full historical session/timing correlation and future interruption behavior; no perpetual reliability guarantee"
+  ],
+  "secret_values_included": false
+}

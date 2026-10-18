@@ -24,7 +24,7 @@ Der lokale Dienst läuft automatisch über launchd auf `127.0.0.1:8765`. Die Sta
 Der Workspace ist ein Arbeits-/Austauschordner, **kein Git-Checkout**. Der auf
 diesem Mac installierte bearbeitbare Quellstand liegt in `~/KiraBridge`.
 Für `chatgpt` sind zusätzlich genau `~/KiraBridge` und
-`~/Projects/ki-hilfezentrum` einschließlich dessen Worktrees als `read_roots`
+`~/Projects` einschließlich Hilfezentrum-Worktrees als `read_roots`
 freigegeben. Das erweitert ausschließlich `file.read`/`file.list`, keine Schreib-,
 Lösch-, Terminal- oder fremden Principal-Rechte. Konfiguration und geladener
 Dienststand sind über [die Bereitschaftsprüfung](docs/OPERATIONS.md#bereitschaft-und-projektdateien)

@@ -1,4 +1,15 @@
-# Abnahmestand 0.5.0
+# Abnahmestand 0.5.1
+
+Fortschreibung18.10.2026: Geladener lokaler Quell-/Konfigurationsstand geprüft,
+Projektlesen für `chatgpt` korrigiert, zusätzliche reine Lesepfade ohne neue
+Schreib-/Programmrechte. Neuer Readiness-Abgleich, sicherer Proxy-Reconnect und
+persistenter Stdio-Benachrichtigungsadapter.15 gezielte lokale Prüfungen und die
+vorhandene CI auf drei Plattform-/Python-Kombinationen bestanden. Echter Datei-
+und Ergebnisabruf über die verbundene App dieser Codex-Sitzung nachgewiesen;
+separater Ziel-ChatGPT-/iPhone-Abruf bleibt ausdrücklich ausstehend. Kein neuer
+Agentenauftrag. [Ursachen, Belege, genauer Abruf und Rückweg](REPAIR-PROJECT-ACCESS-20261018.md).
+
+Die folgenden Abschnitte erhalten den historischen Stand0.5.0:
 
 Stand: 17. Oktober 2026. Grundlage bleibt der [Entwicklungsplan](DEVELOPMENT_PLAN.md). Der frühere rein paketbezogene Stand ist in [STATUS-v0.1.md](STATUS-v0.1.md) archiviert.
 

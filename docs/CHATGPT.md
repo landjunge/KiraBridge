@@ -1,5 +1,15 @@
 # ChatGPT-Anbindung: Tunnel aktiv, Statusabfrage zurückgemeldet
 
+**Fortschreibung18.10.2026:** Die lokale Bridge läuft auf0.5.1. Direkte
+Projektlesung wurde über die verbundene KiraBridge-App dieser Codex-Sitzung
+tatsächlich bis zum vollständigen Ergebnis geprüft, einschließlich erneutem
+Abruf nach Tunnel-Wiederverbindung ohne Doppelauftrag. Eine weitere, nicht von
+dieser Codex-Sitzung erzeugte `chatgpt`-Anfrage las dieselbe Datei erfolgreich.
+Die genaue Oberfläche dieses anderen Clients ist daraus nicht belegbar; der
+abschließende Abruf in der separaten Ziel-ChatGPT-/iPhone-Unterhaltung bleibt
+ausdrücklich ausstehend. [Reparatur, genaue Abrufe und Grenzen](REPAIR-PROJECT-ACCESS-20261018.md).
+Die folgenden Angaben vom17.10. sind historische Belege.
+
 Stand der Prüfung: 17. Oktober 2026. Der private OpenAI-Tunnel läuft; Prozess, Health und Readiness wurden lokal geprüft. OpenAI hat Discovery-Anfragen über den Tunnel an KiraBridge weitergeleitet. Die lokalen Tunnel-Metriken bestätigen zusätzlich echte `tools/call`-Anfragen mit Transportstatus 200. Der Nutzer hat eine erfolgreiche Statusabfrage aus seinem ChatGPT-Chat mit Version 0.2.0, aktivem Dispatcher und erkannten Codex-/Grok-Programmen zurückgemeldet. Der genaue Inhalt dieser Antwort ist ein Nutzerbericht; die Metriken geben keinen einzelnen Werkzeugnamen oder dessen Ergebnis wieder. Gemeinsame Ende-zu-Ende-Tests von Aufgabenfreigabe, Ausführung und Ergebnisabruf aus ChatGPT stehen noch aus. Der [Betriebsnachweis](evidence/local-operation-2026-10-17.json) unterscheidet diese Belegarten und hält auch zwei Transportantworten mit Status 409 fest. Aus diesen wird kein Ausführungsstatus abgeleitet und kein Auftrag automatisch wiederholt.
 
 `bridge_health` gibt derzeit fest `chatgpt_integration="unverified"` aus; `kirabridge chatgpt status` gibt unabhängig von der gemessenen Tunnelbereitschaft `chatgpt_tool_call="unverified"` aus. Diese Felder erkennen einen durchgeführten Kontotest nicht automatisch und werden nicht allein aufgrund eines laufenden Tunnels auf Erfolg gesetzt.
@@ -21,7 +31,7 @@ Für diesen privaten Einzelbenutzer-Anschluss übernimmt der Tunnel die kontroll
 
 ## Freigaben für ChatGPT-Aufträge
 
-Die lokale Freigabeseite ist [KiraBridge auf diesem Mac](http://127.0.0.1:8766/). Sie wird über `kirabridge approvals` oder „KiraBridge Freigaben.command“ auf dem Schreibtisch geöffnet und angemeldet. Anfragen erscheinen dort automatisch. `task_request` und `bridge_health` liefern die Adresse als `local_approval_url`. Der Agent soll diesen Link nennen und nach der lokalen Entscheidung mit `task_get` weiter prüfen; IDs müssen nicht zwischen Chats kopiert werden.
+Die lokale Freigabeseite ist [KiraBridge auf diesem Mac](http://127.0.0.1:8766/). Sie wird über `kirabridge approvals` oder „KiraBridge Freigaben.command“ auf dem Schreibtisch geöffnet und angemeldet. Anfragen erscheinen dort automatisch. `task_request` und `bridge_health` liefern die Adresse als `local_approval_url`. Der Agent soll diesen Link nur bei `approval_required=true` zur Entscheidung nennen und danach mit `task_get` weiter prüfen. Beim hier eingerichteten `automatic`/`approval_required=false` braucht es keinen Freigabeklick; direkt Ergebnis/Ereignisse abrufen. Alte zwischengespeicherte Toolbeschreibungen sind kein Ersatz für den tatsächlich zurückgegebenen Modus. IDs müssen nicht zwischen Chats kopiert werden.
 
 Die Freigabeseite ist ein getrennter lokaler Dienst und wird nicht durch den OpenAI-Tunnel freigegeben. Ein lokaler Ende-zu-Ende-Test mit dem `chatgpt`-Principal hat MCP-Anfrage, Browserfreigabe, tatsächliche Dateilisten-Ausführung und Ergebnisabruf geprüft. Ein isolierter echter Browser hat auch den Freigabeklick und die Ergebnisanzeige erfolgreich durchlaufen. Für einen aus der ChatGPT-Unterhaltung selbst ausgelösten Ausführungsauftrag bleibt die Herkunft weiterhin getrennt nachzuweisen.
 
@@ -36,7 +46,7 @@ Ein öffentlich erreichbarer HTTPS-Endpunkt ist eine alternative Infrastrukturen
 ## Ausstehender Integrationsnachweis
 
 1. Einen tatsächlichen Toolaufruf aus dem Zielchat unabhängig mit einem entsprechenden Ergebnisbeleg abgleichen. Der bisherige Statusaufruf wurde vom Nutzer zurückgemeldet; die Tunnelprotokolle bestätigen Discovery und Weiterleitung und die Metriken belegen `tools/call`. Der konkrete Werkzeugname und das Ergebnis dieses einzelnen Aufrufs sind darin nicht enthalten.
-2. Einen einzelnen harmlosen Testauftrag aus ChatGPT anfordern, lokal freigeben und Empfang, Ausführung und Ergebnisabruf anhand derselben Task-ID prüfen.
+2. Den vorbereiteten harmlosen Dateiabruf aus der Ziel-ChatGPT-Unterhaltung verwenden und Empfang, Ausführung und Ergebnisabruf anhand derselben Task-ID prüfen. Im automatischen Modus ohne Freigabeklick; der unveränderte vorbereitete Auftrag darf idempotent wieder abgerufen werden.
 3. Unberechtigte Aufrufe und Principal-Trennung zusätzlich über die konkrete ChatGPT-Verbindung prüfen.
 4. Falls eine Mehrbenutzer-Anbindung gewünscht wird: Identity Provider auswählen, OAuth-Resource-Server-Integration implementieren und Tokenziel, Scopes, Ablauf und Erneuerung testen.
 
