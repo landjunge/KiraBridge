@@ -186,8 +186,17 @@ rebuilt or relabeled; public release and Discussion remain pending separately.
 
 ## Private Quellsicherung und CI
 
+Aktueller fortgeführter Stand nach Bild-/Wissens-/Beobachtungsintegration:
+Quellcommit df995f6, lokale0.5.2, Instanz748efc8b8ee341f5858d915abb1fb131,
+Konfig-SHA25604637ceeb2fdc4a645ba25d5ff4e8867b11068cd24eb991b7badd5b29e12405c.
+Neun weitere echte ChatGPT-App-Tasks und das Rücklesen desselben Bildes nach
+Dienstneustart sind in [den aktuellen Belegen](evidence/workflow-reads-chatgpt-20261018.json)
+gesichert. Alle385 vorherigen Tasks, Nachrichten/Jobs und Zugangs-/Dienstdateien
+blieben erhalten. Die Adminprobe steht weiterhin unknown/Versuch1. Historische
+Abnahmefingerabdrücke und eingefrorene Downloads werden nicht umgeschrieben.
+
 Fortgeführter Stand: M1 und M2 wurden anschließend unter Erhalt dieser Rechte
-integriert. Aktuelle lokale0.5.2: Quellcommit c7a00e0, Runtime
+integriert. Nach M2 geladene lokale0.5.2: Quellcommit c7a00e0, Runtime
 f9cf3308086544079731f2aeb9daa2b2, Konfig-SHA256
 e6dd7af8ded9f98098fe59e232a8fe5d0711189782a08c7790552efc266219a0.
 Die spätere M2-Rundreise ist in

@@ -28,27 +28,25 @@
   },
   "workers": {
     "/root/threaddesk_m1": {
-      "state": "pause_requested_no_new_steps_until_user_ok",
-      "worktree": "/Users/landjunge/threaddesk-worktrees/seven-tools-knowledge-design-20261018",
+      "state": "worker_stands_git_resource_bound_fix",
+      "worktree": "/Users/landjunge/gnom-hub-v1/.worktrees/seven-tools-worker-stands-20261018",
       "packages": [
-        "TD-C03",
-        "TD-D01",
-        "TD-R01"
+        "GH-C04"
       ]
     },
     "/root/tollgate_control": {
-      "state": "pause_requested_no_new_steps_until_user_ok",
-      "worktree": "/Users/landjunge/KiraBridge/.worktrees/seven-tools-observations-20261018",
+      "state": "workflow_stop_final_review",
+      "worktree": "/Users/landjunge/KiraBridge/.worktrees/seven-tools-workflow-stop-20261018",
       "packages": [
-        "AA-C01",
-        "KB-C05"
+        "KB-C04",
+        "TG-C02"
       ]
     },
     "/root/fourallpass_protected": {
-      "state": "pause_requested_no_new_steps_until_user_ok",
-      "worktree": "/Users/landjunge/KiraBridge/.worktrees/seven-tools-image-read-20261018",
+      "state": "design_handoff_final_review_and_browser_acceptance",
+      "worktree": "/Users/landjunge/blockdesigner/.worktrees/seven-tools-handoff-20261018",
       "packages": [
-        "KB-C05"
+        "BD-C04"
       ]
     }
   },
@@ -131,32 +129,34 @@
     "TD-D01": {
       "title": "Design",
       "owner": "/root/threaddesk_m1",
-      "state": "source_and_local_checks_complete_ci_pending",
+      "state": "main_integrated_source_browser_and_ci_checked",
       "dependencies": [],
       "source_commit": null,
-      "commit": "502f0db8a65d9701a44f956d5c56b3efbd748cf6",
+      "commit": "6c7d578a1edb612d0e8e6d99faa2953888d69bfb",
       "pr": "https://github.com/landjunge/threaddesk/pull/77",
       "checks": [],
       "delivered": false,
       "user_accepted": false,
-      "next_step": "Review fixed source and CI; knowledge adapter not yet live",
+      "next_step": "Published desktop downloads remain separately pinned; no new public release",
       "blocker": null,
-      "evidence": "docs/evidence/seven-tools-20261018/TD-D01-R01.md"
+      "evidence": "docs/evidence/seven-tools-20261018/TD-D01-R01.md",
+      "merge_commit": "c43e078aba618ada41f1ffcf012b24fc38f4492f"
     },
     "TD-R01": {
       "title": "README / Dokumentation",
       "owner": "/root/threaddesk_m1",
-      "state": "source_and_local_checks_complete_ci_pending",
+      "state": "main_integrated_source_browser_and_ci_checked",
       "dependencies": [],
       "source_commit": null,
-      "commit": "502f0db8a65d9701a44f956d5c56b3efbd748cf6",
+      "commit": "6c7d578a1edb612d0e8e6d99faa2953888d69bfb",
       "pr": "https://github.com/landjunge/threaddesk/pull/77",
       "checks": [],
       "delivered": false,
       "user_accepted": false,
-      "next_step": "Review fixed source and CI; knowledge adapter not yet live",
+      "next_step": "Published desktop downloads remain separately pinned; no new public release",
       "blocker": null,
-      "evidence": "docs/evidence/seven-tools-20261018/TD-D01-R01.md"
+      "evidence": "docs/evidence/seven-tools-20261018/TD-D01-R01.md",
+      "merge_commit": "c43e078aba618ada41f1ffcf012b24fc38f4492f"
     },
     "KB-C01": {
       "title": "Bau / KB-01–02",
@@ -221,18 +221,19 @@
     "KB-C04": {
       "title": "Stopp / KB-04",
       "owner": "/root",
-      "state": "open",
+      "state": "targeted_source_tests_complete_final_review_in_progress",
       "dependencies": [
         "TG-C02"
       ],
       "source_commit": null,
-      "commit": null,
+      "commit": "a50d77592ccf5739debf8bd7f20914fd9eec7f19",
       "pr": null,
       "checks": [],
       "delivered": false,
       "user_accepted": false,
       "next_step": null,
-      "blocker": null
+      "blocker": null,
+      "evidence": "docs/evidence/workflow-stop-20261018/PAUSE-CHECKPOINT.md"
     },
     "KB-C05": {
       "title": "Rückkanal",
@@ -286,7 +287,7 @@
     "FP-C01": {
       "title": "Ursache / FP-01",
       "owner": "/root/fourallpass_protected",
-      "state": "source_and_ci_checked",
+      "state": "main_integrated_bounded_source_and_targeted_checks",
       "dependencies": [],
       "source_commit": null,
       "commit": "3fd6ed2",
@@ -297,8 +298,10 @@
       ],
       "delivered": false,
       "user_accepted": false,
-      "next_step": null,
-      "blocker": null
+      "next_step": "Actual product/runtime assembly and applicable remaining package criteria remain separate",
+      "blocker": null,
+      "merge_commit": "f07be5ff75937aae6cf9cbbb7c369af818a2fe9e",
+      "integration_scope": "source main/master; not a new installed/download release"
     },
     "FP-C02": {
       "title": "Geschützte Nutzung / FP-02",
@@ -318,8 +321,10 @@
       ],
       "delivered": false,
       "user_accepted": false,
-      "next_step": null,
-      "blocker": "Trusted production ProtectedHost, consent/version history, OS secret boundary and browser isolation absent; synthetic test host only; fails closed"
+      "next_step": "Actual product/runtime assembly and applicable remaining package criteria remain separate",
+      "blocker": "Trusted production ProtectedHost, consent/version history, OS secret boundary and browser isolation absent; synthetic test host only; fails closed",
+      "merge_commit": "a983814a582c913fd27663c529e0d007225b1071",
+      "integration_scope": "source main/master; not a new installed/download release"
     },
     "FP-C03": {
       "title": "Browser-/Sitzungsgrenze / FP-03–04",
@@ -342,7 +347,7 @@
     "FP-D01": {
       "title": "Design",
       "owner": "/root/fourallpass_protected",
-      "state": "source_browser_and_ci_checked",
+      "state": "main_integrated_bounded_source_and_targeted_checks",
       "dependencies": [],
       "source_commit": null,
       "commit": "fd5473203abc8fdc3fab4fff2e2331882d5f2dde",
@@ -352,13 +357,15 @@
       ],
       "delivered": false,
       "user_accepted": false,
-      "next_step": "Sequential source integration; published RC2 unchanged",
-      "blocker": null
+      "next_step": "Actual product/runtime assembly and applicable remaining package criteria remain separate",
+      "blocker": null,
+      "merge_commit": "60f1a59315e61a8bb089130fae684cae3bf80d1c",
+      "integration_scope": "source main/master; not a new installed/download release"
     },
     "FP-R01": {
       "title": "README / Boundary",
       "owner": "/root/fourallpass_protected",
-      "state": "source_browser_and_ci_checked",
+      "state": "main_integrated_bounded_source_and_targeted_checks",
       "dependencies": [],
       "source_commit": null,
       "commit": "fd5473203abc8fdc3fab4fff2e2331882d5f2dde",
@@ -366,8 +373,10 @@
       "checks": [],
       "delivered": false,
       "user_accepted": false,
-      "next_step": "Sequential source integration; published RC2 unchanged",
-      "blocker": null
+      "next_step": "Actual product/runtime assembly and applicable remaining package criteria remain separate",
+      "blocker": null,
+      "merge_commit": "60f1a59315e61a8bb089130fae684cae3bf80d1c",
+      "integration_scope": "source main/master; not a new installed/download release"
     },
     "FP-V01": {
       "title": "Abnahme / bestehende Produktarbeit",
@@ -389,7 +398,7 @@
     "TG-C01": {
       "title": "Kontrollvertrag / TG-01–02",
       "owner": "/root/tollgate_control",
-      "state": "bounded_source_and_ci_checked",
+      "state": "main_integrated_bounded_source_and_targeted_checks",
       "dependencies": [
         "G-01"
       ],
@@ -403,8 +412,10 @@
       ],
       "delivered": false,
       "user_accepted": false,
-      "next_step": "Integrate reviewed source; actual Bridge execution-controller assembly pending",
-      "blocker": "actual registered provider/identity/dispatch integration remains separate; not arbitrary CLI stop"
+      "next_step": "Actual product/runtime assembly and applicable remaining package criteria remain separate",
+      "blocker": "actual registered provider/identity/dispatch integration remains separate; not arbitrary CLI stop",
+      "merge_commit": "c1aa2472444032c87b38139a8fb3715cd688465f",
+      "integration_scope": "source main/master; not a new installed/download release"
     },
     "TG-C02": {
       "title": "Auftragsstopp / TG-02–03",
@@ -423,13 +434,15 @@
       ],
       "delivered": false,
       "user_accepted": false,
-      "next_step": "Integrate reviewed source; actual Bridge execution-controller assembly pending",
-      "blocker": "actual registered provider/identity/dispatch integration remains separate; not arbitrary CLI stop"
+      "next_step": "Actual product/runtime assembly and applicable remaining package criteria remain separate",
+      "blocker": "actual registered provider/identity/dispatch integration remains separate; not arbitrary CLI stop",
+      "merge_commit": "c1aa2472444032c87b38139a8fb3715cd688465f",
+      "integration_scope": "source main/master; not a new installed/download release"
     },
     "TG-C03": {
       "title": "Gesamtbudget / TG-04",
       "owner": "/root/tollgate_control",
-      "state": "bounded_source_and_ci_checked",
+      "state": "main_integrated_bounded_source_and_targeted_checks",
       "dependencies": [
         "TG-C01",
         "G-02"
@@ -444,13 +457,15 @@
       ],
       "delivered": false,
       "user_accepted": false,
-      "next_step": "Integrate reviewed source; actual Bridge execution-controller assembly pending",
-      "blocker": "actual registered provider/identity/dispatch integration remains separate; not arbitrary CLI stop"
+      "next_step": "Actual product/runtime assembly and applicable remaining package criteria remain separate",
+      "blocker": "actual registered provider/identity/dispatch integration remains separate; not arbitrary CLI stop",
+      "merge_commit": "c1aa2472444032c87b38139a8fb3715cd688465f",
+      "integration_scope": "source main/master; not a new installed/download release"
     },
     "TG-C04": {
       "title": "Rückmeldung / TG-05",
       "owner": "/root/tollgate_control",
-      "state": "bounded_source_and_ci_checked",
+      "state": "main_integrated_bounded_source_and_targeted_checks",
       "dependencies": [
         "TG-C02",
         "TG-C03"
@@ -465,13 +480,15 @@
       ],
       "delivered": false,
       "user_accepted": false,
-      "next_step": "Integrate reviewed source; actual Bridge execution-controller assembly pending",
-      "blocker": "actual registered provider/identity/dispatch integration remains separate; not arbitrary CLI stop"
+      "next_step": "Actual product/runtime assembly and applicable remaining package criteria remain separate",
+      "blocker": "actual registered provider/identity/dispatch integration remains separate; not arbitrary CLI stop",
+      "merge_commit": "c1aa2472444032c87b38139a8fb3715cd688465f",
+      "integration_scope": "source main/master; not a new installed/download release"
     },
     "TG-D01": {
       "title": "Design",
       "owner": "/root/tollgate_control",
-      "state": "bounded_source_and_ci_checked",
+      "state": "main_integrated_bounded_source_and_targeted_checks",
       "dependencies": [],
       "source_commit": null,
       "commit": "e8e66430fb64def027abdee2063a7a774a763883",
@@ -483,13 +500,15 @@
       ],
       "delivered": false,
       "user_accepted": false,
-      "next_step": "Integrate reviewed source; actual Bridge execution-controller assembly pending",
-      "blocker": "actual registered provider/identity/dispatch integration remains separate; not arbitrary CLI stop"
+      "next_step": "Actual product/runtime assembly and applicable remaining package criteria remain separate",
+      "blocker": "actual registered provider/identity/dispatch integration remains separate; not arbitrary CLI stop",
+      "merge_commit": "c1aa2472444032c87b38139a8fb3715cd688465f",
+      "integration_scope": "source main/master; not a new installed/download release"
     },
     "TG-R01": {
       "title": "README / Dokumentation",
       "owner": "/root/tollgate_control",
-      "state": "bounded_source_and_ci_checked",
+      "state": "main_integrated_bounded_source_and_targeted_checks",
       "dependencies": [],
       "source_commit": null,
       "commit": "e8e66430fb64def027abdee2063a7a774a763883",
@@ -501,13 +520,15 @@
       ],
       "delivered": false,
       "user_accepted": false,
-      "next_step": "Integrate reviewed source; actual Bridge execution-controller assembly pending",
-      "blocker": "actual registered provider/identity/dispatch integration remains separate; not arbitrary CLI stop"
+      "next_step": "Actual product/runtime assembly and applicable remaining package criteria remain separate",
+      "blocker": "actual registered provider/identity/dispatch integration remains separate; not arbitrary CLI stop",
+      "merge_commit": "c1aa2472444032c87b38139a8fb3715cd688465f",
+      "integration_scope": "source main/master; not a new installed/download release"
     },
     "GH-C01": {
       "title": "Handoff/Rückgabe / GH-01–02/05",
       "owner": "/root",
-      "state": "bounded_source_browser_and_ci_checked",
+      "state": "main_integrated_bounded_source_and_targeted_checks",
       "dependencies": [
         "TD-C02",
         "KB-C02"
@@ -522,13 +543,15 @@
       ],
       "delivered": false,
       "user_accepted": false,
-      "next_step": "Integrate source; no provider execution claim",
-      "blocker": "Production G01/G02 controller/issuer/provider/ProtectedHost assembly and genuine user/team acceptance absent"
+      "next_step": "Actual product/runtime assembly and applicable remaining package criteria remain separate",
+      "blocker": "Production G01/G02 controller/issuer/provider/ProtectedHost assembly and genuine user/team acceptance absent",
+      "merge_commit": "d40615e4bf95a5e236375378ba552e1bf45efd1f",
+      "integration_scope": "source main/master; not a new installed/download release"
     },
     "GH-C02": {
       "title": "Abbruch / GH-04",
       "owner": "/root",
-      "state": "bounded_source_browser_and_ci_checked",
+      "state": "main_integrated_bounded_source_and_targeted_checks",
       "dependencies": [
         "TG-C02",
         "KB-C04"
@@ -543,13 +566,15 @@
       ],
       "delivered": false,
       "user_accepted": false,
-      "next_step": "Integrate source; no provider execution claim",
-      "blocker": "Production G01/G02 controller/issuer/provider/ProtectedHost assembly and genuine user/team acceptance absent"
+      "next_step": "Actual product/runtime assembly and applicable remaining package criteria remain separate",
+      "blocker": "Production G01/G02 controller/issuer/provider/ProtectedHost assembly and genuine user/team acceptance absent",
+      "merge_commit": "d40615e4bf95a5e236375378ba552e1bf45efd1f",
+      "integration_scope": "source main/master; not a new installed/download release"
     },
     "GH-C03": {
       "title": "Kosten-/Zugangsgrenze / GH-04",
       "owner": "/root",
-      "state": "bounded_source_browser_and_ci_checked",
+      "state": "main_integrated_bounded_source_and_targeted_checks",
       "dependencies": [
         "TG-C03",
         "FP-C02"
@@ -564,19 +589,21 @@
       ],
       "delivered": false,
       "user_accepted": false,
-      "next_step": "Integrate source; no provider execution claim",
-      "blocker": "Production G01/G02 controller/issuer/provider/ProtectedHost assembly and genuine user/team acceptance absent"
+      "next_step": "Actual product/runtime assembly and applicable remaining package criteria remain separate",
+      "blocker": "Production G01/G02 controller/issuer/provider/ProtectedHost assembly and genuine user/team acceptance absent",
+      "merge_commit": "d40615e4bf95a5e236375378ba552e1bf45efd1f",
+      "integration_scope": "source main/master; not a new installed/download release"
     },
     "GH-C04": {
       "title": "Arbeitsstände / GH-03",
       "owner": "/root",
-      "state": "open",
+      "state": "source_and_ci_checked_one_resource_bound_review_fix_pending",
       "dependencies": [
         "GH-C01"
       ],
       "source_commit": null,
-      "commit": null,
-      "pr": null,
+      "commit": "b24a59d0d28204150b038b36ebda0f10ad09d810",
+      "pr": "https://github.com/landjunge/gnom-hub-v1/pull/176",
       "checks": [],
       "delivered": false,
       "user_accepted": false,
@@ -603,7 +630,7 @@
     "GH-D01": {
       "title": "Design",
       "owner": "/root",
-      "state": "bounded_source_browser_and_ci_checked",
+      "state": "main_integrated_bounded_source_and_targeted_checks",
       "dependencies": [],
       "source_commit": null,
       "commit": "875cabd82d8b74f6de78e9577237291e0d08cb1c",
@@ -615,13 +642,15 @@
       ],
       "delivered": false,
       "user_accepted": false,
-      "next_step": "Integrate source; no provider execution claim",
-      "blocker": "Production G01/G02 controller/issuer/provider/ProtectedHost assembly and genuine user/team acceptance absent"
+      "next_step": "Actual product/runtime assembly and applicable remaining package criteria remain separate",
+      "blocker": "Production G01/G02 controller/issuer/provider/ProtectedHost assembly and genuine user/team acceptance absent",
+      "merge_commit": "d40615e4bf95a5e236375378ba552e1bf45efd1f",
+      "integration_scope": "source main/master; not a new installed/download release"
     },
     "GH-R01": {
       "title": "README / Dokumentation",
       "owner": "/root",
-      "state": "bounded_source_browser_and_ci_checked",
+      "state": "main_integrated_bounded_source_and_targeted_checks",
       "dependencies": [],
       "source_commit": null,
       "commit": "875cabd82d8b74f6de78e9577237291e0d08cb1c",
@@ -633,8 +662,10 @@
       ],
       "delivered": false,
       "user_accepted": false,
-      "next_step": "Integrate source; no provider execution claim",
-      "blocker": "Production G01/G02 controller/issuer/provider/ProtectedHost assembly and genuine user/team acceptance absent"
+      "next_step": "Actual product/runtime assembly and applicable remaining package criteria remain separate",
+      "blocker": "Production G01/G02 controller/issuer/provider/ProtectedHost assembly and genuine user/team acceptance absent",
+      "merge_commit": "d40615e4bf95a5e236375378ba552e1bf45efd1f",
+      "integration_scope": "source main/master; not a new installed/download release"
     },
     "AA-C01": {
       "title": "Ereignisprojektion / AA-01–02",
@@ -651,13 +682,15 @@
       "checks": [],
       "delivered": false,
       "user_accepted": false,
-      "next_step": "Integrate reviewed source; no repository security-setting change",
-      "blocker": "CodeQL upload blocked by repository code-scanning setting; native and Python tests passed"
+      "next_step": "Actual product/runtime assembly and applicable remaining package criteria remain separate",
+      "blocker": "CodeQL upload blocked by repository code-scanning setting; native and Python tests passed",
+      "merge_commit": "faea80d028ce6611eadb42c7f0e5ed650f555b9f",
+      "integration_scope": "source main/master; not a new installed/download release"
     },
     "AA-C02": {
       "title": "Warnungen / AA-03",
       "owner": "/root",
-      "state": "source_native_and_targeted_checks_complete",
+      "state": "main_integrated_bounded_source_and_targeted_checks",
       "dependencies": [
         "AA-C01"
       ],
@@ -667,8 +700,10 @@
       "checks": [],
       "delivered": false,
       "user_accepted": false,
-      "next_step": "Retarget after PR50; regular Python CI on actual base",
-      "blocker": "Source integration pending; findings remain reported/unknown, not proven violations"
+      "next_step": "Actual product/runtime assembly and applicable remaining package criteria remain separate",
+      "blocker": "Source integration pending; findings remain reported/unknown, not proven violations",
+      "merge_commit": "932b33f363a9d8c6811b09074c15b8ad7a6cd8b5",
+      "integration_scope": "source main/master; not a new installed/download release"
     },
     "AA-C03": {
       "title": "Betrieb / AA-04",
@@ -689,7 +724,7 @@
     "AA-D01": {
       "title": "Design",
       "owner": "/root",
-      "state": "source_native_and_python_checks_complete",
+      "state": "main_integrated_bounded_source_and_targeted_checks",
       "dependencies": [],
       "source_commit": null,
       "commit": "9a0bd2acfbef64af0b56d0e566ee07d62adf05de",
@@ -697,13 +732,15 @@
       "checks": [],
       "delivered": false,
       "user_accepted": false,
-      "next_step": "Integrate reviewed source; no repository security-setting change",
-      "blocker": "CodeQL upload blocked by repository code-scanning setting; native and Python tests passed"
+      "next_step": "Actual product/runtime assembly and applicable remaining package criteria remain separate",
+      "blocker": "CodeQL upload blocked by repository code-scanning setting; native and Python tests passed",
+      "merge_commit": "faea80d028ce6611eadb42c7f0e5ed650f555b9f",
+      "integration_scope": "source main/master; not a new installed/download release"
     },
     "AA-R01": {
       "title": "README / Dokumentation",
       "owner": "/root",
-      "state": "source_native_and_python_checks_complete",
+      "state": "main_integrated_bounded_source_and_targeted_checks",
       "dependencies": [],
       "source_commit": null,
       "commit": "9a0bd2acfbef64af0b56d0e566ee07d62adf05de",
@@ -711,13 +748,15 @@
       "checks": [],
       "delivered": false,
       "user_accepted": false,
-      "next_step": "Integrate reviewed source; no repository security-setting change",
-      "blocker": "CodeQL upload blocked by repository code-scanning setting; native and Python tests passed"
+      "next_step": "Actual product/runtime assembly and applicable remaining package criteria remain separate",
+      "blocker": "CodeQL upload blocked by repository code-scanning setting; native and Python tests passed",
+      "merge_commit": "faea80d028ce6611eadb42c7f0e5ed650f555b9f",
+      "integration_scope": "source main/master; not a new installed/download release"
     },
     "BD-C01": {
       "title": "Quellstand / BD-I01",
       "owner": "/root",
-      "state": "source_and_browser_checked",
+      "state": "main_integrated_bounded_source_and_targeted_checks",
       "dependencies": [],
       "source_commit": null,
       "commit": "b875912e477523059671849f856a4b6dac8270e6",
@@ -728,13 +767,15 @@
       ],
       "delivered": false,
       "user_accepted": false,
-      "next_step": "Review and integrate private source; no standard-port runtime confirmed",
-      "blocker": null
+      "next_step": "Actual product/runtime assembly and applicable remaining package criteria remain separate",
+      "blocker": null,
+      "merge_commit": "cf0f348e76080154c839e828799697056508bcfa",
+      "integration_scope": "source main/master; not a new installed/download release"
     },
     "BD-C02": {
       "title": "Import / BD-I02–03",
       "owner": "/root",
-      "state": "source_and_isolated_browser_checked",
+      "state": "main_integrated_bounded_source_and_targeted_checks",
       "dependencies": [
         "BD-C01"
       ],
@@ -747,14 +788,16 @@
       ],
       "delivered": false,
       "user_accepted": false,
-      "next_step": "Sequential reviewed source integration; no default-port runtime confirmation",
+      "next_step": "Actual product/runtime assembly and applicable remaining package criteria remain separate",
       "blocker": null,
-      "evidence": "docs/acceptance/IMPORT-20261018.md"
+      "evidence": "docs/acceptance/IMPORT-20261018.md",
+      "merge_commit": "29a56812828a7ab4d842c5e8c18e5a355f9ffb40",
+      "integration_scope": "source main/master; not a new installed/download release"
     },
     "BD-C03": {
       "title": "Elementzuordnung / BD-I03",
       "owner": "/root",
-      "state": "source_and_isolated_browser_checked",
+      "state": "main_integrated_bounded_source_and_targeted_checks",
       "dependencies": [
         "BD-C02"
       ],
@@ -767,32 +810,35 @@
       ],
       "delivered": false,
       "user_accepted": false,
-      "next_step": "Sequential reviewed source integration; no default-port runtime confirmation",
+      "next_step": "Actual product/runtime assembly and applicable remaining package criteria remain separate",
       "blocker": null,
-      "evidence": "docs/acceptance/IMPORT-20261018.md"
+      "evidence": "docs/acceptance/IMPORT-20261018.md",
+      "merge_commit": "29a56812828a7ab4d842c5e8c18e5a355f9ffb40",
+      "integration_scope": "source main/master; not a new installed/download release"
     },
     "BD-C04": {
       "title": "Übergabe / BD-I04–05",
       "owner": "/root",
-      "state": "open",
+      "state": "isolated_actual_contract_path_implemented_final_browser_review_pending",
       "dependencies": [
         "TD-C02",
         "KB-C02",
         "KB-C05"
       ],
       "source_commit": null,
-      "commit": null,
+      "commit": "cdf439abd27b09596901a33ee5a70fdbbcbf68fc",
       "pr": null,
       "checks": [],
       "delivered": false,
       "user_accepted": false,
       "next_step": null,
-      "blocker": null
+      "blocker": null,
+      "evidence": "docs/acceptance/HANDOFF-WIP-20261018.md"
     },
     "BD-D01": {
       "title": "Design",
       "owner": "/root",
-      "state": "source_and_isolated_browser_checked",
+      "state": "main_integrated_bounded_source_and_targeted_checks",
       "dependencies": [
         "BD-C02",
         "BD-C03",
@@ -807,14 +853,16 @@
       ],
       "delivered": false,
       "user_accepted": false,
-      "next_step": "Sequential reviewed source integration; no default-port runtime confirmation",
+      "next_step": "Actual product/runtime assembly and applicable remaining package criteria remain separate",
       "blocker": null,
-      "evidence": "docs/acceptance/IMPORT-20261018.md"
+      "evidence": "docs/acceptance/IMPORT-20261018.md",
+      "merge_commit": "29a56812828a7ab4d842c5e8c18e5a355f9ffb40",
+      "integration_scope": "source main/master; not a new installed/download release"
     },
     "BD-R01": {
       "title": "README / Konzept",
       "owner": "/root",
-      "state": "source_and_isolated_browser_checked",
+      "state": "main_integrated_bounded_source_and_targeted_checks",
       "dependencies": [
         "BD-C01"
       ],
@@ -827,9 +875,11 @@
       ],
       "delivered": false,
       "user_accepted": false,
-      "next_step": "Sequential reviewed source integration; no default-port runtime confirmation",
+      "next_step": "Actual product/runtime assembly and applicable remaining package criteria remain separate",
       "blocker": null,
-      "evidence": "docs/acceptance/IMPORT-20261018.md"
+      "evidence": "docs/acceptance/IMPORT-20261018.md",
+      "merge_commit": "29a56812828a7ab4d842c5e8c18e5a355f9ffb40",
+      "integration_scope": "source main/master; not a new installed/download release"
     }
   },
   "milestones": {
@@ -847,20 +897,21 @@
     "No new competing task queue; existing stores/contracts and standalone products preserved.",
     "Source, runtime, package, delivery and user acceptance remain separate."
   ],
-  "updated_at": "2026-10-18T19:31:46.827933+00:00",
+  "updated_at": "2026-10-18T21:46:12.756128+00:00",
   "active_focus": {
-    "task": "Paused at explicit user request; current real App acceptance saved locally",
+    "task": "M2 actual image/knowledge/observation proof complete; M3 stop assembly and bounded M4/M5 source integration",
     "critical_permissions": "Completed in private main 8226763 and actual runtime c6f1eab; docs/DEVELOPMENT-ACCESS-20261018.md",
     "remaining_permissions_gate": "Local macOS administrator confirmation; unknown test never replayed",
     "next_gate": "M3 actual controller assembly must preserve trusted scope/quote/secret boundaries; no synthetic production authority",
     "loaded_runtime": "df995f6 / 0.5.2; instance748efc8b8ee341f5858d915abb1fb131; config04637ceeb2fdc4a645ba25d5ff4e8867b11068cd24eb991b7badd5b29e12405c"
   },
   "user_pause": {
-    "requested": true,
+    "requested": false,
     "reason": "User temporarily disconnecting internet; await explicit OK",
-    "new_work_allowed": false,
+    "new_work_allowed": true,
     "service": "KiraBridge left healthy and running; no further restart",
     "checkpoint": "docs/evidence/workflow-reads-chatgpt-20261018.json",
-    "next_step_after_ok": "Finish preservation comparison and documentation of actual image/knowledge/observation acceptance; then review pending stop/BD/Gnom packages"
+    "next_step_after_ok": "Finish preservation comparison and documentation of actual image/knowledge/observation acceptance; then review pending stop/BD/Gnom packages",
+    "resumed_at": "2026-10-18T21:46:12.755827+00:00"
   }
 }

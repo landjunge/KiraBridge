@@ -10,6 +10,17 @@ Tatsächlicher Teilnachweis: [Belege](evidence/workflow-observation-export-20261
 
 ## Deutsch
 
+### Tatsächlicher Gesprächsabruf
+
+Der integrierte lokale0.5.2-Backport df995f6 ist geladen. App-Task
+seven-c05-20261018-observations las16 ausgewählte Ereignisse der vorher tatsächlich
+ausgeführten M2-Tasks. Frühere Runtimefingerabdrücke bleiben aus ihrem jeweiligen
+Preflight erhalten; die heutige Runtime wird nicht rückwirkend eingesetzt. Ereignisse
+vor ihrem Preflight bleiben diesbezüglich unbekannt. Ein anschließender lokaler
+Aufruf des tatsächlichen AA-Lesers verarbeitete exakt diese gelieferten Metadaten:
+observer_only, Identität/Wirkung/Gesamtabdeckung unbekannt. Dies ist kein gesonderter
+ChatGPT-AA-Webdienst. [Belege](evidence/workflow-reads-chatgpt-20261018.json).
+
 ### Was gelesen wird
 
 Der Export liest ausschließlich das vorhandene `bridge.sqlite3` der konfigurierten

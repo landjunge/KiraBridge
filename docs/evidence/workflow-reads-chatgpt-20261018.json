@@ -184,5 +184,18 @@
     "Synthetic operator thread retained privately",
     "No full Mac reboot, new model request or administrator retry",
     "Frozen RC2 downloads unchanged"
-  ]
+  ],
+  "preservation_check_after_resume": {
+    "historical_tasks": 385,
+    "historical_tasks_unchanged": true,
+    "messages_unchanged": 5,
+    "message_jobs_unchanged": 4,
+    "credential_and_launchagent_hashes_and_modes_unchanged": true,
+    "image_task_unchanged_after_restart": true,
+    "image_running_events": 1,
+    "unknown_admin_state": "unknown",
+    "unknown_admin_attempt": 1,
+    "config_mode": "0600",
+    "private_proof": "~/.local/share/kirabridge/workflow-reads-20261018/preservation.json"
+  }
 }

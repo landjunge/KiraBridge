@@ -2,9 +2,10 @@
 
 ## Deutsch
 
-**Quellstand umgesetzt, lokal über echte MCP-HTTP-Clients geprüft; tatsächliche
-verbundene ChatGPT-App-Abnahme noch ausstehend.** Keine Runtime-/Konfigurationsänderung,
-kein aktualisierter Release-Download und keine Zusage automatischer Push-Zustellung.
+**Integriert und in der verbundenen ChatGPT-App tatsächlich als Bild empfangen.**
+Die ursprüngliche isolierte Quellprüfung wurde anschließend durch kontrolliertes
+Laden des lokalen0.5.2-Backports df995f6 ergänzt. Kein aktualisierter Release-Download
+und keine Zusage automatischer Push-Zustellung.
 Der bestehende Task-/SQLite-/MCP-Rückweg wird wiederverwendet; keine zweite Queue.
 
 `file.image` ist eine **eigene Capability**, nicht automatisch Bestandteil von
@@ -75,9 +76,10 @@ Grenzen:
 
 ## English
 
-**Implemented in source; verified with real isolated local MCP HTTP clients. Connected
-ChatGPT image acceptance is pending.** Runtime, configuration and frozen release
-artifacts are unchanged. This is polling through the existing task store, not push.
+**Integrated and received as an actual image in the connected ChatGPT App.** The
+original isolated source checks were followed by controlled loading of local0.5.2
+backport df995f6. Frozen release artifacts are unchanged. This is polling through
+the existing task store, not push.
 
 The separate `file.image` capability must be explicitly granted by the local operator.
 It uses existing `roots`/`read_roots`, descriptor-relative no-symlink access and the
@@ -120,7 +122,29 @@ Snapshot hashes do not establish current source freshness or remote attestation.
   104 bytes, four coloured quadrants, generated solely from Python standard-library
   bytes/CRC/Zlib; no external image, personal data or image-generation service.
   SHA256 `cabc398201d3063c587946158c88a4a4d4dadc023bb99d61f944302a01ad19e2`.
-- Still required: integrate/load the reviewed source; explicitly configure the separate
+- At the original worker checkpoint, still required: integrate/load the reviewed source;
+  explicitly configure the separate
   capability for the intended principal; one real connected ChatGPT invocation must
   receive and inspect the image and retain task ID/source/runtime evidence. This worker
   did not change live configuration, reload a daemon or submit that acceptance task.
+
+## Tatsächliche App-Abnahme / real connected App acceptance
+
+Task seven-c05-20261018-image lief als chatgpt genau einmal, completed/Versuch1.
+task_get lieferte Textmetadaten UND ImageContent: die eigene32×24-Fixture mit vier
+sichtbaren Farbquadranten,104Bytes und obigem SHA256. Nach kontrolliertem
+Dienstneustart lieferte dieselbe Task erneut denselben Bildblock/Hash, ohne neue
+Ausführung; die gespeicherte Task blieb vollständig unverändert. Die Quelldatei
+wurde bei dieser echten App-Probe erhalten; die Entfernen-/Reconnect-Gegenfälle
+stammen aus den oben getrennten lokalen Tests.
+
+Die eigene Capability wurde ausschließlich den vorhandenen local/chatgpt-Profilen
+ergänzt. Andere Rechte, Zugänge und385 frühere Tasks blieben erhalten. Konfiguration
+weiter0600, Backup unter ~/.local/share/kirabridge/workflow-reads-20261018/.
+[Quittungen und Runtimefingerabdrücke](evidence/workflow-reads-chatgpt-20261018.json).
+Kein gesamter Mac-Neustart, keine Gesamtprojekt- oder Nutzerabnahme.
+
+The connected App received the real image, then the same stored snapshot after
+a controlled service restart, with one running event and attempt1. Source removal
+was tested only in the separate isolated suite. Existing credentials, service
+settings and historical tasks were preserved. This is not an overall acceptance.
