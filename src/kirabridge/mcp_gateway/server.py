@@ -83,6 +83,7 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
         executables: list[str] | None = None,
         operations: list[str] | None = None,
         workflow_id: str | None = None,
+        working_directories: list[str] | None = None,
     ) -> dict[str, Any]:
         """Check this identity's requested file/program prerequisites and loaded daemon snapshot.
 
@@ -98,9 +99,34 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
                     executables=executables or [],
                     operations=operations or [],
                     workflow_id=workflow_id,
+                    working_directories=working_directories or [],
                 ),
             )
         )
+
+    @server.tool(annotations=read)
+    def policy_inspect(ctx: Context) -> dict[str, Any]:
+        """Loaded policy and config/source drift, without credentials or raw config."""
+        from kirabridge.development_status import permissions_snapshot
+
+        def action():
+            name = identity(ctx)
+            bridge.security.principal(name, "policy.inspect")
+            return permissions_snapshot(bridge, name)
+
+        return safe(action)
+
+    @server.tool(annotations=read)
+    async def agent_status(ctx: Context) -> dict[str, Any]:
+        """Own managed work and bounded process observation; no interactive session attachment."""
+        from kirabridge.development_status import agent_status as inspect
+
+        try:
+            name = identity(ctx)
+            bridge.security.principal(name, "agent.status")
+            return await inspect(bridge, name)
+        except BridgeError as exc:
+            return {"error": {"code": exc.code, "message": str(exc)}}
 
     @server.tool(annotations=read)
     def operation_catalog(ctx: Context) -> dict[str, Any]:
