@@ -1,4 +1,5 @@
 """Only console assets and operator presentation; no runtime or grants."""
+
 import hashlib
 
 import httpx
