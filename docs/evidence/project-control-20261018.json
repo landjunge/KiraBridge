@@ -264,5 +264,24 @@
     "One real structured Codex write in KiraBridge; other five model turns not repeated.",
     "Loopback client uses chatgpt principal; not a new call from external ChatGPT conversation.",
     "No new Grok task, builds, releases or tool integration."
-  ]
+  ],
+  "connected_app_followup": {
+    "source": "KiraBridge connector of this Codex session, not the separate iPhone voice chat",
+    "runtime_instance_id": "193c91766e444f06827de90256a7a328",
+    "write_task": "plugin-project-control-20261018-write",
+    "read_task": "plugin-project-control-20261018-read",
+    "principal": "chatgpt",
+    "states": [
+      "completed",
+      "completed"
+    ],
+    "bytes": 54,
+    "content_sha256": "9f60db9d32151d0fc54105703572646635b860bb2c3f47cc52b8df8d3af3794f",
+    "attempts": [
+      1,
+      1
+    ],
+    "exact_content_verified": true,
+    "own_synthetic_file_removed": true
+  }
 }
