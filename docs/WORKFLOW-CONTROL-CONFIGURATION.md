@@ -84,9 +84,17 @@ Direkte Standalone-Terminal-/Agentenaufrufe werden dadurch nicht global kontroll
 
 Vor Konfigänderung private Kopie mit denselben Dateirechten und Hash sichern.
 Eigene laufende/wartende Tasks berücksichtigen; nur die betroffenen Bridge-Dienste
-kontrolliert laden. Bei Rücknahme frühere Quelle/Konfiguration wiederherstellen,
-Queue, Zugangsdaten, Audit und TG-Journale erhalten. Bereits kontrollierte oder
+kontrolliert laden. Bei Rücknahme Queue, Zugangsdaten, Audit und TG-Journale
+erhalten. Bereits kontrollierte oder
 gestoppte Historie darf nicht automatisch als Standalone fortgesetzt werden.
+
+Für den aktuellen Betreiberstand ist der sichere Funktionsrückweg:
+`workflow_control.enabled=false` setzen und die geprüfte neue Guard-Quelle geladen
+lassen. Allgemeiner Dienst und historische Leser bleiben verfügbar, kontrollierte
+Fortsetzungen gesperrt. Nicht auf alte Builds ohne Stopwunsch-/Historienguard
+zurückstufen und damit gestoppte Handoffs ausführen. Ein vollständiger Quelldowngrade
+benötigt eine gesondert geprüfte Ausführungssperre; bloßes Erhalten der Journaldatei
+gibt alter Software dieses Wissen nicht.
 
 ## English
 
@@ -111,3 +119,6 @@ runtime and separates requested/pending/effective. Cost and external effects sta
 unknown; no hard money cap or global control of standalone tools is claimed.
 Preserve configuration permissions, queue, credentials, audit and journals on
 reload/rollback. Stopped work cannot silently resume; no automatic unlock exists.
+Disable the optional assembly while retaining the checked history/stop guards for
+feature rollback. Older builds without these guards must not execute stopped
+history; preserving a journal alone cannot teach older software to enforce it.
