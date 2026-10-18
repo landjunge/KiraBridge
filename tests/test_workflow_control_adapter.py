@@ -391,3 +391,144 @@ async def test_late_turn_metadata_save_cannot_erase_effective_stop_observation(b
     assert control.control.status(control.scope(metadata))["stopped"] is True
     with pytest.raises(BridgeError):
         await run_bound(bridge, control, task, current)
+
+
+def test_stale_caller_metadata_cannot_downgrade_persisted_bounded_mode(bridge, control):
+    task, metadata = binding(bridge)
+    persisted = {**metadata, "control_mode": "bounded"}
+    with bridge.store.transaction():
+        bridge.handoffs.save(persisted, task_id=task["id"], event="handoff.control_attached")
+    with pytest.raises(BridgeError) as failure:
+        with control.bind_turn(task, metadata):
+            pytest.fail("stale standalone metadata downgraded the persisted mode")
+    assert failure.value.code == "workflow_control_mode"
+    assert bridge.handoffs.get("local", "h-synthetic", 1)["control_mode"] == "bounded"
+
+
+def test_inconsistent_or_modified_stop_record_is_unknown_not_effective(bridge):
+    task, metadata = binding(bridge)
+    with bridge.store.transaction():
+        bridge.store.audit(
+            "workflow.stop",
+            "local",
+            task["id"],
+            {
+                "binding_ref": metadata["id"],
+                "status": "EFFECTIVE",
+                "further_dispatch_blocked": False,
+            },
+        )
+    assert bridge.handoffs.view(metadata)["stop_observation"]["status"] == "not_observed"
+    with bridge.store.transaction():
+        bridge.store.db.execute(
+            "UPDATE audit SET metadata=? WHERE kind='workflow.stop'",
+            (
+                canonical(
+                    {
+                        "binding_ref": metadata["id"],
+                        "status": "EFFECTIVE",
+                        "further_dispatch_blocked": True,
+                    }
+                ),
+            ),
+        )
+    assert bridge.handoffs.view(metadata)["stop_observation"]["status"] == "not_observed"
+
+
+async def test_stop_audit_uses_actual_owned_stop_task_preflight_never_old_turn(bridge, control):
+    from kirabridge.bridge_core.models import digest
+
+    turn, metadata = binding(bridge)
+    with bridge.store.transaction():
+        bridge.store.audit(
+            "task.preflight",
+            "local",
+            turn["id"],
+            {
+                "runtime": {"instance_id": "old-turn-runtime"},
+            },
+        )
+        # Isolated source fixture for the Root-owned future workflow.stop wiring.
+        # No production schema or Bridge input catalog is changed by this test.
+        bridge.store.db.execute(
+            "INSERT INTO tasks(id,principal,idem,request_hash,operation,args,"
+            "state,created,updated,receipt) "
+            "VALUES(?,?,?,?,?,?,?,?,?,?)",
+            (
+                "actual-stop",
+                "local",
+                "actual-stop",
+                "d" * 64,
+                "workflow.stop",
+                canonical({"handoff_id": "h-synthetic", "revision": 1, "stop_id": "stop-actual"}),
+                "accepted",
+                100,
+                100,
+                "stop-receipt",
+            ),
+        )
+        bridge.store.audit(
+            "task.preflight",
+            "local",
+            "actual-stop",
+            {
+                "runtime": {"instance_id": "actual-stop-runtime"},
+            },
+        )
+    with pytest.raises(BridgeError):
+        await control.stop("local", "h-synthetic", 1, "stop-actual", task_id=turn["id"])
+    with pytest.raises(BridgeError):
+        await control.stop("other", "h-synthetic", 1, "stop-actual", task_id="actual-stop")
+    with pytest.raises(BridgeError):
+        await control.stop("local", "h-synthetic", 1, "changed-request", task_id="actual-stop")
+    result = await control.stop("local", "h-synthetic", 1, "stop-actual", task_id="actual-stop")
+    record = bridge.store.db.execute(
+        "SELECT * FROM audit WHERE kind='workflow.stop' ORDER BY seq DESC LIMIT 1"
+    ).fetchone()
+    evidence = json.loads(record["metadata"])
+    assert record["task_id"] == "actual-stop" and evidence["bridge_task_id"] == "actual-stop"
+    assert evidence["original_task_id"] == "thread:task"
+    assert (
+        evidence["project_id"] == "synthetic-project" and evidence["workflow_id"] == metadata["id"]
+    )
+    assert evidence["control_ref"] == digest(
+        {"project_id": "synthetic-project", "workflow_id": metadata["id"]}
+    )
+    assert (
+        evidence["stop_state"] == "EFFECTIVE"
+        and evidence["barrier_seq"] == result["barrier"]["barrier_seq"]
+    )
+    runtime = bridge.store.db.execute(
+        "SELECT metadata FROM audit WHERE principal=? AND task_id=? "
+        "AND kind='task.preflight' AND seq<=? ORDER BY seq DESC LIMIT 1",
+        (record["principal"], record["task_id"], record["seq"]),
+    ).fetchone()
+    assert json.loads(runtime[0])["runtime"]["instance_id"] == "actual-stop-runtime"
+    await control.stop("local", "h-synthetic", 1, "host-probe")
+    host = bridge.store.db.execute(
+        "SELECT task_id,metadata FROM audit WHERE kind='workflow.stop' ORDER BY seq DESC LIMIT 1"
+    ).fetchone()
+    assert host["task_id"] is None and "bridge_task_id" not in json.loads(host["metadata"])
+
+
+async def test_invalid_stop_id_does_not_cancel_queued_work(bridge, control):
+    binding(bridge)
+    submit(
+        bridge,
+        request(
+            "handoff.start",
+            {
+                "handoff_id": "h-synthetic",
+                "revision": 1,
+                "cwd": bridge.config.principals["local"].roots[0],
+            },
+            task_id="still-queued",
+        ),
+    )
+    with pytest.raises(BridgeError) as failure:
+        await control.stop("local", "h-synthetic", 1, "invalid\nstop")
+    assert failure.value.code == "invalid_workflow_stop"
+    assert bridge.store.get("still-queued")["state"] == "queued"
+    assert not bridge.store.db.execute(
+        "SELECT seq FROM audit WHERE kind='workflow.stop'"
+    ).fetchall()

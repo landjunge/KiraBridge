@@ -1,0 +1,28 @@
+{
+  "observed_at": "2026-10-18T21:50:19.977485+00:00",
+  "kb_base_commit": "5f0766dd0fe02a2bcf12e02fe2988a5261e1c024",
+  "kb_pause_checkpoint": "a50d77592ccf5739debf8bd7f20914fd9eec7f19",
+  "tg_source_commit": "e382f4784543b1b62c3a238dd6c924b1e7d93ecb",
+  "tg_source_visibility": "PUBLIC",
+  "kb_source_visibility": "PRIVATE",
+  "tg_reviewed_sha256": {
+    "workflow_control.py": "4a7180f3fa4a1a49ae55ea9cc98125ed89bd90cbc852510443911b0286f6cfb8",
+    "filelock.py": "4e1306d6069ef1619414e004a52a3345e68d1f00a1fc3c410227755e59ceda43"
+  },
+  "kb_source_sha256": {
+    "src/kirabridge/workflow_control_adapter.py": "1a1da27e54e94889d3ca08b17471641612412d0f314725f20f64ba64ca5bf679",
+    "src/kirabridge/terminal_manager/__init__.py": "26ab91764ca3f52c8425701e295efece2611bd2cf9098e93390ba5460cd4428f",
+    "src/kirabridge/handoff_manager.py": "ae573af89c1a2d88bc8ba0af42af260e5fdca6a08b41cb4be8b6e8cfb82acde3",
+    "tests/test_workflow_control_adapter.py": "891aa1b0e44fb02e063ac40a1b888083990059526f8c3a726d72f7a7915a20f2"
+  },
+  "latest_targeted_checks": "4 passed,12 deselected0.42s (2new,2directlychanged)",
+  "previous_checks_preserved_in": "PAUSE-CHECKPOINT.md",
+  "live_runtime_used_or_modified": false,
+  "real_codex_grok_provider_calls": false,
+  "operator_assembly_activated": false,
+  "new_queue_or_control_journal": false,
+  "cost_kind": "unknown",
+  "hard_cost_cap": false,
+  "specific_new_kb_cases_completed_in_targeted_rounds": 16,
+  "actual_stop_task_runtime_proof": "Active owned matching workflow.stop task is audit executor; host probe without task_id records None, never previous turn preflight"
+}
