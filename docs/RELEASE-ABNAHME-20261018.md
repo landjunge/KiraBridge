@@ -70,3 +70,37 @@ Prüfung der Drittanbieterbedingungen und Wartungs-/Sicherheitsbewertung des fü
 Intel-macOS begrenzten cryptography48.0.1-Pins. Die automatische Konto-/Workspace-
 Verfügbarkeit wird nicht behauptet. Public Release, Discussion und Subdomain
 bleiben bis zur separaten Entscheidung zurückgestellt. Keine stabile1.0.
+
+
+## Fortführung nach Projektsteuerungsauftrag ·18.10.2026
+
+Der installierte Dienst0.5.2 verwendet inzwischen den gezielten Adapterbackport
+55046b0 mit ausdrücklich konfiguriertem workspace-write. Die sechs Projekt-
+berechtigungen und ein echter Codex-Schreib-/App-Schreib-/Leseweg sind in
+[Projektsteuerung](PROJECT-CONTROL-20261018.md) belegt. Quelle/Config/Runtime und
+bestehende Aufgaben bleiben getrennt vom eingefrorenen RC2-Paketstand.
+
+**Wichtige Grenze des vorhandenen Entwurfs:** RC2 am Pin57bee99 enthält die
+neue Einstellung `agents.codex.sandbox_mode` noch nicht. Sein striktes
+Konfigurationsmodell akzeptiert diese neue Einstellung nicht. Die aktuelle
+Operator-Konfiguration darf daher nicht ungeprüft mit diesen alten RC2-
+Artefakten gestartet werden. Keine Konfiguration dafür automatisch zurücksetzen
+und keine Nutzerinstallation auf diesen Kandidaten umstellen. Vor späterer
+öffentlicher Paketfreigabe ist ein neu gepinnter, gezielt geprüfter Kandidat
+mit der übernommenen Adapteroption erforderlich. Der Folgeauftrag zur
+Projektsteuerung löst ausdrücklich keinen solchen neuen Build/Release aus.
+Historische RC1/RC2-Dateien und Hashes bleiben unverändert.
+
+Der ergänzende4AllPass-Lizenz-/AP4-Auftrag ist dagegen ausgeliefert:
+[öffentliche Vorabversionv0.1.2-rc.2](https://github.com/landjunge/4AllPass/releases/tag/v0.1.2-rc.2),
+gebauter Pin60eef0a, vier native Plattformen,27 SHA-geprüfte Assets. Download-
+Integration über PR221/main82bf0f8, erforderliche CI und Pages grün. README,
+beide Standardinstaller und öffentliche Produkt-/Downloadseiten zeigen denselben
+Stand. Historische Tags/Pakete unverändert; keine persönlichen Tresore getestet.
+[Zusätzlicher Auslieferungsbeleg](evidence/4allpass-public-delivery-20261018.json)
+referenziert die bereits im4AllPass-Projekt gespeicherten Originalbelege.
+
+KiraBridge bleibt privat, vorhandener Release bleibt Entwurf, Discussion bleibt
+zurückgestellt. Keine Subdomain-/DNS-/Provideränderung. Die
+[Integrationsanalyse der sechs Tools](INTEGRATIONSANALYSE-SECHS-TOOLS-20261018.md)
+ist abgeschlossen, die Gesamtintegration wurde nicht gebaut.

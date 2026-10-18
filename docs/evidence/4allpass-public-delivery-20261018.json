@@ -1,0 +1,99 @@
+{
+  "at": "2026-10-18T16:22:54.218796+00:00",
+  "source_of_original_evidence": "landjunge/4AllPass docs/evidence/license-release-20261018 at PR221/main82bf0f8",
+  "public_release": {
+    "at": "2026-10-18T16:14:04.373236+00:00",
+    "url": "https://github.com/landjunge/4AllPass/releases/tag/v0.1.2-rc.2",
+    "release_id": 416464674,
+    "draft": false,
+    "prerelease": true,
+    "source_commit": "60eef0a7cc522c83dd13842c82c63a4430eb256f",
+    "asset_count": 27,
+    "public_license_bytes": 6373,
+    "public_license_sha256": "3316d5eda60ac1fea355aa43d196feea3567384179b55ca88c8636c0322021ec"
+  },
+  "public_download_heads": {
+    "at": "2026-10-18T16:19:30.793161+00:00",
+    "scope": "anonymous public native download HEAD after redirects; no signed redirect URLs retained; package bytes independently matched GitHub digests",
+    "checks": [
+      {
+        "name": "4AllPass_0.1.2-rc.2_aarch64.dmg",
+        "status": 200,
+        "content_length": 40932136,
+        "expected_bytes": 40932136
+      },
+      {
+        "name": "4AllPass_0.1.2-rc.2_amd64.AppImage",
+        "status": 200,
+        "content_length": 143399416,
+        "expected_bytes": 143399416
+      },
+      {
+        "name": "4AllPass_0.1.2-rc.2_x64-setup.exe",
+        "status": 200,
+        "content_length": 36088404,
+        "expected_bytes": 36088404
+      },
+      {
+        "name": "4AllPass_0.1.2-rc.2_x64.dmg",
+        "status": 200,
+        "content_length": 39956358,
+        "expected_bytes": 39956358
+      }
+    ]
+  },
+  "integrated_downloads": {
+    "at": "2026-10-18T16:22:28.961230+00:00",
+    "integration_commit": "82bf0f88d276071387bab3ee835a628106b13f9a",
+    "pr": 221,
+    "pages_workflow": 39144498364,
+    "checks": [
+      {
+        "path": "scripts/install.sh",
+        "matches_integrated_bytes": true,
+        "sha256": "b27f09da5efbc5e743eb9f42b01c3328970f975b22da8c2115d4fb29dab74ac9"
+      },
+      {
+        "path": "scripts/install.ps1",
+        "matches_integrated_bytes": true,
+        "sha256": "28749b5585508e229b8da59176abfefc5d07e98b6f3cf14a05efa86782d749d2"
+      },
+      {
+        "path": "README.md",
+        "matches_integrated_bytes": true,
+        "sha256": "dde7556f670d24e03f2851962696a5c3f994757649fc90d458c969817fadb7fd"
+      },
+      {
+        "url": "https://landjunge.github.io/4AllPass/",
+        "new_tag": true,
+        "matches_integrated_bytes": true,
+        "full_license_notice_on_download_page": false
+      },
+      {
+        "url": "https://landjunge.github.io/4AllPass/download.html",
+        "new_tag": true,
+        "matches_integrated_bytes": true,
+        "full_license_notice_on_download_page": true
+      }
+    ],
+    "scope_correction": "First probe incorrectly required full license wording on homepage as well; full current license notice is on linked download page. Both pages match committed bytes."
+  },
+  "main_ci": {
+    "run": 39144498349,
+    "conclusion": "success"
+  },
+  "main_codeql": {
+    "run": 39144498326,
+    "conclusion": "success"
+  },
+  "pages": {
+    "run": 39144498364,
+    "conclusion": "success"
+  },
+  "limits": [
+    "Prerelease, not a stable/general GUI/autofill acceptance.",
+    "macOS ad-hoc signed, not notarized; Windows unsigned.",
+    "Existing user vaults/crypto unchanged; historical packages not relabeled.",
+    "KiraBridge remains private; no new KiraBridge build, release publication, Discussion or provider changes."
+  ]
+}
