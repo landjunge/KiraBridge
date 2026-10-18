@@ -112,6 +112,10 @@ nur als lokale Python-Direktprobe:
   Das ist ein Turnnachweis, keine Abnahme aller Projekte oder Übernahme einer
   bereits offenen interaktiven Sitzung.
 - ps direkt und als normaler Programmname; Git im neu freigegebenen BlockDesigner.
+  GitHub-CLI mit vorhandener Anmeldung bestätigt isPrivate=true, ohne Zugangsdaten
+  auszugeben. Groks echter ACP-Initialize antwortet mit Protokoll1 und cached_token;
+  kein authenticate, session/new oder Modellprompt gesendet. Dies ist ein
+  Schnittstellen-, kein aktueller Kontingent-/Modellzugangsnachweis.
   Agentstatus unterscheidet verwaltete Arbeit von lediglich beobachteten Prozessen.
   Kurze Darwin-Prozessnamen beheben die tatsächlich beobachtete Abschneidung durch
   lange fremde Programmpfade; zweiter Lauf observed/truncated=false.
@@ -161,6 +165,9 @@ isolated offline package installation/removal and owned-process termination pass
 through the connected ChatGPT app. The same policy survived a controlled service
 restart; a complete Mac reboot was not performed. All299 historical tasks, five
 messages, four receiver jobs and authentication/service files were preserved.
+The existing GitHub CLI authentication also works. A real, bounded Grok ACP
+initialize returned protocol1/cached_token without authentication or a model
+prompt. This proves protocol reachability, not current model/account availability.
 
 Administrator execution uses explicit JavaScript Automation and the standard local
 macOS authorization dialog. The default AppleScript component is unavailable on

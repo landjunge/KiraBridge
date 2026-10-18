@@ -829,11 +829,69 @@
       "finished": 1792344436.447275,
       "receipt": "01619a3a-ff9d-4e2e-a965-dadb8feab133",
       "error_code": "executable_denied"
+    },
+    {
+      "id": "permissions-20261018-github",
+      "principal": "chatgpt",
+      "operation": "terminal.execute",
+      "state": "completed",
+      "attempt": 1,
+      "created": 1792344613.00496,
+      "accepted": 1792344613.040504,
+      "started": 1792344613.338437,
+      "finished": 1792344614.312006,
+      "receipt": "5dc5d2cd-d99e-49b9-8c30-b3101ce3d1b0",
+      "error_code": null,
+      "success": true,
+      "exit_code": 0,
+      "evidence": {
+        "exit_code": 0,
+        "pid": 21499,
+        "terminated": false,
+        "timed_out": false
+      },
+      "safe_json_output": {
+        "isPrivate": true
+      }
+    },
+    {
+      "id": "permissions-20261018-grok-protocol",
+      "principal": "chatgpt",
+      "operation": "terminal.execute",
+      "state": "completed",
+      "attempt": 1,
+      "created": 1792344705.5845299,
+      "accepted": 1792344705.666295,
+      "started": 1792344705.95557,
+      "finished": 1792344712.01664,
+      "receipt": "1be591c1-c0da-47d4-b209-c35a30c13684",
+      "error_code": null,
+      "success": true,
+      "exit_code": 0,
+      "evidence": {
+        "exit_code": 0,
+        "pid": 21696,
+        "terminated": false,
+        "timed_out": false
+      },
+      "safe_json_output": {
+        "ok": true,
+        "protocol_version": 1,
+        "auth_methods_declared": [
+          "cached_token"
+        ],
+        "authentication_tested": false,
+        "model_prompt_sent": false,
+        "existing_session_attached": false,
+        "scope": "ACP initialization only"
+      }
     }
   ],
   "synthetic_objects_removed": true,
   "mac_reboot_performed": false,
   "root_execution_confirmed": false,
   "real_grok_provider_test": false,
-  "public_release_or_discussion": false
+  "public_release_or_discussion": false,
+  "real_grok_acp_initialize": true,
+  "grok_authentication_tested": false
 }
