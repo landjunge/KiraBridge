@@ -93,7 +93,12 @@ def readiness(bridge, principal: str, requirements: ReadinessInput) -> dict:
 
     def executable(path):
         bridge.security.principal(principal, "terminal.execute")
-        check_executable(path, policy.executables, policy.allow_any_executable)
+        check_executable(
+            path,
+            policy.executables,
+            policy.allow_any_executable,
+            bridge.terminal.environment["PATH"],
+        )
 
     def working_directory(path):
         bridge.security.principal(principal, "terminal.execute")
@@ -225,7 +230,10 @@ def task_preflight(bridge, task: dict) -> dict:
                 "executable",
                 executable,
                 lambda: check_executable(
-                    executable, policy.executables, policy.allow_any_executable
+                    executable,
+                    policy.executables,
+                    policy.allow_any_executable,
+                    bridge.terminal.environment["PATH"],
                 ),
             )
         else:

@@ -27,8 +27,13 @@ def authorization_script(argv: list[str], cwd: str) -> str:
 async def execute_admin(bridge, task, args, policy, running):
     if sys.platform != "darwin":
         raise BridgeError("unsupported_platform", "Local administrator authorization needs macOS")
-    check_executable(args.argv[0], policy.executables, policy.allow_any_executable)
-    script = authorization_script(args.argv, args.cwd)
+    executable = check_executable(
+        args.argv[0],
+        policy.executables,
+        policy.allow_any_executable,
+        bridge.terminal.environment["PATH"],
+    )
+    script = authorization_script([executable, *args.argv[1:]], args.cwd)
     result = await bridge.terminal.execute(
         task["id"],
         task["principal"],
