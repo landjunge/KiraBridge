@@ -314,6 +314,7 @@ def permissions_snapshot(bridge, principal: str) -> dict:
                     "kind": agent.kind,
                     "sandbox_mode": agent.sandbox_mode,
                     "executable": agent.executable,
+                    "local_tools_available": agent.allow_local_tools,
                 }
             )
     return {
