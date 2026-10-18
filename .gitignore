@@ -20,3 +20,5 @@ demo-workspace/
 coverage.xml
 .coverage
 
+
+.worktrees/

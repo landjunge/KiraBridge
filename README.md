@@ -17,6 +17,10 @@ Privates, modulares Desktop- und Agenten-Gateway für macOS und Linux. Python 3.
 
 **Betriebsnachweis:** Codex und Grok haben echte, getrennt nachgewiesene Testaufträge abgeschlossen. Ein echter Codex-MCP-Aufruf und Groks MCP-Handshake wurden geprüft. Der private ChatGPT-Tunnel läuft; der Nutzer meldet eine erfolgreiche Statusabfrage. Die neue lokale Freigabeseite wurde mit einem echten MCP-Dateilistenauftrag bis zum Abschluss geprüft. Windows hat definierte Erweiterungspunkte, noch keinen ausführbaren nativen Adapter. Bilder, Datei-Clipboard, PTY/interactive stdin, A2A und die optionalen externen Integrationen sind Erweiterungen; siehe [Status](docs/STATUS.md).
 
+## ThreadDesk-Anschluss / ThreadDesk connection
+
+Optionaler fester [ThreadDesk-Fachadapter DE/EN](docs/THREADDESK-ADAPTER-20261018.md) mit getrennten Lese-/Schreibrechten und tatsächlicher ChatGPT-Abnahme im separaten Betreiberprofil. Verwaltung startet keine Agenten und migriert keine vorhandenen Benutzerprofile. / Fixed optional management adapter, verified through ChatGPT in a separate operator profile; management does not start agents or migrate existing profiles.
+
 ## Auf diesem Mac bereits eingerichtet
 
 Der lokale Dienst läuft automatisch über launchd auf `127.0.0.1:8765`. Die Standardkonfiguration liegt unter `~/.config/kirabridge/config.toml`; Zugangsdaten liegen separat mit Modus 0600. Als Arbeitsbereich ist `~/workspace/KiraBridge` freigegeben. Codex und Grok sind mit eigenen Identitäten als MCP-Clients registriert.
