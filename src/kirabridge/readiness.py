@@ -20,6 +20,7 @@ from kirabridge.terminal_manager import check_executable
 
 class ReadinessInput(Input):
     read_paths: list[str] = Field(default_factory=list, max_length=16)
+    image_paths: list[str] = Field(default_factory=list, max_length=16)
     working_directories: list[str] = Field(default_factory=list, max_length=16)
     executables: list[str] = Field(default_factory=list, max_length=16)
     operations: list[str] = Field(default_factory=list, max_length=16)
@@ -86,8 +87,12 @@ def readiness(bridge, principal: str, requirements: ReadinessInput) -> dict:
         bridge.security.principal(principal, "file.read")
         _file(scope, path)
 
+    def image(path):
+        bridge.security.principal(principal, "file.image")
+        _file(scope, path)
+
     def directory(path):
-        if not {"file.read", "file.list"}.intersection(policy.capabilities):
+        if not {"file.read", "file.image", "file.list"}.intersection(policy.capabilities):
             raise BridgeError("forbidden", "File capability not granted")
         _directory(scope, path)
 
@@ -116,6 +121,7 @@ def readiness(bridge, principal: str, requirements: ReadinessInput) -> dict:
             bridge.clipboard.platform.clipboard_command(write=name == "clipboard.write")
 
     paths = [{"path": p, **_probe(lambda p=p: file(p))} for p in requirements.read_paths]
+    images = [{"path": p, **_probe(lambda p=p: image(p))} for p in requirements.image_paths]
     programs = [{"path": p, **_probe(lambda p=p: executable(p))} for p in requirements.executables]
     working_dirs = [
         {"path": p, **_probe(lambda p=p: working_directory(p))}
@@ -129,8 +135,8 @@ def readiness(bridge, principal: str, requirements: ReadinessInput) -> dict:
         for p in dict.fromkeys(policy.roots + policy.read_roots)
     ]
     health = bridge.health(principal)
-    requested = bool(paths or programs or operations or working_dirs)
-    checks = paths + programs + operations + working_dirs
+    requested = bool(paths or images or programs or operations or working_dirs)
+    checks = paths + images + programs + operations + working_dirs
     result = {
         "principal": principal,
         "runtime": bridge.runtime,
@@ -143,6 +149,7 @@ def readiness(bridge, principal: str, requirements: ReadinessInput) -> dict:
         "terminal_roots": policy.terminal_roots or policy.roots,
         "root_checks": roots,
         "read_path_checks": paths,
+        "image_path_checks": images,
         "executable_checks": programs,
         "working_directory_checks": working_dirs,
         "operation_checks": operations,
@@ -206,14 +213,16 @@ def task_preflight(bridge, task: dict) -> dict:
 
     operation, args, principal = task["operation"], task["args"], task["principal"]
     policy = bridge.security.principal(principal, operation)
-    roots = policy.roots + (policy.read_roots if operation in {"file.read", "file.list"} else [])
+    roots = policy.roots + (
+        policy.read_roots if operation in {"file.read", "file.image", "file.list"} else []
+    )
     scope = PathScope(roots, excluded=[str(bridge.config.state_path)])
     checks = []
 
     def check(kind, path, action):
         checks.append({"kind": kind, "path": path, **_probe(action)})
 
-    if operation == "file.read":
+    if operation in {"file.read", "file.image"}:
         check("read_path", args["path"], lambda: _file(scope, args["path"]))
     elif operation == "file.list":
         check("directory", args["path"], lambda: _directory(scope, args["path"]))

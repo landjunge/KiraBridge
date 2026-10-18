@@ -81,6 +81,10 @@ class ReadInput(PathInput):
     max_bytes: int = Field(default=65536, ge=1, le=1048576)
 
 
+class ImageInput(Input):
+    path: str = Field(min_length=1, max_length=4096)
+
+
 class WriteInput(PathInput):
     text: str = Field(max_length=1048576)
     overwrite: bool = False
@@ -116,7 +120,12 @@ class AgentInput(Input):
 
 class ThreadDeskReadInput(Input):
     tool: Literal[
-        "list_threads", "get_thread", "current_thread", "list_snapshots", "thread_operation_status"
+        "list_threads",
+        "get_thread",
+        "current_thread",
+        "list_snapshots",
+        "thread_operation_status",
+        "get_reentry",
     ]
     arguments: dict[str, Any] = Field(default_factory=dict)
 
@@ -138,6 +147,21 @@ class ThreadDeskManageInput(Input):
     id: str | None = Field(default=None, min_length=1, max_length=128)
     expected_revision: int = Field(ge=0)
     data: dict[str, Any] = Field(default_factory=dict)
+
+
+class ThreadDeskKnowledgeInput(Input):
+    operation_id: str = Field(min_length=1, max_length=128, pattern=r"^[a-zA-Z0-9_-]+$")
+    action: Literal["record", "supersede", "resolve_question", "save_reentry"]
+    id: str = Field(min_length=1, max_length=128, pattern=r"^[a-zA-Z0-9_-]+$")
+    expected_revision: int = Field(ge=0, strict=True)
+    data: dict[str, Any]
+
+
+class ObservationReadInput(Input):
+    task_ids: list[str] = Field(min_length=1, max_length=16)
+    cursor: int = Field(default=0, ge=0, lt=2**63, strict=True)
+    limit: int = Field(default=100, ge=1, le=500, strict=True)
+    through_seq: int | None = Field(default=None, ge=0, lt=2**63, strict=True)
 
 
 class HandoffIssueInput(Input):

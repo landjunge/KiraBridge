@@ -11,6 +11,7 @@ from pydantic import ValidationError
 from kirabridge import LOCAL_APPROVAL_URL
 from kirabridge.bridge_core.bridge import INPUTS, Bridge
 from kirabridge.bridge_core.models import BridgeError, TaskRequest
+from kirabridge.image_manager import image_task_result
 from kirabridge.message_manager import MessageSend
 from kirabridge.readiness import ReadinessInput, readiness
 
@@ -84,11 +85,13 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
         operations: list[str] | None = None,
         workflow_id: str | None = None,
         working_directories: list[str] | None = None,
+        image_paths: list[str] | None = None,
     ) -> dict[str, Any]:
         """Check this identity's requested file/program prerequisites and loaded daemon snapshot.
 
         Does not read file contents, execute programs, submit tasks, or certify a workflow.
-        Use file.read via task_request for actual content; no cat/Python workaround needed.
+        image_paths checks descriptor access, not PNG validity or client image display.
+        Use file.read/file.image via task_request for actual content; no cat/Python workaround.
         """
         return safe(
             lambda: readiness(
@@ -96,6 +99,7 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
                 identity(ctx),
                 ReadinessInput(
                     read_paths=read_paths or [],
+                    image_paths=image_paths or [],
                     executables=executables or [],
                     operations=operations or [],
                     workflow_id=workflow_id,
@@ -159,8 +163,11 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
 
     @server.tool(annotations=read)
     def task_get(task_id: str, ctx: Context) -> dict[str, Any]:
-        """Read your task, receipt, timestamps, result and evidence-backed state."""
-        return safe(lambda: bridge.task(identity(ctx), task_id))
+        """Read own task and evidence; completed file.image also returns bounded MCP image content.
+
+        The PNG is a saved snapshot, not a fresh read. Other tasks retain their JSON format.
+        """
+        return safe(lambda: image_task_result(bridge.task(identity(ctx), task_id)))
 
     @server.tool(annotations=read)
     def task_diagnose(task_id: str, ctx: Context) -> dict[str, Any]:

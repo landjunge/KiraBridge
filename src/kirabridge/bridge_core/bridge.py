@@ -20,19 +20,23 @@ from kirabridge.bridge_core.models import (
     HandoffIssueInput,
     HandoffReference,
     HandoffStartInput,
+    ImageInput,
     MoveInput,
+    ObservationReadInput,
     PathInput,
     ProcessInput,
     ReadInput,
     State,
     TaskRequest,
     TerminalInput,
+    ThreadDeskKnowledgeInput,
     ThreadDeskManageInput,
     ThreadDeskReadInput,
     WriteInput,
 )
 from kirabridge.clipboard_manager import ClipboardManager
 from kirabridge.filesystem_manager import FilesystemManager, PathScope
+from kirabridge.image_manager import ImageManager
 from kirabridge.message_manager import MessageManager
 from kirabridge.message_manager.receiver import MessageReceiver
 from kirabridge.process_manager import ProcessManager
@@ -44,6 +48,7 @@ from kirabridge.terminal_manager import TerminalManager
 INPUTS = {
     "terminal.execute": TerminalInput,
     "file.read": ReadInput,
+    "file.image": ImageInput,
     "file.list": PathInput,
     "file.write": WriteInput,
     "file.mkdir": PathInput,
@@ -65,6 +70,8 @@ INPUTS = {
     "handoff.decide": HandoffDecisionInput,
     "threaddesk.read": ThreadDeskReadInput,
     "threaddesk.manage": ThreadDeskManageInput,
+    "threaddesk.knowledge": ThreadDeskKnowledgeInput,
+    "observations.read": ObservationReadInput,
     "agent.status": EmptyInput,
     "policy.inspect": EmptyInput,
     "admin.execute": TerminalInput,
@@ -95,6 +102,7 @@ class Bridge:
         self.security = SecurityManager(config, self.store)
         self.terminal = TerminalManager(config.terminal)
         self.filesystem = FilesystemManager()
+        self.images = ImageManager()
         self.clipboard = ClipboardManager()
         self.processes = ProcessManager(self.terminal)
         self.agents = AgentManager(config, self.terminal)
@@ -221,7 +229,7 @@ class Bridge:
         args = INPUTS[operation].model_validate(arguments)
         policy = self.security.principal(principal, operation)
         roots = policy.roots + (
-            policy.read_roots if operation in {"file.read", "file.list"} else []
+            policy.read_roots if operation in {"file.read", "file.image", "file.list"} else []
         )
         scope = PathScope(roots, excluded=[str(self.config.state_path)])
         if operation == "terminal.execute":
@@ -252,6 +260,13 @@ class Bridge:
             return await self.handoffs.execute(task, args, policy, running, progress)
         if operation.startswith("threaddesk."):
             return await self.threaddesk.execute(task, args, running)
+        if operation == "observations.read":
+            from kirabridge.observation_export import export_workflow_observations
+
+            await running({"evidence_type": "local_operation_entered", "operation": operation})
+            return await asyncio.to_thread(
+                export_workflow_observations, self, principal, **args.model_dump()
+            )
 
         if operation == "admin.execute":
             from kirabridge.admin_manager import execute_admin
@@ -269,6 +284,8 @@ class Bridge:
             if operation == "file.move":
                 scope.split(args.destination)
             await running({"evidence_type": "local_operation_entered", "operation": operation})
+            if operation == "file.image":
+                return await asyncio.to_thread(self.images.read, scope, args.path)
             method = getattr(self.filesystem, operation.split(".")[1])
             return await asyncio.to_thread(method, scope, **args.model_dump())
         if operation.startswith("clipboard."):
