@@ -283,5 +283,21 @@
     ],
     "exact_content_verified": true,
     "own_synthetic_file_removed": true
+  },
+  "frozen_rc2_compatibility_probe": {
+    "source_commit": "57bee99df829398102f8ab57c6dd845e3c8cf3aa",
+    "method": "Isolated validation using frozen trusted Config source and current operator TOML; no daemon startup/install/build.",
+    "current_operator_policy_accepted": false,
+    "errors": [
+      {
+        "location": [
+          "agents",
+          "codex",
+          "sandbox_mode"
+        ],
+        "code": "extra_forbidden"
+      }
+    ],
+    "runtime_service_or_credentials_modified": false
   }
 }

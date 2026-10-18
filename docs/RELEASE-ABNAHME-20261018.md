@@ -84,7 +84,10 @@ bestehende Aufgaben bleiben getrennt vom eingefrorenen RC2-Paketstand.
 neue Einstellung `agents.codex.sandbox_mode` noch nicht. Sein striktes
 Konfigurationsmodell akzeptiert diese neue Einstellung nicht. Die aktuelle
 Operator-Konfiguration darf daher nicht ungeprüft mit diesen alten RC2-
-Artefakten gestartet werden. Keine Konfiguration dafür automatisch zurücksetzen
+Artefakten gestartet werden. Die isolierte Validierung des eingefrorenen
+Config-Quellstands gegen die aktuelle Policy bestätigt exakt
+`agents.codex.sandbox_mode: extra_forbidden`, ohne Dienststart oder Installation.
+Beleg im bestehenden Projektsteuerungsnachweis. Keine Konfiguration dafür automatisch zurücksetzen
 und keine Nutzerinstallation auf diesen Kandidaten umstellen. Vor späterer
 öffentlicher Paketfreigabe ist ein neu gepinnter, gezielt geprüfter Kandidat
 mit der übernommenen Adapteroption erforderlich. Der Folgeauftrag zur
