@@ -18,8 +18,24 @@ from pathlib import Path
 def run(argv, **kwargs):
     result = subprocess.run(argv, capture_output=True, text=True, timeout=240, **kwargs)
     if result.returncode:
+        try:
+            payload = json.loads(result.stdout)
+            detail = {
+                k: payload.get(k)
+                for k in (
+                    "error",
+                    "requested_prerequisites_ready",
+                    "service_matches_local_config_and_source",
+                    "audit_recorded",
+                )
+            }
+            detail["codes"] = [x.get("code") for x in payload.get("read_path_checks", [])]
+        except ValueError:
+            detail = {"output": "not structured"}
         raise RuntimeError(
-            f"Isolated release command failed ({result.returncode}): " + result.stderr[-3000:]
+            f"Isolated release command failed ({result.returncode}): "
+            + json.dumps(detail)
+            + result.stderr[-1000:]
         )
     return result
 
@@ -28,7 +44,7 @@ def smoke(artifacts: Path):
     target = platform.system() + "-" + platform.machine()
     bundle = next(artifacts.glob("KiraBridge-*-" + target + ".tar.gz"))
     with tempfile.TemporaryDirectory(prefix="kirabridge-release-") as tmp:
-        folder = Path(tmp)
+        folder = Path(tmp).resolve()
         with tarfile.open(bundle) as archive:
             # Own freshly built archive; reject links/path escapes as an additional check.
             if any(

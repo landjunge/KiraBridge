@@ -84,7 +84,11 @@ def build(destination: Path):
                         0,
                     )
                     archive.addfile(item, io.BytesIO(data))
-    outputs = sorted(p for p in destination.iterdir() if p.is_file() and p.name != "SHA256SUMS")
+    outputs = sorted(
+        p
+        for p in destination.iterdir()
+        if p.is_file() and (p.name.endswith(".tar.gz") or p.suffix == ".whl")
+    )
     (destination / "SHA256SUMS").write_text(
         "".join(hashlib.sha256(p.read_bytes()).hexdigest() + "  " + p.name + "\n" for p in outputs)
     )
