@@ -2,7 +2,9 @@
 
 AA-C03 / KB-C05, 18.10.2026. Additive Quellcodevorbereitung auf
 `583c000a8f226d5d9e71c51310fb0a81a3bafb49`; privates KiraBridge-Repository.
-Keine Laufzeit-, Konfigurations-, CLI-Hauptbefehl- oder MCP-Wireänderung. Keine
+Der ursprüngliche Leser verändert weder Runtime noch Konfiguration. Der anschließend
+integrierte Leseweg observations.read verwendet die vorhandenen authentifizierten Tasks.
+Seine Aktivierung und echte App-Abnahme werden separat nachgewiesen. Keine
 zweite Warteschlange, Auditwelt, Serverinstanz, Ausführung oder Freigabeinstanz.
 Tatsächlicher Teilnachweis: [Belege](evidence/workflow-observation-export-20261018/STATUS.md).
 
@@ -19,9 +21,13 @@ sind kein zusätzlicher Task-/Auditstore.
 
 `export_workflow_observations(bridge, principal, *, task_ids, cursor=0, limit=100,
 through_seq=None)` prüft die bestehende `task.read`-Berechtigung der Bridge.
-Die spätere MCP-Verdrahtung muss `principal` aus dem **authentifizierten Transport**
-liefern, niemals aus frei wählbaren Auftragsargumenten. Diese Verdrahtung ist hier
-nicht implementiert. Das lokale Skript nutzt
+Die Taskoperation observations.read übernimmt principal aus dem **authentifizierten
+Transport**, niemals aus frei wählbaren Auftragsargumenten. Zusätzlich benötigt sie
+die eigene Capability observations.read. Beispielargumente:
+`{"task_ids":["OWN_EXISTING_TASK"],"cursor":0,"limit":100}`.
+Bei has_more mit next_cursor und unverändertem through_seq weiterlesen. Der Export
+führt ausgewählte Arbeit nicht erneut aus. Sein eigener Task erzeugt lediglich die
+üblichen Verwaltungsquittungen im bestehenden Audit. Das lokale Skript nutzt
 `export_configured_observations(config, principal, ...)` mit derselben
 konfigurierten Fähigkeit; es authentifiziert keine entfernte Identität. Ein
 vertrauenswürdiger lokaler Betreiber wählt seinen bestehenden Principal.
@@ -163,9 +169,10 @@ agent-authority workflow-inspect --input /selected/segment-directory \
 
 AA kann wegen ursprünglicher Filter-/Hashkettenlücken Exit2/UNKNOWN ausgeben;
 das ist korrekt und keine Berechtigung zum Wiederholen einer Arbeit. Hier ist
-kein neuer Hintergrunddienst, MCP-Befehl, Gesprächspush oder Sprachchat-Rückkanal
-freigeschaltet. Root verdrahtet einen geeigneten authentifizierten Leseweg später
-separat. Keine Produktionsdaten für die beigefügte Teilprüfung verwendet.
+kein neuer Hintergrunddienst, Gesprächspush oder Sprachchat-Rückkanal freigeschaltet.
+Der ergänzte Task-Leseweg ist gezielt auf Eigentümergrenze, vertrauliche Dateiinhalte,
+stabile Ereignisse und verweigerte eigene Capability geprüft. Keine Produktionsdaten
+für die beigefügte ursprüngliche Teilprüfung verwendet.
 
 ## English
 
@@ -174,8 +181,12 @@ the unchanged `agent-authority-workflow-event-v1` contract. It creates no Bridge
 Store, migration, task, grant, queue, emitter, transport, agent process, stop,
 background service or runtime/configuration change. KiraBridge remains private.
 
-The authenticated facade requires existing `task.read`; future MCP wiring must
-supply principal from its authenticated transport. The standalone source script
+The authenticated facade requires existing `task.read`. The added observations.read
+task operation also requires its separate capability and takes principal only from
+the authenticated transport. Its arguments select owned task IDs and a bounded
+cursor/snapshot page; it does not repeat selected work. Its ordinary task receipt
+reuses the existing audit. Runtime activation and real App proof are separate.
+The standalone source script
 uses a trusted local operator's existing configuration/identity and does not
 claim remote authentication. Every selected task (1–16) must belong to that exact
 principal; foreign/missing tasks return not_found. State must be existing,

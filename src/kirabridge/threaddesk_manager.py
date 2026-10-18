@@ -11,6 +11,7 @@ from pathlib import Path
 from kirabridge.bridge_core.config import Config
 from kirabridge.bridge_core.models import (
     BridgeError,
+    ThreadDeskKnowledgeInput,
     ThreadDeskManageInput,
     ThreadDeskReadInput,
     UncertainExecution,
@@ -22,6 +23,7 @@ from kirabridge.mcp_gateway.client import MCPClientPool, Peer
 READ_KEYS = {
     "list_threads": {"include_archived"},
     "get_thread": {"id"},
+    "get_reentry": {"id"},
     "current_thread": set(),
     "list_snapshots": {"id"},
     "thread_operation_status": {"operation_id"},
@@ -47,6 +49,7 @@ ERROR_CODES = {
     "question_not_waiting",
     "question_limit",
     "source_configuration",
+    "scope_conflict",
 }
 
 
@@ -99,7 +102,7 @@ class ThreadDeskManager:
         values = dict(args.arguments)
         if set(values) - READ_KEYS[args.tool]:
             raise BridgeError("invalid_arguments", "Unsupported ThreadDesk read arguments")
-        if args.tool == "get_thread" and not isinstance(values.get("id"), str):
+        if args.tool in {"get_thread", "get_reentry"} and not isinstance(values.get("id"), str):
             raise BridgeError("invalid_arguments", "An exact thread identifier is required")
         if "id" in values and (not isinstance(values["id"], str) or not values["id"]):
             raise BridgeError("invalid_arguments", "An exact thread identifier is required")
@@ -211,9 +214,14 @@ class ThreadDeskManager:
         return True, value
 
     async def execute(self, task, args, running):
-        mutation = isinstance(args, ThreadDeskManageInput)
+        mutation = isinstance(args, (ThreadDeskManageInput, ThreadDeskKnowledgeInput))
         if mutation:
-            tool, values = "thread_manage", args.model_dump(exclude_none=True)
+            tool = (
+                "knowledge_manage"
+                if isinstance(args, ThreadDeskKnowledgeInput)
+                else "thread_manage"
+            )
+            values = args.model_dump(exclude_none=True)
             values["operation_id"] = self.operation_id(task["principal"], args.operation_id)
         else:
             tool, values = args.tool, self.read_arguments(task["principal"], args)
@@ -221,6 +229,8 @@ class ThreadDeskManager:
             if self.observer_factory:
                 self.pool.observer = self.observer_factory(task["principal"])
             await self.connect()
+            if tool not in self.available_tools:
+                raise BridgeError("threaddesk_version", "Peer lacks the declared operation")
             await running(
                 {
                     "adapter": "threaddesk",

@@ -22,12 +22,14 @@ from kirabridge.bridge_core.models import (
     HandoffStartInput,
     ImageInput,
     MoveInput,
+    ObservationReadInput,
     PathInput,
     ProcessInput,
     ReadInput,
     State,
     TaskRequest,
     TerminalInput,
+    ThreadDeskKnowledgeInput,
     ThreadDeskManageInput,
     ThreadDeskReadInput,
     WriteInput,
@@ -68,6 +70,8 @@ INPUTS = {
     "handoff.decide": HandoffDecisionInput,
     "threaddesk.read": ThreadDeskReadInput,
     "threaddesk.manage": ThreadDeskManageInput,
+    "threaddesk.knowledge": ThreadDeskKnowledgeInput,
+    "observations.read": ObservationReadInput,
     "agent.status": EmptyInput,
     "policy.inspect": EmptyInput,
     "admin.execute": TerminalInput,
@@ -256,6 +260,13 @@ class Bridge:
             return await self.handoffs.execute(task, args, policy, running, progress)
         if operation.startswith("threaddesk."):
             return await self.threaddesk.execute(task, args, running)
+        if operation == "observations.read":
+            from kirabridge.observation_export import export_workflow_observations
+
+            await running({"evidence_type": "local_operation_entered", "operation": operation})
+            return await asyncio.to_thread(
+                export_workflow_observations, self, principal, **args.model_dump()
+            )
 
         if operation == "admin.execute":
             from kirabridge.admin_manager import execute_admin
