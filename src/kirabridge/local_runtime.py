@@ -91,7 +91,7 @@ def write_private(path: Path, text: str | bytes, *, mode: int = 0o600) -> None:
         os.fsync(output.fileno())
 
 
-def setup(workspace: str, destination: Path | None = None) -> dict:
+def setup(workspace: str, destination: Path | None = None, *, install_wrapper: bool = True) -> dict:
     destination = destination or default_config()
     private_directory(destination.parent)
     if destination.exists():
@@ -99,7 +99,11 @@ def setup(workspace: str, destination: Path | None = None) -> dict:
     root = Path(workspace).expanduser().absolute()
     root.mkdir(parents=True, exist_ok=True)
     root = root.resolve()
-    state = Path.home() / ".local/share/kirabridge"
+    state = (
+        Path.home() / ".local/share/kirabridge"
+        if destination == default_config()
+        else destination.parent / "state"
+    )
     private_directory(state)
     credential_path = destination.parent / "credentials.json"
     credentials = {name: secrets.token_urlsafe(48) for name in ("local", "codex", "grok")}
@@ -151,10 +155,11 @@ def setup(workspace: str, destination: Path | None = None) -> dict:
             )
     write_private(destination, content)
     command_path = Path.home() / ".local/bin/kirabridge"
-    command_path.parent.mkdir(parents=True, exist_ok=True)
     wrapper = f'#!/bin/sh\nexec {shlex.quote(sys.executable)} -m kirabridge.cli "$@"\n'
-    if not command_path.exists():
-        write_private(command_path, wrapper, mode=0o700)
+    if install_wrapper:
+        command_path.parent.mkdir(parents=True, exist_ok=True)
+        if not command_path.exists():
+            write_private(command_path, wrapper, mode=0o700)
     return {
         "config": str(destination),
         "workspace": str(root),
@@ -165,16 +170,13 @@ def setup(workspace: str, destination: Path | None = None) -> dict:
     }
 
 
-def install_service(config_path: Path) -> dict:
+def install_service(config_path: Path, *, command: str | None = None) -> dict:
     if sys.platform != "darwin":
         raise BridgeError("unsupported_platform", "Use the documented systemd unit on Linux")
     launch_dir = Path.home() / "Library/LaunchAgents"
     launch_dir.mkdir(parents=True, exist_ok=True)
     plist_path = launch_dir / f"{LABEL}.plist"
-    arguments = [
-        sys.executable,
-        "-m",
-        "kirabridge.cli",
+    arguments = ([command] if command else [sys.executable, "-m", "kirabridge.cli"]) + [
         "--config",
         str(config_path),
         "serve",

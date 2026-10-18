@@ -33,6 +33,19 @@ def parse_request(path: str) -> TaskRequest:
 
 
 async def execute(args) -> None:
+    if args.command == "install":
+        from kirabridge.installation import guided_install
+        from kirabridge.local_runtime import default_config
+
+        emit(
+            await guided_install(
+                Path(args.config).expanduser().absolute() if args.config else default_config(),
+                Path(args.release_root).resolve() if args.release_root else None,
+                args.language,
+                check=args.check,
+            )
+        )
+        return
     if args.command == "setup":
         from kirabridge.local_runtime import setup
 
@@ -177,6 +190,7 @@ async def execute(args) -> None:
                 config,
                 Path(args.config).absolute() if args.config else default_config(),
                 args.action,
+                language=args.language,
             )
         )
         return
@@ -388,6 +402,10 @@ def main() -> None:
     parser.add_argument("--config", help="TOML policy file (or KIRABRIDGE_CONFIG)")
     parser.add_argument("--principal", default="local", help="Local CLI/stdio policy identity")
     sub = parser.add_subparsers(dest="command", required=True)
+    installation = sub.add_parser("install", help="Guided local installation and ChatGPT setup")
+    installation.add_argument("--language", choices=["de", "en"], default="de")
+    installation.add_argument("--release-root")
+    installation.add_argument("--check", action="store_true", help="Read-only prerequisites")
     setup = sub.add_parser("setup", help="Create private local policy, credentials and CLI command")
     setup.add_argument("--workspace", default=str(Path.home() / "workspace/KiraBridge"))
     sub.add_parser("status", help="Query the running local daemon")
@@ -429,6 +447,7 @@ def main() -> None:
     sub.add_parser("approval-server", help="Run the loopback-only local approval interface")
     chatgpt = sub.add_parser("chatgpt", help="Local account linking for a private ChatGPT tunnel")
     chatgpt.add_argument("action", choices=["setup", "status"])
+    chatgpt.add_argument("--language", choices=["de", "en"], default="de")
     service = sub.add_parser("service")
     service.add_argument("action", choices=["install", "status"])
     sub.add_parser("pending", help="Review requests awaiting local approval")

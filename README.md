@@ -1,5 +1,25 @@
 # KiraBridge
 
+**Vibe Coding:** Du besprichst mit ChatGPT, was gebaut oder geändert werden soll.
+ChatGPT übergibt die Aufträge über KiraBridge an Codex oder Grok auf deinem
+Rechner. Beide können mit eingerichteten Berechtigungen am selben Projekt
+arbeiten. Weitere CLI-Anbindungen sind geplant.
+
+**Built for Vibe Coding:** discuss what to build or change with ChatGPT.
+ChatGPT delegates through KiraBridge to Codex or Grok on your computer. Both can
+collaborate on the same project with configured permissions. More CLI integrations
+are planned.
+
+**0.6.0rc1 · private Release-Vorbereitung:** [Installieren DE](docs/INSTALL-DE.md) ·
+[Install EN](docs/INSTALL-EN.md) · [Release Notes](docs/RELEASE-NOTES-0.6.0rc1.md).
+Noch keine öffentliche Installation oder endgültige Lizenz. Betreiberwunsch:
+kostenlose private Nutzung, Firmeneinsatz/Weiterverkauf/kostenpflichtiger Dienst
+nur mit gesonderter Erlaubnis; dies ist noch keine erteilte Lizenz. Die Projektseite
+`kirabridge.netzwerkpunkt.de` ist geplant. Keine Sichtbarkeitsänderung.
+
+Die nachfolgenden Betriebsdetails dokumentieren die vorhandene Entwicklerinstallation;
+der neue normale Schnellstart verwendet das geprüfte Release-Paket.
+
 Privates, modulares Desktop- und Agenten-Gateway für macOS und Linux. Python 3.11+, asyncio, SQLite und das offizielle MCP Python SDK. Version **0.5.2** ergänzt [konkrete Vorabprüfung und reduzierte Fehlerdiagnose](docs/DIAGNOSTICS-20261018.md) in der bestehenden Audit-Kette. Version0.5.1 ergänzte die begrenzte Bereitschaftsprüfung und zusätzliche reine Lesepfade; Version0.5.0 ergänzte den direkten, dauerhaften [Agentenkanal Codex ↔ Grok](docs/AGENT_CHANNEL.md) mit automatischer Empfängeranbindung. Grundlage bleibt der [Entwicklungsplan](docs/DEVELOPMENT_PLAN.md).
 
 ## Implementiert

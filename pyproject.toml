@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "kirabridge"
-version = "0.5.2"
+version = "0.6.0rc1"
 description = "Private, permission-scoped desktop and agent bridge"
 requires-python = ">=3.11"
 dependencies = ["mcp>=1.30,<2", "httpx>=0.28,<1", "uvicorn>=0.34,<1"]
@@ -14,6 +14,13 @@ kirabridge = "kirabridge.cli:main"
 
 [dependency-groups]
 dev = ["pytest>=8,<10", "pytest-asyncio>=1,<2", "ruff>=0.14,<1"]
+
+[tool.uv]
+# Upstream stopped publishing Intel-macOS wheels in 49. No surprise Rust build.
+constraint-dependencies = ["cryptography<49; sys_platform == 'darwin' and platform_machine == 'x86_64'"]
+
+[tool.hatch.build.targets.sdist]
+include = ["src/", "pyproject.toml", "uv.lock", "docs/INSTALL-DE.md", "docs/INSTALL-EN.md", "docs/RELEASE-NOTES-0.6.0rc1.md"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
