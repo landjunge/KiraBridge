@@ -1,0 +1,806 @@
+{
+  "task_id": "seven-tools-build-20261018-1833",
+  "coordinator": "/root",
+  "created_at": "2026-10-18T16:45:01.230494+00:00",
+  "source_sha256": "6b36639394b4eb2d91252e89e52ccadb470b7cd6d046f4f51894b8daa836cdd1",
+  "source_documents": [
+    "Gesamtplan-Sieben-Tools.md",
+    "ThreadDesk-Umsetzungsplan.md",
+    "KiraBridge-Umsetzungsplan.md",
+    "4AllPass-Umsetzungsplan.md",
+    "TollGate-Umsetzungsplan.md",
+    "Gnom-Hub-Umsetzungsplan.md",
+    "Agent-Authority-Umsetzungsplan.md",
+    "Blockdesigner-Umsetzungsplan.md"
+  ],
+  "authority": "status.json is authoritative progress only, not an execution queue; MASTERPLAN.md is rendered from it",
+  "contracts": {
+    "G-01": {
+      "owner": "/root",
+      "state": "agreed_m1_contract",
+      "details": "Fixed thread_manage actions, exact IDs, expected_revision, stable operation_id+contenthash; separate handoff/source revision."
+    },
+    "G-02": {
+      "owner": "/root/tollgate_control",
+      "state": "agreed_bounded_core_contract",
+      "details": "Trusted budget provisioning; microusd reservations; per-workflow ordered dispatch/stop; unknown retains reservation; FP activation fails closed without OS secret boundary."
+    }
+  },
+  "workers": {
+    "/root/threaddesk_m1": {
+      "worktree": "/Users/landjunge/threaddesk-worktrees/seven-tools-m1-20261018",
+      "packages": [
+        "TD-C01",
+        "TD-C02",
+        "TD-C03",
+        "TD-D01",
+        "TD-R01"
+      ],
+      "state": "package_saved_no_next_stage_started_during_critical_repair"
+    },
+    "/root/tollgate_control": {
+      "worktree": "/Users/landjunge/tollgate/.worktrees/seven-tools-control-20261018",
+      "packages": [
+        "TG-C01",
+        "TG-C02",
+        "TG-C03",
+        "TG-C04",
+        "TG-D01",
+        "TG-R01"
+      ],
+      "state": "package_saved_no_next_stage_started_during_critical_repair"
+    },
+    "/root/fourallpass_protected": {
+      "worktree": "/Users/landjunge/4AllPass/.worktrees/seven-tools-protected-20261018",
+      "packages": [
+        "FP-C01",
+        "FP-C02",
+        "FP-C03",
+        "FP-D01",
+        "FP-R01",
+        "FP-V01"
+      ],
+      "state": "package_saved_no_next_stage_started_during_critical_repair"
+    }
+  },
+  "packages": {
+    "TD-C01": {
+      "title": "Bau / TD-01–03",
+      "owner": "/root/threaddesk_m1",
+      "state": "source_and_ci_checked",
+      "dependencies": [
+        "G-01"
+      ],
+      "source_commit": null,
+      "commit": "a99afa8b4ddfdc4396521bad11d6868b2069d9b0",
+      "pr": "https://github.com/landjunge/threaddesk/pull/75",
+      "checks": [
+        "targeted JSON/SQLite/migration/MCP checks",
+        "required CI: twice573 + three native builds"
+      ],
+      "delivered": false,
+      "user_accepted": false,
+      "next_step": null,
+      "blocker": "Bridge M1 integration/readback still pending"
+    },
+    "TD-C02": {
+      "title": "Bau / TD-04",
+      "owner": "/root/threaddesk_m1",
+      "state": "source_and_ci_checked",
+      "dependencies": [
+        "G-01"
+      ],
+      "source_commit": null,
+      "commit": "05403916e549e1060f839ccbaf36a5cb90413776",
+      "pr": "https://github.com/landjunge/threaddesk/pull/76",
+      "checks": [
+        "issuance/source/first-stale-return/runbinding/questions negative checks",
+        "required CI: twice590 + three native builds"
+      ],
+      "delivered": false,
+      "user_accepted": false,
+      "next_step": null,
+      "blocker": "strict Bridge binding and actual waiting-adapter answer delivery pending"
+    },
+    "TD-C03": {
+      "title": "Bau / Wissensführung",
+      "owner": "/root/threaddesk_m1",
+      "state": "open",
+      "dependencies": [
+        "TD-C01"
+      ],
+      "source_commit": null,
+      "commit": null,
+      "pr": null,
+      "checks": [],
+      "delivered": false,
+      "user_accepted": false,
+      "next_step": null,
+      "blocker": null
+    },
+    "TD-C04": {
+      "title": "Separater Ausbau",
+      "owner": "/root/threaddesk_m1",
+      "state": "open",
+      "dependencies": [
+        "operator_server_scope"
+      ],
+      "source_commit": null,
+      "commit": null,
+      "pr": null,
+      "checks": [],
+      "delivered": false,
+      "user_accepted": false,
+      "next_step": null,
+      "blocker": null
+    },
+    "TD-D01": {
+      "title": "Design",
+      "owner": "/root/threaddesk_m1",
+      "state": "open",
+      "dependencies": [],
+      "source_commit": null,
+      "commit": null,
+      "pr": null,
+      "checks": [],
+      "delivered": false,
+      "user_accepted": false,
+      "next_step": null,
+      "blocker": null
+    },
+    "TD-R01": {
+      "title": "README / Dokumentation",
+      "owner": "/root/threaddesk_m1",
+      "state": "open",
+      "dependencies": [],
+      "source_commit": null,
+      "commit": null,
+      "pr": null,
+      "checks": [],
+      "delivered": false,
+      "user_accepted": false,
+      "next_step": null,
+      "blocker": null
+    },
+    "KB-C01": {
+      "title": "Bau / KB-01–02",
+      "owner": "/root",
+      "state": "implemented_unverified_adapter_worktree",
+      "dependencies": [
+        "TD-C01",
+        "G-01"
+      ],
+      "source_commit": null,
+      "commit": null,
+      "pr": null,
+      "checks": [],
+      "delivered": false,
+      "user_accepted": false,
+      "next_step": "Resume targeted real stdio test against pinned ThreadDesk M1; no live TD profile migration yet",
+      "blocker": null
+    },
+    "KB-C02": {
+      "title": "Bau / KB-03",
+      "owner": "/root",
+      "state": "open",
+      "dependencies": [
+        "TD-C02",
+        "KB-C01"
+      ],
+      "source_commit": null,
+      "commit": null,
+      "pr": null,
+      "checks": [],
+      "delivered": false,
+      "user_accepted": false,
+      "next_step": null,
+      "blocker": null
+    },
+    "KB-C03": {
+      "title": "Ausführungsprofil / schon implementiert",
+      "owner": "/root",
+      "state": "implemented_prior_current_runtime_to_verify",
+      "dependencies": [],
+      "source_commit": null,
+      "commit": null,
+      "pr": null,
+      "checks": [],
+      "delivered": false,
+      "user_accepted": false,
+      "next_step": null,
+      "blocker": null
+    },
+    "KB-C04": {
+      "title": "Stopp / KB-04",
+      "owner": "/root",
+      "state": "open",
+      "dependencies": [
+        "TG-C02"
+      ],
+      "source_commit": null,
+      "commit": null,
+      "pr": null,
+      "checks": [],
+      "delivered": false,
+      "user_accepted": false,
+      "next_step": null,
+      "blocker": null
+    },
+    "KB-C05": {
+      "title": "Rückkanal",
+      "owner": "/root",
+      "state": "open",
+      "dependencies": [
+        "KB-C02"
+      ],
+      "source_commit": null,
+      "commit": null,
+      "pr": null,
+      "checks": [],
+      "delivered": false,
+      "user_accepted": false,
+      "next_step": null,
+      "blocker": null
+    },
+    "KB-D01": {
+      "title": "Design",
+      "owner": "/root",
+      "state": "open",
+      "dependencies": [],
+      "source_commit": null,
+      "commit": null,
+      "pr": null,
+      "checks": [],
+      "delivered": false,
+      "user_accepted": false,
+      "next_step": null,
+      "blocker": null
+    },
+    "KB-R01": {
+      "title": "README / Dokumentation",
+      "owner": "/root",
+      "state": "open",
+      "dependencies": [],
+      "source_commit": null,
+      "commit": null,
+      "pr": null,
+      "checks": [],
+      "delivered": false,
+      "user_accepted": false,
+      "next_step": null,
+      "blocker": null
+    },
+    "FP-C01": {
+      "title": "Ursache / FP-01",
+      "owner": "/root/fourallpass_protected",
+      "state": "source_and_ci_checked",
+      "dependencies": [],
+      "source_commit": null,
+      "commit": "3fd6ed2",
+      "pr": "https://github.com/landjunge/4AllPass/pull/222",
+      "checks": [
+        "Core27 SDK9 Node6 backend9 frontend184",
+        "all10 CI checks green; synthetic browser vaults only"
+      ],
+      "delivered": false,
+      "user_accepted": false,
+      "next_step": null,
+      "blocker": null
+    },
+    "FP-C02": {
+      "title": "Geschützte Nutzung / FP-02",
+      "owner": "/root/fourallpass_protected",
+      "state": "partial_fail_closed",
+      "dependencies": [
+        "FP-C01",
+        "KB-C02",
+        "TG-C01",
+        "secret_os_boundary"
+      ],
+      "source_commit": null,
+      "commit": "3fd6ed2",
+      "pr": "https://github.com/landjunge/4AllPass/pull/222",
+      "checks": [
+        "protected core17 +3 actual TG adapter/Dummy checks"
+      ],
+      "delivered": false,
+      "user_accepted": false,
+      "next_step": null,
+      "blocker": "real OS secret boundary/secret handoff + KB-C02 identity + provider executor missing; no real vault secret transferred"
+    },
+    "FP-C03": {
+      "title": "Browser-/Sitzungsgrenze / FP-03–04",
+      "owner": "/root/fourallpass_protected",
+      "state": "open",
+      "dependencies": [
+        "FP-C02",
+        "TG-C02",
+        "KB-C04"
+      ],
+      "source_commit": null,
+      "commit": null,
+      "pr": null,
+      "checks": [],
+      "delivered": false,
+      "user_accepted": false,
+      "next_step": null,
+      "blocker": null
+    },
+    "FP-D01": {
+      "title": "Design",
+      "owner": "/root/fourallpass_protected",
+      "state": "source_and_browser_checked",
+      "dependencies": [],
+      "source_commit": null,
+      "commit": "fd5473203abc8fdc3fab4fff2e2331882d5f2dde",
+      "pr": "https://github.com/landjunge/4AllPass/pull/223",
+      "checks": [
+        "DE/EN 640/1440 focus150% reduced-motion; AP4/LICENSE preserved"
+      ],
+      "delivered": false,
+      "user_accepted": false,
+      "next_step": null,
+      "blocker": "stacked on222; final current CI not yet read by coordinator"
+    },
+    "FP-R01": {
+      "title": "README / Boundary",
+      "owner": "/root/fourallpass_protected",
+      "state": "in_progress",
+      "dependencies": [],
+      "source_commit": null,
+      "commit": null,
+      "pr": null,
+      "checks": [],
+      "delivered": false,
+      "user_accepted": false,
+      "next_step": null,
+      "blocker": null
+    },
+    "FP-V01": {
+      "title": "Abnahme / bestehende Produktarbeit",
+      "owner": "/root/fourallpass_protected",
+      "state": "open",
+      "dependencies": [
+        "FP-C02",
+        "FP-C03"
+      ],
+      "source_commit": null,
+      "commit": null,
+      "pr": null,
+      "checks": [],
+      "delivered": false,
+      "user_accepted": false,
+      "next_step": null,
+      "blocker": null
+    },
+    "TG-C01": {
+      "title": "Kontrollvertrag / TG-01–02",
+      "owner": "/root/tollgate_control",
+      "state": "bounded_source_and_ci_checked",
+      "dependencies": [
+        "G-01"
+      ],
+      "source_commit": null,
+      "commit": "c3a062d89cd3be449cb61976149ee5d455d67b8a",
+      "pr": "https://github.com/landjunge/tollgate/pull/34",
+      "checks": [
+        "23 new cases; earlier90 relevant checks",
+        "existing Python3.11/3.12 CI green",
+        "real isolated DE/EN zoom/focus/reduced-motion browser"
+      ],
+      "delivered": false,
+      "user_accepted": false,
+      "next_step": null,
+      "blocker": "actual registered provider/identity/dispatch integration remains separate; not arbitrary CLI stop"
+    },
+    "TG-C02": {
+      "title": "Auftragsstopp / TG-02–03",
+      "owner": "/root/tollgate_control",
+      "state": "bounded_source_and_ci_checked",
+      "dependencies": [
+        "TG-C01"
+      ],
+      "source_commit": null,
+      "commit": "c3a062d89cd3be449cb61976149ee5d455d67b8a",
+      "pr": "https://github.com/landjunge/tollgate/pull/34",
+      "checks": [
+        "23 new cases; earlier90 relevant checks",
+        "existing Python3.11/3.12 CI green",
+        "real isolated DE/EN zoom/focus/reduced-motion browser"
+      ],
+      "delivered": false,
+      "user_accepted": false,
+      "next_step": null,
+      "blocker": "actual registered provider/identity/dispatch integration remains separate; not arbitrary CLI stop"
+    },
+    "TG-C03": {
+      "title": "Gesamtbudget / TG-04",
+      "owner": "/root/tollgate_control",
+      "state": "bounded_source_and_ci_checked",
+      "dependencies": [
+        "TG-C01",
+        "G-02"
+      ],
+      "source_commit": null,
+      "commit": "c3a062d89cd3be449cb61976149ee5d455d67b8a",
+      "pr": "https://github.com/landjunge/tollgate/pull/34",
+      "checks": [
+        "23 new cases; earlier90 relevant checks",
+        "existing Python3.11/3.12 CI green",
+        "real isolated DE/EN zoom/focus/reduced-motion browser"
+      ],
+      "delivered": false,
+      "user_accepted": false,
+      "next_step": null,
+      "blocker": "actual registered provider/identity/dispatch integration remains separate; not arbitrary CLI stop"
+    },
+    "TG-C04": {
+      "title": "Rückmeldung / TG-05",
+      "owner": "/root/tollgate_control",
+      "state": "bounded_source_and_ci_checked",
+      "dependencies": [
+        "TG-C02",
+        "TG-C03"
+      ],
+      "source_commit": null,
+      "commit": "c3a062d89cd3be449cb61976149ee5d455d67b8a",
+      "pr": "https://github.com/landjunge/tollgate/pull/34",
+      "checks": [
+        "23 new cases; earlier90 relevant checks",
+        "existing Python3.11/3.12 CI green",
+        "real isolated DE/EN zoom/focus/reduced-motion browser"
+      ],
+      "delivered": false,
+      "user_accepted": false,
+      "next_step": null,
+      "blocker": "actual registered provider/identity/dispatch integration remains separate; not arbitrary CLI stop"
+    },
+    "TG-D01": {
+      "title": "Design",
+      "owner": "/root/tollgate_control",
+      "state": "bounded_source_and_ci_checked",
+      "dependencies": [],
+      "source_commit": null,
+      "commit": "c3a062d89cd3be449cb61976149ee5d455d67b8a",
+      "pr": "https://github.com/landjunge/tollgate/pull/34",
+      "checks": [
+        "23 new cases; earlier90 relevant checks",
+        "existing Python3.11/3.12 CI green",
+        "real isolated DE/EN zoom/focus/reduced-motion browser"
+      ],
+      "delivered": false,
+      "user_accepted": false,
+      "next_step": null,
+      "blocker": "actual registered provider/identity/dispatch integration remains separate; not arbitrary CLI stop"
+    },
+    "TG-R01": {
+      "title": "README / Dokumentation",
+      "owner": "/root/tollgate_control",
+      "state": "bounded_source_and_ci_checked",
+      "dependencies": [],
+      "source_commit": null,
+      "commit": "c3a062d89cd3be449cb61976149ee5d455d67b8a",
+      "pr": "https://github.com/landjunge/tollgate/pull/34",
+      "checks": [
+        "23 new cases; earlier90 relevant checks",
+        "existing Python3.11/3.12 CI green",
+        "real isolated DE/EN zoom/focus/reduced-motion browser"
+      ],
+      "delivered": false,
+      "user_accepted": false,
+      "next_step": null,
+      "blocker": "actual registered provider/identity/dispatch integration remains separate; not arbitrary CLI stop"
+    },
+    "GH-C01": {
+      "title": "Handoff/Rückgabe / GH-01–02/05",
+      "owner": "/root",
+      "state": "open",
+      "dependencies": [
+        "TD-C02",
+        "KB-C02"
+      ],
+      "source_commit": null,
+      "commit": null,
+      "pr": null,
+      "checks": [],
+      "delivered": false,
+      "user_accepted": false,
+      "next_step": null,
+      "blocker": null
+    },
+    "GH-C02": {
+      "title": "Abbruch / GH-04",
+      "owner": "/root",
+      "state": "open",
+      "dependencies": [
+        "TG-C02",
+        "KB-C04"
+      ],
+      "source_commit": null,
+      "commit": null,
+      "pr": null,
+      "checks": [],
+      "delivered": false,
+      "user_accepted": false,
+      "next_step": null,
+      "blocker": null
+    },
+    "GH-C03": {
+      "title": "Kosten-/Zugangsgrenze / GH-04",
+      "owner": "/root",
+      "state": "open",
+      "dependencies": [
+        "TG-C03",
+        "FP-C02"
+      ],
+      "source_commit": null,
+      "commit": null,
+      "pr": null,
+      "checks": [],
+      "delivered": false,
+      "user_accepted": false,
+      "next_step": null,
+      "blocker": null
+    },
+    "GH-C04": {
+      "title": "Arbeitsstände / GH-03",
+      "owner": "/root",
+      "state": "open",
+      "dependencies": [
+        "GH-C01"
+      ],
+      "source_commit": null,
+      "commit": null,
+      "pr": null,
+      "checks": [],
+      "delivered": false,
+      "user_accepted": false,
+      "next_step": null,
+      "blocker": null
+    },
+    "GH-C05": {
+      "title": "Browseradapter",
+      "owner": "/root",
+      "state": "open",
+      "dependencies": [
+        "FP-C03",
+        "TG-C01"
+      ],
+      "source_commit": null,
+      "commit": null,
+      "pr": null,
+      "checks": [],
+      "delivered": false,
+      "user_accepted": false,
+      "next_step": null,
+      "blocker": null
+    },
+    "GH-D01": {
+      "title": "Design",
+      "owner": "/root",
+      "state": "open",
+      "dependencies": [],
+      "source_commit": null,
+      "commit": null,
+      "pr": null,
+      "checks": [],
+      "delivered": false,
+      "user_accepted": false,
+      "next_step": null,
+      "blocker": null
+    },
+    "GH-R01": {
+      "title": "README / Dokumentation",
+      "owner": "/root",
+      "state": "open",
+      "dependencies": [],
+      "source_commit": null,
+      "commit": null,
+      "pr": null,
+      "checks": [],
+      "delivered": false,
+      "user_accepted": false,
+      "next_step": null,
+      "blocker": null
+    },
+    "AA-C01": {
+      "title": "Ereignisprojektion / AA-01–02",
+      "owner": "/root",
+      "state": "open",
+      "dependencies": [
+        "G-01",
+        "TD-C02",
+        "KB-C02"
+      ],
+      "source_commit": null,
+      "commit": null,
+      "pr": null,
+      "checks": [],
+      "delivered": false,
+      "user_accepted": false,
+      "next_step": null,
+      "blocker": null
+    },
+    "AA-C02": {
+      "title": "Warnungen / AA-03",
+      "owner": "/root",
+      "state": "open",
+      "dependencies": [
+        "AA-C01"
+      ],
+      "source_commit": null,
+      "commit": null,
+      "pr": null,
+      "checks": [],
+      "delivered": false,
+      "user_accepted": false,
+      "next_step": null,
+      "blocker": null
+    },
+    "AA-C03": {
+      "title": "Betrieb / AA-04",
+      "owner": "/root",
+      "state": "open",
+      "dependencies": [
+        "operator_transport_scope"
+      ],
+      "source_commit": null,
+      "commit": null,
+      "pr": null,
+      "checks": [],
+      "delivered": false,
+      "user_accepted": false,
+      "next_step": null,
+      "blocker": null
+    },
+    "AA-D01": {
+      "title": "Design",
+      "owner": "/root",
+      "state": "open",
+      "dependencies": [],
+      "source_commit": null,
+      "commit": null,
+      "pr": null,
+      "checks": [],
+      "delivered": false,
+      "user_accepted": false,
+      "next_step": null,
+      "blocker": null
+    },
+    "AA-R01": {
+      "title": "README / Dokumentation",
+      "owner": "/root",
+      "state": "open",
+      "dependencies": [],
+      "source_commit": null,
+      "commit": null,
+      "pr": null,
+      "checks": [],
+      "delivered": false,
+      "user_accepted": false,
+      "next_step": null,
+      "blocker": null
+    },
+    "BD-C01": {
+      "title": "Quellstand / BD-I01",
+      "owner": "/root",
+      "state": "open",
+      "dependencies": [],
+      "source_commit": null,
+      "commit": null,
+      "pr": null,
+      "checks": [],
+      "delivered": false,
+      "user_accepted": false,
+      "next_step": null,
+      "blocker": null
+    },
+    "BD-C02": {
+      "title": "Import / BD-I02–03",
+      "owner": "/root",
+      "state": "open",
+      "dependencies": [
+        "BD-C01"
+      ],
+      "source_commit": null,
+      "commit": null,
+      "pr": null,
+      "checks": [],
+      "delivered": false,
+      "user_accepted": false,
+      "next_step": null,
+      "blocker": null
+    },
+    "BD-C03": {
+      "title": "Elementzuordnung / BD-I03",
+      "owner": "/root",
+      "state": "open",
+      "dependencies": [
+        "BD-C02"
+      ],
+      "source_commit": null,
+      "commit": null,
+      "pr": null,
+      "checks": [],
+      "delivered": false,
+      "user_accepted": false,
+      "next_step": null,
+      "blocker": null
+    },
+    "BD-C04": {
+      "title": "Übergabe / BD-I04–05",
+      "owner": "/root",
+      "state": "open",
+      "dependencies": [
+        "TD-C02",
+        "KB-C02",
+        "KB-C05"
+      ],
+      "source_commit": null,
+      "commit": null,
+      "pr": null,
+      "checks": [],
+      "delivered": false,
+      "user_accepted": false,
+      "next_step": null,
+      "blocker": null
+    },
+    "BD-D01": {
+      "title": "Design",
+      "owner": "/root",
+      "state": "open",
+      "dependencies": [
+        "BD-C02",
+        "BD-C03",
+        "BD-C04"
+      ],
+      "source_commit": null,
+      "commit": null,
+      "pr": null,
+      "checks": [],
+      "delivered": false,
+      "user_accepted": false,
+      "next_step": null,
+      "blocker": null
+    },
+    "BD-R01": {
+      "title": "README / Konzept",
+      "owner": "/root",
+      "state": "open",
+      "dependencies": [
+        "BD-C01"
+      ],
+      "source_commit": null,
+      "commit": null,
+      "pr": null,
+      "checks": [],
+      "delivered": false,
+      "user_accepted": false,
+      "next_step": null,
+      "blocker": null
+    }
+  },
+  "milestones": {
+    "M0": "in_progress",
+    "M1": "in_progress",
+    "M2": "open",
+    "M3": "open",
+    "M4": "open",
+    "M5": "open",
+    "M6": "requires_concrete_operator_scope"
+  },
+  "limits": [
+    "No public KiraBridge release/Discussion, visibility changes, paid provider calls, real account tests, foreign-session stops.",
+    "No secret material returned to model/agent/thread/tool/log; no raw_secret fallback.",
+    "No new competing task queue; existing stores/contracts and standalone products preserved.",
+    "Source, runtime, package, delivery and user acceptance remain separate."
+  ],
+  "updated_at": "2026-10-18T17:30:54.959973+00:00",
+  "active_focus": {
+    "task": "critical persistent KiraBridge operator permissions, subsequent full-terminal/admin expansion",
+    "runtime_commit": "c6f1eab91f4102fcfaa3d8503141fd18274bb45d",
+    "report": "docs/DEVELOPMENT-ACCESS-20261018.md in permissions-main branch",
+    "remaining_gate": "local macOS administrator confirmation; unknown test not replayed",
+    "seven_tools_work_preserved": true
+  }
+}
