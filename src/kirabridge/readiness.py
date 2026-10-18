@@ -110,7 +110,7 @@ def readiness(bridge, principal: str, requirements: ReadinessInput) -> dict:
         if name not in INPUTS:
             raise BridgeError("unknown_operation", "Unknown operation")
         bridge.security.principal(principal, name)
-        if name.startswith("threaddesk."):
+        if name.startswith(("threaddesk.", "handoff.")) and name != "handoff.status":
             bridge.threaddesk.check_configuration()
         if name in {"clipboard.read", "clipboard.write"}:
             bridge.clipboard.platform.clipboard_command(write=name == "clipboard.write")
@@ -225,8 +225,23 @@ def task_preflight(bridge, task: dict) -> dict:
                     pass
 
             check("mutation_parent", path, parent)
-    elif operation.startswith("threaddesk."):
+    elif operation.startswith(("threaddesk.", "handoff.")) and operation != "handoff.status":
         check("threaddesk_endpoint", "configured_threaddesk", bridge.threaddesk.check_configuration)
+        if operation == "handoff.start":
+            check(
+                "agent_workflow",
+                args.get("agent", "codex"),
+                lambda: bridge.handoffs.agent_preflight(
+                    principal, args.get("agent", "codex"), args["cwd"]
+                ),
+            )
+        elif operation == "handoff.answer":
+
+            def waiting_agent():
+                binding = bridge.handoffs.get(principal, args["handoff_id"], args["revision"])
+                bridge.handoffs.agent_preflight(principal, binding["agent"], binding["cwd"])
+
+            check("agent_workflow", "owned_waiting_session", waiting_agent)
     elif operation in {"terminal.execute", "admin.execute", "agent.execute"}:
         if operation in {"terminal.execute", "admin.execute"}:
             executable = args["argv"][0]

@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import json
 import os
+import uuid
 from pathlib import Path
 from typing import Protocol
 
@@ -60,10 +61,29 @@ class CodexAdapter:
     def __init__(self, terminal: TerminalManager):
         self.terminal = terminal
 
-    async def execute(self, task, args, config, roots, running, progress) -> dict:
+    async def execute(
+        self,
+        task,
+        args,
+        config,
+        roots,
+        running,
+        progress,
+        *,
+        owned_resume_session=None,
+        handoff_reply=False,
+    ) -> dict:
         if not config.executable:
             raise BridgeError("agent_config", "Codex executable must be configured explicitly")
-        session, completed, failed, started = None, False, False, False
+        if owned_resume_session is not None:
+            try:
+                if str(uuid.UUID(owned_resume_session)) != owned_resume_session:
+                    raise ValueError()
+            except (ValueError, TypeError, AttributeError):
+                raise BridgeError(
+                    "agent_identity", "An exact owned session UUID is required"
+                ) from None
+        session, completed, failed, started = owned_resume_session, False, False, False
         messages: list[str] = []
         message_bytes = 0
 
@@ -109,8 +129,17 @@ class CodexAdapter:
             "-c",
             "features.multi_agent=false",
         ]
+        if owned_resume_session is not None:
+            command += ["resume", "--json", "--ignore-user-config", "--skip-git-repo-check"]
+        if handoff_reply:
+            command += [
+                "--output-schema",
+                str(Path(__file__).with_name("handoff_reply.schema.json")),
+            ]
         if config.model:
             command += ["--model", config.model]
+        if owned_resume_session is not None:
+            command += [owned_resume_session]
         command += ["-"]
 
         async def spawned(evidence):
@@ -146,6 +175,7 @@ class CodexAdapter:
         return {
             "evidence": evidence,
             "text": "\n".join(messages),
+            "final_message": messages[-1] if messages else "",
             "success": completed and not failed and result["exit_code"] == 0,
             "scope": "agent_turn",
             "project_completion_verified": False,
@@ -450,7 +480,17 @@ class AgentManager:
             ]
         }
 
-    async def execute(self, task, args, principal, running, progress):
+    async def execute(
+        self,
+        task,
+        args,
+        principal,
+        running,
+        progress,
+        *,
+        owned_resume_session=None,
+        handoff_reply=False,
+    ):
         if args.agent not in principal.agents:
             raise BridgeError("agent_denied", "Agent identity not granted")
         config = self.config.agents.get(args.agent)
@@ -465,6 +505,15 @@ class AgentManager:
                 "agent_tools_denied",
                 "Local agent tools require explicit operator and principal permission",
             )
+        if (owned_resume_session is not None or handoff_reply) and config.kind != "codex":
+            raise BridgeError(
+                "agent_resume_unsupported", "Owned workflow continuation requires Codex"
+            )
+        extra = (
+            {"owned_resume_session": owned_resume_session, "handoff_reply": handoff_reply}
+            if owned_resume_session is not None or handoff_reply
+            else {}
+        )
         try:
             async with asyncio.timeout(args.timeout):
                 return await self.adapters[config.kind].execute(
@@ -474,6 +523,7 @@ class AgentManager:
                     principal.roots,
                     running,
                     progress,
+                    **extra,
                 )
         except TimeoutError:
             raise UncertainExecution(

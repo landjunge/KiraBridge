@@ -14,6 +14,12 @@ from kirabridge.bridge_core.models import (
     ClipboardRead,
     ClipboardWrite,
     EmptyInput,
+    HandoffAnswerInput,
+    HandoffDecisionInput,
+    HandoffInboxInput,
+    HandoffIssueInput,
+    HandoffReference,
+    HandoffStartInput,
     MoveInput,
     PathInput,
     ProcessInput,
@@ -50,6 +56,13 @@ INPUTS = {
     "process.inspect": ProcessInput,
     "process.terminate": ProcessInput,
     "agent.execute": AgentInput,
+    "handoff.issue": HandoffIssueInput,
+    "handoff.start": HandoffStartInput,
+    "handoff.answer": HandoffAnswerInput,
+    "handoff.status": HandoffReference,
+    "handoff.inbox": HandoffInboxInput,
+    "handoff.reconcile": HandoffReference,
+    "handoff.decide": HandoffDecisionInput,
     "threaddesk.read": ThreadDeskReadInput,
     "threaddesk.manage": ThreadDeskManageInput,
     "agent.status": EmptyInput,
@@ -76,6 +89,9 @@ class Bridge:
             self.diagnostics,
             lambda principal: AuditObserver(config, principal, self.runtime, self.store),
         )
+        from kirabridge.handoff_manager import HandoffManager
+
+        self.handoffs = HandoffManager(self)
         self.security = SecurityManager(config, self.store)
         self.terminal = TerminalManager(config.terminal)
         self.filesystem = FilesystemManager()
@@ -232,6 +248,8 @@ class Bridge:
             }
         if operation == "agent.execute":
             return await self.agents.execute(task, args, policy, running, progress)
+        if operation.startswith("handoff."):
+            return await self.handoffs.execute(task, args, policy, running, progress)
         if operation.startswith("threaddesk."):
             return await self.threaddesk.execute(task, args, running)
 

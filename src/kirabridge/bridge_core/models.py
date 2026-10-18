@@ -138,3 +138,47 @@ class ThreadDeskManageInput(Input):
     id: str | None = Field(default=None, min_length=1, max_length=128)
     expected_revision: int = Field(ge=0)
     data: dict[str, Any] = Field(default_factory=dict)
+
+
+class HandoffIssueInput(Input):
+    operation_id: str = Field(min_length=1, max_length=128, pattern=r"^[a-zA-Z0-9_-]+$")
+    thread_id: str = Field(min_length=1, max_length=128, pattern=r"^[a-zA-Z0-9_-]+$")
+    expected_revision: int = Field(ge=0)
+    target: Literal["generic", "codex"] = "codex"
+
+
+class HandoffReference(Input):
+    handoff_id: str = Field(min_length=1, max_length=128, pattern=r"^[a-zA-Z0-9_-]+$")
+    revision: int = Field(ge=1)
+
+
+class HandoffStartInput(HandoffReference):
+    agent: str = Field(default="codex", pattern=r"^[a-z][a-z0-9_-]{0,40}$")
+    cwd: str
+    timeout: float = Field(default=120.0, gt=0, le=300)
+
+
+class HandoffAnswerInput(HandoffReference):
+    question_id: str = Field(min_length=1, max_length=128, pattern=r"^[a-zA-Z0-9_-]+$")
+    answer_id: str = Field(min_length=1, max_length=128, pattern=r"^[a-zA-Z0-9_-]+$")
+    text: str = Field(min_length=1, max_length=10000)
+    timeout: float = Field(default=120.0, gt=0, le=300)
+
+
+class HandoffDecisionInput(HandoffReference):
+    return_id: str = Field(min_length=1, max_length=128, pattern=r"^[a-zA-Z0-9_-]+$")
+    choice: Literal["accepted", "rejected", "rework"]
+    note: str = Field(min_length=1, max_length=10000)
+
+
+class HandoffAgentReply(Input):
+    kind: Literal["question", "result"]
+    text: str = Field(min_length=1, max_length=10000)
+    files: list[str] = Field(default_factory=list, max_length=32)
+    test_results: list[str] = Field(default_factory=list, max_length=32)
+    open_issues: list[str] = Field(default_factory=list, max_length=32)
+
+
+class HandoffInboxInput(Input):
+    offset: int = Field(default=0, ge=0, le=1000000)
+    limit: int = Field(default=20, ge=1, le=50)
