@@ -61,6 +61,20 @@ class DiagnosticsConfig(BaseModel):
     max_records: int = Field(default=20000, ge=10, le=1000000)
 
 
+class ThreadDeskConfig(BaseModel):
+    """Operator-owned local endpoint; requests cannot select a process or store."""
+
+    model_config = ConfigDict(extra="forbid")
+    enabled: bool = False
+    command: str | None = None
+    args: list[str] = Field(default_factory=list, max_length=32)
+    workspace: str | None = None
+    source_root: str | None = None
+    storage: Literal["json", "sqlite"] = "json"
+    timeout: float = Field(default=15, gt=0, le=60)
+    max_result_bytes: int = Field(default=524288, ge=1024, le=1048576)
+
+
 class TerminalConfig(BaseModel):
     """Operator-owned tool discovery; never inherit the daemon's secret environment."""
 
@@ -94,6 +108,8 @@ class Config(BaseModel):
     agents: dict[str, AgentConfig] = Field(default_factory=dict)
     messaging: MessagingConfig = Field(default_factory=MessagingConfig)
     diagnostics: DiagnosticsConfig = Field(default_factory=DiagnosticsConfig)
+    threaddesk: ThreadDeskConfig = Field(default_factory=ThreadDeskConfig)
+
     terminal: TerminalConfig = Field(default_factory=TerminalConfig)
 
     @property

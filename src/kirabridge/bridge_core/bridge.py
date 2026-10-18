@@ -21,6 +21,8 @@ from kirabridge.bridge_core.models import (
     State,
     TaskRequest,
     TerminalInput,
+    ThreadDeskManageInput,
+    ThreadDeskReadInput,
     WriteInput,
 )
 from kirabridge.clipboard_manager import ClipboardManager
@@ -48,6 +50,8 @@ INPUTS = {
     "process.inspect": ProcessInput,
     "process.terminate": ProcessInput,
     "agent.execute": AgentInput,
+    "threaddesk.read": ThreadDeskReadInput,
+    "threaddesk.manage": ThreadDeskManageInput,
     "agent.status": EmptyInput,
     "policy.inspect": EmptyInput,
     "admin.execute": TerminalInput,
@@ -65,6 +69,13 @@ class Bridge:
         from kirabridge.readiness import task_preflight
 
         self.diagnostics = AuditObserver(config, "service", self.runtime, self.store)
+        from kirabridge.threaddesk_manager import ThreadDeskManager
+
+        self.threaddesk = ThreadDeskManager(
+            config,
+            self.diagnostics,
+            lambda principal: AuditObserver(config, principal, self.runtime, self.store),
+        )
         self.security = SecurityManager(config, self.store)
         self.terminal = TerminalManager(config.terminal)
         self.filesystem = FilesystemManager()
@@ -221,6 +232,9 @@ class Bridge:
             }
         if operation == "agent.execute":
             return await self.agents.execute(task, args, policy, running, progress)
+        if operation.startswith("threaddesk."):
+            return await self.threaddesk.execute(task, args, running)
+
         if operation == "admin.execute":
             from kirabridge.admin_manager import execute_admin
 
@@ -309,4 +323,5 @@ class Bridge:
             await self.message_receiver.stop()
         finally:
             await self.tasks.stop()
+            await self.threaddesk.close()
             self.store.close()

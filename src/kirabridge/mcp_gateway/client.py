@@ -47,6 +47,8 @@ class Peer:
     args: tuple[str, ...] = ()
     token: str | None = field(default=None, repr=False)
     ca_file: str | None = None
+    env: dict[str, str] | None = field(default=None, repr=False)
+    cwd: str | None = None
 
 
 class MCPClientPool:
@@ -163,7 +165,10 @@ class MCPClientPool:
                         read, write = await stack.enter_async_context(
                             stdio_client(
                                 StdioServerParameters(
-                                    command=peer.command, args=list(peer.args), env={}
+                                    command=peer.command,
+                                    args=list(peer.args),
+                                    env=peer.env or {},
+                                    cwd=peer.cwd,
                                 ),
                             )
                         )
@@ -204,10 +209,12 @@ class MCPClientPool:
             await self.disconnect(peer.id)
             raise
 
-    async def call(self, peer_id: str, tool: str, arguments: dict):
+    async def call(self, peer_id: str, tool: str, arguments: dict, *, task_id: str | None = None):
         request = arguments.get("request")
-        task_id = arguments.get("task_id") or (
-            request.get("task_id") if isinstance(request, dict) else None
+        task_id = (
+            task_id
+            or arguments.get("task_id")
+            or (request.get("task_id") if isinstance(request, dict) else None)
         )
         if not isinstance(task_id, str) or not re.fullmatch(r"[a-zA-Z0-9_-]{1,128}", task_id):
             task_id = None
