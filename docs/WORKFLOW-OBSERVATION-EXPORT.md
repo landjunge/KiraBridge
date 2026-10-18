@@ -110,7 +110,8 @@ Tunnelereignisse bleiben UNKNOWN; auch null Ereignisse ist kein Sicherheitsbewei
 
 ### Grenzen und Fortsetzung
 
-`limit` zählt untersuchte Auditzeilen (1–500), nicht ausschließlich projizierte
+`limit` zählt untersuchte Auditzeilen (1–500), plus eine begrenzte Vorschauzeile
+zur Fortsetzungserkennung; nicht ausschließlich projizierte
 Ereignisse. Maximal4096Byte je JSONL-Record, 65536Byte Ereignisdaten je Seite;
 64 Diagnosen und16 aktuelle Korrelationen, weitere Diagnosen/Bezüge sind begrenzt
 bzw. als ausgelassen erkennbar. Audits/Preflights werden bis16KiB aufgenommen;
@@ -123,7 +124,10 @@ Für Folgeseiten **denselben** Wert und `next_cursor` übergeben. Währenddessen
 hinzukommende Audits werden erst in einer neuen Auswahl ohne `through_seq`
 gelesen. Jede untersuchte/übersprungene Zeile bewegt den Cursor, selbst ohne
 projizierbares Ereignis; Bytegrenze lässt die noch nicht ausgegebene Zeile für die
-nächste Seite liegen. Kein automatischer Arbeitsstart oder Schreib-Replay.
+nächste Seite liegen. `has_more` bezieht sich auf tatsächlich weitere ausgewählte
+Zeilen, nicht nur eine größere numerische Grenzsequenz; eine Grenze innerhalb
+einer gefilterten Lücke führt nicht zum leeren Endloslauf. Kein automatischer
+Arbeitsstart oder Schreib-Replay.
 Aufnahmegrenze/unklare Quelle ist keine Erlaubnis, den ursprünglichen Auftrag
 neu auszuführen. Die vorhandene Quellaufbewahrung bleibt erhalten; keine
 Rotation/Löschung oder wachsende zweite Exportdatenbank wird angelegt. Der
@@ -190,13 +194,15 @@ arrival, review and project acceptance are not conflated. No artifact or actual
 effect proof is fabricated. Overall activity, identity and external tunnel
 lifecycle remain unknown even with no findings.
 
-Bounds: 500 scanned audit rows,16 owned tasks,4KiB per event,64KiB event bytes per
+Bounds: 500 examined audit rows plus one bounded lookahead,16 owned tasks,4KiB per event,64KiB event bytes per
 page,64 displayed diagnostics and16 current correlations; oversized/invalid input
 is diagnosed with advancing cursor. Metadata input is bounded to16KiB/record.
 Existing source audit retention is untouched; no second accumulating store.
 SQLite wait is0.2s with a2s VM progress check, not a hard OS-I/O deadline. Reuse
 through_seq plus next_cursor for a stable selected snapshot; later appends wait
-for a new snapshot. Connection/read failures never retry an uncertain write.
+for a new snapshot. has_more means an actual further selected row; a numeric
+boundary inside a filtered gap never causes empty endless pages. Connection/read
+failures never retry an uncertain write.
 
 The command above prints data-only JSONL to stdout and minimized paging/error
 codes to stderr. --format json adds provenance/correlation query metadata and is

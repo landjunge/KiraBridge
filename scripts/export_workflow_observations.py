@@ -13,6 +13,9 @@ from kirabridge.observation_export import export_configured_observations
 
 
 class Arguments(argparse.ArgumentParser):
+    def print_help(self, file=None):
+        super().print_help(file=file or sys.stderr)
+
     def error(self, message):
         # Never echo arbitrary arguments, config paths or exception strings.
         self.exit(2, '{"status":"error","code":"invalid_cli_arguments"}\n')
@@ -20,7 +23,8 @@ class Arguments(argparse.ArgumentParser):
 
 def main(argv=None):
     parser = Arguments(
-        description="Read selected owned existing task audit metadata / Metadaten lesen"
+        prog="export_workflow_observations",
+        description="Read selected owned existing task audit metadata / Metadaten lesen",
     )
     parser.add_argument(
         "--config", required=True, help="Existing operator configuration / vorhandene Konfiguration"

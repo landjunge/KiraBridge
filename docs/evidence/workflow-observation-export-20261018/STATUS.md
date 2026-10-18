@@ -28,7 +28,7 @@ Transport oder Queue. [Vollständiger DE/EN-Vertrag](../../WORKFLOW-OBSERVATION-
 
 ## Tatsächliche Prüfungen
 
-33 spezifische Fälle in gezielten Teilrunden:
+35 spezifische Fälle in gezielten Teilrunden:
 
 - Erster enger Lauf:27 bestanden in0.66s, einschließlich vorhandener Eigentümer-
   und Cap-Prüfung, Historie/Minimierung, Cursor/Fremdscope, Hashfehler, Bytegrenze,
@@ -43,6 +43,13 @@ Transport oder Queue. [Vollständiger DE/EN-Vertrag](../../WORKFLOW-OBSERVATION-
 -2 zusätzliche Sidecar-/Fehlerfälle bestanden: symlink-SHM wird vor SQLitezugriff
   abgewiesen und Sentinel bleibt unverändert; SQLite-Fehler wird geheimnisfrei
   gemeldet, genau ein Versuch, bestehender Task bleibt queued.
+
+-1 zusätzlicher CLI-Hilfefall bestanden: auch --help schreibt keine Prosa auf
+  Daten-stdout und nennt keinen tatsächlichen Skriptpfad.
+-1 zusätzlicher Grenzfall bestanden: through_seq innerhalb einer gefilterten
+  Sequenzlücke endet nach tatsächlich vorhandenen Auswahlzeilen. has_more wird
+  nicht bloß aus numerisch größerer Grenzsequenz abgeleitet; kein leerer
+  Endlosfolgelauf. Neue Quelle/Teilchecks in followup-source-checks.json.
 
 Keine alte allgemeine Suite nochmals lokal wiederholt. Ruff/Format/diff Checks
 beziehen sich auf die neue Exportfunktion und deren Tests/Skript; reguläre

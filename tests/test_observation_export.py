@@ -512,3 +512,26 @@ def test_sqlite_error_sanitized_without_retry_or_task_mutation(bridge, monkeypat
     assert failure.value.code == "observation_state_unavailable"
     assert SECRET not in str(failure.value) and calls == [1]
     assert bridge.store.get("owned-task")["state"] == "queued"
+
+
+def test_cli_help_does_not_pollute_data_stdout(capsys):
+    script = Path(__file__).resolve().parents[1] / "scripts/export_workflow_observations.py"
+    main = runpy.run_path(str(script))["main"]
+    with pytest.raises(SystemExit) as finished:
+        main(["--help"])
+    assert finished.value.code == 0
+    output = capsys.readouterr()
+    assert not output.out and "--task-id" in output.err
+    assert str(script) not in output.err
+
+
+def test_snapshot_boundary_inside_filtered_gap_never_reports_endless_more(bridge):
+    queued(bridge)
+    queued(bridge, "foreign-gap", "other")
+    audit(bridge, "task.transition", {"to": "running"})
+    first = read(bridge, through_seq=3)
+    assert first["next_cursor"] == 2 and not first["has_more"]
+    empty = read(bridge, cursor=first["next_cursor"], through_seq=3)
+    assert not empty["events"] and not empty["has_more"]
+    fresh = read(bridge, cursor=first["next_cursor"])
+    assert fresh["events"][-1]["event_type"] == "task.running"

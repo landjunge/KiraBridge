@@ -371,7 +371,7 @@ def _page(db, rows, principal, source_id, task_ids, cursor, through, limit):
         "cursor": cursor,
         "next_cursor": next_cursor,
         "through_seq": through,
-        "has_more": next_cursor < through,
+        "has_more": scanned < len(rows),
         "audit_rows_examined": scanned,
         "audit_rows_without_workflow_projection": skipped,
         "page_event_bytes": page_bytes,
