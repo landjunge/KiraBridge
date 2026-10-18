@@ -15,6 +15,7 @@ from pathlib import Path
 
 from kirabridge.bridge_core.config import Config, private_directory
 from kirabridge.filesystem_manager import PathScope
+from kirabridge.terminal_manager import TerminalManager
 
 
 def configure(
@@ -53,6 +54,7 @@ def configure(
                     + [
                         "policy.inspect",
                         "agent.status",
+                        "agent.inspect",
                         "admin.execute",
                         "agent.local_tools",
                         "message.send",
@@ -103,10 +105,15 @@ def configure(
         + "\n"
     )
     if re.search(r"^\[terminal\]", text, re.M):
-        text = re.sub(r"^\[terminal\]\n.*?(?=\n\[|\Z)", lambda _: terminal, text, flags=re.M | re.S)
+        text, count = re.subn(
+            r"^\[terminal\]\n.*?(?=\n\[|\Z)", lambda _: terminal, text, flags=re.M | re.S
+        )
+        if count != 1:
+            raise ValueError("Unsupported terminal table layout; original retained")
     else:
         text += "\n" + terminal
     new = Config.model_validate(tomllib.loads(text))
+    TerminalManager(new.terminal)  # Validate actual runtime prerequisites before any replacement.
     # Bot identities, network/authentication and all queue settings stay unchanged.
     for name in old.principals.keys() - set(principals):
         assert old.principals[name] == new.principals[name]
@@ -130,6 +137,11 @@ def configure(
         target.write(raw)
         target.flush()
         os.fsync(target.fileno())
+    backup_parent = os.open(backup_dir, os.O_RDONLY | os.O_DIRECTORY)
+    try:
+        os.fsync(backup_parent)
+    finally:
+        os.close(backup_parent)
     fd, temporary = tempfile.mkstemp(prefix=".development-access-", dir=path.parent)
     try:
         os.fchmod(fd, stat.S_IMODE(info.st_mode))

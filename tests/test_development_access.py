@@ -128,18 +128,32 @@ def test_policy_update_backs_up_preserves_rights_and_survives_repeat(tmp_path):
         assert loaded.principals["chatgpt"].roots == [str(project)]
     with pytest.raises(ValueError, match="changed"):
         configure(path, backup, [], [], full_terminal=True, expected_sha256="outdated")
+    unchanged = path.read_bytes()
+    with pytest.raises(BridgeError, match="absolute"):
+        configure(
+            path,
+            backup,
+            [],
+            ["relative"],
+            full_terminal=True,
+            expected_sha256=hashlib.sha256(unchanged).hexdigest(),
+        )
+    assert path.read_bytes() == unchanged
     link = tmp_path / "link"
     link.symlink_to(path)
     with pytest.raises(ValueError, match="regular file"):
         configure(link, backup, [], [], full_terminal=True, expected_sha256="outdated")
 
 
-async def test_admin_timeout_is_unknown_never_an_implicit_retry(bridge, config, monkeypatch):
+@pytest.mark.parametrize("timed_out,terminated", [(True, False), (False, True)])
+async def test_admin_timeout_is_unknown_never_an_implicit_retry(
+    bridge, config, monkeypatch, timed_out, terminated
+):
     from kirabridge.admin_manager import execute_admin
     from kirabridge.bridge_core.models import TerminalInput, UncertainExecution
 
     async def timeout(*args, **kwargs):
-        return {"timed_out": True, "exit_code": -15}
+        return {"timed_out": timed_out, "terminated": terminated, "exit_code": -15}
 
     monkeypatch.setattr("kirabridge.admin_manager.sys.platform", "darwin")
     monkeypatch.setattr(bridge.terminal, "execute", timeout)
@@ -180,9 +194,17 @@ async def test_grok_tools_require_both_operator_and_principal(
         assert result["error"]["code"] == "agent_tools_denied"
 
 
-@pytest.mark.parametrize("opt_in", [False, True])
+@pytest.mark.parametrize(
+    "opt_in,permission_session,kind",
+    [
+        (False, "test-session", "execute"),
+        (True, "test-session", "execute"),
+        (True, "foreign-session", "execute"),
+        (True, "test-session", "other"),
+    ],
+)
 async def test_grok_permission_is_one_request_only_not_a_receiver_escalation(
-    bridge, config, tmp_path, opt_in
+    bridge, config, tmp_path, opt_in, permission_session, kind
 ):
     from test_agents import fake_cli
 
@@ -194,7 +216,7 @@ for line in sys.stdin:
     elif method=="session/new": result={"sessionId":"test-session"}
     elif method=="session/prompt":
         options=[{"optionId":"one","kind":"allow_once"},{"optionId":"forever","kind":"allow_always"}]
-        print(json.dumps({"jsonrpc":"2.0","id":999,"method":"session/request_permission","params":{"options":options}}),flush=True)
+        print(json.dumps({"jsonrpc":"2.0","id":999,"method":"session/request_permission","params":{"options":options,"sessionId":"test-session","toolCall":{"kind":"execute"}}}),flush=True)
         answer=json.loads(sys.stdin.readline())["result"]["outcome"]
         chunk={"sessionUpdate":"agent_message_chunk","content":{"type":"text","text":json.dumps({"permission":answer,"argv":sys.argv[1:]})}}
         print(json.dumps({"jsonrpc":"2.0","method":"session/update","params":{"sessionId":"test-session","update":chunk}}),flush=True)
@@ -202,6 +224,14 @@ for line in sys.stdin:
     else: continue
     print(json.dumps({"jsonrpc":"2.0","id":msg["id"],"result":result}),flush=True)
 """
+    body = body.replace(
+        '"sessionId":"test-session","toolCall":{"kind":"execute"}',
+        '"sessionId":'
+        + json.dumps(permission_session)
+        + ',"toolCall":{"kind":'
+        + json.dumps(kind)
+        + "}",
+    )
     config.agents["grok"] = AgentConfig(
         kind="grok_acp", executable=fake_cli(tmp_path, body), allow_local_tools=True
     )
@@ -222,7 +252,9 @@ for line in sys.stdin:
     assert result["state"] == "completed"
     answer = json.loads(result["result"]["text"])
     assert answer["permission"] == (
-        {"outcome": "selected", "optionId": "one"} if opt_in else {"outcome": "cancelled"}
+        {"outcome": "selected", "optionId": "one"}
+        if opt_in and permission_session == "test-session" and kind == "execute"
+        else {"outcome": "cancelled"}
     )
     assert "forever" not in json.dumps(answer)
     argv = answer["argv"]
