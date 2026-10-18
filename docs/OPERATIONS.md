@@ -144,12 +144,29 @@ Anfrage mit derselben ID und demselben Idempotenzschlüssel verwenden.
 
 Der beobachtete Tunnel-HTTP409 `mcp_initialization_required` ist getrennt von
 `path_denied`/`executable_denied`. Der eigene MCP-HTTP-Dienst läuft stateless;
-er definiert diesen409-Code nicht. Die erhaltenen Tunnel-Metriken zählen409,
-enthalten aber weder Task-ID noch exakten Auslöser. Im Zielclient muss eine neue
+er definiert diesen409-Code nicht. Der installierte `tunnel-client`v0.0.16
+definiert genau diesen Code im Stdio-Initialisierungsschutz: Ein Legacy-Aufruf
+vor erfolgreichem Initialize **und** Abschlussbenachrichtigung wird nicht an
+das Kind weitergegeben. Seine mitgelieferte Konfigurationsreferenz dokumentiert
+`mcp.stdio_send_initialized_notification` (Standardfalse). Der Schalter ist im
+bestehenden lokalen Profil jetzttrue. Er sendet nach erfolgreicher Initialisierung
+die Abschlussbenachrichtigung und unterdrückt deren spätere Dublette; er erfindet
+keine Initialisierung, hebt keinen Guard auf und wiederholt kein Tool.
+Der eigene Einrichtungsweg setzt die passende Laufzeitvariable und speichert das
+Feld anschließend privat im erzeugten nativen JSON/YAML-Profil: Der native
+`runtimes connect`-Generator lässt dieses optionale Feld sonst wieder weg.
+Das gilt für unseren Stdio-Proxy mit regulärem MCP-Lifecycle, nicht beliebige
+Fremdserver. Kein neuer Schlüssel/Kontoaufbau wurde dafür ausgeführt.
+
+Die erhaltenen Tunnel-Metriken zählen409,
+enthalten aber weder Task-ID noch den exakten früheren Timing-Auslöser. Nach
+einem Reload trat einmal auch ein Ergebnisabruf-Timeout auf; die bereits
+abgeschlossene Aufgabe wurde nicht neu ausgeführt. Im Zielclient muss eine neue
 MCP-Verbindung ordnungsgemäß initialisiert werden, bevor wieder Tools gerufen
 werden. Das ist keine Aufforderung zur Wiederholung einer Schreibaktion.
-Der lokale Proxy-Fix ist kein Beweis, dass damit jeder Cloud-/Tunnel409 beseitigt
-wäre. [Offizielle OpenAI-Tunneldokumentation](https://developers.openai.com/api/docs/guides/secure-mcp-tunnels)
+Proxy-Fix und Benachrichtigungsadapter sind kein Beweis, dass damit jeder
+Cloud-/Tunnel409 beseitigt wäre.
+[Offizielle OpenAI-Tunneldokumentation](https://developers.openai.com/api/docs/guides/secure-mcp-tunnels)
 trennt `/healthz`, `/readyz`, `/metrics` und den tatsächlichen Aufruf aus ChatGPT;
 sie spezifiziert dort keinen genauen Auslöser dieses Fehlercodes.
 

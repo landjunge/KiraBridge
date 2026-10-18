@@ -35,6 +35,21 @@ def replace_private(path: Path, value: str) -> None:
         temporary.unlink(missing_ok=True)
 
 
+def persist_stdio_notification(config_path: Path) -> None:
+    """Native runtimes connect generates JSON-as-YAML and drops optional MCP fields.
+
+    Keep the documented lifecycle shim across subsequent starts. This completes
+    a successful initialize, never synthesizes initialize or replays a tool.
+    """
+    profile = config_path.parent / "tunnel/kirabridge.yaml"
+    settings = private_json(profile)
+    mcp = settings.get("mcp")
+    if not isinstance(mcp, dict) or not isinstance(mcp.get("commands"), list):
+        raise BridgeError("tunnel_profile_format", "Expected the generated native stdio profile")
+    mcp["stdio_send_initialized_notification"] = True
+    replace_private(profile, json.dumps(settings, indent=2) + "\n")
+
+
 def runtime_status(binary: str) -> dict:
     result = subprocess.run(
         [binary, "runtimes", "status", "kirabridge", "--json"],
@@ -150,6 +165,7 @@ def configure_tunnel(
     command = shlex.join(
         [str(Path.home() / ".local/bin/kirabridge"), "--principal", "chatgpt", "connect"]
     )
+    runtime_env = {**os.environ, "MCP_STDIO_SEND_INITIALIZED_NOTIFICATION": "true"}
     result = subprocess.run(
         [
             binary,
@@ -171,11 +187,13 @@ def configure_tunnel(
         capture_output=True,
         text=True,
         timeout=90,
+        env=runtime_env,
     )
     if result.returncode:
         raise BridgeError(
             "tunnel_access", "Tunnel setup failed; check account, workspace and Tunnels Read + Use"
         )
+    persist_stdio_notification(config_path)
     return runtime_status(binary)
 
 

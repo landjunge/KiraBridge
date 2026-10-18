@@ -7,7 +7,12 @@ import pytest
 
 from kirabridge.bridge_core.config import load_config
 from kirabridge.bridge_core.models import BridgeError
-from kirabridge.chatgpt_setup import configure_tunnel, runtime_status, wait_for_service
+from kirabridge.chatgpt_setup import (
+    configure_tunnel,
+    persist_stdio_notification,
+    runtime_status,
+    wait_for_service,
+)
 from kirabridge.local_runtime import private_json, setup
 
 
@@ -68,6 +73,12 @@ def test_account_setup_keeps_literal_key_out_of_commands_and_policy(tmp_path, mo
                     {"name": "KiraBridge", "api_version": "1", "dispatcher_active": True}
                 ),
             )
+        if "connect" in argv:
+            assert kwargs["env"]["MCP_STDIO_SEND_INITIALIZED_NOTIFICATION"] == "true"
+            profile = path.parent / "tunnel/kirabridge.yaml"
+            profile.parent.mkdir()
+            profile.write_text(json.dumps({"mcp": {"commands": []}, "existing": "preserved"}))
+            profile.chmod(0o600)
         return SimpleNamespace(
             returncode=0,
             stdout=json.dumps({"process_running": True, "healthy": True, "ready": True}),
@@ -89,6 +100,21 @@ def test_account_setup_keeps_literal_key_out_of_commands_and_policy(tmp_path, mo
     probe = next(i for i, argv in enumerate(calls) if argv[-1] == "status")
     connect = next(i for i, argv in enumerate(calls) if "connect" in argv)
     assert probe < connect
+    profile = path.parent / "tunnel/kirabridge.yaml"
+    settings = json.loads(profile.read_text())
+    assert settings["mcp"]["stdio_send_initialized_notification"] is True
+    assert settings["existing"] == "preserved" and profile.stat().st_mode & 0o077 == 0
+
+
+def test_notification_shim_rejects_unexpected_profile_without_clobber(tmp_path):
+    path = tmp_path / "tunnel/kirabridge.yaml"
+    path.parent.mkdir()
+    path.write_text('{"mcp":{"server_url":"http://127.0.0.1/mcp"}}')
+    path.chmod(0o600)
+    before = path.read_bytes()
+    with pytest.raises(BridgeError, match="Expected the generated native stdio profile"):
+        persist_stdio_notification(tmp_path / "config.toml")
+    assert path.read_bytes() == before
 
 
 def test_restart_waits_for_authenticated_dispatcher_health(tmp_path, monkeypatch):
