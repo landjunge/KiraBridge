@@ -102,6 +102,14 @@ class Store:
                         if statement.strip():
                             self.db.execute(statement)
                 self.db.execute(
+                    "CREATE TABLE IF NOT EXISTS handoff_bindings ("
+                    "id TEXT PRIMARY KEY, principal TEXT NOT NULL, operator_ref TEXT NOT NULL, "
+                    "handoff_id TEXT NOT NULL, revision INTEGER NOT NULL, "
+                    "first_task_id TEXT NOT NULL REFERENCES tasks(id), "
+                    "request_hash TEXT NOT NULL, metadata TEXT NOT NULL, "
+                    "UNIQUE(principal,operator_ref,handoff_id,revision))"
+                )
+                self.db.execute(
                     "CREATE INDEX IF NOT EXISTS audit_kind_at ON audit(kind COLLATE NOCASE,at)"
                 )
                 self.db.execute(
@@ -216,7 +224,7 @@ class Store:
             row = self.db.execute(
                 f"SELECT id,principal FROM tasks WHERE state='queued' AND operation {comparison} "
                 "('process.list','process.inspect','process.terminate',"
-                "'agent.status','policy.inspect') "
+                "'agent.status','policy.inspect','handoff.status') "
                 "ORDER BY created,id LIMIT 1"
             ).fetchone()
             if row is None:

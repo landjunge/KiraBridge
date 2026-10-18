@@ -36,6 +36,17 @@ ERROR_CODES = {
     "unknown_tool",
     "secret_detected",
     "gate_blocked",
+    "unissued_handoff",
+    "unbound_run",
+    "binding_conflict",
+    "return_binding_conflict",
+    "return_stale",
+    "return_stale_source",
+    "question_conflict",
+    "answer_conflict",
+    "question_not_waiting",
+    "question_limit",
+    "source_configuration",
 }
 
 
@@ -48,6 +59,7 @@ class ThreadDeskManager:
         )
         self.lock = asyncio.Lock()
         self.observer_factory = observer_factory
+        self.available_tools: set[str] = set()
 
     def check_configuration(self) -> None:
         settings = self.settings
@@ -124,6 +136,7 @@ class ThreadDeskManager:
             async with asyncio.timeout(self.settings.timeout):
                 catalog = await self.pool.sessions["threaddesk"].list_tools()
             names = {tool.name for tool in catalog.tools}
+            self.available_tools = names
             if not {"list_threads", "get_thread", "thread_manage"}.issubset(names):
                 await self.pool.disconnect("threaddesk")
                 raise BridgeError("threaddesk_version", "Peer lacks the required Fachvertrag")

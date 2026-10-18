@@ -76,12 +76,14 @@ class TaskManager:
                 "process.terminate",
                 "agent.status",
                 "policy.inspect",
+                "handoff.status",
             }
             comparison = "IN" if control else "NOT IN"
             count = self.store.db.execute(
                 f"SELECT COUNT(*) FROM tasks WHERE state IN ('created','queued') "
                 f"AND operation {comparison} "
-                "('process.list','process.inspect','process.terminate','agent.status','policy.inspect')"
+                "('process.list','process.inspect','process.terminate',"
+                "'agent.status','policy.inspect','handoff.status')"
             ).fetchone()[0]
             capacity = self.config.max_control_queued if control else self.config.max_queued
             if count >= capacity:
