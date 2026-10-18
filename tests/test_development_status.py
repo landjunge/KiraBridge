@@ -2,6 +2,7 @@ import asyncio
 import hashlib
 import json
 import os
+import sys
 from types import SimpleNamespace
 
 import pytest
@@ -203,7 +204,8 @@ async def test_ps_command_is_absolute_own_uid_metadata_only_and_timeout_is_bound
     result = await status._observe_processes(set())
     assert result["status"] == "timeout" and process.killed
     assert captured["argv"][0] in {"/bin/ps", "/usr/bin/ps"}
-    assert captured["argv"][1:] == ("-U", str(os.getuid()), "-o", "uid=,pid=,ppid=,comm=")
+    columns = "uid=,pid=,ppid=,ucomm=" if sys.platform == "darwin" else "uid=,pid=,ppid=,comm="
+    assert captured["argv"][1:] == ("-U", str(os.getuid()), "-o", columns)
     assert "args" not in " ".join(captured["argv"])
     assert set(captured["kwargs"]["env"]) == {"PATH", "LC_ALL"}
 
