@@ -1,0 +1,11 @@
+{
+  "source_commit": "d788ec2b405f3d5551daabc9c10ab6513296645e",
+  "base_commit": "8226763f7a48b1c00ba905960210d2419a41ded0",
+  "files": {
+    "checks.json": "da3ef6e641ad8c3f36735ddc25a05f88fb24ae0382095e847cd866ae2f842743",
+    "dark-en.png": "da0564dfd848f028c8a9b357af546dbbb38009c3fb72d621f8a02c64a37e2174",
+    "dark-small-de.png": "951ad7b109f62602631fd504a58078599620cca9485fdea54077809e73272fef",
+    "light-en.png": "cee65a442267661f657ccfe65cb507d7f4d980b83addd91d2cbb96e9ed8d4aaa",
+    "light-small-de.png": "b71d9ee7de635ed204ab4392b4fd98be8aa28194aea600b7d78c40eb018d2022"
+  }
+}
