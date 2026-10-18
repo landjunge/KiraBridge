@@ -1,0 +1,201 @@
+{
+  "schema": "kirabridge-workflow-reads-acceptance-v1",
+  "scope": "actual connected ChatGPT App; synthetic operator data; no overall user acceptance",
+  "source_commit": "9d6e1a86c7719d1755508f9d3e51a625d6660c1c",
+  "installed_commit": "df995f6",
+  "threaddesk_source_commit": "6c7d578a1edb612d0e8e6d99faa2953888d69bfb",
+  "ci": "https://github.com/landjunge/KiraBridge/actions/runs/39158491623",
+  "tasks": [
+    {
+      "id": "seven-c05-20261018-image",
+      "principal": "chatgpt",
+      "operation": "file.image",
+      "state": "completed",
+      "attempt": 1,
+      "receipt": "7ca37581-cf5b-45ca-b8e4-cd99d91cfd57",
+      "accepted": 1792351660.8433762,
+      "started": 1792351660.847532,
+      "finished": 1792351660.850837
+    },
+    {
+      "id": "seven-c05-20261018-observations",
+      "principal": "chatgpt",
+      "operation": "observations.read",
+      "state": "completed",
+      "attempt": 1,
+      "receipt": "fffcb4af-2701-4d57-8ced-b31c9f6be43d",
+      "accepted": 1792351661.940866,
+      "started": 1792351662.009296,
+      "finished": 1792351662.126388
+    },
+    {
+      "id": "seven-c05-20261018-knowledge-create",
+      "principal": "chatgpt",
+      "operation": "threaddesk.manage",
+      "state": "completed",
+      "attempt": 1,
+      "receipt": "d356bd53-3411-415a-82e4-ed3eb4a0e2d7",
+      "accepted": 1792351663.1692889,
+      "started": 1792351663.5241249,
+      "finished": 1792351663.5335538
+    },
+    {
+      "id": "seven-c05-20261018-knowledge-record",
+      "principal": "chatgpt",
+      "operation": "threaddesk.knowledge",
+      "state": "completed",
+      "attempt": 1,
+      "receipt": "5001722a-dd12-40bf-875f-386befe54c5a",
+      "accepted": 1792351714.79088,
+      "started": 1792351714.823601,
+      "finished": 1792351714.926649
+    },
+    {
+      "id": "seven-c05-20261018-knowledge-supersede",
+      "principal": "chatgpt",
+      "operation": "threaddesk.knowledge",
+      "state": "completed",
+      "attempt": 1,
+      "receipt": "a2126a52-fe68-479f-958d-c5ede03d0c22",
+      "accepted": 1792351716.6394858,
+      "started": 1792351716.67361,
+      "finished": 1792351716.843051
+    },
+    {
+      "id": "seven-c05-20261018-knowledge-question",
+      "principal": "chatgpt",
+      "operation": "threaddesk.knowledge",
+      "state": "completed",
+      "attempt": 1,
+      "receipt": "053caca4-d2eb-43de-83a7-40948f11f34e",
+      "accepted": 1792351718.550624,
+      "started": 1792351718.5849102,
+      "finished": 1792351718.74988
+    },
+    {
+      "id": "seven-c05-20261018-knowledge-resolve",
+      "principal": "chatgpt",
+      "operation": "threaddesk.knowledge",
+      "state": "completed",
+      "attempt": 1,
+      "receipt": "095bc4eb-73a4-4aff-8727-ad74a4b83be2",
+      "accepted": 1792351720.408054,
+      "started": 1792351720.439821,
+      "finished": 1792351720.559284
+    },
+    {
+      "id": "seven-c05-20261018-knowledge-save",
+      "principal": "chatgpt",
+      "operation": "threaddesk.knowledge",
+      "state": "completed",
+      "attempt": 1,
+      "receipt": "6d6cf33c-76a2-4df2-8d1a-c82899cd11e9",
+      "accepted": 1792351723.0185559,
+      "started": 1792351723.068865,
+      "finished": 1792351723.1650612
+    },
+    {
+      "id": "seven-c05-20261018-knowledge-read",
+      "principal": "chatgpt",
+      "operation": "threaddesk.read",
+      "state": "completed",
+      "attempt": 1,
+      "receipt": "595d66a5-3858-456a-882f-eeba3ae5f62a",
+      "accepted": 1792351725.91477,
+      "started": 1792351725.947252,
+      "finished": 1792351726.062687
+    }
+  ],
+  "image": {
+    "task_id": "seven-c05-20261018-image",
+    "content_types": [
+      "text",
+      "image"
+    ],
+    "bytes": 104,
+    "width": 32,
+    "height": 24,
+    "sha256": "cabc398201d3063c587946158c88a4a4d4dadc023bb99d61f944302a01ad19e2",
+    "visually_observed": "Four coloured quadrants received as real MCP ImageContent in the connected App",
+    "after_restart_same_snapshot": true,
+    "after_restart_attempt": 1,
+    "after_restart_content_types": [
+      "text",
+      "image"
+    ],
+    "source_removed_in_actual_app_test": false
+  },
+  "knowledge": {
+    "thread_id": "67f9698601df",
+    "revision": 6,
+    "current": [
+      "dc65869ca745"
+    ],
+    "superseded": [
+      "51ba89a550af"
+    ],
+    "answered": 1,
+    "original_question_preserved": true,
+    "source_verification": "referenced_unverified"
+  },
+  "observations": {
+    "events": 16,
+    "all_activity": "unknown",
+    "external_tunnel": "unknown",
+    "historical_runtime_bases": [
+      "unknown_no_prior_task_preflight",
+      "existing_task_preflight_at_or_before_event"
+    ],
+    "runtime_instances": [
+      "ac01a4e6d9484c0fb845a9b82006bc32"
+    ],
+    "response_bytes": 25824,
+    "aa_reader_scope": "Local actual existing Agent Authority source reader over the App-delivered 16 selected minimized events; no separate App-to-AA service claim",
+    "aa_reader_schema": "agent-authority-workflow-report-v1",
+    "aa_reader_role": "observer_only",
+    "aa_reader_identity": "UNBEKANNT",
+    "aa_reader_effect": "UNBEKANNT",
+    "aa_reader_source_authenticated": false,
+    "private_report": "~/.local/share/kirabridge/workflow-reads-20261018/aa-reader-report.json"
+  },
+  "runtime": {
+    "before_restart": {
+      "instance_id": "cdaa662638c84f83a4ce20971e18ba37",
+      "version": "0.5.2",
+      "started_at": "2026-10-18T19:27:05.092321+00:00",
+      "config_sha256": "04637ceeb2fdc4a645ba25d5ff4e8867b11068cd24eb991b7badd5b29e12405c",
+      "effective_config_sha256": "d4f9380268c72f90712e775c39de854cf74a097661c34b019a91b304e6d5f08f",
+      "source_tree_sha256": "1d994ab1e3257d0701d2786e4220fca1f3891c914ae115ee11c4d45ea449ae31",
+      "source_file_count": 37
+    },
+    "after_restart": {
+      "instance_id": "748efc8b8ee341f5858d915abb1fb131",
+      "version": "0.5.2",
+      "started_at": "2026-10-18T19:29:38.814780+00:00",
+      "config_sha256": "04637ceeb2fdc4a645ba25d5ff4e8867b11068cd24eb991b7badd5b29e12405c",
+      "effective_config_sha256": "d4f9380268c72f90712e775c39de854cf74a097661c34b019a91b304e6d5f08f",
+      "source_tree_sha256": "1d994ab1e3257d0701d2786e4220fca1f3891c914ae115ee11c4d45ea449ae31",
+      "source_file_count": 37
+    }
+  },
+  "preservation_check": "Backup of 385 existing tasks, five messages/four receiver jobs and credential/service fingerprints saved privately before activation; final comparison pending at user pause",
+  "limits": [
+    "No automatic push or voice-session delivery",
+    "Synthetic operator thread retained privately",
+    "No full Mac reboot, new model request or administrator retry",
+    "Frozen RC2 downloads unchanged"
+  ],
+  "preservation_check_after_resume": {
+    "historical_tasks": 385,
+    "historical_tasks_unchanged": true,
+    "messages_unchanged": 5,
+    "message_jobs_unchanged": 4,
+    "credential_and_launchagent_hashes_and_modes_unchanged": true,
+    "image_task_unchanged_after_restart": true,
+    "image_running_events": 1,
+    "unknown_admin_state": "unknown",
+    "unknown_admin_attempt": 1,
+    "config_mode": "0600",
+    "private_proof": "~/.local/share/kirabridge/workflow-reads-20261018/preservation.json"
+  }
+}

@@ -35,6 +35,17 @@ unveränderte Originalfrage, nachvollziehbarer Ersatz, Duplikat, geänderter Inh
 veraltete Revision, fremder Knoten und verweigerte Capability. Keine Modellaufrufe.
 Der Runtime-/App-Nachweis wird getrennt ergänzt; Quelltests sind keine Nutzerabnahme.
 
+## Tatsächliche App-Rundreise
+
+Neun tatsächliche App-Tasks decken gemeinsam Bild-/Metadatenabruf und einen klar
+synthetischen Wissensthread ab. Thread67f9698601df wurde angelegt; bestätigter
+Beschluss gespeichert und nachvollziehbar ersetzt; Frage gespeichert und separat
+beantwortet; Wiedereinstieg gespeichert und über get_reentry gelesen. Revision6
+enthält genau den aktuellen sowie den ersetzten Beschluss und die unveränderte
+Originalfrage samt Antwort. Quellenstatus bleibt referenced_unverified. Kein neuer
+Agentenlauf durch Wissensverwaltung. Der synthetische Thread bleibt privat erhalten.
+[Tatsächliche Quittungen](evidence/workflow-reads-chatgpt-20261018.json).
+
 ## English
 
 Use the existing task_request/task_get path. The separate threaddesk.knowledge
@@ -48,3 +59,6 @@ Source references remain unverified. Stored context grants no tool rights and st
 no agent. Unknown writes are never automatically repeated. Targeted real-peer tests
 cover all actions, replay/conflict/staleness/scope, reconnect and capability denial.
 Runtime delivery, actual connected-App checks and overall user acceptance are separate.
+The subsequent connected-App roundtrip exercised all four mutations and get_reentry
+on one synthetic operator thread, retaining the old decision and original question.
+It is loaded in the local0.5.2 backport df995f6; this is not overall user acceptance.
