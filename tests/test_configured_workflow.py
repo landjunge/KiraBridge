@@ -353,3 +353,60 @@ async def test_same_project_id_does_not_hide_changed_directory_binding(
         assert not bridge.terminal.sessions
     finally:
         bridge.store.close()
+
+
+async def test_stopped_answer_does_not_record_human_answer_or_change_waiting_binding(
+    config, monkeypatch
+):
+    from kirabridge.bridge_core.config import AgentConfig
+    from kirabridge.bridge_core.models import HandoffAnswerInput, digest
+    from kirabridge.workflow_control_adapter import owned_stop
+
+    config.agents["codex"] = AgentConfig(kind="codex", executable=sys.executable)
+    bridge = Bridge(config)
+    try:
+        _, metadata = owned_binding(bridge)
+        metadata.update(
+            phase="awaiting_answer",
+            question_id="q-synthetic",
+            session_id="synthetic-session",
+            turn_count=1,
+            agent="codex",
+            agent_profile_ref=digest(config.agents["codex"].model_dump()),
+        )
+        with bridge.store.transaction():
+            bridge.handoffs.save(metadata, task_id="turn1", event="test.waiting_fixture")
+        await owned_stop(
+            bridge,
+            "local",
+            "h-synthetic",
+            1,
+            "stop-before-answer",
+            scope=None,
+            barrier={"status": "UNKNOWN", "further_dispatch_blocked": False},
+        )
+        before = bridge.handoffs.get("local", "h-synthetic", 1)
+        calls = []
+
+        async def forbidden(*args, **kwargs):
+            calls.append(True)
+            pytest.fail("Stopped human answer must not be recorded or sent to an agent")
+
+        monkeypatch.setattr(bridge.handoffs, "rpc", forbidden)
+        monkeypatch.setattr(bridge.agents, "execute", forbidden)
+        args = HandoffAnswerInput(
+            handoff_id="h-synthetic",
+            revision=1,
+            question_id="q-synthetic",
+            answer_id="answer-after-stop",
+            text="synthetic countercase",
+        )
+        answer = request("handoff.answer", args.model_dump(), task_id="answer-after-stop")
+        submit(bridge, answer)
+        task = bridge.store.claim("synthetic-worker", 30)
+        with pytest.raises(BridgeError) as error:
+            await bridge.handoffs.answer(task, args, noop, noop)
+        assert error.value.code == "workflow_stopped" and calls == []
+        assert bridge.handoffs.get("local", "h-synthetic", 1) == before
+    finally:
+        bridge.store.close()

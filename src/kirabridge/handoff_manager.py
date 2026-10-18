@@ -289,6 +289,7 @@ class HandoffManager:
         return await self.turn(task, metadata, prompt, args.timeout, policy, running, progress)
 
     async def answer(self, task, args, running, progress):
+        self.ensure_not_stopped(task["principal"], args.handoff_id, args.revision)
         metadata = self.get(task["principal"], args.handoff_id, args.revision)
         policy, configured = self.agent_preflight(
             task["principal"], metadata["agent"], metadata["cwd"]
