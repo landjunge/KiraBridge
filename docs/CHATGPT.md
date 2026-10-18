@@ -5,9 +5,10 @@ Projektlesung wurde über die verbundene KiraBridge-App dieser Codex-Sitzung
 tatsächlich bis zum vollständigen Ergebnis geprüft, einschließlich erneutem
 Abruf nach Tunnel-Wiederverbindung ohne Doppelauftrag. Eine weitere, nicht von
 dieser Codex-Sitzung erzeugte `chatgpt`-Anfrage las dieselbe Datei erfolgreich.
-Die genaue Oberfläche dieses anderen Clients ist daraus nicht belegbar; der
-abschließende Abruf in der separaten Ziel-ChatGPT-/iPhone-Unterhaltung bleibt
-ausdrücklich ausstehend. [Reparatur, genaue Abrufe und Grenzen](REPAIR-PROJECT-ACCESS-20261018.md).
+Die genaue Oberfläche war aus dem Datensatz allein nicht belegbar. Der Nutzer
+hat den echten ChatGPT-Abruf inzwischen ausdrücklich bestätigt: Task
+`chatgpt-file-verification-20261018-1311`, completed,9117Bytes vollständig.
+Bestehenden Beleg übernommen, keinen neuen Lauf ausgeführt. [Reparatur, genaue Abrufe und Grenzen](REPAIR-PROJECT-ACCESS-20261018.md).
 Die folgenden Angaben vom17.10. sind historische Belege.
 
 Stand der Prüfung: 17. Oktober 2026. Der private OpenAI-Tunnel läuft; Prozess, Health und Readiness wurden lokal geprüft. OpenAI hat Discovery-Anfragen über den Tunnel an KiraBridge weitergeleitet. Die lokalen Tunnel-Metriken bestätigen zusätzlich echte `tools/call`-Anfragen mit Transportstatus 200. Der Nutzer hat eine erfolgreiche Statusabfrage aus seinem ChatGPT-Chat mit Version 0.2.0, aktivem Dispatcher und erkannten Codex-/Grok-Programmen zurückgemeldet. Der genaue Inhalt dieser Antwort ist ein Nutzerbericht; die Metriken geben keinen einzelnen Werkzeugnamen oder dessen Ergebnis wieder. Gemeinsame Ende-zu-Ende-Tests von Aufgabenfreigabe, Ausführung und Ergebnisabruf aus ChatGPT stehen noch aus. Der [Betriebsnachweis](evidence/local-operation-2026-10-17.json) unterscheidet diese Belegarten und hält auch zwei Transportantworten mit Status 409 fest. Aus diesen wird kein Ausführungsstatus abgeleitet und kein Auftrag automatisch wiederholt.

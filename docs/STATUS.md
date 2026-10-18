@@ -6,7 +6,9 @@ Schreib-/Programmrechte. Neuer Readiness-Abgleich, sicherer Proxy-Reconnect und
 persistenter Stdio-Benachrichtigungsadapter.15 gezielte lokale Prüfungen und die
 vorhandene CI auf drei Plattform-/Python-Kombinationen bestanden. Echter Datei-
 und Ergebnisabruf über die verbundene App dieser Codex-Sitzung nachgewiesen;
-separater Ziel-ChatGPT-/iPhone-Abruf bleibt ausdrücklich ausstehend. Kein neuer
+echter ChatGPT-Abruf durch Nutzer und bestehenden Task
+`chatgpt-file-verification-20261018-1311` bestätigt (completed,9117Bytes),
+ohne Wiederholung. Kein neuer
 Agentenauftrag. [Ursachen, Belege, genauer Abruf und Rückweg](REPAIR-PROJECT-ACCESS-20261018.md).
 
 Die folgenden Abschnitte erhalten den historischen Stand0.5.0:

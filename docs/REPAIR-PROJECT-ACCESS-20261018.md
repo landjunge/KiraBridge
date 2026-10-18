@@ -101,10 +101,13 @@ beschreiben den lokalen lesenden Abgleich und das neue MCP-Tool
 werden nur geprüft, nicht gestartet. Health allein belegt weder Datei- noch
 vollständige Arbeitsfähigkeit. Rechte und zukünftige Laufzeit bleiben begrenzt.
 
-**Ausstehend bleibt der explizite Abruf in der separaten Ziel-ChatGPT-/iPhone-
-Unterhaltung.** Die obigen App-Aufrufe kamen aus dieser Codex-Sitzung und sind
-mehr als eine lokale Shellprobe; sie sind keine Behauptung über die Bedienung
-eines anderen Chats. Dort exakt anfordern:
+**ChatGPT-Abnahme bestanden:** Im Folgeauftrag vom18.10.2026 bestätigt der Nutzer
+den echten Abruf `chatgpt-file-verification-20261018-1311`: completed,9117Bytes
+vollständig gelesen. Dies stimmt mit dem bereits vorhandenen Datensatz im obigen
+Beleg überein. Kein neuer Lauf und keine erneute Dateiausführung. Die Herkunft
+dieses Zielchat-Nachweises ist damit Nutzerbestätigung plus bestehender Taskbeleg;
+die eigenen Codex-App-Aufrufe bleiben davon getrennt. Der weiterhin vorbereitete
+Abruf des schon abgeschlossenen eigenen Vergleichsauftrags lautet:
 
 ```json
 {"task_id":"project-handoff-repair-20261018"}
