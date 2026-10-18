@@ -195,14 +195,29 @@ def task_report(bridge, principal: str, task_id: str) -> dict:
         for r in trace
     ]
     execution = json.loads(preflight["metadata"]) if preflight else None
+    code = (task["error"] or {}).get("code")
+    if (
+        code is None
+        and task["state"] == "failed"
+        and (task["result"] or {}).get("scope") == "workflow_operation_rejected"
+        and task["evidence"].get("rejected") is True
+    ):
+        # Workflow rejections preserve the existing result contract rather than
+        # populating the exception column. Read only the bounded technical code,
+        # never context, exception messages or arbitrary nested agent results.
+        candidate = task["evidence"].get("error_code")
+        code = (
+            candidate
+            if type(candidate) is str and re.fullmatch(r"[a-z][a-z0-9_]{0,79}", candidate)
+            else "workflow_rejected"
+        )
     return {
         "schema": "1",
         "diagnostic_id": "task-" + digest([principal, task_id])[:24],
         "task_id": task_id,
         "at": time.time(),
         "operation": task["operation"],
-        "error_code": (task["error"] or {}).get("code")
-        or ("outcome_unknown" if task["state"] == "unknown" else None),
+        "error_code": code or ("outcome_unknown" if task["state"] == "unknown" else None),
         "state": task["state"],
         "accepted": task["accepted"] is not None,
         "accepted_at": task["accepted"],
