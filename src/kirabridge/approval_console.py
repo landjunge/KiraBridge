@@ -70,6 +70,7 @@ class ApprovalConsole:
                 Route("/app.js", self.asset),
                 Route("/login.js", self.asset),
                 Route("/style.css", self.asset),
+                Route("/networkpunkt.css", self.asset),
                 Route("/api/tasks", self.tasks),
                 Route("/api/tasks/{task_id}", self.task),
                 Route("/api/tasks/{task_id}/{decision}", self.decide, methods=["POST"]),
