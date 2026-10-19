@@ -59,12 +59,15 @@ def build(destination: Path):
             contents[f"INSTALL-{language}.md"] = (
                 f"# KiraBridge {version}\n\n"
                 f"[Installation {language}](docs/INSTALL-{language}.md)\n\n"
-                f"```sh\n{command}\n```\n\n[Team](docs/TEAM-ORCHESTRATION.md)\n"
+                f"```sh\n{command}\n```\n\n[Team](docs/TEAM-ORCHESTRATION.md)\n\n"
+                "[Grok App / Eve](docs/GROK-APP-CONNECTOR.md)\n"
             ).encode()
         contents["RELEASE-NOTES.md"] = (
             Path(f"docs/RELEASE-NOTES-{version}.md")
             .read_bytes()
             .replace(b"(providers/README.md)", b"(docs/providers/README.md)")
+            .replace(b"(GROK-APP-CONNECTOR.md)", b"(docs/GROK-APP-CONNECTOR.md)")
+            .replace(b"(evidence/", b"(docs/evidence/")
         )
         contents["TEAM-ORCHESTRATION.md"] = (
             b"# Team\n\n[Anleitung / Guide](docs/TEAM-ORCHESTRATION.md)\n"

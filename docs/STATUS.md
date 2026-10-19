@@ -1,3 +1,37 @@
+# Grok-App-Connector · 19.10.2026 · 0.7.0rc2
+
+Der getrennte OAuth-/MCP-Gateway ist auf dem Ziel-Mac aktiv und über einen
+eigenen HTTPS-Tunnel erreichbar. Der bisherige CLI-Arbeitsagent `grok` bleibt
+erhalten; die Web-/Handy-App erhält den eigenen Zugang `grok_app`. Das vorhandene
+automatische Freigabeprofil ist übernommen, ohne zusätzliche Einzelauftragsklicks.
+ChatGPT bleibt Koordinator. Die App benötigt einmalig ihre eigene Verknüpfung
+im Grok-Konto und eine lokale Bestätigung der zugehörigen Anmeldung.
+
+Ein kontrollierter Client hat über den echten öffentlichen TLS-Eingang den
+vollständigen OAuth-/PKCE-Ablauf, MCP-Health, eine adressierte Teamnachricht an
+den echten Grok-CLI-Zugang samt Quittierung und einen automatischen Datei-
+Schreibauftrag abgeschlossen. Nachricht und Auftrag behalten bei Wiederholung
+ihre IDs; der Schreibauftrag lief genau einmal. Gefälschter Absender, Zugriff
+auf fremde private Aufgaben sowie wiederverwendete Codes und Refresh-Tokens
+wurden zurückgewiesen. Die kontrollierten Testclients sind widerrufen.
+
+101 gezielte Auth-, Transport-, Oberflächen- und Supervisorprüfungen bestanden.
+Alle 638 vor Aktivierung gesicherten Aufgaben, bisherigen Zugangsdaten und
+ursprünglichen Policies sind unverändert. Die bestehende Runtime behält ihre
+Versionsanzeige 0.5.2 und fremde Erweiterungen; der neue Code ist gezielt ergänzt.
+Eine kostenpflichtige Voice-API oder ein neues KI-Konto wurde nicht eingerichtet.
+
+Ein echter Aufruf aus dem Grok-Konto am Handy beziehungsweise aus Eve ist noch
+**nicht verifiziert**. Ein lokaler Test ersetzt diesen Nachweis nicht. Temporäre
+Quick-Tunnel-Adressen können sich bei Neustarts ändern; die aktuelle Adresse
+steht unter `kirabridge grok-connector status` und im lokalen Bereich **Grok App**.
+
+[Einrichtung und Grenzen](GROK-APP-CONNECTOR.md) ·
+[Prüfnachweis](evidence/grok-app-connector-20261019.json) ·
+[Releasehinweise](RELEASE-NOTES-0.7.0rc2.md).
+
+---
+
 # Teamsteuerung · 19.10.2026 · 0.7.0rc1
 
 Teamrollen, wählbarer Koordinator, dauerhafte adressierte Nachrichten und

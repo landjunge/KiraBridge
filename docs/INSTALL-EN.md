@@ -1,4 +1,4 @@
-# Install KiraBridge · 0.7.0rc1
+# Install KiraBridge · 0.7.0rc2
 
 **Private release candidate for acceptance. No public installation yet.**
 The included `LICENSE` is the Netzwerkpunkt Personal Use License1.0. German
@@ -15,7 +15,7 @@ text adapters include OpenCode, Gemini CLI, Claude Code and Copilot CLI; provide
 
 ## Release and existing installations
 
-This guide belongs to **0.7.0rc1 with team orchestration**. The bundle's
+This guide belongs to **0.7.0rc2 with team orchestration and the Grok app connector**. The bundle's
 `release.json` identifies the exact source, platform and license; `SHA256SUMS`
 identifies these artifacts. Earlier RC1/RC2/RC3 artifacts remain unchanged and
 must not be treated as this release based on a similar version label.
