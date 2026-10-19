@@ -7,7 +7,7 @@ import uuid
 import pytest
 
 from kirabridge.bridge_core.models import BridgeError
-from kirabridge.session_manager import SessionInput, SessionManager
+from kirabridge.session_manager import SessionInput, SessionManager, SessionOpen
 
 
 @pytest.mark.asyncio
@@ -55,3 +55,65 @@ async def test_exact_session_input_and_capture_on_private_real_tmux(bridge, conf
                 await asyncio.sleep(0.03)
     finally:
         await asyncio.to_thread(subprocess.run, [tmux, "-L", socket, "kill-server"], check=False)
+
+
+@pytest.mark.asyncio
+async def test_native_session_selection_read_and_input(bridge, config, monkeypatch):
+    config.principals["local"].capabilities += ["session.inspect", "session.input"]
+    manager = SessionManager(bridge)
+    selected = {
+        "pane_id": "terminal:123:ttys004",
+        "expected_pid": 345,
+        "tty": "/dev/ttys004",
+        "transport": "terminal_app",
+    }
+    calls = []
+
+    async def catalog(principal):
+        bridge.security.principal(principal, "session.inspect")
+        return {"sessions": [selected]}
+
+    async def native(source, *, mutation=False):
+        calls.append((source, mutation))
+        return "read-output" if not mutation else {"sent": True}
+
+    monkeypatch.setattr(manager, "catalog", catalog)
+    monkeypatch.setattr(manager, "native", native)
+    with pytest.raises(BridgeError, match="exact current"):
+        await manager.read("local", selected["pane_id"], 346)
+    assert not calls
+    result = await manager.read("local", selected["pane_id"], 345)
+    assert result["text"] == "read-output"
+    args = SessionInput(
+        **{k: selected[k] for k in ("pane_id", "expected_pid")}, text='hello "quoted"\nline'
+    )
+    with pytest.raises(BridgeError, match="submits a line"):
+        await manager.send("local", args.model_copy(update={"submit": False}))
+    sent = await manager.send("local", args)
+    assert sent["input_handed_to_transport"] and not sent["agent_processed"]
+    assert calls[-1][1] is True
+    assert 'hello \\"quoted\\"\\nline' in calls[-1][0]
+
+
+@pytest.mark.asyncio
+async def test_native_open_checks_authority_and_quotes_command(bridge, config, monkeypatch):
+    manager = SessionManager(bridge)
+    calls = []
+
+    async def native(source, *, mutation=False):
+        calls.append(source)
+        return {"opened": True, "tty": "/dev/ttys009"}
+
+    async def catalog():
+        return [{"pane_id": "terminal:333:ttys009", "expected_pid": 444, "tty": "/dev/ttys009"}]
+
+    monkeypatch.setattr(manager, "native", native)
+    monkeypatch.setattr(manager, "terminal_catalog", catalog)
+    with pytest.raises(BridgeError):
+        await manager.open("local", SessionOpen(cwd="/"))
+    assert not calls
+    cwd = config.principals["local"].roots[0]
+    args = SessionOpen(cwd=cwd, argv=[sys.executable, "-c", "print('hello')"])
+    result = await manager.open("local", args)
+    assert result["opened"] and result["expected_pid"] == 444
+    assert len(calls) == 1 and "app.doScript" in calls[0]

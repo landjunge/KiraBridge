@@ -31,7 +31,9 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
         "Query task_get and task_events for additional evidence. "
         "Use message_send/message_receive for addressed peer communication. "
         "Automatic message receivers use separate managed sessions, not existing interactive ones; "
-        "check message_channel_status and message_get for actual evidence.",
+        "check message_channel_status and message_get for actual evidence. "
+        "For visible macOS terminals use session_catalog/session_read and session_open. "
+        "Send input only to an exact pane_id and expected_pid using operation session.input.",
         stateless_http=True,
         json_response=True,
         log_level="CRITICAL",
@@ -151,12 +153,12 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
 
     @server.tool(annotations=read)
     async def session_catalog(ctx: Context) -> dict[str, Any]:
-        """Discover addressable tmux panes; process discovery alone is not a session handle."""
+        """List existing Terminal.app tabs and tmux panes with exact input/read handles."""
         return await bridge.sessions.catalog(identity(ctx))
 
     @server.tool(annotations=read)
     async def session_read(pane_id: str, expected_pid: int, ctx: Context) -> dict[str, Any]:
-        """Read up to 200 lines / 65536 bytes from an exactly selected tmux pane."""
+        """Read bounded output from a Terminal.app tab or tmux pane selected by catalog handle."""
         try:
             return await bridge.sessions.read(identity(ctx), pane_id, expected_pid)
         except BridgeError as exc:
@@ -253,6 +255,30 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
             }
 
         return safe(action)
+
+    @server.tool(annotations=write)
+    def session_open(
+        cwd: str,
+        task_id: str,
+        idempotency_key: str,
+        ctx: Context,
+        argv: list[str] | None = None,
+    ) -> dict[str, Any]:
+        """Open a new visible Terminal.app window in cwd, preserving existing tabs.
+
+        Optional argv runs a program in the new window. Read task_get for the resulting
+        pane_id and expected_pid; session_read reads output, session.input sends input.
+        Reuse task_id and idempotency_key for retries of this same request.
+        """
+        return task_request(
+            TaskRequest(
+                task_id=task_id,
+                idempotency_key=idempotency_key,
+                operation="session.open",
+                arguments={"cwd": cwd, "argv": argv or []},
+            ),
+            ctx,
+        )
 
     @server.tool(annotations=read)
     def task_events(task_id: str, ctx: Context, after: int = 0) -> dict[str, Any]:
@@ -448,8 +474,30 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
                     and bridge.message_receiver.worker
                     and not bridge.message_receiver.worker.done()
                 ),
+                "receiver_status_scope": "authenticated_principal_inbox",
+                "dispatcher_active": bool(
+                    bridge.message_receiver.worker and not bridge.message_receiver.worker.done()
+                ),
+                "peer_receivers": {
+                    peer: {
+                        "receiver_configured": peer in config.messaging.receivers,
+                        "receiver_active": bool(
+                            peer in config.messaging.receivers
+                            and bridge.message_receiver.worker
+                            and not bridge.message_receiver.worker.done()
+                        ),
+                    }
+                    for peer in policy.message_peers
+                },
                 "session_scope": "separate_managed_session",
                 "existing_session_attached": False,
+                "interactive_session_access": {
+                    "mode": "on_demand_exact_target",
+                    "catalog_tool": "session_catalog",
+                    "read_tool": "session_read",
+                    "open_tool": "session_open",
+                    "input_operation": "session.input",
+                },
                 "jobs": {row["state"]: row["count"] for row in states},
                 "limits": config.messaging.model_dump(exclude={"receivers"}),
             }

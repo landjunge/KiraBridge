@@ -67,3 +67,21 @@ Für die Gegenrichtung `--principal grok` und Empfänger `codex` verwenden. Nach
 Die private Konfiguration und Datenbank wurden vorher gesichert. Schema 1 wird atomar auf Schema 2 erweitert, auch bei parallelem Öffnen; bestehende Aufgaben werden nicht umgeschrieben. Vor geplanten Neustarts müssen normale Bridge-Aufträge und Empfänger-Turns beendet sein.
 
 Der [Live-Nachweis](evidence/agent-channel-2026-10-17.json) dokumentiert den echten Austausch mit beiden CLI-Adaptern, einen tatsächlichen Dienstneustart, Idempotenz, Quittungen, Fremdzugriff und die erhaltene Hilfezentrum-Arbeit.
+
+## Existing macOS terminals
+
+`session_catalog` lists existing Terminal.app tabs as well as tmux panes. Use its
+exact `pane_id` and `expected_pid` with `session_read` or the queued `session.input`
+operation. `session_open` queues a new visible window using `task_id`,
+`idempotency_key`, `cwd` and optional `argv`. It requires `session.open` plus
+`terminal.execute`; enable only for authorized principals. Existing windows are
+never stopped or replaced. Terminal.app input submits a line; `submit=false` is
+rejected. An input receipt does not prove agent processing; read back output.
+
+macOS automation uses explicit JavaScript (`osascript -l JavaScript`). Automation
+denial is reported rather than treated as an empty terminal list. Private tmux
+sockets remain isolated from native Terminal.app discovery.
+
+Health reports the bridge receiver dispatcher; channel status reports the caller's
+inbox and separately its peer receivers. A caller without its own automatic
+receiver can still address configured peers and use interactive session tools.

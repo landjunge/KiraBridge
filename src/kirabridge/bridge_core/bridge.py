@@ -42,12 +42,13 @@ from kirabridge.message_manager import MessageManager
 from kirabridge.message_manager.receiver import MessageReceiver
 from kirabridge.process_manager import ProcessManager
 from kirabridge.security_manager import SecurityManager
-from kirabridge.session_manager import SessionInput, SessionManager
+from kirabridge.session_manager import SessionInput, SessionManager, SessionOpen
 from kirabridge.task_manager.manager import TaskManager
 from kirabridge.task_manager.store import Store
 from kirabridge.terminal_manager import TerminalManager
 
 INPUTS = {
+    "session.open": SessionOpen,
     "session.input": SessionInput,
     "terminal.execute": TerminalInput,
     "file.read": ReadInput,
@@ -220,6 +221,7 @@ class Bridge:
             "message_receiver_active": bool(
                 self.message_receiver.worker and not self.message_receiver.worker.done()
             ),
+            "message_receiver_scope": "bridge_dispatcher_for_configured_receivers",
         }
 
     def task(self, principal: str, task_id: str) -> dict:
@@ -296,6 +298,9 @@ class Bridge:
         if operation == "session.input":
             await running({"evidence_type": "session_input_dispatch", "pane_id": args.pane_id})
             return await self.sessions.send(principal, args)
+        if operation == "session.open":
+            await running({"evidence_type": "session_open_dispatch"})
+            return await self.sessions.open(principal, args)
         if operation == "agent.execute":
             return await self.agents.execute(task, args, policy, running, progress)
         if operation.startswith("handoff."):
