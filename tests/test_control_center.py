@@ -34,6 +34,26 @@ def test_three_levels_preserve_legacy_and_enforce_selected_approvals():
     assert level_for(ask) == "ask"
 
 
+def test_chatgpt_terminal_standing_grant_survives_reconfiguration_and_reload(tmp_path):
+    path = tmp_path / "config.toml"
+    path.write_text(
+        '[principals.chatgpt]\npermission_level="full"\n'
+        "[session_input_policy]\nenabled=false\nprincipals=[]\n"
+        "[voice_messaging]\ntimeout_seconds=60\n"
+    )
+    configure_access(path, level="full")
+    config = load_config(str(path))
+    assert config.principals["chatgpt"].automatic_operations == ["session.input"]
+    assert {"session.inspect", "session.input", "terminal.execute"} <= set(
+        config.principals["chatgpt"].capabilities
+    )
+    configure_access(path)
+    reloaded = load_config(str(path))
+    assert reloaded.principals["chatgpt"].automatic_operations == ["session.input"]
+    assert not reloaded.session_input_policy.enabled
+    assert reloaded.voice_messaging.timeout_seconds == 60
+
+
 @pytest.mark.asyncio
 async def test_medium_write_waits_for_approval_then_executes_once(bridge, config):
     policy = config.principals["local"]

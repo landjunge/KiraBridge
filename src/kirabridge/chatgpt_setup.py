@@ -138,15 +138,12 @@ def configure_tunnel(
     credential_path = Path(config.credentials_file)
     credentials = private_json(credential_path)
     if "chatgpt" not in config.principals:
-        policy = config.principals["local"]
-        section = (
-            "\n[principals.chatgpt]\n"
-            f"approval_mode = {json.dumps(policy.approval_mode)}\n"
-            f"capabilities = {json.dumps(policy.capabilities)}\n"
-            f"roots = {json.dumps(policy.roots)}\n"
-            f"executables = {json.dumps(policy.executables)}\n"
-            f"agents = {json.dumps(policy.agents)}\n"
-            'token_env = "KIRABRIDGE_CHATGPT_TOKEN"\n'
+        policy = config.principals["local"].model_copy(deep=True)
+        policy.token_env = "KIRABRIDGE_CHATGPT_TOKEN"
+        section = "\n[principals.chatgpt]\n" + "".join(
+            key + " = " + json.dumps(value) + "\n"
+            for key, value in policy.model_dump().items()
+            if value is not None
         )
         credentials["chatgpt"] = secrets.token_urlsafe(48)
         replace_private(credential_path, json.dumps(credentials))
@@ -163,7 +160,14 @@ def configure_tunnel(
     key_path = config_path.parent / "openai-tunnel-runtime.key"
     replace_private(key_path, runtime_key)
     command = shlex.join(
-        [str(Path.home() / ".local/bin/kirabridge"), "--principal", "chatgpt", "connect"]
+        [
+            str(Path.home() / ".local/bin/kirabridge"),
+            "--config",
+            str(config_path.absolute()),
+            "--principal",
+            "chatgpt",
+            "connect",
+        ]
     )
     runtime_env = {**os.environ, "MCP_STDIO_SEND_INITIALIZED_NOTIFICATION": "true"}
     result = subprocess.run(

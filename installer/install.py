@@ -288,7 +288,8 @@ def fresh_config(args, release):
         text += (
             f'\n[principals.{name}]\napproval_mode = "automatic"\n'
             'permission_level = "full"\n'
-            f"capabilities = {json.dumps(capabilities)}\n"
+            + ('automatic_operations = ["session.input"]\n' if name == "chatgpt" else "")
+            + f"capabilities = {json.dumps(capabilities)}\n"
             'roots = ["/"]\nread_roots = ["/"]\nterminal_roots = ["/"]\n'
             "allow_any_executable = true\nexecutables = []\nagents = []\n"
             f'token_env = "KIRABRIDGE_{name.upper()}_TOKEN"\n'

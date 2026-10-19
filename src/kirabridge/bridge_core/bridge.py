@@ -44,7 +44,7 @@ from kirabridge.message_manager.receiver import MessageReceiver
 from kirabridge.permissions import LEVELS, level_for, state_exclusions
 from kirabridge.process_manager import ProcessManager
 from kirabridge.security_manager import SecurityManager
-from kirabridge.session_manager import SessionInput, SessionManager, SessionOpen
+from kirabridge.session_manager import SessionInput, SessionManager, SessionOpen, SessionRead
 from kirabridge.task_manager.manager import TaskManager
 from kirabridge.task_manager.store import Store
 from kirabridge.terminal_manager import TerminalManager
@@ -53,6 +53,8 @@ INPUTS = {
     "connection.check": ConnectionCheckInput,
     "session.open": SessionOpen,
     "session.input": SessionInput,
+    "session.catalog": EmptyInput,
+    "session.read": SessionRead,
     "terminal.execute": TerminalInput,
     "file.read": ReadInput,
     "file.image": ImageInput,
@@ -199,6 +201,8 @@ class Bridge:
 
     def health(self, principal: str) -> dict:
         policy = self.security.principal(principal, "bridge.health")
+        from kirabridge.terminal_access import terminal_access
+
         return {
             "name": "KiraBridge",
             "version": __version__,
@@ -227,6 +231,7 @@ class Bridge:
             "permission_label": LEVELS[level_for(policy)],
             "approval_required": policy.approval_mode == "manual",
             "session_input_policy": self.config.session_input_policy.model_dump(),
+            "terminal_access": terminal_access(self.config, principal),
             "automatic_operations": policy.automatic_operations,
             "voice_messaging": self.config.voice_messaging.model_dump(),
             **self.messages.voice_channel.profile(principal),
@@ -292,6 +297,14 @@ class Bridge:
         if operation == "connection.check":
             await running({"evidence_type": "connection_check_received"})
             return await self.check_connection(principal, args.device, args.mode)
+        if operation == "session.catalog":
+            await running({"evidence_type": "terminal_catalog_query"})
+            return await self.sessions.catalog(principal)
+        if operation == "session.read":
+            await running({"evidence_type": "terminal_read_query", "pane_id": args.pane_id})
+            return await self.sessions.read_observed(
+                principal, args.pane_id, args.expected_pid, max_bytes=args.max_bytes
+            )
         if operation == "terminal.execute":
             result = await self.terminal.execute(
                 task["id"],

@@ -60,6 +60,10 @@ def test_account_setup_keeps_literal_key_out_of_commands_and_policy(tmp_path, mo
     path = Path(configured["config"])
     config = load_config(str(path))
     config.principals["local"].approval_mode = "automatic"
+    config.principals["local"].permission_level = "full"
+    config.principals["local"].automatic_operations = ["session.input"]
+    config.principals["local"].allow_any_executable = True
+    config.principals["local"].terminal_roots = ["/"]
     original = private_json(Path(config.credentials_file))
     key = "test-runtime-key-" + "x" * 40
     calls = []
@@ -94,6 +98,15 @@ def test_account_setup_keeps_literal_key_out_of_commands_and_policy(tmp_path, mo
     updated = load_config(str(path))
     assert "chatgpt" in updated.principals
     assert updated.principals["chatgpt"].approval_mode == "automatic"
+    assert updated.principals["chatgpt"].permission_level == "full"
+    assert updated.principals["chatgpt"].automatic_operations == ["session.input"]
+    assert updated.principals["chatgpt"].terminal_roots == ["/"]
+    assert updated.principals["chatgpt"].allow_any_executable
+    import shlex
+
+    connect_argv = next(argv for argv in calls if "--mcp-command" in argv)
+    command = shlex.split(connect_argv[connect_argv.index("--mcp-command") + 1])
+    assert command[command.index("--config") + 1] == str(path.absolute())
     credentials = private_json(Path(updated.credentials_file))
     assert all(credentials[name] == token for name, token in original.items())
     assert credentials["chatgpt"] not in original.values()

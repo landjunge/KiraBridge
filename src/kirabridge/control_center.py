@@ -96,6 +96,10 @@ def configure_access(config_path: Path, *, level=None):
             policy.permission_level = level
             policy.approval_mode = "manual" if level == "ask" else "automatic"
         if level == "full":
+            if name == "chatgpt":
+                policy.automatic_operations = list(
+                    dict.fromkeys(policy.automatic_operations + ["session.input"])
+                )
             policy.capabilities = list(
                 dict.fromkeys(
                     policy.capabilities

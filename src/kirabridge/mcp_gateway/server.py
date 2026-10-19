@@ -43,6 +43,11 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
         "check message_channel_status and message_get for actual evidence. "
         "For visible macOS terminals use session_catalog/session_read and session_open. "
         "Send input only to an exact pane_id and expected_pid using operation session.input. "
+        "session_input_policy is an optional confirmation buffer, not a terminal enable switch. "
+        "agent_status includes existing interactive_terminal_sessions. Cached clients can use "
+        "task_request operations session.catalog (empty arguments) and session.read "
+        "(pane_id, expected_pid, optional max_bytes) then task_get for actual output, or "
+        "read_query with operation session.catalog or session.read and exact pane_id/expected_pid. "
         "Eve = Grok Voice; Grok Build = Grok Terminal; Kira = ChatGPT Voice; "
         "Codex = ChatGPT Terminal. Eve relays only Daniel's dictation unchanged, "
         "without additions or premature sending. Never invent Daniel's go-go-go. "
@@ -157,7 +162,7 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
 
     @server.tool(annotations=read)
     async def agent_status(ctx: Context) -> dict[str, Any]:
-        """Own managed work and bounded process observation; no interactive session attachment."""
+        """Managed work and exact existing terminal handles; discovery never sends input."""
         from kirabridge.development_status import agent_status as inspect
 
         try:
@@ -168,18 +173,23 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
             return {"error": {"code": exc.code, "message": str(exc)}}
 
     @server.tool(annotations=read)
-    def read_query(query: dict[str, Any], ctx: Context) -> dict[str, Any]:
+    async def read_query(query: dict[str, Any], ctx: Context) -> dict[str, Any]:
         """Direct authorized read without tasks, approvals or Events subscriptions.
 
         query.operation: file.read (path, max_bytes<=65536, offset or tail),
         file.list (path; at most 100 entries), terminal.output (owned task_id,
-        max_bytes<=65536). Uses existing capabilities and file roots. No shell,
-        Desktop Commander or external interactive-session attachment.
+        max_bytes<=65536). session.catalog lists existing terminal handles;
+        session.read requires exact pane_id and expected_pid, max_bytes<=65536.
+        Session reads require session.inspect; no shell input or process attachment.
         """
-        from kirabridge.read_query import ReadQuery
-        from kirabridge.read_query import read_query as read_direct
+        from kirabridge.read_query import ReadQuery, read_query_async
 
-        return safe(lambda: read_direct(bridge, identity(ctx), ReadQuery.model_validate(query)))
+        try:
+            return await read_query_async(bridge, identity(ctx), ReadQuery.model_validate(query))
+        except BridgeError as exc:
+            return {"error": {"code": exc.code, "message": str(exc)}}
+        except ValidationError:
+            return {"error": {"code": "invalid_arguments", "message": "Invalid read query"}}
 
     @server.tool(annotations=read)
     async def session_catalog(ctx: Context) -> dict[str, Any]:
@@ -190,31 +200,7 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
     async def session_read(pane_id: str, expected_pid: int, ctx: Context) -> dict[str, Any]:
         """Read bounded output from a Terminal.app tab or tmux pane selected by catalog handle."""
         try:
-            name = identity(ctx)
-            result = await bridge.sessions.read(name, pane_id, expected_pid)
-            from kirabridge.bridge_core.models import digest
-
-            key = (name, pane_id, expected_pid)
-            fingerprint = digest(result["text"])
-            if bridge.sessions.observed_outputs.get(key) != fingerprint:
-                if len(bridge.sessions.observed_outputs) >= 128:
-                    bridge.sessions.observed_outputs.pop(
-                        next(iter(bridge.sessions.observed_outputs))
-                    )
-                bridge.sessions.observed_outputs[key] = fingerprint
-                with bridge.store.transaction():
-                    bridge.store.audit(
-                        "terminal.output",
-                        name,
-                        None,
-                        {
-                            "pane_id": pane_id,
-                            "expected_pid": expected_pid,
-                            "text": result["text"],
-                            "content_sha256": fingerprint,
-                        },
-                    )
-            return result
+            return await bridge.sessions.read_observed(identity(ctx), pane_id, expected_pid)
         except BridgeError as exc:
             return {"error": {"code": exc.code, "message": str(exc)}}
 
@@ -224,6 +210,7 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
 
         def action():
             from kirabridge.permissions import LEVELS, automatic_for, level_for
+            from kirabridge.terminal_access import terminal_access
 
             policy = bridge.security.principal(identity(ctx))
             return {
@@ -232,6 +219,7 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
                 "permission_level": level_for(policy),
                 "permission_label": LEVELS[level_for(policy)],
                 "session_input_policy": bridge.config.session_input_policy.model_dump(),
+                "terminal_access": terminal_access(bridge.config, identity(ctx)),
                 "automatic_operations": policy.automatic_operations,
                 "voice_messaging": bridge.config.voice_messaging.model_dump(),
                 **bridge.messages.voice_channel.profile(identity(ctx)),

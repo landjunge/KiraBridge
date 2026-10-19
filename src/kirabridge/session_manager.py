@@ -15,11 +15,19 @@ from kirabridge.filesystem_manager import PathScope
 from kirabridge.terminal_manager import check_executable
 
 
-class SessionInput(Input):
+class SessionReference(Input):
     pane_id: str = Field(pattern=r"^(%[0-9]+|terminal:[0-9]+:ttys[0-9]+)$")
     expected_pid: int = Field(gt=0)
+
+
+class SessionRead(SessionReference):
+    max_bytes: int = Field(default=65536, ge=1, le=65536)
+
+
+class SessionInput(SessionReference):
     text: str = Field(min_length=1, max_length=16384)
     submit: bool = True
+    require_idle: bool = False
 
 
 class SessionOpen(Input):
@@ -53,6 +61,8 @@ class SessionManager:
                 code = (
                     "session_automation_denied"
                     if "1743" in detail
+                    else "session_busy"
+                    if "Selected terminal is busy" in detail
                     else "session_transport_unavailable"
                 )
                 raise BridgeError(code, detail or "Terminal.app automation failed")
@@ -82,31 +92,41 @@ window_id:w.id(), tty:t.tty(), busy:t.busy()
         child = await asyncio.create_subprocess_exec(
             "/bin/ps",
             "-axo",
-            "pid=,ppid=,tty=",
+            "pid=,ppid=,tty=,comm=",
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.DEVNULL,
         )
         async with asyncio.timeout(3):
             output, _ = await child.communicate()
-        processes = [line.split() for line in output.decode().splitlines()]
+        processes = [
+            parts
+            for line in output.decode().splitlines()
+            if len(parts := line.split(None, 3)) == 4 and parts[0].isdigit() and parts[1].isdigit()
+        ]
         sessions = []
         for row in rows[:100]:
             tty = Path(row["tty"]).name
             if not re.fullmatch(r"ttys[0-9]+", tty):
                 continue
-            members = [(int(p), int(parent)) for p, parent, t in processes if t == tty]
+            members = [(int(p), int(parent)) for p, parent, t, _ in processes if t == tty]
             pids = {p for p, _ in members}
             roots = [p for p, parent in members if parent not in pids]
-            if not roots:
+            if len(roots) != 1:
                 continue
             sessions.append(
                 {
                     "pane_id": f"terminal:{int(row['window_id'])}:{tty}",
-                    "expected_pid": min(roots),
+                    "window_id": int(row["window_id"]),
+                    "expected_pid": roots[0],
                     "tty": row["tty"],
                     "transport": "terminal_app",
                     "busy": row["busy"],
                     "agent_identity_verified": False,
+                    "processes": [
+                        {"pid": int(p), "ppid": int(parent), "name": Path(comm).name}
+                        for p, parent, t, comm in processes
+                        if t == tty
+                    ],
                 }
             )
         return sessions
@@ -215,7 +235,9 @@ const tab = tabs[0];"""
         except BridgeError as exc:
             return {
                 "transport": "terminal_app" if native_rows else "tmux",
-                "status": "available" if native_rows else exc.code,
+                "status": "available"
+                if native_rows
+                else errors.get("terminal_app", {}).get("code", exc.code),
                 "sessions": native_rows,
                 "transport_errors": {**errors, "tmux": {"code": exc.code}},
                 "scope": "Exact Terminal.app tabs and tmux panes; existing sessions preserved",
@@ -243,24 +265,23 @@ const tab = tabs[0];"""
 
     async def selected(self, principal, pane_id, expected_pid):
         catalog = await self.catalog(principal)
-        if not any(
-            r["pane_id"] == pane_id and r["expected_pid"] == expected_pid
-            for r in catalog["sessions"]
-        ):
-            raise BridgeError(
-                "session_selection_changed",
-                "Select an exact current pane_id and expected_pid from session_catalog",
-            )
+        for row in catalog["sessions"]:
+            if row["pane_id"] == pane_id and row["expected_pid"] == expected_pid:
+                return row
+        raise BridgeError(
+            "session_selection_changed",
+            "Select an exact current pane_id and expected_pid from session_catalog",
+        )
 
-    async def read(self, principal, pane_id, expected_pid):
+    async def read(self, principal, pane_id, expected_pid, *, max_bytes=65536):
         await self.selected(principal, pane_id, expected_pid)
         if pane_id.startswith("terminal:"):
             text = await self.native(
                 self.native_target(pane_id) + "\nJSON.stringify(tab.contents().slice(-65536));"
             )
-            text = text.encode("utf-8")[-65536:].decode("utf-8", "replace")
         else:
             text = await self.command("capture-pane", "-p", "-t", pane_id, "-S", "-200")
+        text = text.encode("utf-8")[-max_bytes:].decode("utf-8", "ignore")
         return {
             "pane_id": pane_id,
             "expected_pid": expected_pid,
@@ -268,13 +289,38 @@ const tab = tabs[0];"""
             "scope": "selected terminal output; not proof of project completion",
         }
 
+    async def read_observed(self, principal, pane_id, expected_pid, *, max_bytes=65536):
+        from kirabridge.bridge_core.models import digest
+
+        result = await self.read(principal, pane_id, expected_pid, max_bytes=max_bytes)
+        key, fingerprint = (principal, pane_id, expected_pid), digest(result["text"])
+        if self.observed_outputs.get(key) != fingerprint:
+            if len(self.observed_outputs) >= 128:
+                self.observed_outputs.pop(next(iter(self.observed_outputs)))
+            self.observed_outputs[key] = fingerprint
+            with self.bridge.store.transaction():
+                self.bridge.store.audit(
+                    "terminal.output",
+                    principal,
+                    None,
+                    {
+                        "pane_id": pane_id,
+                        "expected_pid": expected_pid,
+                        "text": result["text"],
+                        "content_sha256": fingerprint,
+                    },
+                )
+        return result
+
     async def send(self, principal, args, *, task_id=None):
         self.bridge.security.principal(principal, "session.input")
         self.bridge.security.principal(principal, "terminal.execute")
         if "\x00" in args.text:
             raise BridgeError("invalid_arguments", "NUL in input")
         async with self.lock:
-            await self.selected(principal, args.pane_id, args.expected_pid)
+            selected = await self.selected(principal, args.pane_id, args.expected_pid)
+            if args.require_idle and selected.get("busy", True):
+                raise BridgeError("session_busy", "Selected terminal is not an idle shell")
             if args.pane_id.startswith("terminal:"):
                 if not args.submit:
                     raise BridgeError(
@@ -283,6 +329,11 @@ const tab = tabs[0];"""
                 args = self.bridge.tasks.input_policy.dispatch(principal, args, task_id)
                 await self.native(
                     self.native_target(args.pane_id)
+                    + (
+                        '\nif(tab.busy()) throw Error("Selected terminal is busy");'
+                        if args.require_idle
+                        else ""
+                    )
                     + "\napp.doScript("
                     + json.dumps(args.text)
                     + ", {in:tab}); JSON.stringify({sent:true});",

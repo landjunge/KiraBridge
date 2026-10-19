@@ -54,6 +54,58 @@ def test_direct_reads_reject_invalid_or_mutating_requests(values):
         ReadQuery.model_validate(values)
 
 
+@pytest.mark.parametrize(
+    "values",
+    [
+        {"operation": "session.read", "pane_id": "terminal:123:ttys004"},
+        {"operation": "session.read", "pane_id": "terminal:123:ttys004", "expected_pid": 0},
+        {"operation": "session.read", "pane_id": "%1", "expected_pid": 1, "text": "must not send"},
+        {"operation": "session.catalog", "pane_id": "%1", "expected_pid": 1},
+        {"operation": "file.read", "path": "/tmp/file", "pane_id": "%1"},
+    ],
+)
+def test_session_query_requires_exact_read_only_selector(values):
+    with pytest.raises(ValidationError):
+        ReadQuery.model_validate(values)
+
+
+async def test_cached_read_tool_discovers_reads_and_rejects_stale_pid(bridge, config, monkeypatch):
+    from kirabridge.read_query import read_query_async
+
+    config.principals["local"].capabilities += ["session.inspect"]
+    selected = {"pane_id": "terminal:123:ttys004", "expected_pid": 345}
+    reads = []
+
+    async def catalog(principal):
+        bridge.security.principal(principal, "session.inspect")
+        return {"sessions": [selected], "status": "available"}
+
+    async def native(source, *, mutation=False):
+        assert not mutation
+        reads.append(source)
+        return "bounded-output"
+
+    monkeypatch.setattr(bridge.sessions, "catalog", catalog)
+    monkeypatch.setattr(bridge.sessions, "native", native)
+    result = await read_query_async(bridge, "local", ReadQuery(operation="session.catalog"))
+    assert result["sessions"] == [selected] and not reads
+    with pytest.raises(BridgeError, match="exact current"):
+        await read_query_async(
+            bridge,
+            "local",
+            ReadQuery(operation="session.read", **{**selected, "expected_pid": 346}),
+        )
+    assert not reads
+    result = await read_query_async(
+        bridge, "local", ReadQuery(operation="session.read", max_bytes=6, **selected)
+    )
+    assert result["text"] == "output" and len(reads) == 1
+    assert bridge.store.db.execute("SELECT count(*) FROM tasks").fetchone()[0] == 0
+    config.principals["local"].capabilities.remove("session.inspect")
+    with pytest.raises(BridgeError, match="Capability"):
+        await read_query_async(bridge, "local", ReadQuery(operation="session.read", **selected))
+
+
 @pytest.mark.asyncio
 async def test_terminal_output_is_real_bounded_and_owner_checked(bridge, config):
     async with bridge:

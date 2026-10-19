@@ -46,6 +46,89 @@ async def http_bridge(bridge, monkeypatch):
             sock.close()
 
 
+async def test_cached_tools_expose_existing_terminal_targets_over_real_http(
+    http_bridge, config, monkeypatch
+):
+    bridge, endpoint = http_bridge
+    policy = config.principals["local"]
+    policy.capabilities += ["session.inspect"]
+    policy.permission_level = "full"
+    target = {
+        "pane_id": "terminal:123:ttys004",
+        "expected_pid": 345,
+        "window_id": 123,
+        "tty": "/dev/ttys004",
+        "busy": True,
+    }
+    reads = []
+
+    async def catalog(principal):
+        bridge.security.principal(principal, "session.inspect")
+        return {"status": "available", "sessions": [target]}
+
+    async def native(source, *, mutation=False):
+        assert not mutation
+        reads.append(source)
+        return "READ_FROM_EXACT_WINDOW"
+
+    monkeypatch.setattr(bridge.sessions, "catalog", catalog)
+    monkeypatch.setattr(bridge.sessions, "native", native)
+    async with MCPClientPool() as clients:
+        await clients.connect(Peer("local", url=endpoint, token="local-test-" + "a" * 40))
+        result = (await clients.call("local", "agent_status", {})).structuredContent
+        assert result["interactive_terminal_sessions"] == [target] and not reads
+        permissions = (await clients.call("local", "operation_catalog", {})).structuredContent
+        assert permissions["terminal_access"]["policy_authorized"]
+        assert not permissions["terminal_access"]["input_approval_required"]
+        assert not permissions["terminal_access"]["additional_input_buffer_enabled"]
+        result = (
+            await clients.call("local", "read_query", {"query": {"operation": "session.catalog"}})
+        ).structuredContent
+        assert result["sessions"] == [target]
+        result = (
+            await clients.call(
+                "local",
+                "read_query",
+                {
+                    "query": {
+                        "operation": "session.read",
+                        "pane_id": target["pane_id"],
+                        "expected_pid": 346,
+                    }
+                },
+            )
+        ).structuredContent
+        assert result["error"]["code"] == "session_selection_changed" and not reads
+        result = (
+            await clients.call(
+                "local",
+                "read_query",
+                {
+                    "query": {
+                        "operation": "session.read",
+                        "pane_id": target["pane_id"],
+                        "expected_pid": 345,
+                    }
+                },
+            )
+        ).structuredContent
+        assert result["text"] == "READ_FROM_EXACT_WINDOW"
+        assert len(reads) == 1
+        for operation, arguments in [
+            ("session.catalog", {}),
+            ("session.read", {"pane_id": target["pane_id"], "expected_pid": 345}),
+        ]:
+            value = request(operation, arguments, task_id="cached-" + operation.replace(".", "-"))
+            await clients.call("local", "task_request", {"request": value.model_dump()})
+            completed = await bridge.tasks.wait("local", value.task_id, timeout=5)
+            assert completed["state"] == "completed", completed
+            assert (
+                completed["result"].get("sessions") == [target]
+                if operation == "session.catalog"
+                else completed["result"]["text"] == "READ_FROM_EXACT_WINDOW"
+            )
+
+
 async def test_http_auth_origin_host_and_protocol_limits(http_bridge):
     _, endpoint = http_bridge
     async with httpx.AsyncClient(trust_env=False) as client:

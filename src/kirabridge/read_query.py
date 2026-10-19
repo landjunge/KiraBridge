@@ -13,16 +13,32 @@ from kirabridge.permissions import state_exclusions
 
 
 class ReadQuery(Input):
-    operation: Literal["file.read", "file.list", "terminal.output"]
+    operation: Literal[
+        "file.read", "file.list", "terminal.output", "session.catalog", "session.read"
+    ]
     path: str | None = Field(default=None, max_length=4096)
     task_id: str | None = Field(default=None, max_length=128)
     max_bytes: int = Field(default=32768, ge=1, le=65536)
     offset: int = Field(default=0, ge=0, le=2**63 - 1)
     tail: bool = False
+    pane_id: str | None = Field(default=None, pattern=r"^(%[0-9]+|terminal:[0-9]+:ttys[0-9]+)$")
+    expected_pid: int | None = Field(default=None, gt=0)
 
     @model_validator(mode="after")
     def selector(self):
-        if self.operation == "terminal.output":
+        if self.operation.startswith("session."):
+            if self.path or self.task_id or self.offset or self.tail:
+                raise ValueError(
+                    "session queries require exact catalog handles, not paths or tasks"
+                )
+            if self.operation == "session.read":
+                if not self.pane_id or self.expected_pid is None:
+                    raise ValueError("session.read requires pane_id and expected_pid")
+            elif self.pane_id is not None or self.expected_pid is not None:
+                raise ValueError("session.catalog does not accept a target")
+        elif self.pane_id is not None or self.expected_pid is not None:
+            raise ValueError("terminal handles are only valid for session.read")
+        elif self.operation == "terminal.output":
             if not self.task_id or self.path is not None or self.offset or self.tail:
                 raise ValueError("terminal.output requires only task_id and max_bytes")
         elif not self.path or self.task_id is not None:
@@ -32,6 +48,18 @@ class ReadQuery(Input):
         if self.tail and self.offset:
             raise ValueError("use either tail or offset")
         return self
+
+
+async def read_query_async(bridge, principal: str, query: ReadQuery) -> dict:
+    """Existing dictionary-shaped tool also works with cached client tool lists."""
+    if query.operation == "session.catalog":
+        return {"operation": query.operation, **await bridge.sessions.catalog(principal)}
+    if query.operation == "session.read":
+        result = await bridge.sessions.read_observed(
+            principal, query.pane_id, query.expected_pid, max_bytes=query.max_bytes
+        )
+        return {"operation": query.operation, **result}
+    return read_query(bridge, principal, query)
 
 
 def read_query(bridge, principal: str, query: ReadQuery) -> dict:

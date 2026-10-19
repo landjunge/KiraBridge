@@ -7,6 +7,8 @@ from kirabridge.bridge_core.config import PrincipalConfig
 LEVELS = {"full": "Voll erlaubt", "medium": "Mittel", "ask": "Nur mit Erlaubnis"}
 READ_OPERATIONS = {
     "connection.check",
+    "session.catalog",
+    "session.read",
     "file.read",
     "file.list",
     "file.image",

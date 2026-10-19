@@ -41,6 +41,41 @@ def test_private_atomic_write_rejects_symlink_and_preserves_original(installer, 
     assert p.stat().st_mode & 0o777 == 0o600
 
 
+def test_upgrade_never_replaces_saved_terminal_grant_or_voice_policy(installer, tmp_path):
+    path = tmp_path / "config.toml"
+    policy = (
+        '[principals.chatgpt]\npermission_level="full"\n'
+        'automatic_operations=["session.input"]\n'
+        "[session_input_policy]\nenabled=false\nprincipals=[]\n"
+        "[voice_messaging]\ntimeout_seconds=60\n"
+    )
+    path.write_text(policy)
+    installer.fresh_config(SimpleNamespace(config=path, full_access=True), tmp_path / "release")
+    assert path.read_text() == policy
+
+
+def test_update_rejects_silent_switch_to_another_config(installer, tmp_path):
+    path = tmp_path / "service.plist"
+    definition = {
+        "Label": installer.LABEL,
+        "ProgramArguments": [
+            "python",
+            "-m",
+            "kirabridge.cli",
+            "--config",
+            str(tmp_path / "original.toml"),
+            "serve",
+        ],
+    }
+    original = plistlib.dumps(definition)
+    path.write_bytes(original)
+    with pytest.raises(RuntimeError, match="expected KiraBridge config"):
+        installer.validate_service_owner(
+            SimpleNamespace(service="launchd", plist=path, config=tmp_path / "other.toml")
+        )
+    assert path.read_bytes() == original
+
+
 def test_launchd_failure_restores_previous_definition_without_config_restore(
     installer, tmp_path, monkeypatch
 ):

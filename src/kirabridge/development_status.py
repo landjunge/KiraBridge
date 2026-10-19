@@ -199,6 +199,18 @@ async def agent_status(bridge, principal: str) -> dict:
     for row in observation["processes"]:
         if row["pid"] in own_pids:
             row["ownership"] = "bridge_managed"
+    from kirabridge.terminal_access import terminal_access
+
+    access = terminal_access(bridge.config, principal)
+    catalog = {"sessions": [], "status": "not_granted"}
+    if access["discovery_allowed"]:
+        try:
+            catalog = await bridge.sessions.catalog(principal)
+        except Exception as exc:
+            catalog = {"sessions": [], "status": getattr(exc, "code", "discovery_failed")}
+    access["availability"] = catalog["status"]
+    access["catalog_observed_at"] = time.time()
+    access["transport_errors"] = catalog.get("transport_errors", {})
     return {
         "principal": principal,
         "at": time.time(),
@@ -206,6 +218,9 @@ async def agent_status(bridge, principal: str) -> dict:
         "managed_tasks": [dict(row) for row in rows[:TASK_LIMIT]],
         "tasks_truncated": len(rows) > TASK_LIMIT,
         "managed_terminal_sessions": own_sessions,
+        "managed_terminal_sessions_scope": "only child processes started by this bridge principal",
+        "interactive_terminal_sessions": catalog["sessions"],
+        "terminal_access": access,
         "observed_processes": observation.pop("processes"),
         "process_observation": {
             **observation,
@@ -216,7 +231,8 @@ async def agent_status(bridge, principal: str) -> dict:
             "fields": ["pid", "ppid", "comm", "name"],
             "discovery_scope": "exact names only; generic interpreter children are not inferred",
         },
-        "scope": "observed processes are not attached sessions or evidence of agent work",
+        "scope": "interactive sessions are catalog targets, not bridge-owned processes; "
+        "catalog discovery does not read output or prove agent readiness",
         "project_completion_verified": False,
     }
 
@@ -317,12 +333,15 @@ def permissions_snapshot(bridge, principal: str) -> dict:
                     "local_tools_available": agent.allow_local_tools,
                 }
             )
+    from kirabridge.terminal_access import terminal_access
+
     return {
         "principal": principal,
         "at": time.time(),
         "approval_mode": policy.approval_mode,
         "approval_required": policy.approval_mode == "manual",
         "session_input_policy": bridge.config.session_input_policy.model_dump(),
+        "terminal_access": terminal_access(bridge.config, principal),
         "automatic_operations": policy.automatic_operations,
         "voice_messaging": bridge.config.voice_messaging.model_dump(),
         **bridge.messages.voice_channel.profile(principal),

@@ -3,11 +3,65 @@ import shutil
 import subprocess
 import sys
 import uuid
+from types import SimpleNamespace
 
 import pytest
 
 from kirabridge.bridge_core.models import BridgeError
 from kirabridge.session_manager import SessionInput, SessionManager, SessionOpen
+
+
+async def test_native_catalog_binds_window_tty_and_unambiguous_root_pid(bridge, monkeypatch):
+    manager = SessionManager(bridge)
+
+    async def native(*args, **kwargs):
+        return [
+            {"window_id": 123, "tty": "/dev/ttys004", "busy": True},
+            {"window_id": 124, "tty": "/dev/ttys005", "busy": False},
+        ]
+
+    async def communicate():
+        return (
+            b"345 1 ttys004 /usr/bin/login\n346 345 ttys004 /bin/zsh\n"
+            b"347 346 ttys004 /private/path/codex\n"
+            b"400 1 ttys005 /bin/zsh\n401 1 ttys005 /bin/zsh\n",
+            b"",
+        )
+
+    async def process(*args, **kwargs):
+        return SimpleNamespace(communicate=communicate)
+
+    monkeypatch.setattr(manager, "native", native)
+    monkeypatch.setattr("kirabridge.session_manager.asyncio.create_subprocess_exec", process)
+    rows = await manager.terminal_catalog()
+    assert len(rows) == 1  # Two possible roots on ttys005 must not be guessed.
+    assert rows[0]["pane_id"] == "terminal:123:ttys004"
+    assert rows[0]["expected_pid"] == 345
+    assert rows[0]["processes"][-1] == {"pid": 347, "ppid": 346, "name": "codex"}
+
+
+async def test_idle_only_input_rejects_busy_target_before_transport(bridge, config, monkeypatch):
+    config.principals["local"].capabilities += ["session.inspect"]
+    target = {"pane_id": "terminal:123:ttys004", "expected_pid": 345, "busy": True}
+
+    async def catalog(principal):
+        return {"sessions": [target]}
+
+    async def no_transport(*args, **kwargs):
+        pytest.fail("busy target must never receive input")
+
+    monkeypatch.setattr(bridge.sessions, "catalog", catalog)
+    monkeypatch.setattr(bridge.sessions, "native", no_transport)
+    with pytest.raises(BridgeError, match="idle shell"):
+        await bridge.sessions.send(
+            "local",
+            SessionInput(
+                pane_id=target["pane_id"],
+                expected_pid=345,
+                text="printf harmless",
+                require_idle=True,
+            ),
+        )
 
 
 @pytest.mark.asyncio
