@@ -38,6 +38,7 @@ class TaskManager:
         self.wake = asyncio.Event()
         self.preflight = preflight
         self.runtime = runtime
+        self.maintenance = None
         from kirabridge.session_input_policy import SessionInputPolicy
 
         self.input_policy = SessionInputPolicy(config, store, security)
@@ -64,7 +65,7 @@ class TaskManager:
         self.input_policy.expire()
         from kirabridge.session_input_policy import marked
 
-        buffered = self.input_policy.applies(request)
+        buffered = self.input_policy.applies(request, principal)
         held = buffered and not marked(request.arguments["text"])
         if held:
             pending = True
@@ -287,6 +288,8 @@ class TaskManager:
         while True:
             self.wake.clear()
             self.input_policy.expire()
+            if self.maintenance:
+                self.maintenance()
             task = self.store.claim(self.owner, self.config.lease_seconds, control)
             if task is None:
                 try:

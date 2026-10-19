@@ -17,8 +17,13 @@ class SessionInputPolicy:
     def __init__(self, config, store, security):
         self.config, self.store, self.security = config, store, security
 
-    def applies(self, request):
-        return self.config.session_input_policy.enabled and request.operation == "session.input"
+    def applies(self, request, principal):
+        return (
+            self.config.session_input_policy.enabled
+            and principal in self.config.session_input_policy.principals
+            and request.operation == "session.input"
+            and "session.input" not in self.config.principals[principal].automatic_operations
+        )
 
     def stage(self, request, principal):
         """Inside enqueue's transaction, after the immutable task has been stored."""
@@ -108,7 +113,12 @@ class SessionInputPolicy:
 
     def dispatch(self, principal, args, task_id):
         """Last guard at the transport boundary; direct sends cannot bypass the buffer."""
-        if not self.config.session_input_policy.enabled:
+        policy = self.config.session_input_policy
+        if (
+            not policy.enabled
+            or principal not in policy.principals
+            or "session.input" in self.config.principals[principal].automatic_operations
+        ):
             # Persisted buffers remain binding even if the policy was subsequently disabled.
             if (
                 not task_id

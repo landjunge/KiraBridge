@@ -123,6 +123,25 @@ async def message_for_conversation(bridge, principal, message):
     """Keep an addressed agent's answer on the requesting Grok voice turn."""
     if not enabled_for(bridge, principal) or "id" not in message:
         return message
+    if message.get("transport") == "team":
+        return message
+    buffer = message.get("message_buffer")
+    if buffer and buffer["state"] in {"waiting", "expired"}:
+        return {
+            **message,
+            "conversation_return": {
+                "text": "Die Nachricht liegt im Puffer. go-go-go kann mit message_release "
+                "für diese Nachrichten-ID nachgereicht werden."
+                if buffer["state"] == "waiting"
+                else "Die Nachricht ist verfallen und wurde nicht zugestellt.",
+                "final": buffer["state"] == "expired",
+                "continue_required": False,
+                "next_call": None,
+                "scope": "voice_message_buffer",
+                "delivery": "current_tool_response",
+                "audio_playback": "not_observed_by_bridge",
+            },
+        }
     channel = bridge.messages
     if message["recipient"] == principal and message["kind"] in {"answer", "result"}:
         return {

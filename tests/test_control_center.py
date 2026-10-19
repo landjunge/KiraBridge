@@ -256,15 +256,15 @@ def test_all_agents_can_exchange_messages_even_with_ask_level(bridge, config):
                 sender,
                 MessageSend(
                     recipient=recipient,
-                    body="probe",
+                    body="probe go-go-go" if sender in {"chatgpt", "grok_app"} else "probe",
                     kind="note",
                     conversation_id=conversation,
                     idempotency_key=conversation,
                 ),
             )
-            received = bridge.messages.receive(recipient, conversation_id=conversation)["messages"][
-                0
-            ]
+            received = bridge.messages.receive(recipient, conversation_id=sent["conversation_id"])[
+                "messages"
+            ][0]
             assert received["sender"] == sender
             done = bridge.messages.ack(recipient, sent["id"], received["receipt"])
             assert done["acknowledged"]

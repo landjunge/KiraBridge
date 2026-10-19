@@ -130,18 +130,27 @@ class Store:
                     "CREATE INDEX IF NOT EXISTS session_input_expiry "
                     "ON session_input_buffers(state,expires)"
                 )
+                from kirabridge.voice_channel import SCHEMA as VOICE_SCHEMA
+
+                for statement in VOICE_SCHEMA:
+                    self.db.execute(statement)
         except BaseException:
             self.db.close()
             raise
 
     @contextmanager
     def transaction(self):
-        self.db.execute("BEGIN IMMEDIATE")
+        savepoint = "nested_" + uuid.uuid4().hex if self.db.in_transaction else None
+        self.db.execute(f"SAVEPOINT {savepoint}" if savepoint else "BEGIN IMMEDIATE")
         try:
             yield self.db
-            self.db.execute("COMMIT")
+            self.db.execute(f"RELEASE {savepoint}" if savepoint else "COMMIT")
         except BaseException:
-            self.db.execute("ROLLBACK")
+            if savepoint:
+                self.db.execute(f"ROLLBACK TO {savepoint}")
+                self.db.execute(f"RELEASE {savepoint}")
+            else:
+                self.db.execute("ROLLBACK")
             raise
 
     def audit(self, kind: str, principal: str, task_id: str | None, metadata: dict) -> None:

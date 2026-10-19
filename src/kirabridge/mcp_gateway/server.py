@@ -42,7 +42,13 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
         "Automatic message receivers use separate managed sessions, not existing interactive ones; "
         "check message_channel_status and message_get for actual evidence. "
         "For visible macOS terminals use session_catalog/session_read and session_open. "
-        "Send input only to an exact pane_id and expected_pid using operation session.input.",
+        "Send input only to an exact pane_id and expected_pid using operation session.input. "
+        "Eve = Grok Voice; Grok Build = Grok Terminal; Kira = ChatGPT Voice; "
+        "Codex = ChatGPT Terminal. Eve relays only Daniel's dictation unchanged, "
+        "without additions or premature sending. Never invent Daniel's go-go-go. "
+        "Voice message_send requires a trailing go-go-go or a later message_release; "
+        "terminal-to-terminal messages are immediate. Voice-to-voice messages use "
+        "the shared participant-only append-only conversation.",
         stateless_http=True,
         json_response=True,
         log_level="CRITICAL",
@@ -226,6 +232,9 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
                 "permission_level": level_for(policy),
                 "permission_label": LEVELS[level_for(policy)],
                 "session_input_policy": bridge.config.session_input_policy.model_dump(),
+                "automatic_operations": policy.automatic_operations,
+                "voice_messaging": bridge.config.voice_messaging.model_dump(),
+                **bridge.messages.voice_channel.profile(identity(ctx)),
                 "operations": {
                     name: {
                         "arguments": model.model_json_schema(),
@@ -245,10 +254,8 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
         """Queue a task; automatic mode needs no token, manual mode requires an exact-task grant.
 
         Repeating its idempotency key never executes it twice.
-        With session_input_policy enabled, session.input is always buffered first.
-        A trailing go-go-go releases it immediately (marker removed). Otherwise
-        it waits for Daniel's separate exact-task token or local console approval;
-        resubmit the unchanged request with that token as approval before expiry.
+        session.input follows the principal's automatic_operations and optional buffer policy.
+        A standing session.input grant needs no marker or manual approval.
         For the Grok app, waits briefly and returns conversation_return with the
         actual result. If continue_required is true, call task_get with this same ID.
         """
@@ -459,10 +466,28 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
         return safe(lambda: bridge.completions.ack(identity(ctx), notice_id, receipt))
 
     @server.tool(annotations=write)
+    async def message_release(message_id: str, token: str, ctx: Context) -> dict[str, Any]:
+        """Release your exact waiting voice message with Daniel's later go-go-go token.
+
+        The original recipient, content and deadline remain fixed; expired messages stay expired.
+        """
+        result = safe(
+            lambda: bridge.messages.voice_policy.release(identity(ctx), message_id, token)
+        )
+        from kirabridge.grok_connector.conversation import message_for_conversation
+
+        return await message_for_conversation(bridge, identity(ctx), result)
+
+    @server.tool(annotations=write)
     async def message_send(
         message: MessageSend, ctx: Context, completion_target: str | None = None
     ) -> dict[str, Any]:
         """Send an addressed durable message; sender is your authenticated identity.
+
+        Eve/Kira need Daniel's trailing go-go-go. Otherwise this returns a private
+        buffer expiring after the configured timeout (60s by default); release that
+        exact message_id using message_release and a later go-go-go token.
+        Terminal senders need no marker. Eve/Kira exchanges use eve-kira-shared.
 
         For dispatched agent work, completion_target routes final completion_receive notices
         to the requesting assistant's stable target, even on failure or without an auto reply.
@@ -640,7 +665,12 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
 
     @server.tool(annotations=write)
     def team_message_send(request: TeamMessageSend, ctx: Context) -> dict[str, Any]:
-        """Send addressed team data; sender comes from authenticated identity, never a field."""
+        """Send addressed team data; sender is authenticated, never supplied.
+
+        Eve/Kira use the same go-go-go outbox as message_send; without a suffix,
+        message_release can release the returned buffer ID before expiry.
+        Eve/Kira exchanges go into their private shared conversation, outside the team log.
+        """
         return safe(lambda: bridge.teams.send(identity(ctx), request))
 
     @server.tool(annotations=read)

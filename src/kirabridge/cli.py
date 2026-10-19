@@ -250,6 +250,7 @@ async def execute(args) -> None:
             "receive": "message_receive",
             "ack": "message_ack",
             "get": "message_get",
+            "release": "message_release",
             "conversation": "conversation_get",
             "status": "message_channel_status",
         }[args.action]
@@ -266,10 +267,12 @@ async def execute(args) -> None:
                 dispatch=not args.inbox_only,
                 request_reply=False if args.no_reply else None,
             ).model_dump()
-        elif args.action in {"get", "ack"}:
+        elif args.action in {"get", "ack", "release"}:
             payload["message_id"] = args.message_id
             if args.action == "ack":
                 payload["receipt"] = args.receipt
+            if args.action == "release":
+                payload["token"] = args.token
         elif args.action == "receive":
             payload = {"after": args.after, "limit": args.limit, "wait_seconds": args.wait}
         elif args.action == "conversation":
@@ -617,6 +620,9 @@ def main() -> None:
     receive.add_argument("--wait", type=float, default=0)
     get = message_actions.add_parser("get")
     get.add_argument("message_id")
+    release = message_actions.add_parser("release")
+    release.add_argument("message_id")
+    release.add_argument("--token", required=True, choices=["go-go-go"])
     ack = message_actions.add_parser("ack")
     ack.add_argument("message_id")
     ack.add_argument("--receipt", required=True)

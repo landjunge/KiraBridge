@@ -130,11 +130,13 @@ class Bridge:
 
         self.completions = CompletionManager(self.store, self.security)
         self.messages = MessageManager(config, self.store, self.security)
+        self.tasks.maintenance = self.messages.voice_policy.expire
         self.message_receiver = MessageReceiver(self)
         from kirabridge.team_manager import TeamManager
         from kirabridge.team_manager.dispatcher import TeamDispatcher
 
         self.teams = TeamManager(self)
+        self.messages.voice_policy.teams = self.teams
         self.team_dispatcher = TeamDispatcher(self)
 
     def validate(self, request: TaskRequest) -> None:
@@ -225,6 +227,9 @@ class Bridge:
             "permission_label": LEVELS[level_for(policy)],
             "approval_required": policy.approval_mode == "manual",
             "session_input_policy": self.config.session_input_policy.model_dump(),
+            "automatic_operations": policy.automatic_operations,
+            "voice_messaging": self.config.voice_messaging.model_dump(),
+            **self.messages.voice_channel.profile(principal),
             "health_scope": "dispatcher and authentication; use bridge_readiness for prerequisites",
             "runtime": self.runtime,
             "diagnostics_storage": self.diagnostics.status(),

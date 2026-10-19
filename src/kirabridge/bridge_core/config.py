@@ -27,6 +27,7 @@ class PrincipalConfig(BaseModel):
     message_peers: list[str] = Field(default_factory=list, max_length=16)
     team_only_execution: bool = False
     permission_level: Literal["full", "medium", "ask"] | None = None
+    automatic_operations: list[Literal["session.input"]] = Field(default_factory=list)
 
 
 class ReceiverConfig(BaseModel):
@@ -251,6 +252,18 @@ class SessionInputPolicyConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
     enabled: bool = False
     timeout_seconds: float = Field(default=60, gt=0, le=86400)
+    principals: list[str] = Field(default_factory=list)
+
+
+class VoiceMessagingConfig(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    timeout_seconds: float = Field(default=60, gt=0, le=86400)
+
+
+class VoiceChannelConfig(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    enabled: bool = True
+    conversation_id: str = Field(default="eve-kira-shared", pattern=r"^[\w-]{1,128}$")
 
 
 class Config(BaseModel):
@@ -283,6 +296,8 @@ class Config(BaseModel):
     threaddesk: ThreadDeskConfig = Field(default_factory=ThreadDeskConfig)
     workflow_control: WorkflowControlConfig = Field(default_factory=WorkflowControlConfig)
     session_input_policy: SessionInputPolicyConfig = Field(default_factory=SessionInputPolicyConfig)
+    voice_messaging: VoiceMessagingConfig = Field(default_factory=VoiceMessagingConfig)
+    voice_channel: VoiceChannelConfig = Field(default_factory=VoiceChannelConfig)
 
     terminal: TerminalConfig = Field(default_factory=TerminalConfig)
 

@@ -235,7 +235,7 @@ async def test_all_seven_authenticated_agent_identities_can_address_each_other(
                         "request": {
                             "team_id": "matrix",
                             "recipient": target,
-                            "body": key,
+                            "body": key + (" go-go-go" if sender == "chatgpt" else ""),
                             "idempotency_key": key,
                         }
                     },

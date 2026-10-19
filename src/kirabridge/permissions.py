@@ -31,6 +31,8 @@ def level_for(policy: PrincipalConfig) -> str:
 
 
 def automatic_for(policy: PrincipalConfig, operation: str) -> bool:
+    if operation in policy.automatic_operations:
+        return True
     # Existing policies retain their exact behavior until the operator selects a level.
     if policy.permission_level is None:
         return policy.approval_mode == "automatic"

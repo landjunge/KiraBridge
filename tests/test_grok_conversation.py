@@ -231,6 +231,18 @@ for event in [
     async with MCPClientPool() as clients:
         await connect(clients, endpoint)
         result = (await clients.call("grok", "message_send", {"message": value})).structuredContent
+        assert result["message_buffer"]["state"] == "waiting"
+        assert "Puffer" in result["conversation_return"]["text"]
+        result = (
+            await clients.call(
+                "grok",
+                "message_release",
+                {
+                    "message_id": result["id"],
+                    "token": "go-go-go",
+                },
+            )
+        ).structuredContent
         assert result["conversation_return"]["text"] == "EXACT_AGENT_RETURN"
         assert result["conversation_return"]["final"]
         reply = result["reply_message"]

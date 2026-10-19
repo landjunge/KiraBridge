@@ -32,13 +32,21 @@ class MessageManager:
     def __init__(self, config, store, security):
         self.config, self.store, self.security = config, store, security
         self.wake = asyncio.Event()
+        from kirabridge.voice_channel import VoiceChannel
+        from kirabridge.voice_message_policy import VoiceMessagePolicy
+
+        self.voice_channel = VoiceChannel(config, store)
+        self.voice_policy = VoiceMessagePolicy(self)
 
     def _identity(self, principal, capability):
         return self.security.principal(principal, capability)
 
     def _row(self, principal, message_id):
         row = self.store.db.execute("SELECT * FROM messages WHERE id=?", (message_id,)).fetchone()
-        if row is None or principal not in {row["sender"], row["recipient"]}:
+        if row is None:
+            raise BridgeError("not_found", "Message not found")
+        members = self.voice_channel.check(principal, row["conversation_id"])
+        if not members and principal not in {row["sender"], row["recipient"]}:
             raise BridgeError("not_found", "Message not found")
         return row
 
@@ -51,6 +59,11 @@ class MessageManager:
 
     def get(self, principal, message_id):
         self._identity(principal, "message.read")
+        pending = self.voice_policy.get(principal, message_id)
+        if pending and (
+            pending.get("transport") == "team" or pending["message_buffer"]["state"] != "released"
+        ):
+            return pending
         result = dict(self._row(principal, message_id))
         result.pop("idem")
         result.pop("request_hash")
@@ -65,6 +78,11 @@ class MessageManager:
         return {"api_version": "1", **result}
 
     def send(self, principal, message: MessageSend, *, completion_target=None):
+        self._identity(principal, "message.send")
+        message = self.voice_channel.route(principal, message)
+        return self.voice_policy.send(principal, message, completion_target)
+
+    def _send(self, principal, message, *, completion_target=None, validate_only=False):
         from kirabridge.completion_manager import valid_target
 
         if completion_target is not None:
@@ -118,6 +136,8 @@ class MessageManager:
                 raise BridgeError(
                     "agent_denied", "Receiver agent is not configured for this identity"
                 )
+        if validate_only:
+            return None
         hashed = digest({**message.model_dump(), "dispatch": dispatch})
         message_id = message.message_id or str(uuid.uuid4())
         with self.store.transaction():
@@ -153,7 +173,14 @@ class MessageManager:
                 "SELECT * FROM conversations WHERE id=?", (message.conversation_id,)
             ).fetchone()
             parties = {principal, message.recipient}
-            if conversation and {conversation["party_a"], conversation["party_b"]} != parties:
+            members = self.voice_channel.check(principal, message.conversation_id)
+            if members and message.recipient not in members:
+                raise BridgeError("message_peer_denied", "Recipient is not a conversation member")
+            if (
+                conversation
+                and not members
+                and {conversation["party_a"], conversation["party_b"]} != parties
+            ):
                 raise BridgeError("not_found", "Conversation not found")
             parent = self._row(principal, message.reply_to) if message.reply_to else None
             depth, task_id = 0, message.task_id
@@ -170,7 +197,7 @@ class MessageManager:
                 task_id = parent["task_id"]
             elif task_id:
                 self.store.get(task_id, principal)
-            if depth > limits.max_reply_depth:
+            if depth > limits.max_reply_depth and not members:
                 raise BridgeError("reply_loop", "Conversation reply depth limit reached")
             position = (
                 self.store.db.execute(
@@ -179,7 +206,7 @@ class MessageManager:
                 ).fetchone()[0]
                 + 1
             )
-            if position > limits.max_conversation_messages:
+            if position > limits.max_conversation_messages and not members:
                 raise BridgeError("conversation_full", "Conversation message limit reached")
             if (
                 self.store.db.execute("SELECT count(*) FROM messages").fetchone()[0]
@@ -246,6 +273,8 @@ class MessageManager:
 
     def receive(self, principal, after=0, limit=20, conversation_id=None):
         self._identity(principal, "message.read")
+        if conversation_id:
+            self.voice_channel.check(principal, conversation_id)
         if after < 0 or not 1 <= limit <= 50:
             raise BridgeError("invalid_cursor", "Use nonnegative cursor and limit 1..50")
         with self.store.transaction():
@@ -306,7 +335,8 @@ class MessageManager:
         row = self.store.db.execute(
             "SELECT * FROM conversations WHERE id=?", (conversation_id,)
         ).fetchone()
-        if row is None or principal not in {row["party_a"], row["party_b"]}:
+        members = self.voice_channel.check(principal, conversation_id)
+        if row is None or (not members and principal not in {row["party_a"], row["party_b"]}):
             raise BridgeError("not_found", "Conversation not found")
         rows = self.store.db.execute(
             "SELECT id,seq FROM messages WHERE conversation_id=? AND seq>? ORDER BY seq LIMIT ?",
@@ -314,6 +344,8 @@ class MessageManager:
         ).fetchall()
         return {
             "conversation_id": conversation_id,
+            "participants": members or [row["party_a"], row["party_b"]],
+            "append_only": bool(members),
             "messages": [self.get(principal, r["id"]) for r in rows],
             "next_cursor": rows[-1]["seq"] if rows else after,
         }

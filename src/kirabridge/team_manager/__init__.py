@@ -390,11 +390,39 @@ class TeamManager:
         return dict(row)
 
     def send(self, principal, request: TeamMessageSend):
+        from kirabridge.message_manager import MessageSend
+        from kirabridge.voice_channel import VOICE_PRINCIPALS
+
+        self._team(principal, request.team_id, "team.write", write=True)
+        self._member(request.team_id, request.recipient, writable=True)
+        if {principal, request.recipient} == VOICE_PRINCIPALS:
+            return self.bridge.messages.send(
+                principal,
+                MessageSend(
+                    recipient=request.recipient,
+                    conversation_id=self.config.voice_channel.conversation_id,
+                    idempotency_key="voice-team-"
+                    + digest(
+                        {
+                            "team_id": request.team_id,
+                            "key": request.idempotency_key,
+                        }
+                    ),
+                    body=request.body,
+                    kind=request.kind,
+                    reply_to=request.reply_to,
+                ),
+            )
+        return self.bridge.messages.voice_policy.send(principal, request, None, transport="team")
+
+    def _send(self, principal, request, *, message_id=None, validate_only=False):
         self._automatic(principal)
         self._size(request.body, self.config.team.max_body_bytes)
         with self.store.transaction():
             self._team(principal, request.team_id, "team.write", write=True)
             self._member(request.team_id, request.recipient, writable=True)
+            if validate_only:
+                return None
             prior = self._previous(principal, request.team_id, "message", request)
             if prior:
                 return self._message(request.team_id, prior)
@@ -413,7 +441,7 @@ class TeamManager:
             ).fetchone()[0]
             if count >= self.config.team.max_pending_per_member:
                 raise BridgeError("message_queue_full", "Member message inbox is full")
-            message_id = "tm-" + uuid.uuid4().hex
+            message_id = message_id or "tm-" + uuid.uuid4().hex
             self.store.db.execute(
                 "INSERT INTO team_messages(id,team_id,sender,recipient,kind,body,reply_to,created) "
                 "VALUES(?,?,?,?,?,?,?,?)",

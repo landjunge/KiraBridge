@@ -1,5 +1,10 @@
 # Grok Voice und Handy – laufende Reparatur
 
+Aktuelle Versandregel: [Daniels Voice-Policy](VOICE-POLICY.md). Eves sichtbare
+Terminaleingaben sind dauerhaft ohne Marker und Einzelbestätigung freigegeben;
+`go-go-go` gilt für ausgehende Bridge-Nachrichten von Eve und Kira. Die folgenden
+Pufferbefunde dokumentieren den vorherigen Prüfstand.
+
 Status: Die Hauptfunktion ist noch nicht durchgehend abgenommen.
 Die bestehende ChatGPT-Anbindung wird funktional unverändert belassen.
 
