@@ -75,3 +75,22 @@ Für den Abschluss fehlen weiterhin korrelierte Tests im nativen Grok-Sprachmodu
 insbesondere auf dem Handy: gesprochener Auftrag, tatsächlicher Agenten- und
 Terminalaufruf und hörbare Ergebnisrückgabe im selben laufenden Sprachgespräch.
 Die Browser- oder API-Prüfung wird nicht als Handy-Abnahme ausgegeben.
+
+## Befund im echten Eve → Grok Build → Codex-Handoff
+
+Die Nachrichten Seq 87 und 88 waren verarbeitet; beide waren Notizen ohne
+angeforderte Antwort. Die Frage Seq 89 erzeugte die tatsächliche Codex-Antwort
+Seq 90 mit fünf Herzchen. Diese Antwort war jedoch automatisch an einen weiteren
+verwalteten Grok-Empfänger disponiert und von diesem quittiert worden. Die
+Quittierung belegt deshalb nicht den Empfang durch die sichtbare Build-Sitzung.
+
+Das ist eine konkrete Konkurrenz im Rückweg. Automatische Empfängerantworten
+bleiben nun im Postfach des ursprünglichen anfragenden Clients. Antworten und
+Ergebnisse starten standardmäßig keinen weiteren Empfänger; ein ausdrücklich
+angeforderter Dispatch bleibt möglich. Alte Idempotenzentscheidungen werden bei
+Wiederverbindung erhalten. Bereits abgeschlossene Aufträge werden nicht wiederholt.
+Für Eve kann außerdem der bestehende Nachrichtenaufruf auf die korrelierte
+Agentenantwort warten und sie im selben Werkzeugergebnis zurückgeben.
+
+Nach `session.input` wird Eve explizit zum Lesen genau dieses Terminalziels
+weitergeführt. Die Quittung wird nicht als fertige Antwort ausgegeben.

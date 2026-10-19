@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import asyncio
+
 from kirabridge import LOCAL_APPROVAL_URL
 from kirabridge.bridge_core.models import State
 
@@ -72,10 +74,20 @@ async def result_for_conversation(bridge, principal, task):
         "conversation_return": {
             "text": text,
             "final": state not in ACTIVE | {State.CREATED} and not input_only,
-            "continue_required": waiting,
-            "next_call": {"tool": "task_get", "arguments": {"task_id": task["id"]}}
-            if waiting
-            else None,
+            "continue_required": waiting or input_only,
+            "next_call": (
+                {
+                    "tool": "session_read",
+                    "arguments": {
+                        "pane_id": task["args"]["pane_id"],
+                        "expected_pid": task["args"]["expected_pid"],
+                    },
+                }
+                if input_only
+                else {"tool": "task_get", "arguments": {"task_id": task["id"]}}
+                if waiting
+                else None
+            ),
             "terminal_reply_tool": "session_read" if input_only else None,
             "scope": "terminal_input_delivery" if input_only else "task_execution_result",
             "delivery": "current_tool_response",
@@ -97,3 +109,91 @@ async def result_for_conversation(bridge, principal, task):
             },
         )
     return response
+
+
+async def message_for_conversation(bridge, principal, message):
+    """Keep an addressed agent's answer on the requesting Grok voice turn."""
+    if not enabled_for(bridge, principal) or "id" not in message:
+        return message
+    channel = bridge.messages
+    if message["recipient"] == principal and message["kind"] in {"answer", "result"}:
+        return {
+            **message,
+            "conversation_return": {
+                "text": message["body"],
+                "final": True,
+                "continue_required": False,
+                "next_call": None,
+                "scope": "addressed_agent_reply",
+                "delivery": "current_tool_response",
+                "audio_playback": "not_observed_by_bridge",
+            },
+        }
+    deadline = asyncio.get_running_loop().time() + WAIT_SECONDS
+    reply = None
+    while True:
+        message = channel.get(principal, message["id"])
+        job = message.get("processing")
+        if message["sender"] == principal:
+            row = bridge.store.db.execute(
+                "SELECT id FROM messages WHERE reply_to=? AND recipient=? AND sender=? "
+                "ORDER BY seq LIMIT 1",
+                (message["id"], principal, message["recipient"]),
+            ).fetchone()
+            if row:
+                reply = channel.get(principal, row["id"])
+                if reply["acknowledged"] is None:
+                    delivered = channel.receive(
+                        principal,
+                        after=reply["seq"] - 1,
+                        limit=1,
+                        conversation_id=reply["conversation_id"],
+                    )["messages"]
+                    if delivered and delivered[0]["id"] == reply["id"]:
+                        reply = delivered[0]
+                break
+        active = job and job["state"] in {"queued", "running"}
+        waiting_reply = (
+            message["sender"] == principal
+            and message["request_reply"]
+            and (not job or job["state"] not in {"failed", "unknown"})
+        )
+        if not (active or waiting_reply) or asyncio.get_running_loop().time() >= deadline:
+            break
+        await asyncio.sleep(0.05)
+
+    job = message.get("processing")
+    waiting = bool(
+        not reply
+        and (
+            (job and job["state"] in {"queued", "running"})
+            or (
+                message["request_reply"]
+                and message["sender"] == principal
+                and (not job or job["state"] == "completed")
+            )
+        )
+    )
+    if reply:
+        text, final = reply["body"], True
+    elif job and job["state"] == "completed" and not message["request_reply"]:
+        text, final = "Die Nachricht ist verarbeitet. Es war keine Antwort angefordert.", True
+    elif job and job["state"] in {"failed", "unknown"}:
+        text, final = "Die Nachrichtenverarbeitung ist " + job["state"] + ".", True
+    else:
+        text, final = "Eine fertige Antwort liegt noch nicht vor.", False
+    return {
+        **message,
+        "reply_message": reply,
+        "conversation_return": {
+            "text": text,
+            "final": final,
+            "continue_required": waiting,
+            "next_call": {"tool": "message_get", "arguments": {"message_id": message["id"]}}
+            if waiting
+            else None,
+            "scope": "addressed_agent_reply" if reply else "message_processing",
+            "delivery": "current_tool_response",
+            "audio_playback": "not_observed_by_bridge",
+        },
+    }

@@ -86,7 +86,9 @@ class MessageManager:
         limits = self.config.messaging
         dispatch = message.dispatch
         if dispatch is None:
-            dispatch = message.recipient in limits.receivers
+            dispatch = (
+                message.kind not in {"answer", "result"} and message.recipient in limits.receivers
+            )
         if dispatch and message.recipient in {"chatgpt", "grok_app", "local"}:
             if message.recipient not in limits.receivers:
                 dispatch = False
@@ -124,7 +126,17 @@ class MessageManager:
                 (principal, message.idempotency_key),
             ).fetchone()
             if previous:
-                if previous["request_hash"] != hashed:
+                previous_hash = hashed
+                if message.dispatch is None:
+                    # Preserve the recorded dispatch decision on retries across
+                    # upgrades, including old answers sent to managed receivers.
+                    recorded_dispatch = bool(
+                        self.store.db.execute(
+                            "SELECT 1 FROM message_jobs WHERE message_id=?", (previous["id"],)
+                        ).fetchone()
+                    )
+                    previous_hash = digest({**message.model_dump(), "dispatch": recorded_dispatch})
+                if previous["request_hash"] != previous_hash:
                     raise BridgeError("idempotency_conflict", "Key belongs to a different message")
                 route = self.store.db.execute(
                     "SELECT target FROM message_completion_routes WHERE message_id=?",
@@ -226,7 +238,7 @@ class MessageManager:
                     "conversation_id": message.conversation_id,
                     "position": position,
                     "content_sha256": digest(message.body),
-                    "automatic_dispatch": message.dispatch,
+                    "automatic_dispatch": dispatch,
                 },
             )
         self.wake.set()

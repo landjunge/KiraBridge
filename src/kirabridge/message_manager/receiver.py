@@ -328,7 +328,9 @@ class MessageReceiver:
                     reply_to=message_id,
                     request_reply=False,
                     kind="result" if message["kind"] == "work" else "answer",
-                    dispatch=message["sender"] in limits.receivers,
+                    # The original sender's live client owns this return path.
+                    # Starting another receiver here can consume its awaited answer.
+                    dispatch=False,
                 )
                 reply = await call("message_send", {"message": response.model_dump()})
                 assert reply["sender"] == recipient

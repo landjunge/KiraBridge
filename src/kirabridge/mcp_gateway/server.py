@@ -454,7 +454,7 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
         return safe(lambda: bridge.completions.ack(identity(ctx), notice_id, receipt))
 
     @server.tool(annotations=write)
-    def message_send(
+    async def message_send(
         message: MessageSend, ctx: Context, completion_target: str | None = None
     ) -> dict[str, Any]:
         """Send an addressed durable message; sender is your authenticated identity.
@@ -465,17 +465,30 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
         exact same message. dispatch=true invokes the configured separate managed receiver;
         existing interactive sessions are not attached. Questions/work request one response
         by default. Answers/results never request another response. No shell interpolation.
+        Returned answers stay in the sender's client inbox; they do not automatically
+        start another background receiver. Grok app calls wait briefly and include
+        conversation_return and reply_message. Acknowledge the reply only after processing it.
         """
-        return safe(
+        result = safe(
             lambda: bridge.messages.send(
                 identity(ctx), message, completion_target=completion_target
             )
         )
+        from kirabridge.grok_connector.conversation import message_for_conversation
+
+        return await message_for_conversation(bridge, identity(ctx), result)
 
     @server.tool(annotations=read)
-    def message_get(message_id: str, ctx: Context) -> dict[str, Any]:
-        """Read your message, delivery receipt, acknowledgement and worker evidence."""
-        return safe(lambda: bridge.messages.get(identity(ctx), message_id))
+    async def message_get(message_id: str, ctx: Context) -> dict[str, Any]:
+        """Read your message, delivery receipt, acknowledgement and worker evidence.
+
+        For the Grok app, waits briefly for its addressed agent's answer. If
+        conversation_return.continue_required, keep waiting on this same message ID.
+        """
+        from kirabridge.grok_connector.conversation import message_for_conversation
+
+        result = safe(lambda: bridge.messages.get(identity(ctx), message_id))
+        return await message_for_conversation(bridge, identity(ctx), result)
 
     @server.tool(annotations=delivery)
     async def message_receive(

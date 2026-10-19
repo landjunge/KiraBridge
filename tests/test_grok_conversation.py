@@ -6,7 +6,7 @@ import pytest
 from conftest import request
 from test_mcp import http_bridge  # noqa: F401
 
-from kirabridge.bridge_core.config import GrokConnectorConfig
+from kirabridge.bridge_core.config import AgentConfig, GrokConnectorConfig, ReceiverConfig
 from kirabridge.bridge_core.models import BridgeError, State
 from kirabridge.grok_connector.conversation import result_for_conversation
 from kirabridge.mcp_gateway.client import MCPClientPool, Peer
@@ -168,6 +168,11 @@ async def test_terminal_input_delivery_never_claims_a_spoken_agent_reply(
     assert not result["conversation_return"]["final"]
     assert result["conversation_return"]["scope"] == "terminal_input_delivery"
     assert result["conversation_return"]["terminal_reply_tool"] == "session_read"
+    assert result["conversation_return"]["continue_required"]
+    assert result["conversation_return"]["next_call"] == {
+        "tool": "session_read",
+        "arguments": {"pane_id": "%1", "expected_pid": 1},
+    }
 
 
 async def test_chatgpt_submission_contract_is_unchanged(http_bridge, config, monkeypatch):  # noqa: F811
@@ -182,3 +187,60 @@ async def test_chatgpt_submission_contract_is_unchanged(http_bridge, config, mon
         ).structuredContent
     assert result["state"] == "queued"
     assert "conversation_return" not in result
+
+
+async def test_grok_voice_message_returns_actual_agent_reply_to_same_client(
+    http_bridge,  # noqa: F811
+    config,
+    monkeypatch,
+    tmp_path,  # noqa: F811
+):
+    from test_agents import fake_cli
+
+    bridge, endpoint = http_bridge
+    configure(config, monkeypatch)
+    source = config.principals["grok_app"]
+    source.capabilities += ["message.send", "message.read", "message.ack"]
+    source.message_peers = ["codex"]
+    target = source.model_copy(deep=True)
+    target.message_peers = ["grok_app"]
+    target.token_env = "GROK_MESSAGE_CODEX_TOKEN"
+    monkeypatch.setenv(target.token_env, "codex-native-return-" + "x" * 40)
+    config.principals["codex"] = target
+    cli = fake_cli(
+        tmp_path,
+        """import json,sys
+sys.stdin.read()
+for event in [
+ {'type':'thread.started','thread_id':'explicit-test-codex'},
+ {'type':'turn.started'},
+ {'type':'item.completed','item':{'type':'agent_message','text':'EXACT_AGENT_RETURN'}},
+ {'type':'turn.completed'}]:print(json.dumps(event),flush=True)
+""",
+    )
+    config.agents["codex"] = AgentConfig(kind="codex", executable=cli)
+    config.messaging.receivers["codex"] = ReceiverConfig(cwd=source.roots[0], timeout=5)
+    await bridge.message_receiver.start()
+    value = {
+        "recipient": "codex",
+        "conversation_id": "real-tool-client-return",
+        "idempotency_key": "once",
+        "kind": "question",
+        "body": "This test double must return its protocol result.",
+    }
+    async with MCPClientPool() as clients:
+        await connect(clients, endpoint)
+        result = (await clients.call("grok", "message_send", {"message": value})).structuredContent
+        assert result["conversation_return"]["text"] == "EXACT_AGENT_RETURN"
+        assert result["conversation_return"]["final"]
+        reply = result["reply_message"]
+        assert reply["recipient"] == "grok_app" and reply["receipt"]
+        assert reply["acknowledged"] is None and reply["processing"] is None
+        await clients.call(
+            "grok", "message_ack", {"message_id": reply["id"], "receipt": reply["receipt"]}
+        )
+        duplicate = (
+            await clients.call("grok", "message_send", {"message": value})
+        ).structuredContent
+        assert duplicate["reply_message"]["id"] == reply["id"]
+    assert bridge.store.db.execute("SELECT count(*) FROM message_jobs").fetchone()[0] == 1
