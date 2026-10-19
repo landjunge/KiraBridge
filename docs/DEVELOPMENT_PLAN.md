@@ -1,6 +1,6 @@
 # KiraBridge
 
-Private, modular local desktop and multi-agent bridge. **Status: specification only; no implementation or agent assignment has been launched.**
+Private, modular local desktop and multi-agent bridge. This document is the original architectural baseline. Implementation and team assignment have since been carried out; current evidence and limits are recorded in [STATUS.md](STATUS.md), [team operation](TEAM-ORCHESTRATION.md) and the versioned release notes.
 
 ## Goal
 
@@ -34,7 +34,7 @@ Provide secure local file, terminal and process capabilities to multiple authori
 - Multiple independent MCP clients and agent adapters cannot cross task or authorization boundaries.
 - Targeted tests cover failure recovery, idempotency, authorization and protocol interoperability.
 
-## Work division (not yet dispatched)
+## Initial work division
 
 **Codex:** implement foundation, task lifecycle, adapters, desktop tools and MCP interfaces in isolated increments; document actual test results and remaining blockers.
 

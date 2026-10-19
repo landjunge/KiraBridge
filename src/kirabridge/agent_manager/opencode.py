@@ -93,7 +93,7 @@ def _isolated_environment(config, terminal):
                     "models": {
                         model_id: {
                             "name": model_id,
-                            "limit": {"context": 4096, "output": 128},
+                            "limit": {"context": 4096, "output": config.local_output_tokens or 128},
                             "tool_call": False,
                         }
                     },

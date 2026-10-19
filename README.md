@@ -9,7 +9,7 @@
 
 **[Zur Installation](docs/INSTALL-DE.md)** · **[ChatGPT verbinden](docs/CHATGPT.md)** · **[Versionsübersicht](https://github.com/landjunge/KiraBridge/releases)**
 
-Noch kein Release-Download veröffentlicht. Der vereinfachte CLI-Weg ist als privater0.6.0rc2 zur Abnahme vorbereitet. Sobald geprüfte Pakete veröffentlicht sind, stehen die direkten Downloads hier oben.
+Das private Vorabrelease [0.7.0rc1](https://github.com/landjunge/KiraBridge/releases/tag/v0.7.0rc1) enthält die geführte CLI-Installation und Teamsteuerung. Downloads erfordern Zugriff auf das private Repository.
 
 | Weg | Stand |
 |---|---|
@@ -22,7 +22,7 @@ Noch kein Release-Download veröffentlicht. Der vereinfachte CLI-Weg ist als pri
 
 **[Installation](docs/INSTALL-EN.md)** · **[Connect ChatGPT](docs/CHATGPT.md)** · **[Releases](https://github.com/landjunge/KiraBridge/releases)**
 
-No release download has been published yet. The simpler CLI flow is prepared as a private0.6.0rc2 for acceptance. Direct downloads will appear here at the top when verified packages are published.
+The private [0.7.0rc1 prerelease](https://github.com/landjunge/KiraBridge/releases/tag/v0.7.0rc1) includes guided CLI installation and team coordination. Downloads require access to the private repository.
 
 | Option | Status |
 |---|---|
@@ -36,15 +36,14 @@ No release download has been published yet. The simpler CLI flow is prepared as 
 **Vibe Coding:** Du besprichst mit ChatGPT, was gebaut oder geändert werden soll.
 ChatGPT übergibt die Aufträge über KiraBridge an Codex oder Grok auf deinem
 Rechner. Beide können mit eingerichteten Berechtigungen am selben Projekt
-arbeiten. Weitere CLI-Anbindungen sind geplant.
+arbeiten. OpenCode, Gemini CLI, Claude Code und Copilot CLI sind als Textadapter eingebunden; nutzbare Modellzugänge sind Voraussetzung.
 
 **Built for Vibe Coding:** discuss what to build or change with ChatGPT.
 ChatGPT delegates through KiraBridge to Codex or Grok on your computer. Both can
-collaborate on the same project with configured permissions. More CLI integrations
-are planned.
+collaborate on the same project with configured permissions. OpenCode, Gemini CLI, Claude Code and Copilot CLI text adapters require working provider access.
 
-**0.6.0rc2 · private Release-Vorbereitung:** [Installieren DE](docs/INSTALL-DE.md) ·
-[Install EN](docs/INSTALL-EN.md) · [Release Notes](docs/RELEASE-NOTES-0.6.0rc2.md).
+**0.7.0rc1 · privates Vorabrelease:** [Installieren DE](docs/INSTALL-DE.md) ·
+[Install EN](docs/INSTALL-EN.md) · [Release Notes](docs/RELEASE-NOTES-0.7.0rc1.md).
 ## Lizenz / License
 
 **Deutsch:** Es gilt die **Netzwerkpunkt Personal Use License 1.0**, eine individuelle Source-available-Lizenz. Private, nicht geschäftliche Nutzung ist kostenlos erlaubt, einschließlich privater Anpassungen und privatem Self-Hosting. Interner Firmeneinsatz, berufliche Nutzung, Weiterverkauf und kostenpflichtige Dienste benötigen eine vorherige schriftliche Erlaubnis beziehungsweise gesonderte Lizenz. Es gibt keine allgemeine Weiterverteilungserlaubnis. Historische Rechte und gesonderte Drittanbieter-Lizenzen bleiben erhalten. [Vollständige Bedingungen](LICENSE).
@@ -58,7 +57,7 @@ Die Projektseite `kirabridge.netzwerkpunkt.de` bleibt geplant. Noch kein öffent
 Die nachfolgenden Betriebsdetails dokumentieren die vorhandene Entwicklerinstallation;
 der neue normale Schnellstart verwendet das geprüfte Release-Paket.
 
-Privates, modulares Desktop- und Agenten-Gateway für macOS und Linux. Python 3.11+, asyncio, SQLite und das offizielle MCP Python SDK. Version **0.5.2** ergänzt [konkrete Vorabprüfung und reduzierte Fehlerdiagnose](docs/DIAGNOSTICS-20261018.md) in der bestehenden Audit-Kette. Version0.5.1 ergänzte die begrenzte Bereitschaftsprüfung und zusätzliche reine Lesepfade; Version0.5.0 ergänzte den direkten, dauerhaften [Agentenkanal Codex ↔ Grok](docs/AGENT_CHANNEL.md) mit automatischer Empfängeranbindung. Grundlage bleibt der [Entwicklungsplan](docs/DEVELOPMENT_PLAN.md).
+Privates, modulares Desktop- und Agenten-Gateway für macOS und Linux. Python 3.11+, asyncio, SQLite und das offizielle MCP Python SDK. **0.7.0rc1** ergänzt [gemeinsame Teams mit wählbarem Koordinator, Rollen, adressierten Nachrichten und delegierten Aufträgen](docs/TEAM-ORCHESTRATION.md). Ein lokaler Team-Bereich, MCP und CLI verwenden dieselben dauerhaften Daten und belegten Ausführungszustände. [Release-Hinweise](docs/RELEASE-NOTES-0.7.0rc1.md). Grundlage bleibt der [Entwicklungsplan](docs/DEVELOPMENT_PLAN.md).
 
 ## Implementiert
 
@@ -73,6 +72,7 @@ Privates, modulares Desktop- und Agenten-Gateway für macOS und Linux. Python 3.
 - Unicode-Zwischenablage mit `pbcopy`/`pbpaste`, Wayland oder X11; konfigurierbare Lesefreigaben und Schreibbestätigung durch sofortiges Rücklesen. Keine Überwachung.
 - MCP über stdio und Streamable HTTP; authentifizierte parallele HTTP-Clients; ausgehender MCP-Clientpool mit getrennten Verbindungen.
 - Adressierte Nachrichten über sieben eigene MCP-Werkzeuge: SQLite-Postfächer, authentifizierte Absender, Gespräche, Quittungen, Idempotenz, begrenzte automatische Empfänger-Turns und keine blinden Wiederholungen nach Neustarts. Bestehende interaktive Sitzungen werden nicht übernommen; verwendet werden separate verwaltete Arbeitssitzungen.
+- [Teamsteuerung](docs/TEAM-ORCHESTRATION.md): Jeder freigegebene Bearbeiter/Prüfer kann anderen Mitgliedern Aufgaben geben und gemeinsame Ergebnisse sehen. Besitzer und Koordinator vergeben Rollen; ChatGPT kann koordinieren, solange sein Chat aktiv ist. Begrenzte Agentenantworten können Nachrichten und echte Unteraufträge auslösen. Private Einzelaufträge bleiben getrennt. Lokal im Browser: [Team](http://127.0.0.1:8766/team).
 - Optionaler fester [ThreadDesk-Fachadapter / management adapter](docs/THREADDESK-ADAPTER-20261018.md): getrennte Lese-/Schreibrechte, genaue Objektkennungen, Revisionen und wiederabgleichbare Mutationsquittungen. Verwaltung startet keinen Agenten. / Separate read/manage permissions, exact IDs, revision checks and reconcilable receipts; management does not start agents.
 - [Zugeordnete Handoffs / correlated workflows](docs/HANDOFF-WORKFLOW-20261018.md) sind im privaten Entwicklungsstand implementiert: exakte Laufbindung, eigene Codex-Fortsetzung nach Rückfrage und zunächst ungeprüfte Inbox-Rückgabe. Dieser Quellstand ist noch kein aktualisierter RC2-Download. / Source-stage workflow integration preserves owned session and return IDs; it does not update the frozen RC2 artifacts.
 - [Eigener Auftragsstopp / owned workflow stop](docs/WORKFLOW-CONTROL-CONFIGURATION.md): feste Betreiberzuordnung, geprüfter Quellpin, dauerhafte Stopwünsche und echter Dispatch-/Journalabgleich. Optional `stop_only`; Kosten unbekannt, kein globaler CLI-Dollarcap. / Fixed operator assembly, durable stop intent and atomic journal-bound dispatch; no global hard cost cap.

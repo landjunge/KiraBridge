@@ -1,3 +1,36 @@
+# Teamsteuerung · 19.10.2026 · 0.7.0rc1
+
+Teamrollen, wählbarer Koordinator, dauerhafte adressierte Nachrichten und
+bewusst geteilte Aufträge/Ergebnisse sind implementiert. Alle sieben eingerichteten
+Agentenzugänge haben über echte authentifizierte MCP-Verbindungen die 42
+Richtungen geprüft und quittiert. ChatGPT ist im lokalen Team Koordinator.
+Ein Rollenwechsel ChatGPT → Codex → ChatGPT wurde durchgeführt; ein normaler
+Bearbeiter konnte sich nicht selbst befördern. Private Einzelaufträge bleiben
+für andere Zugänge gesperrt.
+
+Der echte automatische Ablauf Codex → OpenCode/Ollama → Codex ist mit drei
+abgeschlossenen nativen Turns und einer quittierten Rücknachricht nachgewiesen.
+Die vollständige gespeicherte OpenCode-Antwort benötigte ein ausdrücklich
+aktiviertes festes Antwortformat und einmalige, hashgebundene Nachverarbeitung;
+die ursprünglichen Modellaufrufe wurden nicht erneut gestartet. Zwei frühere
+begrenzte Versuche und ihr tatsächlicher Ausgang bleiben dokumentiert.
+
+Die Funktion ist als gezielter Backport in der bestehenden eigenen Runtime
+(Versionsanzeige weiterhin 0.5.2) aktiv. Nach geordnetem Neustart sind alle
+633 vorher gesicherten Aufgaben unverändert, 42 Nachrichten/Quittungen erhalten
+und die ursprünglichen Zugangsdaten unverändert. Das saubere private Release
+0.7.0rc1 wird separat mit eigenem Quellpin und Prüfsummen gebaut.
+
+[Bedienung und Grenzen](TEAM-ORCHESTRATION.md) ·
+[Prüfnachweise](evidence/team-orchestration-20261019.json) ·
+[Releasehinweise](RELEASE-NOTES-0.7.0rc1.md).
+ChatGPT bleibt ein externer aktiver Chat; Rollen wecken keine geschlossenen Chats.
+Gemini benötigt einen anderen unterstützten Anbieterzugang; Claude/Copilot sind
+hier noch nicht beim Anbieter angemeldet. Die zusätzlichen vier CLI-Adapter sind
+Textadapter ohne native Projekttools oder Übernahme bestehender Sitzungen.
+
+---
+
 # Fortschreibung Betreiberrechte · 18.10.2026
 
 Regulärer Terminal-Vollzugriff für chatgpt/local ist ausdrücklich konfiguriert

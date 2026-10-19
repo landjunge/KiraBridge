@@ -20,6 +20,10 @@ def git(*args):
 
 
 def build(destination: Path):
+    if destination.is_symlink() or (destination.exists() and any(destination.iterdir())):
+        raise SystemExit(
+            "Use a new empty output directory; existing release artifacts are preserved"
+        )
     if git("status", "--porcelain", "--untracked-files=normal"):
         raise SystemExit("Commit the source first; release builds require a clean worktree")
     commit, version = git("rev-parse", "HEAD"), __import__("kirabridge").__version__
@@ -27,7 +31,8 @@ def build(destination: Path):
     files = {
         name: subprocess.check_output(["git", "show", f"{commit}:{name}"])
         for name in git("ls-files").splitlines()
-        if name.startswith("src/") or name in {"LICENSE", "pyproject.toml", "uv.lock"}
+        if name.startswith(("src/", "docs/", "examples/"))
+        or name in {"LICENSE", "pyproject.toml", "uv.lock"}
     }
     subprocess.run(
         ["uv", "build", "--out-dir", str(destination)],
@@ -37,6 +42,9 @@ def build(destination: Path):
     for target in PLATFORMS:
         prefix = f"KiraBridge-{version}-{target}"
         contents = {"payload/" + name: data for name, data in files.items()}
+        contents.update(
+            {name: data for name, data in files.items() if name.startswith(("docs/", "examples/"))}
+        )
         contents["LICENSE"] = files["LICENSE"]
         contents["install.sh"] = (
             Path("scripts/release-install.sh")
@@ -44,10 +52,23 @@ def build(destination: Path):
             .replace(b"@PLATFORM@", target.encode())
             .replace(b"@SOURCE_SHORT@", commit[:12].encode())
             .replace(b"@SOURCE@", commit.encode())
+            .replace(b"@VERSION@", version.encode())
         )
         for language in ("DE", "EN"):
-            contents[f"INSTALL-{language}.md"] = Path(f"docs/INSTALL-{language}.md").read_bytes()
-        contents["RELEASE-NOTES.md"] = Path("docs/RELEASE-NOTES-0.6.0rc2.md").read_bytes()
+            command = "sh install.sh" + (" --language en" if language == "EN" else "")
+            contents[f"INSTALL-{language}.md"] = (
+                f"# KiraBridge {version}\n\n"
+                f"[Installation {language}](docs/INSTALL-{language}.md)\n\n"
+                f"```sh\n{command}\n```\n\n[Team](docs/TEAM-ORCHESTRATION.md)\n"
+            ).encode()
+        contents["RELEASE-NOTES.md"] = (
+            Path(f"docs/RELEASE-NOTES-{version}.md")
+            .read_bytes()
+            .replace(b"(providers/README.md)", b"(docs/providers/README.md)")
+        )
+        contents["TEAM-ORCHESTRATION.md"] = (
+            b"# Team\n\n[Anleitung / Guide](docs/TEAM-ORCHESTRATION.md)\n"
+        )
         contents["release.json"] = (
             json.dumps(
                 {

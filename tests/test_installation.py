@@ -12,7 +12,7 @@ from kirabridge.bridge_core.config import load_config
 from kirabridge.bridge_core.models import BridgeError
 from kirabridge.chatgpt_setup import configure_tunnel, wizard
 from kirabridge.install_ui import SetupUI
-from kirabridge.installation import activate_managed, guided_install, linux_service
+from kirabridge.installation import activate_managed, guided_install, idle_queue, linux_service
 from kirabridge.local_runtime import setup
 from kirabridge.task_manager.store import Store
 
@@ -106,6 +106,111 @@ def test_managed_install_upgrade_and_busy_gate_preserve_data(tmp_path, monkeypat
         == snapshot
     )
     store.close()
+
+
+def pending_team_upgrade(tmp_path, monkeypatch, state):
+    """An installed launcher and real team schema, without starting any workers."""
+    from kirabridge.bridge_core.bridge import Bridge
+
+    path = configured(tmp_path, monkeypatch)
+    config = load_config(str(path))
+    first, second = tmp_path / "release-1", tmp_path / "release-2"
+    for folder in (first, second):
+        (folder / ".venv/bin").mkdir(parents=True)
+        (folder / ".venv/bin/python3").write_text("test launcher target")
+    activate_managed(path, first, service=False)
+    bridge = Bridge(config)
+    try:
+        bridge.store.db.execute(
+            "INSERT INTO teams(id,name,owner,coordinator,revision,created) "
+            "VALUES('update-team','Team','local','local',1,1)"
+        )
+        bridge.store.db.execute(
+            "INSERT INTO team_work(id,team_id,assigned_by,assignee,title,body,root_id,"
+            "depth,state,created) VALUES(?,?,?,?,?,?,?,?,?,?)",
+            (
+                "update-work",
+                "update-team",
+                "local",
+                "local",
+                "Preserve work",
+                "An update must preserve this intentional team content.",
+                "update-work",
+                0,
+                state,
+                1,
+            ),
+        )
+    finally:
+        bridge.store.close()
+    return path, config, first, second
+
+
+@pytest.mark.parametrize(
+    "state", ["queued", "dispatching", "created", "accepted", "running", "processing_result"]
+)
+def test_managed_upgrade_blocks_pending_automatic_team_work_without_modifying_it(
+    tmp_path, monkeypatch, state
+):
+    path, config, first, second = pending_team_upgrade(tmp_path, monkeypatch, state)
+    launcher = tmp_path / ".local/bin/kirabridge"
+    manifest = path.parent / "installation.json"
+    before = {p: p.read_bytes() for p in (launcher, manifest, path)}
+    store = Store(config.state_path / "bridge.sqlite3")
+    try:
+        row = dict(store.db.execute("SELECT * FROM team_work WHERE id='update-work'").fetchone())
+        with pytest.raises(BridgeError) as caught:
+            activate_managed(path, second, service=False)
+        assert caught.value.code == "service_busy"
+        assert all(p.read_bytes() == contents for p, contents in before.items())
+        assert json.loads(manifest.read_text())["release_root"] == str(first)
+        assert (
+            dict(store.db.execute("SELECT * FROM team_work WHERE id='update-work'").fetchone())
+            == row
+        )
+        assert store.db.execute("SELECT count(*) FROM tasks").fetchone()[0] == 0
+    finally:
+        store.close()
+
+
+@pytest.mark.parametrize("state", ["queued_manual", "accepted_manual", "unknown"])
+def test_managed_upgrade_preserves_external_pending_and_unknown_team_work(
+    tmp_path, monkeypatch, state
+):
+    path, config, first, second = pending_team_upgrade(tmp_path, monkeypatch, state)
+    store = Store(config.state_path / "bridge.sqlite3")
+    try:
+        before = dict(store.db.execute("SELECT * FROM team_work WHERE id='update-work'").fetchone())
+        activate_managed(path, second, service=False)
+        record = json.loads((path.parent / "installation.json").read_text())
+        assert record["release_root"] == str(second)
+        assert record["previous_root"] == str(first)
+        assert (
+            dict(store.db.execute("SELECT * FROM team_work WHERE id='update-work'").fetchone())
+            == before
+        )
+        assert store.db.execute("SELECT count(*) FROM tasks").fetchone()[0] == 0
+    finally:
+        store.close()
+
+
+def test_idle_gate_accepts_older_database_without_creating_team_tables(tmp_path, monkeypatch):
+    path = configured(tmp_path, monkeypatch)
+    config = load_config(str(path))
+    store = Store(config.state_path / "bridge.sqlite3")
+    try:
+        before = [tuple(row) for row in store.db.execute("SELECT name,sql FROM sqlite_master")]
+        version = store.db.execute("PRAGMA user_version").fetchone()[0]
+        assert not any(name == "team_work" for name, _ in before)
+        with idle_queue(config):
+            pass
+        assert [
+            tuple(row) for row in store.db.execute("SELECT name,sql FROM sqlite_master")
+        ] == before
+        assert store.db.execute("PRAGMA user_version").fetchone()[0] == version
+        assert store.db.execute("SELECT count(*) FROM tasks").fetchone()[0] == 0
+    finally:
+        store.close()
 
 
 def test_foreign_launcher_never_replaced(tmp_path, monkeypatch):

@@ -4,7 +4,7 @@ set -eu
 umask 077
 language=de
 prepare_only=false
-install_dir="${HOME}/.local/share/kirabridge/releases/0.6.0rc2-@SOURCE_SHORT@"
+install_dir="${HOME}/.local/share/kirabridge/releases/@VERSION@-@SOURCE_SHORT@"
 while [ "$#" -gt 0 ]; do
   case "$1" in
     --language) language="$2"; shift 2 ;;
@@ -25,7 +25,7 @@ case "$platform" in
   Linux-x86_64) [ -f /etc/os-release ] && grep -q '^ID=ubuntu$' /etc/os-release && grep -q '^VERSION_ID="24.04"$' /etc/os-release || fail 'RC geprüft auf Ubuntu 24.04 x86_64.' 'RC tested on Ubuntu 24.04 x86_64.' ;;
   *) exit 1 ;;
 esac
-say '=== KiraBridge · 0.6.0rc2 ===' '=== KiraBridge · 0.6.0rc2 ==='
+say '=== KiraBridge · @VERSION@ ===' '=== KiraBridge · @VERSION@ ==='
 say 'Lizenz: Netzwerkpunkt Personal Use License 1.0 (beiliegende LICENSE). Private nicht geschäftliche Nutzung kostenlos; geschäftlich nur mit gesonderter schriftlicher Erlaubnis. Deutsch ist maßgeblich. Kein OSI-Standard und nicht anwaltlich geprüft.' 'License: Netzwerkpunkt Personal Use License 1.0 (included LICENSE). Private non-business use is free; business use needs separate written permission. German governs. Not an OSI standard or legal review.'
 say '[1] Paket prüfen und Voraussetzungen erkennen' '[1] Verify package and detect prerequisites'
 if command -v sha256sum >/dev/null 2>&1; then

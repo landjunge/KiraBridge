@@ -1,4 +1,4 @@
-# Install KiraBridge · 0.6.0rc2
+# Install KiraBridge · 0.7.0rc1
 
 **Private release candidate for acceptance. No public installation yet.**
 The included `LICENSE` is the Netzwerkpunkt Personal Use License1.0. German
@@ -11,25 +11,24 @@ this does not establish DNS, hosting or publication.
 Built specifically for Vibe Coding: discuss what to build or change with ChatGPT;
 ChatGPT passes tasks through KiraBridge to Codex or Grok on your computer. Both
 can collaborate on the same project with configured permissions. Further CLI
-integrations are planned.
+text adapters include OpenCode, Gemini CLI, Claude Code and Copilot CLI; provider credentials remain separate.
 
-## Choose the right source, service and package first
+## Release and existing installations
 
-| State | Meaning |
-| --- | --- |
-| Reviewed source `7af39cd`, version label `0.6.0rc2` | Includes newer project controls and optional adapters; the same version string does not identify the same package. |
-| Documented operator Mac `0.5.2` with selected backports | A separate installed service with its own source/config/runtime evidence, not defaults for new users. |
-| Frozen private RC2 draft `57bee99` | Historical packages with original hashes. They lack `agents.codex.sandbox_mode` and the later integrations. |
+This guide belongs to **0.7.0rc1 with team orchestration**. The bundle's
+`release.json` identifies the exact source, platform and license; `SHA256SUMS`
+identifies these artifacts. Earlier RC1/RC2/RC3 artifacts remain unchanged and
+must not be treated as this release based on a similar version label.
 
-[Release acceptance and publication gates](RELEASE-ABNAHME-20261018.md) remain
-separate. Do not start the old RC2 against the current operator configuration: its
-strict model rejects newer settings. Do not reset policy to fit an old package.
-A later release requires a newly pinned and checked package; this guide neither
-builds nor publishes one. Inspect the loaded service with `kirabridge status` and
-concrete readiness instead of inferring it from a checkout or filename.
+Preserve existing settings, private credentials and task data. Drain active
+Bridge work before updating. Never reset permissions to make an older package
+accept newer configuration. `kirabridge status` and `kirabridge readiness`
+report the actual loaded service and drift from the local source.
 
-The package/platform statements below describe the **frozen RC2**. Identify the
-existing installation's update path first; do not rerun initial setup on it.
+The new [Team panel](TEAM-ORCHESTRATION.md) uses an explicit operator roster.
+Owners/coordinators assign roles; members exchange addressed messages, delegate
+work and inspect intentionally shared results. Roles do not grant additional
+OS permissions. ChatGPT remains external; assigning a role never wakes an inactive chat.
 
 ## Normal quick start
 

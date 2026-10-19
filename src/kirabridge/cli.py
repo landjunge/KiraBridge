@@ -71,6 +71,69 @@ async def execute(args) -> None:
         emit({"config": str(destination), "workspace": str(workspace)})
         return
     config = load_config(args.config)
+    if args.command == "team":
+        from kirabridge.local_runtime import peer
+        from kirabridge.mcp_gateway.client import MCPClientPool
+
+        action = args.action
+        tool = {
+            "list": "team_list",
+            "show": "team_get",
+            "create": "team_create",
+            "role": "team_set_role",
+            "send": "team_message_send",
+            "assign": "team_work_create",
+            "work": "team_work_get" if getattr(args, "work_id", None) else "team_work_list",
+            "inbox": "team_messages",
+            "claim": "team_work_claim",
+            "complete": "team_work_complete",
+            "reprocess": "team_work_reprocess",
+            "events": "team_events",
+        }[action]
+        arguments = {} if action == "list" else {"team_id": args.team_id}
+        if action == "create":
+            members = {name.strip(): "worker" for name in args.members.split(",") if name.strip()}
+            arguments.update(
+                name=args.name or args.team_id, members=members, coordinator=args.coordinator
+            )
+        elif action == "role":
+            arguments.update(
+                member=args.member,
+                role=args.role,
+                active=not args.disable,
+                expected_revision=args.revision,
+            )
+        elif action == "send":
+            arguments.update(
+                recipient=args.recipient, body=args.text, kind=args.kind, reply_to=args.reply_to
+            )
+        elif action == "assign":
+            arguments.update(
+                assignee=args.assignee, title=args.title, body=args.text, parent_id=args.parent
+            )
+        elif action in {"claim", "complete", "reprocess"}:
+            arguments["work_id"] = args.work_id
+            if action == "complete":
+                arguments.update(result=args.text, success=not args.failed)
+            elif action == "reprocess":
+                arguments.update(
+                    core_task_id=args.core_task,
+                    expected_result_sha256=args.result_sha256,
+                )
+        elif action == "work" and args.work_id:
+            arguments["work_id"] = args.work_id
+        writes = action in {"create", "role", "send", "assign", "claim", "complete", "reprocess"}
+        if writes:
+            arguments["idempotency_key"] = args.key or "cli-" + uuid.uuid4().hex
+            arguments = {"request": arguments}
+        async with MCPClientPool(call_timeout=20) as pool:
+            await pool.connect(peer(config, args.principal))
+            response = await pool.call("daemon", tool, arguments)
+        result = response.structuredContent or {"error": {"code": "invalid_team_response"}}
+        emit(result)
+        if result.get("error"):
+            raise SystemExit(2)
+        return
     if args.command == "readiness":
         from kirabridge.local_runtime import connection_observer, peer
         from kirabridge.mcp_gateway.client import MCPClientPool
@@ -409,6 +472,65 @@ def main() -> None:
     setup = sub.add_parser("setup", help="Create private local policy, credentials and CLI command")
     setup.add_argument("--workspace", default=str(Path.home() / "workspace/KiraBridge"))
     sub.add_parser("status", help="Query the running local daemon")
+    team = sub.add_parser("team", help="Shared roles, addressed messages and delegated work")
+    actions = team.add_subparsers(dest="action", required=True)
+    actions.add_parser("list")
+    for action in ("show", "inbox", "events"):
+        actions.add_parser(action).add_argument("team_id")
+    work = actions.add_parser("work")
+    work.add_argument("team_id")
+    work.add_argument("--work-id")
+    create = actions.add_parser("create")
+    create.add_argument("team_id")
+    create.add_argument("--name")
+    create.add_argument(
+        "--members", required=True, help="Comma-separated operator-enabled identities"
+    )
+    create.add_argument("--coordinator", required=True)
+    role = actions.add_parser("role")
+    role.add_argument("team_id")
+    role.add_argument("member")
+    role.add_argument("role", choices=["coordinator", "worker", "reviewer", "observer"])
+    role.add_argument("--revision", type=int, required=True)
+    role.add_argument("--disable", action="store_true")
+    send = actions.add_parser("send")
+    send.add_argument("team_id")
+    send.add_argument("recipient")
+    send.add_argument("text")
+    send.add_argument(
+        "--kind", choices=["question", "answer", "work", "result", "note"], default="question"
+    )
+    send.add_argument("--reply-to")
+    assign = actions.add_parser("assign")
+    assign.add_argument("team_id")
+    assign.add_argument("assignee")
+    assign.add_argument("text")
+    assign.add_argument("--title", default="Teamauftrag")
+    assign.add_argument("--parent")
+    for action in ("claim", "complete"):
+        command = actions.add_parser(action)
+        command.add_argument("team_id")
+        command.add_argument("work_id")
+        if action == "complete":
+            command.add_argument("text")
+            command.add_argument("--failed", action="store_true")
+    reprocess = actions.add_parser("reprocess")
+    reprocess.add_argument("team_id")
+    reprocess.add_argument("work_id")
+    reprocess.add_argument("--core-task", required=True)
+    reprocess.add_argument("--result-sha256", required=True)
+    for command in (
+        create,
+        role,
+        send,
+        assign,
+        reprocess,
+        actions.choices["claim"],
+        actions.choices["complete"],
+    ):
+        command.add_argument(
+            "--key", help="Reuse this key for exactly the same operation; never blindly repeat work"
+        )
     readiness = sub.add_parser(
         "readiness", help="Check requested prerequisites on the loaded daemon"
     )

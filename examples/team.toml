@@ -1,0 +1,72 @@
+# ADDITIVE example: merge into the operator's EXISTING private config.toml.
+# Do not replace existing principals, permissions, agents or authentication.
+# Replace the example workspace. Keep tokens in the existing private credential
+# store or selected environment variables; never put token values in this file.
+
+[team]
+enabled = true
+concurrency = 2
+max_hops = 6
+max_work_per_root = 32
+max_pending_per_member = 32
+max_runs_per_hour = 24
+max_actions_per_turn = 4
+max_body_bytes = 16384
+max_result_bytes = 65536
+
+# External members: no automatic model process and no attachment to a chat.
+[team.workers.local]
+
+[team.workers.chatgpt]
+
+# Automatic workers use existing, separately configured agents. Participation
+# does not establish account/model readiness and may use provider allowances.
+[team.workers.codex]
+agent = "codex"
+cwd = "/Users/YOUR_NAME/workspace/PROJECT"
+timeout = 120
+
+[team.workers.grok]
+agent = "grok"
+cwd = "/Users/YOUR_NAME/workspace/PROJECT"
+timeout = 120
+
+[team.workers.opencode]
+agent = "opencode"
+cwd = "/Users/YOUR_NAME/workspace/PROJECT"
+timeout = 120
+
+# Add these only when their existing agent configurations and accounts are ready.
+# [team.workers.claude]
+# agent = "claude"
+# cwd = "/Users/YOUR_NAME/workspace/PROJECT"
+# timeout = 120
+#
+# [team.workers.gemini]
+# agent = "gemini"
+# cwd = "/Users/YOUR_NAME/workspace/PROJECT"
+# timeout = 120
+#
+# [team.workers.copilot]
+# agent = "copilot"
+# cwd = "/Users/YOUR_NAME/workspace/PROJECT"
+# timeout = 120
+
+# Merge the following capabilities into the EXISTING principals; do not discard
+# their current capabilities, roots, agents or limits:
+#
+# local:   team.manage, team.read, team.write
+# chatgpt: team.read, team.write  (team.manage only if it may create teams)
+# each automatic worker: team.read, team.write, agent.execute, task.read
+#
+# Every automatic worker must be an existing authenticated principal with
+# approval_mode="automatic", its OWN agent in its agents allowlist, and the
+# fixed cwd in its roots. Example selected token environment NAMES only:
+# Set team_only_execution=true on worker principals whose agent.execute grant
+# is exclusively for sealed team assignments, preserving private owner boundaries.
+# codex -> KIRABRIDGE_CODEX_TOKEN, grok -> KIRABRIDGE_GROK_TOKEN,
+# opencode -> KIRABRIDGE_OPENCODE_TOKEN. Use existing credentials where present.
+# Do not grant one worker the other workers' provider credentials or agents.
+#
+# Selecting chatgpt as coordinator is a team role change (team_set_role), not a
+# configuration change and not a new program/account permission.
