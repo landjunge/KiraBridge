@@ -76,6 +76,10 @@ class ApprovalConsole:
                 Route("/api/tasks/{task_id}/{decision}", self.decide, methods=["POST"]),
             ],
         )
+        from kirabridge.team_console import TeamConsole
+
+        self.team_console = TeamConsole(bridge, self.authenticate)
+        self.app.routes.extend(self.team_console.routes)
 
     async def __call__(self, scope, receive, send):
         if scope["type"] != "http":

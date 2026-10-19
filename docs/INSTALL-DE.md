@@ -1,4 +1,4 @@
-# KiraBridge installieren · 0.6.0rc2
+# KiraBridge installieren · 0.7.0rc1
 
 **Privater Release Candidate zur Abnahme. Noch keine öffentliche Installation.**
 Es gilt die beiliegende `LICENSE`: Netzwerkpunkt Personal Use License1.0,
@@ -12,26 +12,27 @@ geplant. Keine DNS-/Hostingfreigabe ist daraus abzuleiten.
 KiraBridge ist speziell für Vibe Coding entwickelt: Du besprichst mit ChatGPT,
 was gebaut oder geändert werden soll; ChatGPT übergibt Aufträge an Codex oder
 Grok auf deinem Rechner. Beide können mit eingerichteten Berechtigungen am selben
-Projekt arbeiten. Weitere CLI-Anbindungen sind geplant.
+Projekt arbeiten. OpenCode, Gemini CLI, Claude Code und Copilot CLI besitzen zusätzliche Textadapter; ein passender Anbieterzugang bleibt erforderlich.
 
-## Zuerst den richtigen Stand wählen
+## Release und bestehende Installation
 
-| Stand | Bedeutung |
-| --- | --- |
-| Aktueller Quellstand `7af39cd`, Versionskennung `0.6.0rc2` | Enthält die neuere Projektsteuerung und optionalen Adapter; eine gleiche Versionsnummer belegt kein identisches Paket. |
-| Dokumentierter Betreiber-Mac `0.5.2` mit gezielten Backports | Eigene laufende Installation mit eigenen Quell-/Config-/Runtimebelegen, keine allgemeine Voreinstellung für neue Nutzer. |
-| Eingefrorener privater RC2-Entwurf `57bee99` | Historische Pakete mit damaligen Hashes. Enthält insbesondere `agents.codex.sandbox_mode` und die späteren Integrationen **nicht**. |
+Diese Anleitung gehört zu **0.7.0rc1 mit Teamsteuerung**. Der genaue Quellstand,
+die Plattform und die Lizenz stehen in `release.json` im Paket; `SHA256SUMS`
+bezieht sich auf genau diese Artefakte. Ältere RC1-/RC2-/RC3-Pakete bleiben
+unverändert und dürfen nicht allein anhand einer ähnlichen Versionskennung
+mit dieser Ausgabe verwechselt werden.
 
-[Releaseabnahme und offene Freigaben](RELEASE-ABNAHME-20261018.md) bleiben maßgeblich.
-Die aktuelle Betreiberkonfiguration darf nicht mit dem alten RC2 gestartet werden:
-sein striktes Modell lehnt neue Einstellungen ab. Keine Policy zurücksetzen, um ein
-altes Paket passend zu machen. Vor neuer Veröffentlichung braucht es einen neuen
-belegten Paketpin; diese Anleitung baut oder veröffentlicht keinen Kandidaten.
-Den tatsächlich geladenen Stand mit `kirabridge status` und konkreter Readiness
-prüfen, nicht aus einem Checkout oder Dateinamen ableiten.
+Bestehende Konfigurationen, private Schlüssel und Auftragsdaten erhalten.
+Vor einem Update laufende Bridge-Aufträge geordnet beenden lassen. Kein altes
+Paket gegen eine neuere Policy starten und keine Berechtigungen zurücksetzen,
+um ein Paket passend zu machen. `kirabridge status` und `kirabridge readiness`
+zeigen den tatsächlich geladenen Dienst und Abweichungen zum lokalen Quellstand.
 
-Die folgenden Paket-/Plattformangaben betreffen den **eingefrorenen RC2**. Für eine
-bestehende Installation zuerst ihren Updateweg bestimmen, nicht neu einrichten.
+Der neue [Team-Bereich](TEAM-ORCHESTRATION.md) verwendet ausdrücklich vom Betreiber
+freigegebene Teilnehmer. Nach Einrichtung können Besitzer/Koordinator Rollen
+wählen und Teammitglieder Nachrichten, Aufträge und gemeinsame Ergebnisse
+bearbeiten. Teamrollen sind keine zusätzlichen Betriebssystemrechte. ChatGPT
+bleibt ein externer Teilnehmer; eine Rolle weckt keinen inaktiven Chat.
 
 ## Normaler Schnellstart
 

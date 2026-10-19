@@ -57,7 +57,22 @@ def idle_queue(config):
             jobs = store.db.execute(
                 "SELECT count(*) FROM message_jobs WHERE state IN ('queued','running')"
             ).fetchone()[0]
-            if tasks or jobs:
+            # Older stores have no team tables. Inspect only; an update check
+            # must neither initialize a team domain nor dispatch queued work.
+            team_table = store.db.execute(
+                "SELECT 1 FROM sqlite_master WHERE type='table' AND name='team_work'"
+            ).fetchone()
+            team_work = (
+                store.db.execute(
+                    "SELECT count(*) FROM team_work WHERE state IN "
+                    "('queued','dispatching','created','accepted','running','processing_result')"
+                ).fetchone()[0]
+                if team_table
+                else 0
+            )
+            # External/manual assignments are durable data, without a running
+            # model process; queued_manual/accepted_manual survive the update.
+            if tasks or jobs or team_work:
                 raise BridgeError("service_busy", "Pending/active work: finish it before updating")
             yield
     finally:

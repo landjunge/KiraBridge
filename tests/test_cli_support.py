@@ -94,3 +94,16 @@ def test_cli_uses_only_operator_search_path_and_fixed_runtime_directories(tmp_pa
     paths = cli_environment(config, terminal)["PATH"].split(os.pathsep)
     assert paths[:2] == ["/usr/bin", "/bin"]
     assert str(tmp_path) in paths
+
+
+def test_structured_local_team_turn_can_use_operator_bounded_output():
+    configured = AgentConfig(
+        kind="opencode", base_url="http://127.0.0.1:11434/v1", local_output_tokens=512
+    )
+    assert configured.local_output_tokens == 512
+    for changes in (
+        {"kind": "codex"},
+        {"kind": "opencode", "base_url": "http://127.0.0.1:11434/v1", "local_output_tokens": 2049},
+    ):
+        with pytest.raises(ValueError):
+            AgentConfig.model_validate({"local_output_tokens": 512, **changes})

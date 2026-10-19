@@ -1,0 +1,160 @@
+{
+  "schema": "1",
+  "date": "2026-10-19",
+  "release": "0.7.0rc1",
+  "scope": "Team communication, role selection, shared assignments and results",
+  "authenticated_accesses": [
+    "chatgpt",
+    "codex",
+    "grok",
+    "opencode",
+    "gemini",
+    "claude",
+    "copilot"
+  ],
+  "live_mcp_message_matrix": {
+    "directed_pairs": 42,
+    "every_message_acknowledged": true,
+    "native_model_calls": 0,
+    "proof_kind": "actual configured KiraBridge access tokens, not proof of seven vendor logins"
+  },
+  "live_role_switch": {
+    "team_id": "kirabridge-team",
+    "coordinator_before": "chatgpt",
+    "coordinator_test": "codex",
+    "coordinator_final": "chatgpt",
+    "revision": 3,
+    "worker_self_promotion_denied": true,
+    "model_calls": 0
+  },
+  "native_roundtrip": {
+    "agents": [
+      "codex",
+      "opencode"
+    ],
+    "verified": true,
+    "path": [
+      "codex",
+      "opencode",
+      "codex"
+    ],
+    "work": [
+      {
+        "id": "tw-4fb87522b87c490da9707360bcf4d0a7",
+        "assignee": "codex",
+        "state": "completed",
+        "result": "CODEX_TEAM_DELEGATED"
+      },
+      {
+        "id": "tw-674c224efd024609adf9b3ca01af68da",
+        "assignee": "opencode",
+        "state": "completed",
+        "result": "OPENCODE_TEAM_OK"
+      },
+      {
+        "id": "tw-e0395a4b2271460b9e43fb65b50159a8",
+        "assignee": "codex",
+        "state": "completed",
+        "result": "KIRABRIDGE_TEAM_ROUNDTRIP_OK"
+      }
+    ],
+    "messages": [
+      {
+        "id": "tm-2421052540c1422fa10af3bd46a3c6e8",
+        "sender": "opencode",
+        "recipient": "codex",
+        "acknowledged": true
+      }
+    ],
+    "core_attempts": [
+      {
+        "id": "team-tw-4fb87522b87c490da9707360bcf4d0a7",
+        "agent": "codex",
+        "state": "completed",
+        "attempt": 1
+      },
+      {
+        "id": "team-tw-674c224efd024609adf9b3ca01af68da",
+        "agent": "opencode",
+        "state": "completed",
+        "attempt": 1
+      },
+      {
+        "id": "team-tw-e0395a4b2271460b9e43fb65b50159a8",
+        "agent": "codex",
+        "state": "completed",
+        "attempt": 1
+      }
+    ],
+    "idempotency_verified": true,
+    "audit_chain_valid": true,
+    "original_result_postprocessing": {
+      "explicit": true,
+      "original_core_reexecuted": false,
+      "native_utf8_sha256": "d3daf18b5b0b5520401a35e143711de32c549e66b43e958d0844b4ec011007d9",
+      "reason": "Exact work reply header framing explicitly enabled; previously saved complete result pinned and reviewed before applying its actions."
+    },
+    "new_accounts": false,
+    "api_keys_used": false,
+    "provider_basis": "existing Codex ChatGPT login/plan and preexisting local Ollama model weights"
+  },
+  "previous_bounded_trials": [
+    {
+      "trial": "live-01",
+      "outcome": "1B local model produced malformed action data; no return action was executed; original evidence retained."
+    },
+    {
+      "trial": "live-02",
+      "outcome": "90s local deadline exceeded; outcome unknown, not automatically repeated."
+    },
+    {
+      "trial": "live-03",
+      "outcome": "Both initial native tasks completed once. Explicit hash-pinned result postprocessing triggered the final Codex task once."
+    }
+  ],
+  "activation": {
+    "graceful_reload": true,
+    "dispatcher_active": true,
+    "runtime_version": "0.5.2",
+    "feature_installation": "additive team backport; existing custom runtime preserved",
+    "preserved_messages": 42,
+    "preserved_receipts": 42,
+    "same_message_after_restart_and_duplicate": true,
+    "coordinator": "chatgpt",
+    "preserved_original_task_rows": 633,
+    "old_credentials_unchanged": true,
+    "native_models_restarted": false,
+    "new_native_model_calls": 0,
+    "com.kirabridge.bridge_pid": 52104,
+    "com.kirabridge.approvals_pid": 52103
+  },
+  "tests": {
+    "targeted_final_passed": 149,
+    "browser": "actual isolated Chromium console test; coordinator switch, manual work, result, safe rendering and lost-response/reload idempotency passed",
+    "integration": "real authenticated MCP transport with controlled CLI processes tests multi-hop, restart, identity and limits",
+    "full_local_passed": 483,
+    "full_local_skipped": 43,
+    "skips": "Optional integrations requiring explicitly supplied external fixture sources; final CI config supplies pinned ThreadDesk/TollGate."
+  },
+  "limits": [
+    "ChatGPT UI session/wakeup was not newly verified; ChatGPT remains an external active-chat participant.",
+    "Gemini personal CLI OAuth is discontinued by its provider; no paid cloud replacement configured.",
+    "Claude and Copilot executable adapters exist but their vendor authentication is not configured here.",
+    "Four added CLI adapters accept bounded text turns; native project tools and existing-session resume remain unsupported.",
+    "Existing custom runtime reports 0.5.2 and receives additive team files; clean 0.7.0rc1 release artifacts are built separately.",
+    "No Windows native acceptance or real Linux desktop clipboard session was performed."
+  ],
+  "private_evidence_directory": "~/.local/share/kirabridge/team-orchestration-20261019",
+  "live_manual_shared_work": {
+    "work_id": "tw-3cccd56589c74debad290eac78548572",
+    "sender": "codex",
+    "assignee": "chatgpt",
+    "reader": "copilot",
+    "result_kind": "assignee_report",
+    "state": "completed",
+    "private_core_task_denied": true,
+    "team_tools": 15,
+    "native_model_calls": 0,
+    "external_chatgpt_app_verified": false
+  }
+}

@@ -25,6 +25,7 @@ class PrincipalConfig(BaseModel):
     agents: list[str] = Field(default_factory=list)
     token_env: str | None = None
     message_peers: list[str] = Field(default_factory=list, max_length=16)
+    team_only_execution: bool = False
 
 
 class ReceiverConfig(BaseModel):
@@ -45,6 +46,47 @@ class MessagingConfig(BaseModel):
     receivers: dict[str, ReceiverConfig] = Field(default_factory=dict)
 
 
+class TeamWorkerConfig(BaseModel):
+    """Operator consent for one authenticated identity and its fixed executor."""
+
+    model_config = ConfigDict(extra="forbid")
+    agent: str | None = Field(default=None, pattern=r"^[a-z][a-z0-9_-]{0,40}$")
+    cwd: str | None = Field(default=None, min_length=1, max_length=4096)
+    timeout: float = Field(default=120, gt=0, le=300)
+    response_framing: Literal["strict_json", "work_reply_header"] = "strict_json"
+
+    @model_validator(mode="after")
+    def execution_directory(self):
+        if self.agent is not None and (not self.cwd or not Path(self.cwd).is_absolute()):
+            raise ValueError("An automatic team worker needs an absolute fixed working directory")
+        return self
+
+
+class TeamConfig(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    enabled: bool = False
+    workers: dict[str, TeamWorkerConfig] = Field(default_factory=dict, max_length=16)
+    concurrency: int = Field(default=2, ge=1, le=8)
+    max_teams: int = Field(default=64, ge=1, le=1024)
+    max_hops: int = Field(default=6, ge=1, le=16)
+    max_work_per_root: int = Field(default=32, ge=1, le=256)
+    max_pending_per_member: int = Field(default=32, ge=1, le=1000)
+    max_total_work: int = Field(default=10000, ge=1, le=1000000)
+    max_messages: int = Field(default=10000, ge=1, le=1000000)
+    max_body_bytes: int = Field(default=16384, ge=256, le=65536)
+    max_result_bytes: int = Field(default=65536, ge=256, le=262144)
+    max_actions_per_turn: int = Field(default=4, ge=1, le=4)
+    max_runs_per_hour: int = Field(default=24, ge=1, le=1000)
+
+    @model_validator(mode="after")
+    def participant_names(self):
+        import re
+
+        if any(not re.fullmatch(r"[a-z][a-z0-9_-]{0,40}", name) for name in self.workers):
+            raise ValueError("Team workers must use explicit principal identities")
+        return self
+
+
 class AgentConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
     kind: str
@@ -54,6 +96,7 @@ class AgentConfig(BaseModel):
     sandbox_mode: Literal["read-only", "workspace-write"] = "read-only"
     allow_local_tools: bool = False
     base_url: str | None = Field(default=None, max_length=2048)
+    local_output_tokens: int | None = Field(default=None, ge=128, le=2048)
 
     @model_validator(mode="before")
     @classmethod
@@ -74,6 +117,8 @@ class AgentConfig(BaseModel):
 
     @model_validator(mode="after")
     def local_provider_endpoint(self):
+        if self.local_output_tokens is not None and (self.kind != "opencode" or not self.base_url):
+            raise ValueError("Local output tokens require a loopback OpenCode provider")
         if self.base_url is None:
             return self
         try:
@@ -163,6 +208,7 @@ class Config(BaseModel):
     )
     agents: dict[str, AgentConfig] = Field(default_factory=dict)
     messaging: MessagingConfig = Field(default_factory=MessagingConfig)
+    team: TeamConfig = Field(default_factory=TeamConfig)
     diagnostics: DiagnosticsConfig = Field(default_factory=DiagnosticsConfig)
     threaddesk: ThreadDeskConfig = Field(default_factory=ThreadDeskConfig)
     workflow_control: WorkflowControlConfig = Field(default_factory=WorkflowControlConfig)

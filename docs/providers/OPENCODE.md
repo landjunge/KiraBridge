@@ -43,12 +43,18 @@ allow_local_tools = false
 `base_url` wird ausschließlich vom Betreiber konfiguriert und auf lokales
 Loopback-HTTP beschränkt. Der Adapter verwendet OpenCodes bereits enthaltenes
 `@ai-sdk/openai-compatible`, definiert genau das ausgewählte Modell mit einem
-deklarierten Kontext von 4096 und einem Ausgabelimit von 128 Tokens und deaktiviert
+deklarierten Kontext von 4096 und standardmäßig 128 Ausgabetokens und deaktiviert
 Modell-Toolaufrufe. Er lädt keine Modelle oder SDK-Pakete nach. Das lokale
 Profil reicht keine Provider-API-Schlüssel an den lokalen Dienst weiter. Das
 Modell muss bereits verfügbar sein; der Adapter behauptet keine geeignete
 Leistung für umfangreiche Entwicklungsaufträge. Lokale Inferenz verursacht
 keine Cloud-API-Gebühren, benötigt aber die Rechenressourcen des Macs.
+
+Für strukturierte Teamantworten kann der Betreiber bei diesem lokalen Profil
+`local_output_tokens = 512` setzen (zulässig 128 bis 2048). Das Feld gilt nur
+für einen konfigurierten Loopback-OpenCode-Endpunkt. Es ist ein natives
+Ausgabelimit, kein finanzielles Budget. Das Kontextlimit und die deaktivierten
+Werkzeuge bleiben erhalten.
 
 Die deklarierte Kontextgröße ist OpenCode-Metadatum: Sie setzt Ollamas
 tatsächliches `num_ctx` nicht. Der lokale Abnahmeweg verwendet deshalb den

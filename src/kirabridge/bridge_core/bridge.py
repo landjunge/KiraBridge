@@ -121,6 +121,11 @@ class Bridge:
         )
         self.messages = MessageManager(config, self.store, self.security)
         self.message_receiver = MessageReceiver(self)
+        from kirabridge.team_manager import TeamManager
+        from kirabridge.team_manager.dispatcher import TeamDispatcher
+
+        self.teams = TeamManager(self)
+        self.team_dispatcher = TeamDispatcher(self)
 
     def validate(self, request: TaskRequest) -> None:
         model = INPUTS.get(request.operation)
@@ -260,6 +265,7 @@ class Bridge:
                 },
             }
         if operation == "agent.execute":
+            self.teams.authorize_execution(task)
             return await self.agents.execute(task, args, policy, running, progress)
         if operation.startswith("handoff."):
             return await self.handoffs.execute(task, args, policy, running, progress)
@@ -375,14 +381,20 @@ class Bridge:
         try:
             self.record_runtime_load()
             await self.message_receiver.start()
+            await self.team_dispatcher.start()
         except BaseException:
+            await self.team_dispatcher.stop()
+            await self.message_receiver.stop()
             await self.tasks.stop()
             raise
         return self
 
     async def __aexit__(self, *exc):
         try:
-            await self.message_receiver.stop()
+            try:
+                await self.team_dispatcher.stop()
+            finally:
+                await self.message_receiver.stop()
         finally:
             await self.tasks.stop()
             await self.threaddesk.close()

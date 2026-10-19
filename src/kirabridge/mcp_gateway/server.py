@@ -14,6 +14,15 @@ from kirabridge.bridge_core.models import BridgeError, TaskRequest
 from kirabridge.image_manager import image_task_result
 from kirabridge.message_manager import MessageSend
 from kirabridge.readiness import ReadinessInput, readiness
+from kirabridge.team_manager.models import (
+    TeamCreate,
+    TeamMessageSend,
+    TeamRoleSet,
+    TeamWorkClaim,
+    TeamWorkComplete,
+    TeamWorkCreate,
+    TeamWorkReprocess,
+)
 
 
 def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = "local") -> FastMCP:
@@ -28,7 +37,10 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
         "Acceptance is a receipt, not execution. Query task_get and task_events for evidence. "
         "Use message_send/message_receive for addressed peer communication. "
         "Automatic message receivers use separate managed sessions, not existing interactive ones; "
-        "check message_channel_status and message_get for actual evidence.",
+        "check message_channel_status and message_get for actual evidence. "
+        "Use team_* tools for shared role-based teams, addressed communication and delegated work. "
+        "Team results are shared only with team members; private tasks stay private. "
+        "ChatGPT is an external participant and is never automatically awakened by a team role.",
         stateless_http=True,
         json_response=True,
         log_level="CRITICAL",
@@ -367,5 +379,84 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
             }
 
         return safe(action)
+
+    @server.tool(annotations=write)
+    def team_create(request: TeamCreate, ctx: Context) -> dict[str, Any]:
+        """Create an operator-enabled team; authenticated creator remains owner."""
+        return safe(lambda: bridge.teams.create(identity(ctx), request))
+
+    @server.tool(annotations=read)
+    def team_list(ctx: Context) -> dict[str, Any]:
+        """List teams this authenticated identity belongs to; no private task disclosure."""
+        return safe(lambda: bridge.teams.list(identity(ctx)))
+
+    @server.tool(annotations=read)
+    def team_get(team_id: str, ctx: Context) -> dict[str, Any]:
+        """Read team members, actual roles and configuration revision."""
+        return safe(lambda: bridge.teams.get(identity(ctx), team_id))
+
+    @server.tool(annotations=read)
+    def team_context(team_id: str, ctx: Context) -> dict[str, Any]:
+        """Bounded current team context, recent results and this member's pending messages."""
+        return safe(lambda: bridge.teams.context(identity(ctx), team_id))
+
+    @server.tool(annotations=write)
+    def team_set_role(request: TeamRoleSet, ctx: Context) -> dict[str, Any]:
+        """Owner/coordinator changes a role with revision CAS; coordinator switch is atomic."""
+        return safe(lambda: bridge.teams.set_role(identity(ctx), request))
+
+    @server.tool(annotations=write)
+    def team_message_send(request: TeamMessageSend, ctx: Context) -> dict[str, Any]:
+        """Send addressed team data; sender comes from authenticated identity, never a field."""
+        return safe(lambda: bridge.teams.send(identity(ctx), request))
+
+    @server.tool(annotations=read)
+    def team_messages(
+        team_id: str, ctx: Context, after: int = 0, limit: int = 50
+    ) -> dict[str, Any]:
+        """Read bounded intentional team messages; does not expose private mailboxes."""
+        return safe(lambda: bridge.teams.messages(identity(ctx), team_id, after, limit))
+
+    @server.tool(annotations=write)
+    def team_message_ack(team_id: str, message_id: str, ctx: Context) -> dict[str, Any]:
+        """Only the actual addressed recipient acknowledges receipt; not execution proof."""
+        return safe(lambda: bridge.teams.ack(identity(ctx), team_id, message_id))
+
+    @server.tool(annotations=write)
+    def team_work_create(request: TeamWorkCreate, ctx: Context) -> dict[str, Any]:
+        """Assign work to an enabled teammate; own ancestry and idempotency prevent loops."""
+        return safe(lambda: bridge.teams.delegate(identity(ctx), request))
+
+    @server.tool(annotations=read)
+    def team_work_get(team_id: str, work_id: str, ctx: Context) -> dict[str, Any]:
+        """Read one team assignment, native evidence and shared result; unknown stays unknown."""
+        return safe(lambda: bridge.teams.work_get(identity(ctx), team_id, work_id))
+
+    @server.tool(annotations=read)
+    def team_work_list(
+        team_id: str, ctx: Context, after: int = 0, limit: int = 50
+    ) -> dict[str, Any]:
+        """Read a team's bounded assignment board, including finished work."""
+        return safe(lambda: bridge.teams.work_list(identity(ctx), team_id, after, limit))
+
+    @server.tool(annotations=write)
+    def team_work_claim(request: TeamWorkClaim, ctx: Context) -> dict[str, Any]:
+        """External/manual assignee accepts its own work; cannot claim another agent's identity."""
+        return safe(lambda: bridge.teams.work_claim(identity(ctx), request))
+
+    @server.tool(annotations=write)
+    def team_work_complete(request: TeamWorkComplete, ctx: Context) -> dict[str, Any]:
+        """External assignee reports its own result; evidence explicitly remains assignee_report."""
+        return safe(lambda: bridge.teams.work_complete(identity(ctx), request))
+
+    @server.tool(annotations=write)
+    def team_work_reprocess(request: TeamWorkReprocess, ctx: Context) -> dict[str, Any]:
+        """Owner/coordinator processes a pinned completed result; never reruns its model."""
+        return safe(lambda: bridge.teams.work_reprocess(identity(ctx), request))
+
+    @server.tool(annotations=read)
+    def team_events(team_id: str, ctx: Context, after: int = 0, limit: int = 50) -> dict[str, Any]:
+        """Read ordered team role/delegation/delivery events, without secret/raw error logs."""
+        return safe(lambda: bridge.teams.events(identity(ctx), team_id, after, limit))
 
     return server
