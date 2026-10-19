@@ -86,3 +86,45 @@ Testeingabe. Tunnel werden nicht neu gestartet.
 Private Vorher-/Nachher-Belege liegen unter
 `~/.config/kirabridge/repairs/chatgpt-terminals-20261020-011050/`.
 Diese Terminalprüfung ist keine Abnahme einer hörbaren Antwort in Grok Voice.
+
+## Tatsächliche Aktivierung und Ergebnis
+
+Der gepushte Code-Commit ist `4188f00`. Der produktive Kern läuft nach
+kontrolliertem Leerlauf-Neustart als `0.8.0rc3`, PID 46820. `policy_inspect`
+bestätigt `matches_loaded` für Quelle und Konfiguration. Die tatsächliche
+ChatGPT-Werkzeugbindung bestätigt `automatic_operations=["session.input"]`,
+keine zusätzliche Eingabefreigabe und weiterhin `voice_message_gate=true`.
+
+Beim ersten Aktivierungsversuch zeigte sich zusätzlich ein veralteter
+Steuerfenster-Prozess: Sein bereits geladener Konfigurationsparser kannte die
+inzwischen vorhandenen Voice-Felder noch nicht. Er scheiterte vor dem Neustart
+des Kerns. Der unveränderte alte Kern-PID wurde danach überprüft; anschließend
+wurde nur `com.kirabridge.approvals` neu geladen und der Kern über dessen
+Leerlaufprüfung aktiviert. Die Tunnel wurden dabei nicht neu gestartet.
+
+Über die echte ChatGPT-App-Werkzeugbindung wurden anschließend geprüft:
+
+| Prüfung | Tatsächlicher Befund |
+| --- | --- |
+| Bestehendes Codex-Fenster | Fenster 22104, `/dev/ttys000`, Wurzel-PID 94023, Codex-PID 94386 |
+| Codex lesen | `session.read` über bestehendes `task_request`/`task_get`: abgeschlossen, tatsächliche Ausgabe zurück |
+| Bestehendes Grok Build | Fenster 22228, `/dev/ttys002`, Wurzel-PID 6957, Grok-PID 6986; vor der Änderung mit ChatGPT gelesen und danach im Katalog unverändert |
+| Testterminal | Eigenes Fenster 22803, `/dev/ttys001`, Wurzel-PID 46994; `busy=false`, nur login und zsh |
+| Testeingabe | Einmaliges `printf` mit `require_idle=true`, ohne Nachrichtenmarker; abgeschlossen |
+| Ausgabe | Eindeutige Markerzeile exakt in der tatsächlichen Shell-Ausgabe gefunden |
+| Aufräumen | Ausschließlich das weiterhin unbeschäftigte eigene Testfenster geschlossen |
+| Abschließender Katalog | Über ChatGPT-`task_request` mit `session.catalog`: beide ursprünglichen Fenster mit unveränderten IDs und PIDs |
+
+Die Eingabefunktion wurde bewusst nur im Testterminal ausgeführt. Lesen des
+bestehenden Codex-Fensters ist belegt; eine Eingabe in den laufenden Codex
+wurde nicht als Test durchgeführt. macOS-Automation für diese Terminalaktionen
+funktioniert im tatsächlichen Dienstkontext.
+
+595 Tests haben im vollständigen lokalen Prüflauf bestanden; Paketbau,
+Ruff und JavaScript-Syntaxprüfung sind erfolgreich. Ein früherer Prüflauf
+traf beim bestehenden Prozessgruppen-Test auf dessen knappe 300-ms-Startfrist;
+derselbe Test bestand separat und anschließend im vollständigen Prüflauf.
+Die Laufzeitfrist der Anwendung wurde dafür nicht verändert.
+
+Die privaten Belege enthalten `before.json`, `activation.json`,
+`actual-chatgpt-app-test.json` und Prozess-Snapshots vor/nach der Aktivierung.
