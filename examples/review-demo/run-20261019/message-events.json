@@ -1,0 +1,166 @@
+{
+  "audit": {
+    "valid": true,
+    "records": 24,
+    "head": "0cf2efa625ca50dfe8e7e32a4a62a66a69a0a8c92fa3d2b68c5106ab39ed2f0a"
+  },
+  "message_count": 4,
+  "messages": [
+    {
+      "id": "4d02c425-ef9a-49f9-a5df-0569467f8bda",
+      "sender": "user",
+      "recipient": "codex",
+      "acknowledged": 1792366861.935076,
+      "events": [
+        {
+          "seq": 1,
+          "message_id": "4d02c425-ef9a-49f9-a5df-0569467f8bda",
+          "at": 1792366859.700387,
+          "kind": "message.queued",
+          "evidence": {
+            "automatic_dispatch": false,
+            "content_sha256": "3f5dd675cfd7b0842e4632f98faa7769d6265bcd0c9daaa063f8019f775232fe",
+            "conversation_id": "demo-work",
+            "position": 1,
+            "recipient": "codex"
+          }
+        },
+        {
+          "seq": 2,
+          "message_id": "4d02c425-ef9a-49f9-a5df-0569467f8bda",
+          "at": 1792366860.812821,
+          "kind": "message.delivered",
+          "evidence": {
+            "receipt": "3f813ed7-ddee-4215-9372-5d7c07664b23"
+          }
+        },
+        {
+          "seq": 3,
+          "message_id": "4d02c425-ef9a-49f9-a5df-0569467f8bda",
+          "at": 1792366861.9351199,
+          "kind": "message.acknowledged",
+          "evidence": {
+            "receipt": "3f813ed7-ddee-4215-9372-5d7c07664b23"
+          }
+        }
+      ]
+    },
+    {
+      "id": "ca94f211-190c-4825-ac6b-9ecf0793ca9a",
+      "sender": "codex",
+      "recipient": "grok-sim",
+      "acknowledged": 1792366877.3500009,
+      "events": [
+        {
+          "seq": 4,
+          "message_id": "ca94f211-190c-4825-ac6b-9ecf0793ca9a",
+          "at": 1792366875.073859,
+          "kind": "message.queued",
+          "evidence": {
+            "automatic_dispatch": false,
+            "content_sha256": "2b0349c1064fd34407f770d5ca4ab487d54c5efe9871dd8a046878478ccc69fe",
+            "conversation_id": "demo-review",
+            "position": 1,
+            "recipient": "grok-sim"
+          }
+        },
+        {
+          "seq": 5,
+          "message_id": "ca94f211-190c-4825-ac6b-9ecf0793ca9a",
+          "at": 1792366876.1930099,
+          "kind": "message.delivered",
+          "evidence": {
+            "receipt": "47f10f85-00ad-4f9c-aa28-56a2866bba49"
+          }
+        },
+        {
+          "seq": 6,
+          "message_id": "ca94f211-190c-4825-ac6b-9ecf0793ca9a",
+          "at": 1792366877.350044,
+          "kind": "message.acknowledged",
+          "evidence": {
+            "receipt": "47f10f85-00ad-4f9c-aa28-56a2866bba49"
+          }
+        }
+      ]
+    },
+    {
+      "id": "6261b4db-4c1d-4152-963c-831977fa99ba",
+      "sender": "grok-sim",
+      "recipient": "codex",
+      "acknowledged": 1792366880.691777,
+      "events": [
+        {
+          "seq": 7,
+          "message_id": "6261b4db-4c1d-4152-963c-831977fa99ba",
+          "at": 1792366878.496002,
+          "kind": "message.queued",
+          "evidence": {
+            "automatic_dispatch": false,
+            "content_sha256": "9474dfabfb031bc7a25c8b68f852f3f5b4fa82d890ee152d5998da7b922d5042",
+            "conversation_id": "demo-review",
+            "position": 2,
+            "recipient": "codex"
+          }
+        },
+        {
+          "seq": 8,
+          "message_id": "6261b4db-4c1d-4152-963c-831977fa99ba",
+          "at": 1792366879.6013381,
+          "kind": "message.delivered",
+          "evidence": {
+            "receipt": "afc5077c-c475-4315-ad8a-81fcf228dcb6"
+          }
+        },
+        {
+          "seq": 9,
+          "message_id": "6261b4db-4c1d-4152-963c-831977fa99ba",
+          "at": 1792366880.691846,
+          "kind": "message.acknowledged",
+          "evidence": {
+            "receipt": "afc5077c-c475-4315-ad8a-81fcf228dcb6"
+          }
+        }
+      ]
+    },
+    {
+      "id": "192fda62-c9e0-4cef-ad9d-07c8b71ca762",
+      "sender": "codex",
+      "recipient": "user",
+      "acknowledged": 1792366910.384552,
+      "events": [
+        {
+          "seq": 10,
+          "message_id": "192fda62-c9e0-4cef-ad9d-07c8b71ca762",
+          "at": 1792366908.190042,
+          "kind": "message.queued",
+          "evidence": {
+            "automatic_dispatch": false,
+            "content_sha256": "a4ad48f099e916ea3215175d1d270ffd1be68bfe660798bd5b19cee0cb6d673b",
+            "conversation_id": "demo-work",
+            "position": 2,
+            "recipient": "user"
+          }
+        },
+        {
+          "seq": 11,
+          "message_id": "192fda62-c9e0-4cef-ad9d-07c8b71ca762",
+          "at": 1792366909.296947,
+          "kind": "message.delivered",
+          "evidence": {
+            "receipt": "078db171-fe60-4914-ae46-f5087beca952"
+          }
+        },
+        {
+          "seq": 12,
+          "message_id": "192fda62-c9e0-4cef-ad9d-07c8b71ca762",
+          "at": 1792366910.384601,
+          "kind": "message.acknowledged",
+          "evidence": {
+            "receipt": "078db171-fe60-4914-ae46-f5087beca952"
+          }
+        }
+      ]
+    }
+  ]
+}

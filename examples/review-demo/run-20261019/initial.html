@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="de" data-theme="light">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kleine Pause · KiraBridge Demo</title>
+<style>
+:root { color-scheme: light; --bg: #f4f1e9; --ink: #183c39; --card: #ffffff; }
+:root[data-theme="dark"] { color-scheme: dark; --bg: #102725; --ink: #e1eee7; --card: #1a3936; }
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 18px/1.6 system-ui, sans-serif; }
+main { max-width: 780px; margin: 12vh auto; padding: 32px; }
+small { letter-spacing: .12em; text-transform: uppercase; }
+h1 { font-size: clamp(40px, 8vw, 76px); line-height: 1.05; margin: 28px 0; }
+section { padding: 26px; background: var(--card); border-radius: 20px; margin: 32px 0; }
+button { cursor: pointer; color: var(--ink); background: var(--card); border: 2px solid currentColor; border-radius: 30px; padding: 12px 22px; font: inherit; }
+button:focus-visible { outline: 3px solid #bc781e; outline-offset: 5px; }
+</style>
+<main>
+<small>KiraBridge · kleine Demo</small>
+<h1>Ein Moment für neue Ideen.</h1>
+<p>Eine kleine Seite, die sich deinem Licht anpasst.</p>
+<button id="theme" type="button">Dunkelmodus einschalten</button>
+<section><h2>In Ruhe weiterdenken.</h2><p>Ein klarer Gedanke, ein kleiner Schritt. Heute reicht das.</p></section>
+<footer>Grok-Prüfung ausdrücklich simuliert. Umsetzung: echte laufende Codex-Sitzung.</footer>
+</main>
+<script>
+const root = document.documentElement;
+const button = document.getElementById('theme');
+button.addEventListener('click', () => {
+  const dark = root.dataset.theme !== 'dark';
+  root.dataset.theme = dark ? 'dark' : 'light';
+  button.textContent = dark ? 'Hellmodus einschalten' : 'Dunkelmodus einschalten';
+});
+</script>
+</html>

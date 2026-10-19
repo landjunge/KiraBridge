@@ -1,0 +1,667 @@
+{
+  "phase": "completed",
+  "grok": "SIMULATION: deterministic prepared response",
+  "chatgpt_connector_verified": false,
+  "tasks": [
+    {
+      "api_version": "1",
+      "id": "codex-initial",
+      "principal": "codex",
+      "operation": "agent.execute",
+      "args": {
+        "agent": "codex",
+        "cwd": "/Users/landjunge/KiraBridge/examples/review-demo/automatic-20261019-02/site",
+        "prompt": "Erstelle eine kleine deutsche Webseite mit funktionierendem Hell-Dunkel-Schalter.\nSchreibe nur index.html: eigenständig, deutsch, inline CSS/JS, keine externen Ressourcen. Verwende einen nativen button mit id=theme und type=button, html lang=de und data-theme=light/dark. Zunächst nur einfacher Themenwechsel; Persistenz und aria-pressed folgen im separaten Review. Keine Agenten starten, kein MCP, kein Netzwerk, keine Dateien außerhalb dieses Verzeichnisses ändern. Keine Rückfragen. Antworte kurz nach dem tatsächlichen Schreiben.",
+        "timeout": 180.0
+      },
+      "agent": "codex",
+      "parent_id": null,
+      "state": "completed",
+      "created": 1792367267.507862,
+      "updated": 1792367291.362474,
+      "accepted": 1792367267.5098429,
+      "started": 1792367268.853693,
+      "finished": 1792367291.362474,
+      "receipt": "c246b21f-3471-4758-b056-f9bd0825c50f",
+      "evidence": {
+        "adapter": "codex",
+        "agent": "codex",
+        "exit_code": 0,
+        "mcp_servers_enabled": false,
+        "project_rules_enabled": true,
+        "sandbox_mode": "workspace-write",
+        "session_id": "01a1516a-1022-72c3-8137-45c3c9c72216",
+        "timed_out": false,
+        "turn_completed": true,
+        "turn_failed": false
+      },
+      "result": {
+        "evidence": {
+          "adapter": "codex",
+          "agent": "codex",
+          "exit_code": 0,
+          "mcp_servers_enabled": false,
+          "project_rules_enabled": true,
+          "sandbox_mode": "workspace-write",
+          "session_id": "01a1516a-1022-72c3-8137-45c3c9c72216",
+          "timed_out": false,
+          "turn_completed": true,
+          "turn_failed": false
+        },
+        "final_message": "`index.html` ist geschrieben: eigenständig, deutsch, mit inline CSS/JS und funktionierendem Hell-Dunkel-Schalter. Ohne Persistenz, `aria-pressed` oder externe Ressourcen.",
+        "project_completion_verified": false,
+        "scope": "agent_turn",
+        "success": true,
+        "text": "Ich schreibe die eigenständige deutsche Seite mit inline CSS und einem einfachen Hell-Dunkel-Schalter in `index.html`.\n`index.html` ist geschrieben: eigenständig, deutsch, mit inline CSS/JS und funktionierendem Hell-Dunkel-Schalter. Ohne Persistenz, `aria-pressed` oder externe Ressourcen."
+      },
+      "error": null,
+      "attempt": 1
+    },
+    {
+      "api_version": "1",
+      "id": "codex-rework",
+      "principal": "codex",
+      "operation": "agent.execute",
+      "args": {
+        "agent": "codex",
+        "cwd": "/Users/landjunge/KiraBridge/examples/review-demo/automatic-20261019-02/site",
+        "prompt": "Bearbeite die bestehende index.html. Die folgende vorbereitete Prüfantwort kam durch KiraBridge, ausdrücklich SIMULATION. Setze sie tatsächlich um:\nSIMULATION – vorbereitete Grok-Prüfung, kein Provideraufruf: Ergänze am Hell-Dunkel-Schalter aria-pressed passend zum Zustand und speichere die Auswahl unter kirabridge-theme in localStorage. Beim Neuladen muss die Auswahl wiederhergestellt werden.\nBei gesperrtem localStorage muss der Schalter weiter funktionieren. Behalte id=theme, type=button und data-theme=light/dark. Keine Agenten, kein MCP, kein Netzwerk, keine externen Ressourcen. Nur index.html in diesem Verzeichnis bearbeiten, keine Rückfragen.",
+        "timeout": 180.0
+      },
+      "agent": "codex",
+      "parent_id": "codex-initial",
+      "state": "completed",
+      "created": 1792367291.497261,
+      "updated": 1792367320.861057,
+      "accepted": 1792367291.499152,
+      "started": 1792367292.839166,
+      "finished": 1792367320.861057,
+      "receipt": "9278c928-2249-4aea-9dcf-dba5ebcfe2e2",
+      "evidence": {
+        "adapter": "codex",
+        "agent": "codex",
+        "exit_code": 0,
+        "mcp_servers_enabled": false,
+        "project_rules_enabled": true,
+        "sandbox_mode": "workspace-write",
+        "session_id": "01a1516a-6dba-7f41-af7d-0e928d68a685",
+        "timed_out": false,
+        "turn_completed": true,
+        "turn_failed": false
+      },
+      "result": {
+        "evidence": {
+          "adapter": "codex",
+          "agent": "codex",
+          "exit_code": 0,
+          "mcp_servers_enabled": false,
+          "project_rules_enabled": true,
+          "sandbox_mode": "workspace-write",
+          "session_id": "01a1516a-6dba-7f41-af7d-0e928d68a685",
+          "timed_out": false,
+          "turn_completed": true,
+          "turn_failed": false
+        },
+        "final_message": "In index.html umgesetzt: `aria-pressed` folgt dem Dunkelmodus, die Auswahl wird unter `kirabridge-theme` gespeichert und beim Neuladen wiederhergestellt. Bei gesperrtem localStorage funktioniert der Schalter weiter.\n\nAlle Fälle erfolgreich geprüft. Nur index.html geändert.",
+        "project_completion_verified": false,
+        "scope": "agent_turn",
+        "success": true,
+        "text": "Ich passe den bestehenden Schalter in index.html an und prüfe die Zustandsanzeige sowie das Verhalten bei gesperrtem localStorage.\n\nIn index.html umgesetzt: `aria-pressed` folgt dem Dunkelmodus, die Auswahl wird unter `kirabridge-theme` gespeichert und beim Neuladen wiederhergestellt. Bei gesperrtem localStorage funktioniert der Schalter weiter.\n\nAlle Fälle erfolgreich geprüft. Nur index.html geändert."
+      },
+      "error": null,
+      "attempt": 1
+    }
+  ],
+  "messages": [
+    {
+      "api_version": "1",
+      "seq": 1,
+      "id": "59599e6d-8f67-4e1f-b790-4f9008e5836e",
+      "conversation_id": "work",
+      "position": 1,
+      "sender": "user",
+      "recipient": "codex",
+      "kind": "work",
+      "body": "Erstelle eine kleine deutsche Webseite mit funktionierendem Hell-Dunkel-Schalter.",
+      "reply_to": null,
+      "task_id": null,
+      "depth": 0,
+      "request_reply": true,
+      "created": 1792367267.468181,
+      "delivered": 1792367267.4854999,
+      "receipt": "c96c473f-669b-4783-afb2-6f4fa80b7248",
+      "acknowledged": 1792367267.499549,
+      "processing": null
+    },
+    {
+      "api_version": "1",
+      "seq": 2,
+      "id": "4ca7ae30-46f2-4723-bebd-eb844eef213a",
+      "conversation_id": "review",
+      "position": 1,
+      "sender": "codex",
+      "recipient": "grok-sim",
+      "kind": "work",
+      "body": "SIMULATION: Prüfe Auftrag 59599e6d-8f67-4e1f-b790-4f9008e5836e; Artefakt SHA256=81ec4c876258c7f3702872e99a56dcb31dabd7ec5ee76b35899126145e48294f",
+      "reply_to": null,
+      "task_id": "codex-initial",
+      "depth": 0,
+      "request_reply": true,
+      "created": 1792367291.4387572,
+      "delivered": 1792367291.449703,
+      "receipt": "fe0d6526-f76b-4418-af81-eb2f680c6eb8",
+      "acknowledged": 1792367291.46401,
+      "processing": null
+    },
+    {
+      "api_version": "1",
+      "seq": 3,
+      "id": "fa890c35-a770-4fe2-a965-f2f7b36d2d4e",
+      "conversation_id": "review",
+      "position": 2,
+      "sender": "grok-sim",
+      "recipient": "codex",
+      "kind": "answer",
+      "body": "SIMULATION – vorbereitete Grok-Prüfung, kein Provideraufruf: Ergänze am Hell-Dunkel-Schalter aria-pressed passend zum Zustand und speichere die Auswahl unter kirabridge-theme in localStorage. Beim Neuladen muss die Auswahl wiederhergestellt werden.",
+      "reply_to": "4ca7ae30-46f2-4723-bebd-eb844eef213a",
+      "task_id": "codex-initial",
+      "depth": 1,
+      "request_reply": false,
+      "created": 1792367291.4732969,
+      "delivered": 1792367291.481747,
+      "receipt": "d1a8cdbe-5fe6-4713-9e10-238d4c479f08",
+      "acknowledged": 1792367291.488699,
+      "processing": null
+    },
+    {
+      "api_version": "1",
+      "seq": 4,
+      "id": "7e546598-b9cd-4b41-8350-0b935ea91b6a",
+      "conversation_id": "work",
+      "position": 2,
+      "sender": "codex",
+      "recipient": "user",
+      "kind": "result",
+      "body": "{\"page\": \"site/index.html\", \"sha256\": \"4171290a2ed92dd61c31fe1b8ea9b65846d19fbc064c5e1b07036f5e1ae77675\", \"initial_task_id\": \"codex-initial\", \"rework_task_id\": \"codex-rework\", \"review_reply_id\": \"fa890c35-a770-4fe2-a965-f2f7b36d2d4e\", \"browser_passed\": true, \"grok\": \"SIMULATION\"}",
+      "reply_to": "59599e6d-8f67-4e1f-b790-4f9008e5836e",
+      "task_id": null,
+      "depth": 1,
+      "request_reply": false,
+      "created": 1792367326.1725628,
+      "delivered": 1792367326.1838138,
+      "receipt": "6bcc0eb1-00b6-4b73-bdb7-3d974fc43fd5",
+      "acknowledged": 1792367326.1919,
+      "processing": null
+    }
+  ],
+  "events": [
+    {
+      "at": 1792367267.45935,
+      "phase": "ready",
+      "endpoint": "isolated authenticated loopback MCP",
+      "codex_executable": "/Users/landjunge/.codex/packages/standalone/releases/0.163.0-x86_64-apple-darwin/bin/codex",
+      "max_codex_turns": 2,
+      "timeout_per_turn": 180.0
+    },
+    {
+      "at": 1792367267.480599,
+      "phase": "message_sent",
+      "message_id": "59599e6d-8f67-4e1f-b790-4f9008e5836e",
+      "sender": "user",
+      "recipient": "codex"
+    },
+    {
+      "at": 1792367267.503644,
+      "phase": "message_received",
+      "message_id": "59599e6d-8f67-4e1f-b790-4f9008e5836e",
+      "recipient": "codex"
+    },
+    {
+      "at": 1792367267.522488,
+      "phase": "codex_queued",
+      "task_id": "codex-initial",
+      "state": "queued"
+    },
+    {
+      "at": 1792367267.532303,
+      "phase": "codex_state",
+      "task_id": "codex-initial",
+      "state": "accepted"
+    },
+    {
+      "at": 1792367269.057024,
+      "phase": "codex_state",
+      "task_id": "codex-initial",
+      "state": "running"
+    },
+    {
+      "at": 1792367291.424042,
+      "phase": "codex_state",
+      "task_id": "codex-initial",
+      "state": "completed"
+    },
+    {
+      "at": 1792367291.4331698,
+      "phase": "codex_completed",
+      "task_id": "codex-initial",
+      "session_id": "01a1516a-1022-72c3-8137-45c3c9c72216"
+    },
+    {
+      "at": 1792367291.443222,
+      "phase": "message_sent",
+      "message_id": "4ca7ae30-46f2-4723-bebd-eb844eef213a",
+      "sender": "codex",
+      "recipient": "grok-sim"
+    },
+    {
+      "at": 1792367291.468333,
+      "phase": "message_received",
+      "message_id": "4ca7ae30-46f2-4723-bebd-eb844eef213a",
+      "recipient": "grok-sim"
+    },
+    {
+      "at": 1792367291.4774,
+      "phase": "message_sent",
+      "message_id": "fa890c35-a770-4fe2-a965-f2f7b36d2d4e",
+      "sender": "grok-sim",
+      "recipient": "codex"
+    },
+    {
+      "at": 1792367291.492598,
+      "phase": "message_received",
+      "message_id": "fa890c35-a770-4fe2-a965-f2f7b36d2d4e",
+      "recipient": "codex"
+    },
+    {
+      "at": 1792367291.5132291,
+      "phase": "codex_queued",
+      "task_id": "codex-rework",
+      "state": "queued"
+    },
+    {
+      "at": 1792367291.522986,
+      "phase": "codex_state",
+      "task_id": "codex-rework",
+      "state": "accepted"
+    },
+    {
+      "at": 1792367293.0497122,
+      "phase": "codex_state",
+      "task_id": "codex-rework",
+      "state": "running"
+    },
+    {
+      "at": 1792367321.000212,
+      "phase": "codex_state",
+      "task_id": "codex-rework",
+      "state": "completed"
+    },
+    {
+      "at": 1792367321.010396,
+      "phase": "codex_completed",
+      "task_id": "codex-rework",
+      "session_id": "01a1516a-6dba-7f41-af7d-0e928d68a685"
+    },
+    {
+      "at": 1792367326.163863,
+      "phase": "browser_passed",
+      "checks": [
+        "mouse changes rendered theme",
+        "aria-pressed follows state",
+        "localStorage and reload both themes",
+        "Enter and Space operate native button",
+        "390px viewport without horizontal overflow",
+        "blocked storage keeps switch usable",
+        "no page JavaScript errors"
+      ],
+      "version": "151.0.7922.34"
+    },
+    {
+      "at": 1792367326.17767,
+      "phase": "message_sent",
+      "message_id": "7e546598-b9cd-4b41-8350-0b935ea91b6a",
+      "sender": "codex",
+      "recipient": "user"
+    },
+    {
+      "at": 1792367326.196139,
+      "phase": "message_received",
+      "message_id": "7e546598-b9cd-4b41-8350-0b935ea91b6a",
+      "recipient": "user"
+    },
+    {
+      "at": 1792367326.259582,
+      "phase": "completed",
+      "tasks": 2,
+      "messages": 4,
+      "final_sha256": "4171290a2ed92dd61c31fe1b8ea9b65846d19fbc064c5e1b07036f5e1ae77675",
+      "audit_valid": true
+    }
+  ],
+  "automatic_retries": 0,
+  "task_events": {
+    "codex-initial": {
+      "events": [
+        {
+          "seq": 1,
+          "at": 1792367267.507862,
+          "state": "created",
+          "evidence": {
+            "persisted": true
+          }
+        },
+        {
+          "seq": 2,
+          "at": 1792367267.507862,
+          "state": "queued",
+          "evidence": {
+            "approval_source": "principal_policy",
+            "persisted": true
+          }
+        },
+        {
+          "seq": 3,
+          "at": 1792367267.5098429,
+          "state": "accepted",
+          "evidence": {
+            "receipt_id": "c246b21f-3471-4758-b056-f9bd0825c50f",
+            "receiver": "kirabridge.dispatcher",
+            "worker": "3e59a92e-410d-4f09-9886-bc64ff4deceb"
+          }
+        },
+        {
+          "seq": 4,
+          "at": 1792367267.683053,
+          "state": "accepted",
+          "evidence": {
+            "agent": "codex",
+            "evidence_type": "local_process_spawned",
+            "pid": 76570
+          }
+        },
+        {
+          "seq": 5,
+          "at": 1792367268.281481,
+          "state": "accepted",
+          "evidence": {
+            "agent": "codex",
+            "event": "thread.started",
+            "session_id": "01a1516a-1022-72c3-8137-45c3c9c72216"
+          }
+        },
+        {
+          "seq": 6,
+          "at": 1792367268.853693,
+          "state": "running",
+          "evidence": {
+            "agent": "codex",
+            "event": "turn.started",
+            "session_id": "01a1516a-1022-72c3-8137-45c3c9c72216"
+          }
+        },
+        {
+          "seq": 7,
+          "at": 1792367291.362474,
+          "state": "completed",
+          "evidence": {
+            "adapter": "codex",
+            "agent": "codex",
+            "exit_code": 0,
+            "mcp_servers_enabled": false,
+            "project_rules_enabled": true,
+            "sandbox_mode": "workspace-write",
+            "session_id": "01a1516a-1022-72c3-8137-45c3c9c72216",
+            "timed_out": false,
+            "turn_completed": true,
+            "turn_failed": false
+          }
+        }
+      ]
+    },
+    "codex-rework": {
+      "events": [
+        {
+          "seq": 8,
+          "at": 1792367291.497261,
+          "state": "created",
+          "evidence": {
+            "persisted": true
+          }
+        },
+        {
+          "seq": 9,
+          "at": 1792367291.497261,
+          "state": "queued",
+          "evidence": {
+            "approval_source": "principal_policy",
+            "persisted": true
+          }
+        },
+        {
+          "seq": 10,
+          "at": 1792367291.499152,
+          "state": "accepted",
+          "evidence": {
+            "receipt_id": "9278c928-2249-4aea-9dcf-dba5ebcfe2e2",
+            "receiver": "kirabridge.dispatcher",
+            "worker": "3e59a92e-410d-4f09-9886-bc64ff4deceb"
+          }
+        },
+        {
+          "seq": 11,
+          "at": 1792367291.667768,
+          "state": "accepted",
+          "evidence": {
+            "agent": "codex",
+            "evidence_type": "local_process_spawned",
+            "pid": 76693
+          }
+        },
+        {
+          "seq": 12,
+          "at": 1792367292.2254221,
+          "state": "accepted",
+          "evidence": {
+            "agent": "codex",
+            "event": "thread.started",
+            "session_id": "01a1516a-6dba-7f41-af7d-0e928d68a685"
+          }
+        },
+        {
+          "seq": 13,
+          "at": 1792367292.839166,
+          "state": "running",
+          "evidence": {
+            "agent": "codex",
+            "event": "turn.started",
+            "session_id": "01a1516a-6dba-7f41-af7d-0e928d68a685"
+          }
+        },
+        {
+          "seq": 14,
+          "at": 1792367320.861057,
+          "state": "completed",
+          "evidence": {
+            "adapter": "codex",
+            "agent": "codex",
+            "exit_code": 0,
+            "mcp_servers_enabled": false,
+            "project_rules_enabled": true,
+            "sandbox_mode": "workspace-write",
+            "session_id": "01a1516a-6dba-7f41-af7d-0e928d68a685",
+            "timed_out": false,
+            "turn_completed": true,
+            "turn_failed": false
+          }
+        }
+      ]
+    }
+  },
+  "initial_sha256": "81ec4c876258c7f3702872e99a56dcb31dabd7ec5ee76b35899126145e48294f",
+  "rework_reply_id": "fa890c35-a770-4fe2-a965-f2f7b36d2d4e",
+  "final_sha256": "4171290a2ed92dd61c31fe1b8ea9b65846d19fbc064c5e1b07036f5e1ae77675",
+  "browser": {
+    "passed": true,
+    "kind": "real Chromium browser",
+    "page_sha256": "4171290a2ed92dd61c31fe1b8ea9b65846d19fbc064c5e1b07036f5e1ae77675",
+    "checks": [
+      "mouse changes rendered theme",
+      "aria-pressed follows state",
+      "localStorage and reload both themes",
+      "Enter and Space operate native button",
+      "390px viewport without horizontal overflow",
+      "blocked storage keeps switch usable",
+      "no page JavaScript errors"
+    ],
+    "browser_version": "151.0.7922.34"
+  },
+  "message_events": [
+    {
+      "events": [
+        {
+          "seq": 1,
+          "message_id": "59599e6d-8f67-4e1f-b790-4f9008e5836e",
+          "at": 1792367267.468277,
+          "kind": "message.queued",
+          "evidence": {
+            "automatic_dispatch": false,
+            "content_sha256": "3f5dd675cfd7b0842e4632f98faa7769d6265bcd0c9daaa063f8019f775232fe",
+            "conversation_id": "work",
+            "position": 1,
+            "recipient": "codex"
+          }
+        },
+        {
+          "seq": 2,
+          "message_id": "59599e6d-8f67-4e1f-b790-4f9008e5836e",
+          "at": 1792367267.4855318,
+          "kind": "message.delivered",
+          "evidence": {
+            "receipt": "c96c473f-669b-4783-afb2-6f4fa80b7248"
+          }
+        },
+        {
+          "seq": 3,
+          "message_id": "59599e6d-8f67-4e1f-b790-4f9008e5836e",
+          "at": 1792367267.499594,
+          "kind": "message.acknowledged",
+          "evidence": {
+            "receipt": "c96c473f-669b-4783-afb2-6f4fa80b7248"
+          }
+        }
+      ]
+    },
+    {
+      "events": [
+        {
+          "seq": 4,
+          "message_id": "4ca7ae30-46f2-4723-bebd-eb844eef213a",
+          "at": 1792367291.438812,
+          "kind": "message.queued",
+          "evidence": {
+            "automatic_dispatch": false,
+            "content_sha256": "9dbe0694f6df008d0d0c7552f53606f2618731fe7597ae2c17e0a1312f3c7acb",
+            "conversation_id": "review",
+            "position": 1,
+            "recipient": "grok-sim"
+          }
+        },
+        {
+          "seq": 5,
+          "message_id": "4ca7ae30-46f2-4723-bebd-eb844eef213a",
+          "at": 1792367291.449764,
+          "kind": "message.delivered",
+          "evidence": {
+            "receipt": "fe0d6526-f76b-4418-af81-eb2f680c6eb8"
+          }
+        },
+        {
+          "seq": 6,
+          "message_id": "4ca7ae30-46f2-4723-bebd-eb844eef213a",
+          "at": 1792367291.464032,
+          "kind": "message.acknowledged",
+          "evidence": {
+            "receipt": "fe0d6526-f76b-4418-af81-eb2f680c6eb8"
+          }
+        }
+      ]
+    },
+    {
+      "events": [
+        {
+          "seq": 7,
+          "message_id": "fa890c35-a770-4fe2-a965-f2f7b36d2d4e",
+          "at": 1792367291.473332,
+          "kind": "message.queued",
+          "evidence": {
+            "automatic_dispatch": false,
+            "content_sha256": "9474dfabfb031bc7a25c8b68f852f3f5b4fa82d890ee152d5998da7b922d5042",
+            "conversation_id": "review",
+            "position": 2,
+            "recipient": "codex"
+          }
+        },
+        {
+          "seq": 8,
+          "message_id": "fa890c35-a770-4fe2-a965-f2f7b36d2d4e",
+          "at": 1792367291.481764,
+          "kind": "message.delivered",
+          "evidence": {
+            "receipt": "d1a8cdbe-5fe6-4713-9e10-238d4c479f08"
+          }
+        },
+        {
+          "seq": 9,
+          "message_id": "fa890c35-a770-4fe2-a965-f2f7b36d2d4e",
+          "at": 1792367291.488715,
+          "kind": "message.acknowledged",
+          "evidence": {
+            "receipt": "d1a8cdbe-5fe6-4713-9e10-238d4c479f08"
+          }
+        }
+      ]
+    },
+    {
+      "events": [
+        {
+          "seq": 10,
+          "message_id": "7e546598-b9cd-4b41-8350-0b935ea91b6a",
+          "at": 1792367326.1726332,
+          "kind": "message.queued",
+          "evidence": {
+            "automatic_dispatch": false,
+            "content_sha256": "db067f8f6f931db19353697a1e9542e68615a6859165c2255c0798f82fd7cc1e",
+            "conversation_id": "work",
+            "position": 2,
+            "recipient": "user"
+          }
+        },
+        {
+          "seq": 11,
+          "message_id": "7e546598-b9cd-4b41-8350-0b935ea91b6a",
+          "at": 1792367326.183831,
+          "kind": "message.delivered",
+          "evidence": {
+            "receipt": "6bcc0eb1-00b6-4b73-bdb7-3d974fc43fd5"
+          }
+        },
+        {
+          "seq": 12,
+          "message_id": "7e546598-b9cd-4b41-8350-0b935ea91b6a",
+          "at": 1792367326.191923,
+          "kind": "message.acknowledged",
+          "evidence": {
+            "receipt": "6bcc0eb1-00b6-4b73-bdb7-3d974fc43fd5"
+          }
+        }
+      ]
+    }
+  ],
+  "audit": {
+    "valid": true,
+    "records": 29,
+    "head": "a49411e01a3c0407db388c18bb70048d60a3276e9447a097e6e999371a159d56"
+  },
+  "codex_cli_run_verified": true,
+  "automatic_workflow_verified": true
+}

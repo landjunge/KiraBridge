@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="de" data-theme="light">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Ein heller Moment</title>
+  <style>
+    :root { color-scheme: light; --bg: #f5f2eb; --card: #fffdf8; --text: #252d29; --muted: #59665e; --accent: #25664a; --line: #d7ded5; }
+    html[data-theme="dark"] { color-scheme: dark; --bg: #17221d; --card: #223029; --text: #f1f4eb; --muted: #bdcbbf; --accent: #a3e1b9; --line: #46594b; }
+    * { box-sizing: border-box; }
+    body { margin: 0; min-height: 100vh; background: var(--bg); color: var(--text); font-family: system-ui, sans-serif; line-height: 1.6; }
+    main { width: min(100% - 2rem, 720px); margin: 0 auto; padding: 4rem 0; }
+    header { display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap; margin-bottom: 3rem; }
+    .brand { font-weight: 750; letter-spacing: .04em; }
+    button { padding: .7rem 1rem; border: 1px solid var(--accent); border-radius: 999px; background: var(--card); color: var(--accent); font: inherit; font-weight: 650; cursor: pointer; }
+    button:hover { background: var(--line); }
+    button:focus-visible { outline: 3px solid var(--accent); outline-offset: 4px; }
+    article { padding: clamp(1.5rem, 5vw, 3rem); border: 1px solid var(--line); border-radius: 24px; background: var(--card); }
+    .eyebrow { margin: 0; color: var(--accent); font-weight: 650; }
+    h1 { margin: .6rem 0 1rem; font-size: clamp(2rem, 7vw, 3.5rem); line-height: 1.15; letter-spacing: -.04em; }
+    p { color: var(--muted); }
+    footer { margin-top: 2rem; color: var(--muted); font-size: .9rem; }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <span class="brand">PAUSENZEIT</span>
+      <button id="theme" type="button" aria-pressed="false">Dunkelmodus aktivieren</button>
+    </header>
+    <article>
+      <p class="eyebrow">Weniger Trubel, mehr Ruhe.</p>
+      <h1>Ein kleiner Moment für dich.</h1>
+      <p>Atme durch, lass den Blick schweifen und gönn dir eine Pause vom Alltag.</p>
+      <p>Ob hell oder dunkel: Mit dem Schalter oben passt du diese Seite an deine Stimmung an.</p>
+    </article>
+    <footer>Einfach ankommen. Ganz ohne Eile.</footer>
+  </main>
+  <script>
+    const themeButton = document.getElementById('theme');
+    function applyTheme(theme) {
+      const dark = theme === 'dark';
+      document.documentElement.dataset.theme = dark ? 'dark' : 'light';
+      themeButton.setAttribute('aria-pressed', String(dark));
+      themeButton.textContent = dark ? 'Hellmodus aktivieren' : 'Dunkelmodus aktivieren';
+    }
+
+    let savedTheme;
+    try {
+      savedTheme = localStorage.getItem('kirabridge-theme');
+    } catch {}
+    applyTheme(savedTheme === 'dark' || savedTheme === 'light'
+      ? savedTheme : document.documentElement.dataset.theme);
+
+    themeButton.addEventListener('click', () => {
+      const theme = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
+      applyTheme(theme);
+      try {
+        localStorage.setItem('kirabridge-theme', theme);
+      } catch {}
+    });
+  </script>
+</body>
+</html>
