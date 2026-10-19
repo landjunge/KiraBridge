@@ -1,4 +1,9 @@
-# Architektur v1
+# Architektur
+
+Stand 20. Oktober 2026: produktiver Ausgangspunkt `0.8.0rc3`, Quellpin
+`4188f001d405a9f04ee63f6bbe1b088c6f39d26e`, Dokumentation `d9727ac1`,
+portable Prüfergänzung `5680921`. Die schrittweise Weiterentwicklung und ihre
+tatsächlichen Abnahmen stehen in [ARCHITECTURE-STAGES-20261020.md](ARCHITECTURE-STAGES-20261020.md).
 
 ## Abhängigkeiten und Verantwortung
 
@@ -7,7 +12,7 @@ MCP und CLI sind Eingänge in dieselbe `Bridge`. Sie reichen versionierte Anfrag
 | Modul | Verantwortung |
 |---|---|
 | bridge_core | Konfiguration, typisierte Eingaben, Fehlercodes, Operationsregister, Orchestrierung |
-| task_manager | SQLite-Schema v1, Queue, Empfangsbelege, Zustandsmaschine, Leases, Wiederherstellung |
+| task_manager | SQLite-Schema v2, Queue, Empfangsbelege, Zustandsmaschine, Leases, Wiederherstellung |
 | agent_manager | Identitäten, Adapterregister, Codex-JSONL, Grok-ACP und Grok-API |
 | mcp_gateway | Offizielles SDK, stdio/Streamable HTTP, ausgehende getrennte Client-Verbindungen |
 | terminal_manager | Begrenzte Prozesssitzungen, Ausgaben, Zeitlimits, Prozessgruppen |
@@ -28,7 +33,7 @@ Es gibt drei direkte Laufzeitabhängigkeiten: `mcp`, `httpx` und `uvicorn`. Pyda
 - Agenten: `AgentAdapter.interface_version == "1"`; `register(kind, adapter)` verbietet doppelte Namen und fremde Versionen.
 - MCP-Protokoll: Das offizielle SDK übernimmt die Initialisierung und Versionsaushandlung. Die eigene API-Version ist davon unabhängig.
 - Grok Build: ACP-Protokollversion 1; andere Initialisierungsantworten werden abgelehnt.
-- Datenbank: `PRAGMA user_version=1`; zukünftige Schema-Versionen werden nicht still geöffnet. Weitere Migrationen müssen vor Einführung einer neuen Schema-Version ergänzt werden.
+- Datenbank: `PRAGMA user_version=2`; Version 1 wird über die vorhandene Migration auf 2 angehoben. Zukünftige Schema-Versionen werden nicht still geöffnet. Weitere Migrationen benötigen einen ausdrücklichen Rückkehrplan; eine ältere Datenbankkopie darf keine inzwischen gespeicherten Aufträge ersetzen.
 
 Eine neue Agentenart implementiert das `AgentAdapter`-Protokoll und wird in `bridge.agents.register(...)` registriert. `AgentConfig.kind` wählt den Adapter, der konfigurierte Name ist die auftragsgebundene Agentenidentität. Erweiterungen für Claude Code, Gemini CLI, OpenCode und A2A benötigen entsprechende eigene Protokollimplementierungen; vorhandene Prozesse sind kein Ersatz für diese Adapter.
 
