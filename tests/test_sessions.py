@@ -12,6 +12,7 @@ from kirabridge.session_manager import SessionInput, SessionManager, SessionOpen
 
 
 async def test_native_catalog_binds_window_tty_and_unambiguous_root_pid(bridge, monkeypatch):
+    monkeypatch.setattr("kirabridge.session_manager.sys", SimpleNamespace(platform="darwin"))
     manager = SessionManager(bridge)
 
     async def native(*args, **kwargs):
