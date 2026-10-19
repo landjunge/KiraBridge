@@ -238,26 +238,39 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
         return safe(action)
 
     @server.tool(annotations=write)
-    def task_submit(
+    async def task_submit(
         request: TaskRequest, ctx: Context, approval: str = "", completion_target: str | None = None
     ) -> dict[str, Any]:
         """Queue a task; automatic mode needs no token, manual mode requires an exact-task grant.
 
         Repeating its idempotency key never executes it twice.
+        For the Grok app, waits briefly and returns conversation_return with the
+        actual result. If continue_required is true, call task_get with this same ID.
         """
-        return safe(
+        result = safe(
             lambda: bridge.submit(
                 identity(ctx), request, approval, completion_target=completion_target
             )
         )
+        from kirabridge.grok_connector.conversation import result_for_conversation
+
+        return await result_for_conversation(bridge, identity(ctx), result)
 
     @server.tool(annotations=read)
-    def task_get(task_id: str, ctx: Context) -> dict[str, Any]:
+    async def task_get(task_id: str, ctx: Context) -> dict[str, Any]:
         """Read own task and evidence; completed file.image also returns bounded MCP image content.
 
         The PNG is a saved snapshot, not a fresh read. Other tasks retain their JSON format.
+        For the Grok app, waits for ongoing work and returns conversation_return.
+        Keep waiting on this same task when continue_required is true; never resubmit it.
         """
-        return safe(lambda: image_task_result(bridge.task(identity(ctx), task_id)))
+        from kirabridge.grok_connector.conversation import enabled_for, result_for_conversation
+
+        name = identity(ctx)
+        result = safe(lambda: bridge.task(name, task_id))
+        if enabled_for(bridge, name):
+            result = await result_for_conversation(bridge, name, result)
+        return safe(lambda: image_task_result(result))
 
     @server.tool(annotations=read)
     def task_diagnose(task_id: str, ctx: Context) -> dict[str, Any]:
@@ -270,7 +283,7 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
         return safe(lambda: task_report(bridge, identity(ctx), task_id))
 
     @server.tool(annotations=write)
-    def task_request(
+    async def task_request(
         request: TaskRequest, ctx: Context, completion_target: str | None = None
     ) -> dict[str, Any]:
         """Queue permitted work automatically, or request approval if this identity is manual.
@@ -283,6 +296,9 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
         Check approval_required: false means no browser click is needed.
         Only when true, give the operator local_approval_url to approve in their Mac browser.
         Do not ask them to copy task IDs between chats. A queued receipt is not proof of execution.
+        For the Grok app, waits briefly and includes conversation_return. Speak its
+        actual result when final is true. If continue_required, call task_get with
+        this same task ID before finishing the conversation. This does not attest audio playback.
         """
 
         def action():
@@ -306,10 +322,12 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
                 },
             }
 
-        return safe(action)
+        from kirabridge.grok_connector.conversation import result_for_conversation
+
+        return await result_for_conversation(bridge, identity(ctx), safe(action))
 
     @server.tool(annotations=write)
-    def session_open(
+    async def session_open(
         cwd: str,
         task_id: str,
         idempotency_key: str,
@@ -322,7 +340,7 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
         pane_id and expected_pid; session_read reads output, session.input sends input.
         Reuse task_id and idempotency_key for retries of this same request.
         """
-        return task_request(
+        return await task_request(
             TaskRequest(
                 task_id=task_id,
                 idempotency_key=idempotency_key,
