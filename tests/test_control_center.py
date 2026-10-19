@@ -171,6 +171,45 @@ async def test_action_retry_does_not_start_a_second_process(bridge, monkeypatch)
 
 
 @pytest.mark.asyncio
+async def test_terminal_start_keeps_configured_local_model_and_bridge(bridge, monkeypatch):
+    control = ApprovalConsole(bridge, KEY).control_center
+    config = bridge.config
+    config._source_path = "/private/config.toml"
+    config.principals["local"].permission_level = "full"
+    config.agents["opencode"] = AgentConfig(
+        kind="opencode",
+        executable="/bin/echo",
+        model="ollama/local-model:latest",
+        base_url="http://127.0.0.1:11434/v1",
+        bridge_tools=True,
+    )
+    monkeypatch.setattr(control, "config", lambda: config)
+
+    async def snapshot(**kw):
+        return {"services": [{"id": "opencode", "active": False}]}
+
+    captured = {}
+
+    async def rpc(tool, arguments):
+        captured.update(tool=tool, arguments=arguments)
+        return {"state": "completed"}
+
+    monkeypatch.setattr(control, "snapshot", snapshot)
+    monkeypatch.setattr(control, "rpc", rpc)
+    await control.service_action("opencode", "start", "model-start")
+    assert captured["tool"] == "session_open"
+    argv = captured["arguments"]["argv"]
+    settings = json.loads(
+        next(a.split("=", 1)[1] for a in argv if a.startswith("OPENCODE_CONFIG_CONTENT="))
+    )
+    assert settings["model"] == "ollama/local-model:latest"
+    assert settings["provider"]["ollama"]["options"]["baseURL"] == "http://127.0.0.1:11434/v1"
+    assert "opencode" in settings["mcp"]["kirabridge"]["command"]
+    assert argv[argv.index("-u") + 1] == config.agents["opencode"].api_key_env
+    assert argv[-2:] == ["--model", "ollama/local-model:latest"]
+
+
+@pytest.mark.asyncio
 async def test_protocol_uses_event_time_state_not_later_completion(bridge):
     app = ApprovalConsole(bridge, KEY)
     path = bridge.config.principals["local"].roots[0]

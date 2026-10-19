@@ -30,6 +30,38 @@ def bridge_server(source_path, identity):
     }
 
 
+def opencode_settings(profile, server, *, full):
+    settings = {
+        "mcp": {
+            "kirabridge": {
+                "type": "local",
+                "command": [server["command"], *server["args"]],
+                "enabled": True,
+            }
+        }
+    }
+    if full:
+        settings["permission"] = "allow"
+    if profile.model:
+        settings["model"] = profile.model
+    if profile.base_url and profile.model:
+        provider, model = profile.model.split("/", 1)
+        settings["provider"] = {
+            provider: {
+                "npm": "@ai-sdk/openai-compatible",
+                "options": {"baseURL": profile.base_url},
+                "models": {
+                    model: {
+                        "name": model,
+                        "tool_call": True,
+                        "limit": {"context": 32768, "output": 4096},
+                    }
+                },
+            }
+        }
+    return settings
+
+
 class FullAccessAdapter:
     def __init__(self, terminal, source_path, permission_level="full"):
         self.terminal, self.source_path = terminal, source_path
@@ -133,34 +165,10 @@ class FullAccessAdapter:
                     args.prompt,
                 ]
             elif config.kind == "opencode":
-                native = {
-                    "permission": "allow",
-                    "mcp": {
-                        "kirabridge": {
-                            "type": "local",
-                            "command": [server["command"], *server["args"]],
-                            "enabled": True,
-                        }
-                    },
-                }
+                native = opencode_settings(config, server, full=True)
                 env["OPENCODE_CONFIG_CONTENT"] = json.dumps(native)
                 if config.base_url and config.model:
-                    provider, model = config.model.split("/", 1)
-                    native["provider"] = {
-                        provider: {
-                            "npm": "@ai-sdk/openai-compatible",
-                            "options": {"baseURL": config.base_url},
-                            "models": {
-                                model: {
-                                    "name": model,
-                                    "tool_call": True,
-                                    "limit": {"context": 32768, "output": 4096},
-                                }
-                            },
-                        }
-                    }
                     env.pop(config.api_key_env, None)
-                    env["OPENCODE_CONFIG_CONTENT"] = json.dumps(native)
                 env["OPENCODE_PERMISSION"] = '{"*":"allow"}'
                 command += ["run", "--format", "json"]
                 stdin = args.prompt.encode()

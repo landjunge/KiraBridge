@@ -581,18 +581,15 @@ class ControlCenter:
                     if full:
                         argv += ["--approval-mode", "yolo"]
                 elif name == "opencode":
-                    native = {
-                        "mcp": {
-                            "kirabridge": {
-                                "type": "local",
-                                "enabled": True,
-                                "command": [spec["command"], *spec["args"]],
-                            }
-                        }
-                    }
-                    if full:
-                        native["permission"] = "allow"
-                    argv = ["/usr/bin/env", "OPENCODE_CONFIG_CONTENT=" + json.dumps(native), *argv]
+                    from kirabridge.agent_manager.full_access import opencode_settings
+
+                    native = opencode_settings(profile, spec, full=full)
+                    environment = ["/usr/bin/env"]
+                    if profile.base_url and profile.model:
+                        environment += ["-u", profile.api_key_env]
+                    argv = [*environment, "OPENCODE_CONFIG_CONTENT=" + json.dumps(native), *argv]
+            if profile.model:
+                argv += ["--model", profile.model]
             return await self.rpc(
                 "session_open",
                 {
