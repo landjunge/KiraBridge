@@ -101,6 +101,10 @@ class Store:
                     for statement in script.split(";"):
                         if statement.strip():
                             self.db.execute(statement)
+                from kirabridge.completion_manager import SCHEMA as COMPLETION_SCHEMA
+
+                for statement in COMPLETION_SCHEMA:
+                    self.db.execute(statement)
                 self.db.execute(
                     "CREATE TABLE IF NOT EXISTS handoff_bindings ("
                     "id TEXT PRIMARY KEY, principal TEXT NOT NULL, operator_ref TEXT NOT NULL, "
@@ -207,10 +211,14 @@ class Store:
                     task_id,
                 ),
             )
-            self.db.execute(
+            event = self.db.execute(
                 "INSERT INTO events(task_id,at,state,evidence) VALUES(?,?,?,?)",
                 (task_id, now, state, canonical(evidence)),
             )
+            from kirabridge.completion_manager import TERMINAL, record_task_completion
+
+            if state in TERMINAL:
+                record_task_completion(self, task_id, event.lastrowid)
             self.audit(
                 "task.transition",
                 row["principal"],

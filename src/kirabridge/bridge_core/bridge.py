@@ -122,6 +122,9 @@ class Bridge:
             preflight=lambda task: task_preflight(self, task),
             runtime=runtime_ref(self.runtime),
         )
+        from kirabridge.completion_manager import CompletionManager
+
+        self.completions = CompletionManager(self.store, self.security)
         self.messages = MessageManager(config, self.store, self.security)
         self.message_receiver = MessageReceiver(self)
 
@@ -136,18 +139,31 @@ class Bridge:
                 "invalid_arguments", "Arguments do not match the operation schema"
             ) from None
 
-    def submit(self, principal: str, request: TaskRequest, approval: str = "") -> dict:
+    def submit(
+        self,
+        principal: str,
+        request: TaskRequest,
+        approval: str = "",
+        *,
+        completion_target: str | None = None,
+    ) -> dict:
         try:
             self.validate(request)
-            return self.tasks.enqueue(principal, request, approval)
+            return self.tasks.enqueue(
+                principal, request, approval, completion_target=completion_target
+            )
         except BridgeError as exc:
             self.rejection(principal, request, exc)
             raise
 
-    def prepare(self, principal: str, request: TaskRequest) -> dict:
+    def prepare(
+        self, principal: str, request: TaskRequest, *, completion_target: str | None = None
+    ) -> dict:
         try:
             self.validate(request)
-            return self.tasks.enqueue(principal, request, "", pending=True)
+            return self.tasks.enqueue(
+                principal, request, "", pending=True, completion_target=completion_target
+            )
         except BridgeError as exc:
             self.rejection(principal, request, exc)
             raise
@@ -186,6 +202,13 @@ class Bridge:
                 "legacy_connector_schema": "If a cached task_* connector requires "
                 "completion_subscription, the root value empty string is accepted "
                 "as no subscription; use fresh action_* schemas after metadata refresh.",
+            },
+            "completion_channel": {
+                "receive_tool": "completion_receive",
+                "ack_tool": "completion_ack",
+                "default_target": "default",
+                "mode": "durable_inbox_with_waiting_consumer",
+                "unsolicited_chatgpt_wakeup": "unavailable_on_current_transport",
             },
             "local_approval_url": LOCAL_APPROVAL_URL,
             "approval_mode": policy.approval_mode,

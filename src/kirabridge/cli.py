@@ -18,7 +18,7 @@ from kirabridge.bridge_core.models import BridgeError, State, TaskRequest
 
 
 def emit(value, *, stream=None):
-    print(json.dumps(value, ensure_ascii=False, indent=2), file=stream or sys.stdout)
+    print(json.dumps(value, ensure_ascii=False, indent=2), file=stream or sys.stdout, flush=True)
 
 
 def parse_request(path: str) -> TaskRequest:
@@ -58,6 +58,15 @@ async def execute(args) -> None:
         emit({"config": str(destination), "workspace": str(workspace)})
         return
     config = load_config(args.config)
+    if args.command == "watch":
+        from kirabridge.completion_client import CompletionClient
+        from kirabridge.local_runtime import peer
+
+        async with CompletionClient(peer(config, args.principal)) as client:
+            await client.listen(
+                args.target, lambda notice: emit(notice), once=args.once, timeout=args.timeout
+            )
+        return
     if args.command == "readiness":
         from kirabridge.local_runtime import connection_observer, peer
         from kirabridge.mcp_gateway.client import MCPClientPool
@@ -475,6 +484,10 @@ def main() -> None:
                 "--approve", action="store_true", help="Explicitly approve this exact request"
             )
             command.add_argument("--wait", type=float, default=3700)
+    watch = sub.add_parser("watch", help="Receive/print own completions automatically, then ack")
+    watch.add_argument("--target", default="default", help="Stable requesting assistant/session ID")
+    watch.add_argument("--once", action="store_true")
+    watch.add_argument("--timeout", type=float, help="Optional total listener deadline in seconds")
     task = sub.add_parser("task")
     task.add_argument("task_id")
     tasks = sub.add_parser("tasks")

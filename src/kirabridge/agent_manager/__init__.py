@@ -86,14 +86,44 @@ class CodexAdapter:
         session, completed, failed, started = owned_resume_session, False, False, False
         messages: list[str] = []
         message_bytes = 0
+        provider_error = None
 
         async def event(line: str):
-            nonlocal session, completed, failed, started, message_bytes
+            nonlocal session, completed, failed, started, message_bytes, provider_error
             try:
                 value = json.loads(line)
             except ValueError:
                 return
             kind = value.get("type")
+            if kind in {"error", "turn.failed"}:
+                error = value.get("error")
+                code = error.get("code") if isinstance(error, dict) else None
+                categories = {
+                    "insufficient_quota": "quota_exhausted",
+                    "quota_exceeded": "quota_exhausted",
+                    "rate_limit_exceeded": "rate_limit",
+                    "invalid_api_key": "authentication",
+                    "authentication_error": "authentication",
+                }
+                if isinstance(code, str) and code in categories:
+                    from kirabridge.bridge_core.models import digest
+
+                    provider_error = {
+                        "provider": "codex",
+                        "code": code,
+                        "category": categories[code],
+                        "source": "codex_jsonl",
+                        "event": kind,
+                        "event_sha256": digest(value),
+                    }
+                    await progress(
+                        {
+                            "agent": args.agent,
+                            "session_id": session,
+                            "event": "provider_error_observed",
+                            "provider_error": provider_error,
+                        }
+                    )
             if kind == "thread.started" and isinstance(value.get("thread_id"), str):
                 if session and session != value["thread_id"]:
                     raise UncertainExecution("agent_identity", "Codex changed session identity")
@@ -160,6 +190,7 @@ class CodexAdapter:
             "agent": args.agent,
             "adapter": "codex",
             "sandbox_mode": config.sandbox_mode,
+            "pid": result["pid"],
             "project_rules_enabled": True,
             "mcp_servers_enabled": False,
             "session_id": session,
@@ -167,8 +198,11 @@ class CodexAdapter:
             "turn_completed": completed,
             "turn_failed": failed,
             "timed_out": result["timed_out"],
+            "terminated": result["terminated"],
+            "provider_error": provider_error,
         }
         if not completed and not failed:
+            await progress(evidence)
             raise UncertainExecution("agent_unconfirmed", "No Codex turn completion evidence")
         if not started:
             await running({**evidence, "event": "terminal_response_observed"})
@@ -207,11 +241,24 @@ class GrokAPIAdapter:
                     },
                 ) as response:
                     if response.status_code != 200:
-                        if response.status_code >= 500 or response.status_code == 408:
-                            raise UncertainExecution(
-                                "provider_unknown", "Provider outcome is unknown"
-                            )
-                        raise BridgeError("provider_rejected", "Grok API rejected the request")
+                        uncertain = response.status_code >= 500 or response.status_code == 408
+                        exc = (
+                            UncertainExecution("provider_unknown", "Provider outcome is unknown")
+                            if uncertain
+                            else BridgeError("provider_rejected", "Grok API rejected the request")
+                        )
+                        exc.provider_error = {
+                            "provider": "xai",
+                            "source": "provider_http_status",
+                            "http_status": response.status_code,
+                            "category": {
+                                401: "authentication",
+                                403: "authentication",
+                                429: "rate_limit",
+                            }.get(response.status_code, "provider"),
+                        }
+                        # HTTP 429 is rate limiting, not evidence of exhausted quota.
+                        raise exc
                     async for line in bounded_lines(response):
                         if line == "data: [DONE]":
                             break

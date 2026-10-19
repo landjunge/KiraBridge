@@ -63,7 +63,11 @@ class MessageManager:
         result["request_reply"] = bool(result["request_reply"])
         return {"api_version": "1", **result}
 
-    def send(self, principal, message: MessageSend):
+    def send(self, principal, message: MessageSend, *, completion_target=None):
+        from kirabridge.completion_manager import valid_target
+
+        if completion_target is not None:
+            valid_target(completion_target)
         policy = self._identity(principal, "message.send")
         target = self.config.principals.get(message.recipient)
         if (
@@ -109,6 +113,16 @@ class MessageManager:
             if previous:
                 if previous["request_hash"] != hashed:
                     raise BridgeError("idempotency_conflict", "Key belongs to a different message")
+                route = self.store.db.execute(
+                    "SELECT target FROM message_completion_routes WHERE message_id=?",
+                    (previous["id"],),
+                ).fetchone()
+                if completion_target is not None and completion_target != (
+                    route[0] if route else "default"
+                ):
+                    raise BridgeError(
+                        "completion_route_conflict", "Original return target is fixed"
+                    )
                 return self.get(principal, previous["id"])
             conversation = self.store.db.execute(
                 "SELECT * FROM conversations WHERE id=?", (message.conversation_id,)
@@ -183,6 +197,10 @@ class MessageManager:
                 ),
             )
             if message.dispatch:
+                self.store.db.execute(
+                    "INSERT INTO message_completion_routes(message_id,target) VALUES(?,?)",
+                    (message_id, completion_target or "default"),
+                )
                 self.store.db.execute(
                     "INSERT INTO message_jobs(message_id,state) VALUES(?,'queued')", (message_id,)
                 )

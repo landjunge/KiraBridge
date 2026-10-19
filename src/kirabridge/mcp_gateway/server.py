@@ -25,7 +25,10 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
         "Only when approval_required is true, send the operator to local_approval_url. "
         "Do not ask for approval when approval_required is false. "
         "Do not ask them to copy task IDs between chats. "
-        "Acceptance is a receipt, not execution. Query task_get and task_events for evidence. "
+        "Acceptance is a receipt, not execution. For completion, set completion_target and keep "
+        "a completion_receive consumer active; ack only after processing. "
+        "This return channel cannot wake an inactive ChatGPT chat. "
+        "Query task_get and task_events for additional evidence. "
         "Use message_send/message_receive for addressed peer communication. "
         "Automatic message receivers use separate managed sessions, not existing interactive ones; "
         "check message_channel_status and message_get for actual evidence.",
@@ -181,12 +184,18 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
         return safe(action)
 
     @server.tool(annotations=write)
-    def task_submit(request: TaskRequest, ctx: Context, approval: str = "") -> dict[str, Any]:
+    def task_submit(
+        request: TaskRequest, ctx: Context, approval: str = "", completion_target: str | None = None
+    ) -> dict[str, Any]:
         """Queue a task; automatic mode needs no token, manual mode requires an exact-task grant.
 
         Repeating its idempotency key never executes it twice.
         """
-        return safe(lambda: bridge.submit(identity(ctx), request, approval))
+        return safe(
+            lambda: bridge.submit(
+                identity(ctx), request, approval, completion_target=completion_target
+            )
+        )
 
     @server.tool(annotations=read)
     def task_get(task_id: str, ctx: Context) -> dict[str, Any]:
@@ -207,22 +216,40 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
         return safe(lambda: task_report(bridge, identity(ctx), task_id))
 
     @server.tool(annotations=write)
-    def task_request(request: TaskRequest, ctx: Context) -> dict[str, Any]:
+    def task_request(
+        request: TaskRequest, ctx: Context, completion_target: str | None = None
+    ) -> dict[str, Any]:
         """Queue permitted work automatically, or request approval if this identity is manual.
 
-        Check approval_required: false means no browser click is needed; poll task_get.
+        No Events subscription is required. completion_target is optional.
+        Set a stable unique completion_target for the requesting assistant session.
+        The return route is committed with the task before dispatch. Use completion_receive
+        through a waiting consumer for the final notice, then completion_ack after processing.
+        This does not wake an inactive ChatGPT chat. task_get remains diagnostic.
+        Check approval_required: false means no browser click is needed.
         Only when true, give the operator local_approval_url to approve in their Mac browser.
         Do not ask them to copy task IDs between chats. A queued receipt is not proof of execution.
         """
 
         def action():
             principal = identity(ctx)
-            task = bridge.prepare(principal, request)
+            task = bridge.prepare(principal, request, completion_target=completion_target)
             return {
                 **task,
                 "local_approval_url": LOCAL_APPROVAL_URL,
                 "approval_required": task["state"] == "created",
                 "approval_mode": config.principals[principal].approval_mode,
+                "completion_channel": {
+                    "target": (
+                        bridge.store.db.execute(
+                            "SELECT target FROM completion_routes WHERE task_id=?", (task["id"],)
+                        ).fetchone()
+                        or ["default"]
+                    )[0],
+                    "receive_tool": "completion_receive",
+                    "ack_tool": "completion_ack",
+                    "assistant_wakeup": "not_provided_by_current_transport",
+                },
             }
 
         return safe(action)
@@ -304,16 +331,50 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
         readOnlyHint=False, destructiveHint=False, idempotentHint=True, openWorldHint=False
     )
 
+    @server.tool(annotations=delivery)
+    async def completion_receive(
+        ctx: Context,
+        target: str = "default",
+        limit: int = 20,
+        wait_seconds: float = 20,
+    ) -> dict[str, Any]:
+        """Wait for own durable completion notices, including already finished tasks.
+
+        Run a persistent consumer that rearms this bounded wait; no task-status polling.
+        Receipts/IDs remain stable until completion_ack after consumer processing.
+        A tool response is client delivery, never proof of unsolicited assistant/chat wake-up.
+        """
+        try:
+            return await bridge.completions.wait(identity(ctx), target, limit, wait_seconds)
+        except BridgeError as exc:
+            return {"error": {"code": exc.code, "message": str(exc)}}
+
+    @server.tool(annotations=delivery)
+    def completion_ack(notice_id: str, receipt: str, ctx: Context) -> dict[str, Any]:
+        """Acknowledge own processed completion by stable ID and matching receipt.
+
+        Repeating this exact acknowledgement is safe. Does not attest ChatGPT chat delivery.
+        """
+        return safe(lambda: bridge.completions.ack(identity(ctx), notice_id, receipt))
+
     @server.tool(annotations=write)
-    def message_send(message: MessageSend, ctx: Context) -> dict[str, Any]:
+    def message_send(
+        message: MessageSend, ctx: Context, completion_target: str | None = None
+    ) -> dict[str, Any]:
         """Send an addressed durable message; sender is your authenticated identity.
 
+        For dispatched agent work, completion_target routes final completion_receive notices
+        to the requesting assistant's stable target, even on failure or without an auto reply.
         Kinds: question, answer, work, result, note. Reuse the idempotency_key only for the
         exact same message. dispatch=true invokes the configured separate managed receiver;
         existing interactive sessions are not attached. Questions/work request one response
         by default. Answers/results never request another response. No shell interpolation.
         """
-        return safe(lambda: bridge.messages.send(identity(ctx), message))
+        return safe(
+            lambda: bridge.messages.send(
+                identity(ctx), message, completion_target=completion_target
+            )
+        )
 
     @server.tool(annotations=read)
     def message_get(message_id: str, ctx: Context) -> dict[str, Any]:

@@ -1,5 +1,7 @@
 # KiraBridge
 
+**Version 0.6.0 ist zur sichtbaren Installation vorbereitet.** [Installieren, Status, Rückweg und Nachweise](docs/INSTALLATION-0.6.0.md). Die bestehende Mac-Installation wird erst durch den dort genannten Befehl umgeschaltet.
+
 Privates, modulares Desktop- und Agenten-Gateway für macOS und Linux. Python 3.11+, asyncio, SQLite und das offizielle MCP Python SDK. Version **0.5.2** ergänzt [konkrete Vorabprüfung und reduzierte Fehlerdiagnose](docs/DIAGNOSTICS-20261018.md) in der bestehenden Audit-Kette. Version0.5.1 ergänzte die begrenzte Bereitschaftsprüfung und zusätzliche reine Lesepfade; Version0.5.0 ergänzte den direkten, dauerhaften [Agentenkanal Codex ↔ Grok](docs/AGENT_CHANNEL.md) mit automatischer Empfängeranbindung. Grundlage bleibt der [Entwicklungsplan](docs/DEVELOPMENT_PLAN.md).
 
 ## Implementiert

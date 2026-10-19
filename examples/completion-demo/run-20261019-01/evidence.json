@@ -1,0 +1,758 @@
+{
+  "scope": "actual local callback and terminal output; not ChatGPT autonomous wake-up",
+  "receipts": [
+    {
+      "id": "completion-task-5",
+      "seq": 1,
+      "target": "assistant-immediate",
+      "receipt": "930ad5a1-8ab1-40b6-852d-ed73738ae52f",
+      "returned_at": 1792368251.6735811,
+      "payload": {
+        "agent": null,
+        "error_code": null,
+        "event_seq": 5,
+        "evidence_refs": {
+          "task_events_after": 4,
+          "task_get": "immediate"
+        },
+        "execution_outcome_unknown": false,
+        "exit_code": 0,
+        "finished_at": 1792368251.6059341,
+        "observed_at": 1792368251.6059341,
+        "outcome": "success",
+        "parent_id": null,
+        "provider_error": null,
+        "quota_diagnosis": "not_established",
+        "session_id": null,
+        "source": "task",
+        "state": "completed",
+        "summary": "terminal.execute: success (exit 0). REAL_FAST_RESULT",
+        "task_id": "immediate"
+      }
+    },
+    {
+      "id": "completion-task-10",
+      "seq": 2,
+      "target": "assistant-longer",
+      "receipt": "6adda6d8-7475-4ab0-9ed8-ceb59736e4b5",
+      "returned_at": 1792368254.1166809,
+      "payload": {
+        "agent": null,
+        "error_code": null,
+        "event_seq": 10,
+        "evidence_refs": {
+          "task_events_after": 9,
+          "task_get": "longer"
+        },
+        "execution_outcome_unknown": false,
+        "exit_code": 0,
+        "finished_at": 1792368254.096596,
+        "observed_at": 1792368254.096596,
+        "outcome": "success",
+        "parent_id": null,
+        "provider_error": null,
+        "quota_diagnosis": "not_established",
+        "session_id": null,
+        "source": "task",
+        "state": "completed",
+        "summary": "terminal.execute: success (exit 0). REAL_START REAL_END",
+        "task_id": "longer"
+      }
+    },
+    {
+      "id": "completion-task-15",
+      "seq": 3,
+      "target": "assistant-error",
+      "receipt": "0b9bf39f-ee2c-49f0-9321-6760d1c65572",
+      "returned_at": 1792368254.4863749,
+      "payload": {
+        "agent": null,
+        "error_code": null,
+        "event_seq": 15,
+        "evidence_refs": {
+          "task_events_after": 14,
+          "task_get": "error"
+        },
+        "execution_outcome_unknown": false,
+        "exit_code": 7,
+        "finished_at": 1792368254.484712,
+        "observed_at": 1792368254.484712,
+        "outcome": "error",
+        "parent_id": null,
+        "provider_error": null,
+        "quota_diagnosis": "not_established",
+        "session_id": null,
+        "source": "task",
+        "state": "failed",
+        "summary": "terminal.execute: error (exit 7). REAL_ERROR_CASE",
+        "task_id": "error"
+      }
+    },
+    {
+      "id": "completion-task-20",
+      "seq": 4,
+      "target": "assistant-timeout",
+      "receipt": "9c66e4ff-114f-4167-929e-41272586b346",
+      "returned_at": 1792368254.963539,
+      "payload": {
+        "agent": null,
+        "error_code": null,
+        "event_seq": 20,
+        "evidence_refs": {
+          "task_events_after": 19,
+          "task_get": "timeout"
+        },
+        "execution_outcome_unknown": false,
+        "exit_code": -15,
+        "finished_at": 1792368254.90643,
+        "observed_at": 1792368254.90643,
+        "outcome": "timeout",
+        "parent_id": null,
+        "provider_error": null,
+        "quota_diagnosis": "not_established",
+        "session_id": null,
+        "source": "task",
+        "state": "failed",
+        "summary": "terminal.execute: timeout (exit -15)",
+        "task_id": "timeout"
+      }
+    },
+    {
+      "id": "completion-task-27",
+      "seq": 5,
+      "target": "assistant-codex",
+      "receipt": "8bd3d788-003f-4d0e-bb7b-9e43e4813ed0",
+      "returned_at": 1792368262.799804,
+      "payload": {
+        "agent": "codex",
+        "error_code": null,
+        "event_seq": 27,
+        "evidence_refs": {
+          "task_events_after": 26,
+          "task_get": "codex"
+        },
+        "execution_outcome_unknown": false,
+        "exit_code": 0,
+        "finished_at": 1792368262.7689412,
+        "observed_at": 1792368262.7689412,
+        "outcome": "success",
+        "parent_id": null,
+        "provider_error": null,
+        "quota_diagnosis": "not_established",
+        "session_id": "01a15179-2165-7523-9b6e-1a5fdaf602d6",
+        "source": "task",
+        "state": "completed",
+        "summary": "agent.execute: success (exit 0). CODEX_COMPLETION_CONFIRMED",
+        "task_id": "codex"
+      }
+    },
+    {
+      "id": "completion-task-32",
+      "seq": 6,
+      "target": "reconnect",
+      "receipt": "e9b62efd-eef1-4b8f-9c2c-34cdd1f38664",
+      "returned_at": 1792368263.2486231,
+      "payload": {
+        "agent": null,
+        "error_code": null,
+        "event_seq": 32,
+        "evidence_refs": {
+          "task_events_after": 31,
+          "task_get": "reconnect"
+        },
+        "execution_outcome_unknown": false,
+        "exit_code": 0,
+        "finished_at": 1792368263.1542232,
+        "observed_at": 1792368263.1542232,
+        "outcome": "success",
+        "parent_id": null,
+        "provider_error": null,
+        "quota_diagnosis": "not_established",
+        "session_id": null,
+        "source": "task",
+        "state": "completed",
+        "summary": "terminal.execute: success (exit 0). RECONNECT_ONCE",
+        "task_id": "reconnect"
+      }
+    }
+  ],
+  "submissions": [
+    {
+      "id": "immediate",
+      "principal": "local",
+      "idem": "immediate",
+      "operation": "terminal.execute",
+      "args": {
+        "argv": [
+          "/Users/landjunge/KiraBridge/.venv/bin/python",
+          "-c",
+          "print('REAL_FAST_RESULT')"
+        ],
+        "cwd": "/Users/landjunge/KiraBridge/examples/completion-demo/run-20261019-01/workspace",
+        "timeout": 3
+      },
+      "agent": null,
+      "parent_id": null,
+      "state": "queued",
+      "created": 1792368251.268905,
+      "updated": 1792368251.268905,
+      "accepted": null,
+      "started": null,
+      "finished": null,
+      "receipt": null,
+      "evidence": {},
+      "result": null,
+      "error": null,
+      "lease_owner": null,
+      "lease_until": null,
+      "attempt": 1,
+      "local_approval_url": "http://127.0.0.1:8766/",
+      "approval_required": false,
+      "approval_mode": "automatic",
+      "completion_channel": {
+        "target": "assistant-immediate",
+        "receive_tool": "completion_receive",
+        "ack_tool": "completion_ack",
+        "assistant_wakeup": "not_provided_by_current_transport"
+      }
+    },
+    {
+      "id": "longer",
+      "principal": "local",
+      "idem": "longer",
+      "operation": "terminal.execute",
+      "args": {
+        "argv": [
+          "/Users/landjunge/KiraBridge/.venv/bin/python",
+          "-c",
+          "import time;print('REAL_START');time.sleep(2);print('REAL_END')"
+        ],
+        "cwd": "/Users/landjunge/KiraBridge/examples/completion-demo/run-20261019-01/workspace",
+        "timeout": 5
+      },
+      "agent": null,
+      "parent_id": null,
+      "state": "queued",
+      "created": 1792368251.711669,
+      "updated": 1792368251.711669,
+      "accepted": null,
+      "started": null,
+      "finished": null,
+      "receipt": null,
+      "evidence": {},
+      "result": null,
+      "error": null,
+      "lease_owner": null,
+      "lease_until": null,
+      "attempt": 1,
+      "local_approval_url": "http://127.0.0.1:8766/",
+      "approval_required": false,
+      "approval_mode": "automatic",
+      "completion_channel": {
+        "target": "assistant-longer",
+        "receive_tool": "completion_receive",
+        "ack_tool": "completion_ack",
+        "assistant_wakeup": "not_provided_by_current_transport"
+      }
+    },
+    {
+      "id": "error",
+      "principal": "local",
+      "idem": "error",
+      "operation": "terminal.execute",
+      "args": {
+        "argv": [
+          "/Users/landjunge/KiraBridge/.venv/bin/python",
+          "-c",
+          "print('REAL_ERROR_CASE');raise SystemExit(7)"
+        ],
+        "cwd": "/Users/landjunge/KiraBridge/examples/completion-demo/run-20261019-01/workspace",
+        "timeout": 3
+      },
+      "agent": null,
+      "parent_id": null,
+      "state": "queued",
+      "created": 1792368254.153153,
+      "updated": 1792368254.153153,
+      "accepted": null,
+      "started": null,
+      "finished": null,
+      "receipt": null,
+      "evidence": {},
+      "result": null,
+      "error": null,
+      "lease_owner": null,
+      "lease_until": null,
+      "attempt": 1,
+      "local_approval_url": "http://127.0.0.1:8766/",
+      "approval_required": false,
+      "approval_mode": "automatic",
+      "completion_channel": {
+        "target": "assistant-error",
+        "receive_tool": "completion_receive",
+        "ack_tool": "completion_ack",
+        "assistant_wakeup": "not_provided_by_current_transport"
+      }
+    },
+    {
+      "id": "timeout",
+      "principal": "local",
+      "idem": "timeout",
+      "operation": "terminal.execute",
+      "args": {
+        "argv": [
+          "/Users/landjunge/KiraBridge/.venv/bin/python",
+          "-c",
+          "import time;time.sleep(30)"
+        ],
+        "cwd": "/Users/landjunge/KiraBridge/examples/completion-demo/run-20261019-01/workspace",
+        "timeout": 0.2
+      },
+      "agent": null,
+      "parent_id": null,
+      "state": "queued",
+      "created": 1792368254.532473,
+      "updated": 1792368254.532473,
+      "accepted": null,
+      "started": null,
+      "finished": null,
+      "receipt": null,
+      "evidence": {},
+      "result": null,
+      "error": null,
+      "lease_owner": null,
+      "lease_until": null,
+      "attempt": 1,
+      "local_approval_url": "http://127.0.0.1:8766/",
+      "approval_required": false,
+      "approval_mode": "automatic",
+      "completion_channel": {
+        "target": "assistant-timeout",
+        "receive_tool": "completion_receive",
+        "ack_tool": "completion_ack",
+        "assistant_wakeup": "not_provided_by_current_transport"
+      }
+    },
+    {
+      "id": "codex",
+      "principal": "local",
+      "idem": "codex",
+      "operation": "agent.execute",
+      "args": {
+        "agent": "codex",
+        "cwd": "/Users/landjunge/KiraBridge/examples/completion-demo/run-20261019-01/workspace",
+        "prompt": "Dies ist ein echter begrenzter Abschlussbenachrichtigungs-Test. Keine Tools verwenden, keine Agenten starten. Antworte nur: CODEX_COMPLETION_CONFIRMED.",
+        "timeout": 120
+      },
+      "agent": "codex",
+      "parent_id": null,
+      "state": "queued",
+      "created": 1792368255.001848,
+      "updated": 1792368255.001848,
+      "accepted": null,
+      "started": null,
+      "finished": null,
+      "receipt": null,
+      "evidence": {},
+      "result": null,
+      "error": null,
+      "lease_owner": null,
+      "lease_until": null,
+      "attempt": 1,
+      "local_approval_url": "http://127.0.0.1:8766/",
+      "approval_required": false,
+      "approval_mode": "automatic",
+      "completion_channel": {
+        "target": "assistant-codex",
+        "receive_tool": "completion_receive",
+        "ack_tool": "completion_ack",
+        "assistant_wakeup": "not_provided_by_current_transport"
+      }
+    }
+  ],
+  "tool_calls": [
+    "completion_receive",
+    "completion_ack",
+    "completion_receive",
+    "completion_ack",
+    "completion_receive",
+    "completion_ack",
+    "completion_receive",
+    "completion_ack",
+    "completion_receive",
+    "completion_ack"
+  ],
+  "real_grok_calls": 0,
+  "installed_connection_probe": {
+    "scope": "actual installed chatgpt principal; read-only MCP handshake",
+    "capabilities": {
+      "experimental": {},
+      "prompts": {
+        "listChanged": false
+      },
+      "resources": {
+        "subscribe": false,
+        "listChanged": false
+      },
+      "tools": {
+        "listChanged": false
+      }
+    },
+    "completion_tools_available": false,
+    "mcp_events_advertised": false,
+    "chatgpt_unsolicited_assistant_delivery": "not_verified",
+    "callback_subscription_supplied_by_host": false
+  },
+  "immediate_finished_before_listener": true,
+  "reconnect_receipt_stable": true,
+  "tasks": [
+    {
+      "id": "immediate",
+      "principal": "local",
+      "idem": "immediate",
+      "operation": "terminal.execute",
+      "args": {
+        "argv": [
+          "/Users/landjunge/KiraBridge/.venv/bin/python",
+          "-c",
+          "print('REAL_FAST_RESULT')"
+        ],
+        "cwd": "/Users/landjunge/KiraBridge/examples/completion-demo/run-20261019-01/workspace",
+        "timeout": 3
+      },
+      "agent": null,
+      "parent_id": null,
+      "state": "completed",
+      "created": 1792368251.268905,
+      "updated": 1792368251.6059341,
+      "accepted": 1792368251.2719948,
+      "started": 1792368251.44458,
+      "finished": 1792368251.6059341,
+      "receipt": "a46910e9-e153-4f2f-b88e-bddeda7f64ae",
+      "evidence": {
+        "exit_code": 0,
+        "pid": 78768,
+        "terminated": false,
+        "timed_out": false
+      },
+      "result": {
+        "evidence": {
+          "exit_code": 0,
+          "pid": 78768,
+          "terminated": false,
+          "timed_out": false
+        },
+        "exit_code": 0,
+        "output_bytes": 17,
+        "pid": 78768,
+        "stderr": "",
+        "stdout": "REAL_FAST_RESULT\n",
+        "success": true,
+        "terminated": false,
+        "timed_out": false,
+        "truncated": false
+      },
+      "error": null,
+      "lease_owner": "37bf0b3e-5905-47ba-9397-cd17250474a4",
+      "lease_until": 1792368281.2719948,
+      "attempt": 1
+    },
+    {
+      "id": "longer",
+      "principal": "local",
+      "idem": "longer",
+      "operation": "terminal.execute",
+      "args": {
+        "argv": [
+          "/Users/landjunge/KiraBridge/.venv/bin/python",
+          "-c",
+          "import time;print('REAL_START');time.sleep(2);print('REAL_END')"
+        ],
+        "cwd": "/Users/landjunge/KiraBridge/examples/completion-demo/run-20261019-01/workspace",
+        "timeout": 5
+      },
+      "agent": null,
+      "parent_id": null,
+      "state": "completed",
+      "created": 1792368251.711669,
+      "updated": 1792368254.096596,
+      "accepted": 1792368251.7144861,
+      "started": 1792368251.9166248,
+      "finished": 1792368254.096596,
+      "receipt": "3da413c2-dba9-4e63-ac33-5ac4fd9e4f73",
+      "evidence": {
+        "exit_code": 0,
+        "pid": 78772,
+        "terminated": false,
+        "timed_out": false
+      },
+      "result": {
+        "evidence": {
+          "exit_code": 0,
+          "pid": 78772,
+          "terminated": false,
+          "timed_out": false
+        },
+        "exit_code": 0,
+        "output_bytes": 20,
+        "pid": 78772,
+        "stderr": "",
+        "stdout": "REAL_START\nREAL_END\n",
+        "success": true,
+        "terminated": false,
+        "timed_out": false,
+        "truncated": false
+      },
+      "error": null,
+      "lease_owner": "37bf0b3e-5905-47ba-9397-cd17250474a4",
+      "lease_until": 1792368281.7144861,
+      "attempt": 1
+    },
+    {
+      "id": "error",
+      "principal": "local",
+      "idem": "error",
+      "operation": "terminal.execute",
+      "args": {
+        "argv": [
+          "/Users/landjunge/KiraBridge/.venv/bin/python",
+          "-c",
+          "print('REAL_ERROR_CASE');raise SystemExit(7)"
+        ],
+        "cwd": "/Users/landjunge/KiraBridge/examples/completion-demo/run-20261019-01/workspace",
+        "timeout": 3
+      },
+      "agent": null,
+      "parent_id": null,
+      "state": "failed",
+      "created": 1792368254.153153,
+      "updated": 1792368254.484712,
+      "accepted": 1792368254.155596,
+      "started": 1792368254.3263261,
+      "finished": 1792368254.484712,
+      "receipt": "33b6b0a1-4004-4d21-876d-468c1bf22951",
+      "evidence": {
+        "exit_code": 7,
+        "pid": 78779,
+        "terminated": false,
+        "timed_out": false
+      },
+      "result": {
+        "evidence": {
+          "exit_code": 7,
+          "pid": 78779,
+          "terminated": false,
+          "timed_out": false
+        },
+        "exit_code": 7,
+        "output_bytes": 16,
+        "pid": 78779,
+        "stderr": "",
+        "stdout": "REAL_ERROR_CASE\n",
+        "success": false,
+        "terminated": false,
+        "timed_out": false,
+        "truncated": false
+      },
+      "error": null,
+      "lease_owner": "37bf0b3e-5905-47ba-9397-cd17250474a4",
+      "lease_until": 1792368284.155596,
+      "attempt": 1
+    },
+    {
+      "id": "timeout",
+      "principal": "local",
+      "idem": "timeout",
+      "operation": "terminal.execute",
+      "args": {
+        "argv": [
+          "/Users/landjunge/KiraBridge/.venv/bin/python",
+          "-c",
+          "import time;time.sleep(30)"
+        ],
+        "cwd": "/Users/landjunge/KiraBridge/examples/completion-demo/run-20261019-01/workspace",
+        "timeout": 0.2
+      },
+      "agent": null,
+      "parent_id": null,
+      "state": "failed",
+      "created": 1792368254.532473,
+      "updated": 1792368254.90643,
+      "accepted": 1792368254.5349388,
+      "started": 1792368254.7022378,
+      "finished": 1792368254.90643,
+      "receipt": "c45ca8c5-9288-4bae-a2ab-5b12daf4be05",
+      "evidence": {
+        "exit_code": -15,
+        "pid": 78781,
+        "terminated": false,
+        "timed_out": true
+      },
+      "result": {
+        "evidence": {
+          "exit_code": -15,
+          "pid": 78781,
+          "terminated": false,
+          "timed_out": true
+        },
+        "exit_code": -15,
+        "output_bytes": 0,
+        "pid": 78781,
+        "stderr": "",
+        "stdout": "",
+        "success": false,
+        "terminated": false,
+        "timed_out": true,
+        "truncated": false
+      },
+      "error": null,
+      "lease_owner": "37bf0b3e-5905-47ba-9397-cd17250474a4",
+      "lease_until": 1792368284.5349388,
+      "attempt": 1
+    },
+    {
+      "id": "codex",
+      "principal": "local",
+      "idem": "codex",
+      "operation": "agent.execute",
+      "args": {
+        "agent": "codex",
+        "cwd": "/Users/landjunge/KiraBridge/examples/completion-demo/run-20261019-01/workspace",
+        "prompt": "Dies ist ein echter begrenzter Abschlussbenachrichtigungs-Test. Keine Tools verwenden, keine Agenten starten. Antworte nur: CODEX_COMPLETION_CONFIRMED.",
+        "timeout": 120
+      },
+      "agent": "codex",
+      "parent_id": null,
+      "state": "completed",
+      "created": 1792368255.001848,
+      "updated": 1792368262.7689412,
+      "accepted": 1792368255.004533,
+      "started": 1792368256.924871,
+      "finished": 1792368262.7689412,
+      "receipt": "7830bfd4-67a9-4f83-bd1f-a3b3a9799d31",
+      "evidence": {
+        "adapter": "codex",
+        "agent": "codex",
+        "exit_code": 0,
+        "mcp_servers_enabled": false,
+        "project_rules_enabled": true,
+        "provider_error": null,
+        "sandbox_mode": "read-only",
+        "session_id": "01a15179-2165-7523-9b6e-1a5fdaf602d6",
+        "terminated": false,
+        "timed_out": false,
+        "turn_completed": true,
+        "turn_failed": false
+      },
+      "result": {
+        "evidence": {
+          "adapter": "codex",
+          "agent": "codex",
+          "exit_code": 0,
+          "mcp_servers_enabled": false,
+          "project_rules_enabled": true,
+          "provider_error": null,
+          "sandbox_mode": "read-only",
+          "session_id": "01a15179-2165-7523-9b6e-1a5fdaf602d6",
+          "terminated": false,
+          "timed_out": false,
+          "turn_completed": true,
+          "turn_failed": false
+        },
+        "final_message": "CODEX_COMPLETION_CONFIRMED",
+        "project_completion_verified": false,
+        "scope": "agent_turn",
+        "success": true,
+        "text": "CODEX_COMPLETION_CONFIRMED"
+      },
+      "error": null,
+      "lease_owner": "37bf0b3e-5905-47ba-9397-cd17250474a4",
+      "lease_until": 1792368285.004533,
+      "attempt": 1
+    },
+    {
+      "id": "reconnect",
+      "principal": "local",
+      "idem": "reconnect",
+      "operation": "terminal.execute",
+      "args": {
+        "argv": [
+          "/Users/landjunge/KiraBridge/.venv/bin/python",
+          "-c",
+          "print('RECONNECT_ONCE')"
+        ],
+        "cwd": "/Users/landjunge/KiraBridge/examples/completion-demo/run-20261019-01/workspace",
+        "timeout": 3
+      },
+      "agent": null,
+      "parent_id": null,
+      "state": "completed",
+      "created": 1792368262.825453,
+      "updated": 1792368263.1542232,
+      "accepted": 1792368262.8274019,
+      "started": 1792368262.9959738,
+      "finished": 1792368263.1542232,
+      "receipt": "689d3059-f583-4e9e-b691-c9f2188202ac",
+      "evidence": {
+        "exit_code": 0,
+        "pid": 78865,
+        "terminated": false,
+        "timed_out": false
+      },
+      "result": {
+        "evidence": {
+          "exit_code": 0,
+          "pid": 78865,
+          "terminated": false,
+          "timed_out": false
+        },
+        "exit_code": 0,
+        "output_bytes": 15,
+        "pid": 78865,
+        "stderr": "",
+        "stdout": "RECONNECT_ONCE\n",
+        "success": true,
+        "terminated": false,
+        "timed_out": false,
+        "truncated": false
+      },
+      "error": null,
+      "lease_owner": "37bf0b3e-5905-47ba-9397-cd17250474a4",
+      "lease_until": 1792368292.8274019,
+      "attempt": 1
+    }
+  ],
+  "acknowledged": [
+    {
+      "id": "completion-task-5",
+      "acknowledged": 1792368251.688709
+    },
+    {
+      "id": "completion-task-10",
+      "acknowledged": 1792368254.131959
+    },
+    {
+      "id": "completion-task-15",
+      "acknowledged": 1792368254.504174
+    },
+    {
+      "id": "completion-task-20",
+      "acknowledged": 1792368254.981187
+    },
+    {
+      "id": "completion-task-27",
+      "acknowledged": 1792368262.816031
+    },
+    {
+      "id": "completion-task-32",
+      "acknowledged": 1792368263.297067
+    }
+  ],
+  "audit": {
+    "valid": true,
+    "records": 57,
+    "head": "41eaafb4501fa2ed6b62db930e9196297cb43e907d458dffcf3238f05ce41fe2"
+  },
+  "no_task_status_polling_by_consumer": true,
+  "passed": true
+}

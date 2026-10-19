@@ -47,7 +47,12 @@ class TaskManager:
         *,
         attempt: int = 1,
         pending: bool = False,
+        completion_target: str | None = None,
     ) -> dict:
+        from kirabridge.completion_manager import valid_target
+
+        if completion_target is not None:
+            valid_target(completion_target)
         policy = self.security.principal(principal, request.operation)
         automatic = policy.approval_mode == "automatic" and not approval
         pending = pending and not automatic
@@ -64,6 +69,15 @@ class TaskManager:
                 if existing["request_hash"] != request_hash(request):
                     raise BridgeError(
                         "idempotency_conflict", "Idempotency key belongs to a different request"
+                    )
+                route = self.store.db.execute(
+                    "SELECT target FROM completion_routes WHERE task_id=?", (existing["id"],)
+                ).fetchone()
+                if completion_target is not None and completion_target != (
+                    route[0] if route else "default"
+                ):
+                    raise BridgeError(
+                        "completion_route_conflict", "Original return target is fixed"
                     )
                 return self.store.get(existing["id"], principal)
             if self.store.db.execute(
@@ -89,7 +103,13 @@ class TaskManager:
             capacity = self.config.max_control_queued if control else self.config.max_queued
             if count >= capacity:
                 raise BridgeError("queue_full", "Queue capacity reached")
+            effective_target = completion_target or "default"
             if request.parent_id:
+                if completion_target is None:
+                    route = self.store.db.execute(
+                        "SELECT target FROM completion_routes WHERE task_id=?", (request.parent_id,)
+                    ).fetchone()
+                    effective_target = route[0] if route else "default"
                 parent = self.store.get(request.parent_id, principal)
                 depth = 1
                 while parent["parent_id"]:
@@ -119,6 +139,10 @@ class TaskManager:
                     now,
                     attempt,
                 ),
+            )
+            self.store.db.execute(
+                "INSERT INTO completion_routes(task_id,target) VALUES(?,?)",
+                (request.task_id, effective_target),
             )
             for state in (State.CREATED,) if pending else (State.CREATED, State.QUEUED):
                 evidence = {"persisted": True}
@@ -322,6 +346,7 @@ class TaskManager:
                 state,
                 {
                     "exception_type": type(exc).__name__,
+                    "provider_error": getattr(exc, "provider_error", None),
                     "safe_to_retry": state == State.FAILED and not observed_effect,
                     "last_observation": self.store.get(task["id"])["evidence"],
                 },

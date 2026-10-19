@@ -63,22 +63,64 @@ class MessageReceiver:
             self.worker = None
 
     def _finish(self, message_id, state, evidence, error=None, reply_id=None):
+        from kirabridge.completion_manager import completion_payload, record_notice
+
+        job = self.bridge.store.db.execute(
+            "SELECT * FROM message_jobs WHERE message_id=?", (message_id,)
+        ).fetchone()
+        if job["state"] not in {"queued", "running"}:
+            return  # same job must not create a second completion
+        now = time.time()
         self.bridge.store.db.execute(
             "UPDATE message_jobs SET state=?,finished=?,evidence=?,error=?,reply_id=? "
             "WHERE message_id=?",
-            (state, time.time(), canonical(evidence), error, reply_id, message_id),
+            (state, now, canonical(evidence), error, reply_id, message_id),
         )
         row = self.bridge.store.db.execute(
-            "SELECT recipient FROM messages WHERE id=?", (message_id,)
+            "SELECT * FROM messages WHERE id=?", (message_id,)
         ).fetchone()
         self.messages._event(
             message_id,
             "message.processing_" + state,
-            row[0],
-            {
-                "evidence_sha256": digest(evidence),
-                "error": error,
-            },
+            row["recipient"],
+            {"evidence_sha256": digest(evidence), "error": error},
+        )
+        seq = self.bridge.store.db.execute(
+            "SELECT max(seq) FROM message_events WHERE message_id=?", (message_id,)
+        ).fetchone()[0]
+        task = {
+            "id": row["task_id"] or job["run_id"] or "message-" + message_id,
+            "message_id": message_id,
+            "operation": "message.agent_turn",
+            "agent": row["recipient"],
+            "state": state,
+            "evidence": evidence,
+            "error": {"code": error} if error else None,
+            "updated": now,
+            "finished": now,
+            "result": {"text": evidence.get("response_preview", "")},
+        }
+        payload = completion_payload(task, seq, source="message")
+        payload.update(
+            message_id=message_id,
+            run_id=job["run_id"],
+            conversation_id=row["conversation_id"],
+            reply_id=reply_id,
+        )
+        if evidence.get("externally_acknowledged"):
+            payload["outcome"] = "not_executed"
+            payload["summary"] = "Message acknowledged externally; no receiver turn executed"
+        route = self.bridge.store.db.execute(
+            "SELECT target FROM message_completion_routes WHERE message_id=?", (message_id,)
+        ).fetchone()
+        record_notice(
+            self.bridge.store,
+            row["sender"],
+            route[0] if route else "default",
+            "message",
+            message_id,
+            seq,
+            payload,
         )
 
     def _claim(self, message_id):
@@ -245,12 +287,14 @@ class MessageReceiver:
                 progress,
             )
             if not result.get("success"):
+                await progress(result.get("evidence", {}))
                 raise BridgeError("agent_failed", "Receiving agent did not complete successfully")
             evidence = {
                 **result.get("evidence", {}),
                 "run_id": run_id,
                 "session_scope": "separate_managed_session",
                 "response_sha256": digest(result.get("text", "")),
+                "response_preview": result.get("text", "")[:320],
             }
             reply_id = None
             if message["request_reply"]:
@@ -278,7 +322,18 @@ class MessageReceiver:
                 self._finish(message_id, "completed", evidence, reply_id=reply_id)
         except asyncio.CancelledError:
             with self.bridge.store.transaction():
-                self._finish(message_id, "unknown", {"run_id": run_id}, "receiver_interrupted")
+                observed = self.bridge.store.db.execute(
+                    "SELECT evidence FROM message_jobs WHERE message_id=?", (message_id,)
+                ).fetchone()[0]
+                self._finish(
+                    message_id,
+                    "unknown",
+                    {
+                        "run_id": run_id,
+                        "last_observation": json.loads(observed),
+                    },
+                    "receiver_interrupted",
+                )
             raise
         except Exception as exc:
             state = (
@@ -297,7 +352,7 @@ class MessageReceiver:
                     state,
                     {
                         "run_id": run_id,
-                        "last_observation": observed,
+                        "last_observation": json.loads(observed),
                     },
                     exc.code if isinstance(exc, BridgeError) else "receiver_failed",
                 )

@@ -246,6 +246,18 @@ async def test_http_readiness_checks_authenticated_identity_and_loaded_snapshot(
         assert excessive["error"]["code"] == "invalid_arguments"
 
 
+async def test_task_contract_does_not_require_events_subscription(http_bridge):
+    _, endpoint = http_bridge
+    async with MCPClientPool() as clients:
+        await clients.connect(Peer("local", url=endpoint, token="local-test-" + "a" * 40))
+        listing = await clients.sessions["local"].list_tools()
+        for name in ["task_request", "task_submit"]:
+            tool = next(tool for tool in listing.tools if tool.name == name)
+            assert "completion_subscription" not in tool.inputSchema["properties"]
+            assert set(tool.inputSchema["required"]) == {"request"}
+            assert "completion_target" not in tool.inputSchema["required"]
+
+
 async def test_direct_read_http_needs_no_task_or_subscription(http_bridge, config):
     from pathlib import Path
 
