@@ -1,0 +1,134 @@
+{
+  "schema": "1",
+  "captured_at": "2026-10-19T09:01:41.157417+00:00",
+  "source_base_commit": "612a5c8f34a01d4280ce665dbf9d380a9e45a2c3",
+  "source_branch": "feat/cli-providers-20261019",
+  "provider_file_sha256": {
+    "src/kirabridge/agent_manager/claude.py": "c0ae8523d0bfb55cfbfabf2d8f78b5d153d259c530a1297d0ce96a403b4a0d90",
+    "src/kirabridge/agent_manager/cli_support.py": "1424ab89619c280f95c3c8f6ff93a4f26dd198a4895b2a104fcc5e6f25b9f00a",
+    "src/kirabridge/agent_manager/copilot.py": "68604f6a3fa595e1d5cc50e3114bfb12ada722f8015468d2fe7ea1f1c86981d4",
+    "src/kirabridge/agent_manager/gemini.py": "64435a218d431a6afe0468e0bd1baf4d910a2e7f1bbfd0d550a4af8a5adc123d",
+    "src/kirabridge/agent_manager/opencode.py": "962e7296122abaf959dc9587dac441326bbbb2d47bf9800a9dc82c3c6217fd39",
+    "src/kirabridge/bridge_core/config.py": "42df31a9599c35aa6f2f9529450cf4631cd321b8135aff7146e3c387eac06334"
+  },
+  "scope": "isolated text-only CLI turns; no owned session resume or project tools",
+  "opencode": {
+    "task_id": "cli-opencode-mcp-20261019-01",
+    "authenticated_principal": "chatgpt",
+    "transport": "Streamable HTTP on loopback",
+    "state": "completed",
+    "result": {
+      "evidence": {
+        "adapter": "opencode",
+        "agent": "opencode",
+        "config_isolated": true,
+        "execution_workspace": "private_temporary_directory",
+        "exit_code": 0,
+        "external_plugins_enabled": false,
+        "finish_reason": "stop",
+        "local_tools_enabled": false,
+        "mcp_servers_enabled": false,
+        "native_permissions": "deny",
+        "output_truncated": false,
+        "requested_cwd_validated": true,
+        "requested_workspace_access": false,
+        "session_id": "ses_eac9dfa03ffeqzoQv1zC3kzWgw",
+        "timed_out": false,
+        "turn_completed": true,
+        "turn_failed": false
+      },
+      "final_message": "KIRABRIDGE_MCP_OPENCODE_OK",
+      "project_completion_verified": false,
+      "scope": "agent_turn",
+      "success": true,
+      "text": "KIRABRIDGE_MCP_OPENCODE_OK"
+    },
+    "error": null,
+    "execution_seconds": 10.48,
+    "approval_required": false,
+    "approval_mode": "automatic",
+    "duplicate_submit_preserved_id": true,
+    "duplicate_after_completion_preserved_id": true,
+    "foreign_read_error": "not_found",
+    "expected_text": "KIRABRIDGE_MCP_OPENCODE_OK",
+    "exact_match": true,
+    "cloud_model_calls": 0
+  },
+  "gemini": {
+    "version": "0.37.2",
+    "model_attempts": 1,
+    "historical_task_state": "unknown",
+    "verified_auth_diagnosis": "individual OAuth client no longer supported",
+    "diagnostic_model_turns": 0,
+    "new_failure_code": "agent_auth_unsupported_client",
+    "paid_api_key_used": false,
+    "original_cache_unchanged": true
+  },
+  "claude": {
+    "version": "2.1.236",
+    "authenticated": false,
+    "model_calls": 0
+  },
+  "copilot": {
+    "version": "1.0.67",
+    "authenticated": false,
+    "model_calls": 0,
+    "native_offline_session_created_and_destroyed": true,
+    "native_effective_tool_count": 0
+  },
+  "activation": {
+    "graceful_restart": true,
+    "active_jobs_before_restart": 0,
+    "dispatcher_active": true,
+    "automatic_approval_preserved": true,
+    "principal_agents": {
+      "local": [
+        "codex",
+        "grok",
+        "opencode",
+        "gemini",
+        "claude",
+        "copilot"
+      ],
+      "codex": [
+        "codex",
+        "grok"
+      ],
+      "grok": [
+        "codex",
+        "grok"
+      ],
+      "chatgpt": [
+        "codex",
+        "grok",
+        "opencode",
+        "gemini",
+        "claude",
+        "copilot"
+      ]
+    }
+  },
+  "preservation": {
+    "existing_dirty_files_unchanged": 103,
+    "existing_tasks_unchanged": 625,
+    "new_runtime_proof_task": {
+      "id": "cli-opencode-mcp-20261019-01",
+      "state": "completed",
+      "attempt": 1
+    }
+  },
+  "tests": {
+    "source_suite_before_final_auth_fix": {
+      "passed": 365,
+      "skipped": 43
+    },
+    "final_runtime_provider_and_existing_agent_tests": {
+      "passed": 132
+    },
+    "ruff": "passed",
+    "format": "passed",
+    "offline_build": "passed"
+  },
+  "external_chatgpt_ui_verified": false,
+  "repository_visibility": "private"
+}

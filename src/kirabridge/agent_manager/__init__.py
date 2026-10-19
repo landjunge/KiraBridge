@@ -9,6 +9,10 @@ from typing import Protocol
 
 import httpx
 
+from kirabridge.agent_manager.claude import ClaudeCodeAdapter
+from kirabridge.agent_manager.copilot import CopilotCLIAdapter
+from kirabridge.agent_manager.gemini import GeminiAdapter
+from kirabridge.agent_manager.opencode import OpenCodeAdapter
 from kirabridge.bridge_core.config import AgentConfig, Config
 from kirabridge.bridge_core.models import AgentInput, BridgeError, TerminalInput, UncertainExecution
 from kirabridge.filesystem_manager import PathScope
@@ -444,6 +448,10 @@ class AgentManager:
             "codex": CodexAdapter(terminal),
             "grok_api": GrokAPIAdapter(),
             "grok_acp": GrokACPAdapter(terminal),
+            "opencode": OpenCodeAdapter(terminal),
+            "gemini_cli": GeminiAdapter(terminal),
+            "claude_code": ClaudeCodeAdapter(terminal),
+            "copilot_cli": CopilotCLIAdapter(terminal),
         }
 
     def register(self, kind: str, adapter: AgentAdapter) -> None:
@@ -470,6 +478,16 @@ class AgentManager:
                     ),
                     "executable_present": bool(
                         config.executable and Path(config.executable).is_file()
+                    ),
+                    **(
+                        {
+                            "execution_mode": "isolated_text_only",
+                            "supports_local_tools": False,
+                            "supports_owned_resume": False,
+                            "authentication_status": "unknown",
+                        }
+                        if config.kind in {"opencode", "gemini_cli", "claude_code", "copilot_cli"}
+                        else {}
                     ),
                     "daemon_status": "unknown",
                     "session_status": "unknown",
