@@ -38,6 +38,9 @@ class TaskManager:
         self.wake = asyncio.Event()
         self.preflight = preflight
         self.runtime = runtime
+        from kirabridge.session_input_policy import SessionInputPolicy
+
+        self.input_policy = SessionInputPolicy(config, store, security)
 
     def enqueue(
         self,
@@ -58,6 +61,13 @@ class TaskManager:
 
         automatic = automatic_for(policy, request.operation) and not approval
         pending = pending and not automatic
+        self.input_policy.expire()
+        from kirabridge.session_input_policy import marked
+
+        buffered = self.input_policy.applies(request)
+        held = buffered and not marked(request.arguments["text"])
+        if held:
+            pending = True
         if request.api_version != "1":
             raise BridgeError("api_version", "Unsupported API version")
         if len(canonical(request.model_dump()).encode()) > self.config.max_task_bytes:
@@ -81,6 +91,12 @@ class TaskManager:
                     raise BridgeError(
                         "completion_route_conflict", "Original return target is fixed"
                     )
+                if approval and self.input_policy.waiting(existing["id"]):
+                    if request.task_id != existing["id"]:
+                        raise BridgeError("review_conflict", "Use the original buffered task ID")
+                    self.input_policy.release(principal, request, approval)
+                    self._approve_in_transaction(existing["id"], "daniel_token")
+                    self.wake.set()
                 return self.store.get(existing["id"], principal)
             if self.store.db.execute(
                 "SELECT 1 FROM tasks WHERE id=?", (request.task_id,)
@@ -154,13 +170,15 @@ class TaskManager:
                     "INSERT INTO events(task_id,at,state,evidence) VALUES(?,?,?,?)",
                     (request.task_id, now, state, canonical(evidence)),
                 )
+            if buffered:
+                self.input_policy.stage(request, principal)
             self.store.audit(
                 "task.requested" if pending else "task.queued",
                 principal,
                 request.task_id,
                 {"operation": request.operation, "request_hash": request_hash(request)},
             )
-            if automatic:
+            if automatic and not held:
                 self.store.audit(
                     "task.auto_approved",
                     principal,
@@ -179,6 +197,7 @@ class TaskManager:
         self, task_id: str, *, expected_hash: str | None = None, source: str = "local_cli"
     ) -> dict:
         """Local operator authority only; deliberately not an MCP tool."""
+        self.input_policy.expire()
         with self.store.transaction():
             task = self.store.get(task_id)
             actual_hash = self.store.db.execute(
@@ -189,27 +208,49 @@ class TaskManager:
             self.security.principal(task["principal"], task["operation"])
             if task["state"] != State.CREATED:
                 raise BridgeError("state_conflict", "Only pending requests can be approved")
-            now = time.time()
-            self.store.db.execute(
-                "UPDATE tasks SET state='queued',updated=? WHERE id=?", (now, task_id)
-            )
-            evidence = {"local_operator_approved": True}
-            self.store.db.execute(
-                "INSERT INTO events(task_id,at,state,evidence) VALUES(?,?,?,?)",
-                (task_id, now, State.QUEUED, canonical(evidence)),
-            )
-            self.store.audit(
-                "task.approved",
-                task["principal"],
-                task_id,
-                {
-                    "source": source,
-                    "operation": task["operation"],
-                    "request_hash": actual_hash,
-                },
-            )
+            if self.input_policy.waiting(task_id):
+                request = TaskRequest(
+                    task_id=task_id,
+                    idempotency_key=task["idem"],
+                    operation=task["operation"],
+                    arguments=task["args"],
+                    parent_id=task["parent_id"],
+                )
+                # An explicit click/CLI approval by the trusted local operator is the
+                # separate step. Issue and consume its exact-task token atomically.
+                token = self.security.grant_in_transaction(task["principal"], request)
+                self.input_policy.release(task["principal"], request, token, source=source)
+            self._approve_in_transaction(task_id, source)
         self.wake.set()
         return self.store.get(task_id)
+
+    def _approve_in_transaction(self, task_id, source):
+        task = self.store.get(task_id)
+        now = time.time()
+        self.store.db.execute(
+            "UPDATE tasks SET state='queued',updated=? WHERE id=?", (now, task_id)
+        )
+        self.store.db.execute(
+            "INSERT INTO events(task_id,at,state,evidence) VALUES(?,?,?,?)",
+            (
+                task_id,
+                now,
+                State.QUEUED,
+                canonical({"approval_source": source, "local_operator_approved": True}),
+            ),
+        )
+        self.store.audit(
+            "task.approved",
+            task["principal"],
+            task_id,
+            {
+                "source": source,
+                "operation": task["operation"],
+                "request_hash": self.store.db.execute(
+                    "SELECT request_hash FROM tasks WHERE id=?", (task_id,)
+                ).fetchone()[0],
+            },
+        )
 
     async def start(self) -> None:
         if self.workers:
@@ -245,6 +286,7 @@ class TaskManager:
     async def _worker(self, control: bool) -> None:
         while True:
             self.wake.clear()
+            self.input_policy.expire()
             task = self.store.claim(self.owner, self.config.lease_seconds, control)
             if task is None:
                 try:

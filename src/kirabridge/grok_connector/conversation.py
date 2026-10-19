@@ -33,7 +33,15 @@ async def result_for_conversation(bridge, principal, task):
     result = task.get("result") or {}
     waiting = state in ACTIVE
     input_only = operation == "session.input" and state == State.COMPLETED
-    if state == State.CREATED:
+    buffer = task.get("input_buffer") or {}
+    if buffer.get("state") == "expired":
+        text = "Die Terminal-Nachricht ist im Puffer verfallen und wurde nicht zugestellt."
+    elif state == State.CREATED and buffer.get("state") == "waiting":
+        text = (
+            "Die Terminal-Nachricht liegt im Puffer und wartet auf Daniels separate Freigabe. "
+            "Ohne Freigabe verfällt sie zum angegebenen expires-Zeitpunkt."
+        )
+    elif state == State.CREATED:
         text = "Der Auftrag wartet auf deine Erlaubnis in KiraBridge."
     elif waiting:
         text = "Der Auftrag läuft noch. Eine fertige Antwort liegt noch nicht vor."

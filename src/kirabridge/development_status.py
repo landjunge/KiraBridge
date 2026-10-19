@@ -322,6 +322,7 @@ def permissions_snapshot(bridge, principal: str) -> dict:
         "at": time.time(),
         "approval_mode": policy.approval_mode,
         "approval_required": policy.approval_mode == "manual",
+        "session_input_policy": bridge.config.session_input_policy.model_dump(),
         "capabilities": list(policy.capabilities),
         "roots": list(policy.roots),
         "read_roots": list(policy.read_roots),

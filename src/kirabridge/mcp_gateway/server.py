@@ -225,6 +225,7 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
                 "approval_mode": policy.approval_mode,
                 "permission_level": level_for(policy),
                 "permission_label": LEVELS[level_for(policy)],
+                "session_input_policy": bridge.config.session_input_policy.model_dump(),
                 "operations": {
                     name: {
                         "arguments": model.model_json_schema(),
@@ -244,6 +245,10 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
         """Queue a task; automatic mode needs no token, manual mode requires an exact-task grant.
 
         Repeating its idempotency key never executes it twice.
+        With session_input_policy enabled, session.input is always buffered first.
+        A trailing go-go-go releases it immediately (marker removed). Otherwise
+        it waits for Daniel's separate exact-task token or local console approval;
+        resubmit the unchanged request with that token as approval before expiry.
         For the Grok app, waits briefly and returns conversation_return with the
         actual result. If continue_required is true, call task_get with this same ID.
         """

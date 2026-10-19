@@ -224,6 +224,7 @@ class Bridge:
             "permission_level": level_for(policy),
             "permission_label": LEVELS[level_for(policy)],
             "approval_required": policy.approval_mode == "manual",
+            "session_input_policy": self.config.session_input_policy.model_dump(),
             "health_scope": "dispatcher and authentication; use bridge_readiness for prerequisites",
             "runtime": self.runtime,
             "diagnostics_storage": self.diagnostics.status(),
@@ -310,7 +311,7 @@ class Bridge:
             }
         if operation == "session.input":
             await running({"evidence_type": "session_input_dispatch", "pane_id": args.pane_id})
-            return await self.sessions.send(principal, args)
+            return await self.sessions.send(principal, args, task_id=task["id"])
         if operation == "session.open":
             await running({"evidence_type": "session_open_dispatch"})
             return await self.sessions.open(principal, args)

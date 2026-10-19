@@ -268,7 +268,7 @@ const tab = tabs[0];"""
             "scope": "selected terminal output; not proof of project completion",
         }
 
-    async def send(self, principal, args):
+    async def send(self, principal, args, *, task_id=None):
         self.bridge.security.principal(principal, "session.input")
         self.bridge.security.principal(principal, "terminal.execute")
         if "\x00" in args.text:
@@ -280,6 +280,7 @@ const tab = tabs[0];"""
                     raise BridgeError(
                         "session_submit_required", "Terminal.app input submits a line"
                     )
+                args = self.bridge.tasks.input_policy.dispatch(principal, args, task_id)
                 await self.native(
                     self.native_target(args.pane_id)
                     + "\napp.doScript("
@@ -288,10 +289,12 @@ const tab = tabs[0];"""
                     mutation=True,
                 )
             else:
+                args = self.bridge.tasks.input_policy.dispatch(principal, args, task_id)
                 argv = ["send-keys", "-t", args.pane_id, "-l", "--", args.text]
                 if args.submit:
                     argv += [";", "send-keys", "-t", args.pane_id, "Enter"]
                 await self.command(*argv, mutation=True)
+            self.bridge.tasks.input_policy.sent(principal, task_id)
         return {
             "pane_id": args.pane_id,
             "expected_pid": args.expected_pid,

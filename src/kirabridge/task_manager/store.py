@@ -120,6 +120,16 @@ class Store:
                     "CREATE INDEX IF NOT EXISTS audit_task_kind "
                     "ON audit(principal,task_id,kind,seq)"
                 )
+                self.db.execute(
+                    "CREATE TABLE IF NOT EXISTS session_input_buffers ("
+                    "task_id TEXT PRIMARY KEY REFERENCES tasks(id), "
+                    "state TEXT NOT NULL, created REAL NOT NULL, expires REAL NOT NULL, "
+                    "released REAL, release_source TEXT, dispatch_started REAL)"
+                )
+                self.db.execute(
+                    "CREATE INDEX IF NOT EXISTS session_input_expiry "
+                    "ON session_input_buffers(state,expires)"
+                )
         except BaseException:
             self.db.close()
             raise
@@ -167,6 +177,11 @@ class Store:
         for key in ("args", "evidence", "result", "error"):
             result[key] = json.loads(result[key]) if result[key] is not None else None
         result.pop("request_hash")
+        buffer = self.db.execute(
+            "SELECT * FROM session_input_buffers WHERE task_id=?", (task_id,)
+        ).fetchone()
+        if buffer:
+            result["input_buffer"] = dict(buffer)
         return result
 
     def transition(
@@ -218,6 +233,12 @@ class Store:
             from kirabridge.completion_manager import TERMINAL, record_task_completion
 
             if state in TERMINAL:
+                if state == State.CANCELLED:
+                    self.db.execute(
+                        "UPDATE session_input_buffers SET state='cancelled' WHERE task_id=? "
+                        "AND state IN ('waiting','released')",
+                        (task_id,),
+                    )
                 record_task_completion(self, task_id, event.lastrowid)
             self.audit(
                 "task.transition",

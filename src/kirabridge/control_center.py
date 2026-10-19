@@ -918,6 +918,7 @@ class ControlCenter:
         records = db.execute(
             f"SELECT * FROM audit WHERE {condition} AND ("
             "kind LIKE 'message.%' OR kind LIKE 'task.%' OR kind LIKE 'control.%' "
+            "OR kind LIKE 'session.input.%' "
             "OR kind LIKE 'console.%' OR kind='connection.checked' OR kind='terminal.output' "
             "OR json_extract(metadata,'$.error_code') IS NOT NULL) "
             f"ORDER BY seq {order} LIMIT 100",

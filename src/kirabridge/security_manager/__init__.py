@@ -35,28 +35,32 @@ class SecurityManager:
         raise BridgeError("unauthorized", "Authentication required")
 
     def grant(self, principal: str, request: TaskRequest, ttl: int = 300) -> str:
+        with self.store.transaction():
+            return self.grant_in_transaction(principal, request, ttl)
+
+    def grant_in_transaction(self, principal: str, request: TaskRequest, ttl: int = 300) -> str:
+        """Trusted local operator only; caller owns the enclosing transaction."""
         self.principal(principal, request.operation)
         if request.api_version != "1" or not 1 <= ttl <= 3600:
             raise BridgeError("invalid_grant", "Invalid API version or approval lifetime")
         token = secrets.token_urlsafe(32)
-        with self.store.transaction():
-            self.store.db.execute(
-                "INSERT INTO approvals(token_hash,principal,task_id,request_hash,expires) "
-                "VALUES(?,?,?,?,?)",
-                (
-                    hashlib.sha256(token.encode()).hexdigest(),
-                    principal,
-                    request.task_id,
-                    request_hash(request),
-                    time.time() + ttl,
-                ),
-            )
-            self.store.audit(
-                "approval.granted",
+        self.store.db.execute(
+            "INSERT INTO approvals(token_hash,principal,task_id,request_hash,expires) "
+            "VALUES(?,?,?,?,?)",
+            (
+                hashlib.sha256(token.encode()).hexdigest(),
                 principal,
                 request.task_id,
-                {"operation": request.operation, "request_hash": request_hash(request)},
-            )
+                request_hash(request),
+                time.time() + ttl,
+            ),
+        )
+        self.store.audit(
+            "approval.granted",
+            principal,
+            request.task_id,
+            {"operation": request.operation, "request_hash": request_hash(request)},
+        )
         return token
 
     def consume(self, principal: str, request: TaskRequest, token: str) -> None:

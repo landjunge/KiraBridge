@@ -247,6 +247,12 @@ class GrokConnectorConfig(BaseModel):
         return self
 
 
+class SessionInputPolicyConfig(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    enabled: bool = False
+    timeout_seconds: float = Field(default=60, gt=0, le=86400)
+
+
 class Config(BaseModel):
     model_config = ConfigDict(extra="forbid")
     _source_path: str | None = PrivateAttr(default=None)
@@ -276,6 +282,7 @@ class Config(BaseModel):
     diagnostics: DiagnosticsConfig = Field(default_factory=DiagnosticsConfig)
     threaddesk: ThreadDeskConfig = Field(default_factory=ThreadDeskConfig)
     workflow_control: WorkflowControlConfig = Field(default_factory=WorkflowControlConfig)
+    session_input_policy: SessionInputPolicyConfig = Field(default_factory=SessionInputPolicyConfig)
 
     terminal: TerminalConfig = Field(default_factory=TerminalConfig)
 
