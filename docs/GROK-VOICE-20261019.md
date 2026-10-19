@@ -3,6 +3,53 @@
 Status: Die Hauptfunktion ist noch nicht durchgehend abgenommen.
 Die bestehende ChatGPT-Anbindung wird funktional unverändert belassen.
 
+## Vorrang: nativer MCP-Zugang
+
+Daniel hat MCP ausdrücklich als bevorzugten Weg für Grok Voice und Handy
+festgelegt. Die weitere Reparatur und Abnahme verwendet deshalb den vorhandenen
+Custom-MCP-Connector im echten Grok-Konto. Ein eigener Sprachclient über die
+Anbieter-API ersetzt diesen Weg nicht.
+
+Die Zuordnung ist: Eve = Grok Voice, Grok Build = Grok Terminal,
+Kira = ChatGPT Voice, Codex = ChatGPT Terminal. Ein verwalteter Empfänger
+und die bereits sichtbare interaktive Terminal-Sitzung sind unterschiedliche
+Ausführungswege; ihre Quittungen werden nicht gleichgesetzt.
+
+## Nachprüfung am aktiven Dienst
+
+Nach Push von `13a8162` läuft der Kern tatsächlich als `0.8.0rc2`.
+Die geladene Quelle und Konfiguration stimmen mit den Dateien auf dem Mac überein.
+Die bestehenden drei Terminalziele, der Grok-Gateway-Prozess und beide Tunnel
+wurden erhalten. Die neue `session.input`-Pufferregel ist aktiv: ohne
+abschließendes `go-go-go` separate lokale Freigabe oder Ablauf nach 60 Sekunden.
+
+Der öffentliche MCP-Zugang wurde erneut geprüft: Health und beide OAuth-
+Metadaten-Endpunkte antworten mit 200; `/mcp` fordert ohne Token korrekt
+Authentifizierung mit 401. Für die tatsächlich aktive Tunneladresse gibt es
+eine gültige Token-Familie des echten Grok-Clients und weitere echte Aufrufe.
+Die statische Konfiguration enthält noch eine frühere Tunneladresse;
+maßgeblich ist `effective_settings()` mit dem privaten Laufzeitprofil.
+Eine zweite genehmigte Registrierung hat keinen abgeschlossenen Tokenaustausch.
+Diese Registrierungen erlauben allein keine Zuordnung zu Browser oder Handy.
+
+Die native Grok-Oberfläche zeigt weiterhin ein laufendes Eve-Sprachgespräch
+mit aktivem Mikrofon und dessen Transkript. Im erhaltenen Grok-Build-Terminal
+ist die korrelierte Codex-Antwort auf die Zehn-Herzen-Frage sichtbar.
+Das bestätigt den tatsächlichen Terminal-Rückweg. Es bestätigt noch nicht,
+dass diese Antwort im selben Sprachgespräch auf dem Handy hörbar wurde.
+
+Der Puffer wurde zusätzlich am laufenden Dienst mit der Grok-App-Identität
+und einem isolierten echten Test-Terminal geprüft: Freigabe-Token, Marker,
+Doppelaufruf und der tatsächliche 60-Sekunden-Ablauf. Nur die beiden
+freigegebenen Eingaben kamen an; die abgelaufene Eingabe wurde nicht gesendet.
+Die gesamte lokale Testsuite hat 570 Tests bestanden; die CI für `13a8162`
+war auf Linux und macOS erfolgreich.
+
+Die verbleibende Abnahme ist ein korrelierter, vom Handy gesprochener Auftrag
+über Eve → MCP → vorhandenes Grok Build → Codex mit hörbarer Antwort in
+demselben laufenden Eve-Gespräch. Eine konkrete Grok-Produktgrenze, die diesen
+Weg ausschließt, ist bisher nicht belegt.
+
 ## Unterstützte Schnittstellen
 
 xAI dokumentiert eigene MCP-Connectoren für Grok und Connectoren auf Web,
