@@ -53,7 +53,10 @@ async def connect_stdio(config, principal):
             "no task-ID copying is needed. "
             "Use message_send/message_receive for addressed peer communication, not shared files. "
             "message_channel_status reports peers and the separate managed receiver; "
-            "existing interactive sessions are not attached.",
+            "For existing Terminal.app tabs and tmux panes use session_catalog and session_read; "
+            "session_open opens a visible window. session.input addresses an exact catalog handle. "
+            "These tools have the same permissions on mobile, browser, Live and voice. "
+            "Use connection_check from the actual conversation to verify its current device/mode.",
         )
 
         @server.list_tools()

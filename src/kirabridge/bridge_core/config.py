@@ -6,8 +6,9 @@ import sys
 import tomllib
 from pathlib import Path
 from typing import Literal
+from urllib.parse import urlsplit
 
-from pydantic import BaseModel, ConfigDict, Field, PrivateAttr
+from pydantic import BaseModel, ConfigDict, Field, PrivateAttr, model_validator
 
 from kirabridge.bridge_core.models import BridgeError
 
@@ -24,6 +25,8 @@ class PrincipalConfig(BaseModel):
     agents: list[str] = Field(default_factory=list)
     token_env: str | None = None
     message_peers: list[str] = Field(default_factory=list, max_length=16)
+    team_only_execution: bool = False
+    permission_level: Literal["full", "medium", "ask"] | None = None
 
 
 class ReceiverConfig(BaseModel):
@@ -44,14 +47,106 @@ class MessagingConfig(BaseModel):
     receivers: dict[str, ReceiverConfig] = Field(default_factory=dict)
 
 
+class TeamWorkerConfig(BaseModel):
+    """Operator consent for one authenticated identity and its fixed executor."""
+
+    model_config = ConfigDict(extra="forbid")
+    agent: str | None = Field(default=None, pattern=r"^[a-z][a-z0-9_-]{0,40}$")
+    cwd: str | None = Field(default=None, min_length=1, max_length=4096)
+    timeout: float = Field(default=120, gt=0, le=300)
+    response_framing: Literal["strict_json", "work_reply_header"] = "strict_json"
+
+    @model_validator(mode="after")
+    def execution_directory(self):
+        if self.agent is not None and (not self.cwd or not Path(self.cwd).is_absolute()):
+            raise ValueError("An automatic team worker needs an absolute fixed working directory")
+        return self
+
+
+class TeamConfig(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    enabled: bool = False
+    workers: dict[str, TeamWorkerConfig] = Field(default_factory=dict, max_length=16)
+    concurrency: int = Field(default=2, ge=1, le=8)
+    max_teams: int = Field(default=64, ge=1, le=1024)
+    max_hops: int = Field(default=6, ge=1, le=16)
+    max_work_per_root: int = Field(default=32, ge=1, le=256)
+    max_pending_per_member: int = Field(default=32, ge=1, le=1000)
+    max_total_work: int = Field(default=10000, ge=1, le=1000000)
+    max_messages: int = Field(default=10000, ge=1, le=1000000)
+    max_body_bytes: int = Field(default=16384, ge=256, le=65536)
+    max_result_bytes: int = Field(default=65536, ge=256, le=262144)
+    max_actions_per_turn: int = Field(default=4, ge=1, le=4)
+    max_runs_per_hour: int = Field(default=24, ge=1, le=1000)
+
+    @model_validator(mode="after")
+    def participant_names(self):
+        import re
+
+        if any(not re.fullmatch(r"[a-z][a-z0-9_-]{0,40}", name) for name in self.workers):
+            raise ValueError("Team workers must use explicit principal identities")
+        return self
+
+
 class AgentConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
     kind: str
     executable: str | None = None
     model: str | None = None
     api_key_env: str = "XAI_API_KEY"
-    sandbox_mode: Literal["read-only", "workspace-write"] = "read-only"
+    sandbox_mode: Literal["read-only", "workspace-write", "danger-full-access"] = "read-only"
+    bridge_tools: bool = False
     allow_local_tools: bool = False
+    base_url: str | None = Field(default=None, max_length=2048)
+    local_output_tokens: int | None = Field(default=None, ge=128, le=2048)
+
+    @model_validator(mode="after")
+    def explicit_full_access(self):
+        if self.sandbox_mode == "danger-full-access" and not self.bridge_tools:
+            raise ValueError("Full access requires the operator's explicit full bridge profile")
+        return self
+
+    @model_validator(mode="before")
+    @classmethod
+    def cli_credential_defaults(cls, value):
+        defaults = {
+            "opencode": "OPENCODE_API_KEY",
+            "gemini_cli": "GEMINI_API_KEY",
+            "claude_code": "ANTHROPIC_API_KEY",
+            "copilot_cli": "COPILOT_GITHUB_TOKEN",
+        }
+        if (
+            isinstance(value, dict)
+            and isinstance(value.get("kind"), str)
+            and value["kind"] in defaults
+        ):
+            return {"api_key_env": defaults[value["kind"]], **value}
+        return value
+
+    @model_validator(mode="after")
+    def local_provider_endpoint(self):
+        if self.local_output_tokens is not None and (self.kind != "opencode" or not self.base_url):
+            raise ValueError("Local output tokens require a loopback OpenCode provider")
+        if self.base_url is None:
+            return self
+        try:
+            url = urlsplit(self.base_url)
+            port = url.port
+        except ValueError:
+            raise ValueError("Invalid local model endpoint") from None
+        if (
+            self.kind != "opencode"
+            or url.scheme not in {"http", "https"}
+            or url.hostname not in {"127.0.0.1", "localhost", "::1"}
+            or url.username is not None
+            or url.password is not None
+            or url.query
+            or url.fragment
+            or (port is not None and not 1 <= port <= 65535)
+            or any(char.isspace() or ord(char) < 32 for char in self.base_url)
+        ):
+            raise ValueError("Only a credential-free loopback OpenCode endpoint is supported")
+        return self
 
 
 class DiagnosticsConfig(BaseModel):
@@ -97,6 +192,61 @@ class TerminalConfig(BaseModel):
     home: str | None = None
 
 
+class GrokConnectorConfig(BaseModel):
+    """Separate OAuth entry point for the Grok application, never its CLI identity."""
+
+    model_config = ConfigDict(extra="forbid")
+    enabled: bool = False
+    public_origin: str | None = Field(default=None, max_length=2048)
+    principal: Literal["grok_app"] = "grok_app"
+    port: int = Field(default=8767, ge=1024, le=65535)
+    redirect_hosts: list[str] = Field(
+        default_factory=lambda: ["grok.com", "accounts.x.ai", "console.x.ai"],
+        min_length=1,
+        max_length=16,
+    )
+    max_requests: int = Field(default=16, ge=1, le=64)
+    max_body_bytes: int = Field(default=2097152, ge=1024, le=8388608)
+
+    @model_validator(mode="after")
+    def external_identity(self):
+        import re
+
+        if any(
+            not re.fullmatch(r"[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?", h) or ".." in h or "." not in h
+            for h in self.redirect_hosts
+        ):
+            raise ValueError("Use exact HTTPS callback host names, without wildcard or path")
+        if self.public_origin is not None:
+            if (
+                any(c.isspace() or ord(c) < 32 for c in self.public_origin)
+                or "?" in self.public_origin
+                or "#" in self.public_origin
+            ):
+                raise ValueError(
+                    "Use a canonical HTTPS origin without query, fragment or whitespace"
+                )
+            parsed = urlsplit(self.public_origin)
+            _ = parsed.port  # Validate port syntax before starting a supervised service.
+            if (
+                parsed.scheme != "https"
+                or not parsed.hostname
+                or parsed.username
+                or parsed.password
+                or parsed.query
+                or parsed.fragment
+                or parsed.path not in {"", "/"}
+                or parsed.hostname in {"localhost", "127.0.0.1", "::1"}
+            ):
+                raise ValueError(
+                    "Grok connector needs a public HTTPS origin without credentials or path"
+                )
+            self.public_origin = self.public_origin.rstrip("/")
+        if self.enabled and not self.public_origin:
+            raise ValueError("An enabled Grok connector needs its public HTTPS origin")
+        return self
+
+
 class Config(BaseModel):
     model_config = ConfigDict(extra="forbid")
     _source_path: str | None = PrivateAttr(default=None)
@@ -121,6 +271,8 @@ class Config(BaseModel):
     )
     agents: dict[str, AgentConfig] = Field(default_factory=dict)
     messaging: MessagingConfig = Field(default_factory=MessagingConfig)
+    team: TeamConfig = Field(default_factory=TeamConfig)
+    grok_connector: GrokConnectorConfig = Field(default_factory=GrokConnectorConfig)
     diagnostics: DiagnosticsConfig = Field(default_factory=DiagnosticsConfig)
     threaddesk: ThreadDeskConfig = Field(default_factory=ThreadDeskConfig)
     workflow_control: WorkflowControlConfig = Field(default_factory=WorkflowControlConfig)

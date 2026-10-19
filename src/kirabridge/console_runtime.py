@@ -146,7 +146,17 @@ def open_console(config_path: Path) -> dict:
         os.replace(temporary, destination)
     finally:
         temporary.unlink(missing_ok=True)
-    if sys.platform == "darwin":
+    native = Path.home() / "Applications/KiraBridge.app"
+    if os.environ.get("KIRABRIDGE_CONSOLE_EMBED") == "1":
+        opened = False
+    elif sys.platform == "darwin" and native.is_dir():
+        result = subprocess.run(
+            ["/usr/bin/open", "-a", str(native)],
+            capture_output=True,
+            timeout=10,
+        )
+        opened = result.returncode == 0
+    elif sys.platform == "darwin":
         result = subprocess.run(
             ["/usr/bin/open", str(destination)], capture_output=True, timeout=10
         )
@@ -165,7 +175,12 @@ def open_console(config_path: Path) -> dict:
             desktop.symlink_to(launcher)
         except FileExistsError:
             pass
-    return {"url": ORIGIN + "/", "opened": opened, "launcher": str(launcher)}
+    return {
+        "url": ORIGIN + "/",
+        "opened": opened,
+        "launcher": str(launcher),
+        "login_file": str(destination),
+    }
 
 
 async def serve_console(config: Config, config_path: Path) -> None:

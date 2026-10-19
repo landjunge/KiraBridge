@@ -9,6 +9,7 @@ from pydantic import Field, model_validator
 
 from kirabridge.bridge_core.models import BridgeError, Input
 from kirabridge.filesystem_manager import PathScope
+from kirabridge.permissions import state_exclusions
 
 
 class ReadQuery(Input):
@@ -66,7 +67,9 @@ def read_query(bridge, principal: str, query: ReadQuery) -> dict:
             "exit_code": source.get("exit_code"),
             "scope": "owned Bridge task only; no external terminal attachment",
         }
-    scope = PathScope(policy.roots + policy.read_roots, excluded=[str(bridge.config.state_path)])
+    scope = PathScope(
+        policy.roots + policy.read_roots, excluded=state_exclusions(bridge.config, policy)
+    )
     if query.operation == "file.list":
         result = bridge.filesystem.list(scope, query.path)
         entries = result["entries"][:100]

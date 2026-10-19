@@ -1,5 +1,32 @@
 # ChatGPT-Anbindung: Tunnel aktiv, Statusabfrage zurückgemeldet
 
+**Aktueller Stand:** [Korrigierte Events-Anbindung erneut aktiviert; echter Empfang im ursprünglichen Chat weiterhin offen](MCP-SCHEMA-CACHE-20261019.md). Die nachfolgenden Betriebsstände sind historische Nachweise.
+
+**Aktueller Vorrang:** [Events-Fassade zurückgerollt; ursprünglicher Anschluss wiederhergestellt](CHATGPT-EVENTS-RECOVERY-20261019.md).
+Die nachfolgenden Aktivierungsangaben sind historisch. Vor erneuter Aktivierung
+müssen Pflicht-Subscription für normale Aufträge und Sender-Startbereitschaft
+korrigiert werden. Die App benötigt jetzt Refresh/Rescan der alten Werkzeugdefinition.
+
+**Produktionsaktivierung:** [Ereignissender und bestehender Tunnel sind aktiviert](CHATGPT-EVENTS-ACTIVATION-20261019.md).
+Die vorhandene App-Verbindung funktioniert weiter. Private Verbindung jetzt über
+chatgpt.com/plugins → KiraBridge → Refresh neu einlesen; echte Host-Subscription
+und Empfang im ursprünglichen Chat sind noch offen.
+
+**MCP-Events-Ausbau:** [Isolierter Adapter und konkrete Plattformschritte](CHATGPT-EVENTS-20261019.md).
+Offizieller Webhookweg verifiziert, vorhandene Tunnelbinary lokal mit MCP 2 geprüft.
+Noch kein echter ChatGPT-Callback und keine belegte Zustellung im ursprünglichen Chat.
+
+**Abschlussmeldungen, 19.10.2026:** Der tatsächliche `chatgpt`-Handshake bietet
+keine MCP Events und keinen belegten autonomen Chat-Wake-up. Ein neuer dauerhafter
+[Completion-Rückkanal](COMPLETION-CHANNEL-20261019.md) mit wartendem Consumer wurde
+in isolierter Runtime bis zum echten Codex-Abschluss geprüft. Empfang einer
+Toolantwort, Consumer-Quittierung und Aufwecken eines inaktiven Assistenten bleiben
+getrennte Belegstufen. Nach 184 bestandenen Tests wurde der idle Dienst unter
+Schreibsperre kontrolliert aktiviert; Daten und Rechte sind per Hash unverändert.
+Ein tatsächlich über die verbundene App eingereichter Terminalauftrag wurde durch
+den wartenden lokalen Consumer ohne Statusabfragen bis zur Quittierung empfangen.
+Das ist weiterhin kein Nachweis eines autonomen Turns in einem inaktiven ChatGPT-Chat.
+
 **Fortschreibung18.10.2026:** Die lokale Bridge läuft auf0.5.1. Direkte
 Projektlesung wurde über die verbundene KiraBridge-App dieser Codex-Sitzung
 tatsächlich bis zum vollständigen Ergebnis geprüft, einschließlich erneutem

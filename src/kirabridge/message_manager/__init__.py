@@ -23,7 +23,7 @@ class MessageSend(Input):
     reply_to: str | None = Field(default=None, min_length=1, max_length=128)
     task_id: str | None = Field(default=None, min_length=1, max_length=128)
     request_reply: bool | None = None
-    dispatch: bool = True
+    dispatch: bool | None = None
 
 
 class MessageManager:
@@ -58,6 +58,7 @@ class MessageManager:
             "SELECT * FROM message_jobs WHERE message_id=?", (message_id,)
         ).fetchone()
         result["processing"] = dict(job) if job else None
+        result["processing_route"] = "managed_receiver" if job else "external_client_inbox"
         if job:
             result["processing"]["evidence"] = json.loads(job["evidence"])
         result["request_reply"] = bool(result["request_reply"])
@@ -69,6 +70,10 @@ class MessageManager:
         if completion_target is not None:
             valid_target(completion_target)
         policy = self._identity(principal, "message.send")
+        if policy.permission_level is None and policy.approval_mode != "automatic":
+            raise BridgeError(
+                "approval_required", "Messaging requires local automatic authorization"
+            )
         target = self.config.principals.get(message.recipient)
         if (
             principal == message.recipient
@@ -78,11 +83,13 @@ class MessageManager:
             or "message.read" not in target.capabilities
         ):
             raise BridgeError("message_peer_denied", "Recipient is not an authorized peer")
-        if policy.approval_mode != "automatic":
-            raise BridgeError(
-                "approval_required", "Messaging requires local automatic authorization"
-            )
         limits = self.config.messaging
+        dispatch = message.dispatch
+        if dispatch is None:
+            dispatch = message.recipient in limits.receivers
+        if dispatch and message.recipient in {"chatgpt", "grok_app", "local"}:
+            if message.recipient not in limits.receivers:
+                dispatch = False
         if len(message.body.encode()) > limits.max_body_bytes:
             raise BridgeError("payload_limit", "Message exceeds configured byte limit")
         wants_reply = message.request_reply
@@ -92,10 +99,16 @@ class MessageManager:
             raise BridgeError(
                 "reply_loop", "Answers, results and notes cannot request auto replies"
             )
-        if message.dispatch:
+        if dispatch:
+            from kirabridge.permissions import automatic_for
+
             receiver = limits.receivers.get(message.recipient)
-            if not receiver or target.approval_mode != "automatic":
+            if not receiver:
                 raise BridgeError("receiver_unavailable", "No automatic receiver for this identity")
+            if not automatic_for(target, "agent.execute"):
+                raise BridgeError(
+                    "approval_required", "Dieser Agentenauftrag benötigt deine Erlaubnis"
+                )
             if (
                 message.recipient not in self.config.agents
                 or message.recipient not in target.agents
@@ -103,7 +116,7 @@ class MessageManager:
                 raise BridgeError(
                     "agent_denied", "Receiver agent is not configured for this identity"
                 )
-        hashed = digest(message.model_dump())
+        hashed = digest({**message.model_dump(), "dispatch": dispatch})
         message_id = message.message_id or str(uuid.uuid4())
         with self.store.transaction():
             previous = self.store.db.execute(
@@ -196,7 +209,7 @@ class MessageManager:
                     now,
                 ),
             )
-            if message.dispatch:
+            if dispatch:
                 self.store.db.execute(
                     "INSERT INTO message_completion_routes(message_id,target) VALUES(?,?)",
                     (message_id, completion_target or "default"),

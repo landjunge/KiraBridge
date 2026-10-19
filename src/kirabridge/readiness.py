@@ -15,6 +15,7 @@ from kirabridge import __version__
 from kirabridge.bridge_core.config import Config
 from kirabridge.bridge_core.models import BridgeError, Input, digest
 from kirabridge.filesystem_manager import PathScope
+from kirabridge.permissions import state_exclusions
 from kirabridge.terminal_manager import check_executable
 
 
@@ -81,7 +82,9 @@ def _directory(scope: PathScope, path: str) -> None:
 
 def readiness(bridge, principal: str, requirements: ReadinessInput) -> dict:
     policy = bridge.security.principal(principal, "bridge.health")
-    scope = PathScope(policy.roots + policy.read_roots, excluded=[str(bridge.config.state_path)])
+    scope = PathScope(
+        policy.roots + policy.read_roots, excluded=state_exclusions(bridge.config, policy)
+    )
 
     def file(path):
         bridge.security.principal(principal, "file.read")
@@ -231,7 +234,7 @@ def task_preflight(bridge, task: dict) -> dict:
     roots = policy.roots + (
         policy.read_roots if operation in {"file.read", "file.image", "file.list"} else []
     )
-    scope = PathScope(roots, excluded=[str(bridge.config.state_path)])
+    scope = PathScope(roots, excluded=state_exclusions(bridge.config, policy))
     checks = []
 
     def check(kind, path, action):

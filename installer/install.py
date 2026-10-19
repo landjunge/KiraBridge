@@ -168,7 +168,7 @@ def prepare(args):
         run(["git", "-C", args.repo, "show", ref + ":pyproject.toml"], capture=True).decode()
     )
     version = project["project"]["version"]
-    if not re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+", version):
+    if not re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+(?:(?:a|b|rc)[0-9]+)?", version):
         raise RuntimeError("Unsupported release version")
     releases = args.prefix / "releases"
     private_dir(releases)
@@ -287,6 +287,7 @@ def fresh_config(args, release):
     for name in tokens:
         text += (
             f'\n[principals.{name}]\napproval_mode = "automatic"\n'
+            'permission_level = "full"\n'
             f"capabilities = {json.dumps(capabilities)}\n"
             'roots = ["/"]\nread_roots = ["/"]\nterminal_roots = ["/"]\n'
             "allow_any_executable = true\nexecutables = []\nagents = []\n"

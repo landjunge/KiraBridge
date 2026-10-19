@@ -71,11 +71,26 @@ class ApprovalConsole:
                 Route("/login.js", self.asset),
                 Route("/style.css", self.asset),
                 Route("/networkpunkt.css", self.asset),
+                Route("/center.js", self.asset),
+                Route("/center.css", self.asset),
+                Route("/protocol.js", self.asset),
                 Route("/api/tasks", self.tasks),
                 Route("/api/tasks/{task_id}", self.task),
                 Route("/api/tasks/{task_id}/{decision}", self.decide, methods=["POST"]),
             ],
         )
+        from kirabridge.team_console import TeamConsole
+
+        self.team_console = TeamConsole(bridge, self.authenticate)
+        self.app.routes.extend(self.team_console.routes)
+        from kirabridge.grok_connector.console import GrokConnectorConsole
+
+        self.grok_connector_console = GrokConnectorConsole(bridge, self.authenticate)
+        self.app.routes.extend(self.grok_connector_console.routes)
+        from kirabridge.control_center import ControlCenter
+
+        self.control_center = ControlCenter(bridge, self.authenticate)
+        self.app.routes.extend(self.control_center.routes)
 
     async def __call__(self, scope, receive, send):
         if scope["type"] != "http":
@@ -157,6 +172,17 @@ class ApprovalConsole:
             raise BridgeError("unauthorized", "Open the local launcher again")
         self.used_tickets[ticket] = now
         session = signed_token(self.key, "session")
+        with self.bridge.store.transaction():
+            self.bridge.store.audit(
+                "console.login",
+                "local",
+                None,
+                {
+                    "surface": "desktop"
+                    if "KiraBridgeDesktop" in request.headers.get("user-agent", "")
+                    else "browser",
+                },
+            )
         return HTMLResponse(
             '<!doctype html><html lang="de"><meta charset="utf-8">'
             '<meta name="referrer" content="no-referrer"><title>KiraBridge öffnen</title>'
@@ -165,7 +191,7 @@ class ApprovalConsole:
         )
 
     async def index(self, request: Request):
-        return HTMLResponse((ASSETS / "index.html").read_text())
+        return HTMLResponse((ASSETS / "center.html").read_text())
 
     async def asset(self, request: Request):
         name = request.url.path.removeprefix("/")

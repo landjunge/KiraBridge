@@ -13,6 +13,7 @@ from kirabridge.bridge_core.models import (
     BridgeError,
     ClipboardRead,
     ClipboardWrite,
+    ConnectionCheckInput,
     EmptyInput,
     HandoffAnswerInput,
     HandoffDecisionInput,
@@ -40,14 +41,17 @@ from kirabridge.filesystem_manager import FilesystemManager, PathScope
 from kirabridge.image_manager import ImageManager
 from kirabridge.message_manager import MessageManager
 from kirabridge.message_manager.receiver import MessageReceiver
+from kirabridge.permissions import LEVELS, level_for, state_exclusions
 from kirabridge.process_manager import ProcessManager
 from kirabridge.security_manager import SecurityManager
-from kirabridge.session_manager import SessionInput, SessionManager
+from kirabridge.session_manager import SessionInput, SessionManager, SessionOpen
 from kirabridge.task_manager.manager import TaskManager
 from kirabridge.task_manager.store import Store
 from kirabridge.terminal_manager import TerminalManager
 
 INPUTS = {
+    "connection.check": ConnectionCheckInput,
+    "session.open": SessionOpen,
     "session.input": SessionInput,
     "terminal.execute": TerminalInput,
     "file.read": ReadInput,
@@ -127,6 +131,11 @@ class Bridge:
         self.completions = CompletionManager(self.store, self.security)
         self.messages = MessageManager(config, self.store, self.security)
         self.message_receiver = MessageReceiver(self)
+        from kirabridge.team_manager import TeamManager
+        from kirabridge.team_manager.dispatcher import TeamDispatcher
+
+        self.teams = TeamManager(self)
+        self.team_dispatcher = TeamDispatcher(self)
 
     def validate(self, request: TaskRequest) -> None:
         model = INPUTS.get(request.operation)
@@ -212,6 +221,8 @@ class Bridge:
             },
             "local_approval_url": LOCAL_APPROVAL_URL,
             "approval_mode": policy.approval_mode,
+            "permission_level": level_for(policy),
+            "permission_label": LEVELS[level_for(policy)],
             "approval_required": policy.approval_mode == "manual",
             "health_scope": "dispatcher and authentication; use bridge_readiness for prerequisites",
             "runtime": self.runtime,
@@ -220,6 +231,7 @@ class Bridge:
             "message_receiver_active": bool(
                 self.message_receiver.worker and not self.message_receiver.worker.done()
             ),
+            "message_receiver_scope": "bridge_dispatcher_for_configured_receivers",
         }
 
     def task(self, principal: str, task_id: str) -> dict:
@@ -270,7 +282,10 @@ class Bridge:
         roots = policy.roots + (
             policy.read_roots if operation in {"file.read", "file.image", "file.list"} else []
         )
-        scope = PathScope(roots, excluded=[str(self.config.state_path)])
+        scope = PathScope(roots, excluded=state_exclusions(self.config, policy))
+        if operation == "connection.check":
+            await running({"evidence_type": "connection_check_received"})
+            return await self.check_connection(principal, args.device, args.mode)
         if operation == "terminal.execute":
             result = await self.terminal.execute(
                 task["id"],
@@ -296,7 +311,11 @@ class Bridge:
         if operation == "session.input":
             await running({"evidence_type": "session_input_dispatch", "pane_id": args.pane_id})
             return await self.sessions.send(principal, args)
+        if operation == "session.open":
+            await running({"evidence_type": "session_open_dispatch"})
+            return await self.sessions.open(principal, args)
         if operation == "agent.execute":
+            self.teams.authorize_execution(task)
             return await self.agents.execute(task, args, policy, running, progress)
         if operation.startswith("handoff."):
             return await self.handoffs.execute(task, args, policy, running, progress)
@@ -378,6 +397,28 @@ class Bridge:
             return await self.terminal.terminate(principal, args.task_id)
         raise BridgeError("unknown_operation", "Operation is not supported")
 
+    async def check_connection(self, principal, device, mode):
+        self.security.principal(principal, "bridge.health")
+        terminals = {"status": "not_granted", "sessions": []}
+        if "session.inspect" in self.config.principals[principal].capabilities:
+            terminals = await self.sessions.catalog(principal)
+        evidence = {
+            "device": device,
+            "mode": mode,
+            "device_mode_source": "caller_report",
+            "transport_receipt": True,
+            "terminal_transport": terminals.get("status"),
+            "terminal_count": len(terminals.get("sessions", [])),
+        }
+        with self.store.transaction():
+            self.store.audit("connection.checked", principal, None, evidence)
+        return {
+            "principal": principal,
+            **evidence,
+            "dispatcher_active": bool(self.tasks.workers),
+            "permission_scope": "same_for_all_devices_and_modes",
+        }
+
     def record_runtime_load(self):
         previous = self.store.db.execute(
             "SELECT metadata FROM audit WHERE kind='diagnostic.runtime.loaded' "
@@ -412,14 +453,20 @@ class Bridge:
         try:
             self.record_runtime_load()
             await self.message_receiver.start()
+            await self.team_dispatcher.start()
         except BaseException:
+            await self.team_dispatcher.stop()
+            await self.message_receiver.stop()
             await self.tasks.stop()
             raise
         return self
 
     async def __aexit__(self, *exc):
         try:
-            await self.message_receiver.stop()
+            try:
+                await self.team_dispatcher.stop()
+            finally:
+                await self.message_receiver.stop()
         finally:
             await self.tasks.stop()
             await self.threaddesk.close()

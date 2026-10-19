@@ -1,18 +1,26 @@
-# Optional ChatGPT Events adapter 0.0.2
+# Optionaler ChatGPT-Events-Anschluss
 
-KiraBridge 0.6.0 keeps this SDK-2 adapter isolated from the MCP-1 backend.
-Normal task/action submissions never need an Events subscription. The backend's
-input schemas are forwarded unchanged; optional push uses the existing
-`completion_target=push:<real verified subscription id>`.
+Status, private Vorbereitung, Grenzen und Abnahme:
+[CHATGPT-EVENTS-20261019.md](../../docs/CHATGPT-EVENTS-20261019.md).
+**Echter Chatempfang ist noch nicht nachgewiesen.**
 
-`serve.py --external-sender` is the facade; `--sender-only` is the durable sender.
-Both use the same private state and explicitly allowed actual callback hosts.
-`prepare.py` only creates private candidates. `check_protocol.py` is a clearly
-simulated host for tests; never connect it to the actual ChatGPT App.
+Separates Abhängigkeitsprojekt; verändert die laufende SDK-1-Bridge nicht:
 
-The versioned core installer preserves an already configured facade, sender,
-tunnel, credentials and App connection. It does not invent a subscription or install
-new host credentials. On a new machine this optional integration is a separate
-operator setup. Actual original-chat receipt remains unverified.
+```sh
+uv sync --project integrations/chat-events --locked
+integrations/chat-events/.venv/bin/python integrations/chat-events/serve.py --help
+```
 
-See [versioned installation and acceptance limits](../../docs/INSTALLATION-0.6.0.md).
+Produktiv: `serve.py --external-sender` hinter dem vorhandenen privaten Tunnel,
+zusätzlich derselbe Einstieg mit `--sender-only` als dauerhafter lokaler Dienst.
+Beide benötigen dieselbe private `--state`-Datei und die tatsächlich geprüften
+`--allow-callback-host`-Werte. `--config` verweist auf die bestehende TOML-Policy;
+keine neuen Tokens/Rechte. Die Standard-Allowlist ist leer.
+
+`prepare.py` schreibt nur neue private Kandidaten, installiert oder startet nichts.
+`check_protocol.py` ist ausschließlich ein simulierter Host für isolierte Tests.
+Niemals diesen Testadapter mit der echten App verbinden.
+
+Normale Task-Schemas bleiben unverändert. Push ist optional über das bestehende
+`completion_target=push:<echte bestätigte Subscription-ID>`; kein neues Pflichtfeld.
+[Aktueller Betrieb und Abnahmegrenze](../../docs/MCP-SCHEMA-CACHE-20261019.md).

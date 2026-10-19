@@ -54,7 +54,9 @@ class TaskManager:
         if completion_target is not None:
             valid_target(completion_target)
         policy = self.security.principal(principal, request.operation)
-        automatic = policy.approval_mode == "automatic" and not approval
+        from kirabridge.permissions import automatic_for
+
+        automatic = automatic_for(policy, request.operation) and not approval
         pending = pending and not automatic
         if request.api_version != "1":
             raise BridgeError("api_version", "Unsupported API version")

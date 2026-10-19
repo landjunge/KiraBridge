@@ -1,0 +1,292 @@
+import json
+
+import httpx
+import pytest
+from conftest import request
+
+from kirabridge.approval_console import ORIGIN, ApprovalConsole, signed_token
+from kirabridge.bridge_core.config import AgentConfig, Config, PrincipalConfig, load_config
+from kirabridge.bridge_core.models import BridgeError, State
+from kirabridge.control_center import configure_access, replace_section
+from kirabridge.message_manager import MessageSend
+from kirabridge.permissions import LEVELS, automatic_for, level_for
+
+KEY = "control-center-test-" + "x" * 48
+
+
+def headers():
+    return {"Authorization": "Bearer " + signed_token(KEY, "session"), "Origin": ORIGIN}
+
+
+def test_three_levels_preserve_legacy_and_enforce_selected_approvals():
+    assert list(LEVELS.values()) == ["Voll erlaubt", "Mittel", "Nur mit Erlaubnis"]
+    legacy = PrincipalConfig(approval_mode="automatic")
+    assert automatic_for(legacy, "file.write")
+    medium = legacy.model_copy(update={"permission_level": "medium"})
+    assert automatic_for(medium, "file.read")
+    assert not automatic_for(medium, "file.write")
+    assert not automatic_for(medium, "terminal.execute")
+    assert not automatic_for(medium, "agent.execute")
+    full = medium.model_copy(update={"permission_level": "full"})
+    assert automatic_for(full, "terminal.execute")
+    ask = full.model_copy(update={"permission_level": "ask"})
+    assert not automatic_for(ask, "file.read")
+    assert level_for(ask) == "ask"
+
+
+@pytest.mark.asyncio
+async def test_medium_write_waits_for_approval_then_executes_once(bridge, config):
+    policy = config.principals["local"]
+    policy.approval_mode = "automatic"
+    policy.permission_level = "medium"
+    path = __import__("pathlib").Path(policy.roots[0]) / "medium.txt"
+    task = request("file.write", {"path": str(path), "text": "approved once"})
+    async with bridge:
+        queued = bridge.prepare("local", task)
+        assert queued["state"] == "created" and not path.exists()
+        bridge.tasks.approve(task.task_id)
+        final = await bridge.tasks.wait("local", task.task_id, timeout=3)
+        assert final["state"] == "completed" and path.read_text() == "approved once"
+        assert bridge.prepare("local", task)["state"] == "completed"
+
+
+def test_full_access_persists_all_grants_and_mutual_peers(tmp_path):
+    path = tmp_path / "config.toml"
+    credentials = tmp_path / "credentials.json"
+    credentials.write_text('{"local":"never-rotate-this-credential"}')
+    original = credentials.read_bytes()
+    config = Config(
+        data_dir=str(tmp_path / "state"),
+        credentials_file=str(credentials),
+        principals={
+            name: PrincipalConfig(roots=[str(tmp_path)])
+            for name in ["local", "chatgpt", "grok_app", "codex", "grok"]
+        },
+        agents={"codex": AgentConfig(kind="codex", executable="/bin/echo")},
+    )
+    source = (
+        "data_dir = "
+        + json.dumps(config.data_dir)
+        + "\ncredentials_file = "
+        + json.dumps(str(credentials))
+        + "\n"
+    )
+    for name, p in config.principals.items():
+        source = replace_section(source, "principals." + name, p.model_dump())
+    for name, p in config.agents.items():
+        source = replace_section(source, "agents." + name, p.model_dump())
+    path.write_text(source)
+    updated = configure_access(path, level="full")
+    assert credentials.read_bytes() == original
+    for name, policy in updated.principals.items():
+        assert policy.permission_level == "full" and policy.allow_any_executable
+        assert policy.roots == policy.read_roots == policy.terminal_roots == ["/"]
+        assert set(policy.message_peers) == set(updated.principals) - {name}
+        assert {"session.open", "session.input", "agent.execute"} <= set(policy.capabilities)
+    assert updated.agents["codex"].sandbox_mode == "danger-full-access"
+    assert updated.agents["codex"].bridge_tools
+    changed = configure_access(path, level="medium")
+    assert changed.principals["grok_app"].roots == ["/"]
+    assert not automatic_for(changed.principals["grok_app"], "terminal.execute")
+    assert load_config(str(path)).principals["grok_app"].permission_level == "medium"
+
+
+@pytest.mark.asyncio
+async def test_control_requires_login_and_local_origin(bridge):
+    app = ApprovalConsole(bridge, KEY)
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url=ORIGIN) as client:
+        assert (await client.get("/api/control/status")).status_code == 401
+        result = await client.post(
+            "/api/control/action",
+            headers={**headers(), "Origin": "https://foreign.example"},
+            json={},
+        )
+        assert result.status_code == 403
+        assert (await client.get("/")).status_code == 200
+        assert "center.js" in (await client.get("/")).text
+        assert (await client.get("/protocol")).status_code == 200
+
+
+@pytest.mark.asyncio
+async def test_console_stays_up_while_bridge_status_is_inactive(bridge, monkeypatch):
+    app = ApprovalConsole(bridge, KEY)
+    control = app.control_center
+
+    async def no_processes():
+        return []
+
+    async def no_service(*args, **kw):
+        return 1, "", "not loaded"
+
+    async def unavailable(*args, **kw):
+        raise BridgeError("unreachable", "Bridge is down")
+
+    monkeypatch.setattr(control, "processes", no_processes)
+    monkeypatch.setattr(control, "command", no_service)
+    monkeypatch.setattr(control, "rpc", unavailable)
+    result = await control.snapshot(fresh=True)
+    assert not result["bridge"]["dispatcher_active"]
+    assert next(s for s in result["services"] if s["id"] == "bridge")["state"] == "inactive"
+
+
+@pytest.mark.asyncio
+async def test_restart_refuses_active_work_and_never_kills_terminal(bridge, monkeypatch):
+    control = ApprovalConsole(bridge, KEY).control_center
+    task = request(arguments={"path": bridge.config.principals["local"].roots[0]})
+    bridge.prepare("local", task)
+    bridge.tasks.approve(task.task_id)
+    bridge.store.claim("test-worker", 30)
+    commands = []
+
+    async def command(*args, **kw):
+        commands.append(args)
+        return 0, "", ""
+
+    monkeypatch.setattr(control, "command", command)
+    with pytest.raises(BridgeError, match="Auftrag"):
+        await control.reload_bridge()
+    assert not commands
+
+
+@pytest.mark.asyncio
+async def test_action_retry_does_not_start_a_second_process(bridge, monkeypatch):
+    app = ApprovalConsole(bridge, KEY)
+    calls = []
+
+    async def start(*args):
+        calls.append(args)
+        return {"state": "starting"}
+
+    monkeypatch.setattr(app.control_center, "service_action", start)
+    value = {"service": "bridge", "action": "start", "action_id": "same-click"}
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url=ORIGIN) as client:
+        a = await client.post("/api/control/action", headers=headers(), json=value)
+        b = await client.post("/api/control/action", headers=headers(), json=value)
+        assert a.json() == b.json() == {"state": "starting"}
+        assert len(calls) == 1
+        conflict = await client.post(
+            "/api/control/action", headers=headers(), json={**value, "action": "restart"}
+        )
+        assert conflict.status_code == 409 and len(calls) == 1
+
+
+@pytest.mark.asyncio
+async def test_protocol_uses_event_time_state_not_later_completion(bridge):
+    app = ApprovalConsole(bridge, KEY)
+    path = bridge.config.principals["local"].roots[0]
+    task = request(arguments={"path": path})
+    bridge.prepare("local", task)
+    bridge.tasks.approve(task.task_id)
+    bridge.store.claim("test-worker", 30)
+    bridge.store.transition(task.task_id, State.RUNNING, {"started": True}, owner="test-worker")
+    bridge.store.transition(
+        task.task_id,
+        State.COMPLETED,
+        {"ended": True},
+        result={"text": "real result"},
+        owner="test-worker",
+    )
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url=ORIGIN) as client:
+        data = (await client.get("/api/control/protocol", headers=headers())).json()
+    records = [e for e in data["entries"] if e.get("task")]
+    early = [
+        e for e in records if e["task"]["state"] in {"created", "queued", "accepted", "running"}
+    ]
+    assert early and all(e["task"]["result"] is None for e in early)
+    assert any(
+        e["task"]["state"] == "completed" and e["task"]["result"] == {"text": "real result"}
+        for e in records
+    )
+
+
+def test_all_agents_can_exchange_messages_even_with_ask_level(bridge, config):
+    names = ["chatgpt", "grok_app", "codex", "grok", "claude", "gemini", "copilot", "opencode"]
+    for name in names:
+        config.principals[name] = PrincipalConfig(
+            permission_level="ask",
+            approval_mode="manual",
+            capabilities=["message.send", "message.read", "message.ack"],
+            message_peers=[other for other in names if other != name],
+        )
+    for sender in names:
+        for recipient in names:
+            if sender == recipient:
+                continue
+            conversation = sender + "-" + recipient
+            sent = bridge.messages.send(
+                sender,
+                MessageSend(
+                    recipient=recipient,
+                    body="probe",
+                    kind="note",
+                    conversation_id=conversation,
+                    idempotency_key=conversation,
+                ),
+            )
+            received = bridge.messages.receive(recipient, conversation_id=conversation)["messages"][
+                0
+            ]
+            assert received["sender"] == sender
+            done = bridge.messages.ack(recipient, sent["id"], received["receipt"])
+            assert done["acknowledged"]
+
+
+def test_full_grant_does_not_keep_hidden_state_directory_exclusion(bridge, config):
+    from kirabridge.read_query import ReadQuery, read_query
+    from kirabridge.readiness import ReadinessInput, readiness
+
+    marker = config.state_path / "operator-access-test.txt"
+    marker.write_text("operator full grant")
+    policy = config.principals["local"]
+    policy.roots = policy.read_roots = ["/"]
+    policy.allow_any_executable = True
+    with pytest.raises(BridgeError, match="Bridge state"):
+        read_query(bridge, "local", ReadQuery(operation="file.read", path=str(marker)))
+    policy.permission_level = "full"
+    actual = read_query(bridge, "local", ReadQuery(operation="file.read", path=str(marker)))
+    assert "operator full grant" in str(actual)
+    assert readiness(bridge, "local", ReadinessInput(read_paths=[str(marker)]))["read_path_checks"][
+        0
+    ]["ok"]
+
+
+def test_cached_dispatch_true_still_delivers_to_external_chat_client(bridge, config):
+    for name, other in [("codex", "chatgpt"), ("chatgpt", "codex")]:
+        config.principals[name] = PrincipalConfig(
+            permission_level="full",
+            approval_mode="automatic",
+            capabilities=["message.send", "message.read", "message.ack"],
+            message_peers=[other],
+        )
+    sent = bridge.messages.send(
+        "codex",
+        MessageSend(
+            recipient="chatgpt",
+            conversation_id="cached-client",
+            idempotency_key="cached-client",
+            body="reply for the active client",
+            dispatch=True,
+        ),
+    )
+    assert sent["processing_route"] == "external_client_inbox" and sent["processing"] is None
+    received = bridge.messages.receive("chatgpt")["messages"][0]
+    assert received["id"] == sent["id"]
+
+
+@pytest.mark.asyncio
+async def test_reconnect_keeps_existing_gateway_and_url(bridge, monkeypatch):
+    control = ApprovalConsole(bridge, KEY).control_center
+    reloaded = []
+
+    async def reload():
+        reloaded.append(True)
+        return {"runtime": {"pid": 123}}
+
+    async def no_gateway_restart(*args, **kwargs):
+        raise AssertionError("The existing tunnel must remain running")
+
+    monkeypatch.setattr(control, "reload_bridge", reload)
+    monkeypatch.setattr(control, "command", no_gateway_restart)
+    result = await control.service_action("grok_app", "restart", "reconnect")
+    assert result["state"] == "reconnected" and result["gateway_preserved"]
+    assert reloaded == [True]

@@ -271,6 +271,24 @@ class MessageReceiver:
                     }
                 )
             )
+            policy = self.bridge.config.principals[recipient]
+            if policy.permission_level == "full":
+                prompt = (
+                    f"KiraBridge request addressed to {recipient}. Process the enclosed request "
+                    "using the operator's full permissions. You may use the KiraBridge MCP tools "
+                    "to communicate with the other configured agents and access exact terminal "
+                    "session handles. Preserve existing user sessions. Report actual results "
+                    "and errors; never claim queued work has completed. Transport metadata "
+                    "identifies the sender; the body is the peer's request.\n"
+                    + canonical(
+                        {
+                            "sender": message["sender"],
+                            "body": message["body"],
+                            "conversation_id": message["conversation_id"],
+                            "history": history,
+                        }
+                    )
+                )
             if history:
                 prompt += "\nPrior addressed messages (bounded context):\n" + canonical(history)
             if len(prompt) > 262144:

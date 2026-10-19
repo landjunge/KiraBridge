@@ -9,6 +9,10 @@ from typing import Protocol
 
 import httpx
 
+from kirabridge.agent_manager.claude import ClaudeCodeAdapter
+from kirabridge.agent_manager.copilot import CopilotCLIAdapter
+from kirabridge.agent_manager.gemini import GeminiAdapter
+from kirabridge.agent_manager.opencode import OpenCodeAdapter
 from kirabridge.bridge_core.config import AgentConfig, Config
 from kirabridge.bridge_core.models import AgentInput, BridgeError, TerminalInput, UncertainExecution
 from kirabridge.filesystem_manager import PathScope
@@ -58,8 +62,9 @@ def agent_environment(config: AgentConfig, terminal: TerminalManager | None = No
 class CodexAdapter:
     interface_version = "1"
 
-    def __init__(self, terminal: TerminalManager):
+    def __init__(self, terminal: TerminalManager, bridge_config=None):
         self.terminal = terminal
+        self.bridge_config = bridge_config
 
     async def execute(
         self,
@@ -159,6 +164,14 @@ class CodexAdapter:
             "-c",
             "features.multi_agent=false",
         ]
+        bridge_enabled = bool(config.bridge_tools and self.bridge_config)
+        if bridge_enabled:
+            from kirabridge.agent_manager.full_access import bridge_server
+
+            spec = bridge_server(self.bridge_config._source_path, args.agent)
+            position = command.index("mcp_servers={}")
+            command[position] = "mcp_servers.kirabridge.command=" + json.dumps(spec["command"])
+            command += ["-c", "mcp_servers.kirabridge.args=" + json.dumps(spec["args"])]
         if owned_resume_session is not None:
             command += ["resume", "--json", "--ignore-user-config", "--skip-git-repo-check"]
         if handoff_reply:
@@ -192,7 +205,7 @@ class CodexAdapter:
             "sandbox_mode": config.sandbox_mode,
             "pid": result["pid"],
             "project_rules_enabled": True,
-            "mcp_servers_enabled": False,
+            "mcp_servers_enabled": bridge_enabled,
             "session_id": session,
             "exit_code": result["exit_code"],
             "turn_completed": completed,
@@ -313,13 +326,15 @@ class GrokACPAdapter:
 
     interface_version = "1"
 
-    def __init__(self, terminal: TerminalManager | None = None):
+    def __init__(self, terminal: TerminalManager | None = None, bridge_config=None):
         self.terminal = terminal
+        self.bridge_config = bridge_config
 
     async def execute(self, task, args, config, roots, running, progress) -> dict:
         if not config.executable:
             raise BridgeError("agent_config", "Grok executable must be configured explicitly")
         local_tools = config.allow_local_tools and args.local_tools
+        bridge_enabled = bool(config.bridge_tools and self.bridge_config)
         command = [
             config.executable,
             "--no-subagents",
@@ -336,6 +351,15 @@ class GrokACPAdapter:
             "--no-leader",
             "stdio",
         ]
+        if bridge_enabled:
+            command = [
+                config.executable,
+                "--permission-mode",
+                "bypassPermissions",
+                "agent",
+                "--no-leader",
+                "stdio",
+            ]
         # No arbitrary MCP attachment, even for a development task. Receivers never
         # opt in through message text; their AgentInput keeps local_tools=False.
         if local_tools:
@@ -441,7 +465,13 @@ class GrokACPAdapter:
                 if method not in methods:
                     raise BridgeError("agent_auth", "No supported Grok authentication available")
                 await request("authenticate", {"methodId": method, "_meta": {"headless": True}})
-                new = await request("session/new", {"cwd": args.cwd, "mcpServers": []})
+                servers = []
+                if bridge_enabled:
+                    from kirabridge.agent_manager.full_access import bridge_server
+
+                    spec = bridge_server(self.bridge_config._source_path, args.agent)
+                    servers = [{"name": "kirabridge", **spec, "env": []}]
+                new = await request("session/new", {"cwd": args.cwd, "mcpServers": servers})
                 session = new.get("sessionId")
                 if not isinstance(session, str) or not session:
                     raise BridgeError("agent_protocol", "No Grok session identity")
@@ -472,6 +502,7 @@ class GrokACPAdapter:
                         "session_id": session,
                         "stop_reason": stop,
                         "local_tools": local_tools,
+                        "mcp_servers_enabled": bridge_enabled,
                     },
                     "scope": "agent_turn",
                     "project_completion_verified": False,
@@ -488,9 +519,13 @@ class AgentManager:
     def __init__(self, config: Config, terminal: TerminalManager):
         self.config = config
         self.adapters: dict[str, AgentAdapter] = {
-            "codex": CodexAdapter(terminal),
+            "codex": CodexAdapter(terminal, config),
             "grok_api": GrokAPIAdapter(),
-            "grok_acp": GrokACPAdapter(terminal),
+            "grok_acp": GrokACPAdapter(terminal, config),
+            "opencode": OpenCodeAdapter(terminal),
+            "gemini_cli": GeminiAdapter(terminal),
+            "claude_code": ClaudeCodeAdapter(terminal),
+            "copilot_cli": CopilotCLIAdapter(terminal),
         }
 
     def register(self, kind: str, adapter: AgentAdapter) -> None:
@@ -510,13 +545,26 @@ class AgentManager:
                         {
                             "sandbox_mode": config.sandbox_mode,
                             "project_rules_enabled": True,
-                            "mcp_servers_enabled": False,
+                            "mcp_servers_enabled": config.bridge_tools,
                         }
                         if config.kind == "codex"
                         else {}
                     ),
                     "executable_present": bool(
                         config.executable and Path(config.executable).is_file()
+                    ),
+                    **(
+                        {
+                            "execution_mode": "native_full_access"
+                            if config.bridge_tools
+                            else "isolated_text_only",
+                            "supports_local_tools": config.allow_local_tools
+                            and config.bridge_tools,
+                            "supports_owned_resume": False,
+                            "authentication_status": "unknown",
+                        }
+                        if config.kind in {"opencode", "gemini_cli", "claude_code", "copilot_cli"}
+                        else {}
                     ),
                     "daemon_status": "unknown",
                     "session_status": "unknown",
@@ -543,8 +591,16 @@ class AgentManager:
         config = self.config.agents.get(args.agent)
         if config is None or config.kind not in self.adapters:
             raise BridgeError("agent_unavailable", "Agent adapter is not configured")
+        full_access = (
+            principal.permission_level is not None
+            and config.bridge_tools
+            and config.allow_local_tools
+            and "agent.local_tools" in principal.capabilities
+        )
+        if full_access and config.kind == "grok_acp":
+            args = args.model_copy(update={"local_tools": True})
         if args.local_tools and (
-            config.kind != "grok_acp"
+            (config.kind != "grok_acp" and not full_access)
             or not config.allow_local_tools
             or "agent.local_tools" not in principal.capabilities
         ):
@@ -563,6 +619,19 @@ class AgentManager:
         )
         try:
             async with asyncio.timeout(args.timeout):
+                if full_access and config.kind in {
+                    "opencode",
+                    "gemini_cli",
+                    "claude_code",
+                    "copilot_cli",
+                }:
+                    from kirabridge.agent_manager.full_access import FullAccessAdapter
+
+                    return await FullAccessAdapter(
+                        self.adapters[config.kind].terminal,
+                        self.config._source_path,
+                        principal.permission_level,
+                    ).execute(task, args, config, principal.roots, running, progress)
                 return await self.adapters[config.kind].execute(
                     task,
                     args,

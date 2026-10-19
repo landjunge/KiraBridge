@@ -1,6 +1,54 @@
+# KiraBridge 0.8.0rc1 · kompaktes Steuerfenster
+
+Auf diesem Mac öffnet **KiraBridge.app** die Steuerung in einem eigenen Fenster.
+Prozesse, Kira/ChatGPT und Grok, Terminals, Reparatur-Doktor und Rechte sind dort
+direkt erreichbar. Nur das Protokoll öffnet ein weiteres Fenster. Die Steuerung
+bleibt erreichbar, wenn der eigentliche Bridge-Dienst ausgeschaltet ist.
+
+Es gibt drei Rechtestufen: **Voll erlaubt**, **Mittel** und **Nur mit Erlaubnis**.
+Vollfreigaben werden tatsächlich genutzt; vorhandene Zugangsdaten bleiben erhalten.
+Die Stufen ändern die Auftragsfreigabe, ohne bereits erteilte Zugriffsrechte zu löschen.
+Alle eingerichteten Identitäten können adressierte Nachrichten austauschen.
+Terminal.app und tmux verwenden genau ausgewählte Sitzungen; laufende fremde
+Nutzersitzungen werden durch eine Reparatur nicht ersetzt.
+
+Browser, Handy, Text, Live und Sprache verwenden dieselben MCP-Werkzeuge und Rechte.
+`connection_check` bestätigt einen Aufruf aus dem jeweiligen Gespräch. Gerät und
+Modus sind Angaben dieses aufrufenden Clients. Die Oberfläche zeigt ungeprüfte
+Zugänge ausdrücklich als ungeprüft; lokale Tests simulieren keine Handy- oder
+Sprachsitzung beim Anbieter. Die Verfügbarkeit der Werkzeuge im jeweiligen
+ChatGPT-/Grok-Modus muss dort tatsächlich bestätigt werden.
+
+Prüfstand: 539 Tests im vollständigen Lauf; zusätzliche gezielte Regressionstests.
+Echte Codex- und Grok-Arbeitssitzungen haben die Bridge über MCP abgefragt.
+72 adressierte Nachrichtenwege zwischen neun authentifizierten Identitäten wurden
+zugestellt und quittiert. Die native macOS-Anmeldung, die getrennte Protokollseite
+und der Wiederanlauf der ausgeschalteten Bridge über die laufende Steuerung sind
+geprüft. Bestehende Sitzungen und Zugangsdaten wurden erhalten.
+
 # KiraBridge
 
-**Version 0.6.0 ist zur sichtbaren Installation vorbereitet.** [Installieren, Status, Rückweg und Nachweise](docs/INSTALLATION-0.6.0.md). Die bestehende Mac-Installation wird erst durch den dort genannten Befehl umgeschaltet.
+**Events-Status:** korrigierte Anbindung aktiviert; echte Zustellung im ursprünglichen Chat weiterhin offen. [Nachweise und fehlender Host-Schritt](docs/MCP-SCHEMA-CACHE-20261019.md).
+
+> **Anschluss wiederhergestellt, 19.10.2026:** [Events-Fassade zurückgerollt](docs/CHATGPT-EVENTS-RECOVERY-20261019.md).
+> Der bisherige Server bearbeitet normale Aufträge wieder ohne Subscription.
+> Echter App-Status und neuer Terminalauftrag funktionieren mit leerem Legacy-
+> Kompatibilitätsfeld. Der Connector hält noch die alte Pflichtdefinition vor;
+> der Schema-Cache ist nicht dauerhaft bereinigt. Chat-Push bleibt deaktiviert.
+
+> **Abschlusskanal 19.10.2026:** [Dauerhafte Abschlussmeldungen und Abnahme](docs/COMPLETION-CHANNEL-20261019.md)
+> mit atomarer Auftragszuordnung, wartendem MCP-Consumer, Quittierung und Wiederverbindung
+> implementiert. Sechs reale Rückmeldungen einschließlich echtem Codex-Turn geprüft.
+> Nach 184 bestandenen Tests im leeren Dienst kontrolliert aktiviert; bestehende Daten,
+> Konfiguration und Rechte per Hash erhalten. Echter App-Terminalauftrag mit empfangener
+> Abschlussmeldung geprüft. Kein autonomes Aufwecken eines inaktiven ChatGPT-Chats.
+
+> **Automatische Demo-Abnahme 19.10.2026:** [Ablauf, Webseite und Nachweise](examples/review-demo/README.md)
+> bestanden: zwei serielle echte Codex-CLI-Aufträge über Bridge-MCP, ausdrücklich
+> simuliertes Grok, tatsächliche Nacharbeit, quittierte Ergebnisrückgabe und echte
+> Chromium-Abnahme. App-Dateirückgabe unter `chatgpt` mit identischem Datei-Hash geprüft.
+> Separater ChatGPT-UI-Auftrag und echte Grok-Abnahme bleiben offen. Kein Release.
+
 
 Privates, modulares Desktop- und Agenten-Gateway für macOS und Linux. Python 3.11+, asyncio, SQLite und das offizielle MCP Python SDK. Version **0.5.2** ergänzt [konkrete Vorabprüfung und reduzierte Fehlerdiagnose](docs/DIAGNOSTICS-20261018.md) in der bestehenden Audit-Kette. Version0.5.1 ergänzte die begrenzte Bereitschaftsprüfung und zusätzliche reine Lesepfade; Version0.5.0 ergänzte den direkten, dauerhaften [Agentenkanal Codex ↔ Grok](docs/AGENT_CHANNEL.md) mit automatischer Empfängeranbindung. Grundlage bleibt der [Entwicklungsplan](docs/DEVELOPMENT_PLAN.md).
 
