@@ -9,7 +9,7 @@
 
 **[Zur Installation](docs/INSTALL-DE.md)** · **[ChatGPT verbinden](docs/CHATGPT.md)** · **[Versionsübersicht](https://github.com/landjunge/KiraBridge/releases)**
 
-Das private Vorabrelease [0.7.0rc1](https://github.com/landjunge/KiraBridge/releases/tag/v0.7.0rc1) enthält die geführte CLI-Installation und Teamsteuerung. Downloads erfordern Zugriff auf das private Repository.
+Das private Vorabrelease [0.7.0rc2](https://github.com/landjunge/KiraBridge/releases/tag/v0.7.0rc2) enthält die geführte CLI-Installation, Teamsteuerung und den Grok-App-Connector. Downloads erfordern Zugriff auf das private Repository.
 
 | Weg | Stand |
 |---|---|
@@ -22,7 +22,7 @@ Das private Vorabrelease [0.7.0rc1](https://github.com/landjunge/KiraBridge/rele
 
 **[Installation](docs/INSTALL-EN.md)** · **[Connect ChatGPT](docs/CHATGPT.md)** · **[Releases](https://github.com/landjunge/KiraBridge/releases)**
 
-The private [0.7.0rc1 prerelease](https://github.com/landjunge/KiraBridge/releases/tag/v0.7.0rc1) includes guided CLI installation and team coordination. Downloads require access to the private repository.
+The private [0.7.0rc2 prerelease](https://github.com/landjunge/KiraBridge/releases/tag/v0.7.0rc2) includes guided CLI installation, team coordination and the Grok app connector. Downloads require access to the private repository.
 
 | Option | Status |
 |---|---|
@@ -42,8 +42,8 @@ arbeiten. OpenCode, Gemini CLI, Claude Code und Copilot CLI sind als Textadapter
 ChatGPT delegates through KiraBridge to Codex or Grok on your computer. Both can
 collaborate on the same project with configured permissions. OpenCode, Gemini CLI, Claude Code and Copilot CLI text adapters require working provider access.
 
-**0.7.0rc1 · privates Vorabrelease:** [Installieren DE](docs/INSTALL-DE.md) ·
-[Install EN](docs/INSTALL-EN.md) · [Release Notes](docs/RELEASE-NOTES-0.7.0rc1.md).
+**0.7.0rc2 · privates Vorabrelease:** [Installieren DE](docs/INSTALL-DE.md) ·
+[Install EN](docs/INSTALL-EN.md) · [Release Notes](docs/RELEASE-NOTES-0.7.0rc2.md).
 ## Lizenz / License
 
 **Deutsch:** Es gilt die **Netzwerkpunkt Personal Use License 1.0**, eine individuelle Source-available-Lizenz. Private, nicht geschäftliche Nutzung ist kostenlos erlaubt, einschließlich privater Anpassungen und privatem Self-Hosting. Interner Firmeneinsatz, berufliche Nutzung, Weiterverkauf und kostenpflichtige Dienste benötigen eine vorherige schriftliche Erlaubnis beziehungsweise gesonderte Lizenz. Es gibt keine allgemeine Weiterverteilungserlaubnis. Historische Rechte und gesonderte Drittanbieter-Lizenzen bleiben erhalten. [Vollständige Bedingungen](LICENSE).
@@ -57,7 +57,12 @@ Die Projektseite `kirabridge.netzwerkpunkt.de` bleibt geplant. Noch kein öffent
 Die nachfolgenden Betriebsdetails dokumentieren die vorhandene Entwicklerinstallation;
 der neue normale Schnellstart verwendet das geprüfte Release-Paket.
 
-Privates, modulares Desktop- und Agenten-Gateway für macOS und Linux. Python 3.11+, asyncio, SQLite und das offizielle MCP Python SDK. **0.7.0rc1** ergänzt [gemeinsame Teams mit wählbarem Koordinator, Rollen, adressierten Nachrichten und delegierten Aufträgen](docs/TEAM-ORCHESTRATION.md). Ein lokaler Team-Bereich, MCP und CLI verwenden dieselben dauerhaften Daten und belegten Ausführungszustände. [Release-Hinweise](docs/RELEASE-NOTES-0.7.0rc1.md). Grundlage bleibt der [Entwicklungsplan](docs/DEVELOPMENT_PLAN.md).
+Privates, modulares Desktop- und Agenten-Gateway für macOS und Linux. Python 3.11+, asyncio, SQLite und das offizielle MCP Python SDK. [Gemeinsame Teams mit wählbarem Koordinator, Rollen, adressierten Nachrichten und delegierten Aufträgen](docs/TEAM-ORCHESTRATION.md) verbinden die eingerichteten Zugänge. Ein lokaler Team-Bereich, MCP und CLI verwenden dieselben dauerhaften Daten und belegten Ausführungszustände. [Release-Hinweise 0.7.0rc2](docs/RELEASE-NOTES-0.7.0rc2.md). Grundlage bleibt der [Entwicklungsplan](docs/DEVELOPMENT_PLAN.md).
+
+Der zusätzliche [Grok-App-Connector](docs/GROK-APP-CONNECTOR.md) verbindet eigene
+OAuth-MCP-Clients mit der getrennten Identität `grok_app`; der vorhandene
+Grok-CLI-Agent bleibt `grok`. Für Eve am Handy muss dessen tatsächlicher
+Werkzeugaufruf gesondert geprüft werden. Eine Voice-API wird nicht verwendet.
 
 ## Implementiert
 

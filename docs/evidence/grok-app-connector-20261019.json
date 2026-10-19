@@ -1,0 +1,92 @@
+{
+  "date": "2026-10-19",
+  "release": "0.7.0rc2",
+  "kind": "controlled real TLS/OAuth/MCP acceptance against the existing local runtime",
+  "identities": {
+    "CLI": "grok",
+    "external_app": "grok_app",
+    "existing_team_coordinator": "chatgpt"
+  },
+  "acceptance": {
+    "public_TLS": true,
+    "OAuth_DCR_consent_PKCE": true,
+    "fixed_principal": "grok_app",
+    "CLI_principal": "grok",
+    "actual_Grok_app_call_verified": false,
+    "Eve_voice_verified": false,
+    "provider_voice_API_used": false,
+    "native_model_calls": 0,
+    "MCP_to_real_bridge": true,
+    "separate_app_sender": "grok_app",
+    "team_coordinator_preserved": "chatgpt",
+    "CLI_receipt_confirmed": true,
+    "message_id": "tm-f13fda6555bb445ca50a1800c31d9208",
+    "same_message_on_repeat": true,
+    "forged_sender_rejected": true,
+    "private_task_rejected": true,
+    "automatic_file_write": {
+      "task_id": "grok-app-connector-write-20261019-01",
+      "state": "completed",
+      "attempt": 1,
+      "same_task_on_repeat": true,
+      "existing_file_overwritten": false
+    },
+    "refresh_rotated": true,
+    "refresh_replay_revokes_family": true,
+    "authorization_code_replay_denied": true
+  },
+  "preservation": {
+    "old_task_rows_unchanged": 638,
+    "old_credentials_unchanged": true,
+    "old_principal_policies_unchanged": true,
+    "original_CLI_adapter_preserved": "grok_acp",
+    "new_OAuth_principal": "grok_app",
+    "automatic_mode_preserved": "automatic",
+    "main_runtime_version_unchanged": "0.5.2",
+    "no_native_model_invocations_by_acceptance": true,
+    "controlled_client_revoked": true,
+    "public_TLS_healthy": true,
+    "latest_oauth_schema_loaded": true,
+    "app_and_Eve_still_require_real_session_proof": true
+  },
+  "local_checks": {
+    "focused_auth_gateway_console_runtime_tests": 94,
+    "result": "passed",
+    "ruff": "passed",
+    "format": "passed",
+    "full_suite_before_final_supervisor_hardening": {
+      "passed": 577,
+      "skipped_external_fixtures": 43,
+      "seconds": 96.57
+    },
+    "final_runtime_hardening_tests": {
+      "passed": 7,
+      "existing_runtime_tests_previously_passed": 13
+    },
+    "focused_checks_total": 101
+  },
+  "coverage": [
+    "real SDK OAuth registration, local HMAC-authenticated operator decision, PKCE S256 and resource binding",
+    "public HTTPS OAuth-to-private-MCP call and separate authenticated CLI receipt",
+    "message and task idempotency, one file-write attempt, forged sender and foreign task rejection",
+    "access/refresh rotation, replay denial, refresh-family revocation",
+    "persisted restart, exact issuer/resource and callback binding, client quotas and additive original-schema migration",
+    "real isolated supervisor signal cleanup and duplicate-process guard",
+    "local UI authorization, origin checks, text-only metadata rendering and lost-response handling",
+    "Both connector-start paths only inspect authenticated loaded access; no core/operator service signal. Unexpected tunnel exit propagates failure after gateway drain for Linux supervisor recovery."
+  ],
+  "client_cleanup": "Only controlled acceptance clients revoked; no user connector changed.",
+  "provider_costs": {
+    "voice_API_installed": false,
+    "new_AI_account": false,
+    "model_calls_in_acceptance": 0
+  },
+  "limits": [
+    "This controlled client is not an authenticated real Grok account/mobile session.",
+    "Eve voice tool invocation remains unverified until a matching call from that specific session.",
+    "Quick Tunnel addresses are temporary; a changed origin requires a new app connection.",
+    "The app identity is an external participant; roles do not wake a closed app.",
+    "The production runtime uses additive backports and retains its existing 0.5.2 version and foreign extensions.",
+    "Existing provider plans, account limits and feature availability are independent of this connector."
+  ]
+}

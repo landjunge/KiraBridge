@@ -80,6 +80,10 @@ class ApprovalConsole:
 
         self.team_console = TeamConsole(bridge, self.authenticate)
         self.app.routes.extend(self.team_console.routes)
+        from kirabridge.grok_connector.console import GrokConnectorConsole
+
+        self.grok_connector_console = GrokConnectorConsole(bridge, self.authenticate)
+        self.app.routes.extend(self.grok_connector_console.routes)
 
     async def __call__(self, scope, receive, send):
         if scope["type"] != "http":

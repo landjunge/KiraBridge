@@ -114,7 +114,7 @@ Die Audit-Kette erkennt Veränderungen in vorhandenen Einträgen. Ein lokaler Ad
 
 Die direkte TLS-Implementierung ist für authentifizierte private Verbindungen vorgesehen. Zertifikatsprüfung ist im Client aktiv; eine private CA kann als `Peer.ca_file` angegeben werden. Proxy-Umgebungsvariablen werden für ausgehende Provider-/MCP-HTTP-Verbindungen nicht übernommen. Weiterleitungen dürfen keine Entscheidung über neue fremde Ziele ersetzen.
 
-Dieser Threat Review ist eine interne Entwurfsprüfung, kein unabhängiges Penetrationstest-Zertifikat. Der autorisierte private OpenAI-Tunnel verbindet ausschließlich den MCP-Proxy. Es wurde kein öffentlicher HTTP-Dienst oder Portforwarding eingerichtet. Eine spätere öffentliche Internetbereitstellung erfordert ausdrücklich freigegebene Infrastruktur und passende OAuth-/Netzwerkregeln.
+Dieser Threat Review ist eine interne Entwurfsprüfung, kein unabhängiges Penetrationstest-Zertifikat. Der frühere autorisierte private OpenAI-Tunnel verbindet ausschließlich den MCP-Proxy. Seit 0.7.0rc2 ergänzt der ausdrücklich beauftragte Grok-App-Connector einen getrennten, öffentlich erreichbaren OAuth-/MCP-Gateway über einen eigenen ausgehenden HTTPS-Tunnel. Hauptdienst und lokale Betreiberoberfläche werden nicht weitergeleitet. Der Gateway authentifiziert kurzlebige, Resource-gebundene Tokens und verwendet intern ausschließlich die getrennte Identität `grok_app`. Exakte Rücksprungadressen, PKCE, einmalige lokale Verknüpfungsfreigaben, Replay-Sperren und Ressourcenlimits begrenzen diesen Eingang. Eine Gateway-Gesundheitsantwort ist kein Nachweis einer echten Handy-/Eve-Sitzung. [Betrieb und Grenzen](GROK-APP-CONNECTOR.md).
 
 
 ## Historischer lokaler Betrieb 0.2.0

@@ -71,6 +71,60 @@ async def execute(args) -> None:
         emit({"config": str(destination), "workspace": str(workspace)})
         return
     config = load_config(args.config)
+    if args.command == "grok-connector":
+        from kirabridge.grok_connector import effective_settings, state_dir
+        from kirabridge.grok_connector.runtime import (
+            connector_status,
+            prepare,
+            serve,
+            start,
+            stop,
+        )
+        from kirabridge.local_runtime import default_config
+
+        config_path = Path(args.config).expanduser().absolute() if args.config else default_config()
+        if args.action == "setup":
+            emit(
+                prepare(
+                    config_path,
+                    access=args.access,
+                    cloudflared=args.cloudflared,
+                    public_origin=args.public_origin,
+                )
+            )
+        elif args.action == "start":
+            emit(await start(config_path))
+        elif args.action == "serve":
+            try:
+                await serve(config_path)
+            except asyncio.CancelledError:
+                pass
+        elif args.action == "stop":
+            emit(stop())
+        elif args.action == "status":
+            emit(connector_status(config))
+        else:
+            from kirabridge.grok_connector.auth_store import OAuthStore
+
+            settings = effective_settings(config)
+            if not settings.enabled:
+                raise BridgeError("connector_disabled", "Start the local connector first")
+            store = OAuthStore(
+                state_dir(config) / "oauth.sqlite3",
+                issuer=settings.public_origin,
+                principal=settings.principal,
+                redirect_hosts=settings.redirect_hosts,
+            )
+            try:
+                if args.action == "approve":
+                    store.decide(args.request_id, not args.deny)
+                    emit({"id": args.request_id, "approved": not args.deny})
+                else:
+                    store.revoke_client(args.client_id)
+                    emit({"revoked": True})
+            finally:
+                store.close()
+        return
     if args.command == "team":
         from kirabridge.local_runtime import peer
         from kirabridge.mcp_gateway.client import MCPClientPool
@@ -472,6 +526,20 @@ def main() -> None:
     setup = sub.add_parser("setup", help="Create private local policy, credentials and CLI command")
     setup.add_argument("--workspace", default=str(Path.home() / "workspace/KiraBridge"))
     sub.add_parser("status", help="Query the running local daemon")
+    connector = sub.add_parser("grok-connector", help="Connect the Grok app/Eve through OAuth MCP")
+    connector_actions = connector.add_subparsers(dest="action", required=True)
+    preparation = connector_actions.add_parser("setup")
+    preparation.add_argument("--access", choices=["team", "same-as-chatgpt"], default="team")
+    preparation.add_argument("--cloudflared", help="Existing official cloudflared binary")
+    preparation.add_argument(
+        "--public-origin", help="Existing stable HTTPS origin; no quick tunnel"
+    )
+    for action in ("start", "serve", "status", "stop"):
+        connector_actions.add_parser(action)
+    approval = connector_actions.add_parser("approve")
+    approval.add_argument("request_id")
+    approval.add_argument("--deny", action="store_true")
+    connector_actions.add_parser("revoke").add_argument("client_id")
     team = sub.add_parser("team", help="Shared roles, addressed messages and delegated work")
     actions = team.add_subparsers(dest="action", required=True)
     actions.add_parser("list")

@@ -1,4 +1,4 @@
-# KiraBridge installieren · 0.7.0rc1
+# KiraBridge installieren · 0.7.0rc2
 
 **Privater Release Candidate zur Abnahme. Noch keine öffentliche Installation.**
 Es gilt die beiliegende `LICENSE`: Netzwerkpunkt Personal Use License1.0,
@@ -16,7 +16,7 @@ Projekt arbeiten. OpenCode, Gemini CLI, Claude Code und Copilot CLI besitzen zus
 
 ## Release und bestehende Installation
 
-Diese Anleitung gehört zu **0.7.0rc1 mit Teamsteuerung**. Der genaue Quellstand,
+Diese Anleitung gehört zu **0.7.0rc2 mit Teamsteuerung und Grok-App-Connector**. Der genaue Quellstand,
 die Plattform und die Lizenz stehen in `release.json` im Paket; `SHA256SUMS`
 bezieht sich auf genau diese Artefakte. Ältere RC1-/RC2-/RC3-Pakete bleiben
 unverändert und dürfen nicht allein anhand einer ähnlichen Versionskennung

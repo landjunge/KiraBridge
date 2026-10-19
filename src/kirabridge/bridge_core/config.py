@@ -184,6 +184,61 @@ class TerminalConfig(BaseModel):
     home: str | None = None
 
 
+class GrokConnectorConfig(BaseModel):
+    """Separate OAuth entry point for the Grok application, never its CLI identity."""
+
+    model_config = ConfigDict(extra="forbid")
+    enabled: bool = False
+    public_origin: str | None = Field(default=None, max_length=2048)
+    principal: Literal["grok_app"] = "grok_app"
+    port: int = Field(default=8767, ge=1024, le=65535)
+    redirect_hosts: list[str] = Field(
+        default_factory=lambda: ["grok.com", "accounts.x.ai", "console.x.ai"],
+        min_length=1,
+        max_length=16,
+    )
+    max_requests: int = Field(default=16, ge=1, le=64)
+    max_body_bytes: int = Field(default=2097152, ge=1024, le=8388608)
+
+    @model_validator(mode="after")
+    def external_identity(self):
+        import re
+
+        if any(
+            not re.fullmatch(r"[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?", h) or ".." in h or "." not in h
+            for h in self.redirect_hosts
+        ):
+            raise ValueError("Use exact HTTPS callback host names, without wildcard or path")
+        if self.public_origin is not None:
+            if (
+                any(c.isspace() or ord(c) < 32 for c in self.public_origin)
+                or "?" in self.public_origin
+                or "#" in self.public_origin
+            ):
+                raise ValueError(
+                    "Use a canonical HTTPS origin without query, fragment or whitespace"
+                )
+            parsed = urlsplit(self.public_origin)
+            _ = parsed.port  # Validate port syntax before starting a supervised service.
+            if (
+                parsed.scheme != "https"
+                or not parsed.hostname
+                or parsed.username
+                or parsed.password
+                or parsed.query
+                or parsed.fragment
+                or parsed.path not in {"", "/"}
+                or parsed.hostname in {"localhost", "127.0.0.1", "::1"}
+            ):
+                raise ValueError(
+                    "Grok connector needs a public HTTPS origin without credentials or path"
+                )
+            self.public_origin = self.public_origin.rstrip("/")
+        if self.enabled and not self.public_origin:
+            raise ValueError("An enabled Grok connector needs its public HTTPS origin")
+        return self
+
+
 class Config(BaseModel):
     model_config = ConfigDict(extra="forbid")
     _source_path: str | None = PrivateAttr(default=None)
@@ -209,6 +264,7 @@ class Config(BaseModel):
     agents: dict[str, AgentConfig] = Field(default_factory=dict)
     messaging: MessagingConfig = Field(default_factory=MessagingConfig)
     team: TeamConfig = Field(default_factory=TeamConfig)
+    grok_connector: GrokConnectorConfig = Field(default_factory=GrokConnectorConfig)
     diagnostics: DiagnosticsConfig = Field(default_factory=DiagnosticsConfig)
     threaddesk: ThreadDeskConfig = Field(default_factory=ThreadDeskConfig)
     workflow_control: WorkflowControlConfig = Field(default_factory=WorkflowControlConfig)
