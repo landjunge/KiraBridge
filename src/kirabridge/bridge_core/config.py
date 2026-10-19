@@ -6,8 +6,9 @@ import sys
 import tomllib
 from pathlib import Path
 from typing import Literal
+from urllib.parse import urlsplit
 
-from pydantic import BaseModel, ConfigDict, Field, PrivateAttr
+from pydantic import BaseModel, ConfigDict, Field, PrivateAttr, model_validator
 
 from kirabridge.bridge_core.models import BridgeError
 
@@ -52,6 +53,47 @@ class AgentConfig(BaseModel):
     api_key_env: str = "XAI_API_KEY"
     sandbox_mode: Literal["read-only", "workspace-write"] = "read-only"
     allow_local_tools: bool = False
+    base_url: str | None = Field(default=None, max_length=2048)
+
+    @model_validator(mode="before")
+    @classmethod
+    def cli_credential_defaults(cls, value):
+        defaults = {
+            "opencode": "OPENCODE_API_KEY",
+            "gemini_cli": "GEMINI_API_KEY",
+            "claude_code": "ANTHROPIC_API_KEY",
+            "copilot_cli": "COPILOT_GITHUB_TOKEN",
+        }
+        if (
+            isinstance(value, dict)
+            and isinstance(value.get("kind"), str)
+            and value["kind"] in defaults
+        ):
+            return {"api_key_env": defaults[value["kind"]], **value}
+        return value
+
+    @model_validator(mode="after")
+    def local_provider_endpoint(self):
+        if self.base_url is None:
+            return self
+        try:
+            url = urlsplit(self.base_url)
+            port = url.port
+        except ValueError:
+            raise ValueError("Invalid local model endpoint") from None
+        if (
+            self.kind != "opencode"
+            or url.scheme not in {"http", "https"}
+            or url.hostname not in {"127.0.0.1", "localhost", "::1"}
+            or url.username is not None
+            or url.password is not None
+            or url.query
+            or url.fragment
+            or (port is not None and not 1 <= port <= 65535)
+            or any(char.isspace() or ord(char) < 32 for char in self.base_url)
+        ):
+            raise ValueError("Only a credential-free loopback OpenCode endpoint is supported")
+        return self
 
 
 class DiagnosticsConfig(BaseModel):

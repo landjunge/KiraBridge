@@ -1,0 +1,29 @@
+# Add selected sections to an existing private policy; do not replace its principals.
+# Add selected names to the intended principal's existing agents list.
+# agent.execute and an authorized cwd remain required. Never place secrets here.
+
+[agents.opencode]
+kind = "opencode"
+executable = "/usr/local/bin/opencode"
+# Dedicated alias of an existing local model; see docs/providers/OPENCODE.md.
+model = "ollama/kirabridge-text:latest"
+base_url = "http://127.0.0.1:11434/v1"
+allow_local_tools = false
+
+[agents.gemini]
+kind = "gemini_cli"
+executable = "/usr/local/bin/gemini"
+api_key_env = "GEMINI_API_KEY"
+allow_local_tools = false
+
+[agents.claude]
+kind = "claude_code"
+executable = "/usr/local/bin/claude"
+api_key_env = "ANTHROPIC_API_KEY"
+allow_local_tools = false
+
+[agents.copilot]
+kind = "copilot_cli"
+executable = "/usr/local/bin/copilot"
+api_key_env = "COPILOT_GITHUB_TOKEN"
+allow_local_tools = false

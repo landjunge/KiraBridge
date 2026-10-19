@@ -8,7 +8,7 @@ MCP und CLI sind Eingänge in dieselbe `Bridge`. Sie reichen versionierte Anfrag
 |---|---|
 | bridge_core | Konfiguration, typisierte Eingaben, Fehlercodes, Operationsregister, Orchestrierung |
 | task_manager | SQLite-Schema v1, Queue, Empfangsbelege, Zustandsmaschine, Leases, Wiederherstellung |
-| agent_manager | Identitäten, Adapterregister, Codex-JSONL, Grok-ACP und Grok-API |
+| agent_manager | Identitäten, Adapterregister, Codex-JSONL, Grok-ACP/API und getrennte native CLI-Textadapter |
 | mcp_gateway | Offizielles SDK, stdio/Streamable HTTP, ausgehende getrennte Client-Verbindungen |
 | terminal_manager | Begrenzte Prozesssitzungen, Ausgaben, Zeitlimits, Prozessgruppen |
 | filesystem_manager | Pfadprüfung, descriptor-relative Operationen, begrenztes Lesen, atomisches Schreiben |
@@ -30,7 +30,7 @@ Es gibt drei direkte Laufzeitabhängigkeiten: `mcp`, `httpx` und `uvicorn`. Pyda
 - Grok Build: ACP-Protokollversion 1; andere Initialisierungsantworten werden abgelehnt.
 - Datenbank: `PRAGMA user_version=1`; zukünftige Schema-Versionen werden nicht still geöffnet. Weitere Migrationen müssen vor Einführung einer neuen Schema-Version ergänzt werden.
 
-Eine neue Agentenart implementiert das `AgentAdapter`-Protokoll und wird in `bridge.agents.register(...)` registriert. `AgentConfig.kind` wählt den Adapter, der konfigurierte Name ist die auftragsgebundene Agentenidentität. Erweiterungen für Claude Code, Gemini CLI, OpenCode und A2A benötigen entsprechende eigene Protokollimplementierungen; vorhandene Prozesse sind kein Ersatz für diese Adapter.
+Eine neue Agentenart implementiert das `AgentAdapter`-Protokoll und wird in `bridge.agents.register(...)` registriert. `AgentConfig.kind` wählt den Adapter, der konfigurierte Name ist die auftragsgebundene Agentenidentität. OpenCode, Gemini CLI, Claude Code und GitHub Copilot CLI besitzen eigene native JSONL-Adapter für isolierte Textaufträge; [Verträge und tatsächliche Grenzen](providers/README.md). Projektwerkzeuge und Sitzungsfortsetzung bleiben für diese vier Adapter ausdrücklich ununterstützt. A2A benötigt weiterhin eine eigene Protokollimplementierung; vorhandene Prozesse sind kein Ersatz für Adapter oder Arbeitsnachweise.
 
 ## Zustände und Belege
 
