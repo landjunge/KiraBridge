@@ -145,3 +145,8 @@ Tests nutzen temporäre Dateien, eigene Testprozesse und simulierte Agenten. Sie
 - [Abnahmestand und Testnachweise](docs/STATUS.md)
 
 Alle Rechte verbleiben beim Repository-Inhaber; das Repository bleibt privat.
+
+## ChatGPT access repair
+
+Authorized file, terminal and result access works independently of Events.
+See [deployment evidence and remaining host/session limits](docs/ACCESS-REPAIR-20261019.md).

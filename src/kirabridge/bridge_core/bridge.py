@@ -42,11 +42,13 @@ from kirabridge.message_manager import MessageManager
 from kirabridge.message_manager.receiver import MessageReceiver
 from kirabridge.process_manager import ProcessManager
 from kirabridge.security_manager import SecurityManager
+from kirabridge.session_manager import SessionInput, SessionManager
 from kirabridge.task_manager.manager import TaskManager
 from kirabridge.task_manager.store import Store
 from kirabridge.terminal_manager import TerminalManager
 
 INPUTS = {
+    "session.input": SessionInput,
     "terminal.execute": TerminalInput,
     "file.read": ReadInput,
     "file.image": ImageInput,
@@ -103,6 +105,7 @@ class Bridge:
         self.handoffs = HandoffManager(self)
         self.security = SecurityManager(config, self.store)
         self.terminal = TerminalManager(config.terminal)
+        self.sessions = SessionManager(self)
         self.filesystem = FilesystemManager()
         self.images = ImageManager()
         self.clipboard = ClipboardManager()
@@ -176,6 +179,14 @@ class Bridge:
             "dispatcher_active": bool(self.tasks.workers)
             and all(not worker.done() for worker in self.tasks.workers),
             "chatgpt_integration": "unverified",
+            "task_submission": {
+                "events_subscription_required": False,
+                "preferred_tools": ["action_request", "action_submit"],
+                "result_tools": ["task_get", "task_events", "read_query"],
+                "legacy_connector_schema": "If a cached task_* connector requires "
+                "completion_subscription, the root value empty string is accepted "
+                "as no subscription; use fresh action_* schemas after metadata refresh.",
+            },
             "local_approval_url": LOCAL_APPROVAL_URL,
             "approval_mode": policy.approval_mode,
             "approval_required": policy.approval_mode == "manual",
@@ -259,6 +270,9 @@ class Bridge:
                     "terminated": result["terminated"],
                 },
             }
+        if operation == "session.input":
+            await running({"evidence_type": "session_input_dispatch", "pane_id": args.pane_id})
+            return await self.sessions.send(principal, args)
         if operation == "agent.execute":
             return await self.agents.execute(task, args, policy, running, progress)
         if operation.startswith("handoff."):

@@ -1,0 +1,90 @@
+import sys
+
+import pytest
+from conftest import request, submit
+from pydantic import ValidationError
+
+from kirabridge.bridge_core.models import BridgeError
+from kirabridge.read_query import ReadQuery, read_query
+
+
+def test_direct_file_reads_are_bounded_scoped_and_do_not_create_tasks(bridge, config, tmp_path):
+    root = config.principals["local"].roots[0]
+    from pathlib import Path
+
+    p = Path(root) / "codex-demo.log"
+    p.write_bytes(b"old\n" + b"x" * 100 + b"latest\n")
+    result = read_query(
+        bridge, "local", ReadQuery(operation="file.read", path=str(p), tail=True, max_bytes=7)
+    )
+    assert result["text"] == "latest\n" and result["bytes"] == 7
+    first = read_query(bridge, "local", ReadQuery(operation="file.read", path=str(p), max_bytes=4))
+    assert first["text"] == "old\n" and first["truncated"]
+    assert (
+        read_query(
+            bridge, "local", ReadQuery(operation="file.read", path=str(p), offset=104, max_bytes=7)
+        )["text"]
+        == "latest\n"
+    )
+    assert bridge.store.db.execute("select count(*) from tasks").fetchone()[0] == 0
+    for denied in [str(tmp_path / "outside"), str(config.state_path / "bridge.sqlite3")]:
+        with pytest.raises(BridgeError, match="allowed|available"):
+            read_query(bridge, "local", ReadQuery(operation="file.read", path=denied))
+    link = Path(root) / "link"
+    link.symlink_to(p)
+    with pytest.raises(BridgeError):
+        read_query(bridge, "local", ReadQuery(operation="file.read", path=str(link)))
+    config.principals["local"].capabilities.remove("file.read")
+    with pytest.raises(BridgeError, match="Capability"):
+        read_query(bridge, "local", ReadQuery(operation="file.read", path=str(p)))
+
+
+@pytest.mark.parametrize(
+    "values",
+    [
+        {"operation": "file.write", "path": "/tmp/no"},
+        {"operation": "file.read", "path": "/tmp/no", "max_bytes": 65537},
+        {"operation": "file.read", "path": "/tmp/no", "offset": -1},
+        {"operation": "file.read", "path": "/tmp/no", "tail": True, "offset": 1},
+        {"operation": "terminal.output", "task_id": "x", "path": "/tmp/no"},
+    ],
+)
+def test_direct_reads_reject_invalid_or_mutating_requests(values):
+    with pytest.raises(ValidationError):
+        ReadQuery.model_validate(values)
+
+
+@pytest.mark.asyncio
+async def test_terminal_output_is_real_bounded_and_owner_checked(bridge, config):
+    async with bridge:
+        value = request(
+            "terminal.execute",
+            {
+                "argv": [sys.executable, "-c", "print('DIRECT_READ_OK')"],
+                "cwd": config.principals["local"].roots[0],
+            },
+            task_id="read-output",
+        )
+        submit(bridge, value)
+        await bridge.tasks.wait("local", value.task_id)
+        result = read_query(
+            bridge, "local", ReadQuery(operation="terminal.output", task_id=value.task_id)
+        )
+        assert result["stdout"] == "DIRECT_READ_OK\n" and result["output_available"]
+        assert (
+            read_query(
+                bridge,
+                "local",
+                ReadQuery(operation="terminal.output", task_id=value.task_id, max_bytes=6),
+            )["stdout"]
+            == "DIRECT"
+        )
+        with pytest.raises(BridgeError, match="not found|Not found"):
+            read_query(
+                bridge, "other", ReadQuery(operation="terminal.output", task_id=value.task_id)
+            )
+        bridge.terminal.sessions.clear()
+        saved = read_query(
+            bridge, "local", ReadQuery(operation="terminal.output", task_id=value.task_id)
+        )
+        assert saved["stdout"] == "DIRECT_READ_OK\n" and saved["source"] == "persisted_task_result"

@@ -91,7 +91,7 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
 
         Does not read file contents, execute programs, submit tasks, or certify a workflow.
         image_paths checks descriptor access, not PNG validity or client image display.
-        Use file.read/file.image via task_request for actual content; no cat/Python workaround.
+        Use read_query for direct bounded text reads; file.image still uses task_request.
         """
         return safe(
             lambda: readiness(
@@ -129,6 +129,33 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
             name = identity(ctx)
             bridge.security.principal(name, "agent.status")
             return await inspect(bridge, name)
+        except BridgeError as exc:
+            return {"error": {"code": exc.code, "message": str(exc)}}
+
+    @server.tool(annotations=read)
+    def read_query(query: dict[str, Any], ctx: Context) -> dict[str, Any]:
+        """Direct authorized read without tasks, approvals or Events subscriptions.
+
+        query.operation: file.read (path, max_bytes<=65536, offset or tail),
+        file.list (path; at most 100 entries), terminal.output (owned task_id,
+        max_bytes<=65536). Uses existing capabilities and file roots. No shell,
+        Desktop Commander or external interactive-session attachment.
+        """
+        from kirabridge.read_query import ReadQuery
+        from kirabridge.read_query import read_query as read_direct
+
+        return safe(lambda: read_direct(bridge, identity(ctx), ReadQuery.model_validate(query)))
+
+    @server.tool(annotations=read)
+    async def session_catalog(ctx: Context) -> dict[str, Any]:
+        """Discover addressable tmux panes; process discovery alone is not a session handle."""
+        return await bridge.sessions.catalog(identity(ctx))
+
+    @server.tool(annotations=read)
+    async def session_read(pane_id: str, expected_pid: int, ctx: Context) -> dict[str, Any]:
+        """Read up to 200 lines / 65536 bytes from an exactly selected tmux pane."""
+        try:
+            return await bridge.sessions.read(identity(ctx), pane_id, expected_pid)
         except BridgeError as exc:
             return {"error": {"code": exc.code, "message": str(exc)}}
 
@@ -368,4 +395,24 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
 
         return safe(action)
 
+    # Fresh names provide a clean contract for clients retaining the historical
+    # task_* schema. Authentication, authorization and idempotency stay identical.
+    server.add_tool(
+        task_request,
+        name="action_request",
+        annotations=write,
+        description=(
+            "Execute any authorized catalog operation; no Events subscription required. "
+            "Poll task_get for evidence. Same idempotent task_request implementation."
+        ),
+    )
+    server.add_tool(
+        task_submit,
+        name="action_submit",
+        annotations=write,
+        description=(
+            "Submit any authorized operation; no Events subscription required. "
+            "Automatic identities need no approval token. Poll task_get."
+        ),
+    )
     return server

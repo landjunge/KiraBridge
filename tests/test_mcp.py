@@ -244,3 +244,47 @@ async def test_http_readiness_checks_authenticated_identity_and_loaded_snapshot(
             )
         ).structuredContent
         assert excessive["error"]["code"] == "invalid_arguments"
+
+
+async def test_direct_read_http_needs_no_task_or_subscription(http_bridge, config):
+    from pathlib import Path
+
+    bridge, endpoint = http_bridge
+    path = Path(config.principals["local"].roots[0]) / "direct.log"
+    path.write_text("ACTUAL_HTTP_READ\n")
+    before = bridge.store.db.execute("select count(*) from tasks").fetchone()[0]
+    async with MCPClientPool() as clients:
+        await clients.connect(Peer("local", url=endpoint, token="local-test-" + "a" * 40))
+        result = await clients.call(
+            "local", "read_query", {"query": {"operation": "file.read", "path": str(path)}}
+        )
+        assert result.structuredContent["text"] == "ACTUAL_HTTP_READ\n"
+        result = await clients.call(
+            "local", "read_query", {"query": {"operation": "file.write", "path": str(path)}}
+        )
+        assert result.structuredContent["error"]["code"] == "invalid_arguments"
+    assert bridge.store.db.execute("select count(*) from tasks").fetchone()[0] == before
+
+
+async def test_action_aliases_without_events_preserve_execution_and_idempotency(
+    http_bridge, config
+):
+    bridge, endpoint = http_bridge
+    config.principals["local"].approval_mode = "automatic"
+    async with MCPClientPool() as clients:
+        await clients.connect(Peer("local", url=endpoint, token="local-test-" + "a" * 40))
+        listing = {t.name: t for t in (await clients.sessions["local"].list_tools()).tools}
+        for name in ("action_request", "action_submit", "task_request", "task_submit"):
+            assert "completion_subscription" not in listing[name].inputSchema["properties"]
+            assert listing[name].inputSchema["required"] == ["request"]
+        for name in ("action_request", "action_submit"):
+            value = request(
+                "file.write",
+                {"path": config.principals["local"].roots[0] + "/" + name, "text": "ALIAS_OK"},
+                task_id=name,
+            )
+            result = await clients.call("local", name, {"request": value.model_dump()})
+            assert result.structuredContent["state"] == "queued"
+            assert (await bridge.tasks.wait("local", value.task_id))["state"] == "completed"
+            duplicate = await clients.call("local", name, {"request": value.model_dump()})
+            assert duplicate.structuredContent["id"] == value.task_id
