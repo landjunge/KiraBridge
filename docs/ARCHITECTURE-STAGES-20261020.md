@@ -13,8 +13,8 @@ auf ein kleines Paket Implementierung, Grok-Prüfung, Korrektur und Nachprüfung
 | 2 Freigaben | 0.8.0rc5 aktiviert; 313 gezielte Tests und unabhängige Grok-Abnahme | Normale Voice-/CLI-Wege beim weiteren Umbau erhalten |
 | 3 Aktivierung | Koordinierter Betriebsdienst aktiv; alte unklare Eve-Zustellung ohne Nachversand stillgelegt | Historischen unbekannten Ausgang erhalten |
 | 4 Client-Lesewege | rc7 aktiv; 776 Tests, Grok-Abnahmen und echte ChatGPT-Leseprüfung unter Last bestanden; lokaler Eve-Rückweg bestätigt | Physische Handy-/Voice-Abnahme bleibt gesondert offen |
-| 5 Modulgrenzen | 5a/5b von Grok geprüft; 5c/5d isoliert umgesetzt | Mac entsperren: sichtbare Grok-Prüfung 5c, dann 5d, vor Aktivierung |
-| 6 Ausgabeablage | Offen | Begrenzte Rohdaten, unveränderte historische Audit-Kette |
+| 5 Modulgrenzen | rc8 aktiv; 817 Tests und echte Grok-Abnahmen aller Pakete | Tatsächlicher Kira-Rückweg nach Aktivierung bestätigt |
+| 6 Ausgabeablage | Beginnt nach praktischer rc8-Abnahme | Begrenzte Rohdaten, unveränderte historische Audit-Kette |
 
 ## Etappe 1: gesicherter Ausgangspunkt
 
@@ -897,3 +897,45 @@ Antwort `1e19ed6a-d7cc-48fb-b606-f4eb0075be1e`, Übergabe
 `channel-82fa917839cb44d49d853ee8ead2a154`; Antwort und Abschluss quittiert.
 Belege `grok-stage5c-review.json` und `grok-stage5d-review.json`.
 Die Aktivierung dieses geprüften Standes folgt erst nach dem Push.
+
+
+## Etappe 5: tatsächliche Aktivierung und Kira-Nachprüfung
+
+Der geprüfte Quellstand wurde als Merge `1de508d` vor Aktivierung gepusht.
+Das bereits bytegenau geprüfte Wheel wurde mit `uv pip install --no-deps`
+installiert; nur KiraBridge wechselte von rc7 auf rc8. Die anderen installierten
+Pakete blieben erhalten. Der produktive Importpfad ist jetzt das installierte,
+unveränderliche Wheel unter `.venv/lib/python3.11/site-packages/kirabridge`.
+Weitere Repository-Bearbeitung aktiviert damit keinen neuen Produktivcode.
+
+Koordinierte Aktivierung `activation-d8b8925848184cad9b8890777d6c188f`,
+Core-PID **15071**, Instanz `048accc501dc4048a007d57f5cc837bf`, Version **0.8.0rc8**.
+Die Phasen `activating` und `verifying` wurden unabhängig beobachtet; der
+Aktivierungsdatensatz und die Bedienaktion stehen auf `completed`.
+Vorher wurden tatsächliche Konfiguration und SQLite-Datenbank konsistent privat
+zusätzlich gesichert. Alle 16 beobachteten App-, Agenten-, TTY- und Tunnel-PIDs
+blieben erhalten. Nur Core und Steuerdienst wurden gezielt neu geladen.
+Beleg: `activation-stage5-rc8.json`. Die einmalige lokale Aktivierungsreservierung
+verhindert blindes erneutes Ausführen des Installationsskripts.
+
+Quelle: 83 Dateien, SHA256
+`7fcb86e8f19cb7c2c6b83b91dd844d0c82ff1afdfc29fcf0edf1ee535789c847`.
+Die tatsächliche Konfiguration blieb bytegleich bei
+`642ef01516ff2ff8199980556b733ac97525329e78d22b14f50a93ed673d54cd`;
+der wirksame Stand bei
+`20b62401392a95debed96ae5ed8c6369b30b94acbf29e4d6ec085393738d8ffa`.
+Kiras dauerhafte Ausnahme und alle normalen Freigaben blieben aktiv,
+Voice-Sondertoken und Zusatzpuffer aus. Kiras tatsächliches `policy_inspect`
+meldet Quelle und Konfiguration als `matches_loaded`.
+
+Neue Kira-Nachprüfung `kira-rc8-check-1792481458793`: drei erhaltene Fenster
+aufgelistet; das Original-Codex-Fenster über Kiras echte zwischengespeicherte
+Werkzeugbindung gelesen (955 Zeichen). Eine neue harmlose Frage
+`b6b7357f-f652-42f4-8115-64d9f37b642f` wurde über das bestehende Grok-Fenster
+übergeben. Übergabe `channel-4fee424677b043b18c485eb7e21e2597` abgeschlossen,
+authentifizierte Grok-Bestätigung und Antwort **RC8-KIRA-OK** zurück an Kira,
+Antwort-ID `0fe9ec28-dce7-4e5b-9f9c-6f17182db04b`. Antwort und beide
+Aufgaben-/Nachrichten-Abschlussmeldungen wurden verarbeitet und quittiert.
+Keine Eingabe in den beschäftigten ursprünglichen Codex, kein Ersatzfenster,
+keine Wiederholung eines alten Tests. Beleg `kira-rc8-check-1792481458793.json`.
+Die hörbare physische Handy-/Sprachausgabe bleibt eine eigene offene Abnahme.
