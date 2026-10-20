@@ -4,7 +4,7 @@
   "version": "0.3.0",
   "scope": "Targeted local configuration repair and one read-only terminal verification; no product code changes.",
   "active_configuration": {
-    "path": "/Users/landjunge/.config/kirabridge/config.toml",
+    "path": "/Users/EXAMPLE_USER/.config/kirabridge/config.toml",
     "source": "LaunchAgent com.kirabridge.bridge ProgramArguments --config",
     "mode": "0o600",
     "changed_principal": "chatgpt",
