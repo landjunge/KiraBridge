@@ -12,7 +12,7 @@ auf ein kleines Paket Implementierung, Grok-Prüfung, Korrektur und Nachprüfung
 | 1a Sichtbare Übergaben und Aufhebung Voice-Gate | 0.8.0rc4 aktiviert: 660 Tests bestanden, Grok-Prüfung und produktive sichtbare Übergabe abgeschlossen | Ursprünglichen beschäftigten Codex nicht für Eingabetest unterbrechen |
 | 2 Freigaben | 0.8.0rc5 aktiviert; 313 gezielte Tests und unabhängige Grok-Abnahme | Normale Voice-/CLI-Wege beim weiteren Umbau erhalten |
 | 3 Aktivierung | 0.8.0rc6 aktiviert; 732 Tests, echte Grok-Abnahmen und koordinierter Neustart belegt | Zusätzlichen Eve-Test nach Entsperren ohne Wiederholung abgleichen |
-| 4 Client-Lesewege | rc7 vorbereitet; 757 Gesamttests, Nachprüfungen und 163 unabhängige Grok-Tests bestanden | Paket prüfen, aktivieren und echte Lesewege abnehmen |
+| 4 Client-Lesewege | rc7 vorbereitet; 776 Gesamttests, Grok-Abnahmen mit 163 und 25 eigenen Tests bestanden | Aktivieren und echte Lesewege abnehmen |
 | 5 Modulgrenzen | Offen | Fachliche Abfragen, austauschbarer Transport |
 | 6 Ausgabeablage | Offen | Begrenzte Rohdaten, unveränderte historische Audit-Kette |
 
@@ -566,6 +566,23 @@ Agentenantwort und keine Audio-Abnahme. Der stillgelegte unklare Test meldet
 seinen unbestätigten früheren Ausgang. Empfang oder ACK werden nicht erfunden.
 105 gezielte Tests bestanden nach diesen Korrekturen in 13,48 Sekunden.
 Die Veröffentlichung aktualisiert außerdem die Versionsangaben auf `0.8.0rc7`.
-Unabhängige Grok-Nachprüfung der beiden Ergänzungen, Aktivierung und echte
-Leseabnahme stehen noch aus. Anschließend folgen die
+Grok prüfte die beiden Ergänzungen unabhängig als Nachricht
+`b2dc766c-6957-45c6-993b-639870c3266a`, Übergabe
+`channel-76bc692cdf0a410a8edb36828cbd6f73`, im ursprünglichen sichtbaren Fenster.
+Er bestätigte `3d75c8e`, rc7 und Quellmanifest
+`2a63dcf33b14d80c6576bc4f943fb870df0656b466d1393206ffd7968ff4aec1`
+und führte selbst 25 Tests in 12,14 Sekunden aus. Empfehlung: beide Deltas
+freigeben. Antwort `5647ce00-c693-4cbb-8d33-58914be46891` und die beiden
+Abschlussmeldungen wurden verarbeitet und quittiert. Nachweis:
+`grok-stage4-errors-review.json`.
+
+Der erste anschließende Gesamtlauf meldete 775 bestanden und einen
+Umask-abhängigen Testaufbau: `mkdir(0755)` erzeugt unter `umask 077` bereits
+ein privates Verzeichnis. Der Test setzt den absichtlich unsicheren Zustand
+jetzt ausdrücklich mit `chmod(0755)`; die produktive Rechteprüfung blieb
+unverändert. Zehn Sicherheitstests bestanden gezielt. Der endgültige Lauf
+unter restriktiver Umask besteht mit **776 Tests in 182,50 Sekunden**, wiederum
+mit Unraisable-Warnings als Fehlern. Frühere Logs und Paketkandidaten bleiben
+erhalten; ausgeliefert wird der Stand aus `dist-stage4-rc7-publish`.
+Aktivierung und echte Leseabnahme stehen noch aus. Anschließend folgen die
 kleinen Pakete aus Etappe 5; eine neue Nutzerfreigabe ist dafür nicht nötig.
