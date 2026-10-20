@@ -4,7 +4,7 @@
   "message_api_version": "1",
   "database_schema": 2,
   "effective_configuration": {
-    "path": "/Users/landjunge/.config/kirabridge/config.toml",
+    "path": "/Users/EXAMPLE_USER/.config/kirabridge/config.toml",
     "message_peers": {
       "codex": [
         "grok"
@@ -21,11 +21,11 @@
     },
     "receivers": {
       "codex": {
-        "cwd": "/Users/landjunge/workspace/KiraBridge/kanal-agenten/codex",
+        "cwd": "/Users/EXAMPLE_USER/workspace/KiraBridge/kanal-agenten/codex",
         "timeout": 90.0
       },
       "grok": {
-        "cwd": "/Users/landjunge/workspace/KiraBridge/kanal-agenten/grok",
+        "cwd": "/Users/EXAMPLE_USER/workspace/KiraBridge/kanal-agenten/grok",
         "timeout": 90.0
       }
     },
@@ -160,7 +160,7 @@
   },
   "preservation": {
     "existing_task_rows_unchanged": 46,
-    "protected_grok_job": "/Users/landjunge/workspace/KiraBridge/auftraege/grok-restpunkte-20261017-2103",
+    "protected_grok_job": "/Users/EXAMPLE_USER/workspace/KiraBridge/auftraege/grok-restpunkte-20261017-2103",
     "protected_control_file_hashes_before": {
       "run.py": "a833bf3470f7f6c06e92092befc58df7ca25e53e889d182e5d910dc4804b9786",
       "auftrag.txt": "210c6774fc5bdfb9f648a29013edfa33229ac0aff75902bc70b8fcd7c28162d4",
