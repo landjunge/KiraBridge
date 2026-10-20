@@ -10,8 +10,8 @@ auf ein kleines Paket Implementierung, Grok-Prüfung, Korrektur und Nachprüfung
 | --- | --- | --- |
 | 1 Ausgangspunkt | Gesichert; praktische ChatGPT-Leseprüfung und unabhängige Grok-Prüfung abgeschlossen | Sichtbare Übergabe ergänzen |
 | 1a Sichtbare Übergaben und Aufhebung Voice-Gate | 0.8.0rc4 aktiviert: 660 Tests bestanden, Grok-Prüfung und produktive sichtbare Übergabe abgeschlossen | Ursprünglichen beschäftigten Codex nicht für Eingabetest unterbrechen |
-| 2 Freigaben | Quellpaket 0.8.0rc5 geprüft; Grok-Abnahme vorhanden; Aktivierung folgt | Befunde korrigieren, aktivieren und geladenen Zustand prüfen |
-| 3 Aktivierung | Offen | Persistente Wartung und Fehler-/Parallelitätstests |
+| 2 Freigaben | 0.8.0rc5 aktiviert; 313 gezielte Tests und unabhängige Grok-Abnahme | Normale Voice-/CLI-Wege beim weiteren Umbau erhalten |
+| 3 Aktivierung | Begonnen | Persistente Wartung und Fehler-/Parallelitätstests |
 | 4 Client-Lesewege | Offen | Gleiche Rechte, reservierte Lesekapazität, Lastprüfung |
 | 5 Modulgrenzen | Offen | Fachliche Abfragen, austauschbarer Transport |
 | 6 Ausgabeablage | Offen | Begrenzte Rohdaten, unveränderte historische Audit-Kette |
@@ -310,3 +310,20 @@ Antwort `f1f874cd-0755-4071-a39d-00d9929d5d8e` wurde verarbeitet und quittiert.
 Er weist ausdrücklich auf den erhaltenen groben Legacy-Health-Schalter hin;
 die konkrete Entscheidung und ihre Ausnahme stehen daneben.
 Quelländerung und Aktivierung werden getrennt erfasst.
+
+Commit `9272240` wurde vor Aktivierung gepusht. Der aktivierte Dienst PID 67474,
+Instanz `f17991c1b70042568fe9223cd1c37027`, meldet `0.8.0rc5`, Quellmanifest
+wie oben, Konfiguration unverändert zu Paket 1a. Der tatsächliche ChatGPT-Zugang
+bestätigt Quelle und Konfiguration als `matches_loaded`; Katalog und
+Terminalanzeige geben dieselbe konkrete Freigabeentscheidung zurück.
+Das neu geladene Steuerfenster zeigt die erhaltenen Ausnahmen.
+ChatGPT-Auftrag `stage2-codex-read-20261020` las das ursprüngliche Codex-Fenster
+erneut erfolgreich (932 Zeichen); Abschluss verarbeitet und quittiert.
+Nachricht `4080db28-ea8c-426a-b99d-2fa7ce8a65d1` gelangte vom tatsächlichen
+ChatGPT-Zugang ohne Sondertoken über das sichtbare Grok-Fenster bis zur
+authentifizierten Antwort `a673f750-7c93-4409-97cb-e5d21c946d37`.
+Einfügen, Return und Quittung sind getrennt belegt; Antwort verarbeitet und
+quittiert. Die Queue zeigte jetzt korrekt `pending_visible_terminal`.
+Private Nachweise: `stage2-loaded-proof.json`, `activation-stage2.json`,
+`grok-stage2-review.json`. Handy-Audio und positiver Input im beschäftigten
+ursprünglichen Codex sind weiterhin keine behauptete Abnahme.
