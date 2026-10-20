@@ -17,6 +17,7 @@ MCP und CLI sind Eingänge in dieselbe `Bridge`. Sie reichen versionierte Anfrag
 | mcp_gateway | Offizielles SDK, stdio/Streamable HTTP, ausgehende getrennte Client-Verbindungen |
 | terminal_manager | Begrenzte Prozesssitzungen, Ausgaben, Zeitlimits, Prozessgruppen |
 | session_manager | Bestehende Terminal.app-/tmux-Ziele, exakte Fenster-/TTY-/PID-Prüfung, Einfügen und separates Return |
+| session_ports | Benannte Autorisierungs-, Freigabe-, Audit- und Transportpartner ohne gesamtes Bridge-Objekt (Etappe-5-Kandidat) |
 | visible_handoff | Verbindliche persistierte bestehende CLI-Ziele für alle Absender und Adapter; getrennte Transport-/Quittungs-/Antwortbelege, kein Hintergrundersatz |
 | filesystem_manager | Pfadprüfung, descriptor-relative Operationen, begrenztes Lesen, atomisches Schreiben |
 | clipboard_manager | Explizite Textübertragung, Byte-Limits, Rücklesebestätigung, kein Polling |
@@ -90,6 +91,14 @@ und MCP-Ports. Konsolenaktionen werden vor Ausführung atomar reserviert; auch
 getrennte Steuerfenster-Prozesse starten dieselbe Kennung nur einmal. Unklare
 Ausgänge bleiben unklar und werden nicht automatisch wiederholt. Diese interne
 Entkopplung ist keine Sandbox gegen freie OS-Rechte des Mac-Benutzers.
+
+Im Etappe-5-Kandidaten koordiniert `SessionManager` Autorisierung und exakte
+Auswahl über `SessionPorts`. `platform_adapters.terminal_app` und
+`platform_adapters.tmux` kapseln die bisher nachgewiesenen Plattformbefehle.
+Adapter können ohne vollständigen Kern ersetzt werden. Ein unklarer Eingabeausgang
+führt zu keiner automatischen Wiederholung und zu keinem anderen Transport.
+Die sichtbare zentrale Übergabe behält ihre persistierte Zielbindung für alle
+Absender einschließlich Grok und für Rückantworten.
 
 Die aktivierte Version `0.8.0rc4` ergänzt die persistenten Zustände sichtbarer Übergaben
 und einmaliger Fensterstarts additiv in Schema 2. Neue CLI-Übergaben müssen

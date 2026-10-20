@@ -12,8 +12,10 @@ from kirabridge.session_manager import SessionInput, SessionManager, SessionOpen
 
 
 async def test_native_catalog_binds_window_tty_and_unambiguous_root_pid(bridge, monkeypatch):
-    monkeypatch.setattr("kirabridge.session_manager.sys", SimpleNamespace(platform="darwin"))
-    manager = SessionManager(bridge)
+    monkeypatch.setattr(
+        "kirabridge.platform_adapters.terminal_app.sys", SimpleNamespace(platform="darwin")
+    )
+    manager = SessionManager(bridge.sessions.ports)
 
     async def native(*args, **kwargs):
         return [
@@ -30,11 +32,13 @@ async def test_native_catalog_binds_window_tty_and_unambiguous_root_pid(bridge, 
         )
 
     async def process(*args, **kwargs):
-        return SimpleNamespace(communicate=communicate)
+        return SimpleNamespace(communicate=communicate, returncode=0)
 
-    monkeypatch.setattr(manager, "native", native)
-    monkeypatch.setattr("kirabridge.session_manager.asyncio.create_subprocess_exec", process)
-    rows = await manager.terminal_catalog()
+    monkeypatch.setattr(manager.terminal_app, "native", native)
+    monkeypatch.setattr(
+        "kirabridge.platform_adapters.terminal_app.asyncio.create_subprocess_exec", process
+    )
+    rows = await manager.terminal_app.catalog()
     assert len(rows) == 1  # Two possible roots on ttys005 must not be guessed.
     assert rows[0]["pane_id"] == "terminal:123:ttys004"
     assert rows[0]["expected_pid"] == 345
@@ -52,7 +56,7 @@ async def test_idle_only_input_rejects_busy_target_before_transport(bridge, conf
         pytest.fail("busy target must never receive input")
 
     monkeypatch.setattr(bridge.sessions, "catalog", catalog)
-    monkeypatch.setattr(bridge.sessions, "native", no_transport)
+    monkeypatch.setattr(bridge.sessions.terminal_app, "native", no_transport)
     with pytest.raises(BridgeError, match="idle shell"):
         await bridge.sessions.send(
             "local",
@@ -75,7 +79,7 @@ async def test_exact_session_input_and_capture_on_private_real_tmux(bridge, conf
         str(__import__("pathlib").Path(tmux).parent) + ":" + bridge.terminal.environment["PATH"]
     )
     socket = "kb-test-" + uuid.uuid4().hex
-    manager = SessionManager(bridge, socket_name=socket)
+    manager = SessionManager(bridge.sessions.ports, socket_name=socket)
     fixture = tmp_path / "receiver.py"
     fixture.write_text(
         "import time\nprint('SESSION_READY',flush=True)\nline=input()\n"
@@ -115,7 +119,7 @@ async def test_exact_session_input_and_capture_on_private_real_tmux(bridge, conf
 @pytest.mark.asyncio
 async def test_native_session_selection_read_and_input(bridge, config, monkeypatch):
     config.principals["local"].capabilities += ["session.inspect", "session.input"]
-    manager = SessionManager(bridge)
+    manager = SessionManager(bridge.sessions.ports)
     selected = {
         "pane_id": "terminal:123:ttys004",
         "expected_pid": 345,
@@ -133,7 +137,7 @@ async def test_native_session_selection_read_and_input(bridge, config, monkeypat
         return "read-output" if not mutation else {"sent": True}
 
     monkeypatch.setattr(manager, "catalog", catalog)
-    monkeypatch.setattr(manager, "native", native)
+    monkeypatch.setattr(manager.terminal_app, "native", native)
     with pytest.raises(BridgeError, match="exact current"):
         await manager.read("local", selected["pane_id"], 346)
     assert not calls
@@ -152,7 +156,7 @@ async def test_native_session_selection_read_and_input(bridge, config, monkeypat
 
 @pytest.mark.asyncio
 async def test_native_open_checks_authority_and_quotes_command(bridge, config, monkeypatch):
-    manager = SessionManager(bridge)
+    manager = SessionManager(bridge.sessions.ports)
     calls = []
 
     async def native(source, *, mutation=False):
@@ -162,8 +166,8 @@ async def test_native_open_checks_authority_and_quotes_command(bridge, config, m
     async def catalog():
         return [{"pane_id": "terminal:333:ttys009", "expected_pid": 444, "tty": "/dev/ttys009"}]
 
-    monkeypatch.setattr(manager, "native", native)
-    monkeypatch.setattr(manager, "terminal_catalog", catalog)
+    monkeypatch.setattr(manager.terminal_app, "native", native)
+    monkeypatch.setattr(manager.terminal_app, "catalog", catalog)
     with pytest.raises(BridgeError):
         await manager.open("local", SessionOpen(cwd="/"))
     assert not calls
@@ -193,7 +197,7 @@ async def test_no_window_for_shell_or_wrapper_without_trusted_operator_grant(
         calls.append(args)
         raise AssertionError("No window creation allowed")
 
-    monkeypatch.setattr(bridge.sessions, "native", native)
+    monkeypatch.setattr(bridge.sessions.terminal_app, "native", native)
     args = SessionOpen(
         cwd=config.principals["local"].roots[0],
         argv=argv,
@@ -233,7 +237,7 @@ async def test_expired_window_grant_cannot_reach_the_transport(bridge, config, m
     async def forbidden(*args, **kwargs):
         raise AssertionError("Expired grant must not start any window")
 
-    monkeypatch.setattr(bridge.sessions, "native", forbidden)
+    monkeypatch.setattr(bridge.sessions.terminal_app, "native", forbidden)
     with pytest.raises(BridgeError) as exc:
         await bridge.sessions.open("local", args, task_id="expired-window")
     assert exc.value.code == "window_request_required"
@@ -256,7 +260,7 @@ async def test_native_two_step_scripts_compile_without_executing_ui(
         return {}
 
     monkeypatch.setattr(bridge.sessions, "selected", selected)
-    monkeypatch.setattr(bridge.sessions, "native", capture)
+    monkeypatch.setattr(bridge.sessions.terminal_app, "native", capture)
     if action == "insert":
         await bridge.sessions.insert(
             "local",

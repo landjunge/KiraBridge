@@ -13,7 +13,7 @@ auf ein kleines Paket Implementierung, Grok-Prüfung, Korrektur und Nachprüfung
 | 2 Freigaben | 0.8.0rc5 aktiviert; 313 gezielte Tests und unabhängige Grok-Abnahme | Normale Voice-/CLI-Wege beim weiteren Umbau erhalten |
 | 3 Aktivierung | Koordinierter Betriebsdienst aktiv; alte unklare Eve-Zustellung ohne Nachversand stillgelegt | Historischen unbekannten Ausgang erhalten |
 | 4 Client-Lesewege | rc7 aktiv; 776 Tests, Grok-Abnahmen und echte ChatGPT-Leseprüfung unter Last bestanden; lokaler Eve-Rückweg bestätigt | Physische Handy-/Voice-Abnahme bleibt gesondert offen |
-| 5 Modulgrenzen | 5a von Grok geprüft; 5b Bedienwege im isolierten Kandidaten | Danach Sitzungsports und Plattformadapter |
+| 5 Modulgrenzen | 5a/5b von Grok geprüft; 5c Sitzungsports im isolierten Kandidaten | Unabhängige Adapterprüfung und Betriebsabfragen |
 | 6 Ausgabeablage | Offen | Begrenzte Rohdaten, unveränderte historische Audit-Kette |
 
 ## Etappe 1: gesicherter Ausgangspunkt
@@ -727,6 +727,55 @@ desselben Mac-Benutzers. Sitzungsmanager und Terminaladapter folgen in Paket 5c.
 die neuen fachlichen Besitzer. Enthalten sind echte getrennte SQLite-Verbindungen,
 einmalige Aktionsausführung, unklare Unterbrechungen, Konflikte, lokale Authentifizierung,
 Freigaben, OAuth/PKCE, Team-, Protokoll- und Aktivierungsregressionen. Zusätzlicher
-Negativtest für den fehlenden Agenten-Neustart und Groks unabhängige Prüfung folgen.
+Negativtest für den fehlenden Agenten-Neustart bestand anschließend mit insgesamt
+20 gezielten Tests in 0,92 s. Grok prüfte Commit `7713646` (80 Python-Dateien,
+Quellpin `9ddade1ccaf9014a1f0acf3cca583127752ceb91d1fabdadfa62db8222ea6547`)
+und führte **156 Tests in 27,37 s** selbst aus. Seine begrenzte Abnahme kam als
+Antwort `d8f30b1c-c594-4a2d-a891-43b938b6a58f` auf Auftrag
+`3dfe83bb-93ca-4adc-81b2-3419054bfe5b`, sichtbare Übergabe
+`channel-0c6b564f76ff4ae5abe363daabe761b0`. Antwort und Abschluss sind quittiert;
+Beleg `grok-stage5b-review.json`.
 Keine produktive Codeaktivierung, keine neuen echten Agentenfenster oder Eingaben
 in bestehende Codex-Sitzungen gehören zu diesen Tests.
+
+## Etappe 5, Paket 5c: schmale Sitzungsports und ersetzbare Transporte (Kandidat)
+
+Arbeitsstand: `/Users/landjunge/KiraBridge-stage5c-20261020`; produktiv weiterhin rc7.
+`SessionManager` erhält `SessionPorts` mit Autorisierung, Eingabefreigabe,
+Audit, konfigurierter Umgebung und Agentenzuordnung. Die zentrale Bridge verdrahtet
+ihn erst nach Eingabepolicy und Clipboard-Partner. Der Sitzungsmanager kennt kein
+Bridge-Objekt, keine SQL-Tabelle und keine Prozessstart- oder AppleScript-API.
+`TerminalAppTransport` und `TmuxTransport` implementieren explizite Transportports.
+Beide lassen sich ohne Aufbau des Kerns vollständig ersetzen.
+
+Terminal.app behält Katalog, exakte Fenster-/TTY-Auswahl, Fokusprüfung, wörtlichen
+Paste-Menübefehl, Erhalt aller Clipboard-Formate und separates Return. Vor jeder
+Mutation erfolgt weiterhin die neue Sitzungsauswahl mit PID-Prüfung und persistierter
+Agentenbindung. Native Zielskripte prüfen zusätzlich, dass Terminal.app noch läuft,
+bevor sie Fenster abfragen. Die eigene kurzlebige Prozessbeobachtung wird auch bei
+Abbruch beendet. tmux besitzt nur die bisherigen bestehenden Lese-/Eingabewege;
+kein Adapter startet einen Ersatzagenten, ein Fenster oder einen tmux-Server.
+Der einzige Fensterstart bleibt der gesondert freigegebene lokale Startauftrag.
+
+Tests ersetzen beide Transporte ohne Bridge und prüfen Kira, Eve, Codex und Grok
+gegen fehlende, falsche, doppelte und veraltete Ziele. Keine dieser Prüfungen erreicht
+Paste, Return, Fensterstart oder Eingabe über einen anderen Adapter. Direkte Eingaben
+in erkannte CLI-Agenten benötigen weiterhin die zentrale Übergabe. Mehrzeiliger Paste
+und Return bleiben getrennte Aktionen; ein unklarer Return hat genau einen Versuch
+und löst keinen Ersatz aus. Transportflags bestätigen keinen Agentenempfang.
+
+214 gezielte Tests in 14,38 s bestanden, Ruff und JavaScript-Syntax ebenfalls.
+Vorherige Testinjektionen wurden an die tatsächlichen neuen Adapter verlegt.
+Zusätzlich las der isolierte Kandidat tatsächlich die beiden Originalfenster
+`terminal:22104:ttys000`/PID 94023 (1001 Zeichen) und
+`terminal:22228:ttys002`/PID 6957 (1103 Zeichen), Katalog mit drei erhaltenen Fenstern.
+Diese rein lesende lokale Prüfung verwendet die tatsächlich gespeicherten
+Capability-Einstellungen, aber keinen gestarteten Kandidaten-Daemon und keine
+produktive Datenbankschreibaktion. Beleg `stage5c-candidate-native-read.json`.
+Sie ersetzt weder die spätere Prüfung nach Aktivierung noch eine Eingabe in das
+beschäftigte Original-Codex-Fenster oder die physische Handy-Sprachausgabe.
+
+Die Terminalauswahl nennt OS-`busy` jetzt „Programm läuft“ beziehungsweise
+„Terminal wartet“; tmux ohne diese Beobachtung zeigt „Prozess erkannt“.
+Agentenbereitschaft wird erst vor der tatsächlichen Übergabe geprüft.
+Groks unabhängige Prüfung dieses Pakets steht noch aus.

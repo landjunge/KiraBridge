@@ -31,7 +31,7 @@ def buffered(bridge, config, monkeypatch):
         return ""
 
     monkeypatch.setattr(bridge.sessions, "selected", selected)
-    monkeypatch.setattr(bridge.sessions, "command", command)
+    monkeypatch.setattr(bridge.sessions.tmux, "command", command)
     return bridge, calls
 
 
@@ -259,7 +259,7 @@ async def test_two_step_delivery_to_private_real_terminal(bridge, config, tmp_pa
     config.principals["local"].approval_mode = "automatic"
     config.principals["local"].capabilities += ["session.inspect"]
     socket = "kb-buffer-" + uuid.uuid4().hex
-    manager = SessionManager(bridge, socket_name=socket)
+    manager = SessionManager(bridge.sessions.ports, socket_name=socket)
     bridge.sessions = manager
     bridge.terminal.environment["PATH"] = (
         str(__import__("pathlib").Path(tmux).parent) + ":" + bridge.terminal.environment["PATH"]

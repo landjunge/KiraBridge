@@ -72,7 +72,7 @@ async def test_cached_tools_expose_existing_terminal_targets_over_real_http(
         return "READ_FROM_EXACT_WINDOW"
 
     monkeypatch.setattr(bridge.sessions, "catalog", catalog)
-    monkeypatch.setattr(bridge.sessions, "native", native)
+    monkeypatch.setattr(bridge.sessions.terminal_app, "native", native)
     async with MCPClientPool() as clients:
         await clients.connect(Peer("local", url=endpoint, token="local-test-" + "a" * 40))
         result = (await clients.call("local", "agent_status", {})).structuredContent
