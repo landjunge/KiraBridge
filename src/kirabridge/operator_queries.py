@@ -1,0 +1,50 @@
+"""Application queries for the local operator, without cross-module SQL.
+
+Only the authenticated local operator surface uses these all-principal views.
+Public MCP tools retain their existing owner-scoped permission checks.
+"""
+
+import time
+
+
+class OperatorQueries:
+    def __init__(self, tasks, messages, teams, audit):
+        self.tasks, self.messages, self.teams, self.audit = tasks, messages, teams, audit
+
+    def busy(self):
+        # Keep the existing response keys for cached local clients. The values
+        # are supplied by each domain owner, never inferred from OS 'busy'.
+        return {
+            "tasks": self.tasks.operator_work_count(),
+            "message_jobs": self.messages.operator_work_count(),
+            "team_work": self.teams.operator_work_count(),
+        }
+
+    def pending(self):
+        return self.tasks.operator_pending()
+
+    def recent_connection_checks(self):
+        return self.audit.recent_connection_checks()
+
+    def protocol(self, after=0, before=0):
+        entries = []
+        for row in self.audit.protocol_page(after, before):
+            metadata = row["metadata"]
+            entry = {key: row[key] for key in ("seq", "at", "kind", "principal", "task_id")}
+            entry["details"] = metadata
+            if metadata.get("message_id"):
+                message = self.messages.operator_protocol_snapshot(
+                    metadata["message_id"], row["at"]
+                )
+                if message is not None:
+                    entry["message"] = message
+            if row["task_id"]:
+                task = self.tasks.operator_snapshot_at(row["task_id"], row["at"])
+                if task is not None:
+                    entry["task"] = task
+            entries.append(entry)
+        return {
+            "entries": entries,
+            "last_seq": entries[-1]["seq"] if entries else after,
+            "observed_at": time.time(),
+        }

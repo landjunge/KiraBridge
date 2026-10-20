@@ -29,6 +29,24 @@ class MessageSend(Input):
 class MessageManager:
     interface_version = "1"
 
+    def operator_work_count(self):
+        return self.store.db.execute(
+            "SELECT count(*) FROM message_jobs WHERE state IN ('queued','running')"
+        ).fetchone()[0]
+
+    def operator_protocol_snapshot(self, message_id, at):
+        row = self.store.db.execute(
+            "SELECT sender,recipient,body,delivered,acknowledged,created FROM messages WHERE id=?",
+            (message_id,),
+        ).fetchone()
+        if row is None or row["created"] > at:
+            return None
+        result = {key: row[key] for key in row.keys() if key != "created"}
+        for key in ("delivered", "acknowledged"):
+            if result[key] is not None and result[key] > at:
+                result[key] = None
+        return result
+
     def __init__(self, config, store, security):
         self.config, self.store, self.security = config, store, security
         self.wake = asyncio.Event()

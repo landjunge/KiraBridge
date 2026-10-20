@@ -375,6 +375,48 @@ class Store:
             names,
         ).fetchone()[0]
 
+    def operator_work_count(self):
+        return self.db.execute(
+            "SELECT count(*) FROM tasks WHERE state IN ('queued','accepted','running')"
+        ).fetchone()[0]
+
+    def operator_pending(self, limit=20):
+        return [
+            dict(row)
+            for row in self.db.execute(
+                "SELECT id,principal,operation FROM tasks WHERE state='created' "
+                "ORDER BY created LIMIT ?",
+                (min(100, max(1, limit)),),
+            )
+        ]
+
+    def operator_snapshot_at(self, task_id, at):
+        """Historical presentation, without turning later results into earlier evidence."""
+        row = self.db.execute(
+            "SELECT operation,state,args,result,error,evidence,finished FROM tasks WHERE id=?",
+            (task_id,),
+        ).fetchone()
+        if row is None:
+            return None
+        result = {
+            key: json.loads(row[key])
+            if key in {"args", "result", "error", "evidence"} and row[key]
+            else row[key]
+            for key in row.keys()
+        }
+        observed = self.db.execute(
+            "SELECT state,evidence FROM events WHERE task_id=? AND at<=? ORDER BY seq DESC LIMIT 1",
+            (task_id, at),
+        ).fetchone()
+        if observed is None:
+            return None  # The task had not yet been observed at this event's time.
+        result["state"] = observed["state"]
+        result["evidence"] = json.loads(observed["evidence"])
+        if row["finished"] is None or row["finished"] > at:
+            result["result"] = None
+            result["error"] = None
+        return result
+
     def claim(self, owner: str, lease_seconds: float, control: bool | str = False) -> dict | None:
         with self.transaction():
             selection, names = self.lane_selection(control)

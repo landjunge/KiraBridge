@@ -17,6 +17,7 @@ from starlette.requests import Request
 from starlette.responses import HTMLResponse, JSONResponse
 from starlette.routing import Route
 
+from kirabridge.audit_manager import AuditReader
 from kirabridge.bridge_core.config import load_config
 from kirabridge.bridge_core.models import BridgeError, canonical, digest
 from kirabridge.local_runtime import peer, write_private
@@ -24,6 +25,7 @@ from kirabridge.mcp_gateway.client import MCPClientPool
 from kirabridge.operations_service import OperationsService
 from kirabridge.operations_service import configure_access as configure_access
 from kirabridge.operations_service import replace_section as replace_section
+from kirabridge.operator_queries import OperatorQueries
 from kirabridge.permissions import LEVELS, level_for, permission_summary
 
 ASSETS = Path(__file__).with_name("console_assets")
@@ -56,6 +58,9 @@ class ControlCenter:
         self.cache = None
         self.cache_at = 0.0
         self.seen_surfaces = set()
+        self.queries = OperatorQueries(
+            bridge.store, bridge.messages, bridge.teams, AuditReader(bridge.store)
+        )
         self.operations = OperationsService(
             bridge.store,
             self.config,
@@ -141,26 +146,7 @@ class ControlCenter:
         return rows
 
     def busy(self):
-        db = self.bridge.store.db
-        counts = {}
-        for table, states in [
-            ("tasks", ("queued", "accepted", "running")),
-            ("message_jobs", ("queued", "running")),
-            (
-                "team_work",
-                ("queued", "dispatching", "created", "accepted", "running", "processing_result"),
-            ),
-        ]:
-            present = db.execute(
-                "SELECT 1 FROM sqlite_master WHERE type='table' AND name=?", (table,)
-            ).fetchone()
-            if present:
-                counts[table] = db.execute(
-                    f"SELECT count(*) FROM {table} "
-                    f"WHERE state IN ({','.join('?' for _ in states)})",
-                    states,
-                ).fetchone()[0]
-        return counts
+        return self.queries.busy()
 
     async def snapshot(self, *, fresh=False):
         async with self.status_lock:
@@ -273,10 +259,7 @@ class ControlCenter:
             }
         )
         levels = {name: level_for(policy) for name, policy in config.principals.items()}
-        pending = self.bridge.store.db.execute(
-            "SELECT id,principal,operation FROM tasks WHERE state='created' "
-            "ORDER BY created LIMIT 20"
-        ).fetchall()
+        pending = self.queries.pending()
         result = {
             "observed_at": time.time(),
             "services": cards,
@@ -295,7 +278,7 @@ class ControlCenter:
                 for name, p in config.principals.items()
             ),
             "level": levels.get("chatgpt", levels.get("local", "ask")),
-            "pending": [dict(r) for r in pending],
+            "pending": pending,
             "busy": self.busy(),
             "identities": [
                 {"id": "chatgpt", "name": "Kira · ChatGPT", "url": "https://chatgpt.com"},
@@ -773,17 +756,10 @@ class ControlCenter:
                 grok["last_use"] = store.status().get("last_use")
             finally:
                 store.close()
-        records = self.bridge.store.db.execute(
-            "SELECT at,principal,metadata FROM audit WHERE kind='connection.checked' "
-            "ORDER BY seq DESC LIMIT 50"
-        ).fetchall()
         return JSONResponse(
             {
                 "grok": grok,
-                "checks": [
-                    {"at": r["at"], "principal": r["principal"], **json.loads(r["metadata"])}
-                    for r in records
-                ],
+                "checks": self.queries.recent_connection_checks(),
                 "chatgpt_url": "https://chatgpt.com",
                 "grok_url": "https://grok.com",
             }
@@ -820,70 +796,4 @@ class ControlCenter:
             before = max(0, int(request.query_params.get("before", "0")))
         except ValueError:
             raise BridgeError("invalid_request", "Ungültige Protokollposition") from None
-        db = self.bridge.store.db
-        condition, parameter = (
-            ("seq>?", after) if after else ("seq<?", before) if before else ("seq>?", 0)
-        )
-        order = "ASC" if after else "DESC"
-        records = db.execute(
-            f"SELECT * FROM audit WHERE {condition} AND ("
-            "kind LIKE 'message.%' OR kind LIKE 'task.%' OR kind LIKE 'control.%' "
-            "OR kind LIKE 'session.input.%' "
-            "OR kind LIKE 'console.%' OR kind='connection.checked' OR kind='terminal.output' "
-            "OR json_extract(metadata,'$.error_code') IS NOT NULL) "
-            f"ORDER BY seq {order} LIMIT 100",
-            (parameter,),
-        ).fetchall()
-        if not after:
-            records = list(reversed(records))
-        entries = []
-        for r in records:
-            metadata = json.loads(r["metadata"])
-            entry = {
-                "seq": r["seq"],
-                "at": r["at"],
-                "kind": r["kind"],
-                "principal": r["principal"],
-                "task_id": r["task_id"],
-                "details": metadata,
-            }
-            message_id = metadata.get("message_id")
-            if message_id:
-                m = db.execute(
-                    "SELECT sender,recipient,body,delivered,acknowledged FROM messages WHERE id=?",
-                    (message_id,),
-                ).fetchone()
-                if m:
-                    entry["message"] = dict(m)
-            if r["task_id"]:
-                t = db.execute(
-                    "SELECT operation,state,args,result,error,evidence,finished "
-                    "FROM tasks WHERE id=?",
-                    (r["task_id"],),
-                ).fetchone()
-                if t:
-                    entry["task"] = {
-                        k: json.loads(t[k])
-                        if k in {"args", "result", "error", "evidence"} and t[k]
-                        else t[k]
-                        for k in t.keys()
-                    }
-                    observed = db.execute(
-                        "SELECT state,evidence FROM events WHERE task_id=? AND at<=? "
-                        "ORDER BY seq DESC LIMIT 1",
-                        (r["task_id"], r["at"]),
-                    ).fetchone()
-                    if observed:
-                        entry["task"]["state"] = observed["state"]
-                        entry["task"]["evidence"] = json.loads(observed["evidence"])
-                    if t["finished"] is None or t["finished"] > r["at"]:
-                        entry["task"]["result"] = None
-                        entry["task"]["error"] = None
-            entries.append(entry)
-        return JSONResponse(
-            {
-                "entries": entries,
-                "last_seq": entries[-1]["seq"] if entries else after,
-                "observed_at": time.time(),
-            }
-        )
+        return JSONResponse(self.queries.protocol(after, before))

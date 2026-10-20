@@ -638,3 +638,31 @@ Private Nachweise: `rc7-publish-manifest.json`, `activation-stage4-rc7.json`,
 `stage4-live-locked-load-observation.json`, `stage4-live-chatgpt-load-proof.json`,
 `rc7-eve-roundtrip.json`. Weiter geht es mit dem kleinen Paket 5a für fachliche
 Status-/Protokollabfragen; eine neue Nutzerfreigabe ist dafür nicht nötig.
+
+## Etappe 5, Paket 5a: fachliche Status- und Protokollabfragen (Kandidat)
+
+Der Kandidat liegt isoliert unter `/Users/landjunge/KiraBridge-stage5a-20261020`.
+Produktiv bleibt der geprüfte rc7-Stand. `OperatorQueries` fasst die lokalen
+Bedienabfragen zusammen, ohne eigene SQL-Abfragen oder ein gesamtes Bridge-Objekt.
+Aufgabenabfragen gehören `task_manager.Store`, Nachrichtenabfragen dem
+`MessageManager`, Team-Zähler dem `TeamManager` und Audit-Seiten `AuditReader`.
+Es werden weder neue Netzwerkdienste noch zusätzliche Datenbanken eingeführt.
+
+`ControlCenter.busy`, wartende Aufgaben, Verbindungsbelege und Protokollseiten
+verwenden diese fachlichen Abfragen. In diesen Wegen kennt die Oberfläche keine
+Fremdtabellen mehr. Ihre eigene Aktionsablage und weitere Bedien-/Betriebslogik
+bleiben ausdrücklich Arbeit für Paket 5b; die Sitzungsports und Plattformadapter
+folgen anschließend. Die gemeinsame Transaktion für Aufgabenwechsel, Audit und
+Abschlussnachricht wurde nicht verändert.
+
+Die Protokollprüfung verbessert auch zwei konkrete Zeitbezüge: Eine später
+angelegte Aufgabe wird keinem früheren Audit-Ereignis zugeordnet; spätere
+Zustellung und Quittung einer Nachricht erscheinen nicht schon im früheren
+Queue-Eintrag. Der Nachrichtentext bleibt unverändert verfügbar. Bestehende
+Audit-Ketten und historische Inhalte werden nicht umgeschrieben.
+
+86 gezielte Tests bestanden in 52,95 Sekunden: austauschbare fachliche Abfragen
+ohne Core-Aufbau, Authentifizierung vor Datenzugriff, historische Zustände,
+mutationsfreie Abfragen, bestehende HTTP-Oberfläche, Aufgaben-, Nachrichten-,
+Abschluss- und Aktivierungsregressionen. Ruff und Whitespace-Prüfung bestanden.
+Grok-Prüfung dieses kleinen Pakets und Aktivierung sind noch offen.
