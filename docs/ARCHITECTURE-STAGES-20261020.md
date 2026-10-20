@@ -1297,3 +1297,59 @@ Fehlerpfade nicht. Dies ist kein PR-Codeurteil. Die getrennte Prüfung des
 vollständigen PR-Diffs und Quellkontexts lieferte bis zu diesem Kontrollpunkt
 noch kein Abschlussurteil; sie wird nicht als bestanden ausgegeben.
 [Maschinenlesbarer, bereinigter Nachweis](evidence/receiver-resilience-mac-20261020.json).
+
+### Grok-Befunde reproduziert, korrigiert und endgültiger Stand aktiviert
+
+Groks danach eingetroffene PR-Prüfung fand zwei konkrete Blocker: `_waiting`
+ersetzte die gespeicherte `receiver_retry`-Frist; unerwartete Exceptions eines
+Empfängers konnten über die TaskGroup Geschwister abbrechen. Neun zusätzliche
+Regressionen scheiterten vor der Korrektur. Nachtrag
+`956b0f81c380895105d32c585b569ea52979adc9` behebt beide Fälle: ursprüngliche
+Fristen bleiben erhalten, unerwartete Fehler vor Claim werden sanitisiert als
+failed gespeichert, nach Claim als unknown ohne Wiederholung; eine weitere
+Fehlergrenze schützt die anderen Empfänger auch bei Beobachtungs-/Speicherfehlern.
+Beendete Workerhandles lassen sich wieder starten. Ein zusätzlicher zunächst
+scheiternder Test belegt nun auch den Abbruch eines Stop-Warters.
+
+Der verbindliche Lifecycle-Vertrag lautet: Ein angeforderter Stop bleibt bestehen,
+wenn nur sein wartender Aufrufer abbricht. Shield erhält die laufende Arbeit; der
+Workerhandle bleibt bis zum tatsächlichen Ende zugeordnet. Wartende Nachrichten
+bleiben queued und werden erst durch einen ausdrücklich späteren Start nach Ende
+des alten Workers genau einmal verarbeitet. Grok bestätigt beide ursprünglichen
+Fixes und nennt nach Klärung dieses Vertrags keine konkrete Verletzung mehr.
+Grok prüfte ausschließlich lesend und führte selbst keine Tests aus.
+
+Der endgültige Produktionscode bestand **941 Gesamttests in 178.61 Sekunden**
+auf dem Mac sowie **35 gezielte Receiverprüfungen**, einschließlich der erweiterten
+Stop-/Wiederanlaufprüfung; Ruff für alle Quellen/Tests und Diff-Prüfung sauber.
+Commit `956b0f8` ist auf dem bestehenden Architekturbranch integriert und gepusht.
+Das neue Wheel wurde erneut in allen 97 Paketdateien vor und nach Installation
+byteweise verglichen. Wheel-SHA256:
+`bff5aa46541e24124aa9d15a59815a6605c0f9734f49cb87dd735369490ccbcb`.
+
+Koordinierte Aktivierung `activation-c492e4e34fc944f18649da8a37b8c343` completed;
+endgültige Core-PID **79466**, Start **2026-10-20 13:38:41.776401 UTC**, Instanz
+`1085478016e84c838c55c6eada33d9bf`, 86 Python-Dateien, Quelle:
+`cfad2a3026c435192374f26580be3556e51b7641cb36918452ad0f280362ceb7`.
+Kiras echter Connector bestätigt diese Pins und aktiven Receiver ohne
+Wartungssperre; lokale Quelle/Konfiguration stimmen überein. Steuerdienst nach
+signiertem Vor-/Nachprobe PID 79560. Die Konfiguration blieb beim Nachtrag
+bytegleich (`e4f3d2aa…43601f8`), einschließlich neuer Codex-Bindung und aller
+Berechtigungen. Alle drei ursprünglichen unbeanspruchten Grok-Queueeinträge,
+die sieben alten unknown-Datensätze und alle 20 überwachten Prozesse erhalten.
+Ein zweiter vollständiger Installationsrückweg liegt unter dem privaten
+Belegverzeichnis in `followup/`; kein DB-Restore oder Rollbackpfad ausgeführt.
+
+Die oben belegte einzelne sichtbare Terminaleingabe/Rückantwort gehört zur
+dabei geladenen Quelle `8ef2742c…`. Nach dem Nachtrag wurde gemäß ausdrücklichem
+„kein weiterer Testauftrag“ keine weitere Terminaleingabe veranlasst. Der Nachtrag
+ist durch Fehlerregressionen und die vollständige Suite geprüft; seine aktuellen
+geladenen Pins und der authentisierte Nachrichtenrückweg sind zusätzlich live
+bestätigt. Die endgültige Ergebnisnachricht
+`8c2cd45c-4f1b-43c9-8467-df26b0fce6ce` im beauftragten Gespräch
+`kira-receiver-fixes-20261020` wurde als codex/result ohne Dispatch/Antwortanforderung
+über den endgültigen Dienst gesendet, um **13:40:19 UTC** über Kiras echten
+Connector empfangen und um **13:40:20 UTC** mit dessen tatsächlichem Receipt
+quittiert. Ihre Meldung trennt Code, Dienst, Terminalübergabe, Rückantwort und
+verbleibende historische Unklarheiten. Der maschinenlesbare Nachweis enthält
+beide Aktivierungen und die jeweilige genaue Prüfreichweite.

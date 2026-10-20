@@ -172,8 +172,117 @@
     "reason": "No matching authenticated final answer and completed visible handoff; not retried"
   },
   "grok": {
-    "pr_code_review": "Existing access requested; CLI still streaming reasoning with no final verdict at this checkpoint",
-    "local_activation_script_review": "Three error-path observations; one fixed before execution, remaining rollback and queue-release checks strengthened in local script. Successful actual run did not enter error/rollback path. No production PR change requested by this script review."
+    "initial_pr_verdict": "Do not approve: visible waiting resets retry deadline; non-BridgeError can cancel sibling recipient tasks.",
+    "followup_verdict": "Both original blockers fixed; additional stop cancellation ownership concern raised.",
+    "final_stop_contract_verdict": "No concrete violation under that lifecycle.\n\n`stop` sets `stopping` before `shield` and leaves it set if the waiting caller is cancelled. `shield` lets the current turn finish. The `finally` clears the handle only when that same task is already done, so a cancelled waiter keeps the live worker.\n\n`start` returns while that worker exists, before recovery, new locks, `stopping = False`, or a new task. Queued rows stay queued. Only a later `start`, after the old worker has exited and the handle is cleared, clears `stopping` and runs the next job once.",
+    "contract": "Stop requests persistent quiescence. Cancelling its waiter does not withdraw stop. Current work drains; queued work resumes once on an explicit later start after old worker exits.",
+    "reviewer_executed_tests": false,
+    "local_activation_script_review": "Error paths reviewed and strengthened; one issue corrected before execution. Both real activations completed without rollback/error path.",
+    "review_output_sha256": {
+      "grok-review.txt": "d774651ed0be418f9cfb44b205fde40c4f7edd5dd54ca2433814d26750535465",
+      "grok-followup-review.txt": "afd0a12e1003c4c3922cdb4ec9a83316c75f131000f02159a4d0e7f3f06e3a3b",
+      "grok-final-stop-review.txt": "4a115b062f1ebe601949a28f27922484e417df5ca6838343d4c462d815972339",
+      "grok-stop-contract-review.txt": "a4f7956297ee73196c9fd69b5a380c06164c83b088daa0dca6e2652152ae5e05",
+      "grok-activation-review.txt": "9c05e0a45bbb3b6afaab66547890b5fdfd4429aff93329ecd905b8dcaf4d7b52"
+    }
   },
-  "private_evidence_directory": "/Users/landjunge/.config/kirabridge/repairs/receiver-resilience-20261020"
+  "private_evidence_directory": "/Users/landjunge/.config/kirabridge/repairs/receiver-resilience-20261020",
+  "active_code_commit": "956b0f81c380895105d32c585b569ea52979adc9",
+  "active_source_sha256": "cfad2a3026c435192374f26580be3556e51b7641cb36918452ad0f280362ceb7",
+  "followup": {
+    "reason": "Independent Grok review found two reproduced blockers; fixed retry evidence loss and unexpected exception coupling, with explicit stop ownership/cancellation contract.",
+    "commit": "956b0f81c380895105d32c585b569ea52979adc9",
+    "wheel_sha256": "bff5aa46541e24124aa9d15a59815a6605c0f9734f49cb87dd735369490ccbcb",
+    "wheel_package_files_compared": 97,
+    "verification": {
+      "tests_passed": 941,
+      "seconds": 178.61,
+      "focused_receiver_tests_passed": 35,
+      "ruff": "passed",
+      "diff_check": "passed",
+      "new_regression_cases": 10,
+      "reproduction": "9 cases failed before initial fixes; cancelled-stop case failed before shield; all10 final cases pass"
+    },
+    "activation_id": "activation-c492e4e34fc944f18649da8a37b8c343",
+    "before_runtime": {
+      "instance_id": "b3407a2b11bd475483249ec1c3b6caed",
+      "version": "0.8.0rc11",
+      "pid": 73628,
+      "started_at": "2026-10-20T13:20:56.429925+00:00",
+      "config_path": "/Users/landjunge/.config/kirabridge/config.toml",
+      "config_sha256": "e4f3d2aab9b35727a211ca77cc57523b39618cd6bb36c4616998092fb43601f8",
+      "effective_config_sha256": "003566914f9422cf7cb0dd633ae46c9b52f43ee0de995a934935d9cb6295d498",
+      "source_tree_sha256": "8ef2742c04a0a49b67e57136b1e90b1ee7774789830ab6e50ef15a50fd8c5728",
+      "source_file_count": 86,
+      "source_package_path": "/Users/landjunge/KiraBridge/.venv/lib/python3.11/site-packages/kirabridge",
+      "source_scope": "package Python files observed at startup; no remote attestation"
+    },
+    "after_runtime": {
+      "instance_id": "1085478016e84c838c55c6eada33d9bf",
+      "version": "0.8.0rc11",
+      "pid": 79466,
+      "started_at": "2026-10-20T13:38:41.776401+00:00",
+      "config_path": "/Users/landjunge/.config/kirabridge/config.toml",
+      "config_sha256": "e4f3d2aab9b35727a211ca77cc57523b39618cd6bb36c4616998092fb43601f8",
+      "effective_config_sha256": "003566914f9422cf7cb0dd633ae46c9b52f43ee0de995a934935d9cb6295d498",
+      "source_tree_sha256": "cfad2a3026c435192374f26580be3556e51b7641cb36918452ad0f280362ceb7",
+      "source_file_count": 86,
+      "source_package_path": "/Users/landjunge/KiraBridge/.venv/lib/python3.11/site-packages/kirabridge",
+      "source_scope": "package Python files observed at startup; no remote attestation"
+    },
+    "receiver_active": true,
+    "maintenance": null,
+    "configuration_changed": false,
+    "preservation_checks": {
+      "source_config_match": true,
+      "credentials_and_launchd_unchanged": true,
+      "preserved_process_count": 20,
+      "queued": [
+        {
+          "id": "e5db3654-cdfa-46a5-a3c2-28d632a6810b",
+          "recipient": "grok",
+          "state": "queued",
+          "claimed": null,
+          "started": null
+        },
+        {
+          "id": "ef86163a-88b9-4aee-b0d5-c574ada7b629",
+          "recipient": "grok",
+          "state": "queued",
+          "claimed": null,
+          "started": null
+        },
+        {
+          "id": "68e47f45-749f-428a-a300-82e411c10133",
+          "recipient": "grok",
+          "state": "queued",
+          "claimed": null,
+          "started": null
+        }
+      ],
+      "remaining_unknown": 7,
+      "config_unchanged_during_followup": true
+    },
+    "console_reload": {
+      "before_instance": "9a052ef1fe39b9c934f25faec3eb22da",
+      "after_instance": "4fbedc1fafbea63b103341f53f005046",
+      "before_pid": 73776,
+      "after_pid": 79560,
+      "authenticated_signed_probe": true,
+      "key_changed": false
+    },
+    "rollback": "Complete PR7 venv, wheel, canonical config and consistent SQLite backups in private followup/previous-installation and followup/; original pre-PR7 backup also retained; no DB restore.",
+    "additional_terminal_test_requests": 0,
+    "live_validation_scope": "The single visible insert/separate Return/ACK/reply/Kira ACK was observed on source8ef2742c before this hardening. No new terminal input was requested after hardening because user explicitly said no further test. Actual final Kira connector health/source pins and final result delivery/ACK below were checked on sourcecfad2a30.",
+    "final_result": {
+      "id": "8c2cd45c-4f1b-43c9-8467-df26b0fce6ce",
+      "conversation_id": "kira-receiver-fixes-20261020",
+      "kind": "result",
+      "dispatch": false,
+      "request_reply": false,
+      "sent_utc": "2026-10-20T13:40:11.511350+00:00",
+      "received_via_actual_kira_connector_utc": "2026-10-20T13:40:19.041680+00:00",
+      "kira_ack_utc": "2026-10-20T13:40:20.228751+00:00"
+    }
+  }
 }

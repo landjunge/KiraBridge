@@ -1,15 +1,22 @@
-Aktueller Stand am 20. Oktober 2026, 15:25 Uhr: produktiv **0.8.0rc11 mit PR #7**,
-Commit `4e0e066`, integriert und gepusht über `971e685`. 931 Tests auf diesem Mac,
-Ruff und Diff-Prüfung bestanden. Das tatsächlich installierte neue Wheel und die
-neu gestartete Dienstinstanz verwenden Quelle `8ef2742c…fd8c5728`.
+Aktueller Stand am 20. Oktober 2026, 15:40 Uhr: produktiv **0.8.0rc11 mit PR #7
+und Grok-Nachtrag `956b0f8`**, integriert und gepusht. 941 Tests auf diesem Mac,
+35 gezielte Receiverprüfungen, Ruff und Diff-Prüfung bestanden. Das tatsächlich
+installierte neue Wheel und die neu gestartete Dienstinstanz PID 79466 verwenden
+Quelle `cfad2a30…0362ceb7`, Start 13:38:41 UTC. Groks zwei reproduzierte Blocker
+sind behoben; die abschließende Prüfung des ausdrücklich beschriebenen
+Stop-Vertrags nennt keine konkrete Verletzung. Grok führte selbst keine Tests aus.
 Der ursprüngliche Kira→Codex→Kira-Kurztest war bereits abgeschlossen und wurde
 nicht wiederholt. Ein weiterer einmaliger Diagnosetest bestätigt jetzt auch die
 neu gestartete Codex-Sitzung: Einfügen, separates Return, authentisierter Empfang,
 passende Antwort sowie Empfang und Quittierung über Kiras echten Connector sind
-getrennt belegt. [Maschinenlesbare Abnahme](evidence/receiver-resilience-mac-20261020.json)
-und [Etappenakte](ARCHITECTURE-STAGES-20261020.md) enthalten die konkreten Pins
-und verbleibenden Grenzen. Groks unabhängiges PR-Codeurteil steht noch aus;
-seine Prüfung des lokalen Aktivierungsskripts ist gesondert dokumentiert.
+getrennt belegt. Dieser Live-Terminaltest fand vor dem Grok-Nachtrag statt;
+gemäß „kein weiterer Testauftrag“ wurde danach keine weitere Eingabe veranlasst.
+Kiras tatsächlicher Connector bestätigte anschließend die endgültigen geladenen
+Pins und empfing/quittierte die authentisierte Abschlussmeldung.
+[Maschinenlesbare Abnahme](evidence/receiver-resilience-mac-20261020.json) und
+[Etappenakte](ARCHITECTURE-STAGES-20261020.md) enthalten die konkreten Pins und
+verbleibenden Grenzen. Sieben ältere unbekannte Aufträge bleiben mangels
+ausreichender Abschlussbelege unverändert; keine Wiederholung.
 Sichtbare Übergaben verwenden ausschließlich die gespeicherte bestehende
 Fenster-/TTY-/PID-Zuordnung in der entsperrten Mac-Sitzung. Fehlende Ziele starten
 keinen Ersatz. Der koordinierte Neustart wartet auch auf Team-Ergebnisverarbeitung.
