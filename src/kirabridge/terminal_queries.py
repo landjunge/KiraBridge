@@ -2,7 +2,10 @@
 
 import asyncio
 
-from kirabridge.bridge_core.models import BridgeError
+from pydantic import ValidationError
+
+from kirabridge.bridge_core.models import BridgeError, EmptyInput
+from kirabridge.session_manager import SessionRead
 
 TERMINAL_QUERY_SECONDS = 8.0
 
@@ -16,6 +19,14 @@ class TerminalQueries:
     async def execute(self, principal, operation, arguments, *, task_id=None):
         if operation not in {"session.catalog", "session.read"}:
             raise BridgeError("unknown_operation", "Not a terminal read operation")
+        try:
+            args = (EmptyInput if operation == "session.catalog" else SessionRead).model_validate(
+                arguments
+            )
+        except ValidationError:
+            raise BridgeError(
+                "invalid_arguments", "Arguments do not match the operation schema"
+            ) from None
         decision = self.security.authorize(principal, operation)
         if task_id is None:
             if decision["approval_required"]:
@@ -44,9 +55,9 @@ class TerminalQueries:
                     return await self.sessions.catalog(principal)
                 return await self.sessions.read_observed(
                     principal,
-                    arguments["pane_id"],
-                    arguments["expected_pid"],
-                    max_bytes=arguments.get("max_bytes", 65536),
+                    args.pane_id,
+                    args.expected_pid,
+                    max_bytes=args.max_bytes,
                 )
         except TimeoutError:
             raise BridgeError(

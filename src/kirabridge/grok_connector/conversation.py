@@ -10,6 +10,7 @@ from kirabridge.platform_adapters.desktop import DESKTOP_MESSAGES
 
 WAIT_SECONDS = 18.0  # Below the existing gateway/client transport deadlines.
 ACTIVE = {State.QUEUED, State.ACCEPTED, State.RUNNING}
+MESSAGE_FAILURES = {State.FAILED, State.UNKNOWN, State.BLOCKED, State.CANCELLED}
 
 
 def enabled_for(bridge, principal):
@@ -222,7 +223,7 @@ async def message_for_conversation(bridge, principal, message):
         waiting_reply = (
             message["sender"] == principal
             and message["request_reply"]
-            and (not job or job["state"] not in {"failed", "unknown"})
+            and (not job or job["state"] not in MESSAGE_FAILURES)
         )
         if not (active or waiting_reply) or asyncio.get_running_loop().time() >= deadline:
             break
@@ -244,8 +245,21 @@ async def message_for_conversation(bridge, principal, message):
         text, final = reply["body"], True
     elif job and job["state"] == "completed" and not message["request_reply"]:
         text, final = "Die Nachricht ist verarbeitet. Es war keine Antwort angefordert.", True
-    elif job and job["state"] in {"failed", "unknown"}:
-        text, final = "Die Nachrichtenverarbeitung ist " + job["state"] + ".", True
+    elif job and job["state"] in MESSAGE_FAILURES:
+        text = {
+            State.FAILED: "Die Nachrichtenverarbeitung ist fehlgeschlagen.",
+            State.UNKNOWN: (
+                "Der Nachrichtenausgang ist unklar. Die Nachricht wird nicht erneut gesendet."
+            ),
+            State.BLOCKED: "Die Nachrichtenverarbeitung ist blockiert.",
+            State.CANCELLED: "Die Nachrichtenverarbeitung wurde abgebrochen.",
+        }[job["state"]]
+        if job.get("error") == "delivery_retired_unresolved":
+            text += (
+                " Der ungeklärte Zustellungsversuch wurde stillgelegt. "
+                "Sein früherer Ausgang bleibt unbestätigt."
+            )
+        final = True  # Final error report; never an addressed agent answer.
     else:
         text, final = "Eine fertige Antwort liegt noch nicht vor.", False
     return {

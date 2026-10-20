@@ -12,7 +12,7 @@ auf ein kleines Paket Implementierung, Grok-Prüfung, Korrektur und Nachprüfung
 | 1a Sichtbare Übergaben und Aufhebung Voice-Gate | 0.8.0rc4 aktiviert: 660 Tests bestanden, Grok-Prüfung und produktive sichtbare Übergabe abgeschlossen | Ursprünglichen beschäftigten Codex nicht für Eingabetest unterbrechen |
 | 2 Freigaben | 0.8.0rc5 aktiviert; 313 gezielte Tests und unabhängige Grok-Abnahme | Normale Voice-/CLI-Wege beim weiteren Umbau erhalten |
 | 3 Aktivierung | 0.8.0rc6 aktiviert; 732 Tests, echte Grok-Abnahmen und koordinierter Neustart belegt | Zusätzlichen Eve-Test nach Entsperren ohne Wiederholung abgleichen |
-| 4 Client-Lesewege | Quellkandidat; 757 Gesamttests sowie 116 gezielte Tests mit erweiterter Vier-Absender-Negativmatrix bestanden | Grok-Prüfung und echte Leseprüfung benötigen das entsperrte bestehende Ziel |
+| 4 Client-Lesewege | rc7 vorbereitet; 757 Gesamttests, Nachprüfungen und 163 unabhängige Grok-Tests bestanden | Paket prüfen, aktivieren und echte Lesewege abnehmen |
 | 5 Modulgrenzen | Offen | Fachliche Abfragen, austauschbarer Transport |
 | 6 Ausgabeablage | Offen | Begrenzte Rohdaten, unveränderte historische Audit-Kette |
 
@@ -526,8 +526,46 @@ unveränderten historischen unversionierten Belege. Die Transportreserve bestand
 danach mit 21 gezielten Tests; der Kandidat selbst wurde nach der räumlichen
 Trennung nochmals ausdrücklich über sein eigenes `PYTHONPATH` geprüft:
 39 Tests bestanden in 3,16 Sekunden.
-Eine Grok-Abnahme oder Aktivierung von Etappe 4 ist **nicht erfolgt**.
-Nächster Schritt nach Entsperren: den einen unklaren Eve-Auftrag zuerst lesen
-und abgleichen, danach Grok in seinem bestehenden Fenster mit der unabhängigen
-Prüfung dieses absoluten Kandidatenpfads beauftragen. Etappen 5 und 6 bleiben
-bis zur Abnahme dieses Pakets offen.
+### Wieder lesbares Ziel und unabhängige Grok-Abnahme
+
+Nach Daniels Bestätigung wurde nur lesend geprüft: Fenster 22228/ttys002,
+Sitzungs-PID 6957 und Grok-PID 6986 passen unverändert; das Eingabefeld ist leer.
+Der Providerverlauf ist bytegleich zum gesperrten Zustand und enthält weder
+Auftrags-ID noch Prüfmarker des alten Eve-Tests. Eine damalige Ausführung wird
+dadurch weiterhin nicht behauptet. Der ursprüngliche Task bleibt `unknown`.
+Nur seine Übergabereservierung wurde mit `interrupted` administrativ aufgegeben
+und die zugehörige Nachricht als `blocked/delivery_retired_unresolved` gespeichert.
+Es wurde dafür kein Input, Return oder Betriebssystemsignal gesendet und keine
+Agentenquittung erzeugt. Historische Ereignisse bleiben unverändert.
+Nachweise: `rc6-eve-unlocked-observation.json`, `rc6-eve-delivery-retirement.json`.
+
+Der neue unabhängige Prüfauftrag `architecture-stage4-review-20261020`,
+Nachricht `f0654b5b-de68-4d6c-8a46-88909e37dc3c`, Übergabe
+`channel-6464256463fb48e2abe1c060d8dddd62`, wurde tatsächlich im ursprünglichen
+sichtbaren Grok-Fenster eingefügt, mit separatem Return abgeschickt und von
+Grok authentifiziert quittiert. Grok bestätigte den exakten Kandidatenpfad,
+Commit und Quellpin und führte selbst die sechs beauftragten Testdateien aus:
+**163 bestanden in 12,92 Sekunden**. Er empfiehlt die begrenzte Abnahme ohne
+Ablehnungsbefund. Seine Antwort `51420373-ae84-470b-8cd1-7906b2f6b379` wurde
+verarbeitet und quittiert; `grok-stage4-review.json` enthält den Nachweis.
+Den alten Eve-Test hat Grok ausdrücklich weder empfangen noch quittiert oder
+wiederholt. Handy-Audio bleibt ungeprüft.
+
+Der erste rc7-Gesamtlauf bestand mit **769 Tests in 178,79 Sekunden**. In der
+anschließenden Vertragsprüfung stellte Codex drei bisher nicht abgedeckte
+Fälle nach: PID 0, negative PID und ungültige TTY ergaben beim direkten Werkzeug
+`session_selection_changed`, beim alten Aufgabenweg dagegen `invalid_arguments`.
+`TerminalQueries` validiert jetzt vor Rechten und Plattformzugriff mit denselben
+`SessionRead`-/`EmptyInput`-Modellen wie die Queue. Die drei Negativtests liefen
+vorher rot und bestehen nach der Korrektur ohne Terminalprobe oder Aufgabenanlage.
+
+Zusätzlich behandelt die Voice-Rückgabe `blocked` und `cancelled` wie die anderen
+endgültigen Fehlerzustände: ohne weiteres Warten und mit einem finalen
+Fehlerbericht unter `message_processing`. Das ist ausdrücklich keine bestätigte
+Agentenantwort und keine Audio-Abnahme. Der stillgelegte unklare Test meldet
+seinen unbestätigten früheren Ausgang. Empfang oder ACK werden nicht erfunden.
+105 gezielte Tests bestanden nach diesen Korrekturen in 13,48 Sekunden.
+Die Veröffentlichung aktualisiert außerdem die Versionsangaben auf `0.8.0rc7`.
+Unabhängige Grok-Nachprüfung der beiden Ergänzungen, Aktivierung und echte
+Leseabnahme stehen noch aus. Anschließend folgen die
+kleinen Pakete aus Etappe 5; eine neue Nutzerfreigabe ist dafür nicht nötig.
