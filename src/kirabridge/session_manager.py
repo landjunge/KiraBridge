@@ -54,6 +54,7 @@ class SessionManager:
             ports.audit,
         )
         self.environment, self.agent_registry = ports.environment, ports.agent_registry
+        self.readiness = ports.readiness
         self.lock = asyncio.Lock()
         self.terminal_app = (
             terminal_app if terminal_app is not None else TerminalAppTransport(ports.clipboard_lock)
@@ -194,6 +195,10 @@ class SessionManager:
 
     async def read_observed(self, principal, pane_id, expected_pid, *, max_bytes=65536):
         result = await self.read(principal, pane_id, expected_pid, max_bytes=max_bytes)
+        if self.readiness:
+            observation = await self.readiness(principal, result)
+            if observation is not None:
+                result = {**result, "input_readiness": observation}
         return self.audit.observe_terminal(principal, result)
 
     async def open(self, principal, args, *, task_id=None):

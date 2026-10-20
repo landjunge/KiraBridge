@@ -266,7 +266,11 @@ async def message_for_conversation(bridge, principal, message):
             )
         final = True  # Final error report; never an addressed agent answer.
     else:
-        text, final = "Eine fertige Antwort liegt noch nicht vor.", False
+        evidence = (job or {}).get("evidence") or {}
+        text, final = (
+            evidence.get("waiting_message") or "Eine fertige Antwort liegt noch nicht vor.",
+            False,
+        )
     return {
         **message,
         "reply_message": reply,

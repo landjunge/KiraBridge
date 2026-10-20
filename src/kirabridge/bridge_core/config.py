@@ -275,6 +275,14 @@ class VisibleTerminalBinding(BaseModel):
     agent_pid: int = Field(gt=0)
     ready_pattern: str = Field(min_length=1, max_length=256)
     busy_pattern: str = Field(default=r"\[stop\]|esc to interrupt|Thinking…", max_length=256)
+    codex_thread_id: str | None = Field(default=None, pattern=r"^[0-9a-f-]{36}$")
+    codex_rollout_path: str | None = Field(default=None, min_length=1, max_length=4096)
+
+    @model_validator(mode="after")
+    def protocol_pair(self):
+        if bool(self.codex_thread_id) != bool(self.codex_rollout_path):
+            raise ValueError("Codex protocol path and thread must be bound together")
+        return self
 
 
 class VisibleHandoffConfig(BaseModel):

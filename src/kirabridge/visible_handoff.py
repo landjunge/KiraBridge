@@ -7,7 +7,28 @@ import time
 from kirabridge.bridge_core.models import BridgeError, UncertainExecution, canonical, digest
 from kirabridge.message_manager import MessageSend
 from kirabridge.session_manager import SessionInput
+from kirabridge.visible_readiness import assess, input_view
 from kirabridge.voice_channel import IDENTITIES
+
+
+class VisibleReadinessError(BridgeError):
+    def __init__(self, observation):
+        self.observation = observation
+        code = {
+            "working": "visible_target_working",
+            "input_not_empty": "visible_input_not_empty",
+            "scrolled": "visible_target_scrolled",
+            "unknown": "visible_target_unknown",
+            "target_changed": "visible_target_changed",
+        }[observation["state"]]
+        message = {
+            "working": "Der Agent arbeitet noch; die Nachricht wartet ohne Eingabe.",
+            "input_not_empty": "Im Eingabefeld steht bereits Text; er wird nicht überschrieben.",
+            "scrolled": "Die aktuelle Eingabeansicht ist nicht erreichbar; Nachricht wartet.",
+            "unknown": "Die aktuelle Eingabebereitschaft ist nicht eindeutig; keine Eingabe.",
+            "target_changed": "Die zugeordnete CLI-Sitzung hat sich geändert; keine Eingabe.",
+        }[observation["state"]]
+        super().__init__(code, message)
 
 
 class VisibleHandoffs:
@@ -21,14 +42,7 @@ class VisibleHandoffs:
     @staticmethod
     def input_view(target, text):
         """The last current input widget, never an older prompt in scrollback."""
-        if target == "grok" and "╭" in text:
-            return text[text.rfind("╭") :]
-        if target == "codex":
-            prompts = list(re.finditer(r"(?m)^\s*›[^\n]*", text))
-            if prompts:
-                return text[prompts[-1].start() :]
-        # Replaceable transports in tests and other explicitly configured CLIs.
-        return text if target not in {"grok", "codex"} else ""
+        return input_view(target, text)
 
     @staticmethod
     def prompt(principal, target, identifier, body, message_id=None, conversation_id=None):
@@ -75,6 +89,9 @@ class VisibleHandoffs:
     def __init__(self, config, store, security, sessions, messages):
         self.config, self.store, self.security = config, store, security
         self.sessions, self.messages = sessions, messages
+        from kirabridge.platform_adapters.codex_state import CodexTurnState
+
+        self.codex_state = CodexTurnState()
         with store.transaction():
             store.db.execute(
                 "CREATE TABLE IF NOT EXISTS visible_handoffs ("
@@ -163,6 +180,45 @@ class VisibleHandoffs:
                 "control.handoff." + state, row[0], None, {"handoff_id": identifier, **evidence}
             )
 
+    async def observe_readiness(self, principal, output):
+        for target, binding in self.config.visible_handoffs.bindings.items():
+            if (output.get("pane_id"), output.get("expected_pid")) != (
+                binding.pane_id,
+                binding.expected_pid,
+            ):
+                continue
+            selected = await self.sessions.selected(
+                principal, binding.pane_id, binding.expected_pid
+            )
+            if not any(
+                p["pid"] == binding.agent_pid and p["name"] == target
+                for p in selected.get("processes", [])
+            ):
+                return {
+                    "state": "target_changed",
+                    "ready": False,
+                    "reason": "bound_agent_pid_not_present",
+                    "target": target,
+                    "observed_at": time.time(),
+                }
+            protocol = None
+            if target == "codex" and binding.codex_thread_id:
+                protocol = await self.codex_state.read(
+                    binding.codex_rollout_path, binding.codex_thread_id
+                )
+            return {
+                **assess(target, output["text"], binding, protocol),
+                "binding": {
+                    "pane_id": binding.pane_id,
+                    "expected_pid": binding.expected_pid,
+                    "agent_pid": binding.agent_pid,
+                },
+                "protocol": protocol,
+                "observed_at": time.time(),
+                "scope": "current input and separately bound turn observation; no input proof",
+            }
+        return None
+
     async def dispatch_ready(self, principal, target):
         """Observe before claiming a message; never paste or settle unknown input."""
         binding = self.config.visible_handoffs.bindings.get(target)
@@ -180,9 +236,24 @@ class VisibleHandoffs:
                 "SELECT state FROM visible_handoffs WHERE id=?", (active["id"],)
             ).fetchone()[0]
             if state not in {"completed", "interrupted"}:
-                raise BridgeError(
+                error = BridgeError(
                     "visible_target_busy", "Existing handoff must finish or reconcile"
                 )
+                error.observation = {
+                    "state": "reserved",
+                    "handoff_id": active["id"],
+                    "handoff_state": state,
+                    "next_step": "Empfang und Antwort dieses Auftrags abgleichen; nicht neu senden",
+                }
+                status = self.status(active["principal"], active["id"])
+                message = self.messages.get(active["principal"], status["message_id"])
+                last = status["events"][-1] if status["events"] else None
+                error.observation.update(
+                    message_id=message["id"],
+                    acknowledged=message["acknowledged"],
+                    last_event={key: last[key] for key in ("state", "at")} if last else None,
+                )
+                raise error
         await self.check_target(principal, target, binding, ready=True)
 
     async def check_target(self, principal, target, binding, *, ready=False):
@@ -197,14 +268,24 @@ class VisibleHandoffs:
                 "visible_target_changed", "Bound CLI process is not in this exact terminal"
             )
         output = await self.sessions.read(principal, binding.pane_id, binding.expected_pid)
-        if ready and (
-            not re.search(binding.ready_pattern, self.input_view(target, output["text"]))
-            or (binding.busy_pattern and re.search(binding.busy_pattern, output["text"], re.I))
-            or re.search(r"Back to bottom|enter/esc latest", output["text"], re.I)
-        ):
-            raise BridgeError(
-                "visible_target_not_ready", "No matching empty CLI input prompt; no input sent"
+        if ready:
+            observation = await self.observe_readiness(
+                principal,
+                {**output, "pane_id": binding.pane_id, "expected_pid": binding.expected_pid},
             )
+            if not observation["ready"]:
+                # Store raw contents only in the bounded capture repository.
+                observed = self.sessions.audit.observe_terminal(
+                    principal,
+                    {**output, "pane_id": binding.pane_id, "expected_pid": binding.expected_pid},
+                )
+                raise VisibleReadinessError(
+                    {
+                        **observation,
+                        "observed_at": time.time(),
+                        "output_ref": observed.get("output_ref"),
+                    }
+                )
         return output
 
     async def submit_inserted(self, identifier, principal, target, binding, running):
@@ -391,17 +472,20 @@ class VisibleHandoffs:
                         canonical({"agent_confirmed": False}),
                     ),
                 )
-            self.transition(
-                identifier,
-                "inserting",
-                {
-                    "agent_confirmed": False,
-                    "marker_preexisting": False,
-                    "empty_input_observed": True,
-                },
-            )
+            input_attempted = False
             try:
                 await self.check_target(principal, target, binding, ready=True)
+                self.transition(
+                    identifier,
+                    "inserting",
+                    {
+                        "agent_confirmed": False,
+                        "marker_preexisting": False,
+                        "empty_input_observed": True,
+                        "terminal_input_attempted": True,
+                    },
+                )
+                input_attempted = True
                 await self.sessions.insert(
                     principal,
                     SessionInput(
@@ -432,6 +516,18 @@ class VisibleHandoffs:
                 )
                 await self.submit_inserted(identifier, principal, target, binding, running)
             except BaseException as exc:
+                if not input_attempted:
+                    self.transition(
+                        identifier,
+                        "interrupted",
+                        {
+                            "reason": getattr(exc, "code", "preinput_error"),
+                            "preinput_abort": True,
+                            "terminal_input_attempted": False,
+                            "automatic_retry": False,
+                        },
+                    )
+                    raise  # Only a pre-input readiness error may be deferred by the receiver.
                 self.transition(
                     identifier,
                     "unknown",
