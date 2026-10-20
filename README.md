@@ -12,6 +12,12 @@
 
 ## English
 
+### Start here: live voice and terminal connection
+
+KiraBridge's intended conversational workflow starts with **ChatGPT Live voice mode**: you speak naturally with the assistant in a real-time voice conversation, agree on a task, and explicitly authorize its handoff. This is **not the same as tapping the microphone icon to dictate text** into a message field. Dictation converts speech into text; it is not, by itself, a continuous live voice conversation. Live voice availability and limits depend on the user's ChatGPT setup.
+
+For implementation, KiraBridge uses **terminal interfaces** to hand work to configured coding agents, notably **Codex CLI and Grok Build**. The terminal connection is a separate technical step from the live voice conversation; successful voice input alone does not prove that a terminal command was delivered or executed.
+
 ### What is KiraBridge?
 
 KiraBridge connects your AI conversation with coding assistants such as Codex and
@@ -100,6 +106,12 @@ The release includes the detailed test report.
 ---
 
 ## Deutsch
+
+### Zuerst das Wichtigste: Live-Sprache und Terminal-Schnittstellen
+
+Unser gewünschter Arbeitsweg beginnt mit dem **Live-Sprachmodus von ChatGPT**: Wir besprechen eine Idee in einem laufenden, natürlichen Sprachgespräch, legen den Auftrag fest und geben die Übergabe ausdrücklich frei. Das ist **nicht dasselbe wie das Mikrofon-Symbol zur Spracheingabe** in einem Textfeld. Dort wird Gesprochenes lediglich als Text diktiert; daraus entsteht noch kein fortlaufendes Live-Sprachgespräch. Verfügbarkeit und Nutzungslimits des Live-Modus hängen von der ChatGPT-Konfiguration ab.
+
+Für die eigentliche Umsetzung nutzt KiraBridge **Terminal-Schnittstellen** zu den eingerichteten Coding-Agenten, insbesondere **Codex CLI und Grok Build**. Das Sprachgespräch und die Terminal-Übergabe sind zwei getrennte Schritte. Eine verstandene Spracheingabe beweist noch nicht, dass ein Auftrag im Terminal angekommen oder ausgeführt worden ist.
 
 ### Was ist KiraBridge?
 
