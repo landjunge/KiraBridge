@@ -1002,3 +1002,27 @@ die tatsächliche neue Beobachtungs-/Speicherfunktion. Die realen Lastzeitbudget
 und Gleichheitsprüfungen bleiben bestehen. Frühere fehlgeschlagene Prüflogs
 bleiben als historische Belege erhalten. Die unabhängige Grok-Prüfung folgt
 gegen den eingefrorenen, gepushten Kandidaten, vor Installation und Aktivierung.
+
+### Tatsächliche unabhängige Grok-Abnahme von Etappe 6
+
+Grok bestätigte den Auftrag im ursprünglichen Fenster und prüfte exakt Commit
+6821268aa1d6260735054c4b43d59a8c8ce76eb2, 84 Python-Dateien, SHA256
+709c188dd357512f1e86fb3776da6414a4e30fe9d65d740a3fecf352e027828b.
+Er führte selbst **105 Tests in 58,61 Sekunden** aus und empfiehlt eine
+begrenzte Abnahme. Die im Auftrag irrtümlich genannte Datei
+tests/test_grok_connector.py existiert nicht; Grok verwendete korrekt
+tests/test_grok_conversation.py. Er bestätigt Zugriffsprüfung, Grenzen,
+gemeinsamen Fehler-Rollback, Ablauf ohne Replay und den begrenzten Rückkehrplan.
+Keine Codeänderung oder Eingabe in Codex, kein neues Fenster; Handy-Audio nicht
+geprüft. Antwort c2d81e8f-9d6d-4d18-af10-962942c10e93, Übergabe
+channel-41a3b38f14c04c3aa6bc2be38e8c795a; Beleg grok-stage6-review.json.
+Aktivierung folgt erst nach Push; das geprüfte Wheel enthält 84 Python-Dateien
+und zehn Console-Assets bytegleich zum Kandidaten.
+
+Eine zusätzliche Außenprüfung fand bereits vor rc9-Aktivierung:
+Grok-Connector lokal HTTP200/healthy, gespeicherte öffentliche Quick-Tunnel-
+Adresse dagegen lokal nicht auflösbar und auch über Cloudflare DNS-over-HTTPS
+Status3/NXDOMAIN. Das ist kein Beweis eines funktionierenden Handy-Zugangs.
+Der existierende Connector meldet seine noch laufende ältere Gateway-Version
+0.5.2; der Kern ist davon getrennt rc8. Die alten Gateway-/Tunnelprozesse wurden
+erhalten und nicht ersetzt. Kiras tatsächlicher MCP-Rundlauf ist separat belegt.
