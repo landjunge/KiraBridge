@@ -11,9 +11,9 @@ auf ein kleines Paket Implementierung, Grok-Prüfung, Korrektur und Nachprüfung
 | 1 Ausgangspunkt | Gesichert; praktische ChatGPT-Leseprüfung und unabhängige Grok-Prüfung abgeschlossen | Sichtbare Übergabe ergänzen |
 | 1a Sichtbare Übergaben und Aufhebung Voice-Gate | 0.8.0rc4 aktiviert: 660 Tests bestanden, Grok-Prüfung und produktive sichtbare Übergabe abgeschlossen | Ursprünglichen beschäftigten Codex nicht für Eingabetest unterbrechen |
 | 2 Freigaben | 0.8.0rc5 aktiviert; 313 gezielte Tests und unabhängige Grok-Abnahme | Normale Voice-/CLI-Wege beim weiteren Umbau erhalten |
-| 3 Aktivierung | 0.8.0rc6 aktiviert; 732 Tests, echte Grok-Abnahmen und koordinierter Neustart belegt | Zusätzlichen Eve-Test nach Entsperren ohne Wiederholung abgleichen |
-| 4 Client-Lesewege | rc7 vorbereitet; 776 Gesamttests, Grok-Abnahmen mit 163 und 25 eigenen Tests bestanden | Aktivieren und echte Lesewege abnehmen |
-| 5 Modulgrenzen | Offen | Fachliche Abfragen, austauschbarer Transport |
+| 3 Aktivierung | Koordinierter Betriebsdienst aktiv; alte unklare Eve-Zustellung ohne Nachversand stillgelegt | Historischen unbekannten Ausgang erhalten |
+| 4 Client-Lesewege | rc7 aktiv; 776 Tests, Grok-Abnahmen und echte ChatGPT-Leseprüfung unter Last bestanden; lokaler Eve-Rückweg bestätigt | Physische Handy-/Voice-Abnahme bleibt gesondert offen |
+| 5 Modulgrenzen | Paket 5a beginnt mit Status-/Protokollabfragen | Fachliche Datenbesitzer und austauschbare Abfragen |
 | 6 Ausgabeablage | Offen | Begrenzte Rohdaten, unveränderte historische Audit-Kette |
 
 ## Etappe 1: gesicherter Ausgangspunkt
@@ -584,5 +584,57 @@ unverändert. Zehn Sicherheitstests bestanden gezielt. Der endgültige Lauf
 unter restriktiver Umask besteht mit **776 Tests in 182,50 Sekunden**, wiederum
 mit Unraisable-Warnings als Fehlern. Frühere Logs und Paketkandidaten bleiben
 erhalten; ausgeliefert wird der Stand aus `dist-stage4-rc7-publish`.
-Aktivierung und echte Leseabnahme stehen noch aus. Anschließend folgen die
-kleinen Pakete aus Etappe 5; eine neue Nutzerfreigabe ist dafür nicht nötig.
+### rc7 tatsächlich aktiviert und praktisch geprüft
+
+Mergecommit `40aa47a` wurde vor Installation und Aktivierung gepusht.
+Ein Dokumentationskonflikt wurde mit dem aktuellen Abnahmebericht aufgelöst;
+vorherige Berichte bleiben in den Elterncommits erhalten. Das geprüfte Wheel
+hat SHA256 `998df531f09785424ad0e98a9936f3dd0a1c41928e3dd71cc38a70aff9d01529`;
+alle 74 Python-Dateien und zehn Console-Assets stimmen mit dem Quellstand überein.
+Die Installation änderte ausschließlich das Projektpaket, keine übrigen Pakete.
+
+Der authentifizierte lokale Bedienweg führte
+`activation-b197a4397ac4435d8f7c51f844e8dbfa` bis `completed` durch;
+`activating` und `verifying` wurden getrennt beobachtet. Neuer Core PID 92689,
+Instanz `4d20022197e24d4683675b34be6918fe`, Version `0.8.0rc7`, Quellpin
+`2a63dcf33b14d80c6576bc4f943fb870df0656b466d1393206ffd7968ff4aec1`.
+Alle 16 erfassten Agenten-, Terminal-, Provider-, Tunnel- und App-PIDs blieben
+erhalten. Die Freigabendatei SHA256 `642ef01516ff2ff8199980556b733ac97525329e78d22b14f50a93ed673d54cd`
+ist unverändert. Die effektive Revision
+`20b62401392a95debed96ae5ed8c6369b30b94acbf29e4d6ec085393738d8ffa`
+enthält zusätzlich die neuen Standardwerte für Lesekapazität; der gesonderte
+Freigaben-Fingerprint `056ba5b4c1ef0e9db2c5bd5f857e765e4273a58a2196add20710981c5a9af2d6`
+bleibt gleich. Der tatsächliche ChatGPT-Zugang bestätigt Quellen und Datei als
+`matches_loaded`, dauerhafte Terminalfreigabe aktiv, zusätzliches Voice-Gate aus.
+
+Die erste Lastprobe nahm fälschlich zwei normale Plätze an; die tatsächlich
+verwendete Konfiguration hat **einen** normalen und zwei Leseplätze. Die eigenen
+Sleep-Aufträge wurden gezielt abgeschlossen bzw. beendet. Als sich der Mac
+erneut sperrte, lieferte der reale ChatGPT-Leseauftrag korrekt `desktop_locked`
+und keinen angeblichen Terminalzugriff. Diese Beobachtung bleibt separat erhalten.
+Nach erneuter lesender Prüfung des wieder zugänglichen Originalfensters bestand
+die neue Probe `stage4-live-r2-20261020`: Während der eine normale Platz mit
+einem eigenen `/bin/sleep 30` belegt blieb, lieferte der echte zwischengespeicherte
+ChatGPT-`task_request`-Weg drei bestehende Sitzungen in 3,822 s und las das
+ursprüngliche Codex-Fenster in 5,300 s. Der direkte neue Leseweg funktionierte
+ebenfalls (1,330 s). Der separate Stopp des eigenen Schlafprozesses war in
+1,655 s abgeschlossen. Bestehende Agenten erhielten keine Eingabe oder Signale.
+Alle zugehörigen Abschlussmeldungen wurden verarbeitet und quittiert.
+
+Der neue lokale Eve-Auftrag `stage4-eve-rc7-return-20261020` lief anschließend
+tatsächlich über das ursprüngliche Grok-Fenster, ein separates automatisches
+Return, authentifizierte Quittung und Antwort
+`aaf7310e-c755-4e2a-84b1-b1d511516281` zurück. Die Rückgabe lautet
+`RC7-EVE-RUECKWEG-OK`, `final=true`, `continue_required=false`,
+`scope=addressed_agent_reply`. Während der Wartezeit wurden drei nicht-finale
+laufende Zustände gemeldet; der Aufrufer fragte jeweils denselben Auftrag ab.
+Genau ein `submitting` und ein `return_sent` sind belegt. Antwort und Abschluss
+wurden verarbeitet und quittiert. Der alte rc6-Test wurde nicht wiederholt.
+Dies ist ein lokaler MCP-Test mit Eves Identität; Handy-Gerät und hörbare Ausgabe
+sind weiterhin ausdrücklich **nicht** abgenommen. Daniel wurde um den praktischen
+Sprachtest im laufenden Handy-Gespräch gebeten; eine Antwort liegt noch nicht vor.
+
+Private Nachweise: `rc7-publish-manifest.json`, `activation-stage4-rc7.json`,
+`stage4-live-locked-load-observation.json`, `stage4-live-chatgpt-load-proof.json`,
+`rc7-eve-roundtrip.json`. Weiter geht es mit dem kleinen Paket 5a für fachliche
+Status-/Protokollabfragen; eine neue Nutzerfreigabe ist dafür nicht nötig.
