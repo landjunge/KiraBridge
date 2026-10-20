@@ -14,7 +14,7 @@ auf ein kleines Paket Implementierung, Grok-Prüfung, Korrektur und Nachprüfung
 | 3 Aktivierung | Koordinierter Betriebsdienst aktiv; alte unklare Eve-Zustellung ohne Nachversand stillgelegt | Historischen unbekannten Ausgang erhalten |
 | 4 Client-Lesewege | rc7 aktiv; 776 Tests, Grok-Abnahmen und echte ChatGPT-Leseprüfung unter Last bestanden; lokaler Eve-Rückweg bestätigt | Physische Handy-/Voice-Abnahme bleibt gesondert offen |
 | 5 Modulgrenzen | rc8 aktiv; 817 Tests und echte Grok-Abnahmen aller Pakete | Tatsächlicher Kira-Rückweg nach Aktivierung bestätigt |
-| 6 Ausgabeablage | rc9-Kandidat: 829 Tests bestanden; noch nicht aktiviert | Unabhängige sichtbare Grok-Prüfung, danach koordinierte Aktivierung und praktische Abnahme |
+| 6 Ausgabeablage | rc9 aktiv; 829 Gesamttests, 105 eigene Grok-Tests und tatsächliche Kira-/lokale Eve-Rückwege bestätigt | Öffentlicher Grok-Tunnel ausgefallen; physische Handy-/Audio-Abnahme weiterhin offen |
 
 ## Etappe 1: gesicherter Ausgangspunkt
 
@@ -1026,3 +1026,77 @@ Status3/NXDOMAIN. Das ist kein Beweis eines funktionierenden Handy-Zugangs.
 Der existierende Connector meldet seine noch laufende ältere Gateway-Version
 0.5.2; der Kern ist davon getrennt rc8. Die alten Gateway-/Tunnelprozesse wurden
 erhalten und nicht ersetzt. Kiras tatsächlicher MCP-Rundlauf ist separat belegt.
+
+## Etappe 6: tatsächliche Aktivierung und praktische Nachprüfung
+
+Merge a4c4e2f wurde vor Installation und Aktivierung gepusht. Nur KiraBridge
+wechselte per geprüftem Wheel und --no-deps von rc8 auf rc9. Wheel-SHA256:
+20dbcb52938adea23d53dae80a5d2b2b2b9c44a906d11af02303b0cd849a934d.
+Koordinierte Aktivierung activation-beb2e86fb1a84e989dd975dd617ee888 ist
+completed. Core-PID 22811, Instanz 2fbe03a17028419ea4ddb2d3386d55e3;
+Quelle 709c188dd357512f1e86fb3776da6414a4e30fe9d65d740a3fecf352e027828b,
+84 Python-Dateien. Vorherige Konfiguration und SQLite wurden konsistent privat
+gesichert; alle 16 beobachteten bestehenden App-/Agenten-/TTY-/Tunnel-PIDs
+blieben erhalten. Nur Core und Steuerdienst wurden neu geladen.
+Beleg activation-stage6-rc9.json.
+
+Der neue output_history-Abschnitt steht in der tatsächlich verwendeten Datei
+~/.config/kirabridge/config.toml. Datei-SHA256:
+cd80c04c54e27e57bc4249261a3a2ce9f9ba9300e83fcf301b6d4eff253245c3,
+effektiver SHA256:
+ba72132a31dd21f44891b75a631d2f8b2495c6c82b4fba2a544f32212b21703d.
+Die reale Kira-Bindung meldet Quelle und Konfiguration als matches_loaded.
+Vollfreigabe/dauerhafte Terminalausnahme blieben erhalten, der zusätzliche
+Voice-Sondermarker und optionale Terminalpuffer aus. Bereits laufende Gateway-
+und Proxyprozesse laden ihre Konfiguration beim Start; ihre bestehenden
+Prozesse wurden durch den additiven Abschnitt nicht neu gestartet.
+
+Kiras echter alter task_request-Client listete alle drei erhaltenen Fenster auf
+und las 900 Zeichen aus Original-Codex 22104/ttys000/94023/94386. Die rohe Ausgabe
+steht nur im begrenzten Snapshot, Taskresultat und Audit enthalten eine Referenz.
+Frage 8af53691-72d3-421d-908e-82ad0292b1bc ging an Original-Grok
+22228/ttys002/6957/6986. Einfügen, genau ein submitting/return_sent, sent,
+authentifizierte Bestätigung und completed sind separat belegt:
+channel-d8264bef68744ca7bb1502fdc5f752fc. Antwort RC9-KIRA-OK,
+54060220-05fe-471f-92ec-7897d21f9f1c, kam tatsächlich an Kira zurück und wurde
+verarbeitet/quittiert; alle drei Abschlussmeldungen ebenfalls. Belege
+kira-rc9-check-1792484149339.json und rc9-kira-handoff-steps.json.
+Keine Eingabe in den beschäftigten Original-Codex und kein Ersatzfenster.
+
+Ein lokaler authentifizierter grok_app-Aufruf übergab an dasselbe Grok-Fenster
+und erhielt RC9-EVE-OK als finales conversation_return mit
+continue_required=false. Nachricht 9e920ffe-b38c-4cc2-8369-a1a4c5f0d2fa,
+Antwort 78a71c64-f772-4876-8bbb-1a8270e9f533; nach zwei zulässigen Lese-
+Fortsetzungen derselben Nachricht. Keine wiederholte Eingabe; Antwort und
+Abschlussmeldungen quittiert. audio_playback bleibt not_observed_by_bridge.
+Beleg rc9-eve-local-roundtrip.json, kein Nachweis physischer Handynutzung.
+
+Die authentifizierte lokale Protokoll-API liefert neue referenzierte Ausgaben
+weiter als Text. Headless-Chrome zeigte Bridge läuft und die dauerhafte
+Terminalausnahme, keine JavaScriptfehler; Hauptfenster 1365x768 und mobile
+Darstellung 393x852 passen jeweils in die geprüfte Ansicht, das separate
+Protokoll zeigt RC9-EVE-OK. Belege rc9-local-operator-protocol-check.json und
+rc9-operator-browser-check.json. Dies ist ein lokaler Renderingtest.
+
+Alle 13.375 vor Aktivierung vorhandenen Audit-Zeilen wurden spaltenweise mit
+der konsistenten Sicherung verglichen: keine geänderte/fehlende Zeile.
+Die gesamte aktuelle Audit-Kette (13.530 Zeilen beim Prüfen) wurde zusätzlich
+schreibgeschützt verifiziert; Schema 2 bleibt erhalten.
+Beleg rc9-audit-preservation-check.json.
+
+### Offener tatsächlicher Grok-Außenfehler
+
+cloudflared 86602 läuft, /ready auf Port62522 liefert HTTP503/readyConnections0;
+die gespeicherte öffentliche Adresse ist lokal nicht auflösbar und liefert über
+Cloudflare/Google DNS-over-HTTPS Status3/NXDOMAIN. Das lokal gesunde Gateway
+meldet seine erhaltene Version0.5.2. Beleg grok-public-dns-check-20261020.json.
+
+Grok wiederholte diese Abfragen unabhängig und bestätigt denselben Befund:
+Antwort 3dfd737e-8d56-4d6f-b86b-cf1374d05900, Übergabe
+channel-38d3678c47324ceb9a3c3e82a6bffc9b, Beleg grok-stage6dns-review.json.
+Kein Neustart, Signal, Konfigurationswechsel oder Agenteneingriff wurde dafür
+vorgenommen. Ein Neuverbinden mit möglichem Adresswechsel ist wegen Daniels
+Vorgabe zum Tunnelerhalt noch nicht ausgeführt; die konkrete Rückfrage steht
+aus. Kiras getrennt geprüfter MCP-Zugang funktioniert. Eine physische
+Grok-Handy-/Audio-Abnahme fehlt weiterhin; der Gesamtauftrag wird deshalb
+nicht als vollständig funktionierend ausgegeben.

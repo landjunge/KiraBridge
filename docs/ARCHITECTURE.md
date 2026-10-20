@@ -1,6 +1,6 @@
 # Architektur
 
-Stand 20. Oktober 2026: produktiv `0.8.0rc8`; gesicherter Ausgangspunkt `0.8.0rc3`, Quellpin
+Stand 20. Oktober 2026: produktiv `0.8.0rc9`; gesicherter Ausgangspunkt `0.8.0rc3`, Quellpin
 `4188f001d405a9f04ee63f6bbe1b088c6f39d26e`, Dokumentation `d9727ac1`,
 portable Prüfergänzung `5680921`. Die schrittweise Weiterentwicklung und ihre
 tatsächlichen Abnahmen stehen in [ARCHITECTURE-STAGES-20261020.md](ARCHITECTURE-STAGES-20261020.md).
@@ -25,6 +25,7 @@ MCP und CLI sind Eingänge in dieselbe `Bridge`. Sie reichen versionierte Anfrag
 | security_manager | Capability-Prüfung und kryptografisch zufällige, einmalige Aufgabenfreigaben |
 | platform_adapters | macOS/Linux, Prozessstart und Sperren; Windows-Erweiterungspunkt |
 | audit_manager | Prüfung einer SHA-256-verknüpften Audit-Kette |
+| output_history | Begrenzte neue rohe Terminalausgaben, autorisierte Auflösung und Taskresultatcodec; historische Audit-Ketten bleiben erhalten (aktiv ab rc9) |
 | operator_queries | Lokale Status-/Protokollabfragen über fachliche Besitzer (aktiv ab rc8) |
 | operator_application | Zentrale Verdrahtung der schmalen lokalen Anwendungspartner (aktiv ab rc8) |
 | operator_control / operator_actions | Bedienlogik und atomare Aktionsreservierung; keine HTTP-Verantwortung (aktiv ab rc8) |
@@ -174,7 +175,7 @@ Principal/Scope zusammenpassen. Transporterfolg oder behauptete bool-Felder
 genügen nicht. Audioausgabe wird weiterhin nicht als serverseitig beobachtet
 ausgegeben.
 
-## Begrenzte neue Terminalausgaben (Etappe 6, rc9-Kandidat)
+## Begrenzte neue Terminalausgaben (Etappe 6, aktiviert ab rc9)
 
 `OutputHistory` besitzt die additive Tabelle `output_snapshots` und den internen
 Task-Resultatcodec. Neue rohe Mitschnitte/stdout/stderr stehen dort, Taskresultate

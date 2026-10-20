@@ -1,5 +1,5 @@
-Aktueller Stand am 20. Oktober 2026: produktiv **0.8.0rc8**, geprüftes Wheel
-mit 817 bestandenen Gesamttests, unabhängigen Grok-Abnahmen und praktisch
+Aktueller Stand am 20. Oktober 2026: produktiv **0.8.0rc9**, geprüftes Wheel
+mit 829 bestandenen Gesamttests, unabhängigen Grok-Abnahmen und praktisch
 bestätigtem Kira-Terminal-Rückweg. Die tatsächlichen Aktivierungs- und weiterhin
 offenen Handy-/Voice-Nachweise stehen in [der Etappenakte](ARCHITECTURE-STAGES-20261020.md).
 Sichtbare Übergaben verwenden ausschließlich die gespeicherte bestehende
@@ -187,9 +187,9 @@ vorherige Fassung erfordert zuerst Rücknahme der neuen `read_roots`-Option in
 der Konfiguration, weil alte Versionen unbekannte Felder absichtlich ablehnen.
 
 
-## Begrenzte neue Ausgabehistorie (rc9-Kandidat)
+## Begrenzte neue Ausgabehistorie (aktiviert ab rc9)
 
-Nach koordinierter Aktivierung gelten die persistenten Werte in
+Seit koordinierter Aktivierung gelten die persistenten Werte in
 `[output_history]`: `max_bytes=16777216`, `max_entries=256`,
 `max_item_bytes=8388608`, `retention_seconds=604800`. Änderungen benötigen
 den bestehenden geprüften Aktivierungsweg. Ablauf und FIFO-Verdrängung gelten
@@ -206,3 +206,13 @@ Konfiguration sichern und die im [Etappenbericht](ARCHITECTURE-STAGES-20261020.m
 beschriebene begrenzte Taskresultat-Aufbereitung oder einen kompatiblen Leser
 verwenden. Neue Audit-Referenzen brauchen auch danach einen kompatiblen Leser;
 der Rückkehrhelfer schreibt historische Audit-Zeilen nicht um.
+
+Die tatsächliche rc9-Aktivierung bestätigte Quelle und Konfiguration; Kira las
+anschließend das Original-Codex-Fenster und erhielt RC9-KIRA-OK vom bestehenden
+Grok. Ein lokaler authentifizierter Eve-Aufruf erhielt RC9-EVE-OK als finales
+conversation_return. Dies bestätigt keine physische Audiowiedergabe. Die
+Außenprüfung des erhaltenen Grok-Tunnels meldete Readiness HTTP503 und die
+öffentliche Quick-Tunnel-Adresse bei zwei DNS-Diensten NXDOMAIN. Der lokale
+Gatewayprozess/HTTP200 allein bestätigt keinen funktionierenden Handy-Zugang.
+Ein Neuverbinden mit möglichem Adresswechsel ist noch nicht erfolgt; die
+Rückfrage folgt Daniels ausdrücklicher Vorgabe zum Tunnelerhalt.
