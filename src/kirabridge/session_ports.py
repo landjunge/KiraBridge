@@ -44,3 +44,4 @@ class SessionPorts:
     environment: dict[str, str]
     agent_registry: Callable
     clipboard_lock: object
+    readiness: Callable | None = None

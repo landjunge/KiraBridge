@@ -145,6 +145,9 @@ class Bridge:
                 environment=self.terminal.environment,
                 agent_registry=lambda: (config.agents, config.visible_handoffs.bindings),
                 clipboard_lock=self.clipboard.lock,
+                readiness=lambda principal, result: self.visible_handoffs.observe_readiness(
+                    principal, result
+                ),
             )
         )
         self.terminal_queries = TerminalQueries(

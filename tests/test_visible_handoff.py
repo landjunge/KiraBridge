@@ -567,7 +567,7 @@ async def test_empty_field_with_active_agent_never_receives_a_new_handoff(visibl
             callback,
             callback,
         )
-    assert exc.value.code == "visible_target_not_ready" and not transport["calls"]
+    assert exc.value.code == "visible_target_working" and not transport["calls"]
 
 
 @pytest.mark.parametrize("sender", ["codex", "grok"])

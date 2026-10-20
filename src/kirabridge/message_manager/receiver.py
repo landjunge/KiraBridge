@@ -25,6 +25,10 @@ class MessageReceiver:
         "visible_target_not_ready",
         "desktop_locked",
         "desktop_session_inactive",
+        "visible_target_working",
+        "visible_input_not_empty",
+        "visible_target_scrolled",
+        "visible_target_unknown",
     }
 
     def __init__(self, bridge):
@@ -184,7 +188,7 @@ class MessageReceiver:
             )
             return dict(row), run_id
 
-    def _waiting(self, message_id, reason):
+    def _waiting(self, message_id, reason, observation=None):
         """A pre-dispatch observation is not a failed turn or an input attempt."""
         evidence = {
             "session_scope": "existing_visible_terminal",
@@ -196,23 +200,39 @@ class MessageReceiver:
                 "visible_target_not_ready": "Das Agentenfenster ist noch nicht eingabebereit.",
                 "desktop_locked": "Mac gesperrt; die Nachricht wartet ohne Eingabe.",
                 "desktop_session_inactive": "Die Mac-Sitzung ist nicht am Bildschirm aktiv.",
+                "visible_target_working": "Der angebundene Agent arbeitet; Nachricht wartet.",
+                "visible_input_not_empty": "Vorhandener Eingabetext wird nicht überschrieben.",
+                "visible_target_scrolled": "Zur aktuellen Eingabeansicht zurückkehren.",
+                "visible_target_unknown": "Bereitschaft nicht eindeutig; Diagnose ansehen.",
             }[reason],
         }
+        if observation is not None:
+            evidence["observation"] = observation
         with self.bridge.store.transaction():
             row = self.bridge.store.db.execute(
                 "SELECT state,evidence FROM message_jobs WHERE message_id=?", (message_id,)
             ).fetchone()
-            if row and row["state"] == "queued" and json.loads(row["evidence"]) != evidence:
+            previous = json.loads(row["evidence"]) if row else {}
+
+            def comparable(value):
+                value = {**value}
+                if "observation" in value:
+                    value["observation"] = {**value["observation"]}
+                    value["observation"].pop("observed_at", None)
+                return value
+
+            if row and row["state"] == "queued" and previous != evidence:
                 self.bridge.store.db.execute(
                     "UPDATE message_jobs SET evidence=? WHERE message_id=?",
                     (canonical(evidence), message_id),
                 )
-                self.messages._event(
-                    message_id, "message.waiting_for_visible_target", "local", evidence
-                )
+                if comparable(previous) != comparable(evidence):
+                    self.messages._event(
+                        message_id, "message.waiting_for_visible_target", "local", evidence
+                    )
 
     def _queue_unsent(self, message_id, reason, run_id, state):
-        """Only before any recorded handoff/input; never retry an uncertain attempt."""
+        """Only without input or with a recorded preinput abort; never replay uncertainty."""
         if reason not in self.WAIT_REASONS or state not in {"running", "failed"}:
             return False
         with self.bridge.store.transaction():
@@ -221,6 +241,10 @@ class MessageReceiver:
                 "ON m.id=j.message_id WHERE j.message_id=?",
                 (message_id,),
             ).fetchone()
+            handoffs = self.bridge.store.db.execute(
+                "SELECT state,evidence FROM visible_handoffs WHERE id=? OR message_id=?",
+                (run_id, message_id),
+            ).fetchall()
             if (
                 not row
                 or row["state"] != state
@@ -229,10 +253,12 @@ class MessageReceiver:
                 or row["acknowledged"] is not None
                 or state == "failed"
                 and row["error"] != reason
-                or self.bridge.store.db.execute(
-                    "SELECT 1 FROM visible_handoffs WHERE id=? OR message_id=?",
-                    (run_id, message_id),
-                ).fetchone()
+                or any(
+                    h["state"] != "interrupted"
+                    or json.loads(h["evidence"]).get("preinput_abort") is not True
+                    or json.loads(h["evidence"]).get("terminal_input_attempted") is not False
+                    for h in handoffs
+                )
             ):
                 return False
             self.bridge.store.db.execute(
@@ -267,7 +293,7 @@ class MessageReceiver:
     async def _dispatch_next(self):
         # One oldest message per recipient: a busy Codex must not hide ready Grok.
         rows = self.bridge.store.db.execute(
-            "SELECT m.id,m.sender,m.recipient,m.created FROM messages m "
+            "SELECT m.id,m.sender,m.recipient,m.created,m.acknowledged FROM messages m "
             "JOIN message_jobs j ON j.message_id=m.id WHERE j.state='queued' "
             "AND NOT EXISTS (SELECT 1 FROM messages older JOIN message_jobs q "
             "ON q.message_id=older.id WHERE q.state='queued' "
@@ -278,6 +304,9 @@ class MessageReceiver:
                 continue
             if not self.bridge.store.can_claim(row["created"]):
                 continue
+            if row["acknowledged"] is not None:
+                self._claim(row["id"])  # Completes externally received work, without a CLI turn.
+                continue
             try:
                 if self.bridge.config.visible_handoffs.enabled:
                     try:
@@ -286,7 +315,7 @@ class MessageReceiver:
                         )
                     except BridgeError as exc:
                         if exc.code in self.WAIT_REASONS:
-                            self._waiting(row["id"], exc.code)
+                            self._waiting(row["id"], exc.code, getattr(exc, "observation", None))
                             continue
                         # Missing/stale targets retain the existing explicit failure path.
                 async with MCPClientPool(call_timeout=15) as pool:
@@ -496,7 +525,7 @@ class MessageReceiver:
             if isinstance(exc, BridgeError) and self._queue_unsent(
                 message_id, exc.code, run_id, "running"
             ):
-                return  # Readiness changed after observation, before any handoff existed.
+                return  # Readiness changed before any input attempt.
             state = (
                 "unknown"
                 if isinstance(exc, UncertainExecution)

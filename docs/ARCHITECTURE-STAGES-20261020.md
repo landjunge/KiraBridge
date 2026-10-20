@@ -1100,3 +1100,65 @@ Vorgabe zum Tunnelerhalt noch nicht ausgeführt; die konkrete Rückfrage steht
 aus. Kiras getrennt geprüfter MCP-Zugang funktioniert. Eine physische
 Grok-Handy-/Audio-Abnahme fehlt weiterhin; der Gesamtauftrag wird deshalb
 nicht als vollständig funktionierend ausgegeben.
+
+### Folgeauftrag E01 und Codex-Bereitschaft (RC11-Kandidat, noch nicht aktiviert)
+
+Der Gesamtauftrag `kira-gesamtplan-team-20261020-1031` wurde aus zehn
+geordneten `content`-Anlagen übernommen. SHA256 des unveränderten Plans:
+`4b8ac493add0b76bd1a353d59d13152bbb5ec62bc956c1def9f1ccc1aa211ca8`,
+107935 UTF-8-Bytes. ThreadDesk-Thread `6b5b73b9de36`, Revision 3,
+„Gesamtplan ThreadDesk & 4AllPass – 20.10.2026“ wurde vollständig über die
+Fach-API nachgelesen; Beschreibung nach Ablagehinweis und anschließende
+Notizen ergeben ohne Trennzeichen exakt den Originaltext. Der direkt
+erteilte Auftrag und Nachricht `7a7a268e-09c2-4a0f-a333-031cd7fc094c`
+sind derselbe Auftrag. Die authentifiziert empfangsquittierte Nachricht
+wurde über den vorhandenen Receiver-Abschluss ohne weiteren Agententurn
+abgeschlossen. Das bestätigt die Übernahme, nicht die Umsetzung E01–E09.
+
+E01 übernimmt die datierten RC9-/RC10-Belege; neue Arbeit bleibt erkennbar.
+Der öffentliche Handy-/Tunnelweg ist laut Gesamtauftrag zurückgestellt.
+Die laufende Codex-Übergabereparatur gehört zu E01/ST-01–ST-05. Codex führt
+getrennte native Teamaufgaben für Parser-/Regressionen und Client-/Bestand-
+Prüfung. Groks unabhängige RC10-Prüfung gilt nicht als RC11-Abnahme.
+
+Der RC9-Codefehler ist unabhängig reproduziert: Bereitschaft nur im
+Eingabefeld, Aktivität hingegen im gesamten gelesenen Text. Historische
+oder zitierte Arbeitswörter können somit fälschlich sperren. Die aktuelle
+Codex-Arbeit und Eingabefeld `q` auf der Aufnahme 10:54 rechtfertigen dort
+eine Sperre; zum gescheiterten Live-Versuch 10:49 fehlt die Aufnahme.
+
+Der Kandidat wertet aktuelles Eingabefeld und Status getrennt aus. Eine
+ausdrücklich lokal zugeordnete Codex-Thread-ID samt Rolloutdatei liefert
+zusätzlich typisierte `task_started`/`task_complete`/`turn_aborted`-Ereignisse.
+Die Zuordnung wurde durch eine harmlose einmalige Toolausgabe in genau
+22104/ttys000/94023/94386 und derselben vertrauenswürdigen Threaddatei
+geprüft; im zusätzlichen Fenster fehlte sie. Keine Auswahl nach Dateialter,
+keine Eingabe dafür. Das ist weder ein Identitätsnachweis durch Hash noch
+eine Grenze gegen andere Prozesse mit denselben Benutzerrechten.
+
+Historische Arbeitswörter mit belegtem beendetem Turn blockieren den
+bekannten leeren aktuellen Prompt nicht. Aktuelle Arbeit, vorhandene
+Eingabe, Scrollansicht, unbekannter Zustand und Zielabweichung bleiben
+getrennte Gründe. Unvollständige, veränderte oder nicht gebundene Protokolle
+liefern unbekannt. Aktuelle Fortschrittsanzeige darf auch durch ein
+abweichendes Idle-Protokoll nicht übergangen werden. Sitzungslesewege
+zeigen dieselbe Einschätzung; begrenzte Ausgabereferenz und Beobachtungszeit
+begleiten Ablehnungen. Die ursprünglichen Fenster bleiben verbindlich.
+
+Ein zweiter Bereitschaftscheck erfolgt vor dem ersten Eingabeversuch.
+Wird er abgebrochen, werden `preinput_abort=true` und
+`terminal_input_attempted=false` gespeichert; nur dieser belegte Ausgang
+ist ohne Eingabewiederholung erneut einreihbar. Nach möglicherweise
+ausgeführter Eingabe bleibt der Ausgang unbekannt. Einfügen, separates
+Return, authentifizierter Empfang und Antwort bleiben eigene Nachweise.
+Bereits extern quittierte Queue-Nachrichten benötigen keinen freien
+Terminalprompt, um ohne neuen Turn abgeschlossen zu werden.
+
+Der ursprüngliche Kira-Kurztest `d5f54c18-7068-4abb-9d2f-339fb9a8a526`
+bleibt offen. RC10 schrieb vor dem zweiten Check bereits `inserting`;
+ein folgender Bereitschaftsfehler wurde deshalb als unbekannt gespeichert.
+Vor einem Wiederanlauf sind konkreter Quellstand, Fehlerpfad, Ereignisse,
+frische Zielbindung und Eingabefeld abzugleichen. Kein pauschales Löschen
+unbekannter Reservierungen. Erst ein beobachteter Ablauf im ursprünglichen
+Codex-Fenster samt bei Kira empfangener Antwort `KIRA-TEST-OK` schließt die
+praktische Abnahme. Während dieses Reparaturturns ist Codex aktiv.
