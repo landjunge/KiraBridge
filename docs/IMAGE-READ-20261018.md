@@ -31,7 +31,7 @@ dieses Beispiel wurde nicht an die Nutzer-Runtime gesendet):
     "idempotency_key": "kb-image-acceptance-20261018-1",
     "operation": "file.image",
     "arguments": {
-      "path": "/Users/landjunge/KiraBridge/tests/fixtures/images/own-rgb-32x24.png"
+      "path": "/Users/EXAMPLE_USER/KiraBridge/tests/fixtures/images/own-rgb-32x24.png"
     }
   }
 }
