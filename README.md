@@ -1,4 +1,4 @@
-# KiraBridge 0.8.0rc9
+# KiraBridge 0.8.0rc10
 
 Ein kompaktes Steuerfenster für Kira/ChatGPT, Grok und die angebundenen Agenten.
 Auf diesem Mac startet **KiraBridge.app** die Oberfläche. Prozesse, Terminals,
@@ -42,7 +42,7 @@ Der physische Handy-/Voice-Ablauf bleibt gesondert offen. Bei der letzten Prüfu
 war der vorhandene öffentliche Grok-Tunnel ausgefallen; Kiras tatsächlicher
 MCP-Rückweg und der lokale Eve-Rückweg wurden bestätigt.
 
-## Starten und entwickeln
+Sichtbare Übergaben warten seit rc10 ungeclaimt auf ein freies bestehendes\nAgentenfenster. Alte unklare Eingaben werden nicht automatisch wiederholt.\n[Ursache, Reparatur und echter Codex-Test](docs/VISIBLE-HANDOFF-RECOVERY-20261020.md).\n\n## Starten und entwickeln
 
 Bestehende Installation öffnen:
 

@@ -1,6 +1,6 @@
 # Architektur
 
-Stand 20. Oktober 2026: produktiv `0.8.0rc9`; gesicherter Ausgangspunkt `0.8.0rc3`, Quellpin
+Stand 20. Oktober 2026: produktiv `0.8.0rc10`; gesicherter Ausgangspunkt `0.8.0rc3`, Quellpin
 `4188f001d405a9f04ee63f6bbe1b088c6f39d26e`, Dokumentation `d9727ac1`,
 portable Prüfergänzung `5680921`. Die schrittweise Weiterentwicklung und ihre
 tatsächlichen Abnahmen stehen in [ARCHITECTURE-STAGES-20261020.md](ARCHITECTURE-STAGES-20261020.md).
@@ -188,3 +188,12 @@ Die Standardgrenzen sind 16 MiB Nutzlast, 256 Einträge, 8 MiB je Eintrag und
 sieben Tage; fachliche Antworten und historische Rohdaten zählen nicht dazu.
 Ein Hash belegt Bytes, nicht Identität oder Ausführung. Rückkehrplan und
 tatsächlicher Abnahmestand: [Etappenbericht](ARCHITECTURE-STAGES-20261020.md).
+
+## Sichtbare Übergaben bei belegtem Ziel (rc10)
+
+Der Nachrichtenreceiver prüft die zentrale sichtbare Route vor dem Claim.
+Beschäftigte oder gesperrte Ziele lassen ungeclaimte Nachrichten mit verständlichem
+Grund in der dauerhaften Queue. Andere freie Ziele behalten ihre Kapazität.
+Historische unbekannte Eingaben werden ausschließlich über tatsächliche
+Empfangs-/Antwortbelege abgeglichen. Unklare Ergebnisse werden nie blind
+wiederholt. [Reparatur und Abnahmegrenzen](VISIBLE-HANDOFF-RECOVERY-20261020.md).

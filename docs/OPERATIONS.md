@@ -1,5 +1,5 @@
-Aktueller Stand am 20. Oktober 2026: produktiv **0.8.0rc9**, geprüftes Wheel
-mit 829 bestandenen Gesamttests, unabhängigen Grok-Abnahmen und praktisch
+Aktueller Stand am 20. Oktober 2026: produktiv **0.8.0rc10**, geprüftes Wheel
+mit 844 bestandenen Gesamttests, unabhängigen Grok-Abnahmen und praktisch
 bestätigtem Kira-Terminal-Rückweg. Die tatsächlichen Aktivierungs- und weiterhin
 offenen Handy-/Voice-Nachweise stehen in [der Etappenakte](ARCHITECTURE-STAGES-20261020.md).
 Sichtbare Übergaben verwenden ausschließlich die gespeicherte bestehende
@@ -216,3 +216,13 @@ Außenprüfung des erhaltenen Grok-Tunnels meldete Readiness HTTP503 und die
 Gatewayprozess/HTTP200 allein bestätigt keinen funktionierenden Handy-Zugang.
 Ein Neuverbinden mit möglichem Adresswechsel ist noch nicht erfolgt; die
 Rückfrage folgt Daniels ausdrücklicher Vorgabe zum Tunnelerhalt.
+
+## Sichtbarer Kira-Codex-Weg (rc10)
+
+Beschäftigte Fenster werden nicht unterbrochen. Wartende Nachrichten bleiben
+queued mit waiting_for_visible_target und verständlicher waiting_message;
+sie sind damit noch nicht eingefügt oder abgesendet. Vor jedem Einfügen werden
+Ziel und Bereitschaft erneut geprüft. Unbekannte Ergebnisse benötigen echte
+Empfangs-/Antwortbelege. [Konkrete Reparatur und echter Teststatus](VISIBLE-HANDOFF-RECOVERY-20261020.md).
+Für Kiras alten Werkzeugcache ist completion_subscription als leerer String
+auf oberster Ebene zulässig; hierfür keine Subscription erfinden.
