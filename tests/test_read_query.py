@@ -73,6 +73,7 @@ async def test_cached_read_tool_discovers_reads_and_rejects_stale_pid(bridge, co
     from kirabridge.read_query import read_query_async
 
     config.principals["local"].capabilities += ["session.inspect"]
+    config.principals["local"].permission_level = "medium"
     selected = {"pane_id": "terminal:123:ttys004", "expected_pid": 345}
     reads = []
 

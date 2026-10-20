@@ -8,12 +8,17 @@ def terminal_access(config, principal):
     caps = set(policy.capabilities)
     inspect = "session.inspect" in caps
     effective = decision(config, principal, "session.input")
+    catalog_decision = decision(config, principal, "session.catalog")
+    read_decision = decision(config, principal, "session.read")
     send = effective["authorized"]
     buffered = effective["buffer_enabled"]
     return {
         "policy_authorized": inspect and send,
         "discovery_allowed": inspect,
         "read_allowed": inspect,
+        "catalog_decision": catalog_decision,
+        "read_decision": read_decision,
+        "read_approval_required": read_decision["approval_required"],
         "input_allowed": send,
         "input_approval_required": effective["approval_required"],
         "input_decision": effective,

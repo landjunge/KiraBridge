@@ -87,6 +87,10 @@ class ControlCenter:
         return load_config(path) if path else self.bridge.config
 
     async def rpc(self, tool, arguments=None, principal="local", timeout=8):
+        if tool in {"session_catalog", "session_read"}:
+            from kirabridge.terminal_queries import TERMINAL_QUERY_SECONDS
+
+            timeout = max(timeout, TERMINAL_QUERY_SECONDS + 2)
         async with MCPClientPool(call_timeout=timeout) as pool:
             await pool.connect(peer(self.config(), principal))
             result = await pool.call("daemon", tool, arguments or {})
@@ -697,11 +701,15 @@ class ControlCenter:
             )
         try:
             catalog = await self.rpc("session_catalog")
+            native_error = catalog.get("transport_errors", {}).get("terminal_app", {})
             checks.append(
                 {
                     "name": "Terminalzugriff",
-                    "ok": catalog.get("status") == "available",
-                    "message": str(len(catalog.get("sessions", []))) + " Sitzungen erreichbar",
+                    "ok": catalog.get("status") == "available" and not native_error,
+                    "message": native_error.get("message")
+                    or "Terminaltransport nicht verfügbar: " + catalog.get("status", "unbekannt")
+                    if catalog.get("status") != "available" or native_error
+                    else str(len(catalog.get("sessions", []))) + " Sitzungen erreichbar",
                 }
             )
         except BridgeError as exc:

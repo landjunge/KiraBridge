@@ -70,6 +70,14 @@ Ein exklusiver POSIX-Lock erlaubt nur einen Dispatcher pro Datenverzeichnis. Meh
 
 Standardmäßig arbeiten zwei Ausführungs-Worker und ein reservierter Prozesssteuerungs-Worker. So bleibt das Beenden eines eigenen Prozesses auch bei ausgelasteten Ausführungsslots erreichbar. Im Leerlauf warten Worker auf ein Event; alle zwei Sekunden erfolgt ein Abgleich für Aufträge, die externe lokale CLI-Prozesse eingereiht haben.
 
+Der noch nicht aktivierte Etappe-4-Kandidat trennt zwei reservierte Lese-Worker
+von einem eigenen Stopp-Worker. Terminalabfragen nutzen unabhängig vom
+Clientweg `TerminalQueries`, `session.inspect`, dieselbe Freigabeentscheidung
+und ein Budget von acht Sekunden. Die Operationsbeschreibungen enthalten
+Capability, Wirkung und Ausführungsklasse und dienen Katalog, Vorprüfung und
+Queue gemeinsam. `max_read_queued` begrenzt die neue Lesequeue. Details und
+der jeweilige tatsächliche Abnahmestand stehen in der Etappenakte.
+
 Die aktivierte Version `0.8.0rc4` ergänzt die persistenten Zustände sichtbarer Übergaben
 und einmaliger Fensterstarts additiv in Schema 2. Neue CLI-Übergaben müssen
 die gespeicherte bestehende Fenster-/TTY-/Sitzungs-PID-/Agenten-PID-Bindung

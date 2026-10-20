@@ -4,25 +4,9 @@ from __future__ import annotations
 
 from kirabridge.bridge_core.config import PrincipalConfig
 from kirabridge.bridge_core.models import digest
+from kirabridge.operations import READ_OPERATIONS, capability_for
 
 LEVELS = {"full": "Voll erlaubt", "medium": "Mittel", "ask": "Nur mit Erlaubnis"}
-READ_OPERATIONS = {
-    "connection.check",
-    "session.catalog",
-    "session.read",
-    "file.read",
-    "file.list",
-    "file.image",
-    "clipboard.info",
-    "process.list",
-    "process.inspect",
-    "agent.status",
-    "policy.inspect",
-    "handoff.status",
-    "handoff.inbox",
-    "threaddesk.read",
-    "observations.read",
-}
 
 
 def level_for(policy: PrincipalConfig) -> str:
@@ -83,7 +67,7 @@ def decision(config, principal, operation, *, text=None):
     Exact-task approvals and persisted historical buffers remain separate evidence.
     """
     policy = config.principals.get(principal)
-    required = {operation}
+    required = {capability_for(operation)}
     if operation == "session.input":
         required.update({"session.inspect", "terminal.execute"})
     missing = sorted(required - set(policy.capabilities if policy else []))

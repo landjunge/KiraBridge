@@ -11,9 +11,10 @@ from typing import Any
 
 from kirabridge.bridge_core.config import private_directory
 from kirabridge.bridge_core.models import TRANSITIONS, BridgeError, State, canonical, digest
+from kirabridge.operations import RESERVED_READ_OPERATIONS, STOP_OPERATIONS, lane_operations
 
 SCHEMA_VERSION = 2
-DRAIN_CONTROL = {"process.terminate", "workflow.stop"}
+DRAIN_CONTROL = STOP_OPERATIONS
 
 MESSAGE_SCHEMA = """
 CREATE TABLE conversations (
@@ -354,15 +355,33 @@ class Store:
                 {"from": row["state"], "to": state, "evidence_hash": digest(evidence)},
             )
 
-    def claim(self, owner: str, lease_seconds: float, control: bool = False) -> dict | None:
+    @staticmethod
+    def lane_selection(lane):
+        lane = "control" if lane is True else "normal" if lane is False else lane
+        if lane not in {"normal", "control", "read", "stop"}:
+            raise ValueError("Unknown execution lane")
+        names = sorted(
+            RESERVED_READ_OPERATIONS | STOP_OPERATIONS
+            if lane == "normal"
+            else lane_operations(lane)
+        )
+        comparison = "NOT IN" if lane == "normal" else "IN"
+        return "operation " + comparison + " (" + ",".join("?" for _ in names) + ")", names
+
+    def queued_count(self, lane):
+        selection, names = self.lane_selection(lane)
+        return self.db.execute(
+            "SELECT COUNT(*) FROM tasks WHERE state IN ('created','queued') AND " + selection,
+            names,
+        ).fetchone()[0]
+
+    def claim(self, owner: str, lease_seconds: float, control: bool | str = False) -> dict | None:
         with self.transaction():
-            comparison = "IN" if control else "NOT IN"
+            selection, names = self.lane_selection(control)
             row = self.db.execute(
                 "SELECT id,principal,created,operation FROM tasks WHERE state='queued' "
-                f"AND operation {comparison} "
-                "('process.list','process.inspect','process.terminate',"
-                "'agent.status','policy.inspect','handoff.status','workflow.stop') "
-                "ORDER BY created,id LIMIT 1"
+                "AND " + selection + " ORDER BY created,id LIMIT 1",
+                names,
             ).fetchone()
             if row is None:
                 return None

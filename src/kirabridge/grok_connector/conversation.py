@@ -6,6 +6,7 @@ import asyncio
 
 from kirabridge import LOCAL_APPROVAL_URL
 from kirabridge.bridge_core.models import BridgeError, State
+from kirabridge.platform_adapters.desktop import DESKTOP_MESSAGES
 
 WAIT_SECONDS = 18.0  # Below the existing gateway/client transport deadlines.
 ACTIVE = {State.QUEUED, State.ACCEPTED, State.RUNNING}
@@ -104,6 +105,7 @@ async def result_for_conversation(bridge, principal, task):
             or result.get("text")
             or result.get("stderr")
             or error.get("message")
+            or DESKTOP_MESSAGES.get(error.get("code"))
         )
         if isinstance(detail, str) and detail:
             text += " " + detail

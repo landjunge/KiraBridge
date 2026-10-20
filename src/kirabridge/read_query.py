@@ -53,10 +53,19 @@ class ReadQuery(Input):
 async def read_query_async(bridge, principal: str, query: ReadQuery) -> dict:
     """Existing dictionary-shaped tool also works with cached client tool lists."""
     if query.operation == "session.catalog":
-        return {"operation": query.operation, **await bridge.sessions.catalog(principal)}
+        return {
+            "operation": query.operation,
+            **await bridge.terminal_queries.execute(principal, query.operation, {}),
+        }
     if query.operation == "session.read":
-        result = await bridge.sessions.read_observed(
-            principal, query.pane_id, query.expected_pid, max_bytes=query.max_bytes
+        result = await bridge.terminal_queries.execute(
+            principal,
+            query.operation,
+            {
+                "pane_id": query.pane_id,
+                "expected_pid": query.expected_pid,
+                "max_bytes": query.max_bytes,
+            },
         )
         return {"operation": query.operation, **result}
     return read_query(bridge, principal, query)

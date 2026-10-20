@@ -231,6 +231,9 @@ def task_preflight(bridge, task: dict) -> dict:
     from kirabridge.diagnostics import compact_checks, runtime_ref
 
     operation, args, principal = task["operation"], task["args"], task["principal"]
+    from kirabridge.operations import OPERATIONS
+
+    permission = bridge.security.authorize(principal, operation, text=args.get("text"))
     policy = bridge.security.principal(principal, operation)
     roots = policy.roots + (
         policy.read_roots if operation in {"file.read", "file.image", "file.list"} else []
@@ -325,5 +328,7 @@ def task_preflight(bridge, task: dict) -> dict:
         "ready": all(c["ok"] for c in checks),
         "checks": compact_checks(checks),
         "operation": operation,
+        "operation_properties": OPERATIONS[operation].describe(),
+        "permission_decision": permission,
         "runtime": runtime_ref(bridge.runtime),
     }

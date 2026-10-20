@@ -173,13 +173,15 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
 
     @server.tool(annotations=read)
     async def read_query(query: dict[str, Any], ctx: Context) -> dict[str, Any]:
-        """Direct authorized read without tasks, approvals or Events subscriptions.
+        """Direct authorized read without tasks or Events subscriptions.
 
         query.operation: file.read (path, max_bytes<=65536, offset or tail),
         file.list (path; at most 100 entries), terminal.output (owned task_id,
         max_bytes<=65536). session.catalog lists existing terminal handles;
         session.read requires exact pane_id and expected_pid, max_bytes<=65536.
-        Session reads require session.inspect; no shell input or process attachment.
+        Session reads require session.inspect and the shared permission decision.
+        When approval is required, submit the same operation using task_request.
+        No shell input or process attachment.
         """
         from kirabridge.read_query import ReadQuery, read_query_async
 
@@ -193,13 +195,18 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
     @server.tool(annotations=read)
     async def session_catalog(ctx: Context) -> dict[str, Any]:
         """List existing Terminal.app tabs and tmux panes with exact input/read handles."""
-        return await bridge.sessions.catalog(identity(ctx))
+        try:
+            return await bridge.terminal_queries.execute(identity(ctx), "session.catalog", {})
+        except BridgeError as exc:
+            return {"error": {"code": exc.code, "message": str(exc)}}
 
     @server.tool(annotations=read)
     async def session_read(pane_id: str, expected_pid: int, ctx: Context) -> dict[str, Any]:
         """Read bounded output from a Terminal.app tab or tmux pane selected by catalog handle."""
         try:
-            return await bridge.sessions.read_observed(identity(ctx), pane_id, expected_pid)
+            return await bridge.terminal_queries.execute(
+                identity(ctx), "session.read", {"pane_id": pane_id, "expected_pid": expected_pid}
+            )
         except BridgeError as exc:
             return {"error": {"code": exc.code, "message": str(exc)}}
 
@@ -213,8 +220,10 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
         """Permitted version-1 operations and exact argument JSON schemas."""
 
         def action():
+            from kirabridge.operations import OPERATIONS
             from kirabridge.permissions import LEVELS, decision, level_for, permission_summary
             from kirabridge.terminal_access import terminal_access
+            from kirabridge.terminal_queries import TERMINAL_QUERY_SECONDS
 
             policy = bridge.security.principal(identity(ctx))
             return {
@@ -231,6 +240,10 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
                 **bridge.messages.voice_channel.profile(identity(ctx)),
                 "operations": {
                     name: {
+                        **OPERATIONS[name].describe(),
+                        "execution_budget_seconds": TERMINAL_QUERY_SECONDS
+                        if name in {"session.catalog", "session.read"}
+                        else None,
                         "arguments": model.model_json_schema(),
                         "approval_required": decision(bridge.config, identity(ctx), name)[
                             "approval_required"
@@ -238,7 +251,7 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
                         "permission_decision": decision(bridge.config, identity(ctx), name),
                     }
                     for name, model in INPUTS.items()
-                    if name in policy.capabilities
+                    if decision(bridge.config, identity(ctx), name)["authorized"]
                 },
             }
 
