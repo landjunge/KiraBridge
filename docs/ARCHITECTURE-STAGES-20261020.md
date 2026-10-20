@@ -328,7 +328,7 @@ Private Nachweise: `stage2-loaded-proof.json`, `activation-stage2.json`,
 `grok-stage2-review.json`. Handy-Audio und positiver Input im beschäftigten
 ursprünglichen Codex sind weiterhin keine behauptete Abnahme.
 
-## Etappe 3: Betriebsdienst und persistente Aktivierung (Kandidat)
+## Etappe 3: Betriebsdienst und persistente Aktivierung (0.8.0rc6 aktiv)
 
 Konfigurationsgenerierung und Core-Neustart liegen in `operations_service.py`.
 Das Steuerfenster reicht authentifizierte Bedienaktionen an diesen Dienst
@@ -376,8 +376,8 @@ Abschlussmeldung, zwei Controller, persistente Sperre nach Neuöffnung der DB,
 abgestürzter/laufender Besitzer, fehlgeschlagener und fälschlich erfolgreicher
 Neustart, Schemaabweichung, gleichzeitige Dateiänderung, alle vier Absender
 und ihre Rückantworten. Eine separate SQLite-Verbindung kann während des
-wartenden Supervisoraufrufs schreiben. Aktivierung dieses Kandidaten und
-unabhängige Grok-Abnahme sind noch offen.
+wartenden Supervisoraufrufs schreiben. Unabhängige Grok-Abnahme und tatsächliche
+Aktivierung sind nachfolgend getrennt belegt.
 
 ### Abnahmen vor Aktivierung
 
@@ -410,4 +410,55 @@ die Betriebssupervisor-Tests simulieren keine Windows-Dienstverwaltung.
 Der abschließende unveränderte Kandidat besteht mit 732 Tests in 162,58 Sekunden,
 mit Unraisable-Warnings als Fehlern. Ruff und Paketbau sind erfolgreich;
 alle 65 historischen unversionierten Belege sind unverändert erhalten.
-Aktivierung und praktische Prüfung dieses Stands sind noch offen.
+Commit `1173b41` wurde vor Aktivierung gepusht. Das geprüfte Paket hat SHA256
+`6b6cff52ae52c6f994e4a5a7bfb8a9867f26c25dd58b14d241c603ac707344d6`,
+das geladene Manifest der 71 Python-Dateien
+`d7a4401bbe56c99b2cfa8e4f2691d0cfa6451016099ff05cc99367452d6cc1a3`.
+
+### Tatsächliche Aktivierung und verbleibende praktische Abnahme
+
+Der alte Core ohne Aktivierungsprotokoll wurde einmalig nach überprüftem
+Leerlauf ersetzt; bestehende Agenten und Tunnel blieben erhalten. Danach
+führte das authentifizierte Steuerfenster den neuen koordinierten Neustart
+`activation-d76210420ef046eaa92db5bf0c4448de` tatsächlich durch:
+PID 77939 → 78133, neue Instanz `12654aed980a4ce18474b8eedb98e75a`,
+Zustand `completed`. `activating` und `verifying` wurden gesondert beobachtet.
+Während `verifying`, vor Rückkehr des HTTP-Aufrufs, konnte eine unabhängige
+SQLite-Verbindung `BEGIN IMMEDIATE` und `ROLLBACK` in 0,393 ms abschließen.
+Alle 16 zuvor erfassten Agenten-, Provider-, Tunnel- und App-PIDs lebten danach
+weiter. Datei-Konfiguration
+`642ef01516ff2ff8199980556b733ac97525329e78d22b14f50a93ed673d54cd`
+und effektive Revision
+`1786b287511313d7bbd518006b4afcbc26c445a929ca1a011385faa999e4089a`
+blieben unverändert. Private Nachweise: `activation-stage3-bootstrap.json`,
+`stage3-coordinated-restart.json`, `rc6-publish-manifest.json`.
+
+Die zusätzliche tatsächliche Eve-Abnahme des alten `session.input`-Wegs
+`stage3-eve-terminal-return-20261020` endete anschließend mit **unknown**.
+Der zentrale Beleg enthält `inserting` und danach
+`session_transport_unavailable`; kein `submitting`, kein Return und keine
+Agentenquittung sind protokolliert. Ob Text im Eingabefeld verblieb, ist damit
+nicht entschieden. Die macOS-Konsole meldet für UID 501 tatsächlich
+`CGSSessionScreenIsLocked=true`; Terminal.app hat keine zugänglichen
+AX-Fenster. Der Grok-Providerverlauf enthält den Prüfmarker nicht, was allein
+einen ungesendeten Paste nicht ausschließt. Der Auftrag wird weder erneut
+eingefügt noch durch einen zusätzlichen Return geraten. Nach Entsperren ist
+zuerst dieselbe exakte Sitzung samt Eingabefeld und Belegen zu lesen.
+Private Zustandsaufnahme: `rc6-eve-terminal-unknown-locked.json`.
+
+Neue Grok-Prüfaufträge sind bis zur Zustandsklärung ebenfalls blockiert.
+Ein Hintergrundreceiver ersetzt keine sichtbare Prüfung. Die physische
+Handy-/Audio-Abnahme bleibt offen; lokale MCP-Antworten bestätigen keine
+hörbare Rückgabe im laufenden Grok-Sprachgespräch.
+
+### Kleines Folgepaket: konkrete Desktop-Diagnose (noch nicht aktiviert)
+
+Ein Kandidat liest den lokalen Console-Lock-Zustand mit einem begrenzten
+`ioreg`-Aufruf, ohne UI-Eingriffe. Bei eindeutig gesperrter oder inaktiver
+eigener Sitzung blockiert er Terminal.app vor osascript und meldet den Grund;
+unbekannte Zusatzdiagnose nimmt keine vorhandenen Berechtigungen zurück.
+Andere tmux-Ziele werden davon nicht ersetzt oder pauschal gesperrt.
+Die letzte Beobachtung wird mit Zeitpunkt und begrenzter Aussage im Status
+geführt, der Doktor zeigt den konkreten Transportfehler.
+45 gezielte Tests einschließlich vorhandener Sitzungs- und Steuerfenstertests
+bestanden. Diese Quelländerung ist weder aktiviert noch von Grok geprüft.
