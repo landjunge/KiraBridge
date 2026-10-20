@@ -12,9 +12,9 @@ abgeschlossenen [Diagnoseausbau](DIAGNOSTICS-20261018.md).
 Angehängt: je ein Startpaket für macOS15 Intel/Apple Silicon und Ubuntu24.04 x86_64,
 Python-Wheel und Quellpaket, separate `LICENSE`, `SHA256SUMS`, Quell-/Prüfmanifest
 und drei Plattformbelege. Lokal:
-`/Users/landjunge/KiraBridge-release-20261018/dist/release-0.6.0rc2/`.
+`/Users/EXAMPLE_USER/KiraBridge-release-20261018/dist/release-0.6.0rc2/`.
 Eine Kopie unter dem bestehenden lesefreigegebenen Projektpfad liegt in
-`/Users/landjunge/KiraBridge/dist/release-0.6.0rc2-57bee99/`.
+`/Users/EXAMPLE_USER/KiraBridge/dist/release-0.6.0rc2-57bee99/`.
 
 Normale Installation: passendes Originalpaket prüfen und entpacken, darin
 `sh install.sh`, Englisch `sh install.sh --language en`. Der Assistent führt
