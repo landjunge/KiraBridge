@@ -163,6 +163,28 @@ class VisibleHandoffs:
                 "control.handoff." + state, row[0], None, {"handoff_id": identifier, **evidence}
             )
 
+    async def dispatch_ready(self, principal, target):
+        """Observe before claiming a message; never paste or settle unknown input."""
+        binding = self.config.visible_handoffs.bindings.get(target)
+        if binding is None:
+            raise BridgeError("visible_target_missing", "No assigned existing visible terminal")
+        # An old uncertain input remains owned until actual receipt is reconciled.
+        active = self.store.db.execute(
+            "SELECT id,principal FROM visible_handoffs WHERE target=? AND state IN "
+            "('planned','inserting','inserted','submitting','return_sent','sent','confirmed','unknown')",
+            (target,),
+        ).fetchone()
+        if active:
+            self.reconcile(active["principal"], active["id"])
+            state = self.store.db.execute(
+                "SELECT state FROM visible_handoffs WHERE id=?", (active["id"],)
+            ).fetchone()[0]
+            if state not in {"completed", "interrupted"}:
+                raise BridgeError(
+                    "visible_target_busy", "Existing handoff must finish or reconcile"
+                )
+        await self.check_target(principal, target, binding, ready=True)
+
     async def check_target(self, principal, target, binding, *, ready=False):
         row = await self.sessions.selected(principal, binding.pane_id, binding.expected_pid)
         matches = [
