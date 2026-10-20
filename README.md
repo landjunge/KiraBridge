@@ -16,7 +16,7 @@
 
 KiraBridge's intended conversational workflow starts with **ChatGPT Live voice mode**: you speak naturally with the assistant in a real-time voice conversation, agree on a task, and explicitly authorize its handoff. This is **not the same as tapping the microphone icon to dictate text** into a message field. Dictation converts speech into text; it is not, by itself, a continuous live voice conversation. Live voice availability and limits depend on the user's ChatGPT setup.
 
-For implementation, KiraBridge uses **terminal interfaces** to hand work to configured coding agents, notably **Codex CLI and Grok Build**. The terminal connection is a separate technical step from the live voice conversation; successful voice input alone does not prove that a terminal command was delivered or executed.
+For implementation, KiraBridge uses **terminal interfaces** to hand work to configured coding agents, notably **Codex CLI and Grok Build CLI**. Where configured and permitted, the two CLI agents can exchange tasks, findings and reviews through explicit handoffs; each CLI may also coordinate its own subagents. Parallel work can greatly accelerate complex projects, but the speedup depends on task independence, available resources and usage limits. Agent-to-agent communication and subagents are capabilities to configure and verify, not proof that every installation supports them automatically. The terminal connection is a separate technical step from the live voice conversation; successful voice input alone does not prove that a terminal command was delivered or executed.
 
 ### What is KiraBridge?
 
@@ -111,7 +111,7 @@ The release includes the detailed test report.
 
 Unser gewünschter Arbeitsweg beginnt mit dem **Live-Sprachmodus von ChatGPT**: Wir besprechen eine Idee in einem laufenden, natürlichen Sprachgespräch, legen den Auftrag fest und geben die Übergabe ausdrücklich frei. Das ist **nicht dasselbe wie das Mikrofon-Symbol zur Spracheingabe** in einem Textfeld. Dort wird Gesprochenes lediglich als Text diktiert; daraus entsteht noch kein fortlaufendes Live-Sprachgespräch. Verfügbarkeit und Nutzungslimits des Live-Modus hängen von der ChatGPT-Konfiguration ab.
 
-Für die eigentliche Umsetzung nutzt KiraBridge **Terminal-Schnittstellen** zu den eingerichteten Coding-Agenten, insbesondere **Codex CLI und Grok Build**. Das Sprachgespräch und die Terminal-Übergabe sind zwei getrennte Schritte. Eine verstandene Spracheingabe beweist noch nicht, dass ein Auftrag im Terminal angekommen oder ausgeführt worden ist.
+Für die eigentliche Umsetzung nutzt KiraBridge **Terminal-Schnittstellen** zu den eingerichteten Coding-Agenten, insbesondere **Codex CLI und Grok Build CLI**. Bei entsprechender Einrichtung und Freigabe können beide CLI-Agenten über ausdrücklich geregelte Übergaben Aufgaben, Erkenntnisse und Prüfergebnisse miteinander austauschen. Jede CLI kann außerdem eigene Unteragenten koordinieren. Durch parallele Arbeit lässt sich die Umsetzung komplexer Projekte erheblich beschleunigen. Der tatsächliche Geschwindigkeitsgewinn hängt jedoch von der Aufgabenteilung, den verfügbaren Ressourcen und den Nutzungslimits ab. Diese Zusammenarbeit muss jeweils eingerichtet und geprüft werden; sie ist nicht automatisch in jeder Installation aktiv. Das Sprachgespräch und die Terminal-Übergabe sind zwei getrennte Schritte. Eine verstandene Spracheingabe beweist noch nicht, dass ein Auftrag im Terminal angekommen oder ausgeführt worden ist.
 
 ### Was ist KiraBridge?
 
