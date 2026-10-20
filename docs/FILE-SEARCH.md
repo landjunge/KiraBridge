@@ -24,6 +24,13 @@ roots. A project selector grants no authority. A `/` permission never becomes a
 scan root. Explicit `/` and the user's home directory are rejected too.
 Selecting an excluded credential/vault/build tree itself (or a directory under
 it) as a project root does not bypass its exclusion.
+Project roots require the single POSIX `/` anchor, including on every fresh
+source view after in-memory configuration changes. Exactly two leading slashes
+are refused rather than treated as a different lexical permission/exclusion
+space. Ambiguous known exclusion paths (policy, credentials, state or home,
+including unresolved `..`) deny the optional search as a whole. The index uses
+the credential consumer's literal `Path` interpretation, without a separate
+home expansion. This changes neither the core path adapter nor its permissions.
 
 ```sh
 kirabridge --config /path/to/reviewed.toml file-index status example

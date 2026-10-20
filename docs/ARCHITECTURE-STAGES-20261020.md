@@ -1363,8 +1363,10 @@ authentisierten `read_query`. Ein lokaler `file-index`-CLI-Bedienweg erlaubt den
 ausdrücklichen Cacheaufbau/-ersatz. Die vorhandenen Rechte `file.read` **und**
 `file.list` bleiben erforderlich; Projektwahl schafft keine Freigabe. Weder `/`
 noch Home werden als Scanwurzel akzeptiert, aus Rechten werden keine Wurzeln
-abgeleitet. Kein Produktdatenbestand, Dienst, Credential oder Livekonfiguration
-wurde dafür verändert.
+abgeleitet. Mehrdeutige POSIX-Root-/Ausschlusspfade (einschließlich genau zwei
+führender Slashes) sperren die optionale Suche auch nach In-Memory-Änderungen.
+Kein Produktdatenbestand, Dienst, Credential oder Livekonfiguration wurde dafür
+verändert.
 
 Der [genaue Bedien- und Sicherheitsvertrag](FILE-SEARCH.md) trennt frische
 Trefferprüfungen von einer nicht vorhandenen globalen Dateisystem-Snapshotgarantie.

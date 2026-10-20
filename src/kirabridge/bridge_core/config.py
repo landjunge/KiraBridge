@@ -340,7 +340,7 @@ class FileIndexConfig(BaseModel):
                 not re.fullmatch(r"[A-Za-z0-9_-]{1,128}", name)
                 or len(value.encode("utf-8")) > 4096
                 or "\0" in value
-                or not path.is_absolute()
+                or path.anchor != "/"
                 or ".." in path.parts
                 or path in {Path("/"), Path.home().absolute()}
             ):

@@ -65,6 +65,13 @@ def case_excluded(scope, path):
     )
 
 
+def unambiguous_posix(path):
+    # Exactly two leading slashes retain a distinct pathlib anchor even where
+    # the OS opens the same local file. Never weaken lexical exclusions with
+    # that spelling or an unresolved parent component.
+    return path.anchor == "/" and ".." not in path.parts and "\0" not in str(path)
+
+
 class Source:
     def __init__(self, config, security, principal, project):
         self.config, self.security = config, security
@@ -78,13 +85,15 @@ class Source:
         if not settings.enabled or self.project not in settings.projects:
             raise BridgeError("search_scope_denied", "Search scope unavailable")
         root = Path(settings.projects[self.project])
-        if root in {Path("/"), Path.home().absolute()} or any(
+        home = Path.home().absolute()
+        if (
+            not unambiguous_posix(root) or not unambiguous_posix(home) or root in {Path("/"), home}
+        ) or any(
             part.casefold().lstrip(".") in IGNORED
             or part.casefold() in {".ssh", ".gnupg", ".4allpass"}
             for part in root.parts[1:]
         ):
             raise BridgeError("search_scope_denied", "An explicit project directory is required")
-        home = Path.home().absolute()
         protected = [
             self.config.state_path,
             home / ".config/kirabridge",
@@ -100,12 +109,16 @@ class Source:
         ]
         for value in (self.config._source_path, self.config.credentials_file):
             if value:
-                protected.append(Path(value).expanduser().absolute())
+                # Match the loaded policy reference / credentials consumer's
+                # literal Path semantics; do not invent a second ~ expansion.
+                protected.append(Path(value).absolute())
         excluded = [
             *state_exclusions(self.config, policy),
             *(str(p) for p in protected),
             *(str(root / value) for value in settings.exclusions),
         ]
+        if any(not unambiguous_posix(Path(value).absolute()) for value in excluded):
+            raise BridgeError("search_scope_denied", "Search exclusions are ambiguous")
         scope = PathScope(policy.roots + policy.read_roots, excluded=excluded)
         scope.split(str(root))
         if case_excluded(scope, root):
