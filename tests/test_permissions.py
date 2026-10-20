@@ -10,6 +10,7 @@ from kirabridge.bridge_core.config import load_config
 from kirabridge.bridge_core.models import BridgeError
 from kirabridge.control_center import configure_access
 from kirabridge.mcp_gateway.client import MCPClientPool, Peer
+from kirabridge.operator_application import operator_application
 from kirabridge.permissions import decision, permission_summary
 from kirabridge.terminal_access import terminal_access
 
@@ -135,7 +136,7 @@ async def test_revocation_requires_authenticated_local_route(bridge, tmp_path, m
     )
     bridge.config._source_path = str(path)
     key = "local-operator-" + "k" * 48
-    app = ApprovalConsole(bridge, key)
+    app = ApprovalConsole(operator_application(bridge), key)
 
     async def activated(*, text=None, expected_config_sha=None):
         # Activation supervision is tested separately; this test owns the
@@ -146,7 +147,7 @@ async def test_revocation_requires_authenticated_local_route(bridge, tmp_path, m
         replace_private(path, text)
         return {"dispatcher_active": True, "runtime": {}}
 
-    monkeypatch.setattr(app.control_center.operations, "activate", activated)
+    monkeypatch.setattr(app.control_center.service.operations, "activate", activated)
     payload = {"revoke_operations": {"chatgpt": ["session.input"]}}
     async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url=ORIGIN) as client:
         denied = await client.post("/api/control/permissions", json=payload)

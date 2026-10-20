@@ -13,7 +13,7 @@ auf ein kleines Paket Implementierung, Grok-Prüfung, Korrektur und Nachprüfung
 | 2 Freigaben | 0.8.0rc5 aktiviert; 313 gezielte Tests und unabhängige Grok-Abnahme | Normale Voice-/CLI-Wege beim weiteren Umbau erhalten |
 | 3 Aktivierung | Koordinierter Betriebsdienst aktiv; alte unklare Eve-Zustellung ohne Nachversand stillgelegt | Historischen unbekannten Ausgang erhalten |
 | 4 Client-Lesewege | rc7 aktiv; 776 Tests, Grok-Abnahmen und echte ChatGPT-Leseprüfung unter Last bestanden; lokaler Eve-Rückweg bestätigt | Physische Handy-/Voice-Abnahme bleibt gesondert offen |
-| 5 Modulgrenzen | Paket 5a beginnt mit Status-/Protokollabfragen | Fachliche Datenbesitzer und austauschbare Abfragen |
+| 5 Modulgrenzen | 5a von Grok geprüft; 5b Bedienwege im isolierten Kandidaten | Danach Sitzungsports und Plattformadapter |
 | 6 Ausgabeablage | Offen | Begrenzte Rohdaten, unveränderte historische Audit-Kette |
 
 ## Etappe 1: gesicherter Ausgangspunkt
@@ -681,5 +681,52 @@ Die anschließende Feldprüfung fand noch einen verbliebenen Zukunftsbezug:
 Aufgabenzeile vorhanden. Zwei Tests für späteren Erfolg und Fehler liefen
 zunächst rot. Eine zusätzliche Zuweisung blendet den späteren Abschlusszeitpunkt
 jetzt ebenso aus wie spätere Ergebnisse und Fehler. 56 gezielte Tests bestanden
-nach dieser Korrektur in 32,87 s. Groks gezielte Nachprüfung dieses einen Felds
-und die spätere Aktivierung der gesamten Etappe 5 stehen noch aus.
+nach dieser Korrektur in 32,87 s. Grok bestätigte `6c05938` und den Quellpin
+`f579255e6ff1299bfbfd3328fa775cdcfc81fcdda6b3ddf4c153463e17f16aea`
+mit **22 eigenen Tests in 0,80 s** und empfiehlt die Abnahme der Korrektur.
+Auftrag `24be2cf1-4370-40f2-bb20-162428290131`, sichtbare Übergabe
+`channel-e5adec61b72d42b7b1d89dbf73e11d2b`, Antwort
+`7c63af5d-ed5a-419d-9d8f-3a3c6f61f0da`; Antwort und Abschluss quittiert.
+Beleg: `grok-stage5a-finish-review.json`. Die Aktivierung der gesamten Etappe 5
+steht noch aus.
+
+## Etappe 5, Paket 5b: Bedienwege hinter Anwendungsschnittstellen (Kandidat)
+
+Isolierter Arbeitsstand: `/Users/landjunge/KiraBridge-stage5b-20261020`.
+Die vier HTTP-Präsentationen (`ControlCenter`, `ApprovalConsole`, Team- und
+Grok-Verbindungsansicht) erhalten schmale Anwendungspartner statt des gesamten
+Bridge-Objekts. Sie authentifizieren, prüfen HTTP-Eingaben und stellen Ergebnisse
+dar. Keine dieser Oberflächen kennt SQL-Tabellen oder startet Betriebssystemprozesse.
+Nur `operator_application` als zentrale Verdrahtung kennt den vollständigen Kern.
+
+`OperatorControl` führt Bedienaktionen und Zustandsabfragen über benannte Ports
+aus. `LocalDaemonClient` kapselt den bestehenden authentifizierten MCP-Zugang;
+`LocalProcessPlatform` die begrenzten Prozessaufrufe und Beobachtung. Die
+Konfigurationsaktivierung verbleibt beim bereits geprüften `OperationsService`.
+`ConnectorAdministration` ist gemeinsamer Besitzer der OAuth-Bedienabfragen;
+`OperatorTaskDecisions` nutzt die vorhandene atomare Aufgabenfreigabe und Ablehnung.
+SQL für Aufgabenansichten liegt beim Task-Store, eigenständige Konsolenereignisse
+bei `AuditWriter`. Gemeinsam zu speichernde Fachänderungen behalten ihre Transaktion.
+
+`ControlActionRepository` besitzt die unveränderte `control_actions`-Tabelle.
+Kennungsprüfung, Reservierung und Audit passieren in einer kurzen Transaktion,
+auch über getrennte SQLite-Verbindungen. Ausführung wartet außerhalb. Wiederholte
+Kennungen lösen keine zweite Aktion aus; andere Inhalte erzeugen einen Konflikt.
+Eine abgebrochene wartende Ausführung wird als `unknown` gespeichert und nicht
+wiederholt. Ein Prozessabbruch vor dem Abschluss lässt die vorhandene Reservierung
+erhalten. Ein bestätigter Bridge-Neustart wird als `completed` gespeichert; bloßes
+`launchctl` ohne den vorhandenen Aktivierungsnachweis genügt dafür nicht.
+
+Vorhandene Agentensitzungen bleiben erhalten. Der ausdrücklich vom lokalen Nutzer
+gewählte Start verwendet weiterhin die einmalige vertrauenswürdige Fensterfreigabe.
+Ein Neustart bei fehlendem Agentenfenster erzeugt keine Ersatzfreigabe und keinen
+Ersatzprozess. Diese interne Abgrenzung ist keine Sandbox gegen freie OS-Rechte
+desselben Mac-Benutzers. Sitzungsmanager und Terminaladapter folgen in Paket 5c.
+
+155 gezielte Tests in 26,76 s bestanden nach Anpassung zweier Testinjektionen an
+die neuen fachlichen Besitzer. Enthalten sind echte getrennte SQLite-Verbindungen,
+einmalige Aktionsausführung, unklare Unterbrechungen, Konflikte, lokale Authentifizierung,
+Freigaben, OAuth/PKCE, Team-, Protokoll- und Aktivierungsregressionen. Zusätzlicher
+Negativtest für den fehlenden Agenten-Neustart und Groks unabhängige Prüfung folgen.
+Keine produktive Codeaktivierung, keine neuen echten Agentenfenster oder Eingaben
+in bestehende Codex-Sitzungen gehören zu diesen Tests.

@@ -21,6 +21,7 @@ from kirabridge.bridge_core.bridge import Bridge
 from kirabridge.bridge_core.config import Config, private_directory
 from kirabridge.bridge_core.models import BridgeError
 from kirabridge.local_runtime import private_json, write_private
+from kirabridge.operator_application import operator_application
 
 LABEL = "com.kirabridge.approvals"
 
@@ -190,7 +191,7 @@ async def serve_console(config: Config, config_path: Path) -> None:
     try:
         server = uvicorn.Server(
             uvicorn.Config(
-                ApprovalConsole(bridge, console_key(config_path)),
+                ApprovalConsole(operator_application(bridge), console_key(config_path)),
                 host="127.0.0.1",
                 port=PORT,
                 access_log=False,

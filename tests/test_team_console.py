@@ -9,6 +9,7 @@ from conftest import request
 from kirabridge.approval_console import ORIGIN, ApprovalConsole, signed_token
 from kirabridge.bridge_core.bridge import Bridge
 from kirabridge.bridge_core.config import AgentConfig, PrincipalConfig, TeamConfig, TeamWorkerConfig
+from kirabridge.operator_application import operator_application
 from kirabridge.team_console import MAX_REQUEST_BYTES
 from kirabridge.team_manager.models import TeamCreate, TeamMessageSend, TeamWorkCreate
 
@@ -33,7 +34,9 @@ def team_bridge(config):
 
 def browser(bridge, **kwargs):
     return httpx.AsyncClient(
-        transport=httpx.ASGITransport(app=ApprovalConsole(bridge, KEY), **kwargs),
+        transport=httpx.ASGITransport(
+            app=ApprovalConsole(operator_application(bridge), KEY), **kwargs
+        ),
         base_url=ORIGIN,
     )
 

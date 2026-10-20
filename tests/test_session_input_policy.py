@@ -11,6 +11,7 @@ from test_mcp import http_bridge  # noqa: F401
 
 from kirabridge.bridge_core.bridge import Bridge
 from kirabridge.bridge_core.models import BridgeError, State
+from kirabridge.operator_application import operator_application
 from kirabridge.session_manager import SessionInput, SessionManager
 
 
@@ -156,7 +157,7 @@ async def test_authenticated_console_approval_and_protocol_show_buffer(buffered)
     bridge, calls = buffered
     task = value()
     bridge.prepare("local", task)
-    async with client(ApprovalConsole(bridge, KEY)) as browser:
+    async with client(ApprovalConsole(operator_application(bridge), KEY)) as browser:
         detail = (await browser.get("/api/tasks/" + task.task_id, headers=authenticated())).json()
         assert detail["task"]["input_buffer"]["state"] == "waiting"
         result = await browser.post(

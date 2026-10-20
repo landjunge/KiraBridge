@@ -375,6 +375,25 @@ class Store:
             names,
         ).fetchone()[0]
 
+    def operator_listing(self):
+        rows = self.db.execute(
+            "SELECT id,principal,operation,agent,state,created,updated FROM tasks "
+            "ORDER BY CASE state WHEN 'created' THEN 0 WHEN 'queued' THEN 1 "
+            "WHEN 'accepted' THEN 2 WHEN 'running' THEN 3 WHEN 'unknown' THEN 4 ELSE 5 END, "
+            "updated DESC LIMIT 100"
+        ).fetchall()
+        count = self.db.execute(
+            "SELECT count(*) FROM tasks WHERE state='created'"
+        ).fetchone()[0]
+        return {"tasks": [dict(row) for row in rows], "pending": count}
+
+    def operator_detail(self, task_id):
+        task = self.get(task_id)
+        request_hash = self.db.execute(
+            "SELECT request_hash FROM tasks WHERE id=?", (task_id,)
+        ).fetchone()[0]
+        return {"task": task, "request_hash": request_hash}
+
     def operator_work_count(self):
         return self.db.execute(
             "SELECT count(*) FROM tasks WHERE state IN ('queued','accepted','running')"

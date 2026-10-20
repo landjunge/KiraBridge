@@ -112,8 +112,8 @@ async def test_http_protocol_only_needs_the_operator_query_port():
     control = object.__new__(ControlCenter)
     seen = []
     control.authenticate = lambda request: seen.append("authenticated")
-    control.queries = SimpleNamespace(
-        protocol=lambda after, before: {"after": after, "before": before}
+    control.service = SimpleNamespace(
+        queries=SimpleNamespace(protocol=lambda after, before: {"after": after, "before": before})
     )
     response = await control.protocol(
         Request(
@@ -139,7 +139,7 @@ async def test_unauthenticated_surface_never_calls_operator_queries():
         pytest.fail("Operator queries must remain behind local authentication")
 
     control.authenticate = deny
-    control.queries = SimpleNamespace(protocol=forbidden)
+    control.service = SimpleNamespace(queries=SimpleNamespace(protocol=forbidden))
     with pytest.raises(BridgeError) as error:
         await control.protocol(
             Request(

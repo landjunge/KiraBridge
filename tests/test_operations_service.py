@@ -375,7 +375,9 @@ def test_process_and_network_waits_never_nest_in_write_transactions():
     from pathlib import Path
 
     root = Path(__file__).parents[1] / "src/kirabridge"
-    for name in ["operations_service.py", "control_center.py"]:
+    for name in [
+        "operations_service.py", "control_center.py", "operator_actions.py", "operator_control.py"
+    ]:
         tree = ast.parse((root / name).read_text())
         for block in ast.walk(tree):
             if not isinstance(block, ast.With) or not any(

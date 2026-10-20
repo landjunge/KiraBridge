@@ -9,6 +9,17 @@ if TYPE_CHECKING:
     from kirabridge.task_manager.store import Store
 
 
+class AuditWriter:
+    """Atomic events for callers which own no other database mutation."""
+
+    def __init__(self, store):
+        self.store = store
+
+    def record(self, kind, metadata, principal="local", task_id=None):
+        with self.store.transaction():
+            self.store.audit(kind, principal, task_id, metadata)
+
+
 class AuditReader:
     """Audit-table reads for the authenticated local operator application."""
 

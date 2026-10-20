@@ -11,6 +11,7 @@ from conftest import request
 from kirabridge.approval_console import ORIGIN, ApprovalConsole, signed_token, valid_token
 from kirabridge.bridge_core.models import BridgeError, State
 from kirabridge.console_runtime import console_key, open_console, probe
+from kirabridge.operator_application import operator_application
 
 KEY = "console-test-key-" + "x" * 48
 
@@ -24,7 +25,7 @@ def authenticated():
 
 
 async def test_console_denies_unauthenticated_external_and_cross_origin_access(bridge):
-    app = ApprovalConsole(bridge, KEY)
+    app = ApprovalConsole(operator_application(bridge), KEY)
     async with client(app) as browser:
         assert (await browser.get("/")).status_code == 200
         assert (await browser.get("/api/tasks")).status_code == 401
@@ -41,7 +42,7 @@ async def test_console_denies_unauthenticated_external_and_cross_origin_access(b
 
 
 async def test_private_login_ticket_is_short_lived_one_use_and_bound_to_server(bridge):
-    app = ApprovalConsole(bridge, KEY)
+    app = ApprovalConsole(operator_application(bridge), KEY)
     ticket = signed_token(KEY, "login:" + app.instance)
     async with client(app) as browser:
         headers = {"Origin": "null"}
@@ -68,7 +69,7 @@ async def test_approval_executes_once_only_after_review_and_records_local_consol
     root = config.principals["local"].roots[0]
     value = request("file.list", {"path": root}, task_id="browser-approval")
     bridge.prepare("other", value)
-    app = ApprovalConsole(bridge, KEY)
+    app = ApprovalConsole(operator_application(bridge), KEY)
     async with bridge, client(app) as browser:
         headers = authenticated()
         listing = (await browser.get("/api/tasks", headers=headers)).json()
@@ -106,7 +107,7 @@ async def test_rejection_never_executes_and_cannot_cancel_an_active_task(bridge,
     path = str(Path(config.principals["local"].roots[0]) / "not-created.txt")
     value = request("file.write", {"path": path, "text": "must not be written"})
     bridge.prepare("local", value)
-    app = ApprovalConsole(bridge, KEY)
+    app = ApprovalConsole(operator_application(bridge), KEY)
     async with client(app) as browser:
         headers = authenticated()
         detail = (await browser.get("/api/tasks/task-1", headers=headers)).json()
@@ -128,7 +129,7 @@ async def test_rejection_never_executes_and_cannot_cancel_an_active_task(bridge,
 
 
 async def test_console_rejects_oversized_and_malformed_decisions(bridge):
-    async with client(ApprovalConsole(bridge, KEY)) as browser:
+    async with client(ApprovalConsole(operator_application(bridge), KEY)) as browser:
         headers = authenticated()
         result = await browser.post(
             "/api/tasks/any/approve", headers=headers, json={"request_hash": "x" * 5000}
