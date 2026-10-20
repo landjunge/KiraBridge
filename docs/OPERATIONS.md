@@ -1,7 +1,9 @@
-Aktueller Stand am 20. Oktober 2026: produktiv **0.8.0rc10**, geprüftes Wheel
-mit 844 bestandenen Gesamttests, unabhängigen Grok-Abnahmen und praktisch
-bestätigtem Kira-Terminal-Rückweg. Die tatsächlichen Aktivierungs- und weiterhin
-offenen Handy-/Voice-Nachweise stehen in [der Etappenakte](ARCHITECTURE-STAGES-20261020.md).
+Aktueller Stand am 20. Oktober 2026: produktiv **0.8.0rc11**, geprüftes Wheel
+mit 921 bestandenen Gesamttests, anschließend 172 gezielten Prüfungen und
+Groks unabhängigen 172 Tests am Commit `2062055`. Der bisher praktisch
+bestätigte Kira→Grok-Rückweg ersetzt nicht den noch offenen ursprünglichen
+Kira→Codex→Kira-Kurztest. Aktivierung und weitere Grenzen stehen in
+[der Etappenakte](ARCHITECTURE-STAGES-20261020.md).
 Sichtbare Übergaben verwenden ausschließlich die gespeicherte bestehende
 Fenster-/TTY-/PID-Zuordnung in der entsperrten Mac-Sitzung. Fehlende Ziele starten
 keinen Ersatz. Der koordinierte Neustart wartet auch auf Team-Ergebnisverarbeitung.
@@ -226,3 +228,12 @@ Ziel und Bereitschaft erneut geprüft. Unbekannte Ergebnisse benötigen echte
 Empfangs-/Antwortbelege. [Konkrete Reparatur und echter Teststatus](VISIBLE-HANDOFF-RECOVERY-20261020.md).
 Für Kiras alten Werkzeugcache ist completion_subscription als leerer String
 auf oberster Ebene zulässig; hierfür keine Subscription erfinden.
+
+Ab rc11 liefern Sitzungslesewege zusätzlich dieselbe aktuelle Bereitschafts-
+einschätzung wie die Übergabe. Die lokale Codex-Protokollzuordnung besteht aus
+`codex_thread_id` und `codex_rollout_path` in der bestehenden Zielbindung;
+beide werden gemeinsam gesetzt. Eine echte Fenster/TTY/PID-/Threadzuordnung
+vorher nachweisen, nicht aus Dateialter oder gemeinsamem Backend-PID raten.
+Unbekannte/geänderte Protokolle, aktuelle Arbeit und vorhandene Eingabetexte
+bleiben gesperrt. Ablehnungen enthalten Zeit und begrenzte Ausgabereferenz.
+Ein voller Berechtigungsumfang ersetzt weder Ziel- noch Bereitschaftsprüfung.

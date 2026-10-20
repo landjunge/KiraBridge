@@ -1,6 +1,6 @@
 # Architektur
 
-Stand 20. Oktober 2026: produktiv `0.8.0rc10`; gesicherter Ausgangspunkt `0.8.0rc3`, Quellpin
+Stand 20. Oktober 2026: produktiv `0.8.0rc11`; gesicherter Ausgangspunkt `0.8.0rc3`, Quellpin
 `4188f001d405a9f04ee63f6bbe1b088c6f39d26e`, Dokumentation `d9727ac1`,
 portable Prüfergänzung `5680921`. Die schrittweise Weiterentwicklung und ihre
 tatsächlichen Abnahmen stehen in [ARCHITECTURE-STAGES-20261020.md](ARCHITECTURE-STAGES-20261020.md).
@@ -197,3 +197,15 @@ Grund in der dauerhaften Queue. Andere freie Ziele behalten ihre Kapazität.
 Historische unbekannte Eingaben werden ausschließlich über tatsächliche
 Empfangs-/Antwortbelege abgeglichen. Unklare Ergebnisse werden nie blind
 wiederholt. [Reparatur und Abnahmegrenzen](VISIBLE-HANDOFF-RECOVERY-20261020.md).
+
+Ab rc11 wird Codex-Bereitschaft aus aktuellem Eingabefeld und ausdrücklich
+lokal gebundenem typisiertem Turnprotokoll ermittelt. Historische oder zitierte
+Arbeitswörter sind allein kein Arbeitsnachweis. Tatsächliche Arbeit oberhalb
+des Prompts, nicht leere Eingabe, Scrollansicht, unbekannter Zustand und
+Zielabweichung bleiben getrennte Sperrgründe. Ein Protokollfingerprint beweist
+keine Identität und keine Isolation gegen denselben OS-Benutzer.
+Die letzte Bereitschaftsprüfung liegt vor dem ersten Eingabeversuch. Nur ein
+belegter `preinput_abort` erlaubt sicheres Warten; mögliche Eingabe/Return
+bleibt unbekannt und wird nicht wiederholt. Ein konkret durch ursprünglichen
+Quellstand und Ereignisse bewiesener früherer Vor-Eingabe-Abbruch kann separat
+lokal abgeglichen werden; das ist keine allgemeine Unknown-Freigabe.

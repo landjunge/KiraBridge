@@ -1162,3 +1162,51 @@ frische Zielbindung und Eingabefeld abzugleichen. Kein pauschales Löschen
 unbekannter Reservierungen. Erst ein beobachteter Ablauf im ursprünglichen
 Codex-Fenster samt bei Kira empfangener Antwort `KIRA-TEST-OK` schließt die
 praktische Abnahme. Während dieses Reparaturturns ist Codex aktiv.
+
+### RC11 tatsächlich aktiviert, E01-Abnahme weiterhin offen
+
+Commit `20620558aacd03f000843b01fa9a5d75b93901e7` wurde nach Groks Prüfung
+über `2f19aa0` auf den bestehenden Architekturbranch übernommen und gepusht.
+921 Gesamttests bestanden in169.89s; danach172 gezielte Tests am endgültigen
+Korrekturstand. Grok prüfte denselben Commit unabhängig:172 Tests in4.23s,
+Ruff sauber, Urteil ship im geprüften Umfang. Antwort
+`08fde798-0c91-4643-94c1-f348b67dcf4e`, Übergabe
+`channel-0692569ee1864f978a5ef8e5f92b3db3`, authentifizierter Empfang und
+verarbeitete Antwort/Abschlussquittung sind getrennt belegt. Grok hat zwei
+native Lese-Unteragenten gestartet; deren Ergebnisse lagen bei seiner Antwort
+noch nicht vor. Seine Abnahme beruht auf eigener Prüfung und tatsächlichen Tests.
+
+Wheel-SHA256 `5e636856a49d02f9ed632d8ce448f9a58103d14ccbffe13c318e1c0cbb95e4e6`,
+alle97 Paketdateien vor Installation mit dem Arbeitsstand byteweise verglichen.
+Koordinierte Aktivierung `activation-1de1241553d34a968effcd1cde06c90a`
+abgeschlossen, produktiver CorePID40409,86 Python-Dateien, Quell-SHA256
+`4acc2f65e9ea1f9b98f14058675a3dc81134353424a7a2d33ae8ae77679b6235`.
+Datei-SHA256 `fffa301b73fafb2a52c521d0349b2502c62220914ef89ef4665fa818e9855173`,
+effektiver SHA256 `333e5d37d11b40e3cc479af4e2c500ad33680c30c7331409678b33727d063dd5`.
+Die tatsächlich verwendete Datei erhielt ausschließlich die beiden zusätzlich
+belegten Codex-Protokollfelder; Freigaben, Gate-Abschaltung und sonstige
+Einstellungen sind semantisch identisch. Alle16 überwachten bestehenden App-/
+Agenten-/TTY-/Tunnelprozesse erhalten. Nur Core und Steuerdienst neu geladen.
+Kiras tatsächliche Connectorbindung bestätigte geladenen Quell-/Konfigurationspin.
+
+Der konkrete alte Kurztest bleibt noch unknown: Ein erster lokaler Abgleich
+wurde transaktional zurückgerollt, weil der bestehende Receiver-Abschluss
+absichtlich keine bereits unbekannten Jobs umklassifiziert. Es wurde keine
+Eingabe wiederholt. Der anschließend korrigierte, ausschließlich auf diesen
+belegten Vor-Eingabe-Abbruch beschränkte Operatorabgleich scheiterte vor jeder
+Mutation am erneut gesperrten Mac. Der Betriebssystemindikator
+`CGSSessionScreenIsLocked=Yes` bestätigt diese Sperre unabhängig vom Bridgecode.
+Ein begrenzter einmaliger lokaler Prüfer wartet höchstens15Minuten auf Entsperren,
+wiederholt dann alle Quell-/Ereignis-/Ziel-/Eingabeprüfungen und führt höchstens
+einen Abgleichversuch aus; er sendet selbst keinen Prompt oder Return. Die
+ursprüngliche Nachricht würde anschließend über die zentrale Route warten.
+Keine allgemeine Unknown-Wiederholung, kein neuer Testauftrag.
+
+Der getrennte Beobachter verwendet ausschließlich Kiras echte angebotene
+Connectorbindung und die ursprüngliche Konversation; Frist10:37:58UTC.
+Authentifizierter Codex-Empfang, einzelnes Return und tatsächlicher Antwortabruf
+von KIRA-TEST-OK bleiben bis zum beobachteten Ablauf offen. Ein Connectorabruf
+beweist kein hörbares Audio und weckt keinen inaktiven fremden Workchat.
+Der Codex-Reparaturturn muss enden, damit das ursprüngliche Fenster bereit wird.
+E02 wird mit isolierten, noch nicht Grok-abgenommenen Kandidaten vorbereitet;
+E03–E09 sind damit nicht als abgeschlossen ausgewiesen.
