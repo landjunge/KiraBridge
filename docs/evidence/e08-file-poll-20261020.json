@@ -1,0 +1,81 @@
+{
+  "scope": "E08.2 finite descriptor-based polling followup; no native watcher/full E08 acceptance",
+  "baseline": "38d2e9fc3e120b028bc2f0719aec11acffd78c20",
+  "branch": "feat/e08-file-poll-bounded-20261020",
+  "runtime_manifest": {
+    "algorithm": "SHA256 of compact sorted relative-path/SHA256 JSON",
+    "files": 92,
+    "sha256": "22db571762a1db3d1342fdd81a4942462c7c04254791af99e9bfe1eac851e912"
+  },
+  "behavior": [
+    "Explicit finite local file-index poll operator; default-disabled index unchanged; no Bridge startup work",
+    "Only existing fresh file.read ANDfile.list and descriptor Source; session stops on source-policy/root/exclusion changes",
+    "One active coalesced observation; cycles*batches<=1000, interval250\u20135000ms, cooperative duration1\u2013300s",
+    "Unchanged polling preserves cursor generation; actual metadata/content/add/rename/prune or derived-body repair changes epoch in the same transaction",
+    "Writer lock protects preserved-epoch observation start; content fingerprint uses bounded freshly authorized text, not unbounded cached bodies",
+    "Known local transaction/start failure forces bounded fallback with independent local uncertainty; no global fault-delivery or snapshot claim",
+    "SIGINT/SIGTERM unwind the operator and restore handlers; interrupted batch counters not claimed",
+    "Existing manual scan and current-source positive-hit gates retained; all enabled results complete=false"
+  ],
+  "validation": [
+    {
+      "cases": 245,
+      "seconds": 53.04,
+      "command": "PYTHONPATH=src:tests PYTHONDONTWRITEBYTECODE=1 python -m pytest -q -p no:cacheprovider tests/test_file_index_polling.py tests/test_file_index.py tests/test_file_index_boundaries.py tests/test_file_index_limits.py tests/test_file_index_aliases.py tests/test_read_query.py tests/test_permissions.py tests/test_security.py tests/test_full_access.py tests/test_desktop.py tests/test_mcp.py tests/test_cli_support.py tests/test_operations_service.py tests/test_tasks.py",
+      "note": "34 new poll cases +72 existing search/alias cases +139 existing core/permission/API/MCP/CLI regressions"
+    },
+    {
+      "cases": 21,
+      "result": "initial new-feature cases red on38d (missing observation/poll APIs); historical evidence retained"
+    },
+    {
+      "case": "coarse/colliding metadata content change",
+      "baseline_result": "new-source-token search missing, red",
+      "result": "bounded captured-content fingerprint fixes it"
+    },
+    {
+      "case": "actual child CLI SIGINT during wait",
+      "baseline_result": "not stopped within2s; own child terminated/reaped",
+      "result": "stopped status/exit0 after correction; no source batch counters claimed"
+    },
+    {
+      "command": "ruff check .; ruff format --check .; git diff --check",
+      "result": "passed;228Python files formatted"
+    },
+    {
+      "case": "unmodified independent double-leading-slash privacy regression",
+      "result": "passed separately"
+    },
+    {
+      "case": "real child CLI initial/update/rename/delete/create between poll cycles, source query, disabled control and core integrity",
+      "result": "passed on marked synthetic root; no live app/services/data"
+    },
+    {
+      "command": "uv build into private scratch",
+      "result": "new wheel/sdist built; six file-index modules byte-verified; no live installation"
+    }
+  ],
+  "default_enabled": false,
+  "new_dependency": false,
+  "native_filesystem_registration": false,
+  "live_config_grants_credentials_services_or_installation_changed": false,
+  "remaining": [
+    "Independent final-source review, CI and integration",
+    "Native event watcher secure registration/overflow delivery evidence",
+    "Update/delete duration and new polling-runtime10k/100k measurements",
+    "Windows source acceptance and activation"
+  ],
+  "baseline_measurements": {
+    "pin": "38d2e9fc3e120b028bc2f0719aec11acffd78c20",
+    "10k_actual_files": 10000,
+    "10k_text_bytes": 38502400,
+    "10k_build_seconds": 34.596905436133966,
+    "100k_actual_files": 100000,
+    "100k_text_bytes": 385024000,
+    "100k_build_rows": 89648,
+    "100k_build_cpu_seconds": 280.097435,
+    "100k_fts_latency_measured": false,
+    "note": "Private real-content Core/CLI/authHTTP measurements.100k builder stopped cooperatively under unchanged300CPU-s cap. Host load varied, cold=fresh process only; no SLO or transfer to polling bytes."
+  },
+  "private_logs": "e08-bridge-file-poll-verification/{final-targeted-regressions.log,root-alias-counterprobe-final.log,actual-cli-smoke-final.log,actual-cli-stop-final.log,package-proof.json,runtime-manifest-before-final-checks.json}; baseline benchmark artifacts separately frozen"
+}

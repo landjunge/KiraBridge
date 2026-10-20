@@ -1373,6 +1373,14 @@ Trefferprüfungen von einer nicht vorhandenen globalen Dateisystem-Snapshotgaran
 Ergebnisse bleiben ausdrücklich unvollständige Beobachtungen. Der
 [Prüfnachweis](evidence/e08-file-index-20261020.json) nennt gezielte Fälle und
 noch offene Abnahmen. Dieser Stand schließt **nicht E08 insgesamt**: Watcher,
-Änderungsbündelung/Overflow-Recovery, optionale Paketverdrahtung sowie Bridge-
-10k/100k-Messungen sind noch offen. Unabhängige Prüfung und Integration folgen
+native Overflow-Recovery und optionale Paketverdrahtung sind noch offen.
+Ein eigener Folgeschnitt ergänzt einen endlichen, expliziten Polling-Operator:
+gebündelter Abgleich über die bestehende Descriptor-Quelle, begrenzte Zyklen und
+keine native Pfadregistrierung. Unveränderte Beobachtungen erhalten Cursor;
+tatsächliche Änderungen invalidieren sie transaktional. Der
+[Polling-Prüfnachweis](evidence/e08-file-poll-20261020.json) grenzt diesen
+Operatorumfang von nativen Ereignissen ab. Der erste echte
+10k-Messlauf gehört zu `38d2e9f`; der dortige 100k-Aufbau blieb am CPU-Budget
+teilweise und belegt keine volle 100k-FTS-Latenz oder Polling-Laufzeit.
+Unabhängige Prüfung und Integration folgen
 über Root; keine Laufzeitaktivierung ist Bestandteil dieses Patches.

@@ -37,6 +37,7 @@ kirabridge --config /path/to/reviewed.toml file-index status example
 kirabridge --config /path/to/reviewed.toml file-index scan example --batches 100
 kirabridge --config /path/to/reviewed.toml file-index search example orchid --limit 20 --pages 10
 kirabridge --config /path/to/reviewed.toml file-index scan example --discard-cache --batches 100
+kirabridge --config /path/to/reviewed.toml file-index poll example --batches 50 --cycles 3 --interval-ms 1000
 ```
 
 `scan` reconciles create/update/rename/delete through a new bounded observation.
@@ -47,6 +48,50 @@ builders cannot prune or publish another builder's rows. `--restart` restarts an
 observation in the same process. `--discard-cache` deletes only the four fixed
 derived SQLite/journal filenames, after a local scope check. It never deletes
 source files or the Bridge task database. No remote rebuild/reset tool exists.
+
+### Finite polling operator
+
+`poll` periodically advances the same descriptor-checked reconciliation. It
+does not register native filesystem watches or start a Bridge background task.
+The feature still needs explicit enablement and both existing file rights.
+Default-disabled polling creates no index. The operator session is bound to its
+initial principal/project/source-policy token: rights, root or exclusion changes
+stop the session instead of following a newly selected root.
+
+Defaults are two cycles, ten batches per cycle, a 1000 ms interval and a
+60 second cooperative duration. Intervals are 250–5000 ms, durations 1–300
+seconds, and the product of cycles and batches cannot exceed 1000. Each batch
+retains the existing source bounds below. Slow passes continue on the next
+cycle; timer requests are coalesced into one active observation, not queued.
+The operator stops at its finite budget or an interrupt. Held source iterators
+are closed, and a later invocation starts a new bounded observation. It emits
+`poll_mode=bounded_poll` plus `running`, `finished`, `budget`, `stopped`,
+`disabled` or `fault`. `finished` describes the requested operator work, never
+global coverage. Polling changes no source files and exposes no old cached
+filenames or historical change counts.
+SIGINT/SIGTERM unwind the CLI's active batch and return a stopped status without
+claiming counters for the interrupted work; previous process handlers are restored.
+
+An unchanged polling observation preserves query cursors and the existing FTS
+candidate set. Observed content/metadata changes, additions, renames, deletions
+and repaired missing FTS bodies change the generation in the same cache
+transaction. Manual `scan` keeps its explicit rebuild behavior. During a poll
+of a previously reconciled cache, `index_status=observing` can retain FTS
+candidates; it means a historical candidate set is being checked, not current
+or exhaustive results. New/unreconciled caches keep the bounded fallback.
+The internal comparison includes the bounded captured text, so colliding/coarse
+metadata stamps cannot hide a content change. Comparison markers from an older
+cache are conservatively refreshed on its first observation, which may also
+invalidate cursors once.
+
+Commit/transaction failure stops the poll and forces the affected local owner
+to bounded scanning with an unavailable-index status. If cache writes fail,
+other processes cannot be promised receipt of a failure marker. No cache status
+is a global freshness authority; every positive hit still needs current source
+and rights checks, and every enabled result remains explicitly incomplete.
+Polling has no event-delivery or change-latency guarantee. Changes between
+observations or while the operator is stopped remain unverified until another
+bounded reconciliation observes them.
 
 Existing authenticated MCP clients can call the same dictionary-shaped tool:
 
@@ -64,7 +109,7 @@ cache-epoch changes. At most four query iterators and two scan iterators are
 retained per service. CLI `--pages` handles continuation inside one invocation.
 
 The small Python owner is `bridge.file_index`: `status(principal, project)`,
-`scan(principal, project, restart=False)` and
+`scan(principal, project, restart=False, observational=False)` and
 `query(principal, project, text, limit=20, cursor=None)`. It holds configuration
 and security references, not the entire Bridge or another module's database.
 
@@ -89,9 +134,9 @@ exhaustion. `reconciled_observation` means only that a bounded scan reached its
 observed end and pruned old cache rows. It does not mean current or exhaustive.
 `next_cursor=null` means observed iterator exhaustion, not proof of completeness.
 `partial` denotes scan omissions such as unreadable or oversized sources/depth
-limits; that status uses the bounded source fallback. Until a watcher exists,
-operators must explicitly reconcile after edits; there is no automatic update
-or freshness claim.
+limits; that status uses the bounded source fallback. Operators choose explicit
+scans or a finite polling session. There is no always-running update or
+freshness claim.
 
 Queries accept 1–16 literal terms, at most 512 UTF-8 bytes, and limit 1–100.
 C0, DEL and C1 controls are rejected. FTS5 uses quoted, bound literal AND terms;
@@ -130,9 +175,13 @@ already able to alter the Bridge process and its files.
 
 ## Deliberately unfinished E08.2 work
 
-No filesystem watcher, change batching, overflow/restart event recovery, watcher
-extra dependency, live activation, Windows acceptance, or 10k/100k Bridge
-performance acceptance is included. A watchfiles Intel-wheel test was isolated
+No native filesystem watcher, event overflow/restart recovery, watcher extra
+dependency, live activation, Windows acceptance, or performance acceptance is
+included. The finite polling operator provides bounded repeated reconciliation,
+not native event monitoring. On baseline `38d2e9f`, real 10k text measurements
+finished; the real 100k corpus reached only 89,648 indexed rows before its
+declared CPU budget, so no complete 100k FTS latency was measured. Those values
+do not describe the later polling runtime. A watchfiles Intel-wheel test was isolated
 in private scratch; that proves only the tested package/platform combination,
 not watcher integration. ThreadDesk measurements are not Bridge benchmarks.
 The existing architecture record tracks this partial slice and its review.
