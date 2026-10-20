@@ -299,7 +299,23 @@ class MessageManager:
                 + 1
             )
             if position > limits.max_conversation_messages and not members:
-                raise BridgeError("conversation_full", "Conversation message limit reached")
+                # An accepted request must remain answerable, including legacy
+                # conversations already at the limit. Only its first final reply
+                # gets this bounded allowance; new work/notes cannot extend it.
+                final_reply = (
+                    parent
+                    and parent["request_reply"]
+                    and parent["kind"] in {"question", "work"}
+                    and message.kind in {"answer", "result"}
+                    and not wants_reply
+                    and not self.store.db.execute(
+                        "SELECT 1 FROM messages WHERE reply_to=? "
+                        "AND sender=? AND recipient=? AND kind IN ('answer','result') LIMIT 1",
+                        (parent["id"], principal, message.recipient),
+                    ).fetchone()
+                )
+                if not final_reply:
+                    raise BridgeError("conversation_full", "Conversation message limit reached")
             if (
                 self.store.db.execute("SELECT count(*) FROM messages").fetchone()[0]
                 >= limits.max_total

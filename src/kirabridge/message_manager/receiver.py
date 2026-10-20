@@ -1,4 +1,4 @@
-"""One bounded receiver worker. Replies re-enter through authenticated recipient MCP."""
+"""One bounded worker per recipient; replies use authenticated recipient MCP."""
 
 from __future__ import annotations
 
@@ -290,14 +290,53 @@ class MessageReceiver:
             )
         self.messages.wake.set()
 
-    async def _dispatch_next(self):
+    def _preflight_failed(self, message_id, recipient, code):
+        """Persist failures before claim; only connection setup can be retried safely."""
+        with self.bridge.store.transaction():
+            row = self.bridge.store.db.execute(
+                "SELECT state,evidence FROM message_jobs WHERE message_id=?", (message_id,)
+            ).fetchone()
+            if not row or row["state"] != "queued":
+                return
+            previous = json.loads(row["evidence"])
+            now = time.time()
+            retry = previous.get("receiver_retry", {})
+            first = retry.get("first_failure_at", now)
+            attempts = retry.get("attempts", 0) + 1
+            deadline = first + self.bridge.config.messaging.receivers[recipient].timeout
+            evidence = {
+                "phase": "receiver_connect",
+                "reason": code,
+                "terminal_input_attempted": False,
+                "receiver_retry": {
+                    "first_failure_at": first,
+                    "attempts": attempts,
+                    "deadline": deadline,
+                },
+            }
+            if code != "peer_connection" or now >= deadline:
+                self._finish(message_id, "failed", evidence, code)
+                return
+            evidence["waiting_for_receiver"] = True
+            evidence["receiver_retry"]["next_attempt_at"] = min(
+                deadline, now + min(30, 2 ** min(attempts, 5))
+            )
+            self.bridge.store.db.execute(
+                "UPDATE message_jobs SET evidence=? WHERE message_id=?",
+                (canonical(evidence), message_id),
+            )
+            self.messages._event(message_id, "message.waiting_for_receiver", "local", evidence)
+
+    async def _dispatch_next(self, recipient=None):
         # One oldest message per recipient: a busy Codex must not hide ready Grok.
         rows = self.bridge.store.db.execute(
-            "SELECT m.id,m.sender,m.recipient,m.created,m.acknowledged FROM messages m "
+            "SELECT m.id,m.sender,m.recipient,m.created,m.acknowledged,j.evidence FROM messages m "
             "JOIN message_jobs j ON j.message_id=m.id WHERE j.state='queued' "
+            "AND (? IS NULL OR m.recipient=?) "
             "AND NOT EXISTS (SELECT 1 FROM messages older JOIN message_jobs q "
             "ON q.message_id=older.id WHERE q.state='queued' "
-            "AND older.recipient=m.recipient AND older.seq<m.seq) ORDER BY m.seq LIMIT 17"
+            "AND older.recipient=m.recipient AND older.seq<m.seq) ORDER BY m.seq LIMIT 17",
+            (recipient, recipient),
         ).fetchall()
         for row in rows:
             if row["recipient"] not in self.bridge.config.messaging.receivers:
@@ -306,6 +345,13 @@ class MessageReceiver:
                 continue
             if row["acknowledged"] is not None:
                 self._claim(row["id"])  # Completes externally received work, without a CLI turn.
+                continue
+            retry = json.loads(row["evidence"]).get("receiver_retry", {})
+            now = time.time()
+            if retry and now >= retry["deadline"]:
+                self._preflight_failed(row["id"], row["recipient"], "peer_connection")
+                continue
+            if now < retry.get("next_attempt_at", 0):
                 continue
             try:
                 if self.bridge.config.visible_handoffs.enabled:
@@ -324,14 +370,34 @@ class MessageReceiver:
                     if claimed:
                         await self._process(pool, *claimed)
                         return True
-            except BridgeError:
-                pass
+            except BridgeError as exc:
+                self._preflight_failed(row["id"], row["recipient"], exc.code)
         return False
 
     async def _loop(self):
+        # Waiting for Codex's final reply must not prevent a ready Grok from
+        # receiving delegated work. Aliases of one physical pane share an owner.
+        locks = {}
+        async with asyncio.TaskGroup() as group:
+            for recipient in self.bridge.config.messaging.receivers:
+                binding = self.bridge.config.visible_handoffs.bindings.get(recipient)
+                target = (
+                    ("pane", binding.pane_id)
+                    if self.bridge.config.visible_handoffs.enabled and binding
+                    else ("recipient", recipient)
+                )
+                group.create_task(
+                    self._recipient_loop(recipient, locks.setdefault(target, asyncio.Lock()))
+                )
+
+    async def _recipient_loop(self, recipient, lock):
         while not self.stopping:
             self.messages.wake.clear()
-            if await self._dispatch_next():
+            async with lock:
+                if self.stopping:
+                    return
+                dispatched = await self._dispatch_next(recipient)
+            if dispatched:
                 continue
             try:
                 await asyncio.wait_for(self.messages.wake.wait(), 2)
