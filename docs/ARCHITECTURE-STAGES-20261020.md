@@ -1353,3 +1353,24 @@ Connector empfangen und um **13:40:20 UTC** mit dessen tatsächlichem Receipt
 quittiert. Ihre Meldung trennt Code, Dienst, Terminalübergabe, Rückantwort und
 verbleibende historische Unklarheiten. Der maschinenlesbare Nachweis enthält
 beide Aktivierungen und die jeweilige genaue Prüfreichweite.
+
+## E08.2: optionaler Dateiindex, erster begrenzter Prüfschnitt
+
+Auf Architekturbasis `41f4b891a77abd3635738d10a6c38b66efc9ff8d` ergänzt ein eigener
+Branch einen standardmäßig ausgeschalteten, separaten Projektdatei-Cache mit
+begrenztem Scan/Reconcile, Quellprüfung je Treffer und `file.search` im bestehenden
+authentisierten `read_query`. Ein lokaler `file-index`-CLI-Bedienweg erlaubt den
+ausdrücklichen Cacheaufbau/-ersatz. Die vorhandenen Rechte `file.read` **und**
+`file.list` bleiben erforderlich; Projektwahl schafft keine Freigabe. Weder `/`
+noch Home werden als Scanwurzel akzeptiert, aus Rechten werden keine Wurzeln
+abgeleitet. Kein Produktdatenbestand, Dienst, Credential oder Livekonfiguration
+wurde dafür verändert.
+
+Der [genaue Bedien- und Sicherheitsvertrag](FILE-SEARCH.md) trennt frische
+Trefferprüfungen von einer nicht vorhandenen globalen Dateisystem-Snapshotgarantie.
+Ergebnisse bleiben ausdrücklich unvollständige Beobachtungen. Der
+[Prüfnachweis](evidence/e08-file-index-20261020.json) nennt gezielte Fälle und
+noch offene Abnahmen. Dieser Stand schließt **nicht E08 insgesamt**: Watcher,
+Änderungsbündelung/Overflow-Recovery, optionale Paketverdrahtung sowie Bridge-
+10k/100k-Messungen sind noch offen. Unabhängige Prüfung und Integration folgen
+über Root; keine Laufzeitaktivierung ist Bestandteil dieses Patches.

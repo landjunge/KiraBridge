@@ -14,7 +14,12 @@ from kirabridge.permissions import state_exclusions
 
 class ReadQuery(Input):
     operation: Literal[
-        "file.read", "file.list", "terminal.output", "session.catalog", "session.read"
+        "file.read",
+        "file.list",
+        "file.search",
+        "terminal.output",
+        "session.catalog",
+        "session.read",
     ]
     path: str | None = Field(default=None, max_length=4096)
     task_id: str | None = Field(default=None, max_length=128)
@@ -23,9 +28,30 @@ class ReadQuery(Input):
     tail: bool = False
     pane_id: str | None = Field(default=None, pattern=r"^(%[0-9]+|terminal:[0-9]+:ttys[0-9]+)$")
     expected_pid: int | None = Field(default=None, gt=0)
+    project: str | None = Field(default=None, pattern=r"^[A-Za-z0-9_-]{1,128}$")
+    text: str | None = Field(default=None, max_length=512)
+    limit: int | None = Field(default=None, ge=1, le=100, strict=True)
+    cursor: str | None = Field(default=None, max_length=64)
 
     @model_validator(mode="after")
     def selector(self):
+        if self.operation == "file.search":
+            if (
+                not self.project
+                or self.path is not None
+                or self.task_id is not None
+                or self.offset
+                or self.tail
+                or self.pane_id is not None
+                or self.expected_pid is not None
+                or self.max_bytes != 32768
+            ):
+                raise ValueError("file.search requires only configured project/text/limit/cursor")
+            if self.text is None and (self.cursor is not None or self.limit is not None):
+                raise ValueError("search status does not accept pagination")
+            return self
+        if any(value is not None for value in (self.project, self.text, self.limit, self.cursor)):
+            raise ValueError("search selectors require file.search")
         if self.operation.startswith("session."):
             if self.path or self.task_id or self.offset or self.tail:
                 raise ValueError(
@@ -72,6 +98,18 @@ async def read_query_async(bridge, principal: str, query: ReadQuery) -> dict:
 
 
 def read_query(bridge, principal: str, query: ReadQuery) -> dict:
+    if query.operation == "file.search":
+        if query.text is None:
+            return {
+                "operation": query.operation,
+                **bridge.file_index.status(principal, query.project),
+            }
+        return {
+            "operation": query.operation,
+            **bridge.file_index.query(
+                principal, query.project, query.text, limit=query.limit or 20, cursor=query.cursor
+            ),
+        }
     capability = "process.inspect" if query.operation == "terminal.output" else query.operation
     policy = bridge.security.principal(principal, capability)
     if query.operation == "terminal.output":

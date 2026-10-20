@@ -377,6 +377,10 @@ async def execute(args) -> None:
                 args.approve,
                 args.original if args.command == "retry" else None,
             )
+        elif args.command == "file-index":
+            from kirabridge.file_index.cli import execute as execute_index
+
+            execute_index(bridge.file_index, args.principal, args, emit)
         elif args.command in {"ls", "read", "write", "exec", "ask", "clipboard"}:
             policy = config.principals.get(args.principal)
             if not policy or not policy.roots:
@@ -478,6 +482,7 @@ async def execute(args) -> None:
             )
     finally:
         # __aexit__ also closes; sqlite close is idempotent.
+        bridge.close_file_index()
         bridge.store.close()
 
 
@@ -516,6 +521,9 @@ def main() -> None:
     parser.add_argument("--config", help="TOML policy file (or KIRABRIDGE_CONFIG)")
     parser.add_argument("--principal", default="local", help="Local CLI/stdio policy identity")
     sub = parser.add_subparsers(dest="command", required=True)
+    from kirabridge.file_index.cli import register as register_file_index
+
+    register_file_index(sub)
     setup = sub.add_parser("setup", help="Create private local policy, credentials and CLI command")
     setup.add_argument("--workspace", default=str(Path.home() / "workspace/KiraBridge"))
     sub.add_parser("status", help="Query the running local daemon")

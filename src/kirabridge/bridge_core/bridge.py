@@ -119,6 +119,7 @@ class Bridge:
         self.store.result_codec = self.outputs
         self.terminal = TerminalManager(config.terminal)
         self.filesystem = FilesystemManager()
+        self._file_index = None
         self.images = ImageManager()
         self.clipboard = ClipboardManager()
         self.processes = ProcessManager(self.terminal)
@@ -176,6 +177,18 @@ class Bridge:
         self.teams = TeamManager(self)
         self.messages.voice_policy.teams = self.teams
         self.team_dispatcher = TeamDispatcher(self)
+
+    @property
+    def file_index(self):
+        if self._file_index is None:
+            from kirabridge.file_index import FileIndex
+
+            self._file_index = FileIndex(self.config, self.security)
+        return self._file_index
+
+    def close_file_index(self):
+        if self._file_index is not None:
+            self._file_index.close()
 
     def validate(self, request: TaskRequest) -> None:
         model = INPUTS.get(request.operation)
@@ -559,4 +572,5 @@ class Bridge:
         finally:
             await self.tasks.stop()
             await self.threaddesk.close()
+            self.close_file_index()
             self.store.close()

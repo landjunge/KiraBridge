@@ -177,7 +177,11 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
 
         query.operation: file.read (path, max_bytes<=65536, offset or tail),
         file.list (path; at most 100 entries), terminal.output (owned task_id,
-        max_bytes<=65536). session.catalog lists existing terminal handles;
+        max_bytes<=65536).
+        file.search (configured project, text, limit<=100, process-local cursor;
+        omit text for index status). Search requires file.read AND file.list;
+        it never configures roots or grants and is disabled by default.
+        session.catalog lists existing terminal handles;
         session.read requires exact pane_id and expected_pid, max_bytes<=65536.
         Session reads require session.inspect and the shared permission decision.
         When approval is required, submit the same operation using task_request.
