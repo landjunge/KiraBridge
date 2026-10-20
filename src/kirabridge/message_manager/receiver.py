@@ -38,6 +38,10 @@ class MessageReceiver:
         self.stopping = False
 
     async def start(self):
+        if self.worker and self.worker.done():
+            if not self.worker.cancelled():
+                self.worker.exception()  # Consume the finished task before replacing its handle.
+            self.worker = None
         if self.worker or not self.bridge.config.messaging.receivers:
             return
         # The task dispatcher owns the exclusive runtime lock before this is called.
@@ -68,10 +72,14 @@ class MessageReceiver:
     async def stop(self):
         self.stopping = True
         self.messages.wake.set()
-        if self.worker:
+        worker = self.worker
+        if worker:
             # Each adapter invocation has its own configured finite timeout.
-            await self.worker
-            self.worker = None
+            try:
+                await asyncio.shield(worker)
+            finally:
+                if self.worker is worker and worker.done():
+                    self.worker = None
 
     def _finish(self, message_id, state, evidence, error=None, reply_id=None):
         from kirabridge.completion_manager import completion_payload, record_notice
@@ -213,6 +221,8 @@ class MessageReceiver:
                 "SELECT state,evidence FROM message_jobs WHERE message_id=?", (message_id,)
             ).fetchone()
             previous = json.loads(row["evidence"]) if row else {}
+            if "receiver_retry" in previous:
+                evidence["receiver_retry"] = previous["receiver_retry"]
 
             def comparable(value):
                 value = {**value}
@@ -303,7 +313,9 @@ class MessageReceiver:
             retry = previous.get("receiver_retry", {})
             first = retry.get("first_failure_at", now)
             attempts = retry.get("attempts", 0) + 1
-            deadline = first + self.bridge.config.messaging.receivers[recipient].timeout
+            deadline = retry.get(
+                "deadline", first + self.bridge.config.messaging.receivers[recipient].timeout
+            )
             evidence = {
                 "phase": "receiver_connect",
                 "reason": code,
@@ -327,6 +339,25 @@ class MessageReceiver:
             )
             self.messages._event(message_id, "message.waiting_for_receiver", "local", evidence)
 
+    def _unexpected_dispatch_failure(self, message_id):
+        """Never replay an unexpected fault after claim or expose exception contents."""
+        with self.bridge.store.transaction():
+            row = self.bridge.store.db.execute(
+                "SELECT state,evidence FROM message_jobs WHERE message_id=?", (message_id,)
+            ).fetchone()
+            if not row or row["state"] not in {"queued", "running"}:
+                return
+            unclaimed = row["state"] == "queued"
+            code = "receiver_preflight_failed" if unclaimed else "receiver_interrupted"
+            evidence = {
+                "reason": code,
+                "phase": "receiver_preflight" if unclaimed else "receiver_claimed",
+                "last_observation_sha256": digest(row["evidence"]),
+            }
+            if unclaimed:
+                evidence["terminal_input_attempted"] = False
+            self._finish(message_id, "failed" if unclaimed else "unknown", evidence, code)
+
     async def _dispatch_next(self, recipient=None):
         # One oldest message per recipient: a busy Codex must not hide ready Grok.
         rows = self.bridge.store.db.execute(
@@ -341,19 +372,20 @@ class MessageReceiver:
         for row in rows:
             if row["recipient"] not in self.bridge.config.messaging.receivers:
                 continue
-            if not self.bridge.store.can_claim(row["created"]):
-                continue
-            if row["acknowledged"] is not None:
-                self._claim(row["id"])  # Completes externally received work, without a CLI turn.
-                continue
-            retry = json.loads(row["evidence"]).get("receiver_retry", {})
-            now = time.time()
-            if retry and now >= retry["deadline"]:
-                self._preflight_failed(row["id"], row["recipient"], "peer_connection")
-                continue
-            if now < retry.get("next_attempt_at", 0):
-                continue
             try:
+                if not self.bridge.store.can_claim(row["created"]):
+                    continue
+                if row["acknowledged"] is not None:
+                    # Completes externally received work without a CLI turn.
+                    self._claim(row["id"])
+                    continue
+                retry = json.loads(row["evidence"]).get("receiver_retry", {})
+                now = time.time()
+                if retry and now >= retry["deadline"]:
+                    self._preflight_failed(row["id"], row["recipient"], "peer_connection")
+                    continue
+                if now < retry.get("next_attempt_at", 0):
+                    continue
                 if self.bridge.config.visible_handoffs.enabled:
                     try:
                         await self.bridge.visible_handoffs.dispatch_ready(
@@ -372,6 +404,8 @@ class MessageReceiver:
                         return True
             except BridgeError as exc:
                 self._preflight_failed(row["id"], row["recipient"], exc.code)
+            except Exception:
+                self._unexpected_dispatch_failure(row["id"])
         return False
 
     async def _loop(self):
@@ -391,14 +425,32 @@ class MessageReceiver:
                 )
 
     async def _recipient_loop(self, recipient, lock):
+        fault_recorded = False
         while not self.stopping:
             self.messages.wake.clear()
-            async with lock:
-                if self.stopping:
-                    return
-                dispatched = await self._dispatch_next(recipient)
-            if dispatched:
-                continue
+            try:
+                async with lock:
+                    if self.stopping:
+                        return
+                    dispatched = await self._dispatch_next(recipient)
+                fault_recorded = False
+                if dispatched:
+                    continue
+            except Exception:
+                # A storage/observation fault outside one row must not cancel siblings.
+                # Cancellation itself remains a BaseException and still propagates.
+                if not fault_recorded:
+                    try:
+                        with self.bridge.store.transaction():
+                            self.bridge.store.audit(
+                                "message.receiver_loop_failed",
+                                recipient,
+                                None,
+                                {"reason": "receiver_loop_failed"},
+                            )
+                    except Exception:
+                        pass  # The store itself may be unavailable; retry only the observation.
+                    fault_recorded = True
             try:
                 await asyncio.wait_for(self.messages.wake.wait(), 2)
             except TimeoutError:
