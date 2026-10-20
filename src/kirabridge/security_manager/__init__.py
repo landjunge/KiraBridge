@@ -8,6 +8,7 @@ import time
 
 from kirabridge.bridge_core.config import Config, PrincipalConfig
 from kirabridge.bridge_core.models import BridgeError, TaskRequest, digest
+from kirabridge.operations import capability_for
 from kirabridge.task_manager.store import Store
 
 
@@ -27,7 +28,9 @@ class SecurityManager:
 
     def principal(self, name: str, capability: str | None = None) -> PrincipalConfig:
         principal = self.config.principals.get(name)
-        if principal is None or (capability and capability not in principal.capabilities):
+        if principal is None or (
+            capability and capability_for(capability) not in principal.capabilities
+        ):
             raise BridgeError("forbidden", "Capability not granted")
         return principal
 

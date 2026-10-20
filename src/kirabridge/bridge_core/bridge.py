@@ -115,6 +115,11 @@ class Bridge:
         self.security = SecurityManager(config, self.store)
         self.terminal = TerminalManager(config.terminal)
         self.sessions = SessionManager(self)
+        from kirabridge.terminal_queries import TerminalQueries
+
+        self.terminal_queries = TerminalQueries(
+            self.security, self.sessions, self.store, config.read_concurrency
+        )
         self.filesystem = FilesystemManager()
         self.images = ImageManager()
         self.clipboard = ClipboardManager()
@@ -254,6 +259,7 @@ class Bridge:
                 "maintenance": self.store.maintenance_state(),
                 "accepting_new_work": self.store.maintenance_state() is None,
             },
+            "desktop_last_observation": self.sessions.desktop.last,
             "diagnostics_storage": self.diagnostics.status(),
             "message_peers": policy.message_peers,
             "message_receiver_active": bool(
@@ -317,11 +323,13 @@ class Bridge:
             return await self.check_connection(principal, args.device, args.mode)
         if operation == "session.catalog":
             await running({"evidence_type": "terminal_catalog_query"})
-            return await self.sessions.catalog(principal)
+            return await self.terminal_queries.execute(
+                principal, operation, arguments, task_id=task["id"]
+            )
         if operation == "session.read":
             await running({"evidence_type": "terminal_read_query", "pane_id": args.pane_id})
-            return await self.sessions.read_observed(
-                principal, args.pane_id, args.expected_pid, max_bytes=args.max_bytes
+            return await self.terminal_queries.execute(
+                principal, operation, arguments, task_id=task["id"]
             )
         if operation == "terminal.execute":
             result = await self.terminal.execute(

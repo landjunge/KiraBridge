@@ -246,11 +246,15 @@ async def test_four_senders_use_same_visible_route_and_distinct_confirmation(vis
 
 
 @pytest.mark.parametrize("failure", ["binding", "pid", "agent_pid", "ready"])
-async def test_missing_changed_or_unready_target_never_spawns_or_sends(visible, failure):
+@pytest.mark.parametrize("sender", ["chatgpt", "grok_app", "codex", "grok"])
+async def test_missing_changed_or_unready_target_never_spawns_or_sends(visible, failure, sender):
     bridge, transport = visible
-    binding = bridge.config.visible_handoffs.bindings["grok"]
+    target = "codex" if sender == "grok" else "grok"
+    transport["target"] = target
+    transport["text"] = "› " if target == "codex" else "╭\n│ ❯ │\n╰"
+    binding = bridge.config.visible_handoffs.bindings[target]
     if failure == "binding":
-        del bridge.config.visible_handoffs.bindings["grok"]
+        del bridge.config.visible_handoffs.bindings[target]
     elif failure == "pid":
         binding.expected_pid = 999
     elif failure == "agent_pid":
@@ -259,8 +263,8 @@ async def test_missing_changed_or_unready_target_never_spawns_or_sends(visible, 
         transport["text"] = "Agent currently working"
     with pytest.raises(BridgeError):
         await bridge.visible_handoffs.execute(
-            {"id": "blocked", "principal": "codex"},
-            AgentInput(agent="grok", prompt="test", cwd="/tmp"),
+            {"id": "blocked", "principal": sender},
+            AgentInput(agent=target, prompt="test", cwd="/tmp"),
             callback,
             callback,
         )

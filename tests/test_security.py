@@ -77,6 +77,7 @@ def test_http_rejects_missing_short_and_duplicate_tokens(monkeypatch):
 def test_private_state_permissions(tmp_path):
     state = tmp_path / "state"
     state.mkdir(mode=0o755)
+    state.chmod(0o755)  # The fixture must stay public even under an owner-only test umask.
     with pytest.raises(BridgeError, match="owner-only"):
         Store(state / "test.sqlite")
     state.chmod(0o700)

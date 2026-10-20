@@ -14,6 +14,7 @@ from kirabridge.bridge_core.models import (
     canonical,
     digest,
 )
+from kirabridge.operations import OPERATIONS
 from kirabridge.platform_adapters import RuntimeLock
 from kirabridge.security_manager import SecurityManager, request_hash
 from kirabridge.task_manager.store import Store
@@ -109,23 +110,13 @@ class TaskManager:
                 "SELECT 1 FROM tasks WHERE id=?", (request.task_id,)
             ).fetchone():
                 raise BridgeError("task_id_conflict", "Task identifier is already reserved")
-            control = request.operation in {
-                "process.list",
-                "process.inspect",
-                "process.terminate",
-                "agent.status",
-                "policy.inspect",
-                "handoff.status",
-                "workflow.stop",
-            }
-            comparison = "IN" if control else "NOT IN"
-            count = self.store.db.execute(
-                f"SELECT COUNT(*) FROM tasks WHERE state IN ('created','queued') "
-                f"AND operation {comparison} "
-                "('process.list','process.inspect','process.terminate',"
-                "'agent.status','policy.inspect','handoff.status','workflow.stop')"
-            ).fetchone()[0]
-            capacity = self.config.max_control_queued if control else self.config.max_queued
+            lane = OPERATIONS[request.operation].execution_class
+            count = self.store.queued_count(lane)
+            capacity = {
+                "normal": self.config.max_queued,
+                "read": self.config.max_read_queued,
+                "stop": self.config.max_control_queued,
+            }[lane]
             if count >= capacity:
                 raise BridgeError("queue_full", "Queue capacity reached")
             effective_target = completion_target or "default"
@@ -277,10 +268,14 @@ class TaskManager:
         try:
             self.store.recover()
             self.workers = [
-                asyncio.create_task(self._worker(False)) for _ in range(self.config.concurrency)
+                asyncio.create_task(self._worker("normal")) for _ in range(self.config.concurrency)
             ]
-            # Cancellation stays reachable when all execution slots are occupied.
-            self.workers.append(asyncio.create_task(self._worker(True)))
+            self.workers.extend(
+                asyncio.create_task(self._worker("read"))
+                for _ in range(self.config.read_concurrency)
+            )
+            # Read traffic never occupies the independently reserved stop worker.
+            self.workers.append(asyncio.create_task(self._worker("stop")))
         except BaseException:
             self.lock.release()
             raise
@@ -301,13 +296,13 @@ class TaskManager:
                 (time.time() + self.config.lease_seconds, task_id, self.owner),
             )
 
-    async def _worker(self, control: bool) -> None:
+    async def _worker(self, lane: str) -> None:
         while True:
             self.wake.clear()
             self.input_policy.expire()
             if self.maintenance:
                 self.maintenance()
-            task = self.store.claim(self.owner, self.config.lease_seconds, control)
+            task = self.store.claim(self.owner, self.config.lease_seconds, lane)
             if task is None:
                 try:
                     await asyncio.wait_for(self.wake.wait(), 2.0)
@@ -320,15 +315,16 @@ class TaskManager:
         heartbeat = asyncio.create_task(self._heartbeat(task["id"]))
         observed_effect = False
         progress_count = 0
+        mutating = OPERATIONS[task["operation"]].effect != "read"
 
         async def running(evidence):
             nonlocal observed_effect
-            observed_effect = True
+            observed_effect = mutating
             self.store.transition(task["id"], State.RUNNING, evidence, owner=self.owner)
 
         async def progress(evidence):
             nonlocal observed_effect, progress_count
-            observed_effect = True
+            observed_effect = mutating
             progress_count += 1
             if progress_count > 256:
                 raise UncertainExecution("progress_limit", "Task progress event limit reached")

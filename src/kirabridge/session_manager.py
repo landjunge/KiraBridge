@@ -12,6 +12,7 @@ from pydantic import Field
 
 from kirabridge.bridge_core.models import BridgeError, Input, UncertainExecution
 from kirabridge.filesystem_manager import PathScope
+from kirabridge.platform_adapters.desktop import DESKTOP_MESSAGES, MacDesktop
 from kirabridge.terminal_manager import check_executable
 
 
@@ -41,10 +42,12 @@ class SessionManager:
         self.bridge, self.socket_name = bridge, socket_name
         self.lock = asyncio.Lock()
         self.observed_outputs = {}
+        self.desktop = MacDesktop()
 
     async def native(self, source, *, mutation=False):
         if sys.platform != "darwin":
             raise BridgeError("session_transport_unavailable", "Terminal.app requires macOS")
+        await self.desktop.require_interactive()
         child = await asyncio.create_subprocess_exec(
             "/usr/bin/osascript",
             "-l",
@@ -273,6 +276,9 @@ const tab = tabs[0];"""
 
     async def selected(self, principal, pane_id, expected_pid):
         catalog = await self.catalog(principal)
+        native_error = catalog.get("transport_errors", {}).get("terminal_app", {})
+        if pane_id.startswith("terminal:") and native_error.get("code") in DESKTOP_MESSAGES:
+            raise BridgeError(native_error["code"], native_error["message"])
         matches = [
             row
             for row in catalog["sessions"]
