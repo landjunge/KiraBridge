@@ -1,6 +1,6 @@
 # Architektur
 
-Stand 20. Oktober 2026: produktiver Ausgangspunkt `0.8.0rc3`, Quellpin
+Stand 20. Oktober 2026: produktiv `0.8.0rc7`; gesicherter Ausgangspunkt `0.8.0rc3`, Quellpin
 `4188f001d405a9f04ee63f6bbe1b088c6f39d26e`, Dokumentation `d9727ac1`,
 portable Prüfergänzung `5680921`. Die schrittweise Weiterentwicklung und ihre
 tatsächlichen Abnahmen stehen in [ARCHITECTURE-STAGES-20261020.md](ARCHITECTURE-STAGES-20261020.md).
@@ -17,6 +17,7 @@ MCP und CLI sind Eingänge in dieselbe `Bridge`. Sie reichen versionierte Anfrag
 | mcp_gateway | Offizielles SDK, stdio/Streamable HTTP, ausgehende getrennte Client-Verbindungen |
 | terminal_manager | Begrenzte Prozesssitzungen, Ausgaben, Zeitlimits, Prozessgruppen |
 | session_manager | Bestehende Terminal.app-/tmux-Ziele, exakte Fenster-/TTY-/PID-Prüfung, Einfügen und separates Return |
+| session_ports | Benannte Autorisierungs-, Freigabe-, Audit- und Transportpartner ohne gesamtes Bridge-Objekt (Etappe-5-Kandidat) |
 | visible_handoff | Verbindliche persistierte bestehende CLI-Ziele für alle Absender und Adapter; getrennte Transport-/Quittungs-/Antwortbelege, kein Hintergrundersatz |
 | filesystem_manager | Pfadprüfung, descriptor-relative Operationen, begrenztes Lesen, atomisches Schreiben |
 | clipboard_manager | Explizite Textübertragung, Byte-Limits, Rücklesebestätigung, kein Polling |
@@ -24,6 +25,11 @@ MCP und CLI sind Eingänge in dieselbe `Bridge`. Sie reichen versionierte Anfrag
 | security_manager | Capability-Prüfung und kryptografisch zufällige, einmalige Aufgabenfreigaben |
 | platform_adapters | macOS/Linux, Prozessstart und Sperren; Windows-Erweiterungspunkt |
 | audit_manager | Prüfung einer SHA-256-verknüpften Audit-Kette |
+| operator_queries | Lokale Status-/Protokollabfragen über fachliche Besitzer (Etappe-5-Kandidat) |
+| operator_application | Zentrale Verdrahtung der schmalen lokalen Anwendungspartner (Kandidat) |
+| operator_control / operator_actions | Bedienlogik und atomare Aktionsreservierung; keine HTTP-Verantwortung (Kandidat) |
+| operator_platform | Austauschbare Prozessbeobachtung/-aufrufe und authentifizierter lokaler MCP-Client (Kandidat) |
+| operations_service | Dauerhafte Wartungssperre, geprüfte Konfigurationsaktivierung, Wiederherstellung |
 
 Es gibt drei direkte Laufzeitabhängigkeiten: `mcp`, `httpx` und `uvicorn`. Pydantic wird durch das MCP SDK verwendet. `uv.lock` hält auch transitive Versionen fest. Python 3.11 ist die Untergrenze, damit ein Intel-Mac ohne GPU teilnehmen kann.
 
@@ -68,15 +74,38 @@ SQLite läuft mit WAL, `synchronous=FULL` und Fremdschlüsseln. Die Verbrauchsma
 
 Ein exklusiver POSIX-Lock erlaubt nur einen Dispatcher pro Datenverzeichnis. Mehrere kurzlebige administrative Prozesse dürfen gleichzeitig Freigaben schreiben oder Status lesen. Nach Lock-Übernahme werden alte `accepted`/`running`-Aufträge `unknown`; nur noch nie beanspruchte `queued`-Aufträge laufen automatisch weiter. Abgelaufene Leases berechtigen niemals zum blinden Wiederholen. Heartbeats aktualisieren die Lease, ohne fortlaufend Audit-Ereignisse zu erzeugen.
 
-Standardmäßig arbeiten zwei Ausführungs-Worker und ein reservierter Prozesssteuerungs-Worker. So bleibt das Beenden eines eigenen Prozesses auch bei ausgelasteten Ausführungsslots erreichbar. Im Leerlauf warten Worker auf ein Event; alle zwei Sekunden erfolgt ein Abgleich für Aufträge, die externe lokale CLI-Prozesse eingereiht haben.
+Standardmäßig arbeiten zwei Ausführungs-Worker, zwei reservierte Lese-Worker und ein eigener Stopp-Worker. Die produktive Konfiguration wählt einen normalen Ausführungs-Worker. Prozessstopps und begrenzte Leseabfragen behalten damit eigene Kapazität. Im Leerlauf warten Worker auf ein Event; alle zwei Sekunden erfolgt ein Abgleich für Aufträge, die externe lokale CLI-Prozesse eingereiht haben.
 
-Der noch nicht aktivierte Etappe-4-Kandidat trennt zwei reservierte Lese-Worker
+Der aktivierte Etappe-4-Stand `0.8.0rc7` trennt zwei reservierte Lese-Worker
 von einem eigenen Stopp-Worker. Terminalabfragen nutzen unabhängig vom
 Clientweg `TerminalQueries`, `session.inspect`, dieselbe Freigabeentscheidung
 und ein Budget von acht Sekunden. Die Operationsbeschreibungen enthalten
 Capability, Wirkung und Ausführungsklasse und dienen Katalog, Vorprüfung und
 Queue gemeinsam. `max_read_queued` begrenzt die neue Lesequeue. Details und
 der jeweilige tatsächliche Abnahmestand stehen in der Etappenakte.
+
+Die lokalen HTTP-Oberflächen des Etappe-5-Kandidaten kennen keine SQL-Tabellen,
+kein vollständiges Bridge-Objekt und keine Prozessstart-APIs. Der Anwendungskern
+nutzt Besitzerabfragen, den bestehenden Betriebsdienst und getrennte Plattform-
+und MCP-Ports. Konsolenaktionen werden vor Ausführung atomar reserviert; auch
+getrennte Steuerfenster-Prozesse starten dieselbe Kennung nur einmal. Unklare
+Ausgänge bleiben unklar und werden nicht automatisch wiederholt. Diese interne
+Entkopplung ist keine Sandbox gegen freie OS-Rechte des Mac-Benutzers.
+
+Im Etappe-5-Kandidaten koordiniert `SessionManager` Autorisierung und exakte
+Auswahl über `SessionPorts`. `platform_adapters.terminal_app` und
+`platform_adapters.tmux` kapseln die bisher nachgewiesenen Plattformbefehle.
+Adapter können ohne vollständigen Kern ersetzt werden. Ein unklarer Eingabeausgang
+führt zu keiner automatischen Wiederholung und zu keinem anderen Transport.
+Die sichtbare zentrale Übergabe behält ihre persistierte Zielbindung für alle
+Absender einschließlich Grok und für Rückantworten.
+
+Die Aktivierungsabfragen des Etappe-5-Kandidaten werden ebenfalls von den
+jeweiligen Fachbesitzern ausgeführt. `OperationsService` erhält nur die gemeinsame
+Abfragefunktion und übergibt den eigenen Transaktionskontext. Insbesondere gilt
+die Ergebnisverarbeitung eines Teamauftrags als laufende Arbeit; vor ihrem Abschluss
+wird kein Neustart ausgelöst. Die Etappenakte trennt Umsetzung, Grok-Prüfung,
+Quellpin, Aktivierung und tatsächliche praktische Nachweise.
 
 Die aktivierte Version `0.8.0rc4` ergänzt die persistenten Zustände sichtbarer Übergaben
 und einmaliger Fensterstarts additiv in Schema 2. Neue CLI-Übergaben müssen

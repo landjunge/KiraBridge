@@ -87,7 +87,7 @@ async def test_cached_read_tool_discovers_reads_and_rejects_stale_pid(bridge, co
         return "bounded-output"
 
     monkeypatch.setattr(bridge.sessions, "catalog", catalog)
-    monkeypatch.setattr(bridge.sessions, "native", native)
+    monkeypatch.setattr(bridge.sessions.terminal_app, "native", native)
     result = await read_query_async(bridge, "local", ReadQuery(operation="session.catalog"))
     assert result["sessions"] == [selected] and not reads
     with pytest.raises(BridgeError, match="exact current"):

@@ -14,6 +14,7 @@ from kirabridge.bridge_core.bridge import Bridge
 from kirabridge.bridge_core.config import load_config
 from kirabridge.bridge_core.models import BridgeError, canonical
 from kirabridge.operations_service import OperationsService, installed_source_sha, replace_section
+from kirabridge.operator_application import operator_application
 
 pytestmark = pytest.mark.skipif(os.name != "posix", reason="POSIX ownership and launchd supervisor")
 
@@ -76,7 +77,12 @@ def operations(config, tmp_path):
         return 0, "", ""
 
     service = OperationsService(
-        bridge.store, lambda: load_config(str(path)), rpc, command, bridge.runtime
+        bridge.store,
+        lambda: load_config(str(path)),
+        rpc,
+        command,
+        bridge.runtime,
+        work_queries=operator_application(bridge).control.queries.maintenance_counts,
     )
     service.drain_timeout = 0.25
     state.service = service
@@ -275,7 +281,12 @@ async def test_persistent_barrier_survives_reopened_store_and_dead_controller(op
             other.assert_accepting()
         assert error.value.code == "service_maintenance"
         service = OperationsService(
-            other, rig.service.config, rig.service.rpc, rig.service.command, rig.bridge.runtime
+            other,
+            rig.service.config,
+            rig.service.rpc,
+            rig.service.command,
+            rig.bridge.runtime,
+            work_queries=rig.service.work_queries,
         )
         rig.fail = False
         await service.recover()
@@ -310,7 +321,12 @@ async def test_second_controller_cannot_activate_over_existing_barrier(operation
     other = Store(rig.bridge.config.state_path / "bridge.sqlite3")
     try:
         service = OperationsService(
-            other, rig.service.config, rig.service.rpc, rig.service.command, rig.bridge.runtime
+            other,
+            rig.service.config,
+            rig.service.rpc,
+            rig.service.command,
+            rig.bridge.runtime,
+            work_queries=rig.service.work_queries,
         )
         with pytest.raises(BridgeError) as error:
             await service.configure(level="ask")
@@ -375,7 +391,12 @@ def test_process_and_network_waits_never_nest_in_write_transactions():
     from pathlib import Path
 
     root = Path(__file__).parents[1] / "src/kirabridge"
-    for name in ["operations_service.py", "control_center.py"]:
+    for name in [
+        "operations_service.py",
+        "control_center.py",
+        "operator_actions.py",
+        "operator_control.py",
+    ]:
         tree = ast.parse((root / name).read_text())
         for block in ast.walk(tree):
             if not isinstance(block, ast.With) or not any(
@@ -442,3 +463,43 @@ async def test_non_posix_owner_probe_never_sends_a_process_signal(operations, mo
         await rig.service.recover()
     assert error.value.code == "activation_in_progress"
     assert len(rig.commands) == 1
+
+
+async def test_activation_waits_for_team_result_processing_without_holding_writer(operations):
+    from test_activation_queries import processing_result_fixture
+
+    rig = operations
+    processing_result_fixture(rig.bridge.store)
+
+    async def finish_result():
+        async with asyncio.timeout(2):
+            while not rig.bridge.store.maintenance_state():
+                await asyncio.sleep(0.001)
+        assert not rig.commands
+        # The drain awaits outside a transaction; the domain can complete.
+        with rig.bridge.store.transaction():
+            rig.bridge.store.db.execute(
+                "UPDATE team_work SET state='completed',result='Actual team result' WHERE id='work'"
+            )
+
+    result, _ = await asyncio.gather(rig.service.activate(), finish_result())
+    assert result["dispatcher_active"] and len(rig.commands) == 1
+    assert rig.bridge.store.maintenance_state() is None
+    assert (
+        rig.bridge.store.db.execute("SELECT result FROM team_work WHERE id='work'").fetchone()[0]
+        == "Actual team result"
+    )
+
+
+async def test_unfinished_team_result_blocks_restart_and_keeps_config(operations):
+    from test_activation_queries import processing_result_fixture
+
+    rig = operations
+    processing_result_fixture(rig.bridge.store)
+    before = rig.path.read_bytes()
+    rig.service.drain_timeout = 0
+    with pytest.raises(BridgeError) as error:
+        await rig.service.activate()
+    assert error.value.code == "service_busy" and not rig.commands
+    assert rig.path.read_bytes() == before
+    assert rig.bridge.store.maintenance_state() is None

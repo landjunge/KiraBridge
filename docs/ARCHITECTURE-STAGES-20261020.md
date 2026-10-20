@@ -880,3 +880,20 @@ und `kira-check-1792480431762-handoff.json`. Keine Konfigurationsreparatur war n
 Der Mac ist bei dieser Prüfung wieder tatsächlich zugänglich. Der zuvor nicht
 abgesendete 5c-Prüfauftrag wurde danach als Codex über dieselbe zentrale sichtbare
 Grok-Route eingereiht: `7f397465-25be-4400-a37d-f8be5189d669`.
+
+
+## Etappe 5: unabhängige Schlussprüfungen nach Entsperrung
+
+Grok prüfte 5c im bestehenden sichtbaren Fenster gegen `579ab65` und den
+83-Dateien-Quellpin `f7048b777cf874ffa026efc6b60af65c119053a96522557eefa6b94a90b00f9e`.
+Er führte selbst **214 Tests in 17,16 s** aus und empfiehlt die begrenzte Abnahme.
+Antwort `f2e80c21-b2f1-4712-9c02-528f492bf6f1`, Übergabe
+`channel-7da0f7482af74b3ea25080eb6c187c52`; Antwort und Abschluss quittiert.
+
+Danach prüfte er 5d gegen `aab0bf7`/rc8 und Quellpin
+`7fcb86e8f19cb7c2c6b83b91dd844d0c82ff1afdfc29fcf0edf1ee535789c847`.
+**100 eigene Tests in 53,90 s**, begrenzte Abnahme ohne neue Befunde.
+Antwort `1e19ed6a-d7cc-48fb-b606-f4eb0075be1e`, Übergabe
+`channel-82fa917839cb44d49d853ee8ead2a154`; Antwort und Abschluss quittiert.
+Belege `grok-stage5c-review.json` und `grok-stage5d-review.json`.
+Die Aktivierung dieses geprüften Standes folgt erst nach dem Push.

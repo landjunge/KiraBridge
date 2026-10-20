@@ -17,8 +17,8 @@ from starlette.responses import HTMLResponse, JSONResponse, Response
 from starlette.routing import Route
 
 from kirabridge import LOCAL_APPROVAL_URL
-from kirabridge.bridge_core.bridge import Bridge
-from kirabridge.bridge_core.models import BridgeError, State
+from kirabridge.bridge_core.models import BridgeError
+from kirabridge.operator_application import OperatorApplication
 
 PORT = 8766
 ORIGIN = LOCAL_APPROVAL_URL.rstrip("/")
@@ -55,10 +55,10 @@ async def limited_body(request: Request) -> bytes:
 
 
 class ApprovalConsole:
-    def __init__(self, bridge: Bridge, key: str):
+    def __init__(self, application: OperatorApplication, key: str):
         if len(key) < 32:
             raise BridgeError("unsafe_credentials", "Console credential is too short")
-        self.bridge, self.key = bridge, key
+        self.application, self.key = application, key
         self.instance = secrets.token_hex(16)
         self.used_tickets: dict[str, float] = {}
         self.app = Starlette(
@@ -81,15 +81,17 @@ class ApprovalConsole:
         )
         from kirabridge.team_console import TeamConsole
 
-        self.team_console = TeamConsole(bridge, self.authenticate)
+        self.team_console = TeamConsole(application.team, self.authenticate)
         self.app.routes.extend(self.team_console.routes)
         from kirabridge.grok_connector.console import GrokConnectorConsole
 
-        self.grok_connector_console = GrokConnectorConsole(bridge, self.authenticate)
+        self.grok_connector_console = GrokConnectorConsole(
+            application.connectors, application.authorize_operator, self.authenticate
+        )
         self.app.routes.extend(self.grok_connector_console.routes)
         from kirabridge.control_center import ControlCenter
 
-        self.control_center = ControlCenter(bridge, self.authenticate)
+        self.control_center = ControlCenter(application.control, self.authenticate)
         self.app.routes.extend(self.control_center.routes)
 
     async def __call__(self, scope, receive, send):
@@ -172,17 +174,14 @@ class ApprovalConsole:
             raise BridgeError("unauthorized", "Open the local launcher again")
         self.used_tickets[ticket] = now
         session = signed_token(self.key, "session")
-        with self.bridge.store.transaction():
-            self.bridge.store.audit(
-                "console.login",
-                "local",
-                None,
-                {
-                    "surface": "desktop"
-                    if "KiraBridgeDesktop" in request.headers.get("user-agent", "")
-                    else "browser",
-                },
-            )
+        self.application.audit.record(
+            "console.login",
+            {
+                "surface": "desktop"
+                if "KiraBridgeDesktop" in request.headers.get("user-agent", "")
+                else "browser"
+            },
+        )
         return HTMLResponse(
             '<!doctype html><html lang="de"><meta charset="utf-8">'
             '<meta name="referrer" content="no-referrer"><title>KiraBridge öffnen</title>'
@@ -200,34 +199,11 @@ class ApprovalConsole:
 
     async def tasks(self, request: Request):
         self.authenticate(request)
-        rows = self.bridge.store.db.execute(
-            "SELECT id,principal,operation,agent,state,created,updated FROM tasks "
-            "ORDER BY CASE state WHEN 'created' THEN 0 WHEN 'queued' THEN 1 "
-            "WHEN 'accepted' THEN 2 WHEN 'running' THEN 3 WHEN 'unknown' THEN 4 ELSE 5 END, "
-            "updated DESC LIMIT 100"
-        ).fetchall()
-        count = self.bridge.store.db.execute(
-            "SELECT count(*) FROM tasks WHERE state='created'"
-        ).fetchone()[0]
-        return JSONResponse(
-            {
-                "tasks": [dict(row) for row in rows],
-                "pending": count,
-                "approval_modes": {
-                    name: policy.approval_mode
-                    for name, policy in self.bridge.config.principals.items()
-                },
-            }
-        )
+        return JSONResponse(self.application.task_decisions.listing())
 
     async def task(self, request: Request):
         self.authenticate(request)
-        task_id = request.path_params["task_id"]
-        task = self.bridge.store.get(task_id)
-        request_hash = self.bridge.store.db.execute(
-            "SELECT request_hash FROM tasks WHERE id=?", (task_id,)
-        ).fetchone()[0]
-        return JSONResponse({"task": task, "request_hash": request_hash})
+        return JSONResponse(self.application.task_decisions.detail(request.path_params["task_id"]))
 
     async def decide(self, request: Request):
         self.authenticate(request)
@@ -244,19 +220,10 @@ class ApprovalConsole:
             or not re.fullmatch(r"[a-f0-9]{64}", payload["request_hash"])
         ):
             raise BridgeError("invalid_request", "Review the complete request first")
-        task_id, decision = request.path_params["task_id"], request.path_params["decision"]
-        if decision == "approve":
-            self.bridge.tasks.approve(
-                task_id, expected_hash=payload["request_hash"], source="local_console"
+        return JSONResponse(
+            self.application.task_decisions.decide(
+                request.path_params["task_id"],
+                request.path_params["decision"],
+                payload["request_hash"],
             )
-        elif decision == "deny":
-            self.bridge.store.transition(
-                task_id,
-                State.CANCELLED,
-                {"source": "local_console_rejection"},
-                expected_hash=payload["request_hash"],
-                expected_states={State.CREATED, State.QUEUED},
-            )
-        else:
-            raise BridgeError("invalid_request", "Unknown decision")
-        return JSONResponse({"task": self.bridge.store.get(task_id)})
+        )

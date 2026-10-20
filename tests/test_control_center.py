@@ -9,6 +9,7 @@ from kirabridge.bridge_core.config import AgentConfig, Config, PrincipalConfig, 
 from kirabridge.bridge_core.models import BridgeError, State
 from kirabridge.control_center import configure_access, replace_section
 from kirabridge.message_manager import MessageSend
+from kirabridge.operator_application import operator_application
 from kirabridge.permissions import LEVELS, automatic_for, level_for
 
 KEY = "control-center-test-" + "x" * 48
@@ -113,7 +114,7 @@ def test_full_access_persists_all_grants_and_mutual_peers(tmp_path):
 
 @pytest.mark.asyncio
 async def test_control_requires_login_and_local_origin(bridge):
-    app = ApprovalConsole(bridge, KEY)
+    app = ApprovalConsole(operator_application(bridge), KEY)
     async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url=ORIGIN) as client:
         assert (await client.get("/api/control/status")).status_code == 401
         result = await client.post(
@@ -129,8 +130,8 @@ async def test_control_requires_login_and_local_origin(bridge):
 
 @pytest.mark.asyncio
 async def test_console_stays_up_while_bridge_status_is_inactive(bridge, monkeypatch):
-    app = ApprovalConsole(bridge, KEY)
-    control = app.control_center
+    app = ApprovalConsole(operator_application(bridge), KEY)
+    control = app.control_center.service
 
     async def no_processes():
         return []
@@ -154,7 +155,7 @@ async def test_restart_refuses_active_work_and_never_kills_terminal(bridge, monk
     path = tmp_path / "active-config.toml"
     path.write_text("data_dir=" + json.dumps(str(bridge.config.state_path)) + "\n")
     bridge.config._source_path = str(path)
-    control = ApprovalConsole(bridge, KEY).control_center
+    control = ApprovalConsole(operator_application(bridge), KEY).control_center.service
     control.operations.drain_timeout = 0
     loaded = load_config(str(path))
 
@@ -186,14 +187,14 @@ async def test_restart_refuses_active_work_and_never_kills_terminal(bridge, monk
 
 @pytest.mark.asyncio
 async def test_action_retry_does_not_start_a_second_process(bridge, monkeypatch):
-    app = ApprovalConsole(bridge, KEY)
+    app = ApprovalConsole(operator_application(bridge), KEY)
     calls = []
 
     async def start(*args):
         calls.append(args)
         return {"state": "starting"}
 
-    monkeypatch.setattr(app.control_center, "service_action", start)
+    monkeypatch.setattr(app.control_center.service, "service_action", start)
     value = {"service": "bridge", "action": "start", "action_id": "same-click"}
     async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url=ORIGIN) as client:
         a = await client.post("/api/control/action", headers=headers(), json=value)
@@ -208,7 +209,7 @@ async def test_action_retry_does_not_start_a_second_process(bridge, monkeypatch)
 
 @pytest.mark.asyncio
 async def test_terminal_start_keeps_configured_local_model_and_bridge(bridge, monkeypatch):
-    control = ApprovalConsole(bridge, KEY).control_center
+    control = ApprovalConsole(operator_application(bridge), KEY).control_center.service
     config = bridge.config
     config._source_path = "/private/config.toml"
     config.principals["local"].permission_level = "full"
@@ -247,7 +248,7 @@ async def test_terminal_start_keeps_configured_local_model_and_bridge(bridge, mo
 
 @pytest.mark.asyncio
 async def test_protocol_uses_event_time_state_not_later_completion(bridge):
-    app = ApprovalConsole(bridge, KEY)
+    app = ApprovalConsole(operator_application(bridge), KEY)
     path = bridge.config.principals["local"].roots[0]
     task = request(arguments={"path": path})
     bridge.prepare("local", task)
@@ -350,7 +351,7 @@ def test_cached_dispatch_true_still_delivers_to_external_chat_client(bridge, con
 
 @pytest.mark.asyncio
 async def test_reconnect_keeps_existing_gateway_and_url(bridge, monkeypatch):
-    control = ApprovalConsole(bridge, KEY).control_center
+    control = ApprovalConsole(operator_application(bridge), KEY).control_center.service
     reloaded = []
 
     async def reload():

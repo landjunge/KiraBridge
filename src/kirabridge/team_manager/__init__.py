@@ -135,6 +135,24 @@ def _native_evidence(value):
 class TeamManager:
     interface_version = "1"
 
+    def activation_work_count(self, *, active_only=False, context=None):
+        db = context.db if context is not None else self.store.db
+        states = (
+            ("accepted", "running", "processing_result")
+            if active_only
+            else ("queued", "dispatching", "created", "accepted", "running", "processing_result")
+        )
+        return db.execute(
+            "SELECT count(*) FROM team_work WHERE state IN (" + ",".join("?" for _ in states) + ")",
+            states,
+        ).fetchone()[0]
+
+    def operator_work_count(self):
+        return self.store.db.execute(
+            "SELECT count(*) FROM team_work WHERE state IN "
+            "('queued','dispatching','created','accepted','running','processing_result')"
+        ).fetchone()[0]
+
     def __init__(self, bridge):
         self.bridge = bridge
         self.config, self.store, self.security = bridge.config, bridge.store, bridge.security

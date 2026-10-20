@@ -187,7 +187,7 @@ async def test_eve_session_input_standing_grant_bypasses_gate_and_manual_approva
         return ""
 
     monkeypatch.setattr(voices.sessions, "selected", selected)
-    monkeypatch.setattr(voices.sessions, "command", command)
+    monkeypatch.setattr(voices.sessions.tmux, "command", command)
     value = request("session.input", {"pane_id": "%1", "expected_pid": 1, "text": "Diktat"})
     queued = voices.prepare("grok_app", value)
     assert queued["state"] == State.QUEUED

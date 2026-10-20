@@ -117,7 +117,9 @@ async def test_probe_cancellation_reaps_only_its_own_child(monkeypatch):
 async def test_known_unavailable_desktop_blocks_osascript_before_any_ui_action(
     bridge, monkeypatch, code
 ):
-    monkeypatch.setattr("kirabridge.session_manager.sys", SimpleNamespace(platform="darwin"))
+    monkeypatch.setattr(
+        "kirabridge.platform_adapters.terminal_app.sys", SimpleNamespace(platform="darwin")
+    )
 
     async def state():
         return {"state": code}
@@ -126,9 +128,11 @@ async def test_known_unavailable_desktop_blocks_osascript_before_any_ui_action(
         pytest.fail("No osascript, window, paste, Return, or replacement process allowed")
 
     monkeypatch.setattr(bridge.sessions.desktop, "probe", state)
-    monkeypatch.setattr("kirabridge.session_manager.asyncio.create_subprocess_exec", forbidden)
+    monkeypatch.setattr(
+        "kirabridge.platform_adapters.terminal_app.asyncio.create_subprocess_exec", forbidden
+    )
     with pytest.raises(BridgeError) as error:
-        await bridge.sessions.native("must never execute", mutation=True)
+        await bridge.sessions.terminal_app.native("must never execute", mutation=True)
     assert error.value.code == code
 
 

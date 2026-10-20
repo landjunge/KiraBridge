@@ -114,12 +114,6 @@ class Bridge:
         self.handoffs = HandoffManager(self)
         self.security = SecurityManager(config, self.store)
         self.terminal = TerminalManager(config.terminal)
-        self.sessions = SessionManager(self)
-        from kirabridge.terminal_queries import TerminalQueries
-
-        self.terminal_queries = TerminalQueries(
-            self.security, self.sessions, self.store, config.read_concurrency
-        )
         self.filesystem = FilesystemManager()
         self.images = ImageManager()
         self.clipboard = ClipboardManager()
@@ -135,6 +129,23 @@ class Bridge:
             self.execute,
             preflight=lambda task: task_preflight(self, task),
             runtime=runtime_ref(self.runtime),
+        )
+        from kirabridge.audit_manager import AuditWriter
+        from kirabridge.session_ports import SessionPorts
+        from kirabridge.terminal_queries import TerminalQueries
+
+        self.sessions = SessionManager(
+            SessionPorts(
+                authorization=self.security,
+                input_release=self.tasks.input_policy,
+                audit=AuditWriter(self.store),
+                environment=self.terminal.environment,
+                agent_registry=lambda: (config.agents, config.visible_handoffs.bindings),
+                clipboard_lock=self.clipboard.lock,
+            )
+        )
+        self.terminal_queries = TerminalQueries(
+            self.security, self.sessions, self.store, config.read_concurrency
         )
         from kirabridge.completion_manager import CompletionManager
 

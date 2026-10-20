@@ -171,9 +171,10 @@ class OperationsService:
     Crashed controllers leave the barrier for explicit local recovery.
     """
 
-    def __init__(self, store, config_provider, rpc, command, runtime):
+    def __init__(self, store, config_provider, rpc, command, runtime, *, work_queries):
         self.store, self.config = store, config_provider
         self.rpc, self.command = rpc, command
+        self.work_queries = work_queries
         self.source_sha = runtime["source_tree_sha256"]
         self.version = runtime["version"]
         self.drain_timeout = 30.0
@@ -188,43 +189,9 @@ class OperationsService:
             )
 
     def work_counts(self, *, active_only=False):
-        counts = {}
-        for table, states in (
-            ("tasks", ("queued", "accepted", "running")),
-            ("message_jobs", ("queued", "running")),
-            (
-                "team_work",
-                ("queued", "dispatching", "created", "accepted", "running"),
-            ),
-            (
-                "visible_handoffs",
-                (
-                    "planned",
-                    "inserting",
-                    "inserted",
-                    "submitting",
-                    "return_sent",
-                    "sent",
-                    "confirmed",
-                ),
-            ),
-        ):
-            if active_only:
-                if table == "tasks":
-                    states = ("accepted", "running")
-                elif table == "message_jobs":
-                    states = ("running",)
-                elif table == "team_work":
-                    states = ("accepted", "running")
-            if self.store.db.execute(
-                "SELECT 1 FROM sqlite_master WHERE type='table' AND name=?", (table,)
-            ).fetchone():
-                counts[table] = self.store.db.execute(
-                    f"SELECT count(*) FROM {table} "
-                    f"WHERE state IN ({','.join('?' for _ in states)})",
-                    states,
-                ).fetchone()[0]
-        return counts
+        # Domain owners issue their SQL using this same transaction context.
+        # The runtime service knows no foreign table or foreign state machine.
+        return self.work_queries(active_only=active_only, context=self.store)
 
     def update(self, identifier, state, error=None):
         with self.store.transaction():
