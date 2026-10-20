@@ -104,6 +104,21 @@ def test_loaded_config_and_credential_paths_are_excluded_even_with_ordinary_name
     assert index.cache.db.execute("SELECT count(*) FROM files").fetchone()[0] == 0
 
 
+@pytest.mark.parametrize(
+    "relative", ["vault", "VaUlT/project", "secrets", ".secrets", "credentials", ".ssh", ".gnupg"]
+)
+def test_excluded_tree_cannot_be_selected_as_a_project_root(sample, config, relative):
+    index, root = sample
+    excluded = root / relative
+    excluded.mkdir(parents=True)
+    (excluded / "ordinary.md").write_text("private orchid")
+    config.file_index.projects["project"] = str(excluded)
+    with pytest.raises(BridgeError) as denied:
+        index.query("local", "project", "orchid")
+    assert denied.value.code == "search_scope_denied"
+    assert not index.cache.directory.exists()
+
+
 def test_exclusion_case_aliases_and_symlink_directories_are_never_sources(sample, tmp_path):
     index, root = sample
     config = index.config

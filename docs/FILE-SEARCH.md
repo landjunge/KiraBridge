@@ -22,6 +22,8 @@ The authenticated principal must already have **both** `file.read` and
 `file.list`, and the configured directory must lie inside its existing file
 roots. A project selector grants no authority. A `/` permission never becomes a
 scan root. Explicit `/` and the user's home directory are rejected too.
+Selecting an excluded credential/vault/build tree itself (or a directory under
+it) as a project root does not bypass its exclusion.
 
 ```sh
 kirabridge --config /path/to/reviewed.toml file-index status example
@@ -109,7 +111,7 @@ data. No index hook is placed on canonical Bridge saves. Windows has no secure
 source adapter in this slice; disabling the feature leaves core work unchanged.
 
 The scanner excludes Bridge state and its configured policy/credential files
-even for full file grants, hidden paths,
+even for full file grants, hidden descendants,
 common build/dependency/credential directories, key/database suffixes, and the
 user's SSH/GPG/4AllPass/browser/keychain locations. Explicit relative exclusions
 apply before traversal/read, including conservative case aliases. An explicit

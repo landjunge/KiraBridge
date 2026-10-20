@@ -78,7 +78,11 @@ class Source:
         if not settings.enabled or self.project not in settings.projects:
             raise BridgeError("search_scope_denied", "Search scope unavailable")
         root = Path(settings.projects[self.project])
-        if root in {Path("/"), Path.home().absolute()}:
+        if root in {Path("/"), Path.home().absolute()} or any(
+            part.casefold().lstrip(".") in IGNORED
+            or part.casefold() in {".ssh", ".gnupg", ".4allpass"}
+            for part in root.parts[1:]
+        ):
             raise BridgeError("search_scope_denied", "An explicit project directory is required")
         home = Path.home().absolute()
         protected = [
