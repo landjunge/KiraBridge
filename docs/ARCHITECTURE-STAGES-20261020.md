@@ -514,6 +514,18 @@ konkreten Core-Timeout statt eines früheren eigenen Abbruchs anzeigen kann.
 Dieser Stand wird auf `architecture/stage4-candidate-20261020` und im eigenen
 Arbeitsverzeichnis `/Users/landjunge/KiraBridge-stage4-20261020` erhalten.
 Der produktive Installationspfad bleibt beim aktivierten rc6-Quellstand.
+Die Trennung wurde tatsächlich durchgeführt: Kandidat `4763fd5` ist gepusht
+und im genannten eigenen Arbeitsverzeichnis ausgecheckt. Anschließend wurde
+der produktive Pfad auf seine 71 Python-Dateien zurückgeführt und deren Manifest
+erneut bytegenau mit dem geladenen rc6-Pin verglichen: passend. Es erfolgte
+kein weiterer Dienstneustart. Damit lädt auch ein unerwarteter Neustart im
+produktiven Pfad nicht versehentlich den ungeprüften Kandidaten.
+Die Kontrolle `stage4-unactivated-runtime-check.json` bestätigt dieselbe aktive
+Core-Instanz, unveränderte Konfiguration, alle 16 erhaltenen PIDs und alle 65
+unveränderten historischen unversionierten Belege. Die Transportreserve bestand
+danach mit 21 gezielten Tests; der Kandidat selbst wurde nach der räumlichen
+Trennung nochmals ausdrücklich über sein eigenes `PYTHONPATH` geprüft:
+39 Tests bestanden in 3,16 Sekunden.
 Eine Grok-Abnahme oder Aktivierung von Etappe 4 ist **nicht erfolgt**.
 Nächster Schritt nach Entsperren: den einen unklaren Eve-Auftrag zuerst lesen
 und abgleichen, danach Grok in seinem bestehenden Fenster mit der unabhängigen
