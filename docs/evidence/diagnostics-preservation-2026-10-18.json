@@ -18,12 +18,12 @@
     "version": "0.5.2",
     "pid": 75452,
     "started_at": "2026-10-18T11:47:01.557862+00:00",
-    "config_path": "/Users/landjunge/.config/kirabridge/config.toml",
+    "config_path": "/Users/EXAMPLE_USER/.config/kirabridge/config.toml",
     "config_sha256": "c95c79de984966f39e57a073df1304d82262a5eb52768a5892e2a0c84cdcc519",
     "effective_config_sha256": "07222817791808e160368fb1aba326a7e4c6bc8d91b27d3a6e7a55aa206de8d3",
     "source_tree_sha256": "0e0c346567d5e6727d3371af16c629bcd5b69de28c7af4159ae2b04287101203",
     "source_file_count": 31,
-    "source_package_path": "/Users/landjunge/KiraBridge/src/kirabridge",
+    "source_package_path": "/Users/EXAMPLE_USER/KiraBridge/src/kirabridge",
     "source_scope": "package Python files observed at startup; no remote attestation"
   },
   "diagnostics_storage": {
