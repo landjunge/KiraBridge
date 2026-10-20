@@ -5,20 +5,20 @@
     "version": "0.5.1",
     "pid": 71410,
     "started_at": "2026-10-18T11:12:28.797431+00:00",
-    "config_path": "/Users/landjunge/.config/kirabridge/config.toml",
+    "config_path": "/Users/EXAMPLE_USER/.config/kirabridge/config.toml",
     "config_sha256": "c95c79de984966f39e57a073df1304d82262a5eb52768a5892e2a0c84cdcc519",
     "effective_config_sha256": "9b77bee53c49dd1742c74718d2929aae3fc848f71967dd2733ca9bd6d37a0f93",
     "source_tree_sha256": "86f0474f3804a83e5a8241e81dad6f010ccdbe80baa0bf6532a724c5e65267a2",
     "source_file_count": 30,
-    "source_package_path": "/Users/landjunge/KiraBridge/src/kirabridge",
+    "source_package_path": "/Users/EXAMPLE_USER/KiraBridge/src/kirabridge",
     "source_scope": "package Python files observed at startup; no remote attestation"
   },
   "configuration_change": {
     "principal": "chatgpt",
     "only_field": "read_roots",
     "value": [
-      "/Users/landjunge/Projects",
-      "/Users/landjunge/KiraBridge"
+      "/Users/EXAMPLE_USER/Projects",
+      "/Users/EXAMPLE_USER/KiraBridge"
     ],
     "original_policy_otherwise_unchanged": true,
     "mode": "0600",
