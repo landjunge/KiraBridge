@@ -1,5 +1,11 @@
 # KiraBridge
 
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="assets/design/icons/dark/KiraBridge-dark-128.png">
+  <img src="assets/design/icons/light/KiraBridge-light-128.png" alt="KiraBridge" width="96" height="96">
+</picture>
+
+
 **Vibe Coding mit ChatGPT, Codex und Grok.**  
 **Vibe coding with ChatGPT, Codex and Grok.**
 
