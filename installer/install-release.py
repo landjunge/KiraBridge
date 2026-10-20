@@ -13,6 +13,24 @@ import tempfile
 from pathlib import Path
 
 
+def restore_source(bundle, ref, repo):
+    repo.mkdir()
+    subprocess.run(["git", "init", "--quiet", "-b", "release"], cwd=repo, check=True, timeout=30)
+    subprocess.run(
+        ["git", "bundle", "unbundle", str(bundle)],
+        cwd=repo,
+        check=True,
+        capture_output=True,
+        timeout=60,
+    )
+    # The package deliberately contains one tree, not repository history. Restore
+    # its shallow boundary before Git tries to traverse the original parent.
+    (repo / ".git/shallow").write_text(ref + "\n")
+    subprocess.run(
+        ["git", "checkout", "--quiet", "--detach", ref], cwd=repo, check=True, timeout=60
+    )
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("action", choices=["prepare", "install", "status", "rollback"])
@@ -39,11 +57,7 @@ def main():
             raise RuntimeError(f"Release checksum mismatch: {name}")
     with tempfile.TemporaryDirectory(prefix="kirabridge-package-") as temp:
         repo = Path(temp) / "source"
-        subprocess.run(
-            ["git", "clone", "--quiet", str(root / "source.bundle"), str(repo)],
-            check=True,
-            timeout=60,
-        )
+        restore_source(root / "source.bundle", ref, repo)
         actual = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=repo).decode().strip()
         if actual != ref:
             raise RuntimeError("Bundled source commit differs from manifest")
