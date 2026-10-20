@@ -11,8 +11,8 @@ auf ein kleines Paket Implementierung, Grok-Prüfung, Korrektur und Nachprüfung
 | 1 Ausgangspunkt | Gesichert; praktische ChatGPT-Leseprüfung und unabhängige Grok-Prüfung abgeschlossen | Sichtbare Übergabe ergänzen |
 | 1a Sichtbare Übergaben und Aufhebung Voice-Gate | 0.8.0rc4 aktiviert: 660 Tests bestanden, Grok-Prüfung und produktive sichtbare Übergabe abgeschlossen | Ursprünglichen beschäftigten Codex nicht für Eingabetest unterbrechen |
 | 2 Freigaben | 0.8.0rc5 aktiviert; 313 gezielte Tests und unabhängige Grok-Abnahme | Normale Voice-/CLI-Wege beim weiteren Umbau erhalten |
-| 3 Aktivierung | Kandidat 0.8.0rc6: 732 Tests bestanden und Grok-Abnahmen vorhanden; Aktivierung folgt | Wartungs-/Fehlerpfade prüfen, korrigieren, aktivieren |
-| 4 Client-Lesewege | Offen | Gleiche Rechte, reservierte Lesekapazität, Lastprüfung |
+| 3 Aktivierung | 0.8.0rc6 aktiviert; 732 Tests, echte Grok-Abnahmen und koordinierter Neustart belegt | Zusätzlichen Eve-Test nach Entsperren ohne Wiederholung abgleichen |
+| 4 Client-Lesewege | Quellkandidat; 757 Gesamttests sowie 116 gezielte Tests mit erweiterter Vier-Absender-Negativmatrix bestanden | Grok-Prüfung und echte Leseprüfung benötigen das entsperrte bestehende Ziel |
 | 5 Modulgrenzen | Offen | Fachliche Abfragen, austauschbarer Transport |
 | 6 Ausgabeablage | Offen | Begrenzte Rohdaten, unveränderte historische Audit-Kette |
 
@@ -461,4 +461,73 @@ Andere tmux-Ziele werden davon nicht ersetzt oder pauschal gesperrt.
 Die letzte Beobachtung wird mit Zeitpunkt und begrenzter Aussage im Status
 geführt, der Doktor zeigt den konkreten Transportfehler.
 45 gezielte Tests einschließlich vorhandener Sitzungs- und Steuerfenstertests
-bestanden. Diese Quelländerung ist weder aktiviert noch von Grok geprüft.
+bestanden. Diese Quelländerung gehört zum isolierten Kandidaten aus Etappe 4
+und ist weder aktiviert noch von Grok geprüft.
+
+## Etappe 4: gemeinsamer Leseweg und reservierte Kapazität (Quellkandidat)
+
+`operations.py` beschreibt jede unterstützte Queue-Operation mit Capability,
+Wirkung und Ausführungsklasse. Der Katalog, die gemeinsame Freigabeentscheidung,
+die Vorprüfung und die Queue verwenden diese Eigenschaften. Für Terminalkatalog
+und Lesen ist auf allen Wegen `session.inspect` maßgeblich; die alte zusätzliche
+Capability-Abweichung zwischen direkten Werkzeugen und Queue fällt weg.
+
+`TerminalQueries` führt `session_catalog`, `session_read`, dictionaryförmiges
+`read_query` und alte `task_request`-Aufträge auf dieselben Sitzungsfunktionen.
+Fehlende Rechte und geänderte PID führen zu denselben Fehlercodes. Unter
+„Nur mit Erlaubnis“ wird eine direkte Leseabfrage mit `approval_required` an den
+vorhandenen Aufgaben-/Freigabeweg verwiesen; sie umgeht die gewählte Stufe nicht.
+Bereits tatsächlich freigegebene Queue-Aufträge prüfen ihren gespeicherten
+Besitzer, Operation, Argumente und Ausführungszustand. Die produktive Stufe
+„Voll erlaubt“ und die bestehenden Terminalausnahmen werden nicht verändert.
+
+Vor der Lastprüfung festgelegte Grenze: **acht Sekunden pro Terminalabfrage**,
+einschließlich nativer Leseaufrufe. Standard sind zwei reservierte Lese-Worker
+und maximal 32 wartende Leseaufträge (`read_concurrency`, `max_read_queued`).
+Die normalen Ausführungsplätze und der separate Stopp-Worker werden dafür nicht
+verwendet. Eine direkte Abfrage bei belegten Leseplätzen erhält `terminal_read_busy`
+statt einer unbegrenzten Warteschlange; ein Zeitablauf `terminal_read_timeout`.
+Es gibt keine behauptete Erfolgsgarantie bei gleichzeitig unbegrenzt vielen
+Leseanfragen. Abgebrochene lesende Plattformaufrufe werden begrenzt abgeräumt;
+ein fehlgeschlagenes Lesen wird nicht als möglicherweise ausgeführte Eingabe
+klassifiziert. Historische unklare Eingaben bleiben unverändert.
+
+Ein echter HTTP/MCP-Test belegt beide normalen Plätze mit laufenden eigenen
+Testprozessen und ruft neue sowie alte Katalog-/Lesewege auf. Alle liefern unter
+dem vorher gesetzten Fixture-Budget von zwei Sekunden dieselben Ergebnisse.
+Ein weiterer Test blockiert beide Leseplätze und füllt deren Queue; der
+unabhängige Prozessstopp bleibt erfolgreich. Es werden keine zusätzlichen
+Agentenfenster geöffnet. Timeout, PID-Abweichung, fehlende Capability sowie
+alle drei Rechtestufen sind gezielt geprüft. Vor Erweiterung der vorhandenen
+Vier-Absender-Negativmatrix bestanden **757 Gesamttests in 179,52 Sekunden**
+mit Unraisable-Warnings als Fehlern; Ruff war erfolgreich.
+Danach bestanden 116 gezielte Übergabe-, Rückgabe-, Desktop- und Kapazitätstests
+in 12,41 Sekunden, einschließlich fehlender Bindung, falscher Sitzungs-PID,
+falscher Agenten-PID und fehlender Bereitschaft für **jeden** der vier Absender.
+Die bereits vorhandenen Rückantworttests prüfen auch Groks fehlendes bzw.
+während der Antwort geschlossenes ursprüngliches Codex-Ziel. Keine Variante
+darf dadurch einen anderen Adapter, ein neues Fenster oder einen neuen
+CLI-Prozess starten. Das Steuerfenster erhält für die Lese-RPCs zwei Sekunden
+Transportreserve über dem eigentlichen Acht-Sekunden-Budget, damit es den
+konkreten Core-Timeout statt eines früheren eigenen Abbruchs anzeigen kann.
+
+Dieser Stand wird auf `architecture/stage4-candidate-20261020` und im eigenen
+Arbeitsverzeichnis `/Users/landjunge/KiraBridge-stage4-20261020` erhalten.
+Der produktive Installationspfad bleibt beim aktivierten rc6-Quellstand.
+Die Trennung wurde tatsächlich durchgeführt: Kandidat `4763fd5` ist gepusht
+und im genannten eigenen Arbeitsverzeichnis ausgecheckt. Anschließend wurde
+der produktive Pfad auf seine 71 Python-Dateien zurückgeführt und deren Manifest
+erneut bytegenau mit dem geladenen rc6-Pin verglichen: passend. Es erfolgte
+kein weiterer Dienstneustart. Damit lädt auch ein unerwarteter Neustart im
+produktiven Pfad nicht versehentlich den ungeprüften Kandidaten.
+Die Kontrolle `stage4-unactivated-runtime-check.json` bestätigt dieselbe aktive
+Core-Instanz, unveränderte Konfiguration, alle 16 erhaltenen PIDs und alle 65
+unveränderten historischen unversionierten Belege. Die Transportreserve bestand
+danach mit 21 gezielten Tests; der Kandidat selbst wurde nach der räumlichen
+Trennung nochmals ausdrücklich über sein eigenes `PYTHONPATH` geprüft:
+39 Tests bestanden in 3,16 Sekunden.
+Eine Grok-Abnahme oder Aktivierung von Etappe 4 ist **nicht erfolgt**.
+Nächster Schritt nach Entsperren: den einen unklaren Eve-Auftrag zuerst lesen
+und abgleichen, danach Grok in seinem bestehenden Fenster mit der unabhängigen
+Prüfung dieses absoluten Kandidatenpfads beauftragen. Etappen 5 und 6 bleiben
+bis zur Abnahme dieses Pakets offen.
