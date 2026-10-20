@@ -9,6 +9,15 @@
 **Vibe Coding mit ChatGPT, Codex und Grok.**  
 **Vibe coding with ChatGPT, Codex and Grok.**
 
+## Aktueller Funktionsstand / Current capabilities
+
+**Deutsch:** KiraBridge verbindet freigegebene ChatGPT-/MCP-Zugänge mit lokalen Datei-, Zwischenablage-, Terminal- und Agentenfunktionen. Codex und Grok können eingerichtete Teamaufträge bearbeiten; weitere CLI-Textadapter benötigen ihren jeweiligen Anbieterzugang. Aufgabenannahme, laufende Ausführung und belegter Abschluss sind getrennte Zustände. Funktionen und Rechte hängen von der tatsächlich geladenen Konfiguration ab.
+
+**English:** KiraBridge connects authorized ChatGPT/MCP clients to local file, clipboard, terminal and agent operations. Codex and Grok can work on configured team tasks; additional CLI text adapters require their respective provider access. Task acceptance, execution and evidenced completion are separate states. Available operations and permissions depend on the configuration actually loaded.
+
+Python 3.11+. Der veröffentlichte private RC2-Download, der versionierte Entwicklungsstand und eine lokal aktivierte Reparatur sind getrennt zu prüfen. Der laufende Architekturumbau ist damit nicht als fertige Main-Version ausgewiesen. / Python 3.11+. The private RC2 download, committed development source and a locally activated repair must be checked separately; ongoing architecture work is not presented as a completed main-branch feature. [Installation DE](docs/INSTALL-DE.md) · [Installation EN](docs/INSTALL-EN.md) · [Betrieb / Operations](docs/OPERATIONS.md).
+
+
 ## Download & Installation
 
 ### Deutsch
