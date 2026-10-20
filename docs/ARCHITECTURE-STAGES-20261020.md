@@ -13,7 +13,7 @@ auf ein kleines Paket Implementierung, Grok-Prüfung, Korrektur und Nachprüfung
 | 2 Freigaben | 0.8.0rc5 aktiviert; 313 gezielte Tests und unabhängige Grok-Abnahme | Normale Voice-/CLI-Wege beim weiteren Umbau erhalten |
 | 3 Aktivierung | Koordinierter Betriebsdienst aktiv; alte unklare Eve-Zustellung ohne Nachversand stillgelegt | Historischen unbekannten Ausgang erhalten |
 | 4 Client-Lesewege | rc7 aktiv; 776 Tests, Grok-Abnahmen und echte ChatGPT-Leseprüfung unter Last bestanden; lokaler Eve-Rückweg bestätigt | Physische Handy-/Voice-Abnahme bleibt gesondert offen |
-| 5 Modulgrenzen | Paket 5a beginnt mit Status-/Protokollabfragen | Fachliche Datenbesitzer und austauschbare Abfragen |
+| 5 Modulgrenzen | 5a/5b von Grok geprüft; 5c/5d isoliert umgesetzt | Mac entsperren: sichtbare Grok-Prüfung 5c, dann 5d, vor Aktivierung |
 | 6 Ausgabeablage | Offen | Begrenzte Rohdaten, unveränderte historische Audit-Kette |
 
 ## Etappe 1: gesicherter Ausgangspunkt
@@ -638,3 +638,206 @@ Private Nachweise: `rc7-publish-manifest.json`, `activation-stage4-rc7.json`,
 `stage4-live-locked-load-observation.json`, `stage4-live-chatgpt-load-proof.json`,
 `rc7-eve-roundtrip.json`. Weiter geht es mit dem kleinen Paket 5a für fachliche
 Status-/Protokollabfragen; eine neue Nutzerfreigabe ist dafür nicht nötig.
+
+## Etappe 5, Paket 5a: fachliche Status- und Protokollabfragen (Kandidat)
+
+Der Kandidat liegt isoliert unter `/Users/landjunge/KiraBridge-stage5a-20261020`.
+Produktiv bleibt der geprüfte rc7-Stand. `OperatorQueries` fasst die lokalen
+Bedienabfragen zusammen, ohne eigene SQL-Abfragen oder ein gesamtes Bridge-Objekt.
+Aufgabenabfragen gehören `task_manager.Store`, Nachrichtenabfragen dem
+`MessageManager`, Team-Zähler dem `TeamManager` und Audit-Seiten `AuditReader`.
+Es werden weder neue Netzwerkdienste noch zusätzliche Datenbanken eingeführt.
+
+`ControlCenter.busy`, wartende Aufgaben, Verbindungsbelege und Protokollseiten
+verwenden diese fachlichen Abfragen. In diesen Wegen kennt die Oberfläche keine
+Fremdtabellen mehr. Ihre eigene Aktionsablage und weitere Bedien-/Betriebslogik
+bleiben ausdrücklich Arbeit für Paket 5b; die Sitzungsports und Plattformadapter
+folgen anschließend. Die gemeinsame Transaktion für Aufgabenwechsel, Audit und
+Abschlussnachricht wurde nicht verändert.
+
+Die Protokollprüfung verbessert auch zwei konkrete Zeitbezüge: Eine später
+angelegte Aufgabe wird keinem früheren Audit-Ereignis zugeordnet; spätere
+Zustellung und Quittung einer Nachricht erscheinen nicht schon im früheren
+Queue-Eintrag. Der Nachrichtentext bleibt unverändert verfügbar. Bestehende
+Audit-Ketten und historische Inhalte werden nicht umgeschrieben.
+
+86 gezielte Tests bestanden in 52,95 Sekunden: austauschbare fachliche Abfragen
+ohne Core-Aufbau, Authentifizierung vor Datenzugriff, historische Zustände,
+mutationsfreie Abfragen, bestehende HTTP-Oberfläche, Aufgaben-, Nachrichten-,
+Abschluss- und Aktivierungsregressionen. Ruff und Whitespace-Prüfung bestanden.
+Grok prüfte Paket 5a tatsächlich im bestehenden sichtbaren Fenster: Auftrag
+`architecture-stage5a-review-20261020`, Nachricht
+`e5a6f490-4e12-428e-8e7c-40ba7cf2e11c`, Übergabe
+`channel-bea40cc46dd14e6ca33b7297a86ce00f`. Er bestätigte Commit `d7934e3`,
+75 Python-Dateien und Quellpin
+`474f4965bff87ee90d9516c9861f1dee46860fe574978ae44c5746e83dc51f0e`.
+Sein eigener Lauf derselben sechs Testdateien bestand mit **86 Tests in 54,16 s**;
+er empfiehlt die begrenzte Abnahme. Antwort
+`f9f5af35-580a-480b-a235-aea72129fb1b` wurde verarbeitet und quittiert;
+`grok-stage5a-review.json` enthält den Nachweis. Produktiv blieb rc7 unverändert.
+
+Die anschließende Feldprüfung fand noch einen verbliebenen Zukunftsbezug:
+`finished` war trotz historischem laufendem Zustand schon aus der späteren
+Aufgabenzeile vorhanden. Zwei Tests für späteren Erfolg und Fehler liefen
+zunächst rot. Eine zusätzliche Zuweisung blendet den späteren Abschlusszeitpunkt
+jetzt ebenso aus wie spätere Ergebnisse und Fehler. 56 gezielte Tests bestanden
+nach dieser Korrektur in 32,87 s. Grok bestätigte `6c05938` und den Quellpin
+`f579255e6ff1299bfbfd3328fa775cdcfc81fcdda6b3ddf4c153463e17f16aea`
+mit **22 eigenen Tests in 0,80 s** und empfiehlt die Abnahme der Korrektur.
+Auftrag `24be2cf1-4370-40f2-bb20-162428290131`, sichtbare Übergabe
+`channel-e5adec61b72d42b7b1d89dbf73e11d2b`, Antwort
+`7c63af5d-ed5a-419d-9d8f-3a3c6f61f0da`; Antwort und Abschluss quittiert.
+Beleg: `grok-stage5a-finish-review.json`. Die Aktivierung der gesamten Etappe 5
+steht noch aus.
+
+## Etappe 5, Paket 5b: Bedienwege hinter Anwendungsschnittstellen (Kandidat)
+
+Isolierter Arbeitsstand: `/Users/landjunge/KiraBridge-stage5b-20261020`.
+Die vier HTTP-Präsentationen (`ControlCenter`, `ApprovalConsole`, Team- und
+Grok-Verbindungsansicht) erhalten schmale Anwendungspartner statt des gesamten
+Bridge-Objekts. Sie authentifizieren, prüfen HTTP-Eingaben und stellen Ergebnisse
+dar. Keine dieser Oberflächen kennt SQL-Tabellen oder startet Betriebssystemprozesse.
+Nur `operator_application` als zentrale Verdrahtung kennt den vollständigen Kern.
+
+`OperatorControl` führt Bedienaktionen und Zustandsabfragen über benannte Ports
+aus. `LocalDaemonClient` kapselt den bestehenden authentifizierten MCP-Zugang;
+`LocalProcessPlatform` die begrenzten Prozessaufrufe und Beobachtung. Die
+Konfigurationsaktivierung verbleibt beim bereits geprüften `OperationsService`.
+`ConnectorAdministration` ist gemeinsamer Besitzer der OAuth-Bedienabfragen;
+`OperatorTaskDecisions` nutzt die vorhandene atomare Aufgabenfreigabe und Ablehnung.
+SQL für Aufgabenansichten liegt beim Task-Store, eigenständige Konsolenereignisse
+bei `AuditWriter`. Gemeinsam zu speichernde Fachänderungen behalten ihre Transaktion.
+
+`ControlActionRepository` besitzt die unveränderte `control_actions`-Tabelle.
+Kennungsprüfung, Reservierung und Audit passieren in einer kurzen Transaktion,
+auch über getrennte SQLite-Verbindungen. Ausführung wartet außerhalb. Wiederholte
+Kennungen lösen keine zweite Aktion aus; andere Inhalte erzeugen einen Konflikt.
+Eine abgebrochene wartende Ausführung wird als `unknown` gespeichert und nicht
+wiederholt. Ein Prozessabbruch vor dem Abschluss lässt die vorhandene Reservierung
+erhalten. Ein bestätigter Bridge-Neustart wird als `completed` gespeichert; bloßes
+`launchctl` ohne den vorhandenen Aktivierungsnachweis genügt dafür nicht.
+
+Vorhandene Agentensitzungen bleiben erhalten. Der ausdrücklich vom lokalen Nutzer
+gewählte Start verwendet weiterhin die einmalige vertrauenswürdige Fensterfreigabe.
+Ein Neustart bei fehlendem Agentenfenster erzeugt keine Ersatzfreigabe und keinen
+Ersatzprozess. Diese interne Abgrenzung ist keine Sandbox gegen freie OS-Rechte
+desselben Mac-Benutzers. Sitzungsmanager und Terminaladapter folgen in Paket 5c.
+
+155 gezielte Tests in 26,76 s bestanden nach Anpassung zweier Testinjektionen an
+die neuen fachlichen Besitzer. Enthalten sind echte getrennte SQLite-Verbindungen,
+einmalige Aktionsausführung, unklare Unterbrechungen, Konflikte, lokale Authentifizierung,
+Freigaben, OAuth/PKCE, Team-, Protokoll- und Aktivierungsregressionen. Zusätzlicher
+Negativtest für den fehlenden Agenten-Neustart bestand anschließend mit insgesamt
+20 gezielten Tests in 0,92 s. Grok prüfte Commit `7713646` (80 Python-Dateien,
+Quellpin `9ddade1ccaf9014a1f0acf3cca583127752ceb91d1fabdadfa62db8222ea6547`)
+und führte **156 Tests in 27,37 s** selbst aus. Seine begrenzte Abnahme kam als
+Antwort `d8f30b1c-c594-4a2d-a891-43b938b6a58f` auf Auftrag
+`3dfe83bb-93ca-4adc-81b2-3419054bfe5b`, sichtbare Übergabe
+`channel-0c6b564f76ff4ae5abe363daabe761b0`. Antwort und Abschluss sind quittiert;
+Beleg `grok-stage5b-review.json`.
+Keine produktive Codeaktivierung, keine neuen echten Agentenfenster oder Eingaben
+in bestehende Codex-Sitzungen gehören zu diesen Tests.
+
+## Etappe 5, Paket 5c: schmale Sitzungsports und ersetzbare Transporte (Kandidat)
+
+Arbeitsstand: `/Users/landjunge/KiraBridge-stage5c-20261020`; produktiv weiterhin rc7.
+`SessionManager` erhält `SessionPorts` mit Autorisierung, Eingabefreigabe,
+Audit, konfigurierter Umgebung und Agentenzuordnung. Die zentrale Bridge verdrahtet
+ihn erst nach Eingabepolicy und Clipboard-Partner. Der Sitzungsmanager kennt kein
+Bridge-Objekt, keine SQL-Tabelle und keine Prozessstart- oder AppleScript-API.
+`TerminalAppTransport` und `TmuxTransport` implementieren explizite Transportports.
+Beide lassen sich ohne Aufbau des Kerns vollständig ersetzen.
+
+Terminal.app behält Katalog, exakte Fenster-/TTY-Auswahl, Fokusprüfung, wörtlichen
+Paste-Menübefehl, Erhalt aller Clipboard-Formate und separates Return. Vor jeder
+Mutation erfolgt weiterhin die neue Sitzungsauswahl mit PID-Prüfung und persistierter
+Agentenbindung. Native Zielskripte prüfen zusätzlich, dass Terminal.app noch läuft,
+bevor sie Fenster abfragen. Die eigene kurzlebige Prozessbeobachtung wird auch bei
+Abbruch beendet. tmux besitzt nur die bisherigen bestehenden Lese-/Eingabewege;
+kein Adapter startet einen Ersatzagenten, ein Fenster oder einen tmux-Server.
+Der einzige Fensterstart bleibt der gesondert freigegebene lokale Startauftrag.
+
+Tests ersetzen beide Transporte ohne Bridge und prüfen Kira, Eve, Codex und Grok
+gegen fehlende, falsche, doppelte und veraltete Ziele. Keine dieser Prüfungen erreicht
+Paste, Return, Fensterstart oder Eingabe über einen anderen Adapter. Direkte Eingaben
+in erkannte CLI-Agenten benötigen weiterhin die zentrale Übergabe. Mehrzeiliger Paste
+und Return bleiben getrennte Aktionen; ein unklarer Return hat genau einen Versuch
+und löst keinen Ersatz aus. Transportflags bestätigen keinen Agentenempfang.
+
+214 gezielte Tests in 14,38 s bestanden, Ruff und JavaScript-Syntax ebenfalls.
+Vorherige Testinjektionen wurden an die tatsächlichen neuen Adapter verlegt.
+Zusätzlich las der isolierte Kandidat tatsächlich die beiden Originalfenster
+`terminal:22104:ttys000`/PID 94023 (1001 Zeichen) und
+`terminal:22228:ttys002`/PID 6957 (1103 Zeichen), Katalog mit drei erhaltenen Fenstern.
+Diese rein lesende lokale Prüfung verwendet die tatsächlich gespeicherten
+Capability-Einstellungen, aber keinen gestarteten Kandidaten-Daemon und keine
+produktive Datenbankschreibaktion. Beleg `stage5c-candidate-native-read.json`.
+Sie ersetzt weder die spätere Prüfung nach Aktivierung noch eine Eingabe in das
+beschäftigte Original-Codex-Fenster oder die physische Handy-Sprachausgabe.
+
+Die Terminalauswahl nennt OS-`busy` jetzt „Programm läuft“ beziehungsweise
+„Terminal wartet“; tmux ohne diese Beobachtung zeigt „Prozess erkannt“.
+Agentenbereitschaft wird erst vor der tatsächlichen Übergabe geprüft.
+Groks unabhängige Prüfung dieses Pakets steht noch aus: Nach dem Push von
+`579ab65` (83 Python-Dateien, Quellpin
+`f7048b777cf874ffa026efc6b60af65c119053a96522557eefa6b94a90b00f9e`)
+meldete der tatsächliche Terminalzugang `desktop_locked`. Deshalb wurde kein
+neuer Grok-Auftrag gesendet. Es gibt weder einen Hintergrundersatz noch einen
+erneuten Return in ein unbekanntes Feld. 5c bleibt unverändert für die Prüfung;
+die Entsperrung der bestehenden Mac-Benutzersitzung wurde angefragt.
+
+## Etappe 5, Paket 5d: fachliche Betriebsabfragen (isolierter Kandidat)
+
+Während der blockierten sichtbaren 5c-Prüfung liegt diese unabhängige Restarbeit
+separat unter `/Users/landjunge/KiraBridge-stage5d-20261020`. Sie verändert keine
+Datei im festgehaltenen 5c-Prüfbaum. Es handelt sich um einen weiteren Teil der
+Etappe 5, keine Abnahme oder Aktivierung von 5c und keinen Beginn von Etappe 6.
+
+`OperationsService` kennt keine SQL-Tabellen oder Zustandslisten von Aufgaben,
+Nachrichten, Teams und sichtbaren Übergaben mehr. Die jeweiligen Besitzer liefern
+`activation_work_count`; `OperatorQueries.maintenance_counts` verbindet die Werte.
+Der Betriebsdienst übergibt seinen tatsächlichen Store als Transaktionskontext.
+So bleiben auch Abfragen innerhalb einer gemeinsamen Schreibtransaktion konsistent,
+wenn ein zweiter Steuerprozess eine eigene SQLite-Verbindung verwendet.
+Warten und Prozess-/Netzwerkaufrufe bleiben außerhalb der Schreibtransaktion.
+
+Dabei wurde eine konkrete Lücke berichtigt: Die frühere Warteprüfung zählte einen
+Teamauftrag in `processing_result` nicht. In derselben temporären Datenbank liefert
+die tatsächliche rc7-Funktion dafür **0**, die neue Besitzerabfrage **1**.
+Beleg `stage5d-processing-result-before-after.json`; keine produktive Datenbank-
+oder Agentenänderung. Auch die Wiederherstellung erkennt diesen aktiven Zustand.
+Die Ergebnisse selbst, ihre Belege und Abschlussmeldungen bleiben beim bisherigen
+atomaren fachlichen Speicherweg.
+
+100 gezielte Tests in 52,91 s bestanden: Besitzerabfragen, gemeinsam sichtbare
+noch nicht bestätigte Änderungen auf einer zweiten Verbindung, Abwarten laufender
+Ergebnisverarbeitung, blockierter Neustart bei unerledigter Arbeit, erhaltene
+Konfiguration, Aufgaben-/Nachrichten-/Teamabschlüsse und vorhandene UI-/Betriebswege.
+Die Gesamtsuite des vorbereiteten `0.8.0rc8`-Kandidaten bestand mit
+**817 Tests in 171,05 s**, einschließlich als Fehler behandelter
+`PytestUnraisableExceptionWarning`. Ruff, Whitespace-Prüfung, Wheel-Bau und
+`uv lock --check --offline` bestanden. Die 83 Python-Dateien und zehn
+Oberflächenassets im Wheel wurden bytegenau mit dem Quellbaum verglichen.
+Quellpin: `7fcb86e8f19cb7c2c6b83b91dd844d0c82ff1afdfc29fcf0edf1ee535789c847`;
+Wheel-SHA256: `16c34efab00a9477117c6dc21b093364337a291797db5e08b49eed3631161f57`.
+Private Belege: `stage5-rc8-full-tests.log`, `stage5-rc8-candidate-manifest.json`.
+Die unabhängige sichtbare Grok-Prüfung erfolgt erst nach 5c und nach Entsperrung.
+Produktiver Stand bleibt unverändert `0.8.0rc7`; keine Freigaben oder Alt-Puffer
+werden automatisch verändert.
+
+### Fortsetzung nach Entsperrung
+
+Zuerst die bestehende Grok-Zuordnung neu lesen und 5c gegen den unveränderten
+Pin `579ab65` unabhängig prüfen lassen; erst danach 5d gegen dessen dokumentierten
+Pin. Keine dieser beiden Prüfungen wurde während `desktop_locked` eingereiht.
+Bei Befunden korrigieren und gezielt nachprüfen. Anschließend erst den geprüften
+Stand in den produktiven Zweig übernehmen, vor Aktivierung pushen, Paketmetadaten
+aktualisieren und Core/Steuerdienst koordiniert aktivieren. Sitzungskatalog,
+ursprüngliches Codex-Lesen und eine neue sichtbare Grok-Übergabe praktisch prüfen.
+Bestehende Fenster und Tunnel bleiben dabei erhalten. Danach folgt Etappe 6.
+Die hörbare Handy-Antwort im laufenden Grok-Gespräch bleibt zusätzlich offen;
+der bereits belegte lokale Eve-MCP-Rückweg ersetzt diese Abnahme nicht.
+
+Der vorbereitete 5d-/rc8-Kandidat ist als `aab0bf7` auf dem Zweig
+`architecture/stage5d-owned-drain-20261020` gepusht. Die Produktivquelle wurde
+nicht durch diesen ungeprüften Kandidaten ersetzt.
