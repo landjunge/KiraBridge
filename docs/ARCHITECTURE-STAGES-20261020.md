@@ -841,3 +841,42 @@ der bereits belegte lokale Eve-MCP-Rückweg ersetzt diese Abnahme nicht.
 Der vorbereitete 5d-/rc8-Kandidat ist als `aab0bf7` auf dem Zweig
 `architecture/stage5d-owned-drain-20261020` gepusht. Die Produktivquelle wurde
 nicht durch diesen ungeprüften Kandidaten ersetzt.
+
+
+## Zusätzliche aktuelle Kira-Funktionsprüfung
+
+Daniels Auftrag „check die kira verbindung und funktion“ wurde über die tatsächlich
+vorhandenen ChatGPT-Werkzeuge geprüft; die Bridge authentifizierte `chatgpt`/Kira.
+Produktiv antwortet rc7, PID 92689. Quelle und Konfiguration melden `matches_loaded`.
+Die dauerhafte Terminalfreigabe ist automatisch; Voice-Sondertoken und Zusatzpuffer
+sind aus. `session_input_policy.enabled=false` ist keine Terminalsperre.
+
+Testkennung `kira-check-1792480431762`: Über den zwischengespeicherten
+`task_request`-Zugang wurden der Katalog mit drei erhaltenen Fenstern und die
+Ausgaben der Originalfenster Codex `22104/ttys000/94023/94386` (945 Zeichen)
+und Grok `22228/ttys002/6957/6986` (1103 Zeichen) tatsächlich gelesen.
+Aufgaben und Abschlussmeldungen wurden verarbeitet und quittiert.
+
+Kira schickte anschließend ohne Sondertoken eine neue harmlose Frage an Grok,
+Nachricht `f8b7a5b2-f924-4110-ace4-cd9ec89953e2`. Die verbindliche sichtbare Route
+verwendete das bestehende Grok-Fenster. Übergabe
+`channel-141fa2568b274f4689d17a7302fd04ab`: `inserting`, `inserted`,
+`submitting`, `return_sent`, `sent`, authentifiziert `confirmed`, `completed`.
+Genau ein Return-Versuch ist belegt. Grok quittierte die Nachricht und antwortete
+an `chatgpt` exakt **KIRA-VERBINDUNG-OK**, Antwort
+`03514836-0763-445c-8ba0-3e99208dcede`. Kiras wirklicher MCP-Empfang und ACK
+sowie die Abschlussquittierung sind belegt. Das ursprüngliche beschäftigte
+Codex-Fenster bekam keine Eingabe; kein Fenster oder Agent wurde neu gestartet.
+
+`message_receiver_active=true` bezeichnet den zentralen CLI-Dispatcher;
+`receiver_configured=false` für Kira bezeichnet ihr extern gelesenes Clientpostfach.
+Es fehlt deshalb kein eigener Kira-Hintergrundagent. `existing_session_attached=false`
+bezeichnet fehlende dauerhafte Agenten-Protokollanbindung; der praktisch geprüfte
+Fensterzugriff erfolgt pro Aktion über die exakte aktuelle Zuordnung.
+Der Test belegt keine hörbare Ausgabe auf einem Handy und kein automatisches
+Aufwecken eines inaktiven Chats. Private Nachweise: `kira-check-1792480431762.json`
+und `kira-check-1792480431762-handoff.json`. Keine Konfigurationsreparatur war nötig.
+
+Der Mac ist bei dieser Prüfung wieder tatsächlich zugänglich. Der zuvor nicht
+abgesendete 5c-Prüfauftrag wurde danach als Codex über dieselbe zentrale sichtbare
+Grok-Route eingereiht: `7f397465-25be-4400-a37d-f8be5189d669`.
