@@ -15,7 +15,7 @@ Standarddateien: `~/.config/kirabridge/config.toml` (0600), `credentials.json` d
 
 MCP-Clients können `task_request` nutzen. Im Standardmodus `manual` wird die Anfrage dauerhaft als `created` gespeichert; die Antwort enthält den lokalen Freigabelink. Der Bediener öffnet [KiraBridge Freigaben](http://127.0.0.1:8766/), sieht dort automatisch die Anfrage, öffnet ihre vollständigen Angaben und entscheidet mit „Auftrag freigeben“ oder „Ablehnen“. Ergebnisse und Statuswechsel erscheinen anschließend auf derselben Seite. Als CLI-Alternative stehen `pending`, `approve TASK_ID` und `deny TASK_ID` bereit. Der MCP-Server bietet kein Tool zur Selbstfreigabe an. Pending-Anfragen zählen zur Queue-Quote und bleiben nach einem Neustart ungeprüft.
 
-Ab Version 0.4.0 erlaubt `approval_mode = "automatic"` unter `[principals.<zugang>]` neue Aufträge innerhalb der eingerichteten Funktionsrechte ohne einzelne Freigabeklicks. Auf diesem Mac wurde dies auf ausdrücklichen Nutzerwunsch für `chatgpt`, `codex`, `grok` und `local` aktiviert. `task_request` stellt erlaubte Arbeit direkt als `queued` ein und meldet `approval_required=false`; `task_submit`, `clipboard_read` und `clipboard_write` benötigen dann keinen Freigabetoken. Ein ausdrücklich mitgesendeter Token wird weiterhin auf Gültigkeit und einmalige Nutzung geprüft. `bridge_health` und `operation_catalog` zeigen den Modus des authentifizierten Zugangs. Die Oberfläche nennt die automatisch freigegebenen Zugänge.
+Ab Version 0.4.0 erlaubt `approval_mode = "automatic"` unter `[principals.<zugang>]` neue Aufträge innerhalb der eingerichteten Funktionsrechte ohne einzelne Freigabeklicks. Automatische Freigaben dürfen nur nach bewusster Konfiguration und Prüfung der Rechte aktiviert werden.
 
 Der Modus ist eine dauerhafte lokale Berechtigungsentscheidung, kein zweiter Dispatcher: Authentifizierung, erlaubte Fähigkeiten, Programme und Verzeichnisse, Quoten, Zustandsbelege und Idempotenz bleiben aktiv. Automatische Entscheidungen stehen mit Anfragehash und Quelle `principal_policy` als `task.auto_approved` im Audit. Bereits fehlgeschlagene, abgebrochene oder unbekannte Aufträge werden nicht neu gestartet. Zur Rücknahme `approval_mode = "manual"` setzen und den Dienst ohne laufende Aufträge neu starten. Dies gilt für neue Anfragen; bereits autorisierte Aufträge verlieren ihre Freigabe dadurch nicht. Historische Pending-Anfragen werden durch den Moduswechsel nicht nachträglich ausgeführt.
 
@@ -98,7 +98,7 @@ MCP-Aufruf `bridge_readiness` prüft nur die anfragende Identität, beispielswei
 
 ```json
 {
-  "read_paths": ["/Users/landjunge/Projects/ki-hilfezentrum/.worktrees/codex-abschluss-20261017T2335/docs/MORGENUEBERGABE-20261018.md"],
+  "read_paths": ["/Users/EXAMPLE_USER/Projects/EXAMPLE_PROJECT/docs/MORGENUEBERGABE-20261018.md"],
   "executables": ["/usr/bin/osascript"]
 }
 ```
@@ -107,7 +107,7 @@ Der lokale Abgleich fragt denselben laufenden Dienst ab und vergleicht zusätzli
 geladene Konfiguration und Quellfingerabdruck mit der lokalen Installation:
 
 ```sh
-kirabridge --principal chatgpt readiness --read-path /Users/landjunge/Projects/ki-hilfezentrum/.worktrees/codex-abschluss-20261017T2335/docs/MORGENUEBERGABE-20261018.md --executable /usr/bin/osascript
+kirabridge --principal chatgpt readiness --read-path /Users/EXAMPLE_USER/Projects/EXAMPLE_PROJECT/docs/MORGENUEBERGABE-20261018.md --executable /usr/bin/osascript
 ```
 
 `path_denied` verlangt einen Pfad innerhalb der expliziten `roots`/`read_roots`.
@@ -126,7 +126,7 @@ Prüfung, keine Funktions-/Tunnel-/ChatGPT-/Dauerhaftigkeitsgarantie.
 `roots` bleibt die bestehende allgemeine Dateigrenze und Terminal-CWD-Grenze.
 Die additive Principal-Option `read_roots` erweitert nur Lesen/Listen. Auf diesem
 Mac wurden am18.10.2026 ausschließlich beim bestehenden Principal `chatgpt`
-`/Users/landjunge/KiraBridge` und `/Users/landjunge/Projects`
+`/Users/EXAMPLE_USER/KiraBridge` und `/Users/EXAMPLE_USER/Projects`
 ergänzt. Damit sind die bestehenden Projektbäume unter `Projects` lesbar,
 einschließlich der Hilfezentrum-Worktrees. Nicht das gesamte Home oder `/`. Die alte Konfiguration liegt lokal in
 `~/.config/kirabridge/backups/config-before-project-read-roots-20261018.toml`,
