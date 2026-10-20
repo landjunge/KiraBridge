@@ -23,7 +23,7 @@ Nicht als fertige Integration/Aktivierung oder öffentliche Abnahme behandeln.
 - Zugehöriger TollGate-Core: e382f4784543b1b62c3a238dd6c924b1e7d93ecb,
   PR35 https://github.com/landjunge/tollgate/pull/35 (TollGate ist öffentlich,
   KiraBridge privat; keine Sichtbarkeitsänderung). TG-WT
-  `/Users/landjunge/tollgate/.worktrees/seven-tools-process-stop-20261018` vonmainc1aa247.
+  `/Users/EXAMPLE_USER/tollgate/.worktrees/seven-tools-process-stop-20261018` vonmainc1aa247.
   Additive Felder im vorhandenen Scopejournal; kein zweites Journal/Queue.
 
 ## Tatsächlich beendet
