@@ -6,7 +6,7 @@ from conftest import request
 from starlette.requests import Request
 
 from kirabridge.audit_manager import AuditReader
-from kirabridge.bridge_core.models import BridgeError
+from kirabridge.bridge_core.models import BridgeError, State
 from kirabridge.control_center import ControlCenter
 from kirabridge.message_manager import MessageSend
 from kirabridge.operator_queries import OperatorQueries
@@ -56,6 +56,27 @@ def test_task_snapshot_does_not_attach_a_future_task_to_an_old_event(bridge, con
     bridge.prepare("local", request(arguments={"path": config.principals["local"].roots[0]}))
     task = bridge.store.get("task-1")
     assert bridge.store.operator_snapshot_at("task-1", task["created"] - 1) is None
+
+
+@pytest.mark.parametrize("final_state", [State.COMPLETED, State.FAILED])
+def test_historical_running_task_hides_later_finished_timestamp(bridge, config, final_state):
+    value = request(arguments={"path": config.principals["local"].roots[0]})
+    bridge.prepare("local", value)
+    bridge.tasks.approve(value.task_id)
+    bridge.store.claim("history", 30)
+    bridge.store.transition(value.task_id, State.RUNNING, {"started": True}, owner="history")
+    at = bridge.store.get(value.task_id)["started"]
+    bridge.store.transition(
+        value.task_id,
+        final_state,
+        {"finished": True},
+        result={"text": "later result"},
+        error={"code": "later_error"} if final_state == State.FAILED else None,
+        owner="history",
+    )
+    snapshot = bridge.store.operator_snapshot_at(value.task_id, at)
+    assert snapshot["state"] == "running"
+    assert snapshot["finished"] is None and snapshot["result"] is None and snapshot["error"] is None
 
 
 def test_message_snapshot_does_not_project_later_delivery_or_ack_backwards(bridge, config):

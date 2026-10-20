@@ -665,4 +665,21 @@ Audit-Ketten und historische Inhalte werden nicht umgeschrieben.
 ohne Core-Aufbau, Authentifizierung vor Datenzugriff, historische Zustände,
 mutationsfreie Abfragen, bestehende HTTP-Oberfläche, Aufgaben-, Nachrichten-,
 Abschluss- und Aktivierungsregressionen. Ruff und Whitespace-Prüfung bestanden.
-Grok-Prüfung dieses kleinen Pakets und Aktivierung sind noch offen.
+Grok prüfte Paket 5a tatsächlich im bestehenden sichtbaren Fenster: Auftrag
+`architecture-stage5a-review-20261020`, Nachricht
+`e5a6f490-4e12-428e-8e7c-40ba7cf2e11c`, Übergabe
+`channel-bea40cc46dd14e6ca33b7297a86ce00f`. Er bestätigte Commit `d7934e3`,
+75 Python-Dateien und Quellpin
+`474f4965bff87ee90d9516c9861f1dee46860fe574978ae44c5746e83dc51f0e`.
+Sein eigener Lauf derselben sechs Testdateien bestand mit **86 Tests in 54,16 s**;
+er empfiehlt die begrenzte Abnahme. Antwort
+`f9f5af35-580a-480b-a235-aea72129fb1b` wurde verarbeitet und quittiert;
+`grok-stage5a-review.json` enthält den Nachweis. Produktiv blieb rc7 unverändert.
+
+Die anschließende Feldprüfung fand noch einen verbliebenen Zukunftsbezug:
+`finished` war trotz historischem laufendem Zustand schon aus der späteren
+Aufgabenzeile vorhanden. Zwei Tests für späteren Erfolg und Fehler liefen
+zunächst rot. Eine zusätzliche Zuweisung blendet den späteren Abschlusszeitpunkt
+jetzt ebenso aus wie spätere Ergebnisse und Fehler. 56 gezielte Tests bestanden
+nach dieser Korrektur in 32,87 s. Groks gezielte Nachprüfung dieses einen Felds
+und die spätere Aktivierung der gesamten Etappe 5 stehen noch aus.

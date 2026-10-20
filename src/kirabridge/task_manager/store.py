@@ -415,6 +415,7 @@ class Store:
         if row["finished"] is None or row["finished"] > at:
             result["result"] = None
             result["error"] = None
+            result["finished"] = None
         return result
 
     def claim(self, owner: str, lease_seconds: float, control: bool | str = False) -> dict | None:
