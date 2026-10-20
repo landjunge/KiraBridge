@@ -29,21 +29,21 @@
   "workers": {
     "/root/threaddesk_m1": {
       "state": "worker_stands_main_integrated_ci_green",
-      "worktree": "/Users/landjunge/gnom-hub-v1/.worktrees/seven-tools-worker-stands-20261018",
+      "worktree": "/Users/EXAMPLE_USER/gnom-hub-v1/.worktrees/seven-tools-worker-stands-20261018",
       "packages": [
         "GH-C04"
       ]
     },
     "/root/tollgate_control": {
       "state": "blockdesigner_normal_start_profile_loader",
-      "worktree": "/Users/landjunge/blockdesigner/.worktrees/seven-tools-operator-profile-20261019",
+      "worktree": "/Users/EXAMPLE_USER/blockdesigner/.worktrees/seven-tools-operator-profile-20261019",
       "packages": [
         "BD-C04"
       ]
     },
     "/root/fourallpass_protected": {
       "state": "package_guard_main_integrated",
-      "worktree": "/Users/landjunge/blockdesigner/.worktrees/seven-tools-handoff-20261018",
+      "worktree": "/Users/EXAMPLE_USER/blockdesigner/.worktrees/seven-tools-handoff-20261018",
       "packages": [
         "FP-V01"
       ]
