@@ -4,7 +4,7 @@
     "task_id": "project-handoff-repair-20261018",
     "operation": "file.read",
     "arguments": {
-      "path": "/Users/landjunge/Projects/ki-hilfezentrum/.worktrees/codex-abschluss-20261017T2335/docs/MORGENUEBERGABE-20261018.md",
+      "path": "/Users/EXAMPLE_USER/Projects/ki-hilfezentrum/.worktrees/codex-abschluss-20261017T2335/docs/MORGENUEBERGABE-20261018.md",
       "max_bytes": 65536
     },
     "idempotency_key": "project-handoff-repair-20261018",
