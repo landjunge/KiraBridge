@@ -41,7 +41,9 @@ def terminal_reads(bridge, config, monkeypatch):
         return {**TARGET, "text": "EXACT EXISTING OUTPUT"[-max_bytes:]}
 
     monkeypatch.setattr(bridge.sessions, "catalog", catalog)
-    monkeypatch.setattr(bridge.sessions, "read_observed", read)
+    # Replace the platform read, retaining the real bounded observation path
+    # so direct and queued results are compared with actual output metadata.
+    monkeypatch.setattr(bridge.sessions, "read", read)
     return calls
 
 

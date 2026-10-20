@@ -89,7 +89,12 @@ async def result_for_conversation(bridge, principal, task):
         text = result.get("final_message") or result.get("text") or result.get("stdout") or ""
         if not isinstance(text, str):
             text = ""
-        if not text:
+        if not text and result.get("output_available") is False:
+            text = (
+                "Der Auftrag ist abgeschlossen. Die gespeicherte Terminalausgabe ist "
+                "nicht mehr verfügbar. Der Auftrag wird nicht erneut ausgeführt."
+            )
+        elif not text:
             text = (
                 "Der Auftrag ist abgeschlossen. "
                 "Die tatsächlichen Ergebnisse stehen im Ergebnisfeld."

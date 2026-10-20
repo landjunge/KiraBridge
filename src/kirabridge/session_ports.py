@@ -18,7 +18,7 @@ class InputRelease(Protocol):
 
 
 class SessionAudit(Protocol):
-    def record(self, kind, metadata, principal="local", task_id=None): ...
+    def observe_terminal(self, principal, result): ...
 
 
 class SessionTransport(Protocol):

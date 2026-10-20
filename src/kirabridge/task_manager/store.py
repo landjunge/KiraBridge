@@ -75,6 +75,7 @@ class Store:
     """Short synchronous WAL transactions; no network or await inside a transaction."""
 
     def __init__(self, path: Path):
+        self.result_codec = None
         private_directory(path.parent)
         if path.is_symlink():
             raise BridgeError("unsafe_state", "Database must not be a symlink")
@@ -277,7 +278,9 @@ class Store:
             ),
         )
 
-    def get(self, task_id: str, principal: str | None = None) -> dict[str, Any]:
+    def get(
+        self, task_id: str, principal: str | None = None, *, resolve_output=True
+    ) -> dict[str, Any]:
         row = self.db.execute("SELECT * FROM tasks WHERE id=?", (task_id,)).fetchone()
         if row is None or (principal is not None and row["principal"] != principal):
             raise BridgeError("not_found", "Task not found")
@@ -285,6 +288,10 @@ class Store:
         for key in ("args", "evidence", "result", "error"):
             result[key] = json.loads(result[key]) if result[key] is not None else None
         result.pop("request_hash")
+        if resolve_output and self.result_codec:
+            result["result"] = self.result_codec.resolve_result(
+                result["principal"], result["result"]
+            )
         buffer = self.db.execute(
             "SELECT * FROM session_input_buffers WHERE task_id=?", (task_id,)
         ).fetchone()
@@ -319,6 +326,8 @@ class Store:
             if not evidence:
                 raise BridgeError("missing_evidence", "A state transition requires evidence")
             now = time.time()
+            if self.result_codec:
+                result = self.result_codec.persist_task_result(row, result)
             finished = now if state in {State.COMPLETED, State.FAILED, State.CANCELLED} else None
             self.db.execute(
                 "UPDATE tasks SET state=?,updated=?,started=COALESCE(started,?),finished=?,"
@@ -418,7 +427,8 @@ class Store:
     def operator_snapshot_at(self, task_id, at):
         """Historical presentation, without turning later results into earlier evidence."""
         row = self.db.execute(
-            "SELECT operation,state,args,result,error,evidence,finished FROM tasks WHERE id=?",
+            "SELECT principal,operation,state,args,result,error,evidence,finished "
+            "FROM tasks WHERE id=?",
             (task_id,),
         ).fetchone()
         if row is None:
@@ -441,6 +451,9 @@ class Store:
             result["result"] = None
             result["error"] = None
             result["finished"] = None
+        elif self.result_codec:
+            result["result"] = self.result_codec.resolve_result(row["principal"], result["result"])
+        result.pop("principal", None)
         return result
 
     def claim(self, owner: str, lease_seconds: float, control: bool | str = False) -> dict | None:

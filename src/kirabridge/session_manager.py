@@ -55,7 +55,6 @@ class SessionManager:
         )
         self.environment, self.agent_registry = ports.environment, ports.agent_registry
         self.lock = asyncio.Lock()
-        self.observed_outputs = {}
         self.terminal_app = (
             terminal_app if terminal_app is not None else TerminalAppTransport(ports.clipboard_lock)
         )
@@ -194,25 +193,8 @@ class SessionManager:
         return process["name"]
 
     async def read_observed(self, principal, pane_id, expected_pid, *, max_bytes=65536):
-        from kirabridge.bridge_core.models import digest
-
         result = await self.read(principal, pane_id, expected_pid, max_bytes=max_bytes)
-        key, fingerprint = (principal, pane_id, expected_pid), digest(result["text"])
-        if self.observed_outputs.get(key) != fingerprint:
-            if len(self.observed_outputs) >= 128:
-                self.observed_outputs.pop(next(iter(self.observed_outputs)))
-            self.observed_outputs[key] = fingerprint
-            self.audit.record(
-                "terminal.output",
-                {
-                    "pane_id": pane_id,
-                    "expected_pid": expected_pid,
-                    "text": result["text"],
-                    "content_sha256": fingerprint,
-                },
-                principal=principal,
-            )
-        return result
+        return self.audit.observe_terminal(principal, result)
 
     async def open(self, principal, args, *, task_id=None):
         policy = self.authorization.principal(principal, "session.open")

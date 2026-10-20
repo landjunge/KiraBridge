@@ -283,6 +283,14 @@ class VisibleHandoffConfig(BaseModel):
     bindings: dict[str, VisibleTerminalBinding] = Field(default_factory=dict)
 
 
+class OutputHistoryConfig(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    max_bytes: int = Field(default=16777216, ge=4096, le=1073741824)
+    max_entries: int = Field(default=256, ge=1, le=100000)
+    max_item_bytes: int = Field(default=8388608, ge=1024, le=8388608)
+    retention_seconds: float = Field(default=604800, ge=60, le=31536000)
+
+
 class Config(BaseModel):
     model_config = ConfigDict(extra="forbid")
     _source_path: str | None = PrivateAttr(default=None)
@@ -295,6 +303,7 @@ class Config(BaseModel):
     max_read_queued: int = Field(default=32, ge=1, le=1000)
     read_concurrency: int = Field(default=2, ge=1, le=8)
     max_task_bytes: int = Field(default=2097152, ge=1024, le=8388608)
+    output_history: OutputHistoryConfig = Field(default_factory=OutputHistoryConfig)
     lease_seconds: float = Field(default=30, ge=2, le=600)
     host: str = "127.0.0.1"
     port: int = Field(default=8765, ge=1, le=65535)

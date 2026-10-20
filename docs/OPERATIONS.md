@@ -186,3 +186,23 @@ keine Datenbank oder alten Ergebnisse zurückspielen. Ein Quell-Rückweg auf die
 vorherige Fassung erfordert zuerst Rücknahme der neuen `read_roots`-Option in
 der Konfiguration, weil alte Versionen unbekannte Felder absichtlich ablehnen.
 
+
+## Begrenzte neue Ausgabehistorie (rc9-Kandidat)
+
+Nach koordinierter Aktivierung gelten die persistenten Werte in
+`[output_history]`: `max_bytes=16777216`, `max_entries=256`,
+`max_item_bytes=8388608`, `retention_seconds=604800`. Änderungen benötigen
+den bestehenden geprüften Aktivierungsweg. Ablauf und FIFO-Verdrängung gelten
+nur für neue rohe Terminalausgaben. Taskstatus, fachliche Nachrichten und
+historische Audit-Ketten bleiben erhalten. Das Protokoll zeigt Kürzung oder
+fehlende Ausgabe; ein abgeschlossener Auftrag wird dadurch nie wiederholt.
+`bridge_health.output_history` zeigt die logischen Nutzlastgrenzen, keine
+Obergrenze für Datenbankdatei, WAL oder historische Daten.
+
+Kein automatischer Code-Downgrade und kein Zurückspielen einer alten Datenbank.
+Vor einem ausdrücklich gewünschten Wechsel auf einen Leser ohne den neuen
+Codec: neue Arbeit persistent sperren, laufende Arbeit abwarten, passende
+Konfiguration sichern und die im [Etappenbericht](ARCHITECTURE-STAGES-20261020.md)
+beschriebene begrenzte Taskresultat-Aufbereitung oder einen kompatiblen Leser
+verwenden. Neue Audit-Referenzen brauchen auch danach einen kompatiblen Leser;
+der Rückkehrhelfer schreibt historische Audit-Zeilen nicht um.

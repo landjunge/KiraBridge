@@ -44,7 +44,8 @@ async def test_immediate_completion_before_listener_and_route_is_atomic(bridge, 
             "notices"
         ][0]
         assert notice["payload"]["outcome"] == "success"
-        assert "fast result" in notice["payload"]["summary"]
+        assert "fast result" not in notice["payload"]["summary"]
+        assert "fast result" in bridge.task("local", value.task_id)["result"]["stdout"]
         assert notice["payload"]["task_id"] == "work"
         assert not bridge.completions.receive("local", "assistant-session-b")["notices"]
         bridge.prepare("local", value, completion_target="assistant-session-a")

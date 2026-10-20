@@ -134,7 +134,7 @@ def record_notice(store, principal, target, source, source_id, event_seq, payloa
 
 
 def record_task_completion(store, task_id, event_seq):
-    task = store.get(task_id)
+    task = store.get(task_id, resolve_output=False)
     route = store.db.execute(
         "SELECT target FROM completion_routes WHERE task_id=?", (task_id,)
     ).fetchone()

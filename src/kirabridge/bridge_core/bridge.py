@@ -113,6 +113,10 @@ class Bridge:
 
         self.handoffs = HandoffManager(self)
         self.security = SecurityManager(config, self.store)
+        from kirabridge.output_history import OutputHistory
+
+        self.outputs = OutputHistory(config.output_history, self.store)
+        self.store.result_codec = self.outputs
         self.terminal = TerminalManager(config.terminal)
         self.filesystem = FilesystemManager()
         self.images = ImageManager()
@@ -130,7 +134,6 @@ class Bridge:
             preflight=lambda task: task_preflight(self, task),
             runtime=runtime_ref(self.runtime),
         )
-        from kirabridge.audit_manager import AuditWriter
         from kirabridge.session_ports import SessionPorts
         from kirabridge.terminal_queries import TerminalQueries
 
@@ -138,7 +141,7 @@ class Bridge:
             SessionPorts(
                 authorization=self.security,
                 input_release=self.tasks.input_policy,
-                audit=AuditWriter(self.store),
+                audit=self.outputs,
                 environment=self.terminal.environment,
                 agent_registry=lambda: (config.agents, config.visible_handoffs.bindings),
                 clipboard_lock=self.clipboard.lock,
@@ -157,7 +160,12 @@ class Bridge:
             config, self.store, self.security, self.sessions, self.messages
         )
         self.agents.visible_handoffs = self.visible_handoffs
-        self.tasks.maintenance = self.messages.voice_policy.expire
+
+        def maintain():
+            self.messages.voice_policy.expire()
+            self.outputs.prune()
+
+        self.tasks.maintenance = maintain
         self.message_receiver = MessageReceiver(self)
         from kirabridge.team_manager import TeamManager
         from kirabridge.team_manager.dispatcher import TeamDispatcher
@@ -271,6 +279,7 @@ class Bridge:
                 "accepting_new_work": self.store.maintenance_state() is None,
             },
             "desktop_last_observation": self.sessions.desktop.last,
+            "output_history": self.outputs.status(),
             "diagnostics_storage": self.diagnostics.status(),
             "message_peers": policy.message_peers,
             "message_receiver_active": bool(
