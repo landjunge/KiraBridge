@@ -19,6 +19,7 @@ def buffered(bridge, config, monkeypatch):
     config.session_input_policy.enabled = True
     config.session_input_policy.principals = ["local"]
     config.principals["local"].approval_mode = "automatic"
+    config.principals["local"].capabilities += ["session.inspect"]
     calls = []
 
     async def selected(*args):

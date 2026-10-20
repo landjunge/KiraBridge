@@ -37,7 +37,7 @@ def test_three_levels_preserve_legacy_and_enforce_selected_approvals():
 def test_chatgpt_terminal_standing_grant_survives_reconfiguration_and_reload(tmp_path):
     path = tmp_path / "config.toml"
     path.write_text(
-        '[principals.chatgpt]\npermission_level="full"\n'
+        '[principals.chatgpt]\npermission_level="full"\nautomatic_operations=["session.input"]\n'
         "[session_input_policy]\nenabled=false\nprincipals=[]\n"
         "[voice_messaging]\ntimeout_seconds=60\n"
     )

@@ -89,6 +89,15 @@ class MessageManager:
         )
         if job:
             result["processing"]["evidence"] = json.loads(job["evidence"])
+            scope = result["processing"]["evidence"].get("session_scope")
+            if scope == "existing_visible_terminal":
+                result["processing_route"] = scope
+            elif job["state"] == "queued":
+                result["processing_route"] = (
+                    "pending_visible_terminal"
+                    if self.config.visible_handoffs.enabled
+                    else "pending_managed_receiver"
+                )
         result["request_reply"] = bool(result["request_reply"])
         return {"api_version": "1", **result}
 
@@ -171,12 +180,12 @@ class MessageManager:
         ):
             dispatch = bool(recorded["dispatched"])
         if dispatch and not recorded:
-            from kirabridge.permissions import automatic_for
+            from kirabridge.permissions import decision
 
             receiver = limits.receivers.get(message.recipient)
             if not receiver:
                 raise BridgeError("receiver_unavailable", "No automatic receiver for this identity")
-            if not automatic_for(target, "agent.execute"):
+            if not decision(self.config, message.recipient, "agent.execute")["automatic"]:
                 raise BridgeError(
                     "approval_required", "Dieser Agentenauftrag benötigt deine Erlaubnis"
                 )

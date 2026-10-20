@@ -402,6 +402,7 @@ async def test_real_http_receiver_keeps_original_message_and_exactly_one_agent_r
             )
         ).structuredContent
         assert "message_buffer" not in sent and sent["processing"]
+        assert sent["processing_route"] in {"pending_visible_terminal", "existing_visible_terminal"}
         async with asyncio.timeout(5):
             while True:
                 current = bridge.messages.get("chatgpt", sent["id"])

@@ -21,7 +21,7 @@ from kirabridge.bridge_core.config import load_config
 from kirabridge.bridge_core.models import BridgeError, canonical, digest
 from kirabridge.local_runtime import peer, write_private
 from kirabridge.mcp_gateway.client import MCPClientPool
-from kirabridge.permissions import LEVELS, level_for
+from kirabridge.permissions import LEVELS, level_for, permission_summary
 
 ASSETS = Path(__file__).with_name("console_assets")
 SERVICE_LABELS = {
@@ -62,7 +62,7 @@ def replace_section(text, header, values):
     return text.rstrip() + "\n" + body
 
 
-def configure_access(config_path: Path, *, level=None):
+def configure_access(config_path: Path, *, level=None, revoke_operations=None):
     """Keep credentials and existing grants. The full level uses the operator's full grant."""
     from kirabridge.bridge_core.bridge import INPUTS
     from kirabridge.chatgpt_setup import replace_private
@@ -70,11 +70,22 @@ def configure_access(config_path: Path, *, level=None):
     config = load_config(str(config_path))
     if level is not None and level not in LEVELS:
         raise BridgeError("invalid_request", "Wähle eine der drei Rechtestufen")
+    revoke_operations = revoke_operations or {}
+    if not isinstance(revoke_operations, dict) or any(
+        name not in config.principals
+        or not isinstance(operations, list)
+        or any(op != "session.input" for op in operations)
+        for name, operations in revoke_operations.items()
+    ):
+        raise BridgeError("invalid_request", "Ungültiger Widerruf einer dauerhaften Ausnahme")
     text = config_path.read_text()
     names = list(config.principals)
     if len(names) > 17:
         raise BridgeError("peer_capacity", "Mehr Teilnehmer als die Postfachkapazität erlaubt")
     for name, policy in config.principals.items():
+        policy.automatic_operations = [
+            op for op in policy.automatic_operations if op not in revoke_operations.get(name, [])
+        ]
         policy.message_peers = [other for other in names if other != name]
         policy.capabilities = list(
             dict.fromkeys(
@@ -96,10 +107,6 @@ def configure_access(config_path: Path, *, level=None):
             policy.permission_level = level
             policy.approval_mode = "manual" if level == "ask" else "automatic"
         if level == "full":
-            if name == "chatgpt":
-                policy.automatic_operations = list(
-                    dict.fromkeys(policy.automatic_operations + ["session.input"])
-                )
             policy.capabilities = list(
                 dict.fromkeys(
                     policy.capabilities
@@ -376,6 +383,9 @@ class ControlCenter:
             "bridge": health,
             "permission_levels": levels,
             "permission_choices": LEVELS,
+            "permission_details": {
+                name: permission_summary(config, name) for name in config.principals
+            },
             "settings_loaded": health.get("runtime", {}).get("config_sha256")
             == config._source_sha256,
             "permissions_consistent": len(set(levels.values())) == 1,
@@ -735,8 +745,10 @@ class ControlCenter:
 
     async def permissions(self, request):
         self.authenticate(request)
-        level = (await self.body(request)).get("level")
-        if level not in LEVELS:
+        value = await self.body(request)
+        level = value.get("level")
+        revocations = value.get("revoke_operations")
+        if level not in LEVELS and not (level is None and revocations):
             raise BridgeError("invalid_request", "Wähle eine der drei Rechtestufen")
         async with self.lock:
             with self.bridge.store.transaction():
@@ -744,16 +756,23 @@ class ControlCenter:
                     raise BridgeError(
                         "service_busy", "Ein Auftrag läuft. Die bisherigen Rechte bleiben aktiv."
                     )
-                updated = configure_access(Path(self.config()._source_path), level=level)
+                updated = configure_access(
+                    Path(self.config()._source_path), level=level, revoke_operations=revocations
+                )
                 self.bridge.config.principals = updated.principals
                 self.bridge.config.agents = updated.agents
-                self.bridge.store.audit("control.permissions", "local", None, {"level": level})
+                self.bridge.store.audit(
+                    "control.permissions",
+                    "local",
+                    None,
+                    {"level": level, "revoke_operations": revocations or {}},
+                )
             health = await self.reload_bridge()
             self.cache = None
             return JSONResponse(
                 {
                     "level": level,
-                    "label": LEVELS[level],
+                    "label": LEVELS[level] if level else "Dauerhafte Ausnahme widerrufen",
                     "active": True,
                     "runtime": health.get("runtime"),
                 }

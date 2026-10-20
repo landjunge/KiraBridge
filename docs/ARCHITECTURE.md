@@ -70,7 +70,7 @@ Ein exklusiver POSIX-Lock erlaubt nur einen Dispatcher pro Datenverzeichnis. Meh
 
 Standardmäßig arbeiten zwei Ausführungs-Worker und ein reservierter Prozesssteuerungs-Worker. So bleibt das Beenden eines eigenen Prozesses auch bei ausgelasteten Ausführungsslots erreichbar. Im Leerlauf warten Worker auf ein Event; alle zwei Sekunden erfolgt ein Abgleich für Aufträge, die externe lokale CLI-Prozesse eingereiht haben.
 
-Der Kandidat `0.8.0rc4` ergänzt die persistenten Zustände sichtbarer Übergaben
+Die aktivierte Version `0.8.0rc4` ergänzt die persistenten Zustände sichtbarer Übergaben
 und einmaliger Fensterstarts additiv in Schema 2. Neue CLI-Übergaben müssen
 die gespeicherte bestehende Fenster-/TTY-/Sitzungs-PID-/Agenten-PID-Bindung
 verwenden. Neue Fenster benötigen einen genauen Auftrag des lokalen Bedienwegs;
@@ -86,3 +86,22 @@ MCP-HTTP ist zustandslos auf Transportebene. Identität wird für jeden HTTP-Auf
 
 Standardwerte: 1000 wartende Ausführungsaufträge plus 32 reservierte Prozesssteuerungsaufträge, 2 MiB Anfrage, maximal 1 MiB rohe Terminalausgabe, maximal 1 MiB Clipboard-/Dateiinhalt, 1000 Verzeichniseinträge oder Ereignisse pro Seite, 32 parallele HTTP-Anfragen, 8 ausgehende MCP-Verbindungen, 32 gleichzeitige ausgehende Toolaufrufe. Auch eine volle Ausführungsqueue blockiert damit die Prozesssteuerung nicht. Die Anzahl historischer Aufgaben und Audit-Einträge wächst mit der Nutzung; Archivierung erfolgt bewusst administrativ und nicht durch unbeaufsichtigte Löschung.
 
+
+## Verbindliche Freigabeentscheidung (Etappe 2, 0.8.0rc5)
+
+`permissions.decision` liefert Capability-Ergebnis, Sammelstufe, dauerhafte
+Operationsausnahme, optionalen Terminalpuffer, Grund und Revision. Queue,
+Ausführungsgrenze, Terminalanzeige und Operationskatalog verwenden sie.
+`config_revision` ist der beim Laden erfasste effektive Konfigurationshash;
+`permission_revision` umfasst die aktuell ausgewerteten Freigabefelder ohne
+generische Konfigurationsausgabe. Der historische grobe `approval_required`-
+Schalter bleibt für alte Clients erhalten; für eine konkrete Operation sind
+`permission_decision` und `terminal_access.input_decision` maßgeblich.
+
+Eine fehlende Capability bleibt auch mit einer dauerhaften Ausnahme gesperrt.
+Die Oberfläche zeigt Ausnahmen ausdrücklich auch bei „Nur mit Erlaubnis“.
+Der authentifizierte lokale Widerruf entfernt nur die bezeichnete Ausnahme.
+Weder Reparatur noch erneute Wahl von „Voll erlaubt“ fügt sie wieder hinzu;
+die aktuelle Sammelstufe wirkt unabhängig davon weiter. Vorhandene Kira-/Eve-
+Ausnahmen bleiben bei der Aktualisierung erhalten. Alte Voice-Puffer werden
+nicht freigegeben und die aufgehobene zusätzliche Voice-Tokenpflicht bleibt aus.

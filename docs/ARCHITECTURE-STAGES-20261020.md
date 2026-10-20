@@ -10,7 +10,7 @@ auf ein kleines Paket Implementierung, Grok-Prüfung, Korrektur und Nachprüfung
 | --- | --- | --- |
 | 1 Ausgangspunkt | Gesichert; praktische ChatGPT-Leseprüfung und unabhängige Grok-Prüfung abgeschlossen | Sichtbare Übergabe ergänzen |
 | 1a Sichtbare Übergaben und Aufhebung Voice-Gate | 0.8.0rc4 aktiviert: 660 Tests bestanden, Grok-Prüfung und produktive sichtbare Übergabe abgeschlossen | Ursprünglichen beschäftigten Codex nicht für Eingabetest unterbrechen |
-| 2 Freigaben | Offen | Gemeinsame Entscheidung und Matrix |
+| 2 Freigaben | Quellpaket 0.8.0rc5 geprüft; Grok-Abnahme vorhanden; Aktivierung folgt | Befunde korrigieren, aktivieren und geladenen Zustand prüfen |
 | 3 Aktivierung | Offen | Persistente Wartung und Fehler-/Parallelitätstests |
 | 4 Client-Lesewege | Offen | Gleiche Rechte, reservierte Lesekapazität, Lastprüfung |
 | 5 Modulgrenzen | Offen | Fachliche Abfragen, austauschbarer Transport |
@@ -267,3 +267,46 @@ Die 595 bestandenen Tests und die Paket-/Lint-/JavaScript-Prüfungen des
 Reparaturstands sind historische Belege; sie wurden für diese reine
 Ausgangssicherung nicht erneut ausgeführt und ersetzen spätere Etappenprüfungen
 nicht.
+
+## Etappe 2: eine verbindliche Freigabeentscheidung
+
+Capability, Stufe, dauerhafte Operationsausnahme und optionaler Terminalpuffer
+werden gemeinsam ausgewertet. Die Entscheidung enthält einen Grund, den
+geladenen effektiven Konfigurationshash und einen Fingerprint der aktuell
+ausgewerteten Freigabefelder. Anzeige, Queue und Ausführungsgrenze verwenden
+diese Funktion. Fehlende Rechte werden durch keine Ausnahme ersetzt.
+
+Vorhandene Terminalausnahmen für Kira und Eve werden erhalten und sichtbar
+ausgewiesen. Der authentifizierte lokale Widerruf ist gezielt pro Principal
+und Operation. Anschließende Reparatur und Wechsel full/medium/ask fügen
+die Ausnahme nicht wieder hinzu. Die volle Sammelstufe bleibt dabei unabhängig
+von einer Ausnahme wirksam. Die wartende Nachrichtenroute heißt vor ihrem
+Start `pending_visible_terminal`; Claim und Abschluss sind eigene Belege.
+
+Codex-Prüfung: 148 Tests für Entscheidungen, Steuerfenster, Eingabepuffer,
+sichtbare Übergaben, Nachrichten, MCP und Status; weitere 74 Tests für
+Installation, Kontoeinrichtung, Grok-Laufzeit, Vorprüfung, Leseweg, Reserven,
+Aufgaben und Security (21 bereits in einem früheren Teilaufruf enthalten).
+Die 24-fache Entscheidungsmatrix prüft die drei Stufen, mit/ohne Ausnahme,
+mit/ohne Capability und mit/ohne optionalen Puffer. Ein echter HTTP-MCP-Test
+vergleicht Katalog und wartenden Auftrag. Lokaler Widerruf ohne Authentifizierung
+wird abgewiesen. Browserdarstellung mit simuliertem ask-Stand zeigt beide
+Ausnahmen und Widerrufknöpfe ohne horizontales Scrollen; produktive Rechte
+wurden dabei nicht geändert. Dies war keine CSP-Abnahme.
+
+Weitere 91 Voice-/Team-Tests bestanden. Zwei Voice-Testfälle hatten in ihrem
+gemockten Transport das tatsächlich erforderliche `session.inspect` nicht
+erteilt; die Testvoraussetzung wurde ergänzt, die Rechteprüfung blieb bestehen.
+Damit bestanden insgesamt 313 verschiedene gezielte Tests für dieses Paket.
+Ruff und Paketbau sind erfolgreich. Die Wheel-Inhalte stimmen mit allen 70
+Python-Dateien des Kandidaten überein, Quellmanifest:
+`20067bbae8b439ab2beaa6460d1c9a93f9a77d68e1ac8b610435547e452b1bcf`.
+
+Grok-Prüfung im ursprünglichen sichtbaren Fenster, Auftrag
+`architecture-stage2-review-20261020`, Nachricht
+`ca819675-1c37-42f7-a7e9-e8bdd7e993f6`: Grok führte selbst 113 Tests aus
+und nahm die drei gezielten Anforderungen ohne Ablehnungsbefund ab.
+Antwort `f1f874cd-0755-4071-a39d-00d9929d5d8e` wurde verarbeitet und quittiert.
+Er weist ausdrücklich auf den erhaltenen groben Legacy-Health-Schalter hin;
+die konkrete Entscheidung und ihre Ausnahme stehen daneben.
+Quelländerung und Aktivierung werden getrennt erfasst.

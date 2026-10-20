@@ -31,6 +31,16 @@ class SecurityManager:
             raise BridgeError("forbidden", "Capability not granted")
         return principal
 
+    def authorize(self, name, operation, *, text=None):
+        from kirabridge.permissions import decision
+
+        result = decision(self.config, name, operation, text=text)
+        if not result["authorized"]:
+            raise BridgeError(
+                "forbidden", "Capability not granted: " + ", ".join(result["missing_capabilities"])
+            )
+        return result
+
     def authenticate(self, token: str) -> str:
         if len(token) < 32:
             raise BridgeError("unauthorized", "Authentication required")

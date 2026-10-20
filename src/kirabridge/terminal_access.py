@@ -1,26 +1,22 @@
 """Explain granted terminal access separately from optional input confirmation."""
 
-from kirabridge.permissions import automatic_for
+from kirabridge.permissions import decision
 
 
 def terminal_access(config, principal):
     policy = config.principals[principal]
     caps = set(policy.capabilities)
     inspect = "session.inspect" in caps
-    send = inspect and {"session.input", "terminal.execute"} <= caps
-    gate = config.session_input_policy
-    buffered = (
-        gate.enabled
-        and principal in gate.principals
-        and "session.input" not in policy.automatic_operations
-    )
+    effective = decision(config, principal, "session.input")
+    send = effective["authorized"]
+    buffered = effective["buffer_enabled"]
     return {
         "policy_authorized": inspect and send,
         "discovery_allowed": inspect,
         "read_allowed": inspect,
         "input_allowed": send,
-        "input_approval_required": send
-        and (not automatic_for(policy, "session.input") or buffered),
+        "input_approval_required": effective["approval_required"],
+        "input_decision": effective,
         "additional_input_buffer_enabled": buffered,
         "session_input_policy_meaning": "optional_confirmation_buffer_not_terminal_enable_switch",
         "availability": "not_probed",

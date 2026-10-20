@@ -11,6 +11,7 @@ import time
 from pathlib import Path
 
 from kirabridge.bridge_core.models import digest
+from kirabridge.permissions import permission_summary
 
 PS_BYTE_LIMIT = 65536
 PS_RECORD_LIMIT = 256
@@ -340,6 +341,7 @@ def permissions_snapshot(bridge, principal: str) -> dict:
         "at": time.time(),
         "approval_mode": policy.approval_mode,
         "approval_required": policy.approval_mode == "manual",
+        "permission_detail": permission_summary(bridge.config, principal),
         "session_input_policy": bridge.config.session_input_policy.model_dump(),
         "terminal_access": terminal_access(bridge.config, principal),
         "automatic_operations": policy.automatic_operations,

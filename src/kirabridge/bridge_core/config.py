@@ -287,6 +287,7 @@ class Config(BaseModel):
     model_config = ConfigDict(extra="forbid")
     _source_path: str | None = PrivateAttr(default=None)
     _source_sha256: str | None = PrivateAttr(default=None)
+    _effective_sha256: str | None = PrivateAttr(default=None)
     data_dir: str = str(Path.home() / ".local/share/kirabridge")
     concurrency: int = Field(default=2, ge=1, le=32)
     max_queued: int = Field(default=1000, ge=1, le=100000)
@@ -351,6 +352,9 @@ def load_config(path: str | None = None) -> Config:
         config = Config.model_validate(tomllib.loads(raw.decode("utf-8")))
         config._source_path = str(source_path)
         config._source_sha256 = hashlib.sha256(raw).hexdigest()
+        from kirabridge.bridge_core.models import digest
+
+        config._effective_sha256 = digest(config.model_dump())
         return config
     return Config()
 

@@ -207,6 +207,7 @@ class Bridge:
 
     def health(self, principal: str) -> dict:
         policy = self.security.principal(principal, "bridge.health")
+        from kirabridge.permissions import permission_summary
         from kirabridge.terminal_access import terminal_access
 
         return {
@@ -235,6 +236,7 @@ class Bridge:
             "approval_mode": policy.approval_mode,
             "permission_level": level_for(policy),
             "permission_label": LEVELS[level_for(policy)],
+            "permission_detail": permission_summary(self.config, principal),
             "approval_required": policy.approval_mode == "manual",
             "session_input_policy": self.config.session_input_policy.model_dump(),
             "terminal_access": terminal_access(self.config, principal),
@@ -296,6 +298,7 @@ class Bridge:
     async def execute(self, task: dict, running, progress) -> dict[str, Any]:
         operation, arguments, principal = task["operation"], task["args"], task["principal"]
         args = INPUTS[operation].model_validate(arguments)
+        self.security.authorize(principal, operation, text=arguments.get("text"))
         policy = self.security.principal(principal, operation)
         roots = policy.roots + (
             policy.read_roots if operation in {"file.read", "file.image", "file.list"} else []

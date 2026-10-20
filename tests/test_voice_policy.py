@@ -17,7 +17,7 @@ def voices(config):
     for name in names:
         policy = config.principals["local"].model_copy(deep=True)
         policy.approval_mode = "automatic"
-        policy.capabilities += ["message.read", "message.send", "message.ack"]
+        policy.capabilities += ["message.read", "message.send", "message.ack", "session.inspect"]
         policy.message_peers = [other for other in names if other != name]
         config.principals[name] = policy
     instance = Bridge(config)

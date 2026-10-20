@@ -152,9 +152,15 @@ class MessageReceiver:
                 self._finish(message_id, "blocked", {"reason": "hourly_run_limit"})
                 return None
             run_id = "channel-" + uuid.uuid4().hex
+            scope = (
+                "existing_visible_terminal"
+                if self.bridge.config.visible_handoffs.enabled
+                else "separate_managed_session"
+            )
             self.bridge.store.db.execute(
-                "UPDATE message_jobs SET state='running',run_id=?,claimed=? WHERE message_id=?",
-                (run_id, time.time(), message_id),
+                "UPDATE message_jobs SET state='running',run_id=?,claimed=?,evidence=? "
+                "WHERE message_id=?",
+                (run_id, time.time(), canonical({"session_scope": scope}), message_id),
             )
             self.messages._event(
                 message_id,

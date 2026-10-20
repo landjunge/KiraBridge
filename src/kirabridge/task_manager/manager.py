@@ -58,15 +58,14 @@ class TaskManager:
         if completion_target is not None:
             valid_target(completion_target)
         policy = self.security.principal(principal, request.operation)
-        from kirabridge.permissions import automatic_for
-
-        automatic = automatic_for(policy, request.operation) and not approval
+        effective = self.security.authorize(
+            principal, request.operation, text=request.arguments.get("text")
+        )
+        automatic = effective["automatic"] and not approval
         pending = pending and not automatic
         self.input_policy.expire()
-        from kirabridge.session_input_policy import marked
-
-        buffered = self.input_policy.applies(request, principal)
-        held = buffered and not marked(request.arguments["text"])
+        buffered = effective["buffer_enabled"]
+        held = effective["buffer_required"]
         if held:
             pending = True
         if request.api_version != "1":
@@ -183,7 +182,11 @@ class TaskManager:
                 "task.requested" if pending else "task.queued",
                 principal,
                 request.task_id,
-                {"operation": request.operation, "request_hash": request_hash(request)},
+                {
+                    "operation": request.operation,
+                    "request_hash": request_hash(request),
+                    "permission_decision": effective,
+                },
             )
             if automatic and not held:
                 self.store.audit(

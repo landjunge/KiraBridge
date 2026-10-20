@@ -213,7 +213,7 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
         """Permitted version-1 operations and exact argument JSON schemas."""
 
         def action():
-            from kirabridge.permissions import LEVELS, automatic_for, level_for
+            from kirabridge.permissions import LEVELS, decision, level_for, permission_summary
             from kirabridge.terminal_access import terminal_access
 
             policy = bridge.security.principal(identity(ctx))
@@ -222,6 +222,7 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
                 "approval_mode": policy.approval_mode,
                 "permission_level": level_for(policy),
                 "permission_label": LEVELS[level_for(policy)],
+                "permission_detail": permission_summary(bridge.config, identity(ctx)),
                 "session_input_policy": bridge.config.session_input_policy.model_dump(),
                 "terminal_access": terminal_access(bridge.config, identity(ctx)),
                 "automatic_operations": policy.automatic_operations,
@@ -231,7 +232,10 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
                 "operations": {
                     name: {
                         "arguments": model.model_json_schema(),
-                        "approval_required": not automatic_for(policy, name),
+                        "approval_required": decision(bridge.config, identity(ctx), name)[
+                            "approval_required"
+                        ],
+                        "permission_decision": decision(bridge.config, identity(ctx), name),
                     }
                     for name, model in INPUTS.items()
                     if name in policy.capabilities

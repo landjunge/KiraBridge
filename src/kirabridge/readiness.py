@@ -36,6 +36,7 @@ def runtime_snapshot(config: Config) -> dict:
         str(p.relative_to(root)): hashlib.sha256(p.read_bytes()).hexdigest()
         for p in sorted(root.rglob("*.py"))
     }
+    config._effective_sha256 = digest(config.model_dump())
     return {
         "instance_id": uuid.uuid4().hex,
         "version": __version__,
@@ -43,7 +44,7 @@ def runtime_snapshot(config: Config) -> dict:
         "started_at": datetime.now(timezone.utc).isoformat(),
         "config_path": config._source_path,
         "config_sha256": config._source_sha256,
-        "effective_config_sha256": digest(config.model_dump()),
+        "effective_config_sha256": config._effective_sha256,
         "source_tree_sha256": digest(manifest),
         "source_file_count": len(manifest),
         "source_package_path": str(root),
