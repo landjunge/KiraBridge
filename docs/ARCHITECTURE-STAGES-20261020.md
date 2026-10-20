@@ -9,7 +9,7 @@ auf ein kleines Paket Implementierung, Grok-Prüfung, Korrektur und Nachprüfung
 | Etappe | Status | Nächster Nachweis |
 | --- | --- | --- |
 | 1 Ausgangspunkt | Gesichert; praktische ChatGPT-Leseprüfung und unabhängige Grok-Prüfung abgeschlossen | Sichtbare Übergabe ergänzen |
-| 1a Sichtbare Übergaben und Aufhebung Voice-Gate | Kandidat 0.8.0rc4: 660 Tests bestanden, Grok-Nachprüfung der Korrekturen bestanden; Aktivierung offen | Aktuelle Konfiguration und tatsächlichen Daemon prüfen |
+| 1a Sichtbare Übergaben und Aufhebung Voice-Gate | 0.8.0rc4 aktiviert: 660 Tests bestanden, Grok-Prüfung und produktive sichtbare Übergabe abgeschlossen | Ursprünglichen beschäftigten Codex nicht für Eingabetest unterbrechen |
 | 2 Freigaben | Offen | Gemeinsame Entscheidung und Matrix |
 | 3 Aktivierung | Offen | Persistente Wartung und Fehler-/Parallelitätstests |
 | 4 Client-Lesewege | Offen | Gleiche Rechte, reservierte Lesekapazität, Lastprüfung |
@@ -176,6 +176,33 @@ funktionen selbst aufrufen. Die Bridge verspricht keinen Schutz gegen dieses
 andere Vertrauensmodell und erweitert oder beschneidet diese OS-Rechte nicht.
 
 ### Prüfung und Aktivierungsstand
+
+Commit `58de36b` ist auf `architecture/six-stages-20261020` gepusht.
+Der produktive Dienst wurde bei nachgewiesen leerer aktiver Queue ersetzt;
+die SQLite-Abfrage war nur lesend, kein Prozessaufruf hielt eine Schreibtransaktion.
+Agenten, Fenster und Tunnel blieben erhalten. Der neue Dienst PID 60271,
+Instanz `05b026ed12144002aec474010be8af65`, meldet Version `0.8.0rc4`.
+Aktive Datei-SHA256:
+`642ef01516ff2ff8199980556b733ac97525329e78d22b14f50a93ed673d54cd`;
+wirksame Konfiguration:
+`1786b287511313d7bbd518006b4afcbc26c445a929ca1a011385faa999e4089a`.
+Der tatsächliche ChatGPT-Zugang bestätigt Konfiguration und Quelle jeweils
+als `matches_loaded`, Terminalausnahme vorhanden, Voice-Tokenpflicht aus.
+
+Produktiver Auftrag `arch-1a-live-rc4-20261020`, Nachricht
+`fcd20a65-cdb7-4499-b972-1e4a20a74e57`, Übergabe
+`channel-b6b163fa9efe4cd898571295bca173b9`: Einfügen, einzelnes automatisches
+Return, geleertes Feld, authentifizierte Grok-Quittung und Antwort
+`446a7913-7a4c-486d-aacb-172a26235a3e` sind getrennt belegt.
+Grok bestätigt Empfang und geladenen Stand unabhängig im ursprünglichen Fenster;
+seine Antwort wurde verarbeitet und quittiert. Private Belege:
+`rc4-loaded-proof.json`, `activation-idle-core.json`, `rc4-live-handoff.json`.
+Die beim ersten Queue-Zustand noch unzutreffende Bezeichnung `managed_receiver`
+wird als konkrete Anzeigekorrektur in Etappe 2 mitgeführt; die tatsächliche
+Ausführung erfolgte über `existing_visible_terminal`.
+
+Der positive Eingabetest im ursprünglichen Codex bleibt offen, solange er den
+laufenden Auftrag bearbeitet. Handy-/Voice-Audio wurde hier nicht geprüft.
 
 Der unveränderte Python-Kandidat hat 660 Tests bestanden
 (`-W error::pytest.PytestUnraisableExceptionWarning`, 173,89 Sekunden).
