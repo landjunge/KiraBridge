@@ -57,7 +57,9 @@ def manager_without_core(*, rows=None, bound_pid=456):
     ports = SessionPorts(
         authorization=SimpleNamespace(principal=authorize),
         input_release=None,
-        audit=SimpleNamespace(record=lambda *args, **kwargs: seen.append("audit")),
+        audit=SimpleNamespace(
+            observe_terminal=lambda principal, result: seen.append("audit") or result
+        ),
         environment={},
         agent_registry=lambda: ({"grok": object()}, {"grok": binding}),
         clipboard_lock=asyncio.Lock(),

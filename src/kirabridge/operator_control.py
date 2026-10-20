@@ -553,7 +553,9 @@ class OperatorControl:
             {
                 "name": "Agenten untereinander",
                 "ok": peers_ok,
-                "message": "Alle verbunden" if peers_ok else "Kommunikationswege fehlen",
+                "message": "Gegenseitige Nachrichtenrechte eingerichtet"
+                if peers_ok
+                else "Nachrichtenrechte fehlen",
             }
         )
         try:

@@ -53,6 +53,7 @@ def operator_application(bridge):
         bridge.teams,
         AuditReader(bridge.store),
         bridge.visible_handoffs,
+        bridge.outputs,
     )
     control = OperatorControl(
         config=config,

@@ -100,7 +100,10 @@ def read_query(bridge, principal: str, query: ReadQuery) -> dict:
             **output,
             "bytes": query.max_bytes - remaining,
             "truncated": truncated,
-            "output_available": "stdout" in source or "stderr" in source,
+            "output_available": source.get(
+                "output_available", "stdout" in source or "stderr" in source
+            ),
+            "output_status": source.get("output_status", "available"),
             "exit_code": source.get("exit_code"),
             "scope": "owned Bridge task only; no external terminal attachment",
         }

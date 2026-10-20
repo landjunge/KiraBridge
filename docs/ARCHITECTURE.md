@@ -173,3 +173,17 @@ müssen Auftrags-ID, completed-Beleg, Fenster/PID, Antwort-ID und authentifizier
 Principal/Scope zusammenpassen. Transporterfolg oder behauptete bool-Felder
 genügen nicht. Audioausgabe wird weiterhin nicht als serverseitig beobachtet
 ausgegeben.
+
+## Begrenzte neue Terminalausgaben (Etappe 6, rc9-Kandidat)
+
+`OutputHistory` besitzt die additive Tabelle `output_snapshots` und den internen
+Task-Resultatcodec. Neue rohe Mitschnitte/stdout/stderr stehen dort, Taskresultate
+und Audit enthalten Referenzen und Metadaten. Die bestehenden öffentlichen
+Resultatfelder werden erst beim autorisierten Lesen aufgelöst. Ein abgelaufener
+Snapshot ändert keinen Auftragszustand und löst keine Ausführung aus.
+Taskzustand, Snapshot, Audit und dauerhafte Abschlussmeldung teilen weiterhin
+eine Transaktion. Alte Daten und die historische Audit-Kette bleiben unverändert.
+Die Standardgrenzen sind 16 MiB Nutzlast, 256 Einträge, 8 MiB je Eintrag und
+sieben Tage; fachliche Antworten und historische Rohdaten zählen nicht dazu.
+Ein Hash belegt Bytes, nicht Identität oder Ausführung. Rückkehrplan und
+tatsächlicher Abnahmestand: [Etappenbericht](ARCHITECTURE-STAGES-20261020.md).

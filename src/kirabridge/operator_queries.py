@@ -8,9 +8,10 @@ import time
 
 
 class OperatorQueries:
-    def __init__(self, tasks, messages, teams, audit, handoffs=None):
+    def __init__(self, tasks, messages, teams, audit, handoffs=None, output_history=None):
         self.tasks, self.messages, self.teams, self.audit = tasks, messages, teams, audit
         self.handoffs = handoffs
+        self.output_history = output_history
 
     def maintenance_counts(self, *, active_only=False, context=None):
         return {
@@ -44,6 +45,18 @@ class OperatorQueries:
             metadata = row["metadata"]
             entry = {key: row[key] for key in ("seq", "at", "kind", "principal", "task_id")}
             entry["details"] = metadata
+            if (
+                row["kind"] == "terminal.output"
+                and metadata.get("output_ref")
+                and self.output_history
+            ):
+                payload, status = self.output_history.read(row["principal"], metadata["output_ref"])
+                entry["details"] = {
+                    **metadata,
+                    **(payload or {}),
+                    "output_status": status,
+                    "output_available": payload is not None,
+                }
             if metadata.get("message_id"):
                 message = self.messages.operator_protocol_snapshot(
                     metadata["message_id"], row["at"]

@@ -14,7 +14,7 @@ auf ein kleines Paket Implementierung, Grok-Prüfung, Korrektur und Nachprüfung
 | 3 Aktivierung | Koordinierter Betriebsdienst aktiv; alte unklare Eve-Zustellung ohne Nachversand stillgelegt | Historischen unbekannten Ausgang erhalten |
 | 4 Client-Lesewege | rc7 aktiv; 776 Tests, Grok-Abnahmen und echte ChatGPT-Leseprüfung unter Last bestanden; lokaler Eve-Rückweg bestätigt | Physische Handy-/Voice-Abnahme bleibt gesondert offen |
 | 5 Modulgrenzen | rc8 aktiv; 817 Tests und echte Grok-Abnahmen aller Pakete | Tatsächlicher Kira-Rückweg nach Aktivierung bestätigt |
-| 6 Ausgabeablage | Beginnt nach praktischer rc8-Abnahme | Begrenzte Rohdaten, unveränderte historische Audit-Kette |
+| 6 Ausgabeablage | rc9-Kandidat: 829 Tests bestanden; noch nicht aktiviert | Unabhängige sichtbare Grok-Prüfung, danach koordinierte Aktivierung und praktische Abnahme |
 
 ## Etappe 1: gesicherter Ausgangspunkt
 
@@ -904,8 +904,7 @@ Die Aktivierung dieses geprüften Standes folgt erst nach dem Push.
 Der geprüfte Quellstand wurde als Merge `1de508d` vor Aktivierung gepusht.
 Das bereits bytegenau geprüfte Wheel wurde mit `uv pip install --no-deps`
 installiert; nur KiraBridge wechselte von rc7 auf rc8. Die anderen installierten
-Pakete blieben erhalten. Der produktive Importpfad ist jetzt das installierte,
-unveränderliche Wheel unter `.venv/lib/python3.11/site-packages/kirabridge`.
+Pakete blieben erhalten. Der produktive Importpfad ist jetzt das als Wheel installierte, vom Arbeitsbaum getrennte Paket unter `.venv/lib/python3.11/site-packages/kirabridge`.
 Weitere Repository-Bearbeitung aktiviert damit keinen neuen Produktivcode.
 
 Koordinierte Aktivierung `activation-d8b8925848184cad9b8890777d6c188f`,
@@ -939,3 +938,67 @@ Aufgaben-/Nachrichten-Abschlussmeldungen wurden verarbeitet und quittiert.
 Keine Eingabe in den beschäftigten ursprünglichen Codex, kein Ersatzfenster,
 keine Wiederholung eines alten Tests. Beleg `kira-rc8-check-1792481458793.json`.
 Die hörbare physische Handy-/Sprachausgabe bleibt eine eigene offene Abnahme.
+
+
+## Etappe 6: begrenzte Ausgabeablage (rc9-Kandidat, noch nicht aktiviert)
+
+`OutputHistory` besitzt die additive Tabelle `output_snapshots` in derselben
+SQLite-Datenbank. Das Schema bleibt Version 2; bestehende Tabellen, alte
+Ergebnisse und historische Audit-Einträge werden nicht umgeschrieben. Neue
+Terminalmitschnitte und rohe stdout/stderr-Ausgaben erhalten dort begrenzte
+UTF-8-JSON-Snapshots. Die Standardgrenzen sind 16 MiB Gesamt-Nutzlast,
+256 Einträge, 8 MiB je Eintrag und sieben Tage. Bei Begrenzung bleibt vom
+Sitzungsmitschnitt das Ende erhalten; stdout/stderr werden vorn begrenzt.
+Trunkierung und ursprüngliche Bytezahl werden ausgewiesen. Die Grenzen betreffen
+diese neuen Nutzlasten, nicht Datenbankdatei/WAL, alte Audit-Inhalte oder fachliche
+Antworten. Adressierte Nachrichten und strukturierte Agentenantworten bleiben
+als fachliche Ergebnisbelege erhalten.
+
+Neue dauerhafte Audit-Einträge enthalten Referenz, SHA256 und Ereignismetadaten,
+keinen zusätzlichen rohen Terminaltext. Der Hash bezeichnet gespeicherte Bytes,
+keinen Autor, Prozess oder erfolgreichen Auftrag. Lesen benötigt weiterhin die
+bestehende Session-/Task-Berechtigung und Eigentümerprüfung; es gibt keinen
+öffentlichen beliebigen Referenzabruf. Katalog/Lesen über neue und alte Clientwege
+liefern dieselben Resultate, auch bei abgeschnittener Ausgabe. Das lokale
+Protokoll löst Referenzen auf. Ablauf oder Verdrängung wird ausdrücklich gezeigt,
+der Auftrag bleibt abgeschlossen und wird nicht erneut ausgeführt. Der
+Grok-Formatter beendet auch diesen Fall mit einer verständlichen Antwort.
+
+Referenz, Taskzustand, Ereignis, Audit und Abschlussmeldung werden weiterhin in
+derselben Transaktion geschrieben. Ein gezielter Fehler bei der Abschlussmeldung
+rollt auch den neuen Snapshot zurück. Die Abschlussmeldung dupliziert keine
+rohe stdout-Vorschau. Historische Klartextergebnisse bleiben lesbar.
+
+### Rückkehrplan für das additive Datenformat
+
+Die normale Betriebs-Reparatur stellt passende vorherige Konfiguration mit
+aktuell kompatiblem Code wieder her; sie ist kein automatischer Code-Downgrade.
+Ein expliziter Wechsel auf rc8 benötigt angehaltene neue Arbeit, vollständig
+abgeschlossene aktive Arbeit, die passende alte Konfiguration ohne den neuen
+`output_history`-Abschnitt und einen Codec-kompatiblen Leser oder einen zuvor
+geprüften Export. Der ausschließlich interne lokale Helfer
+`outputs.prepare_legacy_results()` verlangt eine persistente Wartungsreservierung
+und kann neue Taskreferenzen innerhalb einer begrenzten atomaren Transaktion in
+alte lesbare Taskresultate auflösen. Zu großer Gesamtexport wird vollständig
+abgewiesen. Kein Zustand, Event, Empfangsbeleg oder historisches Audit wird
+umgeschrieben; keine Datenbanksicherung wird zurückgespielt und keine Eingabe
+wiederholt. Bereits abgelaufene Ausgaben lassen sich dadurch nicht zurückholen.
+Rc8 kann die neuen Audit-Referenzen ohne kompatiblen Leser nicht auflösen;
+die additive Tabelle und die Referenzen müssen daher erhalten bleiben. Dieser
+Helfer ersetzt weder das kontrollierte Leerlaufen noch die tatsächliche
+Versions-/Konfigurationsprüfung des anschließend gestarteten Dienstes.
+
+### Gezielte Prüfungen vor unabhängiger Abnahme
+
+829 Tests bestanden in 194,64 Sekunden, einschließlich Fehler-Rollback,
+Zugriffsgrenzen, Hash-Abgleich, Byte-/Anzahlgrenzen, UTF-8, Ablauf ohne
+Fristverlängerung, unveränderter historischer Audit-Kette, Rückkehr-Vorbereitung,
+Grok-Antwort bei fehlender Ausgabe und exakter Gleichheit direkter/alter
+Queue-Lesewege unter Last. Ruff, JavaScript-Syntax und Diffprüfung bestanden.
+Ein früherer Gesamtlauf fand eine echte DTO-Abweichung der zwei Lesewege;
+diese wurde korrigiert und mit einer zusätzlichen Trunkierungsprüfung belegt.
+Die Lasttest-Fixture ersetzt nur das Plattformlesen und durchläuft weiterhin
+die tatsächliche neue Beobachtungs-/Speicherfunktion. Die realen Lastzeitbudgets
+und Gleichheitsprüfungen bleiben bestehen. Frühere fehlgeschlagene Prüflogs
+bleiben als historische Belege erhalten. Die unabhängige Grok-Prüfung folgt
+gegen den eingefrorenen, gepushten Kandidaten, vor Installation und Aktivierung.
