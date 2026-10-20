@@ -11,6 +11,13 @@ from kirabridge.voice_channel import IDENTITIES
 
 
 class VisibleHandoffs:
+    def activation_work_count(self, *, active_only=False, context=None):
+        db = context.db if context is not None else self.store.db
+        return db.execute(
+            "SELECT count(*) FROM visible_handoffs WHERE state IN "
+            "('planned','inserting','inserted','submitting','return_sent','sent','confirmed')"
+        ).fetchone()[0]
+
     @staticmethod
     def input_view(target, text):
         """The last current input widget, never an older prompt in scrollback."""

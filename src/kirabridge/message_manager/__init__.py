@@ -29,6 +29,16 @@ class MessageSend(Input):
 class MessageManager:
     interface_version = "1"
 
+    def activation_work_count(self, *, active_only=False, context=None):
+        db = context.db if context is not None else self.store.db
+        states = ("running",) if active_only else ("queued", "running")
+        return db.execute(
+            "SELECT count(*) FROM message_jobs WHERE state IN ("
+            + ",".join("?" for _ in states)
+            + ")",
+            states,
+        ).fetchone()[0]
+
     def operator_work_count(self):
         return self.store.db.execute(
             "SELECT count(*) FROM message_jobs WHERE state IN ('queued','running')"

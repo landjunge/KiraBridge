@@ -382,9 +382,7 @@ class Store:
             "WHEN 'accepted' THEN 2 WHEN 'running' THEN 3 WHEN 'unknown' THEN 4 ELSE 5 END, "
             "updated DESC LIMIT 100"
         ).fetchall()
-        count = self.db.execute(
-            "SELECT count(*) FROM tasks WHERE state='created'"
-        ).fetchone()[0]
+        count = self.db.execute("SELECT count(*) FROM tasks WHERE state='created'").fetchone()[0]
         return {"tasks": [dict(row) for row in rows], "pending": count}
 
     def operator_detail(self, task_id):
@@ -393,6 +391,14 @@ class Store:
             "SELECT request_hash FROM tasks WHERE id=?", (task_id,)
         ).fetchone()[0]
         return {"task": task, "request_hash": request_hash}
+
+    def activation_work_count(self, *, active_only=False, context=None):
+        db = context.db if context is not None else self.db
+        states = ("accepted", "running") if active_only else ("queued", "accepted", "running")
+        return db.execute(
+            "SELECT count(*) FROM tasks WHERE state IN (" + ",".join("?" for _ in states) + ")",
+            states,
+        ).fetchone()[0]
 
     def operator_work_count(self):
         return self.db.execute(

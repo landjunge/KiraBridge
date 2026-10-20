@@ -13,7 +13,7 @@ auf ein kleines Paket Implementierung, Grok-Prüfung, Korrektur und Nachprüfung
 | 2 Freigaben | 0.8.0rc5 aktiviert; 313 gezielte Tests und unabhängige Grok-Abnahme | Normale Voice-/CLI-Wege beim weiteren Umbau erhalten |
 | 3 Aktivierung | Koordinierter Betriebsdienst aktiv; alte unklare Eve-Zustellung ohne Nachversand stillgelegt | Historischen unbekannten Ausgang erhalten |
 | 4 Client-Lesewege | rc7 aktiv; 776 Tests, Grok-Abnahmen und echte ChatGPT-Leseprüfung unter Last bestanden; lokaler Eve-Rückweg bestätigt | Physische Handy-/Voice-Abnahme bleibt gesondert offen |
-| 5 Modulgrenzen | 5a/5b von Grok geprüft; 5c Sitzungsports im isolierten Kandidaten | Unabhängige Adapterprüfung und Betriebsabfragen |
+| 5 Modulgrenzen | 5a/5b von Grok geprüft; 5c/5d isoliert umgesetzt | Mac entsperren: sichtbare Grok-Prüfung 5c, dann 5d, vor Aktivierung |
 | 6 Ausgabeablage | Offen | Begrenzte Rohdaten, unveränderte historische Audit-Kette |
 
 ## Etappe 1: gesicherter Ausgangspunkt
@@ -778,4 +778,62 @@ beschäftigte Original-Codex-Fenster oder die physische Handy-Sprachausgabe.
 Die Terminalauswahl nennt OS-`busy` jetzt „Programm läuft“ beziehungsweise
 „Terminal wartet“; tmux ohne diese Beobachtung zeigt „Prozess erkannt“.
 Agentenbereitschaft wird erst vor der tatsächlichen Übergabe geprüft.
-Groks unabhängige Prüfung dieses Pakets steht noch aus.
+Groks unabhängige Prüfung dieses Pakets steht noch aus: Nach dem Push von
+`579ab65` (83 Python-Dateien, Quellpin
+`f7048b777cf874ffa026efc6b60af65c119053a96522557eefa6b94a90b00f9e`)
+meldete der tatsächliche Terminalzugang `desktop_locked`. Deshalb wurde kein
+neuer Grok-Auftrag gesendet. Es gibt weder einen Hintergrundersatz noch einen
+erneuten Return in ein unbekanntes Feld. 5c bleibt unverändert für die Prüfung;
+die Entsperrung der bestehenden Mac-Benutzersitzung wurde angefragt.
+
+## Etappe 5, Paket 5d: fachliche Betriebsabfragen (isolierter Kandidat)
+
+Während der blockierten sichtbaren 5c-Prüfung liegt diese unabhängige Restarbeit
+separat unter `/Users/landjunge/KiraBridge-stage5d-20261020`. Sie verändert keine
+Datei im festgehaltenen 5c-Prüfbaum. Es handelt sich um einen weiteren Teil der
+Etappe 5, keine Abnahme oder Aktivierung von 5c und keinen Beginn von Etappe 6.
+
+`OperationsService` kennt keine SQL-Tabellen oder Zustandslisten von Aufgaben,
+Nachrichten, Teams und sichtbaren Übergaben mehr. Die jeweiligen Besitzer liefern
+`activation_work_count`; `OperatorQueries.maintenance_counts` verbindet die Werte.
+Der Betriebsdienst übergibt seinen tatsächlichen Store als Transaktionskontext.
+So bleiben auch Abfragen innerhalb einer gemeinsamen Schreibtransaktion konsistent,
+wenn ein zweiter Steuerprozess eine eigene SQLite-Verbindung verwendet.
+Warten und Prozess-/Netzwerkaufrufe bleiben außerhalb der Schreibtransaktion.
+
+Dabei wurde eine konkrete Lücke berichtigt: Die frühere Warteprüfung zählte einen
+Teamauftrag in `processing_result` nicht. In derselben temporären Datenbank liefert
+die tatsächliche rc7-Funktion dafür **0**, die neue Besitzerabfrage **1**.
+Beleg `stage5d-processing-result-before-after.json`; keine produktive Datenbank-
+oder Agentenänderung. Auch die Wiederherstellung erkennt diesen aktiven Zustand.
+Die Ergebnisse selbst, ihre Belege und Abschlussmeldungen bleiben beim bisherigen
+atomaren fachlichen Speicherweg.
+
+100 gezielte Tests in 52,91 s bestanden: Besitzerabfragen, gemeinsam sichtbare
+noch nicht bestätigte Änderungen auf einer zweiten Verbindung, Abwarten laufender
+Ergebnisverarbeitung, blockierter Neustart bei unerledigter Arbeit, erhaltene
+Konfiguration, Aufgaben-/Nachrichten-/Teamabschlüsse und vorhandene UI-/Betriebswege.
+Die Gesamtsuite des vorbereiteten `0.8.0rc8`-Kandidaten bestand mit
+**817 Tests in 171,05 s**, einschließlich als Fehler behandelter
+`PytestUnraisableExceptionWarning`. Ruff, Whitespace-Prüfung, Wheel-Bau und
+`uv lock --check --offline` bestanden. Die 83 Python-Dateien und zehn
+Oberflächenassets im Wheel wurden bytegenau mit dem Quellbaum verglichen.
+Quellpin: `7fcb86e8f19cb7c2c6b83b91dd844d0c82ff1afdfc29fcf0edf1ee535789c847`;
+Wheel-SHA256: `16c34efab00a9477117c6dc21b093364337a291797db5e08b49eed3631161f57`.
+Private Belege: `stage5-rc8-full-tests.log`, `stage5-rc8-candidate-manifest.json`.
+Die unabhängige sichtbare Grok-Prüfung erfolgt erst nach 5c und nach Entsperrung.
+Produktiver Stand bleibt unverändert `0.8.0rc7`; keine Freigaben oder Alt-Puffer
+werden automatisch verändert.
+
+### Fortsetzung nach Entsperrung
+
+Zuerst die bestehende Grok-Zuordnung neu lesen und 5c gegen den unveränderten
+Pin `579ab65` unabhängig prüfen lassen; erst danach 5d gegen dessen dokumentierten
+Pin. Keine dieser beiden Prüfungen wurde während `desktop_locked` eingereiht.
+Bei Befunden korrigieren und gezielt nachprüfen. Anschließend erst den geprüften
+Stand in den produktiven Zweig übernehmen, vor Aktivierung pushen, Paketmetadaten
+aktualisieren und Core/Steuerdienst koordiniert aktivieren. Sitzungskatalog,
+ursprüngliches Codex-Lesen und eine neue sichtbare Grok-Übergabe praktisch prüfen.
+Bestehende Fenster und Tunnel bleiben dabei erhalten. Danach folgt Etappe 6.
+Die hörbare Handy-Antwort im laufenden Grok-Gespräch bleibt zusätzlich offen;
+der bereits belegte lokale Eve-MCP-Rückweg ersetzt diese Abnahme nicht.

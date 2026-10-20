@@ -100,6 +100,13 @@ führt zu keiner automatischen Wiederholung und zu keinem anderen Transport.
 Die sichtbare zentrale Übergabe behält ihre persistierte Zielbindung für alle
 Absender einschließlich Grok und für Rückantworten.
 
+Die Aktivierungsabfragen des Etappe-5-Kandidaten werden ebenfalls von den
+jeweiligen Fachbesitzern ausgeführt. `OperationsService` erhält nur die gemeinsame
+Abfragefunktion und übergibt den eigenen Transaktionskontext. Insbesondere gilt
+die Ergebnisverarbeitung eines Teamauftrags als laufende Arbeit; vor ihrem Abschluss
+wird kein Neustart ausgelöst. Die Etappenakte trennt Umsetzung, Grok-Prüfung,
+Quellpin, Aktivierung und tatsächliche praktische Nachweise.
+
 Die aktivierte Version `0.8.0rc4` ergänzt die persistenten Zustände sichtbarer Übergaben
 und einmaliger Fensterstarts additiv in Schema 2. Neue CLI-Übergaben müssen
 die gespeicherte bestehende Fenster-/TTY-/Sitzungs-PID-/Agenten-PID-Bindung

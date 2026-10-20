@@ -1,3 +1,10 @@
+Aktueller Stand am 20. Oktober 2026: produktiv `0.8.0rc7`; der vorbereitete
+`0.8.0rc8`-Umbau ist noch nicht aktiviert. Die tatsächlichen Prüfungen und offenen
+Grok-/Handy-Nachweise stehen in [der Etappenakte](ARCHITECTURE-STAGES-20261020.md).
+Sichtbare Übergaben benötigen die vorhandene entsperrte Mac-Benutzersitzung und
+die gespeicherte Fenster-/TTY-/PID-Zuordnung. Fehlende Ziele erzeugen keinen
+Ersatzprozess. Ein Neustart wartet auch auf laufende Team-Ergebnisverarbeitung.
+
 Fortschreibung0.5.2: [Workflow-Vorabprüfung, Diagnose und Audit-Rotation](DIAGNOSTICS-20261018.md).
 
 # Eingerichteter Betrieb ab 0.3.0

@@ -48,7 +48,11 @@ def operator_application(bridge):
     audit = AuditWriter(bridge.store)
     connectors = ConnectorAdministration(config)
     queries = OperatorQueries(
-        bridge.store, bridge.messages, bridge.teams, AuditReader(bridge.store)
+        bridge.store,
+        bridge.messages,
+        bridge.teams,
+        AuditReader(bridge.store),
+        bridge.visible_handoffs,
     )
     control = OperatorControl(
         config=config,
@@ -67,6 +71,7 @@ def operator_application(bridge):
         lambda *args, **kwargs: control.rpc(*args, **kwargs),
         lambda *args, **kwargs: control.command(*args, **kwargs),
         bridge.runtime,
+        work_queries=queries.maintenance_counts,
     )
     authorize_principal = bridge.security.principal
     return OperatorApplication(

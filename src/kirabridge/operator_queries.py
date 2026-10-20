@@ -8,8 +8,20 @@ import time
 
 
 class OperatorQueries:
-    def __init__(self, tasks, messages, teams, audit):
+    def __init__(self, tasks, messages, teams, audit, handoffs=None):
         self.tasks, self.messages, self.teams, self.audit = tasks, messages, teams, audit
+        self.handoffs = handoffs
+
+    def maintenance_counts(self, *, active_only=False, context=None):
+        return {
+            name: owner.activation_work_count(active_only=active_only, context=context)
+            for name, owner in (
+                ("tasks", self.tasks),
+                ("message_jobs", self.messages),
+                ("team_work", self.teams),
+                ("visible_handoffs", self.handoffs),
+            )
+        }
 
     def busy(self):
         # Keep the existing response keys for cached local clients. The values
