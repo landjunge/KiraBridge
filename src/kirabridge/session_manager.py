@@ -33,6 +33,7 @@ class SessionInput(SessionReference):
 class SessionOpen(Input):
     cwd: str = Field(min_length=1, max_length=4096)
     argv: list[str] = Field(default_factory=list, max_length=256)
+    window_authorization: str = Field(default="", max_length=128)
 
 
 class SessionManager:
@@ -141,9 +142,10 @@ const tabs = wins[0].tabs().filter(t => t.tty() === {json.dumps("/dev/" + tty)})
 if (tabs.length !== 1) throw Error("Selected tab no longer exists");
 const tab = tabs[0];"""
 
-    async def open(self, principal, args):
+    async def open(self, principal, args, *, task_id=None):
         policy = self.bridge.security.principal(principal, "session.open")
         self.bridge.security.principal(principal, "terminal.execute")
+        self.bridge.security.validate_window(principal, task_id, args)
         PathScope(policy.terminal_roots or policy.roots).split(args.cwd)
         cwd = str(Path(args.cwd).resolve(strict=True))
         PathScope(policy.terminal_roots or policy.roots).split(cwd)
@@ -161,12 +163,18 @@ const tab = tabs[0];"""
         if argv:
             command += " && " + shlex.join(argv)
         async with self.lock:
-            result = await self.native(
-                'const app=Application("Terminal"); const tab=app.doScript('
-                + json.dumps(command)
-                + "); JSON.stringify({tty:tab.tty(),opened:true});",
-                mutation=True,
-            )
+            self.bridge.security.check_window(principal, task_id, args)
+            try:
+                result = await self.native(
+                    'const app=Application("Terminal"); const tab=app.doScript('
+                    + json.dumps(command)
+                    + "); JSON.stringify({tty:tab.tty(),opened:true});",
+                    mutation=True,
+                )
+            except BaseException:
+                self.bridge.security.window_outcome(principal, task_id, "unknown")
+                raise
+            self.bridge.security.window_outcome(principal, task_id, "opened")
             for _ in range(20):
                 sessions = await self.terminal_catalog()
                 selected = next((s for s in sessions if s["tty"] == result["tty"]), None)
@@ -265,9 +273,13 @@ const tab = tabs[0];"""
 
     async def selected(self, principal, pane_id, expected_pid):
         catalog = await self.catalog(principal)
-        for row in catalog["sessions"]:
-            if row["pane_id"] == pane_id and row["expected_pid"] == expected_pid:
-                return row
+        matches = [
+            row
+            for row in catalog["sessions"]
+            if row["pane_id"] == pane_id and row["expected_pid"] == expected_pid
+        ]
+        if len(matches) == 1:
+            return matches[0]
         raise BridgeError(
             "session_selection_changed",
             "Select an exact current pane_id and expected_pid from session_catalog",
@@ -288,6 +300,28 @@ const tab = tabs[0];"""
             "text": text,
             "scope": "selected terminal output; not proof of project completion",
         }
+
+    def assigned_agent(self, selected):
+        """Recognized CLI input always needs the persistent original binding."""
+        selected = selected or {}
+        matches = [
+            p for p in selected.get("processes", []) if p["name"] in self.bridge.config.agents
+        ]
+        if not matches:
+            return None
+        if len(matches) != 1:
+            raise BridgeError("visible_target_ambiguous", "Multiple CLI agents in this terminal")
+        process = matches[0]
+        binding = self.bridge.config.visible_handoffs.bindings.get(process["name"])
+        if not binding or (binding.pane_id, binding.expected_pid, binding.agent_pid) != (
+            selected.get("pane_id"),
+            selected.get("expected_pid"),
+            process["pid"],
+        ):
+            raise BridgeError(
+                "visible_target_changed", "CLI input requires its assigned original window"
+            )
+        return process["name"]
 
     async def read_observed(self, principal, pane_id, expected_pid, *, max_bytes=65536):
         from kirabridge.bridge_core.models import digest
@@ -312,6 +346,121 @@ const tab = tabs[0];"""
                 )
         return result
 
+    def native_focus(self, pane_id):
+        window, tty = pane_id.split(":")[1:]
+        return (
+            self.native_target(pane_id)
+            + f"""
+const w=wins[0]; w.selectedTab=tab; w.index=1; app.activate(); delay(0.15);
+const se=Application("System Events");
+function checkFocus() {{
+ if(!se.processes.byName("Terminal").frontmost() || app.windows()[0].id()!=={int(window)} ||
+    app.windows()[0].selectedTab().tty()!=={json.dumps("/dev/" + tty)})
+    throw Error("Selected terminal focus changed; do not repeat input");
+}}
+checkFocus();"""
+        )
+
+    async def insert(self, principal, args):
+        """Paste literal input without Return; used by the durable visible handoff."""
+        self.bridge.security.principal(principal, "session.input")
+        self.bridge.security.principal(principal, "terminal.execute")
+        if args.submit or "\x00" in args.text:
+            raise BridgeError("invalid_arguments", "Insertion must not submit a line")
+        async with self.lock:
+            selected = await self.selected(principal, args.pane_id, args.expected_pid)
+            self.assigned_agent(selected)
+            if args.require_idle and selected.get("busy", True):
+                raise BridgeError("session_busy", "Selected terminal is not an idle shell")
+            if args.pane_id.startswith("terminal:"):
+                # Preserve every clipboard format. Restore only if nobody changed it meanwhile.
+                async with self.bridge.clipboard.lock:
+                    await self.native(
+                        self.native_focus(args.pane_id)
+                        + """
+ObjC.import("AppKit");
+const pb=$.NSPasteboard.generalPasteboard, saved=[]; let totalBytes=0;
+const items=pb.pasteboardItems;
+if(items.count>32) throw Error("Clipboard too large to preserve");
+for(let i=0;i<items.count;i++) {
+ const item=items.objectAtIndex(i), formats=[];
+ if(item.types.count>64) throw Error("Clipboard too large to preserve");
+ for(let j=0;j<item.types.count;j++) {
+  const type=item.types.objectAtIndex(j), data=item.dataForType(type);
+  if(data && data.length>1048576) throw Error("Clipboard too large to preserve");
+  totalBytes+=data ? data.length : 0;
+  if(totalBytes>4194304) throw Error("Clipboard too large to preserve");
+  formats.push([type,data]);
+ }
+ saved.push(formats);
+}
+pb.clearContents;
+pb.setStringForType("""
+                        + json.dumps(args.text)
+                        + """, $.NSPasteboardTypeString);
+const generation=pb.changeCount;
+try {
+ checkFocus();
+ // Invoke the literal Paste menu action; keyboard modifiers can select escaped paste.
+ const editItem=se.processes.byName("Terminal").menuBars()[0].menuBarItems()[3];
+ editItem.click();
+ const edit=editItem.menus()[0];
+ const paste=edit.menuItems()[6];
+ if(!["Einsetzen","Paste"].includes(paste.name()))
+  throw Error("Literal Paste menu action unavailable");
+ if(!paste.enabled()) throw Error("Literal Paste action is disabled; no paste sent");
+ paste.click();
+ let echoed=false;
+ for(let attempt=0;attempt<40;attempt++) {
+  delay(0.1); checkFocus();
+  const screen=tab.contents();
+  if(screen.includes("""
+                        + json.dumps(args.text.split("\n")[-1])
+                        + """) || screen.includes("""
+                        + json.dumps(f"[Pasted Content {len(args.text)} chars]")
+                        + """)) {
+   echoed=true; break;
+  }
+ }
+ if(!echoed) throw Error("Paste not observed before clipboard restoration; no Return sent");
+}
+finally {
+ if(pb.changeCount===generation) {
+  const restored=$.NSMutableArray.alloc.init;
+  for(const formats of saved) {
+   const item=$.NSPasteboardItem.alloc.init;
+   for(const [type,data] of formats) if(data) item.setDataForType(data,type);
+   restored.addObject(item);
+  }
+  pb.clearContents;
+  if(restored.count) pb.writeObjects(restored);
+ }
+}
+JSON.stringify({paste_event_sent:true,return_sent:false});""",
+                        mutation=True,
+                    )
+            else:
+                await self.command(
+                    "send-keys", "-t", args.pane_id, "-l", "--", args.text, mutation=True
+                )
+        return {"paste_event_sent": True, "return_sent": False, "agent_confirmed": False}
+
+    async def press_return(self, principal, pane_id, expected_pid):
+        """Separate, non-replayed submit action after checked insertion."""
+        self.bridge.security.principal(principal, "session.input")
+        self.bridge.security.principal(principal, "terminal.execute")
+        async with self.lock:
+            self.assigned_agent(await self.selected(principal, pane_id, expected_pid))
+            if pane_id.startswith("terminal:"):
+                await self.native(
+                    self.native_focus(pane_id)
+                    + "\ncheckFocus(); se.keyCode(36); JSON.stringify({return_sent:true});",
+                    mutation=True,
+                )
+            else:
+                await self.command("send-keys", "-t", pane_id, "Enter", mutation=True)
+        return {"return_sent": True, "agent_confirmed": False}
+
     async def send(self, principal, args, *, task_id=None):
         self.bridge.security.principal(principal, "session.input")
         self.bridge.security.principal(principal, "terminal.execute")
@@ -319,6 +468,10 @@ const tab = tabs[0];"""
             raise BridgeError("invalid_arguments", "NUL in input")
         async with self.lock:
             selected = await self.selected(principal, args.pane_id, args.expected_pid)
+            if self.assigned_agent(selected):
+                raise BridgeError(
+                    "visible_handoff_required", "CLI handoffs require the central route"
+                )
             if args.require_idle and selected.get("busy", True):
                 raise BridgeError("session_busy", "Selected terminal is not an idle shell")
             if args.pane_id.startswith("terminal:"):

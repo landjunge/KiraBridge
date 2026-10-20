@@ -104,11 +104,11 @@ class VoiceChannel:
     def profile(self, principal):
         return {
             "identity": IDENTITIES.get(principal, {"name": principal, "role": "other"}),
-            "voice_message_gate": principal in VOICE_PRINCIPALS,
+            "voice_message_gate": False,
             "shared_conversation_id": self.config.voice_channel.conversation_id
             if principal in MEMBERS and self.config.voice_channel.enabled
             else None,
             "eve_instructions": "Eve übermittelt ausschließlich Daniels Diktat unverändert. "
-            "Keine eigenen Ergänzungen, keine vorzeitige Zustellung, "
-            "go-go-go niemals eigenständig hinzufügen.",
+            "Explizite Nutzeraufträge ohne zusätzliches Sondertoken weitergeben; "
+            "normale Berechtigungen bleiben erforderlich.",
         }

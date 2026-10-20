@@ -429,7 +429,9 @@ class TeamDispatcher:
             "core_task_id": core["id"],
             "core_result_sha256": core_result_hash,
             "model_turn_completed": True,
-            "session_scope": "separate_managed_session",
+            "session_scope": "existing_visible_terminal"
+            if self.bridge.config.visible_handoffs.enabled
+            else "separate_managed_session",
             "completion_scope": "own_work_turn",
             "response_framing": framing,
             "actions": [],

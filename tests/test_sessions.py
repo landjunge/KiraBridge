@@ -169,6 +169,112 @@ async def test_native_open_checks_authority_and_quotes_command(bridge, config, m
     assert not calls
     cwd = config.principals["local"].roots[0]
     args = SessionOpen(cwd=cwd, argv=[sys.executable, "-c", "print('hello')"])
-    result = await manager.open("local", args)
+    token = bridge.security.grant_window("local", "explicit-new-window", args)
+    args = args.model_copy(update={"window_authorization": token})
+    with bridge.store.transaction():
+        bridge.security.consume_window("local", "explicit-new-window", args)
+    result = await manager.open("local", args, task_id="explicit-new-window")
     assert result["opened"] and result["expected_pid"] == 444
     assert len(calls) == 1 and "app.doScript" in calls[0]
+    with pytest.raises(BridgeError) as exc:
+        await manager.open("local", args, task_id="explicit-new-window")
+    assert exc.value.code == "window_already_dispatched" and len(calls) == 1
+
+
+@pytest.mark.parametrize(
+    "argv", [[], ["codex"], ["/bin/sh", "-c", "grok"], ["/usr/bin/osascript", "-e", "anything"]]
+)
+async def test_no_window_for_shell_or_wrapper_without_trusted_operator_grant(
+    bridge, config, monkeypatch, argv
+):
+    calls = []
+
+    async def native(*args, **kwargs):
+        calls.append(args)
+        raise AssertionError("No window creation allowed")
+
+    monkeypatch.setattr(bridge.sessions, "native", native)
+    args = SessionOpen(
+        cwd=config.principals["local"].roots[0],
+        argv=argv,
+        window_authorization="agent-claims-user-approved",
+    )
+    with pytest.raises(BridgeError) as exc:
+        await bridge.sessions.open("local", args, task_id="untrusted")
+    assert exc.value.code == "window_request_required"
+    assert not calls
+
+
+def test_window_grant_is_bound_to_exact_request_principal_and_task(bridge, config):
+    args = SessionOpen(cwd=config.principals["local"].roots[0])
+    token = bridge.security.grant_window("local", "explicit-window", args)
+    authorized = args.model_copy(update={"window_authorization": token})
+    for principal, task_id, changed in [
+        ("other", "explicit-window", authorized),
+        ("local", "different-window", authorized),
+        ("local", "explicit-window", authorized.model_copy(update={"argv": ["grok"]})),
+    ]:
+        with bridge.store.transaction(), pytest.raises(BridgeError):
+            bridge.security.consume_window(principal, task_id, changed)
+    with bridge.store.transaction():
+        bridge.security.consume_window("local", "explicit-window", authorized)
+    with bridge.store.transaction(), pytest.raises(BridgeError):
+        bridge.security.consume_window("local", "explicit-window", authorized)
+
+
+async def test_expired_window_grant_cannot_reach_the_transport(bridge, config, monkeypatch):
+    args = SessionOpen(cwd=config.principals["local"].roots[0])
+    token = bridge.security.grant_window("local", "expired-window", args)
+    args = args.model_copy(update={"window_authorization": token})
+    with bridge.store.transaction():
+        bridge.security.consume_window("local", "expired-window", args)
+        bridge.store.db.execute("UPDATE approvals SET expires=0 WHERE task_id='expired-window'")
+
+    async def forbidden(*args, **kwargs):
+        raise AssertionError("Expired grant must not start any window")
+
+    monkeypatch.setattr(bridge.sessions, "native", forbidden)
+    with pytest.raises(BridgeError) as exc:
+        await bridge.sessions.open("local", args, task_id="expired-window")
+    assert exc.value.code == "window_request_required"
+
+
+@pytest.mark.parametrize("action", ["insert", "return"])
+async def test_native_two_step_scripts_compile_without_executing_ui(
+    bridge, monkeypatch, tmp_path, action
+):
+    compiler = shutil.which("osacompile") or shutil.which("node")
+    if not compiler:
+        pytest.skip("No JavaScript syntax compiler available")
+    scripts = []
+
+    async def selected(*args):
+        return {"pane_id": "terminal:123:ttys004", "expected_pid": 345}
+
+    async def capture(source, **kwargs):
+        scripts.append(source)
+        return {}
+
+    monkeypatch.setattr(bridge.sessions, "selected", selected)
+    monkeypatch.setattr(bridge.sessions, "native", capture)
+    if action == "insert":
+        await bridge.sessions.insert(
+            "local",
+            SessionInput(
+                pane_id="terminal:123:ttys004",
+                expected_pid=345,
+                text='Quoted " ä🙂\\\nKB-END-static',
+                submit=False,
+            ),
+        )
+    else:
+        await bridge.sessions.press_return("local", "terminal:123:ttys004", 345)
+    source = tmp_path / "native.js"
+    source.write_text(scripts[0])
+    command = [compiler, "-l", "JavaScript", "-o", str(tmp_path / "compiled.scpt"), str(source)]
+    if compiler.endswith("node"):
+        command = [compiler, "--check", str(source)]
+    compiled = await asyncio.to_thread(
+        subprocess.run, command, capture_output=True, text=True, timeout=10
+    )
+    assert compiled.returncode == 0, compiled.stderr

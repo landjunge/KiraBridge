@@ -132,6 +132,12 @@ class Bridge:
 
         self.completions = CompletionManager(self.store, self.security)
         self.messages = MessageManager(config, self.store, self.security)
+        from kirabridge.visible_handoff import VisibleHandoffs
+
+        self.visible_handoffs = VisibleHandoffs(
+            config, self.store, self.security, self.sessions, self.messages
+        )
+        self.agents.visible_handoffs = self.visible_handoffs
         self.tasks.maintenance = self.messages.voice_policy.expire
         self.message_receiver = MessageReceiver(self)
         from kirabridge.team_manager import TeamManager
@@ -234,6 +240,7 @@ class Bridge:
             "terminal_access": terminal_access(self.config, principal),
             "automatic_operations": policy.automatic_operations,
             "voice_messaging": self.config.voice_messaging.model_dump(),
+            "visible_handoffs": self.config.visible_handoffs.model_dump(),
             **self.messages.voice_channel.profile(principal),
             "health_scope": "dispatcher and authentication; use bridge_readiness for prerequisites",
             "runtime": self.runtime,
@@ -328,11 +335,32 @@ class Bridge:
                 },
             }
         if operation == "session.input":
+            selected = await self.sessions.selected(principal, args.pane_id, args.expected_pid)
+            target = self.sessions.assigned_agent(selected)
+            if target:
+                if not args.submit:
+                    raise BridgeError(
+                        "visible_submit_required", "Agent handoffs include a separate Return"
+                    )
+                approved = self.tasks.input_policy.dispatch(principal, args, task["id"])
+                result = await self.visible_handoffs.execute(
+                    task,
+                    AgentInput(
+                        agent=target,
+                        prompt=approved.text,
+                        cwd=str(self.config.state_path),
+                        timeout=300,
+                    ),
+                    running,
+                    progress,
+                )
+                self.tasks.input_policy.sent(principal, task["id"])
+                return result
             await running({"evidence_type": "session_input_dispatch", "pane_id": args.pane_id})
             return await self.sessions.send(principal, args, task_id=task["id"])
         if operation == "session.open":
             await running({"evidence_type": "session_open_dispatch"})
-            return await self.sessions.open(principal, args)
+            return await self.sessions.open(principal, args, task_id=task["id"])
         if operation == "agent.execute":
             self.teams.authorize_execution(task)
             return await self.agents.execute(task, args, policy, running, progress)

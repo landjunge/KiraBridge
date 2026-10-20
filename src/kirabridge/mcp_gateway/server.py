@@ -39,7 +39,7 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
         "This return channel cannot wake an inactive ChatGPT chat. "
         "Query task_get and task_events for additional evidence. "
         "Use message_send/message_receive for addressed peer communication. "
-        "Automatic message receivers use separate managed sessions, not existing interactive ones; "
+        "Agent handoffs require assigned existing visible terminals, with no background fallback; "
         "check message_channel_status and message_get for actual evidence. "
         "For visible macOS terminals use session_catalog/session_read and session_open. "
         "Send input only to an exact pane_id and expected_pid using operation session.input. "
@@ -50,8 +50,7 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
         "read_query with operation session.catalog or session.read and exact pane_id/expected_pid. "
         "Eve = Grok Voice; Grok Build = Grok Terminal; Kira = ChatGPT Voice; "
         "Codex = ChatGPT Terminal. Eve relays only Daniel's dictation unchanged, "
-        "without additions or premature sending. Never invent Daniel's go-go-go. "
-        "Voice message_send requires a trailing go-go-go or a later message_release; "
+        "without additions. Explicit requests need no special voice token. "
         "terminal-to-terminal messages are immediate. Voice-to-voice messages use "
         "the shared participant-only append-only conversation.",
         stateless_http=True,
@@ -205,6 +204,11 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
             return {"error": {"code": exc.code, "message": str(exc)}}
 
     @server.tool(annotations=read)
+    def visible_handoff_status(handoff_id: str, ctx: Context) -> dict[str, Any]:
+        """Read/reconcile visible input, Return and authenticated acknowledgement; never resend."""
+        return safe(lambda: bridge.visible_handoffs.reconcile(identity(ctx), handoff_id))
+
+    @server.tool(annotations=read)
     def operation_catalog(ctx: Context) -> dict[str, Any]:
         """Permitted version-1 operations and exact argument JSON schemas."""
 
@@ -222,6 +226,7 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
                 "terminal_access": terminal_access(bridge.config, identity(ctx)),
                 "automatic_operations": policy.automatic_operations,
                 "voice_messaging": bridge.config.voice_messaging.model_dump(),
+                "visible_handoffs": bridge.config.visible_handoffs.model_dump(),
                 **bridge.messages.voice_channel.profile(identity(ctx)),
                 "operations": {
                     name: {
@@ -333,6 +338,7 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
         idempotency_key: str,
         ctx: Context,
         argv: list[str] | None = None,
+        window_authorization: str = "",
     ) -> dict[str, Any]:
         """Open a new visible Terminal.app window in cwd, preserving existing tabs.
 
@@ -345,7 +351,11 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
                 task_id=task_id,
                 idempotency_key=idempotency_key,
                 operation="session.open",
-                arguments={"cwd": cwd, "argv": argv or []},
+                arguments={
+                    "cwd": cwd,
+                    "argv": argv or [],
+                    "window_authorization": window_authorization,
+                },
             ),
             ctx,
         )
@@ -472,16 +482,16 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
     ) -> dict[str, Any]:
         """Send an addressed durable message; sender is your authenticated identity.
 
-        Eve/Kira need Daniel's trailing go-go-go. Otherwise this returns a private
-        buffer expiring after the configured timeout (60s by default); release that
-        exact message_id using message_release and a later go-go-go token.
-        Terminal senders need no marker. Eve/Kira exchanges use eve-kira-shared.
+        Kira, Eve and terminal senders need no special approval marker.
+        Normal capabilities and peer permissions still apply. Old buffers do not
+        auto-release. Eve/Kira exchanges use eve-kira-shared.
 
         For dispatched agent work, completion_target routes final completion_receive notices
         to the requesting assistant's stable target, even on failure or without an auto reply.
         Kinds: question, answer, work, result, note. Reuse the idempotency_key only for the
-        exact same message. dispatch=true invokes the configured separate managed receiver;
-        existing interactive sessions are not attached. Questions/work request one response
+        exact same message. Work/questions to CLI agents use their assigned visible terminal
+        even with dispatch=false; missing or changed targets block without fallback.
+        Questions/work request one response
         by default. Answers/results never request another response. No shell interpolation.
         Returned answers stay in the sender's client inbox; they do not automatically
         start another background receiver. Grok app calls wait briefly and include
@@ -590,8 +600,14 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
                     }
                     for peer in policy.message_peers
                 },
-                "session_scope": "separate_managed_session",
+                "session_scope": "existing_visible_terminal"
+                if config.visible_handoffs.enabled
+                else "separate_managed_session",
+                "visible_handoffs": config.visible_handoffs.model_dump(),
+                "binding_runtime_status": "not_probed",
                 "existing_session_attached": False,
+                "attachment_meaning": "no_persistent_agent_protocol_attachment; "
+                "exact_existing_UI_target_revalidated_on_each_action",
                 "interactive_session_access": {
                     "mode": "on_demand_exact_target",
                     "catalog_tool": "session_catalog",
@@ -655,8 +671,8 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
     def team_message_send(request: TeamMessageSend, ctx: Context) -> dict[str, Any]:
         """Send addressed team data; sender is authenticated, never supplied.
 
-        Eve/Kira use the same go-go-go outbox as message_send; without a suffix,
-        message_release can release the returned buffer ID before expiry.
+        Kira and Eve need no special approval marker; normal team permissions apply.
+        Historical buffers never release automatically.
         Eve/Kira exchanges go into their private shared conversation, outside the team log.
         """
         return safe(lambda: bridge.teams.send(identity(ctx), request))

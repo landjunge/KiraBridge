@@ -594,6 +594,11 @@ class ControlCenter:
                     argv = [*environment, "OPENCODE_CONFIG_CONTENT=" + json.dumps(native), *argv]
             if profile.model:
                 argv += ["--model", profile.model]
+            from kirabridge.session_manager import SessionOpen
+
+            window_task_id = "control-" + action_id
+            window_args = SessionOpen(cwd=cwd, argv=argv)
+            window_grant = self.bridge.security.grant_window("local", window_task_id, window_args)
             return await self.rpc(
                 "session_open",
                 {
@@ -601,6 +606,7 @@ class ControlCenter:
                     "task_id": "control-" + action_id,
                     "idempotency_key": "control-" + action_id,
                     "argv": argv,
+                    "window_authorization": window_grant,
                 },
             )
         if name not in SERVICE_LABELS or action not in {"start", "restart"}:

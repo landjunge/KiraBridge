@@ -9,8 +9,9 @@ enabled = false
 principals = []
 timeout_seconds = 60
 
-# Only authenticated grok_app (Eve) and chatgpt (Kira) use the message outbox.
+# No extra voice token. Existing historical buffers never auto-release.
 [voice_messaging]
+release_required = false
 timeout_seconds = 60
 
 [voice_channel]

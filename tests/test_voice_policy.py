@@ -1,12 +1,13 @@
 import sqlite3
 import time
+import uuid
 from types import SimpleNamespace
 
 import pytest
 from conftest import request
 
 from kirabridge.bridge_core.bridge import Bridge
-from kirabridge.bridge_core.models import BridgeError, State
+from kirabridge.bridge_core.models import BridgeError, State, canonical, digest
 from kirabridge.message_manager import MessageSend
 
 
@@ -36,32 +37,44 @@ def message(recipient="codex", body="Daniels Diktat", key="one", **kwargs):
     )
 
 
-@pytest.mark.parametrize("sender", ["grok_app", "chatgpt"])
-def test_only_voice_messages_wait_then_release_exactly_once(voices, sender):
-    channel = voices.messages
-    value = message()
-    pending = channel.send(sender, value)
-    assert pending["message_buffer"]["state"] == "waiting"
-    assert pending["message_buffer"]["expires"] - pending["created"] == 60
-    assert not channel.receive("codex")["messages"]
-    assert voices.store.db.execute("SELECT count(*) FROM message_jobs").fetchone()[0] == 0
-    assert channel.send(sender, value)["id"] == pending["id"]
-    for action in [
-        lambda: channel.get("codex", pending["id"]),
-        lambda: channel.voice_policy.release(
-            "chatgpt" if sender == "grok_app" else "grok_app", pending["id"], "go-go-go"
-        ),
-        lambda: channel.voice_policy.release(sender, pending["id"], "wrong"),
-        lambda: channel.send(sender, value.model_copy(update={"body": "changed"})),
-    ]:
-        with pytest.raises(BridgeError):
-            action()
-    released = channel.voice_policy.release(sender, pending["id"], "go-go-go")
-    assert released["body"] == value.body
-    assert released["seq"] > 0
-    assert channel.voice_policy.release(sender, pending["id"], "go-go-go")["id"] == pending["id"]
-    assert channel.send(sender, value)["id"] == pending["id"]
-    assert len(channel.receive("codex")["messages"]) == 1
+def legacy_buffer(bridge, sender, value, target=None):
+    """Seed the immutable pre-upgrade record; new code must never stage it."""
+    value = bridge.messages.voice_channel.route(sender, value)
+    identifier = str(uuid.uuid4())
+    now = time.time()
+    payload = {
+        **value.model_copy(update={"message_id": identifier}).model_dump(),
+        "_transport": "message",
+    }
+    with bridge.store.transaction():
+        bridge.store.db.execute(
+            "INSERT INTO voice_message_buffers VALUES(?,?,?,?,?,?,'waiting',?,?,NULL)",
+            (
+                identifier,
+                sender,
+                value.idempotency_key,
+                digest({"transport": "message", **value.model_dump()}),
+                canonical(payload),
+                target,
+                now,
+                now + bridge.config.voice_messaging.timeout_seconds,
+            ),
+        )
+    return bridge.messages.get(sender, identifier)
+
+
+@pytest.mark.parametrize("sender", ["grok_app", "chatgpt", "codex", "grok"])
+def test_normal_requests_are_immediate_for_all_four_senders(voices, sender):
+    recipient = "grok" if sender == "codex" else "codex"
+    value = message(recipient)
+    sent = voices.messages.send(sender, value)
+    assert sent["body"] == value.body and "message_buffer" not in sent
+    assert voices.messages.send(sender, value)["id"] == sent["id"]
+    assert len(voices.messages.receive(recipient)["messages"]) == 1
+    assert not voices.messages.voice_channel.profile(sender)["voice_message_gate"]
+    assert voices.store.db.execute("SELECT count(*) FROM voice_message_buffers").fetchone()[0] == 0
+    with pytest.raises(BridgeError):
+        voices.messages.send(sender, value.model_copy(update={"body": "changed"}))
 
 
 @pytest.mark.parametrize("sender", ["grok", "codex"])
@@ -74,19 +87,16 @@ def test_terminal_messages_are_immediate_and_literal(voices, sender):
     assert len(voices.messages.receive(recipient)["messages"]) == 2
 
 
-def test_suffix_releases_stripped_dictation_and_retries(voices):
+def test_old_marker_is_literal_and_never_a_new_approval_requirement(voices):
     value = message(body="Wörtliches Diktat.\ngo-go-go\n")
     sent = voices.messages.send("grok_app", value)
-    assert sent["body"] == "Wörtliches Diktat."
+    assert sent["body"] == value.body
     assert voices.messages.send("grok_app", value)["id"] == sent["id"]
-    assert voices.messages.receive("codex")["messages"][0]["body"] == sent["body"]
-    with pytest.raises(BridgeError, match="empty"):
-        voices.messages.send("grok_app", message(body="go-go-go", key="empty"))
 
 
 def test_timeout_survives_restart_and_does_not_append_or_dispatch(voices, config, monkeypatch):
     config.voice_messaging.timeout_seconds = 7
-    pending = voices.messages.send("grok_app", message("chatgpt"))
+    pending = legacy_buffer(voices, "grok_app", message("chatgpt"))
     reopened = Bridge(config)
     try:
         assert (
@@ -109,7 +119,7 @@ def test_timeout_survives_restart_and_does_not_append_or_dispatch(voices, config
 
 
 def test_pending_release_gets_fresh_sequence_after_newer_deliveries(voices):
-    pending = voices.messages.send("grok_app", message("chatgpt"))
+    pending = legacy_buffer(voices, "grok_app", message("chatgpt"))
     newer = voices.messages.send("grok_app", message("chatgpt", "neu go-go-go", "new"))
     sent = voices.messages.voice_policy.release("grok_app", pending["id"], "go-go-go")
     assert sent["seq"] > newer["seq"]
@@ -215,7 +225,7 @@ def test_terminal_session_input_is_outside_voice_buffer_policy(voices, config):
         assert "input_buffer" not in queued
 
 
-def test_team_messages_cannot_bypass_voice_outbox_and_voice_pair_uses_private_log(voices, config):
+def test_team_messages_need_no_special_token_and_voice_pair_uses_private_log(voices, config):
     from kirabridge.bridge_core.config import TeamConfig, TeamWorkerConfig
     from kirabridge.team_manager.models import TeamCreate, TeamMessageSend
 
@@ -237,16 +247,13 @@ def test_team_messages_cannot_bypass_voice_outbox_and_voice_pair_uses_private_lo
     value = TeamMessageSend(
         team_id="voice-team", recipient="codex", body="Diktat", idempotency_key="team-dictation"
     )
-    held = teams.send("grok_app", value)
-    assert held["message_buffer"]["state"] == "waiting"
-    assert not teams.messages("codex", "voice-team")["messages"]
-    sent = voices.messages.voice_policy.release("grok_app", held["id"], "go-go-go")
+    sent = teams.send("grok_app", value)
     assert sent["body"] == "Diktat"
+    assert "message_buffer" not in sent
     assert teams.send("grok_app", value)["id"] == sent["id"]
-    assert voices.messages.get("grok_app", held["id"])["id"] == sent["id"]
     marked = value.model_copy(update={"body": "Noch eins go-go-go", "idempotency_key": "marked"})
-    assert teams.send("grok_app", marked)["body"] == "Noch eins"
-    assert teams.send("grok_app", marked)["body"] == "Noch eins"
+    assert teams.send("grok_app", marked)["body"] == "Noch eins go-go-go"
+    assert teams.send("grok_app", marked)["body"] == "Noch eins go-go-go"
     pair = value.model_copy(
         update={"recipient": "chatgpt", "body": "Privat go-go-go", "idempotency_key": "private"}
     )
@@ -258,7 +265,7 @@ def test_team_messages_cannot_bypass_voice_outbox_and_voice_pair_uses_private_lo
 
 
 def test_failed_release_rolls_back_archive_and_keeps_original_waiting_buffer(voices, config):
-    held = voices.messages.send("grok_app", message())
+    held = legacy_buffer(voices, "grok_app", message())
     config.principals["codex"].message_peers = []
     with pytest.raises(BridgeError):
         voices.messages.voice_policy.release("grok_app", held["id"], "go-go-go")
@@ -269,3 +276,34 @@ def test_failed_release_rolls_back_archive_and_keeps_original_waiting_buffer(voi
         voices.messages.voice_policy.release("grok_app", held["id"], "go-go-go")["body"]
         == "Daniels Diktat"
     )
+
+
+@pytest.mark.parametrize("sender", ["chatgpt", "grok_app"])
+def test_old_waiting_buffer_does_not_send_on_retry_or_reopen(voices, config, sender):
+    value = message()
+    held = legacy_buffer(voices, sender, value)
+    reopened = Bridge(config)
+    try:
+        retry = reopened.messages.send(sender, value)
+        assert retry["id"] == held["id"]
+        assert retry["message_buffer"]["state"] == "waiting"
+        assert not reopened.messages.receive("codex")["messages"]
+    finally:
+        reopened.store.close()
+
+
+def test_updates_cannot_enable_the_retired_voice_gate(config):
+    from pydantic import ValidationError
+
+    from kirabridge.bridge_core.config import VoiceMessagingConfig
+
+    assert not VoiceMessagingConfig().release_required
+    with pytest.raises(ValidationError):
+        VoiceMessagingConfig(release_required=True)
+
+
+def test_missing_message_permission_still_blocks_voice_requests(voices, config):
+    config.principals["chatgpt"].capabilities.remove("message.send")
+    with pytest.raises(BridgeError) as exc:
+        voices.messages.send("chatgpt", message())
+    assert exc.value.code == "forbidden"

@@ -591,6 +591,18 @@ class AgentManager:
         config = self.config.agents.get(args.agent)
         if config is None or config.kind not in self.adapters:
             raise BridgeError("agent_unavailable", "Agent adapter is not configured")
+        if self.config.visible_handoffs.enabled:
+            if owned_resume_session is not None or handoff_reply:
+                raise BridgeError(
+                    "visible_owned_resume_unsupported",
+                    "A provider-owned managed resume cannot replace the assigned visible "
+                    "CLI session",
+                )
+            if getattr(self, "visible_handoffs", None) is None:
+                raise BridgeError(
+                    "visible_route_unavailable", "Visible handoff service is required"
+                )
+            return await self.visible_handoffs.execute(task, args, running, progress)
         full_access = (
             principal.permission_level is not None
             and config.bridge_tools

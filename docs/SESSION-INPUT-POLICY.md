@@ -2,7 +2,8 @@
 
 **Abgelöst für Daniels Installation:** siehe [Voice-Policy](VOICE-POLICY.md).
 Eves sichtbare Terminaleingaben haben eine dauerhafte Operationsfreigabe ohne
-Marker und Einzelbestätigung. Das Voice-Gate gilt für Bridge-Nachrichten.
+Marker und Einzelbestätigung. Auch die zusätzliche Voice-Tokenpflicht ist durch
+Daniels Entscheidung vom 20. Oktober aufgehoben.
 Der nachfolgende Ablauf beschreibt ausschließlich die optionale Altregel;
 sie muss zusätzlich mit `principals = ["EXPLIZITER-PRINCIPAL"]` eingeschränkt werden.
 
@@ -15,7 +16,7 @@ timeout_seconds = 60
 
 Der Timeout ist konfigurierbar (größer als null, maximal 86400 Sekunden).
 Bestehende Konfigurationen ohne diesen Abschnitt behalten ihr bisheriges Verhalten;
-Daniels Installation wird ausdrücklich mit `enabled = true` aktiviert.
+Daniels Installation verwendet `enabled = false` und eine leere Principal-Liste.
 Die drei Rechtestufen bleiben erhalten. Diese optionale Versandregel gilt nur
 für explizit ausgewählte Principals ohne dauerhafte `session.input`-Freigabe.
 

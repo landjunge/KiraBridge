@@ -130,8 +130,8 @@ async def message_for_conversation(bridge, principal, message):
         return {
             **message,
             "conversation_return": {
-                "text": "Die Nachricht liegt im Puffer. go-go-go kann mit message_release "
-                "für diese Nachrichten-ID nachgereicht werden."
+                "text": "Diese alte Nachricht bleibt im historischen Puffer und wird nicht "
+                "automatisch zugestellt. Neue ausdrückliche Aufträge benötigen kein Sondertoken."
                 if buffer["state"] == "waiting"
                 else "Die Nachricht ist verfallen und wurde nicht zugestellt.",
                 "final": buffer["state"] == "expired",

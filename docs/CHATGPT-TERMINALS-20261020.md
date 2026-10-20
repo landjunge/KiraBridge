@@ -1,5 +1,9 @@
 # Kira-Zugriff auf vorhandene Terminal.app-Sitzungen
 
+> Historischer Reparaturbericht: Die damalige Voice-Gate-Regel wurde danach
+> auf Daniels ausdrückliche Anweisung aufgehoben; aktueller Stand siehe
+> [VOICE-POLICY.md](VOICE-POLICY.md). Terminalbelege bleiben unverändert gültig.
+
 ## Ursache
 
 Der aktive Dienst verwendete tatsächlich

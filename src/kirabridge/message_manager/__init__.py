@@ -71,7 +71,22 @@ class MessageManager:
             "SELECT * FROM message_jobs WHERE message_id=?", (message_id,)
         ).fetchone()
         result["processing"] = dict(job) if job else None
-        result["processing_route"] = "managed_receiver" if job else "external_client_inbox"
+        visible = (
+            job
+            and self.store.db.execute(
+                "SELECT 1 FROM sqlite_master WHERE type='table' AND name='visible_handoffs'"
+            ).fetchone()
+            and self.store.db.execute(
+                "SELECT 1 FROM visible_handoffs WHERE id=?", (job["run_id"],)
+            ).fetchone()
+        )
+        result["processing_route"] = (
+            "existing_visible_terminal"
+            if visible
+            else "managed_receiver"
+            if job
+            else "external_client_inbox"
+        )
         if job:
             result["processing"]["evidence"] = json.loads(job["evidence"])
         result["request_reply"] = bool(result["request_reply"])
@@ -82,7 +97,15 @@ class MessageManager:
         message = self.voice_channel.route(principal, message)
         return self.voice_policy.send(principal, message, completion_target)
 
-    def _send(self, principal, message, *, completion_target=None, validate_only=False):
+    def _send(
+        self,
+        principal,
+        message,
+        *,
+        completion_target=None,
+        validate_only=False,
+        visible_internal=False,
+    ):
         from kirabridge.completion_manager import valid_target
 
         if completion_target is not None:
@@ -93,16 +116,33 @@ class MessageManager:
                 "approval_required", "Messaging requires local automatic authorization"
             )
         target = self.config.principals.get(message.recipient)
-        if (
+        self_reply = (
             principal == message.recipient
-            or message.recipient not in policy.message_peers
+            and message.kind in {"answer", "result"}
+            and message.reply_to
+            and self.store.db.execute(
+                "SELECT 1 FROM visible_handoffs WHERE message_id=? AND principal=? AND target=?",
+                (message.reply_to, principal, principal),
+            ).fetchone()
+        )
+        bound_self = principal == message.recipient and (visible_internal or self_reply)
+        if (
+            (principal == message.recipient and not bound_self)
+            or (message.recipient not in policy.message_peers and not bound_self)
             or not target
-            or principal not in target.message_peers
+            or (principal not in target.message_peers and not bound_self)
             or "message.read" not in target.capabilities
         ):
             raise BridgeError("message_peer_denied", "Recipient is not an authorized peer")
         limits = self.config.messaging
         dispatch = message.dispatch
+        if (
+            self.config.visible_handoffs.enabled
+            and not visible_internal
+            and message.recipient in self.config.agents
+            and message.kind in {"work", "question"}
+        ):
+            dispatch = True  # A caller's dispatch=false cannot select an invisible work route.
         if dispatch is None:
             dispatch = (
                 message.kind not in {"answer", "result"} and message.recipient in limits.receivers
@@ -119,7 +159,18 @@ class MessageManager:
             raise BridgeError(
                 "reply_loop", "Answers, results and notes cannot request auto replies"
             )
-        if dispatch:
+        recorded = self.store.db.execute(
+            "SELECT m.id,EXISTS(SELECT 1 FROM message_jobs j "
+            "WHERE j.message_id=m.id) AS dispatched "
+            "FROM messages m WHERE m.sender=? AND m.idem=?",
+            (principal, message.idempotency_key),
+        ).fetchone()
+        if recorded and (
+            message.dispatch is None
+            or (self.config.visible_handoffs.enabled and message.dispatch is False)
+        ):
+            dispatch = bool(recorded["dispatched"])
+        if dispatch and not recorded:
             from kirabridge.permissions import automatic_for
 
             receiver = limits.receivers.get(message.recipient)
@@ -147,7 +198,9 @@ class MessageManager:
             ).fetchone()
             if previous:
                 previous_hash = hashed
-                if message.dispatch is None:
+                if message.dispatch is None or (
+                    self.config.visible_handoffs.enabled and message.dispatch is False
+                ):
                     # Preserve the recorded dispatch decision on retries across
                     # upgrades, including old answers sent to managed receivers.
                     recorded_dispatch = bool(
@@ -225,7 +278,11 @@ class MessageManager:
             if not conversation:
                 self.store.db.execute(
                     "INSERT INTO conversations VALUES(?,?,?,?)",
-                    (message.conversation_id, *sorted(parties), now),
+                    (
+                        message.conversation_id,
+                        *(sorted(parties) if len(parties) == 2 else (principal, principal)),
+                        now,
+                    ),
                 )
             self.store.db.execute(
                 "INSERT INTO messages(id,conversation_id,position,sender,recipient,kind,body,idem,"

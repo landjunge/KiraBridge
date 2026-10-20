@@ -9,7 +9,7 @@ auf ein kleines Paket Implementierung, Grok-Prüfung, Korrektur und Nachprüfung
 | Etappe | Status | Nächster Nachweis |
 | --- | --- | --- |
 | 1 Ausgangspunkt | Gesichert; praktische ChatGPT-Leseprüfung und unabhängige Grok-Prüfung abgeschlossen | Sichtbare Übergabe ergänzen |
-| 1a Sichtbare Übergaben | Neu von Daniel autorisiert, in Arbeit | Kira/Eve/Codex/Grok, Einfügen/Return/Bestätigung getrennt |
+| 1a Sichtbare Übergaben und Aufhebung Voice-Gate | Kandidat 0.8.0rc4: 660 Tests bestanden, Grok-Nachprüfung der Korrekturen bestanden; Aktivierung offen | Aktuelle Konfiguration und tatsächlichen Daemon prüfen |
 | 2 Freigaben | Offen | Gemeinsame Entscheidung und Matrix |
 | 3 Aktivierung | Offen | Persistente Wartung und Fehler-/Parallelitätstests |
 | 4 Client-Lesewege | Offen | Gleiche Rechte, reservierte Lesekapazität, Lastprüfung |
@@ -59,7 +59,9 @@ Antwort in Grok Voice. `busy` ist keine Aussage über Antwortbereitschaft.
 Die dauerhafte Kira-Ausnahme `automatic_operations=["session.input"]` bleibt
 erhalten. `session_input_policy.enabled=false` deaktiviert den zusätzlichen
 Terminal-Bestätigungspuffer, nicht den Terminalzugang. Die eigenständige
-Voice-`go-go-go`-Regel bleibt aktiv.
+Voice-`go-go-go`-Regel war an diesem gesicherten Ausgangspunkt aktiv. Daniel hat
+sie anschließend ausdrücklich aufgehoben; siehe Paket 1a und die aktuelle
+[Voice-Policy](VOICE-POLICY.md). Historische Belege bleiben unverändert.
 
 ### Tatsächliche Grok-Kommunikation
 
@@ -96,7 +98,143 @@ Hintergrundsitzungen. Vor jedem Zugriff werden Fenster, TTY, Sitzungswurzel und
 Agenten-PID erneut geprüft. Einfügen, Return und authentifizierte Bestätigung
 erhalten getrennte Zustände und eine stabile Auftrags-ID. Unklare Ausgänge
 werden nicht automatisch wiederholt. Bereits laufende Arbeit wird abgeglichen.
-Die bisherige Voice-Freigabe für Kira und Eve bleibt getrennt erhalten.
+Daniel hat die bisherige zusätzliche Voice-Tokenpflicht für Kira und Eve danach
+ausdrücklich aufgehoben. Neue Nachrichten werden ohne Sondertoken und ohne
+Entfernung eines wörtlichen Markers weitergegeben. Normale Rechte bleiben
+erforderlich; alte Puffer werden nicht automatisch freigegeben. Der Parser
+akzeptiert `voice_messaging.release_required` ausschließlich als `false`.
+
+### Tatsächliche sichtbare Zusammenarbeit und Korrekturen
+
+- Erster sichtbarer Auftrag `arch-1a-visible-grok-review-20261020`: eingefügt,
+  wegen nicht sichtbarer Auftrags-ID vor Return angehalten (`unknown`). Nach
+  dem angekündigten manuellen Return folgten authentifizierte Grok-Quittung und unabhängige
+  Rückmeldung, Sequenz 111, `0d68c1f6-0b70-4fe0-91ed-ce274d014570`.
+  Grok führte selbst 30 Tests aus. Kein erneuter Prompt und kein zusätzliches
+  Return wurden für diesen Auftrag geschickt.
+- Grok-Befunde: Promptgrenze vor Inbox-Anlage prüfen; verspätete Antworten ohne
+  erneute Eingabe abgleichen. Beides korrigiert und gezielt nachgeprüft.
+- Nachprüfung `arch-1a-grok-check2-20261020`: mehrzeiliger Prompt tatsächlich
+  automatisch eingefügt, separates Return, geleertes Eingabefeld, Grok-Quittung
+  und Ergebnis `17842889-3d88-4703-a7cb-e18e7d94ed34`. Grok bestätigt wörtlich
+  „Sichtbarer Return funktioniert.“ Neue Befunde zu alten Eingabefeldern im
+  Lesefenster, terminalem Abschlusszustand und Konfliktprüfung wurden korrigiert.
+- Literal-Paste verwendet ausdrücklich den normalen Terminal-Menübefehl.
+  Ein Tastaturkürzel hatte stattdessen maskierte Leer-/Sonderzeichen erzeugt.
+- Reale Codex-Felder fassen große Pastes als `[Pasted Content N chars]` zusammen;
+  Grok zeigt je nach Fenstergröße `[Pasted: N lines]` und eine Vorschau. Die
+  Prüfung berücksichtigt diese tatsächlichen Darstellungen, prüft den letzten
+  Eingabebereich und protokolliert die Art des beobachteten Belegs. Eine
+  Zeichenanzahl oder ein Fingerprint allein ist kein Identitätsnachweis.
+- Fehlendes/geändertes Ziel blockiert alle Adapter, einschließlich eines
+  Grok-API-Adapters als vermeintlichem Ersatz. `enabled` akzeptiert persistent
+  ausschließlich `true`. Auch direkte `session.input`-Aufträge an erkannte
+  CLI-Prozesse müssen über die zentrale Route gehen. `dispatch=false` darf für
+  Fragen/Arbeit an CLI-Agenten keine unsichtbare Ausführung auswählen.
+- Rückantworten werden über den laufenden anfordernden MCP-Aufruf und die
+  dauerhafte Inbox zurückgegeben; beide ursprünglichen Terminalbindungen werden
+  vor der Ergebnisrückgabe erneut geprüft. Ohne aktiven Leser bleibt die Inbox
+  dauerhaft erhalten. Eine Bildschirmdarstellung wird serverseitig nicht als
+  bewiesen ausgegeben (`client_not_attested`).
+
+### Neue Fenster: Verantwortlichkeit und verbindliche Begrenzung
+
+Codex öffnete für einen interaktiven Eingabetest selbst das zusätzliche Fenster
+`terminal:23115:ttys001`, Wurzel-PID 52988, Codex-PID 53010. Das wurde Daniel
+offengelegt. Zuerst blieb dessen Collapsed-Paste unbestätigt und ohne Return;
+nach Beobachtung der exakten Zeichenzahl erfolgte einmalig ein separates Return.
+Der Agent quittierte die Nachricht; eine endgültige Antwort ist bislang nicht
+belegt. Nach Daniels anschließender ausdrücklicher Vorgabe wurden dort keine
+weiteren Eingaben geschickt und das Fenster wurde nicht geschlossen.
+Die anschließende ausschließlich lesende Prüfung des genau zugehörigen
+Providerprotokolls belegt `turn_aborted` am 20. Oktober um 00:05:00 UTC,
+Sitzung `01a1569d-e167-74c2-ba80-1258c4046614`. Ein Verursacher ist nicht
+belegt. Der bereits abgebrochene Turn wurde als `interrupted` abgeglichen,
+ohne neuen Input, Signal oder Fensterschließen. Diese Abnahme ersetzt keinen
+Eingabetest im ursprünglichen Codex-Fenster; dieses bearbeitet währenddessen
+den laufenden Umbau und wird nicht unterbrochen.
+
+Ab dieser Vorgabe sind auch für Tests ausschließlich die ursprünglichen Fenster
+zulässig: Codex `22104/ttys000/94023/94386`, Grok `22228/ttys002/6957/6986`.
+Grok hat diese Regel in seiner bestehenden Sitzung als Auftrag
+`arch-1a-route-policy-20261020` ausdrücklich bestätigt.
+
+Ein frei behauptbares `user_requested_agent_window=true` wurde nach Kiras
+Prüfhinweis verworfen. `session.open` benötigt stattdessen einen einmaligen
+`window_authorization`-Token vom authentifizierten lokalen Bedienweg, gebunden
+an Principal, Task-ID, Arbeitsverzeichnis und vollständiges argv. Es gibt keinen
+MCP-Aussteller. Verbrauch und Aufgabenanlage teilen eine Transaktion;
+die Transportgrenze prüft denselben Beleg. Das gilt auch für leere Shell und
+Wrapper. Zusätzlich reserviert die Transportgrenze in `window_dispatches`
+genau einen Versuch pro Token und Aufgabe und prüft die ursprüngliche Frist.
+Auch ein direkter zweiter `open` und ein unklarer erster Ausgang erlauben
+keinen weiteren Fensterstart.
+Die gesamte normale Terminalausführung bei freiem OS-Zugriff unter
+derselben UID ist damit ausdrücklich keine Betriebssystem-Sandbox: Ein Agent
+mit vollem Shell-Zugriff könnte Betriebssystembefehle oder lokale Verwaltungs-
+funktionen selbst aufrufen. Die Bridge verspricht keinen Schutz gegen dieses
+andere Vertrauensmodell und erweitert oder beschneidet diese OS-Rechte nicht.
+
+### Prüfung und Aktivierungsstand
+
+Der unveränderte Python-Kandidat hat 660 Tests bestanden
+(`-W error::pytest.PytestUnraisableExceptionWarning`, 173,89 Sekunden).
+Ruff und Paketbau sind erfolgreich; Wheel-Inhalte stimmen mit allen 70
+Python-Quelldateien überein. Quellmanifest:
+`9f05b61b773dc93fb6e5e02e3068eb250768dcfdd105ec91f2b4444a16c4fbd1`.
+Wheel-SHA256:
+`813ffdebaa6932192101c688600c386263d2124d86b615b940a4c8dee21d0578`.
+
+Ein früherer
+Gesamtlauf: 612 bestanden, ein Test erwartete noch das ausdrücklich abgelöste
+Voice-Gate; dieser Test wurde auf den unmittelbaren tatsächlichen Antwortrückweg
+umgestellt und gezielt erfolgreich ausgeführt. Ein späterer Lauf traf die
+bereits vorhandene knappe Startfrist eines Fake-CLI-Tests; er bestand separat
+und danach im Gesamtlauf. Die Anwendungsfrist wurde nicht verändert.
+
+Grok führte im bestehenden ursprünglichen Fenster selbst 91 Tests aus und
+meldete drei weitere konkrete Befunde. Nach Korrektur führte er als Auftrag
+`arch-1a-grok-fixes4-20261020` selbst 64 Tests erfolgreich aus und bestätigte:
+„Die drei Fixes halten. Kein verbleibender konkreter Fehler in diesen drei
+Punkten.“ Seine tatsächlichen Rückmeldungen sind privat unter
+`grok-visible-review-1a.json`, `grok-visible-review-1a-check2.json` und
+`grok-visible-fixes4.json` erhalten. Das ist eine begrenzte unabhängige
+Prüfung, keine vollständige Sicherheitsabnahme.
+
+Ein weiterer echter HTTP-MCP-Test prüft die ursprüngliche Auftragsnachricht,
+genau eine authentifizierte Agentenantwort und keine zweite interne
+Auftragskopie. Negative Tests decken alle vier Absender, alle Adapter,
+fehlende/veränderte Ziele, Rückzielverlust, belegte Agenten sowie Shell- und
+Wrapper-Starts ohne vertrauenswürdigen Auftrag ab. Alte Inbox-Aufträge werden
+durch einen Retry nach dem Update nicht nachträglich dispatched.
+
+Die dynamisch erzeugten Einfüge- und Return-Skripte werden zusätzlich durch
+`osacompile` ohne UI-Ausführung kompiliert. Eine Syntaxkorrektur erfolgte vor
+der letzten Gesamtabnahme. Paste öffnet den normalen Menüpunkt ausdrücklich
+und erhält die Zwischenablage bis zum beobachteten Echo; Return ist separat.
+Vor einer erneuten Einfügung im vierten Grok-Paket wurden das leere aktuelle
+Feld, fehlende Quittung, das Fehlen eines Return-Versuchs und das unveränderte
+zugehörige Grok-Providerprotokoll ohne diesen Nutzerturn abgeglichen.
+Die erste fehlende Einfügung und der folgende Compile-Fehler bleiben erhalten;
+erst anschließend folgten Einfügen, ein einziges Return und die echte Quittung.
+
+Der tatsächliche bisherige Daemon bestätigte außerdem über einen rein lesenden
+`terminal.execute`-Aufruf `uiEnabled=true`, `menuBarReadable=true`, Exit 0
+(`architecture-ui-daemon-probe-20261020`). Das ist kein Eingabetest und noch
+kein Nachweis einer gesprochenen Antwort auf dem Handy.
+
+Ein alter providergebundener verwalteter Codex-Resume darf die zugeordnete
+sichtbare Sitzung nicht ersetzen; er wird vor einer Eingabe als
+`visible_owned_resume_unsupported` gemeldet. Die Integration dieses separaten
+Workflowpfads bleibt in Etappe 5 offen. Ein sichtbarer UI-Turn wird nicht als
+erfundene verwaltete Provider-Sitzung ausgegeben.
+
+Die neue kanonische Konfiguration ist privat als
+`config-pending-visible.toml` vorbereitet und validiert. Sie bindet ausschließlich
+die zwei ursprünglichen Fenster und erhält beide dauerhaften Terminalfreigaben.
+Sie ist noch nicht in die kanonische Datei übernommen. Der produktive Daemon
+läuft während dieser Entwicklungsprüfung weiterhin mit dem Ausgangsstand;
+Codeänderung, Aktivierung und praktischer Daemontest werden getrennt belegt.
 
 Die 595 bestandenen Tests und die Paket-/Lint-/JavaScript-Prüfungen des
 Reparaturstands sind historische Belege; sie wurden für diese reine

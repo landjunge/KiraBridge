@@ -1,4 +1,4 @@
-# KiraBridge 0.8.0rc1
+# KiraBridge 0.8.0rc4
 
 Ein kompaktes Steuerfenster für Kira/ChatGPT, Grok und die angebundenen Agenten.
 Auf diesem Mac startet **KiraBridge.app** die Oberfläche. Prozesse, Terminals,
@@ -27,6 +27,17 @@ wurden hier nicht direkt abgenommen. Inaktive Chats werden durch eine
 Warteschlangennachricht nicht automatisch aufgeweckt.
 
 [Reparaturursachen, tatsächliche Prüfungen und offene Punkte](docs/CONTROL-CENTER-0.8.0rc1.md).
+
+## Aktueller Umbau
+
+Die [Etappenakte](docs/ARCHITECTURE-STAGES-20261020.md) trennt Quelländerungen,
+Aktivierung und praktische Prüfungen. Neue Aufträge von Kira und Eve benötigen
+kein `go-go-go`. Historische Puffer werden nicht automatisch zugestellt.
+Agentenübergaben verwenden verpflichtend persistierte bestehende sichtbare
+Fenster; fehlende oder geänderte Ziele blockieren ohne Hintergrundersatz.
+Einfügen, separates Return und authentifizierte Quittung bleiben getrennt.
+Neue Fenster benötigen eine konkrete Freigabe aus der lokalen Bedienung.
+Der gesamte sechs Etappen umfassende Umbau ist noch nicht abgeschlossen.
 
 ## Starten und entwickeln
 

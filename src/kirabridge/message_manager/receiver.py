@@ -162,7 +162,9 @@ class MessageReceiver:
                 row["recipient"],
                 {
                     "run_id": run_id,
-                    "session_scope": "separate_managed_session",
+                    "session_scope": "existing_visible_terminal"
+                    if self.bridge.config.visible_handoffs.enabled
+                    else "separate_managed_session",
                 },
             )
             return dict(row), run_id
@@ -289,6 +291,8 @@ class MessageReceiver:
                         }
                     )
                 )
+            if self.bridge.config.visible_handoffs.enabled:
+                prompt = message["body"]
             if history:
                 prompt += "\nPrior addressed messages (bounded context):\n" + canonical(history)
             if len(prompt) > 262144:
@@ -298,7 +302,15 @@ class MessageReceiver:
             )
             policy = self.bridge.security.principal(recipient, "message.read")
             result = await self.bridge.agents.execute(
-                {"id": run_id, "principal": recipient},
+                {
+                    "id": run_id,
+                    "principal": message["sender"]
+                    if self.bridge.config.visible_handoffs.enabled
+                    else recipient,
+                    "visible_message_id": message_id
+                    if self.bridge.config.visible_handoffs.enabled
+                    else None,
+                },
                 args,
                 policy,
                 running,
@@ -310,7 +322,9 @@ class MessageReceiver:
             evidence = {
                 **result.get("evidence", {}),
                 "run_id": run_id,
-                "session_scope": "separate_managed_session",
+                "session_scope": "existing_visible_terminal"
+                if self.bridge.config.visible_handoffs.enabled
+                else "separate_managed_session",
                 "response_sha256": digest(result.get("text", "")),
                 "response_preview": result.get("text", "")[:320],
             }
@@ -332,7 +346,14 @@ class MessageReceiver:
                     # Starting another receiver here can consume its awaited answer.
                     dispatch=False,
                 )
-                reply = await call("message_send", {"message": response.model_dump()})
+                if self.bridge.config.visible_handoffs.enabled:
+                    reply = await call(
+                        "message_get", {"message_id": result["evidence"]["reply_id"]}
+                    )
+                    if reply["reply_to"] != message_id or reply["recipient"] != message["sender"]:
+                        raise BridgeError("reply_conflict", "Visible agent reply does not match")
+                else:
+                    reply = await call("message_send", {"message": response.model_dump()})
                 assert reply["sender"] == recipient
                 reply_id = reply["id"]
                 evidence["response_truncated"] = len(text.encode()) > limits.max_body_bytes

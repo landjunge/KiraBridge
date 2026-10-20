@@ -1,15 +1,16 @@
 # Daniels Voice- und Terminal-Policy
 
-Diese Policy ersetzt für Daniels Installation die allgemeine Terminal-Pufferregel.
-Die bestehende rc2-Version bleibt erhalten.
+Stand 20. Oktober 2026: Daniel hat die zusätzliche `go-go-go`-Freigabepflicht
+für Kira und Eve ausdrücklich aufgehoben. Neue normale Nutzeraufträge benötigen
+kein Sondertoken. Frühere Puffer- und Terminalbelege werden nicht umgeschrieben.
 
 | Modellfamilie | Voice | Terminal | Authentifizierte Principals |
 | --- | --- | --- | --- |
 | Grok | Eve | Grok Build | `grok_app`, `grok` |
 | ChatGPT | Kira | Codex | `chatgpt`, `codex` |
 
-Eve übermittelt ausschließlich Daniels Diktat. Keine eigenen Ergänzungen,
-kein eigenständiges Hinzufügen der Versandfreigabe, kein vorzeitiges Abschicken.
+Eve übermittelt Daniels ausdrücklichen Auftrag ohne eigene Ergänzungen.
+Eine zusätzliche Versandfreigabe durch ein Sondertoken ist nicht erforderlich.
 Die Bridge-Instruktionen und das Identitätsprofil geben diese Vorgabe aus;
 die Herkunft eines Textes aus gesprochenem Diktat kann der Server selbst
 nicht beweisen. Die Namen bezeichnen Rollen, keine vier getrennten Modellfamilien.
@@ -30,40 +31,44 @@ Für besondere Altinstallationen ist sie weiterhin mit einer expliziten Liste
 
 ## Ausgehende Bridge-Nachrichten
 
-Nur `grok_app` und `chatgpt` benötigen `go-go-go` für `message_send` und
-`team_message_send`. Direktnachrichten zwischen `grok` und `codex` sowie
-anderen Terminal-Principals gehen ohne diese Freigabe durch. Ihr Inhalt wird
-nicht nach Markern verändert.
+`message_send` und `team_message_send` übermitteln neue ausdrückliche Aufträge
+für Kira (`chatgpt`), Eve (`grok_app`), Codex und Grok ohne Sondertoken.
+Capabilities, gegenseitige Peer-Freigaben, Team-Zugehörigkeit, Inhaltsgrenzen,
+Idempotenz und feste Rückkanäle bleiben wirksam. Texte werden unverändert
+übernommen; auch ein wörtlich enthaltenes `go-go-go` wird nicht mehr entfernt.
 
-Ein abschließendes, exakt kleingeschriebenes `go-go-go` gibt eine Voice-Nachricht
-sofort frei. Abschließender Leerraum ist erlaubt. Nur der Marker und der direkt
-davor liegende Leerraum werden entfernt. Ein alleinstehender Marker ohne
-Nachrichteninhalt wird abgelehnt.
-
-Ohne Marker liefert der Aufruf `message_buffer.state = "waiting"` und eine
-feste `id` sowie `expires`. Es gibt noch keinen Eintrag im zugestellten Verlauf,
-keine Zustellquittung und keinen Empfängerjob. Der gleiche authentifizierte
-Absender kann vor Ablauf nachreichen:
-
-```json
-{"message_id": "DIE-ZURÜCKGEGEBENE-ID", "token": "go-go-go"}
+```toml
+[voice_messaging]
+release_required = false
+# Nur für vorhandene historische Puffer; keine neue Versandwartezeit.
+timeout_seconds = 60
 ```
 
-Dafür dient `message_release`; alternativ:
+`release_required` akzeptiert ausschließlich `false`. Ein Update kann es nicht
+versehentlich auf `true` stellen. Die Einstellung wird in der tatsächlich
+verwendeten Konfiguration gespeichert und im geladenen Profil geprüft.
+`voice_message_gate` ist für alle vier Absender `false`.
 
-```sh
-kirabridge --principal grok_app message release DIE-ID --token go-go-go
-```
+Historische wartende oder abgelaufene Einträge bleiben unter ihrer ursprünglichen
+ID und Frist erhalten. Ein erneuter Aufruf mit demselben Schlüssel liefert den
+alten Zustand, ohne die Nachricht neu zu versenden. Die alte explizite
+`message_release`-Schnittstelle bleibt ausschließlich für noch gültige Altbelege
+kompatibel; neue Nachrichten benötigen sie nicht. Ein Ablauf oder Neustart
+stellt alte Nachrichten niemals nachträglich zu.
 
-Der Token ist Daniels Versandmarker, kein allgemeiner Berechtigungs-Token.
-Er ist an die ausgewählte gepufferte Nachricht gebunden. Inhalt, Empfänger,
-Idempotenzschlüssel, Rückkanal und ursprüngliche Frist bleiben fest.
-Wiederholungen stellen dieselbe Nachricht nicht erneut zu.
-Nach `voice_messaging.timeout_seconds` (Standard 60 Sekunden) wird der Puffer
-`expired`; ein späterer Token kann ihn auch nach Neustart nicht reaktivieren.
-Freigabe, Ablauf und Zustellung sind transaktional und werden protokolliert.
-Die Sequenz im Verlauf entsteht erst bei tatsächlicher Freigabe, sodass
-später freigegebene Nachrichten keine bereits gelesenen Cursor unterschreiten.
+## Sichtbare Übergabe an CLI-Agenten
+
+Für neue Agentenübergaben ist das eindeutig gebundene bestehende sichtbare
+Terminal der Standard. Kira und Eve werden dabei anhand ihrer authentifizierten
+Voice-Identitäten behandelt, nicht mit einem CLI-Fenster verwechselt.
+Die Regel gilt ebenfalls für Codex und Grok. Keine Absender-Ausnahme erlaubt
+einen stillen Hintergrundersatz. Fehlende oder geänderte Fenster-/TTY-/PID-
+Zuordnung blockiert die Übergabe.
+
+Einfügen, Return, beobachtete Übernahme des Eingabefelds, authentifizierte
+Empfangsbestätigung und abschließende Antwort sind getrennte Belege.
+Ein Transporterfolg allein bestätigt keinen Agentenempfang. Unklare Ausgänge
+werden vor einem weiteren Zugriff abgeglichen und niemals blind wiederholt.
 
 ## Gemeinsamer Voice-Verlauf
 

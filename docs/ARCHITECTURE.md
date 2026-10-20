@@ -16,6 +16,8 @@ MCP und CLI sind Eingänge in dieselbe `Bridge`. Sie reichen versionierte Anfrag
 | agent_manager | Identitäten, Adapterregister, Codex-JSONL, Grok-ACP und Grok-API |
 | mcp_gateway | Offizielles SDK, stdio/Streamable HTTP, ausgehende getrennte Client-Verbindungen |
 | terminal_manager | Begrenzte Prozesssitzungen, Ausgaben, Zeitlimits, Prozessgruppen |
+| session_manager | Bestehende Terminal.app-/tmux-Ziele, exakte Fenster-/TTY-/PID-Prüfung, Einfügen und separates Return |
+| visible_handoff | Verbindliche persistierte bestehende CLI-Ziele für alle Absender und Adapter; getrennte Transport-/Quittungs-/Antwortbelege, kein Hintergrundersatz |
 | filesystem_manager | Pfadprüfung, descriptor-relative Operationen, begrenztes Lesen, atomisches Schreiben |
 | clipboard_manager | Explizite Textübertragung, Byte-Limits, Rücklesebestätigung, kein Polling |
 | process_manager | Übersicht eigener Sitzungen; kein Zugriff auf fremde Prozesse |
@@ -67,6 +69,16 @@ SQLite läuft mit WAL, `synchronous=FULL` und Fremdschlüsseln. Die Verbrauchsma
 Ein exklusiver POSIX-Lock erlaubt nur einen Dispatcher pro Datenverzeichnis. Mehrere kurzlebige administrative Prozesse dürfen gleichzeitig Freigaben schreiben oder Status lesen. Nach Lock-Übernahme werden alte `accepted`/`running`-Aufträge `unknown`; nur noch nie beanspruchte `queued`-Aufträge laufen automatisch weiter. Abgelaufene Leases berechtigen niemals zum blinden Wiederholen. Heartbeats aktualisieren die Lease, ohne fortlaufend Audit-Ereignisse zu erzeugen.
 
 Standardmäßig arbeiten zwei Ausführungs-Worker und ein reservierter Prozesssteuerungs-Worker. So bleibt das Beenden eines eigenen Prozesses auch bei ausgelasteten Ausführungsslots erreichbar. Im Leerlauf warten Worker auf ein Event; alle zwei Sekunden erfolgt ein Abgleich für Aufträge, die externe lokale CLI-Prozesse eingereiht haben.
+
+Der Kandidat `0.8.0rc4` ergänzt die persistenten Zustände sichtbarer Übergaben
+und einmaliger Fensterstarts additiv in Schema 2. Neue CLI-Übergaben müssen
+die gespeicherte bestehende Fenster-/TTY-/Sitzungs-PID-/Agenten-PID-Bindung
+verwenden. Neue Fenster benötigen einen genauen Auftrag des lokalen Bedienwegs;
+kein Agenten-bool und kein Fehlerpfad darf ihn ersetzen. Ein unklarer Ausgang
+wird nicht erneut ausgeführt. Die zusätzliche Voice-Tokenpflicht ist auf Daniels
+ausdrückliche Anweisung entfernt; vorhandene Alt-Puffer werden nicht automatisch
+versandt. Quelländerung, Aktivierung und praktische Abnahme werden in der
+Etappenakte getrennt geführt.
 
 MCP-HTTP ist zustandslos auf Transportebene. Identität wird für jeden HTTP-Aufruf erneut aus dem authentifizierten Kontext bestimmt. Aufgaben und Ergebnisse bleiben persistent. Eine abgebrochene Client-Verbindung bricht einen gespeicherten Auftrag nicht automatisch ab. Ausgehende MCP-Verbindungen haben jeweils eine eigene Besitzer-Coroutine, damit die Lebensdauer der anyio-Kontexte korrekt bleibt.
 

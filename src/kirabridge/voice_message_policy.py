@@ -1,11 +1,10 @@
-"""Durable voice outbox: a suffix or a later exact marker releases one message."""
+"""Immediate normal messages; immutable retry behavior for historical voice buffers."""
 
 import json
 import time
-import uuid
 
-from kirabridge.bridge_core.models import BridgeError, canonical, digest
-from kirabridge.session_input_policy import SUFFIX, marked
+from kirabridge.bridge_core.models import BridgeError, digest
+from kirabridge.session_input_policy import SUFFIX
 from kirabridge.voice_channel import VOICE_PRINCIPALS
 
 
@@ -79,99 +78,29 @@ class VoiceMessagePolicy:
         }
 
     def send(self, principal, message, completion_target, *, transport="message"):
-        if principal not in VOICE_PRINCIPALS:
-            return self._deliver(principal, message, completion_target, transport)
+        """New user requests are immediate; historical buffers never auto-release."""
         self.expire()
-        # Pre-policy messages already delivered retain their original retry contract.
-        previous = self.store.db.execute(
-            "SELECT 1 FROM messages m WHERE m.sender=? AND m.idem=? AND NOT EXISTS "
-            "(SELECT 1 FROM voice_message_buffers b WHERE b.id=m.id)",
-            (principal, message.idempotency_key),
-        ).fetchone()
-        if previous and transport == "message":
-            return self.channel._send(principal, message, completion_target=completion_target)
-        # Validate peers, capabilities, payload limits and execution grants before staging.
-        self._deliver(principal, message, completion_target, transport, validate_only=True)
-        hashed = digest({"transport": transport, **message.model_dump()})
         key = (
             message.idempotency_key
             if transport == "message"
-            else "team-"
-            + digest(
-                {
-                    "team_id": message.team_id,
-                    "key": message.idempotency_key,
-                }
-            )
+            else "team-" + digest({"team_id": message.team_id, "key": message.idempotency_key})
         )
-        with self.store.transaction():
-            row = self.store.db.execute(
-                "SELECT * FROM voice_message_buffers WHERE sender=? AND idem=?",
-                (principal, key),
-            ).fetchone()
-            if row:
-                if row["request_hash"] != hashed:
-                    raise BridgeError("idempotency_conflict", "Key belongs to a different message")
-                if row["completion_target"] != completion_target:
-                    raise BridgeError(
-                        "completion_route_conflict", "Original return target is fixed"
-                    )
-                message_id = row["id"]
-            else:
-                message_id = getattr(message, "message_id", None) or str(uuid.uuid4())
-                if self.store.db.execute(
-                    "SELECT 1 FROM messages WHERE id=? UNION ALL "
-                    "SELECT 1 FROM voice_message_buffers WHERE id=?",
-                    (message_id, message_id),
-                ).fetchone():
-                    raise BridgeError("message_id_conflict", "Message ID is already reserved")
-                body = (
-                    message.body.rstrip()[: -len(SUFFIX)].rstrip()
-                    if marked(message.body)
-                    else message.body
-                )
-                if not body.strip():
-                    raise BridgeError(
-                        "invalid_arguments", "Message is empty after removing go-go-go"
-                    )
-                waiting = self.store.db.execute(
-                    "SELECT count(*) FROM voice_message_buffers WHERE sender=? AND state='waiting'",
-                    (principal,),
-                ).fetchone()[0]
-                if waiting >= self.channel.config.messaging.max_pending_per_recipient:
-                    raise BridgeError("message_queue_full", "Voice outbox is full")
-                total = self.store.db.execute(
-                    "SELECT count(*) FROM voice_message_buffers"
-                ).fetchone()[0]
-                if total >= self.channel.config.messaging.max_total:
-                    raise BridgeError("message_store_full", "Voice outbox capacity reached")
-                now = time.time()
-                changes = {"body": body}
-                if transport == "message":
-                    changes["message_id"] = message_id
-                request = {
-                    **message.model_copy(update=changes).model_dump(),
-                    "_transport": transport,
-                }
-                self.store.db.execute(
-                    "INSERT INTO voice_message_buffers VALUES(?,?,?,?,?,?,'waiting',?,?,NULL)",
-                    (
-                        message_id,
-                        principal,
-                        key,
-                        hashed,
-                        canonical(request),
-                        completion_target,
-                        now,
-                        now + self.channel.config.voice_messaging.timeout_seconds,
-                    ),
-                )
-                self.store.audit("message.buffered", principal, None, {"message_id": message_id})
-            if row and row["state"] == "released":
+        row = self.store.db.execute(
+            "SELECT * FROM voice_message_buffers WHERE sender=? AND idem=?", (principal, key)
+        ).fetchone()
+        if row:
+            hashed = digest({"transport": transport, **message.model_dump()})
+            if row["request_hash"] != hashed:
+                raise BridgeError("idempotency_conflict", "Key belongs to a different message")
+            if row["completion_target"] != completion_target:
+                raise BridgeError("completion_route_conflict", "Original return target is fixed")
+            if row["state"] == "released":
                 return self._released(principal, row)
-            if not row and marked(message.body):
-                return self.release(principal, message_id, SUFFIX)
-        return self.get(principal, message_id)
+            return self.get(principal, row["id"])
+        self.channel.security.principal(
+            principal, "message.send" if transport == "message" else "team.write"
+        )
+        return self._deliver(principal, message, completion_target, transport)
 
     def release(self, principal, message_id, token):
         from kirabridge.message_manager import MessageSend

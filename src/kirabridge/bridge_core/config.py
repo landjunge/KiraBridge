@@ -257,6 +257,8 @@ class SessionInputPolicyConfig(BaseModel):
 
 class VoiceMessagingConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
+    # Retired by Daniel: updates cannot re-enable the extra voice approval gate.
+    release_required: Literal[False] = False
     timeout_seconds: float = Field(default=60, gt=0, le=86400)
 
 
@@ -264,6 +266,21 @@ class VoiceChannelConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
     enabled: bool = True
     conversation_id: str = Field(default="eve-kira-shared", pattern=r"^[\w-]{1,128}$")
+
+
+class VisibleTerminalBinding(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    pane_id: str = Field(pattern=r"^terminal:[0-9]+:ttys[0-9]+$")
+    expected_pid: int = Field(gt=0)
+    agent_pid: int = Field(gt=0)
+    ready_pattern: str = Field(min_length=1, max_length=256)
+    busy_pattern: str = Field(default=r"\[stop\]|esc to interrupt|Thinking…", max_length=256)
+
+
+class VisibleHandoffConfig(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    enabled: Literal[True] = True
+    bindings: dict[str, VisibleTerminalBinding] = Field(default_factory=dict)
 
 
 class Config(BaseModel):
@@ -298,6 +315,7 @@ class Config(BaseModel):
     session_input_policy: SessionInputPolicyConfig = Field(default_factory=SessionInputPolicyConfig)
     voice_messaging: VoiceMessagingConfig = Field(default_factory=VoiceMessagingConfig)
     voice_channel: VoiceChannelConfig = Field(default_factory=VoiceChannelConfig)
+    visible_handoffs: VisibleHandoffConfig = Field(default_factory=VisibleHandoffConfig)
 
     terminal: TerminalConfig = Field(default_factory=TerminalConfig)
 

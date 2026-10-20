@@ -926,7 +926,9 @@ class TeamManager:
                 "team.work_dispatching",
                 work_id,
                 core_task_id=core_id,
-                session_scope="separate_managed_session",
+                session_scope="existing_visible_terminal"
+                if self.config.visible_handoffs.enabled
+                else "separate_managed_session",
             )
         return self._work(work_id)
 
