@@ -95,6 +95,9 @@ class Bridge:
 
         self.runtime = runtime_snapshot(config)
         self.store = Store(config.state_path / "bridge.sqlite3")
+        from kirabridge.operations_service import config_snapshot
+
+        config_snapshot(config)
         from kirabridge.diagnostics import AuditObserver, runtime_ref
         from kirabridge.readiness import task_preflight
 
@@ -246,6 +249,11 @@ class Bridge:
             **self.messages.voice_channel.profile(principal),
             "health_scope": "dispatcher and authentication; use bridge_readiness for prerequisites",
             "runtime": self.runtime,
+            "operations": {
+                "protocol": 1,
+                "maintenance": self.store.maintenance_state(),
+                "accepting_new_work": self.store.maintenance_state() is None,
+            },
             "diagnostics_storage": self.diagnostics.status(),
             "message_peers": policy.message_peers,
             "message_receiver_active": bool(

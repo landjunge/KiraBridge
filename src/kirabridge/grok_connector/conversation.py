@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 
 from kirabridge import LOCAL_APPROVAL_URL
-from kirabridge.bridge_core.models import State
+from kirabridge.bridge_core.models import BridgeError, State
 
 WAIT_SECONDS = 18.0  # Below the existing gateway/client transport deadlines.
 ACTIVE = {State.QUEUED, State.ACCEPTED, State.RUNNING}
@@ -14,6 +14,36 @@ ACTIVE = {State.QUEUED, State.ACCEPTED, State.RUNNING}
 def enabled_for(bridge, principal):
     settings = bridge.config.grok_connector
     return settings.enabled and principal == settings.principal
+
+
+def confirmed_input_reply(bridge, principal, task, result):
+    """A transport boolean is insufficient: require the central completed receipt."""
+    evidence = result.get("evidence") or {}
+    if (
+        task["operation"] != "session.input"
+        or evidence.get("route") != "existing_visible_terminal"
+        or evidence.get("agent_confirmed") is not True
+        or evidence.get("handoff_id") != task["id"]
+        or not isinstance(result.get("text"), str)
+        or not result["text"].strip()
+        or not evidence.get("reply_id")
+    ):
+        return False
+    try:
+        status = bridge.visible_handoffs.status(principal, task["id"])
+    except BridgeError:
+        return False
+    return (
+        status["state"] == "completed"
+        and status["binding"]["pane_id"] == task["args"]["pane_id"]
+        and status["binding"]["expected_pid"] == task["args"]["expected_pid"]
+        and status["evidence"].get("agent_confirmed") is True
+        and status["evidence"].get("reply_id") == evidence["reply_id"]
+        and (
+            status["evidence"].get("identity_scope") == "authenticated_bridge_principal"
+            or status["evidence"].get("authenticated_principal") == status["target"]
+        )
+    )
 
 
 async def result_for_conversation(bridge, principal, task):
@@ -32,7 +62,10 @@ async def result_for_conversation(bridge, principal, task):
     state, operation = task["state"], task["operation"]
     result = task.get("result") or {}
     waiting = state in ACTIVE
-    input_only = operation == "session.input" and state == State.COMPLETED
+    agent_reply = state == State.COMPLETED and confirmed_input_reply(
+        bridge, principal, task, result
+    )
+    input_only = operation == "session.input" and state == State.COMPLETED and not agent_reply
     buffer = task.get("input_buffer") or {}
     if buffer.get("state") == "expired":
         text = "Die Terminal-Nachricht ist im Puffer verfallen und wurde nicht zugestellt."
@@ -97,7 +130,11 @@ async def result_for_conversation(bridge, principal, task):
                 else None
             ),
             "terminal_reply_tool": "session_read" if input_only else None,
-            "scope": "terminal_input_delivery" if input_only else "task_execution_result",
+            "scope": "terminal_input_delivery"
+            if input_only
+            else "addressed_agent_reply"
+            if agent_reply
+            else "task_execution_result",
             "delivery": "current_tool_response",
             "audio_playback": "not_observed_by_bridge",
         },

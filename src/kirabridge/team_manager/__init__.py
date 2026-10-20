@@ -512,6 +512,7 @@ class TeamManager:
             prior = self._previous(principal, request.team_id, "work", request)
             if prior:
                 return self._work(prior)
+            self.store.assert_accepting()
             work_id = "tw-" + uuid.uuid4().hex
             root_id, depth = work_id, 0
             if request.parent_id:
@@ -697,6 +698,8 @@ class TeamManager:
             prior = self._previous(principal, request.team_id, "work_claim", request)
             if prior:
                 return work
+            if not self.store.can_claim(work["created"]):
+                self.store.assert_accepting()
             if work["state"] != "queued_manual":
                 raise BridgeError("state_conflict", "Manual work is no longer awaiting receipt")
             self.store.db.execute(
@@ -901,6 +904,8 @@ class TeamManager:
     def claim(self, work_id):
         with self.store.transaction():
             work = self._work(work_id)
+            if not self.store.can_claim(work["created"]):
+                return None
             if work["state"] != "queued" or work["core_task_id"] is not None:
                 return None
             try:

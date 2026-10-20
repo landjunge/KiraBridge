@@ -137,10 +137,16 @@ async def test_revocation_requires_authenticated_local_route(bridge, tmp_path, m
     key = "local-operator-" + "k" * 48
     app = ApprovalConsole(bridge, key)
 
-    async def restarted():
+    async def activated(*, text=None, expected_config_sha=None):
+        # Activation supervision is tested separately; this test owns the
+        # authenticated route and the real candidate/revocation transformation.
+        assert expected_config_sha == load_config(str(path))._source_sha256
+        from kirabridge.grok_connector.runtime import replace_private
+
+        replace_private(path, text)
         return {"dispatcher_active": True, "runtime": {}}
 
-    monkeypatch.setattr(app.control_center, "reload_bridge", restarted)
+    monkeypatch.setattr(app.control_center.operations, "activate", activated)
     payload = {"revoke_operations": {"chatgpt": ["session.input"]}}
     async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url=ORIGIN) as client:
         denied = await client.post("/api/control/permissions", json=payload)

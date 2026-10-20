@@ -16,6 +16,7 @@ def configure(config, monkeypatch):
     monkeypatch.setenv("GROK_RETURN_TEST_TOKEN", "grok-return-" + "x" * 40)
     config.principals["grok_app"] = config.principals["local"].model_copy(deep=True)
     config.principals["grok_app"].approval_mode = "automatic"
+    config.principals["grok_app"].capabilities += ["session.inspect"]
     config.principals["grok_app"].token_env = "GROK_RETURN_TEST_TOKEN"
     config.grok_connector = GrokConnectorConfig(
         enabled=True, public_origin="https://grok-return.example"
@@ -145,8 +146,9 @@ async def test_grok_manual_approval_is_not_silently_skipped(http_bridge, config,
     assert not bridge.store.db.execute("SELECT 1 FROM events WHERE state='running'").fetchone()
 
 
+@pytest.mark.parametrize("claimed_reply", [False, True])
 async def test_terminal_input_delivery_never_claims_a_spoken_agent_reply(
-    bridge, config, monkeypatch
+    bridge, config, monkeypatch, claimed_reply
 ):
     configure(config, monkeypatch)
     task = request("session.input", {"pane_id": "%1", "expected_pid": 1, "text": "hello"})
@@ -159,7 +161,22 @@ async def test_terminal_input_delivery_never_claims_a_spoken_agent_reply(
         task.task_id,
         State.COMPLETED,
         {"test": "input delivered"},
-        result={"sent": True},
+        result={
+            "sent": True,
+            **(
+                {
+                    "text": "Unverified claimed answer",
+                    "evidence": {
+                        "agent_confirmed": True,
+                        "handoff_id": task.task_id,
+                        "reply_id": "claimed-only",
+                        "route": "existing_visible_terminal",
+                    },
+                }
+                if claimed_reply
+                else {}
+            ),
+        },
         owner="test-worker",
     )
     result = await result_for_conversation(

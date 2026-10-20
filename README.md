@@ -1,4 +1,4 @@
-# KiraBridge 0.8.0rc5
+# KiraBridge 0.8.0rc6
 
 Ein kompaktes Steuerfenster für Kira/ChatGPT, Grok und die angebundenen Agenten.
 Auf diesem Mac startet **KiraBridge.app** die Oberfläche. Prozesse, Terminals,

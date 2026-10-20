@@ -11,7 +11,7 @@ auf ein kleines Paket Implementierung, Grok-Prüfung, Korrektur und Nachprüfung
 | 1 Ausgangspunkt | Gesichert; praktische ChatGPT-Leseprüfung und unabhängige Grok-Prüfung abgeschlossen | Sichtbare Übergabe ergänzen |
 | 1a Sichtbare Übergaben und Aufhebung Voice-Gate | 0.8.0rc4 aktiviert: 660 Tests bestanden, Grok-Prüfung und produktive sichtbare Übergabe abgeschlossen | Ursprünglichen beschäftigten Codex nicht für Eingabetest unterbrechen |
 | 2 Freigaben | 0.8.0rc5 aktiviert; 313 gezielte Tests und unabhängige Grok-Abnahme | Normale Voice-/CLI-Wege beim weiteren Umbau erhalten |
-| 3 Aktivierung | Begonnen | Persistente Wartung und Fehler-/Parallelitätstests |
+| 3 Aktivierung | Kandidat 0.8.0rc6: 732 Tests bestanden und Grok-Abnahmen vorhanden; Aktivierung folgt | Wartungs-/Fehlerpfade prüfen, korrigieren, aktivieren |
 | 4 Client-Lesewege | Offen | Gleiche Rechte, reservierte Lesekapazität, Lastprüfung |
 | 5 Modulgrenzen | Offen | Fachliche Abfragen, austauschbarer Transport |
 | 6 Ausgabeablage | Offen | Begrenzte Rohdaten, unveränderte historische Audit-Kette |
@@ -327,3 +327,87 @@ quittiert. Die Queue zeigte jetzt korrekt `pending_visible_terminal`.
 Private Nachweise: `stage2-loaded-proof.json`, `activation-stage2.json`,
 `grok-stage2-review.json`. Handy-Audio und positiver Input im beschäftigten
 ursprünglichen Codex sind weiterhin keine behauptete Abnahme.
+
+## Etappe 3: Betriebsdienst und persistente Aktivierung (Kandidat)
+
+Konfigurationsgenerierung und Core-Neustart liegen in `operations_service.py`.
+Das Steuerfenster reicht authentifizierte Bedienaktionen an diesen Dienst
+weiter. Ein kurzer SQLite-Vorgang reserviert `activation_runs`: draining →
+activating → verifying → completed. Alle neuen Task-, Dispatch-Nachrichten-,
+Team- und sichtbaren Übergabepfade sowie neue Fensterfreigaben beachten diese
+Reservierung. Bereits gespeicherte Arbeit darf in draining auslaufen.
+Ein vorab reservierter Teamauftrag darf ausschließlich seine versiegelte
+Kernaufgabe nachreichen; Principal und Request-Hash müssen passen. Neue
+Anfragen können dafür keinen laufenden Run-ID-Text als Beleg verwenden.
+Prozessstopps bleiben während draining erreichbar.
+
+Warten und launchctl laufen außerhalb schreibender Transaktionen. Vor dem
+Neustart prüft auch die Transportgrenze eine eigene persistente Reservierung
+und den Leerlauf. Nach dem Start werden neue Instanz, Version, Python-Quellpin,
+Datei- und effektive Konfigurationsrevision geprüft. Ein erfolgreiches
+launchctl allein genügt nicht. Ein veralteter Steuerfenster-Prozess darf keine
+Aktivierung beginnen.
+
+Team-Ergebnisaktionen nach einem bereits abgeschlossenen nativen Turn sind
+ein dauerhafter Zwischenstand (`processing_result`). Während der Aktivierung
+können sie mit identischen Aktionskennungen warten; der Providerturn wird nicht
+wiederholt. Neue Teilaufträge werden erst nach Freigabe der Sperre angelegt.
+Eine abgewiesene Folgeaktion darf den bereits gespeicherten Abschluss nicht
+verwerfen.
+
+Die tatsächlich geladene Konfiguration wird als private, unveränderliche Datei
+unter `activation-configs/<Datei-SHA256>.toml` erhalten. Das Audit enthält
+Referenzen und Metadaten, keine Konfigurationstexte. Bei Fehlschlag nach einer
+Dateiaktivierung wird nur die nachgewiesene eigene Dateiänderung auf die passende
+vorherige Konfiguration zurückgenommen. `failed_blocked` bleibt sichtbar und
+sperrt neue Arbeit, bis der lokale Doktor eine Wiederherstellung tatsächlich
+geprüft hat. Ein abgestürzter Controller hinterlässt die Sperre; ein anderer
+lebender Controller wird nicht automatisch ersetzt.
+
+Das Schema bleibt Version 2 mit additiven Tabellen. Wiederherstellung ersetzt
+niemals eine Datenbank durch eine alte Sicherung. Bei abweichender Schemaversion
+blockiert sie und verlangt einen eigenen Migrations-/Rückkehrplan. Die normale
+Wiederherstellung nutzt den aktuellen kompatiblen Code und die passende frühere
+Konfiguration; sie ist kein automatischer Quellcode-Downgrade. Freier OS-Zugriff
+desselben lokalen Benutzers bleibt außerhalb dieser Bridge-Protokollgrenze.
+
+Gezielt geprüft wurden gleichzeitige Einreichung, fertiger Drain samt
+Abschlussmeldung, zwei Controller, persistente Sperre nach Neuöffnung der DB,
+abgestürzter/laufender Besitzer, fehlgeschlagener und fälschlich erfolgreicher
+Neustart, Schemaabweichung, gleichzeitige Dateiänderung, alle vier Absender
+und ihre Rückantworten. Eine separate SQLite-Verbindung kann während des
+wartenden Supervisoraufrufs schreiben. Aktivierung dieses Kandidaten und
+unabhängige Grok-Abnahme sind noch offen.
+
+### Abnahmen vor Aktivierung
+
+Der erste Gesamtlauf meldete 728 bestanden und einen alten Eve-Test ohne
+`session.inspect`. Die Testvoraussetzung wurde ergänzt; die Rechteprüfung blieb
+unverändert. Anschließend bestanden 729 Tests. Bei der Prüfung eines älteren
+Clientwegs fand Codex zusätzlich eine echte Rückgabelücke: bestätigte Antworten
+aus `session.input` wurden von Groks Rückgabehilfe weiterhin nur als Eingabe-
+zustellung behandelt. Jetzt wird der zentrale completed-Beleg samt Fenster/PID,
+Auftrags-/Antwort-ID und authentifiziertem Principal ausgewertet. Erst dann
+kommt die vorhandene Antwort als final/addressed_agent_reply zurück.
+Transport allein und bloß behauptete bool-Felder bleiben nicht-final.
+Ein integrierter Test führt Queue, sichtbare Route, separates Return, Agenten-
+quittung und tatsächliche Antwort bis zu diesem Rückgabefeld durch.
+Audio bleibt ausdrücklich `not_observed_by_bridge`.
+
+Grok nahm die drei Betriebsanforderungen im ursprünglichen sichtbaren Fenster
+als Auftrag `architecture-stage3-review-20261020` ab und führte selbst 140 Tests
+aus. Nachricht `9aa8a041-82d2-4aaa-bdb6-27d078f1bbb4`, Antwort
+`e7ddf703-b9dd-42d1-986b-74b7483603fc`, verarbeitet und quittiert.
+Die Rückweg-Ergänzung prüfte Grok danach separat mit 79 Tests, Auftrag
+`architecture-stage3-voice-return-20261020`, Nachricht
+`9f32a10c-63f0-4017-8df5-4dcbad72b101`, Antwort
+`52aa1b63-950a-45db-946a-6f965b2e6e82`, ebenfalls verarbeitet und quittiert.
+Beide Prüfungen melden im beauftragten Umfang keinen Ablehnungsbefund.
+
+Eine zusätzliche konservative Besitzerprüfung verhindert `kill(pid, 0)` auf
+Nicht-POSIX-Systemen. Die tatsächliche launchd-Abnahme gilt für diesen Mac;
+die Betriebssupervisor-Tests simulieren keine Windows-Dienstverwaltung.
+Der abschließende unveränderte Kandidat besteht mit 732 Tests in 162,58 Sekunden,
+mit Unraisable-Warnings als Fehlern. Ruff und Paketbau sind erfolgreich;
+alle 65 historischen unversionierten Belege sind unverändert erhalten.
+Aktivierung und praktische Prüfung dieses Stands sind noch offen.

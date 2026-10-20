@@ -1,6 +1,8 @@
 import asyncio
+import time
 
 import pytest
+from conftest import request
 from test_mcp import http_bridge  # noqa: F401
 
 from kirabridge.bridge_core.config import AgentConfig, VisibleTerminalBinding
@@ -93,6 +95,121 @@ def visible(bridge, config, monkeypatch):
 
 async def callback(evidence):
     pass
+
+
+async def test_eve_session_input_returns_actual_confirmed_reply_in_conversation(visible, config):
+    from kirabridge.bridge_core.config import GrokConnectorConfig
+    from kirabridge.grok_connector.conversation import result_for_conversation
+
+    bridge, transport = visible
+    config.grok_connector = GrokConnectorConfig(enabled=True, public_origin="https://voice.example")
+    value = request(
+        "session.input",
+        {"pane_id": "terminal:100:ttys001", "expected_pid": 123, "text": "First line\nSecond line"},
+    )
+    async with bridge:
+        bridge.prepare("grok_app", value)
+        task = await bridge.tasks.wait("grok_app", value.task_id, timeout=5)
+        assert task["state"] == "completed", task
+        result = await result_for_conversation(bridge, "grok_app", task)
+    returned = result["conversation_return"]
+    assert returned["final"] and not returned["continue_required"]
+    assert returned["text"] == "independent review"
+    assert returned["scope"] == "addressed_agent_reply" and returned["next_call"] is None
+    assert returned["audio_playback"] == "not_observed_by_bridge"
+    assert transport["calls"] == ["insert", "return"]
+
+
+def hold_activation(bridge, state):
+    now = time.time()
+    bridge.store.db.execute(
+        "INSERT INTO activation_runs VALUES('maintenance',?,?,?,?,NULL)",
+        (state, now, now, "{}"),
+    )
+
+
+@pytest.mark.parametrize("sender", ["chatgpt", "grok_app", "codex", "grok"])
+@pytest.mark.parametrize("state", ["draining", "verifying", "failed_blocked"])
+async def test_maintenance_blocks_new_visible_work_for_all_senders(visible, sender, state):
+    from kirabridge.bridge_core.config import ReceiverConfig
+
+    bridge, transport = visible
+    target = "codex" if sender == "grok" else "grok"
+    transport["target"] = target
+    transport["text"] = "› " if target == "codex" else "╭\n│ ❯ │\n╰"
+    bridge.config.messaging.receivers[target] = ReceiverConfig(cwd="/tmp")
+    hold_activation(bridge, state)
+    args = AgentInput(agent=target, prompt="New work during maintenance", cwd="/tmp", timeout=1)
+    with pytest.raises(BridgeError) as error:
+        await bridge.agents.execute(
+            {"id": "new-work", "principal": sender},
+            args,
+            bridge.config.principals[sender],
+            callback,
+            callback,
+        )
+    assert error.value.code == "service_maintenance"
+    with pytest.raises(BridgeError) as error:
+        bridge.messages.send(
+            sender,
+            MessageSend(
+                recipient=target,
+                conversation_id="new-public-work",
+                idempotency_key="new",
+                body="New public work",
+                kind="work",
+                dispatch=True,
+            ),
+        )
+    assert error.value.code == "service_maintenance"
+    assert transport["calls"] == []
+    assert not bridge.store.db.execute("SELECT 1 FROM messages").fetchone()
+
+
+@pytest.mark.parametrize("sender", ["chatgpt", "grok_app", "codex", "grok"])
+async def test_already_claimed_visible_turn_and_return_complete_while_draining(visible, sender):
+    from kirabridge.bridge_core.config import ReceiverConfig
+
+    bridge, transport = visible
+    target = "codex" if sender == "grok" else "grok"
+    transport["target"] = target
+    transport["text"] = "› " if target == "codex" else "╭\n│ ❯ │\n╰"
+    bridge.config.messaging.receivers[target] = ReceiverConfig(cwd="/tmp")
+    original = bridge.messages.send(
+        sender,
+        MessageSend(
+            recipient=target,
+            conversation_id="existing-work",
+            idempotency_key="before-barrier",
+            body="Already queued work",
+            kind="work",
+            dispatch=True,
+        ),
+    )
+    _, run_id = bridge.message_receiver._claim(original["id"])
+    hold_activation(bridge, "draining")
+    with pytest.raises(BridgeError) as error:
+        bridge.prepare(
+            sender,
+            request(
+                "file.list", {"path": bridge.config.principals[sender].roots[0]}, task_id=run_id
+            ),
+        )
+    assert error.value.code == "service_maintenance"
+    args = AgentInput(agent=target, prompt=original["body"], cwd="/tmp", timeout=1)
+    result = await bridge.agents.execute(
+        {"id": run_id, "principal": sender, "visible_message_id": original["id"]},
+        args,
+        bridge.config.principals[sender],
+        callback,
+        callback,
+    )
+    assert result["success"]
+    reply = bridge.messages.get(sender, result["evidence"]["reply_id"])
+    assert reply["recipient"] == sender and reply["sender"] == target
+    assert reply["reply_to"] == original["id"]
+    assert transport["calls"] == ["insert", "return"]
+    assert bridge.store.db.execute("SELECT count(*) FROM messages").fetchone()[0] == 2
 
 
 @pytest.mark.parametrize("sender", ["chatgpt", "grok_app", "codex", "grok"])

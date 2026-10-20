@@ -231,6 +231,8 @@ class MessageManager:
                         "completion_route_conflict", "Original return target is fixed"
                     )
                 return self.get(principal, previous["id"])
+            if dispatch:
+                self.store.assert_accepting()
             conversation = self.store.db.execute(
                 "SELECT * FROM conversations WHERE id=?", (message.conversation_id,)
             ).fetchone()

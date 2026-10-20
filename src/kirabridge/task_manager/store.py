@@ -13,6 +13,7 @@ from kirabridge.bridge_core.config import private_directory
 from kirabridge.bridge_core.models import TRANSITIONS, BridgeError, State, canonical, digest
 
 SCHEMA_VERSION = 2
+DRAIN_CONTROL = {"process.terminate", "workflow.stop"}
 
 MESSAGE_SCHEMA = """
 CREATE TABLE conversations (
@@ -130,6 +131,16 @@ class Store:
                     "CREATE INDEX IF NOT EXISTS session_input_expiry "
                     "ON session_input_buffers(state,expires)"
                 )
+                self.db.execute(
+                    "CREATE TABLE IF NOT EXISTS activation_runs ("
+                    "id TEXT PRIMARY KEY,state TEXT NOT NULL,created REAL NOT NULL,"
+                    "updated REAL NOT NULL,plan TEXT NOT NULL,error TEXT)"
+                )
+                self.db.execute(
+                    "CREATE UNIQUE INDEX IF NOT EXISTS activation_single_active "
+                    "ON activation_runs((1)) WHERE state IN "
+                    "('draining','activating','verifying','recovering','failed_blocked')"
+                )
                 from kirabridge.voice_channel import SCHEMA as VOICE_SCHEMA
 
                 for statement in VOICE_SCHEMA:
@@ -152,6 +163,93 @@ class Store:
             else:
                 self.db.execute("ROLLBACK")
             raise
+
+    def maintenance_state(self):
+        row = self.db.execute(
+            "SELECT id,state,created,updated,error FROM activation_runs WHERE state IN "
+            "('draining','activating','verifying','recovering','failed_blocked')"
+        ).fetchone()
+        return dict(row) if row else None
+
+    def team_reservation(self, identifier, principal, request_hash, cutoff):
+        if not self.db.execute(
+            "SELECT 1 FROM sqlite_master WHERE type='table' AND name='team_work'"
+        ).fetchone():
+            return False
+        return bool(
+            self.db.execute(
+                "SELECT 1 FROM team_work WHERE core_task_id=? AND assignee=? "
+                "AND core_request_hash=? AND created<=? "
+                "AND state IN ('dispatching','queued','accepted','running')",
+                (identifier, principal, request_hash, cutoff),
+            ).fetchone()
+        )
+
+    def can_claim(self, created, *, task_id=None, operation=None):
+        state = self.maintenance_state()
+        if not state:
+            return True
+        if state["state"] != "draining":
+            return False
+        if operation in DRAIN_CONTROL:
+            return True
+        if created <= state["created"]:
+            return True
+        task = (
+            self.db.execute(
+                "SELECT principal,request_hash FROM tasks WHERE id=?", (task_id,)
+            ).fetchone()
+            if task_id
+            else None
+        )
+        return bool(
+            task
+            and self.team_reservation(
+                task_id, task["principal"], task["request_hash"], state["created"]
+            )
+        )
+
+    def assert_accepting(
+        self,
+        *,
+        continuation_id=None,
+        principal=None,
+        request_hash=None,
+        owned_execution=False,
+        operation=None,
+    ):
+        state = self.maintenance_state()
+        if not state:
+            return
+        if state["state"] == "draining" and operation in DRAIN_CONTROL:
+            return
+        if state["state"] == "draining" and continuation_id:
+            task = self.db.execute(
+                "SELECT created FROM tasks WHERE id=? AND state IN ('accepted','running')",
+                (continuation_id,),
+            ).fetchone()
+            existing = self.db.execute(
+                "SELECT 1 FROM message_jobs j JOIN messages m ON m.id=j.message_id "
+                "WHERE j.run_id=? AND m.created<=? AND j.state='running'",
+                (continuation_id, state["created"]),
+            ).fetchone()
+            if owned_execution and (
+                existing or task and self.can_claim(task["created"], task_id=continuation_id)
+            ):
+                return
+            if (
+                principal
+                and request_hash
+                and self.team_reservation(
+                    continuation_id, principal, request_hash, state["created"]
+                )
+            ):
+                return
+        raise BridgeError(
+            "service_maintenance",
+            "KiraBridge aktiviert Einstellungen. Neue Aufträge sind vorübergehend gesperrt; "
+            "laufende Arbeit und Antworten bleiben erhalten.",
+        )
 
     def audit(self, kind: str, principal: str, task_id: str | None, metadata: dict) -> None:
         # Call inside the transaction that performs the audited action.
@@ -260,12 +358,15 @@ class Store:
         with self.transaction():
             comparison = "IN" if control else "NOT IN"
             row = self.db.execute(
-                f"SELECT id,principal FROM tasks WHERE state='queued' AND operation {comparison} "
+                "SELECT id,principal,created,operation FROM tasks WHERE state='queued' "
+                f"AND operation {comparison} "
                 "('process.list','process.inspect','process.terminate',"
                 "'agent.status','policy.inspect','handoff.status','workflow.stop') "
                 "ORDER BY created,id LIMIT 1"
             ).fetchone()
             if row is None:
+                return None
+            if not self.can_claim(row["created"], task_id=row["id"], operation=row["operation"]):
                 return None
             now, receipt = time.time(), str(uuid.uuid4())
             evidence = {"receiver": "kirabridge.dispatcher", "receipt_id": receipt, "worker": owner}

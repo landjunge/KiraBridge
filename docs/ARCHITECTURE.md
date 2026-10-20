@@ -105,3 +105,34 @@ Weder Reparatur noch erneute Wahl von „Voll erlaubt“ fügt sie wieder hinzu;
 die aktuelle Sammelstufe wirkt unabhängig davon weiter. Vorhandene Kira-/Eve-
 Ausnahmen bleiben bei der Aktualisierung erhalten. Alte Voice-Puffer werden
 nicht freigegeben und die aufgehobene zusätzliche Voice-Tokenpflicht bleibt aus.
+
+## Koordinierte Aktivierung (Etappe 3, 0.8.0rc6)
+
+`OperationsService` besitzt Konfigurationsgenerierung, private Konfigurations-
+snapshots, Wartung, Supervisoraufruf und Prüfung des geladenen Stands. Die
+Bedienrouten reichen ihre authentifizierten Aktionen weiter. `activation_runs`
+und die Aufgaben-/Nachrichten-/Team-Claims teilen dieselbe SQLite-Sperrgrenze.
+Neue Arbeit wird während der Aktivierung zurückgewiesen; bereits gespeicherte
+Arbeit darf in draining fertigwerden. Nur exakt versiegelte, bereits reservierte
+Teamfortsetzungen und bestehende Ausführungen können unter dieser Sperre
+fortfahren. Prozessstopps behalten in draining ihre Kapazität.
+
+Nach dem Leerlauf sperrt verifying auch Claims. Supervisor- und Netzwerkaufrufe
+laufen außerhalb schreibender Transaktionen. Erst eine neue Instanz mit passender
+Version, Quelle, Datei- und effektiver Konfigurationsrevision schließt die
+Aktivierung ab. Fehler bleiben als failed_blocked sichtbar, bis der lokale
+Doktor die passende vorherige Konfiguration mit aktuellem kompatiblem Code
+wiederhergestellt und tatsächlich geprüft hat. Datenbanken werden nie aus einer
+alten Sicherung darüberkopiert; Schemawechsel benötigen einen eigenen Plan.
+Ein noch lebender Controller wird nicht durch einen zweiten ersetzt.
+
+Abgeschlossene Modellturns können ihre dauerhaften Team-Ergebnisaktionen nach
+Aktivierung unter denselben Aktionskennungen fortsetzen; der Modellturn läuft
+nicht erneut. Voller lokaler OS-Zugriff ist weiterhin keine Bridge-Sandbox.
+
+Der ältere Grok-Clientweg `session.input` liefert nun auch eine tatsächlich
+zentral bestätigte Agentenantwort als fertiges `conversation_return`. Dafür
+müssen Auftrags-ID, completed-Beleg, Fenster/PID, Antwort-ID und authentifizierter
+Principal/Scope zusammenpassen. Transporterfolg oder behauptete bool-Felder
+genügen nicht. Audioausgabe wird weiterhin nicht als serverseitig beobachtet
+ausgegeben.

@@ -21,6 +21,9 @@ from kirabridge.bridge_core.config import load_config
 from kirabridge.bridge_core.models import BridgeError, canonical, digest
 from kirabridge.local_runtime import peer, write_private
 from kirabridge.mcp_gateway.client import MCPClientPool
+from kirabridge.operations_service import OperationsService
+from kirabridge.operations_service import configure_access as configure_access
+from kirabridge.operations_service import replace_section as replace_section
 from kirabridge.permissions import LEVELS, level_for, permission_summary
 
 ASSETS = Path(__file__).with_name("console_assets")
@@ -45,120 +48,6 @@ NAMES = {
 }
 
 
-def replace_section(text, header, values):
-    body = (
-        "\n["
-        + header
-        + "]\n"
-        + "".join(
-            key + " = " + json.dumps(value, ensure_ascii=False) + "\n"
-            for key, value in values.items()
-            if value is not None
-        )
-    )
-    pattern = r"(?ms)^\[" + re.escape(header) + r"\][^\n]*\n.*?(?=^\[|\Z)"
-    if re.search(pattern, text):
-        return re.sub(pattern, lambda _: body.lstrip("\n"), text, count=1)
-    return text.rstrip() + "\n" + body
-
-
-def configure_access(config_path: Path, *, level=None, revoke_operations=None):
-    """Keep credentials and existing grants. The full level uses the operator's full grant."""
-    from kirabridge.bridge_core.bridge import INPUTS
-    from kirabridge.chatgpt_setup import replace_private
-
-    config = load_config(str(config_path))
-    if level is not None and level not in LEVELS:
-        raise BridgeError("invalid_request", "Wähle eine der drei Rechtestufen")
-    revoke_operations = revoke_operations or {}
-    if not isinstance(revoke_operations, dict) or any(
-        name not in config.principals
-        or not isinstance(operations, list)
-        or any(op != "session.input" for op in operations)
-        for name, operations in revoke_operations.items()
-    ):
-        raise BridgeError("invalid_request", "Ungültiger Widerruf einer dauerhaften Ausnahme")
-    text = config_path.read_text()
-    names = list(config.principals)
-    if len(names) > 17:
-        raise BridgeError("peer_capacity", "Mehr Teilnehmer als die Postfachkapazität erlaubt")
-    for name, policy in config.principals.items():
-        policy.automatic_operations = [
-            op for op in policy.automatic_operations if op not in revoke_operations.get(name, [])
-        ]
-        policy.message_peers = [other for other in names if other != name]
-        policy.capabilities = list(
-            dict.fromkeys(
-                policy.capabilities
-                + [
-                    "message.send",
-                    "connection.check",
-                    "message.read",
-                    "message.ack",
-                    "session.inspect",
-                    "session.input",
-                    "session.open",
-                    "team.read",
-                    "team.write",
-                ]
-            )
-        )
-        if level:
-            policy.permission_level = level
-            policy.approval_mode = "manual" if level == "ask" else "automatic"
-        if level == "full":
-            policy.capabilities = list(
-                dict.fromkeys(
-                    policy.capabilities
-                    + list(INPUTS)
-                    + [
-                        "bridge.health",
-                        "task.read",
-                        "task.cancel",
-                        "agent.inspect",
-                        "team.manage",
-                        "agent.local_tools",
-                    ]
-                )
-            )
-            policy.roots = policy.read_roots = policy.terminal_roots = ["/"]
-            policy.allow_any_executable = True
-            policy.team_only_execution = False
-            policy.agents = list(config.agents)
-        text = replace_section(text, "principals." + name, policy.model_dump())
-    for name, profile in config.agents.items():
-        if level == "full":
-            profile.allow_local_tools = True
-            profile.bridge_tools = True
-            if profile.kind == "codex":
-                profile.sandbox_mode = "danger-full-access"
-            text = replace_section(text, "agents." + name, profile.model_dump())
-    # Every installed worker gets an inbox. App identities are consumers, not spawned models.
-    for name in config.agents:
-        if name in config.principals and name not in config.messaging.receivers:
-            directory = config_path.parent / "workers" / name
-            directory.mkdir(parents=True, exist_ok=True, mode=0o700)
-            text = replace_section(
-                text, "messaging.receivers." + name, {"cwd": str(directory), "timeout": 180.0}
-            )
-    # Validate before replacing. The operator's existing credentials are never rotated.
-    import tomllib
-
-    from kirabridge.bridge_core.config import Config
-
-    Config.model_validate(tomllib.loads(text))
-    if text != config_path.read_text():
-        backup = (
-            config_path.parent
-            / "backups"
-            / ("control-" + time.strftime("%Y%m%d-%H%M%S") + "-" + secrets.token_hex(3) + ".toml")
-        )
-        backup.parent.mkdir(exist_ok=True, mode=0o700)
-        write_private(backup, config_path.read_bytes())
-        replace_private(config_path, text)
-    return load_config(str(config_path))
-
-
 class ControlCenter:
     def __init__(self, bridge, authenticate):
         self.bridge, self.authenticate = bridge, authenticate
@@ -167,6 +56,13 @@ class ControlCenter:
         self.cache = None
         self.cache_at = 0.0
         self.seen_surfaces = set()
+        self.operations = OperationsService(
+            bridge.store,
+            self.config,
+            lambda *args, **kwargs: self.rpc(*args, **kwargs),
+            lambda *args, **kwargs: self.command(*args, **kwargs),
+            bridge.runtime,
+        )
         self.bridge.store.db.execute(
             "CREATE TABLE IF NOT EXISTS control_actions ("
             "id TEXT PRIMARY KEY,request_hash TEXT NOT NULL,state TEXT NOT NULL,"
@@ -381,6 +277,7 @@ class ControlCenter:
             "observed_at": time.time(),
             "services": cards,
             "bridge": health,
+            "maintenance": self.bridge.store.maintenance_state(),
             "permission_levels": levels,
             "permission_choices": LEVELS,
             "permission_details": {
@@ -490,32 +387,7 @@ class ControlCenter:
         return value
 
     async def reload_bridge(self):
-        # Write lock closes the enqueue race. No observed terminal is ever killed here.
-        with self.bridge.store.transaction():
-            counts = self.busy()
-            if any(counts.values()):
-                raise BridgeError(
-                    "service_busy",
-                    "Ein Auftrag läuft oder wartet. Neustart nach Abschluss möglich.",
-                )
-            code, _, _ = await self.command(
-                "/bin/launchctl", "kickstart", "-k", f"gui/{os.getuid()}/com.kirabridge.bridge"
-            )
-            if code:
-                raise BridgeError("service_restart", "KiraBridge konnte nicht neu gestartet werden")
-        for _ in range(20):
-            try:
-                value = await self.rpc("bridge_health", timeout=2)
-                if value.get("dispatcher_active") and (
-                    value.get("runtime", {}).get("config_sha256") == self.config()._source_sha256
-                ):
-                    return value
-            except Exception:
-                pass
-            await asyncio.sleep(0.2)
-        raise BridgeError(
-            "service_start_pending", "Start angefordert, Antwort noch nicht bestätigt"
-        )
+        return await self.operations.activate()
 
     async def service_action(self, name, action, action_id):
         config = self.config()
@@ -751,23 +623,7 @@ class ControlCenter:
         if level not in LEVELS and not (level is None and revocations):
             raise BridgeError("invalid_request", "Wähle eine der drei Rechtestufen")
         async with self.lock:
-            with self.bridge.store.transaction():
-                if any(self.busy().values()):
-                    raise BridgeError(
-                        "service_busy", "Ein Auftrag läuft. Die bisherigen Rechte bleiben aktiv."
-                    )
-                updated = configure_access(
-                    Path(self.config()._source_path), level=level, revoke_operations=revocations
-                )
-                self.bridge.config.principals = updated.principals
-                self.bridge.config.agents = updated.agents
-                self.bridge.store.audit(
-                    "control.permissions",
-                    "local",
-                    None,
-                    {"level": level, "revoke_operations": revocations or {}},
-                )
-            health = await self.reload_bridge()
+            health = await self.operations.configure(level=level, revoke_operations=revocations)
             self.cache = None
             return JSONResponse(
                 {
@@ -775,6 +631,7 @@ class ControlCenter:
                     "label": LEVELS[level] if level else "Dauerhafte Ausnahme widerrufen",
                     "active": True,
                     "runtime": health.get("runtime"),
+                    "activation_id": health.get("activation_id"),
                 }
             )
 
@@ -783,29 +640,32 @@ class ControlCenter:
         repaired = []
         if request.method == "POST":
             async with self.lock:
-                config = self.config()
-                before = config._source_sha256
-                with self.bridge.store.transaction():
-                    if any(self.busy().values()):
+                try:
+                    await self.rpc("bridge_health", timeout=2)
+                except BridgeError:
+                    # Bring up only the existing core service so that its
+                    # durable barrier and prior configuration can be inspected.
+                    await self.service_action(
+                        "bridge", "start", "doctor-core-" + secrets.token_hex(6)
+                    )
+                    for _ in range(20):
+                        try:
+                            await self.rpc("bridge_health", timeout=2)
+                            break
+                        except BridgeError:
+                            await asyncio.sleep(0.2)
+                    else:
                         raise BridgeError(
-                            "service_busy",
-                            "Laufende Aufträge bleiben erhalten. Prüfen ist möglich.",
+                            "service_start_pending", "KiraBridge antwortet noch nicht"
                         )
-                    updated = configure_access(Path(config._source_path))
-                if updated._source_sha256 != before:
-                    await self.reload_bridge()
-                    repaired.append("Kommunikationswege zwischen allen Agenten verbunden")
+                if self.bridge.store.maintenance_state():
+                    await self.operations.recover()
+                    repaired.append(
+                        "Fehlgeschlagene Aktivierung mit vorherigen Einstellungen wiederhergestellt"
+                    )
                 else:
-                    try:
-                        loaded = await self.rpc("policy_inspect")
-                        changed = loaded.get("source_files", {}).get(
-                            "changed_on_disk"
-                        ) or loaded.get("configuration_file", {}).get("changed_on_disk")
-                        if changed:
-                            await self.reload_bridge()
-                            repaired.append("Aktuelle Programmdateien und Einstellungen geladen")
-                    except BridgeError:
-                        pass
+                    await self.operations.configure()
+                    repaired.append("Konfiguration und geladener Dienst geprüft und aktiviert")
                 snapshot = await self.snapshot(fresh=True)
                 for item in snapshot["services"]:
                     if item["id"] in SERVICE_LABELS and not item["active"]:
@@ -822,6 +682,19 @@ class ControlCenter:
             for row in snapshot["services"]
             if row["id"] in SERVICE_LABELS
         ]
+        maintenance = self.bridge.store.maintenance_state()
+        if maintenance:
+            checks.append(
+                {
+                    "name": "Konfigurationsaktivierung",
+                    "ok": False,
+                    "message": "Aktivierung "
+                    + maintenance["id"]
+                    + ": "
+                    + maintenance["state"]
+                    + (" · " + maintenance["error"] if maintenance["error"] else ""),
+                }
+            )
         try:
             catalog = await self.rpc("session_catalog")
             checks.append(

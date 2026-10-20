@@ -320,6 +320,7 @@ class VisibleHandoffs:
             if len(prompt) > 16384 or "\x00" in prompt:
                 raise BridgeError("payload_limit", "Visible prompt exceeds terminal input limit")
             with self.store.transaction():
+                self.store.assert_accepting(continuation_id=identifier, owned_execution=True)
                 active = self.store.db.execute(
                     "SELECT id FROM visible_handoffs WHERE target=? AND state IN "
                     "('planned','inserting','inserted','submitting','return_sent',"

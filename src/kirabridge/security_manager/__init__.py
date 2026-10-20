@@ -70,6 +70,7 @@ class SecurityManager:
         self.principal(principal, "session.open")
         token = secrets.token_urlsafe(32)
         with self.store.transaction():
+            self.store.assert_accepting()
             self.store.db.execute(
                 "INSERT INTO approvals(token_hash,principal,task_id,request_hash,expires) "
                 "VALUES(?,?,?,?,?)",

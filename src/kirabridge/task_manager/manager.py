@@ -92,12 +92,19 @@ class TaskManager:
                         "completion_route_conflict", "Original return target is fixed"
                     )
                 if approval and self.input_policy.waiting(existing["id"]):
+                    self.store.assert_accepting()
                     if request.task_id != existing["id"]:
                         raise BridgeError("review_conflict", "Use the original buffered task ID")
                     self.input_policy.release(principal, request, approval)
                     self._approve_in_transaction(existing["id"], "daniel_token")
                     self.wake.set()
                 return self.store.get(existing["id"], principal)
+            self.store.assert_accepting(
+                continuation_id=request.task_id,
+                principal=principal,
+                request_hash=request_hash(request),
+                operation=request.operation,
+            )
             if self.store.db.execute(
                 "SELECT 1 FROM tasks WHERE id=?", (request.task_id,)
             ).fetchone():
@@ -236,6 +243,7 @@ class TaskManager:
 
     def _approve_in_transaction(self, task_id, source):
         task = self.store.get(task_id)
+        self.store.assert_accepting(operation=task["operation"])
         now = time.time()
         self.store.db.execute(
             "UPDATE tasks SET state='queued',updated=? WHERE id=?", (now, task_id)

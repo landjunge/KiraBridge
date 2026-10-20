@@ -133,6 +133,8 @@ class MessageReceiver:
             ).fetchone()
             if not row:
                 return None
+            if not self.bridge.store.can_claim(row["created"]):
+                return None
             if row["acknowledged"]:
                 self._finish(message_id, "completed", {"externally_acknowledged": True})
                 return None
@@ -179,10 +181,15 @@ class MessageReceiver:
         while not self.stopping:
             self.messages.wake.clear()
             row = self.bridge.store.db.execute(
-                "SELECT m.id,m.recipient FROM messages m JOIN message_jobs j ON j.message_id=m.id "
+                "SELECT m.id,m.recipient,m.created FROM messages m "
+                "JOIN message_jobs j ON j.message_id=m.id "
                 "WHERE j.state='queued' ORDER BY m.seq LIMIT 1"
             ).fetchone()
-            if row and row["recipient"] in self.bridge.config.messaging.receivers:
+            if (
+                row
+                and row["recipient"] in self.bridge.config.messaging.receivers
+                and self.bridge.store.can_claim(row["created"])
+            ):
                 try:
                     # Connect before claiming: startup/readiness failures cannot run a model.
                     async with MCPClientPool(call_timeout=15) as pool:

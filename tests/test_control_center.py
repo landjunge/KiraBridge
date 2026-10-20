@@ -150,8 +150,24 @@ async def test_console_stays_up_while_bridge_status_is_inactive(bridge, monkeypa
 
 
 @pytest.mark.asyncio
-async def test_restart_refuses_active_work_and_never_kills_terminal(bridge, monkeypatch):
+async def test_restart_refuses_active_work_and_never_kills_terminal(bridge, monkeypatch, tmp_path):
+    path = tmp_path / "active-config.toml"
+    path.write_text("data_dir=" + json.dumps(str(bridge.config.state_path)) + "\n")
+    bridge.config._source_path = str(path)
     control = ApprovalConsole(bridge, KEY).control_center
+    control.operations.drain_timeout = 0
+    loaded = load_config(str(path))
+
+    async def health(*args, **kwargs):
+        return {
+            "operations": {"protocol": 1},
+            "runtime": {
+                **bridge.runtime,
+                "config_sha256": loaded._source_sha256,
+            },
+        }
+
+    monkeypatch.setattr(control, "rpc", health)
     task = request(arguments={"path": bridge.config.principals["local"].roots[0]})
     bridge.prepare("local", task)
     bridge.tasks.approve(task.task_id)
