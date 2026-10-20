@@ -1210,3 +1210,90 @@ beweist kein hörbares Audio und weckt keinen inaktiven fremden Workchat.
 Der Codex-Reparaturturn muss enden, damit das ursprüngliche Fenster bereit wird.
 E02 wird mit isolierten, noch nicht Grok-abgenommenen Kandidaten vorbereitet;
 E03–E09 sind damit nicht als abgeschlossen ausgewiesen.
+
+### PR #7 auf dem Mac aktiviert; neue Codex-Sitzung tatsächlich abgenommen
+
+Am 20.10.2026 wurde Kiras Commit `4e0e06680da736344e8fed2e2f854c4147da1307`
+auf Basis `500144d` abgeglichen und als `971e685` in den bestehenden
+Architekturbranch integriert und gepusht; PR #7 ist merged. Die vorhandenen
+unversionierten Nachweise wurden erhalten. Die Korrektur isoliert Empfänger,
+speichert Verbindungsfehler vor Übernahme und ermöglicht genau eine passende
+Abschlussantwort eines bereits angenommenen Auftrags am Gesprächslimit.
+Auf diesem Mac/Python 3.11 bestanden alle **931 Tests in 177.58 Sekunden**,
+Ruff für Quellen/Tests und Diff-Prüfung. GitHub-Jobs konnten wegen der
+Kontozahlungs-/Ausgabensperre nicht starten; dies ist kein CI-Testnachweis.
+
+Das Paket behält die Versionsnummer `0.8.0rc11`; der korrigierte Stand ist durch
+den neuen Quellfingerabdruck eindeutig unterscheidbar. Alle 97 Paketdateien des
+Wheels wurden vor und nach Installation byteweise verglichen. Wheel-SHA256:
+`5ff399f8dbb3343a841c7de1e6e503678ff58a276d32de8eb2c9ae5d54a0ba85`.
+Koordinierte Aktivierung `activation-8dcd99aac6be4de7b0f22d98af75c3f1` ist
+completed. Neue Core-PID **73628**, Start **2026-10-20 13:20:56.429925 UTC**,
+Instanz `b3407a2b11bd475483249ec1c3b6caed`, 86 Python-Dateien, Quelle:
+`8ef2742c04a0a49b67e57136b1e90b1ee7774789830ab6e50ef15a50fd8c5728`.
+Kiras echte Connectorbindung bestätigte dieselben geladenen Pins; die lokale
+Bereitschaft meldet `service_matches_local_config_and_source=true`.
+
+Die neu gestartete Sitzung wurde durch eine harmlose eindeutige Toolausgabe in
+genau dem sichtbaren Fenster und derselben vertrauenswürdigen Rolloutdatei
+zugeordnet; in den anderen bestehenden Fenstern fehlte diese Ausgabe.
+Ziel bleibt `terminal:22104:ttys000`, Login-PID 94023; Codex-PID jetzt **68530**,
+Thread **01a15965-0af7-7562-8e0a-da3b5434eef4**, Rollout:
+`~/.codex/sessions/2026/10/20/rollout-2026-10-20T14-59-16-01a15965-0af7-7562-8e0a-da3b5434eef4.jsonl`.
+Ausschließlich diese drei Bindungsfelder änderten sich. Berechtigungen,
+Zugangsdaten, bestehende Fenster und Tunnel wurden erhalten.
+
+Eine vollständige Kopie der bisherigen venv, das alte geprüfte Wheel,
+Konfigurationskopien und konsistente SQLite-Backups liegen privat unter
+`~/.config/kirabridge/repairs/receiver-resilience-20261020/`.
+Der nachweislich untätige alte Core wurde unter SQLite-Writerlock angehalten;
+die drei exakt bestimmten unbeanspruchten Grok-Nachrichten blieben während
+Installation und koordinierter Aktivierung erhalten. Der neue Core startete
+unter der dauerhaften Aktivierungsbarriere. Alle drei Queueeinträge und 20
+überwachte bestehende Terminal-/Agenten-/App-/Tunnelprozesse sind nach Aktivierung
+unverändert belegt. Kein Datenbank-Restore und kein Fehler-/Rollbackpfad wurden
+ausgeführt. Der Steuerdienst wurde zusätzlich mit signiertem Vor-/Nachprobe auf
+PID 73776 neu geladen; Core und Steuerdienst sind die einzigen ersetzten Dienste.
+
+Der bisher als offen dokumentierte Originaltest
+`d5f54c18-7068-4abb-9d2f-339fb9a8a526` war inzwischen schon unter PID 94386
+abgeschlossen: Antwort `7a1bc622-ceeb-4baa-9441-d1826e6e4ba8` mit KIRA-TEST-OK
+wurde von Kira empfangen und quittiert. Dies wurde über den echten Connector
+nachgelesen; **keine erneute Ausführung**. Der veraltete Grok-Receiverdatensatz
+`e4c91752-bd49-425d-a3ce-a1c8bd887dc4` wurde anhand authentisiertem ACK,
+passendem Resultat und abgeschlossenem sichtbaren Handoff ohne Eingabe von
+unknown auf completed abgeglichen. Sieben ältere unbekannte verwaltete Aufträge
+ohne ausreichenden Abschlussbeleg bleiben unknown; keine Wiederholung.
+
+Für die neue Sitzung wurde genau ein gesonderter Diagnosetest über Kiras echten
+Connector eingereicht: Nachricht `e8ecb291-aa21-4abd-9697-bcc1aeddda03`,
+Konversation `kira-receiver-session-check-20261020`, Handoff
+`channel-33314f046c704376855e5aace657ad8f`. Er wartete ohne Eingabe bis zum
+belegten Ende des Reparaturturns. Der danach beobachtete Ablauf (UTC):
+
+| Nachweis | Zeitpunkt |
+| --- | --- |
+| Einfügen beobachtet, Return ausdrücklich false | 13:24:39.521966 |
+| Separates Return gesendet | 13:24:42.727216 |
+| Eingabefeld geleert | 13:24:44.673531 |
+| Authentisierter Codex-Empfang quittiert | 13:24:53.528699 |
+| Passende KIRA-TEST-OK-RECEIVER-FIXES-Antwort erzeugt | 13:24:53.575268 |
+| Antwort über Kiras echten Connector empfangen | 13:24:58.419604 |
+| Nach Inhaltsprüfung mit Kiras tatsächlichem Receipt quittiert | 13:25:06.298752 |
+
+Antwort-ID `4d9ab69d-b8fb-4bdf-bee5-ed3f991024a3`, sender=codex,
+recipient=chatgpt, reply_to=Diagnosetest. Genau je ein
+inserting/inserted/submitting/return_sent/sent/confirmed/completed-Ereignis;
+Receiverjob und Handoff completed. Der begrenzte Beobachter führte keine Eingabe,
+Quittierung oder Wiederholung aus. Dies belegt den aktuellen Terminal- und
+Connectorweg, keine hörbare Audioausgabe oder das Aufwecken inaktiver Workchats.
+
+Grok wurde über seinen vorhandenen Zugang unabhängig hinzugezogen. Seine
+Prüfung des lokalen Aktivierungsskripts nannte drei Fehlerpfad-Hinweise: einer
+war vor Ausführung schon korrigiert; die spätere Prüfung vor Queuefreigabe und
+das Anhalten eines untätigen Ersatzcores vor einer hypothetischen Dateirückkehr
+wurden zusätzlich abgesichert. Der erfolgreiche Aktivierungslauf betrat diese
+Fehlerpfade nicht. Dies ist kein PR-Codeurteil. Die getrennte Prüfung des
+vollständigen PR-Diffs und Quellkontexts lieferte bis zu diesem Kontrollpunkt
+noch kein Abschlussurteil; sie wird nicht als bestanden ausgegeben.
+[Maschinenlesbarer, bereinigter Nachweis](evidence/receiver-resilience-mac-20261020.json).

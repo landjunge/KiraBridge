@@ -1,9 +1,15 @@
-Aktueller Stand am 20. Oktober 2026: produktiv **0.8.0rc11**, geprüftes Wheel
-mit 921 bestandenen Gesamttests, anschließend 172 gezielten Prüfungen und
-Groks unabhängigen 172 Tests am Commit `2062055`. Der bisher praktisch
-bestätigte Kira→Grok-Rückweg ersetzt nicht den noch offenen ursprünglichen
-Kira→Codex→Kira-Kurztest. Aktivierung und weitere Grenzen stehen in
-[der Etappenakte](ARCHITECTURE-STAGES-20261020.md).
+Aktueller Stand am 20. Oktober 2026, 15:25 Uhr: produktiv **0.8.0rc11 mit PR #7**,
+Commit `4e0e066`, integriert und gepusht über `971e685`. 931 Tests auf diesem Mac,
+Ruff und Diff-Prüfung bestanden. Das tatsächlich installierte neue Wheel und die
+neu gestartete Dienstinstanz verwenden Quelle `8ef2742c…fd8c5728`.
+Der ursprüngliche Kira→Codex→Kira-Kurztest war bereits abgeschlossen und wurde
+nicht wiederholt. Ein weiterer einmaliger Diagnosetest bestätigt jetzt auch die
+neu gestartete Codex-Sitzung: Einfügen, separates Return, authentisierter Empfang,
+passende Antwort sowie Empfang und Quittierung über Kiras echten Connector sind
+getrennt belegt. [Maschinenlesbare Abnahme](evidence/receiver-resilience-mac-20261020.json)
+und [Etappenakte](ARCHITECTURE-STAGES-20261020.md) enthalten die konkreten Pins
+und verbleibenden Grenzen. Groks unabhängiges PR-Codeurteil steht noch aus;
+seine Prüfung des lokalen Aktivierungsskripts ist gesondert dokumentiert.
 Sichtbare Übergaben verwenden ausschließlich die gespeicherte bestehende
 Fenster-/TTY-/PID-Zuordnung in der entsperrten Mac-Sitzung. Fehlende Ziele starten
 keinen Ersatz. Der koordinierte Neustart wartet auch auf Team-Ergebnisverarbeitung.
