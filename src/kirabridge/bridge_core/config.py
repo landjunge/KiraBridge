@@ -2,9 +2,10 @@ from __future__ import annotations
 
 import hashlib
 import os
+import re
 import sys
 import tomllib
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Literal
 from urllib.parse import urlsplit
 
@@ -299,6 +300,67 @@ class OutputHistoryConfig(BaseModel):
     retention_seconds: float = Field(default=604800, ge=60, le=31536000)
 
 
+class FileIndexConfig(BaseModel):
+    """Operator opt-in. Permission roots are never a source of scan roots."""
+
+    model_config = ConfigDict(extra="forbid")
+    enabled: bool = False
+    projects: dict[str, str] = Field(default_factory=dict, max_length=16)
+    exclusions: list[str] = Field(default_factory=list, max_length=32)
+    text_extensions: list[str] = Field(
+        default_factory=lambda: [
+            ".md",
+            ".txt",
+            ".py",
+            ".js",
+            ".ts",
+            ".tsx",
+            ".jsx",
+            ".css",
+            ".html",
+            ".toml",
+            ".yaml",
+            ".yml",
+            ".rs",
+            ".c",
+            ".h",
+            ".cpp",
+            ".go",
+            ".java",
+            ".sql",
+        ],
+        max_length=32,
+    )
+
+    @model_validator(mode="after")
+    def bounded_paths(self):
+        for name, value in self.projects.items():
+            path = Path(value)
+            if (
+                not re.fullmatch(r"[A-Za-z0-9_-]{1,128}", name)
+                or len(value.encode("utf-8")) > 4096
+                or "\0" in value
+                or path.anchor != "/"
+                or ".." in path.parts
+                or path in {Path("/"), Path.home().absolute()}
+            ):
+                raise ValueError("Use an explicit absolute project directory")
+        for value in self.exclusions:
+            path = PurePosixPath(value)
+            if (
+                not value
+                or len(value.encode("utf-8")) > 4096
+                or "\0" in value
+                or path.is_absolute()
+                or str(path) != value
+                or any(p in {".", ".."} for p in path.parts)
+            ):
+                raise ValueError("Exclusions must be bounded relative paths")
+        if any(not re.fullmatch(r"\.[a-z0-9]{1,10}", value) for value in self.text_extensions):
+            raise ValueError("Use explicit lowercase text extensions")
+        return self
+
+
 class Config(BaseModel):
     model_config = ConfigDict(extra="forbid")
     _source_path: str | None = PrivateAttr(default=None)
@@ -312,6 +374,7 @@ class Config(BaseModel):
     read_concurrency: int = Field(default=2, ge=1, le=8)
     max_task_bytes: int = Field(default=2097152, ge=1024, le=8388608)
     output_history: OutputHistoryConfig = Field(default_factory=OutputHistoryConfig)
+    file_index: FileIndexConfig = Field(default_factory=FileIndexConfig)
     lease_seconds: float = Field(default=30, ge=2, le=600)
     host: str = "127.0.0.1"
     port: int = Field(default=8765, ge=1, le=65535)

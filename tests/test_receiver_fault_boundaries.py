@@ -1,4 +1,5 @@
 """Reproduce independent review findings without live terminals or providers."""
+
 # Imported pytest fixture is intentionally used as a test parameter.
 # ruff: noqa: F811
 import asyncio
@@ -47,8 +48,9 @@ async def test_visible_wait_preserves_absolute_connection_deadline(
     assert ended["evidence"]["receiver_retry"]["deadline"] == 1003.0
 
 
-@pytest.mark.parametrize("error", [OSError("secret"), TimeoutError("secret"),
-                                   json.JSONDecodeError("secret", "", 0)])
+@pytest.mark.parametrize(
+    "error", [OSError("secret"), TimeoutError("secret"), json.JSONDecodeError("secret", "", 0)]
+)
 async def test_unexpected_preclaim_error_does_not_cancel_running_sibling(
     visible, monkeypatch, error
 ):
@@ -228,6 +230,7 @@ async def test_cancelled_stop_keeps_running_worker_owned_until_it_finishes(visib
     assert bridge.messages.get("chatgpt", second["id"])["processing"]["state"] == "queued"
     await receiver.start()  # An explicit later start resumes the preserved next message once.
     try:
+
         async def completed():
             while (
                 bridge.messages.get("chatgpt", second["id"])["processing"]["state"] != "completed"
