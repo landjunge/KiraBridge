@@ -26,14 +26,26 @@ jobs:
       - name: Install pytest
         run: python -m pip install 'pytest>=8,<10'
       - name: Compile installer and run isolated start checks
+        shell: bash
         run: |
-          python -m py_compile installer/install.py
-          bash -n scripts/install-rc13.sh scripts/kirabridge-doctor.sh
-          python -m pytest -q tests/test_rc13_start_path_isolated.py tests/test_rc13_installer_readiness.py tests/test_rc13_entrypoint.py tests/test_rc13_doctor.py --junitxml=rc13-test-results.xml
+          set +e
+          {
+            python -m py_compile installer/install.py
+            echo "py_compile exit: $?"
+            bash -n scripts/install-rc13.sh scripts/kirabridge-doctor.sh
+            echo "shell syntax exit: $?"
+            python -m pytest -ra -v tests/test_rc13_start_path_isolated.py tests/test_rc13_installer_readiness.py tests/test_rc13_entrypoint.py tests/test_rc13_doctor.py --junitxml=rc13-test-results.xml
+            result=$?
+            echo "pytest exit: $result"
+            exit "$result"
+          } 2>&1 | tee rc13-diagnostics.log
+          exit "${PIPESTATUS[0]}"
       - name: Upload test results even when checks fail
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: rc13-results-${{ matrix.os }}
-          path: rc13-test-results.xml
+          path: |
+            rc13-test-results.xml
+            rc13-diagnostics.log
           if-no-files-found: warn
