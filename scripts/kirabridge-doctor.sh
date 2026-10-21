@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Non-destructive, local-only KiraBridge service diagnostics.
+# KiraBridge Doctor: scoped diagnostics, explicit restart only.
 set -euo pipefail
 LABEL="com.kirabridge.bridge"
 PLIST="$HOME/Library/LaunchAgents/$LABEL.plist"
@@ -22,5 +22,12 @@ if ! launchctl print "$TARGET/$LABEL" >/dev/null 2>&1; then
   echo "FAIL: KiraBridge launchd service not registered"; exit 1
 fi
 echo "launchd: registered"
-"$CLI" status
+# 'status' performs an authenticated MCP bridge_health roundtrip to the local daemon.
+# A successful launchd registration by itself cannot prove MCP responsiveness.
+if ! "$CLI" status; then
+  echo "FAIL: authenticated MCP health check did not succeed" >&2
+  exit 1
+fi
+echo "PASS: local MCP health responded (inspect dispatcher_active above)."
+echo "NOTE: This does not prove the external ChatGPT connector or public tunnel is reachable."
 echo "Doctor finished. Review the reported health before making changes."
