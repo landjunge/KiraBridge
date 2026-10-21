@@ -52,18 +52,26 @@ def assess(target, raw, binding, protocol=None):
         prelude = text[: text.rfind(view)].rstrip()
         current_block = re.split(r"\n[ \t]*\n", prelude)[-1] if prelude else ""
         current = current_block + "\n" + view
-        # Scroll controls belong to the current renderer area, never old quotations.
-        if re.search(r"Back to bottom|enter/esc latest", current, re.I):
-            return result("scrolled", "current_scroll_controls")
         if not empty:
             return result("input_not_empty", "existing_input_must_not_be_overwritten")
         if protocol and protocol.get("state") == "working":
             return result("working", "bound_codex_turn_active")
         if "tab to queue message" in view:
             return result("working", "current_queue_hint")
+        # The TUI can leave a scroll hint visible while its live prompt is empty.
+        # A bound idle event stream makes that viewport hint irrelevant to input.
+        scroll_controls = re.search(r"Back to bottom|enter/esc latest", current, re.I)
+        if scroll_controls and not (protocol and protocol.get("state") == "idle"):
+            return result("scrolled", "current_scroll_controls")
         footer = [line.strip() for line in view.splitlines()[1:] if line.strip()]
         known_footer = all(
-            re.match(r"^GPT-\S+.*", line) or ("for agents" in line and "? for shortcuts" in line)
+            re.match(r"^GPT-\S+.*", line)
+            or ("for agents" in line and "? for shortcuts" in line)
+            or (
+                line.startswith("New activity")
+                and "enter/esc latest" in line
+                and re.search(r"⚠ \d+ warnings · f2 to view$", line)
+            )
             for line in footer
         )
         if not known_footer:
