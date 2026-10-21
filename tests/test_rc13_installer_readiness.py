@@ -28,3 +28,8 @@ def test_service_credentials_and_network_checked_before_switch():
     for marker in ("load_service_credentials(config)", "config.validate_network()"):
         assert marker in activation
         assert activation.index(marker) < activation.index("stop_service(args)")
+
+def test_rollback_checks_restored_release_not_failed_candidate():
+    source = (Path(__file__).resolve().parents[1] / "installer" / "install.py").read_text()
+    rollback = source.split("def rollback(args):", 1)[1].split("\ndef status(", 1)[0]
+    assert 'Path(active["previous"]["release"]) if active["previous"] else Path(active["release"])' in rollback
