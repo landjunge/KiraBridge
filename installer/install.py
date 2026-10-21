@@ -182,7 +182,13 @@ def prepare(args):
     private_dir(releases)
     destination = releases / (version + "-" + ref[:12])
     if destination.exists():
-        manifest = json.loads((destination / "release.json").read_text())
+        manifest_path = destination / "release.json"
+        if not manifest_path.is_file():
+            raise RuntimeError(
+                f"Incomplete RC13 preparation at {destination}. "
+                "Existing files left untouched; recovery requires operator review."
+            )
+        manifest = json.loads(manifest_path.read_text())
         if manifest["commit"] != ref or cli_version(destination) != version:
             raise RuntimeError("Existing release identity differs")
         say(f"Bereits vorbereitet: {version} @ {ref}")
