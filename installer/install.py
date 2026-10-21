@@ -574,7 +574,7 @@ def rollback(args):
         if active["was_loaded"]:
             start_service(args)
     if active["was_loaded"] and active.get("previous_version"):
-        wait_health(args, Path(active["release"]), active["previous_version"])
+        wait_health(args, Path(active["previous"]["release"]) if active["previous"] else Path(active["release"]), active["previous_version"])
     say(
         "ZURÜCKGEROLLT: vorheriger Launcher/Dienst wiederhergestellt. "
         "Konfiguration, Zugangsdaten und neue Ergebnisdaten bleiben erhalten."
