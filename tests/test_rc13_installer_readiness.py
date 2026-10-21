@@ -21,3 +21,10 @@ def test_config_compatibility_checked_before_switch():
     activation = source.split("def activate(args, release):", 1)[1].split("\ndef rollback(", 1)[0]
     assert "load_config(sys.argv[1])" in activation
     assert activation.index("load_config(sys.argv[1])") < activation.index("stop_service(args)")
+
+def test_service_credentials_and_network_checked_before_switch():
+    source = (Path(__file__).resolve().parents[1] / "installer" / "install.py").read_text()
+    activation = source.split("def activate(args, release):", 1)[1].split("\ndef rollback(", 1)[0]
+    for marker in ("load_service_credentials(config)", "config.validate_network()"):
+        assert marker in activation
+        assert activation.index(marker) < activation.index("stop_service(args)")
