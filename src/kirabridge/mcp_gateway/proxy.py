@@ -5,7 +5,7 @@ import json
 
 from mcp.server.lowlevel import Server
 from mcp.server.stdio import stdio_server
-from mcp.types import CallToolResult, TextContent
+from mcp.types import CallToolResult, TextContent, Tool, ToolAnnotations
 
 from kirabridge import __version__
 from kirabridge.bridge_core.models import BridgeError
@@ -54,13 +54,76 @@ async def connect_stdio(config, principal):
             "existing interactive sessions are not attached.",
         )
 
+        async def dynamic_catalog():
+            """Only the configured peer can advertise new read tools; failures stay isolated."""
+            try:
+                result = await connection.call_tool("threaddesk_dynamic_catalog", {})
+                data = result.structuredContent
+                if result.isError or not isinstance(data, dict):
+                    return {}
+                entries = data.get("tools")
+                if not isinstance(entries, list) or len(entries) > 64:
+                    return {}
+                names = {}
+                for item in entries:
+                    if not isinstance(item, dict):
+                        continue
+                    name = item.get("name")
+                    schema = item.get("inputSchema")
+                    if (
+                        isinstance(name, str)
+                        and name.startswith(tuple("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"))
+                        and name.replace("_", "").replace("-", "").isalnum()
+                        and len(name) <= 64
+                        and isinstance(schema, dict)
+                    ):
+                        names["td_" + name] = item
+                return names
+            except Exception:
+                # A missing/offline optional ThreadDesk cannot break core Bridge tools.
+                return {}
+
         @server.list_tools()
         async def list_tools():
-            return await connection.list_tools()
+            baseline = await connection.list_tools()
+            known = {tool.name for tool in baseline}
+            discovered = await dynamic_catalog()
+            for name, item in discovered.items():
+                if name in known:
+                    continue
+                baseline.append(
+                    Tool(
+                        name=name,
+                        description="ThreadDesk read-only: " + (item.get("description") or ""),
+                        inputSchema=item["inputSchema"],
+                        annotations=ToolAnnotations(
+                            readOnlyHint=True, destructiveHint=False, openWorldHint=False
+                        ),
+                    )
+                )
+            return baseline
 
         @server.call_tool()
         async def call_tool(name, arguments):
             try:
+                if name.startswith("td_"):
+                    # Re-list to reject stale tool names and changes after discovery.
+                    discovered = await dynamic_catalog()
+                    item = discovered.get(name)
+                    if item is None:
+                        raise BridgeError("threaddesk_tool_denied", "Dynamic tool is unavailable")
+                    result = await connection.call_tool(
+                        "threaddesk_dynamic_call",
+                        {"name": item["name"], "arguments": arguments or {}},
+                    )
+                    data = result.structuredContent
+                    if isinstance(data, dict) and "error" in data:
+                        return CallToolResult(
+                            isError=True,
+                            content=[TextContent(type="text", text=json.dumps(data))],
+                            structuredContent=data,
+                        )
+                    return result
                 return await connection.call_tool(name, arguments)
             except BridgeError as exc:
                 data = {"error": {"code": exc.code}}
