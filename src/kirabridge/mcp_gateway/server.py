@@ -52,7 +52,10 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
         "Codex = ChatGPT Terminal. Eve relays only Daniel's dictation unchanged, "
         "without additions. Explicit requests need no special voice token. "
         "terminal-to-terminal messages are immediate. Voice-to-voice messages use "
-        "the shared participant-only append-only conversation.",
+        "the shared participant-only append-only conversation. ThreadDesk also exposes "
+        "threaddesk_read, threaddesk_manage and threaddesk_knowledge for immediate synchronous "
+        "operations without a persistent Bridge task; writes require stable operation IDs and "
+        "expected revisions and return a verified readback.",
         stateless_http=True,
         json_response=True,
         log_level="CRITICAL",
@@ -79,6 +82,21 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
     def safe(action: Callable):
         try:
             return action()
+        except BridgeError as exc:
+            result = {"error": {"code": exc.code, "message": str(exc)}}
+            if hasattr(exc, "diagnostic"):
+                result["diagnostic"] = exc.diagnostic
+            return result
+        except ValidationError:
+            return {"error": {"code": "invalid_arguments", "message": "Invalid tool arguments"}}
+        except Exception:
+            return {
+                "error": {"code": "internal_error", "message": "Request could not be completed"}
+            }
+
+    async def safe_async(action):
+        try:
+            return await action()
         except BridgeError as exc:
             result = {"error": {"code": exc.code, "message": str(exc)}}
             if hasattr(exc, "diagnostic"):
@@ -191,6 +209,77 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
             return {"error": {"code": exc.code, "message": str(exc)}}
         except ValidationError:
             return {"error": {"code": "invalid_arguments", "message": "Invalid read query"}}
+
+    @server.tool(annotations=read)
+    async def threaddesk_read(
+        tool: Literal[
+            "list_threads",
+            "get_thread",
+            "current_thread",
+            "list_snapshots",
+            "thread_operation_status",
+            "get_reentry",
+        ],
+        ctx: Context,
+        arguments: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        """Read ThreadDesk immediately in this call; creates no task or queue entry."""
+        return await safe_async(
+            lambda: bridge.execute_threaddesk_immediate(
+                identity(ctx), "threaddesk.read", {"tool": tool, "arguments": arguments or {}}
+            )
+        )
+
+    @server.tool(annotations=write)
+    async def threaddesk_manage(
+        operation_id: str,
+        action: Literal["create", "update", "set_note"],
+        expected_revision: int,
+        ctx: Context,
+        id: str | None = None,
+        data: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        """Create/update a thread or note immediately, with revisions and readback."""
+        arguments = {
+            "operation_id": operation_id,
+            "action": action,
+            "expected_revision": expected_revision,
+            "data": data or {},
+        }
+        if id is not None:
+            arguments["id"] = id
+        return await safe_async(
+            lambda: bridge.execute_threaddesk_immediate(
+                identity(ctx), "threaddesk.manage", arguments
+            )
+        )
+
+    @server.tool(annotations=write)
+    async def threaddesk_knowledge(
+        operation_id: str,
+        action: Literal["record", "save_reentry"],
+        id: str,
+        expected_revision: int,
+        data: dict[str, Any],
+        ctx: Context,
+    ) -> dict[str, Any]:
+        """Immediately save thread-bound knowledge/brainstorming or re-entry notes.
+
+        Repeated normalized title/details/kind records return the existing idea. Every
+        write uses the ThreadDesk operation ID and expected thread revision, then reads back.
+        """
+        arguments = {
+            "operation_id": operation_id,
+            "action": action,
+            "id": id,
+            "expected_revision": expected_revision,
+            "data": data,
+        }
+        return await safe_async(
+            lambda: bridge.execute_threaddesk_immediate(
+                identity(ctx), "threaddesk.knowledge", arguments
+            )
+        )
 
     @server.tool(annotations=read)
     async def session_catalog(ctx: Context) -> dict[str, Any]:

@@ -129,6 +129,35 @@ async def test_cached_tools_expose_existing_terminal_targets_over_real_http(
             )
 
 
+async def test_direct_threaddesk_tools_are_exposed_and_do_not_create_tasks(
+    http_bridge, monkeypatch
+):
+    bridge, endpoint = http_bridge
+    bridge.config.principals["local"].permission_level = "full"
+
+    async def direct(principal, operation, arguments):
+        assert principal == "local"
+        assert operation == "threaddesk.read"
+        assert arguments == {"tool": "list_threads", "arguments": {}}
+        return {
+            "execution": "immediate",
+            "persistent_task_created": False,
+            "success": True,
+            "value": [],
+        }
+
+    monkeypatch.setattr(bridge, "execute_threaddesk_immediate", direct)
+    async with MCPClientPool() as clients:
+        await clients.connect(Peer("local", url=endpoint, token="local-test-" + "a" * 40))
+        names = {tool.name for tool in (await clients.sessions["local"].list_tools()).tools}
+        assert {"threaddesk_read", "threaddesk_manage", "threaddesk_knowledge"} <= names
+        result = (
+            await clients.call("local", "threaddesk_read", {"tool": "list_threads"})
+        ).structuredContent
+        assert result["execution"] == "immediate" and result["persistent_task_created"] is False
+        assert bridge.store.db.execute("SELECT count(*) FROM tasks").fetchone()[0] == 0
+
+
 async def test_http_auth_origin_host_and_protocol_limits(http_bridge):
     _, endpoint = http_bridge
     async with httpx.AsyncClient(trust_env=False) as client:

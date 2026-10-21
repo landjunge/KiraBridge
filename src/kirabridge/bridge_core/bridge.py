@@ -332,6 +332,72 @@ class Bridge:
             "next_cursor": rows[-1]["cursor"] if rows else after,
         }
 
+    async def execute_threaddesk_immediate(
+        self, principal: str, operation: str, arguments: dict[str, Any]
+    ) -> dict[str, Any]:
+        """Execute a ThreadDesk read/write in the current MCP call, without a task row."""
+        if operation not in {"threaddesk.read", "threaddesk.manage", "threaddesk.knowledge"}:
+            raise BridgeError("invalid_operation", "Only ThreadDesk operations are supported")
+        authorization = self.security.authorize(principal, operation)
+        from kirabridge.permissions import decision
+
+        effective = decision(self.config, principal, operation)
+        if not effective["automatic"]:
+            raise BridgeError(
+                "approval_required",
+                "This immediate operation is not authorized by the active permission level",
+            )
+        args = INPUTS[operation].model_validate(arguments)
+        if isinstance(args, ThreadDeskManageInput) and args.action not in {
+            "create",
+            "update",
+            "set_note",
+        }:
+            raise BridgeError(
+                "unsupported_action",
+                "Immediate ThreadDesk management supports create, update and set_note",
+            )
+        if isinstance(args, ThreadDeskKnowledgeInput) and args.action not in {
+            "record",
+            "save_reentry",
+        }:
+            raise BridgeError(
+                "unsupported_action",
+                "Immediate ThreadDesk knowledge supports record and save_reentry",
+            )
+        from kirabridge.bridge_core.models import digest
+
+        invocation_id = "direct_" + digest([principal, operation, arguments])[:40]
+
+        async def running(metadata):
+            # Direct actions have no durable task lifecycle; adapter-level diagnostics
+            # record transport phases without inventing a queued task ID.
+            observer = (
+                self.threaddesk.observer_factory(principal)
+                if self.threaddesk.observer_factory
+                else None
+            )
+            if observer:
+                observer("direct.operation", {"operation": operation, **metadata}, None)
+
+        task = {
+            "id": invocation_id,
+            "principal": principal,
+            "operation": operation,
+            "args": arguments,
+        }
+        result = await self.threaddesk.execute_immediate(task, args, running)
+        return {
+            **result,
+            "execution": "immediate",
+            "persistent_task_created": False,
+            "authorization": {
+                "automatic": authorization["automatic"],
+                "permission_level": authorization["permission_level"],
+                "permission_revision": authorization["permission_revision"],
+            },
+        }
+
     async def execute(self, task: dict, running, progress) -> dict[str, Any]:
         operation, arguments, principal = task["operation"], task["args"], task["principal"]
         args = INPUTS[operation].model_validate(arguments)
