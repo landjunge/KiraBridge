@@ -139,6 +139,10 @@ class VisibleHandoffs:
         """Read authenticated evidence after an uncertain outcome; never send input."""
         status = self.status(principal, identifier)
         message = self.messages.get(principal, status["message_id"])
+        idle_reply_pending = (
+            status["state"] == "unknown"
+            and status["evidence"].get("reason") == "target_idle_reply_unconfirmed"
+        )
         if message["acknowledged"] and status["state"] not in {"completed", "interrupted"}:
             evidence = {
                 "authenticated_principal": status["target"],
@@ -146,7 +150,7 @@ class VisibleHandoffs:
                 "agent_confirmed": True,
                 "reconciled_without_input": True,
             }
-            if status["state"] != "confirmed":
+            if status["state"] != "confirmed" and not idle_reply_pending:
                 self.transition(identifier, "confirmed", evidence)
             reply = self.store.db.execute(
                 "SELECT id FROM messages WHERE reply_to=? AND sender=? AND recipient=? "
@@ -219,41 +223,78 @@ class VisibleHandoffs:
             }
         return None
 
+    async def reconcile_target_reservations(
+        self,
+        principal,
+        target,
+        binding,
+        *,
+        busy_message="Existing handoff must finish or reconcile",
+    ):
+        """Keep the input lock until authenticated receipt and verified target readiness."""
+        active = self.store.db.execute(
+            "SELECT id,principal FROM visible_handoffs WHERE target=? AND state IN "
+            "('planned','inserting','inserted','submitting',"
+            "'return_sent','sent','confirmed','unknown') "
+            "ORDER BY updated,id",
+            (target,),
+        ).fetchall()
+        for row in active:
+            status = self.reconcile(row["principal"], row["id"])
+            if status["state"] in {"completed", "interrupted"}:
+                continue
+            message = self.messages.get(row["principal"], status["message_id"])
+            reply = self.store.db.execute(
+                "SELECT 1 FROM messages WHERE reply_to=? AND sender=? AND recipient=? "
+                "AND kind IN ('answer','result') LIMIT 1",
+                (status["message_id"], target, row["principal"]),
+            ).fetchone()
+            if (
+                target == "codex"
+                and binding.codex_thread_id
+                and status["state"] in {"sent", "confirmed", "unknown"}
+                and message["acknowledged"]
+                and not reply
+            ):
+                # The accepted turn has finished, but its answer may still be missing.
+                # Keep that uncertainty on the original handoff and never replay it;
+                # release only its terminal lock after a fresh positive idle check.
+                await self.check_target(principal, target, binding, ready=True)
+                evidence = {
+                    **status["evidence"],
+                    "reason": "target_idle_reply_unconfirmed",
+                    "previous_state": status["state"],
+                    "agent_acknowledged": True,
+                    "terminal_input_attempted": True,
+                    "target_readiness": "verified_ready_before_new_input",
+                    "automatic_retry": False,
+                }
+                if (
+                    status["state"] != "unknown"
+                    or status["evidence"].get("reason") != "target_idle_reply_unconfirmed"
+                ):
+                    self.transition(row["id"], "unknown", evidence)
+                continue
+
+            error = BridgeError("visible_target_busy", busy_message)
+            last = status["events"][-1] if status["events"] else None
+            error.observation = {
+                "state": "reserved",
+                "handoff_id": row["id"],
+                "handoff_state": status["state"],
+                "message_id": message["id"],
+                "acknowledged": message["acknowledged"],
+                "last_event": {key: last[key] for key in ("state", "at")} if last else None,
+                "next_step": "Empfang und Antwort dieses Auftrags abgleichen; nicht neu senden",
+            }
+            raise error
+
     async def dispatch_ready(self, principal, target):
         """Observe before claiming a message; never paste or settle unknown input."""
         binding = self.config.visible_handoffs.bindings.get(target)
         if binding is None:
             raise BridgeError("visible_target_missing", "No assigned existing visible terminal")
-        # An old uncertain input remains owned until actual receipt is reconciled.
-        active = self.store.db.execute(
-            "SELECT id,principal FROM visible_handoffs WHERE target=? AND state IN "
-            "('planned','inserting','inserted','submitting','return_sent','sent','confirmed','unknown')",
-            (target,),
-        ).fetchone()
-        if active:
-            self.reconcile(active["principal"], active["id"])
-            state = self.store.db.execute(
-                "SELECT state FROM visible_handoffs WHERE id=?", (active["id"],)
-            ).fetchone()[0]
-            if state not in {"completed", "interrupted"}:
-                error = BridgeError(
-                    "visible_target_busy", "Existing handoff must finish or reconcile"
-                )
-                error.observation = {
-                    "state": "reserved",
-                    "handoff_id": active["id"],
-                    "handoff_state": state,
-                    "next_step": "Empfang und Antwort dieses Auftrags abgleichen; nicht neu senden",
-                }
-                status = self.status(active["principal"], active["id"])
-                message = self.messages.get(active["principal"], status["message_id"])
-                last = status["events"][-1] if status["events"] else None
-                error.observation.update(
-                    message_id=message["id"],
-                    acknowledged=message["acknowledged"],
-                    last_event={key: last[key] for key in ("state", "at")} if last else None,
-                )
-                raise error
+        await self.reconcile_target_reservations(principal, target, binding)
         await self.check_target(principal, target, binding, ready=True)
 
     async def check_target(self, principal, target, binding, *, ready=False):
@@ -410,6 +451,12 @@ class VisibleHandoffs:
             message_id = existing["message_id"]
         else:
             before = await self.check_target(principal, target, binding, ready=True)
+            await self.reconcile_target_reservations(
+                principal,
+                target,
+                binding,
+                busy_message="Another handoff owns this terminal; reconcile it first",
+            )
             if "KB-END-" + digest(identifier)[:12] in before["text"]:
                 raise BridgeError(
                     "visible_marker_collision", "This handoff marker was already visible"
@@ -434,7 +481,7 @@ class VisibleHandoffs:
                 active = self.store.db.execute(
                     "SELECT id FROM visible_handoffs WHERE target=? AND state IN "
                     "('planned','inserting','inserted','submitting','return_sent',"
-                    "'sent','confirmed','unknown')",
+                    "'sent','confirmed')",
                     (target,),
                 ).fetchone()
                 if active:
