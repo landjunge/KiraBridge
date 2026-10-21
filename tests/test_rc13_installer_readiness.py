@@ -15,3 +15,9 @@ def test_installer_requires_daemon_identity_and_dispatcher():
     assert 'health.get("version") == version' in source
     assert 'health.get("dispatcher_active")' in source
     assert 'health.get("runtime", {}).get("config_sha256") == sha(args.config)' in source
+
+def test_config_compatibility_checked_before_switch():
+    source = (Path(__file__).resolve().parents[1] / "installer" / "install.py").read_text()
+    activation = source.split("def activate(args, release):", 1)[1].split("\ndef rollback(", 1)[0]
+    assert "load_config(sys.argv[1])" in activation
+    assert activation.index("load_config(sys.argv[1])") < activation.index("stop_service(args)")
