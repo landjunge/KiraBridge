@@ -1,8 +1,11 @@
 """Interrupted RC13 preparation must not delete or overwrite partial payloads."""
+
 import importlib.util
 from pathlib import Path
 from types import SimpleNamespace
+
 import pytest
+
 
 def test_incomplete_version_directory_is_reported_without_deletion(tmp_path, monkeypatch):
     path = Path(__file__).resolve().parents[1] / "installer" / "install.py"

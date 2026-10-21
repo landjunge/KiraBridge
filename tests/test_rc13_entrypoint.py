@@ -1,4 +1,5 @@
 """RC13 macOS entrypoint: source-level regression checks only."""
+
 from pathlib import Path
 
 SCRIPT = Path(__file__).resolve().parents[1] / "scripts" / "install-rc13.sh"
@@ -24,8 +25,8 @@ def test_python_bootstrap_is_opt_in():
     source = SCRIPT.read_text()
     assert "uv python install 3.11" in source
     assert "brew install uv" in source
-    assert 'read -r answer' in source
-    assert 'uv python find' in source
+    assert "read -r answer" in source
+    assert "uv python find" in source
 
 
 def test_banner_and_errors_are_clear():
@@ -41,10 +42,10 @@ def test_doctor_and_restart_from_single_entrypoint():
     assert '"$mode" == "restart"' in source
     assert 'kirabridge-doctor.sh" check' in source
     assert 'kirabridge-doctor.sh" restart' in source
-    assert 'read -r answer' in source
+    assert "read -r answer" in source
 
 
 def test_uv_managed_python_can_be_reused():
     source = SCRIPT.read_text()
     assert "uv python find '>=3.11,<3.14'" in source
-    assert '--no-managed-python' not in source
+    assert "--no-managed-python" not in source

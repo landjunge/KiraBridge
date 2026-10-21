@@ -117,7 +117,9 @@ def test_launchd_failure_restores_previous_definition_without_config_restore(
     )
     monkeypatch.setattr(installer, "loaded", lambda args: True)
     monkeypatch.setattr(installer, "cli", lambda *a, **kw: {"version": "0.5.2"})
-    monkeypatch.setattr(installer, "run", lambda *a, **kw: b'{"version":"0.5.2","dispatcher_active":true}')
+    monkeypatch.setattr(
+        installer, "run", lambda *a, **kw: b'{"version":"0.5.2","dispatcher_active":true}'
+    )
     monkeypatch.setattr(installer, "wait_health", lambda *a, **kw: {"version": "0.5.2"})
     operations = []
     monkeypatch.setattr(installer, "stop_service", lambda args: operations.append("stop"))

@@ -356,7 +356,9 @@ def start_service(args):
         raise RuntimeError("KiraBridge launchd plist missing; cannot start service")
     result = subprocess.run(
         ["launchctl", "bootstrap", f"gui/{os.getuid()}", str(args.plist)],
-        capture_output=True, text=True, timeout=20,
+        capture_output=True,
+        text=True,
+        timeout=20,
     )
     if result.returncode:
         detail = (result.stderr or result.stdout).strip()[:500]
@@ -396,11 +398,12 @@ def wait_health(args, release, version):
         time.sleep(0.5)
     service = subprocess.run(
         ["launchctl", "print", f"gui/{os.getuid()}/{LABEL}"],
-        capture_output=True, text=True, timeout=10,
+        capture_output=True,
+        text=True,
+        timeout=10,
     )
     launch_state = (
-        "registered" if service.returncode == 0
-        else f"not registered (exit {service.returncode})"
+        "registered" if service.returncode == 0 else f"not registered (exit {service.returncode})"
     )
     raise RuntimeError(
         "New daemon readiness not proven within 30 seconds; "
@@ -431,7 +434,6 @@ def snapshot_file(path, backup, name):
     return False
 
 
-
 def preflight(args, release):
     """Validate candidate and current service without activating the candidate."""
     if not args.config.is_file():
@@ -439,7 +441,8 @@ def preflight(args, release):
     validate_service_owner(args)
     run(
         [
-            python(release), "-c",
+            python(release),
+            "-c",
             "import sys; from kirabridge.bridge_core.config import load_config; "
             "from kirabridge.local_runtime import load_service_credentials; "
             "config = load_config(sys.argv[1]); "
@@ -455,7 +458,10 @@ def preflight(args, release):
         health = json.loads(run([args.launcher, "status"], capture=True, timeout=10))
         if not health.get("dispatcher_active") or not isinstance(health.get("version"), str):
             raise RuntimeError("Current KiraBridge health is not ready; no switch")
-        say(f"PREFLIGHT PASS: current service {health['version']} responding; RC13 configuration valid.")
+        say(
+            f"PREFLIGHT PASS: current service {health['version']} responding; "
+            "RC13 configuration valid."
+        )
     else:
         say("PREFLIGHT PASS: RC13 config valid (unmanaged service not tested).")
     say("No service was stopped, started or replaced.")
@@ -507,7 +513,8 @@ def activate(args, release):
             # launcher rather than asking the candidate RC13 to load RC11 settings.
             previous_health = (
                 cli(Path(old["release"]), args.config, "status", timeout=8)
-                if old else json.loads(run([args.launcher, "status"], capture=True, timeout=8))
+                if old
+                else json.loads(run([args.launcher, "status"], capture=True, timeout=8))
             )
         except (RuntimeError, subprocess.TimeoutExpired, ValueError):
             if was_loaded:
@@ -652,9 +659,11 @@ def rollback(args):
             while time.monotonic() < deadline:
                 try:
                     health = json.loads(run([args.launcher, "status"], capture=True, timeout=8))
-                    if (health.get("version") == active["previous_version"]
-                            and health.get("dispatcher_active")
-                            and loaded(args)):
+                    if (
+                        health.get("version") == active["previous_version"]
+                        and health.get("dispatcher_active")
+                        and loaded(args)
+                    ):
                         break
                     last_error = "legacy version, dispatcher or launchd registration mismatch"
                 except (RuntimeError, ValueError, subprocess.TimeoutExpired) as exc:
