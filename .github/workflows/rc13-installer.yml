@@ -28,4 +28,5 @@ jobs:
       - name: Compile installer and run isolated start checks
         run: |
           python -m py_compile installer/install.py
+          bash -n scripts/install-rc13.sh
           python -m pytest -q tests/test_rc13_start_path_isolated.py tests/test_rc13_installer_readiness.py
