@@ -342,6 +342,7 @@ def start_service(args):
 
 def wait_health(args, release, version):
     deadline = time.monotonic() + 30
+    last_error = "no health response"
     while time.monotonic() < deadline:
         try:
             health = cli(release, args.config, "status", timeout=8)
@@ -351,10 +352,27 @@ def wait_health(args, release, version):
                 and health.get("runtime", {}).get("config_sha256") == sha(args.config)
             ):
                 return health
-        except (RuntimeError, subprocess.TimeoutExpired, ValueError):
-            pass
+            last_error = (
+                f"health mismatch: version={health.get('version')!r}, "
+                f"dispatcher_active={health.get('dispatcher_active')!r}, "
+                f"config_hash_matches="
+                f"{health.get('runtime', {}).get('config_sha256') == sha(args.config)}"
+            )
+        except (RuntimeError, subprocess.TimeoutExpired, ValueError) as exc:
+            last_error = f"{type(exc).__name__}: {str(exc)[:500]}"
         time.sleep(0.5)
-    raise RuntimeError("New daemon readiness not proven within 30 seconds")
+    service = subprocess.run(
+        ["launchctl", "print", f"gui/{os.getuid()}/{LABEL}"],
+        capture_output=True, text=True, timeout=10,
+    )
+    launch_state = (
+        "registered" if service.returncode == 0
+        else f"not registered (exit {service.returncode})"
+    )
+    raise RuntimeError(
+        "New daemon readiness not proven within 30 seconds; "
+        f"last health: {last_error}; launchd: {launch_state}"
+    )
 
 
 def validate_service_owner(args):
