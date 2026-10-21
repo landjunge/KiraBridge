@@ -407,7 +407,9 @@ def activate(args, release):
             python(release),
             "-c",
             "import sys; from kirabridge.bridge_core.config import load_config; "
-            "load_config(sys.argv[1])",
+            "from kirabridge.local_runtime import load_service_credentials; "
+            "config = load_config(sys.argv[1]); "
+            "load_service_credentials(config); config.validate_network()",
             str(args.config),
         ],
         capture=True,
