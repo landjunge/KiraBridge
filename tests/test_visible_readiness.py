@@ -94,10 +94,19 @@ def test_unknown_bound_turn_cannot_be_promoted_by_empty_prompt(binding):
 
 
 @pytest.mark.parametrize("hint", ["Back to bottom", "enter/esc latest"])
-@pytest.mark.parametrize("placement", ["before", "after"])
-def test_current_scroll_controls_block_even_with_idle_protocol(binding, hint, placement):
-    text = hint + "\n\n" + EMPTY + FOOTER if placement == "before" else EMPTY + FOOTER + hint
-    assert checked(text, binding, {"state": "idle"})["state"] == "scrolled"
+@pytest.mark.parametrize("protocol", [None, {"state": "working"}, {"state": "unknown"}])
+def test_scroll_controls_block_without_idle_proof(binding, hint, protocol):
+    assert not checked(hint + "\n\n" + EMPTY + FOOTER, binding, protocol)["ready"]
+
+
+def test_idle_protocol_allows_empty_prompt_with_current_new_activity_footer(binding):
+    text = (
+        "New activity · ↓ Back to bottom · esc\n\n"
+        + EMPTY
+        + "\nNew activity · enter/esc latest    ⚠ 3 warnings · f2 to view\n"
+    )
+    result = checked(text, binding, {"state": "idle"})
+    assert result["state"] == "ready" and result["input_empty"]
 
 
 def test_old_scroll_quotation_does_not_poison_current_idle_widget(binding):
