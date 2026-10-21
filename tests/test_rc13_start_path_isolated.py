@@ -55,3 +55,19 @@ def test_missing_plist_does_not_invoke_launchctl(monkeypatch, args):
     monkeypatch.setattr(module.subprocess, "run", lambda *a, **kw: pytest.fail("launchctl must not run"))
     with pytest.raises(RuntimeError, match="plist missing"):
         module.start_service(args)
+
+
+def test_failed_subprocess_surfaces_stderr(monkeypatch):
+    module = installer()
+
+    class FakeProcess:
+        returncode = 12
+        pid = 123456
+
+        def communicate(self, timeout=None):
+            return b"", b"configuration rejected by daemon"
+
+    monkeypatch.setattr(module.subprocess, "Popen", lambda *a, **kw: FakeProcess())
+    monkeypatch.setattr(module.os, "killpg", lambda *a: None)
+    with pytest.raises(RuntimeError, match="configuration rejected by daemon"):
+        module.run(["fake-command"], capture=True)
