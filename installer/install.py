@@ -401,6 +401,18 @@ def snapshot_file(path, backup, name):
 def activate(args, release):
     fresh_config(args, release)
     validate_service_owner(args)
+    # Validate RC13 with the installed configuration before touching RC11.
+    run(
+        [
+            python(release),
+            "-c",
+            "import sys; from kirabridge.bridge_core.config import load_config; "
+            "load_config(sys.argv[1])",
+            str(args.config),
+        ],
+        capture=True,
+        timeout=15,
+    )
     config_before = args.config.read_bytes()
     config = settings(args.config)
     credentials = Path(config["credentials_file"]) if config.get("credentials_file") else None
