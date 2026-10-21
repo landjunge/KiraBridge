@@ -29,7 +29,11 @@ class _Cursor:
 
 
 class CodexTurnState:
-    def __init__(self, sessions_root=None, *, max_bytes=8 * 1024 * 1024, max_line_bytes=1048576):
+    # Codex response_item records can exceed 1 MiB; 2 MiB stays below the
+    # per-read scan budget while allowing bounded recovery across those records.
+    def __init__(
+        self, sessions_root=None, *, max_bytes=8 * 1024 * 1024, max_line_bytes=2 * 1024 * 1024
+    ):
         self.root = Path(sessions_root or Path.home() / ".codex" / "sessions").resolve()
         if max_line_bytes < 128 or max_bytes < max_line_bytes:
             raise ValueError("The scan budget must accommodate one bounded event line")
