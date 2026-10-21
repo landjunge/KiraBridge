@@ -19,7 +19,15 @@ BANNER
 info() { printf '  [INFO] %s\n' "$*"; }
 fail() { printf '  [ERROR] %s\n' "$*" >&2; exit 2; }
 mode="${1:-install}"
-[[ "$#" -le 1 && ( "$mode" == "install" || "$mode" == "--prepare" ) ]] || fail "Usage: bash scripts/install-rc13.sh [--prepare]"
+[[ "$#" -le 1 && ( "$mode" == "install" || "$mode" == "--prepare" || "$mode" == "doctor" || "$mode" == "restart" ) ]] || fail "Usage: bash scripts/install-rc13.sh [--prepare|doctor|restart]"
+if [[ "$mode" == "doctor" ]]; then
+  exec bash "$ROOT/scripts/kirabridge-doctor.sh" check
+elif [[ "$mode" == "restart" ]]; then
+  printf '  Restart only KiraBridge service? [y/N] '
+  read -r answer
+  [[ "$answer" == y || "$answer" == Y ]] || fail "Restart cancelled."
+  exec bash "$ROOT/scripts/kirabridge-doctor.sh" restart
+fi
 [[ "$(uname -s)" == Darwin ]] || fail "Only macOS is supported by this entry point."
 
 info "1/3 Checking environment"
