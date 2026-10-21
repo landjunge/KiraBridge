@@ -336,8 +336,21 @@ def stop_service(args):
 
 
 def start_service(args):
-    if args.service != "none" and args.plist.exists():
-        run(["launchctl", "bootstrap", f"gui/{os.getuid()}", args.plist], capture=True, timeout=20)
+    if args.service == "none":
+        return
+    if not args.plist.is_file():
+        raise RuntimeError("KiraBridge launchd plist missing; cannot start service")
+    result = subprocess.run(
+        ["launchctl", "bootstrap", f"gui/{os.getuid()}", str(args.plist)],
+        capture_output=True, text=True, timeout=20,
+    )
+    if result.returncode:
+        detail = (result.stderr or result.stdout).strip()[:500]
+        raise RuntimeError(
+            f"KiraBridge launchd bootstrap failed (exit {result.returncode}): {detail}"
+        )
+    if not loaded(args):
+        raise RuntimeError("KiraBridge launchd bootstrap returned success but service is absent")
 
 
 def wait_health(args, release, version):
