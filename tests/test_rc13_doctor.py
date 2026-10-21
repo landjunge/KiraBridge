@@ -15,3 +15,9 @@ def test_restart_is_scoped_to_bridge_label():
     assert 'launchctl bootout "$TARGET/$LABEL"' in content
     assert 'launchctl bootstrap "$TARGET" "$PLIST"' in content
     assert "killall" not in content
+
+def test_doctor_requires_active_mcp_dispatcher():
+    source = SCRIPT.read_text()
+    assert 'HEALTH="$("$CLI" status)"' in source
+    assert 'd.get("dispatcher_active") is True' in source
+    assert 'This does not prove the external ChatGPT connector' in source
