@@ -33,7 +33,9 @@ def test_config_refuses_incomplete_protocol_binding_pair(partial):
 
 
 @pytest.mark.parametrize("protocol", [{"state": "unknown"}, {"state": "unsupported"}, {}])
-async def test_bound_unknown_protocol_cannot_release_codex_input(visible, monkeypatch, protocol):
+async def test_bound_unknown_protocol_does_not_block_empty_codex_input(
+    visible, monkeypatch, protocol
+):
     bridge, transport = visible
     binding = bridge.config.visible_handoffs.bindings["codex"]
     binding.codex_thread_id, binding.codex_rollout_path = THREAD, ROLLOUT
@@ -45,9 +47,8 @@ async def test_bound_unknown_protocol_cannot_release_codex_input(visible, monkey
         return protocol
 
     monkeypatch.setattr(bridge.visible_handoffs.codex_state, "read", read)
-    with pytest.raises(BridgeError) as exc:
-        await bridge.visible_handoffs.check_target("chatgpt", "codex", binding, ready=True)
-    assert exc.value.code == "visible_target_unknown"
+    result = await bridge.visible_handoffs.check_target("chatgpt", "codex", binding, ready=True)
+    assert result["text"] == transport["text"]
     assert calls == [(ROLLOUT, THREAD)] and transport["calls"] == []
 
 

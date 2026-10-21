@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import os
 import sqlite3
 import stat
@@ -9,7 +10,7 @@ from time import monotonic
 from uuid import uuid4
 
 from kirabridge.bridge_core.config import private_directory
-from kirabridge.bridge_core.models import BridgeError
+from kirabridge.bridge_core.models import BridgeError, digest
 from kirabridge.file_index.source import ENTRIES
 from kirabridge.filesystem_manager import PathScope
 
@@ -139,47 +140,85 @@ class Cache:
             return {"token": "", "epoch": "", "status": "not_built", "scan": ""}
         return dict(zip(("token", "epoch", "status", "scan"), row, strict=True))
 
-    def start(self, scope, token):
+    def start(self, scope, token, *, observational=False):
         scan = uuid4().hex
         with self.open() as db:
+            previous = {"token": "", "epoch": "", "status": ""}
+            if observational:
+                # Preserve only the generation read under our writer lock;
+                # never restore an epoch sampled before another writer commits.
+                db.execute("BEGIN IMMEDIATE")
+                previous = self.state(scope)
+            preserve = (
+                observational
+                and self.fts
+                and previous["token"] == token
+                and previous["status"] in {"reconciled_observation", "observing"}
+            )
             db.execute(
                 "INSERT OR REPLACE INTO scopes VALUES(?,?,?,?,?)",
-                (scope, token, uuid4().hex, "building", scan),
+                (
+                    scope,
+                    token,
+                    previous["epoch"] if preserve else uuid4().hex,
+                    "observing" if preserve else "building",
+                    scan,
+                ),
             )
         return scan
 
-    def write(self, scope, scan, documents, *, exhausted=False, partial=False):
+    def write(self, scope, scan, documents, *, exhausted=False, partial=False, observational=False):
         db = self.open()
         with db:
             db.execute("BEGIN IMMEDIATE")
-            current = db.execute("SELECT scan FROM scopes WHERE id=?", (scope,)).fetchone()
+            current = db.execute(
+                "SELECT substr(scan,1,129),substr(status,1,64),substr(epoch,1,129) "
+                "FROM scopes WHERE id=?",
+                (scope,),
+            ).fetchone()
             if current is None or current[0] != scan:
                 raise BridgeError("generation_changed", "Cache observation superseded")
+            changed = False
             for doc in documents:
+                # Content changes must survive coarse/colliding filesystem
+                # metadata. Hash the already authorized, bounded capture;
+                # never read an unbounded cached body to compare it.
+                fingerprint = digest([doc.stamp, hashlib.sha256(doc.text.encode()).hexdigest()])
                 row = db.execute(
-                    "SELECT rowid FROM files WHERE scope=? AND relative=?", (scope, doc.relative)
+                    "SELECT rowid,substr(stamp,1,129) FROM files WHERE scope=? AND relative=?",
+                    (scope, doc.relative),
                 ).fetchone()
+                dirty = row is None or row[1] != fingerprint
+                if self.fts and observational and not dirty:
+                    # A cache built without FTS may have metadata but no body.
+                    # Polling must repair that derived absence as a change.
+                    dirty = (
+                        db.execute("SELECT 1 FROM content WHERE rowid=?", (row[0],)).fetchone()
+                        is None
+                    )
+                changed |= dirty
                 if row is None:
                     cursor = db.execute(
                         "INSERT INTO files VALUES(?,?,?,?,?)",
-                        (scope, doc.relative, doc.stamp, doc.size, scan),
+                        (scope, doc.relative, fingerprint, doc.size, scan),
                     )
                     rowid = cursor.lastrowid
                 else:
                     rowid = row[0]
                     db.execute(
                         "UPDATE files SET stamp=?,bytes=?,seen=? WHERE rowid=?",
-                        (doc.stamp, doc.size, scan, rowid),
+                        (fingerprint, doc.size, scan, rowid),
                     )
-                if self.fts:
+                if self.fts and (dirty or not observational):
                     db.execute("DELETE FROM content WHERE rowid=?", (rowid,))
                     db.execute("INSERT INTO content(rowid,body) VALUES(?,?)", (rowid, doc.text))
-            status = "building"
+            status = "observing" if observational and current[1] == "observing" else "building"
             if exhausted:
                 old = db.execute(
                     "SELECT rowid FROM files WHERE scope=? AND seen!=? LIMIT ?",
                     (scope, scan, ENTRIES),
                 ).fetchall()
+                changed |= bool(old)
                 if self.fts:
                     db.executemany("DELETE FROM content WHERE rowid=?", old)
                 db.executemany("DELETE FROM files WHERE rowid=?", old)
@@ -187,7 +226,7 @@ class Cache:
                     status = "partial" if partial else "reconciled_observation"
             db.execute(
                 "UPDATE scopes SET epoch=?,status=? WHERE id=? AND scan=?",
-                (uuid4().hex, status, scope, scan),
+                (uuid4().hex if changed or not observational else current[2], status, scope, scan),
             )
         return self.state(scope)
 

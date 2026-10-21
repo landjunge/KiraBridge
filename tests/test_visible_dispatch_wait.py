@@ -65,6 +65,12 @@ async def test_busy_wait_does_not_claim_insert_or_complete_then_dispatches_once(
     sent = enqueue(bridge, sender, target)
     processed = []
     fake_receiver(monkeypatch, bridge, processed)
+    if target == "codex":
+        assert await bridge.message_receiver._dispatch_next()
+        assert processed == [sent["id"]]
+        assert not await bridge.message_receiver._dispatch_next()
+        assert processed == [sent["id"]]
+        return
     for _ in range(2):
         assert not await bridge.message_receiver._dispatch_next()
     current = bridge.messages.get(sender, sent["id"])["processing"]

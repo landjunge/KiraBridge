@@ -1,7 +1,7 @@
-"""Current input widget plus a separately bound Codex turn observation.
+"""Validate the visible input widget for a bound terminal.
 
-Quoted output is not agent activity. Unknown frames/control sequences fail closed.
-No input, process operations or identity inference takes place here.
+The operator may queue work while Codex is busy or its rollout is incomplete.
+This check only protects existing text in the input field and unsupported UI frames.
 """
 
 import re
@@ -49,48 +49,21 @@ def assess(target, raw, binding, protocol=None):
         # The final input row, not any previous user prompt in visible output.
         empty = bool(re.fullmatch(binding.ready_pattern, first))
         base["input_empty"] = empty
-        prelude = text[: text.rfind(view)].rstrip()
-        current_block = re.split(r"\n[ \t]*\n", prelude)[-1] if prelude else ""
-        current = current_block + "\n" + view
-        # Scroll controls belong to the current renderer area, never old quotations.
-        if re.search(r"Back to bottom|enter/esc latest", current, re.I):
-            return result("scrolled", "current_scroll_controls")
         if not empty:
             return result("input_not_empty", "existing_input_must_not_be_overwritten")
-        if protocol and protocol.get("state") == "working":
-            return result("working", "bound_codex_turn_active")
-        if "tab to queue message" in view:
-            return result("working", "current_queue_hint")
         footer = [line.strip() for line in view.splitlines()[1:] if line.strip()]
         known_footer = all(
-            re.match(r"^GPT-\S+.*", line) or ("for agents" in line and "? for shortcuts" in line)
+            re.match(r"^GPT-\S+.*", line)
+            or ("for agents" in line and "? for shortcuts" in line)
+            or line == "tab to queue message"
+            or line in {"Back to bottom", "enter/esc latest"}
             for line in footer
         )
         if not known_footer:
             return result("unknown", "unrecognized_footer_or_dialog")
-        # Real progress is above the prompt. An idle protocol observation cannot
-        # override a still-rendered current progress row (or vice versa).
-        progress = re.search(
-            r"(?m)^[ \t]*[•◦]\s+[^\n]*\([^\n]*esc to interrupt[^\n]*",
-            current_block,
-        )
-        if progress:
-            return result(
-                "unknown" if protocol and protocol.get("state") == "idle" else "working",
-                "protocol_display_disagree"
-                if protocol and protocol.get("state") == "idle"
-                else "current_progress_row",
-            )
-        if protocol is not None:
-            return result(
-                "ready" if protocol.get("state") == "idle" else "unknown",
-                "bound_codex_turn_idle"
-                if protocol.get("state") == "idle"
-                else "bound_codex_state_unavailable",
-            )
-        # Without a bound protocol, ambiguous work words are not an idle proof.
-        if binding.busy_pattern and re.search(binding.busy_pattern, text, re.I):
-            return result("unknown", "unbound_ambiguous_activity_text")
+        # The exact bound terminal and empty widget are the insertion contract.
+        # Turn status is diagnostic only: Codex can queue a message during a turn,
+        # and partial/large rollout lines must not prevent operator-directed work.
         return result("ready", "current_empty_widget")
 
     empty = bool(re.search(binding.ready_pattern, view))

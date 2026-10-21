@@ -19,6 +19,9 @@ class FileIndex:
         self.cache = Cache(config.state_path)
         self.instance = uuid4().hex
         self.queries, self.scans = OrderedDict(), OrderedDict()
+        # Local uncertainty after a failed operator observation must also
+        # invalidate bounded-mode pages, even if the cache marker write failed.
+        self._poll_faults = {}
 
     def close(self):
         for book in (self.queries, self.scans):
@@ -42,13 +45,15 @@ class FileIndex:
                 if (
                     self.cache.fts
                     and state["token"] == token
-                    and state["status"] == "reconciled_observation"
+                    and state["status"] in {"reconciled_observation", "observing"}
                 )
                 else "bounded_scan"
             )
         except (sqlite3.Error, OSError, BridgeError, ValueError):
             state, mode = {"status": "index_unavailable", "epoch": ""}, "bounded_scan"
-        binding = digest([self.instance, token, state["epoch"], mode])
+        if scope in self._poll_faults:
+            state, mode = {**state, "status": "index_unavailable"}, "bounded_scan"
+        binding = digest([self.instance, token, state["epoch"], mode, self._poll_faults.get(scope)])
         return {
             "enabled": True,
             "source": source,
@@ -68,24 +73,32 @@ class FileIndex:
         if current["binding"] != expected["binding"] or current["enabled"] != expected["enabled"]:
             raise BridgeError("generation_changed", "Search observation changed")
 
-    def scan(self, principal, project, *, restart=False):
+    def _cancel_scan(self, scope):
+        state = self.scans.pop(scope, None)
+        if state is not None:
+            state["iterator"].close()
+
+    def scan(self, principal, project, *, restart=False, observational=False):
         context = self.context(principal, project)
         if not context["enabled"]:
             raise BridgeError("index_disabled", "File index is disabled")
         key, source = context["scope"], context["source"]
         state = self.scans.pop(key, None)
-        if state is not None and (restart or state["token"] != context["token"]):
+        if state is not None and (
+            restart or state["token"] != context["token"] or state["observational"] != observational
+        ):
             state["iterator"].close()
             state = None
         try:
             if state is None:
-                scan = self.cache.start(key, context["token"])
+                scan = self.cache.start(key, context["token"], observational=observational)
                 state = {
                     "token": context["token"],
                     "scan": scan,
                     "partial": False,
                     "iterator": source.walk(context["token"]),
                     "exhausted": False,
+                    "observational": observational,
                 }
             documents, count, size, reasons = [], 0, 0, set()
             deadline = monotonic() + 0.1
@@ -124,8 +137,11 @@ class FileIndex:
                 documents,
                 exhausted=state["exhausted"],
                 partial=state["partial"],
+                observational=observational,
             )
-            if result["status"] == "building":
+            if result["status"] == "reconciled_observation":
+                self._poll_faults.pop(key, None)
+            if result["status"] in {"building", "observing"}:
                 self.scans[key] = state
                 while len(self.scans) > 2:
                     _, old = self.scans.popitem(last=False)
@@ -140,6 +156,8 @@ class FileIndex:
                 "reasons": sorted(reasons | {"filesystem_snapshot_unverified"}),
             }
         except (sqlite3.Error, OSError):
+            if observational:
+                self._poll_faults[key] = uuid4().hex
             if state is not None:
                 state["iterator"].close()
             return {
