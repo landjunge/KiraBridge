@@ -19,7 +19,7 @@ BANNER
 info() { printf '  [INFO] %s\n' "$*"; }
 fail() { printf '  [ERROR] %s\n' "$*" >&2; exit 2; }
 mode="${1:-install}"
-[[ "$#" -le 1 && ( "$mode" == "install" || "$mode" == "--prepare" || "$mode" == "doctor" || "$mode" == "restart" ) ]] || fail "Usage: bash scripts/install-rc13.sh [--prepare|doctor|restart]"
+[[ "$#" -le 1 && ( "$mode" == "install" || "$mode" == "--prepare" || "$mode" == "doctor" || "$mode" == "restart" || "$mode" == "--check" ) ]] || fail "Usage: bash scripts/install-rc13.sh [--prepare|--check|doctor|restart]"
 if [[ "$mode" == "doctor" ]]; then
   exec bash "$ROOT/scripts/kirabridge-doctor.sh" check
 elif [[ "$mode" == "restart" ]]; then
@@ -61,6 +61,10 @@ info "2/3 Checking source revision"
 REF="$(git rev-parse HEAD)"
 info "Candidate: $REF"
 info "Python: $("$PYTHON" --version 2>&1)"
+if [[ "$mode" == "--check" ]]; then
+  info "3/3 Checking RC13 compatibility without switching services"
+  exec "$PYTHON" installer/install.py preflight --repo "$ROOT" --ref "$REF"
+fi
 if [[ "$mode" == "--prepare" ]]; then
   info "3/3 Preparing only (RC11 remains running)"
   exec "$PYTHON" installer/install.py prepare --repo "$ROOT" --ref "$REF"
