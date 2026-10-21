@@ -606,7 +606,26 @@ def rollback(args):
         if active["was_loaded"]:
             start_service(args)
     if active["was_loaded"] and active.get("previous_version"):
-        wait_health(args, Path(active["previous"]["release"]) if active["previous"] else Path(active["release"]), active["previous_version"])
+        if active["previous"]:
+            wait_health(args, Path(active["previous"]["release"]), active["previous_version"])
+        else:
+            # Legacy RC11 has no versioned release record. Its restored launcher
+            # is authoritative; never probe the failed RC13 candidate.
+            deadline = time.monotonic() + 30
+            last_error = "no status response"
+            while time.monotonic() < deadline:
+                try:
+                    health = json.loads(run([args.launcher, "status"], capture=True, timeout=8))
+                    if (health.get("version") == active["previous_version"]
+                            and health.get("dispatcher_active")
+                            and loaded(args)):
+                        break
+                    last_error = "legacy version, dispatcher or launchd registration mismatch"
+                except (RuntimeError, ValueError, subprocess.TimeoutExpired) as exc:
+                    last_error = str(exc)[:500]
+                time.sleep(0.5)
+            else:
+                raise RuntimeError(f"Restored legacy daemon readiness not proven: {last_error}")
     say(
         "ZURÜCKGEROLLT: vorheriger Launcher/Dienst wiederhergestellt. "
         "Konfiguration, Zugangsdaten und neue Ergebnisdaten bleiben erhalten."
