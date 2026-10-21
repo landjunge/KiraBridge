@@ -55,6 +55,10 @@ def run(argv, *, capture=False, timeout=600, **kwargs):
             )
         return stdout if capture else None
     except BaseException:
+        # A completed, failed command has no live process group to terminate.
+        # In particular, do not replace its useful stderr error with a cleanup error.
+        if process.returncode is not None:
+            raise
         try:
             os.killpg(process.pid, signal.SIGTERM)
         except ProcessLookupError:
