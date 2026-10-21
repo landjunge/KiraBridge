@@ -33,3 +33,12 @@ def test_banner_and_errors_are_clear():
     assert "K I R A   B R I D G E" in source
     assert "RC13" in source
     assert "WARNING: This step attempts to switch" in source
+
+
+def test_doctor_and_restart_from_single_entrypoint():
+    source = SCRIPT.read_text()
+    assert '"$mode" == "doctor"' in source
+    assert '"$mode" == "restart"' in source
+    assert 'kirabridge-doctor.sh" check' in source
+    assert 'kirabridge-doctor.sh" restart' in source
+    assert 'read -r answer' in source
