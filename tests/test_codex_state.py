@@ -144,6 +144,27 @@ async def test_bounds_incremental_scan_and_never_accepts_unscanned_end(rollout):
     assert result["state"] == "idle"
 
 
+async def test_default_reader_reconstructs_long_log_with_large_non_turn_records(rollout):
+    root, path, _ = rollout
+    write(path, record("task_started"), append=True)
+    with path.open("a") as stream:
+        for _ in range(6):
+            stream.write(json.dumps({"type": "response_item", "payload": "x" * 900_000}))
+            stream.write("\n")
+        # Codex tool output can make a non-turn record larger than the old 1 MiB cap.
+        stream.write(json.dumps({"type": "response_item", "payload": "x" * 1_500_000}))
+        stream.write("\n")
+    write(path, record("task_complete"), append=True)
+
+    result = await CodexTurnState(root).read(str(path), "thread-one")
+    assert result == {
+        "state": "idle",
+        "reason": "turn_completed",
+        "last_event": "task_complete",
+        "turn_id": "turn-one",
+    }
+
+
 async def test_oversized_line_parse_error_and_missing_turn_id_fail_closed(rollout):
     root, path, header = rollout
     reader = CodexTurnState(root, max_bytes=512, max_line_bytes=256)
