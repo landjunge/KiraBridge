@@ -408,7 +408,7 @@ def activate(args, release):
     previous_health = None
     if args.service != "none":
         try:
-            previous_health = cli(release, args.config, "status", timeout=8)
+            previous_health = cli(Path(old["release"]) if old else release, args.config, "status", timeout=8)
         except (RuntimeError, subprocess.TimeoutExpired, ValueError):
             if was_loaded:
                 raise RuntimeError("Existing service health unavailable; no switch") from None
