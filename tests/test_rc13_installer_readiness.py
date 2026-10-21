@@ -44,3 +44,11 @@ def test_launchd_registration_required_before_ready():
     block = source.split("def wait_health(args, release, version):", 1)[1].split("\ndef validate_service_owner(", 1)[0]
     assert 'if args.service == "none" or loaded(args):' in block
     assert 'expected launchd service is not registered' in block
+
+def test_start_path_reports_launchctl_bootstrap_failure():
+    source = (Path(__file__).resolve().parents[1] / "installer" / "install.py").read_text()
+    start = source.split("def start_service(args):", 1)[1].split("\ndef wait_health(", 1)[0]
+    assert "launchd bootstrap failed" in start
+    assert "result.stderr or result.stdout" in start
+    assert "if not loaded(args):" in start
+    assert "launchd plist missing" in start
