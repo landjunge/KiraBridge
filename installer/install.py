@@ -46,11 +46,19 @@ def run(argv, *, capture=False, timeout=600, **kwargs):
         **kwargs,
     )
     try:
-        stdout, _ = process.communicate(timeout=timeout)
+        stdout, stderr = process.communicate(timeout=timeout)
         if process.returncode:
-            raise RuntimeError(f"command failed ({process.returncode}): {Path(str(argv[0])).name}")
+            detail = (stderr or b"").decode("utf-8", errors="replace").strip()[-1200:]
+            raise RuntimeError(
+                f"command failed ({process.returncode}): {Path(str(argv[0])).name}"
+                + (f"; stderr: {detail}" if detail else "")
+            )
         return stdout if capture else None
     except BaseException:
+        # A completed, failed command has no live process group to terminate.
+        # In particular, do not replace its useful stderr error with a cleanup error.
+        if process.returncode is not None:
+            raise
         try:
             os.killpg(process.pid, signal.SIGTERM)
         except ProcessLookupError:
@@ -174,7 +182,13 @@ def prepare(args):
     private_dir(releases)
     destination = releases / (version + "-" + ref[:12])
     if destination.exists():
-        manifest = json.loads((destination / "release.json").read_text())
+        manifest_path = destination / "release.json"
+        if not manifest_path.is_file():
+            raise RuntimeError(
+                f"Incomplete RC13 preparation at {destination}. "
+                "Existing files left untouched; recovery requires operator review."
+            )
+        manifest = json.loads(manifest_path.read_text())
         if manifest["commit"] != ref or cli_version(destination) != version:
             raise RuntimeError("Existing release identity differs")
         say(f"Bereits vorbereitet: {version} @ {ref}")
@@ -336,12 +350,26 @@ def stop_service(args):
 
 
 def start_service(args):
-    if args.service != "none" and args.plist.exists():
-        run(["launchctl", "bootstrap", f"gui/{os.getuid()}", args.plist], capture=True, timeout=20)
+    if args.service == "none":
+        return
+    if not args.plist.is_file():
+        raise RuntimeError("KiraBridge launchd plist missing; cannot start service")
+    result = subprocess.run(
+        ["launchctl", "bootstrap", f"gui/{os.getuid()}", str(args.plist)],
+        capture_output=True, text=True, timeout=20,
+    )
+    if result.returncode:
+        detail = (result.stderr or result.stdout).strip()[:500]
+        raise RuntimeError(
+            f"KiraBridge launchd bootstrap failed (exit {result.returncode}): {detail}"
+        )
+    if not loaded(args):
+        raise RuntimeError("KiraBridge launchd bootstrap returned success but service is absent")
 
 
 def wait_health(args, release, version):
     deadline = time.monotonic() + 30
+    last_error = "no health response"
     while time.monotonic() < deadline:
         try:
             health = cli(release, args.config, "status", timeout=8)
@@ -350,11 +378,34 @@ def wait_health(args, release, version):
                 and health.get("dispatcher_active")
                 and health.get("runtime", {}).get("config_sha256") == sha(args.config)
             ):
-                return health
-        except (RuntimeError, subprocess.TimeoutExpired, ValueError):
-            pass
+                # A healthy endpoint is insufficient when launchd failed to
+                # register the service expected to survive this installer.
+                if args.service == "none" or loaded(args):
+                    return health
+                last_error = "health responded, but expected launchd service is not registered"
+                time.sleep(0.5)
+                continue
+            last_error = (
+                f"health mismatch: version={health.get('version')!r}, "
+                f"dispatcher_active={health.get('dispatcher_active')!r}, "
+                f"config_hash_matches="
+                f"{health.get('runtime', {}).get('config_sha256') == sha(args.config)}"
+            )
+        except (RuntimeError, subprocess.TimeoutExpired, ValueError) as exc:
+            last_error = f"{type(exc).__name__}: {str(exc)[:500]}"
         time.sleep(0.5)
-    raise RuntimeError("New daemon readiness not proven within 30 seconds")
+    service = subprocess.run(
+        ["launchctl", "print", f"gui/{os.getuid()}/{LABEL}"],
+        capture_output=True, text=True, timeout=10,
+    )
+    launch_state = (
+        "registered" if service.returncode == 0
+        else f"not registered (exit {service.returncode})"
+    )
+    raise RuntimeError(
+        "New daemon readiness not proven within 30 seconds; "
+        f"last health: {last_error}; launchd: {launch_state}"
+    )
 
 
 def validate_service_owner(args):
@@ -380,9 +431,53 @@ def snapshot_file(path, backup, name):
     return False
 
 
+
+def preflight(args, release):
+    """Validate candidate and current service without activating the candidate."""
+    if not args.config.is_file():
+        raise RuntimeError("Existing KiraBridge config is missing; no service modified")
+    validate_service_owner(args)
+    run(
+        [
+            python(release), "-c",
+            "import sys; from kirabridge.bridge_core.config import load_config; "
+            "from kirabridge.local_runtime import load_service_credentials; "
+            "config = load_config(sys.argv[1]); "
+            "load_service_credentials(config); config.validate_network()",
+            str(args.config),
+        ],
+        capture=True,
+        timeout=15,
+    )
+    if args.service != "none":
+        if not loaded(args):
+            raise RuntimeError("Current KiraBridge launchd service is not registered; no switch")
+        health = json.loads(run([args.launcher, "status"], capture=True, timeout=10))
+        if not health.get("dispatcher_active") or not isinstance(health.get("version"), str):
+            raise RuntimeError("Current KiraBridge health is not ready; no switch")
+        say(f"PREFLIGHT PASS: current service {health['version']} responding; RC13 configuration valid.")
+    else:
+        say("PREFLIGHT PASS: RC13 config valid (unmanaged service not tested).")
+    say("No service was stopped, started or replaced.")
+
+
 def activate(args, release):
     fresh_config(args, release)
     validate_service_owner(args)
+    # Validate RC13 with the installed configuration before touching RC11.
+    run(
+        [
+            python(release),
+            "-c",
+            "import sys; from kirabridge.bridge_core.config import load_config; "
+            "from kirabridge.local_runtime import load_service_credentials; "
+            "config = load_config(sys.argv[1]); "
+            "load_service_credentials(config); config.validate_network()",
+            str(args.config),
+        ],
+        capture=True,
+        timeout=15,
+    )
     config_before = args.config.read_bytes()
     config = settings(args.config)
     credentials = Path(config["credentials_file"]) if config.get("credentials_file") else None
@@ -408,7 +503,12 @@ def activate(args, release):
     previous_health = None
     if args.service != "none":
         try:
-            previous_health = cli(Path(old["release"]) if old else release, args.config, "status", timeout=8)
+            # An older installation may predate current.json; inspect its installed
+            # launcher rather than asking the candidate RC13 to load RC11 settings.
+            previous_health = (
+                cli(Path(old["release"]), args.config, "status", timeout=8)
+                if old else json.loads(run([args.launcher, "status"], capture=True, timeout=8))
+            )
         except (RuntimeError, subprocess.TimeoutExpired, ValueError):
             if was_loaded:
                 raise RuntimeError("Existing service health unavailable; no switch") from None
@@ -542,7 +642,26 @@ def rollback(args):
         if active["was_loaded"]:
             start_service(args)
     if active["was_loaded"] and active.get("previous_version"):
-        wait_health(args, Path(active["release"]), active["previous_version"])
+        if active["previous"]:
+            wait_health(args, Path(active["previous"]["release"]), active["previous_version"])
+        else:
+            # Legacy RC11 has no versioned release record. Its restored launcher
+            # is authoritative; never probe the failed RC13 candidate.
+            deadline = time.monotonic() + 30
+            last_error = "no status response"
+            while time.monotonic() < deadline:
+                try:
+                    health = json.loads(run([args.launcher, "status"], capture=True, timeout=8))
+                    if (health.get("version") == active["previous_version"]
+                            and health.get("dispatcher_active")
+                            and loaded(args)):
+                        break
+                    last_error = "legacy version, dispatcher or launchd registration mismatch"
+                except (RuntimeError, ValueError, subprocess.TimeoutExpired) as exc:
+                    last_error = str(exc)[:500]
+                time.sleep(0.5)
+            else:
+                raise RuntimeError(f"Restored legacy daemon readiness not proven: {last_error}")
     say(
         "ZURÜCKGEROLLT: vorheriger Launcher/Dienst wiederhergestellt. "
         "Konfiguration, Zugangsdaten und neue Ergebnisdaten bleiben erhalten."
@@ -565,7 +684,7 @@ def status(args):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("action", choices=["prepare", "install", "status", "rollback"])
+    parser.add_argument("action", choices=["prepare", "preflight", "install", "status", "rollback"])
     parser.add_argument("--repo", type=Path, default=Path(__file__).resolve().parents[1])
     parser.add_argument("--ref")
     parser.add_argument(
@@ -606,9 +725,12 @@ def main():
     fd = os.open(args.prefix / "install.lock", os.O_CREAT | os.O_RDWR | os.O_NOFOLLOW, 0o600)
     try:
         fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
-        if args.action in ("prepare", "install"):
+        if args.action in ("prepare", "preflight", "install"):
             release = prepare(args)
-            if args.action == "install":
+            if args.action == "preflight":
+                preflight(args, release)
+            elif args.action == "install":
+                preflight(args, release)
                 activate(args, release)
         elif args.action == "rollback":
             rollback(args)
