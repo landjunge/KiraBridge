@@ -5,7 +5,7 @@ REPO="https://github.com/landjunge/KiraBridge.git"
 BRANCH="fix/rc13-installer-readiness-20261021"
 DEST="${KIRABRIDGE_RC13_DIR:-$HOME/.local/share/kirabridge/rc13-installer-source}"
 ACTION="${1:---prepare}"
-case "$ACTION" in --prepare|install|doctor|restart) ;; *) echo "Usage: bootstrap-rc13.sh [--prepare|install|doctor|restart]" >&2; exit 2;; esac
+case "$ACTION" in --prepare|--check|install|doctor|restart) ;; *) echo "Usage: bootstrap-rc13.sh [--prepare|--check|install|doctor|restart]" >&2; exit 2;; esac
 command -v git >/dev/null 2>&1 || { echo "Git missing; install macOS Command Line Tools with xcode-select --install" >&2; exit 2; }
 mkdir -p "$(dirname "$DEST")"
 if [[ -e "$DEST" || -L "$DEST" ]]; then
