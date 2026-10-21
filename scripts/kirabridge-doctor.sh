@@ -24,10 +24,10 @@ fi
 echo "launchd: registered"
 # 'status' performs an authenticated MCP bridge_health roundtrip to the local daemon.
 # A successful launchd registration by itself cannot prove MCP responsiveness.
-if ! "$CLI" status; then
+if ! HEALTH="$("$CLI" status)"; then
   echo "FAIL: authenticated MCP health check did not succeed" >&2
   exit 1
 fi
-echo "PASS: local MCP health responded (inspect dispatcher_active above)."
+printf '%s\n' "$HEALTH" | python3 -c 'import json,sys; d=json.load(sys.stdin); ok=d.get("dispatcher_active") is True and isinstance(d.get("version"),str); print(("PASS" if ok else "FAIL")+": MCP "+("connected, dispatcher running, version "+d["version"] if ok else "response received but dispatcher/version invalid")); sys.exit(0 if ok else 1)' || exit 1
 echo "NOTE: This does not prove the external ChatGPT connector or public tunnel is reachable."
 echo "Doctor finished. Review the reported health before making changes."
