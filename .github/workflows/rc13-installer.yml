@@ -46,9 +46,9 @@ jobs:
           {
             python -m py_compile installer/install.py
             echo "py_compile exit: $?"
-            bash -n scripts/install-rc13.sh scripts/kirabridge-doctor.sh
+            bash -n scripts/bootstrap-rc13.sh scripts/install-rc13.sh scripts/kirabridge-doctor.sh
             echo "shell syntax exit: $?"
-            python -m pytest -ra -v tests/test_rc13_start_path_isolated.py tests/test_rc13_installer_readiness.py tests/test_rc13_entrypoint.py tests/test_rc13_doctor.py --junitxml=rc13-test-results.xml
+            python -m pytest -ra -v tests/test_rc13_start_path_isolated.py tests/test_rc13_installer_readiness.py tests/test_rc13_entrypoint.py tests/test_rc13_doctor.py tests/test_rc13_bootstrap.py --junitxml=rc13-test-results.xml
             result=$?
             echo "pytest exit: $result"
             exit "$result"
