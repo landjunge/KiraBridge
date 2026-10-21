@@ -440,7 +440,12 @@ def activate(args, release):
     previous_health = None
     if args.service != "none":
         try:
-            previous_health = cli(Path(old["release"]) if old else release, args.config, "status", timeout=8)
+            # An older installation may predate current.json; inspect its installed
+            # launcher rather than asking the candidate RC13 to load RC11 settings.
+            previous_health = (
+                cli(Path(old["release"]), args.config, "status", timeout=8)
+                if old else json.loads(run([args.launcher, "status"], capture=True, timeout=8))
+            )
         except (RuntimeError, subprocess.TimeoutExpired, ValueError):
             if was_loaded:
                 raise RuntimeError("Existing service health unavailable; no switch") from None
