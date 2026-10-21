@@ -1,0 +1,65 @@
+name: RC13 installer start checks
+
+on:
+  push:
+    branches:
+      - fix/rc13-installer-readiness-20261021
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  runner-smoke:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, macos-15]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 5
+    steps:
+      - name: Prove runner can execute a basic command
+        shell: bash
+        run: |
+          echo "RC13 runner smoke check"
+          uname -s
+          echo "Runner ready"
+  isolated-start:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, macos-15]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install pytest
+        run: python -m pip install 'pytest>=8,<10'
+      - name: Compile installer and run isolated start checks
+        shell: bash
+        run: |
+          set +e
+          {
+            python -m py_compile installer/install.py
+            echo "py_compile exit: $?"
+            bash -n scripts/bootstrap-rc13.sh scripts/install-rc13.sh scripts/kirabridge-doctor.sh
+            echo "shell syntax exit: $?"
+            python -m pytest -ra -v tests/test_rc13_start_path_isolated.py tests/test_rc13_installer_readiness.py tests/test_rc13_entrypoint.py tests/test_rc13_doctor.py tests/test_rc13_bootstrap.py tests/test_rc13_partial_prepare.py tests/test_rc13_preflight.py --junitxml=rc13-test-results.xml
+            result=$?
+            echo "pytest exit: $result"
+            exit "$result"
+          } 2>&1 | tee rc13-diagnostics.log
+          exit "${PIPESTATUS[0]}"
+      - name: Upload test results even when checks fail
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: rc13-results-${{ matrix.os }}
+          path: |
+            rc13-test-results.xml
+            rc13-diagnostics.log
+          if-no-files-found: warn

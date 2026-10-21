@@ -326,7 +326,7 @@ wheels = [
 
 [[package]]
 name = "kirabridge"
-version = "0.8.0rc11"
+version = "0.8.0rc13"
 source = { editable = "." }
 dependencies = [
     { name = "httpx" },
