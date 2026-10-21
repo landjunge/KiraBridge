@@ -1,0 +1,31 @@
+name: RC13 installer start checks
+
+on:
+  push:
+    branches:
+      - fix/rc13-installer-readiness-20261021
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  isolated-start:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, macos-15]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install pytest
+        run: python -m pip install 'pytest>=8,<10'
+      - name: Compile installer and run isolated start checks
+        run: |
+          python -m py_compile installer/install.py
+          python -m pytest -q tests/test_rc13_start_path_isolated.py tests/test_rc13_installer_readiness.py
