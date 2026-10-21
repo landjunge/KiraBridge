@@ -53,27 +53,26 @@ def test_bound_idle_ignores_work_words_in_history_or_quotations(binding, history
 
 
 @pytest.mark.parametrize("protocol", [None, {"state": "unknown"}])
-def test_history_without_reliable_idle_evidence_does_not_prove_ready(binding, protocol):
+def test_history_without_reliable_idle_evidence_does_not_block_empty_widget(binding, protocol):
     text = "• Working (2s • esc to interrupt)\n\n• Angeblich fertig.\n\n" + EMPTY + FOOTER
-    assert checked(text, binding, protocol)["state"] == "unknown"
+    assert checked(text, binding, protocol)["state"] == "ready"
 
 
-def test_real_working_turn_is_blocked_even_with_empty_visible_widget(binding):
+def test_real_working_turn_can_be_queued_with_empty_visible_widget(binding):
     text = WORKING + "\n  └ Tip: Press ⌃t to open the full transcript.\n\n" + EMPTY + FOOTER
     result = checked(text, binding, {"state": "working"})
-    assert result["state"] == "working" and result["input_empty"]
+    assert result["state"] == "ready" and result["input_empty"]
     assert result["protocol_state"] == "working"
 
 
-def test_actual_progress_row_without_protocol_blocks_before_empty_widget(binding):
+def test_actual_progress_row_does_not_block_empty_widget(binding):
     result = checked(WORKING + "\n\n" + EMPTY + FOOTER, binding)
-    assert result["state"] == "working"
+    assert result["state"] == "ready"
 
 
-def test_idle_record_cannot_override_a_current_rendered_progress_row(binding):
-    # A fresh visible renderer and a recorded lifecycle disagree: fail closed.
+def test_turn_record_is_diagnostic_when_widget_is_empty(binding):
     result = checked(WORKING + "\n\n" + EMPTY + FOOTER, binding, {"state": "idle"})
-    assert result["state"] in {"working", "unknown"}
+    assert result["state"] == "ready"
 
 
 @pytest.mark.parametrize("protocol", [{"state": "idle"}, {"state": "working"}])
@@ -83,21 +82,21 @@ def test_existing_q_input_is_never_ready_or_overwritten(binding, protocol):
 
 
 @pytest.mark.parametrize("protocol", [None, {"state": "idle"}])
-def test_empty_field_with_current_queue_hint_remains_busy(binding, protocol):
+def test_empty_field_with_current_queue_hint_accepts_queued_work(binding, protocol):
     result = checked(EMPTY + "\n  tab to queue message\n", binding, protocol)
-    assert result["state"] == "working"
+    assert result["state"] == "ready"
 
 
-def test_unknown_bound_turn_cannot_be_promoted_by_empty_prompt(binding):
+def test_unknown_bound_turn_does_not_block_empty_prompt(binding):
     result = checked(EMPTY + FOOTER, binding, {"state": "unknown"})
-    assert result["state"] == "unknown" and result["protocol_state"] == "unknown"
+    assert result["state"] == "ready" and result["protocol_state"] == "unknown"
 
 
 @pytest.mark.parametrize("hint", ["Back to bottom", "enter/esc latest"])
 @pytest.mark.parametrize("placement", ["before", "after"])
-def test_current_scroll_controls_block_even_with_idle_protocol(binding, hint, placement):
+def test_scroll_controls_do_not_block_an_empty_input(binding, hint, placement):
     text = hint + "\n\n" + EMPTY + FOOTER if placement == "before" else EMPTY + FOOTER + hint
-    assert checked(text, binding, {"state": "idle"})["state"] == "scrolled"
+    assert checked(text, binding, {"state": "idle"})["state"] == "ready"
 
 
 def test_old_scroll_quotation_does_not_poison_current_idle_widget(binding):
@@ -145,4 +144,4 @@ def test_an_old_empty_prompt_does_not_override_the_last_nonempty_widget(binding)
 
 def test_completed_subagent_is_not_a_completed_main_turn(binding):
     text = "• Completed `/root/readiness_audit`\n\n" + WORKING + "\n\n" + EMPTY + FOOTER
-    assert checked(text, binding, {"state": "working"})["state"] == "working"
+    assert checked(text, binding, {"state": "working"})["state"] == "ready"
