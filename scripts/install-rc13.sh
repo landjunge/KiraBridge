@@ -48,7 +48,7 @@ if command -v python3 >/dev/null 2>&1 && python3 -c 'import sys; assert sys.vers
   PYTHON="$(command -v python3)"
 else
   info "System Python is older than 3.11. Finding isolated Python via uv..."
-  if ! PYTHON="$(uv python find '>=3.11,<3.14' --no-managed-python 2>/dev/null)"; then
+  if ! PYTHON="$(uv python find '>=3.11,<3.14' 2>/dev/null)"; then
     printf '  Python 3.11+ is missing. Install isolated Python 3.11 using uv? [y/N] '
     read -r answer
     [[ "$answer" == y || "$answer" == Y ]] || fail "Declined isolated Python installation. RC11 unchanged."
