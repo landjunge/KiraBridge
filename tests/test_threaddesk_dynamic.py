@@ -1,9 +1,9 @@
 """Security and compatibility boundaries for opt-in dynamic ThreadDesk tools."""
 
-from types import SimpleNamespace
-from unittest.mock import AsyncMock
 import asyncio
 import json
+from types import SimpleNamespace
+from unittest.mock import AsyncMock
 
 import pytest
 
