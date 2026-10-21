@@ -33,3 +33,8 @@ def test_rollback_checks_restored_release_not_failed_candidate():
     source = (Path(__file__).resolve().parents[1] / "installer" / "install.py").read_text()
     rollback = source.split("def rollback(args):", 1)[1].split("\ndef status(", 1)[0]
     assert 'Path(active["previous"]["release"]) if active["previous"] else Path(active["release"])' in rollback
+
+def test_existing_legacy_daemon_uses_its_own_launcher_for_status():
+    source = (Path(__file__).resolve().parents[1] / "installer" / "install.py").read_text()
+    activation = source.split("def activate(args, release):", 1)[1].split("\ndef rollback(", 1)[0]
+    assert 'if old else json.loads(run([args.launcher, "status"], capture=True, timeout=8))' in activation
