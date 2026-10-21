@@ -25,10 +25,8 @@ _MAX_ARGUMENTS = 65536
 def _guard(bridge: Any, principal: str) -> None:
     if not bridge.config.threaddesk.dynamic_read_proxy:
         raise BridgeError("threaddesk_proxy_disabled", "Dynamic ThreadDesk proxy is disabled")
-    bridge.security.principal(principal, "threaddesk.read")
-    from kirabridge.permissions import decision
-
-    if not decision(bridge.config, principal, "threaddesk.read")["automatic"]:
+    policy = bridge.security.principal(principal, "threaddesk.read")
+    if policy.approval_mode != "automatic":
         raise BridgeError("approval_required", "Read permission must be automatic for live proxy")
 
 
