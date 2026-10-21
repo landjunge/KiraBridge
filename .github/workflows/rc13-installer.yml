@@ -29,4 +29,11 @@ jobs:
         run: |
           python -m py_compile installer/install.py
           bash -n scripts/install-rc13.sh scripts/kirabridge-doctor.sh
-          python -m pytest -q tests/test_rc13_start_path_isolated.py tests/test_rc13_installer_readiness.py tests/test_rc13_entrypoint.py tests/test_rc13_doctor.py
+          python -m pytest -q tests/test_rc13_start_path_isolated.py tests/test_rc13_installer_readiness.py tests/test_rc13_entrypoint.py tests/test_rc13_doctor.py --junitxml=rc13-test-results.xml
+      - name: Upload test results even when checks fail
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: rc13-results-${{ matrix.os }}
+          path: rc13-test-results.xml
+          if-no-files-found: warn
