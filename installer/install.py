@@ -431,6 +431,36 @@ def snapshot_file(path, backup, name):
     return False
 
 
+
+def preflight(args, release):
+    """Validate candidate and current service without activating the candidate."""
+    if not args.config.is_file():
+        raise RuntimeError("Existing KiraBridge config is missing; no service modified")
+    validate_service_owner(args)
+    run(
+        [
+            python(release), "-c",
+            "import sys; from kirabridge.bridge_core.config import load_config; "
+            "from kirabridge.local_runtime import load_service_credentials; "
+            "config = load_config(sys.argv[1]); "
+            "load_service_credentials(config); config.validate_network()",
+            str(args.config),
+        ],
+        capture=True,
+        timeout=15,
+    )
+    if args.service != "none":
+        if not loaded(args):
+            raise RuntimeError("Current KiraBridge launchd service is not registered; no switch")
+        health = json.loads(run([args.launcher, "status"], capture=True, timeout=10))
+        if not health.get("dispatcher_active") or not isinstance(health.get("version"), str):
+            raise RuntimeError("Current KiraBridge health is not ready; no switch")
+        say(f"PREFLIGHT PASS: current service {health['version']} responding; RC13 configuration valid.")
+    else:
+        say("PREFLIGHT PASS: RC13 config valid (unmanaged service not tested).")
+    say("No service was stopped, started or replaced.")
+
+
 def activate(args, release):
     fresh_config(args, release)
     validate_service_owner(args)
@@ -654,7 +684,7 @@ def status(args):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("action", choices=["prepare", "install", "status", "rollback"])
+    parser.add_argument("action", choices=["prepare", "preflight", "install", "status", "rollback"])
     parser.add_argument("--repo", type=Path, default=Path(__file__).resolve().parents[1])
     parser.add_argument("--ref")
     parser.add_argument(
@@ -695,9 +725,12 @@ def main():
     fd = os.open(args.prefix / "install.lock", os.O_CREAT | os.O_RDWR | os.O_NOFOLLOW, 0o600)
     try:
         fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
-        if args.action in ("prepare", "install"):
+        if args.action in ("prepare", "preflight", "install"):
             release = prepare(args)
-            if args.action == "install":
+            if args.action == "preflight":
+                preflight(args, release)
+            elif args.action == "install":
+                preflight(args, release)
                 activate(args, release)
         elif args.action == "rollback":
             rollback(args)
