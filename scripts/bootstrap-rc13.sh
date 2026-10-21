@@ -12,9 +12,10 @@ if [[ -e "$DEST" || -L "$DEST" ]]; then
   [[ ! -L "$DEST" ]] || { echo "Refusing symlink source location: $DEST" >&2; exit 2; }
   [[ -d "$DEST/.git" && ! -L "$DEST/.git" ]] || { echo "Refusing to replace non-repository: $DEST" >&2; exit 2; }
   [[ -z "$(git -C "$DEST" status --porcelain)" ]] || { echo "Uncommitted source changes at $DEST; refusing update" >&2; exit 2; }
+  [[ "$(git -C "$DEST" branch --show-current)" == "$BRANCH" ]] || { echo "Unexpected checked out branch; refusing update" >&2; exit 2; }
   [[ "$(git -C "$DEST" remote get-url origin)" == "$REPO" ]] || { echo "Unexpected origin at $DEST; refusing update" >&2; exit 2; }
   git -C "$DEST" fetch origin "$BRANCH"
-  git -C "$DEST" checkout -B "$BRANCH" "origin/$BRANCH"
+  git -C "$DEST" merge --ff-only "origin/$BRANCH"
 else
   git clone --depth 1 --single-branch --branch "$BRANCH" "$REPO" "$DEST"
 fi
