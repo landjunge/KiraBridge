@@ -46,9 +46,13 @@ def run(argv, *, capture=False, timeout=600, **kwargs):
         **kwargs,
     )
     try:
-        stdout, _ = process.communicate(timeout=timeout)
+        stdout, stderr = process.communicate(timeout=timeout)
         if process.returncode:
-            raise RuntimeError(f"command failed ({process.returncode}): {Path(str(argv[0])).name}")
+            detail = (stderr or b"").decode("utf-8", errors="replace").strip()[-1200:]
+            raise RuntimeError(
+                f"command failed ({process.returncode}): {Path(str(argv[0])).name}"
+                + (f"; stderr: {detail}" if detail else "")
+            )
         return stdout if capture else None
     except BaseException:
         try:
