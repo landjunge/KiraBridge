@@ -8,8 +8,9 @@ ACTION="${1:---prepare}"
 case "$ACTION" in --prepare|install|doctor|restart) ;; *) echo "Usage: bootstrap-rc13.sh [--prepare|install|doctor|restart]" >&2; exit 2;; esac
 command -v git >/dev/null 2>&1 || { echo "Git missing; install macOS Command Line Tools with xcode-select --install" >&2; exit 2; }
 mkdir -p "$(dirname "$DEST")"
-if [[ -e "$DEST" ]]; then
-  [[ -d "$DEST/.git" ]] || { echo "Refusing to replace non-repository: $DEST" >&2; exit 2; }
+if [[ -e "$DEST" || -L "$DEST" ]]; then
+  [[ ! -L "$DEST" ]] || { echo "Refusing symlink source location: $DEST" >&2; exit 2; }
+  [[ -d "$DEST/.git" && ! -L "$DEST/.git" ]] || { echo "Refusing to replace non-repository: $DEST" >&2; exit 2; }
   [[ -z "$(git -C "$DEST" status --porcelain)" ]] || { echo "Uncommitted source changes at $DEST; refusing update" >&2; exit 2; }
   [[ "$(git -C "$DEST" remote get-url origin)" == "$REPO" ]] || { echo "Unexpected origin at $DEST; refusing update" >&2; exit 2; }
   git -C "$DEST" fetch origin "$BRANCH"
