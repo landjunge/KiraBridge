@@ -72,7 +72,8 @@ async def connect_stdio(config, principal):
                     schema = item.get("inputSchema")
                     if (
                         isinstance(name, str)
-                        and name.startswith(tuple("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"))
+                        and name[:1].isascii()
+                        and name[:1].isalpha()
                         and name.replace("_", "").replace("-", "").isalnum()
                         and len(name) <= 64
                         and isinstance(schema, dict)
