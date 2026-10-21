@@ -153,6 +153,7 @@ class ThreadDeskConfig(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
     enabled: bool = False
+    dynamic_read_proxy: bool = False  # Explicit opt-in: requires existing threaddesk.read permission.
     command: str | None = None
     args: list[str] = Field(default_factory=list, max_length=32)
     workspace: str | None = None
