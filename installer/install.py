@@ -351,7 +351,13 @@ def wait_health(args, release, version):
                 and health.get("dispatcher_active")
                 and health.get("runtime", {}).get("config_sha256") == sha(args.config)
             ):
-                return health
+                # A healthy endpoint is insufficient when launchd failed to
+                # register the service expected to survive this installer.
+                if args.service == "none" or loaded(args):
+                    return health
+                last_error = "health responded, but expected launchd service is not registered"
+                time.sleep(0.5)
+                continue
             last_error = (
                 f"health mismatch: version={health.get('version')!r}, "
                 f"dispatcher_active={health.get('dispatcher_active')!r}, "
