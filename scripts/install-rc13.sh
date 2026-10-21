@@ -24,7 +24,15 @@ mode="${1:-install}"
 
 info "1/3 Checking environment"
 command -v git >/dev/null 2>&1 || fail "Git is required. Install Apple's Command Line Tools first: xcode-select --install"
-command -v uv >/dev/null 2>&1 || fail "uv is not installed. See https://docs.astral.sh/uv/getting-started/installation/ . Nothing changed."
+if ! command -v uv >/dev/null 2>&1; then
+  if ! command -v brew >/dev/null 2>&1; then
+    fail "uv is missing and Homebrew is unavailable. Install uv from https://docs.astral.sh/uv/getting-started/installation/ and retry."
+  fi
+  printf '  uv is missing. Install it via Homebrew? [y/N] '
+  read -r answer
+  [[ "$answer" == y || "$answer" == Y ]] || fail "Declined uv installation. Nothing switched."
+  brew install uv
+fi
 [[ -z "$(git status --porcelain --untracked-files=no)" ]] || fail "Working tree has modifications. No installation started."
 
 # uv can provision isolated Python 3.11 without replacing the Mac's system Python.
@@ -33,7 +41,11 @@ if command -v python3 >/dev/null 2>&1 && python3 -c 'import sys; assert sys.vers
 else
   info "System Python is older than 3.11. Finding isolated Python via uv..."
   if ! PYTHON="$(uv python find '>=3.11,<3.14' --no-managed-python 2>/dev/null)"; then
-    fail "Python 3.11+ not found. Run: uv python install 3.11 ; then retry. RC11 is unchanged."
+    printf '  Python 3.11+ is missing. Install isolated Python 3.11 using uv? [y/N] '
+    read -r answer
+    [[ "$answer" == y || "$answer" == Y ]] || fail "Declined isolated Python installation. RC11 unchanged."
+    uv python install 3.11
+    PYTHON="$(uv python find 3.11)" || fail "Could not locate newly installed Python 3.11."
   fi
 fi
 
