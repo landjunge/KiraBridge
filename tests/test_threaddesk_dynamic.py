@@ -26,11 +26,6 @@ def tool(name, *, readonly=True, destructive=False, schema=None):
 
 
 def bridge_fixture(monkeypatch, *, enabled=True, automatic=True):
-    from kirabridge import permissions
-
-    monkeypatch.setattr(
-        permissions, "decision", lambda config, principal, operation: {"automatic": automatic}
-    )
     listing = SimpleNamespace(tools=[tool("new_read"), tool("writer", readonly=False)])
     manager = SimpleNamespace(
         lock=asyncio.Lock(),
@@ -47,7 +42,11 @@ def bridge_fixture(monkeypatch, *, enabled=True, automatic=True):
     )
     bridge = SimpleNamespace(
         config=SimpleNamespace(threaddesk=SimpleNamespace(dynamic_read_proxy=enabled)),
-        security=SimpleNamespace(principal=lambda *args: None),
+        security=SimpleNamespace(
+            principal=lambda *args: SimpleNamespace(
+                approval_mode="automatic" if automatic else "manual"
+            )
+        ),
         threaddesk=manager,
     )
     return bridge, listing
