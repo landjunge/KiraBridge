@@ -32,7 +32,9 @@ def test_service_credentials_and_network_checked_before_switch():
 def test_rollback_checks_restored_release_not_failed_candidate():
     source = (Path(__file__).resolve().parents[1] / "installer" / "install.py").read_text()
     rollback = source.split("def rollback(args):", 1)[1].split("\ndef status(", 1)[0]
-    assert 'Path(active["previous"]["release"]) if active["previous"] else Path(active["release"])' in rollback
+    assert 'wait_health(args, Path(active["previous"]["release"]), active["previous_version"])' in rollback
+    assert 'json.loads(run([args.launcher, "status"], capture=True, timeout=8))' in rollback
+    assert 'legacy version, dispatcher or launchd registration mismatch' in rollback
 
 def test_existing_legacy_daemon_uses_its_own_launcher_for_status():
     source = (Path(__file__).resolve().parents[1] / "installer" / "install.py").read_text()
