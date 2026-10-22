@@ -369,10 +369,16 @@ def start_service(args):
             text=True,
             timeout=20,
         )
-        if result.returncode == 0 and loaded(args):
+        if result.returncode == 0:
+            if not loaded(args):
+                raise RuntimeError(
+                    "KiraBridge launchd bootstrap returned success but service is absent"
+                )
             return
         last = (result.stderr or result.stdout).strip()[:500]
-        if loaded(args):
+        if not loaded(args):
+            pass  # Confirmed absent; bounded retry only for launchctl exit 5.
+        else:
             raise RuntimeError("Bootstrap reported an error but service is already registered")
         if result.returncode != 5 or attempt == 2:
             break
