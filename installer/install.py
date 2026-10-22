@@ -574,13 +574,26 @@ def activate(args, release):
                 )
             jwrite(current, before)  # Durable recovery record before any switch.
             stop_service(args)
-            wrapper = (
+            # Friendly front-end for interactive users. The actual service and all
+            # expert commands still invoke the exact pinned release executable.
+            frontend = getattr(args, "repo", Path(__file__).resolve().parents[1]) / "scripts" / "kirabridge-easy.sh"
+            backend = (
                 "#!/bin/sh\nexec "
                 + shlex.quote(str(python(release)))
                 + " -m kirabridge.cli --config "
                 + shlex.quote(str(args.config))
                 + ' "$@"\n'
             )
+            wrapper = (
+                frontend.read_text(encoding="utf-8").replace(
+                    'BACKEND="${KIRABRIDGE_BACKEND:-$HOME/.local/bin/kirabridge-core}"',
+                    'BACKEND=' + shlex.quote(str(args.launcher) + "-core"),
+                )
+                if frontend.exists()
+                else backend
+            )
+            if frontend.exists():
+                atomic(Path(str(args.launcher) + "-core"), backend, 0o700)
             atomic(args.launcher, wrapper, 0o700)
             if args.service != "none":
                 plist = (
