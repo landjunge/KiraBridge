@@ -33,6 +33,14 @@ def parse_request(path: str) -> TaskRequest:
 
 
 async def execute(args) -> None:
+    if args.command == "install":
+        from kirabridge.installation import guided_install
+        from kirabridge.local_runtime import default_config
+
+        config_path = Path(args.config).expanduser().absolute() if args.config else default_config()
+        release_root = Path(args.release_root).expanduser().absolute() if args.release_root else None
+        emit(await guided_install(config_path, release_root, language=args.language, check=args.check))
+        return
     if args.command == "setup":
         from kirabridge.local_runtime import setup
 
@@ -516,6 +524,10 @@ def main() -> None:
     parser.add_argument("--config", help="TOML policy file (or KIRABRIDGE_CONFIG)")
     parser.add_argument("--principal", default="local", help="Local CLI/stdio policy identity")
     sub = parser.add_subparsers(dest="command", required=True)
+    install = sub.add_parser("install", help="Guided local installation; --check changes nothing")
+    install.add_argument("--check", action="store_true", help="Read-only prerequisite check")
+    install.add_argument("--language", choices=["de", "en"], default="de")
+    install.add_argument("--release-root", help="Optional existing release directory")
     setup = sub.add_parser("setup", help="Create private local policy, credentials and CLI command")
     setup.add_argument("--workspace", default=str(Path.home() / "workspace/KiraBridge"))
     sub.add_parser("status", help="Query the running local daemon")
