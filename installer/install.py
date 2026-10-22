@@ -347,6 +347,11 @@ def loaded(args):
 def stop_service(args):
     if loaded(args):
         run(["launchctl", "bootout", f"gui/{os.getuid()}/{LABEL}"], capture=True, timeout=20)
+        deadline = time.monotonic() + 10
+        while loaded(args) and time.monotonic() < deadline:
+            time.sleep(0.25)
+        if loaded(args):
+            raise RuntimeError("KiraBridge launchd service still registered after bootout")
 
 
 def start_service(args):
@@ -354,19 +359,28 @@ def start_service(args):
         return
     if not args.plist.is_file():
         raise RuntimeError("KiraBridge launchd plist missing; cannot start service")
-    result = subprocess.run(
-        ["launchctl", "bootstrap", f"gui/{os.getuid()}", str(args.plist)],
-        capture_output=True,
-        text=True,
-        timeout=20,
-    )
-    if result.returncode:
-        detail = (result.stderr or result.stdout).strip()[:500]
-        raise RuntimeError(
-            f"KiraBridge launchd bootstrap failed (exit {result.returncode}): {detail}"
+    # launchctl can return EIO while launchd releases the old job label.
+    # Only retry the same service definition, without touching unrelated jobs.
+    last = ""
+    for attempt in range(3):
+        result = subprocess.run(
+            ["launchctl", "bootstrap", f"gui/{os.getuid()}", str(args.plist)],
+            capture_output=True,
+            text=True,
+            timeout=20,
         )
-    if not loaded(args):
-        raise RuntimeError("KiraBridge launchd bootstrap returned success but service is absent")
+        if result.returncode == 0 and loaded(args):
+            return
+        last = (result.stderr or result.stdout).strip()[:500]
+        if loaded(args):
+            raise RuntimeError("Bootstrap reported an error but service is already registered")
+        if result.returncode != 5 or attempt == 2:
+            break
+        time.sleep(1 + attempt)
+    raise RuntimeError(
+        f"KiraBridge launchd bootstrap failed (exit {result.returncode}): {last}; "
+        "inspect launchd and service stderr, do not use sudo"
+    )
 
 
 def wait_health(args, release, version):
