@@ -14,10 +14,11 @@ from datetime import datetime, timezone
 from kirabridge.bridge_core.models import BridgeError, canonical
 from kirabridge.filesystem_manager import PathScope
 
-MAX_IMAGE_BYTES = 1048576
-MAX_IMAGE_SIDE = 2048
-MAX_IMAGE_PIXELS = 4194304
-MAX_TOOL_BYTES = 2097152
+# Bound allocation and MCP payload size without excluding ordinary macOS screenshots.
+MAX_IMAGE_BYTES = 8 * 1024 * 1024
+MAX_IMAGE_SIDE = 4096
+MAX_IMAGE_PIXELS = 16 * 1024 * 1024
+MAX_TOOL_BYTES = 16 * 1024 * 1024
 SIGNATURE = b"\x89PNG\r\n\x1a\n"
 
 
@@ -28,12 +29,12 @@ def invalid() -> BridgeError:
 def validate_png(data: bytes) -> tuple[int, int]:
     """Validate actual compressed rows, not just dimensions. No third-party decoder.
 
-    Intentionally narrow: static, non-interlaced 8-bit RGB/RGBA; optional fixed-size
-    colour/physical metadata only. Text, ICC profiles, animation and unknown chunks
-    are rejected rather than passed to another decoder with different limits.
+    Pixel decoding is bounded to static, non-interlaced 8-bit RGB/RGBA.
+    Preserve metadata byte-for-byte: verify framing and CRC of ancillary chunks
+    without decoding their payloads; reject unknown critical chunks.
     """
     if len(data) > MAX_IMAGE_BYTES:
-        raise BridgeError("image_limit", "PNG exceeds the one MiB limit")
+        raise BridgeError("image_limit", "PNG exceeds the eight MiB limit")
     if not data.startswith(SIGNATURE):
         raise invalid()
     offset, width, height, channels, chunks = 8, 0, 0, 0, 0
@@ -85,6 +86,9 @@ def validate_png(data: bytes) -> tuple[int, int]:
             if length or b"IDAT" not in seen:
                 raise invalid()
             ended = True
+        elif kind == b"PLTE":
+            if kind in seen or b"IDAT" in seen or length % 3 or not 3 <= length <= 768:
+                raise invalid()
         elif kind in metadata_lengths:
             if kind in seen or b"IDAT" in seen or length != metadata_lengths[kind]:
                 raise invalid()
@@ -95,7 +99,16 @@ def validate_png(data: bytes) -> tuple[int, int]:
             if kind == b"gAMA" and not int.from_bytes(payload, "big"):
                 raise invalid()
         else:
-            raise invalid()
+            # PNG ancillary chunks are safe to carry as opaque bytes: all chunk
+            # lengths and checksums have already been checked above. These
+            # include iCCP, eXIf and iTXt written by macOS screencapture.
+            # Unknown *critical* chunks could change how pixels are decoded.
+            if (
+                not all(65 <= char <= 90 or 97 <= char <= 122 for char in kind)
+                or kind[2] & 0x20  # PNG's reserved third character must be uppercase.
+                or not kind[0] & 0x20
+            ):
+                raise invalid()
         if b"IDAT" in seen and kind != b"IDAT":
             idat_ended = True
         seen.add(kind)
@@ -134,7 +147,7 @@ class ImageManager:
                 if not stat.S_ISREG(before.st_mode):
                     raise BridgeError("file_type", "Only regular image files can be read")
                 if before.st_size > MAX_IMAGE_BYTES:
-                    raise BridgeError("image_limit", "PNG exceeds the one MiB limit")
+                    raise BridgeError("image_limit", "PNG exceeds the eight MiB limit")
                 with os.fdopen(fd, "rb", closefd=False) as source:
                     data = source.read(MAX_IMAGE_BYTES + 1)
                 after = os.fstat(fd)
@@ -200,5 +213,5 @@ def image_task_result(task: dict):
         structuredContent=metadata,
     )
     if len(response.model_dump_json(by_alias=True).encode()) > MAX_TOOL_BYTES:
-        raise BridgeError("image_limit", "Image tool response exceeds two MiB")
+        raise BridgeError("image_limit", "Image tool response exceeds sixteen MiB")
     return response
