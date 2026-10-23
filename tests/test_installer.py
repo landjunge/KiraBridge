@@ -142,3 +142,54 @@ def test_command_timeout_is_bounded_and_does_not_leave_parent_running(installer)
 
     with pytest.raises(subprocess.TimeoutExpired):
         installer.run([sys.executable, "-c", "import time;time.sleep(20)"], timeout=0.05)
+
+
+def test_launchctl_bootstrap_retries_transient_failure(installer, monkeypatch, tmp_path):
+    from subprocess import CompletedProcess
+
+    calls = []
+    sleeps = []
+
+    def fake_run(argv, **kwargs):
+        calls.append((argv, kwargs))
+        code = 5 if len(calls) < 3 else 0
+        return CompletedProcess(argv, code, stdout="", stderr="Input/output error" if code else "")
+
+    monkeypatch.setattr(installer.subprocess, "run", fake_run)
+    monkeypatch.setattr(installer.time, "sleep", sleeps.append)
+    installer.start_service(SimpleNamespace(service="launchd", plist=tmp_path / "test.plist"))
+    assert calls == []  # Nonexistent definition must not bootstrap
+
+    (tmp_path / "test.plist").write_text("placeholder")
+    installer.start_service(SimpleNamespace(service="launchd", plist=tmp_path / "test.plist"))
+    assert len(calls) == 3
+    assert sleeps == [1, 1]
+
+
+def test_launchctl_bootstrap_errors_are_bounded(installer, monkeypatch, tmp_path):
+    from subprocess import CompletedProcess
+
+    path = tmp_path / "test.plist"
+    path.write_text("placeholder")
+    attempts = []
+    monkeypatch.setattr(installer.time, "sleep", lambda n: None)
+
+    def transient(argv, **kwargs):
+        attempts.append(argv)
+        return CompletedProcess(argv, 5, stdout="", stderr="Input/output error")
+
+    monkeypatch.setattr(installer.subprocess, "run", transient)
+    with pytest.raises(RuntimeError, match=r"bootstrap failed \(5\)"):
+        installer.start_service(SimpleNamespace(service="launchd", plist=path))
+    assert len(attempts) == 5
+
+    attempts.clear()
+
+    def permanent(argv, **kwargs):
+        attempts.append(argv)
+        return CompletedProcess(argv, 13, stdout="", stderr="Not permitted")
+
+    monkeypatch.setattr(installer.subprocess, "run", permanent)
+    with pytest.raises(RuntimeError, match="Not permitted"):
+        installer.start_service(SimpleNamespace(service="launchd", plist=path))
+    assert len(attempts) == 1

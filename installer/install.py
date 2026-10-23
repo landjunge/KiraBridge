@@ -337,7 +337,23 @@ def stop_service(args):
 
 def start_service(args):
     if args.service != "none" and args.plist.exists():
-        run(["launchctl", "bootstrap", f"gui/{os.getuid()}", args.plist], capture=True, timeout=20)
+        command = ["launchctl", "bootstrap", f"gui/{os.getuid()}", str(args.plist)]
+        # launchd can still be removing the old job after bootout returns.
+        # macOS reports the pending removal as bootstrap exit code 5
+        # ("Operation already in progress"). Retry *only* that transient
+        # exit code, with a fixed bound, before allowing activate() to roll back.
+        for attempt in range(5):
+            completed = subprocess.run(
+                command, capture_output=True, text=True, timeout=20, check=False
+            )
+            if completed.returncode == 0:
+                return
+            if completed.returncode != 5 or attempt == 4:
+                detail = completed.stderr.strip() or completed.stdout.strip()
+                raise RuntimeError(
+                    f"launchctl bootstrap failed ({completed.returncode}): {detail[:500]}"
+                )
+            time.sleep(1)
 
 
 def wait_health(args, release, version):
