@@ -27,8 +27,10 @@ billing gate, not a passing test. PR review and a successful required CI run
 must precede merge/tag/publication. No new release or download URL is claimed.
 The latest published version remains v0.8.0rc14.
 
-The candidate's authenticated one-line release download can only be tested
-after approved assets exist. Do not substitute guessed URLs or execute curl|sh.
-Local package acceptance is recorded separately in
+The authenticated one-line download has been tested against real draft assets
+with isolated paths on Intel macOS. 960 regression tests and the final actual
+launchd install/upgrade/restart/rollback run pass. Publication remains blocked by
+CI billing and review. Do not substitute guessed URLs or execute curl|sh.
+The exact tested command, package hashes and remaining gates are recorded in
 [the acceptance report](ACCEPTANCE-MACOS-RC15.md). Mobile/Live/ChatGPT and physical
 Apple Silicon acceptance remain distinct from local Intel macOS tests.
