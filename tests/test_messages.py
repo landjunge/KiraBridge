@@ -236,6 +236,30 @@ for event in events:
         config.messaging.receivers[name] = ReceiverConfig(cwd=root, timeout=5)
 
 
+def test_answers_wait_for_requesting_client_and_keep_historical_idempotency(
+    channel, bridge, config, tmp_path
+):
+    configure_receivers(bridge, config, tmp_path)
+    first = channel.send("codex", message(dispatch=True))
+    answer = message(
+        recipient="codex",
+        reply_to=first["id"],
+        kind="answer",
+        dispatch=None,
+        idempotency_key="client-answer",
+    )
+    returned = channel.send("grok", answer)
+    assert returned["processing"] is None
+    assert channel.receive("codex")["messages"][0]["id"] == returned["id"]
+    assert channel.send("grok", answer)["id"] == returned["id"]
+    historical = answer.model_copy(update={"idempotency_key": "old-answer", "dispatch": True})
+    old = channel.send("grok", historical)
+    assert old["processing"]
+    # Historical normalized hashes did not retain whether True was implicit.
+    retry = historical.model_copy(update={"dispatch": None})
+    assert channel.send("grok", retry)["id"] == old["id"]
+
+
 async def test_real_authenticated_mcp_receiver_roundtrip_is_finite(
     channel,
     http_bridge,  # noqa: F811
@@ -259,9 +283,9 @@ async def test_real_authenticated_mcp_receiver_roundtrip_is_finite(
                         "codex", "conversation_get", {"conversation_id": value.conversation_id}
                     )
                 ).structuredContent
-                if len(conv["messages"]) == 2 and all(
-                    m["acknowledged"] and m["processing"]["state"] == "completed"
-                    for m in conv["messages"]
+                if (
+                    len(conv["messages"]) == 2
+                    and conv["messages"][0]["processing"]["state"] == "completed"
                 ):
                     break
                 await asyncio.sleep(0.05)
@@ -269,8 +293,17 @@ async def test_real_authenticated_mcp_receiver_roundtrip_is_finite(
         assert conv["messages"][1]["body"] == "GROK_CHANNEL_ACK"
         assert conv["messages"][1]["reply_to"] == first["id"]
         assert conv["messages"][0]["processing"]["evidence"]["session_id"] == "managed-grok-session"
-        assert (
-            conv["messages"][1]["processing"]["evidence"]["session_id"] == "managed-codex-session"
+        # The requesting Codex client receives its own reply. A separate managed
+        # Codex turn must not consume and acknowledge it before this client can.
+        assert conv["messages"][1]["processing"] is None
+        incoming = (
+            await pool.call("codex", "message_receive", {"conversation_id": value.conversation_id})
+        ).structuredContent["messages"]
+        assert [m["id"] for m in incoming] == [conv["messages"][1]["id"]]
+        await pool.call(
+            "codex",
+            "message_ack",
+            {"message_id": incoming[0]["id"], "receipt": incoming[0]["receipt"]},
         )
         duplicate = (
             await pool.call("codex", "message_send", {"message": value.model_dump()})
@@ -282,10 +315,9 @@ async def test_real_authenticated_mcp_receiver_roundtrip_is_finite(
             "codex", "message_send", {"message": {**value.model_dump(), "sender": "grok"}}
         )
         assert spoof.isError
-        for name in ["codex", "grok"]:
-            assert (
-                Path(config.principals[name].roots[0]) / (name + "-invocations")
-            ).read_text() == "1\n"
+        root = Path(config.principals["grok"].roots[0])
+        assert (root / "grok-invocations").read_text() == "1\n"
+        assert not (root / "codex-invocations").exists()
         assert bridge.store.db.execute("SELECT count(*) FROM messages").fetchone()[0] == 2
         assert verify(bridge.store)["valid"]
 

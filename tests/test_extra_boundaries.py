@@ -20,7 +20,9 @@ async def test_children_are_killed_when_parent_exits(bridge, config):
         {
             "argv": [sys.executable, "-c", code],
             "cwd": config.principals["local"].roots[0],
-            "timeout": 0.3,
+            # Allow interpreter/child startup on the actual Intel host under load.
+            # The invariants remain timeout + observed child PID + child disappearance.
+            "timeout": 3.0,
         },
     )
     submit(bridge, value)

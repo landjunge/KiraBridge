@@ -1,0 +1,19 @@
+{
+  "scope": "ISOLATED REAL INSTALL/HTTP; NOT PRODUCTION LAUNCHD OR CHATGPT HOST",
+  "candidate": "4d00d1d1ad46fa620e34873b951d37ee6e16798c",
+  "previous": "a3b854daa33b4b5ec0da24f39308d2d929aa0f1e",
+  "checks": [
+    "old wheel starts; real file/terminal operations without Events",
+    "busy upgrade refused; process/launcher preserved; own fixture stopped",
+    "new wheel starts; full rights/results preserved; no subscription",
+    "rollback starts old package; config/credentials/new results preserved",
+    "invalid Git ref refused without activation",
+    "separate fresh 0.6.0 install with explicit full access succeeds"
+  ],
+  "production_modified": false,
+  "paid_calls": 0,
+  "event_test_started": false,
+  "upgraded_version": "0.6.0",
+  "rolled_back_version": "0.5.2",
+  "passed": true
+}

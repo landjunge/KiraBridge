@@ -1,0 +1,108 @@
+# Queue management / Warteschlangenverwaltung · unreleased repair
+
+**Development after RC16, not part of the RC16 draft artifacts. Production RC14
+is unchanged. These tools require the reviewed queue-aware code.**
+
+## Deutsch
+
+Die Live-Diagnose zu `dc52c315-b9d5-48c5-8de6-3fdf69970b9b` zeigt `queued`,
+keine Zustellung/Quittung und `terminal_input_attempted=false`. Der reservierende
+Handoff `channel-dae0da0ab69449999007d02ef3c137d5` vom 21.10. hat dagegen einen
+Eingabeversuch und anschließend `unknown / session_transport_unavailable`.
+Ein interner `message.delivered`-Beleg beweist keine Terminalzustellung. Es gibt
+keinen Beleg, dass der neue Bibliotheksauftrag ausgeführt wurde. Nicht neu senden.
+Details ohne Nachrichteninhalte: [Live-Diagnose](evidence/queue-live-diagnosis-20261024.json).
+
+### Werkzeuge und Status
+
+- `queue_catalog`: alle in diesem Bridge-Store für die authentifizierte Identität
+  lesbaren Queue-Familien und Unterqueues samt aktivem Zähler und Snapshot-Revision.
+- `queue_entries(queue_id, after, limit, active_only)`: paginierte Übersicht mit
+  Position innerhalb der berechtigten Ansicht, Ziel, Erstellzeit, Zustand,
+  Zustellaktivität, Revision und Hinweis auf den vollständigen Inhalt. Maximal 100
+  Einträge pro Seite; mit `next_cursor` fortsetzen, solange `has_more` gilt.
+- `queue_entry(queue_id, item_id, content_offset, max_chars, expected_revision)`:
+  vollständiger Inhalt/Argumente und gespeicherte Fehler-/Zustell-/Ausführungsbelege
+  als verlustfreie JSON-Abschnitte. `detail_json_chunk` zusammenfügen, Offset jeweils
+  aus `next_content_offset`, Revision nach der ersten Seite festhalten. Bei
+  `has_more_content=false` JSON dekodieren und UTF-8-SHA-256 prüfen. Kein stilles
+  Abschneiden langer Inhalte. Maximal 16.384 Unicode-Zeichen pro Abschnitt.
+- `queue_control`: exakter Task mit `queue_id`, `action`, `item_id` (bei `clear`
+  leer), `revision` und `reason`; eigene Task-ID und Idempotenzschlüssel erforderlich.
+  Bestehende `task.cancel`- und quellbezogene Rechte bleiben notwendig. Manuelle
+  Policies erfordern weiterhin eine exakt genehmigte Aufgabe; keine neuen Grants.
+- `queue_stop`: eigener expliziter `process.terminate`-Task für einen bereits
+  verwalteten eigenen Prozess, niemals ein beliebiger PID-Kill. Stop-Task und
+  Originaltask prüfen: erst ein tatsächlicher Exitcode belegt Prozessende. Ein
+  Antrag oder `termination_requested` allein genügt nicht. Für verwaltete Workflows
+  bleibt der eigenständige, revisionsgebundene `workflow.stop`-Ablauf zuständig.
+
+Queue-Familien: `tasks` (Unterqueues `normal`, `read`, `stop`),
+`messages` (je Empfänger), `handoffs` (je Ziel), `completions` (je Rückkanal),
+`team-work`, `team-messages`, historische `voice-buffers`, `session-input`.
+Team-Leser dürfen dadurch keine fremde Arbeit stornieren. Inhaltslesen wird weder
+als Zustellung noch als Empfangsquittung verbucht. Separate Provider-Queues können
+nicht aus diesem Store behauptet werden. Der optionale Chat-Events-Adapter bietet
+separat `event_queue_entries`/`event_queue_control` für seine eigene authentifizierte
+Webhook-Outbox; Callback-Secrets, URLs und Receipt-Tokens werden dort nicht ausgegeben.
+
+### Sicherer Ablauf
+
+1. Queue und Einträge einschließlich Historie prüfen. `queued` ist keine Ausführung.
+2. Einzelnen nie begonnenen Eintrag mit dessen Revision `cancel` aus der aktiven
+   Zustellung nehmen. Der unveränderte Nachrichteninhalt und Audit bleiben erhalten.
+3. `clear` nur mit der aktuellen Revision der gewählten Queue. Neue/geänderte
+   Einträge verursachen `queue_changed`; sie werden nicht unbemerkt entfernt. Der
+   ausführende Kontrolltask selbst wird bei seiner eigenen Queue-Prüfung ausgenommen.
+   Laufende/ungeklärte Einträge werden einzeln mit `execution_unresolved` gemeldet;
+   `fully_removed=false` ist kein Erfolg für ein vollständiges Leeren. Kontrollläufe
+   sind auf 10.000 Einträge begrenzt; größere Bestände einzeln/paginiert verwalten.
+4. `restore` ist nur für nie begonnene, zurückgehaltene Zustellungen und nur durch
+   die zurücknehmende Identität erlaubt. Zugestellte/beanspruchte/ungeklärte Arbeit
+   wird nicht erneut geschickt. Erledigte/fehlgeschlagene Ergebnisse bleiben unverändert.
+5. `unknown` zuerst abgleichen. `retire` für einen unklaren sichtbaren Handoff
+   benötigt eine **frische positive Bereitschaftsprüfung des zugewiesenen Ziels**.
+   Es entfernt nur die Zustellreservierung und verknüpfte Inbox-Zustellung, lässt
+   Ausführung/Ergebnis ausdrücklich `unknown`, sendet nichts und stoppt keinen Agenten.
+   Beschäftigte, geänderte oder unbestätigte Fenster lassen sich damit nicht umgehen.
+   Späte Quittungen reaktivieren die aufgehobene Reservierung nicht.
+
+Jede Änderung erhält Historie/Audit. Zurückgehaltene Einträge zählen nicht weiter
+als aktive Pending-Kapazität und werden weder durch Receiver-Claim noch durch Inbox-
+Abruf erneut zugestellt. Andere Empfänger bleiben unabhängig. `queue.control` nutzt
+saturationsgeschützte Stop-Kapazität; das bestehende direkte `task_cancel` bleibt
+für eigene noch nicht angenommene Tasks verfügbar.
+
+### Migration und Rückweg
+
+Additive Tabelle `queue_holds`, keine entfernten oder überschriebenen Quelldatensätze.
+Holds und Audit überleben Neustart. Ein alter Runtime würde Holds ignorieren und
+könnte zurückgenommene Nachrichten erneut zustellen. **Deshalb blockiert der Installer
+Aktivierung/Rollback auf eine Runtime ohne Queue-Unterstützung, solange Holds bestehen,
+bevor er den Dienst stoppt.** Keine Datenbank zurücksetzen, Holds löschen oder alte
+Installer verwenden, um die Sperre zu umgehen. Der Rückweg ist die geprüfte
+Wiederfreigabe nie begonnener eigener Zustellungen oder eine Queue-kompatible Runtime;
+für ungeklärte Vorgänge bleibt der Abgleich erforderlich. Ein abgewiesenes unsicheres
+Downgrade wird nicht als erfolgreicher Rollback bezeichnet.
+
+## English
+
+This unreleased repair separates active delivery from execution outcome. Inventory
+covers every authorized queue family in the Bridge store; provider queues are not
+invented. Full entry content is paginated losslessly with revision/SHA-256 checks.
+Cancel/clear retain immutable source records and audit. Exact revisions prevent races;
+foreign or running/unknown work is never falsely stopped. Existing capabilities and
+manual exact-task approvals remain. Only the withdrawing identity may restore a
+never-started delivery; old results and uncertain executions are not replayed.
+
+Uncertain visible handoffs can retire their delivery reservation only after fresh
+positive assigned-target readiness. Outcome stays unknown and no process is killed.
+An owned managed-process stop uses the existing termination operation and requires
+actual exit evidence. Optional webhook delivery management is separately scoped and
+never exposes signing secrets or claims a ChatGPT UI receipt.
+
+Holds survive restart and free pending capacity. Old runtimes ignore them: the installer
+therefore refuses unsafe activation/downgrade **before stopping the current service**.
+Use a queue-aware runtime or the verified safe restoration flow; never delete holds or
+restore an old database to force rollback. Production RC14 remains unchanged pending
+required review/checks and explicit installation acceptance/authorization.

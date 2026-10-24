@@ -1,0 +1,7 @@
+{
+  "exact_staged_tree": "a28480f3b76eca3ea4c075fdeed833a00d5a55cd",
+  "isolated_checkout": true,
+  "command": "pytest -q tests/test_read_query.py tests/test_sessions.py tests/test_mcp.py",
+  "exit_code": 0,
+  "output": "..................                                                       [100%]\n18 passed in 6.34s\n"
+}

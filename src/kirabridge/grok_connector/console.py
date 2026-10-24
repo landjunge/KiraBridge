@@ -7,14 +7,12 @@ from __future__ import annotations
 import json
 import re
 from collections.abc import Callable
-from contextlib import contextmanager
 
 from starlette.requests import Request
 from starlette.responses import HTMLResponse, JSONResponse, Response
 from starlette.routing import Route
 
 from kirabridge.bridge_core.models import BridgeError
-from kirabridge.grok_connector import state_dir
 
 MAX_DECISION_BYTES = 1024
 
@@ -31,8 +29,9 @@ def _unique_object(pairs):
 class GrokConnectorConsole:
     """Routes inherit the parent console's local Host/Origin/session/CSP checks."""
 
-    def __init__(self, bridge, authenticate: Callable[[Request], None]):
-        self.bridge, self.authenticate = bridge, authenticate
+    def __init__(self, administration, authorize_operator, authenticate: Callable[[Request], None]):
+        self.administration, self.authorize_operator = administration, authorize_operator
+        self.authenticate = authenticate
         self.routes = [
             Route("/grok-connector", self.index),
             Route("/grok-connector.js", self.javascript),
@@ -43,27 +42,7 @@ class GrokConnectorConsole:
 
     def _operator(self, request: Request):
         self.authenticate(request)
-        self.bridge.security.principal("local")
-
-    def _settings(self):
-        from kirabridge.grok_connector import effective_settings
-
-        return effective_settings(self.bridge.config)
-
-    @contextmanager
-    def _store(self, settings):
-        from kirabridge.grok_connector.auth_store import OAuthStore
-
-        store = OAuthStore(
-            state_dir(self.bridge.config) / "oauth.sqlite3",
-            issuer=settings.public_origin,
-            principal=settings.principal,
-            redirect_hosts=settings.redirect_hosts,
-        )
-        try:
-            yield store
-        finally:
-            store.close()
+        self.authorize_operator()
 
     async def index(self, request: Request):
         return HTMLResponse(HTML)
@@ -76,42 +55,7 @@ class GrokConnectorConsole:
 
     async def status(self, request: Request):
         self._operator(request)
-        settings = self._settings()
-        policy = self.bridge.config.principals.get(settings.principal)
-        result = {
-            "enabled": settings.enabled,
-            "principal": settings.principal,
-            "cli_principal": "grok",
-            "public_origin": settings.public_origin,
-            "connector_url": settings.public_origin + "/mcp" if settings.public_origin else None,
-            "gateway_reachability": "unverified",
-            "mobile_app_call": "unverified",
-            "eve_voice_tools": "unverified",
-            "principal_configured": policy is not None,
-            "task_approval_mode": policy.approval_mode if policy else "unknown",
-            "capabilities": policy.capabilities if policy else [],
-            "pending": [],
-            "authorization": None,
-        }
-        # A disabled default must not create the OAuth directory or database.
-        if settings.enabled:
-            if not settings.public_origin:
-                raise BridgeError("connector_not_configured", "A public HTTPS origin is required")
-            with self._store(settings) as store:
-                result["authorization"] = store.status()
-                fields = (
-                    "id",
-                    "client_name",
-                    "redirect_uri",
-                    "scopes",
-                    "created",
-                    "expires_at",
-                    "principal",
-                )
-                result["pending"] = [
-                    {field: item.get(field) for field in fields} for item in store.list_pending()
-                ]
-        return JSONResponse(result)
+        return JSONResponse(self.administration.status())
 
     async def decide(self, request: Request):
         self._operator(request)
@@ -135,11 +79,7 @@ class GrokConnectorConsole:
         request_id = request.path_params["request_id"]
         if not re.fullmatch(r"[a-zA-Z0-9_-]{1,128}", request_id):
             raise BridgeError("invalid_request", "Invalid authorization request ID")
-        settings = self._settings()
-        if not settings.enabled or not settings.public_origin:
-            raise BridgeError("connector_disabled", "The Grok app connector is not enabled")
-        with self._store(settings) as store:
-            decision = store.decide(request_id, payload["allow"])
+        decision = self.administration.decide(request_id, payload["allow"])
         status = decision.get("status") if isinstance(decision, dict) else None
         if status not in {"pending", "approved", "denied", "expired"}:
             raise BridgeError("connector_state_unknown", "Authorization outcome is unknown")

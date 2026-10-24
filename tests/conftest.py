@@ -17,11 +17,15 @@ def config(tmp_path):
         executables=[sys.executable],
         agents=["codex", "grok"],
     )
-    return Config(
+    result = Config(
         data_dir=str(tmp_path / "state"),
         concurrency=2,
         principals={"local": policy, "other": policy.model_copy(deep=True)},
     )
+    # Unit-test legacy adapters independently. No persisted configuration can
+    # disable the production visible route (its parser accepts Literal[True]).
+    result.visible_handoffs.enabled = False
+    return result
 
 
 @pytest.fixture

@@ -16,6 +16,7 @@ from kirabridge.bridge_core.models import BridgeError
 class PrincipalConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
     approval_mode: Literal["manual", "automatic"] = "manual"
+    client_type: Literal["chatgpt", "agent", "operator"] | None = None
     capabilities: list[str] = Field(default_factory=lambda: ["bridge.health", "task.read"])
     roots: list[str] = Field(default_factory=list)
     read_roots: list[str] = Field(default_factory=list)
@@ -26,6 +27,8 @@ class PrincipalConfig(BaseModel):
     token_env: str | None = None
     message_peers: list[str] = Field(default_factory=list, max_length=16)
     team_only_execution: bool = False
+    permission_level: Literal["full", "medium", "ask"] | None = None
+    automatic_operations: list[Literal["session.input"]] = Field(default_factory=list)
 
 
 class ReceiverConfig(BaseModel):
@@ -93,10 +96,17 @@ class AgentConfig(BaseModel):
     executable: str | None = None
     model: str | None = None
     api_key_env: str = "XAI_API_KEY"
-    sandbox_mode: Literal["read-only", "workspace-write"] = "read-only"
+    sandbox_mode: Literal["read-only", "workspace-write", "danger-full-access"] = "read-only"
+    bridge_tools: bool = False
     allow_local_tools: bool = False
     base_url: str | None = Field(default=None, max_length=2048)
     local_output_tokens: int | None = Field(default=None, ge=128, le=2048)
+
+    @model_validator(mode="after")
+    def explicit_full_access(self):
+        if self.sandbox_mode == "danger-full-access" and not self.bridge_tools:
+            raise ValueError("Full access requires the operator's explicit full bridge profile")
+        return self
 
     @model_validator(mode="before")
     @classmethod
@@ -148,12 +158,39 @@ class DiagnosticsConfig(BaseModel):
     max_records: int = Field(default=20000, ge=10, le=1000000)
 
 
+class FileTransferConfig(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    enabled: bool = False
+    source_hosts: list[str] = Field(default_factory=list, max_length=32)
+    export_roots: list[str] = Field(default_factory=list, max_length=32)
+    allowed_projects: list[str] = Field(default_factory=list, max_length=256)
+    from kirabridge.file_transfer.models import Limits as _Limits
+
+    limits: _Limits = Field(default_factory=_Limits)
+
+    @model_validator(mode="after")
+    def explicit_sources(self):
+        import re
+
+        if any(
+            not re.fullmatch(r"[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?", host)
+            or "." not in host
+            or host.endswith(".local")
+            for host in self.source_hosts
+        ):
+            raise ValueError("Use exact operator-approved public download host names")
+        if any(
+            not Path(root).is_absolute() or ".." in Path(root).parts for root in self.export_roots
+        ):
+            raise ValueError("Export roots must be explicit absolute directories")
+        return self
+
+
 class ThreadDeskConfig(BaseModel):
     """Operator-owned local endpoint; requests cannot select a process or store."""
 
     model_config = ConfigDict(extra="forbid")
     enabled: bool = False
-    dynamic_read_proxy: bool = False  # Explicit opt-in: requires existing threaddesk.read permission.
     command: str | None = None
     args: list[str] = Field(default_factory=list, max_length=32)
     workspace: str | None = None
@@ -161,6 +198,7 @@ class ThreadDeskConfig(BaseModel):
     storage: Literal["json", "sqlite"] = "json"
     timeout: float = Field(default=15, gt=0, le=60)
     max_result_bytes: int = Field(default=524288, ge=1024, le=1048576)
+    dynamic_read_proxy: bool = False  # Explicit opt-in; requires threaddesk.read permission.
 
 
 class WorkflowControlConfig(BaseModel):
@@ -240,15 +278,70 @@ class GrokConnectorConfig(BaseModel):
         return self
 
 
+class SessionInputPolicyConfig(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    enabled: bool = False
+    timeout_seconds: float = Field(default=60, gt=0, le=86400)
+    principals: list[str] = Field(default_factory=list)
+
+
+class VoiceMessagingConfig(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    # Retired by Daniel: updates cannot re-enable the extra voice approval gate.
+    release_required: Literal[False] = False
+    timeout_seconds: float = Field(default=60, gt=0, le=86400)
+
+
+class VoiceChannelConfig(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    enabled: bool = True
+    conversation_id: str = Field(default="eve-kira-shared", pattern=r"^[\w-]{1,128}$")
+
+
+class VisibleTerminalBinding(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    pane_id: str = Field(pattern=r"^terminal:[0-9]+:ttys[0-9]+$")
+    expected_pid: int = Field(gt=0)
+    agent_pid: int = Field(gt=0)
+    ready_pattern: str = Field(min_length=1, max_length=256)
+    busy_pattern: str = Field(default=r"\[stop\]|esc to interrupt|Thinking…", max_length=256)
+    codex_thread_id: str | None = Field(default=None, pattern=r"^[0-9a-f-]{36}$")
+    codex_rollout_path: str | None = Field(default=None, min_length=1, max_length=4096)
+
+    @model_validator(mode="after")
+    def protocol_pair(self):
+        if bool(self.codex_thread_id) != bool(self.codex_rollout_path):
+            raise ValueError("Codex protocol path and thread must be bound together")
+        return self
+
+
+class VisibleHandoffConfig(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    enabled: Literal[True] = True
+    bindings: dict[str, VisibleTerminalBinding] = Field(default_factory=dict)
+
+
+class OutputHistoryConfig(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    max_bytes: int = Field(default=16777216, ge=4096, le=1073741824)
+    max_entries: int = Field(default=256, ge=1, le=100000)
+    max_item_bytes: int = Field(default=8388608, ge=1024, le=8388608)
+    retention_seconds: float = Field(default=604800, ge=60, le=31536000)
+
+
 class Config(BaseModel):
     model_config = ConfigDict(extra="forbid")
     _source_path: str | None = PrivateAttr(default=None)
     _source_sha256: str | None = PrivateAttr(default=None)
+    _effective_sha256: str | None = PrivateAttr(default=None)
     data_dir: str = str(Path.home() / ".local/share/kirabridge")
     concurrency: int = Field(default=2, ge=1, le=32)
     max_queued: int = Field(default=1000, ge=1, le=100000)
     max_control_queued: int = Field(default=32, ge=1, le=1000)
+    max_read_queued: int = Field(default=32, ge=1, le=1000)
+    read_concurrency: int = Field(default=2, ge=1, le=8)
     max_task_bytes: int = Field(default=2097152, ge=1024, le=8388608)
+    output_history: OutputHistoryConfig = Field(default_factory=OutputHistoryConfig)
     lease_seconds: float = Field(default=30, ge=2, le=600)
     host: str = "127.0.0.1"
     port: int = Field(default=8765, ge=1, le=65535)
@@ -267,8 +360,13 @@ class Config(BaseModel):
     team: TeamConfig = Field(default_factory=TeamConfig)
     grok_connector: GrokConnectorConfig = Field(default_factory=GrokConnectorConfig)
     diagnostics: DiagnosticsConfig = Field(default_factory=DiagnosticsConfig)
+    file_transfer: FileTransferConfig = Field(default_factory=FileTransferConfig)
     threaddesk: ThreadDeskConfig = Field(default_factory=ThreadDeskConfig)
     workflow_control: WorkflowControlConfig = Field(default_factory=WorkflowControlConfig)
+    session_input_policy: SessionInputPolicyConfig = Field(default_factory=SessionInputPolicyConfig)
+    voice_messaging: VoiceMessagingConfig = Field(default_factory=VoiceMessagingConfig)
+    voice_channel: VoiceChannelConfig = Field(default_factory=VoiceChannelConfig)
+    visible_handoffs: VisibleHandoffConfig = Field(default_factory=VisibleHandoffConfig)
 
     terminal: TerminalConfig = Field(default_factory=TerminalConfig)
 
@@ -304,6 +402,9 @@ def load_config(path: str | None = None) -> Config:
         config = Config.model_validate(tomllib.loads(raw.decode("utf-8")))
         config._source_path = str(source_path)
         config._source_sha256 = hashlib.sha256(raw).hexdigest()
+        from kirabridge.bridge_core.models import digest
+
+        config._effective_sha256 = digest(config.model_dump())
         return config
     return Config()
 

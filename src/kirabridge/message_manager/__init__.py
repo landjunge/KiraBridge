@@ -23,22 +23,61 @@ class MessageSend(Input):
     reply_to: str | None = Field(default=None, min_length=1, max_length=128)
     task_id: str | None = Field(default=None, min_length=1, max_length=128)
     request_reply: bool | None = None
-    dispatch: bool = True
+    dispatch: bool | None = None
 
 
 class MessageManager:
     interface_version = "1"
 
+    def activation_work_count(self, *, active_only=False, context=None):
+        db = context.db if context is not None else self.store.db
+        states = ("running",) if active_only else ("queued", "running")
+        return db.execute(
+            "SELECT count(*) FROM message_jobs WHERE state IN ("
+            + ",".join("?" for _ in states)
+            + ") AND (state='running' OR NOT EXISTS (SELECT 1 FROM queue_holds h "
+            "WHERE h.queue_id='messages' AND h.item_id=message_jobs.message_id))",
+            states,
+        ).fetchone()[0]
+
+    def operator_work_count(self):
+        return self.store.db.execute(
+            "SELECT count(*) FROM message_jobs WHERE state IN ('queued','running') "
+            "AND (state='running' OR NOT EXISTS (SELECT 1 FROM queue_holds h "
+            "WHERE h.queue_id='messages' AND h.item_id=message_jobs.message_id))"
+        ).fetchone()[0]
+
+    def operator_protocol_snapshot(self, message_id, at):
+        row = self.store.db.execute(
+            "SELECT sender,recipient,body,delivered,acknowledged,created FROM messages WHERE id=?",
+            (message_id,),
+        ).fetchone()
+        if row is None or row["created"] > at:
+            return None
+        result = {key: row[key] for key in row.keys() if key != "created"}
+        for key in ("delivered", "acknowledged"):
+            if result[key] is not None and result[key] > at:
+                result[key] = None
+        return result
+
     def __init__(self, config, store, security):
         self.config, self.store, self.security = config, store, security
         self.wake = asyncio.Event()
+        from kirabridge.voice_channel import VoiceChannel
+        from kirabridge.voice_message_policy import VoiceMessagePolicy
+
+        self.voice_channel = VoiceChannel(config, store)
+        self.voice_policy = VoiceMessagePolicy(self)
 
     def _identity(self, principal, capability):
         return self.security.principal(principal, capability)
 
     def _row(self, principal, message_id):
         row = self.store.db.execute("SELECT * FROM messages WHERE id=?", (message_id,)).fetchone()
-        if row is None or principal not in {row["sender"], row["recipient"]}:
+        if row is None:
+            raise BridgeError("not_found", "Message not found")
+        members = self.voice_channel.check(principal, row["conversation_id"])
+        if not members and principal not in {row["sender"], row["recipient"]}:
             raise BridgeError("not_found", "Message not found")
         return row
 
@@ -51,6 +90,11 @@ class MessageManager:
 
     def get(self, principal, message_id):
         self._identity(principal, "message.read")
+        pending = self.voice_policy.get(principal, message_id)
+        if pending and (
+            pending.get("transport") == "team" or pending["message_buffer"]["state"] != "released"
+        ):
+            return pending
         result = dict(self._row(principal, message_id))
         result.pop("idem")
         result.pop("request_hash")
@@ -58,27 +102,109 @@ class MessageManager:
             "SELECT * FROM message_jobs WHERE message_id=?", (message_id,)
         ).fetchone()
         result["processing"] = dict(job) if job else None
+        visible = (
+            job
+            and self.store.db.execute(
+                "SELECT 1 FROM sqlite_master WHERE type='table' AND name='visible_handoffs'"
+            ).fetchone()
+            and self.store.db.execute(
+                "SELECT 1 FROM visible_handoffs WHERE id=?", (job["run_id"],)
+            ).fetchone()
+        )
+        result["processing_route"] = (
+            "existing_visible_terminal"
+            if visible
+            else "managed_receiver"
+            if job
+            else "external_client_inbox"
+        )
         if job:
             result["processing"]["evidence"] = json.loads(job["evidence"])
+            scope = result["processing"]["evidence"].get("session_scope")
+            if scope == "existing_visible_terminal":
+                result["processing_route"] = scope
+            elif job["state"] == "queued":
+                result["processing_route"] = (
+                    "pending_visible_terminal"
+                    if self.config.visible_handoffs.enabled
+                    else "pending_managed_receiver"
+                )
+        if visible:
+            # Preserve the original failure and expose only already-recorded evidence.
+            # Reading a message must never release a reservation or repeat input.
+            try:
+                self._identity(principal, "task.read")
+            except BridgeError:
+                pass  # Message-only readers keep their existing response.
+            else:
+                from kirabridge.visible_message_evidence import visible_message_evidence
+
+                handoff = visible_message_evidence(
+                    self.store.db, principal, message_id, job["run_id"]
+                )
+                if handoff is not None:
+                    result["processing"]["handoff"] = handoff
         result["request_reply"] = bool(result["request_reply"])
         return {"api_version": "1", **result}
 
-    def send(self, principal, message: MessageSend):
+    def send(self, principal, message: MessageSend, *, completion_target=None):
+        self._identity(principal, "message.send")
+        message = self.voice_channel.route(principal, message)
+        return self.voice_policy.send(principal, message, completion_target)
+
+    def _send(
+        self,
+        principal,
+        message,
+        *,
+        completion_target=None,
+        validate_only=False,
+        visible_internal=False,
+    ):
+        from kirabridge.completion_manager import valid_target
+
+        if completion_target is not None:
+            valid_target(completion_target)
         policy = self._identity(principal, "message.send")
-        target = self.config.principals.get(message.recipient)
-        if (
-            principal == message.recipient
-            or message.recipient not in policy.message_peers
-            or not target
-            or principal not in target.message_peers
-            or "message.read" not in target.capabilities
-        ):
-            raise BridgeError("message_peer_denied", "Recipient is not an authorized peer")
-        if policy.approval_mode != "automatic":
+        if policy.permission_level is None and policy.approval_mode != "automatic":
             raise BridgeError(
                 "approval_required", "Messaging requires local automatic authorization"
             )
+        target = self.config.principals.get(message.recipient)
+        self_reply = (
+            principal == message.recipient
+            and message.kind in {"answer", "result"}
+            and message.reply_to
+            and self.store.db.execute(
+                "SELECT 1 FROM visible_handoffs WHERE message_id=? AND principal=? AND target=?",
+                (message.reply_to, principal, principal),
+            ).fetchone()
+        )
+        bound_self = principal == message.recipient and (visible_internal or self_reply)
+        if (
+            (principal == message.recipient and not bound_self)
+            or (message.recipient not in policy.message_peers and not bound_self)
+            or not target
+            or (principal not in target.message_peers and not bound_self)
+            or "message.read" not in target.capabilities
+        ):
+            raise BridgeError("message_peer_denied", "Recipient is not an authorized peer")
         limits = self.config.messaging
+        dispatch = message.dispatch
+        if (
+            self.config.visible_handoffs.enabled
+            and not visible_internal
+            and message.recipient in self.config.agents
+            and message.kind in {"work", "question"}
+        ):
+            dispatch = True  # A caller's dispatch=false cannot select an invisible work route.
+        if dispatch is None:
+            dispatch = (
+                message.kind not in {"answer", "result"} and message.recipient in limits.receivers
+            )
+        if dispatch and message.recipient in {"chatgpt", "grok_app", "local"}:
+            if message.recipient not in limits.receivers:
+                dispatch = False
         if len(message.body.encode()) > limits.max_body_bytes:
             raise BridgeError("payload_limit", "Message exceeds configured byte limit")
         wants_reply = message.request_reply
@@ -88,10 +214,27 @@ class MessageManager:
             raise BridgeError(
                 "reply_loop", "Answers, results and notes cannot request auto replies"
             )
-        if message.dispatch:
+        recorded = self.store.db.execute(
+            "SELECT m.id,EXISTS(SELECT 1 FROM message_jobs j "
+            "WHERE j.message_id=m.id) AS dispatched "
+            "FROM messages m WHERE m.sender=? AND m.idem=?",
+            (principal, message.idempotency_key),
+        ).fetchone()
+        if recorded and (
+            message.dispatch is None
+            or (self.config.visible_handoffs.enabled and message.dispatch is False)
+        ):
+            dispatch = bool(recorded["dispatched"])
+        if dispatch and not recorded:
+            from kirabridge.permissions import decision
+
             receiver = limits.receivers.get(message.recipient)
-            if not receiver or target.approval_mode != "automatic":
+            if not receiver:
                 raise BridgeError("receiver_unavailable", "No automatic receiver for this identity")
+            if not decision(self.config, message.recipient, "agent.execute")["automatic"]:
+                raise BridgeError(
+                    "approval_required", "Dieser Agentenauftrag benötigt deine Erlaubnis"
+                )
             if (
                 message.recipient not in self.config.agents
                 or message.recipient not in target.agents
@@ -99,7 +242,9 @@ class MessageManager:
                 raise BridgeError(
                     "agent_denied", "Receiver agent is not configured for this identity"
                 )
-        hashed = digest(message.model_dump())
+        if validate_only:
+            return None
+        hashed = digest({**message.model_dump(), "dispatch": dispatch})
         message_id = message.message_id or str(uuid.uuid4())
         with self.store.transaction():
             previous = self.store.db.execute(
@@ -107,14 +252,45 @@ class MessageManager:
                 (principal, message.idempotency_key),
             ).fetchone()
             if previous:
-                if previous["request_hash"] != hashed:
+                previous_hash = hashed
+                if message.dispatch is None or (
+                    self.config.visible_handoffs.enabled and message.dispatch is False
+                ):
+                    # Preserve the recorded dispatch decision on retries across
+                    # upgrades, including old answers sent to managed receivers.
+                    recorded_dispatch = bool(
+                        self.store.db.execute(
+                            "SELECT 1 FROM message_jobs WHERE message_id=?", (previous["id"],)
+                        ).fetchone()
+                    )
+                    previous_hash = digest({**message.model_dump(), "dispatch": recorded_dispatch})
+                if previous["request_hash"] != previous_hash:
                     raise BridgeError("idempotency_conflict", "Key belongs to a different message")
+                route = self.store.db.execute(
+                    "SELECT target FROM message_completion_routes WHERE message_id=?",
+                    (previous["id"],),
+                ).fetchone()
+                if completion_target is not None and completion_target != (
+                    route[0] if route else "default"
+                ):
+                    raise BridgeError(
+                        "completion_route_conflict", "Original return target is fixed"
+                    )
                 return self.get(principal, previous["id"])
+            if dispatch:
+                self.store.assert_accepting()
             conversation = self.store.db.execute(
                 "SELECT * FROM conversations WHERE id=?", (message.conversation_id,)
             ).fetchone()
             parties = {principal, message.recipient}
-            if conversation and {conversation["party_a"], conversation["party_b"]} != parties:
+            members = self.voice_channel.check(principal, message.conversation_id)
+            if members and message.recipient not in members:
+                raise BridgeError("message_peer_denied", "Recipient is not a conversation member")
+            if (
+                conversation
+                and not members
+                and {conversation["party_a"], conversation["party_b"]} != parties
+            ):
                 raise BridgeError("not_found", "Conversation not found")
             parent = self._row(principal, message.reply_to) if message.reply_to else None
             depth, task_id = 0, message.task_id
@@ -131,7 +307,7 @@ class MessageManager:
                 task_id = parent["task_id"]
             elif task_id:
                 self.store.get(task_id, principal)
-            if depth > limits.max_reply_depth:
+            if depth > limits.max_reply_depth and not members:
                 raise BridgeError("reply_loop", "Conversation reply depth limit reached")
             position = (
                 self.store.db.execute(
@@ -140,15 +316,33 @@ class MessageManager:
                 ).fetchone()[0]
                 + 1
             )
-            if position > limits.max_conversation_messages:
-                raise BridgeError("conversation_full", "Conversation message limit reached")
+            if position > limits.max_conversation_messages and not members:
+                # An accepted request must remain answerable, including legacy
+                # conversations already at the limit. Only its first final reply
+                # gets this bounded allowance; new work/notes cannot extend it.
+                final_reply = (
+                    parent
+                    and parent["request_reply"]
+                    and parent["kind"] in {"question", "work"}
+                    and message.kind in {"answer", "result"}
+                    and not wants_reply
+                    and not self.store.db.execute(
+                        "SELECT 1 FROM messages WHERE reply_to=? "
+                        "AND sender=? AND recipient=? AND kind IN ('answer','result') LIMIT 1",
+                        (parent["id"], principal, message.recipient),
+                    ).fetchone()
+                )
+                if not final_reply:
+                    raise BridgeError("conversation_full", "Conversation message limit reached")
             if (
                 self.store.db.execute("SELECT count(*) FROM messages").fetchone()[0]
                 >= limits.max_total
             ):
                 raise BridgeError("message_store_full", "Message archive capacity reached")
             pending = self.store.db.execute(
-                "SELECT count(*) FROM messages WHERE recipient=? AND acknowledged IS NULL",
+                "SELECT count(*) FROM messages WHERE recipient=? AND acknowledged IS NULL "
+                "AND NOT EXISTS (SELECT 1 FROM queue_holds h WHERE "
+                "h.queue_id='messages' AND h.item_id=messages.id)",
                 (message.recipient,),
             ).fetchone()[0]
             if pending >= limits.max_pending_per_recipient:
@@ -159,7 +353,11 @@ class MessageManager:
             if not conversation:
                 self.store.db.execute(
                     "INSERT INTO conversations VALUES(?,?,?,?)",
-                    (message.conversation_id, *sorted(parties), now),
+                    (
+                        message.conversation_id,
+                        *(sorted(parties) if len(parties) == 2 else (principal, principal)),
+                        now,
+                    ),
                 )
             self.store.db.execute(
                 "INSERT INTO messages(id,conversation_id,position,sender,recipient,kind,body,idem,"
@@ -182,7 +380,11 @@ class MessageManager:
                     now,
                 ),
             )
-            if message.dispatch:
+            if dispatch:
+                self.store.db.execute(
+                    "INSERT INTO message_completion_routes(message_id,target) VALUES(?,?)",
+                    (message_id, completion_target or "default"),
+                )
                 self.store.db.execute(
                     "INSERT INTO message_jobs(message_id,state) VALUES(?,'queued')", (message_id,)
                 )
@@ -195,7 +397,7 @@ class MessageManager:
                     "conversation_id": message.conversation_id,
                     "position": position,
                     "content_sha256": digest(message.body),
-                    "automatic_dispatch": message.dispatch,
+                    "automatic_dispatch": dispatch,
                 },
             )
         self.wake.set()
@@ -203,12 +405,16 @@ class MessageManager:
 
     def receive(self, principal, after=0, limit=20, conversation_id=None):
         self._identity(principal, "message.read")
+        if conversation_id:
+            self.voice_channel.check(principal, conversation_id)
         if after < 0 or not 1 <= limit <= 50:
             raise BridgeError("invalid_cursor", "Use nonnegative cursor and limit 1..50")
         with self.store.transaction():
             rows = self.store.db.execute(
                 "SELECT id,seq,delivered FROM messages WHERE recipient=? AND seq>? "
                 "AND acknowledged IS NULL AND (? IS NULL OR conversation_id=?) "
+                "AND NOT EXISTS (SELECT 1 FROM queue_holds h WHERE "
+                "h.queue_id='messages' AND h.item_id=messages.id) "
                 "ORDER BY seq LIMIT ?",
                 (principal, after, conversation_id, conversation_id, limit),
             ).fetchall()
@@ -263,7 +469,8 @@ class MessageManager:
         row = self.store.db.execute(
             "SELECT * FROM conversations WHERE id=?", (conversation_id,)
         ).fetchone()
-        if row is None or principal not in {row["party_a"], row["party_b"]}:
+        members = self.voice_channel.check(principal, conversation_id)
+        if row is None or (not members and principal not in {row["party_a"], row["party_b"]}):
             raise BridgeError("not_found", "Conversation not found")
         rows = self.store.db.execute(
             "SELECT id,seq FROM messages WHERE conversation_id=? AND seq>? ORDER BY seq LIMIT ?",
@@ -271,6 +478,8 @@ class MessageManager:
         ).fetchall()
         return {
             "conversation_id": conversation_id,
+            "participants": members or [row["party_a"], row["party_b"]],
+            "append_only": bool(members),
             "messages": [self.get(principal, r["id"]) for r in rows],
             "next_cursor": rows[-1]["seq"] if rows else after,
         }

@@ -11,6 +11,7 @@ from pathlib import Path
 
 from pydantic import ValidationError
 
+from kirabridge import __version__
 from kirabridge.audit_manager import verify
 from kirabridge.bridge_core.bridge import Bridge
 from kirabridge.bridge_core.config import load_config
@@ -18,7 +19,7 @@ from kirabridge.bridge_core.models import BridgeError, State, TaskRequest
 
 
 def emit(value, *, stream=None):
-    print(json.dumps(value, ensure_ascii=False, indent=2), file=stream or sys.stdout)
+    print(json.dumps(value, ensure_ascii=False, indent=2), file=stream or sys.stdout, flush=True)
 
 
 def parse_request(path: str) -> TaskRequest:
@@ -37,12 +38,13 @@ async def execute(args) -> None:
         from kirabridge.installation import guided_install
         from kirabridge.local_runtime import default_config
 
+        config_path = Path(args.config).expanduser().absolute() if args.config else default_config()
+        release_root = (
+            Path(args.release_root).expanduser().absolute() if args.release_root else None
+        )
         emit(
             await guided_install(
-                Path(args.config).expanduser().absolute() if args.config else default_config(),
-                Path(args.release_root).resolve() if args.release_root else None,
-                args.language,
-                check=args.check,
+                config_path, release_root, language=args.language, check=args.check
             )
         )
         return
@@ -171,8 +173,7 @@ async def execute(args) -> None:
                 arguments.update(result=args.text, success=not args.failed)
             elif action == "reprocess":
                 arguments.update(
-                    core_task_id=args.core_task,
-                    expected_result_sha256=args.result_sha256,
+                    core_task_id=args.core_task, expected_result_sha256=args.result_sha256
                 )
         elif action == "work" and args.work_id:
             arguments["work_id"] = args.work_id
@@ -187,6 +188,15 @@ async def execute(args) -> None:
         emit(result)
         if result.get("error"):
             raise SystemExit(2)
+        return
+    if args.command == "watch":
+        from kirabridge.completion_client import CompletionClient
+        from kirabridge.local_runtime import peer
+
+        async with CompletionClient(peer(config, args.principal)) as client:
+            await client.listen(
+                args.target, lambda notice: emit(notice), once=args.once, timeout=args.timeout
+            )
         return
     if args.command == "readiness":
         from kirabridge.local_runtime import connection_observer, peer
@@ -255,6 +265,7 @@ async def execute(args) -> None:
             "receive": "message_receive",
             "ack": "message_ack",
             "get": "message_get",
+            "release": "message_release",
             "conversation": "conversation_get",
             "status": "message_channel_status",
         }[args.action]
@@ -271,10 +282,12 @@ async def execute(args) -> None:
                 dispatch=not args.inbox_only,
                 request_reply=False if args.no_reply else None,
             ).model_dump()
-        elif args.action in {"get", "ack"}:
+        elif args.action in {"get", "ack", "release"}:
             payload["message_id"] = args.message_id
             if args.action == "ack":
                 payload["receipt"] = args.receipt
+            if args.action == "release":
+                payload["token"] = args.token
         elif args.action == "receive":
             payload = {"after": args.after, "limit": args.limit, "wait_seconds": args.wait}
         elif args.action == "conversation":
@@ -516,13 +529,14 @@ async def run_request(bridge, principal, request, wait, approve, original=None):
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="KiraBridge private desktop bridge")
+    parser.add_argument("--version", action="version", version="%(prog)s " + __version__)
     parser.add_argument("--config", help="TOML policy file (or KIRABRIDGE_CONFIG)")
     parser.add_argument("--principal", default="local", help="Local CLI/stdio policy identity")
     sub = parser.add_subparsers(dest="command", required=True)
-    installation = sub.add_parser("install", help="Guided local installation and ChatGPT setup")
-    installation.add_argument("--language", choices=["de", "en"], default="de")
-    installation.add_argument("--release-root")
-    installation.add_argument("--check", action="store_true", help="Read-only prerequisites")
+    install = sub.add_parser("install", help="Guided local installation; --check changes nothing")
+    install.add_argument("--check", action="store_true", help="Read-only prerequisite check")
+    install.add_argument("--language", choices=["de", "en"], default="de")
+    install.add_argument("--release-root", help="Optional existing release directory")
     setup = sub.add_parser("setup", help="Create private local policy, credentials and CLI command")
     setup.add_argument("--workspace", default=str(Path.home() / "workspace/KiraBridge"))
     sub.add_parser("status", help="Query the running local daemon")
@@ -588,11 +602,11 @@ def main() -> None:
     reprocess.add_argument("--core-task", required=True)
     reprocess.add_argument("--result-sha256", required=True)
     for command in (
+        reprocess,
         create,
         role,
         send,
         assign,
-        reprocess,
         actions.choices["claim"],
         actions.choices["complete"],
     ):
@@ -627,6 +641,9 @@ def main() -> None:
     receive.add_argument("--wait", type=float, default=0)
     get = message_actions.add_parser("get")
     get.add_argument("message_id")
+    release = message_actions.add_parser("release")
+    release.add_argument("message_id")
+    release.add_argument("--token", required=True, choices=["go-go-go"])
     ack = message_actions.add_parser("ack")
     ack.add_argument("message_id")
     ack.add_argument("--receipt", required=True)
@@ -684,6 +701,10 @@ def main() -> None:
                 "--approve", action="store_true", help="Explicitly approve this exact request"
             )
             command.add_argument("--wait", type=float, default=3700)
+    watch = sub.add_parser("watch", help="Receive/print own completions automatically, then ack")
+    watch.add_argument("--target", default="default", help="Stable requesting assistant/session ID")
+    watch.add_argument("--once", action="store_true")
+    watch.add_argument("--timeout", type=float, help="Optional total listener deadline in seconds")
     task = sub.add_parser("task")
     task.add_argument("task_id")
     tasks = sub.add_parser("tasks")

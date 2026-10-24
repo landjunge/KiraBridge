@@ -135,6 +135,24 @@ def _native_evidence(value):
 class TeamManager:
     interface_version = "1"
 
+    def activation_work_count(self, *, active_only=False, context=None):
+        db = context.db if context is not None else self.store.db
+        states = (
+            ("accepted", "running", "processing_result")
+            if active_only
+            else ("queued", "dispatching", "created", "accepted", "running", "processing_result")
+        )
+        return db.execute(
+            "SELECT count(*) FROM team_work WHERE state IN (" + ",".join("?" for _ in states) + ")",
+            states,
+        ).fetchone()[0]
+
+    def operator_work_count(self):
+        return self.store.db.execute(
+            "SELECT count(*) FROM team_work WHERE state IN "
+            "('queued','dispatching','created','accepted','running','processing_result')"
+        ).fetchone()[0]
+
     def __init__(self, bridge):
         self.bridge = bridge
         self.config, self.store, self.security = bridge.config, bridge.store, bridge.security
@@ -390,11 +408,39 @@ class TeamManager:
         return dict(row)
 
     def send(self, principal, request: TeamMessageSend):
+        from kirabridge.message_manager import MessageSend
+        from kirabridge.voice_channel import VOICE_PRINCIPALS
+
+        self._team(principal, request.team_id, "team.write", write=True)
+        self._member(request.team_id, request.recipient, writable=True)
+        if {principal, request.recipient} == VOICE_PRINCIPALS:
+            return self.bridge.messages.send(
+                principal,
+                MessageSend(
+                    recipient=request.recipient,
+                    conversation_id=self.config.voice_channel.conversation_id,
+                    idempotency_key="voice-team-"
+                    + digest(
+                        {
+                            "team_id": request.team_id,
+                            "key": request.idempotency_key,
+                        }
+                    ),
+                    body=request.body,
+                    kind=request.kind,
+                    reply_to=request.reply_to,
+                ),
+            )
+        return self.bridge.messages.voice_policy.send(principal, request, None, transport="team")
+
+    def _send(self, principal, request, *, message_id=None, validate_only=False):
         self._automatic(principal)
         self._size(request.body, self.config.team.max_body_bytes)
         with self.store.transaction():
             self._team(principal, request.team_id, "team.write", write=True)
             self._member(request.team_id, request.recipient, writable=True)
+            if validate_only:
+                return None
             prior = self._previous(principal, request.team_id, "message", request)
             if prior:
                 return self._message(request.team_id, prior)
@@ -408,12 +454,14 @@ class TeamManager:
             ):
                 raise BridgeError("message_store_full", "Team message archive capacity reached")
             count = self.store.db.execute(
-                "SELECT count(*) FROM team_messages WHERE recipient=? AND acknowledged IS NULL",
+                "SELECT count(*) FROM team_messages WHERE recipient=? AND acknowledged IS NULL "
+                "AND NOT EXISTS (SELECT 1 FROM queue_holds h WHERE "
+                "h.queue_id='team-messages' AND h.item_id=team_messages.id)",
                 (request.recipient,),
             ).fetchone()[0]
             if count >= self.config.team.max_pending_per_member:
                 raise BridgeError("message_queue_full", "Member message inbox is full")
-            message_id = "tm-" + uuid.uuid4().hex
+            message_id = message_id or "tm-" + uuid.uuid4().hex
             self.store.db.execute(
                 "INSERT INTO team_messages(id,team_id,sender,recipient,kind,body,reply_to,created) "
                 "VALUES(?,?,?,?,?,?,?,?)",
@@ -484,6 +532,7 @@ class TeamManager:
             prior = self._previous(principal, request.team_id, "work", request)
             if prior:
                 return self._work(prior)
+            self.store.assert_accepting()
             work_id = "tw-" + uuid.uuid4().hex
             root_id, depth = work_id, 0
             if request.parent_id:
@@ -589,7 +638,9 @@ class TeamManager:
         ]
         pending = self.store.db.execute(
             "SELECT * FROM team_messages WHERE team_id=? AND recipient=? "
-            "AND acknowledged IS NULL ORDER BY seq LIMIT 16",
+            "AND acknowledged IS NULL "
+            "AND NOT EXISTS (SELECT 1 FROM queue_holds h WHERE "
+            "h.queue_id='team-messages' AND h.item_id=team_messages.id) ORDER BY seq LIMIT 16",
             (team_id, principal),
         ).fetchall()
         latest = self.store.db.execute(
@@ -669,6 +720,8 @@ class TeamManager:
             prior = self._previous(principal, request.team_id, "work_claim", request)
             if prior:
                 return work
+            if not self.store.can_claim(work["created"]):
+                self.store.assert_accepting()
             if work["state"] != "queued_manual":
                 raise BridgeError("state_conflict", "Manual work is no longer awaiting receipt")
             self.store.db.execute(
@@ -873,6 +926,8 @@ class TeamManager:
     def claim(self, work_id):
         with self.store.transaction():
             work = self._work(work_id)
+            if not self.store.can_claim(work["created"]):
+                return None
             if work["state"] != "queued" or work["core_task_id"] is not None:
                 return None
             try:
@@ -898,7 +953,9 @@ class TeamManager:
                 "team.work_dispatching",
                 work_id,
                 core_task_id=core_id,
-                session_scope="separate_managed_session",
+                session_scope="existing_visible_terminal"
+                if self.config.visible_handoffs.enabled
+                else "separate_managed_session",
             )
         return self._work(work_id)
 

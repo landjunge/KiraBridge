@@ -1,0 +1,42 @@
+{
+  "scope": "Phase 1 queue repair only; production installation and queues unchanged",
+  "platform": "macOS-15.7.4-x86_64-i386-64bit",
+  "latest_targeted_tests": {
+    "passed": 66,
+    "log": "queue-phase1-targeted-tests.txt",
+    "tests": [
+      "tests/test_queue_management.py",
+      "tests/test_event_push.py",
+      "tests/test_installer.py"
+    ],
+    "reason": "Queue ownership/CAS/content/recovery, affected webhook delivery race, installer downgrade safety"
+  },
+  "earlier_full_regression": {
+    "passed": 1074,
+    "log": "queue-phase1-earlier-regression.txt",
+    "qualification": "before the final message-job/content revision binding correction; not an exact final-source full-suite claim"
+  },
+  "earlier_failure": {
+    "passed": 1071,
+    "failed": 1,
+    "test": "test_children_are_killed_when_parent_exits",
+    "reason": "300ms fixture budget expired without PID capture; focused unchanged test passed; fixture startup budget now 3s, cleanup assertions unchanged"
+  },
+  "later_full_retry": {
+    "status": "interrupted by explicit user testing instruction; not counted as passing"
+  },
+  "live_http_mcp": "passed inside targeted tests: catalog/entry/cancel/restore/clear and owned managed-process stop with actual exit code",
+  "uncertain_handoff_positive_idle_test": "simulated unit readiness; not a production Codex acceptance/termination claim",
+  "real_old_runtime_probe": "actual isolated RC14 wheel refuses downgrade with holds; queue-aware editable development runtime accepted; no package-install test claim",
+  "production": {
+    "runtime": "0.8.0rc14",
+    "queue_tools_installed": false,
+    "message_id": "dc52c315-b9d5-48c5-8de6-3fdf69970b9b",
+    "last_observed_state": "queued",
+    "input_attempted": false,
+    "duplicate_request_sent": false
+  },
+  "phases_2_3_4": "not started because production Phase 1 acceptance/deployment gate remains open",
+  "merge_release": "required checks and review must pass; no bypass or new publication",
+  "runtime_sources_sha256": "2927d778cc326b33da174de64c0b7915d58e27fe05b4bffdeba3e7b4dde31157"
+}

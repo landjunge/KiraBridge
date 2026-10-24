@@ -1,0 +1,18 @@
+{
+  "scope": "isolated automatic Codex -> simulated Grok review -> Codex rework -> browser -> result",
+  "automatic_demo_passed": true,
+  "codex_real_turns": 2,
+  "grok_real_calls": 0,
+  "message_receipts_verified": 4,
+  "audit_valid": true,
+  "browser_passed": true,
+  "final_sha256": "4171290a2ed92dd61c31fe1b8ea9b65846d19fbc064c5e1b07036f5e1ae77675",
+  "app_readback_same_artifact": true,
+  "separate_chatgpt_ui_run_verified": false,
+  "tests": {
+    "passed": 35,
+    "seconds": 25.64,
+    "command": ".venv/bin/pytest -q tests/test_automatic_review_demo.py tests/test_review_demo.py tests/test_messages.py tests/test_agents.py"
+  },
+  "changes_released": false
+}

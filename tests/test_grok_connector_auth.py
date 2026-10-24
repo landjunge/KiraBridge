@@ -98,6 +98,26 @@ async def tokens(provider):
     return registered, request_id, code, result
 
 
+async def test_mobile_app_switch_does_not_expire_approved_code_after_two_minutes(
+    provider, monkeypatch
+):
+    import time
+
+    now = time.time()
+    monkeypatch.setattr("kirabridge.grok_connector.auth_store.time.time", lambda: now)
+    registered, request_id, code = await authorization(provider)
+    expires = provider.store.db.execute(
+        "SELECT expires FROM oauth_requests WHERE id=?", (request_id,)
+    ).fetchone()[0]
+    assert expires <= now + 600
+    now += 180
+    assert provider.store.poll(request_id)["status"] == "approved"
+    assert await provider.load_authorization_code(registered, code) is not None
+    now += 421
+    assert provider.store.poll(request_id)["status"] == "expired"
+    assert await provider.load_authorization_code(registered, code) is None
+
+
 def test_private_database_permissions_and_symlink_rejection(tmp_path):
     path = tmp_path / "state" / "oauth.sqlite3"
     value = OAuthStore(path, issuer=ISSUER)
@@ -434,7 +454,7 @@ async def test_expired_authorization_code_never_mints_a_token_and_audit_is_prese
     loaded = await provider.load_authorization_code(registered, code)
     import kirabridge.grok_connector.auth_store as module
 
-    after_expiry = module.time.time() + 121
+    after_expiry = loaded.expires_at + 1
     monkeypatch.setattr(module.time, "time", lambda: after_expiry)
     assert await provider.load_authorization_code(registered, code) is None
     with pytest.raises(TokenError):

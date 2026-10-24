@@ -1,3 +1,11 @@
+# Aktueller Integrationsstand / Current integration status
+
+24.10.2026: RC17 ist ein unveröffentlichter Zusammenführungskandidat aus main, RC15, RC16 und den nachfolgenden Reparaturen. Veröffentlicht bleibt RC14. Historische Betriebsnachweise unten sind keine aktuelle Produktivabnahme.
+
+[Zusammenführung / Consolidation](CONSOLIDATION-20261024.md) · [Reparaturstand](REPAIR-SEQUENCE-20261024.md)
+
+## Historische Nachweise aus main
+
 # Grok-App-Connector · 19.10.2026 · 0.7.0rc2
 
 Der getrennte OAuth-/MCP-Gateway ist auf dem Ziel-Mac aktiv und über einen
@@ -77,7 +85,32 @@ historisch. [Aktueller Stand DE/EN und konkrete Taskbelege](DEVELOPMENT-ACCESS-2
 
 ---
 
+
+## Historische Nachweise aus Runtime-Zweig
+
 # Abnahmestand 0.5.2
+
+**Aktueller Stand:** [Korrigierte Events-Anbindung erneut aktiviert; echter Empfang im ursprünglichen Chat weiterhin offen](MCP-SCHEMA-CACHE-20261019.md). Die nachfolgenden Betriebsstände sind historische Nachweise.
+
+> **Anschluss wiederhergestellt, 19.10.2026:** [Events-Fassade zurückgerollt](CHATGPT-EVENTS-RECOVERY-20261019.md).
+> Der bisherige Server bearbeitet normale Aufträge wieder ohne Subscription.
+> Echter App-Status und neuer Terminalauftrag funktionieren mit leerem Legacy-
+> Kompatibilitätsfeld. Der Connector hält noch die alte Pflichtdefinition vor;
+> der Schema-Cache ist nicht dauerhaft bereinigt. Chat-Push bleibt deaktiviert.
+
+> **Abschlusskanal 19.10.2026:** [Dauerhafte Abschlussmeldungen und Abnahme](COMPLETION-CHANNEL-20261019.md)
+> mit atomarer Auftragszuordnung, wartendem MCP-Consumer, Quittierung und Wiederverbindung
+> implementiert. Sechs reale Rückmeldungen einschließlich echtem Codex-Turn geprüft.
+> Nach 184 bestandenen Tests im leeren Dienst kontrolliert aktiviert; bestehende Daten,
+> Konfiguration und Rechte per Hash erhalten. Echter App-Terminalauftrag mit empfangener
+> Abschlussmeldung geprüft. Kein autonomes Aufwecken eines inaktiven ChatGPT-Chats.
+
+> **Automatische Demo-Abnahme 19.10.2026:** [Ablauf, Webseite und Nachweise](../examples/review-demo/README.md)
+> bestanden: zwei serielle echte Codex-CLI-Aufträge über Bridge-MCP, ausdrücklich
+> simuliertes Grok, tatsächliche Nacharbeit, quittierte Ergebnisrückgabe und echte
+> Chromium-Abnahme. App-Dateirückgabe unter `chatgpt` mit identischem Datei-Hash geprüft.
+> Separater ChatGPT-UI-Auftrag und echte Grok-Abnahme bleiben offen. Kein Release.
+
 
 18.10.2026, Projektsteuerung: sechs Projektwurzeln und registrierte Worktrees
 gezielt freigegeben; direkter Codex-Adapter ausdrücklich workspace-write,
@@ -85,11 +118,6 @@ Projektregeln aktiv. Echter Dienst-/Codex-Schreibnachweis, Gegenfälle und
 Erhaltungsgrenzen: [Projektsteuerung](PROJECT-CONTROL-20261018.md). Keine neue
 Paketversion und keine Umsetzung der geplanten Gesamtintegration.
 [Analyse der sechs Verbindungen mit Quellpins, Lücken und Aufwand](INTEGRATIONSANALYSE-SECHS-TOOLS-20261018.md).
-
-Privater Release Candidate0.6.0rc2 mit übernommener gemeinsamer LICENSE ist
-zusätzlich gebaut und als GitHub-Entwurf gesichert. Die Nutzerinstallation wurde
-dafür nicht neu eingerichtet. [Artefakte, Quellpin, Plattformproben und offene
-Veröffentlichungskriterien](RELEASE-ABNAHME-20261018.md).
 
 18.10.2026: Konkrete Workflow-Vorabprüfung, strukturierte eigene Fehlerberichte,
 zuordenbare Verbindungsphasen und geladene Runtimefingerabdrücke sind aktiviert.

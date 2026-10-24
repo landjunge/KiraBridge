@@ -147,6 +147,8 @@ class TeamDispatcher:
             (False, self.teams.pending(limit=16)),
         ):
             for work in rows:
+                if not existing and not self.bridge.store.can_claim(work["created"]):
+                    continue
                 if work["id"] not in self._active and self._defer.get(work["id"], 0) <= now:
                     self._active.add(work["id"])
                     return work, existing
@@ -175,8 +177,10 @@ class TeamDispatcher:
                     "peer_connection",
                     "peer_unknown",
                     "peer_timeout",
+                    "service_maintenance",
                 }:
-                    # Reconnect/read only. Never retry a submission after claim.
+                    # Read an existing turn / resume idempotent result actions;
+                    # never replay a provider turn after claim.
                     self._defer[work["id"]] = time.monotonic() + 5
                 else:
                     self.teams.fail(
@@ -429,7 +433,9 @@ class TeamDispatcher:
             "core_task_id": core["id"],
             "core_result_sha256": core_result_hash,
             "model_turn_completed": True,
-            "session_scope": "separate_managed_session",
+            "session_scope": "existing_visible_terminal"
+            if self.bridge.config.visible_handoffs.enabled
+            else "separate_managed_session",
             "completion_scope": "own_work_turn",
             "response_framing": framing,
             "actions": [],
@@ -463,7 +469,12 @@ class TeamDispatcher:
                 evidence["actions"].append({"type": action.type, "error_code": code})
                 # On transport ambiguity, stop here. Recovery may use the same
                 # deterministic action IDs; it never reruns the native model.
-                if code in {"peer_unknown", "peer_connection", "peer_timeout"}:
+                if code in {
+                    "peer_unknown",
+                    "peer_connection",
+                    "peer_timeout",
+                    "service_maintenance",
+                }:
                     raise
         if any("error_code" in item for item in evidence["actions"]):
             self.teams.fail(work["id"], "failed", "team_action_failed", evidence)

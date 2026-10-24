@@ -1,0 +1,62 @@
+{
+  "scope": "isolated development; production config/permissions/installation unchanged",
+  "base_commit": "a813f08be2603e312cb036ef79703b011c36c313",
+  "platform": "macOS-15.7.4-x86_64-i386-64bit",
+  "targeted_tests": {
+    "handoff_and_selection_cases": 90,
+    "final_raw_image_capture_cases": 3,
+    "unicode_guard_engine": "macOS JavaScriptCore executed without UI; passed"
+  },
+  "native_probe": {
+    "overall_passed": false,
+    "fixture": "new owned head stdin window, not Codex/Grok",
+    "passed_negative_guards": [
+      "stale process generation rejected before native paste",
+      "changed widget rejected before native Return"
+    ],
+    "positive_paste_return": "not passed; focus guard refused before Paste",
+    "error": {
+      "type": "BridgeError",
+      "code": "session_transport_unavailable",
+      "message": "execution error: Error: Error: Selected terminal focus changed; do not repeat input (-2700)\n"
+    },
+    "later_readonly_diagnostic": "precondition changed; no focus/menu action occurred"
+  },
+  "focus_observation_after_refusal": {
+    "terminal_frontmost": true,
+    "windows": [
+      {
+        "id": 30575,
+        "tty": "/dev/ttys002"
+      },
+      {
+        "id": 36931,
+        "tty": "/dev/ttys000"
+      },
+      {
+        "id": 37925,
+        "tty": "/dev/ttys001"
+      }
+    ]
+  },
+  "cleanup": {
+    "owned_window": 37925,
+    "tty": "/dev/ttys001",
+    "agent_pid": 10359,
+    "identity": "501 ttys001 Sat Oct 24 16:47:33 2026 10296 /usr/bin/head",
+    "output_inode": 887257325,
+    "output_device": 16777222,
+    "private_output_fd_verified": true,
+    "input_file_empty": true,
+    "screen_empty_after_fixture_marker": true,
+    "cleanup": "only independently reverified owned head terminated; own idle single-tab window closed"
+  },
+  "actual_agent_restart_test": "simulated process generation and old protocol binding in unit fixtures; no production agent restarted",
+  "remaining_limits": [
+    "No positive final-source native Paste/Return acceptance claim",
+    "No Codex/Grok product integration acceptance; no task sent into user windows",
+    "Unbound Codex historical activity and unknown Grok widgets remain conservative unknown",
+    "Configured automatic/default handoffs never silently migrate to a new window; explicit session.input only",
+    "Old uncertain handoffs are not rebound or replayed"
+  ]
+}

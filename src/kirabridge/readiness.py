@@ -15,6 +15,7 @@ from kirabridge import __version__
 from kirabridge.bridge_core.config import Config
 from kirabridge.bridge_core.models import BridgeError, Input, digest
 from kirabridge.filesystem_manager import PathScope
+from kirabridge.permissions import state_exclusions
 from kirabridge.terminal_manager import check_executable
 
 
@@ -35,6 +36,7 @@ def runtime_snapshot(config: Config) -> dict:
         str(p.relative_to(root)): hashlib.sha256(p.read_bytes()).hexdigest()
         for p in sorted(root.rglob("*.py"))
     }
+    config._effective_sha256 = digest(config.model_dump())
     return {
         "instance_id": uuid.uuid4().hex,
         "version": __version__,
@@ -42,7 +44,7 @@ def runtime_snapshot(config: Config) -> dict:
         "started_at": datetime.now(timezone.utc).isoformat(),
         "config_path": config._source_path,
         "config_sha256": config._source_sha256,
-        "effective_config_sha256": digest(config.model_dump()),
+        "effective_config_sha256": config._effective_sha256,
         "source_tree_sha256": digest(manifest),
         "source_file_count": len(manifest),
         "source_package_path": str(root),
@@ -81,7 +83,9 @@ def _directory(scope: PathScope, path: str) -> None:
 
 def readiness(bridge, principal: str, requirements: ReadinessInput) -> dict:
     policy = bridge.security.principal(principal, "bridge.health")
-    scope = PathScope(policy.roots + policy.read_roots, excluded=[str(bridge.config.state_path)])
+    scope = PathScope(
+        policy.roots + policy.read_roots, excluded=state_exclusions(bridge.config, policy)
+    )
 
     def file(path):
         bridge.security.principal(principal, "file.read")
@@ -227,11 +231,14 @@ def task_preflight(bridge, task: dict) -> dict:
     from kirabridge.diagnostics import compact_checks, runtime_ref
 
     operation, args, principal = task["operation"], task["args"], task["principal"]
+    from kirabridge.operations import OPERATIONS
+
+    permission = bridge.security.authorize(principal, operation, text=args.get("text"))
     policy = bridge.security.principal(principal, operation)
     roots = policy.roots + (
         policy.read_roots if operation in {"file.read", "file.image", "file.list"} else []
     )
-    scope = PathScope(roots, excluded=[str(bridge.config.state_path)])
+    scope = PathScope(roots, excluded=state_exclusions(bridge.config, policy))
     checks = []
 
     def check(kind, path, action):
@@ -284,8 +291,8 @@ def task_preflight(bridge, task: dict) -> dict:
                 bridge.handoffs.agent_preflight(principal, binding["agent"], binding["cwd"])
 
             check("agent_workflow", "owned_waiting_session", waiting_agent)
-    elif operation in {"terminal.execute", "admin.execute", "agent.execute"}:
-        if operation in {"terminal.execute", "admin.execute"}:
+    elif operation in {"terminal.execute", "terminal.visible", "admin.execute", "agent.execute"}:
+        if operation in {"terminal.execute", "terminal.visible", "admin.execute"}:
             executable = args["argv"][0]
             check(
                 "executable",
@@ -321,5 +328,7 @@ def task_preflight(bridge, task: dict) -> dict:
         "ready": all(c["ok"] for c in checks),
         "checks": compact_checks(checks),
         "operation": operation,
+        "operation_properties": OPERATIONS[operation].describe(),
+        "permission_decision": permission,
         "runtime": runtime_ref(bridge.runtime),
     }

@@ -1,3 +1,26 @@
+Aktueller Stand am 20. Oktober 2026, 15:40 Uhr: produktiv **0.8.0rc11 mit PR #7
+und Grok-Nachtrag `956b0f8`**, integriert und gepusht. 941 Tests auf diesem Mac,
+35 gezielte Receiverprüfungen, Ruff und Diff-Prüfung bestanden. Das tatsächlich
+installierte neue Wheel und die neu gestartete Dienstinstanz PID 79466 verwenden
+Quelle `cfad2a30…0362ceb7`, Start 13:38:41 UTC. Groks zwei reproduzierte Blocker
+sind behoben; die abschließende Prüfung des ausdrücklich beschriebenen
+Stop-Vertrags nennt keine konkrete Verletzung. Grok führte selbst keine Tests aus.
+Der ursprüngliche Kira→Codex→Kira-Kurztest war bereits abgeschlossen und wurde
+nicht wiederholt. Ein weiterer einmaliger Diagnosetest bestätigt jetzt auch die
+neu gestartete Codex-Sitzung: Einfügen, separates Return, authentisierter Empfang,
+passende Antwort sowie Empfang und Quittierung über Kiras echten Connector sind
+getrennt belegt. Dieser Live-Terminaltest fand vor dem Grok-Nachtrag statt;
+gemäß „kein weiterer Testauftrag“ wurde danach keine weitere Eingabe veranlasst.
+Kiras tatsächlicher Connector bestätigte anschließend die endgültigen geladenen
+Pins und empfing/quittierte die authentisierte Abschlussmeldung.
+[Maschinenlesbare Abnahme](evidence/receiver-resilience-mac-20261020.json) und
+[Etappenakte](ARCHITECTURE-STAGES-20261020.md) enthalten die konkreten Pins und
+verbleibenden Grenzen. Sieben ältere unbekannte Aufträge bleiben mangels
+ausreichender Abschlussbelege unverändert; keine Wiederholung.
+Sichtbare Übergaben verwenden ausschließlich die gespeicherte bestehende
+Fenster-/TTY-/PID-Zuordnung in der entsperrten Mac-Sitzung. Fehlende Ziele starten
+keinen Ersatz. Der koordinierte Neustart wartet auch auf Team-Ergebnisverarbeitung.
+
 Fortschreibung0.5.2: [Workflow-Vorabprüfung, Diagnose und Audit-Rotation](DIAGNOSTICS-20261018.md).
 
 Aktuelle Betreiberentscheidung18.10.2026: [Terminal-Vollzugriff, sichere Policy-/
@@ -183,3 +206,58 @@ keine Datenbank oder alten Ergebnisse zurückspielen. Ein Quell-Rückweg auf die
 vorherige Fassung erfordert zuerst Rücknahme der neuen `read_roots`-Option in
 der Konfiguration, weil alte Versionen unbekannte Felder absichtlich ablehnen.
 
+
+## Begrenzte neue Ausgabehistorie (aktiviert ab rc9)
+
+Seit koordinierter Aktivierung gelten die persistenten Werte in
+`[output_history]`: `max_bytes=16777216`, `max_entries=256`,
+`max_item_bytes=8388608`, `retention_seconds=604800`. Änderungen benötigen
+den bestehenden geprüften Aktivierungsweg. Ablauf und FIFO-Verdrängung gelten
+nur für neue rohe Terminalausgaben. Taskstatus, fachliche Nachrichten und
+historische Audit-Ketten bleiben erhalten. Das Protokoll zeigt Kürzung oder
+fehlende Ausgabe; ein abgeschlossener Auftrag wird dadurch nie wiederholt.
+`bridge_health.output_history` zeigt die logischen Nutzlastgrenzen, keine
+Obergrenze für Datenbankdatei, WAL oder historische Daten.
+
+Kein automatischer Code-Downgrade und kein Zurückspielen einer alten Datenbank.
+Vor einem ausdrücklich gewünschten Wechsel auf einen Leser ohne den neuen
+Codec: neue Arbeit persistent sperren, laufende Arbeit abwarten, passende
+Konfiguration sichern und die im [Etappenbericht](ARCHITECTURE-STAGES-20261020.md)
+beschriebene begrenzte Taskresultat-Aufbereitung oder einen kompatiblen Leser
+verwenden. Neue Audit-Referenzen brauchen auch danach einen kompatiblen Leser;
+der Rückkehrhelfer schreibt historische Audit-Zeilen nicht um.
+
+Die tatsächliche rc9-Aktivierung bestätigte Quelle und Konfiguration; Kira las
+anschließend das Original-Codex-Fenster und erhielt RC9-KIRA-OK vom bestehenden
+Grok. Ein lokaler authentifizierter Eve-Aufruf erhielt RC9-EVE-OK als finales
+conversation_return. Dies bestätigt keine physische Audiowiedergabe. Die
+Außenprüfung des erhaltenen Grok-Tunnels meldete Readiness HTTP503 und die
+öffentliche Quick-Tunnel-Adresse bei zwei DNS-Diensten NXDOMAIN. Der lokale
+Gatewayprozess/HTTP200 allein bestätigt keinen funktionierenden Handy-Zugang.
+Ein Neuverbinden mit möglichem Adresswechsel ist noch nicht erfolgt; die
+Rückfrage folgt Daniels ausdrücklicher Vorgabe zum Tunnelerhalt.
+
+## Sichtbarer Kira-Codex-Weg (rc10)
+
+Beschäftigte Fenster werden nicht unterbrochen. Wartende Nachrichten bleiben
+queued mit waiting_for_visible_target und verständlicher waiting_message;
+sie sind damit noch nicht eingefügt oder abgesendet. Vor jedem Einfügen werden
+Ziel und Bereitschaft erneut geprüft. Unbekannte Ergebnisse benötigen echte
+Empfangs-/Antwortbelege. [Konkrete Reparatur und echter Teststatus](VISIBLE-HANDOFF-RECOVERY-20261020.md).
+Für Kiras alten Werkzeugcache ist completion_subscription als leerer String
+auf oberster Ebene zulässig; hierfür keine Subscription erfinden.
+
+Ab rc11 liefern Sitzungslesewege zusätzlich dieselbe aktuelle Bereitschafts-
+einschätzung wie die Übergabe. Die lokale Codex-Protokollzuordnung besteht aus
+`codex_thread_id` und `codex_rollout_path` in der bestehenden Zielbindung;
+beide werden gemeinsam gesetzt. Eine echte Fenster/TTY/PID-/Threadzuordnung
+vorher nachweisen, nicht aus Dateialter oder gemeinsamem Backend-PID raten.
+Unbekannte/geänderte Protokolle, aktuelle Arbeit und vorhandene Eingabetexte
+bleiben gesperrt. Ablehnungen enthalten Zeit und begrenzte Ausgabereferenz.
+Ein voller Berechtigungsumfang ersetzt weder Ziel- noch Bereitschaftsprüfung.
+
+## RC16 opt-in modules / optionale Module
+
+See [modularity review](MODULARITY-REVIEW-20261024.md), [file transfer](FILE-TRANSFER.md),
+[receiver contract](THREADDESK-FILE-TRANSFER-V1.md) and [discovery/terminal](DISCOVERY-VISIBLE-TERMINAL.md).
+These candidate additions do not grant production access or establish receiver acceptance.

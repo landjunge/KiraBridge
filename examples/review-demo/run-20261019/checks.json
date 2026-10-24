@@ -1,0 +1,15 @@
+{
+  "passed": true,
+  "engine": "v25.9.0",
+  "kind": "Node VM with minimal DOM; no browser",
+  "page_sha256": "c76184ac0914fc956c376c50987f92c38b3a73e866df6336dc80c5de633dec84",
+  "checks": [
+    "light to dark to light",
+    "aria-pressed and label",
+    "storage and reload both themes",
+    "blocked storage",
+    "invalid stored value",
+    "theme CSS binding",
+    "German document and native button"
+  ]
+}

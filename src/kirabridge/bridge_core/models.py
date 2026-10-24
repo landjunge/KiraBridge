@@ -73,6 +73,11 @@ class TerminalInput(Input):
     max_output: int = Field(default=65536, ge=0, le=1048576)
 
 
+class ConnectionCheckInput(Input):
+    device: Literal["browser", "mobile", "desktop"]
+    mode: Literal["text", "live", "voice"]
+
+
 class PathInput(Input):
     path: str
 

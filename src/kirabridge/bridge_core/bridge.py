@@ -13,6 +13,7 @@ from kirabridge.bridge_core.models import (
     BridgeError,
     ClipboardRead,
     ClipboardWrite,
+    ConnectionCheckInput,
     EmptyInput,
     HandoffAnswerInput,
     HandoffDecisionInput,
@@ -36,18 +37,35 @@ from kirabridge.bridge_core.models import (
     WriteInput,
 )
 from kirabridge.clipboard_manager import ClipboardManager
+from kirabridge.file_transfer.models import InventoryInput, PrepareInput, TransferInput
 from kirabridge.filesystem_manager import FilesystemManager, PathScope
 from kirabridge.image_manager import ImageManager
 from kirabridge.message_manager import MessageManager
 from kirabridge.message_manager.receiver import MessageReceiver
+from kirabridge.permissions import LEVELS, direct_terminal_required, level_for, state_exclusions
 from kirabridge.process_manager import ProcessManager
+from kirabridge.queue_management.models import QueueControl
 from kirabridge.security_manager import SecurityManager
+from kirabridge.session_manager import SessionInput, SessionManager, SessionOpen, SessionRead
 from kirabridge.task_manager.manager import TaskManager
 from kirabridge.task_manager.store import Store
 from kirabridge.terminal_manager import TerminalManager
+from kirabridge.visible_terminal import VisibleTerminal, VisibleTerminalInput
 
 INPUTS = {
+    "queue.control": QueueControl,
+    "files.prepare": PrepareInput,
+    "files.transfer": TransferInput,
+    "files.inventory": InventoryInput,
+    "files.status": TransferInput,
+    "files.pause": TransferInput,
+    "connection.check": ConnectionCheckInput,
+    "session.open": SessionOpen,
+    "session.input": SessionInput,
+    "session.catalog": EmptyInput,
+    "session.read": SessionRead,
     "terminal.execute": TerminalInput,
+    "terminal.visible": VisibleTerminalInput,
     "file.read": ReadInput,
     "file.image": ImageInput,
     "file.list": PathInput,
@@ -87,6 +105,9 @@ class Bridge:
 
         self.runtime = runtime_snapshot(config)
         self.store = Store(config.state_path / "bridge.sqlite3")
+        from kirabridge.operations_service import config_snapshot
+
+        config_snapshot(config)
         from kirabridge.diagnostics import AuditObserver, runtime_ref
         from kirabridge.readiness import task_preflight
 
@@ -102,6 +123,30 @@ class Bridge:
 
         self.handoffs = HandoffManager(self)
         self.security = SecurityManager(config, self.store)
+        from kirabridge.file_transfer.authorization import TransferAuthorization
+        from kirabridge.file_transfer.repository import TransferRepository
+        from kirabridge.file_transfer.service import FileTransferService
+        from kirabridge.file_transfer.sources import SourceRegistry
+        from kirabridge.file_transfer.threaddesk import ThreadDeskFileReceiver
+        from kirabridge.output_history import OutputHistory
+
+        self.file_sources = SourceRegistry()
+        self.file_authorization = TransferAuthorization(
+            config.file_transfer, self.security.principal
+        )
+        self.file_repository = TransferRepository(
+            self.store.db, self.store.transaction, self.store.audit
+        )
+        self.file_transfers = FileTransferService(
+            config.state_path / "file-transfer-snapshots",
+            config.file_transfer,
+            self.file_sources,
+            self.file_authorization,
+            self.file_repository,
+            ThreadDeskFileReceiver(self.threaddesk),
+        )
+        self.outputs = OutputHistory(config.output_history, self.store)
+        self.store.result_codec = self.outputs
         self.terminal = TerminalManager(config.terminal)
         self.filesystem = FilesystemManager()
         self.images = ImageManager()
@@ -119,13 +164,57 @@ class Bridge:
             preflight=lambda task: task_preflight(self, task),
             runtime=runtime_ref(self.runtime),
         )
+        from kirabridge.session_ports import SessionPorts
+        from kirabridge.terminal_queries import TerminalQueries
+
+        self.sessions = SessionManager(
+            SessionPorts(
+                authorization=self.security,
+                input_release=self.tasks.input_policy,
+                audit=self.outputs,
+                environment=self.terminal.environment,
+                agent_registry=lambda: (config.agents, config.visible_handoffs.bindings),
+                clipboard_lock=self.clipboard.lock,
+                visible_required=lambda name: direct_terminal_required(config, name),
+                readiness=lambda principal, result: self.visible_handoffs.observe_readiness(
+                    principal, result
+                ),
+            )
+        )
+        self.visible_terminal = VisibleTerminal(
+            config, self.security, self.sessions, self.terminal.environment
+        )
+        self.terminal_queries = TerminalQueries(
+            self.security, self.sessions, self.store, config.read_concurrency
+        )
+        from kirabridge.completion_manager import CompletionManager
+
+        self.completions = CompletionManager(self.store, self.security)
         self.messages = MessageManager(config, self.store, self.security)
+        from kirabridge.visible_handoff import VisibleHandoffs
+
+        self.visible_handoffs = VisibleHandoffs(
+            config, self.store, self.security, self.sessions, self.messages
+        )
+        self.agents.visible_handoffs = self.visible_handoffs
+
+        def maintain():
+            self.messages.voice_policy.expire()
+            self.outputs.prune()
+
+        self.tasks.maintenance = maintain
         self.message_receiver = MessageReceiver(self)
         from kirabridge.team_manager import TeamManager
         from kirabridge.team_manager.dispatcher import TeamDispatcher
 
         self.teams = TeamManager(self)
+        self.messages.voice_policy.teams = self.teams
         self.team_dispatcher = TeamDispatcher(self)
+        from kirabridge.queue_management import QueueManager
+
+        self.queues = QueueManager(
+            self.store, self.security, self.tasks, self.messages, self.visible_handoffs, self.teams
+        )
 
     def validate(self, request: TaskRequest) -> None:
         model = INPUTS.get(request.operation)
@@ -138,18 +227,31 @@ class Bridge:
                 "invalid_arguments", "Arguments do not match the operation schema"
             ) from None
 
-    def submit(self, principal: str, request: TaskRequest, approval: str = "") -> dict:
+    def submit(
+        self,
+        principal: str,
+        request: TaskRequest,
+        approval: str = "",
+        *,
+        completion_target: str | None = None,
+    ) -> dict:
         try:
             self.validate(request)
-            return self.tasks.enqueue(principal, request, approval)
+            return self.tasks.enqueue(
+                principal, request, approval, completion_target=completion_target
+            )
         except BridgeError as exc:
             self.rejection(principal, request, exc)
             raise
 
-    def prepare(self, principal: str, request: TaskRequest) -> dict:
+    def prepare(
+        self, principal: str, request: TaskRequest, *, completion_target: str | None = None
+    ) -> dict:
         try:
             self.validate(request)
-            return self.tasks.enqueue(principal, request, "", pending=True)
+            return self.tasks.enqueue(
+                principal, request, "", pending=True, completion_target=completion_target
+            )
         except BridgeError as exc:
             self.rejection(principal, request, exc)
             raise
@@ -174,23 +276,66 @@ class Bridge:
 
     def health(self, principal: str) -> dict:
         policy = self.security.principal(principal, "bridge.health")
+        from kirabridge.discovery import snapshot
+        from kirabridge.permissions import automatic_for, permission_summary
+        from kirabridge.terminal_access import terminal_access
+
         return {
             "name": "KiraBridge",
+            "discovery": snapshot(self, principal),
             "version": __version__,
             "api_version": API_VERSION,
             "dispatcher_active": bool(self.tasks.workers)
             and all(not worker.done() for worker in self.tasks.workers),
             "chatgpt_integration": "unverified",
+            "task_submission": {
+                "events_subscription_required": False,
+                "preferred_tools": ["action_request", "action_submit"],
+                "result_tools": ["task_get", "task_events", "read_query"],
+                "legacy_connector_schema": "If a cached task_* connector requires "
+                "completion_subscription, the root value empty string is accepted "
+                "as no subscription; use fresh action_* schemas after metadata refresh.",
+            },
+            "completion_channel": {
+                "receive_tool": "completion_receive",
+                "ack_tool": "completion_ack",
+                "default_target": "default",
+                "mode": "durable_inbox_with_waiting_consumer",
+                "unsolicited_chatgpt_wakeup": "unavailable_on_current_transport",
+            },
             "local_approval_url": LOCAL_APPROVAL_URL,
             "approval_mode": policy.approval_mode,
-            "approval_required": policy.approval_mode == "manual",
+            "permission_level": level_for(policy),
+            "permission_label": LEVELS[level_for(policy)],
+            "permission_detail": permission_summary(self.config, principal),
+            "approval_required": not automatic_for(policy, "terminal.execute"),
+            "approval_required_scope": (
+                "default execution; inspect each operation permission_decision"
+            ),
+            "effective_approval_mode": "automatic"
+            if automatic_for(policy, "terminal.execute")
+            else "per_operation",
+            "session_input_policy": self.config.session_input_policy.model_dump(),
+            "terminal_access": terminal_access(self.config, principal),
+            "automatic_operations": policy.automatic_operations,
+            "voice_messaging": self.config.voice_messaging.model_dump(),
+            "visible_handoffs": self.config.visible_handoffs.model_dump(),
+            **self.messages.voice_channel.profile(principal),
             "health_scope": "dispatcher and authentication; use bridge_readiness for prerequisites",
             "runtime": self.runtime,
+            "operations": {
+                "protocol": 1,
+                "maintenance": self.store.maintenance_state(),
+                "accepting_new_work": self.store.maintenance_state() is None,
+            },
+            "desktop_last_observation": self.sessions.desktop.last,
+            "output_history": self.outputs.status(),
             "diagnostics_storage": self.diagnostics.status(),
             "message_peers": policy.message_peers,
             "message_receiver_active": bool(
                 self.message_receiver.worker and not self.message_receiver.worker.done()
             ),
+            "message_receiver_scope": "bridge_dispatcher_for_configured_receivers",
         }
 
     def task(self, principal: str, task_id: str) -> dict:
@@ -237,11 +382,57 @@ class Bridge:
     async def execute(self, task: dict, running, progress) -> dict[str, Any]:
         operation, arguments, principal = task["operation"], task["args"], task["principal"]
         args = INPUTS[operation].model_validate(arguments)
+        self.security.authorize(principal, operation, text=arguments.get("text"))
         policy = self.security.principal(principal, operation)
         roots = policy.roots + (
             policy.read_roots if operation in {"file.read", "file.image", "file.list"} else []
         )
-        scope = PathScope(roots, excluded=[str(self.config.state_path)])
+        scope = PathScope(roots, excluded=state_exclusions(self.config, policy))
+        if operation == "queue.control":
+            # Rejections before any mutation remain definite failures, not unknown effects.
+            result = await self.queues.control(
+                principal, args, approved=True, control_task_id=task["id"]
+            )
+            await running({"phase": "queue_control_recorded", "history_preserved": True})
+            return result
+        if operation == "files.prepare":
+            return await self.file_transfers.prepare(task, args, running)
+        if operation == "files.transfer":
+            return await self.file_transfers.transfer(task, args, running)
+        if operation == "files.pause":
+            await running({"phase": "pause_requested", "transfer_id": args.transfer_id})
+            return self.file_repository.pause(principal, args.transfer_id)
+        if operation in {"files.inventory", "files.status"}:
+            self.file_authorization.check(principal, "files.inspect")
+            await running({"phase": "file_status_query"})
+            if operation == "files.status":
+                return self.file_repository.public(
+                    self.file_repository.get(principal, args.transfer_id)
+                )
+            return {
+                "transfers": [
+                    self.file_repository.public(row)
+                    for row in self.file_repository.list(principal, args.after, args.limit)
+                ]
+            }
+        if operation == "connection.check":
+            await running({"evidence_type": "connection_check_received"})
+            return await self.check_connection(principal, args.device, args.mode)
+        if operation == "session.catalog":
+            await running({"evidence_type": "terminal_catalog_query"})
+            return await self.terminal_queries.execute(
+                principal, operation, arguments, task_id=task["id"]
+            )
+        if operation == "session.read":
+            await running({"evidence_type": "terminal_read_query", "pane_id": args.pane_id})
+            return await self.terminal_queries.execute(
+                principal, operation, arguments, task_id=task["id"]
+            )
+        if operation == "terminal.visible" or (
+            operation == "terminal.execute" and direct_terminal_required(self.config, principal)
+        ):
+            visible_args = VisibleTerminalInput.model_validate(arguments)
+            return await self.visible_terminal.execute(task, visible_args, running)
         if operation == "terminal.execute":
             result = await self.terminal.execute(
                 task["id"],
@@ -264,6 +455,67 @@ class Bridge:
                     "terminated": result["terminated"],
                 },
             }
+        if operation == "session.input":
+            selected = await self.sessions.selected(principal, args.pane_id, args.expected_pid)
+            target, selected_binding = self.sessions.explicit_agent_binding(selected)
+            if target:
+                if not args.submit:
+                    # Paste-only is an explicit task, never a submitted agent handoff.
+                    # Retain agent access control even though no Return is sent.
+                    agent_policy = self.security.principal(principal, "agent.execute")
+                    if target not in agent_policy.agents:
+                        raise BridgeError("agent_denied", "Selected agent is not granted")
+                    self.security.principal(principal, "terminal.execute")
+                    async with self.sessions.agent_selection(principal, target, selected_binding):
+                        await self.visible_handoffs.check_target(
+                            principal, target, selected_binding, ready=True
+                        )
+                        await self.visible_handoffs.reconcile_target_reservations(
+                            principal, target, selected_binding
+                        )
+                        await running(
+                            {
+                                "evidence_type": "visible_paste_dispatch",
+                                "terminal_input_attempted": True,
+                                "pane_id": args.pane_id,
+                                "expected_pid": args.expected_pid,
+                                "agent_pid": selected_binding.agent_pid,
+                                "return_sent": False,
+                                "agent_confirmed": False,
+                                "automatic_retry": False,
+                            }
+                        )
+                        approved = self.tasks.input_policy.dispatch(principal, args, task["id"])
+                        result = await self.sessions.insert(principal, approved)
+                    self.tasks.input_policy.sent(principal, task["id"])
+                    return {
+                        **result,
+                        "pane_id": args.pane_id,
+                        "expected_pid": args.expected_pid,
+                        "submitted": False,
+                        "execution_confirmed": False,
+                        "scope": "literal paste event only; no Return or agent acknowledgement",
+                    }
+                approved = self.tasks.input_policy.dispatch(principal, args, task["id"])
+                result = await self.visible_handoffs.execute(
+                    task,
+                    AgentInput(
+                        agent=target,
+                        prompt=approved.text,
+                        cwd=str(self.config.state_path),
+                        timeout=300,
+                    ),
+                    running,
+                    progress,
+                    binding_override=selected_binding,
+                )
+                self.tasks.input_policy.sent(principal, task["id"])
+                return result
+            await running({"evidence_type": "session_input_dispatch", "pane_id": args.pane_id})
+            return await self.sessions.send(principal, args, task_id=task["id"])
+        if operation == "session.open":
+            await running({"evidence_type": "session_open_dispatch"})
+            return await self.sessions.open(principal, args, task_id=task["id"])
         if operation == "agent.execute":
             self.teams.authorize_execution(task)
             return await self.agents.execute(task, args, policy, running, progress)
@@ -302,6 +554,10 @@ class Bridge:
             )
 
         if operation == "admin.execute":
+            if direct_terminal_required(self.config, principal):
+                return await self.visible_terminal.execute(
+                    task, VisibleTerminalInput.model_validate(arguments), running, privileged=True
+                )
             from kirabridge.admin_manager import execute_admin
 
             return await execute_admin(self, task, args, policy, running)
@@ -346,6 +602,28 @@ class Bridge:
                 return self.terminal.inspect(principal, args.task_id)
             return await self.terminal.terminate(principal, args.task_id)
         raise BridgeError("unknown_operation", "Operation is not supported")
+
+    async def check_connection(self, principal, device, mode):
+        self.security.principal(principal, "bridge.health")
+        terminals = {"status": "not_granted", "sessions": []}
+        if "session.inspect" in self.config.principals[principal].capabilities:
+            terminals = await self.sessions.catalog(principal)
+        evidence = {
+            "device": device,
+            "mode": mode,
+            "device_mode_source": "caller_report",
+            "transport_receipt": True,
+            "terminal_transport": terminals.get("status"),
+            "terminal_count": len(terminals.get("sessions", [])),
+        }
+        with self.store.transaction():
+            self.store.audit("connection.checked", principal, None, evidence)
+        return {
+            "principal": principal,
+            **evidence,
+            "dispatcher_active": bool(self.tasks.workers),
+            "permission_scope": "same_for_all_devices_and_modes",
+        }
 
     def record_runtime_load(self):
         previous = self.store.db.execute(

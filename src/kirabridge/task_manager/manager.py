@@ -14,6 +14,7 @@ from kirabridge.bridge_core.models import (
     canonical,
     digest,
 )
+from kirabridge.operations import OPERATIONS
 from kirabridge.platform_adapters import RuntimeLock
 from kirabridge.security_manager import SecurityManager, request_hash
 from kirabridge.task_manager.store import Store
@@ -38,6 +39,10 @@ class TaskManager:
         self.wake = asyncio.Event()
         self.preflight = preflight
         self.runtime = runtime
+        self.maintenance = None
+        from kirabridge.session_input_policy import SessionInputPolicy
+
+        self.input_policy = SessionInputPolicy(config, store, security)
 
     def enqueue(
         self,
@@ -47,10 +52,23 @@ class TaskManager:
         *,
         attempt: int = 1,
         pending: bool = False,
+        completion_target: str | None = None,
     ) -> dict:
+        from kirabridge.completion_manager import valid_target
+
+        if completion_target is not None:
+            valid_target(completion_target)
         policy = self.security.principal(principal, request.operation)
-        automatic = policy.approval_mode == "automatic" and not approval
+        effective = self.security.authorize(
+            principal, request.operation, text=request.arguments.get("text")
+        )
+        automatic = effective["automatic"] and not approval
         pending = pending and not automatic
+        self.input_policy.expire()
+        buffered = effective["buffer_enabled"]
+        held = effective["buffer_required"]
+        if held:
+            pending = True
         if request.api_version != "1":
             raise BridgeError("api_version", "Unsupported API version")
         if len(canonical(request.model_dump()).encode()) > self.config.max_task_bytes:
@@ -65,31 +83,49 @@ class TaskManager:
                     raise BridgeError(
                         "idempotency_conflict", "Idempotency key belongs to a different request"
                     )
+                route = self.store.db.execute(
+                    "SELECT target FROM completion_routes WHERE task_id=?", (existing["id"],)
+                ).fetchone()
+                if completion_target is not None and completion_target != (
+                    route[0] if route else "default"
+                ):
+                    raise BridgeError(
+                        "completion_route_conflict", "Original return target is fixed"
+                    )
+                if approval and self.input_policy.waiting(existing["id"]):
+                    self.store.assert_accepting()
+                    if request.task_id != existing["id"]:
+                        raise BridgeError("review_conflict", "Use the original buffered task ID")
+                    self.input_policy.release(principal, request, approval)
+                    self._approve_in_transaction(existing["id"], "daniel_token")
+                    self.wake.set()
                 return self.store.get(existing["id"], principal)
+            self.store.assert_accepting(
+                continuation_id=request.task_id,
+                principal=principal,
+                request_hash=request_hash(request),
+                operation=request.operation,
+            )
             if self.store.db.execute(
                 "SELECT 1 FROM tasks WHERE id=?", (request.task_id,)
             ).fetchone():
                 raise BridgeError("task_id_conflict", "Task identifier is already reserved")
-            control = request.operation in {
-                "process.list",
-                "process.inspect",
-                "process.terminate",
-                "agent.status",
-                "policy.inspect",
-                "handoff.status",
-                "workflow.stop",
-            }
-            comparison = "IN" if control else "NOT IN"
-            count = self.store.db.execute(
-                f"SELECT COUNT(*) FROM tasks WHERE state IN ('created','queued') "
-                f"AND operation {comparison} "
-                "('process.list','process.inspect','process.terminate',"
-                "'agent.status','policy.inspect','handoff.status','workflow.stop')"
-            ).fetchone()[0]
-            capacity = self.config.max_control_queued if control else self.config.max_queued
+            lane = OPERATIONS[request.operation].execution_class
+            count = self.store.queued_count(lane)
+            capacity = {
+                "normal": self.config.max_queued,
+                "read": self.config.max_read_queued,
+                "stop": self.config.max_control_queued,
+            }[lane]
             if count >= capacity:
                 raise BridgeError("queue_full", "Queue capacity reached")
+            effective_target = completion_target or "default"
             if request.parent_id:
+                if completion_target is None:
+                    route = self.store.db.execute(
+                        "SELECT target FROM completion_routes WHERE task_id=?", (request.parent_id,)
+                    ).fetchone()
+                    effective_target = route[0] if route else "default"
                 parent = self.store.get(request.parent_id, principal)
                 depth = 1
                 while parent["parent_id"]:
@@ -97,6 +133,14 @@ class TaskManager:
                     if depth >= 32:
                         raise BridgeError("delegation_limit", "Delegation chain exceeds 32 tasks")
                     parent = self.store.get(parent["parent_id"], principal)
+            if request.operation == "session.open" and request.arguments.get(
+                "window_authorization"
+            ):
+                from kirabridge.session_manager import SessionOpen
+
+                self.security.consume_window(
+                    principal, request.task_id, SessionOpen.model_validate(request.arguments)
+                )
             if not pending and not automatic:
                 self.security.consume(principal, request, approval)
             now = time.time()
@@ -120,6 +164,10 @@ class TaskManager:
                     attempt,
                 ),
             )
+            self.store.db.execute(
+                "INSERT INTO completion_routes(task_id,target) VALUES(?,?)",
+                (request.task_id, effective_target),
+            )
             for state in (State.CREATED,) if pending else (State.CREATED, State.QUEUED):
                 evidence = {"persisted": True}
                 if state == State.QUEUED and automatic:
@@ -128,13 +176,19 @@ class TaskManager:
                     "INSERT INTO events(task_id,at,state,evidence) VALUES(?,?,?,?)",
                     (request.task_id, now, state, canonical(evidence)),
                 )
+            if buffered:
+                self.input_policy.stage(request, principal)
             self.store.audit(
                 "task.requested" if pending else "task.queued",
                 principal,
                 request.task_id,
-                {"operation": request.operation, "request_hash": request_hash(request)},
+                {
+                    "operation": request.operation,
+                    "request_hash": request_hash(request),
+                    "permission_decision": effective,
+                },
             )
-            if automatic:
+            if automatic and not held:
                 self.store.audit(
                     "task.auto_approved",
                     principal,
@@ -153,6 +207,7 @@ class TaskManager:
         self, task_id: str, *, expected_hash: str | None = None, source: str = "local_cli"
     ) -> dict:
         """Local operator authority only; deliberately not an MCP tool."""
+        self.input_policy.expire()
         with self.store.transaction():
             task = self.store.get(task_id)
             actual_hash = self.store.db.execute(
@@ -163,27 +218,50 @@ class TaskManager:
             self.security.principal(task["principal"], task["operation"])
             if task["state"] != State.CREATED:
                 raise BridgeError("state_conflict", "Only pending requests can be approved")
-            now = time.time()
-            self.store.db.execute(
-                "UPDATE tasks SET state='queued',updated=? WHERE id=?", (now, task_id)
-            )
-            evidence = {"local_operator_approved": True}
-            self.store.db.execute(
-                "INSERT INTO events(task_id,at,state,evidence) VALUES(?,?,?,?)",
-                (task_id, now, State.QUEUED, canonical(evidence)),
-            )
-            self.store.audit(
-                "task.approved",
-                task["principal"],
-                task_id,
-                {
-                    "source": source,
-                    "operation": task["operation"],
-                    "request_hash": actual_hash,
-                },
-            )
+            if self.input_policy.waiting(task_id):
+                request = TaskRequest(
+                    task_id=task_id,
+                    idempotency_key=task["idem"],
+                    operation=task["operation"],
+                    arguments=task["args"],
+                    parent_id=task["parent_id"],
+                )
+                # An explicit click/CLI approval by the trusted local operator is the
+                # separate step. Issue and consume its exact-task token atomically.
+                token = self.security.grant_in_transaction(task["principal"], request)
+                self.input_policy.release(task["principal"], request, token, source=source)
+            self._approve_in_transaction(task_id, source)
         self.wake.set()
         return self.store.get(task_id)
+
+    def _approve_in_transaction(self, task_id, source):
+        task = self.store.get(task_id)
+        self.store.assert_accepting(operation=task["operation"])
+        now = time.time()
+        self.store.db.execute(
+            "UPDATE tasks SET state='queued',updated=? WHERE id=?", (now, task_id)
+        )
+        self.store.db.execute(
+            "INSERT INTO events(task_id,at,state,evidence) VALUES(?,?,?,?)",
+            (
+                task_id,
+                now,
+                State.QUEUED,
+                canonical({"approval_source": source, "local_operator_approved": True}),
+            ),
+        )
+        self.store.audit(
+            "task.approved",
+            task["principal"],
+            task_id,
+            {
+                "source": source,
+                "operation": task["operation"],
+                "request_hash": self.store.db.execute(
+                    "SELECT request_hash FROM tasks WHERE id=?", (task_id,)
+                ).fetchone()[0],
+            },
+        )
 
     async def start(self) -> None:
         if self.workers:
@@ -192,10 +270,14 @@ class TaskManager:
         try:
             self.store.recover()
             self.workers = [
-                asyncio.create_task(self._worker(False)) for _ in range(self.config.concurrency)
+                asyncio.create_task(self._worker("normal")) for _ in range(self.config.concurrency)
             ]
-            # Cancellation stays reachable when all execution slots are occupied.
-            self.workers.append(asyncio.create_task(self._worker(True)))
+            self.workers.extend(
+                asyncio.create_task(self._worker("read"))
+                for _ in range(self.config.read_concurrency)
+            )
+            # Read traffic never occupies the independently reserved stop worker.
+            self.workers.append(asyncio.create_task(self._worker("stop")))
         except BaseException:
             self.lock.release()
             raise
@@ -216,10 +298,13 @@ class TaskManager:
                 (time.time() + self.config.lease_seconds, task_id, self.owner),
             )
 
-    async def _worker(self, control: bool) -> None:
+    async def _worker(self, lane: str) -> None:
         while True:
             self.wake.clear()
-            task = self.store.claim(self.owner, self.config.lease_seconds, control)
+            self.input_policy.expire()
+            if self.maintenance:
+                self.maintenance()
+            task = self.store.claim(self.owner, self.config.lease_seconds, lane)
             if task is None:
                 try:
                     await asyncio.wait_for(self.wake.wait(), 2.0)
@@ -232,15 +317,16 @@ class TaskManager:
         heartbeat = asyncio.create_task(self._heartbeat(task["id"]))
         observed_effect = False
         progress_count = 0
+        mutating = OPERATIONS[task["operation"]].effect != "read"
 
         async def running(evidence):
             nonlocal observed_effect
-            observed_effect = True
+            observed_effect = mutating
             self.store.transition(task["id"], State.RUNNING, evidence, owner=self.owner)
 
         async def progress(evidence):
             nonlocal observed_effect, progress_count
-            observed_effect = True
+            observed_effect = mutating
             progress_count += 1
             if progress_count > 256:
                 raise UncertainExecution("progress_limit", "Task progress event limit reached")
@@ -322,6 +408,7 @@ class TaskManager:
                 state,
                 {
                     "exception_type": type(exc).__name__,
+                    "provider_error": getattr(exc, "provider_error", None),
                     "safe_to_retry": state == State.FAILED and not observed_effect,
                     "last_observation": self.store.get(task["id"])["evidence"],
                 },

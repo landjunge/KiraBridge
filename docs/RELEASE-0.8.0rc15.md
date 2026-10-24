@@ -1,5 +1,7 @@
 # 0.8.0rc15 — unpublished candidate / unveröffentlichter Kandidat
 
+Historical source-pinned draft. The combined source and tested package candidate are now RC17; see [consolidation](CONSOLIDATION-20261024.md) and [RC17 package evidence](ACCEPTANCE-MACOS-RC17.md). This historical asset was not overwritten.
+
 Based on RC14 plus the merged PNG metadata and launchd retry fixes on
 `integration/local-rc13-20261022` (2f5d2fa). The default `main` branch is a
 separate lineage; replacing it wholesale would remove features. This change

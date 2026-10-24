@@ -104,7 +104,9 @@ async def read(bridge: Any, principal: str, name: str, arguments: dict[str, Any]
         try:
             Draft202012Validator(tool["inputSchema"]).validate(arguments)
         except ValidationError:
-            raise BridgeError("invalid_arguments", "Arguments do not match ThreadDesk schema") from None
+            raise BridgeError(
+                "invalid_arguments", "Arguments do not match ThreadDesk schema"
+            ) from None
         result = await bridge.threaddesk.pool.call("threaddesk", name, arguments)
         success, value = bridge.threaddesk.decode(result, mutation=False)
     return {

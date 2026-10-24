@@ -104,10 +104,21 @@ def ensure_idle(config):
             exists = db.execute(
                 "SELECT 1 FROM sqlite_master WHERE type='table' AND name=?", (table,)
             ).fetchone()
+            hold_filter = ""
+            if (
+                table == "message_jobs"
+                and db.execute(
+                    "SELECT 1 FROM sqlite_master WHERE name='queue_holds' AND type='table'"
+                ).fetchone()
+            ):
+                hold_filter = (
+                    " AND (state='running' OR NOT EXISTS (SELECT 1 FROM queue_holds h "
+                    "WHERE h.queue_id='messages' AND h.item_id=message_jobs.message_id))"
+                )
             if (
                 exists
                 and db.execute(
-                    f"SELECT 1 FROM {table} WHERE state IN ({states}) LIMIT 1"
+                    f"SELECT 1 FROM {table} WHERE state IN ({states}){hold_filter} LIMIT 1"
                 ).fetchone()
             ):
                 raise BridgeError(

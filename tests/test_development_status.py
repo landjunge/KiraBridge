@@ -100,6 +100,37 @@ async def test_agent_status_is_capped_and_capability_gated(bridge, config, monke
         await status.agent_status(bridge, "local")
 
 
+async def test_existing_terminal_handles_are_visible_without_reading_or_claiming_ownership(
+    bridge, config, monkeypatch
+):
+    config.principals["local"].capabilities += ["session.inspect"]
+    target = {
+        "pane_id": "terminal:123:ttys004",
+        "expected_pid": 345,
+        "window_id": 123,
+        "tty": "/dev/ttys004",
+        "busy": True,
+    }
+
+    async def catalog(principal):
+        assert principal == "local"
+        return {"status": "available", "sessions": [target]}
+
+    async def no_read(*args, **kwargs):
+        pytest.fail("discovery must not read terminal output")
+
+    monkeypatch.setattr(bridge.sessions, "catalog", catalog)
+    monkeypatch.setattr(bridge.sessions, "read", no_read)
+    result = await status.agent_status(bridge, "local")
+    assert result["interactive_terminal_sessions"] == [target]
+    assert result["managed_terminal_sessions"] == []
+    assert result["terminal_access"]["availability"] == "available"
+    config.principals["local"].capabilities.remove("session.inspect")
+    result = await status.agent_status(bridge, "local")
+    assert result["interactive_terminal_sessions"] == []
+    assert result["terminal_access"]["availability"] == "not_granted"
+
+
 def test_permissions_snapshot_is_explicit_whitelist_and_checks_disk_drift(
     bridge, config, tmp_path, monkeypatch
 ):

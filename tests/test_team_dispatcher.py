@@ -683,6 +683,43 @@ async def test_action_error_is_visible_and_does_not_claim_success(config):
     assert "secret" not in json.dumps(teams.failures)
 
 
+async def test_maintenance_preserves_completed_turn_for_same_action_id_without_model_replay(config):
+    dispatcher, teams = isolated_dispatcher(config)
+    calls = []
+    held = True
+
+    async def action(pool, tool, arguments):
+        calls.append((tool, arguments))
+        if held:
+            raise BridgeError("service_maintenance", "Known not queued during activation")
+        return {"id": "one-child"}
+
+    dispatcher._call = action
+    work = {"id": "parent", "team_id": "team"}
+    core = {
+        "id": "completed-core",
+        "result": {
+            "text": json.dumps(
+                {
+                    "kirabridge_team": "1",
+                    "result": "done",
+                    "actions": [
+                        {"type": "task", "assignee": "grok", "title": "child", "body": "continue"}
+                    ],
+                }
+            )
+        },
+    }
+    with pytest.raises(BridgeError) as error:
+        await dispatcher._complete(None, work, core)
+    assert error.value.code == "service_maintenance"
+    assert not teams.failures and not teams.finished
+    held = False
+    await dispatcher._complete(None, work, core)
+    assert calls[0] == calls[1]
+    assert len(teams.finished) == 1 and not teams.failures
+
+
 async def test_empty_native_result_is_a_visible_failure(config):
     dispatcher, teams = isolated_dispatcher(config)
     await dispatcher._complete(

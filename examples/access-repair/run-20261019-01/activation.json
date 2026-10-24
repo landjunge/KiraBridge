@@ -1,0 +1,15 @@
+{
+  "idle_tasks": 0,
+  "idle_receiver_jobs": 0,
+  "existing_rights_preserved": true,
+  "added_capabilities": [
+    "session.inspect",
+    "session.input"
+  ],
+  "other_principals_unchanged": true,
+  "auth_unchanged": true,
+  "profile_unchanged": true,
+  "config_sha256": "b13e5c5364008fd274ffde0bce060cf7bbf9575db287b2f34ae055140d6e7297",
+  "only_own_bridge_and_tunnel_reloaded": true,
+  "sender_not_restarted": true
+}

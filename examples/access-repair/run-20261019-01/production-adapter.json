@@ -1,0 +1,536 @@
+{
+  "origin": "OPERATOR PROBE THROUGH ACTUAL PRODUCTION COMMAND; NOT CHATGPT HOST",
+  "events_subscription_used": false,
+  "event_test_started": false,
+  "host_callback_simulated": false,
+  "tasks": [
+    {
+      "tool": "action_request",
+      "subscription_field_present": false,
+      "result": {
+        "api_version": "1",
+        "id": "access-alias-move-20261019-01",
+        "principal": "chatgpt",
+        "operation": "file.move",
+        "args": {
+          "destination": "/private/tmp/kirabridge-access-20261019-01/moved.txt",
+          "path": "/private/tmp/kirabridge-access-20261019-01/probe.txt"
+        },
+        "agent": null,
+        "parent_id": null,
+        "state": "completed",
+        "created": 1792375647.1004858,
+        "updated": 1792375647.1694841,
+        "accepted": 1792375647.1509418,
+        "started": 1792375647.1667259,
+        "finished": 1792375647.1694841,
+        "receipt": "a8af31e5-d486-4c43-b679-9acc716d35ce",
+        "evidence": {
+          "operation_returned": true
+        },
+        "result": {
+          "moved": true
+        },
+        "error": null,
+        "attempt": 1
+      }
+    },
+    {
+      "tool": "action_submit",
+      "subscription_field_present": false,
+      "result": {
+        "api_version": "1",
+        "id": "access-alias-delete-20261019-01",
+        "principal": "chatgpt",
+        "operation": "file.delete",
+        "args": {
+          "path": "/private/tmp/kirabridge-access-20261019-01/moved.txt"
+        },
+        "agent": null,
+        "parent_id": null,
+        "state": "completed",
+        "created": 1792375647.18397,
+        "updated": 1792375647.1891992,
+        "accepted": 1792375647.186059,
+        "started": 1792375647.1875231,
+        "finished": 1792375647.1891992,
+        "receipt": "94b8f30a-db5b-4b5b-9eb9-4d437d83e581",
+        "evidence": {
+          "operation_returned": true
+        },
+        "result": {
+          "deleted": true
+        },
+        "error": null,
+        "attempt": 1
+      }
+    }
+  ],
+  "task_schemas": {
+    "task_request": {
+      "type": "object",
+      "$defs": {
+        "TaskRequest": {
+          "additionalProperties": false,
+          "properties": {
+            "api_version": {
+              "default": "1",
+              "title": "Api Version",
+              "type": "string"
+            },
+            "task_id": {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[a-zA-Z0-9_-]+$",
+              "title": "Task Id",
+              "type": "string"
+            },
+            "operation": {
+              "maxLength": 80,
+              "minLength": 1,
+              "title": "Operation",
+              "type": "string"
+            },
+            "arguments": {
+              "additionalProperties": true,
+              "title": "Arguments",
+              "type": "object"
+            },
+            "idempotency_key": {
+              "maxLength": 128,
+              "minLength": 1,
+              "title": "Idempotency Key",
+              "type": "string"
+            },
+            "parent_id": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Parent Id"
+            }
+          },
+          "required": [
+            "task_id",
+            "operation",
+            "arguments",
+            "idempotency_key"
+          ],
+          "title": "TaskRequest",
+          "type": "object"
+        }
+      },
+      "properties": {
+        "request": {
+          "$ref": "#/$defs/TaskRequest"
+        },
+        "completion_target": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Completion Target"
+        }
+      },
+      "required": [
+        "request"
+      ],
+      "title": "task_requestArguments"
+    },
+    "task_submit": {
+      "type": "object",
+      "$defs": {
+        "TaskRequest": {
+          "additionalProperties": false,
+          "properties": {
+            "api_version": {
+              "default": "1",
+              "title": "Api Version",
+              "type": "string"
+            },
+            "task_id": {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[a-zA-Z0-9_-]+$",
+              "title": "Task Id",
+              "type": "string"
+            },
+            "operation": {
+              "maxLength": 80,
+              "minLength": 1,
+              "title": "Operation",
+              "type": "string"
+            },
+            "arguments": {
+              "additionalProperties": true,
+              "title": "Arguments",
+              "type": "object"
+            },
+            "idempotency_key": {
+              "maxLength": 128,
+              "minLength": 1,
+              "title": "Idempotency Key",
+              "type": "string"
+            },
+            "parent_id": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Parent Id"
+            }
+          },
+          "required": [
+            "task_id",
+            "operation",
+            "arguments",
+            "idempotency_key"
+          ],
+          "title": "TaskRequest",
+          "type": "object"
+        }
+      },
+      "properties": {
+        "request": {
+          "$ref": "#/$defs/TaskRequest"
+        },
+        "approval": {
+          "default": "",
+          "title": "Approval",
+          "type": "string"
+        },
+        "completion_target": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Completion Target"
+        }
+      },
+      "required": [
+        "request"
+      ],
+      "title": "task_submitArguments"
+    },
+    "action_request": {
+      "type": "object",
+      "$defs": {
+        "TaskRequest": {
+          "additionalProperties": false,
+          "properties": {
+            "api_version": {
+              "default": "1",
+              "title": "Api Version",
+              "type": "string"
+            },
+            "task_id": {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[a-zA-Z0-9_-]+$",
+              "title": "Task Id",
+              "type": "string"
+            },
+            "operation": {
+              "maxLength": 80,
+              "minLength": 1,
+              "title": "Operation",
+              "type": "string"
+            },
+            "arguments": {
+              "additionalProperties": true,
+              "title": "Arguments",
+              "type": "object"
+            },
+            "idempotency_key": {
+              "maxLength": 128,
+              "minLength": 1,
+              "title": "Idempotency Key",
+              "type": "string"
+            },
+            "parent_id": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Parent Id"
+            }
+          },
+          "required": [
+            "task_id",
+            "operation",
+            "arguments",
+            "idempotency_key"
+          ],
+          "title": "TaskRequest",
+          "type": "object"
+        }
+      },
+      "properties": {
+        "request": {
+          "$ref": "#/$defs/TaskRequest"
+        },
+        "completion_target": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Completion Target"
+        }
+      },
+      "required": [
+        "request"
+      ],
+      "title": "task_requestArguments"
+    },
+    "action_submit": {
+      "type": "object",
+      "$defs": {
+        "TaskRequest": {
+          "additionalProperties": false,
+          "properties": {
+            "api_version": {
+              "default": "1",
+              "title": "Api Version",
+              "type": "string"
+            },
+            "task_id": {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[a-zA-Z0-9_-]+$",
+              "title": "Task Id",
+              "type": "string"
+            },
+            "operation": {
+              "maxLength": 80,
+              "minLength": 1,
+              "title": "Operation",
+              "type": "string"
+            },
+            "arguments": {
+              "additionalProperties": true,
+              "title": "Arguments",
+              "type": "object"
+            },
+            "idempotency_key": {
+              "maxLength": 128,
+              "minLength": 1,
+              "title": "Idempotency Key",
+              "type": "string"
+            },
+            "parent_id": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Parent Id"
+            }
+          },
+          "required": [
+            "task_id",
+            "operation",
+            "arguments",
+            "idempotency_key"
+          ],
+          "title": "TaskRequest",
+          "type": "object"
+        }
+      },
+      "properties": {
+        "request": {
+          "$ref": "#/$defs/TaskRequest"
+        },
+        "approval": {
+          "default": "",
+          "title": "Approval",
+          "type": "string"
+        },
+        "completion_target": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Completion Target"
+        }
+      },
+      "required": [
+        "request"
+      ],
+      "title": "task_submitArguments"
+    }
+  },
+  "loaded_policy": {
+    "principal": "chatgpt",
+    "at": 1792375646.10138,
+    "approval_mode": "automatic",
+    "approval_required": false,
+    "capabilities": [
+      "bridge.health",
+      "task.read",
+      "task.cancel",
+      "agent.inspect",
+      "file.read",
+      "file.list",
+      "file.write",
+      "file.mkdir",
+      "file.move",
+      "terminal.execute",
+      "clipboard.info",
+      "clipboard.read",
+      "clipboard.write",
+      "process.list",
+      "process.inspect",
+      "process.terminate",
+      "agent.execute",
+      "policy.inspect",
+      "agent.status",
+      "admin.execute",
+      "agent.local_tools",
+      "message.send",
+      "message.read",
+      "message.ack",
+      "threaddesk.read",
+      "threaddesk.manage",
+      "handoff.issue",
+      "handoff.start",
+      "handoff.answer",
+      "handoff.status",
+      "handoff.inbox",
+      "handoff.reconcile",
+      "handoff.decide",
+      "file.image",
+      "threaddesk.knowledge",
+      "observations.read",
+      "workflow.stop",
+      "file.delete",
+      "session.inspect",
+      "session.input"
+    ],
+    "roots": [
+      "/"
+    ],
+    "read_roots": [
+      "/"
+    ],
+    "executables": [
+      "/Users/landjunge/KiraBridge/.venv/bin/python3",
+      "/bin/ls",
+      "/usr/bin/git",
+      "/bin/zsh",
+      "/usr/bin/osascript"
+    ],
+    "allow_any_executable": true,
+    "terminal_roots": [
+      "/"
+    ],
+    "effective_terminal_roots": [
+      "/"
+    ],
+    "allowed_agents": [
+      "codex",
+      "grok"
+    ],
+    "agent_profiles": [
+      {
+        "name": "codex",
+        "kind": "codex",
+        "sandbox_mode": "workspace-write",
+        "executable": "/Users/landjunge/.local/bin/codex",
+        "local_tools_available": false
+      },
+      {
+        "name": "grok",
+        "kind": "grok_acp",
+        "sandbox_mode": "read-only",
+        "executable": "/Users/landjunge/.local/bin/grok",
+        "local_tools_available": true
+      }
+    ],
+    "config_path": "/Users/landjunge/.config/kirabridge/config.toml",
+    "runtime": {
+      "instance_id": "1ff85ca78458479f9fa9e7d61628a558",
+      "version": "0.5.2",
+      "pid": 93486,
+      "started_at": "2026-10-19T02:06:13.446461+00:00",
+      "config_path": "/Users/landjunge/.config/kirabridge/config.toml",
+      "config_sha256": "b13e5c5364008fd274ffde0bce060cf7bbf9575db287b2f34ae055140d6e7297",
+      "effective_config_sha256": "cf41ac2aae9eed7efe84ab706c5f1bd6e234de5e98af6d95ec9bfe26336dd2a1",
+      "source_tree_sha256": "8244dd31455bfb57c732553f77e005b1ff3b37d45d80ef5d6f06498036d1bdad",
+      "source_file_count": 46,
+      "source_package_path": "/Users/landjunge/KiraBridge/src/kirabridge",
+      "source_scope": "package Python files observed at startup; no remote attestation"
+    },
+    "configuration_file": {
+      "status": "matches_loaded",
+      "loaded_sha256": "b13e5c5364008fd274ffde0bce060cf7bbf9575db287b2f34ae055140d6e7297",
+      "disk_sha256": "b13e5c5364008fd274ffde0bce060cf7bbf9575db287b2f34ae055140d6e7297",
+      "changed_on_disk": false
+    },
+    "source_files": {
+      "status": "matches_loaded",
+      "loaded_sha256": "8244dd31455bfb57c732553f77e005b1ff3b37d45d80ef5d6f06498036d1bdad",
+      "disk_sha256": "8244dd31455bfb57c732553f77e005b1ff3b37d45d80ef5d6f06498036d1bdad",
+      "changed_on_disk": false
+    },
+    "scope": "loaded local policy and metadata; no automatic grant or session attachment"
+  },
+  "direct_read": {
+    "operation": "file.read",
+    "path": "/private/tmp/kirabridge-access-20261019-01/probe.txt",
+    "text": "KIRABRIDGE_APP_FILE_OK\n",
+    "offset": 0,
+    "next_offset": 23,
+    "bytes": 23,
+    "truncated": false,
+    "size_observed": 23,
+    "modified_ns": 1792375518154739738,
+    "content_sha256": "94742dfde1874a878dfed6330e48b8212c956f8b8d75678846d72143fd2974cb",
+    "scope": "file snapshot; does not prove current agent activity or project completion"
+  },
+  "sessions": {
+    "transport": "tmux",
+    "status": "session_transport_unavailable",
+    "sessions": [],
+    "scope": "No session attached; other terminal transports are not inferred"
+  },
+  "passed": true
+}

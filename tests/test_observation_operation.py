@@ -78,7 +78,7 @@ async def test_actual_operation_reads_owned_audit_without_payload_or_duplicate_e
             },
             principal="other",
         )
-        assert foreign["state"] == "unknown" and foreign["error"]["code"] == "not_found"
+        assert foreign["state"] == "failed" and foreign["error"]["code"] == "not_found"
         assert foreign["result"] is None
 
 

@@ -1,0 +1,54 @@
+{
+  "scope": "KiraBridge TaskManager -> actual pinned ThreadDesk MCP -> new private JsonStore",
+  "platform": "macOS-15.7.4-x86_64-i386-64bit",
+  "threaddesk_commit": "64353be01082251b6af72d0096ce0a57d66c5501",
+  "archive_sha256": "22f47f85d58bdd7428284589bc6bcd74845c9b90a1eee3c25d87297a84ac436d",
+  "threaddesk_sources_sha256": "67bf369ec398c73e283c44877d5f4841c3ad48c0ce623f91e213e60070de62a2",
+  "production_modified": false,
+  "live_whiteboard_modified": false,
+  "dependencies_installed": false,
+  "response_budget_bytes": 524288,
+  "response_budget_increased": false,
+  "checks": [
+    "real create: 10000-character description, correlated receipt",
+    "real set_note: 100000 Emoji / 400000 UTF-8 bytes, unchanged budget",
+    "independent get_thread and raw JsonStore match original full values",
+    "10001-character description rejected before mutation; store unchanged",
+    "source unchanged; explicit store only; no default profile created"
+  ],
+  "thread_id": "3ea215fc68c6",
+  "revision": 2,
+  "note_sha256": "4ffeb482122b8f1bdea6faaf382747ea2e094626b4b83ef5ef7a2e21f79419ea",
+  "description_sha256": "27b4a9f24cdf8b6aca655971f4d42b0a34b7ed6cd3e2fd69439e6fa6145bc3fd",
+  "preflight_error": {
+    "code": "threaddesk_validation",
+    "details": {
+      "actual": 10001,
+      "characters": 10001,
+      "constraint": "maxLength characters",
+      "field": "description",
+      "limit": 10000,
+      "limit_source": "peer_tools_list",
+      "request_sent": false,
+      "utf8_bytes": 10001
+    },
+    "message": "ThreadDesk field description: maxLength characters (actual 10001, limit 10000); no mutation sent. Preserve the original input; do not truncate or retry create."
+  },
+  "passed": true,
+  "kirabridge_code_commit": "cc0201bd9ace46b3ca207c3b78a5b229b5b8a858",
+  "acceptance_script": "scripts/accept_whiteboard_interop.py",
+  "acceptance_runs": 1,
+  "setup": "existing KB virtualenv only; fixed launcher imports pinned source; explicit new JsonStore and isolated HOME",
+  "limitations": [
+    "source/MCP compatibility in a new private store, not an installed ThreadDesk app test",
+    "does not explain the separate existing-profile tool_error or validate arbitrary raw delimiter readback",
+    "aggregate beyond-budget contents still require a compatible receiver contract"
+  ],
+  "kirabridge_manager_sha256": "1150e11c2efd01f6d32e777c90416df01e25b93fd73ad66679d296f41b508c3a",
+  "kirabridge_contract_sha256": "017a7cae139b1ddfc6ba5b6300a97bc31a5f681973213dac789ec62c3a37259e",
+  "harness_correction": {
+    "change": "Removed child HOME and XDG_CONFIG_HOME overrides; retain explicit JsonStore and THREADDESK_HOME",
+    "acceptance_rerun": false,
+    "historical_evidence": "The original single executed run used the isolated child HOME described in setup; that original result is retained unchanged."
+  }
+}

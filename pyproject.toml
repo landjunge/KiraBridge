@@ -1,10 +1,10 @@
 [build-system]
-requires = ["hatchling>=1.27"]
+requires = ["hatchling==1.27.0"]
 build-backend = "hatchling.build"
 
 [project]
 name = "kirabridge"
-version = "0.7.0rc2"
+version = "0.8.0rc17"
 description = "Private, permission-scoped desktop and agent bridge"
 license = "LicenseRef-Netzwerkpunkt-Personal-Use-1.0"
 license-files = ["LICENSE"]
@@ -19,7 +19,7 @@ kirabridge = "kirabridge.cli:main"
 dev = ["pytest>=8,<10", "pytest-asyncio>=1,<2", "ruff>=0.14,<1"]
 
 [tool.hatch.build.targets.sdist]
-include = ["LICENSE", "src/", "pyproject.toml", "uv.lock", "docs/", "examples/"]
+include = ["LICENSE", "src/", "pyproject.toml", "uv.lock", "docs/", "examples/", "installer/", "scripts/"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
