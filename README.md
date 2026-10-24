@@ -279,7 +279,7 @@ no sudo; existing configuration, credentials and user files are preserved.
 ## Further reading / Weiterführende Dokumentation
 
 - [RC15 candidate notes / Kandidatenhinweise](docs/RELEASE-0.8.0rc15.md)
-- [Control center / Steuerfenster](docs/CONTROL-CENTER-0.8.0rc1.md)
+- [Control center / Steuerfenster](https://github.com/landjunge/KiraBridge/blob/89c2e4359090de53fb6c1da55b6146072443988d/docs/CONTROL-CENTER-0.8.0rc1.md)
 - [ChatGPT connection / ChatGPT-Verbindung](docs/CHATGPT.md)
 - [Team coordination / Zusammenarbeit im Team](docs/TEAM-ORCHESTRATION.md)
 - [ThreadDesk connection / ThreadDesk-Anbindung](docs/THREADDESK-ADAPTER-20261018.md)
