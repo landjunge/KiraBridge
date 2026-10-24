@@ -184,7 +184,7 @@ def test_launchctl_bootstrap_errors_are_bounded(installer, monkeypatch, tmp_path
     monkeypatch.setattr(installer.subprocess, "run", transient)
     with pytest.raises(RuntimeError, match=r"bootstrap failed \(5\)"):
         installer.start_service(SimpleNamespace(service="launchd", plist=path))
-    assert len(attempts) == 5
+    assert len(attempts) == 30
 
     attempts.clear()
 
@@ -344,3 +344,26 @@ def test_queue_holds_block_unsafe_downgrade_before_service_switch(
     assert bridge.store.db.execute("SELECT count(*) FROM queue_holds").fetchone()[0] == 1
     monkeypatch.setattr(installer, "run", lambda *args, **kwargs: b"")
     installer.require_queue_compatibility(policy_path, tmp_path / "queue-aware-release")
+
+
+def test_launchctl_bootstrap_waits_for_delayed_job_removal(installer, monkeypatch, tmp_path):
+    from subprocess import CompletedProcess
+
+    path = tmp_path / "service.plist"
+    path.write_text("placeholder")
+    elapsed = [0.0]
+    calls = []
+
+    def fake_run(argv, **kwargs):
+        calls.append(kwargs["timeout"])
+        code = 5 if elapsed[0] < 8 else 0
+        return CompletedProcess(argv, code, stdout="", stderr="Input/output error" if code else "")
+
+    monkeypatch.setattr(installer.subprocess, "run", fake_run)
+    monkeypatch.setattr(installer.time, "monotonic", lambda: elapsed[0])
+    monkeypatch.setattr(
+        installer.time, "sleep", lambda seconds: elapsed.__setitem__(0, elapsed[0] + seconds)
+    )
+    installer.start_service(SimpleNamespace(service="launchd", plist=path))
+    assert elapsed[0] == 8 and len(calls) == 9
+    assert all(0 < value <= 20 for value in calls)

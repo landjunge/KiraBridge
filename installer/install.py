@@ -443,18 +443,25 @@ def start_service(args):
         # macOS reports the pending removal as bootstrap exit code 5
         # ("Operation already in progress"). Retry *only* that transient
         # exit code, with a fixed bound, before allowing activate() to roll back.
-        for attempt in range(5):
+        # Production HTTP long-polls can outlive the old four-second retry
+        # window. Keep both elapsed time and command count bounded; do not change
+        # the operator's launchd exit/KeepAlive options or require root.
+        deadline = time.monotonic() + 30
+        for attempt in range(30):
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                raise RuntimeError("launchctl bootstrap did not settle within 30 seconds")
             completed = subprocess.run(
-                command, capture_output=True, text=True, timeout=20, check=False
+                command, capture_output=True, text=True, timeout=min(20, remaining), check=False
             )
             if completed.returncode == 0:
                 return
-            if completed.returncode != 5 or attempt == 4:
+            if completed.returncode != 5 or attempt == 29:
                 detail = completed.stderr.strip() or completed.stdout.strip()
                 raise RuntimeError(
                     f"launchctl bootstrap failed ({completed.returncode}): {detail[:500]}"
                 )
-            time.sleep(1)
+            time.sleep(min(1, max(0, deadline - time.monotonic())))
 
 
 def wait_health(args, release, version):
