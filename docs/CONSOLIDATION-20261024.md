@@ -1,5 +1,9 @@
 # Main, RC15, RC16 and repair consolidation / Zusammenführung
 
+**Current outcome:** [PR28](https://github.com/landjunge/KiraBridge/pull/28) MERGED into main on2026-10-24T16:10:35Z, merge `a74fe613b58a63a4f168805d5306ad84c6ac0487`. Ordinary GitHub merge, exact reviewed head528ffd9, no admin/force/check override. Owner explicitly requested merge and waived additional review. Previous OPEN/DRAFT/not-merged statements below are historical snapshots. CI jobs remain not-started due billing; they are not passes. Release remains draft; no production installation.
+
+Code, installer, scripts, package metadata and lock match tested source5089fca byte-for-byte after integration. Final integrated-source builds record their own exact source pin in release.json; candidate installer acceptance remains historical evidence for identical runtime bytes. No repeated behavior suite is justified by a merge/documentation-only change.
+
 User explicitly requested consolidation on 24 October 2026. Development is isolated
 in `.worktrees/current-release`, branch `integration/current-release-20261024`.
 Parents: `main` `9d03ea8bf75616bfcd5514a9ea5af7f888cbf7b5` and repair branch
