@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import asyncio
 import shlex
+from contextlib import asynccontextmanager
+from contextvars import ContextVar
 from pathlib import Path
 
 from pydantic import Field
@@ -57,6 +59,7 @@ class SessionManager:
         self.environment, self.agent_registry = ports.environment, ports.agent_registry
         self.readiness = ports.readiness
         self.lock = asyncio.Lock()
+        self._selection = ContextVar("kirabridge_visible_selection", default=None)
         self.terminal_app = (
             terminal_app if terminal_app is not None else TerminalAppTransport(ports.clipboard_lock)
         )
@@ -91,17 +94,127 @@ class SessionManager:
                 "status": "available"
                 if native_rows
                 else errors.get("terminal_app", {}).get("code", exc.code),
-                "sessions": native_rows,
+                "sessions": self.describe(native_rows),
                 "transport_errors": {**errors, "tmux": {"code": exc.code}},
                 "scope": "Exact Terminal.app tabs and tmux panes; existing sessions preserved",
             }
         return {
             "transport": "terminal_app_and_tmux" if native_rows else "tmux",
             "status": "available",
-            "sessions": native_rows + rows,
+            "sessions": self.describe(native_rows + rows),
             "transport_errors": errors,
             "truncated": getattr(self.tmux, "last_catalog_truncated", False),
         }
+
+    def describe(self, rows):
+        agents, bindings = self.agent_registry()
+        for row in rows:
+            observed = [p for p in row.get("processes", []) if p["name"] in agents]
+            row["agent_identity_verified"] = False
+            row["agent_identity_scope"] = (
+                "current-user OS process observation, not cryptographic identity"
+            )
+            if len(observed) == 1:
+                process = observed[0]
+                binding = bindings.get(process["name"])
+                row["agent_candidate"] = process["name"]
+                row["agent_pid"] = process["pid"]
+                row["configured_binding_current"] = bool(
+                    binding and self.binding_matches(row, binding, process["name"])
+                )
+                row["agent_activity"] = "not_probed"
+                row["busy_scope"] = "transport process presence; not an agent-turn activity result"
+            elif observed:
+                row["agent_candidates_ambiguous"] = True
+        return rows
+
+    @staticmethod
+    def binding_matches(selected, binding, target):
+        return (
+            binding.pane_id == selected.get("pane_id")
+            and binding.expected_pid
+            in {selected.get("expected_pid"), selected.get("legacy_expected_pid")}
+            and any(
+                p["pid"] == binding.agent_pid and p["name"] == target
+                for p in selected.get("processes", [])
+            )
+        )
+
+    def explicit_agent_binding(self, selected):
+        """A caller selected THIS current handle; never rewrite configured/default targets."""
+        agents, bindings = self.agent_registry()
+        matches = [p for p in selected.get("processes", []) if p["name"] in agents]
+        if not matches:
+            return None, None
+        if len(matches) != 1:
+            raise BridgeError(
+                "visible_target_ambiguous", "Multiple CLI agents in selected terminal"
+            )
+        process = matches[0]
+        original = bindings.get(process["name"])
+        if original is None or not selected["pane_id"].startswith("terminal:"):
+            raise BridgeError(
+                "visible_target_missing",
+                "Agent needs an operator-configured visible input contract",
+            )
+        changed = not self.binding_matches(selected, original, process["name"])
+        updates = {
+            "pane_id": selected["pane_id"],
+            "expected_pid": selected["expected_pid"],
+            "agent_pid": process["pid"],
+        }
+        if changed:
+            # A restarted/different process is not the previous Codex thread.
+            updates.update(codex_thread_id=None, codex_rollout_path=None)
+        return process["name"], original.model_copy(update=updates)
+
+    @asynccontextmanager
+    async def agent_selection(self, principal, target, binding):
+        selected = await self.selected(principal, binding.pane_id, binding.expected_pid)
+        if not self.binding_matches(selected, binding, target) or not any(
+            p["pid"] == binding.agent_pid and p["name"] == target
+            for p in selected.get("processes", [])
+        ):
+            raise BridgeError("visible_target_changed", "Selected agent changed before dispatch")
+        identities = None
+        if selected.get("transport") == "terminal_app":
+            identities = {}
+            for pid in {selected["expected_pid"], binding.agent_pid}:
+                identity = await self.terminal_app.process_identity(pid, detailed=True)
+                fields = identity.split(None, 8)
+                process = next((p for p in selected["processes"] if p["pid"] == pid), None)
+                if (
+                    len(fields) != 9
+                    or not fields[0].isdigit()
+                    or not fields[7].isdigit()
+                    or fields[1] != Path(selected["tty"]).name
+                    or process is None
+                    or int(fields[7]) != process.get("ppid")
+                    or fields[8] != process.get("image")
+                ):
+                    raise BridgeError(
+                        "visible_target_changed", "Selected process image/parent/TTY changed"
+                    )
+                identities[pid] = identity
+        token = self._selection.set((target, binding, identities, asyncio.current_task()))
+        try:
+            yield
+        finally:
+            self._selection.reset(token)
+
+    def current_selection(self):
+        selection = self._selection.get()
+        if selection and selection[3] is not asyncio.current_task():
+            raise BridgeError("visible_selection_required", "Selection belongs to another task")
+        return selection
+
+    def selected_identities(self, selected):
+        selection = self.current_selection()
+        if selection and not self.binding_matches(selected, selection[1], selection[0]):
+            raise BridgeError(
+                "visible_target_changed", "Input differs from this task's selected target"
+            )
+        return selection[2] if selection else None
 
     async def read(self, principal, pane_id, expected_pid, *, max_bytes=65536):
         await self.selected(principal, pane_id, expected_pid)
@@ -124,15 +237,55 @@ class SessionManager:
             self.assigned_agent(selected)
             if args.require_idle and selected.get("busy", True):
                 raise BridgeError("session_busy", "Selected terminal is not an idle shell")
-            await self.transport(args.pane_id).insert(args.pane_id, args.text)
+            identities = self.selected_identities(selected)
+            if selected.get("transport") == "terminal_app" and identities is None:
+                raise BridgeError(
+                    "visible_selection_required",
+                    "Native agent input requires a task-owned selection",
+                )
+            if identities is not None:
+                text = await self.terminal_app.read(args.pane_id)
+                if self.readiness is None:
+                    raise BridgeError(
+                        "visible_target_unknown", "No readiness assessor for agent input"
+                    )
+                observation = await self.readiness(
+                    principal,
+                    {"pane_id": args.pane_id, "expected_pid": args.expected_pid, "text": text},
+                )
+                if not observation or not observation.get("ready"):
+                    raise BridgeError(
+                        "visible_target_not_ready", "Current agent widget is not ready"
+                    )
+                await self.terminal_app.insert(
+                    args.pane_id, args.text, identity_guard=identities, expected_screen=text
+                )
+            else:
+                await self.transport(args.pane_id).insert(args.pane_id, args.text)
         return {"paste_event_sent": True, "return_sent": False, "agent_confirmed": False}
 
-    async def press_return(self, principal, pane_id, expected_pid):
+    async def press_return(self, principal, pane_id, expected_pid, *, expected_screen=None):
         self.authorization.principal(principal, "session.input")
         self.authorization.principal(principal, "terminal.execute")
         async with self.lock:
-            self.assigned_agent(await self.selected(principal, pane_id, expected_pid))
-            await self.transport(pane_id).press_return(pane_id)
+            selected = await self.selected(principal, pane_id, expected_pid)
+            self.assigned_agent(selected)
+            identities = self.selected_identities(selected)
+            if selected.get("transport") == "terminal_app" and identities is None:
+                raise BridgeError(
+                    "visible_selection_required",
+                    "Native agent input requires a task-owned selection",
+                )
+            if identities is not None:
+                if expected_screen is None:
+                    raise BridgeError(
+                        "visible_input_unknown", "Return requires the verified inserted widget"
+                    )
+                await self.terminal_app.press_return(
+                    pane_id, identity_guard=identities, expected_screen=expected_screen
+                )
+            else:
+                await self.transport(pane_id).press_return(pane_id)
         return {"return_sent": True, "agent_confirmed": False}
 
     async def send(self, principal, args, *, task_id=None):
@@ -200,7 +353,12 @@ class SessionManager:
         if len(matches) != 1:
             raise BridgeError("visible_target_ambiguous", "Multiple CLI agents in this terminal")
         process = matches[0]
-        binding = bindings.get(process["name"])
+        selection = self.current_selection()
+        binding = (
+            selection[1]
+            if selection and selection[0] == process["name"]
+            else bindings.get(process["name"])
+        )
         if (
             not binding
             or binding.pane_id != selected.get("pane_id")

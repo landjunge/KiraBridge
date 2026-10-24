@@ -46,7 +46,12 @@ async def test_native_catalog_binds_window_tty_and_unambiguous_root_pid(bridge, 
     assert len(rows) == 1  # Two possible roots on ttys005 must not be guessed.
     assert rows[0]["pane_id"] == "terminal:123:ttys004"
     assert rows[0]["expected_pid"] == 345
-    assert rows[0]["processes"][-1] == {"pid": 347, "ppid": 346, "name": "codex"}
+    assert rows[0]["processes"][-1] == {
+        "pid": 347,
+        "ppid": 346,
+        "name": "codex",
+        "image": "/private/path/codex",
+    }
 
 
 async def test_idle_only_input_rejects_busy_target_before_transport(bridge, config, monkeypatch):

@@ -212,43 +212,53 @@ class VisibleHandoffs:
             )
 
     async def observe_readiness(self, principal, output):
-        for target, binding in self.config.visible_handoffs.bindings.items():
-            if (output.get("pane_id"), output.get("expected_pid")) != (
-                binding.pane_id,
-                binding.expected_pid,
-            ):
-                continue
-            selected = await self.sessions.selected(
-                principal, binding.pane_id, binding.expected_pid
-            )
-            if not any(
-                p["pid"] == binding.agent_pid and p["name"] == target
-                for p in selected.get("processes", [])
-            ):
-                return {
-                    "state": "target_changed",
-                    "ready": False,
-                    "reason": "bound_agent_pid_not_present",
-                    "target": target,
-                    "observed_at": time.time(),
-                }
-            protocol = None
-            if target == "codex" and binding.codex_thread_id:
-                protocol = await self.codex_state.read(
-                    binding.codex_rollout_path, binding.codex_thread_id
-                )
+        selected = await self.sessions.selected(
+            principal, output["pane_id"], output["expected_pid"]
+        )
+        try:
+            target, binding = self.sessions.explicit_agent_binding(selected)
+        except BridgeError as exc:
             return {
-                **assess(target, output["text"], binding, protocol),
-                "binding": {
-                    "pane_id": binding.pane_id,
-                    "expected_pid": binding.expected_pid,
-                    "agent_pid": binding.agent_pid,
-                },
-                "protocol": protocol,
+                "state": "unknown",
+                "ready": False,
+                "reason": exc.code,
                 "observed_at": time.time(),
-                "scope": "current input and separately bound turn observation; no input proof",
+                "identity_scope": "OS process observation only",
             }
-        return None
+        if target is None:
+            return None
+        return await self.binding_readiness(principal, target, binding, output)
+
+    async def binding_readiness(self, principal, target, binding, output):
+        selected = await self.sessions.selected(principal, binding.pane_id, binding.expected_pid)
+        if not any(
+            p["pid"] == binding.agent_pid and p["name"] == target
+            for p in selected.get("processes", [])
+        ):
+            return {
+                "state": "target_changed",
+                "ready": False,
+                "reason": "bound_agent_pid_not_present",
+                "target": target,
+                "observed_at": time.time(),
+            }
+        protocol = None
+        if target == "codex" and binding.codex_thread_id:
+            protocol = await self.codex_state.read(
+                binding.codex_rollout_path, binding.codex_thread_id
+            )
+        return {
+            **assess(target, output["text"], binding, protocol),
+            "binding": {
+                "pane_id": binding.pane_id,
+                "expected_pid": binding.expected_pid,
+                "agent_pid": binding.agent_pid,
+            },
+            "protocol": protocol,
+            "observed_at": time.time(),
+            "identity_scope": "OS process/window observation, not cryptographic identity",
+            "scope": "current input and separately bound turn observation; no input proof",
+        }
 
     async def reconcile_target_reservations(
         self,
@@ -339,8 +349,10 @@ class VisibleHandoffs:
             )
         output = await self.sessions.read(principal, binding.pane_id, binding.expected_pid)
         if ready:
-            observation = await self.observe_readiness(
+            observation = await self.binding_readiness(
                 principal,
+                target,
+                binding,
                 {**output, "pane_id": binding.pane_id, "expected_pid": binding.expected_pid},
             )
             if not observation["ready"]:
@@ -361,8 +373,24 @@ class VisibleHandoffs:
     async def submit_inserted(self, identifier, principal, target, binding, running):
         """Exactly one separately recorded Return; never call after an uncertain submit."""
         self.transition(identifier, "submitting", {"agent_confirmed": False})
-        await self.check_target(principal, target, binding)
-        await self.sessions.press_return(principal, binding.pane_id, binding.expected_pid)
+        view = await self.check_target(principal, target, binding)
+        status = self.status(principal, identifier)
+        message = self.messages.get(principal, status["message_id"])
+        expected_prompt = self.prompt(
+            principal,
+            target,
+            identifier,
+            message["body"],
+            message["id"],
+            message["conversation_id"],
+        )
+        if not self.insertion_observed(target, view["text"], expected_prompt, identifier):
+            raise UncertainExecution(
+                "visible_insert_unknown", "Inserted input changed; no Return sent"
+            )
+        await self.sessions.press_return(
+            principal, binding.pane_id, binding.expected_pid, expected_screen=view["text"]
+        )
         self.transition(identifier, "return_sent", {"return_sent": True, "agent_confirmed": False})
         # Return transport is separate from observable CLI acceptance.
         deadline = time.monotonic() + 8
@@ -384,6 +412,14 @@ class VisibleHandoffs:
         await running({"handoff_id": identifier, "state": "sent", "agent_confirmed": False})
 
     async def continue_unsubmitted(self, principal, identifier, running):
+        from kirabridge.bridge_core.config import VisibleTerminalBinding
+
+        status = self.status(principal, identifier)
+        binding = VisibleTerminalBinding.model_validate(status["binding"])
+        async with self.sessions.agent_selection(principal, status["target"], binding):
+            return await self._continue_unsubmitted(principal, identifier, running)
+
+    async def _continue_unsubmitted(self, principal, identifier, running):
         """Explicit local reconciliation, no new paste and no repeat of a prior Return."""
         from kirabridge.bridge_core.config import VisibleTerminalBinding
 
@@ -439,12 +475,26 @@ class VisibleHandoffs:
             raise
         return self.status(principal, identifier)
 
-    async def execute(self, task, args, running, progress):
+    async def execute(self, task, args, running, progress, *, binding_override=None):
+        policy = self.security.principal(task["principal"], "agent.execute")
+        if args.agent not in policy.agents:
+            raise BridgeError("agent_denied", "Selected agent is not granted to this identity")
+        for capability in ("agent.execute", "session.inspect", "session.input", "terminal.execute"):
+            self.security.principal(task["principal"], capability)
+        binding = binding_override or self.config.visible_handoffs.bindings.get(args.agent)
+        if binding is None:
+            raise BridgeError(
+                "visible_target_missing", "Bind an exact existing visible CLI terminal"
+            )
+        async with self.sessions.agent_selection(task["principal"], args.agent, binding):
+            return await self._execute(task, args, running, progress, binding_override=binding)
+
+    async def _execute(self, task, args, running, progress, *, binding_override=None):
         principal, target, identifier = task["principal"], args.agent, task["id"]
         # All senders use this path. Eve is grok_app; only target selects the CLI window.
         for capability in ("agent.execute", "session.inspect", "session.input", "terminal.execute"):
             self.security.principal(principal, capability)
-        binding = self.config.visible_handoffs.bindings.get(target)
+        binding = binding_override or self.config.visible_handoffs.bindings.get(target)
         if binding is None:
             raise BridgeError(
                 "visible_target_missing",

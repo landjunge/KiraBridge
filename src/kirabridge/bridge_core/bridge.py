@@ -457,7 +457,7 @@ class Bridge:
             }
         if operation == "session.input":
             selected = await self.sessions.selected(principal, args.pane_id, args.expected_pid)
-            target = self.sessions.assigned_agent(selected)
+            target, selected_binding = self.sessions.explicit_agent_binding(selected)
             if target:
                 if not args.submit:
                     raise BridgeError(
@@ -474,6 +474,7 @@ class Bridge:
                     ),
                     running,
                     progress,
+                    binding_override=selected_binding,
                 )
                 self.tasks.input_policy.sent(principal, task["id"])
                 return result

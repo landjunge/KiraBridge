@@ -61,7 +61,7 @@ def visible(bridge, config, monkeypatch):
             else "╭\n│ ❯ " + args.text + "\n╰"
         )
 
-    async def submit(principal, pane, pid):
+    async def submit(principal, pane, pid, *, expected_screen=None):
         transport["calls"].append("return")
         transport["text"] = "› " if transport.get("target") == "codex" else "╭\n│ ❯ │\n╰"
         if transport["fail"]:
@@ -436,7 +436,9 @@ async def test_raw_cli_input_also_enters_central_route(visible, monkeypatch, sen
     bridge, transport = visible
     called = []
 
-    async def central(task, args, *callbacks):
+    async def central(task, args, *callbacks, binding_override=None):
+        assert binding_override.pane_id == "terminal:100:ttys001"
+        assert binding_override.agent_pid == 456
         called.append((task["id"], task["principal"], args.agent, args.prompt))
         return {"success": True}
 

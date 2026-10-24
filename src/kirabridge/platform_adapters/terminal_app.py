@@ -45,6 +45,10 @@ class TerminalAppTransport:
                     if "1743" in detail
                     else "visible_target_changed"
                     if "Selected target identity changed" in detail
+                    else "visible_focus_changed"
+                    if "Selected terminal focus changed" in detail
+                    else "visible_input_changed"
+                    if "Selected terminal input changed" in detail
                     else "visible_input_not_empty"
                     if "Selected terminal has existing input" in detail
                     else "session_busy"
@@ -138,7 +142,7 @@ class TerminalAppTransport:
                     "busy": row["busy"],
                     "agent_identity_verified": False,
                     "processes": [
-                        {"pid": int(p), "ppid": int(parent), "name": Path(comm).name}
+                        {"pid": int(p), "ppid": int(parent), "name": Path(comm).name, "image": comm}
                         for owner, p, parent, t, comm in processes
                         if t == tty and int(owner) == os.getuid()
                     ],
@@ -165,17 +169,58 @@ class TerminalAppTransport:
     const w=wins[0]; w.selectedTab=tab; w.index=1; app.activate(); delay(0.15);
     const se=Application("System Events");
     function checkFocus() {{
-     if(!se.processes.byName("Terminal").frontmost() || app.windows()[0].id()!=={int(window)} ||
-    app.windows()[0].selectedTab().tty()!=={json.dumps("/dev/" + tty)})
-    throw Error("Selected terminal focus changed; do not repeat input");
+     const current=app.windows(), frontmost=se.processes.byName("Terminal").frontmost();
+     const windowID=current.length ? current[0].id() : null;
+     const currentTTY=current.length ? current[0].selectedTab().tty() : null;
+     if(!frontmost || windowID!=={int(window)} || currentTTY!=={json.dumps("/dev/" + tty)})
+      throw Error("Selected terminal focus changed; do not repeat input " + JSON.stringify({{
+       frontmost:frontmost, window_id:windowID, tty:currentTTY,
+       expected_window:{int(window)}, expected_tty:{json.dumps("/dev/" + tty)}
+      }}));
     }}
     checkFocus();"""
         )
 
-    async def insert(self, pane_id, text):
+    @staticmethod
+    def native_identity_guard(identities):
+        if not identities:
+            return ""
+        source = (
+            "\nconst identityHost=Application.currentApplication(); "
+            "identityHost.includeStandardAdditions=true;"
+        )
+        source += "\nfunction checkTargetIdentity(){"
+        for pid, expected in identities.items():
+            command = (
+                f"/usr/bin/env LC_ALL=C /bin/ps -p {int(pid)} -o uid=,tty=,lstart=,ppid=,comm="
+            )
+            source += (
+                "\n{let observedIdentity; try {observedIdentity=identityHost.doShellScript("
+                + json.dumps(command)
+                + ").trim().replace(/\\s+/g,' ');} catch(error) {"
+                + "throw Error('Selected target identity changed');}"
+                + "if(observedIdentity!=="
+                + json.dumps(expected)
+                + ") throw Error('Selected target identity changed');}"
+            )
+        return source + "\n}\ncheckTargetIdentity();"
+
+    @staticmethod
+    def native_screen_guard(expected_screen):
+        if expected_screen is None:
+            return ""
+        # Freeze the current widget and its adjacent activity/footer, not scrollback.
+        return (
+            "\nif(Array.from(tab.contents()).slice(-8192).join('')!=="
+            + json.dumps(expected_screen[-8192:])
+            + ") throw Error('Selected terminal input changed');"
+        )
+
+    async def insert(self, pane_id, text, *, identity_guard=None, expected_screen=None):
         async with self.clipboard_lock:
             await self.native(
                 self.native_focus(pane_id)
+                + self.native_identity_guard(identity_guard)
                 + """
         ObjC.import("AppKit");
         const pb=$.NSPasteboard.generalPasteboard, saved=[]; let totalBytes=0;
@@ -208,6 +253,11 @@ class TerminalAppTransport:
          if(!["Einsetzen","Paste"].includes(paste.name()))
           throw Error("Literal Paste menu action unavailable");
          if(!paste.enabled()) throw Error("Literal Paste action is disabled; no paste sent");
+         if(typeof checkTargetIdentity === 'function') checkTargetIdentity();
+         checkFocus();
+"""
+                + self.native_screen_guard(expected_screen)
+                + """
          paste.click();
          let echoed=false;
          for(let attempt=0;attempt<40;attempt++) {
@@ -252,13 +302,14 @@ class TerminalAppTransport:
             mutation=True,
         )
 
-    async def process_identity(self, pid):
+    async def process_identity(self, pid, *, detailed=False):
         child = await asyncio.create_subprocess_exec(
             "/bin/ps",
             "-p",
             str(int(pid)),
             "-o",
-            "uid=,tty=,lstart=",
+            "uid=,tty=,lstart=,ppid=,comm=" if detailed else "uid=,tty=,lstart=",
+            env={**os.environ, "LC_ALL": "C"} if detailed else None,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.DEVNULL,
         )
@@ -306,10 +357,13 @@ class TerminalAppTransport:
             mutation=True,
         )
 
-    async def press_return(self, pane_id):
+    async def press_return(self, pane_id, *, identity_guard=None, expected_screen=None):
         await self.native(
             self.native_focus(pane_id)
-            + "\ncheckFocus(); se.keyCode(36); JSON.stringify({return_sent:true});",
+            + self.native_identity_guard(identity_guard)
+            + "\ncheckFocus();"
+            + self.native_screen_guard(expected_screen)
+            + "\nse.keyCode(36); JSON.stringify({return_sent:true});",
             mutation=True,
         )
 
