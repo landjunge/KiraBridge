@@ -1,0 +1,43 @@
+{
+  "scope": "native subagent B, KiraBridge-only Whiteboard contract repair",
+  "platform": "macOS-15.7.4-x86_64-i386-64bit",
+  "thread_desk_source_inspected": "64353be01082251b6af72d0096ce0a57d66c5501",
+  "live_whiteboard_mutations": false,
+  "production_modified": false,
+  "tests": {
+    "new_contract_cases_covered_incrementally": 39,
+    "malformed_schema_and_constraint_final": {
+      "passed": 18,
+      "deselected": 17
+    },
+    "catalog_preflight": {
+      "passed": 3,
+      "deselected": 16
+    },
+    "schema_resources": {
+      "passed": 2,
+      "deselected": 35
+    },
+    "actual_mcp_and_affected_existing_adapter": {
+      "passed": 6,
+      "deselected": 33
+    },
+    "actual_description_boundary": {
+      "passed": 1
+    },
+    "full_project_suite_run": false,
+    "fixture_initialization_failure": "4 MCP cases initially failed due unsupported fixture return union; signature corrected and only affected MCP cases rerun successfully"
+  },
+  "limits_observed": {
+    "description_characters": 10000,
+    "note_request_characters": 100000,
+    "aggregate_note_limit": "not declared by inspected peer",
+    "request_bytes": "separate configured Task budget; unchanged",
+    "response_bytes": "operator configured; unchanged"
+  },
+  "remaining_gates": [
+    "actual ThreadDesk product long-text acceptance",
+    "lossless chunk/raw-readback receiver contract for beyond-limit/transforming text",
+    "normal required CI/review"
+  ]
+}
