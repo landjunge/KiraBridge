@@ -8,7 +8,7 @@
 **Turn your ideas into work on your computer.**  
 **Aus deinen Ideen werden Aufgaben auf deinem Rechner.**
 
-[English](#english) · [Deutsch](#deutsch) · [Published RC14](https://github.com/landjunge/KiraBridge/releases/tag/v0.8.0rc14)
+[English](#english) · [Deutsch](#deutsch) · [Published / Veröffentlicht RC14](https://github.com/landjunge/KiraBridge/releases/tag/v0.8.0rc14)
 
 ## English
 
@@ -60,9 +60,11 @@ tracks delivery, acknowledgement and completion separately.
   usage limits.
 - Permissions for the project folders and actions you want to allow.
 
-For the new macOS package: **Python 3.11, uv 0.11.6 and authenticated GitHub
-access**. Intel x86_64 is the primary acceptance target; Apple Silicon has a
-matching dependency lock but still requires its own acceptance run. See the
+For the macOS candidate you need **Python 3.11, uv 0.11.6 and GitHub CLI (`gh`)**,
+signed in with access to this private repository. Draft downloads require permission
+to view the release draft. The package was tested on **macOS 15.7.4, Intel x86_64**.
+Apple Silicon, macOS 26 and older macOS versions remain unverified. A 2015 iMac's
+hardware model alone does not establish OS compatibility. See the
 [bilingual prerequisites and installation guide](docs/INSTALL-MACOS.md).
 
 ### Download and get started
@@ -70,9 +72,30 @@ matching dependency lock but still requires its own acceptance run. See the
 **Latest published release: [v0.8.0rc14](https://github.com/landjunge/KiraBridge/releases/tag/v0.8.0rc14)**
 (private prerelease, 22 October 2026; wheel only).
 
-**RC15 is an unpublished candidate.** The macOS bundle and its installation
-command are described [below](#install--update--installieren--aktualisieren).
-Publication requires successful CI and PR review. The RC15 draft is reserved for authorized reviewers. Existing launchd services continue running when Terminal/browser closes.
+**RC15 is an unpublished candidate.** Its wheel, macOS bundle, bootstrap and
+SHA-256 checksums are available to authorized reviewers in the
+[RC15 release draft](https://github.com/landjunge/KiraBridge/releases/tag/untagged-315af41126d778a271e1).
+The installation command is [below](#install--update--installieren--aktualisieren).
+
+The installer changes were merged through [PR #21](https://github.com/landjunge/KiraBridge/pull/21)
+and the documentation through [PR #22](https://github.com/landjunge/KiraBridge/pull/22)
+on the owner's explicit merge instruction. **Publication remains blocked:** GitHub
+Actions does not start jobs because of account billing/spending limits. Successful
+CI and release acceptance remain outstanding; a merge is not release approval.
+
+For a **first installation**, the command creates a scoped project setup with
+individual approvals. For an **update**, run the same command; existing
+configuration, credentials, databases, permissions and user files are preserved.
+Active tasks and unfamiliar launchers/services cause an explicit error.
+The **launchd service continues running when Terminal or browser windows close**.
+
+Check the running version and status with `~/.local/bin/kirabridge status`.
+After tasks finish, restart with
+`launchctl kickstart -k gui/$(id -u)/com.kirabridge.bridge` and check status again.
+If installation fails, inspect the error and
+`~/.local/share/kirabridge/install/logs/`; retry network failures and reject checksum
+mismatches. Keep existing permissions unchanged. For rollback, obtain and extract
+the candidate bundle and follow the [recovery guide](docs/INSTALL-MACOS.md).
 
 ### Control and optional tools
 
@@ -87,9 +110,17 @@ task. Further assistant adapters and their limits are described in the
 
 ### What has been checked?
 
-The [RC15 acceptance report](docs/ACCEPTANCE-MACOS-RC15.md) records actual
-package tests and remaining gates. Historical RC12 test counts do not establish
-RC15 acceptance. Mobile, Live voice and end-to-end ChatGPT remain separate checks.
+On actual **macOS 15.7.4 / Intel x86_64**, **960 regression tests passed**.
+Two builds produced identical checksums. The real authenticated draft-download
+command, fresh installation, RC14-wheel upgrade, version/status, idempotence,
+launchd restart, automatic crash recovery and rollback passed in isolated paths.
+Configuration, credential hashes, a database row and a user file survived the update.
+The production installation was not modified.
+
+The [acceptance report](docs/ACCEPTANCE-MACOS-RC15.md) records the exact command,
+artifact hashes and remaining gates. These local results do not establish a
+successful GitHub CI or Apple Silicon run. Mobile, Live voice and end-to-end
+ChatGPT remain separate unverified checks.
 
 ---
 
@@ -147,9 +178,12 @@ KiraBridge unterscheidet deshalb Übergabe, Empfangsbestätigung und Abschluss.
   Nutzungslimits nicht auf.
 - Freigaben für die Projektordner und Aktionen, die du erlauben möchtest.
 
-Für das neue macOS-Paket: **Python 3.11, uv 0.11.6 und angemeldeter
-GitHub-Zugriff**. Intel x86_64 ist das primäre Abnahmeziel; Apple Silicon wird
-vom Abhängigkeits-Lock berücksichtigt und benötigt eine eigene Abnahme.
+Für den macOS-Kandidaten brauchst du **Python 3.11, uv 0.11.6 und GitHub CLI
+(`gh`)**, angemeldet mit Zugriff auf dieses private Repository. Für den Entwurf ist
+zusätzlich die Berechtigung zum Anzeigen von Release-Entwürfen nötig. Geprüft wurde
+auf **macOS 15.7.4 mit Intel x86_64**. Apple Silicon, macOS 26 und ältere
+macOS-Versionen sind noch ungeprüft. Das Hardwaremodell iMac 2015 allein belegt
+keine Betriebssystem-Kompatibilität.
 [Voraussetzungen und Anleitung auf Deutsch/Englisch](docs/INSTALL-MACOS.md).
 
 ### Herunterladen und starten
@@ -157,10 +191,32 @@ vom Abhängigkeits-Lock berücksichtigt und benötigt eine eigene Abnahme.
 **Zuletzt veröffentlicht: [v0.8.0rc14](https://github.com/landjunge/KiraBridge/releases/tag/v0.8.0rc14)**
 (privates Vorabrelease vom 22.10.2026; bisher nur ein Wheel).
 
-**RC15 ist ein unveröffentlichter Kandidat.** Paket und Installationsbefehl
-stehen [unten](#install--update--installieren--aktualisieren). Veröffentlichung
-erst nach erfolgreicher CI und PR-Review. Noch kein freigegebener RC15-Download.
-Der launchd-Dienst läuft nach Schließen von Terminal oder Browser weiter.
+**RC15 ist ein unveröffentlichter Kandidat.** Wheel, macOS-Paket, Bootstrap und
+SHA-256-Prüfsummen liegen für berechtigte Reviewer im
+[RC15-Release-Entwurf](https://github.com/landjunge/KiraBridge/releases/tag/untagged-315af41126d778a271e1).
+Der Installationsbefehl steht [unten](#install--update--installieren--aktualisieren).
+
+Die Installer-Änderungen wurden über [PR #21](https://github.com/landjunge/KiraBridge/pull/21)
+und die Dokumentation über [PR #22](https://github.com/landjunge/KiraBridge/pull/22)
+auf ausdrücklichen Merge-Auftrag des Eigentümers integriert.
+**Die Veröffentlichung bleibt gesperrt:** GitHub Actions startet wegen eines
+Zahlungs-/Ausgabenlimits des Kontos keine Jobs. Erfolgreiche CI und Release-Abnahme
+stehen noch aus; ein Merge ist keine Release-Freigabe.
+
+Bei der **Erstinstallation** legt der Befehl einen begrenzten Projektzugang mit
+Einzelgenehmigungen an. Für ein **Update** denselben Befehl wiederholen;
+Konfiguration, Zugangsdaten, Datenbanken, Berechtigungen und Nutzerdateien bleiben
+erhalten. Aktive Aufträge sowie unbekannte Launcher oder Dienste führen zu einer
+klaren Fehlermeldung. Der **launchd-Dienst läuft nach Schließen von Terminal oder
+Browser weiter**.
+
+Version und Zustand des laufenden Dienstes: `~/.local/bin/kirabridge status`.
+Nach Abschluss aktiver Aufträge neu starten:
+`launchctl kickstart -k gui/$(id -u)/com.kirabridge.bridge`; danach Status erneut prüfen.
+Bei Fehlern die Meldung und `~/.local/share/kirabridge/install/logs/` prüfen.
+Netzwerkfehler können erneut versucht werden; bei falschen Prüfsummen abbrechen.
+Vorhandene Berechtigungen unverändert lassen. Für einen Rückfall das Kandidatenpaket
+beziehen und entpacken; Schritte siehe [Wiederherstellung](docs/INSTALL-MACOS.md).
 
 ### Kontrolle und optionale Werkzeuge
 
@@ -177,17 +233,32 @@ Assistenten-Anbindungen und ihre Grenzen stehen in der
 
 ### Was wurde geprüft?
 
-Der [RC15-Abnahmebericht](docs/ACCEPTANCE-MACOS-RC15.md) nennt die tatsächlich
-geprüften Pakete und verbleibenden Hürden. Historische RC12-Zahlen belegen keine
-RC15-Abnahme. Handy, Live-Sprache und ChatGPT benötigen getrennte Prüfungen.
+Auf echtem **macOS 15.7.4 / Intel x86_64** bestanden **960 Regressionstests**.
+Zwei Builds lieferten identische Prüfsummen. Der tatsächliche authentifizierte
+Downloadbefehl, Erstinstallation, Update vom RC14-Wheel, Version/Status, idempotente
+Wiederholung, launchd-Neustart, automatische Erholung nach Prozessabbruch und
+Rollback bestanden in isolierten Verzeichnissen. Konfiguration, Zugangsdaten-Hashes,
+ein Datenbankeintrag und eine Nutzerdatei blieben erhalten. Die produktive
+Installation wurde nicht verändert.
+
+Der [Abnahmebericht](docs/ACCEPTANCE-MACOS-RC15.md) nennt den genauen Befehl,
+Paket-Prüfsummen und offene Hürden. Diese lokalen Ergebnisse belegen keinen
+erfolgreichen GitHub-CI- oder Apple-Silicon-Lauf. Handy, Live-Sprache und die gesamte
+ChatGPT-Verbindung bleiben gesondert ungeprüft.
 
 ---
+
+`main` is a separate development lineage (currently 0.7.0rc2); the latest
+published code is the RC14 integration lineage. Use release assets for installation.
+`main` ist eine getrennte Entwicklungslinie (derzeit 0.7.0rc2); der jüngste
+veröffentlichte Stand liegt in der RC14-Integrationslinie. Zur Installation die
+Release-Dateien verwenden. [Runtime/install PR #21](https://github.com/landjunge/KiraBridge/pull/21).
 
 ## Install / update · Installieren / aktualisieren
 
 **RC15-Kandidat: nur für berechtigte Reviewer des Release-Entwurfs; noch kein
 freigegebener Endnutzer-Download. / RC15 candidate: draft reviewers only until CI
-and review pass.** Voraussetzung / prerequisite: Python 3.11, uv 0.11.6 und
+and release acceptance pass.** Voraussetzung / prerequisite: Python 3.11, uv 0.11.6 und
 angemeldete GitHub CLI mit Repository-Zugriff / authenticated GitHub CLI.
 Der Befehl lädt authentifiziert, prüft SHA-256 und installiert oder aktualisiert /
 authenticated download, checksum verification and install/update:
@@ -208,7 +279,7 @@ no sudo; existing configuration, credentials and user files are preserved.
 ## Further reading / Weiterführende Dokumentation
 
 - [RC15 candidate notes / Kandidatenhinweise](docs/RELEASE-0.8.0rc15.md)
-- [Control center / Steuerfenster](docs/CONTROL-CENTER-0.8.0rc1.md)
+- [Control center / Steuerfenster](https://github.com/landjunge/KiraBridge/blob/89c2e4359090de53fb6c1da55b6146072443988d/docs/CONTROL-CENTER-0.8.0rc1.md)
 - [ChatGPT connection / ChatGPT-Verbindung](docs/CHATGPT.md)
 - [Team coordination / Zusammenarbeit im Team](docs/TEAM-ORCHESTRATION.md)
 - [ThreadDesk connection / ThreadDesk-Anbindung](docs/THREADDESK-ADAPTER-20261018.md)
@@ -216,9 +287,11 @@ no sudo; existing configuration, credentials and user files are preserved.
 - [Operations and recovery / Betrieb und Wiederherstellung](docs/OPERATIONS.md)
 - [Architecture and modules / Architektur und Module](docs/ARCHITECTURE.md)
 
-The download is pinned to tag `v0.8.0rc14`. The `main` branch may contain a
-different development state. / Der Download gehört zum Tag `v0.8.0rc14`; der
-Hauptzweig `main` kann einen anderen Entwicklungsstand enthalten.
+The published download is pinned to `v0.8.0rc14`; the highlighted command selects
+the unpublished `v0.8.0rc15` draft explicitly. `main` and the RC14/RC15 integration
+lineage remain separate. / Der veröffentlichte Download gehört zu `v0.8.0rc14`;
+der hervorgehobene Befehl wählt ausdrücklich den unveröffentlichten Entwurf
+`v0.8.0rc15`. `main` und die RC14/RC15-Integrationslinie bleiben getrennt.
 
 KiraBridge is an independent project and is not an official product of the
 connected AI providers. / KiraBridge ist ein eigenständiges Projekt und kein
