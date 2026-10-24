@@ -1,0 +1,12 @@
+{
+  "file_fingerprints_unchanged": {
+    "/Users/landjunge/.config/kirabridge/config.toml": true,
+    "/Users/landjunge/.local/bin/kirabridge": true,
+    "/Users/landjunge/Library/LaunchAgents/com.kirabridge.bridge.plist": true,
+    "/Users/landjunge/.config/kirabridge/tunnel/kirabridge.yaml": true
+  },
+  "editable_source_version_still": "0.5.2",
+  "production_version_060_not_activated": true,
+  "default_versioned_install_prefix_exists": false,
+  "scope": "Only isolated temporary installation prefixes were activated; production launchd switch pending"
+}

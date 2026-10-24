@@ -1,0 +1,139 @@
+{
+  "scope": "ISOLATED FRESH 0.6.0; NO PRODUCTION SERVICE",
+  "no_events_subscription": true,
+  "production_modified": false,
+  "health": {
+    "name": "KiraBridge",
+    "version": "0.6.0",
+    "api_version": "1",
+    "dispatcher_active": true,
+    "chatgpt_integration": "unverified",
+    "task_submission": {
+      "events_subscription_required": false,
+      "preferred_tools": [
+        "action_request",
+        "action_submit"
+      ],
+      "result_tools": [
+        "task_get",
+        "task_events",
+        "read_query"
+      ],
+      "legacy_connector_schema": "If a cached task_* connector requires completion_subscription, the root value empty string is accepted as no subscription; use fresh action_* schemas after metadata refresh."
+    },
+    "completion_channel": {
+      "receive_tool": "completion_receive",
+      "ack_tool": "completion_ack",
+      "default_target": "default",
+      "mode": "durable_inbox_with_waiting_consumer",
+      "unsolicited_chatgpt_wakeup": "unavailable_on_current_transport"
+    },
+    "local_approval_url": "http://127.0.0.1:8766/",
+    "approval_mode": "automatic",
+    "approval_required": false,
+    "health_scope": "dispatcher and authentication; use bridge_readiness for prerequisites",
+    "runtime": {
+      "instance_id": "ad509e0b079a49fc88350fd8875e5037",
+      "version": "0.6.0",
+      "pid": 99051,
+      "started_at": "2026-10-19T02:32:45.666283+00:00",
+      "config_path": "/private/tmp/kirabridge-install-accept-20261019-01/fresh/config/config.toml",
+      "config_sha256": "07c7629caffb6c4444fe4f7fe33e80343fe46ec667d2a0dfd73bf980cdbbec88",
+      "effective_config_sha256": "a4420ba0c668c392f456778c7ae083b9eb902364ff1941220808e551fba3cc48",
+      "source_tree_sha256": "7c40cf670ae0835dfa16d58909cc8a01067866dfc3456dc30e3d44984c2c73c2",
+      "source_file_count": 44,
+      "source_package_path": "/private/tmp/kirabridge-install-accept-20261019-01/fresh/install/releases/0.6.0-4d00d1d1ad46/source/.venv/lib/python3.11/site-packages/kirabridge",
+      "source_scope": "package Python files observed at startup; no remote attestation"
+    },
+    "diagnostics_storage": {
+      "recording": "available",
+      "records": 1,
+      "today": 1,
+      "max_records": 20000,
+      "max_events_per_day": 2000,
+      "dropped_by_this_observer": 0,
+      "retention": "existing audit preserved; bounded explicit export, no automatic deletion"
+    },
+    "message_peers": [],
+    "message_receiver_active": false
+  },
+  "tasks": [
+    {
+      "api_version": "1",
+      "id": "fresh-file-proof",
+      "principal": "chatgpt",
+      "operation": "file.write",
+      "args": {
+        "path": "/private/tmp/kirabridge-install-accept-20261019-01/fresh/proof.txt",
+        "text": "FRESH_060_OK"
+      },
+      "agent": null,
+      "parent_id": null,
+      "state": "completed",
+      "created": 1792377166.123523,
+      "updated": 1792377166.137002,
+      "accepted": 1792377166.128866,
+      "started": 1792377166.132131,
+      "finished": 1792377166.137002,
+      "receipt": "4f5310c6-45e7-45a5-99ff-35571a43bee5",
+      "evidence": {
+        "operation_returned": true
+      },
+      "result": {
+        "content_sha256": "f7248f135aedfeaa4fbcb9b979e0f513d5910179c9bd4ac3ae88d0b8d2302c56",
+        "written_bytes": 12
+      },
+      "error": null,
+      "attempt": 1
+    },
+    {
+      "api_version": "1",
+      "id": "fresh-terminal-proof",
+      "principal": "chatgpt",
+      "operation": "terminal.execute",
+      "args": {
+        "argv": [
+          "/usr/bin/printf",
+          "FRESH_TERMINAL_OK"
+        ],
+        "cwd": "/private/tmp/kirabridge-install-accept-20261019-01/fresh",
+        "timeout": 5
+      },
+      "agent": null,
+      "parent_id": null,
+      "state": "completed",
+      "created": 1792377166.163758,
+      "updated": 1792377166.453512,
+      "accepted": 1792377166.166559,
+      "started": 1792377166.375628,
+      "finished": 1792377166.453512,
+      "receipt": "7c439c02-dce1-4509-aac5-1fae3277151f",
+      "evidence": {
+        "exit_code": 0,
+        "pid": 99052,
+        "terminated": false,
+        "timed_out": false
+      },
+      "result": {
+        "evidence": {
+          "exit_code": 0,
+          "pid": 99052,
+          "terminated": false,
+          "timed_out": false
+        },
+        "exit_code": 0,
+        "output_bytes": 17,
+        "pid": 99052,
+        "stderr": "",
+        "stdout": "FRESH_TERMINAL_OK",
+        "success": true,
+        "terminated": false,
+        "timed_out": false,
+        "truncated": false
+      },
+      "error": null,
+      "attempt": 1
+    }
+  ],
+  "passed": true
+}

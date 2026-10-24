@@ -1,0 +1,288 @@
+{
+  "scope": "macOS installed receiver correction and actual Kira connector/current visible Codex round trip; no audio or inactive-chat wakeup attestation",
+  "pr": 7,
+  "pr_commit": "4e0e06680da736344e8fed2e2f854c4147da1307",
+  "merge_commit": "971e6850685719b0c26f4079d0360067f4f7f385",
+  "verification": {
+    "tests_passed": 931,
+    "tests_seconds": 177.58,
+    "python": "3.11",
+    "platform": "macOS",
+    "ruff": "passed",
+    "diff_check": "passed",
+    "github_ci": "Jobs never started: recent account payments failed or spending limit reached"
+  },
+  "wheel_sha256": "5ff399f8dbb3343a841c7de1e6e503678ff58a276d32de8eb2c9ae5d54a0ba85",
+  "wheel_package_files_compared": 97,
+  "activation_id": "activation-8dcd99aac6be4de7b0f22d98af75c3f1",
+  "before_runtime": {
+    "instance_id": "d6ecb5590f704fad84388b9767c72384",
+    "version": "0.8.0rc11",
+    "pid": 63908,
+    "started_at": "2026-10-20T12:44:00.526137+00:00",
+    "config_path": "/Users/landjunge/.config/kirabridge/config.toml",
+    "config_sha256": "fffa301b73fafb2a52c521d0349b2502c62220914ef89ef4665fa818e9855173",
+    "effective_config_sha256": "333e5d37d11b40e3cc479af4e2c500ad33680c30c7331409678b33727d063dd5",
+    "source_tree_sha256": "4acc2f65e9ea1f9b98f14058675a3dc81134353424a7a2d33ae8ae77679b6235",
+    "source_file_count": 86,
+    "source_package_path": "/Users/landjunge/KiraBridge/.venv/lib/python3.11/site-packages/kirabridge",
+    "source_scope": "package Python files observed at startup; no remote attestation"
+  },
+  "after_runtime": {
+    "instance_id": "b3407a2b11bd475483249ec1c3b6caed",
+    "version": "0.8.0rc11",
+    "pid": 73628,
+    "started_at": "2026-10-20T13:20:56.429925+00:00",
+    "config_path": "/Users/landjunge/.config/kirabridge/config.toml",
+    "config_sha256": "e4f3d2aab9b35727a211ca77cc57523b39618cd6bb36c4616998092fb43601f8",
+    "effective_config_sha256": "003566914f9422cf7cb0dd633ae46c9b52f43ee0de995a934935d9cb6295d498",
+    "source_tree_sha256": "8ef2742c04a0a49b67e57136b1e90b1ee7774789830ab6e50ef15a50fd8c5728",
+    "source_file_count": 86,
+    "source_package_path": "/Users/landjunge/KiraBridge/.venv/lib/python3.11/site-packages/kirabridge",
+    "source_scope": "package Python files observed at startup; no remote attestation"
+  },
+  "receiver_active": true,
+  "binding": {
+    "agent_pid": 68530,
+    "busy_pattern": "\\[stop\\]|esc to interrupt|Thinking…|Working…|Back to bottom|enter/esc latest",
+    "codex_rollout_path": "/Users/landjunge/.codex/sessions/2026/10/20/rollout-2026-10-20T14-59-16-01a15965-0af7-7562-8e0a-da3b5434eef4.jsonl",
+    "codex_thread_id": "01a15965-0af7-7562-8e0a-da3b5434eef4",
+    "expected_pid": 94023,
+    "pane_id": "terminal:22104:ttys000",
+    "ready_pattern": "(?m)^\\s*›(?: Ask Codex to do anything)?\\s*$"
+  },
+  "configuration_changed_only": [
+    "agent_pid",
+    "codex_thread_id",
+    "codex_rollout_path"
+  ],
+  "credentials_and_grants_unchanged": true,
+  "preserved_process_count": 20,
+  "preserved_queued_message_ids": [
+    "e5db3654-cdfa-46a5-a3c2-28d632a6810b",
+    "ef86163a-88b9-4aee-b0d5-c574ada7b629",
+    "68e47f45-749f-428a-a300-82e411c10133"
+  ],
+  "rollback": "Private previous venv, old wheel, original config and SQLite backups preserved; database was not restored; no error/rollback path executed",
+  "original_test": {
+    "id": "d5f54c18-7068-4abb-9d2f-339fb9a8a526",
+    "state": "completed earlier under agent94386; actual connector rechecked; not repeated",
+    "reply_id": "7a1bc622-ceeb-4baa-9441-d1826e6e4ba8",
+    "kira_acknowledged": true
+  },
+  "current_session_test": {
+    "id": "e8ecb291-aa21-4abd-9697-bcc1aeddda03",
+    "conversation_id": "kira-receiver-session-check-20261020",
+    "handoff_id": "channel-33314f046c704376855e5aace657ad8f",
+    "state": "completed",
+    "events": [
+      {
+        "seq": 247,
+        "state": "inserting",
+        "at_utc": "2026-10-20T13:24:33.774865+00:00",
+        "evidence": {
+          "agent_confirmed": false,
+          "empty_input_observed": true,
+          "marker_preexisting": false,
+          "terminal_input_attempted": true
+        }
+      },
+      {
+        "seq": 248,
+        "state": "inserted",
+        "at_utc": "2026-10-20T13:24:39.521966+00:00",
+        "evidence": {
+          "agent_confirmed": false,
+          "insertion_representation": "codex_collapsed_paste_exact_character_count",
+          "prompt_observed": true,
+          "return_sent": false
+        }
+      },
+      {
+        "seq": 249,
+        "state": "submitting",
+        "at_utc": "2026-10-20T13:24:39.554605+00:00",
+        "evidence": {
+          "agent_confirmed": false
+        }
+      },
+      {
+        "seq": 250,
+        "state": "return_sent",
+        "at_utc": "2026-10-20T13:24:42.727216+00:00",
+        "evidence": {
+          "agent_confirmed": false,
+          "return_sent": true
+        }
+      },
+      {
+        "seq": 251,
+        "state": "sent",
+        "at_utc": "2026-10-20T13:24:44.673531+00:00",
+        "evidence": {
+          "agent_confirmed": false,
+          "input_field_cleared": true,
+          "return_sent": true
+        }
+      },
+      {
+        "seq": 252,
+        "state": "confirmed",
+        "at_utc": "2026-10-20T13:24:53.625050+00:00",
+        "evidence": {
+          "agent_confirmed": true,
+          "authenticated_principal": "codex",
+          "message_id": "e8ecb291-aa21-4abd-9697-bcc1aeddda03",
+          "reconciled_without_input": true
+        }
+      },
+      {
+        "seq": 253,
+        "state": "completed",
+        "at_utc": "2026-10-20T13:24:53.642175+00:00",
+        "evidence": {
+          "agent_confirmed": true,
+          "authenticated_principal": "codex",
+          "message_id": "e8ecb291-aa21-4abd-9697-bcc1aeddda03",
+          "reconciled_without_input": true,
+          "reply_id": "4d9ab69d-b8fb-4bdf-bee5-ed3f991024a3"
+        }
+      }
+    ],
+    "state_counts": {
+      "inserting": 1,
+      "inserted": 1,
+      "submitting": 1,
+      "return_sent": 1,
+      "sent": 1,
+      "confirmed": 1,
+      "completed": 1
+    },
+    "codex_ack_utc": "2026-10-20T13:24:53.528699+00:00",
+    "reply_id": "4d9ab69d-b8fb-4bdf-bee5-ed3f991024a3",
+    "reply_body": "KIRA-TEST-OK RECEIVER-FIXES\nAuftrag: channel-33314f046c704376855e5aace657ad8f\nNachricht e8ecb291-aa21-4abd-9697-bcc1aeddda03 wurde in der bestehenden sichtbaren Codex-Sitzung terminal:22104:ttys000 mit Agent68530 und Thread01a15965-0af7-7562-8e0a-da3b5434eef4 empfangen und authentisiert quittiert. Kein weiterer Auftrag gestartet, keine unbekannte Eingabe wiederholt. Der vollständige Wiederherstellungsabschluss folgt getrennt im Gespräch kira-receiver-fixes-20261020.",
+    "kira_connector_received_utc": "2026-10-20T13:24:58.419604+00:00",
+    "kira_ack_utc": "2026-10-20T13:25:06.298752+00:00",
+    "full_path_proven": true
+  },
+  "reconciliation": {
+    "corrected_unknown_message": "e4c91752-bd49-425d-a3ce-a1c8bd887dc4",
+    "basis": "Authenticated Grok ACK, matching final result08fde798-0c91-4643-94c1-f348b67dcf4e,completed visible handoff; no input/retry",
+    "remaining_unknown": 7,
+    "reason": "No matching authenticated final answer and completed visible handoff; not retried"
+  },
+  "grok": {
+    "initial_pr_verdict": "Do not approve: visible waiting resets retry deadline; non-BridgeError can cancel sibling recipient tasks.",
+    "followup_verdict": "Both original blockers fixed; additional stop cancellation ownership concern raised.",
+    "final_stop_contract_verdict": "No concrete violation under that lifecycle.\n\n`stop` sets `stopping` before `shield` and leaves it set if the waiting caller is cancelled. `shield` lets the current turn finish. The `finally` clears the handle only when that same task is already done, so a cancelled waiter keeps the live worker.\n\n`start` returns while that worker exists, before recovery, new locks, `stopping = False`, or a new task. Queued rows stay queued. Only a later `start`, after the old worker has exited and the handle is cleared, clears `stopping` and runs the next job once.",
+    "contract": "Stop requests persistent quiescence. Cancelling its waiter does not withdraw stop. Current work drains; queued work resumes once on an explicit later start after old worker exits.",
+    "reviewer_executed_tests": false,
+    "local_activation_script_review": "Error paths reviewed and strengthened; one issue corrected before execution. Both real activations completed without rollback/error path.",
+    "review_output_sha256": {
+      "grok-review.txt": "d774651ed0be418f9cfb44b205fde40c4f7edd5dd54ca2433814d26750535465",
+      "grok-followup-review.txt": "afd0a12e1003c4c3922cdb4ec9a83316c75f131000f02159a4d0e7f3f06e3a3b",
+      "grok-final-stop-review.txt": "4a115b062f1ebe601949a28f27922484e417df5ca6838343d4c462d815972339",
+      "grok-stop-contract-review.txt": "a4f7956297ee73196c9fd69b5a380c06164c83b088daa0dca6e2652152ae5e05",
+      "grok-activation-review.txt": "9c05e0a45bbb3b6afaab66547890b5fdfd4429aff93329ecd905b8dcaf4d7b52"
+    }
+  },
+  "private_evidence_directory": "/Users/landjunge/.config/kirabridge/repairs/receiver-resilience-20261020",
+  "active_code_commit": "956b0f81c380895105d32c585b569ea52979adc9",
+  "active_source_sha256": "cfad2a3026c435192374f26580be3556e51b7641cb36918452ad0f280362ceb7",
+  "followup": {
+    "reason": "Independent Grok review found two reproduced blockers; fixed retry evidence loss and unexpected exception coupling, with explicit stop ownership/cancellation contract.",
+    "commit": "956b0f81c380895105d32c585b569ea52979adc9",
+    "wheel_sha256": "bff5aa46541e24124aa9d15a59815a6605c0f9734f49cb87dd735369490ccbcb",
+    "wheel_package_files_compared": 97,
+    "verification": {
+      "tests_passed": 941,
+      "seconds": 178.61,
+      "focused_receiver_tests_passed": 35,
+      "ruff": "passed",
+      "diff_check": "passed",
+      "new_regression_cases": 10,
+      "reproduction": "9 cases failed before initial fixes; cancelled-stop case failed before shield; all10 final cases pass"
+    },
+    "activation_id": "activation-c492e4e34fc944f18649da8a37b8c343",
+    "before_runtime": {
+      "instance_id": "b3407a2b11bd475483249ec1c3b6caed",
+      "version": "0.8.0rc11",
+      "pid": 73628,
+      "started_at": "2026-10-20T13:20:56.429925+00:00",
+      "config_path": "/Users/landjunge/.config/kirabridge/config.toml",
+      "config_sha256": "e4f3d2aab9b35727a211ca77cc57523b39618cd6bb36c4616998092fb43601f8",
+      "effective_config_sha256": "003566914f9422cf7cb0dd633ae46c9b52f43ee0de995a934935d9cb6295d498",
+      "source_tree_sha256": "8ef2742c04a0a49b67e57136b1e90b1ee7774789830ab6e50ef15a50fd8c5728",
+      "source_file_count": 86,
+      "source_package_path": "/Users/landjunge/KiraBridge/.venv/lib/python3.11/site-packages/kirabridge",
+      "source_scope": "package Python files observed at startup; no remote attestation"
+    },
+    "after_runtime": {
+      "instance_id": "1085478016e84c838c55c6eada33d9bf",
+      "version": "0.8.0rc11",
+      "pid": 79466,
+      "started_at": "2026-10-20T13:38:41.776401+00:00",
+      "config_path": "/Users/landjunge/.config/kirabridge/config.toml",
+      "config_sha256": "e4f3d2aab9b35727a211ca77cc57523b39618cd6bb36c4616998092fb43601f8",
+      "effective_config_sha256": "003566914f9422cf7cb0dd633ae46c9b52f43ee0de995a934935d9cb6295d498",
+      "source_tree_sha256": "cfad2a3026c435192374f26580be3556e51b7641cb36918452ad0f280362ceb7",
+      "source_file_count": 86,
+      "source_package_path": "/Users/landjunge/KiraBridge/.venv/lib/python3.11/site-packages/kirabridge",
+      "source_scope": "package Python files observed at startup; no remote attestation"
+    },
+    "receiver_active": true,
+    "maintenance": null,
+    "configuration_changed": false,
+    "preservation_checks": {
+      "source_config_match": true,
+      "credentials_and_launchd_unchanged": true,
+      "preserved_process_count": 20,
+      "queued": [
+        {
+          "id": "e5db3654-cdfa-46a5-a3c2-28d632a6810b",
+          "recipient": "grok",
+          "state": "queued",
+          "claimed": null,
+          "started": null
+        },
+        {
+          "id": "ef86163a-88b9-4aee-b0d5-c574ada7b629",
+          "recipient": "grok",
+          "state": "queued",
+          "claimed": null,
+          "started": null
+        },
+        {
+          "id": "68e47f45-749f-428a-a300-82e411c10133",
+          "recipient": "grok",
+          "state": "queued",
+          "claimed": null,
+          "started": null
+        }
+      ],
+      "remaining_unknown": 7,
+      "config_unchanged_during_followup": true
+    },
+    "console_reload": {
+      "before_instance": "9a052ef1fe39b9c934f25faec3eb22da",
+      "after_instance": "4fbedc1fafbea63b103341f53f005046",
+      "before_pid": 73776,
+      "after_pid": 79560,
+      "authenticated_signed_probe": true,
+      "key_changed": false
+    },
+    "rollback": "Complete PR7 venv, wheel, canonical config and consistent SQLite backups in private followup/previous-installation and followup/; original pre-PR7 backup also retained; no DB restore.",
+    "additional_terminal_test_requests": 0,
+    "live_validation_scope": "The single visible insert/separate Return/ACK/reply/Kira ACK was observed on source8ef2742c before this hardening. No new terminal input was requested after hardening because user explicitly said no further test. Actual final Kira connector health/source pins and final result delivery/ACK below were checked on sourcecfad2a30.",
+    "final_result": {
+      "id": "8c2cd45c-4f1b-43c9-8467-df26b0fce6ce",
+      "conversation_id": "kira-receiver-fixes-20261020",
+      "kind": "result",
+      "dispatch": false,
+      "request_reply": false,
+      "sent_utc": "2026-10-20T13:40:11.511350+00:00",
+      "received_via_actual_kira_connector_utc": "2026-10-20T13:40:19.041680+00:00",
+      "kira_ack_utc": "2026-10-20T13:40:20.228751+00:00"
+    }
+  }
+}

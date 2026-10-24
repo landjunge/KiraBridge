@@ -5,10 +5,11 @@ import hashlib
 import httpx
 
 from kirabridge.approval_console import ORIGIN, ApprovalConsole
+from kirabridge.operator_application import operator_application
 
 
 async def test_shared_design_is_exact_local_asset_with_existing_security(bridge):
-    app = ApprovalConsole(bridge, "isolated-console-design-key-" + "x" * 48)
+    app = ApprovalConsole(operator_application(bridge), "isolated-console-design-key-" + "x" * 48)
     async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url=ORIGIN) as client:
         index = await client.get("/")
         core = await client.get("/networkpunkt.css")

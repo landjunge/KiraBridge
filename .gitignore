@@ -23,3 +23,9 @@ coverage.xml
 .ci-tollgate/
 
 .worktrees/
+# Isolated acceptance runtime; portable evidence stays tracked.
+examples/review-demo/run-*/policy.toml
+examples/review-demo/run-*/state/
+examples/review-demo/automatic-*/state/
+# Completion acceptance owns isolated runtime state.
+examples/completion-demo/run-*/state/

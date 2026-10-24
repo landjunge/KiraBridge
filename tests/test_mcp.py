@@ -46,6 +46,89 @@ async def http_bridge(bridge, monkeypatch):
             sock.close()
 
 
+async def test_cached_tools_expose_existing_terminal_targets_over_real_http(
+    http_bridge, config, monkeypatch
+):
+    bridge, endpoint = http_bridge
+    policy = config.principals["local"]
+    policy.capabilities += ["session.inspect"]
+    policy.permission_level = "full"
+    target = {
+        "pane_id": "terminal:123:ttys004",
+        "expected_pid": 345,
+        "window_id": 123,
+        "tty": "/dev/ttys004",
+        "busy": True,
+    }
+    reads = []
+
+    async def catalog(principal):
+        bridge.security.principal(principal, "session.inspect")
+        return {"status": "available", "sessions": [target]}
+
+    async def native(source, *, mutation=False):
+        assert not mutation
+        reads.append(source)
+        return "READ_FROM_EXACT_WINDOW"
+
+    monkeypatch.setattr(bridge.sessions, "catalog", catalog)
+    monkeypatch.setattr(bridge.sessions.terminal_app, "native", native)
+    async with MCPClientPool() as clients:
+        await clients.connect(Peer("local", url=endpoint, token="local-test-" + "a" * 40))
+        result = (await clients.call("local", "agent_status", {})).structuredContent
+        assert result["interactive_terminal_sessions"] == [target] and not reads
+        permissions = (await clients.call("local", "operation_catalog", {})).structuredContent
+        assert permissions["terminal_access"]["policy_authorized"]
+        assert not permissions["terminal_access"]["input_approval_required"]
+        assert not permissions["terminal_access"]["additional_input_buffer_enabled"]
+        result = (
+            await clients.call("local", "read_query", {"query": {"operation": "session.catalog"}})
+        ).structuredContent
+        assert result["sessions"] == [target]
+        result = (
+            await clients.call(
+                "local",
+                "read_query",
+                {
+                    "query": {
+                        "operation": "session.read",
+                        "pane_id": target["pane_id"],
+                        "expected_pid": 346,
+                    }
+                },
+            )
+        ).structuredContent
+        assert result["error"]["code"] == "session_selection_changed" and not reads
+        result = (
+            await clients.call(
+                "local",
+                "read_query",
+                {
+                    "query": {
+                        "operation": "session.read",
+                        "pane_id": target["pane_id"],
+                        "expected_pid": 345,
+                    }
+                },
+            )
+        ).structuredContent
+        assert result["text"] == "READ_FROM_EXACT_WINDOW"
+        assert len(reads) == 1
+        for operation, arguments in [
+            ("session.catalog", {}),
+            ("session.read", {"pane_id": target["pane_id"], "expected_pid": 345}),
+        ]:
+            value = request(operation, arguments, task_id="cached-" + operation.replace(".", "-"))
+            await clients.call("local", "task_request", {"request": value.model_dump()})
+            completed = await bridge.tasks.wait("local", value.task_id, timeout=5)
+            assert completed["state"] == "completed", completed
+            assert (
+                completed["result"].get("sessions") == [target]
+                if operation == "session.catalog"
+                else completed["result"]["text"] == "READ_FROM_EXACT_WINDOW"
+            )
+
+
 async def test_http_auth_origin_host_and_protocol_limits(http_bridge):
     _, endpoint = http_bridge
     async with httpx.AsyncClient(trust_env=False) as client:
@@ -244,3 +327,59 @@ async def test_http_readiness_checks_authenticated_identity_and_loaded_snapshot(
             )
         ).structuredContent
         assert excessive["error"]["code"] == "invalid_arguments"
+
+
+async def test_task_contract_does_not_require_events_subscription(http_bridge):
+    _, endpoint = http_bridge
+    async with MCPClientPool() as clients:
+        await clients.connect(Peer("local", url=endpoint, token="local-test-" + "a" * 40))
+        listing = await clients.sessions["local"].list_tools()
+        for name in ["task_request", "task_submit"]:
+            tool = next(tool for tool in listing.tools if tool.name == name)
+            assert "completion_subscription" not in tool.inputSchema["properties"]
+            assert set(tool.inputSchema["required"]) == {"request"}
+            assert "completion_target" not in tool.inputSchema["required"]
+
+
+async def test_direct_read_http_needs_no_task_or_subscription(http_bridge, config):
+    from pathlib import Path
+
+    bridge, endpoint = http_bridge
+    path = Path(config.principals["local"].roots[0]) / "direct.log"
+    path.write_text("ACTUAL_HTTP_READ\n")
+    before = bridge.store.db.execute("select count(*) from tasks").fetchone()[0]
+    async with MCPClientPool() as clients:
+        await clients.connect(Peer("local", url=endpoint, token="local-test-" + "a" * 40))
+        result = await clients.call(
+            "local", "read_query", {"query": {"operation": "file.read", "path": str(path)}}
+        )
+        assert result.structuredContent["text"] == "ACTUAL_HTTP_READ\n"
+        result = await clients.call(
+            "local", "read_query", {"query": {"operation": "file.write", "path": str(path)}}
+        )
+        assert result.structuredContent["error"]["code"] == "invalid_arguments"
+    assert bridge.store.db.execute("select count(*) from tasks").fetchone()[0] == before
+
+
+async def test_action_aliases_without_events_preserve_execution_and_idempotency(
+    http_bridge, config
+):
+    bridge, endpoint = http_bridge
+    config.principals["local"].approval_mode = "automatic"
+    async with MCPClientPool() as clients:
+        await clients.connect(Peer("local", url=endpoint, token="local-test-" + "a" * 40))
+        listing = {t.name: t for t in (await clients.sessions["local"].list_tools()).tools}
+        for name in ("action_request", "action_submit", "task_request", "task_submit"):
+            assert "completion_subscription" not in listing[name].inputSchema["properties"]
+            assert listing[name].inputSchema["required"] == ["request"]
+        for name in ("action_request", "action_submit"):
+            value = request(
+                "file.write",
+                {"path": config.principals["local"].roots[0] + "/" + name, "text": "ALIAS_OK"},
+                task_id=name,
+            )
+            result = await clients.call("local", name, {"request": value.model_dump()})
+            assert result.structuredContent["state"] == "queued"
+            assert (await bridge.tasks.wait("local", value.task_id))["state"] == "completed"
+            duplicate = await clients.call("local", name, {"request": value.model_dump()})
+            assert duplicate.structuredContent["id"] == value.task_id

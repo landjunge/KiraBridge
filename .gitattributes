@@ -1,0 +1,2 @@
+# Preserve exact PDF fixture bytes (including required xref spacing).
+tests/fixtures/file-transfer/*.pdf binary

@@ -16,7 +16,8 @@ def tool(name, *, readonly=True, destructive=False, schema=None):
         name=name,
         description="Example read",
         annotations=SimpleNamespace(readOnlyHint=readonly, destructiveHint=destructive),
-        inputSchema=schema or {
+        inputSchema=schema
+        or {
             "type": "object",
             "additionalProperties": False,
             "properties": {"id": {"type": "string"}},
@@ -33,10 +34,13 @@ def bridge_fixture(monkeypatch, *, enabled=True, automatic=True):
         connect=AsyncMock(),
         pool=SimpleNamespace(
             sessions={"threaddesk": SimpleNamespace(list_tools=AsyncMock(return_value=listing))},
-            call=AsyncMock(return_value=SimpleNamespace(
-                structuredContent=None, isError=False,
-                content=[SimpleNamespace(type="text", text=json.dumps({"id": "abc"}))],
-            )),
+            call=AsyncMock(
+                return_value=SimpleNamespace(
+                    structuredContent=None,
+                    isError=False,
+                    content=[SimpleNamespace(type="text", text=json.dumps({"id": "abc"}))],
+                )
+            ),
         ),
         decode=lambda response, mutation: (True, json.loads(response.content[0].text)),
     )
@@ -57,9 +61,18 @@ def test_readonly_annotation_must_be_explicit_and_schema_well_formed():
     assert _read_tool(tool("writer", readonly=False)) is None
     assert _read_tool(tool("ambiguous", destructive=True)) is None
     assert _read_tool(tool("bad", schema={"type": "array"})) is None
-    assert _read_tool(tool("external", schema={
-        "type": "object", "properties": {"id": {"$ref": "https://example.org/schema"}}
-    })) is None
+    assert (
+        _read_tool(
+            tool(
+                "external",
+                schema={
+                    "type": "object",
+                    "properties": {"id": {"$ref": "https://example.org/schema"}},
+                },
+            )
+        )
+        is None
+    )
 
 
 @pytest.mark.asyncio
@@ -69,9 +82,7 @@ async def test_discovery_and_call_use_live_catalog_and_validate_schema(monkeypat
     assert names == {"new_read"}
     result = await read(bridge, "local", "new_read", {"id": "abc"})
     assert result["value"]["id"] == "abc"
-    bridge.threaddesk.pool.call.assert_awaited_once_with(
-        "threaddesk", "new_read", {"id": "abc"}
-    )
+    bridge.threaddesk.pool.call.assert_awaited_once_with("threaddesk", "new_read", {"id": "abc"})
     with pytest.raises(BridgeError, match="Arguments do not match"):
         await read(bridge, "local", "new_read", {"id": 12})
     assert bridge.threaddesk.pool.call.await_count == 1

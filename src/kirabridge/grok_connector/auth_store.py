@@ -32,7 +32,9 @@ from kirabridge.bridge_core.models import BridgeError, canonical, digest
 ACCESS_SECONDS = 3600
 REFRESH_SECONDS = 7 * 86400
 PENDING_SECONDS = 600
-CODE_SECONDS = 120
+# Mobile browsers pause the consent-page poll while the user switches apps.
+# Keep the approved code within the original ten-minute authorization window.
+CODE_SECONDS = 600
 UNAUTHORIZED_CLIENT_SECONDS = 3600
 MAX_REGISTRATIONS_PER_MINUTE = 16
 MAX_GENERATIONS = 256

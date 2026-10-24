@@ -1,0 +1,19 @@
+# Merge into the existing private configuration, preserving permissions and credentials.
+# Add this key to the existing Eve section; do not duplicate the table.
+[principals.grok_app]
+automatic_operations = ["session.input"]
+
+# The old terminal-input buffer is optional legacy behavior, disabled for Daniel.
+[session_input_policy]
+enabled = false
+principals = []
+timeout_seconds = 60
+
+# No extra voice token. Existing historical buffers never auto-release.
+[voice_messaging]
+release_required = false
+timeout_seconds = 60
+
+[voice_channel]
+enabled = true
+conversation_id = "eve-kira-shared"

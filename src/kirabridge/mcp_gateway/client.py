@@ -12,6 +12,7 @@ import httpx
 from mcp import ClientSession, StdioServerParameters, types
 from mcp.client.stdio import stdio_client
 from mcp.client.streamable_http import streamable_http_client
+from mcp.shared.exceptions import McpError
 
 from kirabridge.bridge_core.models import BridgeError, digest
 
@@ -67,6 +68,10 @@ class MCPClientPool:
         self.previous_ids: dict[str, str] = {}
         self.observation_failures = 0
         self.phases: dict[str, str] = {}
+        self.initializations = {}
+        self.catalogs = {}
+        self.catalog_locks = {}
+        self.catalog_dirty = set()
 
     def notice(self, peer_id, phase, **metadata):
         self.phases[peer_id] = phase
@@ -173,16 +178,26 @@ class MCPClientPool:
                             )
                         )
                     self.notice(peer.id, "transport.context_opened")
+
+                    async def notification(message):
+                        if isinstance(message, types.ServerNotification) and isinstance(
+                            message.root, types.ToolListChangedNotification
+                        ):
+                            self.catalog_dirty.add(peer.id)
+
                     session = await stack.enter_async_context(
                         ObservedClientSession(
                             read,
                             write,
                             notice=lambda phase, **meta: self.notice(peer.id, phase, **meta),
+                            message_handler=notification,
                         )
                     )
                     async with asyncio.timeout(self.call_timeout):
-                        await session.initialize()
+                        initialized = await session.initialize()
                     self.sessions[peer.id] = session
+                    self.initializations[peer.id] = initialized
+                    self.catalog_locks[peer.id] = asyncio.Lock()
                     self.notice(peer.id, "connection.ready")
                     ready.set_result(None)
                     await stop.wait()
@@ -194,6 +209,10 @@ class MCPClientPool:
                     )
             finally:
                 self.sessions.pop(peer.id, None)
+                self.initializations.pop(peer.id, None)
+                self.catalogs.pop(peer.id, None)
+                self.catalog_locks.pop(peer.id, None)
+                self.catalog_dirty.discard(peer.id)
                 self.notice(peer.id, "connection.closed")
 
         self.owners[peer.id] = asyncio.create_task(owner())
@@ -208,6 +227,30 @@ class MCPClientPool:
         except BaseException:
             await self.disconnect(peer.id)
             raise
+
+    async def list_tools(self, peer_id):
+        """Fresh bounded pagination; catalogs never survive a connection generation."""
+        if peer_id not in self.sessions:
+            raise self.failure(peer_id, "peer_disconnected", "MCP peer is not connected")
+        async with self.catalog_locks.setdefault(peer_id, asyncio.Lock()):
+            tools, cursor, seen = [], None, set()
+            async with asyncio.timeout(self.call_timeout):
+                for _ in range(8):
+                    page = await self.sessions[peer_id].list_tools(cursor=cursor)
+                    tools.extend(page.tools)
+                    if len(tools) > 512 or len({t.name for t in tools}) != len(tools):
+                        raise BridgeError(
+                            "tool_catalog_invalid", "Ambiguous/oversized tool catalog"
+                        )
+                    cursor = page.nextCursor
+                    if not cursor:
+                        self.catalogs[peer_id] = tools
+                        self.catalog_dirty.discard(peer_id)
+                        return tools
+                    if cursor in seen:
+                        raise BridgeError("tool_catalog_invalid", "Tool pagination cursor repeated")
+                    seen.add(cursor)
+            raise BridgeError("tool_catalog_invalid", "Tool pagination budget exceeded")
 
     async def call(self, peer_id: str, tool: str, arguments: dict, *, task_id: str | None = None):
         request = arguments.get("request")
@@ -227,6 +270,8 @@ class MCPClientPool:
                 task_id=task_id,
                 operation=tool,
             )
+        if peer_id in self.catalog_dirty:
+            await self.list_tools(peer_id)
         self.notice(peer_id, "call.started", tool=tool, task_id=task_id)
         # No automatic retries: a timed-out tool may have already executed remotely.
         try:
@@ -255,7 +300,7 @@ class MCPClientPool:
                 task_id=task_id,
                 operation=tool,
             ) from None
-        except Exception:
+        except Exception as exc:
             self.notice(
                 peer_id,
                 "call.outcome_unknown",
@@ -263,13 +308,18 @@ class MCPClientPool:
                 task_id=task_id,
                 error_code="peer_unknown",
             )
-            raise self.failure(
+            failure = self.failure(
                 peer_id,
                 "peer_unknown",
                 "Tool outcome unknown; reconcile before retry",
                 task_id=task_id,
                 operation=tool,
-            ) from None
+            )
+            if isinstance(exc, McpError) and exc.error.code == types.CONNECTION_CLOSED:
+                # SDK EOF does not end its owner's stop.wait(). Close only this
+                # proven dead connection; never replay the uncertain tool call.
+                await self.disconnect(peer_id)
+            raise failure from None
         except asyncio.CancelledError:
             self.notice(
                 peer_id, "call.interrupted", tool=tool, task_id=task_id, error_code="peer_unknown"

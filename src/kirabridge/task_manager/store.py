@@ -11,8 +11,10 @@ from typing import Any
 
 from kirabridge.bridge_core.config import private_directory
 from kirabridge.bridge_core.models import TRANSITIONS, BridgeError, State, canonical, digest
+from kirabridge.operations import RESERVED_READ_OPERATIONS, STOP_OPERATIONS, lane_operations
 
 SCHEMA_VERSION = 2
+DRAIN_CONTROL = STOP_OPERATIONS
 
 MESSAGE_SCHEMA = """
 CREATE TABLE conversations (
@@ -73,6 +75,7 @@ class Store:
     """Short synchronous WAL transactions; no network or await inside a transaction."""
 
     def __init__(self, path: Path):
+        self.result_codec = None
         private_directory(path.parent)
         if path.is_symlink():
             raise BridgeError("unsafe_state", "Database must not be a symlink")
@@ -101,6 +104,13 @@ class Store:
                     for statement in script.split(";"):
                         if statement.strip():
                             self.db.execute(statement)
+                from kirabridge.queue_management import install_schema
+
+                install_schema(self)
+                from kirabridge.completion_manager import SCHEMA as COMPLETION_SCHEMA
+
+                for statement in COMPLETION_SCHEMA:
+                    self.db.execute(statement)
                 self.db.execute(
                     "CREATE TABLE IF NOT EXISTS handoff_bindings ("
                     "id TEXT PRIMARY KEY, principal TEXT NOT NULL, operator_ref TEXT NOT NULL, "
@@ -116,19 +126,135 @@ class Store:
                     "CREATE INDEX IF NOT EXISTS audit_task_kind "
                     "ON audit(principal,task_id,kind,seq)"
                 )
+                self.db.execute(
+                    "CREATE TABLE IF NOT EXISTS session_input_buffers ("
+                    "task_id TEXT PRIMARY KEY REFERENCES tasks(id), "
+                    "state TEXT NOT NULL, created REAL NOT NULL, expires REAL NOT NULL, "
+                    "released REAL, release_source TEXT, dispatch_started REAL)"
+                )
+                self.db.execute(
+                    "CREATE INDEX IF NOT EXISTS session_input_expiry "
+                    "ON session_input_buffers(state,expires)"
+                )
+                self.db.execute(
+                    "CREATE TABLE IF NOT EXISTS activation_runs ("
+                    "id TEXT PRIMARY KEY,state TEXT NOT NULL,created REAL NOT NULL,"
+                    "updated REAL NOT NULL,plan TEXT NOT NULL,error TEXT)"
+                )
+                self.db.execute(
+                    "CREATE UNIQUE INDEX IF NOT EXISTS activation_single_active "
+                    "ON activation_runs((1)) WHERE state IN "
+                    "('draining','activating','verifying','recovering','failed_blocked')"
+                )
+                from kirabridge.voice_channel import SCHEMA as VOICE_SCHEMA
+
+                for statement in VOICE_SCHEMA:
+                    self.db.execute(statement)
         except BaseException:
             self.db.close()
             raise
 
     @contextmanager
     def transaction(self):
-        self.db.execute("BEGIN IMMEDIATE")
+        savepoint = "nested_" + uuid.uuid4().hex if self.db.in_transaction else None
+        self.db.execute(f"SAVEPOINT {savepoint}" if savepoint else "BEGIN IMMEDIATE")
         try:
             yield self.db
-            self.db.execute("COMMIT")
+            self.db.execute(f"RELEASE {savepoint}" if savepoint else "COMMIT")
         except BaseException:
-            self.db.execute("ROLLBACK")
+            if savepoint:
+                self.db.execute(f"ROLLBACK TO {savepoint}")
+                self.db.execute(f"RELEASE {savepoint}")
+            else:
+                self.db.execute("ROLLBACK")
             raise
+
+    def maintenance_state(self):
+        row = self.db.execute(
+            "SELECT id,state,created,updated,error FROM activation_runs WHERE state IN "
+            "('draining','activating','verifying','recovering','failed_blocked')"
+        ).fetchone()
+        return dict(row) if row else None
+
+    def team_reservation(self, identifier, principal, request_hash, cutoff):
+        if not self.db.execute(
+            "SELECT 1 FROM sqlite_master WHERE type='table' AND name='team_work'"
+        ).fetchone():
+            return False
+        return bool(
+            self.db.execute(
+                "SELECT 1 FROM team_work WHERE core_task_id=? AND assignee=? "
+                "AND core_request_hash=? AND created<=? "
+                "AND state IN ('dispatching','queued','accepted','running')",
+                (identifier, principal, request_hash, cutoff),
+            ).fetchone()
+        )
+
+    def can_claim(self, created, *, task_id=None, operation=None):
+        state = self.maintenance_state()
+        if not state:
+            return True
+        if state["state"] != "draining":
+            return False
+        if operation in DRAIN_CONTROL:
+            return True
+        if created <= state["created"]:
+            return True
+        task = (
+            self.db.execute(
+                "SELECT principal,request_hash FROM tasks WHERE id=?", (task_id,)
+            ).fetchone()
+            if task_id
+            else None
+        )
+        return bool(
+            task
+            and self.team_reservation(
+                task_id, task["principal"], task["request_hash"], state["created"]
+            )
+        )
+
+    def assert_accepting(
+        self,
+        *,
+        continuation_id=None,
+        principal=None,
+        request_hash=None,
+        owned_execution=False,
+        operation=None,
+    ):
+        state = self.maintenance_state()
+        if not state:
+            return
+        if state["state"] == "draining" and operation in DRAIN_CONTROL:
+            return
+        if state["state"] == "draining" and continuation_id:
+            task = self.db.execute(
+                "SELECT created FROM tasks WHERE id=? AND state IN ('accepted','running')",
+                (continuation_id,),
+            ).fetchone()
+            existing = self.db.execute(
+                "SELECT 1 FROM message_jobs j JOIN messages m ON m.id=j.message_id "
+                "WHERE j.run_id=? AND m.created<=? AND j.state='running'",
+                (continuation_id, state["created"]),
+            ).fetchone()
+            if owned_execution and (
+                existing or task and self.can_claim(task["created"], task_id=continuation_id)
+            ):
+                return
+            if (
+                principal
+                and request_hash
+                and self.team_reservation(
+                    continuation_id, principal, request_hash, state["created"]
+                )
+            ):
+                return
+        raise BridgeError(
+            "service_maintenance",
+            "KiraBridge aktiviert Einstellungen. Neue Aufträge sind vorübergehend gesperrt; "
+            "laufende Arbeit und Antworten bleiben erhalten.",
+        )
 
     def audit(self, kind: str, principal: str, task_id: str | None, metadata: dict) -> None:
         # Call inside the transaction that performs the audited action.
@@ -155,7 +281,9 @@ class Store:
             ),
         )
 
-    def get(self, task_id: str, principal: str | None = None) -> dict[str, Any]:
+    def get(
+        self, task_id: str, principal: str | None = None, *, resolve_output=True
+    ) -> dict[str, Any]:
         row = self.db.execute("SELECT * FROM tasks WHERE id=?", (task_id,)).fetchone()
         if row is None or (principal is not None and row["principal"] != principal):
             raise BridgeError("not_found", "Task not found")
@@ -163,6 +291,15 @@ class Store:
         for key in ("args", "evidence", "result", "error"):
             result[key] = json.loads(result[key]) if result[key] is not None else None
         result.pop("request_hash")
+        if resolve_output and self.result_codec:
+            result["result"] = self.result_codec.resolve_result(
+                result["principal"], result["result"]
+            )
+        buffer = self.db.execute(
+            "SELECT * FROM session_input_buffers WHERE task_id=?", (task_id,)
+        ).fetchone()
+        if buffer:
+            result["input_buffer"] = dict(buffer)
         return result
 
     def transition(
@@ -192,6 +329,8 @@ class Store:
             if not evidence:
                 raise BridgeError("missing_evidence", "A state transition requires evidence")
             now = time.time()
+            if self.result_codec:
+                result = self.result_codec.persist_task_result(row, result)
             finished = now if state in {State.COMPLETED, State.FAILED, State.CANCELLED} else None
             self.db.execute(
                 "UPDATE tasks SET state=?,updated=?,started=COALESCE(started,?),finished=?,"
@@ -207,10 +346,20 @@ class Store:
                     task_id,
                 ),
             )
-            self.db.execute(
+            event = self.db.execute(
                 "INSERT INTO events(task_id,at,state,evidence) VALUES(?,?,?,?)",
                 (task_id, now, state, canonical(evidence)),
             )
+            from kirabridge.completion_manager import TERMINAL, record_task_completion
+
+            if state in TERMINAL:
+                if state == State.CANCELLED:
+                    self.db.execute(
+                        "UPDATE session_input_buffers SET state='cancelled' WHERE task_id=? "
+                        "AND state IN ('waiting','released')",
+                        (task_id,),
+                    )
+                record_task_completion(self, task_id, event.lastrowid)
             self.audit(
                 "task.transition",
                 row["principal"],
@@ -218,16 +367,109 @@ class Store:
                 {"from": row["state"], "to": state, "evidence_hash": digest(evidence)},
             )
 
-    def claim(self, owner: str, lease_seconds: float, control: bool = False) -> dict | None:
+    @staticmethod
+    def lane_selection(lane):
+        lane = "control" if lane is True else "normal" if lane is False else lane
+        if lane not in {"normal", "control", "read", "stop"}:
+            raise ValueError("Unknown execution lane")
+        names = sorted(
+            RESERVED_READ_OPERATIONS | STOP_OPERATIONS
+            if lane == "normal"
+            else lane_operations(lane)
+        )
+        comparison = "NOT IN" if lane == "normal" else "IN"
+        return "operation " + comparison + " (" + ",".join("?" for _ in names) + ")", names
+
+    def queued_count(self, lane):
+        selection, names = self.lane_selection(lane)
+        return self.db.execute(
+            "SELECT COUNT(*) FROM tasks WHERE state IN ('created','queued') AND " + selection,
+            names,
+        ).fetchone()[0]
+
+    def operator_listing(self):
+        rows = self.db.execute(
+            "SELECT id,principal,operation,agent,state,created,updated FROM tasks "
+            "ORDER BY CASE state WHEN 'created' THEN 0 WHEN 'queued' THEN 1 "
+            "WHEN 'accepted' THEN 2 WHEN 'running' THEN 3 WHEN 'unknown' THEN 4 ELSE 5 END, "
+            "updated DESC LIMIT 100"
+        ).fetchall()
+        count = self.db.execute("SELECT count(*) FROM tasks WHERE state='created'").fetchone()[0]
+        return {"tasks": [dict(row) for row in rows], "pending": count}
+
+    def operator_detail(self, task_id):
+        task = self.get(task_id)
+        request_hash = self.db.execute(
+            "SELECT request_hash FROM tasks WHERE id=?", (task_id,)
+        ).fetchone()[0]
+        return {"task": task, "request_hash": request_hash}
+
+    def activation_work_count(self, *, active_only=False, context=None):
+        db = context.db if context is not None else self.db
+        states = ("accepted", "running") if active_only else ("queued", "accepted", "running")
+        return db.execute(
+            "SELECT count(*) FROM tasks WHERE state IN (" + ",".join("?" for _ in states) + ")",
+            states,
+        ).fetchone()[0]
+
+    def operator_work_count(self):
+        return self.db.execute(
+            "SELECT count(*) FROM tasks WHERE state IN ('queued','accepted','running')"
+        ).fetchone()[0]
+
+    def operator_pending(self, limit=20):
+        return [
+            dict(row)
+            for row in self.db.execute(
+                "SELECT id,principal,operation FROM tasks WHERE state='created' "
+                "ORDER BY created LIMIT ?",
+                (min(100, max(1, limit)),),
+            )
+        ]
+
+    def operator_snapshot_at(self, task_id, at):
+        """Historical presentation, without turning later results into earlier evidence."""
+        row = self.db.execute(
+            "SELECT principal,operation,state,args,result,error,evidence,finished "
+            "FROM tasks WHERE id=?",
+            (task_id,),
+        ).fetchone()
+        if row is None:
+            return None
+        result = {
+            key: json.loads(row[key])
+            if key in {"args", "result", "error", "evidence"} and row[key]
+            else row[key]
+            for key in row.keys()
+        }
+        observed = self.db.execute(
+            "SELECT state,evidence FROM events WHERE task_id=? AND at<=? ORDER BY seq DESC LIMIT 1",
+            (task_id, at),
+        ).fetchone()
+        if observed is None:
+            return None  # The task had not yet been observed at this event's time.
+        result["state"] = observed["state"]
+        result["evidence"] = json.loads(observed["evidence"])
+        if row["finished"] is None or row["finished"] > at:
+            result["result"] = None
+            result["error"] = None
+            result["finished"] = None
+        elif self.result_codec:
+            result["result"] = self.result_codec.resolve_result(row["principal"], result["result"])
+        result.pop("principal", None)
+        return result
+
+    def claim(self, owner: str, lease_seconds: float, control: bool | str = False) -> dict | None:
         with self.transaction():
-            comparison = "IN" if control else "NOT IN"
+            selection, names = self.lane_selection(control)
             row = self.db.execute(
-                f"SELECT id,principal FROM tasks WHERE state='queued' AND operation {comparison} "
-                "('process.list','process.inspect','process.terminate',"
-                "'agent.status','policy.inspect','handoff.status','workflow.stop') "
-                "ORDER BY created,id LIMIT 1"
+                "SELECT id,principal,created,operation FROM tasks WHERE state='queued' "
+                "AND " + selection + " ORDER BY created,id LIMIT 1",
+                names,
             ).fetchone()
             if row is None:
+                return None
+            if not self.can_claim(row["created"], task_id=row["id"], operation=row["operation"]):
                 return None
             now, receipt = time.time(), str(uuid.uuid4())
             evidence = {"receiver": "kirabridge.dispatcher", "receipt_id": receipt, "worker": owner}

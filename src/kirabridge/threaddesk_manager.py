@@ -19,6 +19,7 @@ from kirabridge.bridge_core.models import (
 )
 from kirabridge.filesystem_manager import PathScope
 from kirabridge.mcp_gateway.client import MCPClientPool, Peer
+from kirabridge.threaddesk_contract import safe_peer_error, validate_management
 
 READ_KEYS = {
     "list_threads": {"include_archived"},
@@ -63,6 +64,7 @@ class ThreadDeskManager:
         self.lock = asyncio.Lock()
         self.observer_factory = observer_factory
         self.available_tools: set[str] = set()
+        self.tool_schemas: dict[str, dict] = {}
 
     def check_configuration(self) -> None:
         settings = self.settings
@@ -115,6 +117,17 @@ class ThreadDeskManager:
             values["operation_id"] = self.operation_id(principal, value)
         return values
 
+    async def refresh_catalog(self):
+        try:
+            async with asyncio.timeout(self.settings.timeout):
+                catalog = await self.pool.list_tools("threaddesk")
+        except TimeoutError:
+            raise BridgeError(
+                "threaddesk_catalog_timeout", "Peer catalog exceeded configured timeout"
+            ) from None
+        self.tool_schemas = {item.name: item.inputSchema for item in catalog}
+        self.available_tools = set(self.tool_schemas)
+
     async def connect(self) -> None:
         self.check_configuration()
         if "threaddesk" in self.pool.sessions:
@@ -136,11 +149,8 @@ class ThreadDeskManager:
                     cwd=self.settings.workspace,
                 )
             )
-            async with asyncio.timeout(self.settings.timeout):
-                catalog = await self.pool.sessions["threaddesk"].list_tools()
-            names = {tool.name for tool in catalog.tools}
-            self.available_tools = names
-            if not {"list_threads", "get_thread", "thread_manage"}.issubset(names):
+            await self.refresh_catalog()
+            if not {"list_threads", "get_thread", "thread_manage"}.issubset(self.available_tools):
                 await self.pool.disconnect("threaddesk")
                 raise BridgeError("threaddesk_version", "Peer lacks the required Fachvertrag")
         except BridgeError:
@@ -171,17 +181,10 @@ class ThreadDeskManager:
         if result.isError:
             code = value.get("code") if isinstance(value, dict) else None
             code = code if code in ERROR_CODES else "threaddesk_rejected"
-            details = value.get("details", {}) if isinstance(value, dict) else {}
-            safe_details = (
-                {
-                    key: item
-                    for key, item in details.items()
-                    if key in {"expected_revision", "actual_revision"} and type(item) is int
-                }
-                if isinstance(details, dict)
-                else {}
+            return False, safe_peer_error(
+                code, value, contract=self.tool_schemas.get("thread_manage")
             )
-            return False, {"error": {"code": code, "details": safe_details}}
+
         if mutation:
             if (
                 not isinstance(value, dict)
@@ -231,12 +234,32 @@ class ThreadDeskManager:
             await self.connect()
             if tool not in self.available_tools:
                 raise BridgeError("threaddesk_version", "Peer lacks the declared operation")
+            if isinstance(args, ThreadDeskManageInput):
+                await self.refresh_catalog()
+                if tool not in self.available_tools:
+                    raise BridgeError("threaddesk_version", "Peer no longer declares the operation")
+                error = validate_management(values, self.tool_schemas.get("thread_manage"))
+                if error:
+                    return {
+                        "success": False,
+                        "value": {"error": error},
+                        "scope": "threaddesk_management",
+                        "evidence": {
+                            "adapter": "threaddesk",
+                            "tool": tool,
+                            "request_sent": False,
+                            "validation_failed": True,
+                        },
+                    }
             await running(
                 {
                     "adapter": "threaddesk",
                     "tool": tool,
                     "endpoint_ref": digest(self.settings.workspace),
                     "request_sent": "about_to_send; no completion claim",
+                    "response_max_bytes": self.settings.max_result_bytes,
+                    "timeout_seconds": self.settings.timeout,
+                    "request_utf8_bytes": len(json.dumps(values, ensure_ascii=False).encode()),
                 }
             )
             try:

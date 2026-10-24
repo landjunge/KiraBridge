@@ -1,0 +1,14 @@
+{
+  "thread_id": "188ce4729a62",
+  "revision": 3,
+  "title": "ThreadDesk und KiraBridge – Wechselentwicklung durch Codex",
+  "task_state": "completed",
+  "readback_verified": true,
+  "marker_occurrences": 1,
+  "write_operation": "kb_28854d2bc9978e384acc1c267194ec202f6f535141e3d3f15d9245aefb95ee08",
+  "scope": "explicitly authorized status append only; no ThreadDesk code or competing Whiteboard created",
+  "write_task": "queue-memory-append-188-20261024-01",
+  "readback_task": "queue-memory-readback-188-20261024-01",
+  "code_commit": "de2c2f7302444ad2762a1e6848dfce96e8c85b4c",
+  "pr": "https://github.com/landjunge/KiraBridge/pull/26"
+}

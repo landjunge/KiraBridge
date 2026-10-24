@@ -22,6 +22,7 @@ from kirabridge.bridge_core.models import (
     digest,
 )
 from kirabridge.filesystem_manager import PathScope
+from kirabridge.permissions import state_exclusions
 from kirabridge.terminal_manager import check_executable
 from kirabridge.workflow_control_adapter import stop_observation
 
@@ -197,7 +198,9 @@ class HandoffManager:
         if not configured.executable:
             raise BridgeError("agent_config", "Configure the existing Codex executable")
         check_executable(configured.executable, [configured.executable])
-        with PathScope(policy.roots, excluded=[str(self.bridge.config.state_path)]).directory(cwd):
+        with PathScope(
+            policy.roots, excluded=state_exclusions(self.bridge.config, policy)
+        ).directory(cwd):
             pass
         return policy, configured
 

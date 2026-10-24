@@ -1,14 +1,14 @@
 from __future__ import annotations
 
 from collections.abc import Callable
-from typing import Any
+from typing import Any, Literal
 
 from mcp.server.fastmcp import Context, FastMCP
 from mcp.server.transport_security import TransportSecuritySettings
 from mcp.types import ToolAnnotations
 from pydantic import ValidationError
 
-from kirabridge import LOCAL_APPROVAL_URL
+from kirabridge import LOCAL_APPROVAL_URL, __version__
 from kirabridge.bridge_core.bridge import INPUTS, Bridge
 from kirabridge.bridge_core.models import BridgeError, TaskRequest
 from kirabridge.image_manager import image_task_result
@@ -29,18 +29,41 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
     config = bridge.config
     server = FastMCP(
         "KiraBridge",
-        instructions="API v1. Check bridge_health or operation_catalog for approval_mode. "
+        instructions="Direct ChatGPT terminal commands use terminal_control (terminal.visible); "
+        "terminal.execute for chatgpt also uses a confirmed visible shell. "
+        "If no suitable idle window exists, open a separate visible window "
+        "under the same task grant. "
+        "Never type into busy/unconfirmed windows or fall back to a hidden session. "
+        "This direct-control rule does not prescribe Codex/Grok internal workflows. "
+        "ThreadDesk is a separate access path. Refresh tools/list and operation_catalog after "
+        "connection, version or session changes; compare discovery.revision. API v1. "
+        "Check per-operation permission_decision; approval_mode is legacy policy metadata. "
         "Use task_request: automatic mode queues permitted work without a browser click. "
         "Only when approval_required is true, send the operator to local_approval_url. "
         "Do not ask for approval when approval_required is false. "
         "Do not ask them to copy task IDs between chats. "
-        "Acceptance is a receipt, not execution. Query task_get and task_events for evidence. "
+        "Acceptance is a receipt, not execution. For completion, set completion_target and keep "
+        "a completion_receive consumer active; ack only after processing. "
+        "This return channel cannot wake an inactive ChatGPT chat. "
+        "Query task_get and task_events for additional evidence. "
         "Use message_send/message_receive for addressed peer communication. "
-        "Automatic message receivers use separate managed sessions, not existing interactive ones; "
-        "check message_channel_status and message_get for actual evidence. "
         "Use team_* tools for shared role-based teams, addressed communication and delegated work. "
         "Team results are shared only with team members; private tasks stay private. "
-        "ChatGPT is an external participant and is never automatically awakened by a team role.",
+        "ChatGPT is an external participant and is never automatically awakened by a team role. "
+        "Agent handoffs require assigned existing visible terminals, with no background fallback; "
+        "check message_channel_status and message_get for actual evidence. "
+        "For visible macOS terminals use session_catalog/session_read and session_open. "
+        "Send input only to an exact pane_id and expected_pid using operation session.input. "
+        "session_input_policy is an optional confirmation buffer, not a terminal enable switch. "
+        "agent_status includes existing interactive_terminal_sessions. Cached clients can use "
+        "task_request operations session.catalog (empty arguments) and session.read "
+        "(pane_id, expected_pid, optional max_bytes) then task_get for actual output, or "
+        "read_query with operation session.catalog or session.read and exact pane_id/expected_pid. "
+        "Eve = Grok Voice; Grok Build = Grok Terminal; Kira = ChatGPT Voice; "
+        "Codex = ChatGPT Terminal. Eve relays only Daniel's dictation unchanged, "
+        "without additions. Explicit requests need no special voice token. "
+        "terminal-to-terminal messages are immediate. Voice-to-voice messages use "
+        "the shared participant-only append-only conversation.",
         stateless_http=True,
         json_response=True,
         log_level="CRITICAL",
@@ -51,6 +74,8 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
             allowed_origins=config.allowed_origins,
         ),
     )
+
+    server._mcp_server.version = __version__
 
     def identity(ctx: Context) -> str:
         if transport == "stdio":
@@ -85,9 +110,30 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
     )
 
     @server.tool(annotations=read)
-    def bridge_health(ctx: Context) -> dict[str, Any]:
+    async def bridge_health(ctx: Context) -> dict[str, Any]:
         """Version and dispatcher health. Never claims ChatGPT integration."""
-        return safe(lambda: bridge.health(identity(ctx)))
+        from kirabridge.discovery import live
+
+        name = identity(ctx)
+        try:
+            return {**bridge.health(name), "discovery": await live(bridge, name)}
+        except BridgeError as exc:
+            return {"error": {"code": exc.code, "message": str(exc)}}
+
+    @server.tool(annotations=read)
+    async def connection_check(
+        device: Literal["browser", "mobile", "desktop"],
+        mode: Literal["text", "live", "voice"],
+        ctx: Context,
+    ) -> dict[str, Any]:
+        """Check this actual ChatGPT/Kira or Grok connection, also from mobile, Live or voice.
+
+        Call from the current conversation and state the device/mode actually in use.
+        Authentication determines your identity. Device/mode are caller reports;
+        this tool proves its own receipt, daemon response and available terminal transport.
+        All modes use the same permissions, messages and terminal tools.
+        """
+        return await bridge.check_connection(identity(ctx), device, mode)
 
     @server.tool(annotations=read)
     def bridge_readiness(
@@ -103,7 +149,7 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
 
         Does not read file contents, execute programs, submit tasks, or certify a workflow.
         image_paths checks descriptor access, not PNG validity or client image display.
-        Use file.read/file.image via task_request for actual content; no cat/Python workaround.
+        Use read_query for direct bounded text reads; file.image still uses task_request.
         """
         return safe(
             lambda: readiness(
@@ -134,7 +180,7 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
 
     @server.tool(annotations=read)
     async def agent_status(ctx: Context) -> dict[str, Any]:
-        """Own managed work and bounded process observation; no interactive session attachment."""
+        """Managed work and exact existing terminal handles; discovery never sends input."""
         from kirabridge.development_status import agent_status as inspect
 
         try:
@@ -145,11 +191,52 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
             return {"error": {"code": exc.code, "message": str(exc)}}
 
     @server.tool(annotations=read)
-    async def threaddesk_dynamic_catalog(ctx: Context) -> dict[str, Any]:
-        """Discover operator-approved ThreadDesk read-only tools and original input schemas.
+    async def read_query(query: dict[str, Any], ctx: Context) -> dict[str, Any]:
+        """Direct authorized read without tasks or Events subscriptions.
 
-        Disabled by default. Never exposes mutation tools or bypasses read permission.
+        query.operation: file.read (path, max_bytes<=65536, offset or tail),
+        file.list (path; at most 100 entries), terminal.output (owned task_id,
+        max_bytes<=65536). session.catalog lists existing terminal handles;
+        session.read requires exact pane_id and expected_pid, max_bytes<=65536.
+        Session reads require session.inspect and the shared permission decision.
+        When approval is required, submit the same operation using task_request.
+        No shell input or process attachment.
         """
+        from kirabridge.read_query import ReadQuery, read_query_async
+
+        try:
+            return await read_query_async(bridge, identity(ctx), ReadQuery.model_validate(query))
+        except BridgeError as exc:
+            return {"error": {"code": exc.code, "message": str(exc)}}
+        except ValidationError:
+            return {"error": {"code": "invalid_arguments", "message": "Invalid read query"}}
+
+    @server.tool(annotations=read)
+    async def session_catalog(ctx: Context) -> dict[str, Any]:
+        """List existing Terminal.app tabs and tmux panes with exact input/read handles."""
+        try:
+            return await bridge.terminal_queries.execute(identity(ctx), "session.catalog", {})
+        except BridgeError as exc:
+            return {"error": {"code": exc.code, "message": str(exc)}}
+
+    @server.tool(annotations=read)
+    async def session_read(pane_id: str, expected_pid: int, ctx: Context) -> dict[str, Any]:
+        """Read bounded output from a Terminal.app tab or tmux pane selected by catalog handle."""
+        try:
+            return await bridge.terminal_queries.execute(
+                identity(ctx), "session.read", {"pane_id": pane_id, "expected_pid": expected_pid}
+            )
+        except BridgeError as exc:
+            return {"error": {"code": exc.code, "message": str(exc)}}
+
+    @server.tool(annotations=read)
+    def visible_handoff_status(handoff_id: str, ctx: Context) -> dict[str, Any]:
+        """Read/reconcile visible input, Return and authenticated acknowledgement; never resend."""
+        return safe(lambda: bridge.visible_handoffs.reconcile(identity(ctx), handoff_id))
+
+    @server.tool(annotations=read)
+    async def threaddesk_dynamic_catalog(ctx: Context) -> dict[str, Any]:
+        """Discover opt-in, operator-approved read-only ThreadDesk tools."""
         from kirabridge.threaddesk_dynamic import catalog
 
         try:
@@ -161,7 +248,7 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
     async def threaddesk_dynamic_call(
         name: str, arguments: dict[str, Any], ctx: Context
     ) -> dict[str, Any]:
-        """Call a freshly revalidated, explicitly read-only ThreadDesk tool."""
+        """Call a freshly validated read-only ThreadDesk tool."""
         from kirabridge.threaddesk_dynamic import read as dynamic_read
 
         try:
@@ -170,41 +257,88 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
             return {"error": {"code": exc.code, "message": str(exc)}}
 
     @server.tool(annotations=read)
-    def operation_catalog(ctx: Context) -> dict[str, Any]:
+    async def operation_catalog(ctx: Context) -> dict[str, Any]:
         """Permitted version-1 operations and exact argument JSON schemas."""
 
         def action():
+            from kirabridge.operations import OPERATIONS
+            from kirabridge.permissions import LEVELS, decision, level_for, permission_summary
+            from kirabridge.terminal_access import terminal_access
+            from kirabridge.terminal_queries import TERMINAL_QUERY_SECONDS
+
             policy = bridge.security.principal(identity(ctx))
             return {
                 "api_version": "1",
                 "approval_mode": policy.approval_mode,
+                "permission_level": level_for(policy),
+                "permission_label": LEVELS[level_for(policy)],
+                "permission_detail": permission_summary(bridge.config, identity(ctx)),
+                "session_input_policy": bridge.config.session_input_policy.model_dump(),
+                "terminal_access": terminal_access(bridge.config, identity(ctx)),
+                "automatic_operations": policy.automatic_operations,
+                "voice_messaging": bridge.config.voice_messaging.model_dump(),
+                "visible_handoffs": bridge.config.visible_handoffs.model_dump(),
+                **bridge.messages.voice_channel.profile(identity(ctx)),
                 "operations": {
                     name: {
+                        **OPERATIONS[name].describe(),
+                        "execution_budget_seconds": TERMINAL_QUERY_SECONDS
+                        if name in {"session.catalog", "session.read"}
+                        else None,
                         "arguments": model.model_json_schema(),
-                        "approval_required": policy.approval_mode == "manual",
+                        "approval_required": decision(bridge.config, identity(ctx), name)[
+                            "approval_required"
+                        ],
+                        "permission_decision": decision(bridge.config, identity(ctx), name),
                     }
                     for name, model in INPUTS.items()
-                    if name in policy.capabilities
+                    if decision(bridge.config, identity(ctx), name)["authorized"]
                 },
             }
 
-        return safe(action)
+        from kirabridge.discovery import live
+
+        result = safe(action)
+        if "error" not in result:
+            result["discovery"] = await live(bridge, identity(ctx))
+        return result
 
     @server.tool(annotations=write)
-    def task_submit(request: TaskRequest, ctx: Context, approval: str = "") -> dict[str, Any]:
+    async def task_submit(
+        request: TaskRequest, ctx: Context, approval: str = "", completion_target: str | None = None
+    ) -> dict[str, Any]:
         """Queue a task; automatic mode needs no token, manual mode requires an exact-task grant.
 
         Repeating its idempotency key never executes it twice.
+        session.input follows the principal's automatic_operations and optional buffer policy.
+        A standing session.input grant needs no marker or manual approval.
+        For the Grok app, waits briefly and returns conversation_return with the
+        actual result. If continue_required is true, call task_get with this same ID.
         """
-        return safe(lambda: bridge.submit(identity(ctx), request, approval))
+        result = safe(
+            lambda: bridge.submit(
+                identity(ctx), request, approval, completion_target=completion_target
+            )
+        )
+        from kirabridge.grok_connector.conversation import result_for_conversation
+
+        return await result_for_conversation(bridge, identity(ctx), result)
 
     @server.tool(annotations=read)
-    def task_get(task_id: str, ctx: Context) -> dict[str, Any]:
+    async def task_get(task_id: str, ctx: Context) -> dict[str, Any]:
         """Read own task and evidence; completed file.image also returns bounded MCP image content.
 
         The PNG is a saved snapshot, not a fresh read. Other tasks retain their JSON format.
+        For the Grok app, waits for ongoing work and returns conversation_return.
+        Keep waiting on this same task when continue_required is true; never resubmit it.
         """
-        return safe(lambda: image_task_result(bridge.task(identity(ctx), task_id)))
+        from kirabridge.grok_connector.conversation import enabled_for, result_for_conversation
+
+        name = identity(ctx)
+        result = safe(lambda: bridge.task(name, task_id))
+        if enabled_for(bridge, name):
+            result = await result_for_conversation(bridge, name, result)
+        return safe(lambda: image_task_result(result))
 
     @server.tool(annotations=read)
     def task_diagnose(task_id: str, ctx: Context) -> dict[str, Any]:
@@ -217,25 +351,131 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
         return safe(lambda: task_report(bridge, identity(ctx), task_id))
 
     @server.tool(annotations=write)
-    def task_request(request: TaskRequest, ctx: Context) -> dict[str, Any]:
+    async def task_request(
+        request: TaskRequest, ctx: Context, completion_target: str | None = None
+    ) -> dict[str, Any]:
         """Queue permitted work automatically, or request approval if this identity is manual.
 
-        Check approval_required: false means no browser click is needed; poll task_get.
+        No Events subscription is required. completion_target is optional.
+        Set a stable unique completion_target for the requesting assistant session.
+        The return route is committed with the task before dispatch. Use completion_receive
+        through a waiting consumer for the final notice, then completion_ack after processing.
+        This does not wake an inactive ChatGPT chat. task_get remains diagnostic.
+        Check approval_required: false means no browser click is needed.
         Only when true, give the operator local_approval_url to approve in their Mac browser.
         Do not ask them to copy task IDs between chats. A queued receipt is not proof of execution.
+        For the Grok app, waits briefly and includes conversation_return. Speak its
+        actual result when final is true. If continue_required, call task_get with
+        this same task ID before finishing the conversation. This does not attest audio playback.
         """
 
         def action():
             principal = identity(ctx)
-            task = bridge.prepare(principal, request)
+            task = bridge.prepare(principal, request, completion_target=completion_target)
             return {
                 **task,
                 "local_approval_url": LOCAL_APPROVAL_URL,
                 "approval_required": task["state"] == "created",
                 "approval_mode": config.principals[principal].approval_mode,
+                "completion_channel": {
+                    "target": (
+                        bridge.store.db.execute(
+                            "SELECT target FROM completion_routes WHERE task_id=?", (task["id"],)
+                        ).fetchone()
+                        or ["default"]
+                    )[0],
+                    "receive_tool": "completion_receive",
+                    "ack_tool": "completion_ack",
+                    "assistant_wakeup": "not_provided_by_current_transport",
+                },
             }
 
-        return safe(action)
+        from kirabridge.grok_connector.conversation import result_for_conversation
+
+        return await result_for_conversation(bridge, identity(ctx), safe(action))
+
+    @server.tool(annotations=write)
+    async def session_open(
+        cwd: str,
+        task_id: str,
+        idempotency_key: str,
+        ctx: Context,
+        argv: list[str] | None = None,
+        window_authorization: str = "",
+    ) -> dict[str, Any]:
+        """Open a new visible Terminal.app window in cwd, preserving existing tabs.
+
+        Optional argv runs a program in the new window. Read task_get for the resulting
+        pane_id and expected_pid; session_read reads output, session.input sends input.
+        Reuse task_id and idempotency_key for retries of this same request.
+        """
+        return await task_request(
+            TaskRequest(
+                task_id=task_id,
+                idempotency_key=idempotency_key,
+                operation="session.open",
+                arguments={
+                    "cwd": cwd,
+                    "argv": argv or [],
+                    "window_authorization": window_authorization,
+                },
+            ),
+            ctx,
+        )
+
+    @server.tool(annotations=write)
+    async def terminal_control(
+        argv: list[str],
+        cwd: str,
+        task_id: str,
+        idempotency_key: str,
+        ctx: Context,
+        pane_id: str | None = None,
+        expected_pid: int | None = None,
+        create_if_needed: bool = True,
+        timeout: float = 60,
+    ) -> dict[str, Any]:
+        """Direct work in a confirmed visible shell, with no hidden replacement.
+
+        Reuses one suitable empty existing Terminal.app shell or opens a separate visible
+        window under the same exact-task/standing grant. Busy agents are preserved.
+        Optional pane_id/expected_pid binds an explicit current target. Inspect task_get
+        for actual visible command completion; an uncertain outcome must never be replayed.
+        Codex/Grok internal execution and ThreadDesk are separate access paths.
+        """
+        return await task_request(
+            TaskRequest(
+                task_id=task_id,
+                idempotency_key=idempotency_key,
+                operation="terminal.visible",
+                arguments={
+                    "argv": argv,
+                    "cwd": cwd,
+                    "pane_id": pane_id,
+                    "expected_pid": expected_pid,
+                    "create_if_needed": create_if_needed,
+                    "timeout": timeout,
+                },
+            ),
+            ctx,
+        )
+
+    from kirabridge.mcp_gateway.queue_tools import register_queue_tools
+
+    register_queue_tools(server, bridge.queues, identity, task_request, safe, read, write)
+
+    from kirabridge.mcp_gateway.file_tools import register_file_tools
+
+    register_file_tools(
+        server,
+        bridge.file_transfers,
+        identity,
+        task_request,
+        bridge.security.authorize,
+        safe,
+        read,
+        write,
+    )
 
     @server.tool(annotations=read)
     def task_events(task_id: str, ctx: Context, after: int = 0) -> dict[str, Any]:
@@ -255,14 +495,15 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
         return safe(lambda: bridge.tasks.cancel_queued(identity(ctx), task_id))
 
     @server.tool(annotations=read)
-    def agent_inventory(ctx: Context) -> dict[str, Any]:
+    async def agent_inventory(ctx: Context) -> dict[str, Any]:
         """Configured agent identities; executable presence never proves a daemon or active task."""
 
-        def action():
-            policy = bridge.security.principal(identity(ctx), "agent.inspect")
-            return bridge.agents.inventory(policy.agents)
+        from kirabridge.discovery import inventory
 
-        return safe(action)
+        try:
+            return await inventory(bridge, identity(ctx))
+        except BridgeError as exc:
+            return {"error": {"code": exc.code, "message": str(exc)}}
 
     @server.tool(annotations=write)
     def clipboard_read(
@@ -314,21 +555,86 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
         readOnlyHint=False, destructiveHint=False, idempotentHint=True, openWorldHint=False
     )
 
+    @server.tool(annotations=delivery)
+    async def completion_receive(
+        ctx: Context,
+        target: str = "default",
+        limit: int = 20,
+        wait_seconds: float = 20,
+    ) -> dict[str, Any]:
+        """Wait for own durable completion notices, including already finished tasks.
+
+        Run a persistent consumer that rearms this bounded wait; no task-status polling.
+        Receipts/IDs remain stable until completion_ack after consumer processing.
+        A tool response is client delivery, never proof of unsolicited assistant/chat wake-up.
+        """
+        try:
+            return await bridge.completions.wait(identity(ctx), target, limit, wait_seconds)
+        except BridgeError as exc:
+            return {"error": {"code": exc.code, "message": str(exc)}}
+
+    @server.tool(annotations=delivery)
+    def completion_ack(notice_id: str, receipt: str, ctx: Context) -> dict[str, Any]:
+        """Acknowledge own processed completion by stable ID and matching receipt.
+
+        Repeating this exact acknowledgement is safe. Does not attest ChatGPT chat delivery.
+        """
+        return safe(lambda: bridge.completions.ack(identity(ctx), notice_id, receipt))
+
     @server.tool(annotations=write)
-    def message_send(message: MessageSend, ctx: Context) -> dict[str, Any]:
+    async def message_release(message_id: str, token: str, ctx: Context) -> dict[str, Any]:
+        """Release your exact waiting voice message with Daniel's later go-go-go token.
+
+        The original recipient, content and deadline remain fixed; expired messages stay expired.
+        """
+        result = safe(
+            lambda: bridge.messages.voice_policy.release(identity(ctx), message_id, token)
+        )
+        from kirabridge.grok_connector.conversation import message_for_conversation
+
+        return await message_for_conversation(bridge, identity(ctx), result)
+
+    @server.tool(annotations=write)
+    async def message_send(
+        message: MessageSend, ctx: Context, completion_target: str | None = None
+    ) -> dict[str, Any]:
         """Send an addressed durable message; sender is your authenticated identity.
 
+        Kira, Eve and terminal senders need no special approval marker.
+        Normal capabilities and peer permissions still apply. Old buffers do not
+        auto-release. Eve/Kira exchanges use eve-kira-shared.
+
+        For dispatched agent work, completion_target routes final completion_receive notices
+        to the requesting assistant's stable target, even on failure or without an auto reply.
         Kinds: question, answer, work, result, note. Reuse the idempotency_key only for the
-        exact same message. dispatch=true invokes the configured separate managed receiver;
-        existing interactive sessions are not attached. Questions/work request one response
+        exact same message. Work/questions to CLI agents use their assigned visible terminal
+        even with dispatch=false; missing or changed targets block without fallback.
+        Questions/work request one response
         by default. Answers/results never request another response. No shell interpolation.
+        Returned answers stay in the sender's client inbox; they do not automatically
+        start another background receiver. Grok app calls wait briefly and include
+        conversation_return and reply_message. Acknowledge the reply only after processing it.
         """
-        return safe(lambda: bridge.messages.send(identity(ctx), message))
+        result = safe(
+            lambda: bridge.messages.send(
+                identity(ctx), message, completion_target=completion_target
+            )
+        )
+        from kirabridge.grok_connector.conversation import message_for_conversation
+
+        return await message_for_conversation(bridge, identity(ctx), result)
 
     @server.tool(annotations=read)
-    def message_get(message_id: str, ctx: Context) -> dict[str, Any]:
-        """Read your message, delivery receipt, acknowledgement and worker evidence."""
-        return safe(lambda: bridge.messages.get(identity(ctx), message_id))
+    async def message_get(message_id: str, ctx: Context) -> dict[str, Any]:
+        """Read your message, delivery receipt, acknowledgement and worker evidence.
+
+        For the Grok app, waits briefly for its addressed agent's answer. If
+        conversation_return.continue_required, keep waiting on this same message ID.
+        """
+        from kirabridge.grok_connector.conversation import message_for_conversation
+
+        result = safe(lambda: bridge.messages.get(identity(ctx), message_id))
+        return await message_for_conversation(bridge, identity(ctx), result)
 
     @server.tool(annotations=delivery)
     async def message_receive(
@@ -383,7 +689,9 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
             policy = bridge.security.principal(principal, "message.read")
             states = bridge.store.db.execute(
                 "SELECT j.state,count(*) AS count FROM message_jobs j JOIN messages m "
-                "ON m.id=j.message_id WHERE m.recipient=? GROUP BY j.state",
+                "ON m.id=j.message_id WHERE m.recipient=? "
+                "AND NOT EXISTS (SELECT 1 FROM queue_holds h "
+                "WHERE h.queue_id='messages' AND h.item_id=m.id) GROUP BY j.state",
                 (principal,),
             ).fetchall()
             return {
@@ -397,13 +705,62 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
                     and bridge.message_receiver.worker
                     and not bridge.message_receiver.worker.done()
                 ),
-                "session_scope": "separate_managed_session",
+                "receiver_status_scope": "authenticated_principal_inbox",
+                "dispatcher_active": bool(
+                    bridge.message_receiver.worker and not bridge.message_receiver.worker.done()
+                ),
+                "peer_receivers": {
+                    peer: {
+                        "receiver_configured": peer in config.messaging.receivers,
+                        "receiver_active": bool(
+                            peer in config.messaging.receivers
+                            and bridge.message_receiver.worker
+                            and not bridge.message_receiver.worker.done()
+                        ),
+                    }
+                    for peer in policy.message_peers
+                },
+                "session_scope": "existing_visible_terminal"
+                if config.visible_handoffs.enabled
+                else "separate_managed_session",
+                "visible_handoffs": config.visible_handoffs.model_dump(),
+                "binding_runtime_status": "not_probed",
                 "existing_session_attached": False,
+                "attachment_meaning": "no_persistent_agent_protocol_attachment; "
+                "exact_existing_UI_target_revalidated_on_each_action",
+                "interactive_session_access": {
+                    "mode": "on_demand_exact_target",
+                    "catalog_tool": "session_catalog",
+                    "read_tool": "session_read",
+                    "open_tool": "session_open",
+                    "input_operation": "session.input",
+                },
                 "jobs": {row["state"]: row["count"] for row in states},
                 "limits": config.messaging.model_dump(exclude={"receivers"}),
             }
 
         return safe(action)
+
+    # Fresh names provide a clean contract for clients retaining the historical
+    # task_* schema. Authentication, authorization and idempotency stay identical.
+    server.add_tool(
+        task_request,
+        name="action_request",
+        annotations=write,
+        description=(
+            "Execute any authorized catalog operation; no Events subscription required. "
+            "Poll task_get for evidence. Same idempotent task_request implementation."
+        ),
+    )
+    server.add_tool(
+        task_submit,
+        name="action_submit",
+        annotations=write,
+        description=(
+            "Submit any authorized operation; no Events subscription required. "
+            "Automatic identities need no approval token. Poll task_get."
+        ),
+    )
 
     @server.tool(annotations=write)
     def team_create(request: TeamCreate, ctx: Context) -> dict[str, Any]:
@@ -432,7 +789,12 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
 
     @server.tool(annotations=write)
     def team_message_send(request: TeamMessageSend, ctx: Context) -> dict[str, Any]:
-        """Send addressed team data; sender comes from authenticated identity, never a field."""
+        """Send addressed team data; sender is authenticated, never supplied.
+
+        Kira and Eve need no special approval marker; normal team permissions apply.
+        Historical buffers never release automatically.
+        Eve/Kira exchanges go into their private shared conversation, outside the team log.
+        """
         return safe(lambda: bridge.teams.send(identity(ctx), request))
 
     @server.tool(annotations=read)
@@ -483,5 +845,24 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
     def team_events(team_id: str, ctx: Context, after: int = 0, limit: int = 50) -> dict[str, Any]:
         """Read ordered team role/delegation/delivery events, without secret/raw error logs."""
         return safe(lambda: bridge.teams.events(identity(ctx), team_id, after, limit))
+
+    @server._mcp_server.list_tools()
+    async def current_tools():
+        from kirabridge.discovery import snapshot
+
+        # Listing schemas is side-effect free: invalid/buffered calls must not
+        # cause terminal probes merely because the SDK fetches its tool schemas.
+        name = identity(server.get_context())
+        epoch = snapshot(bridge, name)
+        metadata = {
+            "version": epoch["version"],
+            "instance_id": epoch["instance_id"],
+            "revision": epoch["revision"],
+            "principal": name,
+        }
+        return [
+            tool.model_copy(update={"meta": {**(tool.meta or {}), "kirabridge": metadata}})
+            for tool in await server.list_tools()
+        ]
 
     return server

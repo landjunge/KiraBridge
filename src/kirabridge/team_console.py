@@ -41,8 +41,8 @@ def _unique_object(pairs):
 class TeamConsole:
     """Supply routes; the parent console retains Host, Origin and CSP guards."""
 
-    def __init__(self, bridge, authenticate: Callable[[Request], None]):
-        self.bridge = bridge
+    def __init__(self, ports, authenticate: Callable[[Request], None]):
+        self.config, self.security, self.teams = ports.config, ports.security, ports.teams
         self.authenticate = authenticate
         self.routes = [
             Route("/team", self.index),
@@ -65,7 +65,7 @@ class TeamConsole:
 
     def _principal(self, request: Request) -> str:
         self.authenticate(request)
-        self.bridge.security.principal("local")
+        self.security.principal("local")
         return "local"
 
     @staticmethod
@@ -124,14 +124,12 @@ class TeamConsole:
 
     async def list_teams(self, request: Request):
         principal = self._principal(request)
-        self.bridge.security.principal(principal, "team.read")
-        result = (
-            self.bridge.teams.list(principal) if self.bridge.config.team.enabled else {"teams": []}
-        )
+        self.security.principal(principal, "team.read")
+        result = self.teams.list(principal) if self.config.team.enabled else {"teams": []}
         roster = []
-        for name, worker in self.bridge.config.team.workers.items():
-            policy = self.bridge.config.principals.get(name)
-            adapter = self.bridge.config.agents.get(worker.agent) if worker.agent else None
+        for name, worker in self.config.team.workers.items():
+            policy = self.config.principals.get(name)
+            adapter = self.config.agents.get(worker.agent) if worker.agent else None
             automatic = bool(
                 worker.agent
                 and worker.cwd
@@ -154,12 +152,12 @@ class TeamConsole:
                     "authentication_status": "unknown" if worker.agent else "external",
                 }
             )
-        policy = self.bridge.security.principal(principal)
+        policy = self.security.principal(principal)
         return JSONResponse(
             {
                 **result,
                 "principal": principal,
-                "enabled": self.bridge.config.team.enabled,
+                "enabled": self.config.team.enabled,
                 "can_create": "team.manage" in policy.capabilities,
                 "roster": roster,
             }
@@ -167,36 +165,36 @@ class TeamConsole:
 
     async def get(self, request: Request):
         principal = self._principal(request)
-        return JSONResponse(self.bridge.teams.get(principal, request.path_params["team_id"]))
+        return JSONResponse(self.teams.get(principal, request.path_params["team_id"]))
 
     async def create(self, request: Request):
         principal = self._principal(request)
         value = await self._model(request, TeamCreate, scoped=False)
-        return JSONResponse(self.bridge.teams.create(principal, value))
+        return JSONResponse(self.teams.create(principal, value))
 
     async def set_role(self, request: Request):
         principal = self._principal(request)
         value = await self._model(request, TeamRoleSet)
-        return JSONResponse(self.bridge.teams.set_role(principal, value))
+        return JSONResponse(self.teams.set_role(principal, value))
 
     async def messages(self, request: Request):
         principal = self._principal(request)
         after, limit = self._page(request)
         return JSONResponse(
-            self.bridge.teams.messages(principal, request.path_params["team_id"], after, limit)
+            self.teams.messages(principal, request.path_params["team_id"], after, limit)
         )
 
     async def send(self, request: Request):
         principal = self._principal(request)
         value = await self._model(request, TeamMessageSend)
-        return JSONResponse(self.bridge.teams.send(principal, value))
+        return JSONResponse(self.teams.send(principal, value))
 
     async def ack(self, request: Request):
         principal = self._principal(request)
         if await self._payload(request):
             raise BridgeError("invalid_request", "Acknowledgement body must be empty")
         return JSONResponse(
-            self.bridge.teams.ack(
+            self.teams.ack(
                 principal, request.path_params["team_id"], request.path_params["message_id"]
             )
         )
@@ -205,18 +203,18 @@ class TeamConsole:
         principal = self._principal(request)
         after, limit = self._page(request)
         return JSONResponse(
-            self.bridge.teams.work_list(principal, request.path_params["team_id"], after, limit)
+            self.teams.work_list(principal, request.path_params["team_id"], after, limit)
         )
 
     async def delegate(self, request: Request):
         principal = self._principal(request)
         value = await self._model(request, TeamWorkCreate)
-        return JSONResponse(self.bridge.teams.delegate(principal, value))
+        return JSONResponse(self.teams.delegate(principal, value))
 
     async def work_get(self, request: Request):
         principal = self._principal(request)
         return JSONResponse(
-            self.bridge.teams.work_get(
+            self.teams.work_get(
                 principal, request.path_params["team_id"], request.path_params["work_id"]
             )
         )
@@ -224,18 +222,18 @@ class TeamConsole:
     async def claim(self, request: Request):
         principal = self._principal(request)
         value = await self._model(request, TeamWorkClaim)
-        return JSONResponse(self.bridge.teams.work_claim(principal, value))
+        return JSONResponse(self.teams.work_claim(principal, value))
 
     async def complete(self, request: Request):
         principal = self._principal(request)
         value = await self._model(request, TeamWorkComplete)
-        return JSONResponse(self.bridge.teams.work_complete(principal, value))
+        return JSONResponse(self.teams.work_complete(principal, value))
 
     async def events(self, request: Request):
         principal = self._principal(request)
         after, limit = self._page(request)
         return JSONResponse(
-            self.bridge.teams.events(principal, request.path_params["team_id"], after, limit)
+            self.teams.events(principal, request.path_params["team_id"], after, limit)
         )
 
 

@@ -15,8 +15,10 @@ from kirabridge.approval_console import ORIGIN, ApprovalConsole, signed_token
 from kirabridge.bridge_core.bridge import Bridge
 from kirabridge.bridge_core.config import GrokConnectorConfig, PrincipalConfig
 from kirabridge.grok_connector import state_dir
+from kirabridge.grok_connector.administration import ConnectorAdministration
 from kirabridge.grok_connector.auth_store import OAuthStore
-from kirabridge.grok_connector.console import MAX_DECISION_BYTES, GrokConnectorConsole
+from kirabridge.grok_connector.console import MAX_DECISION_BYTES
+from kirabridge.operator_application import operator_application
 
 KEY = "grok-connector-console-tests-" + "x" * 48
 ISSUER = "https://kirabridge-console.example"
@@ -37,7 +39,9 @@ def connector_bridge(config):
 
 def browser(bridge, **kwargs):
     return httpx.AsyncClient(
-        transport=httpx.ASGITransport(app=ApprovalConsole(bridge, KEY), **kwargs),
+        transport=httpx.ASGITransport(
+            app=ApprovalConsole(operator_application(bridge), KEY), **kwargs
+        ),
         base_url=ORIGIN,
     )
 
@@ -91,7 +95,7 @@ async def test_disabled_connector_reads_no_oauth_store_and_creates_no_auth_state
     bridge, monkeypatch
 ):
     monkeypatch.setattr(
-        GrokConnectorConsole, "_store", lambda *args: pytest.fail("disabled store was opened")
+        ConnectorAdministration, "store", lambda *args: pytest.fail("disabled store was opened")
     )
     async with browser(bridge) as client:
         result = await client.get("/api/grok-connector", headers=headers())

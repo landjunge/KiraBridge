@@ -17,6 +17,8 @@ from kirabridge.bridge_core.models import BridgeError
 from kirabridge.filesystem_manager import PathScope
 from kirabridge.image_manager import (
     MAX_IMAGE_BYTES,
+    MAX_IMAGE_SIDE,
+    MAX_TOOL_BYTES,
     SIGNATURE,
     ImageManager,
     image_task_result,
@@ -54,7 +56,7 @@ def png(width=1, height=1, rows=b"\0\x11\x22\x33", compressed=None, tail=b""):
         (b"not a PNG", "image_invalid"),
         (FIXTURE.read_bytes()[:-1], "image_invalid"),
         (FIXTURE.read_bytes()[:-4] + b"oops", "image_invalid"),
-        (png(width=2049), "image_limit"),
+        pytest.param(png(width=MAX_IMAGE_SIDE + 1), "image_limit", id="dimension_limit"),
         (png(rows=b"\5\x11\x22\x33"), "image_invalid"),
         (png(rows=b"\0\x11\x22"), "image_invalid"),
         (png(rows=b"\0" * 4000000), "image_invalid"),
@@ -62,9 +64,10 @@ def png(width=1, height=1, rows=b"\0\x11\x22\x33", compressed=None, tail=b""):
         (png(compressed=zlib.compress(b"\0\x11\x22\x33") + b"trailing"), "image_invalid"),
         (png(tail=b"extra"), "image_invalid"),
         (b"x" * (MAX_IMAGE_BYTES + 1), "image_limit"),
-        (
-            png()[:-12] + chunk(b"tEXt", b"not forwarded") + chunk(b"IEND", b""),
+        pytest.param(
+            png()[:-12] + chunk(b"tEXt", b"preserved")[:-1] + b"\0" + chunk(b"IEND", b""),
             "image_invalid",
+            id="ancillary_crc",
         ),
         (
             png()[:33] + chunk(b"IDAT", b"") * 512 + png()[33:],
@@ -89,6 +92,8 @@ def test_png_accepts_bounded_rgb_rgba_and_fixed_metadata():
         + chunk(b"IEND", b"")
     )
     assert validate_png(rgba) == (1, 1)
+    assert validate_png(png(width=2049, rows=b"\0" + b"\x11\x22\x33" * 2049)) == (2049, 1)
+    assert validate_png(rgb[:-12] + chunk(b"tEXt", b"source\0preserved") + rgb[-12:]) == (1, 1)
 
 
 def test_descriptor_read_denies_outside_symlinks_fifo_and_private_state(config, tmp_path):
@@ -191,7 +196,7 @@ def test_whole_tool_response_limit_and_no_unbounded_stored_image(config):
         "operation": "file.image",
         "state": "completed",
         "result": result,
-        "unexpected_metadata": "x" * 1048576,
+        "unexpected_metadata": "x" * (MAX_TOOL_BYTES // 2 + 1),
     }
     with pytest.raises(BridgeError) as exc:
         image_task_result(task)
@@ -241,9 +246,11 @@ async def test_actual_dispatch_capability_private_state_and_invalid_png(bridge, 
         assert failed["state"] == "failed" and failed["error"]["code"] == "path_denied"
         invalid = request("file.image", {"path": str(bad)}, task_id="invalid")
         submit(bridge, invalid)
-        unknown = await bridge.tasks.wait("local", invalid.task_id)
-        assert unknown["state"] == "unknown" and unknown["error"]["code"] == "image_invalid"
-        assert unknown["result"] is None
+        invalid_result = await bridge.tasks.wait("local", invalid.task_id)
+        assert invalid_result["state"] == "failed"
+        assert invalid_result["error"]["code"] == "image_invalid"
+        assert invalid_result["result"] is None
+        assert invalid_result["evidence"]["safe_to_retry"] is True
         assert isinstance(image_task_result(bridge.task("local", invalid.task_id)), dict)
         config.principals["local"].capabilities.remove("file.image")
         checks = readiness(bridge, "local", ReadinessInput(image_paths=[str(bad)]))

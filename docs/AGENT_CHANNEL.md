@@ -1,5 +1,11 @@
 # Agentenkanal ab 0.5.0
 
+**Aktuelle gezielte Empfängerprüfung 19.10.2026:**
+[Statuswerte, echter Codex und ausdrücklich simulierter Grok](../examples/message-receiver/README.md).
+Beide installierten Empfänger melden configured/active=true. Die aktuelle Prüfung
+belegt keine vollständige bidirektionale Produktionsabnahme: echte Codex-Antwort
+im Ausführungsbeleg, Grok nur isoliert simuliert; kein echter Grok-Aufruf.
+
 Die vorhandenen authentifizierten Zugänge `codex` und `grok` können dauerhaft adressierte Nachrichten austauschen. Der Transport verwendet SQLite und eigene MCP-Werkzeuge, keinen gemeinsamen Dateiordner. Beide behalten `approval_mode="automatic"`; Nachrichten erfordern keinen Nutzerklick und kein Kopieren zwischen Chats.
 
 ## Tatsächliche Empfänger

@@ -25,6 +25,7 @@ from kirabridge.bridge_core.models import TaskRequest
 from kirabridge.grok_connector.gateway import create_gateway
 from kirabridge.grok_connector.provider import GrokOAuthProvider
 from kirabridge.mcp_gateway.http import create_http_app
+from kirabridge.operator_application import operator_application
 from kirabridge.team_manager.models import TeamCreate
 
 ISSUER = "https://connector.example.test"
@@ -172,7 +173,9 @@ async def authorize(
     assert (await env.client.get("/oauth/poll/" + request_id)).json()["status"] == "pending"
     # A real local-console session makes the decision. No remote route can approve it.
     async with httpx.AsyncClient(
-        transport=httpx.ASGITransport(app=ApprovalConsole(env.bridge, CONSOLE_KEY)),
+        transport=httpx.ASGITransport(
+            app=ApprovalConsole(operator_application(env.bridge), CONSOLE_KEY)
+        ),
         base_url=ORIGIN,
     ) as operator:
         decision = await operator.post(

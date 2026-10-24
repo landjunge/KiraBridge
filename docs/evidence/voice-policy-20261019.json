@@ -1,0 +1,29 @@
+{
+  "version": "0.8.0rc2",
+  "dispatcher_active": true,
+  "configuration_loaded": true,
+  "source_loaded": true,
+  "eve_session_input_approval_required": false,
+  "eve_automatic_operations": [
+    "session.input"
+  ],
+  "terminal_gate_enabled": false,
+  "voice_message_timeout_seconds": 60.0,
+  "shared_conversation_id": "eve-kira-shared",
+  "terminal_shared_channel_errors": {
+    "codex": "not_found",
+    "grok": "not_found"
+  },
+  "original_terminals_preserved": true,
+  "terminal_count_before": 4,
+  "terminal_count_after": 4,
+  "grok_gateway_restart_requested": false,
+  "shared_message_contents_read": false,
+  "validation": {
+    "pytest_passed": 582,
+    "ruff_check": "passed",
+    "ruff_format": "passed",
+    "package_build": "passed"
+  },
+  "isolation_scope": "authenticated API; no OS isolation from unrestricted same-user shells"
+}

@@ -7,6 +7,7 @@ from kirabridge.bridge_core.models import BridgeError
 def test_full_execution_queue_preserves_control_capacity(bridge, config):
     config.max_queued = 1
     config.max_control_queued = 1
+    config.max_read_queued = 1
     submit(bridge, request(arguments={"path": config.principals["local"].roots[0]}))
     control = request("process.list", task_id="control")
     assert submit(bridge, control)["state"] == "queued"

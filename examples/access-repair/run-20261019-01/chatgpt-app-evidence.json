@@ -1,0 +1,231 @@
+{
+  "origin": "ACTUAL CONNECTED CHATGPT APP TOOL CALLS",
+  "events_subscription_used": false,
+  "legacy_empty_field_compatibility_used": true,
+  "platform_cache_clear_proven": false,
+  "event_test_started": false,
+  "tasks": [
+    {
+      "name": "write",
+      "tool": "task_request",
+      "completion_subscription": "",
+      "real_subscription_used": false,
+      "queued": {
+        "id": "access-app-write-20261019-01",
+        "principal": "chatgpt",
+        "idem": "access-app-write-20261019-01",
+        "operation": "file.write",
+        "args": {
+          "path": "/private/tmp/kirabridge-access-20261019-01/probe.txt",
+          "text": "KIRABRIDGE_APP_FILE_OK\n"
+        },
+        "agent": null,
+        "parent_id": null,
+        "state": "queued",
+        "created": 1792375518.148664,
+        "updated": 1792375518.148664,
+        "accepted": null,
+        "started": null,
+        "finished": null,
+        "receipt": null,
+        "evidence": {},
+        "result": null,
+        "error": null,
+        "lease_owner": null,
+        "lease_until": null,
+        "attempt": 1,
+        "local_approval_url": "http://127.0.0.1:8766/",
+        "approval_required": false,
+        "approval_mode": "automatic",
+        "completion_channel": {
+          "target": "default",
+          "receive_tool": "completion_receive",
+          "ack_tool": "completion_ack",
+          "assistant_wakeup": "not_provided_by_current_transport"
+        }
+      },
+      "terminal": {
+        "api_version": "1",
+        "id": "access-app-write-20261019-01",
+        "principal": "chatgpt",
+        "operation": "file.write",
+        "args": {
+          "path": "/private/tmp/kirabridge-access-20261019-01/probe.txt",
+          "text": "KIRABRIDGE_APP_FILE_OK\n"
+        },
+        "agent": null,
+        "parent_id": null,
+        "state": "completed",
+        "created": 1792375518.148664,
+        "updated": 1792375518.155615,
+        "accepted": 1792375518.150804,
+        "started": 1792375518.152386,
+        "finished": 1792375518.155615,
+        "receipt": "d031ac61-9a2e-4d7d-bf33-4c4d1b484da0",
+        "evidence": {
+          "operation_returned": true
+        },
+        "result": {
+          "content_sha256": "94742dfde1874a878dfed6330e48b8212c956f8b8d75678846d72143fd2974cb",
+          "written_bytes": 23
+        },
+        "error": null,
+        "attempt": 1
+      }
+    },
+    {
+      "name": "read",
+      "tool": "task_submit",
+      "completion_subscription": "",
+      "real_subscription_used": false,
+      "queued": {
+        "id": "access-app-read-20261019-01",
+        "principal": "chatgpt",
+        "idem": "access-app-read-20261019-01",
+        "operation": "file.read",
+        "args": {
+          "max_bytes": 64,
+          "path": "/private/tmp/kirabridge-access-20261019-01/probe.txt"
+        },
+        "agent": null,
+        "parent_id": null,
+        "state": "queued",
+        "created": 1792375531.3467898,
+        "updated": 1792375531.3467898,
+        "accepted": null,
+        "started": null,
+        "finished": null,
+        "receipt": null,
+        "evidence": {},
+        "result": null,
+        "error": null,
+        "lease_owner": null,
+        "lease_until": null,
+        "attempt": 1
+      },
+      "terminal": {
+        "api_version": "1",
+        "id": "access-app-read-20261019-01",
+        "principal": "chatgpt",
+        "operation": "file.read",
+        "args": {
+          "max_bytes": 64,
+          "path": "/private/tmp/kirabridge-access-20261019-01/probe.txt"
+        },
+        "agent": null,
+        "parent_id": null,
+        "state": "completed",
+        "created": 1792375531.3467898,
+        "updated": 1792375531.3519711,
+        "accepted": 1792375531.348696,
+        "started": 1792375531.3503911,
+        "finished": 1792375531.3519711,
+        "receipt": "d2dbe95c-45cd-48a1-a184-0526fa291971",
+        "evidence": {
+          "operation_returned": true
+        },
+        "result": {
+          "bytes": 23,
+          "text": "KIRABRIDGE_APP_FILE_OK\n",
+          "truncated": false
+        },
+        "error": null,
+        "attempt": 1
+      }
+    },
+    {
+      "name": "terminal",
+      "tool": "task_request",
+      "completion_subscription": "",
+      "real_subscription_used": false,
+      "queued": {
+        "id": "access-app-terminal-20261019-01",
+        "principal": "chatgpt",
+        "idem": "access-app-terminal-20261019-01",
+        "operation": "terminal.execute",
+        "args": {
+          "argv": [
+            "/usr/bin/printf",
+            "KIRABRIDGE_APP_TERMINAL_OK\n"
+          ],
+          "cwd": "/private/tmp/kirabridge-access-20261019-01",
+          "max_output": 128,
+          "timeout": 5
+        },
+        "agent": null,
+        "parent_id": null,
+        "state": "queued",
+        "created": 1792375535.95836,
+        "updated": 1792375535.95836,
+        "accepted": null,
+        "started": null,
+        "finished": null,
+        "receipt": null,
+        "evidence": {},
+        "result": null,
+        "error": null,
+        "lease_owner": null,
+        "lease_until": null,
+        "attempt": 1,
+        "local_approval_url": "http://127.0.0.1:8766/",
+        "approval_required": false,
+        "approval_mode": "automatic",
+        "completion_channel": {
+          "target": "default",
+          "receive_tool": "completion_receive",
+          "ack_tool": "completion_ack",
+          "assistant_wakeup": "not_provided_by_current_transport"
+        }
+      },
+      "terminal": {
+        "api_version": "1",
+        "id": "access-app-terminal-20261019-01",
+        "principal": "chatgpt",
+        "operation": "terminal.execute",
+        "args": {
+          "argv": [
+            "/usr/bin/printf",
+            "KIRABRIDGE_APP_TERMINAL_OK\n"
+          ],
+          "cwd": "/private/tmp/kirabridge-access-20261019-01",
+          "max_output": 128,
+          "timeout": 5
+        },
+        "agent": null,
+        "parent_id": null,
+        "state": "completed",
+        "created": 1792375535.95836,
+        "updated": 1792375536.204022,
+        "accepted": 1792375535.960358,
+        "started": 1792375536.133518,
+        "finished": 1792375536.204022,
+        "receipt": "c5cb5a03-1d26-4c55-839e-f88b90d3210b",
+        "evidence": {
+          "exit_code": 0,
+          "pid": 93409,
+          "terminated": false,
+          "timed_out": false
+        },
+        "result": {
+          "evidence": {
+            "exit_code": 0,
+            "pid": 93409,
+            "terminated": false,
+            "timed_out": false
+          },
+          "exit_code": 0,
+          "output_bytes": 27,
+          "pid": 93409,
+          "stderr": "",
+          "stdout": "KIRABRIDGE_APP_TERMINAL_OK\n",
+          "success": true,
+          "terminated": false,
+          "timed_out": false,
+          "truncated": false
+        },
+        "error": null,
+        "attempt": 1
+      }
+    }
+  ]
+}

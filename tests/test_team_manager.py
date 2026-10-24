@@ -1,5 +1,6 @@
 import hashlib
 import json
+import time
 from concurrent.futures import ThreadPoolExecutor
 
 import pytest
@@ -88,6 +89,37 @@ def work(**changes):
             **changes,
         }
     )
+
+
+def test_maintenance_drains_only_sealed_existing_team_work(domain):
+    shared = domain.delegate("local", work())
+    now = time.time()
+    domain.store.db.execute(
+        "INSERT INTO activation_runs VALUES('maintenance','draining',?,?,?,NULL)", (now, now, "{}")
+    )
+    with pytest.raises(BridgeError) as error:
+        domain.delegate("local", work(idempotency_key="new-work"))
+    assert error.value.code == "service_maintenance"
+    claimed = domain.claim(shared["id"])
+    root = domain.config.principals["codex"].roots[0]
+    request = TaskRequest(
+        task_id=claimed["core_task_id"],
+        idempotency_key=claimed["core_task_id"],
+        operation="agent.execute",
+        arguments={"agent": "codex", "prompt": "existing work", "cwd": root},
+    )
+    domain.seal_request(shared["id"], request)
+    wrong = request.model_copy(
+        update={"arguments": {**request.arguments, "prompt": "different work"}}
+    )
+    with pytest.raises(BridgeError) as error:
+        domain.bridge.prepare("codex", wrong)
+    assert error.value.code == "service_maintenance"
+    task = domain.bridge.prepare("codex", request)
+    domain.bind_task(shared["id"], task)
+    accepted = domain.store.claim("existing-team-worker", 30)
+    assert accepted["id"] == request.task_id
+    domain.store.assert_accepting(continuation_id=request.task_id, owned_execution=True)
 
 
 def message(**changes):
