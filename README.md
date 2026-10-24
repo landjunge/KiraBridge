@@ -110,9 +110,9 @@ The installation command is [below](#install--update--installieren--aktualisiere
 
 RC17 combines main, RC15/RC16 and subsequent repairs in [PR #28](https://github.com/landjunge/KiraBridge/pull/28)
 on `integration/current-release-20261024`. RC15 and RC16 remain historical drafts.
-**Publication and merge remain gated:** GitHub Actions cannot start because of account
-billing/spending limits. Required CI/review and the actual ThreadDesk file receiver
-acceptance remain outstanding. Draft creation is not publication.
+**Merged into main; publication remains gated:** GitHub Actions cannot start because of account
+billing/spending limits. Additional review was waived by the owner. Native agent input
+and actual ThreadDesk file receiver acceptance remain outstanding. Draft creation is not publication.
 
 For a **first installation**, the command creates a scoped project setup with
 individual approvals. For an **update**, run the same command; existing
@@ -156,7 +156,7 @@ task. Further assistant adapters and their limits are described in the
 
 ### What was checked?
 
-RC17: two exact-source builds match; the authenticated draft command passed isolated Intel-macOS fresh install, RC14 upgrade, status/version, data preservation, idempotence, restart, KeepAlive and rollback. [RC17 proof](docs/ACCEPTANCE-MACOS-RC17.md). Native agent input and required CI/review remain open.
+RC17: two exact-source builds match; the authenticated draft command passed isolated Intel-macOS fresh install, RC14 upgrade, status/version, data preservation, idempotence, restart, KeepAlive and rollback. [RC17 proof](docs/ACCEPTANCE-MACOS-RC17.md). Native agent input and successful CI remain open; the owner waived additional review.
 
 RC16's [acceptance record](docs/ACCEPTANCE-MACOS-RC16.md) distinguishes actual Intel
 macOS tests, isolated byte/MCP contract fixtures and unverified product integration.
@@ -259,9 +259,9 @@ Der Installationsbefehl steht [unten](#install--update--installieren--aktualisie
 
 RC17 führt main, RC15/RC16 und nachfolgende Reparaturen in [PR #28](https://github.com/landjunge/KiraBridge/pull/28)
 auf `integration/current-release-20261024` zusammen. RC15 und RC16 bleiben historische Entwürfe.
-**Merge und Veröffentlichung bleiben gesperrt:** GitHub Actions startet wegen
-Kontoabrechnung/Ausgabenlimit nicht. Erforderliche CI/Review und die tatsächliche
-ThreadDesk-Dateiempfänger-Abnahme stehen aus. Ein Entwurf ist keine Veröffentlichung.
+**Nach main gemergt; Veröffentlichung bleibt gesperrt:** GitHub Actions startet wegen
+Kontoabrechnung/Ausgabenlimit nicht. Zusätzliche Review auf Nutzeranweisung entfallen; native
+Agenteneingabe und tatsächliche ThreadDesk-Dateiempfänger-Abnahme stehen aus. Ein Entwurf ist keine Veröffentlichung.
 
 Bei der **Erstinstallation** legt der Befehl einen begrenzten Projektzugang mit
 Einzelgenehmigungen an. Für ein **Update** denselben Befehl wiederholen;
@@ -309,7 +309,7 @@ Werkzeugkatalog, Health und Agenteninventar trennen Rechte, Beobachtung und Ausf
 
 ### Was wurde geprüft?
 
-RC17: zwei identische Builds; authentifizierter Draft-Befehl auf Intel-macOS mit isolierter Erstinstallation, RC14-Upgrade, Status/Version, Datenerhalt, Idempotenz, Neustart, KeepAlive und Rollback bestanden. [RC17-Nachweis](docs/ACCEPTANCE-MACOS-RC17.md). Native Agenteneingabe und Pflicht-CI/Review bleiben offen.
+RC17: zwei identische Builds; authentifizierter Draft-Befehl auf Intel-macOS mit isolierter Erstinstallation, RC14-Upgrade, Status/Version, Datenerhalt, Idempotenz, Neustart, KeepAlive und Rollback bestanden. [RC17-Nachweis](docs/ACCEPTANCE-MACOS-RC17.md). Native Agenteneingabe und erfolgreiche CI bleiben offen; zusätzliche Review auf Nutzeranweisung entfallen.
 
 Der [RC16-Prüfbericht](docs/ACCEPTANCE-MACOS-RC16.md) trennt echte Intel-macOS-Tests,
 isolierte Byte-/MCP-Vertragstests und noch ungeprüfte Produktintegration. Der
@@ -319,13 +319,13 @@ Apple-Silicon-Abnahme, echte ChatGPT-Dateiauswahl oder ThreadDesk-Produktimporte
 
 ---
 
-The combined RC17 source includes both main and runtime ancestry; protected main remains unchanged until checks/review pass. / Die RC17-Quelle enthält beide Quelllinien; main bleibt bis zu bestandenen Prüfungen und Review unverändert.
+RC17 source is merged into main through [PR #28](https://github.com/landjunge/KiraBridge/pull/28), merge `a74fe613`. The owner waived additional review. CI jobs did not start because of billing; native agent input and release acceptance remain open. / RC17 ist über PR #28 nach main gemergt. Zusätzliche Review auf ausdrückliche Nutzeranweisung entfallen. CI wegen Abrechnung nicht gestartet; native Agenteneingabe und Release-Freigabe bleiben offen.
 
 ## Install / update · Installieren / aktualisieren
 
 **RC17-Kandidat: nur für berechtigte Reviewer des Release-Entwurfs; noch kein
 freigegebener Endnutzer-Download. / RC17 candidate: draft reviewers only until CI
-and release acceptance pass.** Voraussetzung / prerequisite: Python 3.11, uv 0.11.6 und
+and release acceptance pass (additional review waived by owner).** Voraussetzung / prerequisite: Python 3.11, uv 0.11.6 und
 angemeldete GitHub CLI mit Repository-Zugriff / authenticated GitHub CLI.
 Der Befehl lädt authentifiziert, prüft SHA-256 und installiert oder aktualisiert /
 authenticated download, checksum verification and install/update:
