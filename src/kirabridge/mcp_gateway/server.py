@@ -457,6 +457,10 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
             ctx,
         )
 
+    from kirabridge.mcp_gateway.queue_tools import register_queue_tools
+
+    register_queue_tools(server, bridge.queues, identity, task_request, safe, read, write)
+
     from kirabridge.mcp_gateway.file_tools import register_file_tools
 
     register_file_tools(
@@ -682,7 +686,9 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
             policy = bridge.security.principal(principal, "message.read")
             states = bridge.store.db.execute(
                 "SELECT j.state,count(*) AS count FROM message_jobs j JOIN messages m "
-                "ON m.id=j.message_id WHERE m.recipient=? GROUP BY j.state",
+                "ON m.id=j.message_id WHERE m.recipient=? "
+                "AND NOT EXISTS (SELECT 1 FROM queue_holds h "
+                "WHERE h.queue_id='messages' AND h.item_id=m.id) GROUP BY j.state",
                 (principal,),
             ).fetchall()
             return {

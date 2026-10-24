@@ -104,6 +104,9 @@ class Store:
                     for statement in script.split(";"):
                         if statement.strip():
                             self.db.execute(statement)
+                from kirabridge.queue_management import install_schema
+
+                install_schema(self)
                 from kirabridge.completion_manager import SCHEMA as COMPLETION_SCHEMA
 
                 for statement in COMPLETION_SCHEMA:

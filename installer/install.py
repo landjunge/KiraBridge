@@ -128,6 +128,12 @@ def idle_guard(config):
         jobs = (
             db.execute(
                 "select count(*) from message_jobs where state in ('queued','running')"
+                + (
+                    " and (state='running' or not exists (select 1 from queue_holds h "
+                    "where h.queue_id='messages' and h.item_id=message_jobs.message_id))"
+                    if "queue_holds" in tables
+                    else ""
+                )
             ).fetchone()[0]
             if "message_jobs" in tables
             else 0
@@ -541,6 +547,32 @@ def validate_launcher_owner(args):
         raise RuntimeError("Unrecognized existing launcher preserved; manual migration required")
 
 
+def require_queue_compatibility(config, release):
+    """Old runtimes ignore delivery holds: never resume their worker on such a store."""
+    path = state_file(config)
+    if release is None or not path.exists():
+        return
+    with sqlite3.connect(f"file:{path}?mode=ro", uri=True) as db:
+        exists = db.execute(
+            "SELECT 1 FROM sqlite_master WHERE name='queue_holds' AND type='table'"
+        ).fetchone()
+        held = exists and db.execute("SELECT 1 FROM queue_holds LIMIT 1").fetchone()
+    if not held:
+        return
+    try:
+        run(
+            [python(release), "-c", "from kirabridge.queue_management import QueueManager"],
+            capture=True,
+            timeout=10,
+        )
+    except (RuntimeError, subprocess.TimeoutExpired):
+        raise RuntimeError(
+            "QUEUE COMPATIBILITY: target runtime ignores delivery withdrawals. "
+            "No service switch; preserve queue/audit and use a queue-aware runtime. "
+            "Never delete holds or restore a database backup to force rollback."
+        ) from None
+
+
 def activate(args, release):
     validate_service_owner(args)
     validate_launcher_owner(args)
@@ -599,6 +631,7 @@ def activate(args, release):
     say(f"Rückweg gesichert: {backup}. Konfiguration und Zugangsdaten bleiben erhalten.")
     try:
         with idle_guard(args.config):
+            require_queue_compatibility(args.config, release)
             dbpath = state_file(args.config)
             if dbpath.exists():
                 with (
@@ -693,6 +726,10 @@ def rollback(args):
                 "Installed definition changed since activation; preserve and review first"
             )
     with idle_guard(args.config):
+        previous_release = (active.get("previous") or {}).get("release")
+        require_queue_compatibility(
+            args.config, Path(previous_release) if previous_release else None
+        )
         stop_service(args)
         for path, flag, name in [
             (args.launcher, "had_wrapper", "launcher.before"),

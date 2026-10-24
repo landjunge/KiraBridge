@@ -147,7 +147,9 @@ class MessageReceiver:
         with self.bridge.store.transaction():
             row = self.bridge.store.db.execute(
                 "SELECT m.* FROM messages m JOIN message_jobs j ON j.message_id=m.id "
-                "WHERE m.id=? AND j.state='queued'",
+                "WHERE m.id=? AND j.state='queued' "
+                "AND NOT EXISTS (SELECT 1 FROM queue_holds h WHERE "
+                "h.queue_id='messages' AND h.item_id=m.id)",
                 (message_id,),
             ).fetchone()
             if not row:
@@ -363,9 +365,13 @@ class MessageReceiver:
         rows = self.bridge.store.db.execute(
             "SELECT m.id,m.sender,m.recipient,m.created,m.acknowledged,j.evidence FROM messages m "
             "JOIN message_jobs j ON j.message_id=m.id WHERE j.state='queued' "
+            "AND NOT EXISTS (SELECT 1 FROM queue_holds h WHERE "
+            "h.queue_id='messages' AND h.item_id=m.id) "
             "AND (? IS NULL OR m.recipient=?) "
             "AND NOT EXISTS (SELECT 1 FROM messages older JOIN message_jobs q "
             "ON q.message_id=older.id WHERE q.state='queued' "
+            "AND NOT EXISTS (SELECT 1 FROM queue_holds h WHERE "
+            "h.queue_id='messages' AND h.item_id=older.id) "
             "AND older.recipient=m.recipient AND older.seq<m.seq) ORDER BY m.seq LIMIT 17",
             (recipient, recipient),
         ).fetchall()

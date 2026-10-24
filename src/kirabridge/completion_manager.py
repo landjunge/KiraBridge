@@ -181,7 +181,10 @@ class CompletionManager:
         with self.store.transaction():
             rows = self.store.db.execute(
                 "SELECT * FROM completion_notices WHERE principal=? AND target=? "
-                "AND acknowledged IS NULL AND source IN (?,?) ORDER BY seq LIMIT ?",
+                "AND acknowledged IS NULL AND source IN (?,?) "
+                "AND NOT EXISTS (SELECT 1 FROM queue_holds h WHERE "
+                "h.queue_id='completions' AND h.item_id=completion_notices.id) "
+                "ORDER BY seq LIMIT ?",
                 (
                     principal,
                     target,

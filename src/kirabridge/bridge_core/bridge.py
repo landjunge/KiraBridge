@@ -44,6 +44,7 @@ from kirabridge.message_manager import MessageManager
 from kirabridge.message_manager.receiver import MessageReceiver
 from kirabridge.permissions import LEVELS, direct_terminal_required, level_for, state_exclusions
 from kirabridge.process_manager import ProcessManager
+from kirabridge.queue_management.models import QueueControl
 from kirabridge.security_manager import SecurityManager
 from kirabridge.session_manager import SessionInput, SessionManager, SessionOpen, SessionRead
 from kirabridge.task_manager.manager import TaskManager
@@ -52,6 +53,7 @@ from kirabridge.terminal_manager import TerminalManager
 from kirabridge.visible_terminal import VisibleTerminal, VisibleTerminalInput
 
 INPUTS = {
+    "queue.control": QueueControl,
     "files.prepare": PrepareInput,
     "files.transfer": TransferInput,
     "files.inventory": InventoryInput,
@@ -208,6 +210,11 @@ class Bridge:
         self.teams = TeamManager(self)
         self.messages.voice_policy.teams = self.teams
         self.team_dispatcher = TeamDispatcher(self)
+        from kirabridge.queue_management import QueueManager
+
+        self.queues = QueueManager(
+            self.store, self.security, self.tasks, self.messages, self.visible_handoffs, self.teams
+        )
 
     def validate(self, request: TaskRequest) -> None:
         model = INPUTS.get(request.operation)
@@ -381,6 +388,13 @@ class Bridge:
             policy.read_roots if operation in {"file.read", "file.image", "file.list"} else []
         )
         scope = PathScope(roots, excluded=state_exclusions(self.config, policy))
+        if operation == "queue.control":
+            # Rejections before any mutation remain definite failures, not unknown effects.
+            result = await self.queues.control(
+                principal, args, approved=True, control_task_id=task["id"]
+            )
+            await running({"phase": "queue_control_recorded", "history_preserved": True})
+            return result
         if operation == "files.prepare":
             return await self.file_transfers.prepare(task, args, running)
         if operation == "files.transfer":

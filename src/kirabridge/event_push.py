@@ -546,7 +546,8 @@ class EventPush:
             failures = row["auth_failures"] + 1
             state = "pending" if failures < 3 else "authorization_unknown"
             self.db.execute(
-                "UPDATE deliveries SET auth_failures=?,state=?,next_at=?,reason=? WHERE event_id=?",
+                "UPDATE deliveries SET "
+                "auth_failures=?,state=?,next_at=?,reason=? WHERE event_id=? AND state='pending'",
                 (
                     failures,
                     state,
@@ -564,10 +565,13 @@ class EventPush:
         sub = self.journal.subscription(self.principal, row["subscription_id"])
         if sub["state"] != "active" or sub["expires"] <= time.time():
             return False
-        self.db.execute(
-            "UPDATE deliveries SET state='sending',attempts=attempts+1 WHERE event_id=?",
+        claimed = self.db.execute(
+            "UPDATE deliveries SET state='sending',attempts=attempts+1 "
+            "WHERE event_id=? AND state='pending'",
             (row["event_id"],),
         )
+        if claimed.rowcount != 1:
+            return False  # A queue cancellation during authorization won the CAS.
         reason, status = None, None
         try:
             headers = signed_headers(sub, row["event_id"], row["body"].encode())

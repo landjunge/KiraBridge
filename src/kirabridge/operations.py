@@ -28,7 +28,7 @@ READ_OPERATIONS = frozenset(
         "observations.read",
     }
 )
-STOP_OPERATIONS = frozenset({"process.terminate", "workflow.stop", "files.pause"})
+STOP_OPERATIONS = frozenset({"process.terminate", "workflow.stop", "files.pause", "queue.control"})
 RESERVED_READ_OPERATIONS = frozenset(
     {
         "session.catalog",
@@ -84,7 +84,9 @@ for _name in (
     "admin.execute",
 ):
     OPERATIONS[_name] = Operation(
-        capability="files.inspect"
+        capability="task.cancel"
+        if _name == "queue.control"
+        else "files.inspect"
         if _name in {"files.inventory", "files.status"}
         else "files.transfer"
         if _name == "files.pause"

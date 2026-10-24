@@ -55,7 +55,9 @@ def idle_queue(config):
                 "('created','queued','accepted','running')"
             ).fetchone()[0]
             jobs = store.db.execute(
-                "SELECT count(*) FROM message_jobs WHERE state IN ('queued','running')"
+                "SELECT count(*) FROM message_jobs WHERE state IN ('queued','running') "
+                "AND (state='running' OR NOT EXISTS (SELECT 1 FROM queue_holds h "
+                "WHERE h.queue_id='messages' AND h.item_id=message_jobs.message_id))"
             ).fetchone()[0]
             # Older stores have no team tables. Inspect only; an update check
             # must neither initialize a team domain nor dispatch queued work.

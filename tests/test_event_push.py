@@ -431,3 +431,77 @@ async def test_backend_auth_error_is_not_retried():
     with pytest.raises(EventError, match="backend_readiness_failed"):
         await wait_backend_ready(call)
     assert calls == ["bridge_health"]
+
+
+async def test_delivery_queue_pause_restore_and_revision_race(push, bridge, config):
+    from kirabridge import event_queue
+
+    await finish(push, bridge, config)
+    push.collect()
+    page = event_queue.entries(push)
+    entry = page["entries"][0]
+    assert "receipt_token" not in entry["body"]
+    assert SECRET not in json.dumps(page) and URL not in json.dumps(page)
+    event_queue.control(push, entry["event_id"], entry["revision"], "cancel")
+    assert not await push.deliver_once()
+    paused = event_queue.entries(push)["entries"][0]
+    with pytest.raises(EventError, match="queue_changed"):
+        event_queue.control(push, entry["event_id"], entry["revision"], "restore")
+    event_queue.control(push, paused["event_id"], paused["revision"], "restore")
+    assert await push.deliver_once()
+    assert event_queue.entries(push)["entries"][0]["state"] == "webhook_accepted"
+
+
+async def test_delivery_cancel_wins_during_authorization(push, bridge, config):
+    from kirabridge import event_queue
+
+    await finish(push, bridge, config)
+    push.collect()
+    entered, release = asyncio.Event(), asyncio.Event()
+
+    async def authorize(task_id):
+        entered.set()
+        await release.wait()
+        return True
+
+    push.authorize_task = authorize
+    pending = asyncio.create_task(push.deliver_once())
+    await entered.wait()
+    entry = event_queue.entries(push)["entries"][0]
+    event_queue.control(push, entry["event_id"], entry["revision"], "cancel")
+    release.set()
+    assert not await pending
+    assert event_queue.entries(push)["entries"][0]["attempts"] == 0
+
+
+async def test_delivery_clear_preserves_unknown_and_inflight_evidence(push, bridge, config):
+    from kirabridge import event_queue
+
+    await finish(push, bridge, config)
+    push.collect()
+    entry = event_queue.entries(push)["entries"][0]
+    push.db.execute("UPDATE deliveries SET state='sending',attempts=1")
+    page = event_queue.entries(push)
+    result = event_queue.control(push, "", page["queue_revision"], "clear")
+    assert result["inflight_unresolved"] == [entry["event_id"]]
+    push.db.execute("UPDATE deliveries SET state='unknown'")
+    page = event_queue.entries(push)
+    assert event_queue.control(push, "", page["queue_revision"], "clear")["paused"]
+    paused = event_queue.entries(push)["entries"][0]
+    with pytest.raises(EventError, match="attempted"):
+        event_queue.control(push, paused["event_id"], paused["revision"], "restore")
+
+
+async def test_event_queue_revalidates_before_exposing_captured_results(push, bridge, config):
+    from kirabridge import event_queue
+
+    await finish(push, bridge, config)
+    push.collect()
+
+    async def revoked(task_id):
+        return False
+
+    push.authorize_task = revoked
+    result = await event_queue.inspect_entries(push)
+    assert result["entries"][0]["content_authorization"] == "denied"
+    assert "body" not in result["entries"][0]

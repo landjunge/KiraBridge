@@ -35,13 +35,16 @@ class MessageManager:
         return db.execute(
             "SELECT count(*) FROM message_jobs WHERE state IN ("
             + ",".join("?" for _ in states)
-            + ")",
+            + ") AND (state='running' OR NOT EXISTS (SELECT 1 FROM queue_holds h "
+            "WHERE h.queue_id='messages' AND h.item_id=message_jobs.message_id))",
             states,
         ).fetchone()[0]
 
     def operator_work_count(self):
         return self.store.db.execute(
-            "SELECT count(*) FROM message_jobs WHERE state IN ('queued','running')"
+            "SELECT count(*) FROM message_jobs WHERE state IN ('queued','running') "
+            "AND (state='running' OR NOT EXISTS (SELECT 1 FROM queue_holds h "
+            "WHERE h.queue_id='messages' AND h.item_id=message_jobs.message_id))"
         ).fetchone()[0]
 
     def operator_protocol_snapshot(self, message_id, at):
@@ -337,7 +340,9 @@ class MessageManager:
             ):
                 raise BridgeError("message_store_full", "Message archive capacity reached")
             pending = self.store.db.execute(
-                "SELECT count(*) FROM messages WHERE recipient=? AND acknowledged IS NULL",
+                "SELECT count(*) FROM messages WHERE recipient=? AND acknowledged IS NULL "
+                "AND NOT EXISTS (SELECT 1 FROM queue_holds h WHERE "
+                "h.queue_id='messages' AND h.item_id=messages.id)",
                 (message.recipient,),
             ).fetchone()[0]
             if pending >= limits.max_pending_per_recipient:
@@ -408,6 +413,8 @@ class MessageManager:
             rows = self.store.db.execute(
                 "SELECT id,seq,delivered FROM messages WHERE recipient=? AND seq>? "
                 "AND acknowledged IS NULL AND (? IS NULL OR conversation_id=?) "
+                "AND NOT EXISTS (SELECT 1 FROM queue_holds h WHERE "
+                "h.queue_id='messages' AND h.item_id=messages.id) "
                 "ORDER BY seq LIMIT ?",
                 (principal, after, conversation_id, conversation_id, limit),
             ).fetchall()

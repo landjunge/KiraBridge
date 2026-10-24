@@ -324,3 +324,23 @@ def test_activate_and_rollback_release_sqlite_before_bootstrap(installer, monkey
     assert writes == ["bootstrap", "bootstrap"]
     with sqlite3.connect(database) as db:
         assert db.execute("select count(*) from preserved").fetchone()[0] == 2
+
+
+def test_queue_holds_block_unsafe_downgrade_before_service_switch(
+    installer, bridge, config, tmp_path, monkeypatch
+):
+    policy_path = tmp_path / "config.toml"
+    policy_path.write_text("data_dir = " + json.dumps(str(config.state_path)))
+    bridge.store.db.execute(
+        "INSERT INTO queue_holds VALUES('messages','one','local',1,'withdrawn')"
+    )
+
+    def unsupported(*args, **kwargs):
+        raise RuntimeError("old runtime has no queue module")
+
+    monkeypatch.setattr(installer, "run", unsupported)
+    with pytest.raises(RuntimeError, match="QUEUE COMPATIBILITY"):
+        installer.require_queue_compatibility(policy_path, tmp_path / "old-release")
+    assert bridge.store.db.execute("SELECT count(*) FROM queue_holds").fetchone()[0] == 1
+    monkeypatch.setattr(installer, "run", lambda *args, **kwargs: b"")
+    installer.require_queue_compatibility(policy_path, tmp_path / "queue-aware-release")

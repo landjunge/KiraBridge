@@ -454,7 +454,9 @@ class TeamManager:
             ):
                 raise BridgeError("message_store_full", "Team message archive capacity reached")
             count = self.store.db.execute(
-                "SELECT count(*) FROM team_messages WHERE recipient=? AND acknowledged IS NULL",
+                "SELECT count(*) FROM team_messages WHERE recipient=? AND acknowledged IS NULL "
+                "AND NOT EXISTS (SELECT 1 FROM queue_holds h WHERE "
+                "h.queue_id='team-messages' AND h.item_id=team_messages.id)",
                 (request.recipient,),
             ).fetchone()[0]
             if count >= self.config.team.max_pending_per_member:
@@ -636,7 +638,9 @@ class TeamManager:
         ]
         pending = self.store.db.execute(
             "SELECT * FROM team_messages WHERE team_id=? AND recipient=? "
-            "AND acknowledged IS NULL ORDER BY seq LIMIT 16",
+            "AND acknowledged IS NULL "
+            "AND NOT EXISTS (SELECT 1 FROM queue_holds h WHERE "
+            "h.queue_id='team-messages' AND h.item_id=team_messages.id) ORDER BY seq LIMIT 16",
             (team_id, principal),
         ).fetchall()
         latest = self.store.db.execute(

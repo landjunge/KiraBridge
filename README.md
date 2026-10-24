@@ -10,6 +10,18 @@
 
 [English](#english) · [Deutsch](#deutsch) · [Published / Veröffentlicht RC14](https://github.com/landjunge/KiraBridge/releases/tag/v0.8.0rc14)
 
+## Unreleased queue repair / Unveröffentlichte Queue-Reparatur
+
+The current repair branch adds owner-scoped queue inspection/control. It is **not
+included in the RC16 draft assets and is not installed into production RC14**.
+See [queue tools, safety and rollback limits](docs/QUEUE-MANAGEMENT.md) and
+[ordered repair status](docs/REPAIR-SEQUENCE-20261024.md).
+
+Der Reparaturbranch ergänzt eine identitätsgebundene Queue-Verwaltung. Sie ist
+**nicht in den RC16-Draft-Assets enthalten und nicht produktiv in RC14 installiert**.
+[Bedienung, Sicherheit und Rückweg](docs/QUEUE-MANAGEMENT.md) ·
+[verbindliche Reparaturreihenfolge](docs/REPAIR-SEQUENCE-20261024.md).
+
 ## English
 
 ### Start here: live voice and terminal connection

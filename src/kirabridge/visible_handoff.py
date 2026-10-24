@@ -151,7 +151,10 @@ class VisibleHandoffs:
                 "agent_confirmed": True,
                 "reconciled_without_input": True,
             }
-            if status["state"] != "confirmed" and not idle_reply_pending:
+            retired = self.store.db.execute(
+                "SELECT 1 FROM queue_holds WHERE queue_id='handoffs' AND item_id=?", (identifier,)
+            ).fetchone()
+            if status["state"] != "confirmed" and not idle_reply_pending and not retired:
                 self.transition(identifier, "confirmed", evidence)
             reply = self.store.db.execute(
                 "SELECT id FROM messages WHERE reply_to=? AND sender=? AND recipient=? "
@@ -169,6 +172,29 @@ class VisibleHandoffs:
             ).fetchone()
             if current and current[0] in {"completed", "interrupted"}:
                 return  # Completed evidence is terminal, including after a late callback failure.
+            if (
+                state
+                in {
+                    "planned",
+                    "inserting",
+                    "inserted",
+                    "submitting",
+                    "return_sent",
+                    "sent",
+                    "confirmed",
+                }
+                and self.store.db.execute(
+                    "SELECT 1 FROM queue_holds WHERE queue_id='handoffs' AND item_id=?",
+                    (identifier,),
+                ).fetchone()
+            ):
+                evidence = {
+                    **evidence,
+                    "late_observation_state": state,
+                    "delivery_retired": True,
+                    "automatic_retry": False,
+                }
+                state = "unknown"  # Late receipts never reacquire the delivery reservation.
             now = time.time()
             self.store.db.execute(
                 "UPDATE visible_handoffs SET state=?,updated=?,evidence=? WHERE id=?",
@@ -234,7 +260,9 @@ class VisibleHandoffs:
     ):
         """Keep the input lock until authenticated receipt and verified target readiness."""
         active = self.store.db.execute(
-            "SELECT id,principal FROM visible_handoffs WHERE target=? AND state IN "
+            "SELECT id,principal FROM visible_handoffs WHERE target=? "
+            "AND NOT EXISTS (SELECT 1 FROM queue_holds h WHERE "
+            "h.queue_id='handoffs' AND h.item_id=visible_handoffs.id) AND state IN "
             "('planned','inserting','inserted','submitting',"
             "'return_sent','sent','confirmed','unknown') "
             "ORDER BY updated,id",

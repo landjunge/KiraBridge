@@ -1,0 +1,35 @@
+{
+  "scope": "read-only live RC14 evidence; no terminal input, queue mutation, or installation",
+  "message": {
+    "id": "dc52c315-b9d5-48c5-8de6-3fdf69970b9b",
+    "sender": "chatgpt",
+    "recipient": "codex",
+    "created": 1792847822.0386019,
+    "delivered": null,
+    "acknowledged": null,
+    "state": "queued",
+    "reason": "visible_target_busy",
+    "terminal_input_attempted": false
+  },
+  "blocking_handoff": {
+    "id": "channel-dae0da0ab69449999007d02ef3c137d5",
+    "message_id": "kira-integrate-main-20261021-takeover-v1",
+    "state": "unknown",
+    "reason": "session_transport_unavailable",
+    "events": [
+      {
+        "state": "inserting",
+        "at": 1792596092.470376,
+        "terminal_input_attempted": true
+      },
+      {
+        "state": "unknown",
+        "at": 1792596094.855368,
+        "automatic_retry": false
+      }
+    ],
+    "message_processing_state": "unknown",
+    "acknowledged": null
+  },
+  "duplicate_request_sent": false
+}
