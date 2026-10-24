@@ -125,9 +125,7 @@ class TeamConsole:
     async def list_teams(self, request: Request):
         principal = self._principal(request)
         self.security.principal(principal, "team.read")
-        result = (
-            self.teams.list(principal) if self.config.team.enabled else {"teams": []}
-        )
+        result = self.teams.list(principal) if self.config.team.enabled else {"teams": []}
         roster = []
         for name, worker in self.config.team.workers.items():
             policy = self.config.principals.get(name)

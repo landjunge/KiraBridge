@@ -1,0 +1,31 @@
+{
+  "download_command": "d=$(mktemp -d) && gh release download v0.8.0rc15 -R landjunge/KiraBridge -p 'install-macos.sh*' -D \"$d\" && (cd \"$d\" && shasum -a 256 -c install-macos.sh.sha256 && sh install-macos.sh \"$@\")",
+  "os": "macOS-15.7.4-x86_64-i386-64bit",
+  "architecture": "x86_64",
+  "version": "0.8.0rc15",
+  "scope": "isolated real launchd label, config, port, runtime and data; no production paths",
+  "tested_command": "sh -c 'd=$(mktemp -d) && gh release download v0.8.0rc15 -R landjunge/KiraBridge -p '\"'\"'install-macos.sh*'\"'\"' -D \"$d\" && (cd \"$d\" && shasum -a 256 -c install-macos.sh.sha256 && sh install-macos.sh \"$@\")' kirabridge-isolated-test --prefix /Users/landjunge/KiraBridge-release-20261024/dist/accept-rc15-final/install --config /Users/landjunge/KiraBridge-release-20261024/dist/accept-rc15-final/config/config.toml --launcher /Users/landjunge/KiraBridge-release-20261024/dist/accept-rc15-final/bin/kirabridge --plist /Users/landjunge/KiraBridge-release-20261024/dist/accept-rc15-final/service.plist --cache-dir /Users/landjunge/KiraBridge-release-20261024/dist/accept-rc15-final/cache --workspace /Users/landjunge/KiraBridge-release-20261024/dist/accept-rc15-final/workspace --test-label com.kirabridge.test.accept-rc15-final",
+  "cwd": "/Users/landjunge/KiraBridge-release-20261024/dist/accept-rc15-final/extracted",
+  "checks": [
+    "actual published RC14 wheel starts under isolated launchd",
+    "built package upgrades RC14; authenticated version/status/start",
+    "config/credentials hashes, database row and user file preserved",
+    "daemon survives installer/terminal command exit",
+    "repeat install idempotent; same PID and no config rewrite",
+    "real launchctl kickstart restart and authenticated status",
+    "launchd KeepAlive automatically recovers a crashed daemon",
+    "real rollback restarts previous RC14 wheel and preserves secrets",
+    "fresh built-wheel installation starts actual isolated launchd service"
+  ],
+  "remote_release_command": "authenticated draft download",
+  "passed": true,
+  "source_commit": "efb805ab0d651ad5975d8c9e151edb4058f7e1c6",
+  "regression_tests": 960,
+  "production_modified": false,
+  "isolated_launchd_labels_removed": true,
+  "artifact_sha256": {
+    "kirabridge-0.8.0rc15-py3-none-any.whl": "9ced17a803a29dcbfd0db97ca3e5b6e5c402cdddd8516ee1402bd422b13b9458",
+    "install-macos.sh": "569955e447dbf7539dbd0d5c1cc50b19d4f7cdd0313b5ed7ff5b66f9b9e9f278",
+    "KiraBridge-macos.tar.gz": "6a3d9abdd68068ca567485f3a4ff5129844ec19c880386e73fb45a3590e57f48"
+  }
+}

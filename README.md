@@ -1,98 +1,236 @@
-# KiraBridge 0.8.0rc10
+# KiraBridge
 
-Ein kompaktes Steuerfenster für Kira/ChatGPT, Grok und die angebundenen Agenten.
-Auf diesem Mac startet **KiraBridge.app** die Oberfläche. Prozesse, Terminals,
-Reparatur-Doktor und Rechte sind direkt erreichbar; nur das Protokoll hat ein
-separates Fenster. Die Steuerung bleibt erreichbar, wenn der Bridge-Dienst aus ist.
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="assets/design/icons/dark/KiraBridge-dark-128.png">
+  <img src="assets/design/icons/light/KiraBridge-light-128.png" alt="KiraBridge" width="96" height="96">
+</picture>
 
-- **Übersicht:** Kira und Grok eindeutig wählen; bestätigte und ungeprüfte Zugänge erkennen.
-- **Prozesse:** tatsächlichen Zustand prüfen, starten und neu verbinden.
-- **Terminals:** bestehende Terminal.app- und tmux-Sitzungen auswählen, lesen und bedienen.
-- **Doktor:** Verbindungen, geladene Einstellungen und Terminalzugriff prüfen und reparieren.
-- **Rechte:** genau **Voll erlaubt**, **Mittel** oder **Nur mit Erlaubnis**.
-- **Protokoll:** tatsächliche Nachrichten, Ausführung, Antworten und Fehler verfolgen.
+**Turn your ideas into work on your computer.**  
+**Aus deinen Ideen werden Aufgaben auf deinem Rechner.**
 
-Vorhandene Sitzungen und Zugangsdaten bleiben erhalten. Ein Neustart beendet
-keine beobachtete Nutzersitzung. Vollfreigaben werden genutzt; ein Wechsel der
-Freigabestufe löscht bereits erteilte Zugriffsrechte nicht. Mittel erlaubt
-Leseaufträge automatisch; Änderungen und Ausführung benötigen Freigabe.
-Nur mit Erlaubnis lässt neue Aufträge auf die Freigabe im selben Fenster warten.
+[English](#english) · [Deutsch](#deutsch) · [Published RC14](https://github.com/landjunge/KiraBridge/releases/tag/v0.8.0rc14)
 
-Browser, Handy, Text, Live und Sprache erreichen dieselben MCP-Werkzeuge und
-Rechte, sobald der jeweilige Anbieter den Werkzeugaufruf zulässt.
-`connection_check` bestätigt einen tatsächlich angekommenen Aufruf. Gerät und
-Modus sind Angaben des aufrufenden Clients. Die Oberfläche zeigt ungeprüfte
-Zugänge ausdrücklich als ungeprüft. Native Handy-, Live- und Sprachgespräche
-wurden hier nicht direkt abgenommen. Inaktive Chats werden durch eine
-Warteschlangennachricht nicht automatisch aufgeweckt.
+## English
 
-[Reparaturursachen, tatsächliche Prüfungen und offene Punkte](docs/CONTROL-CENTER-0.8.0rc1.md).
+### Start here: live voice and terminal connection
 
-## Aktueller Umbau
+KiraBridge's intended conversational workflow starts with **ChatGPT Live voice mode**: you speak naturally with the assistant in a real-time voice conversation, agree on a task, and explicitly authorize its handoff. This is **not the same as tapping the microphone icon to dictate text** into a message field. Dictation converts speech into text; it is not, by itself, a continuous live voice conversation. Live voice availability and limits depend on the user's ChatGPT setup.
 
-Die [Etappenakte](docs/ARCHITECTURE-STAGES-20261020.md) trennt Quelländerungen,
-Aktivierung und praktische Prüfungen. Neue Aufträge von Kira und Eve benötigen
-kein `go-go-go`. Historische Puffer werden nicht automatisch zugestellt.
-Agentenübergaben verwenden verpflichtend persistierte bestehende sichtbare
-Fenster; fehlende oder geänderte Ziele blockieren ohne Hintergrundersatz.
-Einfügen, separates Return und authentifizierte Quittung bleiben getrennt.
-Neue Fenster benötigen eine konkrete Freigabe aus der lokalen Bedienung.
-Die sechs Architektur-Etappen sind auf diesem Mac aktiviert und gezielt geprüft.
-Der physische Handy-/Voice-Ablauf bleibt gesondert offen. Bei der letzten Prüfung
-war der vorhandene öffentliche Grok-Tunnel ausgefallen; Kiras tatsächlicher
-MCP-Rückweg und der lokale Eve-Rückweg wurden bestätigt.
+For implementation, KiraBridge uses **terminal interfaces** to hand work to configured coding agents, notably **Codex CLI and Grok Build CLI**. Where configured and permitted, the two CLI agents can exchange tasks, findings and reviews through explicit handoffs; each CLI may also coordinate its own subagents. Parallel work can greatly accelerate complex projects, but the speedup depends on task independence, available resources and usage limits. Agent-to-agent communication and subagents are capabilities to configure and verify, not proof that every installation supports them automatically. The terminal connection is a separate technical step from the live voice conversation; successful voice input alone does not prove that a terminal command was delivered or executed.
 
-Sichtbare Übergaben warten seit rc10 ungeclaimt auf ein freies bestehendes\nAgentenfenster. Alte unklare Eingaben werden nicht automatisch wiederholt.\n[Ursache, Reparatur und echter Codex-Test](docs/VISIBLE-HANDOFF-RECOVERY-20261020.md).\n\n## Starten und entwickeln
+### What is KiraBridge?
 
-Bestehende Installation öffnen:
+KiraBridge connects your AI conversation with coding assistants such as Codex and
+Grok on your own computer. You describe what you want to build or change. The
+bridge passes an explicit task to the configured assistant and makes its replies
+and results available through the connection.
+
+It is useful for **software projects of many kinds**: building an application,
+adding a feature to an existing program, fixing a bug, running tests or creating
+a website. A website is just one example.
+
+### Why use it?
+
+You can discuss an idea, send the agreed work to your coding assistant and follow
+the result without repeatedly copying text between a chat and a terminal.
+A second configured assistant can review the work. You choose which projects and
+actions the connection may access.
+
+For example:
+
+> “Add a search function to my project, test it, and have another assistant review
+> the changes.”
+
+### How does it work?
+
+1. **Describe the task.** Discuss the result you want in your connected chat.
+2. **Give the instruction.** KiraBridge passes the task to the configured assistant.
+   For visible terminal delivery, it uses the explicitly assigned window.
+3. **Follow the result.** Questions and results return through the configured
+   connection. You can discuss changes and give the next instruction.
+
+A task waiting in a queue has not necessarily reached the terminal. KiraBridge
+tracks delivery, acknowledgement and completion separately.
+
+### What do I need?
+
+- A computer with KiraBridge installed and a configured connection to your chat.
+- Access to the coding assistants you want to use, including their accounts,
+  subscriptions or API access. KiraBridge does not provide these or remove their
+  usage limits.
+- Permissions for the project folders and actions you want to allow.
+
+For the new macOS package: **Python 3.11, uv 0.11.6 and authenticated GitHub
+access**. Intel x86_64 is the primary acceptance target; Apple Silicon has a
+matching dependency lock but still requires its own acceptance run. See the
+[bilingual prerequisites and installation guide](docs/INSTALL-MACOS.md).
+
+### Download and get started
+
+**Latest published release: [v0.8.0rc14](https://github.com/landjunge/KiraBridge/releases/tag/v0.8.0rc14)**
+(private prerelease, 22 October 2026; wheel only).
+
+**RC15 is an unpublished candidate.** The macOS bundle and its installation
+command are described [below](#install--update--installieren--aktualisieren).
+Publication requires successful CI and PR review. The RC15 draft is reserved for authorized reviewers. Existing launchd services continue running when Terminal/browser closes.
+
+### Control and optional tools
+
+You configure access to files, commands and assistants. New connections use
+individual approvals by default; an operator can explicitly allow selected
+actions without repeated approval. Assistants cannot grant themselves more rights.
+
+KiraBridge works independently. An optional ThreadDesk connection can keep project
+information and threads together. Creating a thread does not itself start a coding
+task. Further assistant adapters and their limits are described in the
+[provider guide](docs/providers/README.md).
+
+### What has been checked?
+
+The [RC15 acceptance report](docs/ACCEPTANCE-MACOS-RC15.md) records actual
+package tests and remaining gates. Historical RC12 test counts do not establish
+RC15 acceptance. Mobile, Live voice and end-to-end ChatGPT remain separate checks.
+
+---
+
+## Deutsch
+
+### Zuerst das Wichtigste: Live-Sprache und Terminal-Schnittstellen
+
+Unser gewünschter Arbeitsweg beginnt mit dem **Live-Sprachmodus von ChatGPT**: Wir besprechen eine Idee in einem laufenden, natürlichen Sprachgespräch, legen den Auftrag fest und geben die Übergabe ausdrücklich frei. Das ist **nicht dasselbe wie das Mikrofon-Symbol zur Spracheingabe** in einem Textfeld. Dort wird Gesprochenes lediglich als Text diktiert; daraus entsteht noch kein fortlaufendes Live-Sprachgespräch. Verfügbarkeit und Nutzungslimits des Live-Modus hängen von der ChatGPT-Konfiguration ab.
+
+Für die eigentliche Umsetzung nutzt KiraBridge **Terminal-Schnittstellen** zu den eingerichteten Coding-Agenten, insbesondere **Codex CLI und Grok Build CLI**. Bei entsprechender Einrichtung und Freigabe können beide CLI-Agenten über ausdrücklich geregelte Übergaben Aufgaben, Erkenntnisse und Prüfergebnisse miteinander austauschen. Jede CLI kann außerdem eigene Unteragenten koordinieren. Durch parallele Arbeit lässt sich die Umsetzung komplexer Projekte erheblich beschleunigen. Der tatsächliche Geschwindigkeitsgewinn hängt jedoch von der Aufgabenteilung, den verfügbaren Ressourcen und den Nutzungslimits ab. Diese Zusammenarbeit muss jeweils eingerichtet und geprüft werden; sie ist nicht automatisch in jeder Installation aktiv. Das Sprachgespräch und die Terminal-Übergabe sind zwei getrennte Schritte. Eine verstandene Spracheingabe beweist noch nicht, dass ein Auftrag im Terminal angekommen oder ausgeführt worden ist.
+
+### Was ist KiraBridge?
+
+KiraBridge verbindet dein KI-Gespräch mit Programmierassistenten wie Codex und Grok
+auf deinem eigenen Rechner. Du beschreibst, was du entwickeln oder ändern möchtest.
+Die Bridge übergibt einen konkreten Auftrag an den eingerichteten Assistenten und
+macht seine Rückmeldungen und Ergebnisse über die Verbindung zugänglich.
+
+Das hilft bei **unterschiedlichen Softwareprojekten**: eine Anwendung entwickeln,
+eine Funktion in ein bestehendes Programm einbauen, einen Fehler beheben, Tests
+ausführen oder eine Webseite erstellen. Eine Webseite ist dabei nur ein Beispiel.
+
+### Wozu brauche ich das?
+
+Du kannst eine Idee besprechen, die vereinbarte Arbeit an deinen
+Programmierassistenten geben und das Ergebnis verfolgen. Das wiederholte Kopieren
+zwischen Chat und Terminal entfällt. Ein zweiter eingerichteter Assistent kann die
+Arbeit prüfen. Du bestimmst, auf welche Projekte und Aktionen die Verbindung
+zugreifen darf.
+
+Zum Beispiel:
+
+> „Ergänze eine Suchfunktion in meinem Projekt, teste sie und lass die Änderungen
+> von einem zweiten Assistenten prüfen.“
+
+### Wie funktioniert es?
+
+1. **Aufgabe besprechen.** Du erklärst im verbundenen Chat, welches Ergebnis du
+   möchtest.
+2. **Auftrag geben.** KiraBridge übergibt die Aufgabe an den eingerichteten
+   Assistenten. Bei sichtbarer Terminalübergabe verwendet sie das ausdrücklich
+   zugeordnete Fenster.
+3. **Ergebnis verfolgen.** Rückfragen und Ergebnisse kommen über die eingerichtete
+   Verbindung zurück. Du kannst Änderungen besprechen und den nächsten Auftrag geben.
+
+Ein Auftrag in der Warteschlange ist noch nicht unbedingt im Terminal angekommen.
+KiraBridge unterscheidet deshalb Übergabe, Empfangsbestätigung und Abschluss.
+
+### Was brauche ich dafür?
+
+- Einen Rechner mit installierter KiraBridge und einer eingerichteten Verbindung
+  zu deinem Chat.
+- Zugang zu den gewünschten Programmierassistenten einschließlich ihrer Konten,
+  Abonnements oder API-Zugänge. KiraBridge stellt diese nicht bereit und hebt deren
+  Nutzungslimits nicht auf.
+- Freigaben für die Projektordner und Aktionen, die du erlauben möchtest.
+
+Für das neue macOS-Paket: **Python 3.11, uv 0.11.6 und angemeldeter
+GitHub-Zugriff**. Intel x86_64 ist das primäre Abnahmeziel; Apple Silicon wird
+vom Abhängigkeits-Lock berücksichtigt und benötigt eine eigene Abnahme.
+[Voraussetzungen und Anleitung auf Deutsch/Englisch](docs/INSTALL-MACOS.md).
+
+### Herunterladen und starten
+
+**Zuletzt veröffentlicht: [v0.8.0rc14](https://github.com/landjunge/KiraBridge/releases/tag/v0.8.0rc14)**
+(privates Vorabrelease vom 22.10.2026; bisher nur ein Wheel).
+
+**RC15 ist ein unveröffentlichter Kandidat.** Paket und Installationsbefehl
+stehen [unten](#install--update--installieren--aktualisieren). Veröffentlichung
+erst nach erfolgreicher CI und PR-Review. Noch kein freigegebener RC15-Download.
+Der launchd-Dienst läuft nach Schließen von Terminal oder Browser weiter.
+
+### Kontrolle und optionale Werkzeuge
+
+Du legst die Zugriffe auf Dateien, Befehle und Assistenten fest. Neue Zugänge
+verwenden standardmäßig Einzelgenehmigungen. Der Betreiber kann ausgewählte
+Aktionen ausdrücklich ohne wiederholte Bestätigung erlauben. Assistenten können
+sich selbst keine zusätzlichen Rechte geben.
+
+KiraBridge funktioniert eigenständig. Über eine optionale ThreadDesk-Anbindung
+lassen sich Projektinformationen und Threads zusammenhalten. Einen Thread
+anzulegen startet für sich noch keinen Programmierauftrag. Weitere
+Assistenten-Anbindungen und ihre Grenzen stehen in der
+[Anbieterübersicht](docs/providers/README.md).
+
+### Was wurde geprüft?
+
+Der [RC15-Abnahmebericht](docs/ACCEPTANCE-MACOS-RC15.md) nennt die tatsächlich
+geprüften Pakete und verbleibenden Hürden. Historische RC12-Zahlen belegen keine
+RC15-Abnahme. Handy, Live-Sprache und ChatGPT benötigen getrennte Prüfungen.
+
+---
+
+## Install / update · Installieren / aktualisieren
+
+**RC15-Kandidat: nur für berechtigte Reviewer des Release-Entwurfs; noch kein
+freigegebener Endnutzer-Download. / RC15 candidate: draft reviewers only until CI
+and review pass.** Voraussetzung / prerequisite: Python 3.11, uv 0.11.6 und
+angemeldete GitHub CLI mit Repository-Zugriff / authenticated GitHub CLI.
+Der Befehl lädt authentifiziert, prüft SHA-256 und installiert oder aktualisiert /
+authenticated download, checksum verification and install/update:
 
 ```sh
-kirabridge approvals
+d=$(mktemp -d) && gh release download v0.8.0rc15 -R landjunge/KiraBridge -p 'install-macos.sh*' -D "$d" && (cd "$d" && shasum -a 256 -c install-macos.sh.sha256 && sh install-macos.sh "$@")
 ```
 
-Aus einem Checkout einrichten:
+**Für Erstinstallation und Update derselbe Befehl. RC15 bleibt bis zur Abnahme
+unveröffentlicht. / Same command for install and update. RC15 remains unpublished.**
 
-```sh
-uv sync --locked
-uv run kirabridge setup
-uv run kirabridge service install
-uv run python scripts/build_desktop_app.py  # macOS
-uv run kirabridge approvals
-```
+[Download-Voraussetzungen, Status, Neustart, Rollback und Fehlerbehebung /
+prerequisites, status, restart, rollback and troubleshooting](docs/INSTALL-MACOS.md).
+Keine Apple-Signierung/Notarisierung; kein sudo; vorhandene Konfiguration,
+Zugangsdaten und Nutzerdateien bleiben erhalten. / No Apple signing/notarization,
+no sudo; existing configuration, credentials and user files are preserved.
 
-`setup` überschreibt keine vorhandene private Konfiguration. Die native App ist
-ein Begleitfenster zur lokalen Installation. Andere Systeme verwenden den Browser.
-Konfiguration und Zugangsdaten liegen getrennt unter `~/.config/kirabridge`.
+## Further reading / Weiterführende Dokumentation
 
-```sh
-uv run ruff check .
-uv run ruff format --check .
-uv run pytest -q -W error::pytest.PytestUnraisableExceptionWarning
-uv build
-```
+- [RC15 candidate notes / Kandidatenhinweise](docs/RELEASE-0.8.0rc15.md)
+- [Control center / Steuerfenster](docs/CONTROL-CENTER-0.8.0rc1.md)
+- [ChatGPT connection / ChatGPT-Verbindung](docs/CHATGPT.md)
+- [Team coordination / Zusammenarbeit im Team](docs/TEAM-ORCHESTRATION.md)
+- [ThreadDesk connection / ThreadDesk-Anbindung](docs/THREADDESK-ADAPTER-20261018.md)
+- [Permissions and security / Berechtigungen und Sicherheit](docs/SECURITY.md)
+- [Operations and recovery / Betrieb und Wiederherstellung](docs/OPERATIONS.md)
+- [Architecture and modules / Architektur und Module](docs/ARCHITECTURE.md)
 
-GitHub CI prüft macOS und Linux mit Python 3.11/3.13. Tests verwenden isolierte
-Dateien und Testprozesse; sie starten keine kostenpflichtigen Provideraufträge.
+The download is pinned to tag `v0.8.0rc14`. The `main` branch may contain a
+different development state. / Der Download gehört zum Tag `v0.8.0rc14`; der
+Hauptzweig `main` kann einen anderen Entwicklungsstand enthalten.
 
-## Schnittstellen und Nachweise
+KiraBridge is an independent project and is not an official product of the
+connected AI providers. / KiraBridge ist ein eigenständiges Projekt und kein
+offizielles Produkt der angebundenen KI-Anbieter.
 
-MCP-Clients verbinden sich mit `kirabridge --principal NAME connect`. Der lokale
-Dispatcher besitzt die gemeinsame Warteschlange. Aufträge über `action_request`
-liefern zunächst ihren gespeicherten Zustand; `task_get`, `task_events` und der
-Abschlusskanal liefern die tatsächlichen Ausführungsbelege. `message_receive` und
-`message_ack` unterscheiden Zustellung und Quittierung von der Verarbeitung.
-`session_catalog` liefert konkrete Terminalziele; `session_read`, `session.input`
-und `session_open` lesen, bedienen oder öffnen sie unter der aktuellen Freigabe.
+## Lizenz / License
 
-- [Grok-App-Verbindung](docs/GROK-APP-CONNECTOR.md)
-- [ChatGPT-Verbindung](docs/CHATGPT.md)
-- [Abschlussmeldungen und Rückgabe](docs/COMPLETION-CHANNEL-20261019.md)
-- [Architektur](docs/ARCHITECTURE.md)
-- [Betrieb und Wiederherstellung](docs/OPERATIONS.md)
-- [Agentennachrichten](docs/AGENT_CHANNEL.md)
-- [CLI-Anbieter](docs/providers/README.md)
-- [ThreadDesk-Anschluss](docs/THREADDESK-ADAPTER-20261018.md)
+**Deutsch:** Es gilt die **Netzwerkpunkt Personal Use License 1.0**, eine individuelle Source-available-Lizenz. Private, nicht geschäftliche Nutzung ist kostenlos erlaubt, einschließlich privater Anpassungen und privatem Self-Hosting. Interner Firmeneinsatz, berufliche Nutzung, Weiterverkauf und kostenpflichtige Dienste benötigen eine vorherige schriftliche Erlaubnis beziehungsweise gesonderte Lizenz. Es gibt keine allgemeine Weiterverteilungserlaubnis. Historische Rechte und gesonderte Drittanbieter-Lizenzen bleiben erhalten. [Vollständige Bedingungen](LICENSE).
 
-Ältere datierte Abnahmeberichte dokumentieren ihren damaligen Stand.
-Aktuelle Rechte und Zustände zeigt die laufende Steuerung.
-Das Repository bleibt privat. Es gilt die [Lizenz](LICENSE).
+**English:** The **Netzwerkpunkt Personal Use License 1.0** provides custom source-available terms. Private, non-business use is free, including private modifications and private self-hosting. Internal business or professional use, resale and paid services require prior written permission or a separate license. No general redistribution permission is granted. Historical rights and separate third-party licenses remain intact. [Full terms](LICENSE); the German text governs.
+
+Dies ist keine Open-Source-Standardlizenz; eine anwaltliche Prüfung wurde nicht durchgeführt. / This is not a standard open-source license and has not undergone legal review.
+
+Die Projektseite `kirabridge.netzwerkpunkt.de` bleibt geplant. Noch kein öffentlicher Download und keine Sichtbarkeitsänderung. / The project site remains planned; there is no public download or visibility change.
+

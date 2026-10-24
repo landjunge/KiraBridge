@@ -91,7 +91,7 @@ def write_private(path: Path, text: str | bytes, *, mode: int = 0o600) -> None:
         os.fsync(output.fileno())
 
 
-def setup(workspace: str, destination: Path | None = None) -> dict:
+def setup(workspace: str, destination: Path | None = None, *, install_wrapper: bool = True) -> dict:
     destination = destination or default_config()
     private_directory(destination.parent)
     if destination.exists():
@@ -158,7 +158,7 @@ def setup(workspace: str, destination: Path | None = None) -> dict:
     command_path = Path.home() / ".local/bin/kirabridge"
     command_path.parent.mkdir(parents=True, exist_ok=True)
     wrapper = f'#!/bin/sh\nexec {shlex.quote(sys.executable)} -m kirabridge.cli "$@"\n'
-    if not command_path.exists():
+    if install_wrapper and not command_path.exists():
         write_private(command_path, wrapper, mode=0o700)
     return {
         "config": str(destination),
@@ -170,7 +170,7 @@ def setup(workspace: str, destination: Path | None = None) -> dict:
     }
 
 
-def install_service(config_path: Path) -> dict:
+def install_service(config_path: Path, *, command: str | None = None) -> dict:
     if sys.platform != "darwin":
         raise BridgeError("unsupported_platform", "Use the documented systemd unit on Linux")
     launch_dir = Path.home() / "Library/LaunchAgents"
@@ -186,6 +186,8 @@ def install_service(config_path: Path) -> dict:
         "--transport",
         "http",
     ]
+    if command is not None:
+        arguments = [command, "serve", "--transport", "http"]
     if plist_path.exists():
         previous = plistlib.loads(plist_path.read_bytes())
         if previous.get("ProgramArguments") != arguments:

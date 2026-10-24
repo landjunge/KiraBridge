@@ -11,6 +11,7 @@ from pathlib import Path
 
 from pydantic import ValidationError
 
+from kirabridge import __version__
 from kirabridge.audit_manager import verify
 from kirabridge.bridge_core.bridge import Bridge
 from kirabridge.bridge_core.config import load_config
@@ -38,8 +39,14 @@ async def execute(args) -> None:
         from kirabridge.local_runtime import default_config
 
         config_path = Path(args.config).expanduser().absolute() if args.config else default_config()
-        release_root = Path(args.release_root).expanduser().absolute() if args.release_root else None
-        emit(await guided_install(config_path, release_root, language=args.language, check=args.check))
+        release_root = (
+            Path(args.release_root).expanduser().absolute() if args.release_root else None
+        )
+        emit(
+            await guided_install(
+                config_path, release_root, language=args.language, check=args.check
+            )
+        )
         return
     if args.command == "setup":
         from kirabridge.local_runtime import setup
@@ -521,6 +528,7 @@ async def run_request(bridge, principal, request, wait, approve, original=None):
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="KiraBridge private desktop bridge")
+    parser.add_argument("--version", action="version", version="%(prog)s " + __version__)
     parser.add_argument("--config", help="TOML policy file (or KIRABRIDGE_CONFIG)")
     parser.add_argument("--principal", default="local", help="Local CLI/stdio policy identity")
     sub = parser.add_subparsers(dest="command", required=True)
