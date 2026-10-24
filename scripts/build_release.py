@@ -35,7 +35,8 @@ def build(output):
     files = {"wheel/" + wheel.name: wheel.read_bytes()}
     for name in git("ls-files").splitlines():
         if name.startswith(("src/", "docs/")) or name in {"pyproject.toml", "uv.lock", "LICENSE"}:
-            files["payload/" + name] = subprocess.check_output(["git", "show", f"{commit}:{name}"])
+            member = name if name.startswith("docs/") else "payload/" + name
+            files[member] = subprocess.check_output(["git", "show", f"{commit}:{name}"])
     files["installer/install.py"] = Path("installer/install.py").read_bytes()
     files["INSTALL.md"] = (
         Path("docs/INSTALL-MACOS.md").read_bytes().replace(b"](CHATGPT.md)", b"](docs/CHATGPT.md)")
