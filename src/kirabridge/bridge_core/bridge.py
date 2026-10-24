@@ -460,9 +460,42 @@ class Bridge:
             target, selected_binding = self.sessions.explicit_agent_binding(selected)
             if target:
                 if not args.submit:
-                    raise BridgeError(
-                        "visible_submit_required", "Agent handoffs include a separate Return"
-                    )
+                    # Paste-only is an explicit task, never a submitted agent handoff.
+                    # Retain agent access control even though no Return is sent.
+                    agent_policy = self.security.principal(principal, "agent.execute")
+                    if target not in agent_policy.agents:
+                        raise BridgeError("agent_denied", "Selected agent is not granted")
+                    self.security.principal(principal, "terminal.execute")
+                    async with self.sessions.agent_selection(principal, target, selected_binding):
+                        await self.visible_handoffs.check_target(
+                            principal, target, selected_binding, ready=True
+                        )
+                        await self.visible_handoffs.reconcile_target_reservations(
+                            principal, target, selected_binding
+                        )
+                        await running(
+                            {
+                                "evidence_type": "visible_paste_dispatch",
+                                "terminal_input_attempted": True,
+                                "pane_id": args.pane_id,
+                                "expected_pid": args.expected_pid,
+                                "agent_pid": selected_binding.agent_pid,
+                                "return_sent": False,
+                                "agent_confirmed": False,
+                                "automatic_retry": False,
+                            }
+                        )
+                        approved = self.tasks.input_policy.dispatch(principal, args, task["id"])
+                        result = await self.sessions.insert(principal, approved)
+                    self.tasks.input_policy.sent(principal, task["id"])
+                    return {
+                        **result,
+                        "pane_id": args.pane_id,
+                        "expected_pid": args.expected_pid,
+                        "submitted": False,
+                        "execution_confirmed": False,
+                        "scope": "literal paste event only; no Return or agent acknowledgement",
+                    }
                 approved = self.tasks.input_policy.dispatch(principal, args, task["id"])
                 result = await self.visible_handoffs.execute(
                     task,

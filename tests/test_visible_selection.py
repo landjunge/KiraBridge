@@ -300,3 +300,103 @@ async def test_explicit_handle_does_not_grant_an_unallowed_agent(visible, config
             callback,
         )
     assert exc.value.code == "agent_denied" and not transport["calls"]
+
+
+@pytest.mark.parametrize("uncertain", [False, True])
+async def test_paste_only_is_durable_exact_and_never_replayed(
+    visible, config, monkeypatch, uncertain  # noqa: F811
+):
+    from conftest import request
+
+    from kirabridge.bridge_core.models import UncertainExecution
+
+    bridge, transport = visible
+    transport.update(target="codex", text="› ")
+    row = new_row()
+    await new_selection(bridge, monkeypatch, row)
+    config.session_input_policy.enabled = True
+    config.session_input_policy.principals = ["chatgpt"]
+    texts = []
+
+    async def paste(principal, args):
+        assert bridge.sessions.current_selection()[0] == "codex"
+        task = bridge.store.get("literal-paste", principal)
+        assert task["state"] == "running"
+        assert task["evidence"]["terminal_input_attempted"] is True
+        assert task["input_buffer"]["state"] == "dispatching"
+        texts.append(args.text)
+        if uncertain:
+            raise UncertainExecution("session_input_unknown", "Outcome unknown; do not resend")
+        return {"paste_event_sent": True, "return_sent": False, "agent_confirmed": False}
+
+    monkeypatch.setattr(bridge.sessions, "insert", paste)
+    value = request(
+        "session.input",
+        {
+            "pane_id": row["pane_id"],
+            "expected_pid": row["expected_pid"],
+            "text": "Unicode 😀\nLiteral text go-go-go",
+            "submit": False,
+        },
+        task_id="literal-paste",
+    )
+    before = config.visible_handoffs.bindings["codex"].model_dump()
+    async with bridge:
+        bridge.prepare("chatgpt", value)
+        task = await bridge.tasks.wait("chatgpt", value.task_id, timeout=5)
+        assert task["state"] == ("unknown" if uncertain else "completed"), task
+        if uncertain:
+            assert task["evidence"]["safe_to_retry"] is False
+            assert task["evidence"]["last_observation"]["return_sent"] is False
+        else:
+            assert task["input_buffer"]["state"] == "sent"
+            assert task["result"]["paste_event_sent"] is True
+            for key in ("return_sent", "agent_confirmed", "execution_confirmed", "submitted"):
+                assert task["result"][key] is False
+        assert bridge.submit("chatgpt", value, "")["state"] == task["state"]
+    from kirabridge.bridge_core.bridge import Bridge
+
+    restarted = Bridge(config)
+    try:
+        restarted.store.recover()
+        assert restarted.submit("chatgpt", value, "")["state"] == task["state"]
+        assert (
+            restarted.store.db.execute("SELECT count(*) FROM visible_handoffs").fetchone()[0] == 0
+        )
+    finally:
+        restarted.store.close()
+    assert texts == ["Unicode 😀\nLiteral text"]
+    assert not transport["calls"]
+    assert config.visible_handoffs.bindings["codex"].model_dump() == before
+    assert bridge.sessions._selection.get() is None
+
+
+@pytest.mark.parametrize("denial", ["agent", "busy"])
+async def test_paste_only_rejects_denied_agent_or_active_widget_before_input(
+    visible, config, monkeypatch, denial  # noqa: F811
+):
+    bridge, transport = visible
+    row = new_row()
+    await new_selection(bridge, monkeypatch, row)
+    transport.update(target="codex", text="› ")
+    if denial == "agent":
+        config.principals["chatgpt"].agents = ["grok"]
+    else:
+        transport["text"] = "• Working (12s • esc to interrupt)\n› "
+    with pytest.raises(BridgeError):
+        await bridge.execute(
+            {
+                "id": "denied-paste",
+                "principal": "chatgpt",
+                "operation": "session.input",
+                "args": {
+                    "pane_id": row["pane_id"],
+                    "expected_pid": row["expected_pid"],
+                    "text": "must not paste",
+                    "submit": False,
+                },
+            },
+            callback,
+            callback,
+        )
+    assert not transport["calls"]

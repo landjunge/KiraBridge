@@ -72,3 +72,35 @@ Reproduce the narrow native fixture only in a controlled GUI session using
 the development interpreter. The script persists fixture identity/FD evidence before
 input and preserves a still-busy changed fixture on failure. Do not rerun unknown user
 handoffs or change productive permissions to make the test pass.
+
+## Paste without Return / Einfügen ohne Return
+
+Follow-up to `2c1c7af`: the explicit `session.input` route rejected `submit=false`
+with `visible_submit_required` even after deriving a fresh binding. Paste-only now
+uses that task-owned selection and the same native identity/readiness/viewport/focus
+guards. Agent access restrictions, input-release policy and existing handoff
+reservations remain enforced. Only the exact policy-approved text is pasted; the
+existing `go-go-go` release suffix is consumed by policy, with no added handoff marker.
+
+A durable `visible_paste_dispatch` observation precedes possible input. A transport
+failure after this boundary leaves the task `unknown`, with `safe_to_retry=false`.
+Resubmission of the same task/idempotency key and daemon recovery return its durable
+state without another paste. Do not retry uncertain input under a new ID. No automatic
+Return or handoff-continuation route is created for this operation; inspect the task
+and current widget to reconcile uncertainty. A successful task means only
+`paste_event_sent=true`; `return_sent`, `submitted`, `agent_confirmed` and
+`execution_confirmed` remain false. This is not an execution receipt.
+
+Four specifically added tests cover exact Unicode/multiline policy-approved bytes,
+permission/activity refusal, durable pre-input evidence, uncertain transport outcome,
+idempotent resubmission and reopened-database recovery. All four passed. Two initial
+failures were test cleanup reading the fixture's already-closed database; those two
+were corrected to reopen the isolated state and rerun successfully. Existing native
+guard/selection tests cover the reused input boundary; no native positive acceptance
+has been added. In particular the user's Terminal 38077 was never typed into or
+stopped, and this change does not claim a successful native paste there.
+
+The six directly related regression cases also passed: the four existing submitted
+central-route cases, task-owned native guard propagation and immutable old unknown
+handoff rejection. Ruff on the changed Python files and `git diff --check` passed.
+No full suite or additional GUI probe was run for this follow-up.
