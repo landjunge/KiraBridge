@@ -1,0 +1,46 @@
+{
+  "base_commit": "c0f94886bf1ba8f67f9e41d5bea97ca8587a155e",
+  "platform": "macOS-15.7.4-x86_64-i386-64bit",
+  "new_defects": [
+    "require_idle falsely equated agent process presence with activity",
+    "unknown handoff globally blocked independent explicit paste window"
+  ],
+  "targeted_final_checks": {
+    "idle_native_identity_and_busy_shell": 4,
+    "resource_isolation_guards": 7,
+    "permission_activity_durable_unknown_no_replay": 4
+  },
+  "correct_reproductions": {
+    "idle": "idle-before.log",
+    "reservation": "reservation-before-correct.log"
+  },
+  "fixture_failures_retained": [
+    "missing conversation",
+    "work route fixture needed visible_internal=True",
+    "Codex fixture needed Codex renderer"
+  ],
+  "whole_suite_run": false,
+  "production_version_before": "0.8.0rc14",
+  "production_configuration_changed": false,
+  "queued_deliveries_received_via_mcp_not_executed": 3,
+  "log_hashes": {
+    "idle-after.log": "5f7a31871ed64a73f2b0026c6f11eb66a7cdc637e0f6d769da10514a9555745e",
+    "idle-before.log": "6816ecebfd9a23133723720ed5c163bb72dc21eb181ebc388b156d3e188b3310",
+    "paste-regression.log": "9088ab3778ca9f444a1802d43efefb74d45fb5756d7cd8ee4418bf76df25004e",
+    "reservation-after-correct.log": "bc65fea56c68f1a807dc2339b23a78aedc6580de5b33f37938f9efa9ddcc4a82",
+    "reservation-after-fixed-fixture.log": "8ea67682d9d3ae1eda6cb890ccc14055487005a192e8812abf603cce845ecb9d",
+    "reservation-after-real.log": "36d96df369512b4a263af9251df1fd984a02fb2c4b6bcafe1c9cb170005558bf",
+    "reservation-after.log": "e6d2ad77a7ee8a305c607f5f90344ba5eb3bd09c164a255f07e5aecc728ce471",
+    "reservation-before-correct.log": "1c69f34b6c36a7d598ca8c31320b63e92c666a01d0df07a7fb45a3a3aefeac61",
+    "reservation-before-fixed-fixture.log": "a17a36cbb83a44e190973338d63f2dad3fbcc9921a70fbcd70c7072335269d0f",
+    "reservation-before-real.log": "751e72cf993c230ca6ffa0d6af8ef888d41ab80470bc966b4d43c586179e6c2c",
+    "reservation-before.log": "0365402b00300d585c12bdb8f566ca668d87dfd4b9beed03bf8334d6772e100b"
+  },
+  "source_hashes": {
+    "src/kirabridge/session_manager.py": "307b7dc1339f615a58a0cd27d6b845687d174cf8551edfbb227f6f8965cfa454",
+    "src/kirabridge/visible_handoff.py": "4228c25169a453c8e73bbf2040706f6d77fbfa0b6babaa46f627a38001f10c2d",
+    "src/kirabridge/bridge_core/bridge.py": "fca57ae32f1804c462e151422796ae072de90ea6b2fe48e0fe592bcefb633855",
+    "tests/test_visible_selection.py": "aa721a5c7768d75866fbba918df86f6ef7e0c60e49eb5d4c9529084b29ee5e8e",
+    "scripts/accept_macos_release.py": "fb9183ca115394068c4565975f0b40414d8fbcee1ebabc62df238b55eaa26e0c"
+  }
+}
