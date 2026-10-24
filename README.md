@@ -24,6 +24,23 @@ Der Reparaturbranch ergänzt eine identitätsgebundene Queue-Verwaltung. Sie ist
 
 ## English
 
+### Current repair status (unreleased)
+
+The development branch fixes stale explicit visible-agent selection and permits
+authorized `session.input(submit=false)` paste without Return. Process identity,
+current focus, readiness and unchanged-input guards remain mandatory. Positive
+native input acceptance is **still open**; this is not a production fix claim.
+[Terminal evidence and limits](docs/VISIBLE-SELECTION-20261024.md).
+
+Whiteboard mutations now preflight fresh peer schemas and report safe character/
+byte diagnostics. An isolated real ThreadDesk MCP run verified 10,000 description
+characters and 100,000 emoji note characters (400,000 UTF-8 bytes), with independent
+readback. Larger content needs an agreed lossless receiver contract, not truncation.
+[Whiteboard evidence](docs/WHITEBOARD-BOUNDARIES-20261024.md) ·
+[Current integration report](docs/REPAIR-SEQUENCE-20261024.md).
+Published RC14 and its installer status remain as described below; no new release
+or production installation is implied by these source changes.
+
 ### Start here: live voice and terminal connection
 
 KiraBridge's intended conversational workflow starts with **ChatGPT Live voice mode**: you speak naturally with the assistant in a real-time voice conversation, agree on a task, and explicitly authorize its handoff. This is **not the same as tapping the microphone icon to dictate text** into a message field. Dictation converts speech into text; it is not, by itself, a continuous live voice conversation. Live voice availability and limits depend on the user's ChatGPT setup.
@@ -149,6 +166,23 @@ file selection and actual ThreadDesk durable imports must not be inferred from f
 ---
 
 ## Deutsch
+
+### Aktueller Reparaturstand (unveröffentlicht)
+
+Der Entwicklungsbranch behebt veraltete explizite Agenten-Zuordnungen und erlaubt
+autorisierte reine Paste mit `session.input(submit=false)` ohne Return. Prozess-,
+Fokus-, Bereitschafts- und Eingabeprüfungen bleiben verpflichtend. Die positive
+native Eingabe-Abnahme ist **weiter offen**; keine produktive Reparatur behauptet.
+[Terminalbelege und Grenzen](docs/VISIBLE-SELECTION-20261024.md).
+
+Whiteboard-Mutationen prüfen frische Peer-Schemas und melden sichere Zeichen-/
+Byte-Diagnosen. Ein isolierter echter ThreadDesk-MCP-Lauf bestätigte 10.000 Zeichen
+Beschreibung und 100.000 Emoji Notiz (400.000 UTF-8-Bytes) mit separatem Readback.
+Größere Inhalte benötigen einen verlustfreien Empfängervertrag statt Abschneiden.
+[Whiteboardbelege](docs/WHITEBOARD-BOUNDARIES-20261024.md) ·
+[Integrationsstand](docs/REPAIR-SEQUENCE-20261024.md).
+Veröffentlichtes RC14 und dessen unten beschriebener Installationsstand bleiben
+unverändert; diese Quelländerungen bedeuten weder neues Release noch Installation.
 
 ### Zuerst das Wichtigste: Live-Sprache und Terminal-Schnittstellen
 

@@ -304,7 +304,10 @@ async def test_explicit_handle_does_not_grant_an_unallowed_agent(visible, config
 
 @pytest.mark.parametrize("uncertain", [False, True])
 async def test_paste_only_is_durable_exact_and_never_replayed(
-    visible, config, monkeypatch, uncertain  # noqa: F811
+    visible,  # noqa: F811
+    config,
+    monkeypatch,
+    uncertain,
 ):
     from conftest import request
 
@@ -373,7 +376,10 @@ async def test_paste_only_is_durable_exact_and_never_replayed(
 
 @pytest.mark.parametrize("denial", ["agent", "busy"])
 async def test_paste_only_rejects_denied_agent_or_active_widget_before_input(
-    visible, config, monkeypatch, denial  # noqa: F811
+    visible,  # noqa: F811
+    config,
+    monkeypatch,
+    denial,
 ):
     bridge, transport = visible
     row = new_row()

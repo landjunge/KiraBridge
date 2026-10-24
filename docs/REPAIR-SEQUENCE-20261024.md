@@ -94,3 +94,68 @@ status/documentation update.
 PR26 source check [40101832381](https://github.com/landjunge/KiraBridge/actions/runs/40101832381)
 failed before steps: recent account payments failed or the spending limit must increase.
 Review and deployment acceptance remain open; no merge or release publication occurred.
+
+## Native-team milestone and corrected scope
+
+The user's later explicit team instruction authorized independent terminal/Whiteboard
+development and a read-only receiver audit while production gates remain open.
+No queue repair was duplicated. `/root/terminal_repair` and `/root/whiteboard_repair`
+worked in their own KiraBridge worktrees; `/root/receiver_contract_audit` independently
+reviewed the terminal safety contract and receiver/index boundaries. Root reviewed
+the results before cherry-picking. No ThreadDesk source was changed.
+
+The accidentally pasted Codex-3 Server & Sync instruction was withdrawn. This session
+created no Server & Sync source, branch, worktree or project entry and did not touch
+Codex-2/3 sessions. Only a temporary internal steering message was sent and rescinded.
+
+**Completed in isolated code:** fresh task-owned explicit window/TTY/process binding;
+old unknown handoffs never migrate. `submit=false` now supports permission-checked pure
+Paste without Return, with durable uncertain-state/no-replay protection. Source commits
+`2c1c7af`, `ae5f0fd` map to integrated `099ddd5`, `eab1b1e`. Independent C review found
+no remaining identified safety blocker; it is not positive native acceptance.
+The reported Terminal 38077 / ttys001 / expected_pid 12591 was catalogued and read
+successfully again without input. Its agent process was an OS observation, not a
+cryptographic identity. No user terminal was typed into or stopped.
+
+**Required targeted evidence:** 90 affected selection/handoff cases, then three changed
+raw-image capture cases; four added paste-only cases and six direct regressions passed.
+Two paste-only test fixture cleanup failures were corrected and only those cases rerun.
+Native Intel-macOS negative guards and actual JavaScriptCore Unicode check passed.
+Positive native Paste/Return did NOT pass: the focus guard refused. Actual Codex/Grok
+end-to-end input/restart remains open. See [terminal report](VISIBLE-SELECTION-20261024.md).
+
+Whiteboard source `cc0201b` maps to `691e78d`: fresh peer preflight, bounded schema
+validation, safe character/byte diagnostics, no truncation or blind create replay.
+39 new cases were covered incrementally, not a repeated complete suite. A separate
+single real pinned ThreadDesk64353be MCP/private-store run validated 10,000-character
+description, 100,000-emoji note and independent raw/readback equality; 10,001-description
+preflight left the store unchanged. Source `4ee96f3` maps to `c60c1d3`; later harness-only
+HOME correction `fb08f90` maps to `2a57605`, linted but not rerun. Historical evidence
+states the original child environment. No product profile was changed.
+See [Whiteboard report](WHITEBOARD-BOUNDARIES-20261024.md).
+
+**Concrete work-memory failure:** `team-interop-plan-188-20261024-01` returned peer
+`tool_error`, details `{}`. Operation status was `found=false`; its marker was absent
+from revision11. No blind retry and no unproved size-limit cause claimed. A subsequent
+distinct correction/status note `[KB-CODEX1-CORRECTION-20261024-01]` saved revision12;
+separate readback confirmed the entire note and exactly one marker. Earlier plan/team/
+audit notes were independently confirmed at revisions5,6,9. Existing content preserved.
+
+**Open / blocked:** positive controlled native input acceptance, required GitHub checks
+and review, explicit production acceptance/deployment. Current TD64353be lacks the
+negotiated receiver/index MCP operations; selected authorized Library file bytes are
+not supplied. No import, indexing or duplicate queued Library execution was performed.
+The [receiver/index contract](RECEIVER-INDEX-CONTRACT-20261024.md) describes concrete
+missing boundaries. Published release remains RC14; RC15/RC16 are drafts. No new
+package acceptance or installation command for this unreleased patch is claimed.
+
+**Next step:** push reviewed integration, open a stacked PR above PR26, retain required
+CI/review gates and report their actual outcomes. Do not repeat passed suites merely
+because commits were cherry-picked unchanged. Production RC14, credentials, files,
+permissions and launchd lifetime remain unchanged.
+
+Integration Ruff passed on the changed Python files. Format checking initially found
+two test signature layouts; formatting moved their existing F811 comments. The two
+comments were placed on the corresponding fixture parameters and only that file's
+Ruff/format checks were repeated: passed. No behavior changed or test suite repeated.
+Work-memory/target-read evidence: [correction confirmation](evidence/codex1-correction-20261024.json).
