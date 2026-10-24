@@ -45,5 +45,10 @@
     "aggregate beyond-budget contents still require a compatible receiver contract"
   ],
   "kirabridge_manager_sha256": "1150e11c2efd01f6d32e777c90416df01e25b93fd73ad66679d296f41b508c3a",
-  "kirabridge_contract_sha256": "017a7cae139b1ddfc6ba5b6300a97bc31a5f681973213dac789ec62c3a37259e"
+  "kirabridge_contract_sha256": "017a7cae139b1ddfc6ba5b6300a97bc31a5f681973213dac789ec62c3a37259e",
+  "harness_correction": {
+    "change": "Removed child HOME and XDG_CONFIG_HOME overrides; retain explicit JsonStore and THREADDESK_HOME",
+    "acceptance_rerun": false,
+    "historical_evidence": "The original single executed run used the isolated child HOME described in setup; that original result is retained unchanged."
+  }
 }

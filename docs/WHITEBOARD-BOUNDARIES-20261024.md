@@ -105,8 +105,13 @@ One targeted acceptance run used the **actual unmodified** ThreadDesk source com
 `64353be01082251b6af72d0096ce0a57d66c5501`, downloaded only under KiraBridge `dist`.
 No package/dependency was installed. A fixed guarded launcher called
 `threaddesk.ui.mcp_stdio.serve(ThreadService(store=JsonStore(explicit_new_root)))`.
-`THREADDESK_HOME`, HOME and the store were explicitly isolated; default profiles were
-not used. The source Python hash was identical before/after.
+In that original executed run, `THREADDESK_HOME` and the store were explicitly isolated,
+and the launcher also overrode its child process HOME. Default profiles were not used;
+the source Python hash was identical before/after. A subsequent harness-only correction
+removed HOME and XDG_CONFIG_HOME overrides because HOME must not be repurposed.
+The fixed explicit `JsonStore` plus `THREADDESK_HOME` remains the isolation boundary.
+The corrected harness has **not** been rerun; the evidence below describes the original
+single run accurately, rather than claiming new acceptance.
 
 Actual macOS 15.7.4 Intel x86_64 results through KiraBridge **Bridge/TaskManager**:
 

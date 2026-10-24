@@ -49,8 +49,8 @@ async def accept(source, root, archive):
         raise RuntimeError("Pinned source is missing")
     root.mkdir(mode=0o700, parents=True, exist_ok=False)
     os.umask(0o077)
-    store, home, workspace = root / "td-store", root / "home", root / "kb-workspace"
-    for path in (store, home, workspace):
+    store, workspace = root / "td-store", root / "kb-workspace"
+    for path in (store, workspace):
         path.mkdir(mode=0o700)
     before_source = source_hash(source)
     if before_source != PINNED_SOURCE_SHA256:
@@ -61,10 +61,8 @@ async def accept(source, root, archive):
     launcher.write_text(
         "import os,sys\nfrom pathlib import Path\n"
         f"store=Path({str(store)!r})\nsource=Path({str(source / 'src')!r})\n"
-        f"home=Path({str(home)!r})\n"
         "assert Path(os.environ['THREADDESK_HOME']).resolve()==store\n"
         "assert store.stat().st_uid==os.getuid() and not store.stat().st_mode & 0o077\n"
-        "os.environ['HOME']=str(home)\nos.environ['XDG_CONFIG_HOME']=str(home/'config')\n"
         "sys.dont_write_bytecode=True\n"
         "import threaddesk\n"
         "assert Path(threaddesk.__file__).resolve().is_relative_to(source)\n"
@@ -226,9 +224,8 @@ async def accept(source, root, archive):
             )
             evidence["preflight_error"] = error
         assert source_hash(source) == before_source
-        assert not (home / ".threaddesk").exists()
         evidence["checks"].append(
-            "source unchanged; explicit store only; no default profile created"
+            "source unchanged; explicit JsonStore supplied; no default-store constructor requested"
         )
         evidence["passed"] = True
     except Exception as exc:
