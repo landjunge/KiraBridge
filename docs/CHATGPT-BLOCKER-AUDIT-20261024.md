@@ -92,3 +92,38 @@ case passed. No full suite. Actual Intel-macOS stdin execution, numeric generati
 and restoration after an independently killed worker passed with the known own
 clipboard fixture; [evidence](evidence/rc17-clipboard-lease-macos-20261024.json).
 This does not yet claim a passing productive native paste.
+
+## Installed full grant and final terminal responsiveness follow-up
+
+RC17/5d1cba1 was built twice identically and passed actual isolated Intel-macOS
+upgrade/status/data preservation/rollback before productive installation. It ran
+as PID65344. The subsequent explicit local ChatGPT-only ACL activation completed
+as activation-e14e0a12614d4cfb8b1e048dea7797e7, preserving every handoff and handoff
+event, credential bytes/mode and all unrelated configuration. The actual Kira Apps
+operation_catalog independently reported all42 registered operations authorized
+and automatic, none missing a capability and none requiring approval. Runtime
+PID65459/source5d1cba1/config SHA4d116741… was independently read back. The source
+fingerprint was b4d9be4a75e34678829ab13899ba9caf93919d3b6e8e4d63187310a7a91307d3.
+File-module/receiver prerequisites remain distinct from this complete ACL grant.
+
+Actual input test4 was refused before native intent with TimeoutError; no input
+execution claimed. Read-path profiling on the own fixture measured2.08s normally,
+but exposed three complete catalogs and four desktop/native probes inside the8s
+read budget. The read/readiness chain now shares one fresh, private operationscope:
+principal/handle/PID/current-task/active lifetime must match, inherited expired or
+foreign scopes refuse. It is never input authorization. Fresh agent_selection,
+insert selection and native identity/focus/widget checks remain. Count reproduction
+failed3!=1 before repair; the count case and six necessary scope/read/selection
+regressions passed. No global stale window cache or caller-supplied snapshot.
+
+An additional native stall risk was explicit: the Edit menu stayed in tracking mode
+while Terminal Apple events and process checks were requested. Preparation now
+validates then AXCancels that menu before all guards, and invokes only the exact
+Paste item's documented AXPress action afterward. An actual own-window Intel-macOS
+probe confirmed enabled Einsetzen/AXPress, closed-menu geometry and exact focus
+recheck, without Paste: [probe](evidence/rc17-native-menu-20261024.json).
+Activation is acquired once with a bounded2s observation wait; subsequent input
+checks remain immediate. Mutation-worker budget is15s, accommodating the measured
+4.651s pre-Paste path plus bounded2s focus and4s observation phases; reads retain
+their prior budget. Five directly affected JXA/identity/lease/cancellation checks
+passed. This still is not a passing installed final-Paste claim.

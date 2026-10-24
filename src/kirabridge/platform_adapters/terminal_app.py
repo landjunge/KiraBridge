@@ -38,7 +38,7 @@ class TerminalAppTransport:
             stderr=asyncio.subprocess.PIPE,
         )
         try:
-            async with asyncio.timeout(10):
+            async with asyncio.timeout(15 if mutation else 10):
                 stdout, stderr = await child.communicate(source.encode("utf-8"))
             if child.returncode:
                 detail = stderr.decode("utf-8", "replace")[:1024]
@@ -213,7 +213,13 @@ class TerminalAppTransport:
        expected_window:{int(window)}, expected_tty:{json.dumps("/dev/" + tty)}
       }}));
     }}
-    checkFocus();"""
+    // Window activation is asynchronous. Acquire once with a bounded wait;
+    // later pre-input checks remain immediate and never reassert focus.
+    const focusDeadline=Date.now()+2000;
+    while(true) {{
+     try {{ checkFocus(); break; }}
+     catch(error) {{ if(Date.now()>=focusDeadline) throw error; delay(0.05); }}
+    }}"""
         )
 
     @staticmethod
@@ -288,18 +294,25 @@ class TerminalAppTransport:
         }}
         checkClipboard(); checkFocus();
         const editItem=se.processes.byName("Terminal").menuBars()[0].menuBarItems()[3];
+        // Validate the menu, then close tracking BEFORE Terminal Apple events.
+        // AXPress targets this exact Paste item without leaving a menu open.
         editItem.click();
-        const edit=editItem.menus()[0], paste=edit.menuItems()[6];
-        if(!["Einsetzen","Paste"].includes(paste.name()))
-         throw Error("Literal Paste menu action unavailable");
-        if(!paste.enabled()) throw Error("Literal Paste action is disabled; no paste sent");
+        const edit=editItem.menus()[0]; let paste;
+        try {{
+         paste=edit.menuItems()[6];
+         if(!["Einsetzen","Paste"].includes(paste.name()))
+          throw Error("Literal Paste menu action unavailable");
+         if(!paste.enabled()) throw Error("Literal Paste action is disabled; no paste sent");
+         if(!paste.actions.name().includes("AXPress"))
+          throw Error("Literal Paste action is unavailable; no paste sent");
+        }} finally {{ edit.actions.byName("AXCancel").perform(); }}
         if(typeof checkTargetIdentity === 'function') checkTargetIdentity();
         checkFocus(); checkClipboard();
 """
                     + self.native_screen_guard(expected_screen)
                     + """
         const beforePaste=tab.contents();
-        paste.click();
+        paste.actions.byName("AXPress").perform();
         let echoed=false; const echoDeadline=Date.now()+4000;
         while(Date.now()<echoDeadline) {
          delay(0.1); checkFocus();

@@ -54,7 +54,7 @@ async def test_clipboard_owner_outlives_failed_gui_worker():
     async def failed_worker(source, *, mutation=False):
         assert events == ["owner_ready"]
         assert "!==123" in source and source.index("checkClipboard();") < source.index(
-            "paste.click();"
+            'paste.actions.byName("AXPress").perform();'
         )
         assert "saved=[]" not in source and "pb.clearContents" not in source
         events.append("worker_reaped")

@@ -1,0 +1,20 @@
+{
+  "focus_rechecked_after_closed_menu": true,
+  "paste": {
+    "name": "Einsetzen",
+    "enabled": true,
+    "actions": [
+      "AXCancel",
+      "AXPress",
+      "AXPick"
+    ]
+  },
+  "menu_size_after": [
+    0,
+    0
+  ],
+  "input_sent": false,
+  "os": "macOS-15.7.4-x86_64-i386-64bit",
+  "architecture": "x86_64",
+  "scope": "own confirmed fixture; AXPress availability only, no Paste performed"
+}
