@@ -86,3 +86,11 @@ Bridge dependency and reverse session import. Existing task queue/audit/MCP owne
 PathScope are reused. File-transfer dependency tests reject imports of Bridge, UI,
 terminal or provider-agent implementations. Remaining legacy potential cycles are
 explicitly retained rather than claimed fixed by a whole-project rewrite.
+
+## Final upstream recheck
+
+ThreadDesk main advanced to `55e90dd2d1d59961a832a6bc7c2a64fe733886db` through
+PR #86 during this work. Its `services/library_import.py:LibraryImporter` is now
+a real local persistent file importer; the MCP service still lacks the six byte-
+transfer/receipt tools. The [contract](THREADDESK-FILE-TRANSFER-V1.md) records this
+compatibility gap. No receiver code was copied, changed or executed against user data.

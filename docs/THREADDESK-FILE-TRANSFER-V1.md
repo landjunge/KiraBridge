@@ -2,11 +2,18 @@
 
 **Status: proposed interoperable contract; ThreadDesk implementation/acceptance is
 not yet verified.** This document belongs to KiraBridge. No ThreadDesk code or
-workspace is changed. Read-only baseline inspected:
+workspace is changed. Read-only baseline initially inspected:
 `landjunge/threaddesk@7c45d1447a7c11966e22419e2b451c5d54d8df45`.
-Its existing migration imports are not this file-byte protocol. Grok can implement
-this contract in ThreadDesk, or supply an existing versioned contract for the sink
-to target. Tool availability is verified before any transfer mutation.
+Final recheck found [ThreadDesk PR #86](https://github.com/landjunge/threaddesk/pull/86)
+merged into main `55e90dd2d1d59961a832a6bc7c2a64fe733886db`: it adds local
+`src/threaddesk/services/library_import.py:LibraryImporter` with content-addressed
+storage, local folder/selection/ZIP import and 256 MiB/file / 2 GiB/batch limits.
+Its `src/threaddesk/services/mcp.py` does **not** expose file-byte import tools,
+resumable remote chunks or the independently retrievable v1 durable receipt.
+This is useful receiver-side work, not an already compatible KiraBridge connection.
+The proposed port below lets Grok expose that storage owner without copying its
+implementation into KiraBridge. Tool availability is verified before transfer writes.
+
 
 ## Transport and authority
 

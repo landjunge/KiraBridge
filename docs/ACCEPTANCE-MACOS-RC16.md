@@ -61,3 +61,9 @@ proof (including 16 MiB multi-chunk data and lost-commit reconciliation), visibl
 terminal proof and authenticated draft-download acceptance are attached separately
 with their own SHA-256 manifest. Draft links in README use the stable release list:
 GitHub changes temporary `untagged-*` URLs when a draft target is edited.
+
+Final upstream recheck: ThreadDesk PR #86 is merged and supplies local persistent
+file import, but main `55e90dd2d1d59961a832a6bc7c2a64fe733886db` exposes no compatible
+MCP byte-stream/receipt interface. It therefore does not remove the interoperability
+acceptance gate. KiraBridge PR #25 checks on the final candidate also failed before
+steps because of the same GitHub billing/spending-limit annotation.
