@@ -30,13 +30,17 @@ class MessageManager:
     interface_version = "1"
 
     def activation_work_count(self, *, active_only=False, context=None):
+        # An externally ACKed queued job has no delivery left to start. Never
+        # infer that a running receiver finished merely because its message is ACKed.
         db = context.db if context is not None else self.store.db
         states = ("running",) if active_only else ("queued", "running")
         return db.execute(
             "SELECT count(*) FROM message_jobs WHERE state IN ("
             + ",".join("?" for _ in states)
-            + ") AND (state='running' OR NOT EXISTS (SELECT 1 FROM queue_holds h "
-            "WHERE h.queue_id='messages' AND h.item_id=message_jobs.message_id))",
+            + ") AND (state='running' OR (NOT EXISTS (SELECT 1 FROM queue_holds h "
+            "WHERE h.queue_id='messages' AND h.item_id=message_jobs.message_id) "
+            "AND NOT EXISTS (SELECT 1 FROM messages m WHERE m.id=message_jobs.message_id "
+            "AND m.acknowledged IS NOT NULL)))",
             states,
         ).fetchone()[0]
 

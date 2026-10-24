@@ -32,11 +32,22 @@ class VisibleReadinessError(BridgeError):
 
 
 class VisibleHandoffs:
-    def activation_work_count(self, *, active_only=False, context=None):
+    def activation_work_count(
+        self, *, active_only=False, context=None, preserve_external_waits=False
+    ):
+        # Count evidence, without rewriting reservations during a read query.
+        # ACK alone is not completion; transient native input always stays active.
         db = context.db if context is not None else self.store.db
         return db.execute(
-            "SELECT count(*) FROM visible_handoffs WHERE state IN "
-            "('planned','inserting','inserted','submitting','return_sent','sent','confirmed')"
+            "SELECT count(*) FROM visible_handoffs h WHERE state IN "
+            "('planned','inserting','inserted','submitting','return_sent','sent','confirmed') "
+            "AND NOT (h.state IN ('sent','confirmed') AND EXISTS ("
+            "SELECT 1 FROM messages original JOIN messages reply ON reply.reply_to=original.id "
+            "WHERE original.id=h.message_id AND original.sender=h.principal "
+            "AND original.recipient=h.target AND original.acknowledged IS NOT NULL "
+            "AND reply.sender=h.target AND reply.recipient=h.principal "
+            "AND reply.kind IN ('answer','result'))) "
+            + ("AND h.state NOT IN ('sent','confirmed')" if preserve_external_waits else "")
         ).fetchone()[0]
 
     @staticmethod
