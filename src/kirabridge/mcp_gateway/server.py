@@ -219,6 +219,7 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
     async def threaddesk_dynamic_catalog(ctx: Context) -> dict[str, Any]:
         """Discover opt-in, operator-approved read-only ThreadDesk tools."""
         from kirabridge.threaddesk_dynamic import catalog
+
         try:
             return await catalog(bridge, identity(ctx))
         except BridgeError as exc:
@@ -230,6 +231,7 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
     ) -> dict[str, Any]:
         """Call a freshly validated read-only ThreadDesk tool."""
         from kirabridge.threaddesk_dynamic import read as dynamic_read
+
         try:
             return await dynamic_read(bridge, identity(ctx), name, arguments)
         except BridgeError as exc:

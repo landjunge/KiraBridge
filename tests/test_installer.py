@@ -86,7 +86,10 @@ def test_launchd_failure_restores_previous_definition_without_config_restore(
     original_config = config.read_bytes()
     launcher = tmp_path / "bin/kirabridge"
     launcher.parent.mkdir()
-    launcher.write_bytes(b"OLD_LAUNCHER\n")
+    old_launcher = (
+        "#!/bin/sh\nexec old-python -m kirabridge.cli --config " + str(config) + ' "$@"\n'
+    ).encode()
+    launcher.write_bytes(old_launcher)
     plist = tmp_path / "service.plist"
     old_plist = plistlib.dumps(
         {
@@ -129,7 +132,7 @@ def test_launchd_failure_restores_previous_definition_without_config_restore(
     monkeypatch.setattr(installer, "start_service", start)
     with pytest.raises(RuntimeError, match="SIMULATED"):
         installer.activate(args, release)
-    assert launcher.read_bytes() == b"OLD_LAUNCHER\n"
+    assert launcher.read_bytes() == old_launcher
     assert plist.read_bytes() == old_plist
     assert config.read_bytes() == original_config
     assert not (prefix / "current.json").exists()
@@ -193,3 +196,46 @@ def test_launchctl_bootstrap_errors_are_bounded(installer, monkeypatch, tmp_path
     with pytest.raises(RuntimeError, match="Not permitted"):
         installer.start_service(SimpleNamespace(service="launchd", plist=path))
     assert len(attempts) == 1
+
+
+def test_foreign_launcher_refused_before_fresh_config_is_created(installer, tmp_path):
+    launcher = tmp_path / "kirabridge"
+    launcher.write_text('#!/bin/sh\necho "foreign service"\n')
+    config = tmp_path / "config/config.toml"
+    args = SimpleNamespace(
+        launcher=launcher, config=config, prefix=tmp_path / "install", service="none"
+    )
+    with pytest.raises(RuntimeError, match="Unrecognized existing launcher"):
+        installer.activate(args, tmp_path / "missing-release")
+    assert launcher.read_text() == '#!/bin/sh\necho "foreign service"\n'
+    assert not config.exists()
+
+
+def test_bundle_tampering_fails_before_runtime_preparation(installer, tmp_path):
+    bundle = tmp_path / "bundle"
+    bundle.mkdir()
+    (bundle / "payload").mkdir()
+    (bundle / "payload/uv.lock").write_text("tampered")
+    (bundle / "release.json").write_text(
+        json.dumps(
+            {
+                "version": "0.8.0rc15",
+                "commit": "a" * 40,
+                "files": {"payload/uv.lock": "0" * 64},
+            }
+        )
+    )
+    prefix = tmp_path / "installation"
+    with pytest.raises(RuntimeError, match="checksum mismatch"):
+        installer.prepare_bundle(SimpleNamespace(bundle=bundle, prefix=prefix))
+    assert not prefix.exists()
+
+
+def test_unsafe_destination_rejected_without_permission_changes(installer, tmp_path):
+    path = tmp_path / "config.toml"
+    path.write_text("preserve")
+    path.chmod(0o644)
+    with pytest.raises(RuntimeError, match="Unsafe ownership/permissions"):
+        installer.validate_destination(path, private=True)
+    assert path.stat().st_mode & 0o777 == 0o644
+    assert path.read_text() == "preserve"

@@ -132,8 +132,19 @@ def idle_guard(config):
             if "message_jobs" in tables
             else 0
         )
-        if tasks or jobs:
-            raise RuntimeError(f"BUSY: {tasks} tasks, {jobs} receiver jobs. Nothing switched.")
+        team_work = (
+            db.execute(
+                "select count(*) from team_work where state in "
+                "('queued','dispatching','created','accepted','running','processing_result')"
+            ).fetchone()[0]
+            if "team_work" in tables
+            else 0
+        )
+        if tasks or jobs or team_work:
+            raise RuntimeError(
+                f"BUSY: {tasks} tasks, {jobs} receiver jobs, {team_work} team jobs. "
+                "Nothing switched."
+            )
         say("Leerlauf unter Schreibsperre: 0 aktive Tasks, 0 Empfängerjobs.")
         yield db
     finally:
@@ -155,7 +166,80 @@ def cli(release, config, *args, timeout=30):
     )
 
 
+def prepare_bundle(args):
+    bundle = args.bundle.resolve()
+    manifest = json.loads((bundle / "release.json").read_text())
+    ref, version = manifest["commit"], manifest["version"]
+    if not re.fullmatch("[a-f0-9]{40}", ref):
+        raise RuntimeError("Invalid bundle commit")
+    if not re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+(?:(?:a|b|rc)[0-9]+)?", version):
+        raise RuntimeError("Invalid bundle version")
+    for name, expected in manifest["files"].items():
+        path = Path(name)
+        if path.is_absolute() or ".." in path.parts or (bundle / path).is_symlink():
+            raise RuntimeError("Unsafe bundle member")
+        if sha(bundle / path) != expected:
+            raise RuntimeError(f"Bundle checksum mismatch: {name}")
+    releases = args.prefix / "releases"
+    private_dir(releases)
+    destination = releases / (version + "-" + ref[:12])
+    if destination.exists():
+        saved = json.loads((destination / "release.json").read_text())
+        if saved["commit"] != ref or cli_version(destination) != version:
+            raise RuntimeError("Existing release identity differs; preserved")
+        return destination
+    uv = shutil.which("uv")
+    if not uv or run([uv, "--version"], capture=True).decode().split()[:2] != ["uv", "0.11.6"]:
+        raise RuntimeError("uv 0.11.6 is required")
+    private_dir(destination)
+    try:
+        shutil.copytree(bundle / "payload", destination / "source")
+        source = destination / "source"
+        wheel = bundle / manifest["wheel"]
+        run(
+            [
+                uv,
+                "sync",
+                "--project",
+                source,
+                "--locked",
+                "--no-dev",
+                "--no-install-project",
+                "--no-build",
+                "--python",
+                sys.executable,
+                "--cache-dir",
+                args.cache_dir,
+            ]
+        )
+        run(
+            [
+                uv,
+                "pip",
+                "install",
+                "--python",
+                python(destination),
+                "--no-deps",
+                "--cache-dir",
+                args.cache_dir,
+                wheel,
+            ]
+        )
+        if cli_version(destination) != version:
+            raise RuntimeError("Installed wheel version mismatch")
+        jwrite(
+            destination / "release.json",
+            {"version": version, "commit": ref, "lock_sha256": sha(source / "uv.lock")},
+        )
+    except BaseException:
+        shutil.rmtree(destination)
+        raise
+    return destination
+
+
 def prepare(args):
+    if getattr(args, "bundle", None):
+        return prepare_bundle(args)
     ref = args.ref
     if not re.fullmatch("[a-f0-9]{40}", ref or ""):
         raise RuntimeError("--ref must be an exact 40-character Git commit SHA")
@@ -251,10 +335,6 @@ def fresh_config(args, release):
     if args.config.exists():
         # Never rewrite an existing policy, even if its permissions differ.
         return
-    if not args.full_access:
-        raise RuntimeError(
-            "Fresh installation requires --full-access; existing policy is never overwritten"
-        )
     private_dir(args.config.parent)
     data = args.prefix / "data"
     private_dir(data)
@@ -284,14 +364,22 @@ def fresh_config(args, release):
         f"credentials_file = {json.dumps(str(credentials))}\n"
         'host = "127.0.0.1"\nport = 8765\nallow_remote = false\n'
     )
+    full = args.full_access
+    workspace = getattr(args, "workspace", Path.home() / "workspace/KiraBridge").resolve()
+    if not full:
+        if workspace == Path("/"):
+            raise RuntimeError("A scoped workspace cannot be the filesystem root")
+        workspace.mkdir(mode=0o700, parents=True, exist_ok=True)
+    roots = ["/"] if full else [str(workspace)]
     for name in tokens:
         text += (
-            f'\n[principals.{name}]\napproval_mode = "automatic"\n'
-            'permission_level = "full"\n'
-            + ('automatic_operations = ["session.input"]\n' if name == "chatgpt" else "")
+            f'\n[principals.{name}]\napproval_mode = "{"automatic" if full else "manual"}"\n'
+            + f'permission_level = "{"full" if full else "ask"}"\n'
+            + ('automatic_operations = ["session.input"]\n' if full and name == "chatgpt" else "")
             + f"capabilities = {json.dumps(capabilities)}\n"
-            'roots = ["/"]\nread_roots = ["/"]\nterminal_roots = ["/"]\n'
-            "allow_any_executable = true\nexecutables = []\nagents = []\n"
+            f"roots = {json.dumps(roots)}\nread_roots = {json.dumps(roots)}\n"
+            f"terminal_roots = {json.dumps(roots)}\n"
+            f"allow_any_executable = {str(full).lower()}\nexecutables = []\nagents = []\n"
             f'token_env = "KIRABRIDGE_{name.upper()}_TOKEN"\n'
         )
     text += (
@@ -314,7 +402,7 @@ def fresh_config(args, release):
     jwrite(credentials, tokens)
     atomic(args.config, text)
     say(
-        "Neue lokale Vollzugriffs-Konfiguration erstellt; Zugangsdaten nicht ausgegeben. "
+        "Neue lokale Konfiguration erstellt; Zugangsdaten nicht ausgegeben. "
         "ChatGPT-Kontoverbindung separat erforderlich."
     )
 
@@ -396,7 +484,57 @@ def snapshot_file(path, backup, name):
     return False
 
 
+def validate_destination(path, *, private=False):
+    # Validate without chmod/chown. Standard macOS /var aliases are resolved by callers.
+    if path.is_symlink():
+        raise RuntimeError(f"Symlink destination refused: {path}")
+    if path.exists():
+        info = path.stat()
+        if info.st_uid != os.getuid() or info.st_mode & (0o077 if private else 0o022):
+            raise RuntimeError(f"Unsafe ownership/permissions, left unchanged: {path}")
+    parent = path.parent
+    while not parent.exists():
+        parent = parent.parent
+    if parent.is_symlink():
+        raise RuntimeError(f"Symlink parent refused: {parent}")
+    info = parent.stat()
+    if info.st_uid not in (0, os.getuid()) or (info.st_mode & 0o022 and not info.st_mode & 0o1000):
+        raise RuntimeError(f"Unsafe parent directory: {parent}")
+
+
+def validate_launcher_owner(args):
+    if args.launcher.is_symlink():
+        raise RuntimeError("Symlink launcher refused")
+    if not args.launcher.exists():
+        return
+    current = args.prefix / "current.json"
+    if current.exists():
+        recorded = json.loads(current.read_text()).get("installed_wrapper_sha256")
+        if recorded and sha(args.launcher) == recorded:
+            return
+    # Recognize only the established plain KiraBridge launcher, never arbitrary shell code.
+    text = ""
+    try:
+        text = args.launcher.read_text()
+        tokens = shlex.split(text.split("\n", 1)[1])
+    except (ValueError, IndexError, UnicodeError):
+        tokens = []
+    valid = (
+        text.startswith("#!/bin/sh\n")
+        and len(text.splitlines()) == 2
+        and len(tokens) == 7
+        and tokens[:1] == ["exec"]
+        and tokens[2:5] == ["-m", "kirabridge.cli", "--config"]
+        and tokens[5:6] == [str(args.config)]
+        and tokens[6:] == ["$@"]
+    )
+    if not valid:
+        raise RuntimeError("Unrecognized existing launcher preserved; manual migration required")
+
+
 def activate(args, release):
+    validate_service_owner(args)
+    validate_launcher_owner(args)
     fresh_config(args, release)
     validate_service_owner(args)
     config_before = args.config.read_bytes()
@@ -407,7 +545,11 @@ def activate(args, release):
     old = json.loads(current.read_text()) if current.exists() else None
     manifest = json.loads((release / "release.json").read_text())
     if old and old["release"] == str(release):
-        say("Diese Version ist bereits aktiviert. Keine Dienste neu gestartet.")
+        if args.service != "none":
+            if not loaded(args):
+                start_service(args)
+            wait_health(args, release, manifest["version"])
+        say("Diese Version ist bereits aktiviert und geprüft.")
         return
     backup = args.prefix / "backups" / (time.strftime("%Y%m%d-%H%M%S") + "-" + uuid.uuid4().hex[:8])
     private_dir(backup)
@@ -580,10 +722,13 @@ def status(args):
 
 
 def main():
+    global LABEL
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("action", choices=["prepare", "install", "status", "rollback"])
     parser.add_argument("--repo", type=Path, default=Path(__file__).resolve().parents[1])
     parser.add_argument("--ref")
+    parser.add_argument("--bundle", type=Path, help="Verified extracted release bundle")
+    parser.add_argument("--workspace", type=Path, default=Path.home() / "workspace/KiraBridge")
     parser.add_argument(
         "--prefix", type=Path, default=Path.home() / ".local/share/kirabridge/install"
     )
@@ -607,7 +752,16 @@ def main():
         action="store_true",
         help="Explicit operator grant for fresh config only; never modifies an existing policy",
     )
+    parser.add_argument(
+        "--test-label", help="Isolated launchd test label; com.kirabridge.test.* only"
+    )
     args = parser.parse_args()
+    if args.test_label:
+        if not re.fullmatch(r"com\.kirabridge\.test\.[a-z0-9-]{8,64}", args.test_label):
+            parser.error("Invalid isolated test label")
+        LABEL = args.test_label
+    if os.getuid() == 0:
+        parser.error("Run as your normal user without sudo")
     for name in ("repo", "prefix", "config", "launcher", "plist", "cache_dir"):
         setattr(args, name, getattr(args, name).expanduser().absolute())
     if sys.version_info < (3, 11):
@@ -618,6 +772,8 @@ def main():
 
     signal.signal(signal.SIGTERM, interrupted)
     os.umask(0o077)
+    for path in (args.config, args.launcher, args.plist, args.prefix, args.cache_dir):
+        validate_destination(path, private=path == args.config)
     private_dir(args.prefix)
     fd = os.open(args.prefix / "install.lock", os.O_CREAT | os.O_RDWR | os.O_NOFOLLOW, 0o600)
     try:

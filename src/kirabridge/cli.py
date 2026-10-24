@@ -38,8 +38,14 @@ async def execute(args) -> None:
         from kirabridge.local_runtime import default_config
 
         config_path = Path(args.config).expanduser().absolute() if args.config else default_config()
-        release_root = Path(args.release_root).expanduser().absolute() if args.release_root else None
-        emit(await guided_install(config_path, release_root, language=args.language, check=args.check))
+        release_root = (
+            Path(args.release_root).expanduser().absolute() if args.release_root else None
+        )
+        emit(
+            await guided_install(
+                config_path, release_root, language=args.language, check=args.check
+            )
+        )
         return
     if args.command == "setup":
         from kirabridge.local_runtime import setup
