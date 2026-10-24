@@ -149,12 +149,39 @@ def register_file_tools(server, service, identity, task_request, authorize, safe
             ctx,
         )
 
+    @server.tool(annotations=write)
+    async def file_transfer_abort(
+        transfer_id: str,
+        task_id: str,
+        idempotency_key: str,
+        ctx: Context,
+    ) -> dict[str, Any]:
+        """Abort one prepared transfer; never deletes a committed ThreadDesk file."""
+        return await task_request(
+            TaskRequest(
+                task_id=task_id,
+                idempotency_key=idempotency_key,
+                operation="files.abort",
+                arguments={"transfer_id": transfer_id},
+            ),
+            ctx,
+        )
+
     def transfer_read_permission(name, operation):
         service.authorization.check(name, "files.inspect")
         if authorize(name, operation)["approval_required"]:
             raise BridgeError(
                 "approval_required", "Submit this status query as an exact approved task"
             )
+
+    @server.tool(annotations=read)
+    async def file_transfer_receiver_probe(ctx: Context) -> dict[str, Any]:
+        """Discover and read-probe the fixed receiver. Does not create an upload."""
+        try:
+            transfer_read_permission(identity(ctx), "files.status")
+            return {"available": True, **await service.receiver.capabilities()}
+        except BridgeError as exc:
+            return {"available": False, "error": {"code": exc.code}}
 
     @server.tool(annotations=read)
     def file_transfer_inventory(ctx: Context, after: str = "", limit: int = 100) -> dict[str, Any]:

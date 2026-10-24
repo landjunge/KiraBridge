@@ -134,6 +134,8 @@ class FileTransferService:
         if record["state"] == "stored":
             await running({"phase": "stored_receipt_reused", "transfer_id": identifier})
             return self.repository.public(record)
+        if record["state"] == "aborted":
+            raise BridgeError("transfer_closed", "Aborted transfers cannot be resumed")
         # Bound lock count by active invocations, not untrusted historical identifiers.
         if identifier in self.transfer_locks:
             raise BridgeError("transfer_busy", "Transfer already running; read its existing status")
@@ -151,11 +153,35 @@ class FileTransferService:
         except BridgeError as exc:
             state = (
                 "paused"
-                if exc.code in {"peer_unknown", "peer_disconnected", "transfer_storage_unconfirmed"}
+                if exc.code
+                in {
+                    "peer_unknown",
+                    "peer_disconnected",
+                    "transfer_storage_unconfirmed",
+                    "transfer_receipt_mismatch",
+                }
                 else "failed"
             )
             self.repository.update(principal, identifier, state, error_code=exc.code)
             if state == "paused":
+                # Reconcile ONCE by read after a lost response. Never replay the write,
+                # even if this read proves it did not arrive. Explicit resume is required.
+                try:
+                    status = await self.receiver.status(record["operation_id"])
+                    manifest = Manifest.model_validate(record["manifest"])
+                    offset = checkpoint(status, record["operation_id"], manifest)
+                    if status.get("state") == "committed":
+                        receipt = durable_receipt(status, record["operation_id"], manifest)
+                        return self.repository.public(
+                            self.repository.update(
+                                principal, identifier, "stored", offset=offset, receipt=receipt
+                            )
+                        )
+                    self.repository.update(
+                        principal, identifier, "paused", offset=offset, error_code=exc.code
+                    )
+                except BridgeError:
+                    pass
                 raise UncertainExecution(
                     exc.code, "Transfer outcome unconfirmed; resume by status reconciliation"
                 ) from None
@@ -186,6 +212,8 @@ class FileTransferService:
                 "transfer_protocol_mismatch", "Receiver lacks required resume/storage guarantees"
             )
         block_size = min(self.settings.limits.chunk_bytes, capabilities["max_chunk_bytes"])
+        if manifest.size > capabilities.get("max_file_bytes", self.settings.limits.max_file_bytes):
+            raise BridgeError("transfer_size_limit", "Receiver file limit exceeded")
         await running({"phase": "running", "transfer_id": identifier, "bytes_total": manifest.size})
         try:
             state = await self.receiver.status(operation_id)
@@ -194,6 +222,15 @@ class FileTransferService:
                 raise
             state = await self.receiver.begin(operation_id, manifest)
         offset = checkpoint(state, operation_id, manifest)
+        if state.get("state") == "committed":
+            receipt = durable_receipt(
+                await self.receiver.receipt(operation_id), operation_id, manifest
+            )
+            return self.repository.public(
+                self.repository.update(
+                    principal, identifier, "stored", offset=offset, receipt=receipt
+                )
+            )
         with open_snapshot(path) as source:
             prefix_hash = hashlib.sha256()
             remaining = offset
@@ -203,7 +240,8 @@ class FileTransferService:
                     raise BridgeError("transfer_integrity", "Staged prefix is incomplete")
                 prefix_hash.update(previous)
                 remaining -= len(previous)
-            if state["prefix_sha256"] != prefix_hash.hexdigest():
+            native = state.get("receiver_contract") == "threaddesk.library.receive.v1"
+            if not native and state["prefix_sha256"] != prefix_hash.hexdigest():
                 raise BridgeError(
                     "transfer_integrity", "Receiver prefix differs; no resume or overwrite"
                 )
@@ -225,8 +263,11 @@ class FileTransferService:
                 next_offset = checkpoint(ack, operation_id, manifest)
                 if (
                     next_offset != offset + len(data)
-                    or ack.get("chunk_sha256") != chunk_hash
-                    or ack["prefix_sha256"] != prefix_hash.hexdigest()
+                    or not native
+                    and (
+                        ack.get("chunk_sha256") != chunk_hash
+                        or ack["prefix_sha256"] != prefix_hash.hexdigest()
+                    )
                 ):
                     raise BridgeError(
                         "transfer_receipt_mismatch", "Chunk acknowledgement differs from sent bytes"
@@ -244,3 +285,84 @@ class FileTransferService:
             principal, identifier, "stored", offset=offset, receipt=receipt
         )
         return self.repository.public(record)
+
+    async def abort(self, task, args, running):
+        principal, identifier = task["principal"], args.transfer_id
+        self.authorization.check(principal, "files.transfer")
+        record = self.repository.get(principal, identifier)
+        manifest = Manifest.model_validate(record["manifest"])
+        if (
+            manifest.destination_ref != self.receiver.identity
+            or manifest.project_id not in self.settings.allowed_projects
+        ):
+            raise BridgeError("transfer_destination_changed", "Transfer scope is no longer granted")
+        if identifier in self.transfer_locks:
+            raise BridgeError("transfer_busy", "Pause the running transfer before aborting")
+        if record["state"] == "stored":
+            raise BridgeError("transfer_already_stored", "Stored files cannot be aborted")
+        self.transfer_locks[identifier] = asyncio.Lock()
+        try:
+            await self.receiver.capabilities()
+            await running({"phase": "aborting", "transfer_id": identifier})
+            # Even a lost begin must first be reconciled. Never create a new ID here.
+            status = await self.receiver.status(record["operation_id"])
+            if status.get("state") == "committed":
+                receipt = durable_receipt(status, record["operation_id"], manifest)
+                return self.repository.public(
+                    self.repository.update(
+                        principal, identifier, "stored", offset=manifest.size, receipt=receipt
+                    )
+                )
+            if status.get("state") != "aborted":
+                checkpoint(status, record["operation_id"], manifest)
+                await self.receiver.abort(record["operation_id"])
+                status = await self.receiver.status(record["operation_id"])
+            checkpoint(status, record["operation_id"], manifest, allow_aborted=True)
+            if (
+                status.get("state") != "aborted"
+                or status.get("transfer_id") != record["operation_id"]
+                or status.get("manifest")
+                != {
+                    "filename": manifest.name,
+                    "thread_id": manifest.project_id,
+                    "size": manifest.size,
+                    "sha256": manifest.sha256,
+                }
+            ):
+                raise UncertainExecution("transfer_storage_unconfirmed", "Abort unconfirmed")
+            return self.repository.public(
+                self.repository.update(
+                    principal, identifier, "aborted", offset=status["next_offset"]
+                )
+            )
+        except BridgeError as exc:
+            if exc.code in {"peer_unknown", "peer_disconnected", "transfer_storage_unconfirmed"}:
+                self.repository.update(principal, identifier, "paused", error_code=exc.code)
+                # The same terminal status can be confirmed without repeating abort.
+                try:
+                    status = await self.receiver.status(record["operation_id"])
+                    checkpoint(status, record["operation_id"], manifest, allow_aborted=True)
+                    if (
+                        status.get("state") == "aborted"
+                        and status.get("transfer_id") == record["operation_id"]
+                        and status.get("manifest")
+                        == {
+                            "filename": manifest.name,
+                            "thread_id": manifest.project_id,
+                            "size": manifest.size,
+                            "sha256": manifest.sha256,
+                        }
+                    ):
+                        return self.repository.public(
+                            self.repository.update(
+                                principal, identifier, "aborted", offset=status["next_offset"]
+                            )
+                        )
+                except BridgeError:
+                    pass
+                raise UncertainExecution(
+                    exc.code, "Abort outcome unconfirmed; read same ID"
+                ) from None
+            raise
+        finally:
+            self.transfer_locks.pop(identifier, None)

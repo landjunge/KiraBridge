@@ -59,6 +59,7 @@ INPUTS = {
     "files.inventory": InventoryInput,
     "files.status": TransferInput,
     "files.pause": TransferInput,
+    "files.abort": TransferInput,
     "connection.check": ConnectionCheckInput,
     "session.open": SessionOpen,
     "session.input": SessionInput,
@@ -399,6 +400,8 @@ class Bridge:
             return await self.file_transfers.prepare(task, args, running)
         if operation == "files.transfer":
             return await self.file_transfers.transfer(task, args, running)
+        if operation == "files.abort":
+            return await self.file_transfers.abort(task, args, running)
         if operation == "files.pause":
             await running({"phase": "pause_requested", "transfer_id": args.transfer_id})
             return self.file_repository.pause(principal, args.transfer_id)

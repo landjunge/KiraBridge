@@ -1,0 +1,45 @@
+{
+  "base_kirabridge": "b54f4626175c7d51c7746b14dc8d755135fab6f9",
+  "real_threaddesk": "770bbc9f0c0a02699cc93cad47d2e2c3782f7080",
+  "scope": "isolated real ThreadDesk MCP, actual KiraBridge task/source/receiver owners; no historical Library bytes supplied",
+  "checks": {
+    "affected_files_mcp_discovery": {
+      "passed": 87,
+      "failed": 0
+    },
+    "additional_lost_abort_and_revocation": {
+      "passed": 1,
+      "failed": 0
+    },
+    "receipt_mismatch_strengthening": {
+      "passed": 3,
+      "failed": 0,
+      "included_in_87": true
+    },
+    "ruff": "passed",
+    "ruff_format": "passed",
+    "diff_check": "passed",
+    "sdist_wheel_build": "passed"
+  },
+  "retained_failure": "Initial affected run had54 passes and1 legacy test failure: its expectation that status never reconnects was obsolete after required read-only reconciliation. Updated assertion retains explicit resume/no-write-replay. Corrected directly affected29 passed, included in final87. Two mistyped optional test paths aborted collection without running tests; not counted.",
+  "source_boundary": {
+    "expected_inventory": 275,
+    "sensitive_inventory_only": 8,
+    "remaining_without_source_capability": 267,
+    "historical_files_transferred": 0
+  },
+  "source_files": {
+    ".github/workflows/ci.yml": "f7976782961909fa35c3e1d248a345d768eab1b28a23af2fbb029b14e3e4a836",
+    "scripts/import_library_exports.py": "9c7e2e74732777770632d0839f5fd50c18568e0eb3b1cda9540fa6f7ba079477",
+    "src/kirabridge/bridge_core/bridge.py": "e174bd7d318ad2a4095666393366310cf23ea6cf919476efb154a1071098dc22",
+    "src/kirabridge/discovery.py": "0793a063a52ead7ffa3e84fa08e888ef20547a51d129f5e36bab11161246a538",
+    "src/kirabridge/file_transfer/ports.py": "d1d646c134bf4897541d70c203e34851b075dad53aa65ddff026809dff5c394d",
+    "src/kirabridge/file_transfer/protocol.py": "507f2b75059e2cfc2e183d94c488ff40dc34d971282017e29a0fe1ad8e37b3b8",
+    "src/kirabridge/file_transfer/service.py": "66dbfc2567c8ca303af742698c747f00eee771fcb62ac463677acd681b8482b3",
+    "src/kirabridge/file_transfer/threaddesk.py": "3f6f0a54e22f5d20ef9c8ae085e05f5769515f71f4c04c3b6195b5579f3c9bd5",
+    "src/kirabridge/mcp_gateway/file_tools.py": "151a201c6d76a30f730e63c81bd4681f144c939cd473895758324d8c60fab026",
+    "src/kirabridge/operations.py": "0b2278776f194f77f0c776b8b28cb9ae68124a763e7769a4cd1a853b04ea8972",
+    "tests/test_file_transfer.py": "e1b29f702def596b949fd50fe040bc4a905b3907a5e4bd05d670ab060717fbf9",
+    "tests/test_library_receive_adapter.py": "4e636787494e325343cd13fafbe5817f387757e45ebb193f1aa9d9c6149c0963"
+  }
+}
