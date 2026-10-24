@@ -498,14 +498,16 @@ def validate_destination(path, *, private=False):
         info = path.stat()
         if info.st_uid != os.getuid() or info.st_mode & (0o077 if private else 0o022):
             raise RuntimeError(f"Unsafe ownership/permissions, left unchanged: {path}")
-    parent = path.parent
-    while not parent.exists():
-        parent = parent.parent
-    if parent.is_symlink():
-        raise RuntimeError(f"Symlink parent refused: {parent}")
-    info = parent.stat()
-    if info.st_uid not in (0, os.getuid()) or (info.st_mode & 0o022 and not info.st_mode & 0o1000):
-        raise RuntimeError(f"Unsafe parent directory: {parent}")
+    for parent in path.parents:
+        if parent.is_symlink():
+            raise RuntimeError(f"Symlink parent refused: {parent}")
+        if not parent.exists():
+            continue
+        info = parent.stat()
+        if info.st_uid not in (0, os.getuid()) or (
+            info.st_mode & 0o022 and not info.st_mode & 0o1000
+        ):
+            raise RuntimeError(f"Unsafe parent directory: {parent}")
 
 
 def validate_launcher_owner(args):
