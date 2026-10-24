@@ -22,7 +22,8 @@ service continues independently of Terminal/browser windows. Linux source packag
 is preserved from main; its actual installation is not claimed tested on this Mac.
 
 Release gates remain: mandatory CI (currently billing blocked), independent review,
-positive native agent input acceptance and final integrated-source package acceptance.
+positive native agent input acceptance and protected-main/final release-source validation.
+The exact5089fca candidate passed [isolated Intel-macOS package acceptance](ACCEPTANCE-MACOS-RC17.md), including authenticated draft download, upgrade/restart/data preservation and rollback.
 The existing native focus refusal is not a positive test. ThreadDesk byte receiver/
 index MCP implementation and authorized selected source bytes are still prerequisites
 for an actual user Library import. No Library-wide API or duplicate job is created.

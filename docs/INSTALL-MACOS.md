@@ -1,13 +1,13 @@
 # macOS installation / Installation
 
-**Current combined source: RC17 (unpublished). The RC16 command below is historical and does not install the current repairs. No RC17 production command is approved. See [consolidation](CONSOLIDATION-20261024.md).**
+**RC17 is an unpublished review candidate. Its actual [isolated package acceptance](ACCEPTANCE-MACOS-RC17.md) passed; required CI/review and native agent-input acceptance remain open. No production deployment approved.**
 
-**Aktuelle zusammengeführte Quelle: RC17 (unveröffentlicht). Der historische RC16-Befehl unten installiert nicht die neuesten Reparaturen. Kein freigegebener RC17-Produktivbefehl.**
+**RC17 ist ein unveröffentlichter Reviewkandidat. Echte isolierte Paketprüfung bestanden; Pflicht-CI/Review und native Agenteneingabe offen. Keine Produktivfreigabe.**
 
 ## Deutsch
 
 **Veröffentlicht ist [v0.8.0rc14](https://github.com/landjunge/KiraBridge/releases/tag/v0.8.0rc14).
-RC16 ist ein unveröffentlichter Kandidat. Der Release-Entwurf dient ausschließlich berechtigten Reviewern; Freigabe erst nach CI und Review.**
+RC17 ist ein unveröffentlichter Kandidat. Der Release-Entwurf dient ausschließlich berechtigten Reviewern; Freigabe erst nach CI und Review.**
 
 Voraussetzungen: normales Benutzerkonto ohne sudo, macOS 15 (Intel x86_64 oder
 Apple Silicon arm64), Python **3.11**, **uv 0.11.6**, Internet zu PyPI und Zugriff
@@ -33,15 +33,15 @@ Pakets samt `KiraBridge-macos.tar.gz.sha256` in einen neuen leeren Ordner:
 besteht. Prüfsummen vom selben authentifizierten Release schützen vor
 Beschädigung; sie ersetzen keine unabhängige Herausgebersignatur.
 
-**Für berechtigte Reviewer des RC16-Release-Entwurfs: Installation und Update
+**Für berechtigte Reviewer des RC17-Release-Entwurfs: Installation und Update
 mit EINEM Befehl (angemeldete GitHub CLI erforderlich).** Der Bootstrap lädt das
 passende Paket authentifiziert und prüft dessen fest eingebetteten SHA-256-Wert.
 `"$@"` reicht optionale Argumente weiter; beim normalen Einfügen sind diese leer.
-Dies ist ausschließlich der historische RC16-Reviewbefehl:
+Dies ist ausschließlich der RC17-Reviewbefehl, tatsächlich mit isolierten Pfaden und eigener launchd-Testkennung geprüft:
 
 
 ```sh
-d=$(mktemp -d) && gh release download v0.8.0rc16 -R landjunge/KiraBridge -p 'install-macos.sh*' -D "$d" && (cd "$d" && shasum -a 256 -c install-macos.sh.sha256 && sh install-macos.sh "$@")
+d=$(mktemp -d) && gh release download v0.8.0rc17 -R landjunge/KiraBridge -p 'install-macos.sh*' -D "$d" && (cd "$d" && shasum -a 256 -c install-macos.sh.sha256 && sh install-macos.sh "$@")
 ```
 
 Erstinstallation: legt ausschließlich Benutzerdateien an. Standardprojekt:
@@ -93,7 +93,7 @@ um die kompatiblen macOS-Wheels zu verwenden.
 ## English
 
 The published release is [v0.8.0rc14](https://github.com/landjunge/KiraBridge/releases/tag/v0.8.0rc14),
-which only has a wheel. RC16 remains unpublished until CI and review pass.
+which only has a wheel. RC17 remains unpublished until CI and review pass.
 
 Requirements: a regular user account, macOS 15, Intel x86_64 or Apple Silicon
 arm64, Python **3.11**, **uv 0.11.6**, Internet access to PyPI, and repository

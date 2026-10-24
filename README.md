@@ -24,7 +24,7 @@ Der Reparaturbranch ergänzt eine identitätsgebundene Queue-Verwaltung. Sie ist
 
 ## English
 
-**Current source: RC17 consolidation candidate**, combining main, RC15/RC16 and subsequent repairs. Existing RC15/RC16 draft assets contain historical source pins, not this combined code. [Consolidation and acceptance gates](docs/CONSOLIDATION-20261024.md). No RC17 installation command is approved yet.
+**Current source: RC17 consolidation candidate**, combining main, RC15/RC16 and subsequent repairs. Existing RC15/RC16 draft assets contain historical source pins, not this combined code. [Consolidation and acceptance gates](docs/CONSOLIDATION-20261024.md). The RC17 review command was tested with isolated paths; production deployment remains unapproved.
 
 ### Current repair status (unreleased)
 
@@ -103,14 +103,13 @@ hardware model alone does not establish OS compatibility. See the
 **Latest published release: [v0.8.0rc14](https://github.com/landjunge/KiraBridge/releases/tag/v0.8.0rc14)**
 (private prerelease, 22 October 2026; wheel only).
 
-**RC16 is an unpublished candidate.** Its wheel, macOS bundle, bootstrap and
+**RC17 is the combined unpublished candidate.** Its wheel, macOS bundle, bootstrap and
 SHA-256 checksums are available to authorized reviewers in the
-[RC16 release draft](https://github.com/landjunge/KiraBridge/releases).
+[RC17 release draft](https://github.com/landjunge/KiraBridge/releases/tag/untagged-8c7f469dd5b21fb1b123).
 The installation command is [below](#install--update--installieren--aktualisieren).
 
-RC16 is being reviewed in [PR #25](https://github.com/landjunge/KiraBridge/pull/25)
-on `feat/library-transfer-discovery-20261024`, based on
-the installer/runtime integration lineage. RC15 remains a separate historical draft.
+RC17 combines main, RC15/RC16 and subsequent repairs in [PR #28](https://github.com/landjunge/KiraBridge/pull/28)
+on `integration/current-release-20261024`. RC15 and RC16 remain historical drafts.
 **Publication and merge remain gated:** GitHub Actions cannot start because of account
 billing/spending limits. Required CI/review and the actual ThreadDesk file receiver
 acceptance remain outstanding. Draft creation is not publication.
@@ -157,6 +156,8 @@ task. Further assistant adapters and their limits are described in the
 
 ### What was checked?
 
+RC17: two exact-source builds match; the authenticated draft command passed isolated Intel-macOS fresh install, RC14 upgrade, status/version, data preservation, idempotence, restart, KeepAlive and rollback. [RC17 proof](docs/ACCEPTANCE-MACOS-RC17.md). Native agent input and required CI/review remain open.
+
 RC16's [acceptance record](docs/ACCEPTANCE-MACOS-RC16.md) distinguishes actual Intel
 macOS tests, isolated byte/MCP contract fixtures and unverified product integration.
 The RC15 [historical installer proof](docs/ACCEPTANCE-MACOS-RC15.md) remains available.
@@ -167,7 +168,7 @@ file selection and actual ThreadDesk durable imports must not be inferred from f
 
 ## Deutsch
 
-**Aktueller Quellstand: RC17-Konsolidierungskandidat**, aus main, RC15/RC16 und nachfolgenden Reparaturen. Vorhandene RC15/RC16-Draft-Assets enthalten historische Quellstände, nicht diesen zusammengeführten Code. [Zusammenführung und offene Abnahmen](docs/CONSOLIDATION-20261024.md). Noch kein freigegebener RC17-Installationsbefehl.
+**Aktueller Quellstand: RC17-Konsolidierungskandidat**, aus main, RC15/RC16 und nachfolgenden Reparaturen. Vorhandene RC15/RC16-Draft-Assets enthalten historische Quellstände, nicht diesen zusammengeführten Code. [Zusammenführung und offene Abnahmen](docs/CONSOLIDATION-20261024.md). Der RC17-Reviewbefehl wurde mit isolierten Pfaden geprüft; keine Produktivfreigabe.
 
 ### Aktueller Reparaturstand (unveröffentlicht)
 
@@ -251,14 +252,13 @@ keine Betriebssystem-Kompatibilität.
 **Zuletzt veröffentlicht: [v0.8.0rc14](https://github.com/landjunge/KiraBridge/releases/tag/v0.8.0rc14)**
 (privates Vorabrelease vom 22.10.2026; bisher nur ein Wheel).
 
-**RC16 ist ein unveröffentlichter Kandidat.** Wheel, macOS-Paket, Bootstrap und
+**RC17 ist der zusammengeführte unveröffentlichte Kandidat.** Wheel, macOS-Paket, Bootstrap und
 SHA-256-Prüfsummen liegen für berechtigte Reviewer im
-[RC16-Release-Entwurf](https://github.com/landjunge/KiraBridge/releases).
+[RC17-Release-Entwurf](https://github.com/landjunge/KiraBridge/releases/tag/untagged-8c7f469dd5b21fb1b123).
 Der Installationsbefehl steht [unten](#install--update--installieren--aktualisieren).
 
-RC16 wird in [PR #25](https://github.com/landjunge/KiraBridge/pull/25)
-auf `feat/library-transfer-discovery-20261024` auf der bestehenden
-Runtime-/Installer-Linie geprüft. RC15 bleibt ein eigener historischer Entwurf.
+RC17 führt main, RC15/RC16 und nachfolgende Reparaturen in [PR #28](https://github.com/landjunge/KiraBridge/pull/28)
+auf `integration/current-release-20261024` zusammen. RC15 und RC16 bleiben historische Entwürfe.
 **Merge und Veröffentlichung bleiben gesperrt:** GitHub Actions startet wegen
 Kontoabrechnung/Ausgabenlimit nicht. Erforderliche CI/Review und die tatsächliche
 ThreadDesk-Dateiempfänger-Abnahme stehen aus. Ein Entwurf ist keine Veröffentlichung.
@@ -309,6 +309,8 @@ Werkzeugkatalog, Health und Agenteninventar trennen Rechte, Beobachtung und Ausf
 
 ### Was wurde geprüft?
 
+RC17: zwei identische Builds; authentifizierter Draft-Befehl auf Intel-macOS mit isolierter Erstinstallation, RC14-Upgrade, Status/Version, Datenerhalt, Idempotenz, Neustart, KeepAlive und Rollback bestanden. [RC17-Nachweis](docs/ACCEPTANCE-MACOS-RC17.md). Native Agenteneingabe und Pflicht-CI/Review bleiben offen.
+
 Der [RC16-Prüfbericht](docs/ACCEPTANCE-MACOS-RC16.md) trennt echte Intel-macOS-Tests,
 isolierte Byte-/MCP-Vertragstests und noch ungeprüfte Produktintegration. Der
 [historische RC15-Installernachweis](docs/ACCEPTANCE-MACOS-RC15.md) bleibt erhalten.
@@ -317,27 +319,23 @@ Apple-Silicon-Abnahme, echte ChatGPT-Dateiauswahl oder ThreadDesk-Produktimporte
 
 ---
 
-`main` is a separate development lineage (currently 0.7.0rc2); the latest
-published code is the RC14 integration lineage. Use release assets for installation.
-`main` ist eine getrennte Entwicklungslinie (derzeit 0.7.0rc2); der jüngste
-veröffentlichte Stand liegt in der RC14-Integrationslinie. Zur Installation die
-Release-Dateien verwenden. [Runtime/install PR #21](https://github.com/landjunge/KiraBridge/pull/21).
+The combined RC17 source includes both main and runtime ancestry; protected main remains unchanged until checks/review pass. / Die RC17-Quelle enthält beide Quelllinien; main bleibt bis zu bestandenen Prüfungen und Review unverändert.
 
 ## Install / update · Installieren / aktualisieren
 
-**RC16-Kandidat: nur für berechtigte Reviewer des Release-Entwurfs; noch kein
-freigegebener Endnutzer-Download. / RC16 candidate: draft reviewers only until CI
+**RC17-Kandidat: nur für berechtigte Reviewer des Release-Entwurfs; noch kein
+freigegebener Endnutzer-Download. / RC17 candidate: draft reviewers only until CI
 and release acceptance pass.** Voraussetzung / prerequisite: Python 3.11, uv 0.11.6 und
 angemeldete GitHub CLI mit Repository-Zugriff / authenticated GitHub CLI.
 Der Befehl lädt authentifiziert, prüft SHA-256 und installiert oder aktualisiert /
 authenticated download, checksum verification and install/update:
 
 ```sh
-d=$(mktemp -d) && gh release download v0.8.0rc16 -R landjunge/KiraBridge -p 'install-macos.sh*' -D "$d" && (cd "$d" && shasum -a 256 -c install-macos.sh.sha256 && sh install-macos.sh "$@")
+d=$(mktemp -d) && gh release download v0.8.0rc17 -R landjunge/KiraBridge -p 'install-macos.sh*' -D "$d" && (cd "$d" && shasum -a 256 -c install-macos.sh.sha256 && sh install-macos.sh "$@")
 ```
 
-**Für Erstinstallation und Update derselbe Befehl. RC16 bleibt bis zur Abnahme
-unveröffentlicht. / Same command for install and update. RC16 remains unpublished.**
+**Für Erstinstallation und Update derselbe Befehl. RC17 bleibt bis zur Abnahme
+unveröffentlicht. / Same command for install and update. RC17 remains unpublished.**
 
 [Download-Voraussetzungen, Status, Neustart, Rollback und Fehlerbehebung /
 prerequisites, status, restart, rollback and troubleshooting](docs/INSTALL-MACOS.md).
@@ -347,7 +345,8 @@ no sudo; existing configuration, credentials and user files are preserved.
 
 ## Further reading / Weiterführende Dokumentation
 
-- [RC16 candidate notes / Kandidatenhinweise](docs/RELEASE-0.8.0rc16.md)
+- [RC17 candidate notes / Kandidatenhinweise](docs/RELEASE-0.8.0rc17.md)
+- [Actual RC17 package acceptance / Echte RC17-Paketprüfung](docs/ACCEPTANCE-MACOS-RC17.md)
 - [Control center / Steuerfenster](https://github.com/landjunge/KiraBridge/blob/89c2e4359090de53fb6c1da55b6146072443988d/docs/CONTROL-CENTER-0.8.0rc1.md)
 - [ChatGPT connection / ChatGPT-Verbindung](docs/CHATGPT.md)
 - [Team coordination / Zusammenarbeit im Team](docs/TEAM-ORCHESTRATION.md)
@@ -356,11 +355,7 @@ no sudo; existing configuration, credentials and user files are preserved.
 - [Operations and recovery / Betrieb und Wiederherstellung](docs/OPERATIONS.md)
 - [Architecture and modules / Architektur und Module](docs/ARCHITECTURE.md)
 
-The published download is pinned to `v0.8.0rc14`; the highlighted command selects
-the unpublished `v0.8.0rc16` draft explicitly. `main` and the RC14/RC16 integration
-lineage remain separate. / Der veröffentlichte Download gehört zu `v0.8.0rc14`;
-der hervorgehobene Befehl wählt ausdrücklich den unveröffentlichten Entwurf
-`v0.8.0rc16`. `main` und die RC14/RC16-Integrationslinie bleiben getrennt.
+The published release is RC14. The highlighted command selects the RC17 draft, tested with explicit isolated paths; no productive deployment or native agent-input acceptance is implied. / Veröffentlicht bleibt RC14. Der hervorgehobene Befehl wählt den RC17-Entwurf, mit ausdrücklich isolierten Pfaden geprüft; keine Produktivfreigabe oder Abnahme nativer Agenteneingabe.
 
 KiraBridge is an independent project and is not an official product of the
 connected AI providers. / KiraBridge ist ein eigenständiges Projekt und kein

@@ -1,5 +1,7 @@
 # 0.8.0rc16 — unpublished integration candidate / unveröffentlichter Kandidat
 
+Historical source-pinned draft. The combined source and tested package candidate are now RC17; see [consolidation](CONSOLIDATION-20261024.md) and [RC17 package evidence](ACCEPTANCE-MACOS-RC17.md). This historical asset was not overwritten.
+
 Latest published release remains [v0.8.0rc14](https://github.com/landjunge/KiraBridge/releases/tag/v0.8.0rc14).
 RC15 is a separate historical draft. RC16 includes that runtime and installer lineage,
 plus fresh MCP discovery, safe visible-terminal dispatch and opt-in file-byte transfer.
