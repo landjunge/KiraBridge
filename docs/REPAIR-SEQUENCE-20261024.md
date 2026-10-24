@@ -159,3 +159,20 @@ two test signature layouts; formatting moved their existing F811 comments. The t
 comments were placed on the corresponding fixture parameters and only that file's
 Ruff/format checks were repeated: passed. No behavior changed or test suite repeated.
 Work-memory/target-read evidence: [correction confirmation](evidence/codex1-correction-20261024.json).
+
+## GitHub integration gate
+
+Reviewed changes pushed as `ca0ad0123c9f92374ad35a01d825faaa59f2fd78` on
+`fix/terminal-whiteboard-20261024`; local and remote SHA equality confirmed.
+[PR27](https://github.com/landjunge/KiraBridge/pull/27) is OPEN/DRAFT above
+`fix/queue-recovery-20261024` (PR26), not merged. Independent external review remains
+outstanding. Internal native C security review is not a GitHub approval.
+
+[Verify run40106477951](https://github.com/landjunge/KiraBridge/actions/runs/40106477951)
+and [macOS package run40106477987](https://github.com/landjunge/KiraBridge/actions/runs/40106477987)
+failed before any job step. Intel verify check120909110502 and package check120909110683
+annotations both state: "The job was not started because recent account payments have
+failed or your spending limit needs to be increased."
+These checks did not execute and are not passes. No merge, package/release publication
+or check bypass was attempted. Fix billing/start required checks and obtain review,
+then complete controlled positive native acceptance before treating this as working.
