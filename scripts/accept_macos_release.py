@@ -32,7 +32,7 @@ def digest(path):
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
-def accept(artifacts, root, previous_wheel, release_download=False):
+def accept(artifacts, root, previous_wheel, release_download=False, upgrade_only=False):
     if platform.system() != "Darwin":
         raise SystemExit("Actual macOS is required")
     root.mkdir(mode=0o700, parents=True, exist_ok=False)
@@ -155,6 +155,7 @@ def accept(artifacts, root, previous_wheel, release_download=False):
         "tested_command": shlex.join(command),
         "cwd": str(extracted),
         "checks": [],
+        "upgrade_only": upgrade_only,
         "remote_release_command": (
             "authenticated draft download" if release_download else "not exercised in this run"
         ),
@@ -198,19 +199,20 @@ def accept(artifacts, root, previous_wheel, release_download=False):
                 "PRESERVE_DATABASE"
             )
         evidence["checks"].append("config/credentials hashes, database row and user file preserved")
-        # Installer subprocess has exited; the daemon remains independently owned by launchd.
-        time.sleep(1)
-        assert health(version)["runtime"]["pid"] == current["runtime"]["pid"]
-        evidence["checks"].append("daemon survives installer/terminal command exit")
-        print(run(command, cwd=extracted, env=test_env), flush=True)
-        assert health(version)["runtime"]["pid"] == current["runtime"]["pid"]
-        evidence["checks"].append("repeat install idempotent; same PID and no config rewrite")
-        run(["launchctl", "kickstart", "-k", service])
-        restarted = health(version, current["runtime"]["pid"])
-        evidence["checks"].append("real launchctl kickstart restart and authenticated status")
-        run(["launchctl", "kill", "SIGKILL", service])
-        health(version, restarted["runtime"]["pid"])
-        evidence["checks"].append("launchd KeepAlive automatically recovers a crashed daemon")
+        if not upgrade_only:
+            # Installer subprocess has exited; the daemon remains independently owned by launchd.
+            time.sleep(1)
+            assert health(version)["runtime"]["pid"] == current["runtime"]["pid"]
+            evidence["checks"].append("daemon survives installer/terminal command exit")
+            print(run(command, cwd=extracted, env=test_env), flush=True)
+            assert health(version)["runtime"]["pid"] == current["runtime"]["pid"]
+            evidence["checks"].append("repeat install idempotent; same PID and no config rewrite")
+            run(["launchctl", "kickstart", "-k", service])
+            restarted = health(version, current["runtime"]["pid"])
+            evidence["checks"].append("real launchctl kickstart restart and authenticated status")
+            run(["launchctl", "kill", "SIGKILL", service])
+            health(version, restarted["runtime"]["pid"])
+            evidence["checks"].append("launchd KeepAlive automatically recovers a crashed daemon")
         print(
             run(["python3.11", str(package / "installer/install.py"), "status", *common]),
             flush=True,
@@ -224,28 +226,29 @@ def accept(artifacts, root, previous_wheel, release_download=False):
         evidence["checks"].append(
             "real rollback restarts previous RC14 wheel and preserves secrets"
         )
-        # Fresh installation, reusing the prepared wheel in a separate config and prefix.
-        installer.stop_service(args)
-        fresh_args = SimpleNamespace(**vars(args))
-        fresh_args.prefix = root / "fresh/install"
-        fresh_args.config = root / "fresh/config/config.toml"
-        fresh_args.launcher = root / "fresh/bin/kirabridge"
-        fresh_args.plist = root / "fresh/service.plist"
-        fresh_args.workspace = root / "fresh/workspace"
-        installer.private_dir(fresh_args.prefix)
-        fresh_release = installer.prepare_bundle(fresh_args)
-        installer.fresh_config(fresh_args, fresh_release)
-        installer.atomic(
-            fresh_args.config,
-            fresh_args.config.read_text().replace("port = 8765", f"port = {port}"),
-        )
-        # Explicitly isolated service arguments; production label cannot be reached.
-        args = fresh_args
-        installer.activate(args, fresh_release)
-        health(version)
-        evidence["checks"].append(
-            "fresh built-wheel installation starts actual isolated launchd service"
-        )
+        if not upgrade_only:
+            # Fresh installation, reusing the prepared wheel in a separate config and prefix.
+            installer.stop_service(args)
+            fresh_args = SimpleNamespace(**vars(args))
+            fresh_args.prefix = root / "fresh/install"
+            fresh_args.config = root / "fresh/config/config.toml"
+            fresh_args.launcher = root / "fresh/bin/kirabridge"
+            fresh_args.plist = root / "fresh/service.plist"
+            fresh_args.workspace = root / "fresh/workspace"
+            installer.private_dir(fresh_args.prefix)
+            fresh_release = installer.prepare_bundle(fresh_args)
+            installer.fresh_config(fresh_args, fresh_release)
+            installer.atomic(
+                fresh_args.config,
+                fresh_args.config.read_text().replace("port = 8765", f"port = {port}"),
+            )
+            # Explicitly isolated service arguments; production label cannot be reached.
+            args = fresh_args
+            installer.activate(args, fresh_release)
+            health(version)
+            evidence["checks"].append(
+                "fresh built-wheel installation starts actual isolated launchd service"
+            )
         evidence["passed"] = True
     finally:
         subprocess.run(["launchctl", "bootout", service], capture_output=True, timeout=20)
@@ -259,10 +262,16 @@ if __name__ == "__main__":
     parser.add_argument("--root", required=True, type=Path)
     parser.add_argument("--previous-wheel", required=True, type=Path)
     parser.add_argument("--release-download", action="store_true")
+    parser.add_argument(
+        "--upgrade-only",
+        action="store_true",
+        help="Only new-package RC14 upgrade, data preservation and rollback",
+    )
     opts = parser.parse_args()
     accept(
         opts.artifacts.resolve(),
         opts.root.resolve(),
         opts.previous_wheel.resolve(),
         opts.release_download,
+        opts.upgrade_only,
     )

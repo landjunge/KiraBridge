@@ -235,9 +235,11 @@ class SessionManager:
         async with self.lock:
             selected = await self.selected(principal, args.pane_id, args.expected_pid)
             self.assigned_agent(selected)
-            if args.require_idle and selected.get("busy", True):
-                raise BridgeError("session_busy", "Selected terminal is not an idle shell")
             identities = self.selected_identities(selected)
+            # Native agent process presence is not turn activity. A task-owned
+            # identity requires the fresh widget/readiness check below instead.
+            if args.require_idle and selected.get("busy", True) and identities is None:
+                raise BridgeError("session_busy", "Selected terminal is not an idle shell")
             if selected.get("transport") == "terminal_app" and identities is None:
                 raise BridgeError(
                     "visible_selection_required",

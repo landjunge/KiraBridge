@@ -260,6 +260,30 @@ class VisibleHandoffs:
             "scope": "current input and separately bound turn observation; no input proof",
         }
 
+    @staticmethod
+    def independent_unknown_paste(row, binding, task_id):
+        """A different resource is not reconciliation or replay of the old handoff."""
+        from kirabridge.bridge_core.config import VisibleTerminalBinding
+
+        if row["state"] != "unknown" or row["id"] == task_id:
+            return False
+        try:
+            original = VisibleTerminalBinding.model_validate_json(row["binding"])
+            old, current = original.pane_id.split(":"), binding.pane_id.split(":")
+            return (
+                len(old) == len(current) == 3
+                and old[0] == current[0] == "terminal"
+                and old[1] != current[1]
+                and old[2] != current[2]
+                and original.expected_pid > 0
+                and original.agent_pid > 0
+                and {original.expected_pid, original.agent_pid}.isdisjoint(
+                    {binding.expected_pid, binding.agent_pid}
+                )
+            )
+        except (ValueError, TypeError, AttributeError):
+            return False
+
     async def reconcile_target_reservations(
         self,
         principal,
@@ -267,10 +291,27 @@ class VisibleHandoffs:
         binding,
         *,
         busy_message="Existing handoff must finish or reconcile",
+        explicit_paste_task_id=None,
     ):
         """Keep the input lock until authenticated receipt and verified target readiness."""
+        if explicit_paste_task_id is not None:
+            selection = self.sessions.current_selection()
+            if (
+                not explicit_paste_task_id
+                or not selection
+                or selection[0] != target
+                or selection[1] != binding
+                or binding.expected_pid == binding.agent_pid
+                or not isinstance(selection[2], dict)
+                or not {binding.expected_pid, binding.agent_pid}.issubset(selection[2])
+            ):
+                raise BridgeError(
+                    "visible_selection_required",
+                    "Literal paste requires task-owned native identities",
+                )
+            await self.check_target(principal, target, binding, ready=True)
         active = self.store.db.execute(
-            "SELECT id,principal FROM visible_handoffs WHERE target=? "
+            "SELECT id,principal,state,binding FROM visible_handoffs WHERE target=? "
             "AND NOT EXISTS (SELECT 1 FROM queue_holds h WHERE "
             "h.queue_id='handoffs' AND h.item_id=visible_handoffs.id) AND state IN "
             "('planned','inserting','inserted','submitting',"
@@ -279,6 +320,10 @@ class VisibleHandoffs:
             (target,),
         ).fetchall()
         for row in active:
+            if explicit_paste_task_id is not None and self.independent_unknown_paste(
+                row, binding, explicit_paste_task_id
+            ):
+                continue  # Original state, binding, events and receipt remain untouched.
             status = self.reconcile(row["principal"], row["id"])
             if status["state"] in {"completed", "interrupted"}:
                 continue

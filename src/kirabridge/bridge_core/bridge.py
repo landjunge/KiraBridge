@@ -467,11 +467,11 @@ class Bridge:
                         raise BridgeError("agent_denied", "Selected agent is not granted")
                     self.security.principal(principal, "terminal.execute")
                     async with self.sessions.agent_selection(principal, target, selected_binding):
-                        await self.visible_handoffs.check_target(
-                            principal, target, selected_binding, ready=True
-                        )
                         await self.visible_handoffs.reconcile_target_reservations(
-                            principal, target, selected_binding
+                            principal,
+                            target,
+                            selected_binding,
+                            explicit_paste_task_id=task["id"],
                         )
                         await running(
                             {
