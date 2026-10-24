@@ -105,7 +105,7 @@ hardware model alone does not establish OS compatibility. See the
 
 **RC17 is the combined unpublished candidate.** Its wheel, macOS bundle, bootstrap and
 SHA-256 checksums are available to authorized reviewers in the
-[RC17 release draft](https://github.com/landjunge/KiraBridge/releases/tag/untagged-8c7f469dd5b21fb1b123).
+[RC17 release draft](https://github.com/landjunge/KiraBridge/releases).
 The installation command is [below](#install--update--installieren--aktualisieren).
 
 RC17 combines main, RC15/RC16 and subsequent repairs in [PR #28](https://github.com/landjunge/KiraBridge/pull/28)
@@ -254,7 +254,7 @@ keine Betriebssystem-Kompatibilität.
 
 **RC17 ist der zusammengeführte unveröffentlichte Kandidat.** Wheel, macOS-Paket, Bootstrap und
 SHA-256-Prüfsummen liegen für berechtigte Reviewer im
-[RC17-Release-Entwurf](https://github.com/landjunge/KiraBridge/releases/tag/untagged-8c7f469dd5b21fb1b123).
+[RC17-Release-Entwurf](https://github.com/landjunge/KiraBridge/releases).
 Der Installationsbefehl steht [unten](#install--update--installieren--aktualisieren).
 
 RC17 führt main, RC15/RC16 und nachfolgende Reparaturen in [PR #28](https://github.com/landjunge/KiraBridge/pull/28)

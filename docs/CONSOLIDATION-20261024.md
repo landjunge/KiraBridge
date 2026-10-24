@@ -98,7 +98,7 @@ OPEN/DRAFT, not merged. Verify40108852591 and macOSpackage40108852507 did not st
 steps; Intel check120916129067 explicitly cites failed payments/spending limit.
 
 Two exact-commit builds have identical all-four-artifact SHA256SUMS; all126 wheel
-source members match committed bytes. [RC17 draft](https://github.com/landjunge/KiraBridge/releases/tag/untagged-8c7f469dd5b21fb1b123)
+source members match committed bytes. [RC17 draft](https://github.com/landjunge/KiraBridge/releases)
 holds the wheel, macOS update/source package, authenticated bootstrap, Linux source
 package, checksum sidecars/manifests and evidence. It remains draft/unpublished.
 

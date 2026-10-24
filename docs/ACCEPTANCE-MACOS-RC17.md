@@ -1,7 +1,7 @@
 # RC17 package acceptance / Paketabnahme
 
 **Review draft, not published. No production deployment approved.**
-[Actual draft / Tatsächlicher Entwurf](https://github.com/landjunge/KiraBridge/releases/tag/untagged-8c7f469dd5b21fb1b123) ·
+[Actual draft / Tatsächlicher Entwurf](https://github.com/landjunge/KiraBridge/releases) ·
 [PR28](https://github.com/landjunge/KiraBridge/pull/28).
 
 Built source `5089fca8f72bc0088a967eb057d85b0e461f0b55` is the two-parent
