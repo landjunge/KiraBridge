@@ -10,21 +10,24 @@
 
 [English](#english) · [Deutsch](#deutsch) · [Published / Veröffentlicht RC14](https://github.com/landjunge/KiraBridge/releases/tag/v0.8.0rc14)
 
-## Unreleased queue repair / Unveröffentlichte Queue-Reparatur
+## RC17 status / RC17-Stand
 
-The current repair branch adds owner-scoped queue inspection/control. It is **not
-included in the RC16 draft assets and is not installed into production RC14**.
-See [queue tools, safety and rollback limits](docs/QUEUE-MANAGEMENT.md) and
-[ordered repair status](docs/REPAIR-SEQUENCE-20261024.md).
+PR #28 and #30 are merged; queue repairs are part of main. RC14 remains the
+published release; RC15/RC16 are historical drafts and RC17 is still a draft.
+The operator Mac has been explicitly upgraded to RC17. The subsequent native
+focus/polling repair is tracked in [PR #32](https://github.com/landjunge/KiraBridge/pull/32),
+which remains open while GitHub Actions is blocked by account billing. No failed
+CI is presented as passed. [Actual installation and checks](docs/RC17-INSTALLATION-20261024.md).
 
-Der Reparaturbranch ergänzt eine identitätsgebundene Queue-Verwaltung. Sie ist
-**nicht in den RC16-Draft-Assets enthalten und nicht produktiv in RC14 installiert**.
-[Bedienung, Sicherheit und Rückweg](docs/QUEUE-MANAGEMENT.md) ·
-[verbindliche Reparaturreihenfolge](docs/REPAIR-SEQUENCE-20261024.md).
+PR #28 und #30 sind gemergt; die Queue-Reparatur ist in main. Veröffentlicht bleibt
+RC14; RC17 ist weiterhin ein Entwurf. Der Betreiber-Mac wurde ausdrücklich auf
+RC17 aktualisiert. Die folgende Fokus-/Statusabfrage-Reparatur liegt in PR #32;
+GitHub Actions ist wegen Kontozahlung/Ausgabenlimit blockiert. Details und konkrete
+Quellstände stehen im Installationsnachweis; kein fehlgeschlagener Check gilt als bestanden.
 
 ## English
 
-**Current source: RC17 consolidation candidate**, combining main, RC15/RC16 and subsequent repairs. Existing RC15/RC16 draft assets contain historical source pins, not this combined code. [Consolidation and acceptance gates](docs/CONSOLIDATION-20261024.md). The RC17 review command was tested with isolated paths; production deployment remains unapproved.
+**Current source: RC17 consolidation candidate**, combining main, RC15/RC16 and subsequent repairs. Existing RC15/RC16 draft assets contain historical source pins, not this combined code. [Consolidation and acceptance gates](docs/CONSOLIDATION-20261024.md). The RC17 review command was tested with isolated paths; the operator subsequently authorized an RC17 upgrade. Source, draft assets and installed service must be distinguished.
 
 ### Current repair status (unreleased)
 
@@ -40,8 +43,8 @@ characters and 100,000 emoji note characters (400,000 UTF-8 bytes), with indepen
 readback. Larger content needs an agreed lossless receiver contract, not truncation.
 [Whiteboard evidence](docs/WHITEBOARD-BOUNDARIES-20261024.md) ·
 [Current integration report](docs/REPAIR-SEQUENCE-20261024.md).
-Published RC14 and its installer status remain as described below; no new release
-or production installation is implied by these source changes.
+Published RC14 remains unchanged. The authorized operator RC17 installation and
+remaining native-input acceptance are documented separately above.
 
 ### Start here: live voice and terminal connection
 
@@ -168,7 +171,7 @@ file selection and actual ThreadDesk durable imports must not be inferred from f
 
 ## Deutsch
 
-**Aktueller Quellstand: RC17-Konsolidierungskandidat**, aus main, RC15/RC16 und nachfolgenden Reparaturen. Vorhandene RC15/RC16-Draft-Assets enthalten historische Quellstände, nicht diesen zusammengeführten Code. [Zusammenführung und offene Abnahmen](docs/CONSOLIDATION-20261024.md). Der RC17-Reviewbefehl wurde mit isolierten Pfaden geprüft; keine Produktivfreigabe.
+**Aktueller Quellstand: RC17-Konsolidierungskandidat**, aus main, RC15/RC16 und nachfolgenden Reparaturen. Vorhandene RC15/RC16-Draft-Assets enthalten historische Quellstände, nicht diesen zusammengeführten Code. [Zusammenführung und offene Abnahmen](docs/CONSOLIDATION-20261024.md). Der RC17-Reviewbefehl wurde mit isolierten Pfaden geprüft; der Betreiber hat danach sein RC17-Upgrade freigegeben. Quellstand, Draft-Assets und installierter Dienst sind getrennt nachzuweisen.
 
 ### Aktueller Reparaturstand (unveröffentlicht)
 
@@ -355,7 +358,7 @@ no sudo; existing configuration, credentials and user files are preserved.
 - [Operations and recovery / Betrieb und Wiederherstellung](docs/OPERATIONS.md)
 - [Architecture and modules / Architektur und Module](docs/ARCHITECTURE.md)
 
-The published release is RC14. The highlighted command selects the RC17 draft, tested with explicit isolated paths; no productive deployment or native agent-input acceptance is implied. / Veröffentlicht bleibt RC14. Der hervorgehobene Befehl wählt den RC17-Entwurf, mit ausdrücklich isolierten Pfaden geprüft; keine Produktivfreigabe oder Abnahme nativer Agenteneingabe.
+The published release is RC14. The highlighted command selects the RC17 draft, tested with explicit isolated paths; this is not a published RC17 release or native agent-input acceptance. / Veröffentlicht bleibt RC14. Der hervorgehobene Befehl wählt den RC17-Entwurf, mit ausdrücklich isolierten Pfaden geprüft; kein veröffentlichtes RC17-Release und keine Abnahme nativer Agenteneingabe.
 
 KiraBridge is an independent project and is not an official product of the
 connected AI providers. / KiraBridge ist ein eigenständiges Projekt und kein
@@ -371,3 +374,17 @@ Dies ist keine Open-Source-Standardlizenz; eine anwaltliche Prüfung wurde nicht
 
 Die Projektseite `kirabridge.netzwerkpunkt.de` bleibt geplant. Noch kein öffentlicher Download und keine Sichtbarkeitsänderung. / The project site remains planned; there is no public download or visibility change.
 
+
+
+### RC17 interface note / Schnittstellenhinweis
+
+Routine `bridge_health` no longer scans Terminal windows. Explicit
+`observe_terminals=true`, `operation_catalog` or `agent_inventory` refreshes the
+observation; cached health metadata is never input readiness. / Normale Health-Polls
+belegen keine Terminal-Leseplätze. Frische Fenstererkennung ausdrücklich anfordern.
+
+Events are optional. Cached Apps tools that still require `completion_subscription`
+accept `""`; refresh the connector metadata when available. Kira's actual Whiteboard
+write and independent readback passed. / Alte Apps-Schemas können das leere
+Legacyfeld nutzen; keine zusätzliche Freigabe oder Events-Anmeldung erfinden.
+[Interface behavior and limits / Verhalten und Grenzen](docs/DISCOVERY-VISIBLE-TERMINAL.md).

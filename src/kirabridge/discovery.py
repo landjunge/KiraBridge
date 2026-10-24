@@ -12,6 +12,16 @@ from kirabridge.permissions import decision, direct_terminal_required, permissio
 def snapshot(bridge, principal):
     policy = bridge.security.principal(principal)
     observed = getattr(bridge, "discovery_observations", {}).get(principal)
+    current_permissions = permission_revision(bridge.config)
+    access = decision(bridge.config, principal, "session.catalog")
+    if observed and observed.get("permission_revision") != current_permissions:
+        observed = None
+    if not access["authorized"] or access["approval_required"]:
+        observed = {
+            "status": "not_authorized" if not access["authorized"] else "approval_required",
+            "sessions": [],
+            "permission_revision": current_permissions,
+        }
     revision = digest(
         {
             "version": __version__,
@@ -76,7 +86,11 @@ def snapshot(bridge, principal):
             ),
             "threaddesk": "separate optional access path; never a direct-terminal substitute",
         },
-        "terminal_observation": observed or {"status": "not_probed", "sessions": []},
+        "terminal_observation": {
+            **(observed or {"status": "not_probed", "sessions": []}),
+            "freshness": "cached" if observed and "observed_at" in observed else "not_probed",
+            "usable_for_input": False,
+        },
     }
 
 
@@ -99,11 +113,14 @@ async def live(bridge, principal):
             observation = {"status": "observation_unavailable", "sessions": []}
     # Fingerprints exclude timestamps and raw terminal text. A changed PID/TTY or
     # transport status invalidates discovery even if the saved policy is identical.
+    observation["permission_revision"] = permission_revision(bridge.config)
     observation["revision"] = digest({k: v for k, v in observation.items() if k != "observed_at"})
     if not hasattr(bridge, "discovery_observations"):
         bridge.discovery_observations = {}
     bridge.discovery_observations[principal] = observation
-    return snapshot(bridge, principal)
+    result = snapshot(bridge, principal)
+    result["terminal_observation"]["freshness"] = "fresh"
+    return result
 
 
 async def inventory(bridge, principal):

@@ -113,3 +113,45 @@ enabled=false; neither current principal has files.prepare/transfer/inspect; the
 active pinned ThreadDesk adapter lacks file_import_* receiver tools. Existing
 sender modules are reused, not rebuilt. Text-management permission does not grant
 binary transfer. No original files, permissions or receiver implementation changed.
+
+## Follow-up: health polling and actual full-access grant
+
+The6fd1518 package passed isolated actual Intel-macOS RC17b54→RC17 upgrade,
+status/version/data preservation and rollback. Logged authenticated status pinned
+the actual source package to6fd1518 (Python source fingerprint17326f87…). The
+isolated launchd label was absent after cleanup. Productive installation then
+reported RC17/PID51827/source6fd1518;4269 tasks,271 messages and45 handoffs,
+configuration/credential hashes/modes and the prior unknown input record remained
+intact. Backup: `install/backups/20261024-194038-00a3c128`.
+
+Practical input acceptance was then blocked by repeatable terminal_read_busy on
+both the direct and actual Kira queued read route. Root cause in code: each
+stdio proxy polls bridge_health every second, and health performed discovery.live,
+using the same bounded terminal read slots as actual foreground reads. Multiple
+connections can saturate that lane. A new real-HTTP six-monitor regression failed
+before the repair (two catalog probes); passive-default health now performs none.
+Explicit observe_terminals=true, operation_catalog and agent_inventory still
+refresh bounded observations. Cached observations keep timestamps, explicitly
+are not input proof, and are discarded after permission drift. Passive polling
+alone does not discover window changes. Input paths retain independent fresh guards.
+
+Required focused checks: concurrent health/read, explicit fresh discovery, revoked
+cache and reserved stop capacity passed4 cases. Independent team audit caught a
+denial-status semantic issue; it was fixed, and only explicit denied/manual plus
+directly related cache checks ran again (3 passed). No whole suite repeated.
+
+The user's subsequent instruction explicitly authorizes complete ChatGPT access.
+Actual policy already had automatic/full, filesystem and terminal roots `/`, any
+executable, and configured agents; only files.prepare/transfer/inspect were missing.
+A separate source bug used operation names as full-access capabilities, missing
+files.inspect. Full selection now includes each registered operation's actual
+capability, preserving existing grants and revocations. New reproduction failed
+before the fix; full-capability and existing revocation checks then passed2 cases.
+This fixes explicit operator selection, never self-authorizes ordinary MCP calls.
+Any subsequent productive policy change is separately authorized by that new user
+instruction; earlier preservation proofs correctly describe their earlier scope.
+
+PR32 remains open: GitHub Actions annotation explicitly says jobs were not started
+because recent account payments failed or spending limit must increase. No required
+checks are configured according to gh, but failed/not-started controls are not
+bypassed. No merge or release publication is claimed.

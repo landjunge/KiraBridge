@@ -39,6 +39,7 @@ def replace_section(text, header, values):
 def access_text(config_path: Path, *, level=None, revoke_operations=None):
     """Keep credentials and existing grants. The full level uses the operator's full grant."""
     from kirabridge.bridge_core.bridge import INPUTS
+    from kirabridge.operations import capability_for
 
     config = load_config(str(config_path))
     if level is not None and level not in LEVELS:
@@ -84,6 +85,7 @@ def access_text(config_path: Path, *, level=None, revoke_operations=None):
                 dict.fromkeys(
                     policy.capabilities
                     + list(INPUTS)
+                    + [capability_for(operation) for operation in INPUTS]
                     + [
                         "bridge.health",
                         "task.read",

@@ -38,3 +38,19 @@ Build only from a clean committed source: `uv run python scripts/build_release.p
 --out dist/rc17-candidate`. A separately required reproducibility build must use
 another empty destination and compare `SHA256SUMS`. This is a build instruction,
 not a tested public installation command. No download link is invented here.
+
+## Native focus and ChatGPT responsiveness follow-up (PR32, not merged)
+
+The native focus repair binds immutable window IDs and resolves only unique current
+Window/Fenster menu entries when activation selects another window; exact focus,
+TTY, process and viewport checks remain. Focus-only actual Intel-macOS proof passed;
+installed positive paste acceptance remains pending. Routine bridge_health now avoids
+terminal scans so one-second multi-client polling cannot consume foreground read
+slots. Explicit observe_terminals=true/inventory/catalog provide fresh observations.
+The full operator grant now uses actual capability mappings, including files.inspect.
+The latest user explicitly authorized full ChatGPT access; this does not create a
+missing ThreadDesk byte receiver or an unsupported Library-wide API.
+
+GitHub Actions is still blocked before execution by account billing. PR32 is open;
+RC17 remains draft. Additional external review was waived by the owner; independent
+native-team safety audits were performed. No failed Actions run is called passed.
