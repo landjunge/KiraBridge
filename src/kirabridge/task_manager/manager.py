@@ -133,7 +133,9 @@ class TaskManager:
                     if depth >= 32:
                         raise BridgeError("delegation_limit", "Delegation chain exceeds 32 tasks")
                     parent = self.store.get(parent["parent_id"], principal)
-            if request.operation == "session.open":
+            if request.operation == "session.open" and request.arguments.get(
+                "window_authorization"
+            ):
                 from kirabridge.session_manager import SessionOpen
 
                 self.security.consume_window(

@@ -33,6 +33,7 @@ class SessionInput(SessionReference):
 
 
 class SessionOpen(Input):
+    controlled_shell: bool = False
     cwd: str = Field(min_length=1, max_length=4096)
     argv: list[str] = Field(default_factory=list, max_length=256)
     window_authorization: str = Field(default="", max_length=128)
@@ -138,14 +139,23 @@ class SessionManager:
                 raise BridgeError(
                     "visible_handoff_required", "CLI handoffs require the central route"
                 )
-            if args.require_idle and selected.get("busy", True):
+            if (args.require_idle or principal == "chatgpt") and selected.get("busy", True):
                 raise BridgeError("session_busy", "Selected terminal is not an idle shell")
+            if principal == "chatgpt" and not args.pane_id.startswith("terminal:"):
+                raise BridgeError(
+                    "visible_terminal_required",
+                    "ChatGPT direct input requires a visible Terminal.app window",
+                )
             if args.pane_id.startswith("terminal:") and not args.submit:
                 raise BridgeError("session_submit_required", "Terminal.app input submits a line")
             args = self.input_release.dispatch(principal, args, task_id)
-            await self.transport(args.pane_id).send(
-                args.pane_id, args.text, submit=args.submit, require_idle=args.require_idle
-            )
+            if principal == "chatgpt":
+                identity = await self.terminal_app.process_identity(selected["expected_pid"])
+                await self.terminal_app.send_confirmed(selected, args.text, identity)
+            else:
+                await self.transport(args.pane_id).send(
+                    args.pane_id, args.text, submit=args.submit, require_idle=args.require_idle
+                )
             self.input_release.sent(principal, task_id)
         return {
             "pane_id": args.pane_id,
@@ -163,7 +173,8 @@ class SessionManager:
         matches = [
             row
             for row in catalog["sessions"]
-            if row["pane_id"] == pane_id and row["expected_pid"] == expected_pid
+            if row["pane_id"] == pane_id
+            and expected_pid in {row["expected_pid"], row.get("legacy_expected_pid")}
         ]
         if len(matches) == 1:
             return matches[0]
@@ -183,10 +194,12 @@ class SessionManager:
             raise BridgeError("visible_target_ambiguous", "Multiple CLI agents in this terminal")
         process = matches[0]
         binding = bindings.get(process["name"])
-        if not binding or (binding.pane_id, binding.expected_pid, binding.agent_pid) != (
-            selected.get("pane_id"),
-            selected.get("expected_pid"),
-            process["pid"],
+        if (
+            not binding
+            or binding.pane_id != selected.get("pane_id")
+            or binding.agent_pid != process["pid"]
+            or binding.expected_pid
+            not in {selected.get("expected_pid"), selected.get("legacy_expected_pid")}
         ):
             raise BridgeError(
                 "visible_target_changed", "CLI input requires its assigned original window"
@@ -219,7 +232,17 @@ class SessionManager:
         if any("\x00" in arg for arg in argv):
             raise BridgeError("invalid_arguments", "NUL in command")
         command = "cd -- " + shlex.quote(cwd)
-        if argv:
+        if args.controlled_shell:
+            if argv:
+                raise BridgeError(
+                    "invalid_arguments", "Controlled shell setup takes no initial command"
+                )
+            command += (
+                " && exec /usr/bin/env PS1="
+                + shlex.quote("KiraBridge visible %% ")
+                + " /bin/zsh -f"
+            )
+        if argv and principal != "chatgpt":
             command += " && " + shlex.join(argv)
         async with self.lock:
             self.authorization.check_window(principal, task_id, args)
@@ -233,6 +256,22 @@ class SessionManager:
                 sessions = await self.terminal_app.catalog()
                 selected = next((s for s in sessions if s["tty"] == result["tty"]), None)
                 if selected:
+                    if principal == "chatgpt" and argv:
+                        from kirabridge.platform_adapters.shell_prompt import empty_shell_prompt
+
+                        if selected.get("busy", True):
+                            await asyncio.sleep(0.1)
+                            continue
+                        view = await self.read(
+                            principal, selected["pane_id"], selected["expected_pid"]
+                        )
+                        if not empty_shell_prompt(view["text"]):
+                            await asyncio.sleep(0.1)
+                            continue
+                        identity = await self.terminal_app.process_identity(
+                            selected["expected_pid"]
+                        )
+                        await self.terminal_app.send_confirmed(selected, shlex.join(argv), identity)
                     return {**selected, "opened": True, "agent_processed": False}
                 await asyncio.sleep(0.05)
         return {**result, "session_handle_pending": True, "agent_processed": False}

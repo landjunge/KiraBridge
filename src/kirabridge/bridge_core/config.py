@@ -157,6 +157,34 @@ class DiagnosticsConfig(BaseModel):
     max_records: int = Field(default=20000, ge=10, le=1000000)
 
 
+class FileTransferConfig(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    enabled: bool = False
+    source_hosts: list[str] = Field(default_factory=list, max_length=32)
+    export_roots: list[str] = Field(default_factory=list, max_length=32)
+    allowed_projects: list[str] = Field(default_factory=list, max_length=256)
+    from kirabridge.file_transfer.models import Limits as _Limits
+
+    limits: _Limits = Field(default_factory=_Limits)
+
+    @model_validator(mode="after")
+    def explicit_sources(self):
+        import re
+
+        if any(
+            not re.fullmatch(r"[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?", host)
+            or "." not in host
+            or host.endswith(".local")
+            for host in self.source_hosts
+        ):
+            raise ValueError("Use exact operator-approved public download host names")
+        if any(
+            not Path(root).is_absolute() or ".." in Path(root).parts for root in self.export_roots
+        ):
+            raise ValueError("Export roots must be explicit absolute directories")
+        return self
+
+
 class ThreadDeskConfig(BaseModel):
     """Operator-owned local endpoint; requests cannot select a process or store."""
 
@@ -331,6 +359,7 @@ class Config(BaseModel):
     team: TeamConfig = Field(default_factory=TeamConfig)
     grok_connector: GrokConnectorConfig = Field(default_factory=GrokConnectorConfig)
     diagnostics: DiagnosticsConfig = Field(default_factory=DiagnosticsConfig)
+    file_transfer: FileTransferConfig = Field(default_factory=FileTransferConfig)
     threaddesk: ThreadDeskConfig = Field(default_factory=ThreadDeskConfig)
     workflow_control: WorkflowControlConfig = Field(default_factory=WorkflowControlConfig)
     session_input_policy: SessionInputPolicyConfig = Field(default_factory=SessionInputPolicyConfig)

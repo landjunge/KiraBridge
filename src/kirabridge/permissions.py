@@ -68,8 +68,12 @@ def decision(config, principal, operation, *, text=None):
     """
     policy = config.principals.get(principal)
     required = {capability_for(operation)}
-    if operation == "session.input":
-        required.update({"session.inspect", "terminal.execute"})
+    if operation in {"session.input", "terminal.visible"} or (
+        operation == "terminal.execute" and principal == "chatgpt"
+    ):
+        required.update({"session.inspect", "session.input", "terminal.execute"})
+    if operation == "session.open":
+        required.add("terminal.execute")
     missing = sorted(required - set(policy.capabilities if policy else []))
     exception = bool(policy and operation in policy.automatic_operations)
     gate = config.session_input_policy

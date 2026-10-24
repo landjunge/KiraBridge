@@ -25,9 +25,13 @@ async def test_native_catalog_binds_window_tty_and_unambiguous_root_pid(bridge, 
 
     async def communicate():
         return (
-            b"345 1 ttys004 /usr/bin/login\n346 345 ttys004 /bin/zsh\n"
-            b"347 346 ttys004 /private/path/codex\n"
-            b"400 1 ttys005 /bin/zsh\n401 1 ttys005 /bin/zsh\n",
+            (
+                f"{__import__('os').getuid()} 345 1 ttys004 /usr/bin/login\n"
+                f"{__import__('os').getuid()} 346 345 ttys004 /bin/zsh\n"
+                f"{__import__('os').getuid()} 347 346 ttys004 /private/path/codex\n"
+                f"{__import__('os').getuid()} 400 1 ttys005 /bin/zsh\n"
+                f"{__import__('os').getuid()} 401 1 ttys005 /bin/zsh\n"
+            ).encode(),
             b"",
         )
 

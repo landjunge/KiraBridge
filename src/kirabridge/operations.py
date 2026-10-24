@@ -9,6 +9,8 @@ from typing import Literal
 
 READ_OPERATIONS = frozenset(
     {
+        "files.inventory",
+        "files.status",
         "connection.check",
         "session.catalog",
         "session.read",
@@ -26,11 +28,13 @@ READ_OPERATIONS = frozenset(
         "observations.read",
     }
 )
-STOP_OPERATIONS = frozenset({"process.terminate", "workflow.stop"})
+STOP_OPERATIONS = frozenset({"process.terminate", "workflow.stop", "files.pause"})
 RESERVED_READ_OPERATIONS = frozenset(
     {
         "session.catalog",
         "session.read",
+        "files.inventory",
+        "files.status",
         "process.list",
         "process.inspect",
         "agent.status",
@@ -57,9 +61,12 @@ OPERATIONS = {}
 for _name in (
     *READ_OPERATIONS,
     *STOP_OPERATIONS,
+    "files.prepare",
+    "files.transfer",
     "session.open",
     "session.input",
     "terminal.execute",
+    "terminal.visible",
     "file.write",
     "file.mkdir",
     "file.move",
@@ -77,7 +84,15 @@ for _name in (
     "admin.execute",
 ):
     OPERATIONS[_name] = Operation(
-        capability="session.inspect" if _name in {"session.catalog", "session.read"} else _name,
+        capability="files.inspect"
+        if _name in {"files.inventory", "files.status"}
+        else "files.transfer"
+        if _name == "files.pause"
+        else "session.inspect"
+        if _name in {"session.catalog", "session.read"}
+        else "terminal.execute"
+        if _name == "terminal.visible"
+        else _name,
         effect="read"
         if _name in READ_OPERATIONS or _name == "clipboard.read"
         else "control"

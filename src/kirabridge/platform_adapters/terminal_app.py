@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import os
 import re
 import sys
 from pathlib import Path
@@ -42,6 +43,10 @@ class TerminalAppTransport:
                 code = (
                     "session_automation_denied"
                     if "1743" in detail
+                    else "visible_target_changed"
+                    if "Selected target identity changed" in detail
+                    else "visible_input_not_empty"
+                    if "Selected terminal has existing input" in detail
                     else "session_busy"
                     if "Selected terminal is busy" in detail
                     else "session_transport_unavailable"
@@ -73,7 +78,7 @@ class TerminalAppTransport:
         child = await asyncio.create_subprocess_exec(
             "/bin/ps",
             "-axo",
-            "pid=,ppid=,tty=,comm=",
+            "uid=,pid=,ppid=,tty=,comm=",
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.DEVNULL,
         )
@@ -90,31 +95,52 @@ class TerminalAppTransport:
         processes = [
             parts
             for line in output.decode().splitlines()
-            if len(parts := line.split(None, 3)) == 4 and parts[0].isdigit() and parts[1].isdigit()
+            if len(parts := line.split(None, 4)) == 5 and all(part.isdigit() for part in parts[:3])
         ]
         sessions = []
         for row in rows[:100]:
             tty = Path(row["tty"]).name
             if not re.fullmatch(r"ttys[0-9]+", tty):
                 continue
-            members = [(int(p), int(parent)) for p, parent, t, _ in processes if t == tty]
+            all_members = [
+                (int(owner), int(p), int(parent), comm)
+                for owner, p, parent, t, comm in processes
+                if t == tty
+            ]
+            members = [(p, parent) for owner, p, parent, _ in all_members if owner == os.getuid()]
+            all_pids = {p for _, p, _, _ in all_members}
+            legacy_roots = [
+                p
+                for owner, p, parent, comm in all_members
+                if owner == 0 and parent not in all_pids and Path(comm).name == "login"
+            ]
             pids = {p for p, _ in members}
             roots = [p for p, parent in members if parent not in pids]
             if len(roots) != 1:
                 continue
+            if len(legacy_roots) == 1:
+                parents = {p: parent for _, p, parent, _ in all_members}
+                ancestor, seen = roots[0], set()
+                while ancestor in parents and ancestor not in seen and ancestor != legacy_roots[0]:
+                    seen.add(ancestor)
+                    ancestor = parents[ancestor]
+                if ancestor != legacy_roots[0]:
+                    legacy_roots = []
             sessions.append(
                 {
                     "pane_id": f"terminal:{int(row['window_id'])}:{tty}",
                     "window_id": int(row["window_id"]),
                     "expected_pid": roots[0],
+                    **({"legacy_expected_pid": legacy_roots[0]} if len(legacy_roots) == 1 else {}),
+                    "process_owner_verified": True,
                     "tty": row["tty"],
                     "transport": "terminal_app",
                     "busy": row["busy"],
                     "agent_identity_verified": False,
                     "processes": [
                         {"pid": int(p), "ppid": int(parent), "name": Path(comm).name}
-                        for p, parent, t, comm in processes
-                        if t == tty
+                        for owner, p, parent, t, comm in processes
+                        if t == tty and int(owner) == os.getuid()
                     ],
                 }
             )
@@ -222,7 +248,61 @@ class TerminalAppTransport:
         return await self.native(
             'const app=Application("Terminal"); const tab=app.doScript('
             + json.dumps(command)
-            + "); JSON.stringify({tty:tab.tty(),opened:true});",
+            + "); app.activate(); JSON.stringify({tty:tab.tty(),opened:true});",
+            mutation=True,
+        )
+
+    async def process_identity(self, pid):
+        child = await asyncio.create_subprocess_exec(
+            "/bin/ps",
+            "-p",
+            str(int(pid)),
+            "-o",
+            "uid=,tty=,lstart=",
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.DEVNULL,
+        )
+        try:
+            async with asyncio.timeout(3):
+                raw, _ = await child.communicate()
+        finally:
+            if child.returncode is None:
+                child.kill()
+                await child.wait()
+        identity = " ".join(raw.decode().split())
+        if child.returncode or not identity.startswith(str(os.getuid()) + " "):
+            raise BridgeError("visible_target_changed", "Selected target process identity changed")
+        return identity
+
+    async def send_confirmed(self, row, text, identity):
+        """Check process start time/UID/TTY and empty input in the same native dispatch."""
+        if identity.split()[1] != Path(row["tty"]).name:
+            raise BridgeError("visible_target_changed", "Selected process TTY changed")
+        from kirabridge.platform_adapters.shell_prompt import empty_shell_prompt
+
+        if not empty_shell_prompt(await self.read(row["pane_id"])):
+            raise BridgeError("visible_input_not_empty", "Selected terminal has existing input")
+        command = f"/bin/ps -p {int(row['expected_pid'])} -o uid=,tty=,lstart="
+        return await self.native(
+            self.native_target(row["pane_id"])
+            + "\nconst host=Application.currentApplication(); host.includeStandardAdditions=true;"
+            + "\nconst observed=host.doShellScript("
+            + json.dumps(command)
+            + ").trim().replace(/\\s+/g,' ');"
+            + "\nif(observed!=="
+            + json.dumps(identity)
+            + ") throw Error('Selected target identity changed');"
+            + "\nif(tab.busy()) throw Error('Selected terminal is busy');"
+            + "\n"
+            + r"const last=tab.contents().replace(/\n+$/,'').split('\n').pop().replace(/\r$/,'');"
+            + "\n"
+            + r"if(!last.endsWith('KiraBridge visible % ') && "
+            + r"!/^[^\n%$#]{1,240}[%$#] $/.test(last)) "
+            + "throw Error('Selected terminal has existing input');"
+            + "\nwins[0].selectedTab=tab; wins[0].index=1; app.activate();"
+            + "\napp.doScript("
+            + json.dumps(text)
+            + ", {in:tab}); JSON.stringify({sent:true});",
             mutation=True,
         )
 

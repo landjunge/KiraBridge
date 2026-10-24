@@ -37,6 +37,7 @@ from kirabridge.bridge_core.models import (
     WriteInput,
 )
 from kirabridge.clipboard_manager import ClipboardManager
+from kirabridge.file_transfer.models import InventoryInput, PrepareInput, TransferInput
 from kirabridge.filesystem_manager import FilesystemManager, PathScope
 from kirabridge.image_manager import ImageManager
 from kirabridge.message_manager import MessageManager
@@ -48,14 +49,21 @@ from kirabridge.session_manager import SessionInput, SessionManager, SessionOpen
 from kirabridge.task_manager.manager import TaskManager
 from kirabridge.task_manager.store import Store
 from kirabridge.terminal_manager import TerminalManager
+from kirabridge.visible_terminal import VisibleTerminal, VisibleTerminalInput
 
 INPUTS = {
+    "files.prepare": PrepareInput,
+    "files.transfer": TransferInput,
+    "files.inventory": InventoryInput,
+    "files.status": TransferInput,
+    "files.pause": TransferInput,
     "connection.check": ConnectionCheckInput,
     "session.open": SessionOpen,
     "session.input": SessionInput,
     "session.catalog": EmptyInput,
     "session.read": SessionRead,
     "terminal.execute": TerminalInput,
+    "terminal.visible": VisibleTerminalInput,
     "file.read": ReadInput,
     "file.image": ImageInput,
     "file.list": PathInput,
@@ -113,8 +121,28 @@ class Bridge:
 
         self.handoffs = HandoffManager(self)
         self.security = SecurityManager(config, self.store)
+        from kirabridge.file_transfer.authorization import TransferAuthorization
+        from kirabridge.file_transfer.repository import TransferRepository
+        from kirabridge.file_transfer.service import FileTransferService
+        from kirabridge.file_transfer.sources import SourceRegistry
+        from kirabridge.file_transfer.threaddesk import ThreadDeskFileReceiver
         from kirabridge.output_history import OutputHistory
 
+        self.file_sources = SourceRegistry()
+        self.file_authorization = TransferAuthorization(
+            config.file_transfer, self.security.principal
+        )
+        self.file_repository = TransferRepository(
+            self.store.db, self.store.transaction, self.store.audit
+        )
+        self.file_transfers = FileTransferService(
+            config.state_path / "file-transfer-snapshots",
+            config.file_transfer,
+            self.file_sources,
+            self.file_authorization,
+            self.file_repository,
+            ThreadDeskFileReceiver(self.threaddesk),
+        )
         self.outputs = OutputHistory(config.output_history, self.store)
         self.store.result_codec = self.outputs
         self.terminal = TerminalManager(config.terminal)
@@ -149,6 +177,9 @@ class Bridge:
                     principal, result
                 ),
             )
+        )
+        self.visible_terminal = VisibleTerminal(
+            config, self.security, self.sessions, self.terminal.environment
         )
         self.terminal_queries = TerminalQueries(
             self.security, self.sessions, self.store, config.read_concurrency
@@ -237,11 +268,13 @@ class Bridge:
 
     def health(self, principal: str) -> dict:
         policy = self.security.principal(principal, "bridge.health")
-        from kirabridge.permissions import permission_summary
+        from kirabridge.discovery import snapshot
+        from kirabridge.permissions import automatic_for, permission_summary
         from kirabridge.terminal_access import terminal_access
 
         return {
             "name": "KiraBridge",
+            "discovery": snapshot(self, principal),
             "version": __version__,
             "api_version": API_VERSION,
             "dispatcher_active": bool(self.tasks.workers)
@@ -267,7 +300,13 @@ class Bridge:
             "permission_level": level_for(policy),
             "permission_label": LEVELS[level_for(policy)],
             "permission_detail": permission_summary(self.config, principal),
-            "approval_required": policy.approval_mode == "manual",
+            "approval_required": not automatic_for(policy, "terminal.execute"),
+            "approval_required_scope": (
+                "default execution; inspect each operation permission_decision"
+            ),
+            "effective_approval_mode": "automatic"
+            if automatic_for(policy, "terminal.execute")
+            else "per_operation",
             "session_input_policy": self.config.session_input_policy.model_dump(),
             "terminal_access": terminal_access(self.config, principal),
             "automatic_operations": policy.automatic_operations,
@@ -341,6 +380,26 @@ class Bridge:
             policy.read_roots if operation in {"file.read", "file.image", "file.list"} else []
         )
         scope = PathScope(roots, excluded=state_exclusions(self.config, policy))
+        if operation == "files.prepare":
+            return await self.file_transfers.prepare(task, args, running)
+        if operation == "files.transfer":
+            return await self.file_transfers.transfer(task, args, running)
+        if operation == "files.pause":
+            await running({"phase": "pause_requested", "transfer_id": args.transfer_id})
+            return self.file_repository.pause(principal, args.transfer_id)
+        if operation in {"files.inventory", "files.status"}:
+            self.file_authorization.check(principal, "files.inspect")
+            await running({"phase": "file_status_query"})
+            if operation == "files.status":
+                return self.file_repository.public(
+                    self.file_repository.get(principal, args.transfer_id)
+                )
+            return {
+                "transfers": [
+                    self.file_repository.public(row)
+                    for row in self.file_repository.list(principal, args.after, args.limit)
+                ]
+            }
         if operation == "connection.check":
             await running({"evidence_type": "connection_check_received"})
             return await self.check_connection(principal, args.device, args.mode)
@@ -354,6 +413,11 @@ class Bridge:
             return await self.terminal_queries.execute(
                 principal, operation, arguments, task_id=task["id"]
             )
+        if operation == "terminal.visible" or (
+            operation == "terminal.execute" and principal == "chatgpt"
+        ):
+            visible_args = VisibleTerminalInput.model_validate(arguments)
+            return await self.visible_terminal.execute(task, visible_args, running)
         if operation == "terminal.execute":
             result = await self.terminal.execute(
                 task["id"],

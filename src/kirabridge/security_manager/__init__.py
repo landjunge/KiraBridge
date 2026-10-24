@@ -117,6 +117,32 @@ class SecurityManager:
             )
 
     def validate_window(self, principal, task_id, args):
+        self.authorize(principal, "session.open")
+        self.principal(principal, "terminal.execute")
+        if not args.window_authorization:
+            from kirabridge.session_manager import SessionOpen
+
+            try:
+                task = self.store.get(task_id, principal)
+            except BridgeError:
+                task = None
+            expected = None
+            if task and task["operation"] == "session.open":
+                expected = SessionOpen.model_validate(task["args"])
+            elif task and (
+                task["operation"] == "terminal.visible"
+                or (task["operation"] == "terminal.execute" and principal == "chatgpt")
+            ):
+                expected = SessionOpen(cwd=task["args"]["cwd"], controlled_shell=True)
+            if (
+                expected is not None
+                and task["state"] in {"accepted", "running"}
+                and args.model_dump() == expected.model_dump()
+            ):
+                return
+            raise BridgeError(
+                "window_request_required", "A matching approved window task is required"
+            )
         token_hash = hashlib.sha256(args.window_authorization.encode()).hexdigest()
         if not self.store.db.execute(
             "SELECT 1 FROM approvals WHERE token_hash=? AND principal=? AND task_id=? "
@@ -134,7 +160,11 @@ class SecurityManager:
             )
 
     def check_window(self, principal, task_id, args):
-        token_hash = hashlib.sha256(args.window_authorization.encode()).hexdigest()
+        token_hash = (
+            hashlib.sha256(args.window_authorization.encode()).hexdigest()
+            if args.window_authorization
+            else self.window_hash(principal, task_id, args)
+        )
         with self.store.transaction():
             self.validate_window(principal, task_id, args)
             if self.store.db.execute(

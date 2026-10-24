@@ -8,9 +8,10 @@ from mcp.server.transport_security import TransportSecuritySettings
 from mcp.types import ToolAnnotations
 from pydantic import ValidationError
 
-from kirabridge import LOCAL_APPROVAL_URL
+from kirabridge import LOCAL_APPROVAL_URL, __version__
 from kirabridge.bridge_core.bridge import INPUTS, Bridge
 from kirabridge.bridge_core.models import BridgeError, TaskRequest
+from kirabridge.file_transfer.models import OpenAIFile
 from kirabridge.image_manager import image_task_result
 from kirabridge.message_manager import MessageSend
 from kirabridge.readiness import ReadinessInput, readiness
@@ -29,7 +30,15 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
     config = bridge.config
     server = FastMCP(
         "KiraBridge",
-        instructions="API v1. Check bridge_health or operation_catalog for approval_mode. "
+        instructions="Direct ChatGPT terminal commands use terminal_control (terminal.visible); "
+        "terminal.execute for chatgpt also uses a confirmed visible shell. "
+        "If no suitable idle window exists, open a separate visible window "
+        "under the same task grant. "
+        "Never type into busy/unconfirmed windows or fall back to a hidden session. "
+        "This direct-control rule does not prescribe Codex/Grok internal workflows. "
+        "ThreadDesk is a separate access path. Refresh tools/list and operation_catalog after "
+        "connection, version or session changes; compare discovery.revision. API v1. "
+        "Check per-operation permission_decision; approval_mode is legacy policy metadata. "
         "Use task_request: automatic mode queues permitted work without a browser click. "
         "Only when approval_required is true, send the operator to local_approval_url. "
         "Do not ask for approval when approval_required is false. "
@@ -64,6 +73,8 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
         ),
     )
 
+    server._mcp_server.version = __version__
+
     def identity(ctx: Context) -> str:
         if transport == "stdio":
             bridge.security.principal(principal)
@@ -97,9 +108,15 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
     )
 
     @server.tool(annotations=read)
-    def bridge_health(ctx: Context) -> dict[str, Any]:
+    async def bridge_health(ctx: Context) -> dict[str, Any]:
         """Version and dispatcher health. Never claims ChatGPT integration."""
-        return safe(lambda: bridge.health(identity(ctx)))
+        from kirabridge.discovery import live
+
+        name = identity(ctx)
+        try:
+            return {**bridge.health(name), "discovery": await live(bridge, name)}
+        except BridgeError as exc:
+            return {"error": {"code": exc.code, "message": str(exc)}}
 
     @server.tool(annotations=read)
     async def connection_check(
@@ -238,7 +255,7 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
             return {"error": {"code": exc.code, "message": str(exc)}}
 
     @server.tool(annotations=read)
-    def operation_catalog(ctx: Context) -> dict[str, Any]:
+    async def operation_catalog(ctx: Context) -> dict[str, Any]:
         """Permitted version-1 operations and exact argument JSON schemas."""
 
         def action():
@@ -277,7 +294,12 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
                 },
             }
 
-        return safe(action)
+        from kirabridge.discovery import live
+
+        result = safe(action)
+        if "error" not in result:
+            result["discovery"] = await live(bridge, identity(ctx))
+        return result
 
     @server.tool(annotations=write)
     async def task_submit(
@@ -399,6 +421,221 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
             ctx,
         )
 
+    @server.tool(annotations=write)
+    async def terminal_control(
+        argv: list[str],
+        cwd: str,
+        task_id: str,
+        idempotency_key: str,
+        ctx: Context,
+        pane_id: str | None = None,
+        expected_pid: int | None = None,
+        create_if_needed: bool = True,
+        timeout: float = 60,
+    ) -> dict[str, Any]:
+        """Direct work in a confirmed visible shell, with no hidden replacement.
+
+        Reuses one suitable empty existing Terminal.app shell or opens a separate visible
+        window under the same exact-task/standing grant. Busy agents are preserved.
+        Optional pane_id/expected_pid binds an explicit current target. Inspect task_get
+        for actual visible command completion; an uncertain outcome must never be replayed.
+        Codex/Grok internal execution and ThreadDesk are separate access paths.
+        """
+        return await task_request(
+            TaskRequest(
+                task_id=task_id,
+                idempotency_key=idempotency_key,
+                operation="terminal.visible",
+                arguments={
+                    "argv": argv,
+                    "cwd": cwd,
+                    "pane_id": pane_id,
+                    "expected_pid": expected_pid,
+                    "create_if_needed": create_if_needed,
+                    "timeout": timeout,
+                },
+            ),
+            ctx,
+        )
+
+    @server.tool(annotations=write, meta={"openai/fileParams": ["file"]})
+    async def file_transfer_prepare(
+        file: OpenAIFile,
+        project_id: str,
+        task_id: str,
+        idempotency_key: str,
+        ctx: Context,
+        folder: str = "",
+        library_path: str | None = None,
+        source_version: str | None = None,
+        expected_sha256: str | None = None,
+    ) -> dict[str, Any]:
+        """Snapshot a selected ChatGPT file's real bytes; no Library-wide browsing.
+
+        Host-provided file params carry a temporary download capability. The source URL
+        stays ephemeral and never enters tasks/audit. Existing grants still apply. A
+        completed preparation is NOT an import: call file_transfer_start and require
+        state=stored plus a validated durable ThreadDesk receipt.
+        """
+        try:
+            name = identity(ctx)
+            bridge.file_authorization.check(name, "files.prepare")
+            source_id = bridge.file_sources.selected(
+                name, idempotency_key, file, config.file_transfer
+            )
+            return await task_request(
+                TaskRequest(
+                    task_id=task_id,
+                    idempotency_key=idempotency_key,
+                    operation="files.prepare",
+                    arguments={
+                        "source_id": source_id,
+                        "project_id": project_id,
+                        "folder": folder,
+                        "library_path": library_path,
+                        "source_version": source_version,
+                        "expected_sha256": expected_sha256,
+                    },
+                ),
+                ctx,
+            )
+        except (BridgeError, ValidationError) as exc:
+            return {
+                "error": {
+                    "code": getattr(exc, "code", "invalid_arguments"),
+                    "message": "File preparation unavailable; check source settings and grants",
+                }
+            }
+
+    @server.tool(annotations=write)
+    async def file_transfer_export(
+        path: str,
+        project_id: str,
+        task_id: str,
+        idempotency_key: str,
+        ctx: Context,
+        folder: str = "",
+        library_path: str | None = None,
+        source_version: str | None = None,
+        expected_sha256: str | None = None,
+    ) -> dict[str, Any]:
+        """Snapshot a local export under BOTH operator export roots and file.read grants.
+
+        No Google Drive authorization or Library-wide access is inferred. Originals are
+        never changed. This prepares bytes only; it does not claim ThreadDesk storage.
+        """
+        try:
+            name = identity(ctx)
+            policy_scope, export_roots = bridge.file_authorization.export_roots(name)
+            policy_scope.split(path)
+            if any(
+                part in {".ssh", ".aws", ".gnupg", ".config", ".git"}
+                for part in __import__("pathlib").Path(path).parts
+            ):
+                raise BridgeError(
+                    "transfer_source_denied",
+                    "Credential/configuration directories are not export sources",
+                )
+            source_id = bridge.file_sources.export(name, idempotency_key, path, export_roots)
+            return await task_request(
+                TaskRequest(
+                    task_id=task_id,
+                    idempotency_key=idempotency_key,
+                    operation="files.prepare",
+                    arguments={
+                        "source_id": source_id,
+                        "project_id": project_id,
+                        "folder": folder,
+                        "library_path": library_path,
+                        "source_version": source_version,
+                        "expected_sha256": expected_sha256,
+                    },
+                ),
+                ctx,
+            )
+        except BridgeError as exc:
+            return {"error": {"code": exc.code, "message": "Export source is not authorized"}}
+
+    @server.tool(annotations=write)
+    async def file_transfer_start(
+        transfer_id: str,
+        task_id: str,
+        idempotency_key: str,
+        ctx: Context,
+    ) -> dict[str, Any]:
+        """Send prepared bytes to ThreadDesk, or explicitly resume after reconciling its checkpoint.
+
+        A new resume request needs a new task ID/key and the SAME transfer_id. Unknown
+        writes are never blindly replayed. Only result.state=stored with a matching,
+        independently fetched durable receipt counts as successful import.
+        """
+        return await task_request(
+            TaskRequest(
+                task_id=task_id,
+                idempotency_key=idempotency_key,
+                operation="files.transfer",
+                arguments={"transfer_id": transfer_id},
+            ),
+            ctx,
+        )
+
+    @server.tool(annotations=write)
+    async def file_transfer_pause(
+        transfer_id: str,
+        task_id: str,
+        idempotency_key: str,
+        ctx: Context,
+    ) -> dict[str, Any]:
+        """Request a checkpoint pause; originals and acknowledged receiver bytes remain intact."""
+        return await task_request(
+            TaskRequest(
+                task_id=task_id,
+                idempotency_key=idempotency_key,
+                operation="files.pause",
+                arguments={"transfer_id": transfer_id},
+            ),
+            ctx,
+        )
+
+    def transfer_read_permission(name, operation):
+        bridge.file_authorization.check(name, "files.inspect")
+        if bridge.security.authorize(name, operation)["approval_required"]:
+            raise BridgeError(
+                "approval_required", "Submit this status query as an exact approved task"
+            )
+
+    @server.tool(annotations=read)
+    def file_transfer_inventory(ctx: Context, after: str = "", limit: int = 100) -> dict[str, Any]:
+        """This identity's prepared/active/stored transfers; not a census of the ChatGPT Library."""
+
+        def action():
+            from kirabridge.file_transfer.models import InventoryInput
+
+            name = identity(ctx)
+            transfer_read_permission(name, "files.inventory")
+            args = InventoryInput(after=after, limit=limit)
+            return {
+                "transfers": [
+                    bridge.file_repository.public(row)
+                    for row in bridge.file_repository.list(name, args.after, args.limit)
+                ],
+                "scope": "explicitly selected/prepared sources; no historical Library enumeration",
+                "sources": bridge.file_sources.inventory(name),
+            }
+
+        return safe(action)
+
+    @server.tool(annotations=read)
+    def file_transfer_status(transfer_id: str, ctx: Context) -> dict[str, Any]:
+        """Read own safe byte progress, checkpoint errors and the last validated storage receipt."""
+
+        def action():
+            name = identity(ctx)
+            transfer_read_permission(name, "files.status")
+            return bridge.file_repository.public(bridge.file_repository.get(name, transfer_id))
+
+        return safe(action)
+
     @server.tool(annotations=read)
     def task_events(task_id: str, ctx: Context, after: int = 0) -> dict[str, Any]:
         """Read up to 1000 task events after a cursor, only for your own task."""
@@ -417,14 +654,15 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
         return safe(lambda: bridge.tasks.cancel_queued(identity(ctx), task_id))
 
     @server.tool(annotations=read)
-    def agent_inventory(ctx: Context) -> dict[str, Any]:
+    async def agent_inventory(ctx: Context) -> dict[str, Any]:
         """Configured agent identities; executable presence never proves a daemon or active task."""
 
-        def action():
-            policy = bridge.security.principal(identity(ctx), "agent.inspect")
-            return bridge.agents.inventory(policy.agents)
+        from kirabridge.discovery import inventory
 
-        return safe(action)
+        try:
+            return await inventory(bridge, identity(ctx))
+        except BridgeError as exc:
+            return {"error": {"code": exc.code, "message": str(exc)}}
 
     @server.tool(annotations=write)
     def clipboard_read(
@@ -764,5 +1002,22 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
     def team_events(team_id: str, ctx: Context, after: int = 0, limit: int = 50) -> dict[str, Any]:
         """Read ordered team role/delegation/delivery events, without secret/raw error logs."""
         return safe(lambda: bridge.teams.events(identity(ctx), team_id, after, limit))
+
+    @server._mcp_server.list_tools()
+    async def current_tools():
+        from kirabridge.discovery import live
+
+        name = identity(server.get_context())
+        epoch = await live(bridge, name)
+        metadata = {
+            "version": epoch["version"],
+            "instance_id": epoch["instance_id"],
+            "revision": epoch["revision"],
+            "principal": name,
+        }
+        return [
+            tool.model_copy(update={"meta": {**(tool.meta or {}), "kirabridge": metadata}})
+            for tool in await server.list_tools()
+        ]
 
     return server

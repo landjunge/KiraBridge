@@ -126,6 +126,21 @@ class MessageManager:
                     if self.config.visible_handoffs.enabled
                     else "pending_managed_receiver"
                 )
+        if visible:
+            # Preserve the original failure and expose only already-recorded evidence.
+            # Reading a message must never release a reservation or repeat input.
+            try:
+                self._identity(principal, "task.read")
+            except BridgeError:
+                pass  # Message-only readers keep their existing response.
+            else:
+                from kirabridge.visible_message_evidence import visible_message_evidence
+
+                handoff = visible_message_evidence(
+                    self.store.db, principal, message_id, job["run_id"]
+                )
+                if handoff is not None:
+                    result["processing"]["handoff"] = handoff
         result["request_reply"] = bool(result["request_reply"])
         return {"api_version": "1", **result}
 
