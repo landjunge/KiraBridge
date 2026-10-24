@@ -127,3 +127,62 @@ checks remain immediate. Mutation-worker budget is15s, accommodating the measure
 4.651s pre-Paste path plus bounded2s focus and4s observation phases; reads retain
 their prior budget. Five directly affected JXA/identity/lease/cancellation checks
 passed. This still is not a passing installed final-Paste claim.
+
+## Actual final7725bc6 acceptance and remaining gates
+
+The exact7725bc6 package reproduced twice and passed isolated real Intel-macOS
+upgrade/data/status/rollback before installation. Productive service PID68867,
+source fingerprint66b2005be63082d89da6641bda59f1a30462af65a1ac8771904bbc25cba6b544,
+config4d116741… was read back.4285 prior tasks,271 messages and45 handoffs plus
+the original unknown input record survived unchanged; SQLite quick_check passed.
+Installed package files match the built wheel, and launchd options apart from the
+executable remain identical. A bounded128-byte log read through Kira completed;
+contents were not published.
+
+Actual Kira task `kira-rc17-axpress-submitfalse-20261024-05` COMPLETED on owned
+Terminal46256/ttys003, shell65583/agent65606: literal paste event sent, Return=false,
+submitted=false, no agent-execution claim. Independent Kira queued readback COMPLETED,
+contained the exact nonce and reported input_not_empty. A new attempt to overwrite
+it failed `visible_input_not_empty` before input; independent direct readback confirmed
+the original nonce and absence of the forbidden replacement. A separate native read
+also confirmed it in0.88s. Clipboard returned to the known test fixture. An initial
+direct read timed out; subsequent queued and direct reads succeeded. This timeout
+is retained in the report, not called a passing first attempt or proved impossible.
+[Live proof](evidence/rc17-live-7725bc6-20261024.json).
+
+One owned idle fixture was closed after exact PID/start/TTY/widget checks; the core
+daemon kept the same PID and remained active. The other fixture's input no longer
+matched the expected cleanup text, so it was preserved, not killed or overwritten.
+User/Codex2/Codex3 windows were never entered. Earlier unknown tasks were not replayed
+or called executed. Library delivery acknowledgment is not Library import completion.
+
+The actually configured ChatGPT Events frontdoor was separately initialized with
+only its journal state replaced by an isolated directory. Its implicit startup
+health was authorized; no task/event call or sender worker. Version0.0.2/protocol
+2025-11-25,65 tools, NoEvents instructions; all Task/Action schemas require only
+request. Original running frontend started after relevant source mtimes, so an
+outdated live facade is not established. The injected Apps declarations still
+contradict both fresh frontdoor and backend. A first diagnostic reader hit64KiB;
+only that reader was increased before the successful metadata probe. No production
+connector/profile/credentials were replaced. The proven empty legacy field keeps
+current cached tools usable. [Fresh frontdoor](evidence/rc17-fresh-frontdoor-20261024.json).
+
+The candidate bundle896b7d15… and its SHA file are now actual **private draft assets**
+under separately pinned names, preserving standard b54f462 assets. The documented
+one-line authenticated download/checksum/extract/install command exited0 in a clean
+isolated prefix with service=none; CLI/source pin, downloaded bytes and all42 fresh
+full grants passed. Launchd was tested separately with these same package bytes.
+The runner's final artifact lookup initially assumed mktemp honored TMPDIR; only
+that postcheck was corrected from the own recorded wheel URI, without reinstalling
+or rerunning the command. [Command evidence](evidence/rc17-one-line-7725bc6-20261024.json).
+
+PR32 is pushed and OPEN. GitHub Actions explicitly did not start because recent
+account payments failed or spending limits need adjustment. No failed/not-started
+control is bypassed, no merge or published RC17 claimed; RC14 remains published.
+ThreadDesk's actual binary receiver and authorized selected bytes/destinations are
+not available, and the optional file module remains disabled despite complete
+ChatGPT capability grants. No user Library import or index completion is invented.
+Apple Silicon execution remains untested. Further transient native-read latency
+needs observation. Design preview has not started while RC17 release gates remain.
+This documentation-only report follows the tested7725bc6 functional source; the
+future integrated release still requires a final-main build after CI is unblocked.

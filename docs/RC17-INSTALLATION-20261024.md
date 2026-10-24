@@ -155,3 +155,15 @@ PR32 remains open: GitHub Actions annotation explicitly says jobs were not start
 because recent account payments failed or spending limit must increase. No required
 checks are configured according to gh, but failed/not-started controls are not
 bypassed. No merge or release publication is claimed.
+
+## Final installed functional source7725bc6
+
+Actual service PID68867/version0.8.0rc17/source7725bc6, unchanged full ChatGPT config4d116741….
+All42 operations independently authorized+automatic through Kira; no browser approval.
+Actual paste-only request completed and independent Kira readback matched; forbidden
+overwrite refused with original input preserved. Bounded Kira log read completed.
+An earlier direct read timeout remains disclosed. Two identical builds, actual
+isolated upgrade/data/rollback, private draft download/one-line isolated install
+and wheel-file comparison are documented in the [final team report](CHATGPT-BLOCKER-AUDIT-20261024.md).
+Backup: install/backups/20261024-203321-add9ae2b. No Codex2/3 input or permission changes.
+Assets are additional private draft candidates, not a published/merged RC17 release.

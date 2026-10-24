@@ -63,3 +63,15 @@ restoration moves to an independent RAM-only owner, with generation guards and
 stdin transport; killed GUI workers no longer own the only snapshot.
 [Team findings and scoped tests](CHATGPT-BLOCKER-AUDIT-20261024.md).
 Actual final-package/native-paste acceptance remains separately required.
+
+### Verified operator candidate7725bc6 (still unpublished)
+
+Actual Kira paste-only input, independent readback, nonempty-input refusal and
+128-byte authorized log read passed on Intel macOS. All42 ChatGPT operations were
+read back authorized/automatic after explicit operator ACL activation. Package
+bytes reproduced, actual isolated upgrade/rollback and authenticated draft command
+were checked; one earlier direct read timeout is retained. Separately named
+KiraBridge-macos-7725bc6.tar.gz + SHA are actual private draft assets. PR32 remains
+open because Actions did not start due billing. Standard draft assets/main remain
+b54f462; final integrated-main build/publication is still required after checks.
+[Detailed proof and boundaries](CHATGPT-BLOCKER-AUDIT-20261024.md).

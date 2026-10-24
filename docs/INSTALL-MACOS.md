@@ -1,6 +1,26 @@
+# Current RC17 review artifact / Aktuelles RC17-Prüfpaket
+
+The copy command below selects **KiraBridge-macos-7725bc6.tar.gz**, SHA-256
+`896b7d1510cd164459b9cb1767a9b26ffc75164f2f6ca3791b119ddffc272f8c`.
+This is a separately named private RC17 draft candidate from open PR32, not the
+published RC14 and not the historical standard RC17/b54f462 assets. It is unsigned.
+It was reproduced twice, tested with actual Intel-macOS upgrade/data/rollback,
+installed and verified through Kira paste-only input and independent readback.
+GitHub Actions has not started due account billing; no merge/publication claimed.
+
+Der Befehl wählt genau diesen privaten, separat benannten RC17-Kandidaten aus PR32.
+Intel-macOS ist tatsächlich geprüft; Apple Silicon ist nicht ausgeführt. Die
+aktuelle produktive Berechtigung wurde auf ausdrücklichen Nutzerauftrag nur für
+ChatGPT vervollständigt: alle42 Operationen automatisch, andere Identitäten und
+Zugangsdaten unverändert. Details: [Arbeitsnachweis](CHATGPT-BLOCKER-AUDIT-20261024.md).
+Die Ein-Zeilen-Kette wurde aus dem authentifizierten Entwurf mit isolierten Pfaden
+und `--service none` ausgeführt; echte launchd-Prüfungen liefen separat mit denselben
+Paketbytes. Ein nachgelagerter Testpfad-Assert wurde berichtigt, ohne Installation
+zu wiederholen. Versions-/Grant-/SHA-Nachprüfungen sind bestanden.
+
 # macOS installation / Installation
 
-**RC17 is an unpublished review candidate. Its actual [isolated package acceptance](ACCEPTANCE-MACOS-RC17.md) passed; required CI/review and native agent-input acceptance remain open. No production deployment approved.**
+**RC17 remains unpublished. The explicitly authorized operator upgrade, native paste/readback and full ChatGPT grant are verified for7725bc6; GitHub Actions remains blocked before execution by account billing. Additional review was waived.**
 
 **RC17 ist ein unveröffentlichter Reviewkandidat. Echte isolierte Paketprüfung bestanden; Pflicht-CI/Review und native Agenteneingabe offen. Keine Produktivfreigabe.**
 
@@ -25,11 +45,11 @@ Downloads GitHub CLI (`brew install gh`) installieren, mit `gh auth login`
 anmelden und mit `gh repo view landjunge/KiraBridge` den Zugriff prüfen.
 Keine Tokens in Befehle oder Logs kopieren.
 
-Das Paket `KiraBridge-macos.tar.gz` enthält Installer, Wheel, Quellstand,
+Das Paket `KiraBridge-macos-7725bc6.tar.gz` enthält Installer, Wheel, Quellstand,
 `uv.lock`, Lizenz, Anleitung und Releasehinweise. Nach Bezug eines freigegebenen
-Pakets samt `KiraBridge-macos.tar.gz.sha256` in einen neuen leeren Ordner:
-`shasum -a 256 -c KiraBridge-macos.tar.gz.sha256` prüfen und mit
-`tar -xzf KiraBridge-macos.tar.gz` entpacken. Nur ausführen, wenn die Prüfung
+Pakets samt `KiraBridge-macos-7725bc6.tar.gz.sha256` in einen neuen leeren Ordner:
+`shasum -a 256 -c KiraBridge-macos-7725bc6.tar.gz.sha256` prüfen und mit
+`tar -xzf KiraBridge-macos-7725bc6.tar.gz` entpacken. Nur ausführen, wenn die Prüfung
 besteht. Prüfsummen vom selben authentifizierten Release schützen vor
 Beschädigung; sie ersetzen keine unabhängige Herausgebersignatur.
 
@@ -41,12 +61,14 @@ Dies ist ausschließlich der RC17-Reviewbefehl, tatsächlich mit isolierten Pfad
 
 
 ```sh
-d=$(mktemp -d) && gh release download v0.8.0rc17 -R landjunge/KiraBridge -p 'install-macos.sh*' -D "$d" && (cd "$d" && shasum -a 256 -c install-macos.sh.sha256 && sh install-macos.sh "$@")
+d=$(mktemp -d) && gh release download v0.8.0rc17 -R landjunge/KiraBridge -p 'KiraBridge-macos-7725bc6.tar.gz*' -D "$d" && (cd "$d" && shasum -a 256 -c KiraBridge-macos-7725bc6.tar.gz.sha256 && tar -xzf KiraBridge-macos-7725bc6.tar.gz && sh KiraBridge/install.sh --full-access "$@")
 ```
 
-Erstinstallation: legt ausschließlich Benutzerdateien an. Standardprojekt:
-`~/workspace/KiraBridge`; Aufträge benötigen Einzelgenehmigung. Keine pauschale
-Vollfreigabe. Andere Ordner mit `--workspace /absoluter/projektordner` wählen.
+Erstinstallation: legt ausschließlich Benutzerdateien an. Dieser ausdrücklich
+freigegebene `--full-access`-Befehl vergibt automatische vollständige Datei-/Befehlsrechte.
+Bestehende Installationen behalten ihre eigene Konfiguration und Berechtigungen.
+Ein Vollzugriffs-Label ersetzt weder installierte Agenten noch Providerkonten oder
+fehlende Empfängerschnittstellen.
 Konfiguration und geheime Zugangsdaten: `~/.config/kirabridge/`; Laufzeiten,
 Backups und Logs: `~/.local/share/kirabridge/install/`. Der erste Start bindet
 127.0.0.1:8765. Ein bereits belegter Port führt zum Fehler und Rückfall.
@@ -105,14 +127,15 @@ never put access tokens in commands. The installer does not install Python,
 Homebrew, compilers or change permissions.
 
 Download the approved bundle and its `.sha256` file into a new empty directory,
-verify with `shasum -a 256 -c KiraBridge-macos.tar.gz.sha256`, then extract using
-`tar -xzf KiraBridge-macos.tar.gz`. Authorized draft reviewers can run the highlighted command above for both
-installation and updates; it authenticates downloads and verifies both stages.
+verify with `shasum -a 256 -c KiraBridge-macos-7725bc6.tar.gz.sha256`, then extract using
+`tar -xzf KiraBridge-macos-7725bc6.tar.gz`. Authorized draft reviewers can run the highlighted command above for both
+installation and updates; it authenticates the download and verifies the archive before execution.
 After manual extraction, the equivalent local entrypoint is `sh KiraBridge/install.sh`. A checksum obtained through the same authenticated
 release detects corruption; it is not an independent publisher signature.
 
-Fresh installs use `~/workspace/KiraBridge` with individual approvals; override
-with `--workspace /absolute/project`. Config and credentials live under
+This explicitly authorized `--full-access` command creates automatic full filesystem/
+command grants on fresh installations. Existing policies remain unchanged. Agent,
+provider and receiver prerequisites still need their actual setup. Config and credentials live under
 `~/.config/kirabridge`; versioned runtimes, logs and backups under
 `~/.local/share/kirabridge/install`. Updates preserve configuration, credentials,
 database and user files, refuse active tasks or receiver/team jobs, and preserve
