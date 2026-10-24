@@ -34,11 +34,18 @@ def build(output):
     wheel = next(output.glob("*.whl"))
     files = {"wheel/" + wheel.name: wheel.read_bytes()}
     for name in git("ls-files").splitlines():
-        if name.startswith("src/") or name in {"pyproject.toml", "uv.lock", "LICENSE"}:
+        if name.startswith(("src/", "docs/")) or name in {"pyproject.toml", "uv.lock", "LICENSE"}:
             files["payload/" + name] = subprocess.check_output(["git", "show", f"{commit}:{name}"])
     files["installer/install.py"] = Path("installer/install.py").read_bytes()
-    files["INSTALL.md"] = Path("docs/INSTALL-MACOS.md").read_bytes()
-    files["RELEASE-NOTES.md"] = Path("docs/RELEASE-0.8.0rc15.md").read_bytes()
+    files["INSTALL.md"] = (
+        Path("docs/INSTALL-MACOS.md").read_bytes().replace(b"](CHATGPT.md)", b"](docs/CHATGPT.md)")
+    )
+    files["RELEASE-NOTES.md"] = (
+        Path("docs/RELEASE-0.8.0rc15.md")
+        .read_bytes()
+        .replace(b"](INSTALL-MACOS.md)", b"](docs/INSTALL-MACOS.md)")
+        .replace(b"](ACCEPTANCE-MACOS-RC15.md)", b"](docs/ACCEPTANCE-MACOS-RC15.md)")
+    )
     files["LICENSE"] = Path("LICENSE").read_bytes()
     files["install.sh"] = b"""#!/bin/sh
 set -eu

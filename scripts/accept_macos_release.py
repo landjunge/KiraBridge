@@ -32,7 +32,7 @@ def digest(path):
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
-def accept(artifacts, root, previous_wheel):
+def accept(artifacts, root, previous_wheel, release_download=False):
     if platform.system() != "Darwin":
         raise SystemExit("Actual macOS is required")
     root.mkdir(mode=0o700, parents=True, exist_ok=False)
@@ -143,7 +143,11 @@ def accept(artifacts, root, previous_wheel):
         label,
     ]
     command = ["sh", "KiraBridge/install.sh", *common]
+    download_command = Path("scripts/install-command.sh").read_text().strip()
+    if release_download:
+        command = ["sh", "-c", download_command, "kirabridge-isolated-test", *common]
     evidence = {
+        "download_command": download_command if release_download else "not exercised",
         "os": platform.platform(),
         "architecture": platform.machine(),
         "version": version,
@@ -151,8 +155,14 @@ def accept(artifacts, root, previous_wheel):
         "tested_command": shlex.join(command),
         "cwd": str(extracted),
         "checks": [],
-        "remote_release_command": "NOT TESTED: candidate unpublished; CI billing gate",
+        "remote_release_command": (
+            "authenticated draft download" if release_download else "not exercised in this run"
+        ),
     }
+
+    scratch = root / "scratch"
+    scratch.mkdir(mode=0o700)
+    test_env = dict(os.environ, TMPDIR=str(scratch))
 
     def health(expected, prior_pid=None):
         deadline = time.monotonic() + 40
@@ -178,7 +188,7 @@ def accept(artifacts, root, previous_wheel):
             db.execute("create table release_acceptance_probe(value text)")
             db.execute("insert into release_acceptance_probe values ('PRESERVE_DATABASE')")
         evidence["checks"].append("actual published RC14 wheel starts under isolated launchd")
-        print(run(command, cwd=extracted), flush=True)
+        print(run(command, cwd=extracted, env=test_env), flush=True)
         current = health(version)
         evidence["checks"].append("built package upgrades RC14; authenticated version/status/start")
         assert (digest(args.config), digest(credentials)) == before
@@ -192,7 +202,7 @@ def accept(artifacts, root, previous_wheel):
         time.sleep(1)
         assert health(version)["runtime"]["pid"] == current["runtime"]["pid"]
         evidence["checks"].append("daemon survives installer/terminal command exit")
-        print(run(command, cwd=extracted), flush=True)
+        print(run(command, cwd=extracted, env=test_env), flush=True)
         assert health(version)["runtime"]["pid"] == current["runtime"]["pid"]
         evidence["checks"].append("repeat install idempotent; same PID and no config rewrite")
         run(["launchctl", "kickstart", "-k", service])
@@ -248,5 +258,11 @@ if __name__ == "__main__":
     parser.add_argument("artifacts", type=Path)
     parser.add_argument("--root", required=True, type=Path)
     parser.add_argument("--previous-wheel", required=True, type=Path)
+    parser.add_argument("--release-download", action="store_true")
     opts = parser.parse_args()
-    accept(opts.artifacts.resolve(), opts.root.resolve(), opts.previous_wheel.resolve())
+    accept(
+        opts.artifacts.resolve(),
+        opts.root.resolve(),
+        opts.previous_wheel.resolve(),
+        opts.release_download,
+    )

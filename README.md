@@ -72,8 +72,7 @@ matching dependency lock but still requires its own acceptance run. See the
 
 **RC15 is an unpublished candidate.** The macOS bundle and its installation
 command are described [below](#install--update--installieren--aktualisieren).
-Publication requires successful CI and PR review. No RC15 download is available
-yet. Existing launchd services continue running when Terminal/browser closes.
+Publication requires successful CI and PR review. The RC15 draft is reserved for authorized reviewers. Existing launchd services continue running when Terminal/browser closes.
 
 ### Control and optional tools
 
@@ -160,7 +159,7 @@ vom Abhängigkeits-Lock berücksichtigt und benötigt eine eigene Abnahme.
 
 **RC15 ist ein unveröffentlichter Kandidat.** Paket und Installationsbefehl
 stehen [unten](#install--update--installieren--aktualisieren). Veröffentlichung
-erst nach erfolgreicher CI und PR-Review. Noch kein RC15-Download.
+erst nach erfolgreicher CI und PR-Review. Noch kein freigegebener RC15-Download.
 Der launchd-Dienst läuft nach Schließen von Terminal oder Browser weiter.
 
 ### Kontrolle und optionale Werkzeuge
@@ -186,12 +185,15 @@ RC15-Abnahme. Handy, Live-Sprache und ChatGPT benötigen getrennte Prüfungen.
 
 ## Install / update · Installieren / aktualisieren
 
-Nach authentifiziertem Download, SHA-256-Prüfung und Entpacken des freigegebenen
-macOS-Pakets / after authenticated download, SHA-256 verification and extraction
-of the approved macOS bundle:
+**RC15-Kandidat: nur für berechtigte Reviewer des Release-Entwurfs; noch kein
+freigegebener Endnutzer-Download. / RC15 candidate: draft reviewers only until CI
+and review pass.** Voraussetzung / prerequisite: Python 3.11, uv 0.11.6 und
+angemeldete GitHub CLI mit Repository-Zugriff / authenticated GitHub CLI.
+Der Befehl lädt authentifiziert, prüft SHA-256 und installiert oder aktualisiert /
+authenticated download, checksum verification and install/update:
 
 ```sh
-sh KiraBridge/install.sh
+d=$(mktemp -d) && gh release download v0.8.0rc15 -R landjunge/KiraBridge -p 'install-macos.sh*' -D "$d" && (cd "$d" && shasum -a 256 -c install-macos.sh.sha256 && sh install-macos.sh "$@")
 ```
 
 **Für Erstinstallation und Update derselbe Befehl. RC15 bleibt bis zur Abnahme

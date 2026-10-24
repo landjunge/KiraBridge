@@ -3,7 +3,7 @@
 ## Deutsch
 
 **Veröffentlicht ist [v0.8.0rc14](https://github.com/landjunge/KiraBridge/releases/tag/v0.8.0rc14).
-RC15 ist ein unveröffentlichter Kandidat. Sein Downloadbefehl wird erst nach CI und Review freigegeben.**
+RC15 ist ein unveröffentlichter Kandidat. Der Release-Entwurf dient ausschließlich berechtigten Reviewern; Freigabe erst nach CI und Review.**
 
 Voraussetzungen: normales Benutzerkonto ohne sudo, macOS 15 (Intel x86_64 oder
 Apple Silicon arm64), Python **3.11**, **uv 0.11.6**, Internet zu PyPI und Zugriff
@@ -29,10 +29,15 @@ Pakets samt `KiraBridge-macos.tar.gz.sha256` in einen neuen leeren Ordner:
 besteht. Prüfsummen vom selben authentifizierten Release schützen vor
 Beschädigung; sie ersetzen keine unabhängige Herausgebersignatur.
 
-**Installation und Update verwenden denselben kurzen Befehl aus diesem Ordner:**
+**Für berechtigte Reviewer des RC15-Release-Entwurfs: Installation und Update
+mit EINEM Befehl (angemeldete GitHub CLI erforderlich).** Der Bootstrap lädt das
+passende Paket authentifiziert und prüft dessen fest eingebetteten SHA-256-Wert.
+`"$@"` reicht optionale Argumente weiter; beim normalen Einfügen sind diese leer.
+Nach Freigabe ist dies auch der Endnutzer-Befehl:
+
 
 ```sh
-sh KiraBridge/install.sh
+d=$(mktemp -d) && gh release download v0.8.0rc15 -R landjunge/KiraBridge -p 'install-macos.sh*' -D "$d" && (cd "$d" && shasum -a 256 -c install-macos.sh.sha256 && sh install-macos.sh "$@")
 ```
 
 Erstinstallation: legt ausschließlich Benutzerdateien an. Standardprojekt:
@@ -97,8 +102,9 @@ Homebrew, compilers or change permissions.
 
 Download the approved bundle and its `.sha256` file into a new empty directory,
 verify with `shasum -a 256 -c KiraBridge-macos.tar.gz.sha256`, then extract using
-`tar -xzf KiraBridge-macos.tar.gz`. Run the highlighted command above for both
-installation and updates. A checksum obtained through the same authenticated
+`tar -xzf KiraBridge-macos.tar.gz`. Authorized draft reviewers can run the highlighted command above for both
+installation and updates; it authenticates downloads and verifies both stages.
+After manual extraction, the equivalent local entrypoint is `sh KiraBridge/install.sh`. A checksum obtained through the same authenticated
 release detects corruption; it is not an independent publisher signature.
 
 Fresh installs use `~/workspace/KiraBridge` with individual approvals; override
