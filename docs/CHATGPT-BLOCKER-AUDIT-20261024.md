@@ -68,3 +68,27 @@ or not-started controls are not bypassed; PR remains open, RC17 remains a draft 
 published release remains RC14. Productive source at this report snapshot is
 f6deb46/PID59932, not yet all team changes. All recorded previous package/upgrade
 proofs retain their own exact source pins. No whole-suite or Actions success claim.
+
+## Clipboard lifetime follow-up
+
+The GUI worker's timeout could kill its in-process finally before restoration.
+`platform_adapters/clipboard_lease.py` now owns the original formats in a separate
+bounded memory-only helper; only payload crosses stdin, never argv/logs/files.
+The GUI worker uses stdin for its script too. Generation checks immediately before
+Paste reject a changed clipboard; user changes survive cleanup. EOF requests restore
+after the GUI worker is reaped; repeated cancellation cannot skip that reaping.
+Unconfirmed restoration is an explicit error, never success or permission to replay.
+JXA length/count arithmetic is normalized to numbers, avoiding false size limits
+from string concatenation. Existing item/type/byte budgets remain.
+
+Native echo timing now checks newly changed nonempty text or a new collapsed-paste
+marker, not an empty trailing line or pre-existing history. Its wall-clock polling
+budget is bounded. This observation is not an authenticated agent acknowledgement.
+
+Necessary evidence: protocol lifecycle tests (17 defined cases covered through
+initial/affected/generation runs),3 affected native syntax/identity checks,2 worker
+integration cases,7 cancellation/echo cases and1 directly related trailing-space
+case passed. No full suite. Actual Intel-macOS stdin execution, numeric generation
+and restoration after an independently killed worker passed with the known own
+clipboard fixture; [evidence](evidence/rc17-clipboard-lease-macos-20261024.json).
+This does not yet claim a passing productive native paste.

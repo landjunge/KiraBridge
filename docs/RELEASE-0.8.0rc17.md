@@ -54,3 +54,12 @@ missing ThreadDesk byte receiver or an unsupported Library-wide API.
 GitHub Actions is still blocked before execution by account billing. PR32 is open;
 RC17 remains draft. Additional external review was waived by the owner; independent
 native-team safety audits were performed. No failed Actions run is called passed.
+
+The extended blocker audit fixes effective Team/ThreadDesk read permissions,
+paginated/refreshed tool discovery, owned visible/admin output and UTF-8 budgets.
+A local one-principal ACL activation mode preserves durable external reply waits
+without changing their state or allowing partial-input interruption. Clipboard
+restoration moves to an independent RAM-only owner, with generation guards and
+stdin transport; killed GUI workers no longer own the only snapshot.
+[Team findings and scoped tests](CHATGPT-BLOCKER-AUDIT-20261024.md).
+Actual final-package/native-paste acceptance remains separately required.

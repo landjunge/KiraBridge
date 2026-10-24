@@ -10,13 +10,15 @@ import sys
 from pathlib import Path
 
 from kirabridge.bridge_core.models import BridgeError, UncertainExecution
+from kirabridge.platform_adapters.clipboard_lease import clipboard_lease
 from kirabridge.platform_adapters.desktop import MacDesktop
 
 
 class TerminalAppTransport:
-    def __init__(self, clipboard_lock, *, desktop=None):
+    def __init__(self, clipboard_lock, *, desktop=None, clipboard_owner=clipboard_lease):
         self.clipboard_lock = clipboard_lock
         self.desktop = desktop or MacDesktop()
+        self.clipboard_owner = clipboard_owner
 
     @property
     def available(self):
@@ -30,14 +32,14 @@ class TerminalAppTransport:
             "/usr/bin/osascript",
             "-l",
             "JavaScript",
-            "-e",
-            source,
+            "-",
+            stdin=asyncio.subprocess.PIPE,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
         )
         try:
             async with asyncio.timeout(10):
-                stdout, stderr = await child.communicate()
+                stdout, stderr = await child.communicate(source.encode("utf-8"))
             if child.returncode:
                 detail = stderr.decode("utf-8", "replace")[:1024]
                 code = (
@@ -47,10 +49,14 @@ class TerminalAppTransport:
                     if "Selected target identity changed" in detail
                     else "visible_focus_changed"
                     if "Selected terminal focus changed" in detail
+                    else "clipboard_changed"
+                    if "Selected terminal clipboard changed" in detail
                     else "visible_input_changed"
                     if "Selected terminal input changed" in detail
                     else "visible_input_not_empty"
                     if "Selected terminal has existing input" in detail
+                    else "visible_paste_unconfirmed"
+                    if "Paste not observed" in detail
                     else "session_busy"
                     if "Selected terminal is busy" in detail
                     else "session_transport_unavailable"
@@ -70,7 +76,16 @@ class TerminalAppTransport:
         finally:
             if child.returncode is None:
                 child.kill()
-                await child.wait()
+                reaping = asyncio.create_task(child.wait())
+                cancelled = False
+                while not reaping.done():
+                    try:
+                        await asyncio.shield(reaping)
+                    except asyncio.CancelledError:
+                        cancelled = True
+                reaping.result()
+                if cancelled:
+                    raise asyncio.CancelledError
 
     async def catalog(self):
         if sys.platform != "darwin":
@@ -236,78 +251,64 @@ class TerminalAppTransport:
             + ") throw Error('Selected terminal input changed');"
         )
 
+    @staticmethod
+    def native_paste_observation(text):
+        # A historical suffix or empty trailing line is not a new paste observation.
+        last = next((line for line in reversed(text.splitlines()) if line.strip()), "").rstrip()
+        return (
+            "\nfunction observedPaste(before, after) {"
+            "const a=Array.from(before), b=Array.from(after); "
+            "let first=0, endA=a.length, endB=b.length;"
+            "while(first<endA && first<endB && a[first]===b[first]) first++;"
+            "while(endA>first && endB>first && a[endA-1]===b[endB-1]) {endA--;endB--;}"
+            "const changed=b.slice(first,endB).join('');"
+            + "return ("
+            + json.dumps(bool(last))
+            + " && changed.includes("
+            + json.dumps(last)
+            + ")) || changed.includes("
+            + json.dumps(f"[Pasted Content {len(text)} chars]")
+            + ");}\n"
+        )
+
     async def insert(self, pane_id, text, *, identity_guard=None, expected_screen=None):
         async with self.clipboard_lock:
-            await self.native(
-                self.native_focus(pane_id)
-                + self.native_identity_guard(identity_guard)
-                + """
+            # The independent memory-only owner survives a killed/cancelled GUI
+            # worker. native() reaps that worker before the lease requests restore.
+            async with self.clipboard_owner(text) as lease:
+                await self.native(
+                    self.native_focus(pane_id)
+                    + self.native_identity_guard(identity_guard)
+                    + self.native_paste_observation(text)
+                    + f"""
         ObjC.import("AppKit");
-        const pb=$.NSPasteboard.generalPasteboard, saved=[]; let totalBytes=0;
-        const items=pb.pasteboardItems;
-        if(items.count>32) throw Error("Clipboard too large to preserve");
-        for(let i=0;i<items.count;i++) {
-         const item=items.objectAtIndex(i), formats=[];
-         if(item.types.count>64) throw Error("Clipboard too large to preserve");
-         for(let j=0;j<item.types.count;j++) {
-          const type=item.types.objectAtIndex(j), data=item.dataForType(type);
-          if(data && data.length>1048576) throw Error("Clipboard too large to preserve");
-          totalBytes+=data ? data.length : 0;
-          if(totalBytes>4194304) throw Error("Clipboard too large to preserve");
-          formats.push([type,data]);
-         }
-         saved.push(formats);
-        }
-        pb.clearContents;
-        pb.setStringForType("""
-                + json.dumps(text)
-                + """, $.NSPasteboardTypeString);
-        const generation=pb.changeCount;
-        try {
-         checkFocus();
-         // Invoke the literal Paste menu action; keyboard modifiers can select escaped paste.
-         const editItem=se.processes.byName("Terminal").menuBars()[0].menuBarItems()[3];
-         editItem.click();
-         const edit=editItem.menus()[0];
-         const paste=edit.menuItems()[6];
-         if(!["Einsetzen","Paste"].includes(paste.name()))
-          throw Error("Literal Paste menu action unavailable");
-         if(!paste.enabled()) throw Error("Literal Paste action is disabled; no paste sent");
-         if(typeof checkTargetIdentity === 'function') checkTargetIdentity();
-         checkFocus();
+        function checkClipboard() {{
+         if(Number($.NSPasteboard.generalPasteboard.changeCount)!=={int(lease.generation)})
+          throw Error("Selected terminal clipboard changed; do not repeat input");
+        }}
+        checkClipboard(); checkFocus();
+        const editItem=se.processes.byName("Terminal").menuBars()[0].menuBarItems()[3];
+        editItem.click();
+        const edit=editItem.menus()[0], paste=edit.menuItems()[6];
+        if(!["Einsetzen","Paste"].includes(paste.name()))
+         throw Error("Literal Paste menu action unavailable");
+        if(!paste.enabled()) throw Error("Literal Paste action is disabled; no paste sent");
+        if(typeof checkTargetIdentity === 'function') checkTargetIdentity();
+        checkFocus(); checkClipboard();
 """
-                + self.native_screen_guard(expected_screen)
-                + """
-         paste.click();
-         let echoed=false;
-         for(let attempt=0;attempt<40;attempt++) {
-          delay(0.1); checkFocus();
-          const screen=tab.contents();
-          if(screen.includes("""
-                + json.dumps(text.split("\n")[-1])
-                + """) || screen.includes("""
-                + json.dumps(f"[Pasted Content {len(text)} chars]")
-                + """)) {
-           echoed=true; break;
-          }
-         }
-         if(!echoed) throw Error("Paste not observed before clipboard restoration; no Return sent");
+                    + self.native_screen_guard(expected_screen)
+                    + """
+        const beforePaste=tab.contents();
+        paste.click();
+        let echoed=false; const echoDeadline=Date.now()+4000;
+        while(Date.now()<echoDeadline) {
+         delay(0.1); checkFocus();
+         if(observedPaste(beforePaste,tab.contents())) { echoed=true; break; }
         }
-        finally {
-         if(pb.changeCount===generation) {
-          const restored=$.NSMutableArray.alloc.init;
-          for(const formats of saved) {
-           const item=$.NSPasteboardItem.alloc.init;
-           for(const [type,data] of formats) if(data) item.setDataForType(data,type);
-           restored.addObject(item);
-          }
-          pb.clearContents;
-          if(restored.count) pb.writeObjects(restored);
-         }
-        }
+        if(!echoed) throw Error("Paste not observed; no Return sent");
         JSON.stringify({paste_event_sent:true,return_sent:false});""",
-                mutation=True,
-            )
+                    mutation=True,
+                )
 
     async def read(self, pane_id):
         return await self.native(

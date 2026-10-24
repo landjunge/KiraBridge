@@ -1,0 +1,11 @@
+{
+  "os": "macOS-15.7.4-x86_64-i386-64bit",
+  "architecture": "x86_64",
+  "actual_native_stdin_script": true,
+  "independent_owner_survives_reaped_worker": true,
+  "generation_validated": true,
+  "clipboard_restore": "restored",
+  "known_test_clipboard_preserved": true,
+  "terminal_input_sent": false,
+  "scope": "own known clipboard fixture; no production secrets inspected"
+}
