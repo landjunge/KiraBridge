@@ -7,6 +7,7 @@ import hashlib
 import ipaddress
 import mimetypes
 import os
+import re
 import socket
 import stat
 import time
@@ -16,7 +17,7 @@ from urllib.parse import urlsplit
 import httpx
 
 from kirabridge.bridge_core.models import BridgeError
-from kirabridge.file_transfer.integrity import name
+from kirabridge.file_transfer.integrity import SecretScan, name
 from kirabridge.file_transfer.models import OpenAIFile
 from kirabridge.filesystem_manager import PathScope
 
@@ -188,6 +189,10 @@ class SourceRegistry:
         self.entries, self.max_sources, self.ttl = {}, max_sources, ttl
 
     def register(self, principal, stable_key, source):
+        name(source.name)
+        SecretScan().update(source.mime_type.encode())
+        if not re.fullmatch(r"[A-Za-z0-9!#$&^_.+-]+/[A-Za-z0-9!#$&^_.+-]+", source.mime_type):
+            raise BridgeError("transfer_metadata_denied", "A safe MIME media type is required")
         now = time.monotonic()
         self.entries = {key: entry for key, entry in self.entries.items() if entry[2] > now}
         from kirabridge.bridge_core.models import digest

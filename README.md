@@ -74,10 +74,11 @@ hardware model alone does not establish OS compatibility. See the
 
 **RC16 is an unpublished candidate.** Its wheel, macOS bundle, bootstrap and
 SHA-256 checksums are available to authorized reviewers in the
-[RC16 release draft](https://github.com/landjunge/KiraBridge/releases/tag/untagged-8d74d695be23ca561a80).
+[RC16 release draft](https://github.com/landjunge/KiraBridge/releases).
 The installation command is [below](#install--update--installieren--aktualisieren).
 
-RC16 is being reviewed on `feat/library-transfer-discovery-20261024`, based on
+RC16 is being reviewed in [PR #25](https://github.com/landjunge/KiraBridge/pull/25)
+on `feat/library-transfer-discovery-20261024`, based on
 the installer/runtime integration lineage. RC15 remains a separate historical draft.
 **Publication and merge remain gated:** GitHub Actions cannot start because of account
 billing/spending limits. Required CI/review and the actual ThreadDesk file receiver
@@ -204,10 +205,11 @@ keine Betriebssystem-Kompatibilität.
 
 **RC16 ist ein unveröffentlichter Kandidat.** Wheel, macOS-Paket, Bootstrap und
 SHA-256-Prüfsummen liegen für berechtigte Reviewer im
-[RC16-Release-Entwurf](https://github.com/landjunge/KiraBridge/releases/tag/untagged-8d74d695be23ca561a80).
+[RC16-Release-Entwurf](https://github.com/landjunge/KiraBridge/releases).
 Der Installationsbefehl steht [unten](#install--update--installieren--aktualisieren).
 
-RC16 wird auf `feat/library-transfer-discovery-20261024` auf der bestehenden
+RC16 wird in [PR #25](https://github.com/landjunge/KiraBridge/pull/25)
+auf `feat/library-transfer-discovery-20261024` auf der bestehenden
 Runtime-/Installer-Linie geprüft. RC15 bleibt ein eigener historischer Entwurf.
 **Merge und Veröffentlichung bleiben gesperrt:** GitHub Actions startet wegen
 Kontoabrechnung/Ausgabenlimit nicht. Erforderliche CI/Review und die tatsächliche

@@ -425,3 +425,14 @@ async def test_actual_mcp_bytes_and_independent_disk_receipt_across_receiver_res
         assert next((workspace / "fixture-files").glob("*/stored")).read_bytes() == data
         assert original.read_bytes() == data
         assert "--lose-commit-once" not in str(sent["result"])  # transport details not disclosed
+
+
+@pytest.mark.parametrize("mime", ["text/plain\r\nAuthorization: secret", "text/sk-" + "x" * 24])
+def test_source_metadata_cannot_leak_secrets_or_control_characters(mime):
+    from kirabridge.file_transfer.sources import SourceRegistry
+
+    source = SelectedFile("safe.txt", mime, "opaque", "https://files.example/secret")
+    registry = SourceRegistry()
+    with pytest.raises(BridgeError):
+        registry.register("local", "key", source)
+    assert registry.inventory("local") == []

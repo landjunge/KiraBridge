@@ -38,3 +38,26 @@ Required CI/review, actual ThreadDesk v1 receiver storage acceptance, live ChatG
 file selection and Apple Silicon acceptance remain open. Runtime integration base
 is `33126b7`; `main` is a separate lineage and is not overwritten. No new version is
 published or claimed merged while required gates are unsatisfied.
+
+## Candidate package checks before final documentation pin
+
+Two builds of `7bda028844af7b13e28a16637d8ea9721e48dad2` were byte-identical.
+The built wheel passed 63 component tests. Native Terminal.app checks from the
+installed wheel passed: new visible window/exact TTY, idle reuse, busy-window
+preservation/new window, fresh discovery revision, stale PID rejection. Installed
+site-packages path is recorded in `visible-terminal-evidence.json`.
+
+The first isolated launchd baseline run hit the existing 30-second RC14 readiness
+limit and rolled back. A second fresh isolated run passed all nine package checks:
+RC14 start, RC16 upgrade, config/credentials/database/user-file preservation,
+service survival after command exit, idempotence/same PID, actual restart, KeepAlive
+crash recovery, rollback to RC14, fresh RC16 install. This initial timeout is retained
+as a limitation, not erased by the passing run. Final remote-download evidence is
+attached to the review draft after the final documentation/source pin.
+
+Subsequent MIME-metadata leak rejection was checked with **65 passing component tests**.
+The final source full-suite log, reproducibility manifest, installed-wheel transfer
+proof (including 16 MiB multi-chunk data and lost-commit reconciliation), visible
+terminal proof and authenticated draft-download acceptance are attached separately
+with their own SHA-256 manifest. Draft links in README use the stable release list:
+GitHub changes temporary `untagged-*` URLs when a draft target is edited.
