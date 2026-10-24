@@ -566,6 +566,12 @@ class AgentManager:
                         if config.kind in {"opencode", "gemini_cli", "claude_code", "copilot_cli"}
                         else {}
                     ),
+                    "executable_runnable": bool(
+                        config.executable
+                        and Path(config.executable).is_file()
+                        and os.access(config.executable, os.X_OK)
+                    ),
+                    "adapter_available": config.kind in self.adapters,
                     "daemon_status": "unknown",
                     "session_status": "unknown",
                     "task_status": "unknown",

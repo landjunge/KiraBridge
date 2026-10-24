@@ -65,6 +65,13 @@ class SessionManager:
         )
         self.desktop = self.terminal_app.desktop
 
+    def direct(self, principal):
+        return (
+            self.ports.visible_required(principal)
+            if self.ports.visible_required
+            else principal == "chatgpt"
+        )
+
     def transport(self, pane_id):
         return self.terminal_app if pane_id.startswith("terminal:") else self.tmux
 
@@ -139,9 +146,9 @@ class SessionManager:
                 raise BridgeError(
                     "visible_handoff_required", "CLI handoffs require the central route"
                 )
-            if (args.require_idle or principal == "chatgpt") and selected.get("busy", True):
+            if (args.require_idle or self.direct(principal)) and selected.get("busy", True):
                 raise BridgeError("session_busy", "Selected terminal is not an idle shell")
-            if principal == "chatgpt" and not args.pane_id.startswith("terminal:"):
+            if self.direct(principal) and not args.pane_id.startswith("terminal:"):
                 raise BridgeError(
                     "visible_terminal_required",
                     "ChatGPT direct input requires a visible Terminal.app window",
@@ -149,7 +156,7 @@ class SessionManager:
             if args.pane_id.startswith("terminal:") and not args.submit:
                 raise BridgeError("session_submit_required", "Terminal.app input submits a line")
             args = self.input_release.dispatch(principal, args, task_id)
-            if principal == "chatgpt":
+            if self.direct(principal):
                 identity = await self.terminal_app.process_identity(selected["expected_pid"])
                 await self.terminal_app.send_confirmed(selected, args.text, identity)
             else:
@@ -242,7 +249,7 @@ class SessionManager:
                 + shlex.quote("KiraBridge visible %% ")
                 + " /bin/zsh -f"
             )
-        if argv and principal != "chatgpt":
+        if argv and not self.direct(principal):
             command += " && " + shlex.join(argv)
         async with self.lock:
             self.authorization.check_window(principal, task_id, args)
@@ -256,7 +263,7 @@ class SessionManager:
                 sessions = await self.terminal_app.catalog()
                 selected = next((s for s in sessions if s["tty"] == result["tty"]), None)
                 if selected:
-                    if principal == "chatgpt" and argv:
+                    if self.direct(principal) and argv:
                         from kirabridge.platform_adapters.shell_prompt import empty_shell_prompt
 
                         if selected.get("busy", True):

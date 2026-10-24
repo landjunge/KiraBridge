@@ -197,7 +197,6 @@ class MCPClientPool:
                         initialized = await session.initialize()
                     self.sessions[peer.id] = session
                     self.initializations[peer.id] = initialized
-                    self.catalog_dirty.add(peer.id)
                     self.catalog_locks[peer.id] = asyncio.Lock()
                     self.notice(peer.id, "connection.ready")
                     ready.set_result(None)

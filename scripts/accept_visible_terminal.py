@@ -9,13 +9,17 @@ import platform
 import shlex
 from pathlib import Path
 
+import kirabridge
 from kirabridge.bridge_core.bridge import INPUTS, Bridge
 from kirabridge.bridge_core.config import Config, PrincipalConfig
 from kirabridge.bridge_core.models import TaskRequest
 from kirabridge.discovery import live
 
 
-async def accept(root):
+async def accept(root, expected_package_root=None):
+    package_path = Path(kirabridge.__file__).resolve()
+    if expected_package_root is not None:
+        assert package_path.is_relative_to(expected_package_root.resolve())
     if platform.system() != "Darwin":
         raise RuntimeError("Actual macOS required")
     root.mkdir(mode=0o700, parents=True, exist_ok=False)
@@ -48,6 +52,8 @@ async def accept(root):
     owned = set()
     evidence = {
         "platform": platform.platform(),
+        "package": str(package_path),
+        "version": kirabridge.__version__,
         "scope": "only freshly test-owned Terminal.app windows",
         "production_modified": False,
         "checks": [],
@@ -194,5 +200,6 @@ async def accept(root):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--root", required=True, type=Path)
+    parser.add_argument("--expected-package-root", type=Path)
     opts = parser.parse_args()
-    asyncio.run(accept(opts.root.resolve()))
+    asyncio.run(accept(opts.root.resolve(), opts.expected_package_root))

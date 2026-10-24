@@ -6,7 +6,7 @@ import time
 
 from kirabridge import __version__
 from kirabridge.bridge_core.models import BridgeError, digest
-from kirabridge.permissions import decision, permission_revision
+from kirabridge.permissions import decision, direct_terminal_required, permission_revision
 
 
 def snapshot(bridge, principal):
@@ -62,7 +62,7 @@ def snapshot(bridge, principal):
             "tool": "terminal_control",
             "operation": "terminal.visible",
             "legacy_terminal_execute_route": "visible_terminal"
-            if principal == "chatgpt"
+            if direct_terminal_required(bridge.config, principal)
             else "managed_process",
             "rule_scope": (
                 "ChatGPT direct KiraBridge terminal control; not internal Codex/Grok execution"

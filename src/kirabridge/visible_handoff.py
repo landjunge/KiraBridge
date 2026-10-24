@@ -51,7 +51,8 @@ class VisibleHandoffs:
         name = IDENTITIES.get(principal, {}).get("name", principal)
         return (
             f"[KiraBridge Auftrag {identifier}] Von {name} ({principal}) an {target}. "
-            "Bestehende sichtbare Sitzung, keine neue Hintergrundsitzung starten. "
+            "Diese KiraBridge-Übergabe verwendet die bestehende sichtbare Sitzung. "
+            "Codex/Grok bestimmen ihre internen Arbeitsweisen nach ihren eigenen Regeln. "
             f"Zuerst über KiraBridge message_receive die Konversation {conversation_id} lesen und "
             f"Nachricht {message_id} mit deren receipt per message_ack bestätigen. "
             "Danach den folgenden Auftrag bearbeiten. Antworte am Ende sichtbar hier UND mit "

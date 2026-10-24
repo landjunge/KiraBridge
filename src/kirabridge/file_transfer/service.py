@@ -35,12 +35,25 @@ class FileTransferService:
         self.authorization.source(principal, source)
         filename = name(source.name)
         self.sources.state(principal, args.source_id, "authorized")
-        await running({"phase": "authorized", "source_id": args.source_id})
         async with self.prepare_lock:
             from kirabridge.bridge_core.config import private_directory
 
             private_directory(self.root)
-            used = sum(item.stat().st_size for item in self.root.rglob("*") if item.is_file())
+            used, copies = 0, 0
+            for existing in self.root.iterdir():
+                if existing.is_symlink() or not existing.is_dir():
+                    raise BridgeError(
+                        "transfer_staging_unsafe", "Unexpected staged entry; preserved"
+                    )
+                copies += 1
+                if copies >= self.settings.limits.max_staged_files:
+                    raise BridgeError("transfer_storage_limit", "Staged file-count limit reached")
+                for content in existing.iterdir():
+                    if content.is_symlink() or not content.is_file():
+                        raise BridgeError(
+                            "transfer_staging_unsafe", "Unexpected staged content; preserved"
+                        )
+                    used += content.stat().st_size
             if used >= self.settings.limits.max_staged_bytes:
                 raise BridgeError("transfer_storage_limit", "Staging quota exceeded")
             folder = self.root / uuid.uuid4().hex
@@ -48,6 +61,7 @@ class FileTransferService:
             snapshot = folder / filename
             checksum, scan, total = hashlib.sha256(), SecretScan(), 0
             try:
+                await running({"phase": "authorized", "source_id": args.source_id})
                 fd = os.open(snapshot, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
                 with os.fdopen(fd, "wb") as target:
                     async for data in source.chunks(self.settings.limits.chunk_bytes):
@@ -64,6 +78,12 @@ class FileTransferService:
                         target.write(data)
                     target.flush()
                     os.fsync(target.fileno())
+                for directory in (folder, self.root):
+                    descriptor = os.open(directory, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
+                    try:
+                        os.fsync(descriptor)
+                    finally:
+                        os.close(descriptor)
                 sha256 = checksum.hexdigest()
                 if args.expected_sha256 is not None and args.expected_sha256 != sha256:
                     raise BridgeError("transfer_integrity", "Selected source SHA-256 mismatch")
@@ -174,14 +194,20 @@ class FileTransferService:
                 raise
             state = await self.receiver.begin(operation_id, manifest)
         offset = checkpoint(state, operation_id, manifest)
-        prefix = await asyncio.to_thread(sha256_file, path, block_size, offset)
-        if state["prefix_sha256"] != prefix:
-            raise BridgeError(
-                "transfer_integrity", "Receiver prefix differs; no resume or overwrite"
-            )
-        self.repository.update(principal, identifier, "running", offset=offset)
         with open_snapshot(path) as source:
-            source.seek(offset)
+            prefix_hash = hashlib.sha256()
+            remaining = offset
+            while remaining:
+                previous = source.read(min(block_size, remaining))
+                if not previous:
+                    raise BridgeError("transfer_integrity", "Staged prefix is incomplete")
+                prefix_hash.update(previous)
+                remaining -= len(previous)
+            if state["prefix_sha256"] != prefix_hash.hexdigest():
+                raise BridgeError(
+                    "transfer_integrity", "Receiver prefix differs; no resume or overwrite"
+                )
+            self.repository.update(principal, identifier, "running", offset=offset)
             while data := source.read(block_size):
                 if self.repository.get(principal, identifier)["pause_requested"]:
                     return self.repository.public(
@@ -194,9 +220,14 @@ class FileTransferService:
                         )
                     )
                 chunk_hash = hashlib.sha256(data).hexdigest()
+                prefix_hash.update(data)
                 ack = await self.receiver.chunk(operation_id, offset, data, chunk_hash)
                 next_offset = checkpoint(ack, operation_id, manifest)
-                if next_offset != offset + len(data) or ack.get("chunk_sha256") != chunk_hash:
+                if (
+                    next_offset != offset + len(data)
+                    or ack.get("chunk_sha256") != chunk_hash
+                    or ack["prefix_sha256"] != prefix_hash.hexdigest()
+                ):
                     raise BridgeError(
                         "transfer_receipt_mismatch", "Chunk acknowledgement differs from sent bytes"
                     )

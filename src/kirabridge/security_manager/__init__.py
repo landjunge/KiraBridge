@@ -120,6 +120,7 @@ class SecurityManager:
         self.authorize(principal, "session.open")
         self.principal(principal, "terminal.execute")
         if not args.window_authorization:
+            from kirabridge.permissions import direct_terminal_required
             from kirabridge.session_manager import SessionOpen
 
             try:
@@ -131,7 +132,10 @@ class SecurityManager:
                 expected = SessionOpen.model_validate(task["args"])
             elif task and (
                 task["operation"] == "terminal.visible"
-                or (task["operation"] == "terminal.execute" and principal == "chatgpt")
+                or (
+                    task["operation"] in {"terminal.execute", "admin.execute"}
+                    and direct_terminal_required(self.config, principal)
+                )
             ):
                 expected = SessionOpen(cwd=task["args"]["cwd"], controlled_shell=True)
             if (

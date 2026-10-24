@@ -83,8 +83,8 @@ project or cross-user deduplication must not reveal another identity's files.
 
 ## Limits, secrets, errors and interruption
 
-Default sender limits: 2 GiB/file, 8 GiB total staged copies, 256 KiB chunks
-(negotiated down to receiver limits), 10,000 ZIP entries, 8 GiB expanded ZIP bytes,
+Default sender limits: 2 GiB/file, 8 GiB / 2048 total staged copies, 256 KiB chunks
+(negotiated down to receiver limits), 10,000 ZIP entries, 16 MiB central directory, 8 GiB expanded ZIP bytes,
 compression ratio 200. These are configurable upper bounds, not a claim that a
 2 GiB acceptance run occurred. Streaming is bounded; source files remain intact.
 Archives are checked without extraction; obvious credentials/private keys and

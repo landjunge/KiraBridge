@@ -123,6 +123,7 @@ async def connect_stdio(config, principal):
                 if downstream:
                     try:
                         # Reads only; a failed/uncertain mutation is never retried.
+                        await connection.call_tool("bridge_health", {})
                         await connection.list_tools()
                         await changed()
                     except Exception:

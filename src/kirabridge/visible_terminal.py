@@ -54,7 +54,7 @@ class VisibleTerminal:
         output = await self.sessions.read(principal, row["pane_id"], row["expected_pid"])
         return empty_shell_prompt(output["text"])
 
-    async def execute(self, task, args, running):
+    async def execute(self, task, args, running, *, privileged=False):
         bridge, principal = self, task["principal"]
         policy = bridge.security.principal(principal, "terminal.execute")
         bridge.security.principal(principal, "session.inspect")
@@ -70,6 +70,11 @@ class VisibleTerminal:
             self.environment["PATH"],
         )
         argv = [executable, *args.argv[1:]]
+        if privileged:
+            self.security.principal(principal, "admin.execute")
+            # Authorization stays in the confirmed visible TTY; the user types any
+            # required OS credential there. No password is read/stored by KiraBridge.
+            argv = ["/usr/bin/sudo", "--", *argv]
         if any("\x00" in item for item in argv):
             raise BridgeError("invalid_arguments", "NUL in command")
         async with bridge.sessions.lock:

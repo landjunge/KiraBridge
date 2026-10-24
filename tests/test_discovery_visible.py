@@ -56,6 +56,7 @@ async def test_real_http_initialization_and_fresh_catalog_agree_with_grants(
         assert inventory["discovery"]["revision"] == health["discovery"]["revision"]
         before = health["discovery"]["revision"]
         rows[0]["expected_pid"] = 346
+        await pool.call("local", "bridge_health", {})
         tools = await pool.list_tools("local")
         assert tools[0].meta["kirabridge"]["revision"] != before
         changed = (await pool.call("local", "bridge_health", {})).structuredContent
@@ -269,3 +270,14 @@ async def test_file_params_descriptor_and_signed_url_never_persist(
         assert secret_url not in dump and "DO_NOT_PERSIST_CAPABILITY" not in dump
         inventory = (await pool.call("local", "file_transfer_inventory", {})).structuredContent
         assert inventory["transfers"][0]["state"] == "authorized"
+
+
+def test_trusted_custom_chatgpt_role(config):
+    from kirabridge.permissions import direct_terminal_required
+
+    assert direct_terminal_required(config, "chatgpt")
+    assert not direct_terminal_required(config, "local")
+    config.principals["local"].client_type = "chatgpt"
+    assert direct_terminal_required(config, "local")
+    config.principals["local"].client_type = "agent"
+    assert not direct_terminal_required(config, "local")

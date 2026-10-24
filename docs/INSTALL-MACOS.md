@@ -1,9 +1,9 @@
-# macOS installation / Installation (RC15 candidate)
+# macOS installation / Installation (RC16 candidate)
 
 ## Deutsch
 
 **Veröffentlicht ist [v0.8.0rc14](https://github.com/landjunge/KiraBridge/releases/tag/v0.8.0rc14).
-RC15 ist ein unveröffentlichter Kandidat. Der Release-Entwurf dient ausschließlich berechtigten Reviewern; Freigabe erst nach CI und Review.**
+RC16 ist ein unveröffentlichter Kandidat. Der Release-Entwurf dient ausschließlich berechtigten Reviewern; Freigabe erst nach CI und Review.**
 
 Voraussetzungen: normales Benutzerkonto ohne sudo, macOS 15 (Intel x86_64 oder
 Apple Silicon arm64), Python **3.11**, **uv 0.11.6**, Internet zu PyPI und Zugriff
@@ -29,7 +29,7 @@ Pakets samt `KiraBridge-macos.tar.gz.sha256` in einen neuen leeren Ordner:
 besteht. Prüfsummen vom selben authentifizierten Release schützen vor
 Beschädigung; sie ersetzen keine unabhängige Herausgebersignatur.
 
-**Für berechtigte Reviewer des RC15-Release-Entwurfs: Installation und Update
+**Für berechtigte Reviewer des RC16-Release-Entwurfs: Installation und Update
 mit EINEM Befehl (angemeldete GitHub CLI erforderlich).** Der Bootstrap lädt das
 passende Paket authentifiziert und prüft dessen fest eingebetteten SHA-256-Wert.
 `"$@"` reicht optionale Argumente weiter; beim normalen Einfügen sind diese leer.
@@ -37,7 +37,7 @@ Nach Freigabe ist dies auch der Endnutzer-Befehl:
 
 
 ```sh
-d=$(mktemp -d) && gh release download v0.8.0rc15 -R landjunge/KiraBridge -p 'install-macos.sh*' -D "$d" && (cd "$d" && shasum -a 256 -c install-macos.sh.sha256 && sh install-macos.sh "$@")
+d=$(mktemp -d) && gh release download v0.8.0rc16 -R landjunge/KiraBridge -p 'install-macos.sh*' -D "$d" && (cd "$d" && shasum -a 256 -c install-macos.sh.sha256 && sh install-macos.sh "$@")
 ```
 
 Erstinstallation: legt ausschließlich Benutzerdateien an. Standardprojekt:
@@ -89,7 +89,7 @@ um die kompatiblen macOS-Wheels zu verwenden.
 ## English
 
 The published release is [v0.8.0rc14](https://github.com/landjunge/KiraBridge/releases/tag/v0.8.0rc14),
-which only has a wheel. RC15 remains unpublished until CI and review pass.
+which only has a wheel. RC16 remains unpublished until CI and review pass.
 
 Requirements: a regular user account, macOS 15, Intel x86_64 or Apple Silicon
 arm64, Python **3.11**, **uv 0.11.6**, Internet access to PyPI, and repository
@@ -133,3 +133,6 @@ This is a network installer, **without Apple signing or notarization**, and
 contains no newly signed native app. Do not disable Gatekeeper globally.
 Connect ChatGPT and sign in to coding assistants separately. Local health does
 not prove mobile, voice or end-to-end ChatGPT acceptance.
+
+Optional file transfer setup / optionale Dateiübertragung: [FILE-TRANSFER.md](FILE-TRANSFER.md).
+It stays disabled on existing installations; existing permissions are preserved.

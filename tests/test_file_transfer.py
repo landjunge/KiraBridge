@@ -4,6 +4,7 @@ import hashlib
 import io
 import stat
 import zipfile
+from pathlib import Path
 
 import httpx
 import pytest
@@ -65,10 +66,13 @@ async def send(bridge, transfer_id, identifier="send"):
     [
         ("note.txt", "Grüße\nOriginal bytes".encode()),
         ("note.md", b"# Markdown\nunchanged\n"),
-        ("document.pdf", b"%PDF-1.4\n1 0 obj<</Type/Catalog>>endobj\n%%EOF\n"),
-        ("image.png", b"\x89PNG\r\n\x1a\n" + bytes(range(256))),
-        ("sound.wav", b"RIFF\x24\x00\x00\x00WAVEfmt " + bytes(range(40))),
-        ("clip.mp4", b"\x00\x00\x00\x18ftypmp42" + bytes(range(80))),
+        (
+            "document.pdf",
+            (Path(__file__).parent / "fixtures/file-transfer/document.pdf").read_bytes(),
+        ),
+        ("image.png", (Path(__file__).parent / "fixtures/file-transfer/image.png").read_bytes()),
+        ("sound.wav", (Path(__file__).parent / "fixtures/file-transfer/sound.wav").read_bytes()),
+        ("clip.mp4", (Path(__file__).parent / "fixtures/file-transfer/clip.mp4").read_bytes()),
         ("payload.bin", bytes(range(256)) * 6000),
     ],
 )

@@ -17,6 +17,11 @@ def level_for(policy: PrincipalConfig) -> str:
     return "full" if policy.allow_any_executable and "/" in policy.roots else "medium"
 
 
+def direct_terminal_required(config, principal):
+    policy = config.principals.get(principal)
+    return principal == "chatgpt" or bool(policy and policy.client_type == "chatgpt")
+
+
 def automatic_for(policy: PrincipalConfig, operation: str) -> bool:
     if operation in policy.automatic_operations:
         return True
@@ -32,6 +37,7 @@ def permission_revision(config):
     """Explicit authorization whitelist; never serialize credentials in status paths."""
     fields = (
         "capabilities",
+        "client_type",
         "permission_level",
         "approval_mode",
         "automatic_operations",
@@ -69,7 +75,8 @@ def decision(config, principal, operation, *, text=None):
     policy = config.principals.get(principal)
     required = {capability_for(operation)}
     if operation in {"session.input", "terminal.visible"} or (
-        operation == "terminal.execute" and principal == "chatgpt"
+        operation in {"terminal.execute", "admin.execute"}
+        and direct_terminal_required(config, principal)
     ):
         required.update({"session.inspect", "session.input", "terminal.execute"})
     if operation == "session.open":

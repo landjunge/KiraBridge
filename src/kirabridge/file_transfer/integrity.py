@@ -6,6 +6,7 @@ import hashlib
 import os
 import re
 import stat
+import struct
 import unicodedata
 import zipfile
 from contextlib import contextmanager
@@ -66,36 +67,84 @@ class SecretScan:
         self.tail = window[-8192:]
 
 
+def bounded_zip_directory(source, limits):
+    source.seek(0, os.SEEK_END)
+    size = source.tell()
+    source.seek(max(0, size - 65557))
+    tail = source.read(65557)
+    at = tail.rfind(b"PK\x05\x06")
+    if at < 0 or len(tail) - at < 22:
+        raise BridgeError("transfer_invalid_archive", "ZIP end record is missing")
+    _, disk, directory_disk, disk_entries, count, directory_size, _, comment = struct.unpack(
+        "<4s4H2LH", tail[at : at + 22]
+    )
+    if disk or directory_disk or disk_entries != count or at + 22 + comment != len(tail):
+        raise BridgeError("transfer_invalid_archive", "Multi-disk/trailing ZIP data rejected")
+    if count == 65535 or directory_size == 0xFFFFFFFF:
+        # Bound ZIP64 metadata before Python allocates the central directory.
+        eocd_at = max(0, size - 65557) + at
+        source.seek(eocd_at - 20)
+        locator = source.read(20)
+        if len(locator) != 20:
+            raise BridgeError("transfer_invalid_archive", "Missing ZIP64 locator")
+        signature, start_disk, offset, disks = struct.unpack("<4sLQL", locator)
+        if signature != b"PK\x06\x07" or start_disk or disks != 1:
+            raise BridgeError("transfer_invalid_archive", "Invalid ZIP64 locator")
+        source.seek(offset)
+        record = source.read(56)
+        if len(record) != 56:
+            raise BridgeError("transfer_invalid_archive", "Truncated ZIP64 record")
+        values = struct.unpack("<4sQ2H2L4Q", record)
+        if (
+            values[0] != b"PK\x06\x06"
+            or values[1] < 44
+            or values[4]
+            or values[5]
+            or values[6] != values[7]
+        ):
+            raise BridgeError("transfer_invalid_archive", "Invalid ZIP64 directory")
+        count, directory_size = values[7], values[8]
+    if count > limits.max_archive_entries or directory_size > 16 * 1024**2:
+        raise BridgeError("transfer_archive_limit", "ZIP entry/directory allocation limit exceeded")
+    source.seek(0)
+
+
 def validate_archive(path: Path, limits: Limits):
-    if not zipfile.is_zipfile(path):
-        if path.suffix.lower() in {".zip", ".docx", ".xlsx", ".pptx"}:
-            raise BridgeError("transfer_invalid_archive", "ZIP structure is invalid")
-        return
-    expanded = 0
     try:
-        with zipfile.ZipFile(path) as archive:
-            entries = archive.infolist()
-            if len(entries) > limits.max_archive_entries:
-                raise BridgeError("transfer_archive_limit", "Archive entry limit exceeded")
-            seen = set()
-            for entry in entries:
-                entry_path = entry.filename.rstrip("/")
-                if not entry_path or entry_path in seen:
-                    raise BridgeError("transfer_path_denied", "Empty or duplicate archive path")
-                seen.add(entry_path)
-                logical_path(entry_path)
-                if stat.S_ISLNK(entry.external_attr >> 16) or entry.flag_bits & 1:
-                    raise BridgeError("transfer_path_denied", "Archive symlink/encryption rejected")
-                expanded += entry.file_size
-                if (
-                    expanded > limits.max_archive_expanded_bytes
-                    or entry.file_size > max(entry.compress_size, 1) * limits.max_compression_ratio
-                ):
-                    raise BridgeError("transfer_archive_limit", "Archive expansion limit exceeded")
-                scan = SecretScan()
-                with archive.open(entry) as content:
-                    while data := content.read(limits.chunk_bytes):
-                        scan.update(data)
+        with open_snapshot(path) as source:
+            if not zipfile.is_zipfile(source):
+                if path.suffix.lower() in {".zip", ".docx", ".xlsx", ".pptx"}:
+                    raise BridgeError("transfer_invalid_archive", "ZIP structure is invalid")
+                return
+            bounded_zip_directory(source, limits)
+            with zipfile.ZipFile(source) as archive:
+                entries = archive.infolist()
+                if len(entries) > limits.max_archive_entries:
+                    raise BridgeError("transfer_archive_limit", "Archive entry limit exceeded")
+                seen, expanded = set(), 0
+                for entry in entries:
+                    entry_path = entry.filename.rstrip("/")
+                    if not entry_path or entry_path in seen:
+                        raise BridgeError("transfer_path_denied", "Empty or duplicate archive path")
+                    seen.add(entry_path)
+                    logical_path(entry_path)
+                    if stat.S_ISLNK(entry.external_attr >> 16) or entry.flag_bits & 1:
+                        raise BridgeError(
+                            "transfer_path_denied", "Archive symlink/encryption rejected"
+                        )
+                    expanded += entry.file_size
+                    if (
+                        expanded > limits.max_archive_expanded_bytes
+                        or entry.file_size
+                        > max(entry.compress_size, 1) * limits.max_compression_ratio
+                    ):
+                        raise BridgeError(
+                            "transfer_archive_limit", "Archive expansion limit exceeded"
+                        )
+                    scan = SecretScan()
+                    with archive.open(entry) as content:
+                        while data := content.read(limits.chunk_bytes):
+                            scan.update(data)
     except (zipfile.BadZipFile, RuntimeError, OSError, NotImplementedError):
         raise BridgeError("transfer_invalid_archive", "Archive validation failed") from None
 

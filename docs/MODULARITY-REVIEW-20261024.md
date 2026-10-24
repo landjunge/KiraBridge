@@ -24,7 +24,7 @@ potential cycles, including a large deferred composition component; these are
 not all eager-import/runtime cycles. Other components include
 `message_manager` ↔ `voice_message_policy` and `approval_console` ↔ `control_center`.
 Do not claim that the whole existing project is strictly acyclic or fully decoupled.
-The raw inventory is retained with the eventual architecture evidence.
+The raw pre-refactor AST inventory is retained as `docs/evidence/modularity-before.json`.
 
 Read-only ThreadDesk source inspection: main commit
 `7c45d1447a7c11966e22419e2b451c5d54d8df45`. Its migration/import models and
@@ -70,3 +70,19 @@ unknown provenance fields remain unknown. Manual authorized exports remain usabl
 without the optional picker. Historical 275-file / 23-folder counts are not treated
 as a current readable inventory. Enterprise compliance export requires separate
 Compliance API permissions and is not silently enabled.
+
+## Implemented boundaries
+
+`src/kirabridge/file_transfer/{models,ports,sources,authorization,integrity,repository,
+protocol,service,threaddesk,diagnostics}.py` implement the owners above. Source inventory
+belongs to `SourceRegistry` in `sources.py`, durable transfer inventory to `repository.py`;
+there is no redundant index. `mcp_gateway/file_tools.py` registers tools using narrow
+injected partners rather than the Bridge. `Bridge` only wires/dispatches the service.
+
+`private_files.py` extracts existing private-JSON helpers (re-exported by local_runtime)
+and `platform_adapters/shell_prompt.py` owns the pure prompt predicate. The visible
+terminal constructor takes config/security/sessions/environment, removing its whole-
+Bridge dependency and reverse session import. Existing task queue/audit/MCP owner and
+PathScope are reused. File-transfer dependency tests reject imports of Bridge, UI,
+terminal or provider-agent implementations. Remaining legacy potential cycles are
+explicitly retained rather than claimed fixed by a whole-project rewrite.

@@ -230,14 +230,18 @@ class SourceRegistry:
             self.entries[identifier] = (*entry[:3], state)
 
     def selected(self, principal, stable_key, file: OpenAIFile, settings):
-        parsed = urlsplit(file.download_url)
+        try:
+            parsed = urlsplit(file.download_url)
+            port = parsed.port
+        except ValueError:
+            raise BridgeError("transfer_source_denied", "Invalid source capability URL") from None
         if (
             parsed.scheme != "https"
             or parsed.hostname not in settings.source_hosts
             or parsed.username
             or parsed.password
             or parsed.fragment
-            or parsed.port not in (None, 443)
+            or port not in (None, 443)
         ):
             raise BridgeError(
                 "transfer_source_denied", "Source URL is not an authorized download capability"

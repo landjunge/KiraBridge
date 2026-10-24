@@ -250,3 +250,9 @@ vorher nachweisen, nicht aus Dateialter oder gemeinsamem Backend-PID raten.
 Unbekannte/geänderte Protokolle, aktuelle Arbeit und vorhandene Eingabetexte
 bleiben gesperrt. Ablehnungen enthalten Zeit und begrenzte Ausgabereferenz.
 Ein voller Berechtigungsumfang ersetzt weder Ziel- noch Bereitschaftsprüfung.
+
+## RC16 opt-in modules / optionale Module
+
+See [modularity review](MODULARITY-REVIEW-20261024.md), [file transfer](FILE-TRANSFER.md),
+[receiver contract](THREADDESK-FILE-TRANSFER-V1.md) and [discovery/terminal](DISCOVERY-VISIBLE-TERMINAL.md).
+These candidate additions do not grant production access or establish receiver acceptance.

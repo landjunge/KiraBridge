@@ -343,7 +343,8 @@ def fresh_config(args, release):
         raise RuntimeError("Credentials exist without config; refusing to overwrite")
     code = (
         "import json;from kirabridge.bridge_core.bridge import INPUTS;"
-        "print(json.dumps(list(INPUTS)))"
+        "from kirabridge.operations import capability_for;"
+        "print(json.dumps(sorted({capability_for(op) for op in INPUTS})))"
     )
     capabilities = json.loads(run([python(release), "-c", code], capture=True))
     capabilities += [

@@ -72,16 +72,16 @@ hardware model alone does not establish OS compatibility. See the
 **Latest published release: [v0.8.0rc14](https://github.com/landjunge/KiraBridge/releases/tag/v0.8.0rc14)**
 (private prerelease, 22 October 2026; wheel only).
 
-**RC15 is an unpublished candidate.** Its wheel, macOS bundle, bootstrap and
+**RC16 is an unpublished candidate.** Its wheel, macOS bundle, bootstrap and
 SHA-256 checksums are available to authorized reviewers in the
-[RC15 release draft](https://github.com/landjunge/KiraBridge/releases/tag/untagged-315af41126d778a271e1).
+[RC16 release draft](https://github.com/landjunge/KiraBridge/releases/tag/untagged-8d74d695be23ca561a80).
 The installation command is [below](#install--update--installieren--aktualisieren).
 
-The installer changes were merged through [PR #21](https://github.com/landjunge/KiraBridge/pull/21)
-and the documentation through [PR #22](https://github.com/landjunge/KiraBridge/pull/22)
-on the owner's explicit merge instruction. **Publication remains blocked:** GitHub
-Actions does not start jobs because of account billing/spending limits. Successful
-CI and release acceptance remain outstanding; a merge is not release approval.
+RC16 is being reviewed on `feat/library-transfer-discovery-20261024`, based on
+the installer/runtime integration lineage. RC15 remains a separate historical draft.
+**Publication and merge remain gated:** GitHub Actions cannot start because of account
+billing/spending limits. Required CI/review and the actual ThreadDesk file receiver
+acceptance remain outstanding. Draft creation is not publication.
 
 For a **first installation**, the command creates a scoped project setup with
 individual approvals. For an **update**, run the same command; existing
@@ -97,6 +97,21 @@ If installation fails, inspect the error and
 mismatches. Keep existing permissions unchanged. For rollback, obtain and extract
 the candidate bundle and follow the [recovery guide](docs/INSTALL-MACOS.md).
 
+### File transfer and direct terminal control
+
+RC16 adds opt-in transfer of **real unchanged file bytes** from officially supplied
+ChatGPT file parameters or explicitly authorized local exports. No Library-wide API,
+Drive permission or successful import is inferred. ThreadDesk must implement the
+[proposed v1 receipt contract](docs/THREADDESK-FILE-TRANSFER-V1.md); only a verified
+persistent-storage receipt counts. See [setup and limits](docs/FILE-TRANSFER.md).
+
+ChatGPT direct terminal commands use a freshly confirmed idle **visible** Terminal.app
+shell, or a new separate visible window. Busy/unconfirmed windows are preserved;
+there is no hidden replacement session. This rule does not prescribe internal
+Codex/Grok execution. ThreadDesk is a separate route. `operation_catalog`,
+`bridge_health` and `agent_inventory` distinguish grants, observation and execution.
+See [discovery and terminal behavior](docs/DISCOVERY-VISIBLE-TERMINAL.md).
+
 ### Control and optional tools
 
 You configure access to files, commands and assistants. New connections use
@@ -110,17 +125,13 @@ task. Further assistant adapters and their limits are described in the
 
 ### What has been checked?
 
-On actual **macOS 15.7.4 / Intel x86_64**, **960 regression tests passed**.
-Two builds produced identical checksums. The real authenticated draft-download
-command, fresh installation, RC14-wheel upgrade, version/status, idempotence,
-launchd restart, automatic crash recovery and rollback passed in isolated paths.
-Configuration, credential hashes, a database row and a user file survived the update.
-The production installation was not modified.
+### What was checked?
 
-The [acceptance report](docs/ACCEPTANCE-MACOS-RC15.md) records the exact command,
-artifact hashes and remaining gates. These local results do not establish a
-successful GitHub CI or Apple Silicon run. Mobile, Live voice and end-to-end
-ChatGPT remain separate unverified checks.
+RC16's [acceptance record](docs/ACCEPTANCE-MACOS-RC16.md) distinguishes actual Intel
+macOS tests, isolated byte/MCP contract fixtures and unverified product integration.
+The RC15 [historical installer proof](docs/ACCEPTANCE-MACOS-RC15.md) remains available.
+No production installation/configuration was modified. Apple Silicon, live ChatGPT
+file selection and actual ThreadDesk durable imports must not be inferred from fixtures.
 
 ---
 
@@ -191,17 +202,16 @@ keine Betriebssystem-Kompatibilität.
 **Zuletzt veröffentlicht: [v0.8.0rc14](https://github.com/landjunge/KiraBridge/releases/tag/v0.8.0rc14)**
 (privates Vorabrelease vom 22.10.2026; bisher nur ein Wheel).
 
-**RC15 ist ein unveröffentlichter Kandidat.** Wheel, macOS-Paket, Bootstrap und
+**RC16 ist ein unveröffentlichter Kandidat.** Wheel, macOS-Paket, Bootstrap und
 SHA-256-Prüfsummen liegen für berechtigte Reviewer im
-[RC15-Release-Entwurf](https://github.com/landjunge/KiraBridge/releases/tag/untagged-315af41126d778a271e1).
+[RC16-Release-Entwurf](https://github.com/landjunge/KiraBridge/releases/tag/untagged-8d74d695be23ca561a80).
 Der Installationsbefehl steht [unten](#install--update--installieren--aktualisieren).
 
-Die Installer-Änderungen wurden über [PR #21](https://github.com/landjunge/KiraBridge/pull/21)
-und die Dokumentation über [PR #22](https://github.com/landjunge/KiraBridge/pull/22)
-auf ausdrücklichen Merge-Auftrag des Eigentümers integriert.
-**Die Veröffentlichung bleibt gesperrt:** GitHub Actions startet wegen eines
-Zahlungs-/Ausgabenlimits des Kontos keine Jobs. Erfolgreiche CI und Release-Abnahme
-stehen noch aus; ein Merge ist keine Release-Freigabe.
+RC16 wird auf `feat/library-transfer-discovery-20261024` auf der bestehenden
+Runtime-/Installer-Linie geprüft. RC15 bleibt ein eigener historischer Entwurf.
+**Merge und Veröffentlichung bleiben gesperrt:** GitHub Actions startet wegen
+Kontoabrechnung/Ausgabenlimit nicht. Erforderliche CI/Review und die tatsächliche
+ThreadDesk-Dateiempfänger-Abnahme stehen aus. Ein Entwurf ist keine Veröffentlichung.
 
 Bei der **Erstinstallation** legt der Befehl einen begrenzten Projektzugang mit
 Einzelgenehmigungen an. Für ein **Update** denselben Befehl wiederholen;
@@ -231,20 +241,29 @@ anzulegen startet für sich noch keinen Programmierauftrag. Weitere
 Assistenten-Anbindungen und ihre Grenzen stehen in der
 [Anbieterübersicht](docs/providers/README.md).
 
+### Dateiübertragung und direkte Terminalsteuerung
+
+RC16 überträgt optional **echte unveränderte Datei-Bytes** aus offiziell bereitgestellten
+ChatGPT-Dateiparametern oder ausdrücklich autorisierten lokalen Exporten. Kein
+Bibliotheks-Vollzugriff, keine Drive-Freigabe und kein Importerfolg wird daraus
+abgeleitet. ThreadDesk muss den [vorgeschlagenen v1-Vertrag](docs/THREADDESK-FILE-TRANSFER-V1.md)
+umsetzen; erst die geprüfte dauerhafte Speicherbestätigung zählt. [Einrichtung und
+Grenzen](docs/FILE-TRANSFER.md).
+
+ChatGPT-Direktbefehle verwenden eine frisch bestätigte freie **sichtbare** Terminal.app-
+Shell oder ein neues separates sichtbares Fenster. Beschäftigte/unbestätigte Fenster
+bleiben unangetastet; es gibt keine unsichtbare Ersatzsitzung. Diese Regel schreibt
+Codex/Grok keine interne Arbeitsweise vor. ThreadDesk ist ein getrennter Zugang.
+Werkzeugkatalog, Health und Agenteninventar trennen Rechte, Beobachtung und Ausführung.
+[Details](docs/DISCOVERY-VISIBLE-TERMINAL.md).
+
 ### Was wurde geprüft?
 
-Auf echtem **macOS 15.7.4 / Intel x86_64** bestanden **960 Regressionstests**.
-Zwei Builds lieferten identische Prüfsummen. Der tatsächliche authentifizierte
-Downloadbefehl, Erstinstallation, Update vom RC14-Wheel, Version/Status, idempotente
-Wiederholung, launchd-Neustart, automatische Erholung nach Prozessabbruch und
-Rollback bestanden in isolierten Verzeichnissen. Konfiguration, Zugangsdaten-Hashes,
-ein Datenbankeintrag und eine Nutzerdatei blieben erhalten. Die produktive
-Installation wurde nicht verändert.
-
-Der [Abnahmebericht](docs/ACCEPTANCE-MACOS-RC15.md) nennt den genauen Befehl,
-Paket-Prüfsummen und offene Hürden. Diese lokalen Ergebnisse belegen keinen
-erfolgreichen GitHub-CI- oder Apple-Silicon-Lauf. Handy, Live-Sprache und die gesamte
-ChatGPT-Verbindung bleiben gesondert ungeprüft.
+Der [RC16-Prüfbericht](docs/ACCEPTANCE-MACOS-RC16.md) trennt echte Intel-macOS-Tests,
+isolierte Byte-/MCP-Vertragstests und noch ungeprüfte Produktintegration. Der
+[historische RC15-Installernachweis](docs/ACCEPTANCE-MACOS-RC15.md) bleibt erhalten.
+Produktive Installation/Konfiguration blieb unverändert. Aus Testfixtures folgen keine
+Apple-Silicon-Abnahme, echte ChatGPT-Dateiauswahl oder ThreadDesk-Produktimporte.
 
 ---
 
@@ -256,19 +275,19 @@ Release-Dateien verwenden. [Runtime/install PR #21](https://github.com/landjunge
 
 ## Install / update · Installieren / aktualisieren
 
-**RC15-Kandidat: nur für berechtigte Reviewer des Release-Entwurfs; noch kein
-freigegebener Endnutzer-Download. / RC15 candidate: draft reviewers only until CI
+**RC16-Kandidat: nur für berechtigte Reviewer des Release-Entwurfs; noch kein
+freigegebener Endnutzer-Download. / RC16 candidate: draft reviewers only until CI
 and release acceptance pass.** Voraussetzung / prerequisite: Python 3.11, uv 0.11.6 und
 angemeldete GitHub CLI mit Repository-Zugriff / authenticated GitHub CLI.
 Der Befehl lädt authentifiziert, prüft SHA-256 und installiert oder aktualisiert /
 authenticated download, checksum verification and install/update:
 
 ```sh
-d=$(mktemp -d) && gh release download v0.8.0rc15 -R landjunge/KiraBridge -p 'install-macos.sh*' -D "$d" && (cd "$d" && shasum -a 256 -c install-macos.sh.sha256 && sh install-macos.sh "$@")
+d=$(mktemp -d) && gh release download v0.8.0rc16 -R landjunge/KiraBridge -p 'install-macos.sh*' -D "$d" && (cd "$d" && shasum -a 256 -c install-macos.sh.sha256 && sh install-macos.sh "$@")
 ```
 
-**Für Erstinstallation und Update derselbe Befehl. RC15 bleibt bis zur Abnahme
-unveröffentlicht. / Same command for install and update. RC15 remains unpublished.**
+**Für Erstinstallation und Update derselbe Befehl. RC16 bleibt bis zur Abnahme
+unveröffentlicht. / Same command for install and update. RC16 remains unpublished.**
 
 [Download-Voraussetzungen, Status, Neustart, Rollback und Fehlerbehebung /
 prerequisites, status, restart, rollback and troubleshooting](docs/INSTALL-MACOS.md).
@@ -278,7 +297,7 @@ no sudo; existing configuration, credentials and user files are preserved.
 
 ## Further reading / Weiterführende Dokumentation
 
-- [RC15 candidate notes / Kandidatenhinweise](docs/RELEASE-0.8.0rc15.md)
+- [RC16 candidate notes / Kandidatenhinweise](docs/RELEASE-0.8.0rc16.md)
 - [Control center / Steuerfenster](https://github.com/landjunge/KiraBridge/blob/89c2e4359090de53fb6c1da55b6146072443988d/docs/CONTROL-CENTER-0.8.0rc1.md)
 - [ChatGPT connection / ChatGPT-Verbindung](docs/CHATGPT.md)
 - [Team coordination / Zusammenarbeit im Team](docs/TEAM-ORCHESTRATION.md)
@@ -288,10 +307,10 @@ no sudo; existing configuration, credentials and user files are preserved.
 - [Architecture and modules / Architektur und Module](docs/ARCHITECTURE.md)
 
 The published download is pinned to `v0.8.0rc14`; the highlighted command selects
-the unpublished `v0.8.0rc15` draft explicitly. `main` and the RC14/RC15 integration
+the unpublished `v0.8.0rc16` draft explicitly. `main` and the RC14/RC16 integration
 lineage remain separate. / Der veröffentlichte Download gehört zu `v0.8.0rc14`;
 der hervorgehobene Befehl wählt ausdrücklich den unveröffentlichten Entwurf
-`v0.8.0rc15`. `main` und die RC14/RC15-Integrationslinie bleiben getrennt.
+`v0.8.0rc16`. `main` und die RC14/RC16-Integrationslinie bleiben getrennt.
 
 KiraBridge is an independent project and is not an official product of the
 connected AI providers. / KiraBridge ist ein eigenständiges Projekt und kein

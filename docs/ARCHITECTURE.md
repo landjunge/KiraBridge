@@ -209,3 +209,9 @@ belegter `preinput_abort` erlaubt sicheres Warten; mögliche Eingabe/Return
 bleibt unbekannt und wird nicht wiederholt. Ein konkret durch ursprünglichen
 Quellstand und Ereignisse bewiesener früherer Vor-Eingabe-Abbruch kann separat
 lokal abgeglichen werden; das ist keine allgemeine Unknown-Freigabe.
+
+## RC16 opt-in modules / optionale Module
+
+See [modularity review](MODULARITY-REVIEW-20261024.md), [file transfer](FILE-TRANSFER.md),
+[receiver contract](THREADDESK-FILE-TRANSFER-V1.md) and [discovery/terminal](DISCOVERY-VISIBLE-TERMINAL.md).
+These candidate additions do not grant production access or establish receiver acceptance.

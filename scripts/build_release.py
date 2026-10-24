@@ -42,7 +42,7 @@ def build(output):
         Path("docs/INSTALL-MACOS.md").read_bytes().replace(b"](CHATGPT.md)", b"](docs/CHATGPT.md)")
     )
     files["RELEASE-NOTES.md"] = (
-        Path("docs/RELEASE-0.8.0rc15.md")
+        Path(f"docs/RELEASE-{version}.md")
         .read_bytes()
         .replace(b"](INSTALL-MACOS.md)", b"](docs/INSTALL-MACOS.md)")
         .replace(b"](ACCEPTANCE-MACOS-RC15.md)", b"](docs/ACCEPTANCE-MACOS-RC15.md)")

@@ -16,6 +16,7 @@ from kirabridge.bridge_core.models import BridgeError
 class PrincipalConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
     approval_mode: Literal["manual", "automatic"] = "manual"
+    client_type: Literal["chatgpt", "agent", "operator"] | None = None
     capabilities: list[str] = Field(default_factory=lambda: ["bridge.health", "task.read"])
     roots: list[str] = Field(default_factory=list)
     read_roots: list[str] = Field(default_factory=list)

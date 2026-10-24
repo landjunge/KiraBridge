@@ -42,7 +42,7 @@ from kirabridge.filesystem_manager import FilesystemManager, PathScope
 from kirabridge.image_manager import ImageManager
 from kirabridge.message_manager import MessageManager
 from kirabridge.message_manager.receiver import MessageReceiver
-from kirabridge.permissions import LEVELS, level_for, state_exclusions
+from kirabridge.permissions import LEVELS, direct_terminal_required, level_for, state_exclusions
 from kirabridge.process_manager import ProcessManager
 from kirabridge.security_manager import SecurityManager
 from kirabridge.session_manager import SessionInput, SessionManager, SessionOpen, SessionRead
@@ -173,6 +173,7 @@ class Bridge:
                 environment=self.terminal.environment,
                 agent_registry=lambda: (config.agents, config.visible_handoffs.bindings),
                 clipboard_lock=self.clipboard.lock,
+                visible_required=lambda name: direct_terminal_required(config, name),
                 readiness=lambda principal, result: self.visible_handoffs.observe_readiness(
                     principal, result
                 ),
@@ -414,7 +415,7 @@ class Bridge:
                 principal, operation, arguments, task_id=task["id"]
             )
         if operation == "terminal.visible" or (
-            operation == "terminal.execute" and principal == "chatgpt"
+            operation == "terminal.execute" and direct_terminal_required(self.config, principal)
         ):
             visible_args = VisibleTerminalInput.model_validate(arguments)
             return await self.visible_terminal.execute(task, visible_args, running)
@@ -505,6 +506,10 @@ class Bridge:
             )
 
         if operation == "admin.execute":
+            if direct_terminal_required(self.config, principal):
+                return await self.visible_terminal.execute(
+                    task, VisibleTerminalInput.model_validate(arguments), running, privileged=True
+                )
             from kirabridge.admin_manager import execute_admin
 
             return await execute_admin(self, task, args, policy, running)

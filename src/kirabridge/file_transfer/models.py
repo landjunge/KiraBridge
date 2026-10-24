@@ -56,6 +56,7 @@ class Manifest(Model):
 
 class Limits(Model):
     max_file_bytes: int = Field(default=2 * 1024**3, ge=1, le=64 * 1024**3)
+    max_staged_files: int = Field(default=2048, ge=1, le=100000)
     max_staged_bytes: int = Field(default=8 * 1024**3, ge=1, le=256 * 1024**3)
     chunk_bytes: int = Field(default=256 * 1024, ge=16384, le=1024 * 1024)
     max_archive_entries: int = Field(default=10000, ge=1, le=100000)
