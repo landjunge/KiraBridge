@@ -71,6 +71,9 @@ def accept(artifacts, root, previous_wheel):
     installer.private_dir(args.prefix)
     candidate = installer.prepare_bundle(args)
     version = installer.cli_version(candidate)
+    assert run([str(installer.python(candidate)), "-m", "kirabridge.cli", "--version"]).strip() == (
+        "cli.py " + version
+    )
     # The previous runtime runs the actual published RC14 wheel with locked compatible deps.
     previous = root / "previous"
     shutil.copytree(package / "payload", previous / "source")
@@ -104,7 +107,10 @@ def accept(artifacts, root, previous_wheel):
         ]
     )
     assert installer.cli_version(previous) == "0.8.0rc14"
-    installer.jwrite(previous / "release.json", {"version": "0.8.0rc14", "commit": "c21d37e"})
+    installer.jwrite(
+        previous / "release.json",
+        {"version": "0.8.0rc14", "commit": "c21d37ebdd42f03c85df1e89cd3c6969a6362e4c"},
+    )
     installer.fresh_config(args, previous)
     import tomllib
 

@@ -239,3 +239,43 @@ def test_unsafe_destination_rejected_without_permission_changes(installer, tmp_p
         installer.validate_destination(path, private=True)
     assert path.stat().st_mode & 0o777 == 0o644
     assert path.read_text() == "preserve"
+
+
+def test_loaded_foreign_plist_is_never_stopped(installer, monkeypatch, tmp_path):
+    from subprocess import CompletedProcess
+
+    monkeypatch.setattr(
+        installer.subprocess,
+        "run",
+        lambda argv, **kw: CompletedProcess(
+            argv, 0, stdout="service = {\n path = /foreign/service.plist\n}", stderr=""
+        ),
+    )
+    with pytest.raises(RuntimeError, match="another plist"):
+        installer.loaded(SimpleNamespace(service="launchd", plist=tmp_path / "ours.plist"))
+
+
+def test_guided_setup_can_prepare_without_writing_launcher(monkeypatch, tmp_path):
+    from kirabridge.local_runtime import setup
+
+    monkeypatch.setattr(Path, "home", lambda: tmp_path)
+    result = setup(str(tmp_path / "project"), install_wrapper=False)
+    assert Path(result["config"]).exists()
+    assert not (tmp_path / ".local/bin/kirabridge").exists()
+
+
+def test_guided_service_supports_the_recorded_launcher(monkeypatch, tmp_path):
+    from subprocess import CompletedProcess
+
+    from kirabridge.local_runtime import install_service
+
+    monkeypatch.setattr(Path, "home", lambda: tmp_path)
+    monkeypatch.setattr("kirabridge.local_runtime.sys.platform", "darwin")
+    monkeypatch.setattr(
+        "kirabridge.local_runtime.subprocess.run", lambda argv, **kw: CompletedProcess(argv, 0)
+    )
+    launcher = str(tmp_path / "bin/kirabridge")
+    result = install_service(tmp_path / "config.toml", command=launcher)
+    definition = plistlib.loads(Path(result["plist"]).read_bytes())
+    assert definition["ProgramArguments"] == [launcher, "serve", "--transport", "http"]
+    assert definition["RunAtLoad"] and definition["KeepAlive"] == {"SuccessfulExit": False}

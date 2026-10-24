@@ -36,7 +36,7 @@ def run(argv, *, capture=False, timeout=600, **kwargs):
         kwargs["env"] = {
             k: v
             for k, v in os.environ.items()
-            if k not in {"PYTHONPATH", "PYTHONHOME", "UV_PROJECT_ENVIRONMENT"}
+            if k not in {"PYTHONPATH", "PYTHONHOME", "UV_PROJECT_ENVIRONMENT", "VIRTUAL_ENV"}
         }
     process = subprocess.Popen(
         [str(x) for x in argv],
@@ -410,12 +410,18 @@ def fresh_config(args, release):
 def loaded(args):
     if args.service == "none":
         return False
-    return (
-        subprocess.run(
-            ["launchctl", "print", f"gui/{os.getuid()}/{LABEL}"], capture_output=True, timeout=10
-        ).returncode
-        == 0
+    result = subprocess.run(
+        ["launchctl", "print", f"gui/{os.getuid()}/{LABEL}"],
+        capture_output=True,
+        text=True,
+        timeout=10,
     )
+    if result.returncode:
+        return False
+    match = re.search(r"^\s*path = (.+)$", result.stdout, re.MULTILINE)
+    if not match or Path(match.group(1).strip('"')) != args.plist:
+        raise RuntimeError("Loaded service comes from another plist; preserved")
+    return True
 
 
 def stop_service(args):
@@ -619,6 +625,7 @@ def activate(args, release):
                     if had_plist
                     else {
                         "Label": LABEL,
+                        "ProcessType": "Background",
                         "RunAtLoad": True,
                         "KeepAlive": {"SuccessfulExit": False},
                         "ThrottleInterval": 3,
@@ -759,6 +766,9 @@ def main():
     if args.test_label:
         if not re.fullmatch(r"com\.kirabridge\.test\.[a-z0-9-]{8,64}", args.test_label):
             parser.error("Invalid isolated test label")
+        required = ("--prefix", "--config", "--launcher", "--plist", "--cache-dir", "--workspace")
+        if not all(flag in sys.argv for flag in required):
+            parser.error("--test-label requires explicit isolated paths for all destinations")
         LABEL = args.test_label
     if os.getuid() == 0:
         parser.error("Run as your normal user without sudo")

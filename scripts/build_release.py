@@ -79,10 +79,27 @@ exec python3.11 "$bundle/installer/install.py" install --bundle "$bundle" "$@"
         (output / (artifact.name + ".sha256")).write_text(
             hashlib.sha256(artifact.read_bytes()).hexdigest() + "  " + artifact.name + "\n"
         )
+    bootstrap = output / "install-macos.sh"
+    bootstrap.write_text(
+        "#!/bin/sh\nset -eu\numask 077\n"
+        'command -v gh >/dev/null || { echo "GitHub CLI/auth required" >&2; exit 1; }\n'
+        'scratch=$(mktemp -d "${TMPDIR:-/tmp}/kirabridge-release.XXXXXXXX")\n'
+        "trap 'rm -rf \"$scratch\"' EXIT\n"
+        f"gh release download v{version} -R landjunge/KiraBridge "
+        '-p KiraBridge-macos.tar.gz -D "$scratch"\n'
+        f"printf '%s  %s\\n' {hashlib.sha256(bundle.read_bytes()).hexdigest()} "
+        'KiraBridge-macos.tar.gz > "$scratch/expected.sha256"\n'
+        '(cd "$scratch" && shasum -a 256 -c expected.sha256)\n'
+        'tar -xzf "$scratch/KiraBridge-macos.tar.gz" -C "$scratch"\n'
+        'sh "$scratch/KiraBridge/install.sh" "$@"\n'
+    )
+    (output / "install-macos.sh.sha256").write_text(
+        hashlib.sha256(bootstrap.read_bytes()).hexdigest() + "  install-macos.sh\n"
+    )
     (output / "SHA256SUMS").write_text(
         "".join(
             hashlib.sha256(p.read_bytes()).hexdigest() + "  " + p.name + "\n"
-            for p in [bundle, wheel]
+            for p in [bundle, wheel, bootstrap]
         )
     )
     print(json.dumps({"version": version, "commit": commit, "bundle": str(bundle)}, indent=2))
