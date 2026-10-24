@@ -157,7 +157,8 @@ class TerminalAppTransport:
     if (!app.running()) throw Error("Selected Terminal.app is not running");
     const wins = app.windows().filter(w => w.id() === {int(window)});
     if (wins.length !== 1) throw Error("Selected window no longer exists");
-    const tabs = wins[0].tabs().filter(t => t.tty() === {json.dumps("/dev/" + tty)});
+    const targetWindow = app.windows.byId({int(window)});
+    const tabs = targetWindow.tabs().filter(t => t.tty() === {json.dumps("/dev/" + tty)});
     if (tabs.length !== 1) throw Error("Selected tab no longer exists");
     const tab = tabs[0];"""
 
@@ -166,8 +167,27 @@ class TerminalAppTransport:
         return (
             self.native_target(pane_id)
             + f"""
-    const w=wins[0]; w.selectedTab=tab; w.index=1; app.activate(); delay(0.15);
+    const w=targetWindow; tab.selected=true; app.activate(); w.frontmost=true; delay(0.15);
     const se=Application("System Events");
+    // Activation/index alone can restore another key window on macOS. Resolve the
+    // exact Window menu entry; duplicate/changing titles never select a substitute.
+    const currentWindows=app.windows();
+    if(!currentWindows.length || currentWindows[0].id()!=={int(window)} ||
+       currentWindows[0].selectedTab().tty()!=={json.dumps("/dev/" + tty)}) {{
+     const title=w.name();
+     if(app.windows().filter(v=>v.name()===title).length!==1)
+      throw Error("Selected terminal focus changed: ambiguous window title");
+     const windowMenus=se.processes.byName("Terminal").menuBars()[0].menuBarItems()
+      .filter(m=>["Window","Fenster"].includes(m.name()));
+     if(windowMenus.length!==1)
+      throw Error("Selected terminal focus changed: Window menu unavailable");
+     const menu=windowMenus[0].menus()[0], names=menu.menuItems.name();
+     if(names.filter(name=>name===title).length!==1 || w.name()!==title)
+      throw Error("Selected terminal focus changed: window menu target is not unique/current");
+     const item=menu.menuItems.byName(title);
+     if(!item.enabled()) throw Error("Selected terminal focus changed: window entry disabled");
+     item.click(); delay(0.15);
+    }}
     function checkFocus() {{
      const current=app.windows(), frontmost=se.processes.byName("Terminal").frontmost();
      const windowID=current.length ? current[0].id() : null;
@@ -350,7 +370,7 @@ class TerminalAppTransport:
             + r"if(!last.endsWith('KiraBridge visible % ') && "
             + r"!/^[^\n%$#]{1,240}[%$#] $/.test(last)) "
             + "throw Error('Selected terminal has existing input');"
-            + "\nwins[0].selectedTab=tab; wins[0].index=1; app.activate();"
+            + "\ntargetWindow.selectedTab=tab; targetWindow.index=1; app.activate();"
             + "\napp.doScript("
             + json.dumps(text)
             + ", {in:tab}); JSON.stringify({sent:true});",

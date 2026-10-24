@@ -3,11 +3,13 @@
 from __future__ import annotations
 
 import argparse
+import email.parser
 import hashlib
 import importlib.util
 import json
 import os
 import platform
+import re
 import shlex
 import shutil
 import socket
@@ -15,6 +17,7 @@ import sqlite3
 import subprocess
 import tarfile
 import time
+import zipfile
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -32,9 +35,27 @@ def digest(path):
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
-def accept(artifacts, root, previous_wheel, release_download=False, upgrade_only=False):
+def accept(
+    artifacts,
+    root,
+    previous_wheel,
+    release_download=False,
+    upgrade_only=False,
+    previous_commit=None,
+):
     if platform.system() != "Darwin":
         raise SystemExit("Actual macOS is required")
+    with zipfile.ZipFile(previous_wheel) as wheel:
+        metadata_paths = [name for name in wheel.namelist() if name.endswith(".dist-info/METADATA")]
+        assert len(metadata_paths) == 1, "Previous wheel must have one package metadata record"
+        metadata = email.parser.BytesParser().parsebytes(wheel.read(metadata_paths[0]))
+        assert metadata["Name"].lower() == "kirabridge"
+        previous_version = metadata["Version"]
+        assert previous_version
+    if previous_commit is None and previous_version == "0.8.0rc14":
+        previous_commit = "c21d37ebdd42f03c85df1e89cd3c6969a6362e4c"
+    if not previous_commit or not re.fullmatch(r"[0-9a-f]{40}", previous_commit):
+        raise SystemExit("Supply the verified 40-character --previous-commit for this wheel")
     root.mkdir(mode=0o700, parents=True, exist_ok=False)
     extracted = root / "extracted"
     extracted.mkdir()
@@ -74,7 +95,7 @@ def accept(artifacts, root, previous_wheel, release_download=False, upgrade_only
     assert run([str(installer.python(candidate)), "-m", "kirabridge.cli", "--version"]).strip() == (
         "cli.py " + version
     )
-    # The previous runtime runs the actual published RC14 wheel with locked compatible deps.
+    # Run the explicitly pinned previous wheel with locked compatible dependencies.
     previous = root / "previous"
     shutil.copytree(package / "payload", previous / "source")
     run(
@@ -106,10 +127,10 @@ def accept(artifacts, root, previous_wheel, release_download=False, upgrade_only
             str(previous_wheel),
         ]
     )
-    assert installer.cli_version(previous) == "0.8.0rc14"
+    assert installer.cli_version(previous) == previous_version
     installer.jwrite(
         previous / "release.json",
-        {"version": "0.8.0rc14", "commit": "c21d37ebdd42f03c85df1e89cd3c6969a6362e4c"},
+        {"version": previous_version, "commit": previous_commit},
     )
     installer.fresh_config(args, previous)
     import tomllib
@@ -156,6 +177,9 @@ def accept(artifacts, root, previous_wheel, release_download=False, upgrade_only
         "cwd": str(extracted),
         "checks": [],
         "upgrade_only": upgrade_only,
+        "previous_version": previous_version,
+        "previous_commit": previous_commit,
+        "previous_wheel_sha256": digest(previous_wheel),
         "remote_release_command": (
             "authenticated draft download" if release_download else "not exercised in this run"
         ),
@@ -183,15 +207,19 @@ def accept(artifacts, root, previous_wheel, release_download=False, upgrade_only
 
     try:
         installer.activate(args, previous)
-        health("0.8.0rc14")
+        health(previous_version)
         database = installer.state_file(args.config)
         with sqlite3.connect(database) as db:
             db.execute("create table release_acceptance_probe(value text)")
             db.execute("insert into release_acceptance_probe values ('PRESERVE_DATABASE')")
-        evidence["checks"].append("actual published RC14 wheel starts under isolated launchd")
+        evidence["checks"].append(
+            f"pinned previous {previous_version} wheel starts under isolated launchd"
+        )
         print(run(command, cwd=extracted, env=test_env), flush=True)
         current = health(version)
-        evidence["checks"].append("built package upgrades RC14; authenticated version/status/start")
+        evidence["checks"].append(
+            f"built package upgrades {previous_version}; authenticated version/status/start"
+        )
         assert (digest(args.config), digest(credentials)) == before
         assert user_file.read_text() == "PRESERVE_USER_FILE\n"
         with sqlite3.connect(database) as db:
@@ -221,10 +249,10 @@ def accept(artifacts, root, previous_wheel, release_download=False, upgrade_only
             run(["python3.11", str(package / "installer/install.py"), "rollback", *common]),
             flush=True,
         )
-        health("0.8.0rc14")
+        health(previous_version)
         assert (digest(args.config), digest(credentials)) == before
         evidence["checks"].append(
-            "real rollback restarts previous RC14 wheel and preserves secrets"
+            f"real rollback restarts previous {previous_version} wheel and preserves secrets"
         )
         if not upgrade_only:
             # Fresh installation, reusing the prepared wheel in a separate config and prefix.
@@ -262,10 +290,11 @@ if __name__ == "__main__":
     parser.add_argument("--root", required=True, type=Path)
     parser.add_argument("--previous-wheel", required=True, type=Path)
     parser.add_argument("--release-download", action="store_true")
+    parser.add_argument("--previous-commit", help="Verified source commit for the previous wheel")
     parser.add_argument(
         "--upgrade-only",
         action="store_true",
-        help="Only new-package RC14 upgrade, data preservation and rollback",
+        help="Only new-package upgrade, data preservation and rollback",
     )
     opts = parser.parse_args()
     accept(
@@ -274,4 +303,5 @@ if __name__ == "__main__":
         opts.previous_wheel.resolve(),
         opts.release_download,
         opts.upgrade_only,
+        opts.previous_commit,
     )

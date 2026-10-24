@@ -54,3 +54,62 @@ must pass actual isolated RC14 upgrade, version/status/data preservation and rol
 without repeating unchanged idempotence, KeepAlive and fresh-install checks. Default
 full acceptance remains unchanged. Actual installation/input results follow only
 after execution. GitHub Actions billing failures are not local test successes.
+
+## Installed b54f462 and remaining native focus repair
+
+The productive upgrade to b54f462 actually completed on Intel macOS15.7.4. Both
+Kira and Codex health routes reported RC17, PID35689 and instance0c98a902. All126
+installed package files matched the built wheel. Raw configuration/credential
+hashes and modes were unchanged; the4203 previously captured tasks,271 messages
+and45 handoffs remained intact; SQLite quick_check passed. Installer backup:
+`install/backups/20261024-185958-81d93e8a`. Authorized bounded log-file read passed.
+
+The positive native input task `rc17-live-submitfalse-20261024-01` returned
+`unknown/visible_focus_changed`, with Return not sent. Own target readback did not
+contain the test payload. It was not automatically retried. Reserved-TTY and
+wrong-PID negative checks both refused before input. Another owned test window
+later disappeared; cause unproven, no fallback into another window.
+
+Actual focus-only probes disproved that merely setting window.frontmost fixes
+activation reliably. Activation/index changes can restore a different key window;
+collection-derived window references also depend on changing window order. The
+repair binds the parent by immutable window ID, selects the tab, and, when direct
+activation still targets a different window, selects the exact unique current
+Window/Fenster menu entry. Duplicate, changed, disabled or missing entries refuse.
+The original frontmost-app/window-ID/TTY guard, process identity, viewport and
+pre-Paste/Return checks remain. No keyboard input or clipboard access occurs in
+focus-only probes. The final source focus-only probe passed on the owned window
+42963/ttys000; this is not yet a passing installed-service paste test.
+
+Only three directly related checks ran: generated insertion/Return JavaScript
+compilation on macOS and task-local native identity/pre-Paste guard regression.
+All3 passed. Initial formatting/import findings were corrected and only affected
+lint/format checks repeated. Warm-upgrade acceptance now reads the prior wheel's
+actual METADATA version and records its SHA-256 and explicit verified source pin,
+so RC17→RC17 patch installation and rollback can be checked without repeating
+unchanged full lifecycle tests. RC14 remains the default prior source pin.
+
+## Confirmed ChatGPT/ThreadDesk interface diagnosis
+
+An actual Kira/chatgpt `threaddesk.manage` appended the regular work-memory entry
+`KB-RC17-INSTALLED-AND-KIRA-TD-DIAG-20261024-01`; the validated mutation receipt and
+independent `get_thread` readback confirmed revision30 and the complete exact note.
+There is no evidence of a historical failed write. ThreadDesk text writes are not
+generally blocked.
+
+Cached Apps tool declarations still require completion_subscription and describe
+Events as mandatory. The live RC17 tools/list instead requires only request,
+provides action aliases, and declares Events optional. Both identities reached the
+same live daemon. The compatible legacy call with an empty subscription worked.
+Already injected external Apps schemas cannot be replaced by changing permissions
+or repeatedly submitting tasks. Refresh the host connector's metadata; no refresh
+control is exposed in this session. The standard stdio proxy already forwards
+catalogue changes. The optional Events facade lacks that monitor; this is a
+possible improvement, not proof it causes this host's cached schema. No facade,
+ThreadDesk, permission or production configuration change was made for diagnosis.
+
+File transfer has separate prerequisites: absent file_transfer configuration means
+enabled=false; neither current principal has files.prepare/transfer/inspect; the
+active pinned ThreadDesk adapter lacks file_import_* receiver tools. Existing
+sender modules are reused, not rebuilt. Text-management permission does not grant
+binary transfer. No original files, permissions or receiver implementation changed.
