@@ -8,7 +8,7 @@
 **Turn your ideas into work on your computer.**  
 **Aus deinen Ideen werden Aufgaben auf deinem Rechner.**
 
-[English](#english) · [Deutsch](#deutsch) · [Download RC12](https://github.com/landjunge/KiraBridge/releases/tag/v0.8.0rc12)
+[English](#english) · [Deutsch](#deutsch) · [Published RC14](https://github.com/landjunge/KiraBridge/releases/tag/v0.8.0rc14)
 
 ## English
 
@@ -60,26 +60,19 @@ tracks delivery, acknowledgement and completion separately.
   usage limits.
 - Permissions for the project folders and actions you want to allow.
 
-The current setup uses a terminal and requires **Python 3.11+, Git and uv**.
-Technical setup is still necessary; help from someone familiar with these tools
-may be useful. The source supports macOS and Linux. The fresh RC12 package was
-tested on Linux; a fresh macOS package installation still needs validation.
+For the new macOS package: **Python 3.11, uv 0.11.6 and authenticated GitHub
+access**. Intel x86_64 is the primary acceptance target; Apple Silicon has a
+matching dependency lock but still requires its own acceptance run. See the
+[bilingual prerequisites and installation guide](docs/INSTALL-MACOS.md).
 
 ### Download and get started
 
-**[Download 0.8.0rc12](https://github.com/landjunge/KiraBridge/releases/tag/v0.8.0rc12)**
-— a private prerelease published on 20 October 2026. Access to this repository is
-required. This is a release candidate, not the final stable 0.8.0 version.
+**Latest published release: [v0.8.0rc14](https://github.com/landjunge/KiraBridge/releases/tag/v0.8.0rc14)**
+(private prerelease, 22 October 2026; wheel only).
 
-Choose **`KiraBridge-0.8.0rc12-runtime.tar.gz`**. It includes the installer and
-the matching source. Follow the
-[RC12 installation guide](https://github.com/landjunge/KiraBridge/blob/v0.8.0rc12/docs/RELEASE-0.8.0rc12.md),
-then [connect ChatGPT](docs/CHATGPT.md) and configure the assistants you use.
-The first dependency installation needs Internet access. Accounts and credentials
-are not included.
-
-This download does not include a newly built native macOS companion app.
-Mobile and live voice use still require a separate end-to-end check.
+**RC15 is an unpublished candidate.** The macOS bundle and its installation
+command are described [below](#install--update--installieren--aktualisieren).
+Publication requires successful CI and PR review. The RC15 draft is reserved for authorized reviewers. Existing launchd services continue running when Terminal/browser closes.
 
 ### Control and optional tools
 
@@ -94,14 +87,9 @@ task. Further assistant adapters and their limits are described in the
 
 ### What has been checked?
 
-RC12 packages fixes for blocked handoffs, missing error feedback and replies
-blocked by a full conversation. Its installer also restores the exact bundled
-source correctly.
-
-The final Linux test run passed **940 tests**, with **2 skipped**. A fresh package
-installation, startup and authenticated connection check passed. These checks do
-not replace the pending fresh macOS installation or physical mobile/voice checks.
-The release includes the detailed test report.
+The [RC15 acceptance report](docs/ACCEPTANCE-MACOS-RC15.md) records actual
+package tests and remaining gates. Historical RC12 test counts do not establish
+RC15 acceptance. Mobile, Live voice and end-to-end ChatGPT remain separate checks.
 
 ---
 
@@ -159,29 +147,20 @@ KiraBridge unterscheidet deshalb Übergabe, Empfangsbestätigung und Abschluss.
   Nutzungslimits nicht auf.
 - Freigaben für die Projektordner und Aktionen, die du erlauben möchtest.
 
-Die Einrichtung erfolgt derzeit über das Terminal und benötigt **Python 3.11+,
-Git und uv**. Technische Einrichtung ist also weiterhin nötig; dabei kann dir
-jemand helfen, der diese Werkzeuge kennt. Der Quellcode unterstützt macOS und
-Linux. Das frische RC12-Paket wurde unter Linux geprüft; eine neue Paketinstallation
-unter macOS muss noch geprüft werden.
+Für das neue macOS-Paket: **Python 3.11, uv 0.11.6 und angemeldeter
+GitHub-Zugriff**. Intel x86_64 ist das primäre Abnahmeziel; Apple Silicon wird
+vom Abhängigkeits-Lock berücksichtigt und benötigt eine eigene Abnahme.
+[Voraussetzungen und Anleitung auf Deutsch/Englisch](docs/INSTALL-MACOS.md).
 
 ### Herunterladen und starten
 
-**[0.8.0rc12 herunterladen](https://github.com/landjunge/KiraBridge/releases/tag/v0.8.0rc12)**
-— ein privates Vorabrelease vom 20. Oktober 2026. Der Download erfordert Zugriff auf
-dieses Repository. Es ist ein Veröffentlichungskandidat, noch keine endgültige
-stabile Version 0.8.0.
+**Zuletzt veröffentlicht: [v0.8.0rc14](https://github.com/landjunge/KiraBridge/releases/tag/v0.8.0rc14)**
+(privates Vorabrelease vom 22.10.2026; bisher nur ein Wheel).
 
-Wähle **`KiraBridge-0.8.0rc12-runtime.tar.gz`**. Darin sind der Installer und der
-passende Quellstand enthalten. Folge der
-[RC12-Installationsanleitung](https://github.com/landjunge/KiraBridge/blob/v0.8.0rc12/docs/RELEASE-0.8.0rc12.md),
-[verbinde ChatGPT](docs/CHATGPT.md) und richte die gewünschten Assistenten ein.
-Für die erste Installation der Abhängigkeiten wird Internet benötigt. Konten und
-Zugangsdaten sind nicht enthalten.
-
-Eine neu gebaute native macOS-Begleitapp gehört nicht zu diesem Download.
-Die Nutzung am Handy und im Live-Sprachgespräch braucht weiterhin eine gesonderte
-Prüfung des gesamten Ablaufs.
+**RC15 ist ein unveröffentlichter Kandidat.** Paket und Installationsbefehl
+stehen [unten](#install--update--installieren--aktualisieren). Veröffentlichung
+erst nach erfolgreicher CI und PR-Review. Noch kein freigegebener RC15-Download.
+Der launchd-Dienst läuft nach Schließen von Terminal oder Browser weiter.
 
 ### Kontrolle und optionale Werkzeuge
 
@@ -198,22 +177,44 @@ Assistenten-Anbindungen und ihre Grenzen stehen in der
 
 ### Was wurde geprüft?
 
-RC12 enthält Korrekturen für blockierte Übergaben, fehlende Fehlerrückmeldungen und
-Antworten, die durch einen vollen Gesprächsverlauf aufgehalten wurden. Außerdem
-stellt der Installer den mitgelieferten Quellstand korrekt wieder her.
-
-Beim abschließenden Linux-Testlauf bestanden **940 Tests**, **2 wurden
-übersprungen**. Eine frische Paketinstallation, der Start und eine angemeldete
-Verbindungsprüfung waren erfolgreich. Das ersetzt nicht die noch offenen Prüfungen
-einer neuen macOS-Installation sowie des Ablaufs am Handy mit Sprache. Der
-ausführliche Prüfbericht liegt beim Release.
+Der [RC15-Abnahmebericht](docs/ACCEPTANCE-MACOS-RC15.md) nennt die tatsächlich
+geprüften Pakete und verbleibenden Hürden. Historische RC12-Zahlen belegen keine
+RC15-Abnahme. Handy, Live-Sprache und ChatGPT benötigen getrennte Prüfungen.
 
 ---
 
+`main` is a separate development lineage (currently 0.7.0rc2); the latest
+published code is the RC14 integration lineage. Use release assets for installation.
+`main` ist eine getrennte Entwicklungslinie (derzeit 0.7.0rc2); der jüngste
+veröffentlichte Stand liegt in der RC14-Integrationslinie. Zur Installation die
+Release-Dateien verwenden. [Runtime/install PR #21](https://github.com/landjunge/KiraBridge/pull/21).
+
+## Install / update · Installieren / aktualisieren
+
+**RC15-Kandidat: nur für berechtigte Reviewer des Release-Entwurfs; noch kein
+freigegebener Endnutzer-Download. / RC15 candidate: draft reviewers only until CI
+and review pass.** Voraussetzung / prerequisite: Python 3.11, uv 0.11.6 und
+angemeldete GitHub CLI mit Repository-Zugriff / authenticated GitHub CLI.
+Der Befehl lädt authentifiziert, prüft SHA-256 und installiert oder aktualisiert /
+authenticated download, checksum verification and install/update:
+
+```sh
+d=$(mktemp -d) && gh release download v0.8.0rc15 -R landjunge/KiraBridge -p 'install-macos.sh*' -D "$d" && (cd "$d" && shasum -a 256 -c install-macos.sh.sha256 && sh install-macos.sh "$@")
+```
+
+**Für Erstinstallation und Update derselbe Befehl. RC15 bleibt bis zur Abnahme
+unveröffentlicht. / Same command for install and update. RC15 remains unpublished.**
+
+[Download-Voraussetzungen, Status, Neustart, Rollback und Fehlerbehebung /
+prerequisites, status, restart, rollback and troubleshooting](docs/INSTALL-MACOS.md).
+Keine Apple-Signierung/Notarisierung; kein sudo; vorhandene Konfiguration,
+Zugangsdaten und Nutzerdateien bleiben erhalten. / No Apple signing/notarization,
+no sudo; existing configuration, credentials and user files are preserved.
+
 ## Further reading / Weiterführende Dokumentation
 
-- [RC12 installation and release notes / Installation und Releasehinweise](https://github.com/landjunge/KiraBridge/blob/v0.8.0rc12/docs/RELEASE-0.8.0rc12.md)
-- [Control center / Steuerfenster](https://github.com/landjunge/KiraBridge/blob/v0.8.0rc12/docs/CONTROL-CENTER-0.8.0rc1.md)
+- [RC15 candidate notes / Kandidatenhinweise](docs/RELEASE-0.8.0rc15.md)
+- [Control center / Steuerfenster](docs/CONTROL-CENTER-0.8.0rc1.md)
 - [ChatGPT connection / ChatGPT-Verbindung](docs/CHATGPT.md)
 - [Team coordination / Zusammenarbeit im Team](docs/TEAM-ORCHESTRATION.md)
 - [ThreadDesk connection / ThreadDesk-Anbindung](docs/THREADDESK-ADAPTER-20261018.md)
@@ -221,8 +222,8 @@ ausführliche Prüfbericht liegt beim Release.
 - [Operations and recovery / Betrieb und Wiederherstellung](docs/OPERATIONS.md)
 - [Architecture and modules / Architektur und Module](docs/ARCHITECTURE.md)
 
-The download is pinned to tag `v0.8.0rc12`. The `main` branch may contain a
-different development state. / Der Download gehört zum Tag `v0.8.0rc12`; der
+The download is pinned to tag `v0.8.0rc14`. The `main` branch may contain a
+different development state. / Der Download gehört zum Tag `v0.8.0rc14`; der
 Hauptzweig `main` kann einen anderen Entwicklungsstand enthalten.
 
 KiraBridge is an independent project and is not an official product of the
