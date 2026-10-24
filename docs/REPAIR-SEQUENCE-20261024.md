@@ -69,5 +69,28 @@ without switching/stopping a service or modifying the store. The compatible comp
 uses the editable development runtime, not an installer/package acceptance claim.
 
 No new release or production installation is approved. The queued Library request
-has not been resent, acknowledged as executed or run in parallel. No Whiteboard write
-has been attempted while the ordered Phase 1 production gate remains open.
+has not been resent, acknowledged as executed or run in parallel. The user subsequently explicitly authorized a status append to the existing work-memory
+Whiteboard 188ce4729a62 while Phase 1 remains gated; this is recorded below.
+
+## Canonical work-memory Whiteboard (latest user instruction)
+
+Use **188ce4729a62**, “ThreadDesk und KiraBridge – Wechselentwicklung durch Codex”.
+No competing Whiteboard was created. Existing f014aeed7384 and other user Whiteboards
+remain intact; they are not duplicate work-memory targets.
+
+A 3002-character status note was appended using existing authorized RC14 tools and a
+stable operation ID, expected revision 2. ThreadDesk returned a validated mutation
+receipt for revision **3**; a separate `get_thread` task confirmed the entire note and
+exactly one marker. The original description is unchanged. This proves this particular
+status append/readback, **not** a repair or broad acceptance of longer Whiteboard inputs.
+
+Evidence: [stored/readback confirmation](evidence/whiteboard-memory-188ce4729a62.json).
+The note contains the source commit/branch, PR26, completed code/tests, in-progress
+review/acceptance, pending terminal/Whiteboard/import work, CI billing blocker and
+immediate next step. Future meaningful milestones and project switches update this
+same Whiteboard with confirmed readback. No further tests were run for this
+status/documentation update.
+
+PR26 source check [40101832381](https://github.com/landjunge/KiraBridge/actions/runs/40101832381)
+failed before steps: recent account payments failed or the spending limit must increase.
+Review and deployment acceptance remain open; no merge or release publication occurred.
