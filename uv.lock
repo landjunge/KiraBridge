@@ -352,11 +352,12 @@ wheels = [
 
 [[package]]
 name = "kirabridge"
-version = "0.7.0rc2"
+version = "0.8.0rc13"
 source = { editable = "." }
 dependencies = [
     { name = "cryptography", version = "48.0.1", source = { registry = "https://pypi.org/simple" }, marker = "platform_machine == 'x86_64' and sys_platform == 'darwin'" },
     { name = "httpx" },
+    { name = "jsonschema" },
     { name = "mcp" },
     { name = "uvicorn" },
 ]
@@ -372,6 +373,7 @@ dev = [
 requires-dist = [
     { name = "cryptography", marker = "platform_machine == 'x86_64' and sys_platform == 'darwin'", specifier = "<49" },
     { name = "httpx", specifier = ">=0.28,<1" },
+    { name = "jsonschema", specifier = ">=4.20,<5" },
     { name = "mcp", specifier = ">=1.30,<2" },
     { name = "uvicorn", specifier = ">=0.34,<1" },
 ]
