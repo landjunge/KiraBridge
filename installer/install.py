@@ -654,7 +654,9 @@ def activate(args, release):
             if args.service != "none":
                 before["installed_plist_sha256"] = sha(args.plist)
             jwrite(current, before)
-            start_service(args)
+        # Shutdown may need SQLite writes. Do not wait for launchd to replace a
+        # stopping process while our idle guard still holds its writer reservation.
+        start_service(args)
         if args.service != "none":
             health = wait_health(args, release, manifest["version"])
             say(f"Dienst gestartet: Version {health['version']}, PID {health['runtime']['pid']}.")
@@ -706,8 +708,8 @@ def rollback(args):
             jwrite(current, active["previous"])
         else:
             current.unlink()
-        if active["was_loaded"]:
-            start_service(args)
+    if active["was_loaded"]:
+        start_service(args)
     if active["was_loaded"] and active.get("previous_version"):
         wait_health(args, Path(active["release"]), active["previous_version"])
     say(

@@ -279,3 +279,48 @@ def test_guided_service_supports_the_recorded_launcher(monkeypatch, tmp_path):
     definition = plistlib.loads(Path(result["plist"]).read_bytes())
     assert definition["ProgramArguments"] == [launcher, "serve", "--transport", "http"]
     assert definition["RunAtLoad"] and definition["KeepAlive"] == {"SuccessfulExit": False}
+
+
+def test_activate_and_rollback_release_sqlite_before_bootstrap(installer, monkeypatch, tmp_path):
+    import sqlite3
+
+    prefix = tmp_path / "install"
+    prefix.mkdir(mode=0o700)
+    state = tmp_path / "data"
+    state.mkdir()
+    database = state / "bridge.sqlite3"
+    with sqlite3.connect(database) as db:
+        db.execute("create table preserved(value text)")
+    config = tmp_path / "config.toml"
+    config.write_text("data_dir = " + json.dumps(str(state)))
+    release = tmp_path / "runtime"
+    release.mkdir()
+    (release / "release.json").write_text(json.dumps({"version": "0.8.0rc15", "commit": "a" * 40}))
+    args = SimpleNamespace(
+        prefix=prefix,
+        config=config,
+        launcher=tmp_path / "bin/kirabridge",
+        plist=tmp_path / "service.plist",
+        service="launchd",
+        full_access=False,
+    )
+    monkeypatch.setattr(installer, "loaded", lambda args: True)
+    monkeypatch.setattr(installer, "cli", lambda *a, **kw: {"version": "0.8.0rc14"})
+    monkeypatch.setattr(
+        installer, "wait_health", lambda *a, **kw: {"version": "0.8.0rc15", "runtime": {"pid": 1}}
+    )
+    monkeypatch.setattr(installer, "stop_service", lambda args: None)
+    writes = []
+
+    def bootstrap(args):
+        # Models the outgoing daemon's final write needed before launchd can replace it.
+        with sqlite3.connect(database, timeout=0) as db:
+            db.execute("insert into preserved values ('shutdown completed')")
+        writes.append("bootstrap")
+
+    monkeypatch.setattr(installer, "start_service", bootstrap)
+    installer.activate(args, release)
+    installer.rollback(args)
+    assert writes == ["bootstrap", "bootstrap"]
+    with sqlite3.connect(database) as db:
+        assert db.execute("select count(*) from preserved").fetchone()[0] == 2
