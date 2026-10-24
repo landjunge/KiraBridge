@@ -1,11 +1,13 @@
 # Current RC17 review artifact / Aktuelles RC17-Prüfpaket
 
-The copy command below selects **KiraBridge-macos-7725bc6.tar.gz**, SHA-256
-`896b7d1510cd164459b9cb1767a9b26ffc75164f2f6ca3791b119ddffc272f8c`.
+The copy command below selects **KiraBridge-macos-chatgpt-20261024b.tar.gz**, with its adjacent authenticated `.sha256` file. The embedded release.json pins
+its exact source commit; the separate7725bc6 evidence remains historical.
 This is a separately named private RC17 draft candidate from open PR32, not the
 published RC14 and not the historical standard RC17/b54f462 assets. It is unsigned.
-It was reproduced twice, tested with actual Intel-macOS upgrade/data/rollback,
-installed and verified through Kira paste-only input and independent readback.
+The base7725bc6 code passed actual Intel-macOS upgrade/data/rollback and Kira
+paste/readback. The final b candidate adds only a specifically tested legacy
+secret-error classification; package/native code equivalence and final installation
+are recorded in the supplemental operator evidence.
 GitHub Actions has not started due account billing; no merge/publication claimed.
 
 Der Befehl wählt genau diesen privaten, separat benannten RC17-Kandidaten aus PR32.
@@ -45,11 +47,11 @@ Downloads GitHub CLI (`brew install gh`) installieren, mit `gh auth login`
 anmelden und mit `gh repo view landjunge/KiraBridge` den Zugriff prüfen.
 Keine Tokens in Befehle oder Logs kopieren.
 
-Das Paket `KiraBridge-macos-7725bc6.tar.gz` enthält Installer, Wheel, Quellstand,
+Das Paket `KiraBridge-macos-chatgpt-20261024b.tar.gz` enthält Installer, Wheel, Quellstand,
 `uv.lock`, Lizenz, Anleitung und Releasehinweise. Nach Bezug eines freigegebenen
-Pakets samt `KiraBridge-macos-7725bc6.tar.gz.sha256` in einen neuen leeren Ordner:
-`shasum -a 256 -c KiraBridge-macos-7725bc6.tar.gz.sha256` prüfen und mit
-`tar -xzf KiraBridge-macos-7725bc6.tar.gz` entpacken. Nur ausführen, wenn die Prüfung
+Pakets samt `KiraBridge-macos-chatgpt-20261024b.tar.gz.sha256` in einen neuen leeren Ordner:
+`shasum -a 256 -c KiraBridge-macos-chatgpt-20261024b.tar.gz.sha256` prüfen und mit
+`tar -xzf KiraBridge-macos-chatgpt-20261024b.tar.gz` entpacken. Nur ausführen, wenn die Prüfung
 besteht. Prüfsummen vom selben authentifizierten Release schützen vor
 Beschädigung; sie ersetzen keine unabhängige Herausgebersignatur.
 
@@ -61,7 +63,7 @@ Dies ist ausschließlich der RC17-Reviewbefehl, tatsächlich mit isolierten Pfad
 
 
 ```sh
-d=$(mktemp -d) && gh release download v0.8.0rc17 -R landjunge/KiraBridge -p 'KiraBridge-macos-7725bc6.tar.gz*' -D "$d" && (cd "$d" && shasum -a 256 -c KiraBridge-macos-7725bc6.tar.gz.sha256 && tar -xzf KiraBridge-macos-7725bc6.tar.gz && sh KiraBridge/install.sh --full-access "$@")
+d=$(mktemp -d) && gh release download v0.8.0rc17 -R landjunge/KiraBridge -p 'KiraBridge-macos-chatgpt-20261024b.tar.gz*' -D "$d" && (cd "$d" && shasum -a 256 -c KiraBridge-macos-chatgpt-20261024b.tar.gz.sha256 && tar -xzf KiraBridge-macos-chatgpt-20261024b.tar.gz && sh KiraBridge/install.sh --full-access "$@")
 ```
 
 Erstinstallation: legt ausschließlich Benutzerdateien an. Dieser ausdrücklich
@@ -127,8 +129,8 @@ never put access tokens in commands. The installer does not install Python,
 Homebrew, compilers or change permissions.
 
 Download the approved bundle and its `.sha256` file into a new empty directory,
-verify with `shasum -a 256 -c KiraBridge-macos-7725bc6.tar.gz.sha256`, then extract using
-`tar -xzf KiraBridge-macos-7725bc6.tar.gz`. Authorized draft reviewers can run the highlighted command above for both
+verify with `shasum -a 256 -c KiraBridge-macos-chatgpt-20261024b.tar.gz.sha256`, then extract using
+`tar -xzf KiraBridge-macos-chatgpt-20261024b.tar.gz`. Authorized draft reviewers can run the highlighted command above for both
 installation and updates; it authenticates the download and verifies the archive before execution.
 After manual extraction, the equivalent local entrypoint is `sh KiraBridge/install.sh`. A checksum obtained through the same authenticated
 release detects corruption; it is not an independent publisher signature.

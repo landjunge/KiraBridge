@@ -186,3 +186,25 @@ Apple Silicon execution remains untested. Further transient native-read latency
 needs observation. Design preview has not started while RC17 release gates remain.
 This documentation-only report follows the tested7725bc6 functional source; the
 future integrated release still requires a final-main build after CI is unblocked.
+
+## Additional actually reproduced Whiteboard rejection
+
+Final status write kira-final7725-board-write-20261024-01 failed tool_error; independent
+operation status returned found=false, marker absent and revision36 unchanged.
+Read-only validation using the active frozen6c7 peer proved SecretRejected, not a
+40000-character or4221-byte limit. Its unbounded sk-[A-Za-z0-9]{16,} pattern matched
+22 characters inside a benign longer source identifier on line7. The peer loses
+that error type, and KiraBridge previously hid its fixed message under tool_error.
+
+KiraBridge now recognizes only the exact fixed legacy secret-rejection message and
+returns secret_detected with generic safe guidance. Unknown messages remain redacted;
+no secret guard, permission or automatic-replay protection is removed. The new
+regression failed before the fix;7 specific normalization/redaction/numeric-detail
+cases passed afterward, independently reviewed by a native teammate. ThreadDesk
+code is unchanged; its false-positive boundary fix belongs to its owner.
+
+The own status was rewritten into clear prose without removing any factual status.
+Both unchanged frozen-peer pure validators accepted the larger5373-character/
+5445-byte file. This is not claimed as stored until live CAS plus readback completes.
+The latest b artifact uses a stable explicit filename and adjacent checksum; its
+functional difference from7725bc6 is limited to this diagnostics normalization.

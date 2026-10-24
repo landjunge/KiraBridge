@@ -342,7 +342,7 @@ Der Befehl lädt authentifiziert, prüft SHA-256 und installiert oder aktualisie
 authenticated download, checksum verification and install/update:
 
 ```sh
-d=$(mktemp -d) && gh release download v0.8.0rc17 -R landjunge/KiraBridge -p 'KiraBridge-macos-7725bc6.tar.gz*' -D "$d" && (cd "$d" && shasum -a 256 -c KiraBridge-macos-7725bc6.tar.gz.sha256 && tar -xzf KiraBridge-macos-7725bc6.tar.gz && sh KiraBridge/install.sh --full-access "$@")
+d=$(mktemp -d) && gh release download v0.8.0rc17 -R landjunge/KiraBridge -p 'KiraBridge-macos-chatgpt-20261024b.tar.gz*' -D "$d" && (cd "$d" && shasum -a 256 -c KiraBridge-macos-chatgpt-20261024b.tar.gz.sha256 && tar -xzf KiraBridge-macos-chatgpt-20261024b.tar.gz && sh KiraBridge/install.sh --full-access "$@")
 ```
 
 **Für Erstinstallation und Update derselbe Befehl. RC17 bleibt bis zur Abnahme
