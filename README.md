@@ -409,3 +409,5 @@ launchd upgrade/status/rollback were verified separately with these same package
 echter launchd-Upgrade/Status/Rollback ist für dieselben Paketbytes separat belegt.
 
 Current installed RC17 source / Aktuell installierte RC17-Quelle: **012b592**, with preserved data and42 automatic ChatGPT operations. [25 October build/install/command evidence](docs/RC17-RESUME-20261025.md). PR32 remains open, RC17 draft; latest published RC14. / PR32 offen, RC17 Entwurf, veröffentlicht RC14.
+
+Separate terminal design preview / Separate Terminal-Designvorschau: [Draft PR34](https://github.com/landjunge/KiraBridge/pull/34), [pink Braille wordmark and bridge / pinker Braille-Schriftzug und Brücke](https://github.com/landjunge/KiraBridge/blob/ada6e37df1be607bfdc0dec8428e609c12d46ef8/docs/design-preview/terminal-braille-100.png). Not installed or merged; work stops after presenting this preview pending the next user instruction. / Nicht installiert oder gemergt; nach dieser Vorschau Halt bis zum nächsten Nutzerauftrag.
