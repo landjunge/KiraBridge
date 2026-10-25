@@ -159,3 +159,31 @@ separaten historischen Protokoll-Pin. Diese Änderung verspricht dafür keine
 beliebige Protokollmigration. Bei Mehrdeutigkeit kein automatisches Rebinding oder
 Doppelimport; dies bleibt vor einem entsprechenden Empfängerwechsel zu klären.
 Aktivierung und Produktionsintegration sind nicht Bestandteil dieses isolierten Fixes.
+
+## GitHub-Abschluss und weiterer Bedarf
+
+Codecommit `2dd091692d0066f5d45414415e255f6a9497e16d` gepusht, eigener
+[PR35](https://github.com/landjunge/KiraBridge/pull/35) auf PR33 gestapelt.
+Kein Merge und keine neue Installation: Verify-Jobs am Codepin starteten laut
+Annotation121145115269 wegen Kontozahlung/Ausgabenlimit nicht. Die nachfolgenden
+PR-Prüfungen lieferten ebenfalls keinen Pass. Keine Schutzprüfung umgangen.
+
+Der Installationsbefehl wurde aus dem bereits tatsächlich geprüften012b592-Beleg
+übernommen und nicht nochmals ausgeführt: er wählt das eindeutig benannte Paket,
+statt über den alten generischen Bootstrap versehentlich auf main/b54 zurückzugehen.
+Das Installationsdokument wird unverändert aus dem gepushten aktuellen Bericht
+`bb30108` übernommen; der Bibliotheksfix ist nicht Bestandteil dieses Pakets.
+Nur Dokumentationsangleichung, keine neue Paket-/macOS-Abnahme behauptet.
+
+Produktiver Dienst zum Abschluss erneut authentifiziert gelesen: weiterhin
+RC17/012b592, PID72612, Dispatcher aktiv. Keine Installation, kein Profilwechsel,
+keine Originaldatei oder produktive Berechtigung durch diesen Schritt geändert.
+Die Frage nach dem bereitgestellten Exportordner ist an den Nutzer gestellt.
+Ohne echte Quelldateien kein Import; ohne gesondert abgenommenes Receiverprofil
+keine ungeprüfte Öffnung des bisherigen produktiven Stores mit neuem ThreadDesk-Code.
+Nächster konkreter Schritt: gewählten Export und bestehenden Zielthread prüfen,
+Receiverumgebung konkret abnehmen; Pflicht-CI ermöglichen, dann PR32/33/35 normal
+integrieren und erst aus integriertem geprüftem Stand neue Pakete erstellen.
+
+Gemeinsames Whiteboard188ce4729a62: Aufgabenplan in Revision45, Ergebnis in
+Revision46 gespeichert und jeweils unabhängig exakt zurückgelesen; Marker je einmal.

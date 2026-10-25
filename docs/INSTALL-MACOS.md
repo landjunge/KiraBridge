@@ -1,13 +1,37 @@
+# Current RC17 review artifact / Aktuelles RC17-Prüfpaket
+
+The copy command below selects **KiraBridge-macos-chatgpt-20261024b.tar.gz**, with its adjacent authenticated `.sha256` file. Source **012b592caa5b6126342f9148f3b38a7d50b00379**, SHA-256
+**bbf6e91f902df8d9d33f0afcde949d2d4e1117481c5edd63573aad9db9183514**. The embedded release.json pins
+its exact source commit; the separate7725bc6 evidence remains historical.
+This is a separately named private RC17 draft candidate from open PR32, not the
+published RC14 and not the historical standard RC17/b54f462 assets. It is unsigned.
+The base7725bc6 code passed actual Intel-macOS upgrade/data/rollback and Kira
+paste/readback. The final b candidate adds the specifically tested legacy secret-error classification
+and bounded launchctl bootstrap recovery. Its exact build and acceptance are recorded
+in the [current continuation](RC17-RESUME-20261025.md); historical native proof remains
+explicitly pinned to7725bc6.
+GitHub Actions has not started due account billing; no merge/publication claimed.
+
+Der Befehl wählt genau diesen privaten, separat benannten RC17-Kandidaten aus PR32.
+Intel-macOS ist tatsächlich geprüft; Apple Silicon ist nicht ausgeführt. Die
+aktuelle produktive Berechtigung wurde auf ausdrücklichen Nutzerauftrag nur für
+ChatGPT vervollständigt: alle42 Operationen automatisch, andere Identitäten und
+Zugangsdaten unverändert. Details: [Arbeitsnachweis](CHATGPT-BLOCKER-AUDIT-20261024.md).
+Die Ein-Zeilen-Kette wurde aus dem authentifizierten Entwurf mit isolierten Pfaden
+und `--service none` ausgeführt; echte launchd-Prüfungen liefen separat mit denselben
+Paketbytes. Der aktuelle Paketbefehl bestand ohne Pfadkorrektur. Versions-/Grant-/SHA-Nachprüfungen
+sind bestanden; historische Fixturefehler bleiben im älteren Beleg erhalten.
+
 # macOS installation / Installation
 
-**RC17 is an unpublished review candidate. Its actual [isolated package acceptance](ACCEPTANCE-MACOS-RC17.md) passed; required CI/review and native agent-input acceptance remain open. No production deployment approved.**
+**RC17 remains unpublished. The explicitly authorized operator upgrade, native paste/readback and full ChatGPT grant are verified for7725bc6; GitHub Actions remains blocked before execution by account billing. Additional review was waived.**
 
-**RC17 ist ein unveröffentlichter Reviewkandidat. Echte isolierte Paketprüfung bestanden; Pflicht-CI/Review und native Agenteneingabe offen. Keine Produktivfreigabe.**
+**RC17 ist ein unveröffentlichter Kandidat. Produktive Installation ist für012b592 und reine native Eingabe für dessen unveränderte Module aus7725bc6 belegt. Pflicht-CI offen, zusätzliche Review auf Nutzeranweisung entfallen.**
 
 ## Deutsch
 
 **Veröffentlicht ist [v0.8.0rc14](https://github.com/landjunge/KiraBridge/releases/tag/v0.8.0rc14).
-RC17 ist ein unveröffentlichter Kandidat. Der Release-Entwurf dient ausschließlich berechtigten Reviewern; Freigabe erst nach CI und Review.**
+RC17 ist ein unveröffentlichter Kandidat. Der Release-Entwurf dient ausschließlich berechtigten Reviewern; Freigabe erst nach bestandenen erforderlichen Prüfungen. Zusätzliche Review wurde abgewählt.**
 
 Voraussetzungen: normales Benutzerkonto ohne sudo, macOS 15 (Intel x86_64 oder
 Apple Silicon arm64), Python **3.11**, **uv 0.11.6**, Internet zu PyPI und Zugriff
@@ -25,28 +49,29 @@ Downloads GitHub CLI (`brew install gh`) installieren, mit `gh auth login`
 anmelden und mit `gh repo view landjunge/KiraBridge` den Zugriff prüfen.
 Keine Tokens in Befehle oder Logs kopieren.
 
-Das Paket `KiraBridge-macos.tar.gz` enthält Installer, Wheel, Quellstand,
+Das Paket `KiraBridge-macos-chatgpt-20261024b.tar.gz` enthält Installer, Wheel, Quellstand,
 `uv.lock`, Lizenz, Anleitung und Releasehinweise. Nach Bezug eines freigegebenen
-Pakets samt `KiraBridge-macos.tar.gz.sha256` in einen neuen leeren Ordner:
-`shasum -a 256 -c KiraBridge-macos.tar.gz.sha256` prüfen und mit
-`tar -xzf KiraBridge-macos.tar.gz` entpacken. Nur ausführen, wenn die Prüfung
+Pakets samt `KiraBridge-macos-chatgpt-20261024b.tar.gz.sha256` in einen neuen leeren Ordner:
+`shasum -a 256 -c KiraBridge-macos-chatgpt-20261024b.tar.gz.sha256` prüfen und mit
+`tar -xzf KiraBridge-macos-chatgpt-20261024b.tar.gz` entpacken. Nur ausführen, wenn die Prüfung
 besteht. Prüfsummen vom selben authentifizierten Release schützen vor
 Beschädigung; sie ersetzen keine unabhängige Herausgebersignatur.
 
 **Für berechtigte Reviewer des RC17-Release-Entwurfs: Installation und Update
-mit EINEM Befehl (angemeldete GitHub CLI erforderlich).** Der Bootstrap lädt das
-passende Paket authentifiziert und prüft dessen fest eingebetteten SHA-256-Wert.
+mit EINEM Befehl (angemeldete GitHub CLI erforderlich).** Der Befehl lädt Paket und zugehörige Prüfsumme authentifiziert und prüft SHA-256.
 `"$@"` reicht optionale Argumente weiter; beim normalen Einfügen sind diese leer.
 Dies ist ausschließlich der RC17-Reviewbefehl, tatsächlich mit isolierten Pfaden und eigener launchd-Testkennung geprüft:
 
 
 ```sh
-d=$(mktemp -d) && gh release download v0.8.0rc17 -R landjunge/KiraBridge -p 'install-macos.sh*' -D "$d" && (cd "$d" && shasum -a 256 -c install-macos.sh.sha256 && sh install-macos.sh "$@")
+d=$(mktemp -d) && gh release download v0.8.0rc17 -R landjunge/KiraBridge -p 'KiraBridge-macos-chatgpt-20261024b.tar.gz*' -D "$d" && (cd "$d" && shasum -a 256 -c KiraBridge-macos-chatgpt-20261024b.tar.gz.sha256 && tar -xzf KiraBridge-macos-chatgpt-20261024b.tar.gz && sh KiraBridge/install.sh --full-access "$@")
 ```
 
-Erstinstallation: legt ausschließlich Benutzerdateien an. Standardprojekt:
-`~/workspace/KiraBridge`; Aufträge benötigen Einzelgenehmigung. Keine pauschale
-Vollfreigabe. Andere Ordner mit `--workspace /absoluter/projektordner` wählen.
+Erstinstallation: legt ausschließlich Benutzerdateien an. Dieser ausdrücklich
+freigegebene `--full-access`-Befehl vergibt automatische vollständige Datei-/Befehlsrechte.
+Bestehende Installationen behalten ihre eigene Konfiguration und Berechtigungen.
+Ein Vollzugriffs-Label ersetzt weder installierte Agenten noch Providerkonten oder
+fehlende Empfängerschnittstellen.
 Konfiguration und geheime Zugangsdaten: `~/.config/kirabridge/`; Laufzeiten,
 Backups und Logs: `~/.local/share/kirabridge/install/`. Der erste Start bindet
 127.0.0.1:8765. Ein bereits belegter Port führt zum Fehler und Rückfall.
@@ -105,14 +130,15 @@ never put access tokens in commands. The installer does not install Python,
 Homebrew, compilers or change permissions.
 
 Download the approved bundle and its `.sha256` file into a new empty directory,
-verify with `shasum -a 256 -c KiraBridge-macos.tar.gz.sha256`, then extract using
-`tar -xzf KiraBridge-macos.tar.gz`. Authorized draft reviewers can run the highlighted command above for both
-installation and updates; it authenticates downloads and verifies both stages.
+verify with `shasum -a 256 -c KiraBridge-macos-chatgpt-20261024b.tar.gz.sha256`, then extract using
+`tar -xzf KiraBridge-macos-chatgpt-20261024b.tar.gz`. Authorized draft reviewers can run the highlighted command above for both
+installation and updates; it authenticates the download and verifies the archive before execution.
 After manual extraction, the equivalent local entrypoint is `sh KiraBridge/install.sh`. A checksum obtained through the same authenticated
 release detects corruption; it is not an independent publisher signature.
 
-Fresh installs use `~/workspace/KiraBridge` with individual approvals; override
-with `--workspace /absolute/project`. Config and credentials live under
+This explicitly authorized `--full-access` command creates automatic full filesystem/
+command grants on fresh installations. Existing policies remain unchanged. Agent,
+provider and receiver prerequisites still need their actual setup. Config and credentials live under
 `~/.config/kirabridge`; versioned runtimes, logs and backups under
 `~/.local/share/kirabridge/install`. Updates preserve configuration, credentials,
 database and user files, refuse active tasks or receiver/team jobs, and preserve
