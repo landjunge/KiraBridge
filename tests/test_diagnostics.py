@@ -2,7 +2,7 @@ import asyncio
 import json
 
 import pytest
-from conftest import request
+from conftest import archive_task, request
 from test_mcp import http_bridge  # noqa: F401
 
 from kirabridge.audit_manager import verify
@@ -78,8 +78,7 @@ async def test_task_preflight_preserves_accept_start_distinction_and_returns_rep
 
 def test_historical_report_and_submission_rejection_do_not_invent_execution_runtime(bridge):
     value = request(arguments={"path": "/wrong"})
-    token = bridge.security.grant("local", value)
-    bridge.submit("local", value, token)
+    archive_task(bridge, value, "local")
     bridge.store.claim("synthetic-owner", 30)
     bridge.store.transition(
         value.task_id, "failed", {"safe_to_retry": True}, error={"code": "path_denied"}

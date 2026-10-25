@@ -4,7 +4,7 @@ import sys
 from pathlib import Path
 
 import pytest
-from conftest import request
+from conftest import archive_task, request
 from pydantic import ValidationError
 
 from kirabridge.audit_manager import verify
@@ -20,30 +20,30 @@ async def test_automatic_tasks_execute_once_without_a_token(bridge, config, entr
     root = Path(config.principals["local"].roots[0])
     target = root / "once.txt"
     value = request("file.write", {"path": str(target), "text": "once"})
-    initial = getattr(bridge, entry)("local", value)
-    assert initial["state"] == "queued"
-    assert initial["receipt"] is None and initial["started"] is None
-    assert not target.exists()
-    assert bridge.prepare("local", value)["id"] == value.task_id
-    assert bridge.health("local")["approval_required"] is False
-    assert bridge.health("other")["approval_required"] is True
-    assert bridge.store.db.execute("SELECT count(*) FROM approvals").fetchone()[0] == 0
-    audit = bridge.store.db.execute(
-        "SELECT metadata FROM audit WHERE kind='task.auto_approved'"
-    ).fetchall()
-    assert len(audit) == 1
-    assert json.loads(audit[0][0]) == {
-        "source": "principal_policy",
-        "approval_mode": "automatic",
-        "operation": "file.write",
-        "request_hash": request_hash(value),
-    }
-    with pytest.raises(BridgeError, match="different request"):
-        bridge.prepare(
-            "local",
-            value.model_copy(update={"arguments": {"path": str(target), "text": "changed"}}),
-        )
     async with bridge:
+        initial = getattr(bridge, entry)("local", value)
+        assert initial["state"] == "accepted"
+        assert initial["receipt"] is not None and initial["started"] is None
+        assert not target.exists()
+        assert bridge.prepare("local", value)["id"] == value.task_id
+        assert bridge.health("local")["approval_required"] is False
+        assert bridge.health("other")["approval_required"] is True
+        assert bridge.store.db.execute("SELECT count(*) FROM approvals").fetchone()[0] == 0
+        audit = bridge.store.db.execute(
+            "SELECT metadata FROM audit WHERE kind='task.auto_approved'"
+        ).fetchall()
+        assert len(audit) == 1
+        assert json.loads(audit[0][0]) == {
+            "source": "principal_policy",
+            "approval_mode": "automatic",
+            "operation": "file.write",
+            "request_hash": request_hash(value),
+        }
+        with pytest.raises(BridgeError, match="different request"):
+            bridge.prepare(
+                "local",
+                value.model_copy(update={"arguments": {"path": str(target), "text": "changed"}}),
+            )
         final = await bridge.tasks.wait("local", value.task_id)
         assert final["state"] == "completed" and final["started"] is not None
         assert target.read_text() == "once"
@@ -51,7 +51,6 @@ async def test_automatic_tasks_execute_once_without_a_token(bridge, config, entr
         events = bridge.events("local", value.task_id)["events"]
         assert [event["state"] for event in events] == [
             "created",
-            "queued",
             "accepted",
             "running",
             "completed",
@@ -84,41 +83,43 @@ async def test_automatic_mode_keeps_capability_path_and_executable_limits(bridge
         assert final["error"]["code"] == "executable_denied"
 
 
-def test_manual_default_and_switch_back_restore_individual_approvals(bridge, config):
+async def test_manual_default_and_switch_back_restore_individual_approvals(bridge, config):
     assert PrincipalConfig().approval_mode == "manual"
     for invalid in ["none", "unrestricted", False]:
         with pytest.raises(ValidationError):
             PrincipalConfig(approval_mode=invalid)
     config.principals["local"].approval_mode = "automatic"
     value = request(arguments={"path": config.principals["local"].roots[0]})
-    assert bridge.prepare("local", value)["state"] == "queued"
-    config.principals["local"].approval_mode = "manual"
-    pending = value.model_copy(update={"task_id": "pending", "idempotency_key": "pending"})
-    assert bridge.prepare("local", pending)["state"] == "created"
-    new = value.model_copy(update={"task_id": "new", "idempotency_key": "new"})
-    with pytest.raises(BridgeError, match="one-use"):
-        bridge.submit("local", new)
-    assert bridge.store.get(pending.task_id)["started"] is None
+    async with bridge:
+        assert bridge.prepare("local", value)["state"] == "accepted"
+        config.principals["local"].approval_mode = "manual"
+        pending = value.model_copy(update={"task_id": "pending", "idempotency_key": "pending"})
+        assert bridge.prepare("local", pending)["state"] == "created"
+        new = value.model_copy(update={"task_id": "new", "idempotency_key": "new"})
+        with pytest.raises(BridgeError, match="one-use"):
+            bridge.submit("local", new)
+        assert bridge.store.get(pending.task_id)["started"] is None
 
 
-def test_explicit_tokens_are_still_validated_in_automatic_mode(bridge, config):
+async def test_explicit_tokens_are_still_validated_in_automatic_mode(bridge, config):
     config.principals["local"].approval_mode = "automatic"
     value = request(arguments={"path": config.principals["local"].roots[0]})
-    with pytest.raises(BridgeError, match="one-use"):
-        bridge.submit("local", value, "invalid-token")
-    token = bridge.security.grant("local", value)
-    bridge.submit("local", value, token)
-    assert bridge.store.db.execute("SELECT used FROM approvals").fetchone()[0] is not None
-    second = value.model_copy(update={"task_id": "second", "idempotency_key": "second"})
-    with pytest.raises(BridgeError, match="one-use"):
-        bridge.submit("local", second, token)
+    async with bridge:
+        with pytest.raises(BridgeError, match="one-use"):
+            bridge.submit("local", value, "invalid-token")
+        token = bridge.security.grant("local", value)
+        bridge.submit("local", value, token)
+        assert bridge.store.db.execute("SELECT used FROM approvals").fetchone()[0] is not None
+        second = value.model_copy(update={"task_id": "second", "idempotency_key": "second"})
+        with pytest.raises(BridgeError, match="one-use"):
+            bridge.submit("local", second, token)
 
 
 async def test_automatic_mode_never_reexecutes_an_interrupted_task(bridge, config):
     config.principals["local"].approval_mode = "automatic"
     target = Path(config.principals["local"].roots[0]) / "must-not-write"
     value = request("file.write", {"path": str(target), "text": "no"})
-    bridge.prepare("local", value)
+    archive_task(bridge, value, "local")
     bridge.store.claim("previous-worker", 30)
     bridge.store.transition(value.task_id, State.RUNNING, {"external_start_observed": True})
     async with bridge:
@@ -151,7 +152,7 @@ async def test_real_stdio_automatic_mode_and_optional_token(tmp_path):
         for tool in ["task_request", "task_submit"]:
             value = request(arguments={"path": str(root)}, task_id=tool)
             initial = await clients.call("auto", tool, {"request": value.model_dump()})
-            assert not initial.isError and initial.structuredContent["state"] == "queued"
+            assert not initial.isError and initial.structuredContent["state"] == "accepted"
             async with asyncio.timeout(10):
                 while True:
                     final = (

@@ -3,6 +3,17 @@
 import re
 
 
+def idle_shell(row):
+    processes = row.get("processes", [])
+    return (
+        row.get("transport") == "terminal_app"
+        and row.get("busy") is False
+        and len(processes) == 1
+        and processes[0].get("pid") == row.get("expected_pid")
+        and processes[0]["name"].lstrip("-") in {"zsh", "bash", "sh"}
+    )
+
+
 def empty_shell_prompt(text):
     # Only the ordinary zsh/bash prompt is supported. A busy/unknown/input-filled
     # prompt is not an invitation to press Return or clear somebody else's input.

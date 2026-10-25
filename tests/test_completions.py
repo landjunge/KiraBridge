@@ -6,7 +6,7 @@ import sys
 from pathlib import Path
 
 import pytest
-from conftest import request
+from conftest import archive_task, request
 from test_agents import fake_cli
 from test_mcp import http_bridge  # noqa: F401
 from test_messages import channel  # noqa: F401
@@ -37,8 +37,8 @@ def terminal(config, code, task_id="work", timeout=3):
 async def test_immediate_completion_before_listener_and_route_is_atomic(bridge, config):
     automatic(config)
     value = terminal(config, "print('fast result')")
-    bridge.prepare("local", value, completion_target="assistant-session-a")
     async with bridge:
+        bridge.prepare("local", value, completion_target="assistant-session-a")
         await bridge.tasks.wait("local", value.task_id)
         notice = (await bridge.completions.wait("local", "assistant-session-a", wait_seconds=0))[
             "notices"
@@ -67,8 +67,8 @@ async def test_terminal_failure_timeout_and_no_speculative_quota(
 ):
     automatic(config)
     value = terminal(config, code, timeout=timeout)
-    bridge.prepare("local", value)
     async with bridge:
+        bridge.prepare("local", value)
         await bridge.tasks.wait("local", value.task_id)
         payload = bridge.completions.receive("local")["notices"][0]["payload"]
         assert payload["outcome"] == outcome
@@ -79,7 +79,7 @@ async def test_terminal_failure_timeout_and_no_speculative_quota(
 async def test_unknown_recovery_session_then_reconciliation_are_distinct_notices(bridge, config):
     automatic(config)
     value = terminal(config, "print('not actually started')")
-    bridge.prepare("local", value)
+    archive_task(bridge, value, "local")
     bridge.store.claim("dead", 10)
     bridge.store.transition("work", State.RUNNING, {"session_id": "owned-session"}, owner="dead")
     assert bridge.store.recover() == 1
@@ -102,7 +102,7 @@ async def test_unknown_recovery_session_then_reconciliation_are_distinct_notices
 
 def test_state_and_notice_roll_back_together(bridge, config, monkeypatch):
     automatic(config)
-    bridge.prepare("local", terminal(config, "pass"))
+    archive_task(bridge, terminal(config, "pass"), "local")
     bridge.store.claim("owner", 10)
     bridge.store.transition("work", State.RUNNING, {"pid": 123}, owner="owner")
     import kirabridge.completion_manager as module
@@ -119,7 +119,6 @@ def test_state_and_notice_roll_back_together(bridge, config, monkeypatch):
 
 
 async def test_cancel_pending_and_terminate_running_produce_cancelled_notice(bridge, config):
-    automatic(config)
     bridge.prepare(
         "local", terminal(config, "pass", task_id="pending"), completion_target="pending"
     )
@@ -127,12 +126,13 @@ async def test_cancel_pending_and_terminate_running_produce_cancelled_notice(bri
     assert bridge.completions.receive("local", "pending")["notices"][0]["payload"]["outcome"] == (
         "cancelled"
     )
-    bridge.prepare(
-        "local",
-        terminal(config, "import time;time.sleep(30)", timeout=10),
-        completion_target="active",
-    )
+    automatic(config)
     async with bridge:
+        bridge.prepare(
+            "local",
+            terminal(config, "import time;time.sleep(30)", timeout=10),
+            completion_target="active",
+        )
         async with asyncio.timeout(5):
             while bridge.store.get("work")["state"] != "running":
                 await asyncio.sleep(0.02)
@@ -173,8 +173,8 @@ async def test_codex_structured_provider_evidence_only(bridge, config, tmp_path,
             "timeout": 3,
         },
     )
-    bridge.prepare("local", value)
     async with bridge:
+        bridge.prepare("local", value)
         await bridge.tasks.wait("local", value.task_id)
         payload = bridge.completions.receive("local")["notices"][0]["payload"]
         assert payload["session_id"] == "SIMULATED-provider-session"
@@ -300,8 +300,8 @@ async def test_simulated_grok_http_status_is_not_quota_diagnosis(
             "timeout": 2,
         },
     )
-    bridge.prepare("local", value)
     async with bridge:
+        bridge.prepare("local", value)
         await bridge.tasks.wait("local", value.task_id)
         payload = bridge.completions.receive("local")["notices"][0]["payload"]
         assert payload["outcome"] == "provider_error"
@@ -333,8 +333,8 @@ async def test_unknown_codex_preserves_observed_structured_error(bridge, config,
             "timeout": 2,
         },
     )
-    bridge.prepare("local", value)
     async with bridge:
+        bridge.prepare("local", value)
         await bridge.tasks.wait("local", value.task_id)
         payload = bridge.completions.receive("local")["notices"][0]["payload"]
         assert payload["state"] == "unknown" and payload["execution_outcome_unknown"]
@@ -421,9 +421,9 @@ async def test_completion_outlives_one_transport_wait_window(
 def test_child_tasks_inherit_originating_assistant_target(bridge, config):
     automatic(config)
     parent = terminal(config, "pass", task_id="origin")
-    bridge.prepare("local", parent, completion_target="originating-session")
+    archive_task(bridge, parent, "local", completion_target="originating-session")
     child = request("terminal.execute", parent.arguments, task_id="child", parent="origin")
-    bridge.prepare("local", child)
+    archive_task(bridge, child, "local")
     route = bridge.store.db.execute(
         "SELECT target FROM completion_routes WHERE task_id='child'"
     ).fetchone()[0]
@@ -473,8 +473,8 @@ time.sleep(30)
             "timeout": 10,
         },
     )
-    bridge.prepare("local", value)
     async with bridge:
+        bridge.prepare("local", value)
         async with asyncio.timeout(5):
             while bridge.store.get(value.task_id)["state"] != "running":
                 await asyncio.sleep(0.02)

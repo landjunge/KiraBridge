@@ -196,8 +196,9 @@ async def test_eve_session_input_standing_grant_bypasses_gate_and_manual_approva
     monkeypatch.setattr(voices.sessions, "selected", selected)
     monkeypatch.setattr(voices.sessions.tmux, "command", command)
     value = request("session.input", {"pane_id": "%1", "expected_pid": 1, "text": "Diktat"})
+    await voices.tasks.start()
     queued = voices.prepare("grok_app", value)
-    assert queued["state"] == State.QUEUED
+    assert queued["state"] == State.ACCEPTED
     assert "input_buffer" not in queued
     await voices.tasks.start()
     try:
@@ -213,23 +214,24 @@ async def test_eve_session_input_standing_grant_bypasses_gate_and_manual_approva
     assert other["state"] == State.CREATED
 
 
-def test_terminal_session_input_is_outside_voice_buffer_policy(voices, config):
+async def test_terminal_session_input_is_outside_voice_buffer_policy(voices, config):
     config.session_input_policy.enabled = True
-    for sender in ["codex", "grok"]:
-        queued = voices.prepare(
-            sender,
-            request(
-                "session.input",
-                {
-                    "pane_id": "%1",
-                    "expected_pid": 1,
-                    "text": "hello",
-                },
-                task_id=sender,
-            ),
-        )
-        assert queued["state"] == State.QUEUED
-        assert "input_buffer" not in queued
+    async with voices:
+        for sender in ["codex", "grok"]:
+            queued = voices.prepare(
+                sender,
+                request(
+                    "session.input",
+                    {
+                        "pane_id": "%1",
+                        "expected_pid": 1,
+                        "text": "hello",
+                    },
+                    task_id=sender,
+                ),
+            )
+            assert queued["state"] == State.ACCEPTED
+            assert "input_buffer" not in queued
 
 
 def test_team_messages_need_no_special_token_and_voice_pair_uses_private_log(voices, config):

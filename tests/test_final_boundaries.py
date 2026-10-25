@@ -1,14 +1,14 @@
 import asyncio
 import sys
 
-from conftest import request, submit
+from conftest import archive_task, request
 
 from kirabridge.bridge_core.models import TerminalInput
 
 
 def test_task_list_pagination_and_principal_isolation(bridge, config):
     for number in range(3):
-        submit(
+        archive_task(
             bridge,
             request(
                 arguments={"path": config.principals["local"].roots[0]}, task_id=f"list-{number}"

@@ -6,6 +6,7 @@ import asyncio
 import json
 import os
 import re
+import shlex
 import sys
 from pathlib import Path
 
@@ -51,6 +52,8 @@ class TerminalAppTransport:
                     if "Selected terminal input changed" in detail
                     else "visible_input_not_empty"
                     if "Selected terminal has existing input" in detail
+                    else "window_contains_other_tabs"
+                    if "Selected window contains other tabs" in detail
                     else "session_busy"
                     if "Selected terminal is busy" in detail
                     else "session_transport_unavailable"
@@ -296,9 +299,15 @@ class TerminalAppTransport:
 
     async def open(self, command):
         return await self.native(
-            'const app=Application("Terminal"); const tab=app.doScript('
+            'const app=Application("Terminal"); '
+            "const previous=app.running() ? app.windows().map(w=>w.id()) : []; "
+            "const tab=app.doScript("
             + json.dumps(command)
-            + "); app.activate(); JSON.stringify({tty:tab.tty(),opened:true});",
+            + "); app.activate(); "
+            + "const owner=app.windows().filter(w=>w.tabs().some(t=>t.tty()===tab.tty()));"
+            + "if(owner.length!==1) throw Error('New window identity unconfirmed');"
+            + "JSON.stringify({tty:tab.tty(),window_id:owner[0].id(),"
+            + "created_window:!previous.includes(owner[0].id()),opened:true});",
             mutation=True,
         )
 
@@ -324,6 +333,44 @@ class TerminalAppTransport:
         if child.returncode or not identity.startswith(str(os.getuid()) + " "):
             raise BridgeError("visible_target_changed", "Selected target process identity changed")
         return identity
+
+    async def close_idle(self, row, identity):
+        """Close an owned single-tab window after native identity and idle checks."""
+        from kirabridge.platform_adapters.shell_prompt import empty_shell_prompt
+
+        if not empty_shell_prompt(await self.read(row["pane_id"])):
+            raise BridgeError("visible_input_not_empty", "Keep window with pending user input")
+        command = f"/bin/ps -p {int(row['expected_pid'])} -o uid=,tty=,lstart="
+        processes = "/bin/ps -t " + shlex.quote(Path(row["tty"]).name) + " -o uid=,pid=,comm="
+        return await self.native(
+            self.native_target(row["pane_id"])
+            + "\nconst host=Application.currentApplication(); host.includeStandardAdditions=true;"
+            + "\nconst observed=host.doShellScript("
+            + json.dumps(command)
+            + ").trim().replace(/\\s+/g,' ');"
+            + "\nif(observed!=="
+            + json.dumps(identity)
+            + ") throw Error('Selected target identity changed');"
+            + "\nconst members=host.doShellScript("
+            + json.dumps(processes)
+            + r").trim().split(/[\r\n]+/).map(l=>l.trim().match(/^(\d+)\s+(\d+)\s+(.+)$/));"
+            + "\nif(members.some(p=>!p || !((p[1]==='0' && /(^|\\/)login$/.test(p[3])) || "
+            + "(p[1]==="
+            + json.dumps(identity.split()[0])
+            + " && p[2]==="
+            + json.dumps(str(row["expected_pid"]))
+            + " && /(^|\\/)-?(zsh|bash|sh)$/.test(p[3]))))) "
+            + "throw Error('Selected terminal is busy');"
+            + "\nif(tab.busy()) throw Error('Selected terminal is busy');"
+            + "\nconst last=tab.contents().replace(/\\n+$/,'').split('\\n').pop()"
+            + ".replace(/\\r$/,'');"
+            + "\nif(!last.endsWith('KiraBridge visible % ') && "
+            + "!/^[^\\n%$#]{1,240}[%$#] $/.test(last)) "
+            + "throw Error('Selected terminal has existing input');"
+            + "\nif(wins[0].tabs().length!==1) throw Error('Selected window contains other tabs');"
+            + "\napp.close(wins[0], {saving:'no'}); JSON.stringify({closed:true});",
+            mutation=True,
+        )
 
     async def send_confirmed(self, row, text, identity):
         """Check process start time/UID/TTY and empty input in the same native dispatch."""

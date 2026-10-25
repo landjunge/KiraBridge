@@ -9,7 +9,7 @@ import time
 
 import httpx
 import pytest
-from conftest import request
+from conftest import archive_task, request
 
 from kirabridge.event_push import (
     EVENT_NAME,
@@ -85,7 +85,7 @@ async def finish(push, bridge, config, *, task="task-1", code=0):
     config.principals["local"].approval_mode = "automatic"
     sub = await subscribe(push, task)
     value = request(arguments={"path": config.principals["local"].roots[0]}, task_id=task)
-    bridge.prepare("local", value, completion_target=push.binding(task, sub["id"]))
+    archive_task(bridge, value, completion_target=push.binding(task, sub["id"]))
     bridge.store.claim("test", 10)
     from kirabridge.bridge_core.models import State
 

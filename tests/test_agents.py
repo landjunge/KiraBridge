@@ -32,8 +32,8 @@ print(json.dumps({'type':'turn.completed'}),flush=True)
         kind="codex", executable=fake_cli(tmp_path, body), sandbox_mode=mode
     )
     value = agent_request(config)
-    submit(bridge, value)
     async with bridge:
+        submit(bridge, value)
         final = await bridge.tasks.wait("local", value.task_id)
     assert final["state"] == "completed"
     argv = json.loads(final["result"]["text"])
@@ -62,8 +62,8 @@ async def test_codex_write_mode_does_not_grant_a_foreign_working_directory(
     )
     value = agent_request(config)
     value.arguments["cwd"] = str(tmp_path.parent)
-    submit(bridge, value)
     async with bridge:
+        submit(bridge, value)
         final = await bridge.tasks.wait("local", value.task_id)
     assert final["state"] == "failed" and final["started"] is None
     assert final["error"]["code"] == "path_denied"
@@ -102,8 +102,8 @@ async def test_codex_requires_completion_event(bridge, config, tmp_path, ending,
         body += "\nprint(" + repr(ending) + ",flush=True)\n"
     config.agents["codex"] = AgentConfig(kind="codex", executable=fake_cli(tmp_path, body))
     value = agent_request(config)
-    submit(bridge, value)
     async with bridge:
+        submit(bridge, value)
         final = await bridge.tasks.wait("local", value.task_id)
         assert final["state"] == expected
         assert final["agent"] == "codex"
@@ -123,8 +123,8 @@ async def test_codex_rejects_session_identity_change(bridge, config, tmp_path):
         body += f"print({json.dumps(json.dumps(event))},flush=True)\n"
     config.agents["codex"] = AgentConfig(kind="codex", executable=fake_cli(tmp_path, body))
     value = agent_request(config)
-    submit(bridge, value)
     async with bridge:
+        submit(bridge, value)
         final = await bridge.tasks.wait("local", value.task_id)
         assert final["state"] == "unknown"
         assert final["error"]["code"] == "agent_identity"
@@ -133,8 +133,8 @@ async def test_codex_rejects_session_identity_change(bridge, config, tmp_path):
 async def test_agent_identity_permission_is_independent(bridge, config):
     config.principals["local"].agents = ["codex"]
     value = agent_request(config, name="grok")
-    submit(bridge, value)
     async with bridge:
+        submit(bridge, value)
         final = await bridge.tasks.wait("local", value.task_id)
         assert final["state"] == "failed" and final["started"] is None
         assert final["error"]["code"] == "agent_denied"
@@ -166,8 +166,8 @@ for line in sys.stdin:
 """
     config.agents["grok"] = AgentConfig(kind="grok_acp", executable=fake_cli(tmp_path, body))
     value = agent_request(config, "grok")
-    submit(bridge, value)
     async with bridge:
+        submit(bridge, value)
         final = await bridge.tasks.wait("local", value.task_id)
         assert final["state"] == "completed"
         assert final["result"]["text"] == "Grok result"
@@ -199,8 +199,8 @@ async def test_grok_api_requires_server_completion(bridge, config, monkeypatch, 
 
     monkeypatch.setattr("kirabridge.agent_manager.httpx.AsyncClient", client)
     value = agent_request(config, "grok")
-    submit(bridge, value)
     async with bridge:
+        submit(bridge, value)
         final = await bridge.tasks.wait("local", value.task_id)
         assert final["state"] == expected
         assert len(calls) == 1
@@ -227,8 +227,8 @@ async def test_grok_transport_failure_is_never_retried(bridge, config, monkeypat
         lambda **kwargs: original(**kwargs, transport=httpx.MockTransport(handler)),
     )
     value = agent_request(config, "grok")
-    submit(bridge, value)
     async with bridge:
+        submit(bridge, value)
         final = await bridge.tasks.wait("local", value.task_id)
         assert final["state"] == "unknown"
         assert count == 1

@@ -68,8 +68,8 @@ async def test_each_new_provider_requires_the_authenticated_principals_agent_gra
     # A known configured provider and an approved task do not grant agent identity.
     config.principals["local"].agents = []
     value = provider_request(config, name)
-    submit(bridge, value)
     async with bridge:
+        submit(bridge, value)
         final = await bridge.tasks.wait("local", value.task_id)
     assert final["state"] == "failed" and final["started"] is None
     assert final["error"]["code"] == "agent_denied"
@@ -84,8 +84,8 @@ async def test_private_provider_workspace_does_not_bypass_original_cwd_scope(
     config.principals["local"].agents = [name]
     value = provider_request(config, name)
     value.arguments["cwd"] = str(tmp_path)
-    submit(bridge, value)
     async with bridge:
+        submit(bridge, value)
         final = await bridge.tasks.wait("local", value.task_id)
     assert final["state"] == "failed" and final["started"] is None
     assert final["error"]["code"] == "path_denied"
@@ -130,20 +130,20 @@ async def test_provider_turn_is_idempotent_owned_and_evidenced_end_to_end(
     configured_agent(config, "opencode", opencode_fixture(tmp_path, counter))
     config.principals["local"].agents = ["opencode"]
     value = provider_request(config)
-    initial = submit(bridge, value)
-    assert initial["state"] == "queued"
-    assert initial["receipt"] is None and initial["started"] is None
-    assert bridge.submit("local", value, "approval-already-consumed")["id"] == initial["id"]
-    changed = provider_request(config, prompt="Different payload must not reuse this key")
-    with pytest.raises(BridgeError) as conflict:
-        submit(bridge, changed)
-    assert conflict.value.code == "idempotency_conflict"
-    for access in (bridge.task, bridge.events):
-        with pytest.raises(BridgeError) as foreign:
-            access("other", value.task_id)
-        assert foreign.value.code == "not_found"
-
     async with bridge:
+        initial = submit(bridge, value)
+        assert initial["state"] == "accepted"
+        assert initial["receipt"] is not None and initial["started"] is None
+        assert bridge.submit("local", value, "approval-already-consumed")["id"] == initial["id"]
+        changed = provider_request(config, prompt="Different payload must not reuse this key")
+        with pytest.raises(BridgeError) as conflict:
+            submit(bridge, changed)
+        assert conflict.value.code == "idempotency_conflict"
+        for access in (bridge.task, bridge.events):
+            with pytest.raises(BridgeError) as foreign:
+                access("other", value.task_id)
+            assert foreign.value.code == "not_found"
+
         final = await bridge.tasks.wait("local", value.task_id)
         assert bridge.submit("local", value, "")["state"] == "completed"
         states = [event["state"] for event in bridge.events("local", value.task_id)["events"]]
@@ -161,5 +161,5 @@ async def test_provider_turn_is_idempotent_owned_and_evidenced_end_to_end(
     assert evidence["requested_cwd_validated"] and not evidence["requested_workspace_access"]
     assert counter.read_text() == "x"
     assert not bridge.terminal.sessions
-    assert states[0:3] == ["created", "queued", "accepted"]
+    assert states[:2] == ["created", "accepted"] and "queued" not in states
     assert "running" in states and states[-1] == "completed"

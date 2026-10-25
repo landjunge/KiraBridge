@@ -182,6 +182,10 @@ class Bridge:
                 ),
             )
         )
+        from kirabridge.window_lifecycle import OwnedWindows
+
+        self.owned_windows = OwnedWindows(self.store, self.sessions)
+        self.sessions.lifecycle = self.owned_windows
         self.visible_terminal = VisibleTerminal(
             config, self.security, self.sessions, self.terminal.environment
         )
@@ -238,7 +242,7 @@ class Bridge:
     ) -> dict:
         try:
             self.validate(request)
-            return self.tasks.enqueue(
+            return self.tasks.admit(
                 principal, request, approval, completion_target=completion_target
             )
         except BridgeError as exc:
@@ -250,7 +254,7 @@ class Bridge:
     ) -> dict:
         try:
             self.validate(request)
-            return self.tasks.enqueue(
+            return self.tasks.admit(
                 principal, request, "", pending=True, completion_target=completion_target
             )
         except BridgeError as exc:
@@ -286,8 +290,8 @@ class Bridge:
             "discovery": snapshot(self, principal),
             "version": __version__,
             "api_version": API_VERSION,
-            "dispatcher_active": bool(self.tasks.workers)
-            and all(not worker.done() for worker in self.tasks.workers),
+            "dispatcher_active": self.tasks.started,
+            "dispatch_mode": "direct",
             "chatgpt_integration": "unverified",
             "task_submission": {
                 "events_subscription_required": False,
@@ -333,9 +337,7 @@ class Bridge:
             "output_history": self.outputs.status(),
             "diagnostics_storage": self.diagnostics.status(),
             "message_peers": policy.message_peers,
-            "message_receiver_active": bool(
-                self.message_receiver.worker and not self.message_receiver.worker.done()
-            ),
+            "message_receiver_active": bool(self.message_receiver.direct.accepting),
             "message_receiver_scope": "bridge_dispatcher_for_configured_receivers",
         }
 
@@ -624,7 +626,7 @@ class Bridge:
         return {
             "principal": principal,
             **evidence,
-            "dispatcher_active": bool(self.tasks.workers),
+            "dispatcher_active": self.tasks.started,
             "permission_scope": "same_for_all_devices_and_modes",
         }
 
@@ -662,10 +664,12 @@ class Bridge:
         try:
             self.record_runtime_load()
             await self.message_receiver.start()
+            await self.owned_windows.start()
             await self.team_dispatcher.start()
         except BaseException:
             await self.team_dispatcher.stop()
             await self.message_receiver.stop()
+            await self.owned_windows.stop()
             await self.tasks.stop()
             raise
         return self
@@ -676,6 +680,7 @@ class Bridge:
                 await self.team_dispatcher.stop()
             finally:
                 await self.message_receiver.stop()
+                await self.owned_windows.stop()
         finally:
             await self.tasks.stop()
             await self.threaddesk.close()

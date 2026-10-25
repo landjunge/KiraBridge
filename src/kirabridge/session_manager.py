@@ -59,6 +59,7 @@ class SessionManager:
         self.environment, self.agent_registry = ports.environment, ports.agent_registry
         self.readiness = ports.readiness
         self.lock = asyncio.Lock()
+        self.lifecycle = None
         self._selection = ContextVar("kirabridge_visible_selection", default=None)
         self.terminal_app = (
             terminal_app if terminal_app is not None else TerminalAppTransport(ports.clipboard_lock)
@@ -412,6 +413,38 @@ class SessionManager:
         if argv and not self.direct(principal):
             command += " && " + shlex.join(argv)
         async with self.lock:
+            # Exact empty shells can be reused; never repurpose an agent/editor.
+            from kirabridge.platform_adapters.shell_prompt import empty_shell_prompt, idle_shell
+
+            for row in (await self.catalog(principal)).get("sessions", []):
+                if not idle_shell(row) or (
+                    self.lifecycle and self.lifecycle.is_reserved(row["pane_id"], task_id)
+                ):
+                    continue
+                view = await self.read(principal, row["pane_id"], row["expected_pid"])
+                if not empty_shell_prompt(view["text"]):
+                    continue
+                self.authorization.principal(principal, "session.input")
+                self.authorization.check_window(principal, task_id, args, creating=False)
+                if self.lifecycle:
+                    self.lifecycle.reserve(task_id, row["pane_id"])
+                try:
+                    if argv:
+                        identity = await self.terminal_app.process_identity(row["expected_pid"])
+                        reuse_command = command
+                        if self.direct(principal):
+                            reuse_command += " && " + shlex.join(argv)
+                        await self.terminal_app.send_confirmed(row, reuse_command, identity)
+                except BaseException:
+                    self.authorization.window_outcome(principal, task_id, "reuse_unknown")
+                    raise
+                self.authorization.window_outcome(principal, task_id, "reused")
+                return {**row, "opened": False, "reused": True, "agent_processed": False}
+            if self.lifecycle and self.lifecycle.creation_blocked():
+                raise BridgeError(
+                    "window_reconciliation_required",
+                    "Prior window close is unconfirmed; no new window",
+                )
             self.authorization.check_window(principal, task_id, args)
             try:
                 result = await self.terminal_app.open(command)
@@ -419,10 +452,24 @@ class SessionManager:
                 self.authorization.window_outcome(principal, task_id, "unknown")
                 raise
             self.authorization.window_outcome(principal, task_id, "opened")
+            registered = False
             for _ in range(20):
                 sessions = await self.terminal_app.catalog()
                 selected = next((s for s in sessions if s["tty"] == result["tty"]), None)
                 if selected:
+                    if (
+                        self.lifecycle
+                        and task_id
+                        and not registered
+                        and result.get("created_window") is True
+                        and result.get("window_id") == selected.get("window_id")
+                    ):
+                        try:
+                            await self.lifecycle.register(principal, task_id, selected)
+                        except BaseException:
+                            self.authorization.window_outcome(principal, task_id, "unknown")
+                            raise
+                        registered = True
                     if self.direct(principal) and argv:
                         from kirabridge.platform_adapters.shell_prompt import empty_shell_prompt
 

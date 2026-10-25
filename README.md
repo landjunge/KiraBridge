@@ -10,6 +10,15 @@
 
 [English](#english) · [Deutsch](#deutsch) · [Published / Veröffentlicht RC14](https://github.com/landjunge/KiraBridge/releases/tag/v0.8.0rc14)
 
+## RC17 direct-dispatch repair · 25 October 2026
+
+Current development replaces core execution backlogs with immediate admission and
+explicit busy/unknown outcomes, refreshes safe session bindings, and reuses free
+shells with ownership-based cleanup of temporary windows. Persistent file-transfer
+activation is verified on the installed RC17; the new dispatch code is not yet
+deployed. [Current evidence, contract and open gates](docs/RC17-DIRECT-DISPATCH-20261025.md).
+Older repair notes below describe their historical acceptance state.
+
 ## Unreleased queue repair / Unveröffentlichte Queue-Reparatur
 
 The current repair branch adds owner-scoped queue inspection/control. It is **not

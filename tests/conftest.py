@@ -48,3 +48,24 @@ def request(operation="file.list", arguments=None, *, task_id="task-1", key=None
 def submit(bridge, value, principal="local"):
     token = bridge.security.grant(principal, value)
     return bridge.submit(principal, value, token)
+
+
+def archive_task(bridge, value, principal="local", **kwargs):
+    """Seed a pre-upgrade journal for read/migration tests; never admit execution.
+
+    Execution tests must start the dispatcher and use submit/prepare instead.
+    """
+    policy = bridge.config.principals[principal]
+    review = policy.model_copy(deep=True)
+    review.approval_mode = "manual"
+    review.permission_level = "ask"
+    review.automatic_operations = []
+    try:
+        bridge.config.principals[principal] = review
+        bridge.prepare(principal, value, **kwargs)
+    finally:
+        bridge.config.principals[principal] = policy
+    from kirabridge.bridge_core.models import State
+
+    bridge.store.transition(value.task_id, State.QUEUED, {"legacy_fixture": True})
+    return bridge.store.get(value.task_id, principal)

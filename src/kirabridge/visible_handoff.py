@@ -101,9 +101,12 @@ class VisibleHandoffs:
                 "state TEXT NOT NULL,created REAL NOT NULL,updated REAL NOT NULL,"
                 "evidence TEXT NOT NULL)"
             )
+            index = store.db.execute("PRAGMA index_info(visible_target_active)").fetchall()
+            if index and [row[2] for row in index] != ["target", "binding"]:
+                store.db.execute("DROP INDEX visible_target_active")
             store.db.execute(
                 "CREATE UNIQUE INDEX IF NOT EXISTS visible_target_active "
-                "ON visible_handoffs(target) "
+                "ON visible_handoffs(target,binding) "
                 "WHERE state IN ('planned','inserting','inserted','submitting',"
                 "'return_sent','sent','confirmed')"
             )
@@ -263,9 +266,15 @@ class VisibleHandoffs:
     @staticmethod
     def independent_unknown_paste(row, binding, task_id):
         """A different resource is not reconciliation or replay of the old handoff."""
+        if row["state"] != "unknown" or row["id"] == task_id:
+            return False
+        return VisibleHandoffs.independent_resource(row, binding, task_id)
+
+    @staticmethod
+    def independent_resource(row, binding, task_id):
         from kirabridge.bridge_core.config import VisibleTerminalBinding
 
-        if row["state"] != "unknown" or row["id"] == task_id:
+        if row["id"] == task_id:
             return False
         try:
             original = VisibleTerminalBinding.model_validate_json(row["binding"])
@@ -292,12 +301,13 @@ class VisibleHandoffs:
         *,
         busy_message="Existing handoff must finish or reconcile",
         explicit_paste_task_id=None,
+        new_request_id=None,
     ):
         """Keep the input lock until authenticated receipt and verified target readiness."""
-        if explicit_paste_task_id is not None:
+        if explicit_paste_task_id is not None or new_request_id is not None:
             selection = self.sessions.current_selection()
             if (
-                not explicit_paste_task_id
+                not (explicit_paste_task_id or new_request_id)
                 or not selection
                 or selection[0] != target
                 or selection[1] != binding
@@ -320,6 +330,10 @@ class VisibleHandoffs:
             (target,),
         ).fetchall()
         for row in active:
+            if new_request_id is not None and self.independent_resource(
+                row, binding, new_request_id
+            ):
+                continue  # Different verified native resource; original evidence is untouched.
             if explicit_paste_task_id is not None and self.independent_unknown_paste(
                 row, binding, explicit_paste_task_id
             ):
@@ -526,7 +540,26 @@ class VisibleHandoffs:
             raise BridgeError("agent_denied", "Selected agent is not granted to this identity")
         for capability in ("agent.execute", "session.inspect", "session.input", "terminal.execute"):
             self.security.principal(task["principal"], capability)
-        binding = binding_override or self.config.visible_handoffs.bindings.get(args.agent)
+        binding = binding_override or task.get("selected_binding")
+        if binding is None:
+            existing = self.store.db.execute(
+                "SELECT binding FROM visible_handoffs WHERE id=?", (task["id"],)
+            ).fetchone()
+            if existing:
+                import json
+
+                from kirabridge.bridge_core.config import VisibleTerminalBinding
+
+                binding = VisibleTerminalBinding.model_validate(json.loads(existing[0]))
+            else:
+                from kirabridge.session_resolution import resolve
+
+                binding = await resolve(
+                    self.sessions,
+                    self.config.visible_handoffs.bindings,
+                    task["principal"],
+                    args.agent,
+                )
         if binding is None:
             raise BridgeError(
                 "visible_target_missing", "Bind an exact existing visible CLI terminal"
@@ -580,6 +613,12 @@ class VisibleHandoffs:
                 target,
                 binding,
                 busy_message="Another handoff owns this terminal; reconcile it first",
+                new_request_id=identifier
+                if (
+                    self.sessions.current_selection()
+                    and isinstance(self.sessions.current_selection()[2], dict)
+                )
+                else None,
             )
             if "KB-END-" + digest(identifier)[:12] in before["text"]:
                 raise BridgeError(
@@ -603,12 +642,12 @@ class VisibleHandoffs:
             with self.store.transaction():
                 self.store.assert_accepting(continuation_id=identifier, owned_execution=True)
                 active = self.store.db.execute(
-                    "SELECT id FROM visible_handoffs WHERE target=? AND state IN "
+                    "SELECT id,state,binding FROM visible_handoffs WHERE target=? AND state IN "
                     "('planned','inserting','inserted','submitting','return_sent',"
                     "'sent','confirmed')",
                     (target,),
-                ).fetchone()
-                if active:
+                ).fetchall()
+                if any(not self.independent_resource(row, binding, identifier) for row in active):
                     raise BridgeError(
                         "visible_target_busy",
                         "Another handoff owns this terminal; reconcile it first",

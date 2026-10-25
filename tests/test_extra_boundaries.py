@@ -25,8 +25,8 @@ async def test_children_are_killed_when_parent_exits(bridge, config):
             "timeout": 3.0,
         },
     )
-    submit(bridge, value)
     async with bridge:
+        submit(bridge, value)
         final = await bridge.tasks.wait("local", value.task_id, 10)
         assert final["result"]["timed_out"]
         pid = int(final["result"]["stdout"].strip())
@@ -43,8 +43,8 @@ async def test_children_are_killed_when_parent_exits(bridge, config):
 async def test_state_database_is_excluded_even_inside_allowed_root(bridge, config):
     config.principals["local"].roots = [str(config.state_path.parent)]
     value = request("file.read", {"path": str(config.state_path / "bridge.sqlite3")})
-    submit(bridge, value)
     async with bridge:
+        submit(bridge, value)
         final = await bridge.tasks.wait("local", value.task_id)
         assert final["state"] == "failed" and final["started"] is None
         assert final["error"]["code"] == "path_denied"

@@ -1,0 +1,116 @@
+{
+  "date": "2026-10-25",
+  "branch": "fix/direct-dispatch-file-activation-20261025",
+  "base_commit": "7e3b8a305aa97cc1a859552a38f77d2893cd6617",
+  "source_manifest_sha256": "315bcc22e9d57bc2208e6be7786376ed0adbc03a4b9697583f883a6b4d837002",
+  "source_hash_algorithm": "SHA256 of sorted-key JSON list of relative Python paths and individual SHA256 values",
+  "source_files": 121,
+  "initial_local_integration": {
+    "passed": 1094,
+    "failed": 173,
+    "skipped": 54
+  },
+  "subsequent_local_full_sweep": false,
+  "scoped_counts_overlap": true,
+  "final_scoped_passes": {
+    "visible_direct_core": 117,
+    "task_message_migration": 46,
+    "window_ownership": 14,
+    "cli_window_session": 30,
+    "real_threaddesk_adapter": 11,
+    "configuration_authorization": 3,
+    "fixed_tollgate_file_group": 76,
+    "fixed_tollgate_followup": 3
+  },
+  "native": {
+    "owned_test_windows_created": 1,
+    "owned_close_confirmed": true,
+    "other_panes_preserved": true,
+    "native_commands_same_existing_shell": 2,
+    "new_windows_for_repeated_commands": 0,
+    "strict_close_guards_readonly_passed": true,
+    "codex_prompt_delivery_proven": false
+  },
+  "live": {
+    "file_transfer_enabled": true,
+    "restarts_verified": 2,
+    "authenticated_inventory_successes": 2,
+    "registered_sources": 0,
+    "transfers": 0,
+    "complete_library_inventory_claimed": false,
+    "unstarted_messages_withdrawn": 5,
+    "new_dispatch_code_installed": false,
+    "new_receiver_probe_exposed": false,
+    "config_sha256": "998d933c4d57e1afdd928b9f0eafd41dfc87f3d541177a93c2dbb5a475623daa"
+  },
+  "historical_library": {
+    "expected": 275,
+    "imported": 0,
+    "missing_bytes": 267,
+    "sensitive_restricted": 8
+  },
+  "private_log_hashes": {
+    "kirabridge-direct-receiver-contract.log": {
+      "sha256": "128634987e9e723e0874fb345a7cbd3db6be24d0e7e9c7db00c611c4b277f989",
+      "bytes": 100
+    },
+    "kirabridge-direct-optional-gates.log": {
+      "sha256": "63f117cdbbadaca31a25206a07ffe7e5c8526474f7e7d3df808ad9ba8758e230",
+      "bytes": 2929
+    },
+    "kirabridge-direct-final-cli-windows.log": {
+      "sha256": "ca4f1d15f1d36ec93ee05efaf09cc7e19eaffa5a1aea75d95773c7d6eed992ef",
+      "bytes": 100
+    },
+    "kirabridge-direct-integration-20261025.log": {
+      "sha256": "bdd6e74fc810d10d5bf336f468ca09082984d1bf5d626e36b68deb03b6c3ba9c",
+      "bytes": 150045
+    },
+    "kirabridge-direct-final-core.log": {
+      "sha256": "b264d304a1413f6a33020258dc561c54de919afac8cdf27b8620734ce50a5c55",
+      "bytes": 180
+    },
+    "kirabridge-direct-migration-final.log": {
+      "sha256": "f18a01e6c48b7288a314e49788140df9a25d107a6630fc91cf3b1f4b477657c3",
+      "bytes": 99
+    },
+    "kirabridge-direct-ownership-final.log": {
+      "sha256": "641baf96b978afe3ce2ca3bf476c5f84e26782b1083bbf8cd3873fc9be97557f",
+      "bytes": 99
+    },
+    "kirabridge-direct-remaining.log": {
+      "sha256": "c5ca91d133ad0039cfb5477137075c89c310bd5c7680975982b981994060ab8b",
+      "bytes": 12191
+    },
+    "kirabridge-direct-optional-recheck.log": {
+      "sha256": "1ecdd1643bc82d14abb7343ca3eb8dd27f3a31e97c6229702f65020cc3f9aa2d",
+      "bytes": 98
+    },
+    "kirabridge-direct-affected-c.log": {
+      "sha256": "41d3be3b50df8cdcfa1c7a5cedbce516822a692dba3859a8ab78bfbc0fa6ebe7",
+      "bytes": 4235
+    },
+    "kirabridge-direct-affected-b.log": {
+      "sha256": "54daaa8750c137927e13e98bad8d0c6e1776602c1a6ee429ef98ef59efa77cfa",
+      "bytes": 1148
+    },
+    "kirabridge-direct-recheck-d.log": {
+      "sha256": "b17ce91f7d9b2d128d913c690b094655cd196f6eef5adce891e4f9c342de3370",
+      "bytes": 933
+    },
+    "kirabridge-direct-affected-a.log": {
+      "sha256": "2ce1737eeaec7789a7e984ec74be3266aacd87901be9596ecf357c2652a69754",
+      "bytes": 9737
+    },
+    "kirabridge-direct-recheck-e.log": {
+      "sha256": "46b1e2cad2d1d93f24c86958cb1dfe6b7e3af1bd143beed0eff93cb928c9e113",
+      "bytes": 110
+    }
+  },
+  "open_gates": [
+    "PR verification and package acceptance",
+    "Selected Codex session positive delivery",
+    "Production package upgrade after gates"
+  ],
+  "notes": "No test counts summed; no unknown replay, full Library import, production code upgrade or check bypass claimed."
+}

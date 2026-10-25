@@ -127,9 +127,10 @@ def idle_guard(config):
         )
         jobs = (
             db.execute(
-                "select count(*) from message_jobs where state in ('queued','running')"
+                "select count(*) from message_jobs where state in ('queued','accepted','running')"
                 + (
-                    " and (state='running' or not exists (select 1 from queue_holds h "
+                    " and (state in ('accepted','running') or not exists "
+                    "(select 1 from queue_holds h "
                     "where h.queue_id='messages' and h.item_id=message_jobs.message_id))"
                     if "queue_holds" in tables
                     else ""

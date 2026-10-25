@@ -175,7 +175,7 @@ async def test_already_claimed_visible_turn_and_return_complete_while_draining(v
     transport["target"] = target
     transport["text"] = "› " if target == "codex" else "╭\n│ ❯ │\n╰"
     bridge.config.messaging.receivers[target] = ReceiverConfig(cwd="/tmp")
-    original = bridge.messages.send(
+    original = bridge.messages._send(
         sender,
         MessageSend(
             recipient=target,
@@ -183,8 +183,12 @@ async def test_already_claimed_visible_turn_and_return_complete_while_draining(v
             idempotency_key="before-barrier",
             body="Already queued work",
             kind="work",
-            dispatch=True,
+            dispatch=False,
         ),
+        visible_internal=True,
+    )
+    bridge.store.db.execute(
+        "INSERT INTO message_jobs(message_id,state) VALUES(?,'accepted')", (original["id"],)
     )
     _, run_id = bridge.message_receiver._claim(original["id"])
     hold_activation(bridge, "draining")
@@ -525,7 +529,10 @@ async def test_real_http_receiver_keeps_original_message_and_exactly_one_agent_r
             )
         ).structuredContent
         assert "message_buffer" not in sent and sent["processing"]
-        assert sent["processing_route"] in {"pending_visible_terminal", "existing_visible_terminal"}
+        assert sent["processing_route"] in {
+            "pending_visible_terminal",
+            "existing_visible_terminal",
+        }, sent["processing"]
         async with asyncio.timeout(5):
             while True:
                 current = bridge.messages.get("chatgpt", sent["id"])

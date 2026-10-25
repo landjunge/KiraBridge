@@ -35,7 +35,10 @@ class TaskManager:
         self.config, self.store, self.security, self.executor = config, store, security, executor
         self.owner = str(uuid.uuid4())
         self.lock = RuntimeLock(config.state_path / "dispatcher.lock.runtime")
-        self.workers: list[asyncio.Task] = []
+        self.started = False
+        from kirabridge.task_manager.direct import DirectAdmission
+
+        self.admission = DirectAdmission(self)
         self.wake = asyncio.Event()
         self.preflight = preflight
         self.runtime = runtime
@@ -44,7 +47,7 @@ class TaskManager:
 
         self.input_policy = SessionInputPolicy(config, store, security)
 
-    def enqueue(
+    def admit(
         self,
         principal: str,
         request: TaskRequest,
@@ -65,6 +68,8 @@ class TaskManager:
         automatic = effective["automatic"] and not approval
         pending = pending and not automatic
         self.input_policy.expire()
+        if self.maintenance:
+            self.maintenance()
         buffered = effective["buffer_enabled"]
         held = effective["buffer_required"]
         if held:
@@ -92,13 +97,18 @@ class TaskManager:
                     raise BridgeError(
                         "completion_route_conflict", "Original return target is fixed"
                     )
-                if approval and self.input_policy.waiting(existing["id"]):
+                if approval and self.store.get(existing["id"])["state"] == State.CREATED:
                     self.store.assert_accepting()
                     if request.task_id != existing["id"]:
                         raise BridgeError("review_conflict", "Use the original buffered task ID")
-                    self.input_policy.release(principal, request, approval)
+                    if self.input_policy.waiting(existing["id"]):
+                        self.input_policy.release(principal, request, approval)
+                    else:
+                        self.security.consume(principal, request, approval)
+                    self.admission.check(request.operation)
                     self._approve_in_transaction(existing["id"], "daniel_token")
-                    self.wake.set()
+                    self._accept(existing["id"])
+                    self.admission.start(existing["id"])
                 return self.store.get(existing["id"], principal)
             self.store.assert_accepting(
                 continuation_id=request.task_id,
@@ -110,15 +120,6 @@ class TaskManager:
                 "SELECT 1 FROM tasks WHERE id=?", (request.task_id,)
             ).fetchone():
                 raise BridgeError("task_id_conflict", "Task identifier is already reserved")
-            lane = OPERATIONS[request.operation].execution_class
-            count = self.store.queued_count(lane)
-            capacity = {
-                "normal": self.config.max_queued,
-                "read": self.config.max_read_queued,
-                "stop": self.config.max_control_queued,
-            }[lane]
-            if count >= capacity:
-                raise BridgeError("queue_full", "Queue capacity reached")
             effective_target = completion_target or "default"
             if request.parent_id:
                 if completion_target is None:
@@ -143,6 +144,17 @@ class TaskManager:
                 )
             if not pending and not automatic:
                 self.security.consume(principal, request, approval)
+            if not pending:
+                # Admission failure rolls the surrounding transaction back, including
+                # a valid one-shot grant. Invalid grants still report their real cause.
+                self.admission.check(request.operation)
+            elif (
+                self.store.db.execute(
+                    "SELECT count(*) FROM tasks WHERE state='created'"
+                ).fetchone()[0]
+                >= self.config.max_queued
+            ):
+                raise BridgeError("review_capacity", "Pending review capacity is exhausted")
             now = time.time()
             self.store.db.execute(
                 "INSERT INTO tasks(id,principal,idem,request_hash,operation,args,agent,parent_id,"
@@ -158,7 +170,7 @@ class TaskManager:
                     if request.operation == "agent.execute"
                     else None,
                     request.parent_id,
-                    State.CREATED if pending else State.QUEUED,
+                    State.CREATED if pending else State.ACCEPTED,
                     now,
                     now,
                     attempt,
@@ -168,9 +180,9 @@ class TaskManager:
                 "INSERT INTO completion_routes(task_id,target) VALUES(?,?)",
                 (request.task_id, effective_target),
             )
-            for state in (State.CREATED,) if pending else (State.CREATED, State.QUEUED):
+            for state in (State.CREATED,) if pending else (State.CREATED, State.ACCEPTED):
                 evidence = {"persisted": True}
-                if state == State.QUEUED and automatic:
+                if state == State.ACCEPTED and automatic:
                     evidence["approval_source"] = "principal_policy"
                 self.store.db.execute(
                     "INSERT INTO events(task_id,at,state,evidence) VALUES(?,?,?,?)",
@@ -179,7 +191,7 @@ class TaskManager:
             if buffered:
                 self.input_policy.stage(request, principal)
             self.store.audit(
-                "task.requested" if pending else "task.queued",
+                "task.requested" if pending else "task.admitted",
                 principal,
                 request.task_id,
                 {
@@ -200,7 +212,9 @@ class TaskManager:
                         "request_hash": request_hash(request),
                     },
                 )
-        self.wake.set()
+        if not pending:
+            self._accept(request.task_id)
+            self.admission.start(request.task_id)
         return self.store.get(request.task_id, principal)
 
     def approve(
@@ -216,6 +230,7 @@ class TaskManager:
             if expected_hash is not None and expected_hash != actual_hash:
                 raise BridgeError("review_conflict", "The reviewed request does not match")
             self.security.principal(task["principal"], task["operation"])
+            self.admission.check(task["operation"])
             if task["state"] != State.CREATED:
                 raise BridgeError("state_conflict", "Only pending requests can be approved")
             if self.input_policy.waiting(task_id):
@@ -231,7 +246,8 @@ class TaskManager:
                 token = self.security.grant_in_transaction(task["principal"], request)
                 self.input_policy.release(task["principal"], request, token, source=source)
             self._approve_in_transaction(task_id, source)
-        self.wake.set()
+        self._accept(task_id)
+        self.admission.start(task_id)
         return self.store.get(task_id)
 
     def _approve_in_transaction(self, task_id, source):
@@ -239,14 +255,14 @@ class TaskManager:
         self.store.assert_accepting(operation=task["operation"])
         now = time.time()
         self.store.db.execute(
-            "UPDATE tasks SET state='queued',updated=? WHERE id=?", (now, task_id)
+            "UPDATE tasks SET state='accepted',updated=? WHERE id=?", (now, task_id)
         )
         self.store.db.execute(
             "INSERT INTO events(task_id,at,state,evidence) VALUES(?,?,?,?)",
             (
                 task_id,
                 now,
-                State.QUEUED,
+                State.ACCEPTED,
                 canonical({"approval_source": source, "local_operator_approved": True}),
             ),
         )
@@ -263,30 +279,56 @@ class TaskManager:
             },
         )
 
+    def _accept(self, identifier):
+        now = time.time()
+        with self.store.transaction():
+            self.store.db.execute(
+                "UPDATE tasks SET state='accepted',accepted=?,updated=?,receipt=?,"
+                "lease_owner=?,lease_until=? WHERE id=?",
+                (
+                    now,
+                    now,
+                    str(uuid.uuid4()),
+                    self.owner,
+                    now + self.config.lease_seconds,
+                    identifier,
+                ),
+            )
+
     async def start(self) -> None:
-        if self.workers:
+        if self.started:
             return
         self.lock.acquire()
         try:
             self.store.recover()
-            self.workers = [
-                asyncio.create_task(self._worker("normal")) for _ in range(self.config.concurrency)
-            ]
-            self.workers.extend(
-                asyncio.create_task(self._worker("read"))
-                for _ in range(self.config.read_concurrency)
-            )
-            # Read traffic never occupies the independently reserved stop worker.
-            self.workers.append(asyncio.create_task(self._worker("stop")))
+            # Legacy backlog is archived, not replayed after restart. Preserve bodies,
+            # idempotency keys, receipts and unknown/running outcome history.
+            for row in self.store.db.execute(
+                "SELECT id,accepted,started,receipt,lease_owner FROM tasks WHERE state='queued'"
+            ).fetchall():
+                observed = any(
+                    row[key] is not None
+                    for key in ("accepted", "started", "receipt", "lease_owner")
+                )
+                self.store.transition(
+                    row[0],
+                    State.UNKNOWN if observed else State.CANCELLED,
+                    {
+                        "reason": "legacy_execution_unconfirmed"
+                        if observed
+                        else "execution_queue_removed",
+                        "automatic_replay": False,
+                        "history_preserved": True,
+                    },
+                )
+            self.started = True
         except BaseException:
             self.lock.release()
             raise
 
     async def stop(self) -> None:
-        for worker in self.workers:
-            worker.cancel()
-        await asyncio.gather(*self.workers, return_exceptions=True)
-        self.workers.clear()
+        self.started = False
+        await self.admission.stop()
         self.lock.release()
 
     async def _heartbeat(self, task_id: str) -> None:
@@ -297,21 +339,6 @@ class TaskManager:
                 "AND state IN ('accepted','running')",
                 (time.time() + self.config.lease_seconds, task_id, self.owner),
             )
-
-    async def _worker(self, lane: str) -> None:
-        while True:
-            self.wake.clear()
-            self.input_policy.expire()
-            if self.maintenance:
-                self.maintenance()
-            task = self.store.claim(self.owner, self.config.lease_seconds, lane)
-            if task is None:
-                try:
-                    await asyncio.wait_for(self.wake.wait(), 2.0)
-                except TimeoutError:
-                    pass
-                continue
-            await self._execute(task)
 
     async def _execute(self, task: dict) -> None:
         heartbeat = asyncio.create_task(self._heartbeat(task["id"]))
@@ -460,7 +487,7 @@ class TaskManager:
             raise BridgeError(
                 "retry_conflict", "Retry must preserve operation/arguments and link its parent"
             )
-        return self.enqueue(principal, request, approval, attempt=original["attempt"] + 1)
+        return self.admit(principal, request, approval, attempt=original["attempt"] + 1)
 
     async def wait(self, principal: str, task_id: str, timeout: float = 30) -> dict:
         async with asyncio.timeout(timeout):

@@ -307,7 +307,7 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
     async def task_submit(
         request: TaskRequest, ctx: Context, approval: str = "", completion_target: str | None = None
     ) -> dict[str, Any]:
-        """Queue a task; automatic mode needs no token, manual mode requires an exact-task grant.
+        """Admit immediately or fail busy; manual mode requires an exact-task grant.
 
         Repeating its idempotency key never executes it twice.
         session.input follows the principal's automatic_operations and optional buffer policy.
@@ -323,6 +323,18 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
         from kirabridge.grok_connector.conversation import result_for_conversation
 
         return await result_for_conversation(bridge, identity(ctx), result)
+
+    @server.tool(annotations=write)
+    async def task_retry(
+        original_id: str, request: TaskRequest, ctx: Context, approval: str = ""
+    ) -> dict[str, Any]:
+        """Explicitly retry only a proven not-started failure, with a new child task ID."""
+
+        def action():
+            bridge.validate(request)
+            return bridge.tasks.retry(identity(ctx), original_id, request, approval)
+
+        return safe(action)
 
     @server.tool(annotations=read)
     async def task_get(task_id: str, ctx: Context) -> dict[str, Any]:
@@ -590,6 +602,17 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
         result = safe(
             lambda: bridge.messages.voice_policy.release(identity(ctx), message_id, token)
         )
+        if not result.get("error") and result.get("processing"):
+            try:
+                await bridge.message_receiver.direct.wait_delivery(result["id"])
+                result = bridge.messages.get(identity(ctx), result["id"])
+            except TimeoutError:
+                result = bridge.messages.get(identity(ctx), result["id"])
+                result["delivery_observation"] = {
+                    "state": "unconfirmed",
+                    "code": "delivery_deadline",
+                    "automatic_retry": False,
+                }
         from kirabridge.grok_connector.conversation import message_for_conversation
 
         return await message_for_conversation(bridge, identity(ctx), result)
@@ -620,6 +643,17 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
                 identity(ctx), message, completion_target=completion_target
             )
         )
+        if not result.get("error") and result.get("processing"):
+            try:
+                await bridge.message_receiver.direct.wait_delivery(result["id"])
+                result = bridge.messages.get(identity(ctx), result["id"])
+            except TimeoutError:
+                result = bridge.messages.get(identity(ctx), result["id"])
+                result["delivery_observation"] = {
+                    "state": "unconfirmed",
+                    "code": "delivery_deadline",
+                    "automatic_retry": False,
+                }
         from kirabridge.grok_connector.conversation import message_for_conversation
 
         return await message_for_conversation(bridge, identity(ctx), result)
@@ -702,20 +736,16 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
                 "receiver_configured": principal in config.messaging.receivers,
                 "receiver_active": bool(
                     principal in config.messaging.receivers
-                    and bridge.message_receiver.worker
-                    and not bridge.message_receiver.worker.done()
+                    and bridge.message_receiver.direct.accepting
                 ),
                 "receiver_status_scope": "authenticated_principal_inbox",
-                "dispatcher_active": bool(
-                    bridge.message_receiver.worker and not bridge.message_receiver.worker.done()
-                ),
+                "dispatcher_active": bool(bridge.message_receiver.direct.accepting),
                 "peer_receivers": {
                     peer: {
                         "receiver_configured": peer in config.messaging.receivers,
                         "receiver_active": bool(
                             peer in config.messaging.receivers
-                            and bridge.message_receiver.worker
-                            and not bridge.message_receiver.worker.done()
+                            and bridge.message_receiver.direct.accepting
                         ),
                     }
                     for peer in policy.message_peers

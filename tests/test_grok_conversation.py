@@ -3,7 +3,7 @@
 import sys
 
 import pytest
-from conftest import request
+from conftest import archive_task, request
 from test_mcp import http_bridge  # noqa: F401
 
 from kirabridge.bridge_core.config import AgentConfig, GrokConnectorConfig, ReceiverConfig
@@ -152,7 +152,7 @@ async def test_terminal_input_delivery_never_claims_a_spoken_agent_reply(
 ):
     configure(config, monkeypatch)
     task = request("session.input", {"pane_id": "%1", "expected_pid": 1, "text": "hello"})
-    bridge.prepare("grok_app", task)
+    archive_task(bridge, task, "grok_app")
     bridge.store.claim("test-worker", 30)
     bridge.store.transition(
         task.task_id, State.RUNNING, {"test": "input started"}, owner="test-worker"
@@ -202,7 +202,7 @@ async def test_chatgpt_submission_contract_is_unchanged(http_bridge, config, mon
         result = (
             await clients.call("chatgpt", "task_request", {"request": value.model_dump()})
         ).structuredContent
-    assert result["state"] == "queued"
+    assert result["state"] == "accepted"
     assert "conversation_return" not in result
 
 

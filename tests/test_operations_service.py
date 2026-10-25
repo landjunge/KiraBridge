@@ -8,7 +8,7 @@ import sys
 from types import SimpleNamespace
 
 import pytest
-from conftest import request
+from conftest import archive_task, request
 
 from kirabridge.bridge_core.bridge import Bridge
 from kirabridge.bridge_core.config import load_config
@@ -113,12 +113,15 @@ async def test_restart_releases_sql_writer_and_blocks_concurrent_submission(oper
     assert result["operations"]["accepting_new_work"]
     assert rig.bridge.store.maintenance_state() is None
     assert len(rig.commands) == 1 and rig.commands[0][-1].endswith("com.kirabridge.bridge")
-    assert (
-        rig.bridge.prepare(
+    await rig.bridge.tasks.start()
+    try:
+        admitted = rig.bridge.prepare(
             "local", request("file.list", {"path": rig.bridge.config.principals["local"].roots[0]})
-        )["state"]
-        == "queued"
-    )
+        )
+        assert admitted["state"] == "accepted"
+        assert (await rig.bridge.tasks.wait("local", admitted["id"]))["state"] == "completed"
+    finally:
+        await rig.bridge.tasks.stop()
 
 
 async def test_drain_finishes_running_task_and_preserves_completion(operations):
@@ -133,8 +136,8 @@ async def test_drain_finishes_running_task_and_preserves_completion(operations):
 
     rig.bridge.tasks.executor = execute
     task = request("file.list", {"path": rig.bridge.config.principals["local"].roots[0]})
-    rig.bridge.prepare("local", task)
     await rig.bridge.tasks.start()
+    rig.bridge.prepare("local", task)
     try:
         await asyncio.wait_for(started.wait(), 2)
         activation = asyncio.create_task(rig.service.activate())
@@ -153,7 +156,7 @@ async def test_drain_finishes_running_task_and_preserves_completion(operations):
 async def test_preexisting_queue_may_drain_but_no_new_task_can_steal_run_id(operations):
     rig = operations
     task = request("file.list", {"path": rig.bridge.config.principals["local"].roots[0]})
-    original = rig.bridge.prepare("local", task)
+    original = archive_task(rig.bridge, task)
     with rig.bridge.store.transaction():
         now = __import__("time").time()
         rig.bridge.store.db.execute(
@@ -181,7 +184,7 @@ async def test_busy_timeout_leaves_original_task_and_config_untouched(operations
     rig = operations
     before = rig.path.read_bytes()
     task = request("file.list", {"path": rig.bridge.config.principals["local"].roots[0]})
-    rig.bridge.prepare("local", task)
+    archive_task(rig.bridge, task)
     rig.bridge.store.claim("busy", 30)
     rig.service.drain_timeout = 0
     with pytest.raises(BridgeError) as error:
@@ -341,14 +344,14 @@ async def test_second_controller_cannot_activate_over_existing_barrier(operation
 def test_owned_stop_can_drain_but_cannot_race_activation(operations):
     rig = operations
     target = request("file.list", {"path": str(rig.path.parent)}, task_id="owned-target")
-    rig.bridge.prepare("local", target)
+    archive_task(rig.bridge, target)
     rig.bridge.store.claim("original-worker", 30)
     now = __import__("time").time()
     rig.bridge.store.db.execute(
         "INSERT INTO activation_runs VALUES('held','draining',?,?,?,NULL)", (now, now, "{}")
     )
     stop = request("process.terminate", {"task_id": target.task_id}, task_id="stop-owned-target")
-    rig.bridge.prepare("local", stop)
+    archive_task(rig.bridge, stop)
     assert rig.bridge.store.claim("control-worker", 30, control=True)["id"] == stop.task_id
     rig.service.update("held", "verifying")
     with pytest.raises(BridgeError) as error:

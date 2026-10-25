@@ -4,7 +4,7 @@ import asyncio
 import json
 import sys
 
-from conftest import request
+from conftest import archive_task, request
 
 from kirabridge.bridge_core.bridge import Bridge
 from kirabridge.bridge_core.config import AgentConfig
@@ -64,9 +64,11 @@ async def stop_queued_first_start(config, monkeypatch, *, foreign=False):
             ),
         )
         await asyncio.wait_for(occupied.wait(), 2)
-        bridge.prepare("local", request("handoff.start", args, task_id="own-first-start"))
+        archive_task(bridge, request("handoff.start", args, task_id="own-first-start"))
         if foreign:
-            bridge.prepare("other", request("handoff.start", args, task_id="foreign-first-start"))
+            archive_task(
+                bridge, request("handoff.start", args, task_id="foreign-first-start"), "other"
+            )
         assert bridge.store.db.execute("SELECT COUNT(*) FROM handoff_bindings").fetchone()[0] == 0
         assert bridge.store.get("own-first-start", "local")["state"] == "queued"
         bridge.prepare(

@@ -6,7 +6,7 @@ import sys
 from types import SimpleNamespace
 
 import pytest
-from conftest import request, submit
+from conftest import archive_task, request
 
 from kirabridge import development_status as status
 from kirabridge.bridge_core.config import AgentConfig
@@ -58,7 +58,7 @@ async def test_agent_status_filters_owned_tasks_and_terminal_without_reading_out
             {"agent": "codex", "prompt": secret, "cwd": config.principals[principal].roots[0]},
             task_id="task-" + principal,
         )
-        submit(bridge, value, principal)
+        archive_task(bridge, value, principal)
         bridge.store.db.execute("UPDATE tasks SET state='running' WHERE id=?", (value.task_id,))
         process = SimpleNamespace(pid=11 if principal == "local" else 12, returncode=None)
         bridge.terminal.sessions[value.task_id] = Session(
@@ -92,7 +92,7 @@ async def test_agent_status_is_capped_and_capability_gated(bridge, config, monke
 
     monkeypatch.setattr(status, "_observe_processes", observe)
     for number in range(105):
-        submit(bridge, request("clipboard.info", task_id=f"bounded-{number}"))
+        archive_task(bridge, request("clipboard.info", task_id=f"bounded-{number}"))
     result = await status.agent_status(bridge, "local")
     assert len(result["managed_tasks"]) == 100 and result["tasks_truncated"]
     config.principals["local"].capabilities.remove("agent.inspect")

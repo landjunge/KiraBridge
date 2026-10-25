@@ -2,7 +2,7 @@ import json
 from types import SimpleNamespace
 
 import pytest
-from conftest import request
+from conftest import archive_task, request
 from starlette.requests import Request
 
 from kirabridge.audit_manager import AuditReader
@@ -61,8 +61,8 @@ def test_task_snapshot_does_not_attach_a_future_task_to_an_old_event(bridge, con
 @pytest.mark.parametrize("final_state", [State.COMPLETED, State.FAILED])
 def test_historical_running_task_hides_later_finished_timestamp(bridge, config, final_state):
     value = request(arguments={"path": config.principals["local"].roots[0]})
-    bridge.prepare("local", value)
-    bridge.tasks.approve(value.task_id)
+    archive_task(bridge, value, "local")
+    pass  # Historical approval is represented by archive_task.
     bridge.store.claim("history", 30)
     bridge.store.transition(value.task_id, State.RUNNING, {"started": True}, owner="history")
     at = bridge.store.get(value.task_id)["started"]

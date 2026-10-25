@@ -4,7 +4,7 @@ import os
 import signal
 import sys
 
-from conftest import request, submit
+from conftest import request
 
 from kirabridge.bridge_core.bridge import Bridge
 from kirabridge.bridge_core.models import State
@@ -31,14 +31,25 @@ async def test_real_dispatcher_sigkill_never_duplicates(tmp_path):
     value = request(
         "terminal.execute", {"argv": [sys.executable, "-c", code], "cwd": str(workspace)}
     )
-    submit(original, value)
+    # The owner process admits the task directly; no pre-start execution queue.
+    owner_script = (
+        "import asyncio,json,sys\n"
+        "from kirabridge.bridge_core.bridge import Bridge\n"
+        "from kirabridge.bridge_core.config import load_config\n"
+        "from kirabridge.bridge_core.models import TaskRequest\n"
+        "async def main():\n"
+        "    async with Bridge(load_config(sys.argv[1])) as bridge:\n"
+        "        task=TaskRequest.model_validate_json(sys.argv[2])\n"
+        "        bridge.submit('local',task,bridge.security.grant('local',task))\n"
+        "        await asyncio.Event().wait()\n"
+        "asyncio.run(main())\n"
+    )
     process = await asyncio.create_subprocess_exec(
         sys.executable,
-        "-m",
-        "kirabridge.cli",
-        "--config",
+        "-c",
+        owner_script,
         str(policy),
-        "serve",
+        value.model_dump_json(),
         stdin=asyncio.subprocess.PIPE,
         stdout=asyncio.subprocess.DEVNULL,
         stderr=asyncio.subprocess.DEVNULL,
@@ -47,11 +58,9 @@ async def test_real_dispatcher_sigkill_never_duplicates(tmp_path):
     child_pid = None
     try:
         async with asyncio.timeout(10):
-            while (
-                original.store.get(value.task_id)["state"] != State.RUNNING
-                or not (workspace / "effect").exists()
-            ):
+            while not (workspace / "effect").exists():
                 await asyncio.sleep(0.01)
+        assert original.store.get(value.task_id)["state"] == State.RUNNING
         child_pid = original.store.get(value.task_id)["evidence"]["pid"]
         process.kill()
         await process.wait()

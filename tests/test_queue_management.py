@@ -3,7 +3,7 @@
 import json
 
 import pytest
-from conftest import request, submit
+from conftest import archive_task, request
 from test_mcp import http_bridge  # noqa: F401 -- real isolated HTTP fixture
 
 from kirabridge.bridge_core.models import BridgeError, canonical
@@ -67,9 +67,9 @@ async def test_cancel_restore_without_delivery_or_duplicate(queues, bridge):
     assert bridge.messages.receive("other")["messages"] == []
     assert queues.entries("local", "messages/other")["entries"] == []
     assert queues.get("local", "messages/other", "one")["state"] == "queued"
-    restored = await queues.control("local", command(queues, "messages/other", "one", "restore"))
-    assert restored["results"][0]["delivery_active"]
-    assert len(bridge.messages.receive("other")["messages"]) == 1
+    with pytest.raises(BridgeError, match="not replayable"):
+        await queues.control("local", command(queues, "messages/other", "one", "restore"))
+    assert not bridge.messages.receive("other")["messages"]
     assert bridge.store.db.execute("select count(*) from messages").fetchone()[0] == 1
     with pytest.raises(BridgeError):
         await queues.control("local", command(queues, "messages/other", "one", "restore"))
@@ -94,7 +94,7 @@ async def test_exact_clear_race_does_not_remove_new_or_foreign(queues, bridge):
 
 async def test_task_lanes_cancel_and_running_unknown_preserved(queues, bridge, config):
     task = request("file.list", {"path": config.principals["local"].roots[0]})
-    submit(bridge, task)
+    archive_task(bridge, task)
     assert queues.entries("local", "tasks/read")["entries"] == []
     # file.list is normal lane; ownership and exact state still apply.
     entry = queues.get("local", "tasks/normal", task.task_id)
@@ -104,7 +104,7 @@ async def test_task_lanes_cancel_and_running_unknown_preserved(queues, bridge, c
     with pytest.raises(BridgeError):
         await queues.control("local", command(queues, "tasks", task.task_id, "restore"))
     second = request("file.list", {"path": config.principals["local"].roots[0]}, task_id="running")
-    submit(bridge, second)
+    archive_task(bridge, second)
     bridge.store.claim("worker", 20)
     result = await queues.control("local", command(queues, "tasks", "running"))
     assert not result["fully_removed"] and not result["execution_stop_claimed"]
@@ -158,6 +158,7 @@ async def test_unknown_handoff_retirement_requires_idle_and_keeps_unknown(queues
 
 
 async def test_manual_grants_require_exact_approval_and_control_lane(queues, bridge, config):
+    await bridge.message_receiver.start()
     message(bridge)
     config.principals["local"].approval_mode = "manual"
     config.principals["local"].permission_level = "ask"
@@ -169,9 +170,10 @@ async def test_manual_grants_require_exact_approval_and_control_lane(queues, bri
     assert pending["state"] == "created"
     # The old queued message is not delivered by this isolated test.
     approved = bridge.security.grant("local", task)
-    bridge.submit("local", task, approved)
-    bridge.tasks.approve(task.task_id)
-    assert bridge.store.claim("control-worker", 20, "stop")["id"] == task.task_id
+    async with bridge:
+        admitted = bridge.submit("local", task, approved)
+        assert admitted["state"] == "accepted"
+        assert (await bridge.tasks.wait("local", task.task_id))["state"] == "completed"
 
 
 def test_queue_catalog_read_has_no_delivery_side_effects(queues, bridge):
@@ -179,24 +181,25 @@ def test_queue_catalog_read_has_no_delivery_side_effects(queues, bridge):
     result = queues.catalog("local")
     assert any(q["queue_id"] == "messages/other" for q in result["queues"])
     assert bridge.messages.get("local", "one")["delivered"] is None
-    assert bridge.messages.events("local", "one")["events"][0]["kind"] == "message.queued"
+    assert bridge.messages.events("local", "one")["events"][0]["kind"] == "message.recorded"
     assert (
         json.loads(bridge.store.db.execute("SELECT evidence FROM message_jobs").fetchone()[0]) == {}
     )
 
 
 async def test_clear_task_queue_through_exact_control_task_excludes_itself(queues, bridge, config):
-    submit(
+    await bridge.tasks.start()
+    await bridge.message_receiver.start()
+    archive_task(
         bridge,
         request("file.list", {"path": config.principals["local"].roots[0]}, task_id="pending"),
     )
     args = command(queues, "tasks", action="clear")
     value = request("queue.control", args.model_dump(), task_id="clear-control")
-    bridge.prepare("local", value)
-    claimed = bridge.store.claim(bridge.tasks.owner, 30, "stop")
-    await bridge.tasks._execute(claimed)
-    assert bridge.store.get("clear-control")["state"] == "completed"
-    assert bridge.store.get("pending")["state"] == "cancelled"
+    async with bridge:
+        bridge.prepare("local", value)
+        assert (await bridge.tasks.wait("local", value.task_id))["state"] == "completed"
+        assert bridge.store.get("pending")["state"] == "cancelled"
 
 
 async def test_withdrawal_frees_capacity_without_deleting_history(queues, bridge, config):
@@ -286,7 +289,11 @@ async def test_actual_http_mcp_queue_cancel_restore_clear_and_owned_stop(
             )
             assert not result.isError
             done = await bridge.tasks.wait("local", f"queue-{index}", 10)
-            assert done["state"] == "completed", done
+            if action == "restore":
+                assert done["state"] == "failed"
+                assert done["error"]["code"] == "execution_queue_removed"
+            else:
+                assert done["state"] == "completed", done
         assert bridge.messages.get("local", "one")["delivered"] is None
         # This is an isolated owned subprocess, never a user's terminal or coding agent.
         task = request(
@@ -330,7 +337,7 @@ async def test_recipient_cannot_reverse_sender_withdrawal(queues, bridge, config
         revision=record["revision"],
         reason="must not override sender",
     )
-    with pytest.raises(BridgeError, match="withdrawing"):
+    with pytest.raises(BridgeError, match="not replayable"):
         await queues.control("other", args)
     assert bridge.messages.receive("other")["messages"] == []
 
@@ -354,7 +361,7 @@ def test_lossless_unicode_content_paging_and_no_silent_truncation(queues, bridge
 
 
 def test_unknown_historical_operation_remains_inspectable(queues, bridge, config):
-    submit(bridge, request("file.list", {"path": config.principals["local"].roots[0]}))
+    archive_task(bridge, request("file.list", {"path": config.principals["local"].roots[0]}))
     bridge.store.db.execute("UPDATE tasks SET operation='legacy.custom' WHERE id='task-1'")
     assert queues.entries("local", "tasks/unknown")["entries"][0]["id"] == "task-1"
     assert any(q["queue_id"] == "tasks/unknown" for q in queues.catalog("local")["queues"])

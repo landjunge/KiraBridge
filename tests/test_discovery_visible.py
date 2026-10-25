@@ -90,7 +90,7 @@ async def test_window_request_uses_existing_full_grant_without_second_local_toke
     )
     assert not decision(config, "local", "session.open")["approval_required"]
     async with bridge:
-        assert bridge.prepare("local", value)["state"] == "queued"
+        assert bridge.prepare("local", value)["state"] == "accepted"
         result = await bridge.tasks.wait("local", value.task_id, 5)
         assert result["state"] == "completed", result
         assert result["result"]["pane_id"] == "terminal:222:ttys022"
@@ -99,6 +99,7 @@ async def test_window_request_uses_existing_full_grant_without_second_local_toke
 
 
 async def test_manual_window_task_waits_for_exact_operator_approval(bridge, config, monkeypatch):
+    config.principals["local"].capabilities.append("session.inspect")
     calls = []
 
     async def opened(command):
@@ -261,7 +262,7 @@ async def test_file_params_descriptor_and_signed_url_never_persist(
                 },
             )
         ).structuredContent
-        assert result["state"] == "queued", result
+        assert result["state"] == "accepted", result
         task = await bridge.tasks.wait("local", "from-file-param", 10)
         assert task["state"] == "completed", task
         assert task["result"]["manifest"]["size"] == len(payload)

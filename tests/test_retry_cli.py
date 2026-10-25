@@ -8,14 +8,39 @@ from conftest import request, submit
 from kirabridge.bridge_core.models import BridgeError
 
 
+async def test_cli_without_daemon_refuses_agent_handoff_before_admission(bridge, config):
+    from kirabridge.cli import run_request
+
+    config.visible_handoffs.enabled = True
+    value = request(
+        "agent.execute",
+        {
+            "agent": "codex",
+            "prompt": "must not reach a terminal",
+            "cwd": config.principals["local"].roots[0],
+        },
+    )
+    with pytest.raises(BridgeError) as refused:
+        await run_request(bridge, "local", value, wait=1, approve=True)
+    assert refused.value.code == "receiver_unavailable"
+    assert not bridge.tasks.started
+    assert bridge.store.db.execute("SELECT count(*) FROM tasks").fetchone()[0] == 0
+    assert (
+        bridge.store.db.execute("SELECT count(*) FROM approvals WHERE used IS NOT NULL").fetchone()[
+            0
+        ]
+        == 0
+    )
+
+
 async def test_retry_only_proven_not_started_and_bounded(bridge, config):
     config.principals["local"].executables = []
     original = request(
         "terminal.execute",
         {"argv": [sys.executable, "-c", "print(1)"], "cwd": config.principals["local"].roots[0]},
     )
-    submit(bridge, original)
     async with bridge:
+        submit(bridge, original)
         first = await bridge.tasks.wait("local", original.task_id)
         assert first["evidence"]["safe_to_retry"]
         for attempt in (2, 3):
@@ -51,8 +76,8 @@ async def test_failure_after_execution_cannot_be_retried(bridge, config):
             "cwd": config.principals["local"].roots[0],
         },
     )
-    submit(bridge, value)
     async with bridge:
+        submit(bridge, value)
         assert (await bridge.tasks.wait("local", value.task_id))["state"] == "failed"
         following = value.model_copy(
             update={"task_id": "again", "idempotency_key": "again", "parent_id": value.task_id}
