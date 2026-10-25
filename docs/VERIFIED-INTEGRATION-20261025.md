@@ -72,3 +72,20 @@ Abnahme der neuen Quelle umetikettiert. Solange Pflichtchecks fehlen, kein
 Mainmerge und keine Veröffentlichung. Produktiv bleibt RC17/012b592, veröffentlicht
 RC14, RC17 Entwurf. Receiverprofil, autorisierter Exportordner und reale Library-
 Übertragung bleiben getrennte offene Voraussetzungen; keine doppelten Altaufträge.
+
+## Tatsächlicher gezielter vServer-Nachweis
+
+Snapshot `308ffbacb9c65e64124751b693b581e69aa93f29` wurde per Git-Bundle in
+einen neuen privaten Ordner des normalen Serverbenutzers übertragen. Mit bestehendem
+uv0.11.6 und eigenem Cache/Temp/Venv bestand der zuvor auf main fehlgeschlagene
+Rewritefall unter **Debian13/Python3.13.5:1passed in0.32s**. Der Quellhash stimmt
+mit dem lokalen Fix überein, Git-Arbeitsbaum blieb sauber, UID1000. Keine laufende
+Runner-Arbeitskopie oder Dienste verändert, keine GitHub-Zugangsdaten kopiert.
+[Quell-/Testbeleg](evidence/verified-linux313-targeted-20261025.json).
+Dies ist bewusst ein einzelner Linuxregressionsnachweis, kein gesamter Actions-Pass.
+Nachfolgende reine Nachweisdokumentation verändert den getesteten Code nicht.
+
+Als Nächstes laufen am finalen Commit die normalen verpflichtenden Linuxchecks
+auf den vorhandenen GitHub-Runnern und der echte Linux-Release-Smoke-Job.
+Erfolgreiche endgültige CI-/Paketresultate werden separat in PR/Whiteboard
+protokolliert; fehlende macOS-Jobs bleiben ein offenes Gate.

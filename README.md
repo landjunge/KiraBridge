@@ -25,11 +25,11 @@ exakten Quellpins und gelten nicht automatisch für diesen integrierten Stand.
 
 The existing Debian vServer runners execute Linux CI. A concrete Python3.13
 rewrite/idle safety regression and the build/smoke contract are repaired locally;
-Linux3.13 and final package checks remain separate gates.
+the targeted Debian/Python3.13 case passed; full CI and final package checks remain separate gates.
 Hosted macOS jobs remain billing-blocked; no skipped or failed gate is a pass.
 Die vorhandenen Debian-Runner führen Linux-CI aus. Ein konkreter Python3.13-
 Rewrite/Idle-Fehler und der Build/Smoke-Vertrag sind lokal gezielt repariert;
-Linux3.13 und finale Paketabnahme stehen noch aus;
+der gezielte Debian/Python3.13-Fall bestand, vollständige CI und finale Paketabnahme stehen noch aus;
 gehostete macOS-Jobs bleiben abrechnungsbedingt blockiert. Kein Pflichtcheck
 wird umgangen. [Latest installed proof](docs/RC17-RESUME-20261025.md) ·
 [Library contract and compatibility](docs/LIBRARY-COMPAT-20261025.md).

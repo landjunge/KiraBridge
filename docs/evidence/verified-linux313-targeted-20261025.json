@@ -1,0 +1,20 @@
+{
+  "source_commit": "308ffbacb9c65e64124751b693b581e69aa93f29",
+  "source_sha256": "bf892abb43d05ff5d54841981a73d98c25d95452caf8c295514c7dfb0dcf8707",
+  "host_os": "Debian13, Linux6.12.101 x86_64",
+  "user_uid": 1000,
+  "python": "3.13.5",
+  "uv": "0.11.6",
+  "test": "tests/test_codex_binding.py::test_body_rewrite_during_scan_never_leaves_reusable_idle_cursor",
+  "result": "1passed in0.32s",
+  "transport": "exact Git bundle into new private user test directory, no GitHub token copied",
+  "source_worktree_clean_after": true,
+  "production_or_runner_worktrees_changed": false,
+  "logs_sha256": {
+    "server-git-status-after.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "server-targeted.log": "1f57a3ace0ee8aa3108c2bade37cdb67631610eae6555ae899cf3f482f7bc944",
+    "server-source-proof.log": "772c0f9a7f6230fd50d477b7576efaa5554586e934b55f9c8f56d8b6ee0dc071",
+    "server-preflight.log": "2fee9bd22256ccc3d01510ba9bf070602090dcc888806535a150d075a7058f1a"
+  },
+  "scope": "targeted necessary regression only; not full GitHub CI, Ubuntu, macOS or package acceptance"
+}
