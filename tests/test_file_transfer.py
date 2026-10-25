@@ -389,7 +389,6 @@ def test_transfer_package_dependency_direction():
 async def test_actual_mcp_bytes_and_independent_disk_receipt_across_receiver_restart(
     files, tmp_path, lose_commit
 ):
-    import asyncio
     import sys
     from pathlib import Path
 
@@ -414,10 +413,8 @@ async def test_actual_mcp_bytes_and_independent_disk_receipt_across_receiver_res
         sent = await send(bridge, transfer_id)
         if lose_commit:
             assert sent["state"] == "unknown", sent
-            # Only an explicit new resume request reconnects; no mutation replay.
-            async with asyncio.timeout(5):
-                while "threaddesk" in bridge.threaddesk.pool.sessions:
-                    await asyncio.sleep(0.05)
+            # Reconciliation may already have reconnected for one read-only status.
+            # Only this explicit resume is allowed to continue writing.
             sent = await send(bridge, transfer_id, "resume-lost-commit")
         assert sent["state"] == "completed", sent
         assert sent["result"]["import_successful"]

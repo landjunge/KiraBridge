@@ -49,8 +49,10 @@ def snapshot(bridge, principal):
             "prepare_permission": decision(bridge.config, principal, "files.prepare"),
             "transfer_permission": decision(bridge.config, principal, "files.transfer"),
             "inspect_permission": decision(bridge.config, principal, "files.inventory"),
-            "receiver_protocol": "kirabridge.threaddesk.files.v1",
-            "receiver_availability": "not_probed"
+            "receiver_protocol": "threaddesk.library.receive.v1",
+            "receiver_availability": getattr(
+                bridge.file_transfers.receiver, "availability", "not_probed"
+            )
             if bridge.config.threaddesk.enabled
             else "disabled",
             "success_condition": (
