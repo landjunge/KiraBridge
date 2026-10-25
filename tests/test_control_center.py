@@ -2,7 +2,7 @@ import json
 
 import httpx
 import pytest
-from conftest import request
+from conftest import archive_task, request
 
 from kirabridge.approval_console import ORIGIN, ApprovalConsole, signed_token
 from kirabridge.bridge_core.config import AgentConfig, Config, PrincipalConfig, load_config
@@ -170,8 +170,8 @@ async def test_restart_refuses_active_work_and_never_kills_terminal(bridge, monk
 
     monkeypatch.setattr(control, "rpc", health)
     task = request(arguments={"path": bridge.config.principals["local"].roots[0]})
-    bridge.prepare("local", task)
-    bridge.tasks.approve(task.task_id)
+    archive_task(bridge, task, "local")
+    pass  # Historical approval is represented by archive_task.
     bridge.store.claim("test-worker", 30)
     commands = []
 
@@ -251,8 +251,8 @@ async def test_protocol_uses_event_time_state_not_later_completion(bridge):
     app = ApprovalConsole(operator_application(bridge), KEY)
     path = bridge.config.principals["local"].roots[0]
     task = request(arguments={"path": path})
-    bridge.prepare("local", task)
-    bridge.tasks.approve(task.task_id)
+    archive_task(bridge, task, "local")
+    pass  # Historical approval is represented by archive_task.
     bridge.store.claim("test-worker", 30)
     bridge.store.transition(task.task_id, State.RUNNING, {"started": True}, owner="test-worker")
     bridge.store.transition(

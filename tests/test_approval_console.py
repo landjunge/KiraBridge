@@ -84,7 +84,7 @@ async def test_approval_executes_once_only_after_review_and_records_local_consol
             endpoint, headers=headers, json={"request_hash": detail["request_hash"]}
         )
         assert result.status_code == 200
-        assert result.json()["task"]["state"] == "queued"
+        assert result.json()["task"]["state"] == "accepted"
         final = await bridge.tasks.wait("other", value.task_id, timeout=5)
         assert final["state"] == "completed" and final["receipt"] and final["finished"]
         replay = await browser.post(
@@ -106,26 +106,31 @@ async def test_approval_executes_once_only_after_review_and_records_local_consol
 async def test_rejection_never_executes_and_cannot_cancel_an_active_task(bridge, config):
     path = str(Path(config.principals["local"].roots[0]) / "not-created.txt")
     value = request("file.write", {"path": path, "text": "must not be written"})
-    bridge.prepare("local", value)
-    app = ApprovalConsole(operator_application(bridge), KEY)
-    async with client(app) as browser:
-        headers = authenticated()
-        detail = (await browser.get("/api/tasks/task-1", headers=headers)).json()
-        result = await browser.post(
-            "/api/tasks/task-1/deny", headers=headers, json={"request_hash": detail["request_hash"]}
-        )
-        assert result.json()["task"]["state"] == "cancelled"
-        assert not Path(path).exists() and bridge.store.get("task-1")["receipt"] is None
-        second = value.model_copy(update={"task_id": "active", "idempotency_key": "active"})
-        bridge.prepare("local", second)
-        bridge.tasks.approve("active")
-        bridge.store.claim("worker", 30)
-        detail = (await browser.get("/api/tasks/active", headers=headers)).json()
-        result = await browser.post(
-            "/api/tasks/active/deny", headers=headers, json={"request_hash": detail["request_hash"]}
-        )
-        assert result.status_code == 409
-        assert bridge.store.get("active")["state"] == "accepted"
+    async with bridge:
+        bridge.prepare("local", value)
+        app = ApprovalConsole(operator_application(bridge), KEY)
+        async with client(app) as browser:
+            headers = authenticated()
+            detail = (await browser.get("/api/tasks/task-1", headers=headers)).json()
+            result = await browser.post(
+                "/api/tasks/task-1/deny",
+                headers=headers,
+                json={"request_hash": detail["request_hash"]},
+            )
+            assert result.json()["task"]["state"] == "cancelled"
+            assert not Path(path).exists() and bridge.store.get("task-1")["receipt"] is None
+            second = value.model_copy(update={"task_id": "active", "idempotency_key": "active"})
+            bridge.prepare("local", second)
+            bridge.tasks.approve("active")
+            bridge.store.claim("worker", 30)
+            detail = (await browser.get("/api/tasks/active", headers=headers)).json()
+            result = await browser.post(
+                "/api/tasks/active/deny",
+                headers=headers,
+                json={"request_hash": detail["request_hash"]},
+            )
+            assert result.status_code == 409
+            assert bridge.store.get("active")["state"] == "accepted"
 
 
 async def test_console_rejects_oversized_and_malformed_decisions(bridge):
@@ -182,16 +187,17 @@ def test_launcher_does_not_trust_an_unrelated_local_listener():
         probe(operator, KEY)
 
 
-def test_cancel_compare_and_transition_is_atomic(bridge, config):
+async def test_cancel_compare_and_transition_is_atomic(bridge, config):
     value = request(arguments={"path": config.principals["local"].roots[0]})
-    bridge.prepare("local", value)
-    bridge.tasks.approve(value.task_id)
-    bridge.store.claim("worker", 30)
-    with pytest.raises(BridgeError):
-        bridge.store.transition(
-            value.task_id,
-            State.CANCELLED,
-            {"reviewed": True},
-            expected_states={State.CREATED, State.QUEUED},
-        )
-    assert bridge.store.get(value.task_id)["state"] == "accepted"
+    async with bridge:
+        bridge.prepare("local", value)
+        bridge.tasks.approve(value.task_id)
+        bridge.store.claim("worker", 30)
+        with pytest.raises(BridgeError):
+            bridge.store.transition(
+                value.task_id,
+                State.CANCELLED,
+                {"reviewed": True},
+                expected_states={State.CREATED, State.QUEUED},
+            )
+        assert bridge.store.get(value.task_id)["state"] == "accepted"

@@ -232,12 +232,12 @@ class ThreadDeskManager:
             if self.observer_factory:
                 self.pool.observer = self.observer_factory(task["principal"])
             await self.connect()
+            # A connected peer can change its catalog without reconnecting.
+            # Refresh before rejecting cached names or sending any declared operation.
+            await self.refresh_catalog()
             if tool not in self.available_tools:
                 raise BridgeError("threaddesk_version", "Peer lacks the declared operation")
             if isinstance(args, ThreadDeskManageInput):
-                await self.refresh_catalog()
-                if tool not in self.available_tools:
-                    raise BridgeError("threaddesk_version", "Peer no longer declares the operation")
                 error = validate_management(values, self.tool_schemas.get("thread_manage"))
                 if error:
                     return {

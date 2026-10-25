@@ -61,24 +61,25 @@ async def finish(bridge, task_id):
 async def test_full_permission_still_buffers_then_separate_token_releases_once(buffered):
     bridge, calls = buffered
     task = value()
-    first = bridge.prepare("local", task)
-    assert first["state"] == State.CREATED
-    assert first["input_buffer"]["state"] == "waiting"
-    assert first["input_buffer"]["expires"] - first["input_buffer"]["created"] == 60
-    assert not calls
-    assert bridge.store.claim("test", 30) is None
-    token = bridge.security.grant("local", task)
-    assert bridge.submit("local", task, token)["state"] == State.QUEUED
-    result = await finish(bridge, task.task_id)
-    assert result["input_buffer"]["state"] == "sent"
-    assert result["result"]["input_handed_to_transport"]
-    assert not result["result"]["agent_processed"]
-    assert calls == [
-        ("send-keys", "-t", "%1", "-l", "--", "hello", ";", "send-keys", "-t", "%1", "Enter")
-    ]
-    assert bridge.submit("local", task, token)["state"] == State.COMPLETED
-    assert len(calls) == 1
-    assert bridge.store.db.execute("SELECT used FROM approvals").fetchone()[0]
+    async with bridge:
+        first = bridge.prepare("local", task)
+        assert first["state"] == State.CREATED
+        assert first["input_buffer"]["state"] == "waiting"
+        assert first["input_buffer"]["expires"] - first["input_buffer"]["created"] == 60
+        assert not calls
+        assert bridge.store.claim("test", 30) is None
+        token = bridge.security.grant("local", task)
+        assert bridge.submit("local", task, token)["state"] == State.ACCEPTED
+        result = await finish(bridge, task.task_id)
+        assert result["input_buffer"]["state"] == "sent"
+        assert result["result"]["input_handed_to_transport"]
+        assert not result["result"]["agent_processed"]
+        assert calls == [
+            ("send-keys", "-t", "%1", "-l", "--", "hello", ";", "send-keys", "-t", "%1", "Enter")
+        ]
+        assert bridge.submit("local", task, token)["state"] == State.COMPLETED
+        assert len(calls) == 1
+        assert bridge.store.db.execute("SELECT used FROM approvals").fetchone()[0]
 
 
 @pytest.mark.parametrize(
@@ -91,12 +92,13 @@ async def test_full_permission_still_buffers_then_separate_token_releases_once(b
 async def test_suffix_persists_buffer_before_immediate_dispatch(buffered, text, expected):
     bridge, calls = buffered
     task = value(text)
-    queued = bridge.prepare("local", task)
-    assert queued["input_buffer"]["release_source"] == "suffix"
-    assert queued["state"] == State.QUEUED
-    await finish(bridge, task.task_id)
-    assert calls[0][5] == expected
-    assert bridge.task("local", task.task_id)["args"]["text"] == text
+    async with bridge:
+        queued = bridge.prepare("local", task)
+        assert queued["input_buffer"]["release_source"] == "suffix"
+        assert queued["state"] == State.ACCEPTED
+        await finish(bridge, task.task_id)
+        assert calls[0][5] == expected
+        assert bridge.task("local", task.task_id)["args"]["text"] == text
 
 
 @pytest.mark.parametrize("text", ["go-go-go then hello", "hello GO-GO-GO", "hello"])
@@ -123,12 +125,13 @@ def test_wrong_token_and_changed_content_cannot_release(buffered):
 
 async def test_local_daniel_approval_issues_and_consumes_separate_token(buffered):
     bridge, calls = buffered
-    bridge.prepare("local", value())
-    bridge.tasks.approve("buffer-1", source="local_console")
-    await finish(bridge, "buffer-1")
-    assert len(calls) == 1
-    assert bridge.store.db.execute("SELECT used FROM approvals").fetchone()[0]
-    assert bridge.task("local", "buffer-1")["input_buffer"]["release_source"] == "local_console"
+    async with bridge:
+        bridge.prepare("local", value())
+        bridge.tasks.approve("buffer-1", source="local_console")
+        await finish(bridge, "buffer-1")
+        assert len(calls) == 1
+        assert bridge.store.db.execute("SELECT used FROM approvals").fetchone()[0]
+        assert bridge.task("local", "buffer-1")["input_buffer"]["release_source"] == "local_console"
 
 
 async def test_real_http_client_buffers_and_releases_with_separate_token(
@@ -163,27 +166,30 @@ async def test_authenticated_console_approval_and_protocol_show_buffer(buffered)
 
     bridge, calls = buffered
     task = value()
-    bridge.prepare("local", task)
-    async with client(ApprovalConsole(operator_application(bridge), KEY)) as browser:
-        detail = (await browser.get("/api/tasks/" + task.task_id, headers=authenticated())).json()
-        assert detail["task"]["input_buffer"]["state"] == "waiting"
-        result = await browser.post(
-            "/api/tasks/" + task.task_id + "/approve",
-            headers=authenticated(),
-            json={"request_hash": detail["request_hash"]},
-        )
-        assert result.status_code == 200
-        await finish(bridge, task.task_id)
-        entries = (await browser.get("/api/control/protocol", headers=authenticated())).json()[
-            "entries"
-        ]
-    assert {entry["kind"] for entry in entries} >= {
-        "session.input.buffered",
-        "session.input.released",
-        "session.input.dispatching",
-        "session.input.sent",
-    }
-    assert len(calls) == 1
+    async with bridge:
+        bridge.prepare("local", task)
+        async with client(ApprovalConsole(operator_application(bridge), KEY)) as browser:
+            detail = (
+                await browser.get("/api/tasks/" + task.task_id, headers=authenticated())
+            ).json()
+            assert detail["task"]["input_buffer"]["state"] == "waiting"
+            result = await browser.post(
+                "/api/tasks/" + task.task_id + "/approve",
+                headers=authenticated(),
+                json={"request_hash": detail["request_hash"]},
+            )
+            assert result.status_code == 200
+            await finish(bridge, task.task_id)
+            entries = (await browser.get("/api/control/protocol", headers=authenticated())).json()[
+                "entries"
+            ]
+        assert {entry["kind"] for entry in entries} >= {
+            "session.input.buffered",
+            "session.input.released",
+            "session.input.dispatching",
+            "session.input.sent",
+        }
+        assert len(calls) == 1
 
 
 def test_timeout_survives_restart_and_cannot_be_revived(buffered, config, monkeypatch):

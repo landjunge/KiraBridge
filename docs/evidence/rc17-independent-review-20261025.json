@@ -1,0 +1,41 @@
+{
+  "date": "2026-10-25",
+  "scope": "Independent read-only audit alongside ongoing implementation; no production or source-code changes",
+  "source_commit": "012b592caa5b6126342f9148f3b38a7d50b00379",
+  "live_pid": 72612,
+  "verified": {
+    "installed_package_files": 127,
+    "four_build_artifacts_identical": true,
+    "artifact_hashes": true,
+    "archive_installer_matches_git_pin": true,
+    "configuration_credentials_contents_modes_preserved": true,
+    "service_options_except_program_arguments_preserved": true,
+    "isolated_test_service_absent": true
+  },
+  "limits": [
+    "Historical database preservation not independently rerun",
+    "Long-read overlaps installer start; exact bootout overlap and EIO root cause unproven",
+    "Harness ignores bootout return code; separate service absence verification required"
+  ],
+  "whiteboard_failed_write": {
+    "task": "independent-review-append-20261025-01",
+    "operation": "KB-INDEPENDENT-REVIEW-20261025-01",
+    "error": {
+      "code": "revision_conflict",
+      "expected_revision": 43,
+      "actual_revision": 46
+    },
+    "operation_status_found": false,
+    "marker_absent_at_revision": 46
+  },
+  "followup_write": {
+    "task": "independent-review-append-20261025-02",
+    "operation": "KB-INDEPENDENT-REVIEW-20261025-02",
+    "expected_revision": 46,
+    "state": "completed",
+    "revision": 47,
+    "independent_exact_readback": true,
+    "marker_occurrences": 1
+  },
+  "obsolete_own_artifact": "dist/resume-20261025/build-a: b9bd622, historical only"
+}

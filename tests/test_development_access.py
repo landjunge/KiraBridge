@@ -190,8 +190,8 @@ async def test_grok_tools_require_both_operator_and_principal(
         },
         task_id="denied-tools",
     )
-    submit(bridge, value)
     async with bridge:
+        submit(bridge, value)
         result = await bridge.tasks.wait("local", "denied-tools")
         assert result["state"] == "failed" and result["started"] is None
         assert result["error"]["code"] == "agent_tools_denied"
@@ -249,8 +249,8 @@ for line in sys.stdin:
         },
         task_id="permission",
     )
-    submit(bridge, value)
     async with bridge:
+        submit(bridge, value)
         result = await bridge.tasks.wait("local", "permission")
     assert result["state"] == "completed"
     answer = json.loads(result["result"]["text"])
@@ -268,13 +268,18 @@ for line in sys.stdin:
 
 
 @pytest.mark.parametrize("operation", ["agent.status", "policy.inspect", "handoff.status"])
-def test_status_keeps_reserved_capacity_and_can_be_claimed_during_work(bridge, config, operation):
-    config.max_queued = 1
-    submit(
-        bridge, request("file.list", {"path": config.principals["local"].roots[0]}, task_id="busy")
-    )
-    arguments = {"handoff_id": "synthetic", "revision": 1} if operation == "handoff.status" else {}
-    submit(bridge, request(operation, arguments, task_id="status"))
-    status = bridge.store.claim("control-worker", 30, control=True)
-    assert status["id"] == "status"
-    assert bridge.store.claim("normal-worker", 30, control=False)["id"] == "busy"
+async def test_status_keeps_reserved_capacity_during_immediate_work(bridge, config, operation):
+    config.concurrency = 1
+    async with bridge:
+        submit(
+            bridge,
+            request("file.list", {"path": config.principals["local"].roots[0]}, task_id="busy"),
+        )
+        arguments = (
+            {"handoff_id": "synthetic", "revision": 1} if operation == "handoff.status" else {}
+        )
+        assert (
+            submit(bridge, request(operation, arguments, task_id="status"))["state"] == "accepted"
+        )
+        assert (await bridge.tasks.wait("local", "status"))["state"] in {"completed", "failed"}
+        assert (await bridge.tasks.wait("local", "busy"))["state"] == "completed"

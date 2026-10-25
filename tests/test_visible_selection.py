@@ -391,7 +391,7 @@ async def test_process_start_identity_is_task_local_and_transport_guarded(visibl
         assert "checkTargetIdentity" in calls[0]
         assert "/bin/zsh" in calls[0] and "/bin/codex" in calls[0]
         assert "ppid=,comm=" in calls[0]
-        before_paste = calls[0].split("paste.click();", 1)[0]
+        before_paste = calls[0].split('paste.actions.byName("AXPress").perform();', 1)[0]
         assert before_paste.rfind("checkTargetIdentity();") < before_paste.rfind("checkFocus();")
         assert before_paste.rfind("checkFocus();") < before_paste.rfind(
             "Selected terminal input changed"
@@ -595,3 +595,110 @@ async def test_paste_only_rejects_denied_agent_or_active_widget_before_input(
         )
     assert failure.value.code == ("agent_denied" if denial == "agent" else "visible_target_working")
     assert not transport["calls"]
+
+
+async def test_observed_read_catalogues_once_per_operation_with_two_argument_readiness(
+    visible,  # noqa: F811
+    monkeypatch,
+):
+    from kirabridge.session_manager import SessionManager
+
+    bridge, _ = visible
+    row = new_row()
+    calls = []
+
+    async def selected(principal, pane, pid):
+        calls.append((principal, pane, pid))
+        return deepcopy(row)
+
+    async def read(pane):
+        return "› "
+
+    monkeypatch.setattr(bridge.sessions, "selected", selected)
+    monkeypatch.setattr(bridge.sessions.terminal_app, "read", read)
+    monkeypatch.setattr(bridge.sessions, "read", SessionManager.read.__get__(bridge.sessions))
+    result = await bridge.sessions.read_observed("chatgpt", row["pane_id"], 900)
+    assert result["input_readiness"]["ready"] is True
+    assert len(calls) == 1
+
+
+async def test_observation_scope_rejects_wrong_handle_identity_task_and_expiration(
+    visible,  # noqa: F811
+    monkeypatch,
+):
+    bridge, _ = visible
+    row = new_row()
+    _, binding = bridge.sessions.explicit_agent_binding(row)
+    calls = []
+
+    async def selected(*args):
+        calls.append(args)
+        return deepcopy(row)
+
+    monkeypatch.setattr(bridge.sessions, "selected", selected)
+    with bridge.sessions.observation_scope("chatgpt", row):
+        captured = bridge.sessions._observation.get()
+        assert await bridge.sessions.observed_selected("chatgpt", row["pane_id"], 900) == row
+        for principal, pane, pid in (
+            ("other", row["pane_id"], 900),
+            ("chatgpt", "terminal:999:ttys999", 900),
+            ("chatgpt", row["pane_id"], 901),
+        ):
+            with pytest.raises(BridgeError) as error:
+                await bridge.sessions.observed_selected(principal, pane, pid)
+            assert error.value.code == "session_observation_changed"
+
+        async def child():
+            with pytest.raises(BridgeError, match="scope changed or expired"):
+                await bridge.sessions.observed_selected("chatgpt", row["pane_id"], 900)
+
+        await asyncio.create_task(child())
+        wrong_agent = binding.model_copy(update={"agent_pid": 902})
+        observation = await bridge.visible_handoffs.binding_readiness(
+            "chatgpt", "codex", wrong_agent, {"text": "› "}
+        )
+        assert observation["state"] == "target_changed" and not observation["ready"]
+        wrong_target = await bridge.visible_handoffs.binding_readiness(
+            "chatgpt", "grok", binding, {"text": "› "}
+        )
+        assert wrong_target["state"] == "target_changed"
+    token = bridge.sessions._observation.set(captured)
+    try:
+        with pytest.raises(BridgeError, match="scope changed or expired"):
+            await bridge.sessions.observed_selected("chatgpt", row["pane_id"], 900)
+    finally:
+        bridge.sessions._observation.reset(token)
+    assert not calls
+    assert await bridge.sessions.observed_selected("chatgpt", row["pane_id"], 900) == row
+    assert len(calls) == 1  # A subsequent operation must select freshly.
+
+
+async def test_check_target_reuses_only_its_fresh_selection_for_read_and_readiness(
+    visible,  # noqa: F811
+    monkeypatch,
+):
+    from kirabridge.session_manager import SessionManager
+
+    bridge, _ = visible
+    row = new_row()
+    _, binding = bridge.sessions.explicit_agent_binding(row)
+    calls = []
+
+    async def selected(*args):
+        calls.append(args)
+        return deepcopy(row)
+
+    async def read(pane):
+        return "› "
+
+    monkeypatch.setattr(bridge.sessions, "selected", selected)
+    monkeypatch.setattr(bridge.sessions.terminal_app, "read", read)
+    monkeypatch.setattr(bridge.sessions, "read", SessionManager.read.__get__(bridge.sessions))
+    assert (await bridge.visible_handoffs.check_target("chatgpt", "codex", binding, ready=True))[
+        "text"
+    ] == "› "
+    assert len(calls) == 1
+    row["processes"][-1]["pid"] = 902
+    with pytest.raises(BridgeError, match="Bound CLI process"):
+        await bridge.visible_handoffs.check_target("chatgpt", "codex", binding, ready=True)
+    assert len(calls) == 2

@@ -12,6 +12,7 @@ import uuid
 from pathlib import Path
 
 from kirabridge.bridge_core.models import BridgeError, TaskRequest, canonical, digest
+from kirabridge.permissions import automatic_for
 from kirabridge.team_manager.models import (
     TeamCreate,
     TeamMessageSend,
@@ -138,7 +139,7 @@ class TeamManager:
     def activation_work_count(self, *, active_only=False, context=None):
         db = context.db if context is not None else self.store.db
         states = (
-            ("accepted", "running", "processing_result")
+            ("dispatching", "accepted", "running", "processing_result")
             if active_only
             else ("queued", "dispatching", "created", "accepted", "running", "processing_result")
         )
@@ -157,6 +158,7 @@ class TeamManager:
         self.bridge = bridge
         self.config, self.store, self.security = bridge.config, bridge.store, bridge.security
         self.wake = asyncio.Event()
+        self.direct_delivery = getattr(bridge, "team_dispatcher", None)
         with self.store.transaction():
             for statement in SCHEMA.split(";"):
                 if statement.strip():
@@ -206,7 +208,7 @@ class TeamManager:
 
     def _automatic(self, principal, capability="team.write"):
         policy = self._principal(principal, capability)
-        if policy.approval_mode != "automatic":
+        if not automatic_for(policy, capability):
             raise BridgeError(
                 "approval_required", "Team writes require local automatic authorization"
             )
@@ -565,9 +567,12 @@ class TeamManager:
             ).fetchone()[0]
             if pending >= self.config.team.max_pending_per_member:
                 raise BridgeError("team_queue_full", "Member work queue is full")
-            state = (
-                "queued" if self.config.team.workers[request.assignee].agent else "queued_manual"
-            )
+            automatic = bool(self.config.team.workers[request.assignee].agent)
+            if automatic:
+                if self.direct_delivery is None:
+                    raise BridgeError("team_receiver_unavailable", "No direct team receiver")
+                self.direct_delivery.check(request.assignee)
+            state = "accepted" if automatic else "queued_manual"
             self.store.db.execute(
                 "INSERT INTO team_work(id,team_id,assigned_by,assignee,title,body,parent_id,"
                 "root_id,depth,state,created) VALUES(?,?,?,?,?,?,?,?,?,?,?)",
@@ -597,7 +602,8 @@ class TeamManager:
                 depth=depth,
                 content_sha256=digest(request.body),
             )
-        self.wake.set()
+        if automatic:
+            self.direct_delivery.submit(work_id)
         return self._work(work_id)
 
     def work_get(self, principal, team_id, work_id):
@@ -839,6 +845,9 @@ class TeamManager:
                 raise BridgeError(
                     "team_result_conflict", "The expected native result SHA256 does not match"
                 )
+            if self.direct_delivery is None:
+                raise BridgeError("team_receiver_unavailable", "No direct team receiver")
+            self.direct_delivery.check(work["assignee"])
             snapshot_id = "tr-" + uuid.uuid4().hex
             self.store.db.execute(
                 "INSERT INTO team_work_reprocess_history VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)",
@@ -881,7 +890,7 @@ class TeamManager:
                 automatic_retry=False,
                 execution_scope="existing_result_only",
             )
-        self.wake.set()
+        self.direct_delivery.submit(request.work_id, existing=True)
         return self._work(request.work_id)
 
     def events(self, principal, team_id, after=0, limit=50):
@@ -917,7 +926,7 @@ class TeamManager:
         if not worker or not worker.agent or not worker.cwd:
             raise BridgeError("team_worker_unavailable", "No automatic worker is configured")
         policy = self.security.principal(work["assignee"], "agent.execute")
-        if policy.approval_mode != "automatic" or worker.agent not in policy.agents:
+        if not automatic_for(policy, "agent.execute") or worker.agent not in policy.agents:
             raise BridgeError("team_worker_denied", "Worker execution is not authorized")
         if worker.agent not in self.config.agents:
             raise BridgeError("agent_unavailable", "Worker adapter is not configured")
@@ -928,7 +937,7 @@ class TeamManager:
             work = self._work(work_id)
             if not self.store.can_claim(work["created"]):
                 return None
-            if work["state"] != "queued" or work["core_task_id"] is not None:
+            if work["state"] != "accepted" or work["core_task_id"] is not None:
                 return None
             try:
                 self._execution_allowed(work)

@@ -1,0 +1,35 @@
+{
+  "runtime": {
+    "instance_id": "98ec05c9a19a49179d8cef9a2f387235",
+    "version": "0.8.0rc17",
+    "pid": 72612,
+    "started_at": "2026-10-25T09:40:05.212845+00:00",
+    "config_path": "/Users/landjunge/.config/kirabridge/config.toml",
+    "config_sha256": "4d1167412a0d6b2e4362170d63af77c6a25ee883aa3b8271918ed2316bfc8fd3",
+    "effective_config_sha256": "d2630b0afe5515a9b16303e34a1b3dd3e073c12c8b2dc2e03c818e9cc4a623a5",
+    "source_tree_sha256": "1a2134f85774eca60da65c09af528a326e27ecd5b7ece2d699947bba3f235651",
+    "source_file_count": 116,
+    "source_package_path": "/Users/landjunge/.local/share/kirabridge/install/releases/0.8.0rc17-012b592caa5b/source/.venv/lib/python3.11/site-packages/kirabridge",
+    "source_scope": "package Python files observed at startup; no remote attestation"
+  },
+  "dispatcher_active": true,
+  "chatgpt_permissions": {
+    "principal": "chatgpt",
+    "count": 42,
+    "all_authorized_automatic": true,
+    "nonautomatic": []
+  },
+  "terminal_catalog": {
+    "status": "available",
+    "transport": "terminal_app",
+    "sessions": 4,
+    "transport_errors": {
+      "tmux": {
+        "code": "session_transport_unavailable"
+      }
+    }
+  },
+  "native_input_test": "not repeated: native module bytes identical to7725bc6 accepted proof",
+  "published_release": "v0.8.0rc14",
+  "rc17": "draft; PR32 open; CI jobs not started billing"
+}

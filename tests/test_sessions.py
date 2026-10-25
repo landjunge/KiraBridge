@@ -165,6 +165,7 @@ async def test_native_session_selection_read_and_input(bridge, config, monkeypat
 
 @pytest.mark.asyncio
 async def test_native_open_checks_authority_and_quotes_command(bridge, config, monkeypatch):
+    config.principals["local"].capabilities.append("session.inspect")
     manager = SessionManager(bridge.sessions.ports)
     calls = []
 

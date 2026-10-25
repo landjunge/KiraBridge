@@ -19,7 +19,7 @@ from kirabridge.terminal_access import terminal_access
 @pytest.mark.parametrize("exception", [False, True])
 @pytest.mark.parametrize("capability", [False, True])
 @pytest.mark.parametrize("buffer", [False, True])
-def test_effective_decision_matches_queue_and_terminal_display(
+async def test_effective_decision_matches_queue_and_terminal_display(
     bridge, config, level, exception, capability, buffer
 ):
     policy = config.principals["local"]
@@ -36,21 +36,22 @@ def test_effective_decision_matches_queue_and_terminal_display(
     assert displayed["input_decision"] == effective
     assert effective["config_revision"] == bridge.runtime["effective_config_sha256"]
     assert effective["authorized"] is capability
-    if not capability:
-        assert effective["reason"] == "missing_capability"
-        with pytest.raises(BridgeError) as error:
-            bridge.prepare("local", task)
-        assert error.value.code == "forbidden"
-        assert not bridge.store.db.execute("SELECT 1 FROM tasks").fetchone()
-        return
-    automatic = exception or (level == "full" and not buffer)
-    assert effective["automatic"] is automatic
-    queued = bridge.prepare("local", task)
-    assert queued["state"] == ("queued" if automatic else "created")
-    audit = bridge.store.db.execute(
-        "SELECT metadata FROM audit WHERE kind IN ('task.requested','task.queued')"
-    ).fetchone()
-    assert json.loads(audit[0])["permission_decision"] == effective
+    async with bridge:
+        if not capability:
+            assert effective["reason"] == "missing_capability"
+            with pytest.raises(BridgeError) as error:
+                bridge.prepare("local", task)
+            assert error.value.code == "forbidden"
+            assert not bridge.store.db.execute("SELECT 1 FROM tasks").fetchone()
+            return
+        automatic = exception or (level == "full" and not buffer)
+        assert effective["automatic"] is automatic
+        queued = bridge.prepare("local", task)
+        assert queued["state"] == ("accepted" if automatic else "created")
+        audit = bridge.store.db.execute(
+            "SELECT metadata FROM audit WHERE kind IN ('task.requested','task.admitted')"
+        ).fetchone()
+        assert json.loads(audit[0])["permission_decision"] == effective
 
 
 def test_terminal_marker_does_not_replace_missing_capability_or_normal_approval(config):
@@ -162,3 +163,19 @@ async def test_revocation_requires_authenticated_local_route(bridge, tmp_path, m
         reloaded = load_config(str(path))
         assert reloaded.principals["chatgpt"].automatic_operations == []
         assert reloaded.principals["chatgpt"].permission_level == "ask"
+
+
+def test_full_operator_selection_grants_actual_operation_capabilities(tmp_path):
+    from kirabridge.operations import OPERATIONS
+
+    path = tmp_path / "full.toml"
+    path.write_text('[principals.chatgpt]\ncapabilities=["bridge.health"]\n')
+    configure_access(path, level="full")
+    config = load_config(str(path))
+    missing = {
+        name: decision(config, "chatgpt", name)["missing_capabilities"]
+        for name in OPERATIONS
+        if not decision(config, "chatgpt", name)["authorized"]
+    }
+    assert missing == {}, missing
+    assert all(decision(config, "chatgpt", name)["automatic"] for name in OPERATIONS)

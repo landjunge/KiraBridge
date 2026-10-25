@@ -8,9 +8,10 @@ import time
 import uuid
 from typing import Literal
 
-from pydantic import Field
+from pydantic import Field, model_serializer
 
 from kirabridge.bridge_core.models import BridgeError, Input, canonical, digest
+from kirabridge.session_manager import SessionReference
 
 
 class MessageSend(Input):
@@ -24,26 +25,39 @@ class MessageSend(Input):
     task_id: str | None = Field(default=None, min_length=1, max_length=128)
     request_reply: bool | None = None
     dispatch: bool | None = None
+    session: SessionReference | None = None
+
+    @model_serializer(mode="wrap")
+    def serialized(self, handler):
+        value = handler(self)
+        if self.session is None:
+            value.pop("session", None)
+        return value
 
 
 class MessageManager:
     interface_version = "1"
+    direct_delivery = None
 
     def activation_work_count(self, *, active_only=False, context=None):
+        # An externally ACKed queued job has no delivery left to start. Never
+        # infer that a running receiver finished merely because its message is ACKed.
         db = context.db if context is not None else self.store.db
-        states = ("running",) if active_only else ("queued", "running")
+        states = ("accepted", "running") if active_only else ("queued", "accepted", "running")
         return db.execute(
             "SELECT count(*) FROM message_jobs WHERE state IN ("
             + ",".join("?" for _ in states)
-            + ") AND (state='running' OR NOT EXISTS (SELECT 1 FROM queue_holds h "
-            "WHERE h.queue_id='messages' AND h.item_id=message_jobs.message_id))",
+            + ") AND (state IN ('accepted','running') OR (NOT EXISTS (SELECT 1 FROM queue_holds h "
+            "WHERE h.queue_id='messages' AND h.item_id=message_jobs.message_id) "
+            "AND NOT EXISTS (SELECT 1 FROM messages m WHERE m.id=message_jobs.message_id "
+            "AND m.acknowledged IS NOT NULL)))",
             states,
         ).fetchone()[0]
 
     def operator_work_count(self):
         return self.store.db.execute(
-            "SELECT count(*) FROM message_jobs WHERE state IN ('queued','running') "
-            "AND (state='running' OR NOT EXISTS (SELECT 1 FROM queue_holds h "
+            "SELECT count(*) FROM message_jobs WHERE state IN ('queued','accepted','running') "
+            "AND (state IN ('accepted','running') OR NOT EXISTS (SELECT 1 FROM queue_holds h "
             "WHERE h.queue_id='messages' AND h.item_id=message_jobs.message_id))"
         ).fetchone()[0]
 
@@ -123,12 +137,20 @@ class MessageManager:
             scope = result["processing"]["evidence"].get("session_scope")
             if scope == "existing_visible_terminal":
                 result["processing_route"] = scope
+            elif job["state"] == "accepted":
+                result["processing_route"] = "direct_admission"
             elif job["state"] == "queued":
                 result["processing_route"] = (
                     "pending_visible_terminal"
                     if self.config.visible_handoffs.enabled
                     else "pending_managed_receiver"
                 )
+        hold = self.store.db.execute(
+            "SELECT 1 FROM queue_holds WHERE queue_id='messages' AND item_id=?", (message_id,)
+        ).fetchone()
+        if hold:
+            result["processing_route"] = "withdrawn"
+            result["delivery_active"] = False
         if visible:
             # Preserve the original failure and expose only already-recorded evidence.
             # Reading a message must never release a reservation or repeat input.
@@ -242,6 +264,14 @@ class MessageManager:
                 raise BridgeError(
                     "agent_denied", "Receiver agent is not configured for this identity"
                 )
+        if dispatch:
+            self.store.assert_accepting()
+        if (
+            dispatch
+            and not recorded
+            and (self.direct_delivery is None or not self.direct_delivery.accepting)
+        ):
+            raise BridgeError("receiver_unavailable", "Direct receiver is offline; nothing queued")
         if validate_only:
             return None
         hashed = digest({**message.model_dump(), "dispatch": dispatch})
@@ -345,7 +375,7 @@ class MessageManager:
                 "h.queue_id='messages' AND h.item_id=messages.id)",
                 (message.recipient,),
             ).fetchone()[0]
-            if pending >= limits.max_pending_per_recipient:
+            if not dispatch and pending >= limits.max_pending_per_recipient:
                 raise BridgeError("message_queue_full", "Recipient queue is full")
             if self.store.db.execute("SELECT 1 FROM messages WHERE id=?", (message_id,)).fetchone():
                 raise BridgeError("message_id_conflict", "Message ID is already reserved")
@@ -386,11 +416,11 @@ class MessageManager:
                     (message_id, completion_target or "default"),
                 )
                 self.store.db.execute(
-                    "INSERT INTO message_jobs(message_id,state) VALUES(?,'queued')", (message_id,)
+                    "INSERT INTO message_jobs(message_id,state) VALUES(?,'accepted')", (message_id,)
                 )
             self._event(
                 message_id,
-                "message.queued",
+                "message.admitted" if dispatch else "message.recorded",
                 principal,
                 {
                     "recipient": message.recipient,
@@ -400,6 +430,10 @@ class MessageManager:
                     "automatic_dispatch": dispatch,
                 },
             )
+        if dispatch:
+            if self.direct_delivery is None:
+                raise BridgeError("receiver_unavailable", "Direct receiver is not initialized")
+            self.direct_delivery.submit(principal, message_id, message.session)
         self.wake.set()
         return self.get(principal, message_id)
 
@@ -415,6 +449,8 @@ class MessageManager:
                 "AND acknowledged IS NULL AND (? IS NULL OR conversation_id=?) "
                 "AND NOT EXISTS (SELECT 1 FROM queue_holds h WHERE "
                 "h.queue_id='messages' AND h.item_id=messages.id) "
+                "AND NOT EXISTS (SELECT 1 FROM message_jobs j WHERE j.message_id=messages.id "
+                "AND j.state IN ('failed','cancelled','blocked','unknown')) "
                 "ORDER BY seq LIMIT ?",
                 (principal, after, conversation_id, conversation_id, limit),
             ).fetchall()

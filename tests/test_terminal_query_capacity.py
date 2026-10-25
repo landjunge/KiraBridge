@@ -153,10 +153,14 @@ async def test_read_flood_does_not_take_stop_capacity(bridge, config, terminal_r
         for index in range(config.read_concurrency):
             bridge.prepare("local", request("session.catalog", {}, task_id=f"held-{index}"))
         await asyncio.wait_for(all_read_slots.wait(), 2)
-        for index in range(config.max_read_queued):
-            bridge.prepare("local", request("session.catalog", {}, task_id=f"queued-{index}"))
         with pytest.raises(BridgeError, match="capacity"):
             bridge.prepare("local", request("session.catalog", {}, task_id="read-overflow"))
+        assert (
+            bridge.store.db.execute(
+                "SELECT count(*) FROM tasks WHERE id='read-overflow'"
+            ).fetchone()[0]
+            == 0
+        )
         with pytest.raises(BridgeError) as error:
             await bridge.terminal_queries.execute("local", "session.catalog", {})
         assert error.value.code == "terminal_read_busy"

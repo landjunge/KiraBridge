@@ -4,8 +4,9 @@ from __future__ import annotations
 
 import asyncio
 import shlex
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, contextmanager
 from contextvars import ContextVar
+from copy import deepcopy
 from pathlib import Path
 
 from pydantic import Field
@@ -59,7 +60,9 @@ class SessionManager:
         self.environment, self.agent_registry = ports.environment, ports.agent_registry
         self.readiness = ports.readiness
         self.lock = asyncio.Lock()
+        self.lifecycle = None
         self._selection = ContextVar("kirabridge_visible_selection", default=None)
+        self._observation = ContextVar("kirabridge_terminal_observation", default=None)
         self.terminal_app = (
             terminal_app if terminal_app is not None else TerminalAppTransport(ports.clipboard_lock)
         )
@@ -216,8 +219,45 @@ class SessionManager:
             )
         return selection[2] if selection else None
 
+    @contextmanager
+    def observation_scope(self, principal, selected):
+        """Reuse a privately observed row only during this task's single read chain.
+
+        This is not selection authority for input, and is never accepted from MCP.
+        Expiration also invalidates inherited contexts after the operation returns.
+        """
+        observation = {
+            "principal": principal,
+            "row": deepcopy(selected),
+            "task": asyncio.current_task(),
+            "active": True,
+        }
+        token = self._observation.set(observation)
+        try:
+            yield
+        finally:
+            observation["active"] = False
+            self._observation.reset(token)
+
+    async def observed_selected(self, principal, pane_id, expected_pid):
+        observation = self._observation.get()
+        if observation is None:
+            return await self.selected(principal, pane_id, expected_pid)
+        row = observation["row"]
+        if (
+            not observation["active"]
+            or observation["task"] is not asyncio.current_task()
+            or observation["principal"] != principal
+            or row.get("pane_id") != pane_id
+            or expected_pid not in {row.get("expected_pid"), row.get("legacy_expected_pid")}
+        ):
+            raise BridgeError(
+                "session_observation_changed", "Read observation scope changed or expired"
+            )
+        return deepcopy(row)
+
     async def read(self, principal, pane_id, expected_pid, *, max_bytes=65536):
-        await self.selected(principal, pane_id, expected_pid)
+        await self.observed_selected(principal, pane_id, expected_pid)
         text = await self.transport(pane_id).read(pane_id)
         text = text.encode("utf-8")[-max_bytes:].decode("utf-8", "ignore")
         return {
@@ -374,12 +414,14 @@ class SessionManager:
         return process["name"]
 
     async def read_observed(self, principal, pane_id, expected_pid, *, max_bytes=65536):
-        result = await self.read(principal, pane_id, expected_pid, max_bytes=max_bytes)
-        if self.readiness:
-            observation = await self.readiness(principal, result)
-            if observation is not None:
-                result = {**result, "input_readiness": observation}
-        return self.audit.observe_terminal(principal, result)
+        selected = await self.selected(principal, pane_id, expected_pid)
+        with self.observation_scope(principal, selected):
+            result = await self.read(principal, pane_id, expected_pid, max_bytes=max_bytes)
+            if self.readiness:
+                observation = await self.readiness(principal, result)
+                if observation is not None:
+                    result = {**result, "input_readiness": observation}
+            return self.audit.observe_terminal(principal, result)
 
     async def open(self, principal, args, *, task_id=None):
         policy = self.authorization.principal(principal, "session.open")
@@ -412,17 +454,65 @@ class SessionManager:
         if argv and not self.direct(principal):
             command += " && " + shlex.join(argv)
         async with self.lock:
+            # Exact empty shells can be reused; never repurpose an agent/editor.
+            from kirabridge.platform_adapters.shell_prompt import empty_shell_prompt, idle_shell
+
+            for row in (await self.catalog(principal)).get("sessions", []):
+                if not idle_shell(row) or (
+                    self.lifecycle and self.lifecycle.is_reserved(row["pane_id"], task_id)
+                ):
+                    continue
+                view = await self.read(principal, row["pane_id"], row["expected_pid"])
+                if not empty_shell_prompt(view["text"]):
+                    continue
+                self.authorization.principal(principal, "session.input")
+                self.authorization.check_window(principal, task_id, args, creating=False)
+                if self.lifecycle:
+                    self.lifecycle.reserve(task_id, row["pane_id"])
+                try:
+                    if argv:
+                        identity = await self.terminal_app.process_identity(row["expected_pid"])
+                        reuse_command = command
+                        if self.direct(principal):
+                            reuse_command += " && " + shlex.join(argv)
+                        await self.terminal_app.send_confirmed(row, reuse_command, identity)
+                except BaseException:
+                    self.authorization.window_outcome(principal, task_id, "reuse_unknown")
+                    raise
+                self.authorization.window_outcome(principal, task_id, "reused")
+                return {**row, "opened": False, "reused": True, "agent_processed": False}
+            if self.lifecycle and self.lifecycle.creation_blocked():
+                raise BridgeError(
+                    "window_reconciliation_required",
+                    "Prior window close is unconfirmed; no new window",
+                )
             self.authorization.check_window(principal, task_id, args)
             try:
                 result = await self.terminal_app.open(command)
             except BaseException:
                 self.authorization.window_outcome(principal, task_id, "unknown")
                 raise
-            self.authorization.window_outcome(principal, task_id, "opened")
-            for _ in range(20):
+            # Until exact process binding is confirmed, cancellation/restart must
+            # block replacement windows even though native creation returned.
+            self.authorization.window_outcome(principal, task_id, "unknown")
+            registered = False
+            for _ in range(100):
                 sessions = await self.terminal_app.catalog()
                 selected = next((s for s in sessions if s["tty"] == result["tty"]), None)
                 if selected:
+                    if (
+                        self.lifecycle
+                        and task_id
+                        and not registered
+                        and result.get("created_window") is True
+                        and result.get("window_id") == selected.get("window_id")
+                    ):
+                        try:
+                            await self.lifecycle.register(principal, task_id, selected)
+                        except BaseException:
+                            self.authorization.window_outcome(principal, task_id, "unknown")
+                            raise
+                        registered = True
                     if self.direct(principal) and argv:
                         from kirabridge.platform_adapters.shell_prompt import empty_shell_prompt
 
@@ -439,6 +529,11 @@ class SessionManager:
                             selected["expected_pid"]
                         )
                         await self.terminal_app.send_confirmed(selected, shlex.join(argv), identity)
+                    self.authorization.window_outcome(principal, task_id, "opened")
                     return {**selected, "opened": True, "agent_processed": False}
                 await asyncio.sleep(0.05)
-        return {**result, "session_handle_pending": True, "agent_processed": False}
+        self.authorization.window_outcome(principal, task_id, "unknown")
+        raise BridgeError(
+            "window_reconciliation_required",
+            "Opened window identity is unconfirmed; inspect it before any further creation",
+        )

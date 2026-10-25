@@ -1,13 +1,20 @@
 # Discovery and visible terminal / Werkzeugerkennung und sichtbares Terminal
 
-RC16 candidate; production configuration remains unchanged.
+RC17 source; raw production configuration and permissions remain unchanged.
 
 ## Deutsch
 
 `bridge_health`, `operation_catalog` und `agent_inventory` liefern einen principal-
 bezogenen Versions-/Instanz-/Rechte-/Beobachtungs-Fingerabdruck. Bei erlaubtem
-automatischem Lesezugriff wird die Terminalzuordnung frisch beobachtet; andernfalls
-steht dort `approval_required` oder `not_authorized`, kein erfundener Ausführungsbeleg.
+automatischem Lesezugriff beobachten `operation_catalog`, `agent_inventory` und
+`bridge_health(observe_terminals=true)` die Terminalzuordnung frisch. Normales
+`bridge_health` ist leichtgewichtig: keine Terminalabfrage und keine belegten
+Terminal-Leseplätze durch sekündliche Proxy-Monitore. `terminal_observation.freshness`
+kennzeichnet `cached`/`not_probed`, mit ursprünglichem `observed_at`; nach
+Rechteänderungen werden alte Beobachtungen verworfen. Health ist niemals
+Eingabebereitschaft. Frische Fensterwechsel-Revisionen entstehen durch ausdrückliche
+Beobachtung, nicht durch passive Health-Polls. Verweigerung wird weiterhin als
+`approval_required`/`not_authorized` gemeldet, kein erfundener Ausführungsbeleg.
 Installierter Agent, ausführbare Datei, Adapter, beobachtete Sitzung und tatsächliche
 Eingabebereitschaft sind getrennte Zustände. Eine erfolgreiche Ausführung ist erst
 durch den konkreten Taskbeleg nachgewiesen.
@@ -59,3 +66,24 @@ are checked before typing; busy or changed targets are preserved. This does not 
 Codex/Grok internal execution. ThreadDesk remains independent. Exact accepted tasks
 and automatic permissions agree without bypassing manual approval/replay checks.
 Real Intel tests and remaining gates: [acceptance](ACCEPTANCE-MACOS-RC16.md).
+
+
+## RC17 polling correction / Korrektur der Statusabfragen
+
+**English:** Routine `bridge_health` is passive for terminal discovery; current
+runtime/version/grants remain live. Set `observe_terminals=true`, or call
+`operation_catalog`/`agent_inventory`, for a fresh bounded terminal observation.
+Cached observations retain their original timestamp, are never input proof, and
+are discarded when permissions change. This prevents each one-second stdio
+health monitor from saturating the shared foreground read slots. Automatic health
+polling alone no longer discovers window changes. Explicit `session_catalog` and
+`session_read` remain fresh, and every input independently rechecks its target.
+
+**ChatGPT cache / ChatGPT-Cache:** Some Apps schemas still require the obsolete
+`completion_subscription`. Actual RC17 submission requires no Events subscription;
+existing cached tools work with the historical field set to the empty string.
+Use stable task/idempotency IDs and `task_get`, never replay uncertain writes.
+Refresh the host connector metadata when available; KiraBridge cannot overwrite
+already injected tool declarations. / Manche Apps-Schemas verlangen noch das alte
+Feld. Leere Zeichenkette ist abwärtskompatibel; keinen neuen Events-Kanal erfinden,
+keine zusätzlichen Rechte vergeben und unsichere Aufträge nicht wiederholen.

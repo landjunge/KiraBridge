@@ -10,7 +10,7 @@ class TransferAuthorization:
 
     def check(self, identity, capability):
         policy = self.principal(identity, capability)
-        if not self.settings.enabled:
+        if not self.settings.enabled and capability != "files.inspect":
             raise BridgeError("transfer_disabled", "File transfer is not enabled by the operator")
         return policy
 

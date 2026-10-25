@@ -8,7 +8,7 @@ import sys
 from pathlib import Path
 
 import pytest
-from conftest import request, submit
+from conftest import archive_task, request
 
 from kirabridge.bridge_core.models import BridgeError, TerminalInput, UncertainExecution, canonical
 from kirabridge.workflow_control_adapter import WorkflowControlAdapter, process_dispatch
@@ -41,7 +41,7 @@ def binding(bridge, identity="turn1", principal="local", handoff="h-synthetic"):
         "revision": 1,
         "cwd": bridge.config.principals[principal].roots[0],
     }
-    submit(bridge, request("handoff.start", args, task_id=identity), principal=principal)
+    archive_task(bridge, request("handoff.start", args, task_id=identity), principal=principal)
     task = bridge.store.claim("synthetic-worker", 30)
     assert task["id"] == identity
     metadata = {
@@ -161,7 +161,7 @@ async def test_stop_cancels_only_owned_matching_queue_and_terminates_only_owned_
             ("foreign-pending", "other", "h-synthetic"),
             ("other-handoff", "local", "h-other"),
         ]:
-            submit(
+            archive_task(
                 bridge,
                 request(
                     "handoff.start",
@@ -513,7 +513,7 @@ async def test_stop_audit_uses_actual_owned_stop_task_preflight_never_old_turn(b
 
 async def test_invalid_stop_id_does_not_cancel_queued_work(bridge, control):
     binding(bridge)
-    submit(
+    archive_task(
         bridge,
         request(
             "handoff.start",
@@ -587,7 +587,7 @@ async def test_owned_abort_helper_foreign_missing_rights_or_wrong_task_has_no_ef
     from kirabridge.workflow_control_adapter import owned_stop
 
     task, _ = binding(bridge)
-    submit(
+    archive_task(
         bridge,
         request(
             "handoff.start",

@@ -33,6 +33,7 @@ class EvidenceTests(unittest.TestCase):
             CREATE TABLE messages(id TEXT PRIMARY KEY, sender TEXT, recipient TEXT,
                 conversation_id TEXT, idem TEXT, request_hash TEXT, request_reply INTEGER);
             CREATE TABLE message_jobs(message_id TEXT, state TEXT, run_id TEXT, evidence TEXT);
+            CREATE TABLE queue_holds(queue_id TEXT, item_id TEXT);
             CREATE TABLE visible_handoffs(id TEXT PRIMARY KEY, principal TEXT, target TEXT,
                 message_id TEXT, state TEXT, updated REAL, evidence TEXT);
             CREATE TABLE visible_handoff_events(seq INTEGER PRIMARY KEY, id TEXT,

@@ -127,9 +127,10 @@ def idle_guard(config):
         )
         jobs = (
             db.execute(
-                "select count(*) from message_jobs where state in ('queued','running')"
+                "select count(*) from message_jobs where state in ('queued','accepted','running')"
                 + (
-                    " and (state='running' or not exists (select 1 from queue_holds h "
+                    " and (state in ('accepted','running') or not exists "
+                    "(select 1 from queue_holds h "
                     "where h.queue_id='messages' and h.item_id=message_jobs.message_id))"
                     if "queue_holds" in tables
                     else ""
@@ -439,22 +440,29 @@ def stop_service(args):
 def start_service(args):
     if args.service != "none" and args.plist.exists():
         command = ["launchctl", "bootstrap", f"gui/{os.getuid()}", str(args.plist)]
-        # launchd can still be removing the old job after bootout returns.
-        # macOS reports the pending removal as bootstrap exit code 5
-        # ("Operation already in progress"). Retry *only* that transient
-        # exit code, with a fixed bound, before allowing activate() to roll back.
-        for attempt in range(5):
+        # Bootstrap exit code 5 is a generic Input/output error (EIO), not
+        # proof of pending removal. Delayed teardown after bootout is one
+        # possible cause. Retry only code 5 within a fixed bound, then fail
+        # through activate()'s existing rollback path; other errors fail immediately.
+        # Production HTTP long-polls can outlive the old four-second retry
+        # window. Keep both elapsed time and command count bounded; do not change
+        # the operator's launchd exit/KeepAlive options or require root.
+        deadline = time.monotonic() + 30
+        for attempt in range(30):
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                raise RuntimeError("launchctl bootstrap did not settle within 30 seconds")
             completed = subprocess.run(
-                command, capture_output=True, text=True, timeout=20, check=False
+                command, capture_output=True, text=True, timeout=min(20, remaining), check=False
             )
             if completed.returncode == 0:
                 return
-            if completed.returncode != 5 or attempt == 4:
+            if completed.returncode != 5 or attempt == 29:
                 detail = completed.stderr.strip() or completed.stdout.strip()
                 raise RuntimeError(
                     f"launchctl bootstrap failed ({completed.returncode}): {detail[:500]}"
                 )
-            time.sleep(1)
+            time.sleep(min(1, max(0, deadline - time.monotonic())))
 
 
 def wait_health(args, release, version):

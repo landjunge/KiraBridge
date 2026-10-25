@@ -34,6 +34,14 @@ class QueueManager(QueueViews):
     async def control(self, principal, args, *, approved=False, control_task_id=None):
         if args.action != "clear" and args.item_id is None:
             raise BridgeError("invalid_arguments", "An entry ID is required")
+        if args.action == "restore" and args.queue_id.split("/", 1)[0] in {
+            "tasks",
+            "messages",
+            "session-input",
+        }:
+            raise BridgeError(
+                "execution_queue_removed", "Historical execution delivery is not replayable"
+            )
         # Bulk operations are bounded, exact observed snapshots; no implicit 'all future work'.
         with self.store.transaction():
             if args.action == "clear":

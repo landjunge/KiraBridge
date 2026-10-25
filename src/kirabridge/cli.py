@@ -444,7 +444,9 @@ async def execute(args) -> None:
                 }
             )
         elif args.command == "approve":
-            approved = bridge.tasks.approve(args.task_id)
+            from kirabridge.task_manager.local import approve
+
+            approved = await approve(bridge.tasks, args.task_id)
             emit(approved)
         elif args.command == "deny":
             task = bridge.store.get(args.task_id)
@@ -459,7 +461,8 @@ async def execute(args) -> None:
             emit(bridge.store.get(args.task_id))
         elif args.command == "enqueue":
             request = parse_request(args.request)
-            emit(bridge.submit(args.principal, request, os.environ.get("KIRABRIDGE_APPROVAL", "")))
+            # Deprecated spelling, immediate semantics: no persisted execution queue.
+            await run_request(bridge, args.principal, request, 3700, False)
         elif args.command == "task":
             emit(bridge.task(args.principal, args.task_id))
         elif args.command == "tasks":
@@ -504,10 +507,6 @@ async def run_request(bridge, principal, request, wait, approve, original=None):
         if approve
         else os.environ.get("KIRABRIDGE_APPROVAL", "")
     )
-    if original:
-        bridge.tasks.retry(principal, original, request, approval)
-    else:
-        bridge.submit(principal, request, approval)
     owns_dispatcher = False
     try:
         await bridge.tasks.start()
@@ -516,6 +515,53 @@ async def run_request(bridge, principal, request, wait, approve, original=None):
         if exc.code != "already_running":
             raise
     try:
+        if owns_dispatcher:
+            needs_receiver = request.operation in {
+                "agent.execute",
+                "handoff.start",
+                "handoff.answer",
+            }
+            if (
+                bridge.config.visible_handoffs.enabled
+                and request.operation == "session.input"
+                and request.arguments.get("submit", True)
+            ):
+                selected = await bridge.sessions.selected(
+                    principal, request.arguments["pane_id"], request.arguments["expected_pid"]
+                )
+                target, _ = bridge.sessions.explicit_agent_binding(selected)
+                needs_receiver = target is not None
+            if bridge.config.visible_handoffs.enabled and needs_receiver:
+                raise BridgeError(
+                    "receiver_unavailable",
+                    "Start the authenticated daemon before an agent handoff; nothing was sent",
+                )
+            if original:
+                bridge.tasks.retry(principal, original, request, approval)
+            else:
+                bridge.submit(principal, request, approval)
+        else:
+            from kirabridge.local_runtime import peer
+            from kirabridge.mcp_gateway.client import MCPClientPool
+
+            async with MCPClientPool(call_timeout=15) as pool:
+                await pool.connect(peer(bridge.config, principal))
+                health = (await pool.call("daemon", "bridge_health", {})).structuredContent
+                if not health or health.get("dispatch_mode") != "direct":
+                    raise BridgeError(
+                        "dispatcher_upgrade_required", "Dispatcher needs the direct protocol"
+                    )
+                arguments = {"request": request.model_dump(), "approval": approval}
+                if original:
+                    arguments["original_id"] = original
+                response = await pool.call(
+                    "daemon", "task_retry" if original else "task_submit", arguments
+                )
+                result = response.structuredContent
+                if not isinstance(result, dict) or (result.get("error") and not result.get("id")):
+                    raise BridgeError(
+                        "submission_rejected", "Read original task; nothing queued locally"
+                    )
         final = await bridge.tasks.wait(principal, request.task_id, wait)
         if final["state"] in {State.FAILED, State.UNKNOWN, State.BLOCKED}:
             final = bridge.task(principal, request.task_id)

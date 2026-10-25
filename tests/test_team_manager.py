@@ -4,6 +4,7 @@ import time
 from concurrent.futures import ThreadPoolExecutor
 
 import pytest
+from conftest import DomainOnlyTeamPort
 from pydantic import ValidationError
 
 from kirabridge.audit_manager import verify
@@ -42,6 +43,7 @@ def domain(bridge, config):
         },
     )
     manager = TeamManager(bridge)
+    manager.direct_delivery = DomainOnlyTeamPort()
     manager.create("local", create())
     return manager
 
@@ -91,35 +93,36 @@ def work(**changes):
     )
 
 
-def test_maintenance_drains_only_sealed_existing_team_work(domain):
-    shared = domain.delegate("local", work())
-    now = time.time()
-    domain.store.db.execute(
-        "INSERT INTO activation_runs VALUES('maintenance','draining',?,?,?,NULL)", (now, now, "{}")
-    )
-    with pytest.raises(BridgeError) as error:
-        domain.delegate("local", work(idempotency_key="new-work"))
-    assert error.value.code == "service_maintenance"
-    claimed = domain.claim(shared["id"])
-    root = domain.config.principals["codex"].roots[0]
-    request = TaskRequest(
-        task_id=claimed["core_task_id"],
-        idempotency_key=claimed["core_task_id"],
-        operation="agent.execute",
-        arguments={"agent": "codex", "prompt": "existing work", "cwd": root},
-    )
-    domain.seal_request(shared["id"], request)
-    wrong = request.model_copy(
-        update={"arguments": {**request.arguments, "prompt": "different work"}}
-    )
-    with pytest.raises(BridgeError) as error:
-        domain.bridge.prepare("codex", wrong)
-    assert error.value.code == "service_maintenance"
-    task = domain.bridge.prepare("codex", request)
-    domain.bind_task(shared["id"], task)
-    accepted = domain.store.claim("existing-team-worker", 30)
-    assert accepted["id"] == request.task_id
-    domain.store.assert_accepting(continuation_id=request.task_id, owned_execution=True)
+async def test_maintenance_drains_only_sealed_existing_team_work(domain):
+    async with domain.bridge:
+        shared = domain.delegate("local", work())
+        now = time.time()
+        domain.store.db.execute(
+            "INSERT INTO activation_runs VALUES('maintenance','draining',?,?,?,NULL)",
+            (now, now, "{}"),
+        )
+        with pytest.raises(BridgeError) as error:
+            domain.delegate("local", work(idempotency_key="new-work"))
+        assert error.value.code == "service_maintenance"
+        claimed = domain.claim(shared["id"])
+        root = domain.config.principals["codex"].roots[0]
+        request = TaskRequest(
+            task_id=claimed["core_task_id"],
+            idempotency_key=claimed["core_task_id"],
+            operation="agent.execute",
+            arguments={"agent": "codex", "prompt": "existing work", "cwd": root},
+        )
+        domain.seal_request(shared["id"], request)
+        wrong = request.model_copy(
+            update={"arguments": {**request.arguments, "prompt": "different work"}}
+        )
+        with pytest.raises(BridgeError) as error:
+            domain.bridge.prepare("codex", wrong)
+        assert error.value.code == "service_maintenance"
+        task = domain.bridge.prepare("codex", request)
+        domain.bind_task(shared["id"], task)
+        assert task["state"] == "accepted" and task["receipt"]
+        domain.store.assert_accepting(continuation_id=request.task_id, owned_execution=True)
 
 
 def message(**changes):
@@ -497,6 +500,27 @@ def test_manual_authorization_cannot_be_laundered_through_automatic_assignee(dom
     }[target]
     with pytest.raises(BridgeError, match="automatic authorization"):
         operation()
+
+
+def test_explicit_full_team_permissions_override_legacy_manual_without_granting_access(domain):
+    for level in ("ask", "medium"):
+        domain.config.principals["local"].permission_level = level
+        with pytest.raises(BridgeError) as error:
+            domain.delegate("local", work(idempotency_key="nonautomatic-" + level))
+        assert error.value.code == "approval_required"
+    for name in ("local", "codex"):
+        domain.config.principals[name].permission_level = "full"
+        domain.config.principals[name].approval_mode = "manual"
+    shared = domain.delegate("local", work(idempotency_key="effective-full"))
+    assert domain.claim(shared["id"])
+    domain.config.principals["codex"].agents = []
+    blocked = domain.delegate("local", work(idempotency_key="missing-agent"))
+    assert domain.claim(blocked["id"]) is None
+    assert domain.work_get("local", "test-team", blocked["id"])["error"] == "team_worker_denied"
+    domain.config.principals["local"].capabilities.remove("team.write")
+    with pytest.raises(BridgeError) as error:
+        domain.delegate("local", work(idempotency_key="missing-capability"))
+    assert error.value.code == "forbidden"
 
 
 def test_disabled_calls_are_denied_but_private_tasks_remain_unaffected(domain):

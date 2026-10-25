@@ -79,8 +79,8 @@ async def run_terminal(bridge, config, code, **options):
             **options,
         },
     )
-    submit(bridge, value)
     async with bridge:
+        submit(bridge, value)
         return await bridge.tasks.wait("local", value.task_id, 10)
 
 
@@ -136,8 +136,8 @@ async def test_terminal_shell_metacharacters_are_literal(bridge, config):
             "cwd": config.principals["local"].roots[0],
         },
     )
-    submit(bridge, value)
     async with bridge:
+        submit(bridge, value)
         final = await bridge.tasks.wait("local", value.task_id)
         assert "$(touch injected); echo unsafe" in final["result"]["stdout"]
         assert not Path(config.principals["local"].roots[0], "injected").exists()
@@ -152,8 +152,8 @@ async def test_termination_control_lane_survives_saturation(bridge, config):
             "cwd": config.principals["local"].roots[0],
         },
     )
-    submit(bridge, value)
     async with bridge:
+        submit(bridge, value)
         async with asyncio.timeout(5):
             while bridge.store.get(value.task_id)["state"] != "running":
                 await asyncio.sleep(0.01)

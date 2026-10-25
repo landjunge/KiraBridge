@@ -6,7 +6,7 @@ import sys
 from pathlib import Path
 
 import pytest
-from conftest import request, submit
+from conftest import archive_task, request, submit
 from test_workflow_control_adapter import binding, noop, terminal, wait_session
 
 from kirabridge.bridge_core.bridge import Bridge
@@ -133,6 +133,7 @@ async def test_real_stop_task_uses_reserved_queue_and_terminates_only_owned_turn
     process = asyncio.create_task(running())
     try:
         await wait_session(bridge, task["id"])
+        await bridge.tasks.start()
         submit(
             bridge,
             request(
@@ -405,7 +406,7 @@ async def test_stopped_answer_does_not_record_human_answer_or_change_waiting_bin
             text="synthetic countercase",
         )
         answer = request("handoff.answer", args.model_dump(), task_id="answer-after-stop")
-        submit(bridge, answer)
+        archive_task(bridge, answer)
         task = bridge.store.claim("synthetic-worker", 30)
         with pytest.raises(BridgeError) as error:
             await bridge.handoffs.answer(task, args, noop, noop)

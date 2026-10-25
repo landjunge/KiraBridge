@@ -163,7 +163,7 @@ class SecurityManager:
                 "window_request_required", "No matching unexpired operator window grant"
             )
 
-    def check_window(self, principal, task_id, args):
+    def check_window(self, principal, task_id, args, *, creating=True):
         token_hash = (
             hashlib.sha256(args.window_authorization.encode()).hexdigest()
             if args.window_authorization
@@ -171,6 +171,18 @@ class SecurityManager:
         )
         with self.store.transaction():
             self.validate_window(principal, task_id, args)
+            if (
+                creating
+                and self.store.db.execute(
+                    "SELECT 1 FROM window_dispatches WHERE state IN ('unknown','dispatching') "
+                    "AND task_id!=?",
+                    (task_id,),
+                ).fetchone()
+            ):
+                raise BridgeError(
+                    "window_reconciliation_required",
+                    "An earlier window creation is uncertain; no additional window",
+                )
             if self.store.db.execute(
                 "SELECT 1 FROM window_dispatches WHERE token_hash=? OR (principal=? AND task_id=?)",
                 (token_hash, principal, task_id),

@@ -13,9 +13,17 @@ class OperatorQueries:
         self.handoffs = handoffs
         self.output_history = output_history
 
-    def maintenance_counts(self, *, active_only=False, context=None):
+    def maintenance_counts(self, *, active_only=False, context=None, preserve_external_waits=False):
         return {
-            name: owner.activation_work_count(active_only=active_only, context=context)
+            name: owner.activation_work_count(
+                active_only=active_only,
+                context=context,
+                **(
+                    {"preserve_external_waits": True}
+                    if preserve_external_waits and name == "visible_handoffs"
+                    else {}
+                ),
+            )
             for name, owner in (
                 ("tasks", self.tasks),
                 ("message_jobs", self.messages),

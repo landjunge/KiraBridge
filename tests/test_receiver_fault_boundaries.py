@@ -1,243 +1,165 @@
-"""Reproduce independent review findings without live terminals or providers."""
+"""Direct delivery: bounded failure, no backlog replay, isolated active recipients."""
 
-# Imported pytest fixture is intentionally used as a test parameter.
 # ruff: noqa: F811
 import asyncio
-import json
+import time
 
 import pytest
-from test_visible_dispatch_wait import enqueue, fake_receiver
 from test_visible_handoff import visible  # noqa: F401
 
+from kirabridge.bridge_core.config import ReceiverConfig
 from kirabridge.bridge_core.models import BridgeError
+from kirabridge.message_manager import MessageSend
 
 
-@pytest.mark.parametrize("wait_reason", ["desktop_locked", "visible_target_working"])
-async def test_visible_wait_preserves_absolute_connection_deadline(
-    visible, monkeypatch, wait_reason
+@pytest.fixture
+def direct(visible, monkeypatch):
+    bridge, transport = visible
+    for name in ("codex", "grok"):
+        bridge.config.messaging.receivers[name] = ReceiverConfig(cwd="/tmp", timeout=3)
+
+    class Pool:
+        def __init__(self, **kwargs):
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *args):
+            pass
+
+        async def connect(self, connection):
+            pass
+
+    monkeypatch.setattr("kirabridge.message_manager.direct.MCPClientPool", Pool)
+    monkeypatch.setattr("kirabridge.message_manager.direct.peer", lambda *args: None)
+
+    async def ready(*args, **kwargs):
+        return {}
+
+    monkeypatch.setattr(bridge.visible_handoffs, "check_target", ready)
+    return bridge, transport
+
+
+def send(bridge, key, target="grok"):
+    return bridge.messages.send(
+        "chatgpt",
+        MessageSend(
+            recipient=target,
+            conversation_id=key,
+            idempotency_key=key,
+            body="One authorized direct request",
+            kind="work",
+        ),
+    )
+
+
+@pytest.mark.parametrize("reason", ["desktop_locked", "visible_target_working", "peer_connection"])
+async def test_preinput_failure_is_terminal_and_never_retried_after_restart(
+    direct, monkeypatch, reason
 ):
-    bridge, transport = visible
-    fake_receiver(monkeypatch, bridge, [])
-    sent = enqueue(bridge, key="retry-visible-flapping")
-    clock, attempts = [1000.0], []
-    blocked = [False]
-
-    async def ready(*args):
-        if blocked[0]:
-            raise BridgeError(wait_reason, "Must wait without extending the connection deadline")
-
-    async def connect(*args):
-        attempts.append(clock[0])
-        raise BridgeError("peer_connection", "Secret connection details")
-
-    monkeypatch.setattr(bridge.visible_handoffs, "dispatch_ready", ready)
-    monkeypatch.setattr("kirabridge.message_manager.receiver.MCPClientPool.connect", connect)
-    monkeypatch.setattr("kirabridge.message_manager.receiver.time.time", lambda: clock[0])
+    bridge, transport = direct
     receiver = bridge.message_receiver
-    assert not await receiver._dispatch_next()
-    first = bridge.messages.get("chatgpt", sent["id"])["processing"]["evidence"]["receiver_retry"]
-    clock[0], blocked[0] = 1002.0, True
-    assert not await receiver._dispatch_next()
-    waiting = bridge.messages.get("chatgpt", sent["id"])["processing"]
-    assert waiting["evidence"].get("receiver_retry") == first
-    clock[0], blocked[0] = 1003.0, False
-    assert not await receiver._dispatch_next()
-    ended = bridge.messages.get("chatgpt", sent["id"])["processing"]
-    assert ended["state"] == "failed" and ended["error"] == "peer_connection"
-    assert attempts == [1000.0] and not transport["calls"]
-    assert ended["evidence"]["receiver_retry"]["deadline"] == 1003.0
-
-
-@pytest.mark.parametrize(
-    "error", [OSError("secret"), TimeoutError("secret"), json.JSONDecodeError("secret", "", 0)]
-)
-async def test_unexpected_preclaim_error_does_not_cancel_running_sibling(
-    visible, monkeypatch, error
-):
-    bridge, transport = visible
-    receiver = bridge.message_receiver
-    fake_receiver(monkeypatch, bridge, [])
-    codex = enqueue(bridge, target="codex", key="fault-codex")
-    grok = enqueue(bridge, target="grok", key="fault-grok")
-    entered, release, cancelled = asyncio.Event(), asyncio.Event(), asyncio.Event()
-
-    async def ready(sender, recipient):
-        if recipient == "codex":
-            await entered.wait()
-            raise error
-
-    async def process(pool, message, run_id):
-        assert message["id"] == grok["id"]
-        entered.set()
-        try:
-            await release.wait()
-        except asyncio.CancelledError:
-            cancelled.set()
-            raise
-        with bridge.store.transaction():
-            receiver._finish(message["id"], "completed", {})
-
-    monkeypatch.setattr(bridge.visible_handoffs, "dispatch_ready", ready)
-    monkeypatch.setattr(receiver, "_process", process)
-    await receiver.start()
-    try:
-        await asyncio.wait_for(entered.wait(), 1)
-
-        async def settled():
-            while not cancelled.is_set() and not receiver.worker.done():
-                if bridge.messages.get("chatgpt", codex["id"])["processing"]["state"] == "failed":
-                    return
-                await asyncio.sleep(0)
-
-        await asyncio.wait_for(settled(), 1)
-        assert not cancelled.is_set() and not receiver.worker.done()
-        failed = bridge.messages.get("chatgpt", codex["id"])["processing"]
-        assert failed["error"] == "receiver_preflight_failed"
-        assert failed["claimed"] is None and "secret" not in str(failed)
-        assert bridge.messages.get("chatgpt", grok["id"])["processing"]["state"] == "running"
-        assert not transport["calls"]
-    finally:
-        release.set()
-        await asyncio.gather(receiver.stop(), return_exceptions=True)
-    assert bridge.messages.get("chatgpt", grok["id"])["processing"]["state"] == "completed"
-
-
-async def test_outer_recipient_fault_does_not_stop_other_workers(visible, monkeypatch):
-    bridge, _ = visible
-    receiver = bridge.message_receiver
-    fake_receiver(monkeypatch, bridge, [])
-    enqueue(bridge, target="codex", key="loop-fault")
-    enqueue(bridge, target="grok", key="loop-sibling")
-    entered, release, faulted = asyncio.Event(), asyncio.Event(), asyncio.Event()
-    calls = []
-
-    async def dispatch(recipient):
-        if recipient == "codex":
-            await entered.wait()
-            calls.append(recipient)
-            faulted.set()
-            raise OSError("Secret database observation failure")
-        entered.set()
-        await release.wait()
-        return False
-
-    monkeypatch.setattr(receiver, "_dispatch_next", dispatch)
-    await receiver.start()
-    try:
-        await asyncio.wait_for(faulted.wait(), 1)
-        for _ in range(5):
-            await asyncio.sleep(0)
-        assert not receiver.worker.done()
-    finally:
-        release.set()
-        await asyncio.gather(receiver.stop(), return_exceptions=True)
-    assert calls
-
-
-async def test_unexpected_postclaim_error_is_unknown_and_never_replayed(visible, monkeypatch):
-    bridge, transport = visible
-    receiver = bridge.message_receiver
-    fake_receiver(monkeypatch, bridge, [])
-    sent = enqueue(bridge, key="claimed-fault")
     attempts = []
 
-    async def process(pool, message, run_id):
-        attempts.append(message["id"])
-        raise OSError("Secret uncertain result")
+    async def refuse(*args, **kwargs):
+        attempts.append(1)
+        raise BridgeError(reason, "Private diagnostic must not be exposed")
 
-    monkeypatch.setattr(receiver, "_process", process)
-    assert not await receiver._dispatch_next()
-    current = bridge.messages.get("chatgpt", sent["id"])["processing"]
-    assert current["state"] == "unknown" and current["error"] == "receiver_interrupted"
-    assert not await receiver._dispatch_next()
-    assert attempts == [sent["id"]] and not transport["calls"]
-    assert "Secret" not in str(current)
-
-
-async def test_stop_clears_failed_worker_handle(visible, monkeypatch):
-    receiver = visible[0].message_receiver
-    enqueue(visible[0], key="worker-stop-fault")
-
-    async def fail():
-        raise OSError("Synthetic worker failure")
-
-    monkeypatch.setattr(receiver, "_loop", fail)
+    monkeypatch.setattr(bridge.visible_handoffs, "check_target", refuse)
     await receiver.start()
-    for _ in range(3):
-        await asyncio.sleep(0)
-    with pytest.raises(OSError):
-        await receiver.stop()
-    assert receiver.worker is None
-
-
-async def test_start_replaces_finished_worker_handle(visible, monkeypatch):
-    receiver = visible[0].message_receiver
-    enqueue(visible[0], key="worker-start-fault")
-
-    async def fail():
-        raise OSError("Synthetic worker failure")
-
-    monkeypatch.setattr(receiver, "_loop", fail)
+    first = send(bridge, "failed")
+    await receiver.direct.wait_delivery(first["id"])
+    failed = bridge.messages.get("chatgpt", first["id"])
+    assert failed["processing"]["state"] == "failed"
+    assert failed["processing"]["error"] == reason
+    assert "Private diagnostic" not in str(failed["processing"])
+    await receiver.stop()
     await receiver.start()
-    failed = receiver.worker
-    for _ in range(3):
-        await asyncio.sleep(0)
-    assert failed.done()
-    failed.exception()
-    await receiver.start()
-    try:
-        assert receiver.worker is not failed
-    finally:
-        await asyncio.gather(receiver.stop(), return_exceptions=True)
+    assert send(bridge, "failed")["id"] == first["id"]
+    assert len(attempts) == 1 and not transport["calls"]
+    assert not bridge.store.db.execute("SELECT 1 FROM message_jobs WHERE state='queued'").fetchone()
+    await receiver.stop()
 
 
-async def test_cancelled_stop_keeps_running_worker_owned_until_it_finishes(visible, monkeypatch):
-    bridge, _ = visible
+async def test_busy_recipient_fails_immediately_other_recipient_runs_and_no_second_execution(
+    direct, monkeypatch
+):
+    bridge, _ = direct
     receiver = bridge.message_receiver
-    fake_receiver(monkeypatch, bridge, [])
-    sent = enqueue(bridge, key="cancelled-stop")
-    second = enqueue(bridge, key="after-cancelled-stop")
     entered, release = asyncio.Event(), asyncio.Event()
-    calls = []
+    processed = []
 
-    async def process(pool, message, run_id):
-        calls.append(message["id"])
-        entered.set()
-        await release.wait()
+    async def process(pool, message, run_id, **kwargs):
+        processed.append(message["id"])
+        if message["recipient"] == "codex":
+            entered.set()
+            await release.wait()
         with bridge.store.transaction():
-            receiver._finish(message["id"], "completed", {})
+            receiver._finish(message["id"], "completed", {"unit_test_delivery": True})
 
     monkeypatch.setattr(receiver, "_process", process)
     await receiver.start()
-    worker = receiver.worker
-    try:
-        await asyncio.wait_for(entered.wait(), 1)
-        stopping = asyncio.create_task(receiver.stop())
-        await asyncio.sleep(0)
-        stopping.cancel()
-        with pytest.raises(asyncio.CancelledError):
-            await stopping
-        assert receiver.worker is worker and not worker.done()
-        await receiver.start()
-        assert receiver.worker is worker and calls == [sent["id"]]
-        assert receiver.stopping  # Cancelling the waiter does not withdraw the stop request.
-        assert bridge.messages.get("chatgpt", second["id"])["processing"]["state"] == "queued"
-    finally:
-        release.set()
-        await asyncio.gather(receiver.stop(), return_exceptions=True)
-    assert receiver.worker is None
-    assert bridge.messages.get("chatgpt", sent["id"])["processing"]["state"] == "completed"
-    assert bridge.messages.get("chatgpt", second["id"])["processing"]["state"] == "queued"
-    await receiver.start()  # An explicit later start resumes the preserved next message once.
-    try:
+    first = send(bridge, "first", "codex")
+    await asyncio.wait_for(entered.wait(), 1)
+    second = send(bridge, "busy", "codex")
+    other = send(bridge, "other", "grok")
+    await receiver.direct.wait_delivery(second["id"])
+    await receiver.direct.wait_delivery(other["id"])
+    assert bridge.messages.get("chatgpt", second["id"])["processing"]["error"] == "execution_busy"
+    assert other["id"] in processed and second["id"] not in processed
+    release.set()
+    await receiver.direct.wait_delivery(first["id"])
+    assert send(bridge, "busy", "codex")["processing"]["state"] == "failed"
+    assert second["id"] not in processed
+    await receiver.stop()
 
-        async def completed():
-            while (
-                bridge.messages.get("chatgpt", second["id"])["processing"]["state"] != "completed"
-            ):
-                await asyncio.sleep(0)
 
-        await asyncio.wait_for(completed(), 1)
+async def test_postinput_uncertainty_is_preserved_and_shutdown_never_replays(direct, monkeypatch):
+    bridge, _ = direct
+    receiver = bridge.message_receiver
+
+    async def partial(pool, message, run_id, **kwargs):
+        bridge.store.db.execute(
+            "UPDATE message_jobs SET started=? WHERE message_id=?", (time.time(), message["id"])
+        )
+        raise RuntimeError("private process output")
+
+    monkeypatch.setattr(receiver, "_process", partial)
+    await receiver.start()
+    first = send(bridge, "unknown")
+    await receiver.direct.wait_delivery(first["id"])
+    result = bridge.messages.get("chatgpt", first["id"])
+    assert result["processing"]["state"] == "unknown"
+    assert "private process output" not in str(result["processing"])
+    await receiver.stop()
+    await receiver.start()
+    assert send(bridge, "unknown")["processing"]["state"] == "unknown"
+    assert bridge.store.db.execute("SELECT count(*) FROM completion_notices").fetchone()[0] == 1
+    await receiver.stop()
+
+
+async def test_offline_requests_are_refused_without_persisting_a_queue(direct):
+    bridge, _ = direct
+    with pytest.raises(BridgeError, match="offline"):
+        send(bridge, "offline")
+    assert not bridge.store.db.execute("SELECT 1 FROM message_jobs").fetchone()
+
+
+async def test_legacy_queued_label_with_claim_is_unknown_and_never_dispatched(direct):
+    from test_visible_dispatch_wait import archive_request
+
+    bridge, _ = direct
+    original = archive_request(bridge)
+    bridge.store.db.execute(
+        "INSERT INTO message_jobs(message_id,state,run_id,claimed) VALUES(?,'queued','old-run',1)",
+        (original["id"],),
+    )
+    await bridge.message_receiver.start()
+    try:
+        result = bridge.messages.get("chatgpt", original["id"])
+        assert result["processing"]["state"] == "unknown"
+        assert result["processing"]["run_id"] == "old-run"
+        assert not bridge.message_receiver.direct.active
     finally:
-        await receiver.stop()
-    assert calls == [sent["id"], second["id"]]
+        await bridge.message_receiver.stop()

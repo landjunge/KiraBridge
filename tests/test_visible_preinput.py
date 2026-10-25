@@ -75,9 +75,7 @@ class LocalRecipientPool:
 
 
 @pytest.mark.parametrize("sender", ["chatgpt", "grok_app"])
-async def test_proven_preinput_abort_can_resume_once_without_replaying_a_return(
-    visible, monkeypatch, sender
-):
+async def test_preinput_abort_is_final_until_a_new_explicit_request(visible, monkeypatch, sender):
     bridge, transport = visible
     sent = enqueue(bridge, sender=sender, key="preinput-race-then-ready")
     receiver = bridge.message_receiver
@@ -87,33 +85,34 @@ async def test_proven_preinput_abort_can_resume_once_without_replaying_a_return(
     await receiver._process(pool, message, first_run)
     queued = bridge.messages.get(sender, sent["id"])
     assert checks == ["grok", "grok"] and transport["calls"] == []
-    assert queued["processing"]["state"] == "queued"
-    assert queued["processing"]["run_id"] is None
+    assert queued["processing"]["state"] == "failed"
+    assert queued["processing"]["run_id"] == first_run
     assert queued["processing"]["started"] is None
-    assert queued["processing"]["evidence"]["terminal_input_attempted"] is False
     assert bridge.visible_handoffs.status(sender, first_run)["state"] == "interrupted"
-    assert bridge.store.db.execute("SELECT count(*) FROM completion_notices").fetchone()[0] == 0
+    assert bridge.store.db.execute("SELECT count(*) FROM completion_notices").fetchone()[0] == 1
 
-    # Only the proved pre-input abort permits another observation and a new run.
+    # No queue/retry remains. A separately authorized new request has a new ID.
     monkeypatch.setattr(bridge.visible_handoffs, "check_target", original)
     transport["text"] = "╭\n│ ❯ │\n╰"
     await bridge.visible_handoffs.dispatch_ready(sender, "grok")
-    message, second_run = receiver._claim(sent["id"])
+    assert receiver._claim(sent["id"]) is None
+    replacement = enqueue(bridge, sender=sender, key="new-explicit-request")
+    message, second_run = receiver._claim(replacement["id"])
     assert second_run != first_run
     await receiver._process(pool, message, second_run)
-    completed = bridge.messages.get(sender, sent["id"])
+    completed = bridge.messages.get(sender, replacement["id"])
     assert completed["processing"]["state"] == "completed", completed
     assert completed["acknowledged"] is not None
     assert transport["calls"] == ["insert", "return"]
     assert bridge.visible_handoffs.status(sender, first_run)["state"] == "interrupted"
     assert bridge.visible_handoffs.status(sender, second_run)["state"] == "completed"
-    assert bridge.store.db.execute("SELECT count(*) FROM completion_notices").fetchone()[0] == 1
+    assert bridge.store.db.execute("SELECT count(*) FROM completion_notices").fetchone()[0] == 2
     assert receiver._claim(sent["id"]) is None
     assert transport["calls"] == ["insert", "return"]
 
 
 @pytest.mark.parametrize("sender", ["chatgpt", "grok_app", "codex", "grok"])
-async def test_authenticated_ack_of_queued_work_completes_without_terminal_readiness(
+async def test_authenticated_ack_of_accepted_work_completes_without_terminal_readiness(
     visible, monkeypatch, sender
 ):
     bridge, transport = visible
@@ -132,8 +131,8 @@ async def test_authenticated_ack_of_queued_work_completes_without_terminal_readi
     monkeypatch.setattr(bridge.sessions, "read", forbidden)
     monkeypatch.setattr(bridge.sessions, "insert", forbidden)
     monkeypatch.setattr(bridge.sessions, "press_return", forbidden)
-    monkeypatch.setattr("kirabridge.message_manager.receiver.MCPClientPool", forbidden_pool)
-    assert not await bridge.message_receiver._dispatch_next()
+    monkeypatch.setattr("kirabridge.message_manager.direct.MCPClientPool", forbidden_pool)
+    assert bridge.message_receiver._claim(sent["id"]) is None
     result = bridge.messages.get(sender, sent["id"])
     assert result["processing"]["state"] == "completed"
     assert result["processing"]["evidence"]["externally_acknowledged"] is True
@@ -144,5 +143,5 @@ async def test_authenticated_ack_of_queued_work_completes_without_terminal_readi
     assert bridge.store.db.execute("SELECT count(*) FROM visible_handoffs").fetchone()[0] == 0
     notices = bridge.store.db.execute("SELECT payload FROM completion_notices").fetchall()
     assert len(notices) == 1 and '"outcome":"not_executed"' in notices[0][0]
-    assert not await bridge.message_receiver._dispatch_next()
+    assert bridge.message_receiver._claim(sent["id"]) is None
     assert bridge.store.db.execute("SELECT count(*) FROM completion_notices").fetchone()[0] == 1

@@ -12,7 +12,7 @@ from test_mcp import http_bridge  # noqa: F401
 from kirabridge.audit_manager import verify
 from kirabridge.bridge_core.bridge import Bridge
 from kirabridge.bridge_core.config import AgentConfig, ReceiverConfig
-from kirabridge.bridge_core.models import BridgeError
+from kirabridge.bridge_core.models import BridgeError, digest
 from kirabridge.mcp_gateway.client import MCPClientPool, Peer
 from kirabridge.message_manager import MessageSend
 from kirabridge.task_manager.store import SCHEMA, Store
@@ -43,6 +43,21 @@ def message(**changes):
             **changes,
         }
     )
+
+
+def archive_dispatch(channel, principal, value, state="accepted"):
+    """Build a pre-upgrade record without submitting executable work."""
+    saved = channel._send(
+        principal, value.model_copy(update={"dispatch": False}), visible_internal=True
+    )
+    channel.store.db.execute(
+        "UPDATE messages SET request_hash=? WHERE id=?",
+        (digest({**value.model_dump(), "dispatch": True}), saved["id"]),
+    )
+    channel.store.db.execute(
+        "INSERT INTO message_jobs(message_id,state) VALUES(?,?)", (saved["id"], state)
+    )
+    return channel.get(principal, saved["id"])
 
 
 def test_ordered_roundtrip_receipts_idempotency_and_ownership(channel, bridge):
@@ -89,7 +104,7 @@ def test_ordered_roundtrip_receipts_idempotency_and_ownership(channel, bridge):
         reply["id"],
     ]
     assert [e["kind"] for e in channel.events("codex", first["id"])["events"]] == [
-        "message.queued",
+        "message.recorded",
         "message.delivered",
         "message.acknowledged",
     ]
@@ -98,9 +113,10 @@ def test_ordered_roundtrip_receipts_idempotency_and_ownership(channel, bridge):
     assert "harmlose Frage" not in audit_text and "Antwort" not in audit_text
 
 
-def test_sender_cannot_be_supplied_and_task_reference_is_owned(channel, bridge, config):
+async def test_sender_cannot_be_supplied_and_task_reference_is_owned(channel, bridge, config):
     with pytest.raises(ValidationError):
         MessageSend(**{**message().model_dump(), "sender": "grok"})
+    await bridge.tasks.start()
     task = request(arguments={"path": config.principals["codex"].roots[0]})
     bridge.prepare("codex", task)
     with pytest.raises(BridgeError, match="not found"):
@@ -116,6 +132,8 @@ def test_sender_cannot_be_supplied_and_task_reference_is_owned(channel, bridge, 
     config.principals["codex"].approval_mode = "manual"
     with pytest.raises(BridgeError, match="automatic"):
         channel.send("codex", message(idempotency_key="another"))
+
+    await bridge.tasks.stop()
 
 
 def test_quotas_unicode_and_reply_loops_fail_before_insertion(channel, config, bridge):
@@ -240,7 +258,7 @@ def test_answers_wait_for_requesting_client_and_keep_historical_idempotency(
     channel, bridge, config, tmp_path
 ):
     configure_receivers(bridge, config, tmp_path)
-    first = channel.send("codex", message(dispatch=True))
+    first = archive_dispatch(channel, "codex", message(dispatch=True))
     answer = message(
         recipient="codex",
         reply_to=first["id"],
@@ -253,7 +271,7 @@ def test_answers_wait_for_requesting_client_and_keep_historical_idempotency(
     assert channel.receive("codex")["messages"][0]["id"] == returned["id"]
     assert channel.send("grok", answer)["id"] == returned["id"]
     historical = answer.model_copy(update={"idempotency_key": "old-answer", "dispatch": True})
-    old = channel.send("grok", historical)
+    old = archive_dispatch(channel, "grok", historical)
     assert old["processing"]
     # Historical normalized hashes did not retain whether True was implicit.
     retry = historical.model_copy(update={"dispatch": None})
@@ -326,7 +344,7 @@ async def test_interrupted_receiver_is_unknown_and_never_claimed_again(
     channel, bridge, config, tmp_path
 ):
     configure_receivers(bridge, config, tmp_path)
-    first = channel.send("codex", message(dispatch=True))
+    first = archive_dispatch(channel, "codex", message(dispatch=True))
     assert bridge.message_receiver._claim(first["id"])
     bridge.store.db.execute(
         "UPDATE message_jobs SET evidence=? WHERE message_id=?",
@@ -334,13 +352,13 @@ async def test_interrupted_receiver_is_unknown_and_never_claimed_again(
     )
     async with bridge:
         status = channel.get("codex", first["id"])["processing"]
-        assert status["state"] == "unknown" and status["error"] == "interrupted"
+        assert status["state"] == "unknown" and status["error"] == "delivery_unknown"
         assert status["evidence"]["last_observation"]["session_id"] == "prior-session"
         assert bridge.message_receiver._claim(first["id"]) is None
         assert not (Path(config.principals["grok"].roots[0]) / "grok-invocations").exists()
 
 
-async def test_persisted_queue_is_resumed_by_new_receiver(
+async def test_legacy_queue_is_cancelled_without_replay_by_new_receiver(
     channel,
     http_bridge,  # noqa: F811
     config,
@@ -350,7 +368,9 @@ async def test_persisted_queue_is_resumed_by_new_receiver(
 
     bridge, _ = http_bridge
     configure_receivers(bridge, config, tmp_path)
-    first = channel.send("codex", message(dispatch=True, request_reply=False))
+    first = archive_dispatch(
+        channel, "codex", message(dispatch=True, request_reply=False), state="queued"
+    )
     reopened = Bridge(config)
     try:
         assert reopened.messages.get("grok", first["id"])["processing"]["state"] == "queued"
@@ -358,19 +378,19 @@ async def test_persisted_queue_is_resumed_by_new_receiver(
         reopened.store.close()
     bridge.message_receiver = MessageReceiver(bridge)
     await bridge.message_receiver.start()
-    async with asyncio.timeout(10):
-        while channel.get("codex", first["id"])["processing"]["state"] != "completed":
-            await asyncio.sleep(0.02)
-    assert channel.get("codex", first["id"])["acknowledged"]
-    assert (Path(config.principals["grok"].roots[0]) / "grok-invocations").read_text() == "1\n"
+    result = channel.get("codex", first["id"])
+    assert result["processing"]["state"] == "cancelled"
+    assert result["body"] == first["body"] and result["acknowledged"] is None
+    assert not channel.receive("grok")["messages"]
+    assert not (Path(config.principals["grok"].roots[0]) / "grok-invocations").exists()
 
 
 def test_receiver_budget_blocks_extra_provider_turns(channel, bridge, config, tmp_path):
     configure_receivers(bridge, config, tmp_path)
     config.messaging.max_runs_per_conversation = 1
-    first = channel.send("codex", message(dispatch=True))
+    first = archive_dispatch(channel, "codex", message(dispatch=True))
     assert bridge.message_receiver._claim(first["id"])
-    second = channel.send("codex", message(dispatch=True, idempotency_key="second"))
+    second = archive_dispatch(channel, "codex", message(dispatch=True, idempotency_key="second"))
     assert bridge.message_receiver._claim(second["id"]) is None
     assert channel.get("codex", second["id"])["processing"]["state"] == "blocked"
 

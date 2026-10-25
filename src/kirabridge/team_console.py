@@ -17,6 +17,7 @@ from starlette.responses import HTMLResponse, JSONResponse, Response
 from starlette.routing import Route
 
 from kirabridge.bridge_core.models import BridgeError
+from kirabridge.permissions import automatic_for
 from kirabridge.team_manager.models import (
     TeamCreate,
     TeamMessageSend,
@@ -134,7 +135,7 @@ class TeamConsole:
                 worker.agent
                 and worker.cwd
                 and policy
-                and policy.approval_mode == "automatic"
+                and automatic_for(policy, "agent.execute")
                 and "agent.execute" in policy.capabilities
                 and worker.agent in policy.agents
                 and adapter
@@ -207,9 +208,11 @@ class TeamConsole:
         )
 
     async def delegate(self, request: Request):
+        from kirabridge.team_manager.local import delegate
+
         principal = self._principal(request)
         value = await self._model(request, TeamWorkCreate)
-        return JSONResponse(self.teams.delegate(principal, value))
+        return JSONResponse(await delegate(self.teams, principal, value))
 
     async def work_get(self, request: Request):
         principal = self._principal(request)

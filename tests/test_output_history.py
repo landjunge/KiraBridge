@@ -2,7 +2,7 @@ import json
 from types import SimpleNamespace
 
 import pytest
-from conftest import request
+from conftest import archive_task, request
 
 from kirabridge.audit_manager import verify
 from kirabridge.bridge_core.models import BridgeError, State
@@ -30,7 +30,7 @@ def manual_running(
     if operation == "session.read":
         args = {"pane_id": "terminal:100:ttys001", "expected_pid": 123}
     task = request(operation, args, task_id=identifier)
-    bridge.prepare(principal, task)
+    archive_task(bridge, task, principal)
     bridge.store.claim("test-owner", 30, control="read" if operation == "session.read" else False)
     bridge.store.transition(identifier, State.RUNNING, {"test_transport": True}, owner="test-owner")
     return task

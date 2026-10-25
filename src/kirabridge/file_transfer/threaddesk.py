@@ -19,29 +19,53 @@ TOOLS = frozenset(
 
 
 class ThreadDeskFileReceiver:
-    def __init__(self, manager):
+    def __init__(self, manager, *, destination_ref=None, legacy=False):
         self.manager = manager
+        self._destination_ref, self._legacy = destination_ref, legacy
         self.native = False
         self.availability = "not_probed"
 
     @property
     def identity(self):
         settings = self.manager.settings
-        return digest(
-            [
-                settings.command,
-                settings.args,
-                settings.workspace,
-                settings.storage,
-                settings.source_root,
-            ]
-        )
+        fields = [settings.command, settings.args, settings.workspace, settings.storage]
+        if self._legacy:
+            if settings.source_root is not None:
+                raise BridgeError(
+                    "transfer_destination_changed", "Legacy source is no longer bound"
+                )
+        else:
+            fields.append(settings.source_root)
+        observed = digest(fields)
+        if self._destination_ref is not None and observed != self._destination_ref:
+            raise BridgeError("transfer_destination_changed", "Bound destination settings changed")
+        return observed
+
+    def bind_destination(self, destination_ref):
+        """Keep historical manifests immutable; each operation owns its protocol view."""
+        if self._destination_ref is not None:
+            if self.identity != destination_ref:
+                raise BridgeError("transfer_destination_changed", "Prepared destination changed")
+            return self
+        if destination_ref == self.identity:
+            return type(self)(self.manager, destination_ref=destination_ref)
+        settings = self.manager.settings
+        legacy = digest([settings.command, settings.args, settings.workspace, settings.storage])
+        if settings.source_root is None and destination_ref == legacy:
+            return type(self)(self.manager, destination_ref=destination_ref, legacy=True)
+        raise BridgeError("transfer_destination_changed", "Prepared destination changed")
 
     async def native_call(self, action, operation_id, **fields):
+        if self._legacy:
+            raise BridgeError(
+                "transfer_protocol_unavailable", "Legacy checkpoint requires file_import"
+            )
+        _ = self.identity  # Revalidate the pinned view before any asynchronous receiver access.
         # No write replay here, including after a timeout. Resume starts with status.
         manager = self.manager
         async with manager.lock:
             await manager.connect()
+            _ = self.identity
             result = await manager.pool.call(
                 "threaddesk",
                 "library_receive_status" if action == "status" else "library_receive",
@@ -101,6 +125,11 @@ class ThreadDeskFileReceiver:
             }
 
     async def call(self, tool, arguments):
+        _ = self.identity
+        if self._legacy and tool not in TOOLS:
+            raise BridgeError(
+                "transfer_protocol_unavailable", "Legacy checkpoint requires file_import"
+            )
         manager = self.manager
         async with manager.lock:
             await manager.connect()
@@ -110,6 +139,7 @@ class ThreadDeskFileReceiver:
                     "transfer_protocol_unavailable",
                     "ThreadDesk lacks the file-byte import contract",
                 )
+            _ = self.identity  # connect/list_tools may have yielded to a configuration change.
             result = await manager.pool.call("threaddesk", tool, arguments)
             ok, value = manager.decode(result, mutation=False)
             if not ok:
@@ -125,9 +155,14 @@ class ThreadDeskFileReceiver:
             return value
 
     async def capabilities(self):
+        _ = self.identity
+        if self._legacy:
+            # Never rediscover native tools for an original file_import checkpoint.
+            return await self.call("file_import_capabilities", {})
         async with self.manager.lock:
             await self.manager.connect()
             names = {item.name for item in await self.manager.pool.list_tools("threaddesk")}
+            _ = self.identity
             self.native = {
                 "library_receive",
                 "library_receive_status",

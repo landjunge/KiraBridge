@@ -11,7 +11,7 @@ import sys
 from pathlib import Path
 
 import pytest
-from conftest import request, submit
+from conftest import archive_task, request
 
 from kirabridge.bridge_core.models import BridgeError, State, canonical
 from kirabridge.observation_export import (
@@ -25,7 +25,7 @@ SECRET = "DO_NOT_EXPORT_PRIVATE_DATA"
 
 
 def queued(bridge, identity="owned-task", principal="local"):
-    submit(bridge, request(arguments={"path": SECRET}, task_id=identity), principal=principal)
+    archive_task(bridge, request(arguments={"path": SECRET}, task_id=identity), principal=principal)
 
 
 def audit(bridge, kind, metadata, task_id="owned-task", principal="local"):
@@ -550,7 +550,7 @@ def test_diagnostic_limit_reports_omitted_and_still_advances_cursor(bridge):
     with bridge.store.transaction():
         bridge.store.db.execute("UPDATE audit SET hash=? WHERE kind='task.transition'", ("f" * 64,))
     value = read(bridge, limit=500)
-    assert len(value["diagnostics"]) == 64 and value["diagnostics_omitted"] == 2
+    assert len(value["diagnostics"]) == 64 and value["diagnostics_omitted"] == 3
     assert not value["has_more"] and not value["events"]
 
 

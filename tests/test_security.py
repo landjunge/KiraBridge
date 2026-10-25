@@ -14,18 +14,19 @@ def test_default_policy_fails_closed(bridge):
         bridge.security.grant("empty", request())
 
 
-def test_exact_task_approval_and_replay(bridge, config):
+async def test_exact_task_approval_and_replay(bridge, config):
     value = request(arguments={"path": config.principals["local"].roots[0]})
     token = bridge.security.grant("local", value)
     changed = value.model_copy(update={"arguments": {"path": "/"}})
-    with pytest.raises(BridgeError, match="one-use"):
-        bridge.submit("local", changed, token)
-    with pytest.raises(BridgeError):
-        bridge.submit("other", value, token)
-    bridge.submit("local", value, token)
-    other = value.model_copy(update={"task_id": "second", "idempotency_key": "second"})
-    with pytest.raises(BridgeError):
-        bridge.submit("local", other, token)
+    async with bridge:
+        with pytest.raises(BridgeError, match="one-use"):
+            bridge.submit("local", changed, token)
+        with pytest.raises(BridgeError):
+            bridge.submit("other", value, token)
+        bridge.submit("local", value, token)
+        other = value.model_copy(update={"task_id": "second", "idempotency_key": "second"})
+        with pytest.raises(BridgeError):
+            bridge.submit("local", other, token)
 
 
 def test_expired_grant(bridge, config):
@@ -36,16 +37,17 @@ def test_expired_grant(bridge, config):
         bridge.submit("local", value, token)
 
 
-def test_owner_isolation(bridge, config):
+async def test_owner_isolation(bridge, config):
     value = request(arguments={"path": config.principals["local"].roots[0]})
-    submit(bridge, value)
-    for read in (
-        lambda: bridge.task("other", value.task_id),
-        lambda: bridge.events("other", value.task_id),
-        lambda: bridge.tasks.cancel_queued("other", value.task_id),
-    ):
-        with pytest.raises(BridgeError, match="not found"):
-            read()
+    async with bridge:
+        submit(bridge, value)
+        for read in (
+            lambda: bridge.task("other", value.task_id),
+            lambda: bridge.events("other", value.task_id),
+            lambda: bridge.tasks.cancel_queued("other", value.task_id),
+        ):
+            with pytest.raises(BridgeError, match="not found"):
+                read()
 
 
 def test_remote_requires_tls_and_explicit_policy(monkeypatch):

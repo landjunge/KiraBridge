@@ -5,6 +5,7 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
+from conftest import DomainOnlyTeamPort
 from test_agents import fake_cli
 from test_mcp import http_bridge  # noqa: F401
 
@@ -372,7 +373,7 @@ async def test_real_authenticated_team_dispatch_delegates_and_keeps_private_task
         assert verify(bridge.store)["valid"]
 
 
-async def make_http_team(clients, endpoint):
+async def make_http_team(clients, endpoint, *, archive_bridge=None):
     await clients.connect(Peer("local", url=endpoint, token="local-test-" + "a" * 40))
     made = (
         await clients.call(
@@ -390,21 +391,28 @@ async def make_http_team(clients, endpoint):
         )
     ).structuredContent
     assert not made.get("error")
-    created = (
-        await clients.call(
-            "local",
-            "team_work_create",
-            {
-                "request": {
-                    "team_id": "restart-team",
-                    "assignee": "codex",
-                    "title": "Restart prüfen",
-                    "body": "Ein harmloser Test",
-                    "idempotency_key": "restart-work",
-                }
-            },
-        )
-    ).structuredContent
+    original = archive_bridge.teams.direct_delivery if archive_bridge else None
+    if archive_bridge:
+        archive_bridge.teams.direct_delivery = DomainOnlyTeamPort()
+    try:
+        created = (
+            await clients.call(
+                "local",
+                "team_work_create",
+                {
+                    "request": {
+                        "team_id": "restart-team",
+                        "assignee": "codex",
+                        "title": "Restart prüfen",
+                        "body": "Ein harmloser Test",
+                        "idempotency_key": "restart-work",
+                    }
+                },
+            )
+        ).structuredContent
+    finally:
+        if archive_bridge:
+            archive_bridge.teams.direct_delivery = original
     assert not created.get("error")
     return created
 
@@ -418,7 +426,7 @@ async def test_restart_missing_claimed_core_is_unknown_without_model_replay(
     bridge, endpoint = http_bridge
     root = configure_team(bridge, config, tmp_path, monkeypatch)
     async with MCPClientPool() as clients:
-        work = await make_http_team(clients, endpoint)
+        work = await make_http_team(clients, endpoint, archive_bridge=bridge)
         claimed = bridge.teams.claim(work["id"])
         assert claimed["state"] == "dispatching" and claimed["core_task_id"]
         await bridge.team_dispatcher.start()
@@ -428,7 +436,7 @@ async def test_restart_missing_claimed_core_is_unknown_without_model_replay(
                 if latest["state"] == "unknown":
                     break
                 await asyncio.sleep(0.05)
-        assert latest["error"] == "team_core_missing_after_claim"
+        assert latest["error"] == "team_restart_unknown"
         assert not (Path(root) / "team-codex-invocations").exists()
         assert bridge.store.db.execute("SELECT count(*) FROM tasks").fetchone()[0] == 0
 
@@ -461,23 +469,21 @@ async def test_restart_after_delivered_action_is_idempotent_and_never_reexecutes
         return result
 
     bridge.team_dispatcher._call = interrupted
+    await bridge.team_dispatcher.start()
     async with MCPClientPool() as clients:
         work = await make_http_team(clients, endpoint)
         await bridge.team_dispatcher.start()
         await asyncio.wait_for(delivered.wait(), 10)
         await bridge.team_dispatcher.stop()
         before = bridge.teams.work_get("local", "restart-team", work["id"])
-        assert before["state"] == "processing_result"
+        assert before["state"] == "unknown"
         bridge.team_dispatcher = TeamDispatcher(bridge)
         await bridge.team_dispatcher.start()
-        async with asyncio.timeout(10):
-            while True:
-                after = bridge.teams.work_get("local", "restart-team", work["id"])
-                if after["state"] == "completed":
-                    break
-                await asyncio.sleep(0.05)
+        after = bridge.teams.work_get("local", "restart-team", work["id"])
+        assert after["state"] == "unknown"
         assert after["core_task_id"] == before["core_task_id"]
-        assert after["result"] == "DONE_ONCE"
+        assert after["result"] == before["result"]
+        assert json.loads(after["result"])["result"] == "DONE_ONCE"
         messages = bridge.teams.messages("local", "restart-team")["messages"]
         assert len(messages) == 1 and messages[0]["body"] == "ONLY_ONCE"
         assert bridge.store.db.execute("SELECT count(*) FROM tasks").fetchone()[0] == 1
@@ -493,7 +499,7 @@ async def test_fresh_authenticated_context_after_sixteen_items_and_recipient_onl
     bridge, endpoint = http_bridge
     root = configure_team(bridge, config, tmp_path, monkeypatch)
     async with MCPClientPool() as clients:
-        work = await make_http_team(clients, endpoint)
+        work = await make_http_team(clients, endpoint, archive_bridge=bridge)
     for index in range(21):
         historical = bridge.teams.delegate(
             "local",

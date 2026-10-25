@@ -8,7 +8,7 @@ import sys
 from types import SimpleNamespace
 
 import pytest
-from conftest import request
+from conftest import archive_task, request
 
 from kirabridge.bridge_core.bridge import Bridge
 from kirabridge.bridge_core.config import load_config
@@ -113,12 +113,15 @@ async def test_restart_releases_sql_writer_and_blocks_concurrent_submission(oper
     assert result["operations"]["accepting_new_work"]
     assert rig.bridge.store.maintenance_state() is None
     assert len(rig.commands) == 1 and rig.commands[0][-1].endswith("com.kirabridge.bridge")
-    assert (
-        rig.bridge.prepare(
+    await rig.bridge.tasks.start()
+    try:
+        admitted = rig.bridge.prepare(
             "local", request("file.list", {"path": rig.bridge.config.principals["local"].roots[0]})
-        )["state"]
-        == "queued"
-    )
+        )
+        assert admitted["state"] == "accepted"
+        assert (await rig.bridge.tasks.wait("local", admitted["id"]))["state"] == "completed"
+    finally:
+        await rig.bridge.tasks.stop()
 
 
 async def test_drain_finishes_running_task_and_preserves_completion(operations):
@@ -133,8 +136,8 @@ async def test_drain_finishes_running_task_and_preserves_completion(operations):
 
     rig.bridge.tasks.executor = execute
     task = request("file.list", {"path": rig.bridge.config.principals["local"].roots[0]})
-    rig.bridge.prepare("local", task)
     await rig.bridge.tasks.start()
+    rig.bridge.prepare("local", task)
     try:
         await asyncio.wait_for(started.wait(), 2)
         activation = asyncio.create_task(rig.service.activate())
@@ -153,7 +156,7 @@ async def test_drain_finishes_running_task_and_preserves_completion(operations):
 async def test_preexisting_queue_may_drain_but_no_new_task_can_steal_run_id(operations):
     rig = operations
     task = request("file.list", {"path": rig.bridge.config.principals["local"].roots[0]})
-    original = rig.bridge.prepare("local", task)
+    original = archive_task(rig.bridge, task)
     with rig.bridge.store.transaction():
         now = __import__("time").time()
         rig.bridge.store.db.execute(
@@ -181,7 +184,7 @@ async def test_busy_timeout_leaves_original_task_and_config_untouched(operations
     rig = operations
     before = rig.path.read_bytes()
     task = request("file.list", {"path": rig.bridge.config.principals["local"].roots[0]})
-    rig.bridge.prepare("local", task)
+    archive_task(rig.bridge, task)
     rig.bridge.store.claim("busy", 30)
     rig.service.drain_timeout = 0
     with pytest.raises(BridgeError) as error:
@@ -341,14 +344,14 @@ async def test_second_controller_cannot_activate_over_existing_barrier(operation
 def test_owned_stop_can_drain_but_cannot_race_activation(operations):
     rig = operations
     target = request("file.list", {"path": str(rig.path.parent)}, task_id="owned-target")
-    rig.bridge.prepare("local", target)
+    archive_task(rig.bridge, target)
     rig.bridge.store.claim("original-worker", 30)
     now = __import__("time").time()
     rig.bridge.store.db.execute(
         "INSERT INTO activation_runs VALUES('held','draining',?,?,?,NULL)", (now, now, "{}")
     )
     stop = request("process.terminate", {"task_id": target.task_id}, task_id="stop-owned-target")
-    rig.bridge.prepare("local", stop)
+    archive_task(rig.bridge, stop)
     assert rig.bridge.store.claim("control-worker", 30, control=True)["id"] == stop.task_id
     rig.service.update("held", "verifying")
     with pytest.raises(BridgeError) as error:
@@ -503,3 +506,151 @@ async def test_unfinished_team_result_blocks_restart_and_keeps_config(operations
     assert error.value.code == "service_busy" and not rig.commands
     assert rig.path.read_bytes() == before
     assert rig.bridge.store.maintenance_state() is None
+
+
+def external_wait(rig, state="confirmed"):
+    from test_activation_queries import authenticated_delivery
+
+    message_id, receipt = authenticated_delivery(rig.bridge)
+    rig.bridge.messages.ack("other", message_id, receipt)
+    rig.bridge.store.db.execute(
+        "INSERT INTO visible_handoffs VALUES('external-wait','local','other','hash','{}',"
+        "?,?,1,1,'{}')",
+        (message_id, state),
+    )
+    return message_id
+
+
+def principal_only_text(rig):
+    import tomllib
+
+    raw = tomllib.loads(rig.path.read_text())
+    policy = raw["principals"]["local"]
+    policy["roots"] = ["/"]
+    return replace_section(rig.path.read_text(), "principals.local", policy)
+
+
+async def test_local_principal_grant_preserves_external_wait_and_default_remains_strict(operations):
+    rig = operations
+    external_wait(rig)
+    before_handoff = [
+        tuple(row) for row in rig.bridge.store.db.execute("SELECT * FROM visible_handoffs")
+    ]
+    before_events = [
+        tuple(row) for row in rig.bridge.store.db.execute("SELECT * FROM visible_handoff_events")
+    ]
+    rig.service.drain_timeout = 0
+    with pytest.raises(BridgeError, match="läuft oder wartet"):
+        await rig.service.activate(text=principal_only_text(rig))
+    assert not rig.commands
+    result = await rig.service.activate(text=principal_only_text(rig), principal_grant="local")
+    assert result["operations"]["accepting_new_work"] and len(rig.commands) == 1
+    assert [
+        tuple(row) for row in rig.bridge.store.db.execute("SELECT * FROM visible_handoffs")
+    ] == before_handoff
+    assert [
+        tuple(row) for row in rig.bridge.store.db.execute("SELECT * FROM visible_handoff_events")
+    ] == before_events
+    plan = json.loads(
+        rig.bridge.store.db.execute(
+            "SELECT plan FROM activation_runs WHERE state='completed'"
+        ).fetchone()[0]
+    )
+    assert plan["principal_grant"] == "local" and plan["preserved_external_waits"] == 1
+    assert (
+        rig.bridge.store.db.execute(
+            "SELECT count(*) FROM audit WHERE kind='activation.external_waits_preserved'"
+        ).fetchone()[0]
+        == 1
+    )
+
+
+@pytest.mark.parametrize(
+    "changed", ["other-principal", "credential", "source", "agent", "receiver"]
+)
+async def test_principal_grant_refuses_non_acl_changes_and_source_change(operations, changed):
+    import tomllib
+
+    rig = operations
+    raw = tomllib.loads(principal_only_text(rig))
+    if changed == "other-principal":
+        raw["principals"]["other"]["roots"] = ["/"]
+    elif changed == "credential":
+        raw["principals"]["local"]["token_env"] = "OTHER_SECRET"
+    elif changed == "agent":
+        raw["agents"] = {"new": {"kind": "codex"}}
+    elif changed == "receiver":
+        raw["messaging"] = {"receivers": {"local": {"cwd": "/tmp"}}}
+    else:
+        rig.health["runtime"]["source_tree_sha256"] = "0" * 64
+    from kirabridge.bridge_core.config import Config
+
+    candidate = Config.model_validate(raw)
+    if changed == "source":
+        with pytest.raises(BridgeError) as error:
+            await rig.service.activate(text=principal_only_text(rig), principal_grant="local")
+        assert error.value.code == "principal_grant_source"
+    else:
+        with pytest.raises(BridgeError) as error:
+            rig.service.validate_principal_grant(load_config(str(rig.path)), candidate, "local")
+        assert error.value.code == "principal_grant_scope"
+    assert not rig.commands and rig.bridge.store.maintenance_state() is None
+
+
+@pytest.mark.parametrize(
+    "work", ["queued-task", "running-job", "team-result", "inserting", "submitting", "return_sent"]
+)
+async def test_principal_grant_never_bypasses_bridge_work_or_partial_native_input(operations, work):
+    from test_activation_queries import processing_result_fixture
+
+    rig = operations
+    message_id = external_wait(
+        rig, state=work if work in {"inserting", "submitting", "return_sent"} else "confirmed"
+    )
+    if work == "queued-task":
+        archive_task(
+            rig.bridge,
+            request("file.list", {"path": rig.bridge.config.principals["local"].roots[0]}),
+        )
+    elif work == "running-job":
+        rig.bridge.store.db.execute(
+            "INSERT INTO message_jobs(message_id,state) VALUES(?,'running')", (message_id,)
+        )
+    elif work == "team-result":
+        processing_result_fixture(rig.bridge.store)
+    before = rig.path.read_bytes()
+    rig.service.drain_timeout = 0
+    with pytest.raises(BridgeError) as error:
+        await rig.service.activate(text=principal_only_text(rig), principal_grant="local")
+    assert error.value.code == "service_busy"
+    assert not rig.commands and rig.path.read_bytes() == before
+
+
+async def test_principal_grant_restart_rechecks_exact_config_and_recovery_stays_strict(
+    operations, monkeypatch
+):
+    rig = operations
+    external_wait(rig)
+    original_restart = rig.service.restart
+
+    async def changed_before_restart(identifier):
+        # A concurrent operator change must never inherit the exceptional restart grant.
+        rig.path.write_text(rig.path.read_text() + "\n# unrelated concurrent edit\n")
+        await original_restart(identifier)
+
+    monkeypatch.setattr(rig.service, "restart", changed_before_restart)
+    with pytest.raises(BridgeError) as error:
+        await rig.service.activate(text=principal_only_text(rig), principal_grant="local")
+    assert error.value.code == "principal_grant_scope"
+    assert not rig.commands
+    assert rig.bridge.store.maintenance_state()["state"] == "failed_blocked"
+    with pytest.raises(BridgeError) as recovery:
+        await rig.service.recover()
+    assert recovery.value.code == "service_busy"
+    assert not rig.commands
+    assert (
+        rig.bridge.store.db.execute(
+            "SELECT state FROM visible_handoffs WHERE id='external-wait'"
+        ).fetchone()[0]
+        == "confirmed"
+    )

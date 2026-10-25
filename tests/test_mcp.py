@@ -379,7 +379,7 @@ async def test_action_aliases_without_events_preserve_execution_and_idempotency(
                 task_id=name,
             )
             result = await clients.call("local", name, {"request": value.model_dump()})
-            assert result.structuredContent["state"] == "queued"
+            assert result.structuredContent["state"] == "accepted"
             assert (await bridge.tasks.wait("local", value.task_id))["state"] == "completed"
             duplicate = await clients.call("local", name, {"request": value.model_dump()})
             assert duplicate.structuredContent["id"] == value.task_id

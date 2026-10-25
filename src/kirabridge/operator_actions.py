@@ -137,9 +137,11 @@ class OperatorTaskDecisions:
     def detail(self, task_id):
         return self.store.operator_detail(task_id)
 
-    def decide(self, task_id, decision, request_hash):
+    async def decide(self, task_id, decision, request_hash):
         if decision == "approve":
-            self.tasks.approve(task_id, expected_hash=request_hash, source="local_console")
+            from kirabridge.task_manager.local import approve
+
+            await approve(self.tasks, task_id, expected_hash=request_hash, source="local_console")
         elif decision == "deny":
             self.store.transition(
                 task_id,

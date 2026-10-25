@@ -221,7 +221,7 @@ class ApprovalConsole:
         ):
             raise BridgeError("invalid_request", "Review the complete request first")
         return JSONResponse(
-            self.application.task_decisions.decide(
+            await self.application.task_decisions.decide(
                 request.path_params["task_id"],
                 request.path_params["decision"],
                 payload["request_hash"],

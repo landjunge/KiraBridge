@@ -13,7 +13,7 @@ from pydantic import Field, model_validator
 
 from kirabridge.bridge_core.models import BridgeError, TerminalInput, UncertainExecution
 from kirabridge.filesystem_manager import PathScope
-from kirabridge.platform_adapters.shell_prompt import empty_shell_prompt
+from kirabridge.platform_adapters.shell_prompt import empty_shell_prompt, idle_shell
 from kirabridge.private_files import private_json, write_private
 from kirabridge.session_manager import SessionOpen, SessionReference
 from kirabridge.terminal_manager import check_executable
@@ -33,6 +33,7 @@ class VisibleTerminalInput(TerminalInput):
 
 class VisibleTerminal:
     def __init__(self, config, security, sessions, environment):
+        self.admission = asyncio.Lock()
         self.config, self.security, self.sessions, self.environment = (
             config,
             security,
@@ -40,21 +41,24 @@ class VisibleTerminal:
             environment,
         )
 
-    async def suitable(self, principal, row):
-        if (
-            row.get("transport") != "terminal_app"
-            or row.get("busy", True)
-            or not row.get("processes")
-        ):
-            return False
-        # Idle shell only: an interactive agent/editor is never an interchangeable shell.
-        processes = row["processes"]
-        if any(p["name"].lstrip("-") not in {"login", "zsh", "bash", "sh"} for p in processes):
+    async def suitable(self, principal, row, *, task_id=None):
+        lifecycle = getattr(self.sessions, "lifecycle", None)
+        if not idle_shell(row) or (lifecycle and lifecycle.is_reserved(row["pane_id"], task_id)):
             return False
         output = await self.sessions.read(principal, row["pane_id"], row["expected_pid"])
         return empty_shell_prompt(output["text"])
 
     async def execute(self, task, args, running, *, privileged=False):
+        if self.admission.locked():
+            raise BridgeError("execution_busy", "Visible command is active; nothing queued/opened")
+        async with self.admission:
+            try:
+                return await self._execute(task, args, running, privileged=privileged)
+            finally:
+                if self.sessions.lifecycle:
+                    self.sessions.lifecycle.release(task["id"])
+
+    async def _execute(self, task, args, running, *, privileged=False):
         bridge, principal = self, task["principal"]
         policy = bridge.security.principal(principal, "terminal.execute")
         bridge.security.principal(principal, "session.inspect")
@@ -80,7 +84,7 @@ class VisibleTerminal:
         async with bridge.sessions.lock:
             if args.pane_id:
                 row = await bridge.sessions.selected(principal, args.pane_id, args.expected_pid)
-                if not await self.suitable(principal, row):
+                if not await self.suitable(principal, row, task_id=task["id"]):
                     raise BridgeError(
                         "session_busy", "Selected window is not a confirmed empty shell"
                     )
@@ -91,7 +95,7 @@ class VisibleTerminal:
                     raise BridgeError(error["code"], error.get("message", "Terminal unavailable"))
                 candidates = []
                 for candidate in catalog["sessions"]:
-                    if await self.suitable(principal, candidate):
+                    if await self.suitable(principal, candidate, task_id=task["id"]):
                         candidates.append(candidate)
                 # Every candidate has independent fresh empty-shell evidence.
                 row = (
@@ -104,6 +108,8 @@ class VisibleTerminal:
                         )
                     # Do not acquire sessions.lock recursively; open has its own lock.
             if row is not None:
+                if self.sessions.lifecycle:
+                    self.sessions.lifecycle.reserve(task["id"], row["pane_id"])
                 reference = SessionReference(
                     pane_id=row["pane_id"], expected_pid=row["expected_pid"]
                 )
@@ -135,7 +141,7 @@ class VisibleTerminal:
                         pane_id=row["pane_id"], expected_pid=row["expected_pid"]
                     )
                     try:
-                        if await self.suitable(principal, row):
+                        if await self.suitable(principal, row, task_id=task["id"]):
                             break
                     except BridgeError as exc:
                         if exc.code != "session_selection_changed":
@@ -174,11 +180,15 @@ class VisibleTerminal:
             + "\n"
         )
         write_private(script_path, script)
+        lifecycle = getattr(self.sessions, "lifecycle", None)
+        if lifecycle:
+            lifecycle.reserve(task["id"], reference.pane_id)
+            lifecycle.command(reference.pane_id, task["id"], result_path, nonce)
         async with bridge.sessions.lock:
             current = await bridge.sessions.selected(
                 principal, reference.pane_id, reference.expected_pid
             )
-            if current != row or not await self.suitable(principal, current):
+            if current != row or not await self.suitable(principal, current, task_id=task["id"]):
                 raise BridgeError(
                     "visible_target_changed", "Visible shell changed before dispatch; no input"
                 )
