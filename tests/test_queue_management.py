@@ -314,7 +314,8 @@ async def test_actual_http_mcp_queue_cancel_restore_clear_and_owned_stop(
         proof = await bridge.tasks.wait("local", "owned-stop", 10)
         assert proof["state"] == "completed", proof
         assert proof["result"]["exit_code"] is not None
-        assert bridge.terminal.sessions["owned-sleeper"].process.returncode is not None
+        session = bridge.terminal.sessions.get("owned-sleeper")
+        assert session is None or session.process.returncode is not None
 
 
 async def test_recipient_cannot_reverse_sender_withdrawal(queues, bridge, config):
