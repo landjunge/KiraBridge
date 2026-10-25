@@ -1,4 +1,6 @@
 import sys
+from contextlib import asynccontextmanager
+from types import SimpleNamespace
 
 import pytest
 
@@ -31,6 +33,13 @@ def config(tmp_path):
 @pytest.fixture
 def bridge(config):
     instance = Bridge(config)
+
+    @asynccontextmanager
+    async def isolated_clipboard(text):
+        # Unit fixtures must never read or modify the operator's real clipboard.
+        yield SimpleNamespace(generation=1, restore_status="restored")
+
+    instance.sessions.terminal_app.clipboard_owner = isolated_clipboard
     yield instance
     instance.store.close()
 

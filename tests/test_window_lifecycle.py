@@ -111,6 +111,35 @@ async def test_conflicting_window_identity_is_never_silently_adopted(window):
     assert not state["closed"]
 
 
+async def test_unconfirmed_new_window_blocks_repeated_creation(window, config, monkeypatch):
+    bridge, state = window
+    state["exists"] = False
+
+    async def opened(command):
+        state["opened"].append(command)
+        return {"tty": "/dev/ttys098", "window_id": 901, "created_window": True}
+
+    async def no_catalog():
+        return []
+
+    async def no_delay(seconds):
+        return None
+
+    monkeypatch.setattr(bridge.sessions.terminal_app, "open", opened)
+    monkeypatch.setattr(bridge.sessions.terminal_app, "catalog", no_catalog)
+    monkeypatch.setattr("kirabridge.session_manager.asyncio.sleep", no_delay)
+    for identifier in ["unconfirmed-one", "unconfirmed-two"]:
+        args = SessionOpen(cwd=config.principals["local"].roots[0], controlled_shell=True)
+        token = bridge.security.grant_window("local", identifier, args)
+        args = args.model_copy(update={"window_authorization": token})
+        with bridge.store.transaction():
+            bridge.security.consume_window("local", identifier, args)
+        with pytest.raises(BridgeError) as unconfirmed:
+            await bridge.sessions.open("local", args, task_id=identifier)
+        assert unconfirmed.value.code == "window_reconciliation_required"
+    assert len(state["opened"]) == 1
+
+
 @pytest.mark.parametrize(
     "change", ["git", "codex", "zsh", "busy", "input", "identity", "missing_receipt"]
 )

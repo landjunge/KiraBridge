@@ -1,0 +1,81 @@
+{
+  "date": "2026-10-25",
+  "repair_parent": "dd20b263e98272e8d768699445bbd9ce4540fb28",
+  "existing_rc17_integration_parent": "481eb32eca61ba7ccd287c92644cb8305cdae44b",
+  "source_manifest_sha256": "3f90cd86b6d328042fbe8284a90cdc13bfca0623d9e97490537c7411594e8cc9",
+  "source_hash_algorithm": "SHA256 of sorted-key JSON list of relative Python paths and individual SHA256 values",
+  "source_files": 123,
+  "local_full_suite_repeated": false,
+  "counts_overlap": true,
+  "integrated_selection": {
+    "passed": 290,
+    "failed": 1,
+    "failed_case": "new parent legacy queued fixture",
+    "corrected_case_passed": 1
+  },
+  "additional_authority_selection_passed": 108,
+  "session_discovery_unconfirmed_window_selection_passed": 34,
+  "team_first_selection": {
+    "passed": 101,
+    "failed": 3,
+    "old_restart_expectations_corrected": true
+  },
+  "team_console_selection": {
+    "passed": 19,
+    "failed": 1,
+    "failure": "terminal work error string misclassified as transport envelope",
+    "corrected_forward_and_task_approval_cases_passed": 2
+  },
+  "new_team_direct_cases": 5,
+  "native_integrated_close_guard_probe": {
+    "guards_passed": true,
+    "stable_window_id_reference": true,
+    "close_action_executed": false,
+    "new_windows": 0,
+    "pane_set_unchanged": true
+  },
+  "earlier_pr38_snapshot": {
+    "commit": "06272efa902f07289889760043bff981fc32bada",
+    "linux311_ci": "success",
+    "linux313_ci": "one known cursor failure fixed in integrated PR37",
+    "verify_run": 40225241878,
+    "macos_package_run": 40225241749,
+    "hosted_macos_jobs": "not started: billing/spending limit"
+  },
+  "production_new_code_installed": false,
+  "production_file_transfer_config_enabled": true,
+  "real_codex_prompt_delivery_proven": false,
+  "historical_library_bytes_imported": 0,
+  "private_log_hashes": {
+    "kirabridge-direct-affected-a.log": "2ce1737eeaec7789a7e984ec74be3266aacd87901be9596ecf357c2652a69754",
+    "kirabridge-direct-affected-b.log": "54daaa8750c137927e13e98bad8d0c6e1776602c1a6ee429ef98ef59efa77cfa",
+    "kirabridge-direct-affected-c.log": "41d3be3b50df8cdcfa1c7a5cedbce516822a692dba3859a8ab78bfbc0fa6ebe7",
+    "kirabridge-direct-final-cli-windows.log": "ca4f1d15f1d36ec93ee05efaf09cc7e19eaffa5a1aea75d95773c7d6eed992ef",
+    "kirabridge-direct-final-core.log": "b264d304a1413f6a33020258dc561c54de919afac8cdf27b8620734ce50a5c55",
+    "kirabridge-direct-integrated-authority.log": "ce8242f453fffc9c0004f14afc10235792f57d9d67e198a6ff7f48ac46e180fc",
+    "kirabridge-direct-integrated-gates.log": "8819827511110eab5b886a8ad64aa86cb38de0df276b4f4920e2bcb0d1d4e92e",
+    "kirabridge-direct-integrated-recheck.log": "b7b3aa92344a38bedb2ba74f765049f69319b8af87f14816cc3a4df38eeb870a",
+    "kirabridge-direct-integration-20261025.log": "bdd6e74fc810d10d5bf336f468ca09082984d1bf5d626e36b68deb03b6c3ba9c",
+    "kirabridge-direct-migration-final.log": "f18a01e6c48b7288a314e49788140df9a25d107a6630fc91cf3b1f4b477657c3",
+    "kirabridge-direct-optional-gates.log": "63f117cdbbadaca31a25206a07ffe7e5c8526474f7e7d3df808ad9ba8758e230",
+    "kirabridge-direct-optional-recheck.log": "1ecdd1643bc82d14abb7343ca3eb8dd27f3a31e97c6229702f65020cc3f9aa2d",
+    "kirabridge-direct-ownership-final.log": "641baf96b978afe3ce2ca3bf476c5f84e26782b1083bbf8cd3873fc9be97557f",
+    "kirabridge-direct-receiver-contract.log": "128634987e9e723e0874fb345a7cbd3db6be24d0e7e9c7db00c611c4b277f989",
+    "kirabridge-direct-recheck-d.log": "b17ce91f7d9b2d128d913c690b094655cd196f6eef5adce891e4f9c342de3370",
+    "kirabridge-direct-recheck-e.log": "46b1e2cad2d1d93f24c86958cb1dfe6b7e3af1bd143beed0eff93cb928c9e113",
+    "kirabridge-direct-remaining.log": "c5ca91d133ad0039cfb5477137075c89c310bd5c7680975982b981994060ab8b",
+    "kirabridge-direct-team-console-final.log": "795a0c07b9efa7ae287212acdda37fa415606b0ded7d0e64b09d16aaf79219a0",
+    "kirabridge-direct-team-final.log": "00a31d0da13ab3d45949e6b2f9ab4253e769793bc5b17f81c97ac5f0d4160c25",
+    "kirabridge-direct-team-forward-recheck.log": "fe9fb40060ae2f92d89a9f811e7d53bf69cdc5ce753364a85fe141e1c98eb17f",
+    "kirabridge-direct-team-integration.log": "6c501a2e6e192c00a85b8f8834901899da009d7e1bb96e4787b3a4990cc56b1a",
+    "kirabridge-direct-team-recheck.log": "d84700785eb33bb9f1759aafa758b5ec409ca5921008093379c4cf9303785e24",
+    "kirabridge-direct-unconfirmed-window.log": "9b50b57b239fd4f18a58c4ae8dcb8cfe3516cf30a581c50a722084c5fdfc0349"
+  },
+  "gates": "Current combined-source CI/package gates and selected Codex acceptance remain open; do not bypass.",
+  "whitespace_check": {
+    "own_changes_against_pinned_parent": "passed",
+    "source_tests_scripts": "passed",
+    "inherited_literal_patch_payload_lines": 4,
+    "archived_evidence_reformatted": false
+  }
+}

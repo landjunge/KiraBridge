@@ -1,10 +1,11 @@
 # RC17 direct dispatch repair · 2026-10-25
 
-This repair replaces the core task and addressed-message execution queues with
+This repair replaces core task, addressed-message and automatic team execution queues with
 bounded, immediate admission. Durable SQLite records remain execution journals,
 idempotency receipts, review requests and inbox history. They are never polled for
-new core execution. Optional team-domain work and webhook delivery are separate
-features; their existing records are preserved.
+new execution. Manual human-assigned team work remains a project record awaiting
+explicit receipt; it never starts a model automatically. Webhook notification
+delivery remains a separate feature with preserved records.
 
 ## Contract
 
@@ -129,3 +130,57 @@ evidence; no second owned window was created for retesting.
 Public summary and private-log hashes: [evidence](evidence/rc17-direct-repair-20261025.json).
 PR CI and package acceptance remain mandatory. Failed, interrupted or not-started
 checks must never be represented as passing or bypassed.
+
+## Automatic team path and existing RC17 integration
+
+Live configuration confirmed that the team mode was enabled. Its separate polling
+receiver was therefore also removed. New automatic team work is admitted immediately
+or refused before persistence when offline/busy. Idempotent reads never dispatch it
+again. A separate local browser console forwards the exact request through the
+authenticated daemon, which advertises `team_dispatch_mode=direct`. Manual project
+records and explicit, hash-bound result reprocessing retain their existing authority.
+No restart polls old work, replays model turns or resumes uncertain result actions.
+
+Team migration archives only provably unstarted old work; claim/hash/result/execution
+evidence makes the state unknown. Core task IDs, result bytes, action journals and
+history remain. A shutdown or result-action timeout records a bounded explicit
+outcome without rescheduling. Active team dispatches also block an unsafe update.
+
+The first affected team group produced 101 passes and three old restart expectations;
+the corrected cases were verified separately. Five direct admission/shutdown/legacy/
+browser-forwarding cases and the lost-action case are covered. A console result with
+a durable failure code is a valid work record, not a transport-error envelope.
+
+Existing RC17 integration PR37, pinned to `481eb32eca61ba7ccd287c92644cb8305cdae44b`,
+is reused in this isolated branch. It preserves PR32 native runtime fixes already
+installed as `012b592`, PR35 legacy checkpoint compatibility, PR36 cleanup and the
+known Linux3.13 cursor/package fixes. No parent branch or other worktree was modified.
+The initial PR38 source `06272ef` had green Linux3.11 CI; Linux3.13 failed only the
+already-fixed cursor case. Its macOS verification/package jobs did not start because
+of GitHub account billing/spending limits. No bypass or production upgrade occurred.
+
+Three merge conflicts combined the existing native error classifications, exact
+window-ID references, and active accepted-message counting with the parent's ACKed
+legacy-queue exclusion. Close uses the same stable window-ID reference. Targeted
+combined-source verification initially produced 290 passes and one new parent's
+legacy queued fixture failure; that single fixture is corrected and checked again.
+The complete local suite was not repeated. Current integrated evidence and CI must
+be distinguished from the earlier `06272ef` snapshot.
+
+The corrected fixture passed. An additional 108 team authority, gateway, activation
+and permission cases passed. A further 34 session/discovery cases passed, including
+a confirmed native creation with no bindable process: after a bounded wait it stays
+unknown and a second request cannot create another window. Cancellation during
+process discovery retains that same creation barrier. No replacement-window loop
+or pending-success result is returned for an unconfirmed binding.
+
+The integrated exact-ID close guards passed read-only against the existing proof
+shell, with no close action, new window or changed pane set. Final source fingerprint,
+log hashes and dependency pin are in
+[integrated evidence](evidence/rc17-direct-integrated-20261025.json).
+
+Whitespace checks pass for current changes against the pinned integration parent
+and for source/tests/scripts. The full merge comparison also reports four literal
+blank-line additions inside the parent's archived `working-tree.patch`. That evidence
+payload remains byte-for-byte unchanged; it is not source to reformat. Its original
+manifest and parent history are preserved. CI lint/test/package gates are unchanged.

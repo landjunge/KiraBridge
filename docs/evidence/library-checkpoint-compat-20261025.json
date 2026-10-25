@@ -1,0 +1,61 @@
+{
+  "base_commit": "3fa120332e6245aa6a60dfaf3ebb090a71005129",
+  "interpreter": "/Users/landjunge/KiraBridge-release-20261024/.worktrees/current-release/.venv/bin/python",
+  "loaded_source_files": [
+    "/Users/landjunge/KiraBridge-release-20261024/.worktrees/library-checkpoint-compat-20261025/src/kirabridge/file_transfer/service.py",
+    "/Users/landjunge/KiraBridge-release-20261024/.worktrees/library-checkpoint-compat-20261025/src/kirabridge/file_transfer/threaddesk.py"
+  ],
+  "sha256": {
+    "src/kirabridge/file_transfer/service.py": "314f3cdc80f18cdca53fa116859001456d1f3847d9a149d826e82f05847fae49",
+    "src/kirabridge/file_transfer/threaddesk.py": "182a09168f28050300b8880e0ac4374ac4c087e9da222e5a3ebc4205408036f8",
+    "tests/test_file_receiver_checkpoint_compat.py": "7478ea0d7ef8757f6a85ec10614a0c4f44543f0c4a70b88586c378c444a3bdef"
+  },
+  "test_runs": [
+    {
+      "log": "reproduction.log",
+      "result": "2 failed before patch: transfer_destination_changed"
+    },
+    {
+      "log": "legacy-resume.log",
+      "result": "2 passed; initial resume check before audit assertions added"
+    },
+    {
+      "log": "safety.log",
+      "result": "10 passed, 2 deselected; refusals, same-view reconciliation/abort, five-field identity"
+    },
+    {
+      "log": "regressions.log",
+      "result": "8 passed; final resume with audit-prefix assertions, immutable stored receipt, 3 generic receiver regressions, 2 isolated MCP disk contract cases"
+    }
+  ],
+  "lint": "ruff check passed; git diff --check passed",
+  "scope": "isolated new fixture data, legacy disk/MCP and one actual native ThreadDesk process; no live production receiver/config/credentials/TD worktree changes",
+  "native_thread_desk_acceptance": {
+    "passed": 1,
+    "deselected": 10,
+    "source_commit": "770bbc9f0c0a02699cc93cad47d2e2c3782f7080",
+    "source_scope": "git archive copied into isolated KiraBridge test area; original TD worktree unchanged",
+    "checks": [
+      "actual stdio native text transfer",
+      "unchanged original and exact stored bytes",
+      "durable receipt",
+      "restart and readback/search",
+      "duplicate receipt and one stored record"
+    ],
+    "platform": "macOS-15.7.4-x86_64-i386-64bit",
+    "log_sha256": "3559affd81b38f5121627dc4de7951290832d1dfc1ad82960b6524aa032ce1f8"
+  },
+  "limitations": [
+    "Old four-field identity accepted only for exact current four fields and source_root=None",
+    "Legacy view never switches to native; v1 contract has no abort capability",
+    "Existing five-field manifest identity unchanged; it still has no separate historical contract pin"
+  ],
+  "distinct_targeted_cases_passed": 19,
+  "log_sha256": {
+    "legacy-resume.log": "78419627264031e09b8d27d312febff809c752c4503708de329ca11ad2b11318",
+    "native-text.log": "3559affd81b38f5121627dc4de7951290832d1dfc1ad82960b6524aa032ce1f8",
+    "reproduction.log": "df7c2870b218a697d0f1dc73189d4b85fe6d43cd1c3da5842e6e749f3e1bef3f",
+    "safety.log": "1dcaf3a1bd402e19cd3354b066381904e280091e3c3873a2890dcd619e7aaccc",
+    "regressions.log": "32b80c26c38bb8251ffec5ca9a6e07a0263e313bf891780784241831650dac46"
+  }
+}

@@ -502,6 +502,27 @@ def test_manual_authorization_cannot_be_laundered_through_automatic_assignee(dom
         operation()
 
 
+def test_explicit_full_team_permissions_override_legacy_manual_without_granting_access(domain):
+    for level in ("ask", "medium"):
+        domain.config.principals["local"].permission_level = level
+        with pytest.raises(BridgeError) as error:
+            domain.delegate("local", work(idempotency_key="nonautomatic-" + level))
+        assert error.value.code == "approval_required"
+    for name in ("local", "codex"):
+        domain.config.principals[name].permission_level = "full"
+        domain.config.principals[name].approval_mode = "manual"
+    shared = domain.delegate("local", work(idempotency_key="effective-full"))
+    assert domain.claim(shared["id"])
+    domain.config.principals["codex"].agents = []
+    blocked = domain.delegate("local", work(idempotency_key="missing-agent"))
+    assert domain.claim(blocked["id"]) is None
+    assert domain.work_get("local", "test-team", blocked["id"])["error"] == "team_worker_denied"
+    domain.config.principals["local"].capabilities.remove("team.write")
+    with pytest.raises(BridgeError) as error:
+        domain.delegate("local", work(idempotency_key="missing-capability"))
+    assert error.value.code == "forbidden"
+
+
 def test_disabled_calls_are_denied_but_private_tasks_remain_unaffected(domain):
     domain.config.team.enabled = False
     with pytest.raises(BridgeError, match="disabled"):

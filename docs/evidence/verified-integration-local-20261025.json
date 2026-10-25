@@ -1,0 +1,54 @@
+{
+  "base_main": "7e3b8a305aa97cc1a859552a38f77d2893cd6617",
+  "integration_merge_commits": [
+    "9d04c3b",
+    "93852d9"
+  ],
+  "platform": "macOS-15.7.4-x86_64-i386-64bit",
+  "source_sha256": {
+    "src/kirabridge/platform_adapters/codex_state.py": "bf892abb43d05ff5d54841981a73d98c25d95452caf8c295514c7dfb0dcf8707",
+    "scripts/build_release.py": "a55944dd9c989d86c46eba4100bfbf5ce3561f7d4103cfa9836ecd1123eeabe3",
+    "scripts/release_smoke.py": "66804865ff7c1df5355da2fa0c36feb062c0882c557ffeddaddfe6d85e88d604",
+    "src/kirabridge/discovery.py": "0f60915158fe787141c8f7f2b724805eabe8e9a83d7857d39d07f550b60575a0",
+    "src/kirabridge/file_transfer/threaddesk.py": "182a09168f28050300b8880e0ac4374ac4c087e9da222e5a3ebc4205408036f8",
+    "src/kirabridge/file_transfer/service.py": "314f3cdc80f18cdca53fa116859001456d1f3847d9a149d826e82f05847fae49",
+    ".github/workflows/ci.yml": "7b4d6c083e67b30a7784caa4a7be9d73796508b9672b180ff95e2d2eaa2c64e8",
+    ".github/workflows/release-candidate.yml": "97cd6833052c8645834254e597722daa6899af98b414ec84d05b003db8414226"
+  },
+  "checks": {
+    "codex_rewrite_agent_cases_passed": 9,
+    "package_contract_agent_cases_passed": 12,
+    "combined_discovery_grants_receivers_installer_cleanup_passed": 19,
+    "actual_thread_desk_text_and_abort_passed": 2,
+    "actual_thread_desk_source": "770bbc9f0c0a02699cc93cad47d2e2c3782f7080",
+    "ruff_check": "passed",
+    "ruff_format": "338 files already formatted"
+  },
+  "retained_failures": [
+    "MainLinux3.13 CI40190227810 rewrite idle instead of unknown",
+    "Local original case passes onAPFS; strengthened same-mtime reproduction fails before fix",
+    "Package contract reproduction3failed1passed before fix"
+  ],
+  "logs_sha256": {
+    "codex-rewrite-baseline.log": "3a6504404ab639ac8fe2940ac1654603c072a999c0ae65ca7ef9701ab97a0954",
+    "integration-native.log": "71dfc12e887e4eaf2345741206b8d0c52372a02be8ffb0c6abcf199c82170765",
+    "integration-targeted.log": "e1177bb512610aec2dc076cd963cf3950ac67606f0fa39b520a7c2c682d872b7",
+    "package-contract-before.log": "7c1b1778025090c6a6d213388e76ae618a5ce88c9de3d1d4caaa9263edd72703",
+    "codex-rewrite-regressions.log": "90d9370f450c12eb76e48644d868e2458d10c22d5371a726ad49a853390a4a97",
+    "codex-rewrite-fixed.log": "3605abb09038ce24e90d81df8f7c0d87bb6f647a5e016bf461d8a8fcb408f6e9",
+    "ruff-format.log": "6114f759b0852f5f0ec9377c2371f14298d568aae6d48b6d9536b2f4c9f31333",
+    "ruff.log": "82b3e6a6c090a57601d22943bd23fca9218d1031dbe5a7b754092f9a156b4f18",
+    "codex-rewrite-shortreads.log": "0c15948e3e16483bedf87bc0f9680c9fc3067d50fcb935f6c932a701a875dec8",
+    "package-contract-security.log": "cc7e526f25738c4388cc77e4ab3349888c76209aef42dc833df696539fe8eab9",
+    "codex-rewrite-reproduction.log": "8aff168d15ea9a4d654aca4a94877c39a3bdee2864e596113b021986f9a192a8",
+    "package-contract-after.log": "ebd938888ffaa2af3581cec946b9b58fbc84d3d34af429b416dd4a0ad79f1a12"
+  },
+  "not_claimed": [
+    "No new production deployment",
+    "No GitHubActions success yet for this integration",
+    "No new final built-package acceptance yet",
+    "No Ubuntu or AppleSilicon proof from Debian",
+    "No actual historical Library import"
+  ],
+  "runner": "existing Debian self-hosted runners; no new registration or service setup"
+}

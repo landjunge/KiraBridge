@@ -1,0 +1,26 @@
+{
+  "date": "2026-10-25",
+  "base_commit": "bb30108",
+  "scope": "macOS acceptance harness cleanup only; no installer, daemon, permissions or production installation changes",
+  "problem": "launchctl bootout failure could leave evidence passed=true without observing whether the isolated test service disappeared",
+  "fix": "After the single owned bootout attempt, independently poll the exact service using launchctl print for at most ten seconds and 100 observations. Only return code 113 proves absence. Observation denial, timeout or persistent presence fail acceptance and persist passed=false.",
+  "evidence": {
+    "pre_fix": "test_cleanup_failure_cannot_leave_successful_evidence failed: DID NOT RAISE RuntimeError, 1 failed in 0.13s",
+    "after_fix": "4 passed in 0.10s",
+    "cases": [
+      "Removal failure with persistent job cannot retain passed=true",
+      "Already absent fixture passes with explicit absence evidence",
+      "Delayed disappearance is observed",
+      "Observation denial cannot count as absence"
+    ],
+    "ruff": "passed after correcting two format-only layouts; initial cache write denied by sandbox, rerun with authorized cache access",
+    "format": "2 files already formatted",
+    "git_diff_check": "passed"
+  },
+  "limits": [
+    "launchctl is simulated in the four tests; no new live install/upgrade/rollback was run",
+    "Actual exit113 for the exact absent isolated label was observed in the earlier independent read-only review",
+    "Earlier successful production/package evidence remains source-pinned; no historical evidence rewritten"
+  ],
+  "coordination": "Own worktree acceptance-cleanup-20261025 and branch fix/acceptance-cleanup-20261025; no changes in the other implementation worktrees"
+}

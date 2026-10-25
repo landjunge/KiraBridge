@@ -279,6 +279,25 @@ async def test_catalog_reports_configuration_without_claiming_native_authenticat
         assert disabled["enabled"] is False and disabled["teams"] == []
 
 
+@pytest.mark.parametrize("level,execution", [("full", "automatic"), ("ask", "blocked")])
+async def test_roster_uses_effective_worker_permission_not_legacy_approval_mode(
+    team_bridge, level, execution
+):
+    policy = team_bridge.config.principals["codex"]
+    policy.permission_level = level
+    policy.approval_mode = "manual"
+    policy.capabilities.append("agent.execute")
+    policy.agents = ["codex"]
+    team_bridge.config.agents["codex"] = AgentConfig(kind="codex")
+    team_bridge.config.team.workers["codex"] = TeamWorkerConfig(agent="codex", cwd="/tmp")
+    async with browser(team_bridge) as client:
+        result = (await client.get("/api/team", headers=headers())).json()
+        assert (
+            next(row for row in result["roster"] if row["principal"] == "codex")["execution"]
+            == execution
+        )
+
+
 @pytest.mark.parametrize(
     "query", ["after=-1", "limit=51", "after=no", "after=1&after=2", "sender=grok"]
 )

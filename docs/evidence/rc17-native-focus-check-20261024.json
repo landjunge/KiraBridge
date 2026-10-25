@@ -1,0 +1,13 @@
+{
+  "os": "macOS-15.7.4-x86_64-i386-64bit",
+  "architecture": "x86_64",
+  "result": {
+    "focus_only": true,
+    "window_id": 42963,
+    "tty": "/dev/ttys000"
+  },
+  "input_sent": false,
+  "clipboard_accessed": false,
+  "scope": "own confirmed fixture only",
+  "earlier_frontmost_only_candidate": "failed exact focus guard; not installed"
+}

@@ -369,3 +369,38 @@ def test_untrusted_schema_field_names_are_not_echoed_as_diagnostics():
     error = validate_management(values("set_note", **{private_field: "too long"}), schema)
     assert error["details"]["field"] == "data"
     assert private_field not in str(error)
+
+
+def test_legacy_secret_rejection_keeps_specific_code_without_peer_text(config):
+    manager = ThreadDeskManager(config)
+    ok, value = manager.decode(
+        CallToolResult(
+            isError=True,
+            content=[],
+            structuredContent={
+                "code": "tool_error",
+                "message": "Keine API-Keys oder Passwörter in Thread-Dateien.",
+            },
+        ),
+        mutation=False,
+    )
+    assert not ok and value["error"]["code"] == "secret_detected"
+    assert "secret protection" in value["error"]["message"]
+    assert "Keine API-Keys" not in str(value)
+
+
+def test_unrecognized_peer_secret_message_stays_redacted(config):
+    manager = ThreadDeskManager(config)
+    ok, value = manager.decode(
+        CallToolResult(
+            isError=True,
+            content=[],
+            structuredContent={
+                "code": "tool_error",
+                "message": "Keine API-Keys oder Passwörter in Thread-Dateien. PRIVATE_VALUE",
+            },
+        ),
+        mutation=False,
+    )
+    assert not ok and value["error"]["code"] == "tool_error"
+    assert "PRIVATE_VALUE" not in str(value)

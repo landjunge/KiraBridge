@@ -110,13 +110,19 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
     )
 
     @server.tool(annotations=read)
-    async def bridge_health(ctx: Context) -> dict[str, Any]:
-        """Version and dispatcher health. Never claims ChatGPT integration."""
-        from kirabridge.discovery import live
+    async def bridge_health(ctx: Context, observe_terminals: bool = False) -> dict[str, Any]:
+        """Lightweight live daemon health; cached terminal observations are not input proof.
+
+        Set observe_terminals=true for an explicit bounded fresh terminal catalogue.
+        Routine polling must not consume the foreground terminal-read lane.
+        Never claims ChatGPT integration.
+        """
+        from kirabridge.discovery import live, snapshot
 
         name = identity(ctx)
         try:
-            return {**bridge.health(name), "discovery": await live(bridge, name)}
+            discovery = await live(bridge, name) if observe_terminals else snapshot(bridge, name)
+            return {**bridge.health(name), "discovery": discovery}
         except BridgeError as exc:
             return {"error": {"code": exc.code, "message": str(exc)}}
 

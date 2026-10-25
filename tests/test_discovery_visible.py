@@ -1,5 +1,6 @@
 """Regressions for advertised grants, discovery generations and exact visible work."""
 
+import asyncio
 import copy
 
 import pytest
@@ -46,7 +47,9 @@ async def test_real_http_initialization_and_fresh_catalog_agree_with_grants(
         tools = await pool.list_tools("local")
         assert "terminal_control" in {tool.name for tool in tools}
         assert all(tool.meta["kirabridge"]["version"] == __version__ for tool in tools)
-        health = (await pool.call("local", "bridge_health", {})).structuredContent
+        health = (
+            await pool.call("local", "bridge_health", {"observe_terminals": True})
+        ).structuredContent
         catalog_result = (await pool.call("local", "operation_catalog", {})).structuredContent
         inventory = (await pool.call("local", "agent_inventory", {})).structuredContent
         assert not health["approval_required"]
@@ -56,10 +59,12 @@ async def test_real_http_initialization_and_fresh_catalog_agree_with_grants(
         assert inventory["discovery"]["revision"] == health["discovery"]["revision"]
         before = health["discovery"]["revision"]
         rows[0]["expected_pid"] = 346
-        await pool.call("local", "bridge_health", {})
+        await pool.call("local", "bridge_health", {"observe_terminals": True})
         tools = await pool.list_tools("local")
         assert tools[0].meta["kirabridge"]["revision"] != before
-        changed = (await pool.call("local", "bridge_health", {})).structuredContent
+        changed = (
+            await pool.call("local", "bridge_health", {"observe_terminals": True})
+        ).structuredContent
         assert changed["discovery"]["terminal_observation"]["sessions"][0]["expected_pid"] == 346
         connection_id = pool.connection_ids["local"]
         await pool.disconnect("local")
@@ -282,3 +287,90 @@ def test_trusted_custom_chatgpt_role(config):
     assert direct_terminal_required(config, "local")
     config.principals["local"].client_type = "agent"
     assert not direct_terminal_required(config, "local")
+
+
+async def test_health_monitors_leave_terminal_read_capacity_available(
+    http_bridge,  # noqa: F811
+    config,
+    monkeypatch,
+):
+    bridge, endpoint = http_bridge
+    policy = config.principals["local"]
+    policy.capabilities += ["session.inspect"]
+    policy.permission_level = "full"
+    catalog_calls = []
+
+    async def catalog(principal):
+        catalog_calls.append(principal)
+        await asyncio.sleep(0.05)
+        return {"status": "available", "sessions": []}
+
+    async def observed(principal, pane_id, expected_pid, *, max_bytes=65536):
+        return {"pane_id": pane_id, "expected_pid": expected_pid, "text": "FOREGROUND"}
+
+    monkeypatch.setattr(bridge.sessions, "catalog", catalog)
+    monkeypatch.setattr(bridge.sessions, "read_observed", observed)
+    async with MCPClientPool() as pool:
+        await pool.connect(Peer("local", url=endpoint, token="local-test-" + "a" * 40))
+        results = await asyncio.gather(
+            *(pool.call("local", "bridge_health", {}) for _ in range(6)),
+            pool.call(
+                "local", "session_read", {"pane_id": "terminal:123:ttys004", "expected_pid": 345}
+            ),
+        )
+        assert catalog_calls == [], "Health polling must not probe Terminal or consume read slots"
+        assert all(
+            r.structuredContent["discovery"]["terminal_observation"]["freshness"] == "not_probed"
+            for r in results[:-1]
+        )
+        assert results[-1].structuredContent["text"] == "FOREGROUND"
+        assert bridge.terminal_queries.active == 0
+
+
+def test_passive_discovery_invalidates_observations_when_permissions_change(bridge, config):
+    from kirabridge.discovery import snapshot
+    from kirabridge.permissions import permission_revision
+
+    policy = config.principals["local"]
+    policy.capabilities += ["session.inspect"]
+    policy.permission_level = "full"
+    bridge.discovery_observations = {
+        "local": {
+            "status": "available",
+            "sessions": [{"pane_id": "terminal:123:ttys004"}],
+            "observed_at": 123.0,
+            "revision": "old-observation",
+            "permission_revision": permission_revision(config),
+        }
+    }
+    observed = snapshot(bridge, "local")["terminal_observation"]
+    assert observed["freshness"] == "cached" and observed["observed_at"] == 123.0
+    assert not observed["usable_for_input"]
+    policy.capabilities.remove("session.inspect")
+    assert snapshot(bridge, "local")["terminal_observation"]["sessions"] == []
+
+
+@pytest.mark.parametrize(
+    "authorized,manual,status",
+    [(False, False, "not_authorized"), (True, True, "approval_required")],
+)
+async def test_explicit_discovery_preserves_current_denial_without_stale_sessions(
+    bridge, config, monkeypatch, authorized, manual, status
+):
+    from kirabridge.discovery import live
+
+    policy = config.principals["local"]
+    policy.permission_level = "ask" if manual else "full"
+    if authorized:
+        policy.capabilities += ["session.inspect"]
+
+    async def forbidden(*args):
+        pytest.fail("Denied discovery must not probe terminals")
+
+    monkeypatch.setattr(bridge.sessions, "catalog", forbidden)
+    bridge.discovery_observations = {
+        "local": {"status": "available", "sessions": [{"pane_id": "STALE"}]}
+    }
+    observation = (await live(bridge, "local"))["terminal_observation"]
+    assert observation["status"] == status and observation["sessions"] == []
+    assert observation["freshness"] == "fresh" and not observation["usable_for_input"]

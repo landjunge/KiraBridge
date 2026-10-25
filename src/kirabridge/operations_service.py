@@ -39,6 +39,7 @@ def replace_section(text, header, values):
 def access_text(config_path: Path, *, level=None, revoke_operations=None):
     """Keep credentials and existing grants. The full level uses the operator's full grant."""
     from kirabridge.bridge_core.bridge import INPUTS
+    from kirabridge.operations import capability_for
 
     config = load_config(str(config_path))
     if level is not None and level not in LEVELS:
@@ -84,6 +85,7 @@ def access_text(config_path: Path, *, level=None, revoke_operations=None):
                 dict.fromkeys(
                     policy.capabilities
                     + list(INPUTS)
+                    + [capability_for(operation) for operation in INPUTS]
                     + [
                         "bridge.health",
                         "task.read",
@@ -188,10 +190,47 @@ class OperationsService:
                 "Bitte das Steuerfenster neu starten; laufende Agenten bleiben erhalten.",
             )
 
-    def work_counts(self, *, active_only=False):
+    def work_counts(self, *, active_only=False, principal_grant=None):
         # Domain owners issue their SQL using this same transaction context.
         # The runtime service knows no foreign table or foreign state machine.
-        return self.work_queries(active_only=active_only, context=self.store)
+        return self.work_queries(
+            active_only=active_only,
+            context=self.store,
+            **({"preserve_external_waits": True} if principal_grant is not None else {}),
+        )
+
+    @staticmethod
+    def validate_principal_grant(before, candidate, principal):
+        allowed = {
+            "capabilities",
+            "roots",
+            "read_roots",
+            "terminal_roots",
+            "executables",
+            "allow_any_executable",
+            "agents",
+            "team_only_execution",
+            "approval_mode",
+            "permission_level",
+            "automatic_operations",
+            "message_peers",
+        }
+        old, new = before.model_dump(), candidate.model_dump()
+        if not isinstance(principal, str) or principal not in old["principals"]:
+            raise BridgeError("principal_grant_scope", "Select one existing local principal")
+        if principal not in new["principals"]:
+            raise BridgeError("principal_grant_scope", "The selected principal must remain")
+        for document in (old, new):
+            document["principals"][principal] = {
+                key: value
+                for key, value in document["principals"][principal].items()
+                if key not in allowed
+            }
+        if old != new:
+            raise BridgeError(
+                "principal_grant_scope",
+                "Only this principal's ACL may change; preserve all runtime settings",
+            )
 
     def update(self, identifier, state, error=None):
         with self.store.transaction():
@@ -265,7 +304,30 @@ class OperationsService:
                 raise BridgeError(
                     "activation_ownership_required", "Keine eigene aktive Neustartreservierung"
                 )
-            if any(self.work_counts(active_only=row["state"] == "recovering").values()):
+            plan = json.loads(row["plan"])
+            grant = plan.get("principal_grant") if row["state"] == "verifying" else None
+            if grant is not None:
+                self.check_source()
+                target = Path(plan["config_path"])
+                previous = self.state_path / "activation-configs" / (plan["before_sha"] + ".toml")
+                if (
+                    plan["source_sha"] != self.source_sha
+                    or plan["version"] != self.version
+                    or self.store.db.execute("PRAGMA user_version").fetchone()[0] != plan["schema"]
+                    or hashlib.sha256(target.read_bytes()).hexdigest() != plan["target_sha"]
+                    or hashlib.sha256(previous.read_bytes()).hexdigest() != plan["before_sha"]
+                ):
+                    raise BridgeError(
+                        "principal_grant_scope", "Permission-only restart plan changed"
+                    )
+                self.validate_principal_grant(
+                    load_config(str(previous)), load_config(str(target)), grant
+                )
+            if any(
+                self.work_counts(
+                    active_only=row["state"] == "recovering", principal_grant=grant
+                ).values()
+            ):
                 raise BridgeError("service_busy", "Laufende Arbeit bleibt erhalten")
         code, _, _ = await self.command(
             "/bin/launchctl", "kickstart", "-k", f"gui/{os.getuid()}/com.kirabridge.bridge"
@@ -273,7 +335,7 @@ class OperationsService:
         if code:
             raise BridgeError("service_restart", "KiraBridge konnte nicht neu gestartet werden")
 
-    async def activate(self, *, text=None, expected_config_sha=None):
+    async def activate(self, *, text=None, expected_config_sha=None, principal_grant=None):
         self.check_source()
         config = self.config()
         if not config._source_path:
@@ -301,6 +363,8 @@ class OperationsService:
             candidate = Config.model_validate(tomllib.loads(text))
         except (ValueError, ValidationError):
             raise BridgeError("invalid_config", "Die neuen Einstellungen sind ungültig") from None
+        if principal_grant is not None:
+            self.validate_principal_grant(config, candidate, principal_grant)
         target_sha, effective = (
             hashlib.sha256(text.encode()).hexdigest(),
             digest(candidate.model_dump()),
@@ -317,6 +381,17 @@ class OperationsService:
                 "Zuerst den koordinierten Betriebsdienst installieren",
             )
         prior = self.prior_text(config, health)
+        if principal_grant is not None:
+            self.validate_principal_grant(
+                Config.model_validate(tomllib.loads(prior)), candidate, principal_grant
+            )
+            if (
+                health.get("runtime", {}).get("source_tree_sha256") != self.source_sha
+                or health.get("runtime", {}).get("version") != self.version
+            ):
+                raise BridgeError(
+                    "principal_grant_source", "Permission-only activation requires the same source"
+                )
         previous_sha = hashlib.sha256(prior.encode()).hexdigest()
         previous_effective = digest(Config.model_validate(tomllib.loads(prior)).model_dump())
         if self.store.db.execute("PRAGMA user_version").fetchone()[0] != SCHEMA_VERSION:
@@ -338,6 +413,12 @@ class OperationsService:
             "version": self.version,
             "schema": SCHEMA_VERSION,
         }
+        if principal_grant is not None:
+            plan["principal_grant"] = principal_grant
+            plan["preserved_external_waits"] = (
+                self.work_counts()["visible_handoffs"]
+                - self.work_counts(principal_grant=principal_grant)["visible_handoffs"]
+            )
         with self.store.transaction():
             self.store.assert_accepting()
             now = time.time()
@@ -351,7 +432,7 @@ class OperationsService:
         changed = False
         try:
             deadline = time.monotonic() + self.drain_timeout
-            while any(self.work_counts().values()):
+            while any(self.work_counts(principal_grant=principal_grant).values()):
                 if time.monotonic() >= deadline:
                     raise BridgeError(
                         "service_busy",
@@ -359,8 +440,28 @@ class OperationsService:
                     )
                 await asyncio.sleep(0.05)
             with self.store.transaction():
-                if any(self.work_counts().values()):
+                if any(self.work_counts(principal_grant=principal_grant).values()):
                     raise BridgeError("service_busy", "Ein Auftrag läuft noch")
+                if principal_grant is not None:
+                    plan["preserved_external_waits"] = (
+                        self.work_counts()["visible_handoffs"]
+                        - self.work_counts(principal_grant=principal_grant)["visible_handoffs"]
+                    )
+                    self.store.db.execute(
+                        "UPDATE activation_runs SET plan=? WHERE id=?",
+                        (canonical(plan), identifier),
+                    )
+                    self.store.audit(
+                        "activation.external_waits_preserved",
+                        "local",
+                        None,
+                        {
+                            "activation_id": identifier,
+                            "principal": principal_grant,
+                            "count": plan["preserved_external_waits"],
+                            "replay": False,
+                        },
+                    )
                 self.update(identifier, "activating")
             self.check_source()
             if path.read_text() != before:

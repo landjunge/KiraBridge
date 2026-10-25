@@ -76,7 +76,12 @@ def read_query(bridge, principal: str, query: ReadQuery) -> dict:
     policy = bridge.security.principal(principal, capability)
     if query.operation == "terminal.output":
         task = bridge.task(principal, query.task_id)
-        if task["operation"] not in {"terminal.execute", "agent.execute"}:
+        if task["operation"] not in {
+            "terminal.execute",
+            "terminal.visible",
+            "admin.execute",
+            "agent.execute",
+        }:
             raise BridgeError("invalid_operation", "Task has no terminal output")
         try:
             source = bridge.terminal.inspect(principal, query.task_id)
@@ -87,9 +92,11 @@ def read_query(bridge, principal: str, query: ReadQuery) -> dict:
             source = task.get("result") or {}
             origin = "persisted_task_result"
         remaining, output, truncated = query.max_bytes, {}, False
-        for key in ("stdout", "stderr"):
+        keys = ("stdout", "stderr") + (("terminal_output",) if "terminal_output" in source else ())
+        for key in keys:
             raw = str(source.get(key, "")).encode("utf-8")
-            output[key] = raw[:remaining].decode("utf-8", "replace")
+            # A clipped multibyte character must not expand the UTF-8 byte budget.
+            output[key] = raw[:remaining].decode("utf-8", "ignore")
             truncated |= len(raw) > remaining
             remaining -= min(remaining, len(raw))
         return {
@@ -100,10 +107,13 @@ def read_query(bridge, principal: str, query: ReadQuery) -> dict:
             **output,
             "bytes": query.max_bytes - remaining,
             "truncated": truncated,
-            "output_available": source.get(
-                "output_available", "stdout" in source or "stderr" in source
-            ),
+            "output_available": source.get("output_available", any(key in source for key in keys)),
             "output_status": source.get("output_status", "available"),
+            **(
+                {"output_scope": source.get("output_scope", "captured visible screen")}
+                if "terminal_output" in source
+                else {}
+            ),
             "exit_code": source.get("exit_code"),
             "scope": "owned Bridge task only; no external terminal attachment",
         }

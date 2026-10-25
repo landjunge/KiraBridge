@@ -19,28 +19,41 @@ activation is verified on the installed RC17; the new dispatch code is not yet
 deployed. [Current evidence, contract and open gates](docs/RC17-DIRECT-DISPATCH-20261025.md).
 Older repair notes below describe their historical acceptance state.
 
-## Unreleased queue repair / Unveröffentlichte Queue-Reparatur
+## RC17 status / RC17-Stand
 
-The current repair branch adds owner-scoped queue inspection/control. It is **not
-included in the RC16 draft assets and is not installed into production RC14**.
-See [queue tools, safety and rollback limits](docs/QUEUE-MANAGEMENT.md) and
-[ordered repair status](docs/REPAIR-SEQUENCE-20261024.md).
+Published: **RC14**. Installed and verified on the operator Mac: **RC17/012b592**.
+This integration combines current main/PR33, runtime repairs PR32, cleanup PR36
+and legacy checkpoint compatibility PR35; it is not yet a newly accepted package.
+Design PR34 remains separate and uninstalled.
 
-Der Reparaturbranch ergänzt eine identitätsgebundene Queue-Verwaltung. Sie ist
-**nicht in den RC16-Draft-Assets enthalten und nicht produktiv in RC14 installiert**.
-[Bedienung, Sicherheit und Rückweg](docs/QUEUE-MANAGEMENT.md) ·
-[verbindliche Reparaturreihenfolge](docs/REPAIR-SEQUENCE-20261024.md).
+Veröffentlicht bleibt **RC14**, produktiv läuft geprüftes **RC17/012b592**.
+Dieser Integrationsbranch führt main/PR33, Laufzeitreparaturen PR32,
+Abnahme-Cleanup PR36 und Checkpoint-Kompatibilität PR35 zusammen. Die
+Designvorschau PR34 bleibt separat. Bestehende Paketnachweise gehören zu ihren
+exakten Quellpins und gelten nicht automatisch für diesen integrierten Stand.
+
+The existing Debian vServer runners execute Linux CI. A concrete Python3.13
+rewrite/idle safety regression and the build/smoke contract are repaired locally;
+the targeted Debian/Python3.13 case passed; full CI and final package checks remain separate gates.
+Hosted macOS jobs remain billing-blocked; no skipped or failed gate is a pass.
+Die vorhandenen Debian-Runner führen Linux-CI aus. Ein konkreter Python3.13-
+Rewrite/Idle-Fehler und der Build/Smoke-Vertrag sind lokal gezielt repariert;
+der gezielte Debian/Python3.13-Fall bestand, vollständige CI und finale Paketabnahme stehen noch aus;
+gehostete macOS-Jobs bleiben abrechnungsbedingt blockiert. Kein Pflichtcheck
+wird umgangen. [Latest installed proof](docs/RC17-RESUME-20261025.md) ·
+[Library contract and compatibility](docs/LIBRARY-COMPAT-20261025.md).
 
 ## English
 
-**Current source: RC17 consolidation candidate**, combining main, RC15/RC16 and subsequent repairs. Existing RC15/RC16 draft assets contain historical source pins, not this combined code. [Consolidation and acceptance gates](docs/CONSOLIDATION-20261024.md). The RC17 review command was tested with isolated paths; production deployment remains unapproved.
+**Current source: RC17 consolidation candidate**, combining main, RC15/RC16 and subsequent repairs. Existing RC15/RC16 draft assets contain historical source pins, not this combined code. [Consolidation and acceptance gates](docs/CONSOLIDATION-20261024.md). The RC17 review command was tested with isolated paths; the operator subsequently authorized an RC17 upgrade. Source, draft assets and installed service must be distinguished.
 
 ### Current repair status (unreleased)
 
 The development branch fixes stale explicit visible-agent selection and permits
 authorized `session.input(submit=false)` paste without Return. Process identity,
 current focus, readiness and unchanged-input guards remain mandatory. Positive
-native input acceptance is **still open**; this is not a production fix claim.
+Intel-macOS Kira paste-only input and independent Kira readback passed on installed
+`7725bc6`; an earlier transient read timeout remains documented. CI has not run.
 [Terminal evidence and limits](docs/VISIBLE-SELECTION-20261024.md).
 
 Whiteboard mutations now preflight fresh peer schemas and report safe character/
@@ -49,8 +62,8 @@ characters and 100,000 emoji note characters (400,000 UTF-8 bytes), with indepen
 readback. Larger content needs an agreed lossless receiver contract, not truncation.
 [Whiteboard evidence](docs/WHITEBOARD-BOUNDARIES-20261024.md) ·
 [Current integration report](docs/REPAIR-SEQUENCE-20261024.md).
-Published RC14 and its installer status remain as described below; no new release
-or production installation is implied by these source changes.
+Published RC14 remains unchanged. The authorized operator RC17 installation and
+remaining native-input acceptance are documented separately above.
 
 ### Start here: live voice and terminal connection
 
@@ -117,14 +130,17 @@ SHA-256 checksums are available to authorized reviewers in the
 [RC17 release draft](https://github.com/landjunge/KiraBridge/releases).
 The installation command is [below](#install--update--installieren--aktualisieren).
 
-RC17 combines main, RC15/RC16 and subsequent repairs in [PR #28](https://github.com/landjunge/KiraBridge/pull/28)
-on `integration/current-release-20261024`. RC15 and RC16 remain historical drafts.
+[PR #28](https://github.com/landjunge/KiraBridge/pull/28) merged the consolidation into main.
+The subsequent ChatGPT repair is in open [PR #32](https://github.com/landjunge/KiraBridge/pull/32).
+The separately named candidate below pins `012b592`, actually installed and tested on Intel macOS. Native paste/readback proof remains pinned to its byte-identical native modules from7725bc6.
+Standard RC17 draft assets still represent main/b54f462; RC15/RC16 are historical drafts.
 **Merged into main; publication remains gated:** GitHub Actions cannot start because of account
-billing/spending limits. Additional review was waived by the owner. Native agent input
-and actual ThreadDesk file receiver acceptance remain outstanding. Draft creation is not publication.
+billing/spending limits. Additional review was waived by the owner. Native paste-only
+input passed; actual ThreadDesk file receiver acceptance remains outstanding. Draft creation is not publication.
 
-For a **first installation**, the command creates a scoped project setup with
-individual approvals. For an **update**, run the same command; existing
+For a **first installation**, this explicitly authorized `--full-access` command
+grants automatic full filesystem/command access to ChatGPT. Agent/provider accounts
+and optional receivers still require real setup. For an **update**, run the same command; existing
 configuration, credentials, databases, permissions and user files are preserved.
 Active tasks and unfamiliar launchers/services cause an explicit error.
 The **launchd service continues running when Terminal or browser windows close**.
@@ -155,7 +171,7 @@ See [discovery and terminal behavior](docs/DISCOVERY-VISIBLE-TERMINAL.md).
 ### Control and optional tools
 
 You configure access to files, commands and assistants. New connections use
-individual approvals by default; an operator can explicitly allow selected
+individual approvals unless the operator explicitly grants full access; selected
 actions without repeated approval. Assistants cannot grant themselves more rights.
 
 KiraBridge works independently. An optional ThreadDesk connection can keep project
@@ -165,26 +181,27 @@ task. Further assistant adapters and their limits are described in the
 
 ### What was checked?
 
-RC17: two exact-source builds match; the authenticated draft command passed isolated Intel-macOS fresh install, RC14 upgrade, status/version, data preservation, idempotence, restart, KeepAlive and rollback. [RC17 proof](docs/ACCEPTANCE-MACOS-RC17.md). Native agent input and successful CI remain open; the owner waived additional review.
+RC17: two exact-source builds match; the authenticated draft command passed isolated Intel-macOS fresh install, RC14 upgrade, status/version, data preservation, idempotence, restart, KeepAlive and rollback. [RC17 proof](docs/ACCEPTANCE-MACOS-RC17.md). Native paste-only input passed on7725bc6; successful CI remains open. The owner waived additional review.
 
 RC16's [acceptance record](docs/ACCEPTANCE-MACOS-RC16.md) distinguishes actual Intel
 macOS tests, isolated byte/MCP contract fixtures and unverified product integration.
 The RC15 [historical installer proof](docs/ACCEPTANCE-MACOS-RC15.md) remains available.
-No production installation/configuration was modified. Apple Silicon, live ChatGPT
+Those historical RC16 checks modified no production installation/configuration. Apple Silicon, live ChatGPT
 file selection and actual ThreadDesk durable imports must not be inferred from fixtures.
 
 ---
 
 ## Deutsch
 
-**Aktueller Quellstand: RC17-Konsolidierungskandidat**, aus main, RC15/RC16 und nachfolgenden Reparaturen. Vorhandene RC15/RC16-Draft-Assets enthalten historische Quellstände, nicht diesen zusammengeführten Code. [Zusammenführung und offene Abnahmen](docs/CONSOLIDATION-20261024.md). Der RC17-Reviewbefehl wurde mit isolierten Pfaden geprüft; keine Produktivfreigabe.
+**Aktueller Quellstand: RC17-Konsolidierungskandidat**, aus main, RC15/RC16 und nachfolgenden Reparaturen. Vorhandene RC15/RC16-Draft-Assets enthalten historische Quellstände, nicht diesen zusammengeführten Code. [Zusammenführung und offene Abnahmen](docs/CONSOLIDATION-20261024.md). Der RC17-Reviewbefehl wurde mit isolierten Pfaden geprüft; der Betreiber hat danach sein RC17-Upgrade freigegeben. Quellstand, Draft-Assets und installierter Dienst sind getrennt nachzuweisen.
 
 ### Aktueller Reparaturstand (unveröffentlicht)
 
 Der Entwicklungsbranch behebt veraltete explizite Agenten-Zuordnungen und erlaubt
 autorisierte reine Paste mit `session.input(submit=false)` ohne Return. Prozess-,
 Fokus-, Bereitschafts- und Eingabeprüfungen bleiben verpflichtend. Die positive
-native Eingabe-Abnahme ist **weiter offen**; keine produktive Reparatur behauptet.
+Intel-macOS-Eingabe über Kira und ein unabhängiges Kira-Readback sind auf installiertem
+`7725bc6` bestanden. Ein vorübergehender Lese-Timeout ist dokumentiert; CI lief nicht.
 [Terminalbelege und Grenzen](docs/VISIBLE-SELECTION-20261024.md).
 
 Whiteboard-Mutationen prüfen frische Peer-Schemas und melden sichere Zeichen-/
@@ -193,8 +210,8 @@ Beschreibung und 100.000 Emoji Notiz (400.000 UTF-8-Bytes) mit separatem Readbac
 Größere Inhalte benötigen einen verlustfreien Empfängervertrag statt Abschneiden.
 [Whiteboardbelege](docs/WHITEBOARD-BOUNDARIES-20261024.md) ·
 [Integrationsstand](docs/REPAIR-SEQUENCE-20261024.md).
-Veröffentlichtes RC14 und dessen unten beschriebener Installationsstand bleiben
-unverändert; diese Quelländerungen bedeuten weder neues Release noch Installation.
+Veröffentlicht bleibt RC14. Der Betreiber-Mac wurde auf RC17/012b592 aktualisiert;
+Quellstand, private Kandidaten-Assets und tatsächlicher Dienst sind getrennt belegt.
 
 ### Zuerst das Wichtigste: Live-Sprache und Terminal-Schnittstellen
 
@@ -266,14 +283,17 @@ SHA-256-Prüfsummen liegen für berechtigte Reviewer im
 [RC17-Release-Entwurf](https://github.com/landjunge/KiraBridge/releases).
 Der Installationsbefehl steht [unten](#install--update--installieren--aktualisieren).
 
-RC17 führt main, RC15/RC16 und nachfolgende Reparaturen in [PR #28](https://github.com/landjunge/KiraBridge/pull/28)
-auf `integration/current-release-20261024` zusammen. RC15 und RC16 bleiben historische Entwürfe.
+[PR #28](https://github.com/landjunge/KiraBridge/pull/28) hat die Zusammenführung nach main gemergt.
+Die folgende ChatGPT-Reparatur liegt in offenem [PR #32](https://github.com/landjunge/KiraBridge/pull/32).
+Der separat benannte Kandidat unten ist Quelle `012b592`, tatsächlich auf Intel-macOS installiert und geprüft. Native Paste/Readback ist für seine unveränderten Module aus7725bc6 belegt.
+Die Standard-RC17-Draft-Assets stehen noch auf main/b54f462; RC15/RC16 sind historische Entwürfe.
 **Nach main gemergt; Veröffentlichung bleibt gesperrt:** GitHub Actions startet wegen
-Kontoabrechnung/Ausgabenlimit nicht. Zusätzliche Review auf Nutzeranweisung entfallen; native
-Agenteneingabe und tatsächliche ThreadDesk-Dateiempfänger-Abnahme stehen aus. Ein Entwurf ist keine Veröffentlichung.
+Kontoabrechnung/Ausgabenlimit nicht. Zusätzliche Review auf Nutzeranweisung entfallen;
+reine native Eingabe ist bestanden, tatsächliche ThreadDesk-Dateiempfänger-Abnahme bleibt offen. Ein Entwurf ist keine Veröffentlichung.
 
-Bei der **Erstinstallation** legt der Befehl einen begrenzten Projektzugang mit
-Einzelgenehmigungen an. Für ein **Update** denselben Befehl wiederholen;
+Bei der **Erstinstallation** fordert dieser ausdrücklich freigegebene Befehl mit
+`--full-access` automatischen vollständigen Datei-/Befehlszugriff für ChatGPT an.
+Agenten-/Providerkonten und optionale Empfänger benötigen ihre tatsächliche Einrichtung. Für ein **Update** denselben Befehl wiederholen;
 Konfiguration, Zugangsdaten, Datenbanken, Berechtigungen und Nutzerdateien bleiben
 erhalten. Aktive Aufträge sowie unbekannte Launcher oder Dienste führen zu einer
 klaren Fehlermeldung. Der **launchd-Dienst läuft nach Schließen von Terminal oder
@@ -290,7 +310,7 @@ beziehen und entpacken; Schritte siehe [Wiederherstellung](docs/INSTALL-MACOS.md
 ### Kontrolle und optionale Werkzeuge
 
 Du legst die Zugriffe auf Dateien, Befehle und Assistenten fest. Neue Zugänge
-verwenden standardmäßig Einzelgenehmigungen. Der Betreiber kann ausgewählte
+verwenden ohne ausdrückliche Vollfreigabe Einzelgenehmigungen. Der Betreiber kann ausgewählte
 Aktionen ausdrücklich ohne wiederholte Bestätigung erlauben. Assistenten können
 sich selbst keine zusätzlichen Rechte geben.
 
@@ -318,7 +338,7 @@ Werkzeugkatalog, Health und Agenteninventar trennen Rechte, Beobachtung und Ausf
 
 ### Was wurde geprüft?
 
-RC17: zwei identische Builds; authentifizierter Draft-Befehl auf Intel-macOS mit isolierter Erstinstallation, RC14-Upgrade, Status/Version, Datenerhalt, Idempotenz, Neustart, KeepAlive und Rollback bestanden. [RC17-Nachweis](docs/ACCEPTANCE-MACOS-RC17.md). Native Agenteneingabe und erfolgreiche CI bleiben offen; zusätzliche Review auf Nutzeranweisung entfallen.
+RC17: zwei identische Builds; authentifizierter Draft-Befehl auf Intel-macOS mit isolierter Erstinstallation, RC14-Upgrade, Status/Version, Datenerhalt, Idempotenz, Neustart, KeepAlive und Rollback bestanden. [RC17-Nachweis](docs/ACCEPTANCE-MACOS-RC17.md). Native reine Eingabe ist auf7725bc6 bestanden; erfolgreiche CI bleibt offen. Zusätzliche Review auf Nutzeranweisung entfallen.
 
 Der [RC16-Prüfbericht](docs/ACCEPTANCE-MACOS-RC16.md) trennt echte Intel-macOS-Tests,
 isolierte Byte-/MCP-Vertragstests und noch ungeprüfte Produktintegration. Der
@@ -328,7 +348,7 @@ Apple-Silicon-Abnahme, echte ChatGPT-Dateiauswahl oder ThreadDesk-Produktimporte
 
 ---
 
-RC17 source is merged into main through [PR #28](https://github.com/landjunge/KiraBridge/pull/28), merge `a74fe613`. The owner waived additional review. CI jobs did not start because of billing; native agent input and release acceptance remain open. / RC17 ist über PR #28 nach main gemergt. Zusätzliche Review auf ausdrückliche Nutzeranweisung entfallen. CI wegen Abrechnung nicht gestartet; native Agenteneingabe und Release-Freigabe bleiben offen.
+RC17 base was merged through [PR #28](https://github.com/landjunge/KiraBridge/pull/28), merge `a74fe613`. The installed012b592 repair remains in open PR32; native evidence is pinned to unchanged7725bc6 modules. Native paste/readback passed; CI did not start because of billing, so merge/release acceptance remains open. Additional review was waived. / RC17-Basis über PR #28 gemergt; die installierte012b592-Reparatur liegt noch in offenem PR32; native Belege beziehen sich auf unveränderte7725bc6-Module. Native Paste/Readback bestanden; CI wegen Abrechnung nicht gestartet, daher keine Merge-/Release-Abnahme. Zusätzliche Review entfallen.
 
 ## Install / update · Installieren / aktualisieren
 
@@ -340,7 +360,7 @@ Der Befehl lädt authentifiziert, prüft SHA-256 und installiert oder aktualisie
 authenticated download, checksum verification and install/update:
 
 ```sh
-d=$(mktemp -d) && gh release download v0.8.0rc17 -R landjunge/KiraBridge -p 'install-macos.sh*' -D "$d" && (cd "$d" && shasum -a 256 -c install-macos.sh.sha256 && sh install-macos.sh "$@")
+d=$(mktemp -d) && gh release download v0.8.0rc17 -R landjunge/KiraBridge -p 'KiraBridge-macos-chatgpt-20261024b.tar.gz*' -D "$d" && (cd "$d" && shasum -a 256 -c KiraBridge-macos-chatgpt-20261024b.tar.gz.sha256 && tar -xzf KiraBridge-macos-chatgpt-20261024b.tar.gz && sh KiraBridge/install.sh --full-access "$@")
 ```
 
 **Für Erstinstallation und Update derselbe Befehl. RC17 bleibt bis zur Abnahme
@@ -364,7 +384,7 @@ no sudo; existing configuration, credentials and user files are preserved.
 - [Operations and recovery / Betrieb und Wiederherstellung](docs/OPERATIONS.md)
 - [Architecture and modules / Architektur und Module](docs/ARCHITECTURE.md)
 
-The published release is RC14. The highlighted command selects the RC17 draft, tested with explicit isolated paths; no productive deployment or native agent-input acceptance is implied. / Veröffentlicht bleibt RC14. Der hervorgehobene Befehl wählt den RC17-Entwurf, mit ausdrücklich isolierten Pfaden geprüft; keine Produktivfreigabe oder Abnahme nativer Agenteneingabe.
+The published release is RC14. The highlighted command selects the RC17 draft, tested with explicit isolated paths; RC17 is not published. Paste-only Kira input/readback passed on7725bc6, with a transient timeout recorded. / Veröffentlicht bleibt RC14. Der hervorgehobene Befehl wählt den RC17-Entwurf, mit ausdrücklich isolierten Pfaden geprüft; RC17 ist nicht veröffentlicht. Reine Kira-Eingabe/Readback ist auf7725bc6 bestanden, ein vorübergehender Timeout bleibt dokumentiert.
 
 KiraBridge is an independent project and is not an official product of the
 connected AI providers. / KiraBridge ist ein eigenständiges Projekt und kein
@@ -380,3 +400,34 @@ Dies ist keine Open-Source-Standardlizenz; eine anwaltliche Prüfung wurde nicht
 
 Die Projektseite `kirabridge.netzwerkpunkt.de` bleibt geplant. Noch kein öffentlicher Download und keine Sichtbarkeitsänderung. / The project site remains planned; there is no public download or visibility change.
 
+
+
+### RC17 interface note / Schnittstellenhinweis
+
+Routine `bridge_health` no longer scans Terminal windows. Explicit
+`observe_terminals=true`, `operation_catalog` or `agent_inventory` refreshes the
+observation; cached health metadata is never input readiness. / Normale Health-Polls
+belegen keine Terminal-Leseplätze. Frische Fenstererkennung ausdrücklich anfordern.
+
+Events are optional. Cached Apps tools that still require `completion_subscription`
+accept `""`; refresh the connector metadata when available. Kira's actual Whiteboard
+write and independent readback passed. / Alte Apps-Schemas können das leere
+Legacyfeld nutzen; keine zusätzliche Freigabe oder Events-Anmeldung erfinden.
+[Interface behavior and limits / Verhalten und Grenzen](docs/DISCOVERY-VISIBLE-TERMINAL.md).
+
+
+Current operator evidence / Aktueller Betreibernachweis:
+[team audit and remaining limits](docs/CHATGPT-BLOCKER-AUDIT-20261024.md) ·
+[live7725bc6 proof](docs/evidence/rc17-live-7725bc6-20261024.json).
+All42 registered operations were independently read back as authorized and automatic
+for Kira. / Alle42 registrierten Operationen wurden für Kira autorisiert und automatisch zurückgelesen.
+The copy command was exercised with isolated install paths and service=none; actual
+launchd upgrade/status/rollback were verified separately with these same package bytes.
+/ Der Kopierbefehl wurde mit isolierten Pfaden und service=none ausgeführt;
+echter launchd-Upgrade/Status/Rollback ist für dieselben Paketbytes separat belegt.
+
+Current installed RC17 source / Aktuell installierte RC17-Quelle: **012b592**, with preserved data and42 automatic ChatGPT operations. [25 October build/install/command evidence](docs/RC17-RESUME-20261025.md). PR32 remains open, RC17 draft; latest published RC14. / PR32 offen, RC17 Entwurf, veröffentlicht RC14.
+
+Separate terminal design preview / Separate Terminal-Designvorschau: [Draft PR34](https://github.com/landjunge/KiraBridge/pull/34), [pink Braille wordmark and bridge / pinker Braille-Schriftzug und Brücke](https://github.com/landjunge/KiraBridge/blob/ada6e37df1be607bfdc0dec8428e609c12d46ef8/docs/design-preview/terminal-braille-100.png). Not installed or merged; work stops after presenting this preview pending the next user instruction. / Nicht installiert oder gemergt; nach dieser Vorschau Halt bis zum nächsten Nutzerauftrag.
+
+[Integrated source and vServer validation / Integrierter Quellstand und vServer-Prüfung](docs/VERIFIED-INTEGRATION-20261025.md). This is not a new release or productive deployment. / Kein neues Release und kein neuer Produktivwechsel.

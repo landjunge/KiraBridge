@@ -217,3 +217,33 @@ lokal abgeglichen werden; das ist keine allgemeine Unknown-Freigabe.
 See [modularity review](MODULARITY-REVIEW-20261024.md), [file transfer](FILE-TRANSFER.md),
 [receiver contract](THREADDESK-FILE-TRANSFER-V1.md) and [discovery/terminal](DISCOVERY-VISIBLE-TERMINAL.md).
 These candidate additions do not grant production access or establish receiver acceptance.
+
+## RC17: operation-scoped observations and clipboard ownership
+
+`session_manager.py` owns fresh native selection and a private observation scope
+bound to principal, pane/PID, current asyncio task and operation lifetime. It is
+read/readiness evidence, separate from the task-owned input selection. The
+`visible_handoff.py` domain reuses that scope without rescanning all terminals;
+final insert/Return still freshly validate their selected native identities.
+No MCP parameter accepts a caller-supplied row and no global window TTL grants input.
+
+`platform_adapters/terminal_app.py` owns Terminal/System Events only. It resolves
+immutable window IDs, closes menu tracking before Terminal Apple events, and uses
+the exact offered AXPress action after focus/PID/TTY/viewport/generation guards.
+`platform_adapters/clipboard_lease.py` is a separate leaf adapter: it knows neither
+Terminal, sessions, handoffs nor providers. Its short-lived helper keeps original
+formats only in RAM, receives payload over stdin, and restores on EOF after the
+killable GUI worker is reaped. User-modified generations are preserved; unknown
+cleanup is an explicit failure. No new user terminal session is used for this helper.
+
+`operations_service.py` composes domain-owned maintenance counts. Its local
+principal_grant mode validates a one-identity ACL-only diff against both loaded and
+on-disk configuration, and preserves external reply waits without rewriting their
+history. Runtime/profile/receiver/source/schema changes retain the strict path.
+ThreadDesk adapters use central capability decisions and fresh bounded catalogues;
+source/receiver/protocol modules remain separate. No ThreadDesk code was imported.
+
+These changes do not create an import cycle: native adapter → clipboard leaf → core
+models; selection and domain owners are wired by the existing composition root.
+Actual source7725bc6, targeted tests and remaining integration gates are in
+[the team audit](CHATGPT-BLOCKER-AUDIT-20261024.md).

@@ -24,8 +24,15 @@ def build(output):
     if git("status", "--porcelain"):
         raise SystemExit("Commit all source changes before building")
     commit = git("rev-parse", "HEAD")
-    version = tomllib.loads(Path("pyproject.toml").read_text())["project"]["version"]
+    project = tomllib.loads(Path("pyproject.toml").read_text())["project"]
+    version = project["version"]
+    license_bytes = Path("LICENSE").read_bytes()
+    license_fields = {
+        "license": project["license"],
+        "license_sha256": hashlib.sha256(license_bytes).hexdigest(),
+    }
     output.mkdir(parents=True, exist_ok=True)
+    (output / "LICENSE").write_bytes(license_bytes)
     subprocess.run(
         ["uv", "build", "--wheel", "--out-dir", str(output)],
         check=True,
@@ -70,6 +77,8 @@ exec python3.11 "$bundle/installer/install.py" install --bundle "$bundle" "$@"
     manifest = {
         "version": version,
         "commit": commit,
+        "source_commit": commit,
+        **license_fields,
         "platforms": ["Darwin-x86_64", "Darwin-arm64"],
         "wheel": "wheel/" + wheel.name,
         "files": {name: hashlib.sha256(data).hexdigest() for name, data in sorted(files.items())},
@@ -149,6 +158,7 @@ exec python3.11 "$bundle/installer/install.py" install --bundle "$bundle" "$@"
                 "version": version,
                 "source_commit": commit,
                 "platform": "Linux-x86_64",
+                **license_fields,
                 "maturity": "unpublished candidate; Linux package acceptance not performed",
             },
             indent=2,
@@ -176,7 +186,7 @@ exec python3.11 "$bundle/installer/install.py" install --bundle "$bundle" "$@"
     (output / "SHA256SUMS").write_text(
         "".join(
             hashlib.sha256(p.read_bytes()).hexdigest() + "  " + p.name + "\n"
-            for p in [bundle, wheel, bootstrap, linux_bundle]
+            for p in [bundle, wheel, bootstrap, linux_bundle, output / "LICENSE"]
         )
     )
     print(json.dumps({"version": version, "commit": commit, "bundle": str(bundle)}, indent=2))
