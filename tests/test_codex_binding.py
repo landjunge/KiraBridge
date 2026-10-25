@@ -102,15 +102,21 @@ async def test_body_rewrite_during_scan_never_leaves_reusable_idle_cursor(rollou
         original(cursor, item)
         if item.get("payload", {}).get("type") == "task_complete" and not rewritten:
             rewritten = True
+            before = path.stat()
             raw = path.read_bytes()
             changed = raw.replace(b"task_complete", b"task_mystery!")
             assert len(changed) == len(raw)
             path.write_bytes(changed)
+            # Reproduce equal/coarse filesystem timestamps deterministically.
+            # The guard must inspect consumed bytes, not rely on clock progress.
+            os.utime(path, ns=(before.st_atime_ns, before.st_mtime_ns))
 
     monkeypatch.setattr(reader, "_event", rewrite_after_completed_was_parsed)
-    assert (await reader.read(str(path), "thread-one"))["state"] == "unknown"
+    changed = await reader.read(str(path), "thread-one")
+    assert changed["state"] == "unknown" and changed["reason"] == "session_rewritten"
     result = await reader.read(str(path), "thread-one")
     assert result["state"] == "unknown", "A changed body invalidates the previous idle cursor"
+    assert result["reason"] == "session_rewritten"
 
 
 async def test_truncate_during_scan_invalidates_the_cached_turn(rollout, monkeypatch):
@@ -203,3 +209,46 @@ async def test_bound_fifo_is_rejected_without_blocking_all_future_reads(rollout)
     write(path, record("task_started"), append=True)
     result = await asyncio.wait_for(reader.read(str(path), "thread-one"), 1)
     assert result["state"] == "working"
+
+
+async def test_failed_unbuffered_verification_never_reuses_the_parsed_idle_turn(
+    rollout, monkeypatch
+):
+    root, path, _ = rollout
+    reader = CodexTurnState(root)
+    write(path, record("task_started"), record("task_complete"), append=True)
+    original = os.pread
+
+    def unavailable(*args):
+        raise OSError("Synthetic verification failure")
+
+    monkeypatch.setattr(os, "pread", unavailable)
+    assert (await reader.read(str(path), "thread-one"))["state"] == "unknown"
+    monkeypatch.setattr(os, "pread", original)
+    result = await reader.read(str(path), "thread-one")
+    assert result["state"] == "unknown"
+    assert result["reason"] == "session_verification_incomplete"
+
+
+@pytest.mark.parametrize("premature_eof", [False, True], ids=["short-read", "incomplete-read"])
+async def test_unbuffered_verification_handles_short_reads_and_rejects_incomplete_bytes(
+    rollout, monkeypatch, premature_eof
+):
+    root, path, _ = rollout
+    reader = CodexTurnState(root)
+    write(path, record("task_started"), record("task_complete"), append=True)
+    header_size = len(path.read_bytes().splitlines(keepends=True)[0])
+    original = os.pread
+
+    def short_read(fd, size, offset):
+        if premature_eof and offset >= header_size:
+            return b""
+        return original(fd, min(size, 7), offset)
+
+    monkeypatch.setattr(os, "pread", short_read)
+    result = await reader.read(str(path), "thread-one")
+    assert result["state"] == ("unknown" if premature_eof else "idle")
+    monkeypatch.setattr(os, "pread", original)
+    if premature_eof:
+        assert result["reason"] == "session_rewritten"
+        assert (await reader.read(str(path), "thread-one"))["state"] == "unknown"

@@ -24,10 +24,12 @@ Designvorschau PR34 bleibt separat. Bestehende Paketnachweise gehören zu ihren
 exakten Quellpins und gelten nicht automatisch für diesen integrierten Stand.
 
 The existing Debian vServer runners execute Linux CI. A concrete Python3.13
-rewrite/idle safety regression and the build/smoke contract are being repaired.
+rewrite/idle safety regression and the build/smoke contract are repaired locally;
+Linux3.13 and final package checks remain separate gates.
 Hosted macOS jobs remain billing-blocked; no skipped or failed gate is a pass.
 Die vorhandenen Debian-Runner führen Linux-CI aus. Ein konkreter Python3.13-
-Rewrite/Idle-Fehler und der Build/Smoke-Vertrag werden gezielt repariert;
+Rewrite/Idle-Fehler und der Build/Smoke-Vertrag sind lokal gezielt repariert;
+Linux3.13 und finale Paketabnahme stehen noch aus;
 gehostete macOS-Jobs bleiben abrechnungsbedingt blockiert. Kein Pflichtcheck
 wird umgangen. [Latest installed proof](docs/RC17-RESUME-20261025.md) ·
 [Library contract and compatibility](docs/LIBRARY-COMPAT-20261025.md).
@@ -418,3 +420,5 @@ echter launchd-Upgrade/Status/Rollback ist für dieselben Paketbytes separat bel
 Current installed RC17 source / Aktuell installierte RC17-Quelle: **012b592**, with preserved data and42 automatic ChatGPT operations. [25 October build/install/command evidence](docs/RC17-RESUME-20261025.md). PR32 remains open, RC17 draft; latest published RC14. / PR32 offen, RC17 Entwurf, veröffentlicht RC14.
 
 Separate terminal design preview / Separate Terminal-Designvorschau: [Draft PR34](https://github.com/landjunge/KiraBridge/pull/34), [pink Braille wordmark and bridge / pinker Braille-Schriftzug und Brücke](https://github.com/landjunge/KiraBridge/blob/ada6e37df1be607bfdc0dec8428e609c12d46ef8/docs/design-preview/terminal-braille-100.png). Not installed or merged; work stops after presenting this preview pending the next user instruction. / Nicht installiert oder gemergt; nach dieser Vorschau Halt bis zum nächsten Nutzerauftrag.
+
+[Integrated source and vServer validation / Integrierter Quellstand und vServer-Prüfung](docs/VERIFIED-INTEGRATION-20261025.md). This is not a new release or productive deployment. / Kein neues Release und kein neuer Produktivwechsel.
