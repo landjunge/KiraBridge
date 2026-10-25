@@ -15,25 +15,37 @@ jobs:
       matrix:
         include:
           - os: ubuntu-24.04
-            runner: kirabridge
+            runner: '["self-hosted","Linux","X64","kirabridge","debian"]'
             python: '3.11'
           - os: ubuntu-24.04
-            runner: kirabridge
+            runner: '["self-hosted","Linux","X64","kirabridge","debian"]'
             python: '3.13'
           - os: macos-15-intel
-            runner: macos-15-intel
+            runner: '["kirabridge-macos-intel"]'
             python: '3.11'
           - os: macos-15
-            runner: macos-15
+            runner: '["macos-15"]'
             python: '3.11'
-    runs-on: ${{ matrix.runner }}
+    # Defense in depth; repository-level fork workflow execution must stay disabled.
+    if: >-
+      github.repository == 'landjunge/KiraBridge' &&
+      github.actor == 'landjunge' &&
+      (github.event_name != 'pull_request' ||
+       (github.event.pull_request.head.repo.full_name == github.repository &&
+        github.event.pull_request.user.login == 'landjunge'))
+    runs-on: ${{ fromJSON(matrix.runner) }}
     env:
       UV_PYTHON: ${{ matrix.python }}
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Verify isolated Intel macOS identity before any tests
+        if: ${{ matrix.os == 'macos-15-intel' }}
+        run: /usr/local/bin/python3.11 scripts/check_macos_ci_host.py
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
-        if: ${{ matrix.runner != 'kirabridge' }}
+        if: ${{ matrix.os == 'macos-15' }}
         with:
           python-version: ${{ matrix.python }}
       - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0

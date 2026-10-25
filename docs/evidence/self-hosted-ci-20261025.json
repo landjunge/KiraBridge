@@ -1,0 +1,66 @@
+{
+  "base_commit": "481eb32eca61ba7ccd287c92644cb8305cdae44b",
+  "branch": "ci/dedicated-self-hosted-20261025",
+  "scope": "workflow routing and isolation guard only; no production modifications",
+  "inventory": {
+    "linux_runner_ids": [
+      21,
+      22
+    ],
+    "linux_os": "Debian 13.6 x86_64",
+    "mac_os": "macOS 15.7.4 x86_64",
+    "mac_current_uid": 501,
+    "mac_dedicated_account_exists": false,
+    "mac_runner_registered": false,
+    "mac_administrative_setup": "sudo requires password; not attempted",
+    "arm_hardware_available": false
+  },
+  "github_security": {
+    "private": true,
+    "collaborators": [
+      "landjunge"
+    ],
+    "fork_pr_workflows": false,
+    "fork_write_tokens": false,
+    "fork_secrets": false,
+    "default_token_permissions": "read",
+    "main_protected": false,
+    "gate_policy": "user-required tests remain mandatory regardless of branch protection"
+  },
+  "checks": {
+    "host_guard_unit_cases": {
+      "passed": 13,
+      "seconds": 0.05,
+      "scope": "mocked security branches, not native runner acceptance"
+    },
+    "actual_production_uid_guard": {
+      "expected_refusal": true,
+      "reason": "dedicated account required; never production user"
+    },
+    "actionlint": {
+      "version": "1.7.7",
+      "all_three_workflows": "passed"
+    },
+    "ruff_check": "passed",
+    "ruff_format": "passed",
+    "diff_check": "passed"
+  },
+  "independent_review": {
+    "agent": "receiver_contract_audit",
+    "mode": "read-only",
+    "findings_fixed": [
+      "individual production-home R/W/X checks",
+      "primary GID admin membership",
+      "preserve package check names"
+    ]
+  },
+  "not_done": [
+    "dedicated Mac account creation and GUI login",
+    "Mac runner registration",
+    "new Intel Actions execution",
+    "ARM acceptance",
+    "merge",
+    "release"
+  ],
+  "next_step": "administrator creates isolated standard account; validate guard and then repository-only runner registration; retain platform fork restrictions"
+}

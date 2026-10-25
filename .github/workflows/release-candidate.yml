@@ -7,22 +7,31 @@ permissions:
   contents: read
 jobs:
   package:
+    name: package (${{ matrix.os }}, ${{ matrix.os == 'ubuntu-24.04-container-on-debian-13' && 'kirabridge-linux-smoke' || matrix.os }})
     strategy:
       fail-fast: false
       matrix:
         include:
           - os: macos-15
-            runner: macos-15
+            runner: '["macos-15"]'
+          - os: macos-15-intel
+            runner: '["kirabridge-macos-intel"]'
           - os: ubuntu-24.04-container-on-debian-13
-            runner: kirabridge-linux-smoke
-    runs-on: ${{ matrix.runner }}
+            runner: '["kirabridge-linux-smoke"]'
+    if: github.repository == 'landjunge/KiraBridge' && github.actor == 'landjunge'
+    runs-on: ${{ fromJSON(matrix.runner) }}
     env:
       UV_PYTHON: '3.11'
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - name: Verify isolated Intel macOS identity before any tests
+        if: ${{ matrix.os == 'macos-15-intel' }}
+        run: /usr/local/bin/python3.11 scripts/check_macos_ci_host.py
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
-        if: ${{ matrix.runner != 'kirabridge-linux-smoke' }}
+        if: ${{ matrix.os == 'macos-15' }}
         with:
           python-version: '3.11'
       - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884
@@ -31,10 +40,10 @@ jobs:
       - run: uv sync --locked --dev
       - run: uv run python scripts/build_release.py --out dist/candidate
       - name: Smoke Linux package in non-root Ubuntu 24.04 userland
-        if: ${{ matrix.runner == 'kirabridge-linux-smoke' }}
+        if: ${{ matrix.os == 'ubuntu-24.04-container-on-debian-13' }}
         run: sh scripts/ci_linux_release_smoke.sh dist/candidate
       - name: Smoke macOS package natively
-        if: ${{ matrix.runner != 'kirabridge-linux-smoke' }}
+        if: ${{ startsWith(matrix.os, 'macos-') }}
         run: uv run python scripts/release_smoke.py dist/candidate
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
