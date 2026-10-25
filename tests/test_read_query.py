@@ -2,7 +2,7 @@ import sys
 from types import SimpleNamespace
 
 import pytest
-from conftest import request, submit
+from conftest import archive_task, request, submit
 from pydantic import ValidationError
 
 from kirabridge.bridge_core.models import BridgeError, State
@@ -162,7 +162,7 @@ def test_owned_visible_and_admin_output_is_available_without_reexecution(
         {"argv": [sys.executable, "-V"], "cwd": config.principals["local"].roots[0]},
         task_id="saved-visible-output",
     )
-    submit(bridge, value)
+    archive_task(bridge, value)
     bridge.store.claim("fixture", 30)
     bridge.store.transition(value.task_id, State.RUNNING, {"isolated_fixture": True})
     source = (

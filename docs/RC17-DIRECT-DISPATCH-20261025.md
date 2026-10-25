@@ -184,3 +184,11 @@ and for source/tests/scripts. The full merge comparison also reports four litera
 blank-line additions inside the parent's archived `working-tree.patch`. That evidence
 payload remains byte-for-byte unchanged; it is not source to reformat. Its original
 manifest and parent history are preserved. CI lint/test/package gates are unchanged.
+
+The first combined-source CI (`e1923f8`, run `40227569842`) produced the same result
+on Linux3.11 and Linux3.13: **1,445 passed, four failed, 12 skipped**. All four failures
+were the parent's parameterized saved-output read fixture calling pre-start submit.
+That read-only fixture now explicitly seeds its historical task, retaining ownership,
+UTF-8 bounds, unchanged-state and no-reexecution assertions. No execution fallback
+or permission relaxation was added. macOS verification and package jobs again had
+zero steps because of the confirmed GitHub billing/spending-limit rejection.
