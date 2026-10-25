@@ -89,3 +89,35 @@ Als Nächstes laufen am finalen Commit die normalen verpflichtenden Linuxchecks
 auf den vorhandenen GitHub-Runnern und der echte Linux-Release-Smoke-Job.
 Erfolgreiche endgültige CI-/Paketresultate werden separat in PR/Whiteboard
 protokolliert; fehlende macOS-Jobs bleiben ein offenes Gate.
+
+## Erste Pflicht-CI am integrierten Stand und gezielte Korrekturen
+
+PR37 am16642e2: Verify40223059447 scheiterte auf beiden Debian-Achsen3.11/3.13
+mit denselben5Fehlern (je1442passed,12skipped). Nicht als erfolgreich zählen.
+Die PID-Fixture erfand den Wechsel an einer absichtlich entfernten redundanten
+Katalogabfrage. Der korrigierte Fall ersetzt die Agent-PID tatsächlich beim Lesen
+und verlangt danach vor jedem nativen Zugriff die Ablehnung durch die echte
+SessionManager.insert-Grenze. Genau1Fall neu bestanden.
+Vier Receiver-Fixtures injizierten am inzwischen ungenutzten Parentadapter; sie
+inijizieren jetzt die echte MCP-Antwort nach realem Abort beziehungsweise
+manipulieren beide Quittungs-/Reconcile-Antworten. Alle bisherigen Unknown-/
+Paused-/ReceiptNone-/Dedupe-Prüfungen bleiben, Injektionszähler hinzugefügt.
+Genau4betroffeneFälle bestanden. Keine produktive Sicherheitsprüfung gelockert.
+
+Release40223059124 wurde vom Ubuntu24.04-Guard des Linux-Installers auf Debian13
+korrekt abgelehnt. Die direkte Debian-Zuordnung war ein Fehler dieser Integration.
+Der Guard bleibt unverändert: der vorhandene Dockerhost erhält eine isolierte
+Ubuntu24.04-Userspace-Prüfung, kein pauschales Abschalten und kein ungeprüfter
+Debian-Produktsupport. Offizielles Image auf dem Server tatsächlich gezogen:
+`ubuntu@sha256:68ee22004a9109b44973313b02ff7b1de250f1de0f5ecb628d73f579aaff33ac`.
+
+Helper `scripts/ci_linux_release_smoke.sh`: keine root-Ausführung, Apt nur im
+eigenen Dockerimage, normales NSS-Home unverändert; ausschließlich Aufgaben-UVcache
+und Temp in/tmp. Rootfilesystem, einzelnes Smokeskript und Artefakte lesbar; nur
+eigenes Temp und Ergebnisausgabe schreibbar. Kein Socket-/Hostnetz-/Privileged-Mount,
+CPU/RAM/Prozesszahl begrenzt. Fertige JSON-Belege werden im laufenden Container
+gesichert, eigene Container/Images anhand Label/CID bereinigt; unbestätigte
+Bereinigung verhindert Erfolg. Vorhandene andere Container/Services/Runner bleiben
+unberührt. Ubuntu-Userspace teilt den Debian-Kernel, keine macOS-Abnahme.
+Reale Containerprobe steht beim Codecommit noch aus, danach finaler normalerCI-Lauf.
+[Gezielte Nachweise](evidence/integration-ci-followup-20261025.json).

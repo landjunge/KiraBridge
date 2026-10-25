@@ -13,7 +13,7 @@ jobs:
         include:
           - os: macos-15
             runner: macos-15
-          - os: debian-13
+          - os: ubuntu-24.04-container-on-debian-13
             runner: kirabridge
     runs-on: ${{ matrix.runner }}
     env:
@@ -30,7 +30,12 @@ jobs:
           version: '0.11.6'
       - run: uv sync --locked --dev
       - run: uv run python scripts/build_release.py --out dist/candidate
-      - run: uv run python scripts/release_smoke.py dist/candidate
+      - name: Smoke Linux package in non-root Ubuntu 24.04 userland
+        if: ${{ matrix.runner == 'kirabridge' }}
+        run: sh scripts/ci_linux_release_smoke.sh dist/candidate
+      - name: Smoke macOS package natively
+        if: ${{ matrix.runner != 'kirabridge' }}
+        run: uv run python scripts/release_smoke.py dist/candidate
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: KiraBridge-candidate-${{ matrix.os }}

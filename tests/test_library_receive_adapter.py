@@ -8,6 +8,7 @@ from pathlib import Path
 
 import pytest
 from conftest import request
+from mcp.types import TextContent
 
 from kirabridge.bridge_core.bridge import Bridge
 from kirabridge.bridge_core.models import BridgeError
@@ -194,17 +195,21 @@ async def test_lost_abort_is_reconciled_once_and_revoked_project_cannot_abort(re
         assert denied["state"] == "failed"
         assert (await remote.status(record["operation_id"]))["state"] == "receiving"
         config.file_transfer.allowed_projects = projects
-        original, calls = remote.abort, []
+        original, calls = bridge.threaddesk.pool.call, []
 
-        async def lose(operation):
-            calls.append(operation)
-            await original(operation)
-            raise BridgeError("peer_unknown", "Lost abort response after real abort")
+        async def lose(peer, tool, arguments, **kwargs):
+            response = await original(peer, tool, arguments, **kwargs)
+            if tool == "library_receive" and arguments.get("action") == "abort":
+                calls.append(arguments["transfer_id"])
+                raise BridgeError("peer_unknown", "Lost abort response after real abort")
+            return response
 
-        remote.abort = lose
+        # Bound protocol views share the actual MCP owner, not parent-instance methods.
+        bridge.threaddesk.pool.call = lose
         result = await task(bridge, "files.abort", {"transfer_id": identifier}, "lost-abort")
         assert result["state"] == "completed", result
-        assert result["result"]["state"] == "aborted" and len(calls) == 1
+        assert result["result"]["state"] == "aborted" and calls == [record["operation_id"]]
+        assert (await remote.status(record["operation_id"]))["state"] == "aborted"
         assert path.exists()
 
 
@@ -215,27 +220,43 @@ async def test_native_receipt_mismatch_never_counts_as_import(receiver, field, v
     bridge, _ = receiver
     async with bridge:
         identifier, _, _ = await setup(receiver)
-        original = bridge.file_transfers.receiver.receipt
+        record = bridge.file_repository.get("local", identifier)
+        original = bridge.threaddesk.pool.call
+        corrupted = []
 
-        async def corrupt(operation):
-            state = await original(operation)
-            state["receipt"][field] = value
-            return state
+        async def corrupt_status(peer, tool, arguments, **kwargs):
+            response = await original(peer, tool, arguments, **kwargs)
+            if (
+                tool != "library_receive_status"
+                or arguments.get("transfer_id") != record["operation_id"]
+            ):
+                return response
+            assert not response.isError
+            value = response.structuredContent
+            if value is None:
+                value = json.loads(
+                    "\n".join(item.text for item in response.content if item.type == "text")
+                )
+            if not value.get("receipt"):
+                return response  # Real pre-commit status has no durable receipt yet.
+            # Mutate a deep copy of the real receiver response, preserving every
+            # other field. Both receipt readback and reconciliation see the fault.
+            altered = response.model_copy(deep=True)
+            value = json.loads(json.dumps(value))
+            value["receipt"][field] = value_to_inject
+            altered.content = [TextContent(type="text", text=json.dumps(value))]
+            if response.structuredContent is not None:
+                altered.structuredContent = value
+            corrupted.append(arguments["transfer_id"])
+            return altered
 
-        bridge.file_transfers.receiver.receipt = corrupt
-        status_read = bridge.file_transfers.receiver.status
-
-        async def corrupt_status(operation):
-            state = await status_read(operation)
-            if state.get("receipt"):
-                state["receipt"][field] = value
-            return state
-
-        bridge.file_transfers.receiver.status = corrupt_status
+        value_to_inject = value
+        bridge.threaddesk.pool.call = corrupt_status
         result = await task(bridge, "files.transfer", {"transfer_id": identifier}, "corrupt")
         assert result["state"] == "unknown", result
         record = bridge.file_repository.get("local", identifier)
         assert record["receipt"] is None and record["state"] == "paused"
+        assert corrupted == [record["operation_id"], record["operation_id"]]
 
 
 async def test_scoped_batch_runner_originals_inventory_and_no_duplicate_resume(receiver, tmp_path):
