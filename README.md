@@ -12,18 +12,25 @@
 
 ## RC17 status / RC17-Stand
 
-PR #28 and #30 are merged; queue repairs are part of main. RC14 remains the
-published release; RC15/RC16 are historical drafts and RC17 is still a draft.
-The operator Mac has been explicitly upgraded to RC17/012b592. The subsequent native
-focus/polling repair is tracked in [PR #32](https://github.com/landjunge/KiraBridge/pull/32),
-which remains open while GitHub Actions is blocked by account billing. No failed
-CI is presented as passed. [Actual installation and checks](docs/RC17-INSTALLATION-20261024.md).
+Published: **RC14**. Installed and verified on the operator Mac: **RC17/012b592**.
+This integration combines current main/PR33, runtime repairs PR32, cleanup PR36
+and legacy checkpoint compatibility PR35; it is not yet a newly accepted package.
+Design PR34 remains separate and uninstalled.
 
-PR #28 und #30 sind gemergt; die Queue-Reparatur ist in main. Veröffentlicht bleibt
-RC14; RC17 ist weiterhin ein Entwurf. Der Betreiber-Mac wurde ausdrücklich auf
-RC17/012b592 aktualisiert. Die folgende Fokus-/Statusabfrage-Reparatur liegt in PR #32;
-GitHub Actions ist wegen Kontozahlung/Ausgabenlimit blockiert. Details und konkrete
-Quellstände stehen im Installationsnachweis; kein fehlgeschlagener Check gilt als bestanden.
+Veröffentlicht bleibt **RC14**, produktiv läuft geprüftes **RC17/012b592**.
+Dieser Integrationsbranch führt main/PR33, Laufzeitreparaturen PR32,
+Abnahme-Cleanup PR36 und Checkpoint-Kompatibilität PR35 zusammen. Die
+Designvorschau PR34 bleibt separat. Bestehende Paketnachweise gehören zu ihren
+exakten Quellpins und gelten nicht automatisch für diesen integrierten Stand.
+
+The existing Debian vServer runners execute Linux CI. A concrete Python3.13
+rewrite/idle safety regression and the build/smoke contract are being repaired.
+Hosted macOS jobs remain billing-blocked; no skipped or failed gate is a pass.
+Die vorhandenen Debian-Runner führen Linux-CI aus. Ein konkreter Python3.13-
+Rewrite/Idle-Fehler und der Build/Smoke-Vertrag werden gezielt repariert;
+gehostete macOS-Jobs bleiben abrechnungsbedingt blockiert. Kein Pflichtcheck
+wird umgangen. [Latest installed proof](docs/RC17-RESUME-20261025.md) ·
+[Library contract and compatibility](docs/LIBRARY-COMPAT-20261025.md).
 
 ## English
 
