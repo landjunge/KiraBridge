@@ -6,19 +6,24 @@ permissions:
   contents: read
 jobs:
   verify:
+    name: verify (${{ matrix.os }}, ${{ matrix.python }})
     strategy:
       fail-fast: false
       matrix:
         include:
           - os: ubuntu-24.04
+            runner: kirabridge
             python: '3.11'
           - os: ubuntu-24.04
+            runner: kirabridge
             python: '3.13'
           - os: macos-15-intel
+            runner: macos-15-intel
             python: '3.11'
           - os: macos-15
+            runner: macos-15
             python: '3.11'
-    runs-on: ${{ matrix.os }}
+    runs-on: ${{ matrix.runner }}
     env:
       UV_PYTHON: ${{ matrix.python }}
     timeout-minutes: 10
