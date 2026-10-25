@@ -21,6 +21,136 @@ import zipfile
 from pathlib import Path
 from types import SimpleNamespace
 
+# Fixed helper source: credentials are loaded only from the isolated config and
+# never enter argv, stdout, stderr or evidence. This client performs reads only.
+HOLD_COMPLETION = r"""
+import asyncio
+import json
+import sys
+import time
+from pathlib import Path
+
+import anyio
+import httpx
+from mcp import ClientSession
+from mcp.client.streamable_http import streamable_http_client
+from mcp.shared.exceptions import McpError
+from mcp.types import CONNECTION_CLOSED
+
+from kirabridge.bridge_core.config import load_config
+from kirabridge.local_runtime import peer
+
+
+def disconnected(exc):
+    if isinstance(exc, (TimeoutError, httpx.TimeoutException)):
+        return False
+    if isinstance(exc, BaseExceptionGroup):
+        return bool(exc.exceptions) and all(disconnected(child) for child in exc.exceptions)
+    return isinstance(
+        exc,
+        (
+            httpx.TransportError,
+            ConnectionError,
+            anyio.EndOfStream,
+            anyio.BrokenResourceError,
+            anyio.ClosedResourceError,
+        ),
+    ) or (isinstance(exc, McpError) and exc.error.code == CONNECTION_CLOSED)
+
+
+async def main():
+    config_path, ready_path, result_path = map(Path, sys.argv[1:4])
+    root = ready_path.parent.resolve()
+    assert config_path.resolve().is_relative_to(root)
+    config = load_config(str(config_path))
+    assert config.state_path.resolve().is_relative_to(root)
+    assert config.credentials_file
+    assert Path(config.credentials_file).resolve().is_relative_to(root)
+    endpoint = peer(config, "local")
+    sent = asyncio.Event()
+    evidence = {"scope": "isolated authenticated completion_receive only"}
+
+    async def request_hook(request):
+        body = json.loads(await request.aread()) if request.method == "POST" else {}
+        if (
+            body.get("method") == "tools/call"
+            and body.get("params", {}).get("name") == "completion_receive"
+        ):
+
+            async def trace(name, info):
+                if name in {
+                    "http11.send_request_body.complete",
+                    "http2.send_request_body.complete",
+                }:
+                    sent.set()
+
+            request.extensions["trace"] = trace
+
+    try:
+        async with asyncio.timeout(35):
+            async with httpx.AsyncClient(
+                headers={"Authorization": "Bearer " + endpoint.token},
+                trust_env=False,
+                follow_redirects=False,
+                timeout=httpx.Timeout(30),
+                event_hooks={"request": [request_hook]},
+            ) as client:
+                async with streamable_http_client(endpoint.url, http_client=client) as streams:
+                    async with ClientSession(streams[0], streams[1]) as session:
+                        await session.initialize()
+                        evidence["started_monotonic"] = time.monotonic()
+                        call = asyncio.create_task(
+                            session.call_tool(
+                                "completion_receive",
+                                {
+                                    "target": "isolated-upgrade-open-read",
+                                    "limit": 1,
+                                    "wait_seconds": 20,
+                                },
+                            )
+                        )
+                        try:
+                            await asyncio.wait_for(sent.wait(), 5)
+                            await asyncio.sleep(0.25)
+                            assert not call.done(), "Completion read returned before blocking proof"
+                            evidence.update(body_sent=True, pending_after_seconds=0.25)
+                            ready_path.write_text(json.dumps(evidence))
+                            result = await call
+                            assert not result.isError and isinstance(result.structuredContent, dict)
+                            assert not result.structuredContent.get("error")
+                            assert result.structuredContent.get("notices") == []
+                            evidence["settled"] = "empty_response"
+                        except BaseException as exc:
+                            evidence["settled"] = (
+                                "connection_ended"
+                                if disconnected(exc)
+                                else "invalid_or_failed_response"
+                            )
+                            raise
+                        finally:
+                            if not call.done():
+                                call.cancel()
+                            await asyncio.gather(call, return_exceptions=True)
+    except BaseException as exc:
+        evidence["outcome_type"] = type(exc).__name__
+    finally:
+        evidence["ended_monotonic"] = time.monotonic()
+        result_path.write_text(json.dumps(evidence, indent=2) + "\n")
+
+
+asyncio.run(main())
+"""
+
+
+def stop_helper(child):
+    if child is not None and child.poll() is None:
+        child.terminate()
+        try:
+            child.wait(timeout=3)
+        except subprocess.TimeoutExpired:
+            child.kill()
+            child.wait(timeout=3)
+
 
 def run(argv, **kwargs):
     result = subprocess.run(argv, text=True, capture_output=True, timeout=240, **kwargs)
@@ -42,6 +172,7 @@ def accept(
     release_download=False,
     upgrade_only=False,
     previous_commit=None,
+    hold_completion=False,
 ):
     if platform.system() != "Darwin":
         raise SystemExit("Actual macOS is required")
@@ -177,6 +308,7 @@ def accept(
         "cwd": str(extracted),
         "checks": [],
         "upgrade_only": upgrade_only,
+        "hold_completion": hold_completion,
         "previous_version": previous_version,
         "previous_commit": previous_commit,
         "previous_wheel_sha256": digest(previous_wheel),
@@ -205,9 +337,10 @@ def accept(
             time.sleep(0.25)
         raise RuntimeError("Authenticated daemon health timeout")
 
+    helper = None
     try:
         installer.activate(args, previous)
-        health(previous_version)
+        previous_health = health(previous_version)
         database = installer.state_file(args.config)
         with sqlite3.connect(database) as db:
             db.execute("create table release_acceptance_probe(value text)")
@@ -215,8 +348,61 @@ def accept(
         evidence["checks"].append(
             f"pinned previous {previous_version} wheel starts under isolated launchd"
         )
+        if hold_completion:
+            ready_path, result_path = (
+                root / "completion-read-ready.json",
+                root / "completion-read-result.json",
+            )
+            helper = subprocess.Popen(
+                [
+                    str(installer.python(previous)),
+                    "-c",
+                    HOLD_COMPLETION,
+                    str(args.config),
+                    str(ready_path),
+                    str(result_path),
+                ],
+                stdin=subprocess.DEVNULL,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                env=test_env,
+            )
+            deadline = time.monotonic() + 12
+            while not ready_path.exists():
+                if helper.poll() is not None or time.monotonic() >= deadline:
+                    raise RuntimeError(
+                        "Isolated completion read did not become demonstrably pending"
+                    )
+                time.sleep(0.05)
+            proof = json.loads(ready_path.read_text())
+            assert proof["body_sent"] and proof["pending_after_seconds"] >= 0.25
+            assert helper.poll() is None
+            evidence["open_completion_read"] = {
+                "old_pid": previous_health["runtime"]["pid"],
+                "ready": proof,
+                "upgrade_started_monotonic": time.monotonic(),
+            }
         print(run(command, cwd=extracted, env=test_env), flush=True)
         current = health(version)
+        if hold_completion:
+            helper.wait(timeout=8)
+            completion = json.loads(result_path.read_text())
+            assert completion["body_sent"] and completion["pending_after_seconds"] >= 0.25
+            assert (
+                completion["ended_monotonic"]
+                >= evidence["open_completion_read"]["upgrade_started_monotonic"]
+            )
+            assert completion["settled"] in {"empty_response", "connection_ended"}
+            assert current["runtime"]["pid"] != previous_health["runtime"]["pid"]
+            evidence["open_completion_read"].update(
+                new_pid=current["runtime"]["pid"],
+                helper=completion,
+                upgraded_monotonic=time.monotonic(),
+            )
+            evidence["checks"].append(
+                "upgrade while authenticated completion_receive HTTP request remained open; "
+                "old read settled without replay and new daemon PID healthy"
+            )
         evidence["checks"].append(
             f"built package upgrades {previous_version}; authenticated version/status/start"
         )
@@ -279,6 +465,7 @@ def accept(
             )
         evidence["passed"] = True
     finally:
+        stop_helper(helper)
         subprocess.run(["launchctl", "bootout", service], capture_output=True, timeout=20)
         (root / "evidence.json").write_text(json.dumps(evidence, indent=2) + "\n")
     print(json.dumps(evidence, indent=2))
@@ -296,6 +483,11 @@ if __name__ == "__main__":
         action="store_true",
         help="Only new-package upgrade, data preservation and rollback",
     )
+    parser.add_argument(
+        "--hold-completion",
+        action="store_true",
+        help="Keep a proven open isolated completion_receive read during the upgrade",
+    )
     opts = parser.parse_args()
     accept(
         opts.artifacts.resolve(),
@@ -304,4 +496,5 @@ if __name__ == "__main__":
         opts.release_download,
         opts.upgrade_only,
         opts.previous_commit,
+        opts.hold_completion,
     )

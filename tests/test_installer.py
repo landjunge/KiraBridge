@@ -76,8 +76,11 @@ def test_update_rejects_silent_switch_to_another_config(installer, tmp_path):
     assert path.read_bytes() == original
 
 
+@pytest.mark.parametrize(
+    "timeout_failure", [False, True], ids=["bootstrap-error", "bootstrap-timeout"]
+)
 def test_launchd_failure_restores_previous_definition_without_config_restore(
-    installer, tmp_path, monkeypatch
+    installer, tmp_path, monkeypatch, timeout_failure
 ):
     prefix = tmp_path / "install"
     prefix.mkdir(mode=0o700)
@@ -124,13 +127,19 @@ def test_launchd_failure_restores_previous_definition_without_config_restore(
     operations = []
     monkeypatch.setattr(installer, "stop_service", lambda args: operations.append("stop"))
 
+    failure = (
+        installer.subprocess.TimeoutExpired(["SIMULATED launchd bootstrap"], 30)
+        if timeout_failure
+        else RuntimeError("SIMULATED launchd bootstrap failure")
+    )
+
     def start(args):
         operations.append("start")
         if operations.count("start") == 1:
-            raise RuntimeError("SIMULATED launchd bootstrap failure")
+            raise failure
 
     monkeypatch.setattr(installer, "start_service", start)
-    with pytest.raises(RuntimeError, match="SIMULATED"):
+    with pytest.raises(type(failure), match="SIMULATED"):
         installer.activate(args, release)
     assert launcher.read_bytes() == old_launcher
     assert plist.read_bytes() == old_plist
@@ -367,3 +376,33 @@ def test_launchctl_bootstrap_waits_for_delayed_job_removal(installer, monkeypatc
     installer.start_service(SimpleNamespace(service="launchd", plist=path))
     assert elapsed[0] == 8 and len(calls) == 9
     assert all(0 < value <= 20 for value in calls)
+
+
+@pytest.mark.parametrize("timeout_failure", [False, True], ids=["slow-eio", "command-timeout"])
+def test_launchctl_bootstrap_command_runtime_consumes_deadline(
+    installer, monkeypatch, tmp_path, timeout_failure
+):
+    from subprocess import CompletedProcess, TimeoutExpired
+
+    path = tmp_path / "service.plist"
+    path.write_text("placeholder")
+    elapsed, attempts = [0.0], []
+
+    def slow_run(argv, **kwargs):
+        attempts.append((elapsed[0], kwargs["timeout"]))
+        elapsed[0] += kwargs["timeout"]
+        if timeout_failure:
+            raise TimeoutExpired(argv, kwargs["timeout"])
+        return CompletedProcess(argv, 5, stdout="", stderr="Input/output error")
+
+    monkeypatch.setattr(installer.subprocess, "run", slow_run)
+    monkeypatch.setattr(installer.time, "monotonic", lambda: elapsed[0])
+    monkeypatch.setattr(
+        installer.time, "sleep", lambda seconds: elapsed.__setitem__(0, elapsed[0] + seconds)
+    )
+    expected_error = TimeoutExpired if timeout_failure else RuntimeError
+    with pytest.raises(expected_error):
+        installer.start_service(SimpleNamespace(service="launchd", plist=path))
+    assert attempts == ([(0.0, 20)] if timeout_failure else [(0.0, 20), (21.0, 9.0)])
+    assert elapsed[0] == (20 if timeout_failure else 30)
+    assert all(start < 30 and 0 < budget <= min(20, 30 - start) for start, budget in attempts)

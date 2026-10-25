@@ -5,9 +5,10 @@ its exact source commit; the separate7725bc6 evidence remains historical.
 This is a separately named private RC17 draft candidate from open PR32, not the
 published RC14 and not the historical standard RC17/b54f462 assets. It is unsigned.
 The base7725bc6 code passed actual Intel-macOS upgrade/data/rollback and Kira
-paste/readback. The final b candidate adds only a specifically tested legacy
-secret-error classification; package/native code equivalence and final installation
-are recorded in the supplemental operator evidence.
+paste/readback. The final b candidate adds the specifically tested legacy secret-error classification
+and bounded launchctl bootstrap recovery. Its exact build and acceptance are recorded
+in the [current continuation](RC17-RESUME-20261025.md); historical native proof remains
+explicitly pinned to7725bc6.
 GitHub Actions has not started due account billing; no merge/publication claimed.
 
 Der Befehl wählt genau diesen privaten, separat benannten RC17-Kandidaten aus PR32.
@@ -24,12 +25,12 @@ zu wiederholen. Versions-/Grant-/SHA-Nachprüfungen sind bestanden.
 
 **RC17 remains unpublished. The explicitly authorized operator upgrade, native paste/readback and full ChatGPT grant are verified for7725bc6; GitHub Actions remains blocked before execution by account billing. Additional review was waived.**
 
-**RC17 ist ein unveröffentlichter Reviewkandidat. Echte isolierte Paketprüfung bestanden; Pflicht-CI/Review und native Agenteneingabe offen. Keine Produktivfreigabe.**
+**RC17 ist ein unveröffentlichter Kandidat. Produktive Installation und reine native Eingabe sind für7725bc6 belegt; das Folgepaket erfordert seine eigene Prüfung. Pflicht-CI offen, zusätzliche Review auf Nutzeranweisung entfallen.**
 
 ## Deutsch
 
 **Veröffentlicht ist [v0.8.0rc14](https://github.com/landjunge/KiraBridge/releases/tag/v0.8.0rc14).
-RC17 ist ein unveröffentlichter Kandidat. Der Release-Entwurf dient ausschließlich berechtigten Reviewern; Freigabe erst nach CI und Review.**
+RC17 ist ein unveröffentlichter Kandidat. Der Release-Entwurf dient ausschließlich berechtigten Reviewern; Freigabe erst nach bestandenen erforderlichen Prüfungen. Zusätzliche Review wurde abgewählt.**
 
 Voraussetzungen: normales Benutzerkonto ohne sudo, macOS 15 (Intel x86_64 oder
 Apple Silicon arm64), Python **3.11**, **uv 0.11.6**, Internet zu PyPI und Zugriff
@@ -56,8 +57,7 @@ besteht. Prüfsummen vom selben authentifizierten Release schützen vor
 Beschädigung; sie ersetzen keine unabhängige Herausgebersignatur.
 
 **Für berechtigte Reviewer des RC17-Release-Entwurfs: Installation und Update
-mit EINEM Befehl (angemeldete GitHub CLI erforderlich).** Der Bootstrap lädt das
-passende Paket authentifiziert und prüft dessen fest eingebetteten SHA-256-Wert.
+mit EINEM Befehl (angemeldete GitHub CLI erforderlich).** Der Befehl lädt Paket und zugehörige Prüfsumme authentifiziert und prüft SHA-256.
 `"$@"` reicht optionale Argumente weiter; beim normalen Einfügen sind diese leer.
 Dies ist ausschließlich der RC17-Reviewbefehl, tatsächlich mit isolierten Pfaden und eigener launchd-Testkennung geprüft:
 

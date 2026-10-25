@@ -1,3 +1,10 @@
+> Current operator/build continuation: [25 October report](RC17-RESUME-20261025.md).
+> The early5089fca acceptance below is historical. Later7725bc6 native paste/readback
+> and explicitly authorized full ChatGPT access passed; additional review was waived.
+> CI and final merged-source release remain open. / Aktueller Arbeitsstand siehe
+> Fortsetzungsbericht; die ursprünglichen offenen Installations-/Eingabepunkte unten
+> beschreiben den historischen Kandidaten, nicht den heute laufenden Dienst.
+
 # 0.8.0rc17 — consolidation candidate / Zusammenführungskandidat
 
 **Not published or approved. Nicht veröffentlicht oder abgenommen.**

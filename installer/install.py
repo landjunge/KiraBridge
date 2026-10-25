@@ -439,10 +439,10 @@ def stop_service(args):
 def start_service(args):
     if args.service != "none" and args.plist.exists():
         command = ["launchctl", "bootstrap", f"gui/{os.getuid()}", str(args.plist)]
-        # launchd can still be removing the old job after bootout returns.
-        # macOS reports the pending removal as bootstrap exit code 5
-        # ("Operation already in progress"). Retry *only* that transient
-        # exit code, with a fixed bound, before allowing activate() to roll back.
+        # Bootstrap exit code 5 is a generic Input/output error (EIO), not
+        # proof of pending removal. Delayed teardown after bootout is one
+        # possible cause. Retry only code 5 within a fixed bound, then fail
+        # through activate()'s existing rollback path; other errors fail immediately.
         # Production HTTP long-polls can outlive the old four-second retry
         # window. Keep both elapsed time and command count bounded; do not change
         # the operator's launchd exit/KeepAlive options or require root.
