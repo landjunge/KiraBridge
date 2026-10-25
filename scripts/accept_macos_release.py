@@ -189,6 +189,34 @@ def stop_helper(child):
             child.wait(timeout=3)
 
 
+def stop_test_service(service):
+    """Remove the owned fixture and require a bounded, independent absence check."""
+    bootout = subprocess.run(["launchctl", "bootout", service], capture_output=True, timeout=20)
+    deadline = time.monotonic() + 10
+    for _ in range(100):
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            break
+        observed = subprocess.run(
+            ["launchctl", "print", service],
+            capture_output=True,
+            timeout=min(5, remaining),
+        )
+        # launchctl print returns 113 when this exact job is absent. Other
+        # failures (including permission denial) do not prove successful removal.
+        if observed.returncode == 113:
+            return {
+                "service_cleanup_bootout_returncode": bootout.returncode,
+                "service_cleanup_absence_verified": True,
+            }
+        if observed.returncode != 0:
+            raise RuntimeError(
+                f"Cannot observe isolated test service removal ({observed.returncode})"
+            )
+        time.sleep(min(0.1, max(0, deadline - time.monotonic())))
+    raise RuntimeError("Isolated test service still present after cleanup deadline")
+
+
 def run(argv, **kwargs):
     result = subprocess.run(argv, text=True, capture_output=True, timeout=240, **kwargs)
     if result.returncode:
@@ -510,7 +538,7 @@ def accept(
             raise
         finally:
             try:
-                subprocess.run(["launchctl", "bootout", service], capture_output=True, timeout=20)
+                evidence.update(stop_test_service(service))
             except BaseException as exc:
                 evidence["passed"] = False
                 evidence["service_cleanup_error"] = type(exc).__name__
