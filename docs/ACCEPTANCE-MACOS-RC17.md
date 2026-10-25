@@ -1,3 +1,11 @@
+> Historical acceptance of source 5089fca8, not the current RC17 package. Later
+> operator installation/native-input evidence supersedes its open deployment/input
+> statements; additional review was waived. See [current continuation](RC17-RESUME-20261025.md)
+> and [operator audit](CHATGPT-BLOCKER-AUDIT-20261024.md). CI/release gates remain open.
+>
+> Historischer Nachweis für Quelle 5089fca8. Die damaligen offenen Installations-
+> und Eingabepunkte sind keine aktuelle Zustandsmeldung. Aktuellen Stand siehe oben.
+
 # RC17 package acceptance / Paketabnahme
 
 **Review draft, not published. No production deployment approved.**

@@ -1,3 +1,10 @@
+> Current operator/build continuation: [25 October report](RC17-RESUME-20261025.md).
+> The early5089fca acceptance below is historical. Later7725bc6 native paste/readback
+> and explicitly authorized full ChatGPT access passed; additional review was waived.
+> CI and final merged-source release remain open. / Aktueller Arbeitsstand siehe
+> Fortsetzungsbericht; die ursprünglichen offenen Installations-/Eingabepunkte unten
+> beschreiben den historischen Kandidaten, nicht den heute laufenden Dienst.
+
 # 0.8.0rc17 — consolidation candidate / Zusammenführungskandidat
 
 **Not published or approved. Nicht veröffentlicht oder abgenommen.**
@@ -38,3 +45,40 @@ Build only from a clean committed source: `uv run python scripts/build_release.p
 --out dist/rc17-candidate`. A separately required reproducibility build must use
 another empty destination and compare `SHA256SUMS`. This is a build instruction,
 not a tested public installation command. No download link is invented here.
+
+## Native focus and ChatGPT responsiveness follow-up (PR32, not merged)
+
+The native focus repair binds immutable window IDs and resolves only unique current
+Window/Fenster menu entries when activation selects another window; exact focus,
+TTY, process and viewport checks remain. Focus-only actual Intel-macOS proof passed;
+installed positive paste acceptance remains pending. Routine bridge_health now avoids
+terminal scans so one-second multi-client polling cannot consume foreground read
+slots. Explicit observe_terminals=true/inventory/catalog provide fresh observations.
+The full operator grant now uses actual capability mappings, including files.inspect.
+The latest user explicitly authorized full ChatGPT access; this does not create a
+missing ThreadDesk byte receiver or an unsupported Library-wide API.
+
+GitHub Actions is still blocked before execution by account billing. PR32 is open;
+RC17 remains draft. Additional external review was waived by the owner; independent
+native-team safety audits were performed. No failed Actions run is called passed.
+
+The extended blocker audit fixes effective Team/ThreadDesk read permissions,
+paginated/refreshed tool discovery, owned visible/admin output and UTF-8 budgets.
+A local one-principal ACL activation mode preserves durable external reply waits
+without changing their state or allowing partial-input interruption. Clipboard
+restoration moves to an independent RAM-only owner, with generation guards and
+stdin transport; killed GUI workers no longer own the only snapshot.
+[Team findings and scoped tests](CHATGPT-BLOCKER-AUDIT-20261024.md).
+Actual final-package/native-paste acceptance remains separately required.
+
+### Verified operator candidate7725bc6 (still unpublished)
+
+Actual Kira paste-only input, independent readback, nonempty-input refusal and
+128-byte authorized log read passed on Intel macOS. All42 ChatGPT operations were
+read back authorized/automatic after explicit operator ACL activation. Package
+bytes reproduced, actual isolated upgrade/rollback and authenticated draft command
+were checked; one earlier direct read timeout is retained. Separately named
+KiraBridge-macos-7725bc6.tar.gz + SHA are actual private draft assets. PR32 remains
+open because Actions did not start due billing. Standard draft assets/main remain
+b54f462; final integrated-main build/publication is still required after checks.
+[Detailed proof and boundaries](CHATGPT-BLOCKER-AUDIT-20261024.md).

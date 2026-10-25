@@ -1,0 +1,30 @@
+{
+  "passed": true,
+  "exact_command": "d=$(mktemp -d) && gh release download v0.8.0rc17 -R landjunge/KiraBridge -p 'KiraBridge-macos-chatgpt-20261024b.tar.gz*' -D \"$d\" && (cd \"$d\" && shasum -a 256 -c KiraBridge-macos-chatgpt-20261024b.tar.gz.sha256 && tar -xzf KiraBridge-macos-chatgpt-20261024b.tar.gz && sh KiraBridge/install.sh --full-access \"$@\")",
+  "shell_download_checksum_extraction_install_exit_code": 0,
+  "authentication": "actual gh authenticated private RC17 draft download",
+  "source_commit": "012b592caa5b6126342f9148f3b38a7d50b00379",
+  "download_sha256": "bbf6e91f902df8d9d33f0afcde949d2d4e1117481c5edd63573aad9db9183514",
+  "cli_version": "cli.py 0.8.0rc17",
+  "fresh_full_grant_operations": 42,
+  "isolated_args": [
+    "--service",
+    "none",
+    "--prefix",
+    "/Users/landjunge/KiraBridge-release-20261024/.worktrees/current-release/dist/rc17-resume-20261025/clean-command-check/install",
+    "--config",
+    "/Users/landjunge/KiraBridge-release-20261024/.worktrees/current-release/dist/rc17-resume-20261025/clean-command-check/config/config.toml",
+    "--launcher",
+    "/Users/landjunge/KiraBridge-release-20261024/.worktrees/current-release/dist/rc17-resume-20261025/clean-command-check/bin/kirabridge",
+    "--plist",
+    "/Users/landjunge/KiraBridge-release-20261024/.worktrees/current-release/dist/rc17-resume-20261025/clean-command-check/service.plist",
+    "--workspace",
+    "/Users/landjunge/KiraBridge-release-20261024/.worktrees/current-release/dist/rc17-resume-20261025/clean-command-check/workspace",
+    "--cache-dir",
+    "/Users/landjunge/KiraBridge-release-20261024/.worktrees/current-release/dist/rc17-resume-20261025/clean-command-check/cache"
+  ],
+  "scope": "own prefix/config/credentials/launcher/plist/cache/workspace; service none; OS mktemp scratch",
+  "launchd_acceptance": "separate actual isolated warm-open-read-upgrade using identical package bytes",
+  "apple_silicon": "not executed",
+  "release_status": "draft candidate, not published"
+}

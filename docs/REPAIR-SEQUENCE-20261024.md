@@ -1,3 +1,78 @@
+# Aktueller Reparaturstand · 25. Oktober 2026
+
+Dieser Einstieg ersetzt ältere Zustandsaussagen weiter unten. Die bisherigen
+Abschnitte bleiben als unveränderte Entwicklungshistorie erhalten. Maßgeblicher
+Arbeitsspeicher ist weiterhin Whiteboard `188ce4729a62`; keine konkurrierende Ablage.
+
+## Erledigt und belegt
+
+- Produktiver RC17-Stand zuletzt unabhängig bestätigt: Quelle
+  `012b592caa5b6126342f9148f3b38a7d50b00379`, PID 72612, Dispatcher aktiv.
+  127 installierte Paketdateien entsprechen dem geprüften Wheel; Konfiguration,
+  Zugangsdaten und Dateimodi entsprechen der Sicherung. Dienstoptionen außer dem
+  Programmpfad sind erhalten. Siehe [Installationsbeleg](evidence/rc17-installed-012b592-20261025.json),
+  [Datenerhalt](evidence/rc17-data-preservation-20261025.json) und
+  [unabhängige Prüfung](evidence/rc17-independent-review-20261025.json).
+- Reines natives Einfügen ohne Return und separates Rücklesen wurden am
+  unveränderten Eingabecode der Quelle `7725bc6` bestätigt. Das ist keine neue
+  UI-Abnahme von `012b592`, keine Agentenausführung und keine allgemeine
+  Codex-/Grok-Restartabnahme. Der Paketvergleich bestätigt unveränderte Eingabemodule.
+- Whiteboard-Schreibweg und vollständiges unabhängiges Rücklesen sind belegt.
+  Ein Revisionskonflikt der ergänzenden Prüfung ist mit `found=false` und fehlendem
+  Marker abgeglichen; der aktualisierte Nachtrag wurde in Revision 47 bestätigt.
+- Separate Braille-/Pink-Vorschau liegt in [Draft-PR34](https://github.com/landjunge/KiraBridge/pull/34);
+  sie ist nicht in den produktiven Dienst eingebaut.
+
+Die drei früher wartenden Nachrichten wurden regulär empfangen und quittiert,
+mit `externally_acknowledged=true`, `run_id=null` und ohne CLI-Ausführung.
+Das belegt **keinen** Bibliotheksimport. Alte unsichere Übergaben und ihre Historie
+bleiben erhalten. Keinen alten Library-Auftrag erneut einreichen oder ausführen.
+
+## Getrennte Änderungen in Arbeit
+
+- [PR32](https://github.com/landjunge/KiraBridge/pull/32): integrierte RC17-Reparaturen;
+  Kandidateninstallation ist belegt, reguläre main-/Releaseintegration bleibt offen.
+- [PR33](https://github.com/landjunge/KiraBridge/pull/33) und
+  [PR35](https://github.com/landjunge/KiraBridge/pull/35): vorhandener Library-Adapter
+  und Legacy-Checkpointkompatibilität auf getrennten Branches. Whiteboardrevision 46
+  dokumentiert deren gezielte Nachweise; diese Änderungen sind nicht produktiv aktiviert.
+- [Draft-PR36](https://github.com/landjunge/KiraBridge/pull/36): Abnahmeharness verlangt
+  nach der Bereinigung eine unabhängige Abwesenheitsprüfung seines Testdienstes.
+  Vorher reproduzierter falscher Erfolg, danach vier gezielte simulierte Fälle
+  bestanden. Keine Runtime- oder Installationsänderung.
+  [Prüfbeleg](evidence/acceptance-cleanup-20261025.json).
+
+Der Longread-/Upgradebeleg bestätigt Überlappung mit dem Installerstart, keinen
+exakt instrumentierten bootout-Zeitpunkt und keine abschließende Ursache des alten
+allgemeinen EIO. Fehlgeschlagene oder unterbrochene Läufe bleiben als solche sichtbar.
+
+## Offen und nächster konkreter Schritt
+
+GitHub Verify und macOS-Paketprüfung von PR36 starteten laut ihren Annotationen
+wegen Kontozahlung/Ausgabenlimit nicht. Lokale Erfolge ersetzen keine Pflichtchecks.
+RC17 bleibt Entwurf, veröffentlicht bleibt zuletzt RC14; keine Veröffentlichung
+oder Zusammenführung aus dieser Dokumentationsänderung ableiten. Zusätzliche
+Review war vom Nutzer abgewählt; sie darf weder als erfolgt noch pauschal als
+neuer offener Auftrag dargestellt werden. Apple-Silicon-Abnahme bleibt offen.
+
+Das aktive ThreadDesk-Profil verwendet zuletzt den alten Quellpin `6c7d578a` ohne
+Dateiempfänger. Der getrennt getestete Empfänger `770bbc9f` ist dadurch nicht aktiviert.
+Dateimodul, autorisierte Exportquelle und konkrete Ziele fehlen weiterhin.
+Vollständige ChatGPT-Fähigkeiten ersetzen diese Voraussetzungen nicht.
+
+Als Nächstes bestehende PRs koordiniert prüfen und CI-Abrechnung/Pflichtchecks
+ermöglichen; erst mit ihren tatsächlichen Ergebnissen regulär integrieren und aus
+finalem main bauen. Library-Arbeit benötigt zuvor eine bereitgestellte autorisierte
+Exportquelle sowie eine getrennt geprüfte Receiver-/Profil- und Datenmigration.
+Keinen zweiten Adapter, keine erneute Queueausführung und keinen blinden Profilwechsel.
+
+Ausführliche zeitlich geordnete Belege:
+[Fortsetzungsbericht](RC17-RESUME-20261025.md).
+Die folgenden RC14-, Review- und Installationsaussagen beschreiben ihren damaligen
+Zeitpunkt und sind keine aktuellen Freigaben oder Sperren.
+
+---
+
 # Ordered repair status · 2026-10-24
 
 User-mandated order: queue → current terminal binding/input → Whiteboard validation

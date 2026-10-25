@@ -15,6 +15,7 @@ from jsonschema import Draft202012Validator
 from jsonschema.exceptions import SchemaError, ValidationError
 
 from kirabridge.bridge_core.models import BridgeError
+from kirabridge.permissions import decision
 
 _NAME = re.compile(r"^[A-Za-z][A-Za-z0-9_-]{0,63}$")
 _MAX_TOOLS = 64
@@ -25,8 +26,8 @@ _MAX_ARGUMENTS = 65536
 def _guard(bridge: Any, principal: str) -> None:
     if not bridge.config.threaddesk.dynamic_read_proxy:
         raise BridgeError("threaddesk_proxy_disabled", "Dynamic ThreadDesk proxy is disabled")
-    policy = bridge.security.principal(principal, "threaddesk.read")
-    if policy.approval_mode != "automatic":
+    bridge.security.principal(principal, "threaddesk.read")
+    if not decision(bridge.config, principal, "threaddesk.read")["automatic"]:
         raise BridgeError("approval_required", "Read permission must be automatic for live proxy")
 
 
@@ -62,11 +63,11 @@ def _read_tool(tool: Any) -> dict[str, Any] | None:
 async def _fresh_tools(manager: Any) -> dict[str, dict[str, Any]]:
     await manager.connect()
     async with asyncio.timeout(manager.settings.timeout):
-        listing = await manager.pool.sessions["threaddesk"].list_tools()
-    if len(listing.tools) > _MAX_TOOLS:
+        tools = await manager.pool.list_tools("threaddesk")
+    if len(tools) > _MAX_TOOLS:
         raise BridgeError("threaddesk_tool_limit", "Tool catalog is too large")
     approved: dict[str, dict[str, Any]] = {}
-    for tool in listing.tools:
+    for tool in tools:
         item = _read_tool(tool)
         if item is not None:
             if item["name"] in approved:
