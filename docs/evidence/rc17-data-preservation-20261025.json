@@ -1,0 +1,12 @@
+{
+  "config_credentials_hashes_modes_preserved": true,
+  "immutable_counts_preserved": {
+    "tasks": 4439,
+    "messages": 271,
+    "visible_handoffs": 45
+  },
+  "unknown_input_record_preserved": true,
+  "database_integrity": "ok",
+  "commit": "012b592caa5b6126342f9148f3b38a7d50b00379",
+  "backup": "/Users/landjunge/.local/share/kirabridge/install/backups/20261025-104000-86e1065e"
+}

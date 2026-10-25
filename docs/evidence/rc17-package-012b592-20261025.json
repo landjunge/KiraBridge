@@ -1,0 +1,17 @@
+{
+  "source_commit": "012b592caa5b6126342f9148f3b38a7d50b00379",
+  "version": "0.8.0rc17",
+  "two_builds_identical": true,
+  "bundle_sha256": "bbf6e91f902df8d9d33f0afcde949d2d4e1117481c5edd63573aad9db9183514",
+  "wheel_sha256": "0e4296bc7333067f7501b5f9236d7ab81e1151ca487d26f8c713c2695377284b",
+  "manifest_all_files_verified": true,
+  "archive_paths_safe_regular": true,
+  "wheel_against_native_7725_changed": [
+    "kirabridge/threaddesk_contract.py"
+  ],
+  "native_permissions_queue_clipboard_sources_byte_identical": true,
+  "unchanged_package_members": 126,
+  "installer_change": "bounded launchctl EIO retry up to30s; unchanged daemon options/permissions",
+  "apple_signed": false,
+  "apple_silicon_tested": false
+}

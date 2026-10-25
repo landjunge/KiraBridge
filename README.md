@@ -14,14 +14,14 @@
 
 PR #28 and #30 are merged; queue repairs are part of main. RC14 remains the
 published release; RC15/RC16 are historical drafts and RC17 is still a draft.
-The operator Mac has been explicitly upgraded to RC17. The subsequent native
+The operator Mac has been explicitly upgraded to RC17/012b592. The subsequent native
 focus/polling repair is tracked in [PR #32](https://github.com/landjunge/KiraBridge/pull/32),
 which remains open while GitHub Actions is blocked by account billing. No failed
 CI is presented as passed. [Actual installation and checks](docs/RC17-INSTALLATION-20261024.md).
 
 PR #28 und #30 sind gemergt; die Queue-Reparatur ist in main. Veröffentlicht bleibt
 RC14; RC17 ist weiterhin ein Entwurf. Der Betreiber-Mac wurde ausdrücklich auf
-RC17 aktualisiert. Die folgende Fokus-/Statusabfrage-Reparatur liegt in PR #32;
+RC17/012b592 aktualisiert. Die folgende Fokus-/Statusabfrage-Reparatur liegt in PR #32;
 GitHub Actions ist wegen Kontozahlung/Ausgabenlimit blockiert. Details und konkrete
 Quellstände stehen im Installationsnachweis; kein fehlgeschlagener Check gilt als bestanden.
 
@@ -114,7 +114,7 @@ The installation command is [below](#install--update--installieren--aktualisiere
 
 [PR #28](https://github.com/landjunge/KiraBridge/pull/28) merged the consolidation into main.
 The subsequent ChatGPT repair is in open [PR #32](https://github.com/landjunge/KiraBridge/pull/32).
-The separately named candidate below is source `7725bc6`, actually installed and tested.
+The separately named candidate below pins `012b592`, actually installed and tested on Intel macOS. Native paste/readback proof remains pinned to its byte-identical native modules from7725bc6.
 Standard RC17 draft assets still represent main/b54f462; RC15/RC16 are historical drafts.
 **Merged into main; publication remains gated:** GitHub Actions cannot start because of account
 billing/spending limits. Additional review was waived by the owner. Native paste-only
@@ -192,7 +192,7 @@ Beschreibung und 100.000 Emoji Notiz (400.000 UTF-8-Bytes) mit separatem Readbac
 Größere Inhalte benötigen einen verlustfreien Empfängervertrag statt Abschneiden.
 [Whiteboardbelege](docs/WHITEBOARD-BOUNDARIES-20261024.md) ·
 [Integrationsstand](docs/REPAIR-SEQUENCE-20261024.md).
-Veröffentlicht bleibt RC14. Der Betreiber-Mac wurde auf RC17/7725bc6 aktualisiert;
+Veröffentlicht bleibt RC14. Der Betreiber-Mac wurde auf RC17/012b592 aktualisiert;
 Quellstand, private Kandidaten-Assets und tatsächlicher Dienst sind getrennt belegt.
 
 ### Zuerst das Wichtigste: Live-Sprache und Terminal-Schnittstellen
@@ -267,7 +267,7 @@ Der Installationsbefehl steht [unten](#install--update--installieren--aktualisie
 
 [PR #28](https://github.com/landjunge/KiraBridge/pull/28) hat die Zusammenführung nach main gemergt.
 Die folgende ChatGPT-Reparatur liegt in offenem [PR #32](https://github.com/landjunge/KiraBridge/pull/32).
-Der separat benannte Kandidat unten ist Quelle `7725bc6`, tatsächlich installiert und geprüft.
+Der separat benannte Kandidat unten ist Quelle `012b592`, tatsächlich auf Intel-macOS installiert und geprüft. Native Paste/Readback ist für seine unveränderten Module aus7725bc6 belegt.
 Die Standard-RC17-Draft-Assets stehen noch auf main/b54f462; RC15/RC16 sind historische Entwürfe.
 **Nach main gemergt; Veröffentlichung bleibt gesperrt:** GitHub Actions startet wegen
 Kontoabrechnung/Ausgabenlimit nicht. Zusätzliche Review auf Nutzeranweisung entfallen;
@@ -330,7 +330,7 @@ Apple-Silicon-Abnahme, echte ChatGPT-Dateiauswahl oder ThreadDesk-Produktimporte
 
 ---
 
-RC17 base was merged through [PR #28](https://github.com/landjunge/KiraBridge/pull/28), merge `a74fe613`. The installed7725bc6 repair remains in open PR32. Native paste/readback passed; CI did not start because of billing, so merge/release acceptance remains open. Additional review was waived. / RC17-Basis über PR #28 gemergt; die installierte7725bc6-Reparatur liegt noch in offenem PR32. Native Paste/Readback bestanden; CI wegen Abrechnung nicht gestartet, daher keine Merge-/Release-Abnahme. Zusätzliche Review entfallen.
+RC17 base was merged through [PR #28](https://github.com/landjunge/KiraBridge/pull/28), merge `a74fe613`. The installed012b592 repair remains in open PR32; native evidence is pinned to unchanged7725bc6 modules. Native paste/readback passed; CI did not start because of billing, so merge/release acceptance remains open. Additional review was waived. / RC17-Basis über PR #28 gemergt; die installierte012b592-Reparatur liegt noch in offenem PR32; native Belege beziehen sich auf unveränderte7725bc6-Module. Native Paste/Readback bestanden; CI wegen Abrechnung nicht gestartet, daher keine Merge-/Release-Abnahme. Zusätzliche Review entfallen.
 
 ## Install / update · Installieren / aktualisieren
 
@@ -407,3 +407,5 @@ The copy command was exercised with isolated install paths and service=none; act
 launchd upgrade/status/rollback were verified separately with these same package bytes.
 / Der Kopierbefehl wurde mit isolierten Pfaden und service=none ausgeführt;
 echter launchd-Upgrade/Status/Rollback ist für dieselben Paketbytes separat belegt.
+
+Current installed RC17 source / Aktuell installierte RC17-Quelle: **012b592**, with preserved data and42 automatic ChatGPT operations. [25 October build/install/command evidence](docs/RC17-RESUME-20261025.md). PR32 remains open, RC17 draft; latest published RC14. / PR32 offen, RC17 Entwurf, veröffentlicht RC14.

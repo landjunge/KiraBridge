@@ -1,6 +1,7 @@
 # Current RC17 review artifact / Aktuelles RC17-Prüfpaket
 
-The copy command below selects **KiraBridge-macos-chatgpt-20261024b.tar.gz**, with its adjacent authenticated `.sha256` file. The embedded release.json pins
+The copy command below selects **KiraBridge-macos-chatgpt-20261024b.tar.gz**, with its adjacent authenticated `.sha256` file. Source **012b592caa5b6126342f9148f3b38a7d50b00379**, SHA-256
+**bbf6e91f902df8d9d33f0afcde949d2d4e1117481c5edd63573aad9db9183514**. The embedded release.json pins
 its exact source commit; the separate7725bc6 evidence remains historical.
 This is a separately named private RC17 draft candidate from open PR32, not the
 published RC14 and not the historical standard RC17/b54f462 assets. It is unsigned.
@@ -18,14 +19,14 @@ ChatGPT vervollständigt: alle42 Operationen automatisch, andere Identitäten un
 Zugangsdaten unverändert. Details: [Arbeitsnachweis](CHATGPT-BLOCKER-AUDIT-20261024.md).
 Die Ein-Zeilen-Kette wurde aus dem authentifizierten Entwurf mit isolierten Pfaden
 und `--service none` ausgeführt; echte launchd-Prüfungen liefen separat mit denselben
-Paketbytes. Ein nachgelagerter Testpfad-Assert wurde berichtigt, ohne Installation
-zu wiederholen. Versions-/Grant-/SHA-Nachprüfungen sind bestanden.
+Paketbytes. Der aktuelle Paketbefehl bestand ohne Pfadkorrektur. Versions-/Grant-/SHA-Nachprüfungen
+sind bestanden; historische Fixturefehler bleiben im älteren Beleg erhalten.
 
 # macOS installation / Installation
 
 **RC17 remains unpublished. The explicitly authorized operator upgrade, native paste/readback and full ChatGPT grant are verified for7725bc6; GitHub Actions remains blocked before execution by account billing. Additional review was waived.**
 
-**RC17 ist ein unveröffentlichter Kandidat. Produktive Installation und reine native Eingabe sind für7725bc6 belegt; das Folgepaket erfordert seine eigene Prüfung. Pflicht-CI offen, zusätzliche Review auf Nutzeranweisung entfallen.**
+**RC17 ist ein unveröffentlichter Kandidat. Produktive Installation ist für012b592 und reine native Eingabe für dessen unveränderte Module aus7725bc6 belegt. Pflicht-CI offen, zusätzliche Review auf Nutzeranweisung entfallen.**
 
 ## Deutsch
 

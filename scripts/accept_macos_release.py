@@ -41,6 +41,32 @@ from kirabridge.bridge_core.config import load_config
 from kirabridge.local_runtime import peer
 
 
+def exception_tree(exc, *, depth=0, seen=None, budget=None):
+    # Only class identity and numeric MCP codes: never exception text/args,
+    # request URLs/headers, credentials, response bodies or traceback locals.
+    seen = set() if seen is None else seen
+    budget = [64] if budget is None else budget
+    if id(exc) in seen or depth >= 8 or budget[0] <= 0:
+        return None
+    seen.add(id(exc))
+    budget[0] -= 1
+    result = {"type": type(exc).__name__, "module": type(exc).__module__}
+    if isinstance(exc, McpError) and type(exc.error.code) is int:
+        result["mcp_code"] = exc.error.code
+    if isinstance(exc, BaseExceptionGroup):
+        children = [
+            exception_tree(child, depth=depth + 1, seen=seen, budget=budget)
+            for child in exc.exceptions[:64]
+        ]
+        result["children"] = [child for child in children if child is not None]
+    cause = exc.__cause__ if exc.__cause__ is not None else exc.__context__
+    if cause is not None:
+        cause_tree = exception_tree(cause, depth=depth + 1, seen=seen, budget=budget)
+        if cause_tree is not None:
+            result["cause"] = cause_tree
+    return result
+
+
 def disconnected(exc):
     if isinstance(exc, (TimeoutError, httpx.TimeoutException)):
         return False
@@ -68,7 +94,10 @@ async def main():
     assert Path(config.credentials_file).resolve().is_relative_to(root)
     endpoint = peer(config, "local")
     sent = asyncio.Event()
-    evidence = {"scope": "isolated authenticated completion_receive only"}
+    evidence = {
+        "scope": "isolated authenticated completion_receive only",
+        "response_received": False,
+    }
 
     async def request_hook(request):
         body = json.loads(await request.aread()) if request.method == "POST" else {}
@@ -116,11 +145,14 @@ async def main():
                             evidence.update(body_sent=True, pending_after_seconds=0.25)
                             ready_path.write_text(json.dumps(evidence))
                             result = await call
+                            evidence["response_received"] = True
                             assert not result.isError and isinstance(result.structuredContent, dict)
                             assert not result.structuredContent.get("error")
                             assert result.structuredContent.get("notices") == []
                             evidence["settled"] = "empty_response"
                         except BaseException as exc:
+                            evidence["inner_exception_type"] = type(exc).__name__
+                            evidence["request_error_tree"] = exception_tree(exc)
                             evidence["settled"] = (
                                 "connection_ended"
                                 if disconnected(exc)
@@ -133,6 +165,11 @@ async def main():
                             await asyncio.gather(call, return_exceptions=True)
     except BaseException as exc:
         evidence["outcome_type"] = type(exc).__name__
+        evidence["outcome_error_tree"] = exception_tree(exc)
+        # Transport task groups cancel the awaiting request before surfacing
+        # their actual disconnect leaf during async-context unwinding.
+        if evidence.get("body_sent") and not evidence["response_received"] and disconnected(exc):
+            evidence["settled"] = "connection_ended"
     finally:
         evidence["ended_monotonic"] = time.monotonic()
         result_path.write_text(json.dumps(evidence, indent=2) + "\n")
@@ -465,9 +502,21 @@ def accept(
             )
         evidence["passed"] = True
     finally:
-        stop_helper(helper)
-        subprocess.run(["launchctl", "bootout", service], capture_output=True, timeout=20)
-        (root / "evidence.json").write_text(json.dumps(evidence, indent=2) + "\n")
+        try:
+            stop_helper(helper)
+        except BaseException as exc:
+            evidence["passed"] = False
+            evidence["helper_cleanup_error"] = type(exc).__name__
+            raise
+        finally:
+            try:
+                subprocess.run(["launchctl", "bootout", service], capture_output=True, timeout=20)
+            except BaseException as exc:
+                evidence["passed"] = False
+                evidence["service_cleanup_error"] = type(exc).__name__
+                raise
+            finally:
+                (root / "evidence.json").write_text(json.dumps(evidence, indent=2) + "\n")
     print(json.dumps(evidence, indent=2))
 
 
