@@ -10,28 +10,38 @@
 
 [English](#english) · [Deutsch](#deutsch) · [Published / Veröffentlicht RC14](https://github.com/landjunge/KiraBridge/releases/tag/v0.8.0rc14)
 
-## Unreleased queue repair / Unveröffentlichte Queue-Reparatur
+## Current state / Aktueller Stand
 
-The current repair branch adds owner-scoped queue inspection/control. It is **not
-included in the RC16 draft assets and is not installed into production RC14**.
-See [queue tools, safety and rollback limits](docs/QUEUE-MANAGEMENT.md) and
-[ordered repair status](docs/REPAIR-SEQUENCE-20261024.md).
+Published: **RC14**. The operator Mac runs verified **RC17/012b592**; its source,
+package, isolated upgrade/rollback and exact download command are documented in
+[PR32's current report](https://github.com/landjunge/KiraBridge/blob/bb3010817c8d6cf21fbc7aa5eb06ee17426db6fe/docs/RC17-RESUME-20261025.md).
+PR32 is open; CI jobs do not start because of account billing/spending limits.
+This receiver follow-up builds on PR33 and is **not a replacement installation**
+for that verified runtime. The separate design preview in PR34 remains uninstalled.
 
-Der Reparaturbranch ergänzt eine identitätsgebundene Queue-Verwaltung. Sie ist
-**nicht in den RC16-Draft-Assets enthalten und nicht produktiv in RC14 installiert**.
-[Bedienung, Sicherheit und Rückweg](docs/QUEUE-MANAGEMENT.md) ·
-[verbindliche Reparaturreihenfolge](docs/REPAIR-SEQUENCE-20261024.md).
+Veröffentlicht bleibt **RC14**, produktiv läuft geprüftes **RC17/012b592**.
+Diese Empfänger-Ergänzung baut auf PR33 auf und ersetzt die geprüfte Installation
+nicht. PR32/33 sind noch nicht gemergt, RC17 bleibt Entwurf; keine Pflichtprüfung
+wird umgangen. Die Designvorschau aus PR34 bleibt separat. Die Queue-Reparatur
+ist bereits in main und wird nicht erneut umgesetzt.
+
+[Library interface, checkpoint compatibility and remaining setup / Bibliotheksschnittstelle,
+Checkpoint-Kompatibilität und Einrichtung](docs/LIBRARY-COMPAT-20261025.md).
+Older package/input observations below describe their pinned historical source;
+the current deployment report above distinguishes actual installation from this branch.
+Ältere Paket-/Eingabebelege unten gehören zu ihren historischen Quellpins; der
+obige Bericht unterscheidet tatsächliche Installation und diesen Branch.
 
 ## English
 
-**Current source: RC17 consolidation candidate**, combining main, RC15/RC16 and subsequent repairs. Existing RC15/RC16 draft assets contain historical source pins, not this combined code. [Consolidation and acceptance gates](docs/CONSOLIDATION-20261024.md). The RC17 review command was tested with isolated paths; production deployment remains unapproved.
+**Current source: RC17 consolidation candidate**, combining main, RC15/RC16 and subsequent repairs. Existing RC15/RC16 draft assets contain historical source pins, not this combined code. [Consolidation and acceptance gates](docs/CONSOLIDATION-20261024.md). The RC17 review command was tested with isolated paths; deployment of this receiver follow-up remains unapproved.
 
 ### Current repair status (unreleased)
 
 The development branch fixes stale explicit visible-agent selection and permits
 authorized `session.input(submit=false)` paste without Return. Process identity,
 current focus, readiness and unchanged-input guards remain mandatory. Positive
-native input acceptance is **still open**; this is not a production fix claim.
+native input acceptance was open at this historical source pin. Later7725bc6 input/readback passed; the operator now runs012b592 with identical native modules.
 [Terminal evidence and limits](docs/VISIBLE-SELECTION-20261024.md).
 
 Whiteboard mutations now preflight fresh peer schemas and report safe character/
@@ -156,7 +166,7 @@ task. Further assistant adapters and their limits are described in the
 
 ### What was checked?
 
-RC17: two exact-source builds match; the authenticated draft command passed isolated Intel-macOS fresh install, RC14 upgrade, status/version, data preservation, idempotence, restart, KeepAlive and rollback. [RC17 proof](docs/ACCEPTANCE-MACOS-RC17.md). Native agent input and successful CI remain open; the owner waived additional review.
+RC17: two exact-source builds match; the authenticated draft command passed isolated Intel-macOS fresh install, RC14 upgrade, status/version, data preservation, idempotence, restart, KeepAlive and rollback. [RC17 proof](docs/ACCEPTANCE-MACOS-RC17.md). Native input passed later on7725bc6; successful CI remains open; the owner waived additional review.
 
 RC16's [acceptance record](docs/ACCEPTANCE-MACOS-RC16.md) distinguishes actual Intel
 macOS tests, isolated byte/MCP contract fixtures and unverified product integration.
@@ -168,14 +178,14 @@ file selection and actual ThreadDesk durable imports must not be inferred from f
 
 ## Deutsch
 
-**Aktueller Quellstand: RC17-Konsolidierungskandidat**, aus main, RC15/RC16 und nachfolgenden Reparaturen. Vorhandene RC15/RC16-Draft-Assets enthalten historische Quellstände, nicht diesen zusammengeführten Code. [Zusammenführung und offene Abnahmen](docs/CONSOLIDATION-20261024.md). Der RC17-Reviewbefehl wurde mit isolierten Pfaden geprüft; keine Produktivfreigabe.
+**Aktueller Quellstand: RC17-Konsolidierungskandidat**, aus main, RC15/RC16 und nachfolgenden Reparaturen. Vorhandene RC15/RC16-Draft-Assets enthalten historische Quellstände, nicht diesen zusammengeführten Code. [Zusammenführung und offene Abnahmen](docs/CONSOLIDATION-20261024.md). Der RC17-Reviewbefehl wurde mit isolierten Pfaden geprüft; keine Produktivfreigabe für diese Empfänger-Ergänzung.
 
 ### Aktueller Reparaturstand (unveröffentlicht)
 
 Der Entwicklungsbranch behebt veraltete explizite Agenten-Zuordnungen und erlaubt
 autorisierte reine Paste mit `session.input(submit=false)` ohne Return. Prozess-,
 Fokus-, Bereitschafts- und Eingabeprüfungen bleiben verpflichtend. Die positive
-native Eingabe-Abnahme ist **weiter offen**; keine produktive Reparatur behauptet.
+native Eingabe-Abnahme war an diesem historischen Quellpin offen. Später bestanden Eingabe/Readback auf7725bc6; produktiv läuft012b592 mit identischen nativen Modulen.
 [Terminalbelege und Grenzen](docs/VISIBLE-SELECTION-20261024.md).
 
 Whiteboard-Mutationen prüfen frische Peer-Schemas und melden sichere Zeichen-/
@@ -309,7 +319,7 @@ Werkzeugkatalog, Health und Agenteninventar trennen Rechte, Beobachtung und Ausf
 
 ### Was wurde geprüft?
 
-RC17: zwei identische Builds; authentifizierter Draft-Befehl auf Intel-macOS mit isolierter Erstinstallation, RC14-Upgrade, Status/Version, Datenerhalt, Idempotenz, Neustart, KeepAlive und Rollback bestanden. [RC17-Nachweis](docs/ACCEPTANCE-MACOS-RC17.md). Native Agenteneingabe und erfolgreiche CI bleiben offen; zusätzliche Review auf Nutzeranweisung entfallen.
+RC17: zwei identische Builds; authentifizierter Draft-Befehl auf Intel-macOS mit isolierter Erstinstallation, RC14-Upgrade, Status/Version, Datenerhalt, Idempotenz, Neustart, KeepAlive und Rollback bestanden. [RC17-Nachweis](docs/ACCEPTANCE-MACOS-RC17.md). Native Eingabe bestand später auf7725bc6; erfolgreiche CI bleibt offen; zusätzliche Review auf Nutzeranweisung entfallen.
 
 Der [RC16-Prüfbericht](docs/ACCEPTANCE-MACOS-RC16.md) trennt echte Intel-macOS-Tests,
 isolierte Byte-/MCP-Vertragstests und noch ungeprüfte Produktintegration. Der
@@ -319,7 +329,7 @@ Apple-Silicon-Abnahme, echte ChatGPT-Dateiauswahl oder ThreadDesk-Produktimporte
 
 ---
 
-RC17 source is merged into main through [PR #28](https://github.com/landjunge/KiraBridge/pull/28), merge `a74fe613`. The owner waived additional review. CI jobs did not start because of billing; native agent input and release acceptance remain open. / RC17 ist über PR #28 nach main gemergt. Zusätzliche Review auf ausdrückliche Nutzeranweisung entfallen. CI wegen Abrechnung nicht gestartet; native Agenteneingabe und Release-Freigabe bleiben offen.
+RC17 source is merged into main through [PR #28](https://github.com/landjunge/KiraBridge/pull/28), merge `a74fe613`. The owner waived additional review. CI jobs did not start because of billing; release acceptance remains open; later native-input proof is linked above. / RC17 ist über PR #28 nach main gemergt. Zusätzliche Review auf ausdrückliche Nutzeranweisung entfallen. CI wegen Abrechnung nicht gestartet; Release-Freigabe bleibt offen; spätere native Eingabebelege sind oben verlinkt.
 
 ## Install / update · Installieren / aktualisieren
 
