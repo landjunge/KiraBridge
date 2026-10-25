@@ -14,7 +14,7 @@ jobs:
           - os: macos-15
             runner: macos-15
           - os: ubuntu-24.04-container-on-debian-13
-            runner: kirabridge
+            runner: kirabridge-linux-smoke
     runs-on: ${{ matrix.runner }}
     env:
       UV_PYTHON: '3.11'
@@ -22,7 +22,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
-        if: ${{ matrix.runner != 'kirabridge' }}
+        if: ${{ matrix.runner != 'kirabridge-linux-smoke' }}
         with:
           python-version: '3.11'
       - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884
@@ -31,10 +31,10 @@ jobs:
       - run: uv sync --locked --dev
       - run: uv run python scripts/build_release.py --out dist/candidate
       - name: Smoke Linux package in non-root Ubuntu 24.04 userland
-        if: ${{ matrix.runner == 'kirabridge' }}
+        if: ${{ matrix.runner == 'kirabridge-linux-smoke' }}
         run: sh scripts/ci_linux_release_smoke.sh dist/candidate
       - name: Smoke macOS package natively
-        if: ${{ matrix.runner != 'kirabridge' }}
+        if: ${{ matrix.runner != 'kirabridge-linux-smoke' }}
         run: uv run python scripts/release_smoke.py dist/candidate
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:

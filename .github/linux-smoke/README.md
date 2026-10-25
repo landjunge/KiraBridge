@@ -19,3 +19,10 @@ shared build cache and the official base image are not globally pruned. Only
 successful `smoke-Linux-x86_64.json` and separate container-environment evidence are copied into the candidate output,
 including the observed userspace, non-root UID, architecture and base-image pin.
 The macOS workflow still runs its smoke check natively.
+
+The package lane uses label `kirabridge-linux-smoke`, separate from the existing
+`kirabridge` Verify runners. A runner must already possess Docker access; the
+workflow grants no group, socket or sudo permissions. For this acceptance an
+ephemeral single-job runner under the already authorized server user is used,
+with only this label and no default labels/service. Remove/observe its ephemeral
+registration after that job; do not leave a permanent additional worker implicitly.

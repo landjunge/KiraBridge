@@ -121,3 +121,37 @@ Bereinigung verhindert Erfolg. Vorhandene andere Container/Services/Runner bleib
 unberührt. Ubuntu-Userspace teilt den Debian-Kernel, keine macOS-Abnahme.
 Reale Containerprobe steht beim Codecommit noch aus, danach finaler normalerCI-Lauf.
 [Gezielte Nachweise](evidence/integration-ci-followup-20261025.json).
+
+## Reale Ubuntu-Containerprobe und GitHub-Ausführungsidentität
+
+Der erste Containerlauf scheiterte vor der Vorbereitung am standardmäßig nicht
+ausführbaren tmpfs. Ausschließlich das eigene isolierte Container-Runtime-tmpfs
+erhielt explizit `exec`; ro-RootFS, capdrop/no-new-privileges und alle Hostrechte
+bleiben erhalten. Die Wiederholung nur dieses betroffenen Paketfalls bestand mit
+Helper363db4a und Paketquelle16642e2, Gesamt-Exit0. Installation/Voraussetzungsprobe,
+authentifizierter eigener Dispatcher/Quellabgleich, Lizenzkopien und Ablehnung
+eines manipulierten Pakets bestanden, Konfig/Credentials erhalten.
+Beleg erfasst Ubuntu24.04-Userspace, UID1000, x86_64 und offiziellen Imagehash.
+Eigene markierte Container/Images waren danach unabhängig abwesend.
+[Komponenten-/Gesamtexitnachweis](evidence/manual-ubuntu-container-20261025.json).
+Noch keine Abnahme des nachfolgenden finalen CI-/Paketquellpins daraus ableiten.
+
+Neue Laufzeitvoraussetzung festgestellt: die beiden bestehenden Verify-Runner
+laufen als github-runner UID1001 ohne Dockergruppe; Docker-Socket660 root:docker.
+Ihre Rechte werden nicht erweitert. Für den einzelnen Linux-Paketjob wurde daher
+im eigenen privaten Testbereich ein kurzlebiger Runner unter dem bereits
+Docker-berechtigten daniel vorbereitet: Version2.338.0, offizieller API-SHA256
+`af4b794c1bc41d73d40535e3fe092a39f9679cd8d965954c2aca25a05ca41d32`,
+Namekirabridge-smoke-Wtz3KZ4P, ID23. NurLabelkirabridge-linux-smoke,
+keineDefaultlabels, ephemeral/once/disableupdate, kein installierter Dienst.
+Registrierungstoken ausschließlich über SSH-stdin und das offiziell unterstützte
+Maskierungs-/Löschverfahren ACTIONS_RUNNER_INPUT_TOKEN, nicht in Code/Argumenten
+oder Projektlogs. Bestehende Runner/Serverkonten/Produktionsdienste unverändert.
+Nach dem einen Job muss die Abmeldung unabhängig bestätigt werden.
+
+Die Linux-Smoke-Workflowlane verwendet genau dieses Label, während Verify die
+beiden vorhandenen Runner weiterhin regulär nutzt. Fehlende Dockerberechtigung
+eines anderen Benutzers wird nicht durch sudo oder Socketfreigaben umgangen.
+Parallel neu erschienener PR38 (DirectDispatcher/Lifecycle) wird zunächst separat
+lesend geprüft und nicht ohne Abnahme in diesen gezielten Releasefix übernommen.
+Laufende fremde CI-Jobs werden nicht unterbrochen.
