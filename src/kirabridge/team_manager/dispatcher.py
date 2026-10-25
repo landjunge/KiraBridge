@@ -106,91 +106,115 @@ _CORE_TERMINAL = {"completed", "failed", "blocked", "unknown", "cancelled"}
 
 
 class TeamDispatcher:
-    """A finite number of receivers, with TaskManager owning actual processes.
-
-    A restarted receiver only reads the core task already attached to its work.
-    Even a missing core task after a persisted claim is treated as unknown; it
-    is never a reason to issue a replacement model turn.
-    """
+    """One immediate attempt per admitted team turn; no restart replay or backlog."""
 
     interface_version = "1"
 
     def __init__(self, bridge):
-        self.bridge = bridge
-        self.teams = bridge.teams
-        self.workers: list[asyncio.Task] = []
-        self.stopping = False
-        self._active: set[str] = set()
-        self._defer: dict[str, float] = {}
+        self.bridge, self.teams = bridge, bridge.teams
+        self.accepting = False
+        self.active = {}
+        self.teams.direct_delivery = self
+
+    def check(self, assignee):
+        if not self.accepting:
+            raise BridgeError(
+                "team_receiver_unavailable", "Team receiver is offline; nothing queued"
+            )
+        if len(self.active) >= self.bridge.config.team.concurrency or any(
+            member == assignee for member, _ in self.active.values()
+        ):
+            raise BridgeError("execution_busy", "Team recipient/capacity is busy; nothing queued")
+
+    def submit(self, identifier, *, existing=False):
+        work = self.teams._work(identifier)
+        task = asyncio.create_task(self._deliver(work, existing=existing))
+        self.active[identifier] = (work["assignee"], task)
+
+        def finished(result):
+            self.active.pop(identifier, None)
+            if not result.cancelled():
+                result.exception()
+
+        task.add_done_callback(finished)
+
+    async def _deliver(self, work, *, existing):
+        try:
+            await self._run(work, existing=existing)
+            current = self.teams._work(work["id"])
+            if current["state"] not in _CORE_TERMINAL:
+                self.teams.fail(
+                    work["id"],
+                    "unknown" if current["core_task_id"] else "failed",
+                    "team_delivery_unconfirmed",
+                    {"automatic_retry": False},
+                )
+        except asyncio.CancelledError:
+            self.teams.fail(
+                work["id"], "unknown", "team_delivery_interrupted", {"automatic_retry": False}
+            )
+            raise
+        except Exception as exc:
+            current = self.teams._work(work["id"])
+            code = exc.code if isinstance(exc, BridgeError) else "team_dispatch_failed"
+            self.teams.fail(
+                work["id"],
+                "unknown" if current["core_task_id"] else "failed",
+                code,
+                {
+                    "dispatcher_error": code,
+                    "automatic_retry": False,
+                    "last_observation": current["evidence"],
+                },
+            )
 
     async def start(self):
-        if self.workers or not self.bridge.config.team.enabled:
+        if self.accepting or not self.bridge.config.team.enabled:
             return
-        self.stopping = False
-        self.workers = [
-            asyncio.create_task(self._loop()) for _ in range(self.bridge.config.team.concurrency)
-        ]
+        with self.bridge.store.transaction():
+            rows = self.bridge.store.db.execute(
+                "SELECT * FROM team_work WHERE state IN "
+                "('queued','dispatching','created','accepted','running','processing_result')"
+            ).fetchall()
+            for row in rows:
+                unstarted = (
+                    row["state"] == "queued"
+                    and all(
+                        row[key] is None
+                        for key in (
+                            "core_task_id",
+                            "claimed",
+                            "started",
+                            "core_request_hash",
+                            "result",
+                        )
+                    )
+                    and json.loads(row["evidence"]) == {}
+                )
+                self.teams.fail(
+                    row["id"],
+                    "cancelled" if unstarted else "unknown",
+                    "execution_queue_removed" if unstarted else "team_restart_unknown",
+                    {
+                        "automatic_retry": False,
+                        "history_preserved": True,
+                        "last_observation": json.loads(row["evidence"]),
+                    },
+                )
+        self.accepting = True
 
     async def stop(self):
-        self.stopping = True
-        self.teams.wake.set()
-        # Adapter invocations and observation windows are finite. Do not cancel
-        # TaskManager processes or unrelated interactive/native sessions.
-        if self.workers:
-            await asyncio.gather(*self.workers, return_exceptions=True)
-            self.workers.clear()
-
-    def _next(self):
-        now = time.monotonic()
-        for existing, rows in (
-            (True, self.teams.inflight(limit=32)),
-            (False, self.teams.pending(limit=16)),
-        ):
-            for work in rows:
-                if not existing and not self.bridge.store.can_claim(work["created"]):
-                    continue
-                if work["id"] not in self._active and self._defer.get(work["id"], 0) <= now:
-                    self._active.add(work["id"])
-                    return work, existing
-        return None
-
-    async def _loop(self):
-        while not self.stopping:
-            self.teams.wake.clear()
-            selected = self._next()
-            if selected is None:
-                try:
-                    await asyncio.wait_for(self.teams.wake.wait(), 2)
-                except TimeoutError:
-                    pass
-                continue
-            work, existing = selected
-            try:
-                await self._run(work, existing=existing)
-            except asyncio.CancelledError:
-                # A cancelled transport/dispatcher cannot prove no native side
-                # effect. Linked core evidence remains authoritative on restart.
-                raise
-            except Exception as exc:
-                code = exc.code if isinstance(exc, BridgeError) else "team_dispatch_failed"
-                if isinstance(exc, BridgeError) and code in {
-                    "peer_connection",
-                    "peer_unknown",
-                    "peer_timeout",
-                    "service_maintenance",
-                }:
-                    # Read an existing turn / resume idempotent result actions;
-                    # never replay a provider turn after claim.
-                    self._defer[work["id"]] = time.monotonic() + 5
-                else:
-                    self.teams.fail(
-                        work["id"],
-                        "unknown",
-                        code,
-                        {"dispatcher_error": code, "automatic_retry": False},
-                    )
-            finally:
-                self._active.discard(work["id"])
+        self.accepting = False
+        identifiers = list(self.active)
+        tasks = [task for _, task in self.active.values()]
+        for task in tasks:
+            task.cancel()
+        await asyncio.gather(*tasks, return_exceptions=True)
+        for identifier in identifiers:
+            self.teams.fail(
+                identifier, "unknown", "team_delivery_interrupted", {"automatic_retry": False}
+            )
+        self.active.clear()
 
     async def _call(self, pool, tool, arguments):
         response = await pool.call("daemon", tool, arguments)

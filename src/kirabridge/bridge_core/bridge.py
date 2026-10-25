@@ -292,6 +292,8 @@ class Bridge:
             "api_version": API_VERSION,
             "dispatcher_active": self.tasks.started,
             "dispatch_mode": "direct",
+            "team_dispatch_mode": "direct",
+            "team_receiver_active": self.team_dispatcher.accepting,
             "chatgpt_integration": "unverified",
             "task_submission": {
                 "events_subscription_required": False,

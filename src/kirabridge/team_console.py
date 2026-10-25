@@ -207,9 +207,11 @@ class TeamConsole:
         )
 
     async def delegate(self, request: Request):
+        from kirabridge.team_manager.local import delegate
+
         principal = self._principal(request)
         value = await self._model(request, TeamWorkCreate)
-        return JSONResponse(self.teams.delegate(principal, value))
+        return JSONResponse(await delegate(self.teams, principal, value))
 
     async def work_get(self, request: Request):
         principal = self._principal(request)

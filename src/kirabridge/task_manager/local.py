@@ -36,7 +36,7 @@ async def approve(manager, identifier, *, expected_hash=None, source="local_cli"
             "daemon", "task_submit", {"request": request.model_dump(), "approval": approval}
         )
         result = response.structuredContent
-        if not isinstance(result, dict) or result.get("error"):
+        if not isinstance(result, dict) or (result.get("error") and not result.get("id")):
             raise BridgeError(
                 "approval_delivery_unconfirmed", "Read the original task; do not replay"
             )

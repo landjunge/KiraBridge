@@ -4,6 +4,7 @@ import time
 from concurrent.futures import ThreadPoolExecutor
 
 import pytest
+from conftest import DomainOnlyTeamPort
 from pydantic import ValidationError
 
 from kirabridge.audit_manager import verify
@@ -42,6 +43,7 @@ def domain(bridge, config):
         },
     )
     manager = TeamManager(bridge)
+    manager.direct_delivery = DomainOnlyTeamPort()
     manager.create("local", create())
     return manager
 
@@ -92,8 +94,8 @@ def work(**changes):
 
 
 async def test_maintenance_drains_only_sealed_existing_team_work(domain):
-    shared = domain.delegate("local", work())
     async with domain.bridge:
+        shared = domain.delegate("local", work())
         now = time.time()
         domain.store.db.execute(
             "INSERT INTO activation_runs VALUES('maintenance','draining',?,?,?,NULL)",

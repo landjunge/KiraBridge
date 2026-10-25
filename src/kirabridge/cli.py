@@ -558,7 +558,7 @@ async def run_request(bridge, principal, request, wait, approve, original=None):
                     "daemon", "task_retry" if original else "task_submit", arguments
                 )
                 result = response.structuredContent
-                if not isinstance(result, dict) or result.get("error"):
+                if not isinstance(result, dict) or (result.get("error") and not result.get("id")):
                     raise BridgeError(
                         "submission_rejected", "Read original task; nothing queued locally"
                     )

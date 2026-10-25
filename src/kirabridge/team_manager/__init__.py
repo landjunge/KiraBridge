@@ -138,7 +138,7 @@ class TeamManager:
     def activation_work_count(self, *, active_only=False, context=None):
         db = context.db if context is not None else self.store.db
         states = (
-            ("accepted", "running", "processing_result")
+            ("dispatching", "accepted", "running", "processing_result")
             if active_only
             else ("queued", "dispatching", "created", "accepted", "running", "processing_result")
         )
@@ -157,6 +157,7 @@ class TeamManager:
         self.bridge = bridge
         self.config, self.store, self.security = bridge.config, bridge.store, bridge.security
         self.wake = asyncio.Event()
+        self.direct_delivery = getattr(bridge, "team_dispatcher", None)
         with self.store.transaction():
             for statement in SCHEMA.split(";"):
                 if statement.strip():
@@ -565,9 +566,12 @@ class TeamManager:
             ).fetchone()[0]
             if pending >= self.config.team.max_pending_per_member:
                 raise BridgeError("team_queue_full", "Member work queue is full")
-            state = (
-                "queued" if self.config.team.workers[request.assignee].agent else "queued_manual"
-            )
+            automatic = bool(self.config.team.workers[request.assignee].agent)
+            if automatic:
+                if self.direct_delivery is None:
+                    raise BridgeError("team_receiver_unavailable", "No direct team receiver")
+                self.direct_delivery.check(request.assignee)
+            state = "accepted" if automatic else "queued_manual"
             self.store.db.execute(
                 "INSERT INTO team_work(id,team_id,assigned_by,assignee,title,body,parent_id,"
                 "root_id,depth,state,created) VALUES(?,?,?,?,?,?,?,?,?,?,?)",
@@ -597,7 +601,8 @@ class TeamManager:
                 depth=depth,
                 content_sha256=digest(request.body),
             )
-        self.wake.set()
+        if automatic:
+            self.direct_delivery.submit(work_id)
         return self._work(work_id)
 
     def work_get(self, principal, team_id, work_id):
@@ -839,6 +844,9 @@ class TeamManager:
                 raise BridgeError(
                     "team_result_conflict", "The expected native result SHA256 does not match"
                 )
+            if self.direct_delivery is None:
+                raise BridgeError("team_receiver_unavailable", "No direct team receiver")
+            self.direct_delivery.check(work["assignee"])
             snapshot_id = "tr-" + uuid.uuid4().hex
             self.store.db.execute(
                 "INSERT INTO team_work_reprocess_history VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)",
@@ -881,7 +889,7 @@ class TeamManager:
                 automatic_retry=False,
                 execution_scope="existing_result_only",
             )
-        self.wake.set()
+        self.direct_delivery.submit(request.work_id, existing=True)
         return self._work(request.work_id)
 
     def events(self, principal, team_id, after=0, limit=50):
@@ -928,7 +936,7 @@ class TeamManager:
             work = self._work(work_id)
             if not self.store.can_claim(work["created"]):
                 return None
-            if work["state"] != "queued" or work["core_task_id"] is not None:
+            if work["state"] != "accepted" or work["core_task_id"] is not None:
                 return None
             try:
                 self._execution_allowed(work)

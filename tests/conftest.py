@@ -69,3 +69,15 @@ def archive_task(bridge, value, principal="local", **kwargs):
 
     bridge.store.transition(value.task_id, State.QUEUED, {"legacy_fixture": True})
     return bridge.store.get(value.task_id, principal)
+
+
+class DomainOnlyTeamPort:
+    """Nonexecuting port for team-domain tests; real MCP tests use the real receiver."""
+
+    accepting = True
+
+    def check(self, assignee):
+        pass
+
+    def submit(self, work_id, *, existing=False):
+        pass
