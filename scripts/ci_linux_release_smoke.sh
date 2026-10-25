@@ -91,25 +91,33 @@ Path("/output/smoke-container-Linux-x86_64.json").write_text(
     json.dumps(evidence["ci_container"], indent=2) + "\n")
 print(json.dumps({"container_environment": evidence["ci_container"]}, indent=2))'
 
+preflight_code='import json, os, platform
+info = platform.freedesktop_os_release()
+assert (info["ID"], info["VERSION_ID"]) == ("ubuntu", "24.04")
+assert os.getuid() != 0
+assert not (os.statvfs("/tmp").f_flag & os.ST_NOEXEC)
+print(json.dumps({"preflight": "Ubuntu24.04", "uid": os.getuid(), "runtime_tmp_exec": True}))'
+
 # Read-only inputs, isolated writable tmpfs, default bridge networking for pinned
 # downloads. No Docker socket, host network, privileges or production directories.
 docker run --cidfile "$scratch/container.cid" --name "kirabridge-smoke-$nonce-$$" \
   --label "io.kirabridge.smoke=$nonce" --user "$(id -u):$(id -g)" \
   --read-only --cap-drop ALL --security-opt no-new-privileges \
   --cpus 2 --memory 3g --memory-swap 3g --pids-limit 256 \
-  --tmpfs /tmp:rw,nosuid,nodev,size=2g,mode=1777 \
+  --tmpfs /tmp:rw,exec,nosuid,nodev,size=2g,mode=1777 \
   --mount "type=bind,src=$repo/scripts/release_smoke.py,dst=/source/release_smoke.py,readonly" \
   --mount "type=bind,src=$artifacts,dst=/input-artifacts,readonly" \
   --mount "type=bind,src=$scratch/evidence,dst=/output" \
   --env "KIRABRIDGE_SMOKE_UBUNTU_IMAGE=$ubuntu_image" --env PYTHONDONTWRITEBYTECODE=1 \
   --env UV_CACHE_DIR=/tmp/uv-cache --env UV_PYTHON_INSTALL_DIR=/tmp/uv-python --env TMPDIR=/tmp \
   "$image" sh -eu -c '
+    python3 -c "$2"
     mkdir -p /tmp/artifacts
     cp /input-artifacts/*.tar.gz /input-artifacts/*.whl /input-artifacts/LICENSE /tmp/artifacts/
     python3 /source/release_smoke.py /tmp/artifacts
     python3 -c "$1"
     cp /tmp/artifacts/smoke-Linux-x86_64.json /output/
-  ' sh "$proof_code"
+  ' sh "$proof_code" "$preflight_code"
 # Copy only successful evidence before cleanup; tmpfs is removed on container exit.
 cp "$scratch/evidence/smoke-Linux-x86_64.json" "$evidence"
 cp "$scratch/evidence/smoke-container-Linux-x86_64.json" "$environment_evidence"
