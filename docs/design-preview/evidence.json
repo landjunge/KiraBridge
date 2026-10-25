@@ -1,0 +1,14 @@
+{
+  "scope": "standalone design preview only; no runtime/install integration",
+  "basis": "6739343dfaf4f602e37102e99d703c29a0ebd5ad",
+  "checks_by_native_agent": "receiver_contract_audit targeted render/fallback batch passed; Ruff passed",
+  "root_visual_review": "full SVG converted via macOS sips toPNG; full word and perspective bridge visible",
+  "render_seconds_reported_by_agent": 0.0153,
+  "runtime_unchanged": true,
+  "sha256": {
+    "scripts/preview_terminal_design.py": "abe22463aea3957e8f630d5f95572b0789abc7d9995bdceb0711ab1b2764bf5b",
+    "docs/design-preview/terminal-braille-100.svg": "2f0aea41fb43f83bda955df3f6654a73a553cc621c0d908ac3f72555f2d73631",
+    "docs/design-preview/terminal-braille-100.txt": "0c856011697f5592fe0a55a3a9108b0833e5c1025efeda527dc5bbff2c900201",
+    "docs/design-preview/terminal-braille-100.png": "b9351c9ee22fff4a3d89526f515740da20e51af3665e8a53b51f3e0fd5b5fd12"
+  }
+}
