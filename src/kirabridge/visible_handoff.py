@@ -145,6 +145,9 @@ class VisibleHandoffs:
                 (identifier,),
             )
         ]
+        from kirabridge.visible_message_evidence import handoff_delivery_status
+
+        result.update(handoff_delivery_status(self.store.db, identifier, result["state"]))
         return result
 
     def reconcile(self, principal, identifier):
