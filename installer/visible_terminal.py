@@ -76,9 +76,11 @@ def confirm_visible_terminal(expected=None):
         pid = os.getpid()
         for _ in range(16):
             current = process_identity(pid)
-            if current[3] != tty.removeprefix("/dev/"):
+            if current[3] != tty.removeprefix("/dev/") or int(current[2]) != os.getuid():
+                # Terminal's normal login parent is root-owned. It is a chain
+                # boundary, never an input target or an authorization grant.
                 break
-            if int(current[2]) != os.getuid() or pid in {int(i[0]) for i in identities}:
+            if pid in {int(i[0]) for i in identities}:
                 raise VisibilityError("Terminal-Prozesszuordnung ist nicht eindeutig")
             identities.append(current)
             pid = int(current[1])

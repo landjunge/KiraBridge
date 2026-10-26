@@ -85,6 +85,20 @@ def test_pid_reuse_or_exec_during_inventory_is_rejected(visible):
         module.confirm_visible_terminal()
 
 
+def test_normal_root_login_parent_is_only_an_ownership_boundary(visible):
+    module, identities, _ = visible
+    identities[110] = ("110", "109", *identities[110][2:])
+    identities[109] = ("109", "99", "0", "ttys010", "Mon", "Oct", "26", "14:00:00", "2026", "login")
+    assert module.confirm_visible_terminal()["window_id"] == 700
+
+
+def test_foreign_installer_uid_is_never_accepted(visible):
+    module, identities, _ = visible
+    identities[111] = ("111", "110", "0", *identities[111][3:])
+    with pytest.raises(module.VisibilityError, match="nicht an diese TTY"):
+        module.confirm_visible_terminal()
+
+
 def test_visibility_probe_transport_failure_is_not_absence(visible, monkeypatch):
     module, _, _ = visible
 

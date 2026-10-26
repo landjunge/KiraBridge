@@ -30,3 +30,6 @@ visible in a confirmed separate macOS Terminal window. Never treat this preferen
 as permission to bypass failed/missing gates, publish unverified assets, change
 billing/OS rights, or perform unrelated work. Report concrete blockers and actual
 commit, PR, release and installed-source status.
+Reuse one freshly confirmed, owned visible work/install window. Do not open new
+Terminal windows for every probe or step, and never use a running Codex/Grok
+session as an installation window.
