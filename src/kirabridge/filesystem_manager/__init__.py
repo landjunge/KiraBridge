@@ -60,25 +60,28 @@ class PathScope:
 
 
 class FilesystemManager:
-    def read(self, scope: PathScope, path: str, max_bytes: int) -> dict:
-        with scope.parent(path) as (parent, name):
-            fd = os.open(name, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK, dir_fd=parent)
-            try:
-                if not stat.S_ISREG(os.fstat(fd).st_mode):
-                    raise BridgeError("file_type", "Only regular files can be read")
-                with os.fdopen(fd, "rb", closefd=False) as source:
-                    data = source.read(max_bytes + 1)
-            finally:
-                os.close(fd)
-        try:
-            text = data[:max_bytes].decode("utf-8")
-        except UnicodeDecodeError:
-            text = data[:max_bytes].decode("utf-8", errors="replace")
-        return {
-            "text": text,
-            "bytes": min(len(data), max_bytes),
-            "truncated": len(data) > max_bytes,
-        }
+    def read(
+        self,
+        scope: PathScope,
+        path: str,
+        max_bytes: int,
+        *,
+        offset=0,
+        tail=False,
+        encoding="utf-8",
+        expected_identity=None,
+    ) -> dict:
+        from kirabridge.file_ranges import read_file_range
+
+        return read_file_range(
+            scope,
+            path,
+            max_bytes,
+            offset=offset,
+            tail=tail,
+            encoding=encoding,
+            expected_identity=expected_identity,
+        )
 
     def list(self, scope: PathScope, path: str) -> dict:
         entries = []
