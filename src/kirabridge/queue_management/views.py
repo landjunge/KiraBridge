@@ -41,6 +41,13 @@ class QueueViews:
             (family, identifier),
         ).fetchone()
 
+    def _withdrawal(self, family, identifier):
+        return self.store.db.execute(
+            "SELECT actor,created,reason_sha256 FROM queue_withdrawals "
+            "WHERE queue_id=? AND item_id=?",
+            (family, identifier),
+        ).fetchone()
+
     def _access(self, principal, family, row):
         if family in {"tasks", "handoffs", "completions"}:
             if row["principal"] != principal and not (
@@ -90,12 +97,14 @@ class QueueViews:
             state = row.get("state") or ("acknowledged" if row.get("acknowledged") else "queued")
             target = row.get("recipient") or row.get("assignee") or row.get("target") or principal
         hold = self._hold(family, identifier)
-        active = not hold and state not in TERMINAL | {"acknowledged"}
+        withdrawal = self._withdrawal(family, identifier)
+        active = not hold and not withdrawal and state not in TERMINAL | {"acknowledged"}
         version = digest(
             {
                 "family": family,
                 "row": dict(row),
                 "hold": dict(hold) if hold else None,
+                "withdrawal": dict(withdrawal) if withdrawal else None,
                 "detail": value,
             }
         )
@@ -108,6 +117,7 @@ class QueueViews:
             "execution_state": state,
             "delivery_active": bool(active),
             "hold": dict(hold) if hold else None,
+            "withdrawal": dict(withdrawal) if withdrawal else None,
             "revision": version,
             "detail": value,
             "stop_confirmed": False,

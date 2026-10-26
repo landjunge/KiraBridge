@@ -106,3 +106,42 @@ therefore refuses unsafe activation/downgrade **before stopping the current serv
 Use a queue-aware runtime or the verified safe restoration flow; never delete holds or
 restore an old database to force rollback. Production RC14 remains unchanged pending
 required review/checks and explicit installation acceptance/authorization.
+
+## Unknown-Eintrag zurücknehmen / Withdraw an unknown entry
+
+`queue.control` unterstützt zusätzlich die Einzelaktion `withdraw`. Zulässig sind
+nur eigene beziehungsweise nach bestehenden Rechten zugängliche `unknown`-Einträge
+in `tasks`, `messages` und `handoffs`. Benötigt werden die frisch gelesene
+Eintragsrevision und ausdrücklich `acknowledge_execution_unknown: true`; diese
+Bestätigung ersetzt keine bestehenden Rechte oder notwendigen Freigaben.
+Andere Zustände, insbesondere laufende oder nur wartende Aufträge, werden verweigert.
+Für mehrere Einträge jede ausgewählte ID separat mit ihrer Revision bearbeiten;
+`clear` bekommt keine neue Bedeutung. Nach einem Versionswechsel Revisionen neu lesen.
+
+Die aktive Queueansicht zeigt danach `delivery_active: false` und Metadaten unter
+`withdrawal`. `state` und `execution_state` bleiben `unknown`; die Historie ist über
+`queue_entry` und `queue_entries(active_only=false)` weiterhin lesbar. Die Antwort
+meldet ausdrücklich `execution_stop_claimed: false` und
+`execution_reservation_released: false`. Dies beendet weder Prozess noch Auftrag,
+quittiert keine Nachricht und erlaubt kein Wiederholen. Unabhängige wartende
+Nachrichten werden nicht storniert. Receiver-/Inbox-Protokolle bleiben unverändert.
+Ein unbekannter Handoff kann weiterhin die Ausführungsreservierung halten:
+`withdraw` umgeht diese Sicherheitssperre nicht. `retire` bleibt eine getrennte
+Aktion mit eigener frischer positiver Bereitschaftsprüfung.
+
+Die additive Tabelle `queue_withdrawals` enthält nur Queue/ID, Akteur, Zeit und
+SHA-256 des Grundes. Ein neuer Audit-Eintrag hält die Rücknahme fest; Quelldatensätze,
+Evidenz, Nachrichten-/Handoff-/Taskhistorie und `queue_holds` werden nicht verändert.
+Ein erneuter Aufruf mit aktueller Revision verändert eine vorhandene Rücknahme nicht.
+Alte Runtime-Versionen ignorieren diese Tabelle: Die Ansicht kann dort erneut
+auftauchen, aber der ursprüngliche Status bleibt `unknown`, nicht `queued` oder
+`cancelled`. Vorhandene Hold-/Rollback-Sicherheitsprüfungen bleiben bestehen.
+
+**English:** The individual `withdraw` action requires an observed entry revision,
+existing owner/capability/approval checks, and explicit
+`acknowledge_execution_unknown: true`. Only unknown tasks, messages and handoffs
+are eligible. It hides the active queue view while retaining the unknown execution
+state, original evidence and complete history. It never stops execution, releases a
+handoff reservation, acknowledges a message, replays work or bulk-cancels pending
+messages. `queue_withdrawals` is separate from `queue_holds`; older runtimes may show
+the entry again but still see its original unknown state and execution reservation.

@@ -34,6 +34,10 @@ class QueueManager(QueueViews):
     async def control(self, principal, args, *, approved=False, control_task_id=None):
         if args.action != "clear" and args.item_id is None:
             raise BridgeError("invalid_arguments", "An entry ID is required")
+        if args.action == "withdraw" and args.acknowledge_execution_unknown is not True:
+            raise BridgeError(
+                "execution_unknown_ack_required", "Acknowledge that execution remains unknown"
+            )
         # Bulk operations are bounded, exact observed snapshots; no implicit 'all future work'.
         with self.store.transaction():
             if args.action == "clear":
@@ -81,18 +85,23 @@ class QueueManager(QueueViews):
                     )
                 result = self._mutate(principal, family, current, args.action, args.reason)
                 results.append(result)
-        self.messages.wake.set()
-        self.tasks.wake.set()
+        if args.action != "withdraw":
+            self.messages.wake.set()
+            self.tasks.wake.set()
         return {
             "queue_id": args.queue_id,
             "results": results,
             "fully_removed": all(not r["delivery_active"] for r in results),
             "execution_stop_claimed": False,
             "history_preserved": True,
+            "withdrawal_only": args.action == "withdraw",
+            **({"execution_reservation_released": False} if args.action == "withdraw" else {}),
         }
 
     def _mutate(self, principal, family, entry, action, reason):
         identifier, state = entry["id"], entry["state"]
+        if action == "withdraw":
+            return self._withdraw_unknown(principal, family, entry, reason)
         if action in {"cancel", "clear"} and not entry["delivery_active"]:
             return {
                 "id": identifier,
@@ -205,6 +214,43 @@ class QueueManager(QueueViews):
             "state": value["state"],
             "removed": not value["delivery_active"],
             "stop_confirmed": False,
+            "history_preserved": True,
+        }
+
+    def _withdraw_unknown(self, principal, family, entry, reason):
+        if family not in {"tasks", "messages", "handoffs"} or entry["state"] != "unknown":
+            raise BridgeError(
+                "state_conflict", "Withdrawal is only for unknown tasks, messages or handoffs"
+            )
+        if not entry["withdrawal"]:
+            self.store.db.execute(
+                "INSERT INTO queue_withdrawals VALUES(?,?,?,?,?)",
+                (family, entry["id"], principal, time.time(), digest(reason)),
+            )
+            self.store.audit(
+                "queue.withdraw",
+                principal,
+                None,
+                {
+                    "queue": family,
+                    "item_id": entry["id"],
+                    "reason_sha256": digest(reason),
+                    "execution_state_before": "unknown",
+                    "execution_state_unchanged": True,
+                    "execution_reservation_released": False,
+                    "history_preserved": True,
+                },
+            )
+        return {
+            "id": entry["id"],
+            "state": "unknown",
+            "execution_state": "unknown",
+            "delivery_active": False,
+            "removed": True,
+            "withdrawn": True,
+            "stop_confirmed": False,
+            "execution_stop_claimed": False,
+            "execution_reservation_released": False,
             "history_preserved": True,
         }
 

@@ -56,11 +56,14 @@ def register_queue_tools(server, queues, identity, task_request, safe, read, wri
     async def queue_control(
         request: QueueControl, task_id: str, idempotency_key: str, ctx: Context
     ) -> dict[str, Any]:
-        """Queue exact cancel/clear/restore/retire using existing rights and approvals.
+        """Queue exact cancel/clear/restore/retire/withdraw using existing rights and approvals.
 
         clear requires catalog snapshot revision; individual actions require entry revision.
         Running/unknown work is never falsely stopped. Retiring an uncertain handoff
         requires a fresh positively idle assigned target. No resend; no process kill.
+        withdraw requires acknowledge_execution_unknown=true and an individual unknown
+        task/message/handoff. It hides the active entry without ending execution or
+        releasing handoff reservations; historical state/evidence remain unchanged.
         Restore only never-started held deliveries. History/audit remain intact.
         """
         return await task_request(

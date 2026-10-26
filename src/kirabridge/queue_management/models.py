@@ -16,7 +16,14 @@ class QueueRead(Input):
 
 class QueueControl(Input):
     queue_id: str = Field(min_length=1, max_length=180)
-    action: Literal["cancel", "clear", "restore", "retire"]
+    action: Literal["cancel", "clear", "restore", "retire", "withdraw"]
     item_id: str | None = Field(default=None, min_length=1, max_length=180)
     revision: str = Field(pattern=r"^[a-f0-9]{64}$")
     reason: str = Field(min_length=1, max_length=512)
+    acknowledge_execution_unknown: bool = Field(
+        default=False,
+        description=(
+            "Required true for withdraw: hide an unknown entry without claiming it stopped "
+            "or releasing its execution reservation"
+        ),
+    )
