@@ -1,4 +1,17 @@
-# Aktueller Reparaturstand · 25. Oktober 2026
+# Aktueller Reparaturstand · 26. Oktober 2026
+
+Vier bestätigte `less`-Pager wurden ausschließlich durch `q` geschlossen; Shells
+und Codex-Sitzungen blieben erhalten. Rückmeldung und Quittierung funktionieren
+im tatsächlichen nativen und ChatGPT-Connector-Test, ohne erfundene Events-Registrierung.
+Automatische Chat-Aufweckung und aktuelle Grok-Zielzuordnung bleiben offen.
+Queue-Katalogfehler bei Team-Klartext und Health-Poll-Diagnoserauschen sind im
+Quellcode gezielt behoben/getestet; **nicht produktiv installiert**. Historische
+Unknown-Aufträge bleiben ohne Abschlussbeleg erhalten, kein Replay/Queue-Löschen.
+Aktiver Dienst weiterhin RC17/`012b592`, zuletzt PID29004; kein Neustart dieses Auftrags.
+Maßgeblich: [Live-Bericht und genaue Grenzen](RC17-LIVE-DIAGNOSTICS-20261026.md).
+Die folgenden Abschnitte sind historische Zustände, keine neue Abnahme.
+
+# Historischer Einstieg · 25. Oktober 2026
 
 Dieser Einstieg ersetzt ältere Zustandsaussagen weiter unten. Die bisherigen
 Abschnitte bleiben als unveränderte Entwicklungshistorie erhalten. Maßgeblicher
