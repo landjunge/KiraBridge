@@ -1,0 +1,22 @@
+{
+  "source_commit": "20a30e8511c565d3c85776d58f3e50a7cf14ff93",
+  "version": "0.8.0rc17",
+  "local_intel_verify": "1609 passed,1 skipped; ruff/format/build passed",
+  "local_intel_package": "9/9 actual RC14 lifecycle checks passed",
+  "production_config_credentials_install_record_unchanged": true,
+  "own_test_service_cleanup": "bootout0; independent absence113",
+  "new_terminal_windows": 0,
+  "github_hosted_intel_checks": "not started: account billing/spending restriction",
+  "native_arm_tests": "not performed: no ARM hardware",
+  "merged": false,
+  "published": false,
+  "productive_source": "14468ad5e7b28be1c1c4312d2f4517582dbc7701",
+  "draft_pr": "https://github.com/landjunge/KiraBridge/pull/43",
+  "mac_package_sha256": "6b137feda52c3f86207c3a675d2f87ef82ce7448a68149dbd0bf2f24d14d9abd",
+  "python_build_artifacts": {
+    "kirabridge-0.8.0rc17.tar.gz": "a10f8102ae4f29722f7ba0bd41c20645ca4ad1a3f1ff228585064621de13e338",
+    "kirabridge-0.8.0rc17-py3-none-any.whl": "7b6d8e4d537b1cb450e9f8f7eafaf054930d79db5906572012d2bed877cfeb47",
+    ".gitignore": "684888c0ebb17f374298b65ee2807526c066094c701bcc7ebbe1c1095f494fc1"
+  },
+  "operator_accepted_local_intel_scope": true
+}

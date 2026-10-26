@@ -1,8 +1,8 @@
-# 0.8.0rc17 · unveröffentlichter Integrationskandidat / unpublished candidate
+# 0.8.0rc17 · Intel macOS
 
-Published remains [RC14](https://github.com/landjunge/KiraBridge/releases/tag/v0.8.0rc14).
-RC15/RC16 are historical drafts; RC17 is still a draft. The operator's installed
-source14468ad is distinct from this branch and from any eventual merged release.
+[Actual release status / tatsächlicher Release-Status](https://github.com/landjunge/KiraBridge/releases/tag/v0.8.0rc17).
+A GitHub draft remains unpublished. Final assets, source commit, SHA-256 and installed
+service acceptance are recorded separately in the release/PR43, never inferred from a tag.
 
 ## Änderungen / Changes
 
@@ -26,25 +26,24 @@ source14468ad is distinct from this branch and from any eventual merged release.
   Automatic recovery retains old-definition/ownership/idle guards even if
   visibility is lost after a failed switch. launchd remains window-independent.
 
-## Nachweise und offene Gates / Evidence and open gates
+## Nachweise und Abnahme / Evidence and acceptance
 
-Source14468ad passed the missing local Intel-macOS Verify axis:1522passed,
-1 optional AA-source case skipped. Original full RC14 package test failed at
-rollback readiness; subsequent targeted original and lifecycle rollback cases
-passed with the unchanged30s deadline. No exact launchd cause or invented
-production fix is claimed. Fresh installation was not reached in the failed run.
+Actual Intel macOS15.7.4 / Python3.11.15, program source20a30e8:
+**1609 passed,1 skipped**, Ruff/format, wheel and sdist passed. Actual built package:
+**9/9 RC14 lifecycle checks passed**, including data retention, idempotency, installer-exit
+independence, restart, KeepAlive, actual rollback and fresh launchd installation.
+Native full Braille/pulse rendering and the authenticated isolated copy flow are proven.
+Temporary test service was removed; production data/config/credentials were unchanged.
 
-[Actual Mac results](evidence/local-macos-acceptance-14468ad-20261026.json) ·
-[Focused rollback details](RC14-ROLLBACK-20261026.md) ·
-[Renderer evidence](design-preview/renderer-f06db0-evidence.json) ·
-[Native visibility](evidence/visible-installer-window-20261026.json).
+The operator explicitly approved local Intel acceptance for merge and visible installation.
+Hosted Intel/ARM jobs did not start because of account billing/spending restrictions;
+this approval does not claim green Actions or ARM acceptance. **Apple Silicon and macOS26
+remain unverified.** Documentation-only finalization does not change tested program bytes;
+the final merged source and new package hashes must be checked separately.
 
-New integrated-source and actual built-package tests must be recorded against
-their own final commit before acceptance. Team-scoped cases are not added across
-overlapping phases. No unnecessary local full-suite loop. Mandatory GitHub tests
-remain required; hosted Intel/ARM jobs are billing-blocked and no ARM hardware
-is verified. Local Intel evidence never turns a failed Actions job into success.
-No merge, publication or new productive installation until the agreed gates pass.
+[Detailed evidence/approval](INTEL-ACCEPTANCE-20261026.md) ·
+[Historical rollback failure and subsequent passes](RC14-ROLLBACK-20261026.md) ·
+[Partial-write fix](BRAILLE-PARTIAL-OUTPUT-20261026.md).
 
 ## Installation / Update
 
@@ -54,5 +53,5 @@ own evidence. No Apple signing/notarization; no permission or billing changes.
 Config, credentials, rights, Whiteboards, database and user files are preserved.
 
 [Deutsch](INSTALL-DE.md) · [English](INSTALL-EN.md) · [Current status](../README.md).
-The existing reviewed source144 asset remains the honest current download
-until a new source-pinned package is actually built, accepted and supplied.
+Use the README authenticated checksum-verified RC17 command. The release identifies
+the exact final source; historical source-pinned review assets remain historical evidence.

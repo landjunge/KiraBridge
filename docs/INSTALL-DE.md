@@ -1,9 +1,9 @@
 # KiraBridge installieren und aktualisieren · 0.8.0rc17
 
-Veröffentlicht bleibt [RC14](https://github.com/landjunge/KiraBridge/releases/tag/v0.8.0rc14).
-RC17 ist ein privater Release-Entwurf; der Betreiber-Mac läuft auf geprüftem
-RC17/14468ad. Dieser Entwicklungsbranch bereitet die Braille-Integration vor;
-Paketfreigabe, Merge, Veröffentlichung und Installation sind verschiedene Zustände.
+RC17: Intel-Abnahme und ausdrückliche Betreiberfreigabe dokumentiert in
+[Intel-Abnahme](INTEL-ACCEPTANCE-20261026.md). Der tatsächliche
+[Release-Status](https://github.com/landjunge/KiraBridge/releases/tag/v0.8.0rc17)
+und der antwortende installierte Dienst sind getrennt; ein Entwurf ist nicht veröffentlicht.
 
 ## Voraussetzungen
 
@@ -20,19 +20,16 @@ Private Downloads benötigen `gh auth login` und Zugriff; keine Tokens kopieren.
 
 ## Installation / Update
 
-Der eine authentifizierte Kopierbefehl für das bereits tatsächlich bereitgestellte
-RC17-Reviewpaket aus Quelle14468ad steht in der [README](../README.md). Er lädt
-echte Assets, prüft SHA-256 und führt erst dann den lokalen Installer aus.
-Das ist keine Freigabe des noch in Abnahme befindlichen Braille-Kandidaten.
-Nach Abnahme seines exakt gepinnten Pakets ist der lokale sichtbare Einstieg:
+Der eine authentifizierte Installations-/Updatebefehl steht in der
+[README](../README.md). Er prüft Bootstrap und macOS-Paket vor Ausführung.
+Nach dem geprüften Entpacken ist der direkte sichtbare Einstieg:
 
 ```sh
 sh KiraBridge/install.sh --require-visible-terminal --motion full
 ```
 
 Reduzierte Bewegung: `--motion reduced`; Sprache: `--language de` oder `--language en`.
-Die optionalen Darstellungsschalter gehören zum neuen Kandidaten, nicht zu alten
-Reviewarchiven. Der Renderer wird aus dem geprüften Paket geladen; Fehler- und
+Die Darstellungsschalter gehören zum RC17-Paket, nicht zu älteren Reviewarchiven. Der Renderer wird aus dem geprüften Paket geladen; Fehler- und
 Statusmeldungen haben Vorrang, statischer Text bleibt verfügbar.
 
 Neue Installation: Benutzerdateien mit eigenem Konfigurations-/Datenpfad.

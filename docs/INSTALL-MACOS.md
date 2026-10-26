@@ -6,9 +6,10 @@ in [Deutsch](INSTALL-DE.md) and [English](INSTALL-EN.md). The [README](../README
 contains the single copy command for the actually available reviewed package.
 Older source-pinned commands remain in Git history; they do not approve new builds.
 
-Veröffentlicht bleibt RC14; RC17 ist Entwurf. Produktiv läuft derzeit RC17/14468ad.
-Die Braille-Integration dieses Branches benötigt ihre eigene Paketabnahme und
-verändert weder bestehende Rechte noch Daten oder launchd-Laufzeitverhalten.
+Die lokale Intel-Abnahme und Betreiberfreigabe für RC17 sind in
+[INTEL-ACCEPTANCE-20261026.md](INTEL-ACCEPTANCE-20261026.md) dokumentiert.
+Den tatsächlichen Veröffentlichungsstatus zeigt GitHub; den tatsächlich installierten
+Stand der antwortende Dienst. Rechte, Daten und launchd-Laufzeitverhalten bleiben erhalten.
 
 Der Dienst läuft nach Schließen von Terminal/Browser weiter. Die produktive
 Installation erfolgt nach Freigabe ausschließlich in einem frisch bestätigten

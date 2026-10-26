@@ -1,9 +1,9 @@
 # Install and update KiraBridge · 0.8.0rc17
 
-[RC14](https://github.com/landjunge/KiraBridge/releases/tag/v0.8.0rc14) remains published.
-RC17 is a private draft; the operator Mac currently runs reviewed RC17/14468ad.
-Source integration, package acceptance, publication and installed service are
-separate states. This branch adds the existing Braille design to the actual installer.
+RC17 Intel acceptance and explicit operator approval are recorded in
+[Intel acceptance](INTEL-ACCEPTANCE-20261026.md). Actual
+[release status](https://github.com/landjunge/KiraBridge/releases/tag/v0.8.0rc17)
+and the responding installed service remain separate; a draft is unpublished.
 
 ## Requirements
 
@@ -17,16 +17,15 @@ Never put credentials in commands, logs or Git.
 
 ## Install or update
 
-Use the single copy command in the [README](../README.md) for the actual existing
-RC17/14468ad review asset. It authenticates the download and verifies SHA-256
-before execution; it does not install the unaccepted Braille candidate.
-After its exact package is accepted, the new local visible entrypoint is:
+Use the single authenticated install/update command in the [README](../README.md).
+It verifies the bootstrap and package before execution. After verified extraction,
+the direct visible entrypoint is:
 
 ```sh
 sh KiraBridge/install.sh --require-visible-terminal --language en --motion full
 ```
 
-`--motion reduced` disables motion. These new presentation switches are not
+`--motion reduced` disables motion. These presentation switches are not
 claimed supported by older archives. The hashed stdlib renderer is optional;
 real progress, errors and prompts take priority. Unknown terminal capabilities
 fall back to static Unicode/plain text. Human graphics never enter MCP or statusJSON.
