@@ -49,3 +49,23 @@ visible macOS package acceptance. The parent integration must supply and verify
 the raw-byte writer and deadline-aware child-output prefix handshake, then repeat
 the one owned-window built-package acceptance. No production installation,
 Terminal window, agent session, service or queue was touched by these tests.
+
+## Actual native reproduction and integrated follow-up
+
+The built449d851 package reproduced this defect in an owned native Terminal:
+viewport131x35, requested9666bytes/3120Braille cells, partial write reported as
+BlockingIOError, only311Braille cells independently read back. No installation
+was performed. The one owned test window60091 was closed and its absence
+independently confirmed; other windows were untouched.
+
+[Native reproduction](evidence/braille-partial-write-repro-20261026.json). Root
+transport now exposes exact nonblocking byte acknowledgements, forwards opaque
+abort/reset prefixes before real child text under the original deadline, and
+acknowledges only full success. Fast completion never starts a late frame merely
+to discard it. The normal short KiraBridge heading remains visible.
+
+One directly affected combined partial-IO/presenter/package batch passed
+**50 tests in3.79s**, Ruff/format passed and independent review found no remaining
+concrete blocker. Earlier449 package and CI results remain tied to449. The new
+source still needs its own build/targeted actual presentation acceptance; no
+production update, merge, hostedMac/ARM pass or publication is claimed here.

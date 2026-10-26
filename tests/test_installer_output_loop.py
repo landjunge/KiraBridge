@@ -41,6 +41,7 @@ def presenter(events):
                 self.done = True
 
         def cancel(self):
+            events.append(("cancel", None))
             self.done = True
 
     return Presenter()
@@ -58,7 +59,7 @@ def test_real_child_text_releases_graphic_area_before_forwarding(installer):
     installer.sys = SimpleNamespace(stderr=sink)
     installer.PRESENTER = presenter(events)
     installer.OUTPUT_TARGET = SimpleNamespace(
-        write_child=lambda data, *a: sink.write(data.decode("utf-8"))
+        encoding="utf-8", write_child=lambda data, *a: sink.write(data.decode("utf-8"))
     )
     installer.run(
         [
@@ -72,7 +73,7 @@ def test_real_child_text_releases_graphic_area_before_forwarding(installer):
     assert any(kind == "frame" for kind, _ in events)
     for index, event in enumerate(events):
         if event[0] == "real":
-            assert events[index - 1][0] == "finish"
+            assert events[index - 1][0] == "cancel"
     first_real = next(i for i, event in enumerate(events) if event[0] == "real")
     assert all(kind != "frame" for kind, _ in events[first_real:])
 
@@ -115,7 +116,7 @@ def test_no_late_animation_after_immediate_child_prompt(installer):
     events = []
     installer.PRESENTER = presenter(events)
     installer.OUTPUT_TARGET = SimpleNamespace(
-        write_child=lambda data, *a: events.append(("real", data.decode("utf-8")))
+        encoding="utf-8", write_child=lambda data, *a: events.append(("real", data.decode("utf-8")))
     )
     installer.run(
         [sys.executable, "-c", "import time;print('Continue? ',flush=True);time.sleep(.16)"],
@@ -182,6 +183,63 @@ def test_decorative_writer_never_waits_for_full_pipe(installer):
     finally:
         target.close()
         os.close(read_fd)
+
+
+@pytest.mark.parametrize("accepted", [0, 1, 3])
+def test_byte_writer_reports_exact_partial_count_without_character_guessing(installer, accepted):
+    installer.os = SimpleNamespace(write=lambda fd, data: accepted)
+    assert installer.NonBlockingOutput(17).write_bytes("⣿".encode()) == accepted
+
+
+def test_byte_writer_yields_zero_on_backpressure_without_waiting(installer):
+    def full(*a):
+        raise BlockingIOError("owned output full")
+
+    installer.os = SimpleNamespace(write=full)
+    assert installer.NonBlockingOutput(17).write_bytes(b"frame") == 0
+
+
+@pytest.mark.parametrize("write_fails", [False, True])
+def test_cancelled_partial_csi_reset_is_sent_before_real_text_and_acknowledged_only_on_success(
+    installer, write_fails
+):
+    events = []
+    prefix = "\x18\x1b[0m\x1b[12E\n"
+
+    class Partial:
+        output_prefix = prefix
+
+        def cancel(self):
+            events.append("cancel")
+
+        def acknowledge_output_prefix(self):
+            events.append("ack")
+            self.output_prefix = ""
+
+        def begin(self):
+            pass
+
+        def tick(self):
+            pass
+
+    def output(data, *args):
+        events.append(("write", data))
+        if write_fails:
+            raise TimeoutError("synthetic deadline before prefix completed")
+
+    installer.PRESENTER = Partial()
+    installer.OUTPUT_TARGET = SimpleNamespace(encoding="utf-8", write_child=output)
+    command = [sys.executable, "-c", "print('FATAL actual diagnostic',flush=True)"]
+    if write_fails:
+        with pytest.raises(TimeoutError):
+            installer.run(command, timeout=3)
+        assert "ack" not in events and installer.PRESENTER.output_prefix == prefix
+    else:
+        installer.run(command, timeout=3)
+        assert "ack" in events and installer.PRESENTER.output_prefix == ""
+    first_write = next(i for i, event in enumerate(events) if isinstance(event, tuple))
+    assert events[first_write - 1] == "cancel"
+    assert events[first_write][1].startswith(prefix.encode() + b"FATAL")
 
 
 def test_status_json_never_uses_human_presenter(installer, tmp_path, capsys):

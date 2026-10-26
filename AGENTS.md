@@ -33,3 +33,7 @@ commit, PR, release and installed-source status.
 Reuse one freshly confirmed, owned visible work/install window. Do not open new
 Terminal windows for every probe or step, and never use a running Codex/Grok
 session as an installation window.
+The operator explicitly allows one new owned test window when needed. Keep at
+most one such additional window open, reuse it for the necessary test steps, and
+close that owned idle window afterwards with an independent absence check. Do
+not accumulate test windows or close unrelated windows or agent sessions.

@@ -54,6 +54,13 @@ class NonBlockingOutput:
             raise BlockingIOError("Decorative output not fully accepted")
         return len(text)
 
+    def write_bytes(self, data):
+        """One nonblocking attempt; the presenter retains unaccepted bytes."""
+        try:
+            return os.write(self.fd, data)
+        except BlockingIOError:
+            return 0
+
     def write_child(self, data, deadline, process, timeout):
         view = memoryview(data)
         with selectors.DefaultSelector() as selector:
@@ -168,11 +175,18 @@ def relay_child_output(process, timeout):
                     key.fileobj.close()
                     continue
                 if PRESENTER is not None:
-                    # Complete only our own frame, before any real child text.
-                    PRESENTER.finish()
+                    # A partial graphic is discarded, never finalized across logs.
                     PRESENTER.cancel()
                 output_seen = True
-                OUTPUT_TARGET.write_child(data, deadline, process, timeout)
+                prefix = getattr(PRESENTER, "output_prefix", "") if PRESENTER is not None else ""
+                OUTPUT_TARGET.write_child(
+                    prefix.encode(OUTPUT_TARGET.encoding) + data,
+                    deadline,
+                    process,
+                    timeout,
+                )
+                if prefix:
+                    PRESENTER.acknowledge_output_prefix()
         process.wait(timeout=max(0, deadline - time.monotonic()))
 
 
@@ -1029,6 +1043,7 @@ def _main():
             language=args.language,
             motion=args.motion,
         )
+        say("KiraBridge · Installation/Update")
     for path in (args.config, args.launcher, args.plist, args.prefix, args.cache_dir):
         validate_destination(path, private=path == args.config)
     private_dir(args.prefix)
@@ -1044,8 +1059,16 @@ def _main():
         else:
             status(args)
         if PRESENTER is not None:
-            PRESENTER.begin()
-            PRESENTER.finish()
+            # Do not begin a late frame and immediately discard its tail on exit.
+            # Real completion is already reported by activate/rollback/prepare.
+            PRESENTER.cancel()
+            prefix = getattr(PRESENTER, "output_prefix", "")
+            if prefix:
+                written = sys.stderr.write(prefix)
+                if written is not None and written != len(prefix):
+                    raise BlockingIOError("Final terminal cleanup not fully accepted")
+                sys.stderr.flush()
+                PRESENTER.acknowledge_output_prefix()
     finally:
         os.close(fd)
 
