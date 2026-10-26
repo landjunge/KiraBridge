@@ -281,7 +281,7 @@ def test_banner_stderr_narrow_and_no_color(monkeypatch):
         "kirabridge.install_ui.shutil.get_terminal_size", lambda *a: terminal_size((32, 24))
     )
     SetupUI("en", stream).banner()
-    assert stream.getvalue() == "=== KiraBridge ===\n"
+    assert stream.getvalue() == "KiraBridge\n"
 
 
 def test_linux_unit_is_user_only_quoted_and_conflicts_preserved(tmp_path, monkeypatch):

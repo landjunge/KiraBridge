@@ -35,6 +35,16 @@ else
   checksum() { shasum -a 256 "$@"; }
 fi
 (cd "$bundle" && checksum -c SHA256SUMS >/dev/null) || fail 'Paket-Prüfsumme falsch. Originalpaket erneut beziehen.' 'Package checksum mismatch. Obtain the original package again.'
+# Human-only, static early banner. Integrity is checked above; absence of a local
+# Python only skips decoration, never prerequisites or the actual installation.
+if command -v python3 >/dev/null 2>&1; then
+  if python3 "$bundle/installer/presentation.py" --bundle "$bundle" --language "$language"; then
+    :
+  else
+    presentation_status=$?
+    case "$presentation_status" in 130|143) exit "$presentation_status" ;; esac
+  fi
+fi
 say 'Laufzeit wird nur für deinen Benutzer installiert. Netzwerkdownloads von GitHub/PyPI und ggf. Python sind erforderlich. Keine Administratorrechte; vorhandene Zugänge bleiben erhalten.' 'Runtime is installed for your user only. Network downloads from GitHub/PyPI and possibly Python are needed. No administrator rights; existing credentials are preserved.'
 say 'Fortfahren? [j/N]' 'Continue? [y/N]'
 IFS= read -r answer || exit 1

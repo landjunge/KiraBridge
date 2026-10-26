@@ -48,7 +48,26 @@ def build(output):
         }:
             member = name if name.startswith("docs/") else "payload/" + name
             files[member] = subprocess.check_output(["git", "show", f"{commit}:{name}"])
-    files["installer/install.py"] = Path("installer/install.py").read_bytes()
+    for name in (
+        "installer/install.py",
+        "installer/presentation.py",
+        "installer/visible_terminal.py",
+    ):
+        files[name] = subprocess.check_output(["git", "show", f"{commit}:{name}"])
+    presentation_assets = {
+        name: hashlib.sha256(files[name]).hexdigest()
+        for name in (
+            "payload/src/kirabridge/terminal_design.py",
+            "payload/src/kirabridge/install_ui.py",
+            "installer/presentation.py",
+        )
+    }
+    presentation = {
+        "schema": "kirabridge.installer.presentation.v1",
+        "assets": presentation_assets,
+        "palette": "#F06DB0",
+        "output": "human-stderr-only",
+    }
     files["INSTALL.md"] = (
         Path("docs/INSTALL-MACOS.md").read_bytes().replace(b"](CHATGPT.md)", b"](docs/CHATGPT.md)")
     )
@@ -82,6 +101,7 @@ exec python3.11 "$bundle/installer/install.py" install --bundle "$bundle" "$@"
         "platforms": ["Darwin-x86_64", "Darwin-arm64"],
         "wheel": "wheel/" + wheel.name,
         "files": {name: hashlib.sha256(data).hexdigest() for name, data in sorted(files.items())},
+        "presentation": presentation,
         "runtime": "Python 3.11, uv 0.11.6; dependencies from hash-locked uv.lock",
         "apple_signed": False,
         "maturity": "unpublished consolidation candidate; acceptance gates remain",
@@ -143,6 +163,7 @@ exec python3.11 "$bundle/installer/install.py" install --bundle "$bundle" "$@"
         .replace(b"@VERSION@", version.encode())
     )
     linux_files["LICENSE"] = Path("LICENSE").read_bytes()
+    linux_files["installer/presentation.py"] = files["installer/presentation.py"]
     for language in ("DE", "EN"):
         command = "sh install.sh" + (" --language en" if language == "EN" else "")
         linux_files[f"INSTALL-{language}.md"] = (
@@ -159,6 +180,7 @@ exec python3.11 "$bundle/installer/install.py" install --bundle "$bundle" "$@"
                 "source_commit": commit,
                 "platform": "Linux-x86_64",
                 **license_fields,
+                "presentation": presentation,
                 "maturity": "unpublished candidate; Linux package acceptance not performed",
             },
             indent=2,
