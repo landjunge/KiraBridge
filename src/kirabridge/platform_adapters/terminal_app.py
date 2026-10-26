@@ -87,6 +87,44 @@ class TerminalAppTransport:
                 if cancelled:
                     raise asyncio.CancelledError
 
+    async def window_inventory(self):
+        """Unfiltered native window IDs, including windows without a usable shell PID."""
+        return await self.native(
+            'const app=Application("Terminal"), running=app.running(); '
+            "JSON.stringify({running:running,windows:running ? app.windows().map(w=>({"
+            "window_id:w.id(),ttys:w.tabs().map(t=>t.tty())})) : []});"
+        )
+
+    async def process_ids(self):
+        """Observe all OS PIDs; an error or partial/empty list is never absence proof."""
+        if not self.available:
+            raise BridgeError("session_transport_unavailable", "Native PID evidence requires macOS")
+        child = None
+        try:
+            child = await asyncio.create_subprocess_exec(
+                "/bin/ps",
+                "-axo",
+                "pid=",
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+            )
+            async with asyncio.timeout(3):
+                output, error = await child.communicate()
+            lines = output.split()
+            if child.returncode != 0 or error.strip() or not lines or len(output) > 1048576:
+                raise BridgeError(
+                    "visible_absence_unproven", "Complete OS PID inventory unavailable"
+                )
+            if any(not pid.isdigit() for pid in lines) or len(set(lines)) != len(lines):
+                raise BridgeError("visible_absence_unproven", "Invalid OS PID inventory")
+            return frozenset(int(pid) for pid in lines)
+        except (OSError, TimeoutError):
+            raise BridgeError("visible_absence_unproven", "OS PID observation failed") from None
+        finally:
+            if child is not None and child.returncode is None:
+                child.kill()
+                await child.wait()
+
     async def catalog(self):
         if sys.platform != "darwin":
             return []

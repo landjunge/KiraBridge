@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import asyncio
+import re
 import shlex
+import time
 from contextlib import asynccontextmanager, contextmanager
 from contextvars import ContextVar
 from copy import deepcopy
@@ -11,7 +13,7 @@ from pathlib import Path
 
 from pydantic import Field
 
-from kirabridge.bridge_core.models import BridgeError, Input
+from kirabridge.bridge_core.models import BridgeError, Input, digest
 from kirabridge.filesystem_manager import PathScope
 from kirabridge.platform_adapters.desktop import DESKTOP_MESSAGES
 from kirabridge.platform_adapters.terminal_app import TerminalAppTransport
@@ -254,6 +256,92 @@ class SessionManager:
                 "session_observation_changed", "Read observation scope changed or expired"
             )
         return deepcopy(row)
+
+    async def prove_original_target_gone(self, principal, original):
+        """Fresh read-only evidence for a persisted binding, never a current-target guess."""
+        from kirabridge.bridge_core.config import VisibleTerminalBinding
+
+        self.authorization.principal(principal, "session.inspect")
+        if not self.terminal_app.available:
+            raise BridgeError("visible_absence_unproven", "Native observation is unavailable")
+        try:
+            if (
+                not isinstance(original, dict)
+                or type(original.get("expected_pid")) is not int
+                or type(original.get("agent_pid")) is not int
+            ):
+                raise ValueError("Original PID types must be exact")
+            binding = VisibleTerminalBinding.model_validate(original)
+            window = int(binding.pane_id.split(":")[1])
+            if window <= 0 or binding.expected_pid == binding.agent_pid:
+                raise ValueError("Ambiguous original binding")
+        except (ValueError, TypeError):
+            raise BridgeError("visible_absence_unproven", "Original binding is not exact") from None
+        expected = {binding.expected_pid, binding.agent_pid}
+        observations = []
+
+        async def absent_pids():
+            pids = await self.terminal_app.process_ids()
+            if (
+                not isinstance(pids, (set, frozenset))
+                or not pids
+                or any(type(pid) is not int or pid < 0 for pid in pids)
+                or expected.intersection(pids)
+            ):
+                raise BridgeError(
+                    "visible_absence_unproven", "Original PID exists or inventory is invalid"
+                )
+            observations.append(
+                {
+                    "observed_at": time.time(),
+                    "pid_count": len(pids),
+                    "inventory_sha256": digest(sorted(pids)),
+                }
+            )
+
+        await absent_pids()
+        catalog = await self.terminal_app.window_inventory()
+        catalog_at = time.time()
+        if (
+            not isinstance(catalog, dict)
+            or set(catalog) != {"running", "windows"}
+            or type(catalog.get("running")) is not bool
+            or not isinstance(catalog.get("windows"), list)
+            or not catalog["running"]
+            and catalog["windows"]
+        ):
+            raise BridgeError("visible_absence_unproven", "Native window inventory is invalid")
+        seen = set()
+        for row in catalog["windows"]:
+            if (
+                not isinstance(row, dict)
+                or type(row.get("window_id")) is not int
+                or row["window_id"] <= 0
+                or row["window_id"] in seen
+                or not isinstance(row.get("ttys"), list)
+                or any(
+                    not isinstance(tty, str) or not re.fullmatch(r"/dev/ttys[0-9]+", tty)
+                    for tty in row["ttys"]
+                )
+            ):
+                raise BridgeError(
+                    "visible_absence_unproven", "Native window inventory is incomplete"
+                )
+            seen.add(row["window_id"])
+        if window in seen:
+            raise BridgeError("visible_absence_unproven", "Original window still exists")
+        await absent_pids()
+        return {
+            "original_binding_sha256": digest(binding.model_dump()),
+            "original_window": window,
+            "original_pids": sorted(expected),
+            "original_pids_gone": True,
+            "native_window_absent": True,
+            "native_window_count": len(seen),
+            "catalog_observed_at": catalog_at,
+            "process_observations": observations,
+            "observed_at": time.time(),
+        }
 
     async def read(self, principal, pane_id, expected_pid, *, max_bytes=65536):
         await self.observed_selected(principal, pane_id, expected_pid)

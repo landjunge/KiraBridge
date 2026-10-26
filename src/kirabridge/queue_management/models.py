@@ -23,7 +23,7 @@ class QueueControl(Input):
     acknowledge_execution_unknown: bool = Field(
         default=False,
         description=(
-            "Required true for withdraw: hide an unknown entry without claiming it stopped "
-            "or releasing its execution reservation"
+            "Required true for withdraw; with retire selects strict original-target-gone proof. "
+            "Execution remains unknown; neither action claims a process stopped."
         ),
     )
