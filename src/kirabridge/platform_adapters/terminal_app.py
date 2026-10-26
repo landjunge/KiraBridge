@@ -363,7 +363,8 @@ class TerminalAppTransport:
 
     async def read(self, pane_id):
         return await self.native(
-            self.native_target(pane_id) + "\nJSON.stringify(tab.contents().slice(-65536));"
+            self.native_target(pane_id)
+            + "\nJSON.stringify(Array.from(tab.contents()).slice(-65536).join(''));"
         )
 
     async def open(self, command):

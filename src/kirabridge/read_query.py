@@ -91,13 +91,28 @@ def read_query(bridge, principal: str, query: ReadQuery) -> dict:
                 raise
             source = task.get("result") or {}
             origin = "persisted_task_result"
-        remaining, output, truncated = query.max_bytes, {}, False
+        remaining, output, response_truncated = query.max_bytes, {}, False
         keys = ("stdout", "stderr") + (("terminal_output",) if "terminal_output" in source else ())
+        retained_bytes = sum(len(str(source.get(key, "")).encode("utf-8")) for key in keys)
+        observed_bytes = source.get("output_bytes")
+        if type(observed_bytes) is not int or observed_bytes < 0:
+            observed_bytes = None
+        capture_truncated = source.get("truncated") is True or (
+            observed_bytes is not None and observed_bytes > retained_bytes
+        )
+        capture = (
+            "truncated"
+            if capture_truncated
+            else "complete"
+            if source.get("truncated") is False
+            else "unknown"
+        )
+        visible_view = "terminal_output" in source
         for key in keys:
             raw = str(source.get(key, "")).encode("utf-8")
             # A clipped multibyte character must not expand the UTF-8 byte budget.
             output[key] = raw[:remaining].decode("utf-8", "ignore")
-            truncated |= len(raw) > remaining
+            response_truncated |= len(raw) > remaining
             remaining -= min(remaining, len(raw))
         return {
             "operation": query.operation,
@@ -106,7 +121,16 @@ def read_query(bridge, principal: str, query: ReadQuery) -> dict:
             "source": origin,
             **output,
             "bytes": query.max_bytes - remaining,
-            "truncated": truncated,
+            "truncated": capture_truncated or response_truncated,
+            "output_bytes_observed": observed_bytes,
+            "output_completeness": {
+                "capture": capture,
+                "scope": "visible_terminal_view" if visible_view else "managed_process_capture",
+                "retained_text_bytes": retained_bytes,
+                "returned_text_bytes": sum(len(text.encode("utf-8")) for text in output.values()),
+                "response_truncated": response_truncated,
+                "protocol_history": "visible_view_only" if visible_view else "not_established",
+            },
             "output_available": source.get("output_available", any(key in source for key in keys)),
             "output_status": source.get("output_status", "available"),
             **(
