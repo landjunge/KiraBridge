@@ -27,11 +27,13 @@ class DaemonConnection:
                 await self.pool.disconnect(self.endpoint.id)
                 await self.pool.connect(self.endpoint)
 
-    async def call_tool(self, name, arguments):
+    async def call_tool(self, name, arguments, *, routine_health=False):
         await self.ensure_connection()
         tools = await self.list_tools()
         if name not in {tool.name for tool in tools}:
             raise BridgeError("tool_unavailable", "Tool absent from the current daemon catalog")
+        if routine_health:
+            return await self.pool.call(self.endpoint.id, name, arguments, routine_health=True)
         return await self.pool.call(self.endpoint.id, name, arguments)
 
     async def list_tools(self):
@@ -188,7 +190,7 @@ async def connect_stdio(config, principal):
                 if downstream:
                     try:
                         # Reads only; a failed/uncertain mutation is never retried.
-                        await connection.call_tool("bridge_health", {})
+                        await connection.call_tool("bridge_health", {}, routine_health=True)
                         await connection.list_tools()
                         await changed()
                     except Exception:

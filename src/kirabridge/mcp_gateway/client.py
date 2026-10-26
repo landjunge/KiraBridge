@@ -72,6 +72,7 @@ class MCPClientPool:
         self.catalogs = {}
         self.catalog_locks = {}
         self.catalog_dirty = set()
+        self.health_epochs = {}
 
     def notice(self, peer_id, phase, **metadata):
         self.phases[peer_id] = phase
@@ -213,6 +214,7 @@ class MCPClientPool:
                 self.catalogs.pop(peer.id, None)
                 self.catalog_locks.pop(peer.id, None)
                 self.catalog_dirty.discard(peer.id)
+                self.health_epochs.pop(peer.id, None)
                 self.notice(peer.id, "connection.closed")
 
         self.owners[peer.id] = asyncio.create_task(owner())
@@ -252,7 +254,38 @@ class MCPClientPool:
                     seen.add(cursor)
             raise BridgeError("tool_catalog_invalid", "Tool pagination budget exceeded")
 
-    async def call(self, peer_id: str, tool: str, arguments: dict, *, task_id: str | None = None):
+    def health_epoch(self, peer_id, result):
+        """A successful passive observation; never include volatile counts or raw contents."""
+        data = result.structuredContent
+        if result.isError or not isinstance(data, dict) or data.get("error"):
+            return None
+        observed = data.get("discovery")
+        if (
+            data.get("dispatcher_active") is not True
+            or not isinstance(data.get("version"), str)
+            or not isinstance(observed, dict)
+            or not isinstance(observed.get("instance_id"), str)
+            or not isinstance(observed.get("revision"), str)
+        ):
+            return None
+        return digest(
+            [
+                self.connection_ids.get(peer_id),
+                data["version"],
+                observed["instance_id"],
+                observed["revision"],
+            ]
+        )
+
+    async def call(
+        self,
+        peer_id: str,
+        tool: str,
+        arguments: dict,
+        *,
+        task_id: str | None = None,
+        routine_health: bool = False,
+    ):
         request = arguments.get("request")
         task_id = (
             task_id
@@ -272,11 +305,35 @@ class MCPClientPool:
             )
         if peer_id in self.catalog_dirty:
             await self.list_tools(peer_id)
-        self.notice(peer_id, "call.started", tool=tool, task_id=task_id)
+        # Only the internal passive poll may defer successful diagnostics. Explicit
+        # reads and all execution/receipt tools retain the existing observation path.
+        quiet = routine_health and tool == "bridge_health" and arguments == {} and task_id is None
+        started = False
+
+        def observe_start():
+            nonlocal started
+            if not started:
+                self.notice(peer_id, "call.started", tool=tool, task_id=task_id)
+                started = True
+
+        if not quiet:
+            observe_start()
         # No automatic retries: a timed-out tool may have already executed remotely.
         try:
             async with self.gate, asyncio.timeout(self.call_timeout):
                 result = await session.call_tool(tool, arguments)
+                if tool == "bridge_health" and self.health_epoch(peer_id, result) is None:
+                    self.health_epochs.pop(peer_id, None)
+                if quiet:
+                    epoch = self.health_epoch(peer_id, result)
+                    if epoch is not None and self.health_epochs.get(peer_id) == epoch:
+                        self.phases[peer_id] = "call.returned"
+                        return result
+                    if epoch is None:
+                        self.health_epochs.pop(peer_id, None)
+                    else:
+                        self.health_epochs[peer_id] = epoch
+                    observe_start()
                 self.notice(
                     peer_id,
                     "call.returned",
@@ -286,6 +343,9 @@ class MCPClientPool:
                 )
                 return result
         except TimeoutError:
+            if tool == "bridge_health":
+                self.health_epochs.pop(peer_id, None)
+            observe_start()
             self.notice(
                 peer_id,
                 "call.outcome_unknown",
@@ -301,6 +361,9 @@ class MCPClientPool:
                 operation=tool,
             ) from None
         except Exception as exc:
+            if tool == "bridge_health":
+                self.health_epochs.pop(peer_id, None)
+            observe_start()
             self.notice(
                 peer_id,
                 "call.outcome_unknown",
@@ -321,6 +384,9 @@ class MCPClientPool:
                 await self.disconnect(peer_id)
             raise failure from None
         except asyncio.CancelledError:
+            if tool == "bridge_health":
+                self.health_epochs.pop(peer_id, None)
+            observe_start()
             self.notice(
                 peer_id, "call.interrupted", tool=tool, task_id=task_id, error_code="peer_unknown"
             )
