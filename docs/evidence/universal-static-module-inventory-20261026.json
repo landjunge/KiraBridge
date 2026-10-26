@@ -1,0 +1,2733 @@
+{
+  "source_commit": "0866c00364994577581e56f5eee18538941a9315",
+  "method": "AST inventory of every tracked src Python module; imports include deferred references; not a claim of complete semantic/runtime verification",
+  "module_count": 117,
+  "total_source_lines": 30623,
+  "cycles": [
+    [
+      "kirabridge.permissions",
+      "kirabridge.session_input_policy"
+    ],
+    [
+      "kirabridge.message_manager",
+      "kirabridge.voice_message_policy"
+    ],
+    [
+      "kirabridge.bridge_core.bridge",
+      "kirabridge.diagnostics",
+      "kirabridge.grok_connector",
+      "kirabridge.grok_connector.gateway",
+      "kirabridge.grok_connector.runtime",
+      "kirabridge.local_runtime",
+      "kirabridge.message_manager.receiver",
+      "kirabridge.operations_service",
+      "kirabridge.readiness",
+      "kirabridge.team_manager.dispatcher"
+    ],
+    [
+      "kirabridge.approval_console",
+      "kirabridge.control_center"
+    ]
+  ],
+  "modules": [
+    {
+      "module": "kirabridge",
+      "file": "src/kirabridge/__init__.py",
+      "lines": 5,
+      "responsibility": "KiraBridge versioned desktop bridge.",
+      "internal_dependencies": [],
+      "classes": 0,
+      "functions": 0,
+      "declared_bounds": []
+    },
+    {
+      "module": "kirabridge.admin_manager",
+      "file": "src/kirabridge/admin_manager.py",
+      "lines": 65,
+      "responsibility": "Explicit macOS Authorization Services path; no passwords or sudoers changes.",
+      "internal_dependencies": [
+        "kirabridge.bridge_core.models",
+        "kirabridge.terminal_manager"
+      ],
+      "classes": 0,
+      "functions": 2,
+      "declared_bounds": [
+        {
+          "line": 40,
+          "expression": "TerminalInput(\n            argv=[\"/usr/bin/osascript\", \"-l\", \"JavaScript\", \"-e\", script],\n            cwd=args.cwd,\n            timeout=args.timeout,\n            max_output=args.max_output,\n        )"
+        }
+      ]
+    },
+    {
+      "module": "kirabridge.agent_manager",
+      "file": "src/kirabridge/agent_manager/__init__.py",
+      "lines": 665,
+      "responsibility": "",
+      "internal_dependencies": [
+        "kirabridge.agent_manager.claude",
+        "kirabridge.agent_manager.copilot",
+        "kirabridge.agent_manager.full_access",
+        "kirabridge.agent_manager.gemini",
+        "kirabridge.agent_manager.opencode",
+        "kirabridge.bridge_core.config",
+        "kirabridge.bridge_core.models",
+        "kirabridge.filesystem_manager",
+        "kirabridge.platform_adapters",
+        "kirabridge.terminal_manager"
+      ],
+      "classes": 5,
+      "functions": 16,
+      "declared_bounds": [
+        {
+          "line": 194,
+          "expression": "TerminalInput(argv=command, cwd=args.cwd, timeout=args.timeout)"
+        },
+        {
+          "line": 243,
+          "expression": "httpx.AsyncClient(\n                timeout=httpx.Timeout(args.timeout), trust_env=False\n            )"
+        },
+        {
+          "line": 372,
+          "expression": "spawn_process(\n                command,\n                fd,\n                env=agent_environment(config, self.terminal),\n                stdin=asyncio.subprocess.PIPE,\n                stdout=asyncio.subprocess.PIPE,\n   "
+        }
+      ]
+    },
+    {
+      "module": "kirabridge.agent_manager.claude",
+      "file": "src/kirabridge/agent_manager/claude.py",
+      "lines": 172,
+      "responsibility": "Claude Code's native JSONL print protocol, with all local tools disabled.",
+      "internal_dependencies": [
+        "kirabridge.agent_manager.cli_support",
+        "kirabridge.bridge_core.models",
+        "kirabridge.filesystem_manager"
+      ],
+      "classes": 1,
+      "functions": 5,
+      "declared_bounds": [
+        {
+          "line": 136,
+          "expression": "TerminalInput(argv=command, cwd=workspace, timeout=args.timeout)"
+        }
+      ]
+    },
+    {
+      "module": "kirabridge.agent_manager.cli_support",
+      "file": "src/kirabridge/agent_manager/cli_support.py",
+      "lines": 82,
+      "responsibility": "Small shared bounds for optional CLI adapters; no shell or implicit credentials.",
+      "internal_dependencies": [
+        "kirabridge.bridge_core.models",
+        "kirabridge.terminal_manager"
+      ],
+      "classes": 1,
+      "functions": 5,
+      "declared_bounds": []
+    },
+    {
+      "module": "kirabridge.agent_manager.copilot",
+      "file": "src/kirabridge/agent_manager/copilot.py",
+      "lines": 192,
+      "responsibility": "GitHub Copilot CLI JSONL with an isolated, tool-free one-shot session.",
+      "internal_dependencies": [
+        "kirabridge.agent_manager.cli_support",
+        "kirabridge.bridge_core.models",
+        "kirabridge.filesystem_manager"
+      ],
+      "classes": 1,
+      "functions": 5,
+      "declared_bounds": [
+        {
+          "line": 152,
+          "expression": "TerminalInput(argv=command, cwd=str(workspace), timeout=args.timeout)"
+        }
+      ]
+    },
+    {
+      "module": "kirabridge.agent_manager.full_access",
+      "file": "src/kirabridge/agent_manager/full_access.py",
+      "lines": 227,
+      "responsibility": "Native CLI access for the explicitly selected full permission level.",
+      "internal_dependencies": [
+        "kirabridge.agent_manager.cli_support",
+        "kirabridge.bridge_core.models"
+      ],
+      "classes": 1,
+      "functions": 7,
+      "declared_bounds": [
+        {
+          "line": 197,
+          "expression": "TerminalInput(argv=command, cwd=args.cwd, timeout=args.timeout)"
+        }
+      ]
+    },
+    {
+      "module": "kirabridge.agent_manager.gemini",
+      "file": "src/kirabridge/agent_manager/gemini.py",
+      "lines": 339,
+      "responsibility": "",
+      "internal_dependencies": [
+        "kirabridge.agent_manager.cli_support",
+        "kirabridge.bridge_core.models",
+        "kirabridge.filesystem_manager",
+        "kirabridge.terminal_manager"
+      ],
+      "classes": 1,
+      "functions": 7,
+      "declared_bounds": [
+        {
+          "line": 256,
+          "expression": "TerminalInput(\n                    argv=command, cwd=str(workspace), timeout=args.timeout, max_output=65536\n                )"
+        }
+      ]
+    },
+    {
+      "module": "kirabridge.agent_manager.opencode",
+      "file": "src/kirabridge/agent_manager/opencode.py",
+      "lines": 274,
+      "responsibility": "OpenCode V1 JSONL adapter with an isolated, text-only execution profile.",
+      "internal_dependencies": [
+        "kirabridge.agent_manager.cli_support",
+        "kirabridge.bridge_core.models",
+        "kirabridge.filesystem_manager"
+      ],
+      "classes": 1,
+      "functions": 6,
+      "declared_bounds": [
+        {
+          "line": 228,
+          "expression": "TerminalInput(argv=command, cwd=workspace, timeout=args.timeout, max_output=65536)"
+        }
+      ]
+    },
+    {
+      "module": "kirabridge.approval_console",
+      "file": "src/kirabridge/approval_console.py",
+      "lines": 229,
+      "responsibility": "Local operator surface. This application is never mounted on the MCP gateway.",
+      "internal_dependencies": [
+        "kirabridge",
+        "kirabridge.bridge_core.models",
+        "kirabridge.control_center",
+        "kirabridge.grok_connector.console",
+        "kirabridge.operator_application",
+        "kirabridge.team_console"
+      ],
+      "classes": 1,
+      "functions": 16,
+      "declared_bounds": []
+    },
+    {
+      "module": "kirabridge.audit_manager",
+      "file": "src/kirabridge/audit_manager/__init__.py",
+      "lines": 66,
+      "responsibility": "",
+      "internal_dependencies": [
+        "kirabridge.bridge_core.models",
+        "kirabridge.task_manager.store"
+      ],
+      "classes": 2,
+      "functions": 6,
+      "declared_bounds": []
+    },
+    {
+      "module": "kirabridge.automatic_review_demo",
+      "file": "src/kirabridge/automatic_review_demo.py",
+      "lines": 456,
+      "responsibility": "One isolated automatic acceptance: two serial real Codex tasks, simulated Grok.",
+      "internal_dependencies": [
+        "kirabridge.audit_manager",
+        "kirabridge.bridge_core.bridge",
+        "kirabridge.bridge_core.config",
+        "kirabridge.mcp_gateway.client",
+        "kirabridge.mcp_gateway.http",
+        "kirabridge.review_demo"
+      ],
+      "classes": 1,
+      "functions": 15,
+      "declared_bounds": [
+        {
+          "line": 449,
+          "expression": "AutomaticDemo(\n            args.root, args.codex, args.browser_script, timeout=args.timeout, model=args.model\n        )"
+        }
+      ]
+    },
+    {
+      "module": "kirabridge.bridge_core",
+      "file": "src/kirabridge/bridge_core/__init__.py",
+      "lines": 1,
+      "responsibility": "Version-1 KiraBridge module.",
+      "internal_dependencies": [],
+      "classes": 0,
+      "functions": 0,
+      "declared_bounds": []
+    },
+    {
+      "module": "kirabridge.bridge_core.bridge",
+      "file": "src/kirabridge/bridge_core/bridge.py",
+      "lines": 682,
+      "responsibility": "",
+      "internal_dependencies": [
+        "kirabridge",
+        "kirabridge.admin_manager",
+        "kirabridge.agent_manager",
+        "kirabridge.bridge_core.config",
+        "kirabridge.bridge_core.models",
+        "kirabridge.clipboard_manager",
+        "kirabridge.completion_manager",
+        "kirabridge.configured_workflow",
+        "kirabridge.development_status",
+        "kirabridge.diagnostics",
+        "kirabridge.discovery",
+        "kirabridge.file_transfer.authorization",
+        "kirabridge.file_transfer.models",
+        "kirabridge.file_transfer.repository",
+        "kirabridge.file_transfer.service",
+        "kirabridge.file_transfer.sources",
+        "kirabridge.file_transfer.threaddesk",
+        "kirabridge.filesystem_manager",
+        "kirabridge.handoff_manager",
+        "kirabridge.image_manager",
+        "kirabridge.message_manager",
+        "kirabridge.message_manager.receiver",
+        "kirabridge.observation_export",
+        "kirabridge.operations_service",
+        "kirabridge.output_history",
+        "kirabridge.permissions",
+        "kirabridge.process_manager",
+        "kirabridge.queue_management",
+        "kirabridge.queue_management.models",
+        "kirabridge.readiness",
+        "kirabridge.security_manager",
+        "kirabridge.session_manager",
+        "kirabridge.session_ports",
+        "kirabridge.task_manager.manager",
+        "kirabridge.task_manager.store",
+        "kirabridge.team_manager",
+        "kirabridge.team_manager.dispatcher",
+        "kirabridge.terminal_access",
+        "kirabridge.terminal_manager",
+        "kirabridge.terminal_queries",
+        "kirabridge.threaddesk_manager",
+        "kirabridge.visible_handoff",
+        "kirabridge.visible_terminal",
+        "kirabridge.workflow_control_adapter"
+      ],
+      "classes": 1,
+      "functions": 15,
+      "declared_bounds": [
+        {
+          "line": 505,
+          "expression": "AgentInput(\n                        agent=target,\n                        prompt=approved.text,\n                        cwd=str(self.config.state_path),\n                        timeout=300,\n                    )"
+        }
+      ]
+    },
+    {
+      "module": "kirabridge.bridge_core.config",
+      "file": "src/kirabridge/bridge_core/config.py",
+      "lines": 418,
+      "responsibility": "",
+      "internal_dependencies": [
+        "kirabridge.bridge_core.models",
+        "kirabridge.file_transfer.models"
+      ],
+      "classes": 19,
+      "functions": 12,
+      "declared_bounds": [
+        {
+          "line": 28,
+          "expression": "Field(default_factory=list, max_length=16)"
+        },
+        {
+          "line": 37,
+          "expression": "Field(default=90, gt=0, le=300)"
+        },
+        {
+          "line": 42,
+          "expression": "Field(default=16384, ge=256, le=65536)"
+        },
+        {
+          "line": 43,
+          "expression": "Field(default=100, ge=1, le=1000)"
+        },
+        {
+          "line": 44,
+          "expression": "Field(default=10000, ge=1, le=1000000)"
+        },
+        {
+          "line": 45,
+          "expression": "Field(default=16, ge=2, le=128)"
+        },
+        {
+          "line": 46,
+          "expression": "Field(default=8, ge=1, le=32)"
+        },
+        {
+          "line": 47,
+          "expression": "Field(default=4, ge=1, le=16)"
+        },
+        {
+          "line": 48,
+          "expression": "Field(default=24, ge=1, le=1000)"
+        },
+        {
+          "line": 57,
+          "expression": "Field(default=None, min_length=1, max_length=4096)"
+        },
+        {
+          "line": 58,
+          "expression": "Field(default=120, gt=0, le=300)"
+        },
+        {
+          "line": 71,
+          "expression": "Field(default_factory=dict, max_length=16)"
+        },
+        {
+          "line": 72,
+          "expression": "Field(default=2, ge=1, le=8)"
+        },
+        {
+          "line": 73,
+          "expression": "Field(default=64, ge=1, le=1024)"
+        },
+        {
+          "line": 74,
+          "expression": "Field(default=6, ge=1, le=16)"
+        },
+        {
+          "line": 75,
+          "expression": "Field(default=32, ge=1, le=256)"
+        },
+        {
+          "line": 76,
+          "expression": "Field(default=32, ge=1, le=1000)"
+        },
+        {
+          "line": 77,
+          "expression": "Field(default=10000, ge=1, le=1000000)"
+        },
+        {
+          "line": 78,
+          "expression": "Field(default=10000, ge=1, le=1000000)"
+        },
+        {
+          "line": 79,
+          "expression": "Field(default=16384, ge=256, le=65536)"
+        },
+        {
+          "line": 80,
+          "expression": "Field(default=65536, ge=256, le=262144)"
+        },
+        {
+          "line": 81,
+          "expression": "Field(default=4, ge=1, le=4)"
+        },
+        {
+          "line": 82,
+          "expression": "Field(default=24, ge=1, le=1000)"
+        },
+        {
+          "line": 102,
+          "expression": "Field(default=None, max_length=2048)"
+        },
+        {
+          "line": 103,
+          "expression": "Field(default=None, ge=128, le=2048)"
+        },
+        {
+          "line": 157,
+          "expression": "Field(default=2000, ge=10, le=100000)"
+        },
+        {
+          "line": 158,
+          "expression": "Field(default=20000, ge=10, le=1000000)"
+        },
+        {
+          "line": 164,
+          "expression": "Field(default_factory=list, max_length=32)"
+        },
+        {
+          "line": 165,
+          "expression": "Field(default_factory=list, max_length=32)"
+        },
+        {
+          "line": 166,
+          "expression": "Field(default_factory=list, max_length=256)"
+        },
+        {
+          "line": 195,
+          "expression": "Field(default_factory=list, max_length=32)"
+        },
+        {
+          "line": 199,
+          "expression": "Field(default=15, gt=0, le=60)"
+        },
+        {
+          "line": 200,
+          "expression": "Field(default=524288, ge=1024, le=1048576)"
+        },
+        {
+          "line": 211,
+          "expression": "Field(default_factory=dict, max_length=32)"
+        },
+        {
+          "line": 222,
+          "expression": "Field(default_factory=list, max_length=32)"
+        },
+        {
+          "line": 231,
+          "expression": "Field(default=None, max_length=2048)"
+        },
+        {
+          "line": 233,
+          "expression": "Field(default=8767, ge=1024, le=65535)"
+        },
+        {
+          "line": 234,
+          "expression": "Field(\n        default_factory=lambda: [\"grok.com\", \"accounts.x.ai\", \"console.x.ai\"],\n        min_length=1,\n        max_length=16,\n    )"
+        },
+        {
+          "line": 239,
+          "expression": "Field(default=16, ge=1, le=64)"
+        },
+        {
+          "line": 240,
+          "expression": "Field(default=2097152, ge=1024, le=8388608)"
+        },
+        {
+          "line": 284,
+          "expression": "Field(default=60, gt=0, le=86400)"
+        },
+        {
+          "line": 292,
+          "expression": "Field(default=60, gt=0, le=86400)"
+        },
+        {
+          "line": 306,
+          "expression": "Field(min_length=1, max_length=256)"
+        },
+        {
+          "line": 307,
+          "expression": "Field(default=r\"\\[stop\\]|esc to interrupt|Thinking…\", max_length=256)"
+        },
+        {
+          "line": 309,
+          "expression": "Field(default=None, min_length=1, max_length=4096)"
+        },
+        {
+          "line": 326,
+          "expression": "Field(default=16777216, ge=4096, le=1073741824)"
+        },
+        {
+          "line": 327,
+          "expression": "Field(default=256, ge=1, le=100000)"
+        },
+        {
+          "line": 328,
+          "expression": "Field(default=8388608, ge=1024, le=8388608)"
+        },
+        {
+          "line": 329,
+          "expression": "Field(default=604800, ge=60, le=31536000)"
+        },
+        {
+          "line": 338,
+          "expression": "Field(default=2, ge=1, le=32)"
+        },
+        {
+          "line": 339,
+          "expression": "Field(default=1000, ge=1, le=100000)"
+        },
+        {
+          "line": 340,
+          "expression": "Field(default=32, ge=1, le=1000)"
+        },
+        {
+          "line": 341,
+          "expression": "Field(default=32, ge=1, le=1000)"
+        },
+        {
+          "line": 342,
+          "expression": "Field(default=2, ge=1, le=8)"
+        },
+        {
+          "line": 343,
+          "expression": "Field(default=2097152, ge=1024, le=8388608)"
+        },
+        {
+          "line": 345,
+          "expression": "Field(default=30, ge=2, le=600)"
+        },
+        {
+          "line": 347,
+          "expression": "Field(default=8765, ge=1, le=65535)"
+        },
+        {
+          "line": 354,
+          "expression": "Field(default=32, ge=1, le=256)"
+        }
+      ]
+    },
+    {
+      "module": "kirabridge.bridge_core.models",
+      "file": "src/kirabridge/bridge_core/models.py",
+      "lines": 217,
+      "responsibility": "",
+      "internal_dependencies": [],
+      "classes": 29,
+      "functions": 3,
+      "declared_bounds": [
+        {
+          "line": 62,
+          "expression": "Field(min_length=1, max_length=128, pattern=r\"^[a-zA-Z0-9_-]+$\")"
+        },
+        {
+          "line": 63,
+          "expression": "Field(min_length=1, max_length=80)"
+        },
+        {
+          "line": 65,
+          "expression": "Field(min_length=1, max_length=128)"
+        },
+        {
+          "line": 70,
+          "expression": "Field(min_length=1, max_length=256)"
+        },
+        {
+          "line": 72,
+          "expression": "Field(default=60.0, gt=0, le=3600)"
+        },
+        {
+          "line": 73,
+          "expression": "Field(default=65536, ge=0, le=1048576)"
+        },
+        {
+          "line": 86,
+          "expression": "Field(default=65536, ge=1, le=1048576)"
+        },
+        {
+          "line": 90,
+          "expression": "Field(min_length=1, max_length=4096)"
+        },
+        {
+          "line": 94,
+          "expression": "Field(max_length=1048576)"
+        },
+        {
+          "line": 103,
+          "expression": "Field(default=65536, ge=1, le=1048576)"
+        },
+        {
+          "line": 107,
+          "expression": "Field(max_length=1048576)"
+        },
+        {
+          "line": 121,
+          "expression": "Field(min_length=1, max_length=262144)"
+        },
+        {
+          "line": 123,
+          "expression": "Field(default=300.0, gt=0, le=3600)"
+        },
+        {
+          "line": 139,
+          "expression": "Field(min_length=1, max_length=128, pattern=r\"^[a-zA-Z0-9_-]+$\")"
+        },
+        {
+          "line": 152,
+          "expression": "Field(default=None, min_length=1, max_length=128)"
+        },
+        {
+          "line": 153,
+          "expression": "Field(ge=0)"
+        },
+        {
+          "line": 158,
+          "expression": "Field(min_length=1, max_length=128, pattern=r\"^[a-zA-Z0-9_-]+$\")"
+        },
+        {
+          "line": 160,
+          "expression": "Field(min_length=1, max_length=128, pattern=r\"^[a-zA-Z0-9_-]+$\")"
+        },
+        {
+          "line": 161,
+          "expression": "Field(ge=0, strict=True)"
+        },
+        {
+          "line": 166,
+          "expression": "Field(min_length=1, max_length=16)"
+        },
+        {
+          "line": 167,
+          "expression": "Field(default=0, ge=0, lt=2**63, strict=True)"
+        },
+        {
+          "line": 168,
+          "expression": "Field(default=100, ge=1, le=500, strict=True)"
+        },
+        {
+          "line": 169,
+          "expression": "Field(default=None, ge=0, lt=2**63, strict=True)"
+        },
+        {
+          "line": 173,
+          "expression": "Field(min_length=1, max_length=128, pattern=r\"^[a-zA-Z0-9_-]+$\")"
+        },
+        {
+          "line": 174,
+          "expression": "Field(min_length=1, max_length=128, pattern=r\"^[a-zA-Z0-9_-]+$\")"
+        },
+        {
+          "line": 175,
+          "expression": "Field(ge=0)"
+        },
+        {
+          "line": 180,
+          "expression": "Field(min_length=1, max_length=128, pattern=r\"^[a-zA-Z0-9_-]+$\")"
+        },
+        {
+          "line": 181,
+          "expression": "Field(ge=1)"
+        },
+        {
+          "line": 191,
+          "expression": "Field(default=120.0, gt=0, le=300)"
+        },
+        {
+          "line": 195,
+          "expression": "Field(min_length=1, max_length=128, pattern=r\"^[a-zA-Z0-9_-]+$\")"
+        },
+        {
+          "line": 196,
+          "expression": "Field(min_length=1, max_length=128, pattern=r\"^[a-zA-Z0-9_-]+$\")"
+        },
+        {
+          "line": 197,
+          "expression": "Field(min_length=1, max_length=10000)"
+        },
+        {
+          "line": 198,
+          "expression": "Field(default=120.0, gt=0, le=300)"
+        },
+        {
+          "line": 202,
+          "expression": "Field(min_length=1, max_length=128, pattern=r\"^[a-zA-Z0-9_-]+$\")"
+        },
+        {
+          "line": 204,
+          "expression": "Field(min_length=1, max_length=10000)"
+        },
+        {
+          "line": 209,
+          "expression": "Field(min_length=1, max_length=10000)"
+        },
+        {
+          "line": 210,
+          "expression": "Field(default_factory=list, max_length=32)"
+        },
+        {
+          "line": 211,
+          "expression": "Field(default_factory=list, max_length=32)"
+        },
+        {
+          "line": 212,
+          "expression": "Field(default_factory=list, max_length=32)"
+        },
+        {
+          "line": 216,
+          "expression": "Field(default=0, ge=0, le=1000000)"
+        },
+        {
+          "line": 217,
+          "expression": "Field(default=20, ge=1, le=50)"
+        }
+      ]
+    },
+    {
+      "module": "kirabridge.chatgpt_setup",
+      "file": "src/kirabridge/chatgpt_setup.py",
+      "lines": 380,
+      "responsibility": "Explicit local account linking. Never takes a literal runtime key in command arguments.",
+      "internal_dependencies": [
+        "kirabridge.bridge_core.config",
+        "kirabridge.bridge_core.models",
+        "kirabridge.install_ui",
+        "kirabridge.local_runtime",
+        "kirabridge.setup_dependencies",
+        "kirabridge.task_manager.store"
+      ],
+      "classes": 0,
+      "functions": 8,
+      "declared_bounds": [
+        {
+          "line": 55,
+          "expression": "subprocess.run(\n        [binary, \"runtimes\", \"status\", \"kirabridge\", \"--json\"],\n        capture_output=True,\n        text=True,\n        timeout=15,\n    )"
+        },
+        {
+          "line": 184,
+          "expression": "subprocess.run(\n        [\n            binary,\n            \"runtimes\",\n            \"connect\",\n            \"--alias\",\n            \"kirabridge\",\n            \"--tunnel-id\",\n            tunnel_id,\n            \"--runtime-api-k"
+        },
+        {
+          "line": 90,
+          "expression": "subprocess.run(\n                [\n                    sys.executable,\n                    \"-m\",\n                    \"kirabridge.cli\",\n                    \"--config\",\n                    str(config_path),\n                "
+        },
+        {
+          "line": 164,
+          "expression": "subprocess.run(\n                [\"/bin/launchctl\", \"kickstart\", \"-k\", f\"gui/{os.getuid()}/{LABEL}\"],\n                capture_output=True,\n                timeout=15,\n            )"
+        }
+      ]
+    },
+    {
+      "module": "kirabridge.cli",
+      "file": "src/kirabridge/cli.py",
+      "lines": 744,
+      "responsibility": "",
+      "internal_dependencies": [
+        "kirabridge",
+        "kirabridge.audit_manager",
+        "kirabridge.bridge_core.bridge",
+        "kirabridge.bridge_core.config",
+        "kirabridge.bridge_core.models",
+        "kirabridge.chatgpt_setup",
+        "kirabridge.completion_client",
+        "kirabridge.console_runtime",
+        "kirabridge.diagnostics",
+        "kirabridge.grok_connector",
+        "kirabridge.grok_connector.auth_store",
+        "kirabridge.grok_connector.runtime",
+        "kirabridge.installation",
+        "kirabridge.local_runtime",
+        "kirabridge.mcp_gateway.client",
+        "kirabridge.mcp_gateway.http",
+        "kirabridge.mcp_gateway.proxy",
+        "kirabridge.mcp_gateway.server",
+        "kirabridge.message_manager",
+        "kirabridge.platform_adapters",
+        "kirabridge.readiness"
+      ],
+      "classes": 0,
+      "functions": 5,
+      "declared_bounds": [
+        {
+          "line": 197,
+          "expression": "client.listen(\n                args.target, lambda notice: emit(notice), once=args.once, timeout=args.timeout\n            )"
+        }
+      ]
+    },
+    {
+      "module": "kirabridge.clipboard_manager",
+      "file": "src/kirabridge/clipboard_manager/__init__.py",
+      "lines": 90,
+      "responsibility": "",
+      "internal_dependencies": [
+        "kirabridge.bridge_core.models",
+        "kirabridge.platform_adapters",
+        "kirabridge.terminal_manager"
+      ],
+      "classes": 1,
+      "functions": 5,
+      "declared_bounds": []
+    },
+    {
+      "module": "kirabridge.completion_client",
+      "file": "src/kirabridge/completion_client.py",
+      "lines": 73,
+      "responsibility": "Standing return-channel consumer. It invokes a callback, then acknowledges.",
+      "internal_dependencies": [
+        "kirabridge.bridge_core.models",
+        "kirabridge.mcp_gateway.client"
+      ],
+      "classes": 1,
+      "functions": 5,
+      "declared_bounds": []
+    },
+    {
+      "module": "kirabridge.completion_manager",
+      "file": "src/kirabridge/completion_manager.py",
+      "lines": 263,
+      "responsibility": "Durable owner-scoped completion outbox; client receipt is not assistant wake-up.",
+      "internal_dependencies": [
+        "kirabridge.bridge_core.models"
+      ],
+      "classes": 1,
+      "functions": 10,
+      "declared_bounds": []
+    },
+    {
+      "module": "kirabridge.configured_workflow",
+      "file": "src/kirabridge/configured_workflow.py",
+      "lines": 312,
+      "responsibility": "Fixed operator project mapping for optional owned CLI stop control.",
+      "internal_dependencies": [
+        "kirabridge.bridge_core.models",
+        "kirabridge.workflow_control_adapter"
+      ],
+      "classes": 1,
+      "functions": 10,
+      "declared_bounds": []
+    },
+    {
+      "module": "kirabridge.console_runtime",
+      "file": "src/kirabridge/console_runtime.py",
+      "lines": 205,
+      "responsibility": "Private browser login and a separate, loopback-only local operator service.",
+      "internal_dependencies": [
+        "kirabridge.approval_console",
+        "kirabridge.bridge_core.bridge",
+        "kirabridge.bridge_core.config",
+        "kirabridge.bridge_core.models",
+        "kirabridge.local_runtime",
+        "kirabridge.operator_application"
+      ],
+      "classes": 0,
+      "functions": 5,
+      "declared_bounds": [
+        {
+          "line": 82,
+          "expression": "subprocess.run(\n        [\"/bin/launchctl\", \"print\", f\"{target}/{LABEL}\"], capture_output=True, timeout=10\n    )"
+        },
+        {
+          "line": 90,
+          "expression": "subprocess.run(command, capture_output=True, timeout=15)"
+        },
+        {
+          "line": 119,
+          "expression": "httpx.Client(trust_env=False, timeout=2, follow_redirects=False)"
+        },
+        {
+          "line": 154,
+          "expression": "subprocess.run(\n            [\"/usr/bin/open\", \"-a\", str(native)],\n            capture_output=True,\n            timeout=10,\n        )"
+        },
+        {
+          "line": 161,
+          "expression": "subprocess.run(\n            [\"/usr/bin/open\", str(destination)], capture_output=True, timeout=10\n        )"
+        }
+      ]
+    },
+    {
+      "module": "kirabridge.control_center",
+      "file": "src/kirabridge/control_center.py",
+      "lines": 115,
+      "responsibility": "Authenticated HTTP presentation for the local operator application.",
+      "internal_dependencies": [
+        "kirabridge.approval_console",
+        "kirabridge.bridge_core.models",
+        "kirabridge.operations_service"
+      ],
+      "classes": 1,
+      "functions": 13,
+      "declared_bounds": []
+    },
+    {
+      "module": "kirabridge.development_status",
+      "file": "src/kirabridge/development_status.py",
+      "lines": 366,
+      "responsibility": "Bounded metadata views, never an attach/terminate or configuration endpoint.",
+      "internal_dependencies": [
+        "kirabridge.bridge_core.models",
+        "kirabridge.permissions",
+        "kirabridge.terminal_access"
+      ],
+      "classes": 0,
+      "functions": 8,
+      "declared_bounds": [
+        {
+          "line": 168,
+          "expression": "asyncio.wait_for(process.wait(), timeout=0.5)"
+        }
+      ]
+    },
+    {
+      "module": "kirabridge.diagnostics",
+      "file": "src/kirabridge/diagnostics.py",
+      "lines": 302,
+      "responsibility": "Bounded metadata in the existing audit chain; reports are views, not a second log.",
+      "internal_dependencies": [
+        "kirabridge.bridge_core.models",
+        "kirabridge.local_runtime",
+        "kirabridge.task_manager.store"
+      ],
+      "classes": 1,
+      "functions": 9,
+      "declared_bounds": []
+    },
+    {
+      "module": "kirabridge.discovery",
+      "file": "src/kirabridge/discovery.py",
+      "lines": 160,
+      "responsibility": "One principal-scoped truth about grants, execution routes and fresh observations.",
+      "internal_dependencies": [
+        "kirabridge",
+        "kirabridge.bridge_core.models",
+        "kirabridge.permissions"
+      ],
+      "classes": 0,
+      "functions": 3,
+      "declared_bounds": []
+    },
+    {
+      "module": "kirabridge.event_push",
+      "file": "src/kirabridge/event_push.py",
+      "lines": 624,
+      "responsibility": "Optional host-subscribed webhooks over the immutable completion archive.",
+      "internal_dependencies": [],
+      "classes": 5,
+      "functions": 26,
+      "declared_bounds": [
+        {
+          "line": 133,
+          "expression": "httpx.AsyncClient(\n                transport=transport, trust_env=False, follow_redirects=False, timeout=10\n            )"
+        },
+        {
+          "line": 220,
+          "expression": "sqlite3.connect(path, isolation_level=None, timeout=5)"
+        }
+      ]
+    },
+    {
+      "module": "kirabridge.event_queue",
+      "file": "src/kirabridge/event_queue.py",
+      "lines": 134,
+      "responsibility": "Owner-only webhook delivery queue views; no callback secrets or invented UI receipts.",
+      "internal_dependencies": [
+        "kirabridge.event_push"
+      ],
+      "classes": 0,
+      "functions": 6,
+      "declared_bounds": []
+    },
+    {
+      "module": "kirabridge.file_transfer",
+      "file": "src/kirabridge/file_transfer/__init__.py",
+      "lines": 1,
+      "responsibility": "Explicit source-to-ThreadDesk byte transfer through narrow versioned ports.",
+      "internal_dependencies": [],
+      "classes": 0,
+      "functions": 0,
+      "declared_bounds": []
+    },
+    {
+      "module": "kirabridge.file_transfer.authorization",
+      "file": "src/kirabridge/file_transfer/authorization.py",
+      "lines": 60,
+      "responsibility": "Existing policy authority plus explicit, independently configured source/destination scopes.",
+      "internal_dependencies": [
+        "kirabridge.bridge_core.models",
+        "kirabridge.file_transfer.integrity",
+        "kirabridge.filesystem_manager"
+      ],
+      "classes": 1,
+      "functions": 5,
+      "declared_bounds": []
+    },
+    {
+      "module": "kirabridge.file_transfer.diagnostics",
+      "file": "src/kirabridge/file_transfer/diagnostics.py",
+      "lines": 12,
+      "responsibility": "Whitelisted progress/receipt view: never include source capabilities or byte contents.",
+      "internal_dependencies": [],
+      "classes": 0,
+      "functions": 1,
+      "declared_bounds": []
+    },
+    {
+      "module": "kirabridge.file_transfer.integrity",
+      "file": "src/kirabridge/file_transfer/integrity.py",
+      "lines": 182,
+      "responsibility": "Bounded raw-byte integrity, safe logical paths, secret and archive validation.",
+      "internal_dependencies": [
+        "kirabridge.bridge_core.models",
+        "kirabridge.file_transfer.models",
+        "kirabridge.filesystem_manager"
+      ],
+      "classes": 1,
+      "functions": 8,
+      "declared_bounds": []
+    },
+    {
+      "module": "kirabridge.file_transfer.models",
+      "file": "src/kirabridge/file_transfer/models.py",
+      "lines": 64,
+      "responsibility": "Stable metadata and input shapes; download capabilities never enter task arguments.",
+      "internal_dependencies": [],
+      "classes": 7,
+      "functions": 0,
+      "declared_bounds": [
+        {
+          "line": 18,
+          "expression": "Field(min_length=1, max_length=8192, repr=False)"
+        },
+        {
+          "line": 19,
+          "expression": "Field(min_length=1, max_length=256)"
+        },
+        {
+          "line": 20,
+          "expression": "Field(default=\"\", max_length=256)"
+        },
+        {
+          "line": 21,
+          "expression": "Field(default=\"\", max_length=255)"
+        },
+        {
+          "line": 27,
+          "expression": "Field(default=\"\", max_length=2048)"
+        },
+        {
+          "line": 28,
+          "expression": "Field(default=None, max_length=4096)"
+        },
+        {
+          "line": 29,
+          "expression": "Field(default=None, max_length=256)"
+        },
+        {
+          "line": 38,
+          "expression": "Field(default=\"\", max_length=64)"
+        },
+        {
+          "line": 39,
+          "expression": "Field(default=100, ge=1, le=100)"
+        },
+        {
+          "line": 46,
+          "expression": "Field(ge=0)"
+        },
+        {
+          "line": 58,
+          "expression": "Field(default=2 * 1024**3, ge=1, le=64 * 1024**3)"
+        },
+        {
+          "line": 59,
+          "expression": "Field(default=2048, ge=1, le=100000)"
+        },
+        {
+          "line": 60,
+          "expression": "Field(default=8 * 1024**3, ge=1, le=256 * 1024**3)"
+        },
+        {
+          "line": 61,
+          "expression": "Field(default=256 * 1024, ge=16384, le=1024 * 1024)"
+        },
+        {
+          "line": 62,
+          "expression": "Field(default=10000, ge=1, le=100000)"
+        },
+        {
+          "line": 63,
+          "expression": "Field(default=8 * 1024**3, ge=1, le=128 * 1024**3)"
+        },
+        {
+          "line": 64,
+          "expression": "Field(default=200, ge=1, le=10000)"
+        }
+      ]
+    },
+    {
+      "module": "kirabridge.file_transfer.ports",
+      "file": "src/kirabridge/file_transfer/ports.py",
+      "lines": 29,
+      "responsibility": "Dependency direction: domain/service depend on protocols, never the Bridge/UI.",
+      "internal_dependencies": [
+        "kirabridge.file_transfer.models"
+      ],
+      "classes": 2,
+      "functions": 9,
+      "declared_bounds": []
+    },
+    {
+      "module": "kirabridge.file_transfer.protocol",
+      "file": "src/kirabridge/file_transfer/protocol.py",
+      "lines": 118,
+      "responsibility": "Strict checkpoint/receipt validation: transmitted bytes are not a stored import.",
+      "internal_dependencies": [
+        "kirabridge.bridge_core.models",
+        "kirabridge.file_transfer.models"
+      ],
+      "classes": 0,
+      "functions": 2,
+      "declared_bounds": []
+    },
+    {
+      "module": "kirabridge.file_transfer.repository",
+      "file": "src/kirabridge/file_transfer/repository.py",
+      "lines": 118,
+      "responsibility": "Principal-scoped additive checkpoints in the existing durable task database.",
+      "internal_dependencies": [
+        "kirabridge.bridge_core.models",
+        "kirabridge.file_transfer.diagnostics"
+      ],
+      "classes": 1,
+      "functions": 8,
+      "declared_bounds": []
+    },
+    {
+      "module": "kirabridge.file_transfer.service",
+      "file": "src/kirabridge/file_transfer/service.py",
+      "lines": 376,
+      "responsibility": "Snapshot, hash, stream and reconcile files through injected narrow partners.",
+      "internal_dependencies": [
+        "kirabridge.bridge_core.config",
+        "kirabridge.bridge_core.models",
+        "kirabridge.file_transfer.integrity",
+        "kirabridge.file_transfer.models",
+        "kirabridge.file_transfer.protocol"
+      ],
+      "classes": 1,
+      "functions": 6,
+      "declared_bounds": []
+    },
+    {
+      "module": "kirabridge.file_transfer.sources",
+      "file": "src/kirabridge/file_transfer/sources.py",
+      "lines": 278,
+      "responsibility": "Read-only selected-file/export adapters; no account crawling or stored signed URLs.",
+      "internal_dependencies": [
+        "kirabridge.bridge_core.models",
+        "kirabridge.file_transfer.integrity",
+        "kirabridge.file_transfer.models",
+        "kirabridge.filesystem_manager"
+      ],
+      "classes": 4,
+      "functions": 13,
+      "declared_bounds": [
+        {
+          "line": 95,
+          "expression": "httpx.AsyncClient(\n                transport=transport,\n                trust_env=False,\n                follow_redirects=False,\n                timeout=httpx.Timeout(60, connect=15),\n            )"
+        }
+      ]
+    },
+    {
+      "module": "kirabridge.file_transfer.threaddesk",
+      "file": "src/kirabridge/file_transfer/threaddesk.py",
+      "lines": 241,
+      "responsibility": "Versioned file sink over the existing operator-authorized ThreadDesk MCP owner.",
+      "internal_dependencies": [
+        "kirabridge.bridge_core.models",
+        "kirabridge.file_transfer.models"
+      ],
+      "classes": 1,
+      "functions": 12,
+      "declared_bounds": []
+    },
+    {
+      "module": "kirabridge.filesystem_manager",
+      "file": "src/kirabridge/filesystem_manager/__init__.py",
+      "lines": 172,
+      "responsibility": "",
+      "internal_dependencies": [
+        "kirabridge.bridge_core.models"
+      ],
+      "classes": 2,
+      "functions": 10,
+      "declared_bounds": []
+    },
+    {
+      "module": "kirabridge.grok_connector",
+      "file": "src/kirabridge/grok_connector/__init__.py",
+      "lines": 28,
+      "responsibility": "Grok mobile/web MCP access, distinct from the managed Grok CLI worker.",
+      "internal_dependencies": [
+        "kirabridge.bridge_core.config",
+        "kirabridge.bridge_core.models",
+        "kirabridge.local_runtime"
+      ],
+      "classes": 0,
+      "functions": 2,
+      "declared_bounds": []
+    },
+    {
+      "module": "kirabridge.grok_connector.administration",
+      "file": "src/kirabridge/grok_connector/administration.py",
+      "lines": 88,
+      "responsibility": "Local connector administration; owns OAuth storage access for both UI routes.",
+      "internal_dependencies": [
+        "kirabridge.bridge_core.models",
+        "kirabridge.grok_connector",
+        "kirabridge.grok_connector.auth_store"
+      ],
+      "classes": 1,
+      "functions": 6,
+      "declared_bounds": []
+    },
+    {
+      "module": "kirabridge.grok_connector.auth_store",
+      "file": "src/kirabridge/grok_connector/auth_store.py",
+      "lines": 791,
+      "responsibility": "Owner-only, durable OAuth state. Bearer and refresh credentials are stored as hashes.",
+      "internal_dependencies": [
+        "kirabridge.bridge_core.config",
+        "kirabridge.bridge_core.models"
+      ],
+      "classes": 2,
+      "functions": 29,
+      "declared_bounds": [
+        {
+          "line": 154,
+          "expression": "sqlite3.connect(path, isolation_level=None, timeout=5, check_same_thread=False)"
+        }
+      ]
+    },
+    {
+      "module": "kirabridge.grok_connector.console",
+      "file": "src/kirabridge/grok_connector/console.py",
+      "lines": 353,
+      "responsibility": "One-time Grok connector consent inside the existing local operator console.",
+      "internal_dependencies": [
+        "kirabridge.bridge_core.models"
+      ],
+      "classes": 1,
+      "functions": 8,
+      "declared_bounds": []
+    },
+    {
+      "module": "kirabridge.grok_connector.conversation",
+      "file": "src/kirabridge/grok_connector/conversation.py",
+      "lines": 288,
+      "responsibility": "Return completed work inside Grok's tool turn, without replaying that work.",
+      "internal_dependencies": [
+        "kirabridge",
+        "kirabridge.bridge_core.models",
+        "kirabridge.platform_adapters.desktop"
+      ],
+      "classes": 0,
+      "functions": 4,
+      "declared_bounds": [
+        {
+          "line": 59,
+          "expression": "bridge.tasks.wait(principal, task[\"id\"], timeout=WAIT_SECONDS)"
+        },
+        {
+          "line": 218,
+          "expression": "channel.receive(\n                        principal,\n                        after=reply[\"seq\"] - 1,\n                        limit=1,\n                        conversation_id=reply[\"conversation_id\"],\n                    )"
+        }
+      ]
+    },
+    {
+      "module": "kirabridge.grok_connector.gateway",
+      "file": "src/kirabridge/grok_connector/gateway.py",
+      "lines": 614,
+      "responsibility": "OAuth-protected, fixed-identity MCP gateway for an external Grok application.",
+      "internal_dependencies": [
+        "kirabridge",
+        "kirabridge.bridge_core.config",
+        "kirabridge.bridge_core.models",
+        "kirabridge.grok_connector",
+        "kirabridge.grok_connector.auth_store",
+        "kirabridge.grok_connector.provider",
+        "kirabridge.local_runtime"
+      ],
+      "classes": 5,
+      "functions": 20,
+      "declared_bounds": [
+        {
+          "line": 347,
+          "expression": "httpx.AsyncClient(\n            transport=transport,\n            trust_env=False,\n            follow_redirects=False,\n            timeout=httpx.Timeout(30, connect=5),\n            verify=verify,\n        )"
+        }
+      ]
+    },
+    {
+      "module": "kirabridge.grok_connector.provider",
+      "file": "src/kirabridge/grok_connector/provider.py",
+      "lines": 55,
+      "responsibility": "MCP SDK OAuth provider, with persistent single-use grants and rotated token families.",
+      "internal_dependencies": [
+        "kirabridge.grok_connector.auth_store"
+      ],
+      "classes": 1,
+      "functions": 10,
+      "declared_bounds": []
+    },
+    {
+      "module": "kirabridge.grok_connector.runtime",
+      "file": "src/kirabridge/grok_connector/runtime.py",
+      "lines": 602,
+      "responsibility": "Local operator setup and a separately supervised, authenticated Grok app gateway.",
+      "internal_dependencies": [
+        "kirabridge.bridge_core.config",
+        "kirabridge.bridge_core.models",
+        "kirabridge.grok_connector",
+        "kirabridge.grok_connector.auth_store",
+        "kirabridge.grok_connector.gateway",
+        "kirabridge.local_runtime",
+        "kirabridge.platform_adapters"
+      ],
+      "classes": 0,
+      "functions": 12,
+      "declared_bounds": [
+        {
+          "line": 459,
+          "expression": "subprocess.run(command, capture_output=True, timeout=20)"
+        },
+        {
+          "line": 95,
+          "expression": "sqlite3.connect(path.as_uri() + \"?mode=ro\", uri=True, timeout=2)"
+        },
+        {
+          "line": 270,
+          "expression": "httpx.get(\n                f\"http://127.0.0.1:{settings.port}/health\", timeout=3, trust_env=False\n            )"
+        },
+        {
+          "line": 345,
+          "expression": "asyncio.to_thread(\n            subprocess.run,\n            [\"launchctl\", \"print\", f\"gui/{os.getuid()}/{LABEL}\"],\n            capture_output=True,\n            timeout=5,\n        )"
+        },
+        {
+          "line": 352,
+          "expression": "asyncio.to_thread(\n                subprocess.run,\n                [\"launchctl\", \"bootstrap\", f\"gui/{os.getuid()}\", str(path)],\n                check=True,\n                capture_output=True,\n                timeout=15,"
+        },
+        {
+          "line": 375,
+          "expression": "asyncio.to_thread(\n            subprocess.run,\n            [\"systemctl\", \"--user\", \"daemon-reload\"],\n            check=True,\n            capture_output=True,\n            timeout=10,\n        )"
+        },
+        {
+          "line": 382,
+          "expression": "asyncio.to_thread(\n            subprocess.run,\n            [\"systemctl\", \"--user\", \"enable\", \"--now\", unit.name],\n            check=True,\n            capture_output=True,\n            timeout=15,\n        )"
+        }
+      ]
+    },
+    {
+      "module": "kirabridge.handoff_manager",
+      "file": "src/kirabridge/handoff_manager.py",
+      "lines": 715,
+      "responsibility": "Issued ThreadDesk context to an owned, bounded Codex workflow.",
+      "internal_dependencies": [
+        "kirabridge.bridge_core.models",
+        "kirabridge.filesystem_manager",
+        "kirabridge.permissions",
+        "kirabridge.terminal_manager",
+        "kirabridge.workflow_control_adapter"
+      ],
+      "classes": 1,
+      "functions": 18,
+      "declared_bounds": [
+        {
+          "line": 400,
+          "expression": "AgentInput(\n                    agent=metadata[\"agent\"], cwd=metadata[\"cwd\"], prompt=prompt, timeout=timeout\n                )"
+        }
+      ]
+    },
+    {
+      "module": "kirabridge.image_manager",
+      "file": "src/kirabridge/image_manager.py",
+      "lines": 217,
+      "responsibility": "Bounded PNG snapshots through the existing descriptor and task boundaries.",
+      "internal_dependencies": [
+        "kirabridge.bridge_core.models",
+        "kirabridge.filesystem_manager"
+      ],
+      "classes": 1,
+      "functions": 4,
+      "declared_bounds": []
+    },
+    {
+      "module": "kirabridge.install_ui",
+      "file": "src/kirabridge/install_ui.py",
+      "lines": 303,
+      "responsibility": "Human setup output is stderr-only; never used by MCP transports.",
+      "internal_dependencies": [
+        "kirabridge",
+        "kirabridge.terminal_design"
+      ],
+      "classes": 1,
+      "functions": 23,
+      "declared_bounds": []
+    },
+    {
+      "module": "kirabridge.installation",
+      "file": "src/kirabridge/installation.py",
+      "lines": 314,
+      "responsibility": "One guided flow over existing local setup and ChatGPT setup; managed files only.",
+      "internal_dependencies": [
+        "kirabridge.bridge_core.config",
+        "kirabridge.bridge_core.models",
+        "kirabridge.chatgpt_setup",
+        "kirabridge.install_ui",
+        "kirabridge.local_runtime",
+        "kirabridge.task_manager.store"
+      ],
+      "classes": 0,
+      "functions": 5,
+      "declared_bounds": [
+        {
+          "line": 111,
+          "expression": "subprocess.run(argv, capture_output=True, timeout=20)"
+        },
+        {
+          "line": 182,
+          "expression": "subprocess.run(argv, capture_output=True, timeout=20)"
+        }
+      ]
+    },
+    {
+      "module": "kirabridge.local_runtime",
+      "file": "src/kirabridge/local_runtime.py",
+      "lines": 208,
+      "responsibility": "Private local credentials, daemon clients and macOS service installation.",
+      "internal_dependencies": [
+        "kirabridge.bridge_core.config",
+        "kirabridge.bridge_core.models",
+        "kirabridge.diagnostics",
+        "kirabridge.mcp_gateway.client",
+        "kirabridge.private_files",
+        "kirabridge.readiness"
+      ],
+      "classes": 0,
+      "functions": 8,
+      "declared_bounds": [
+        {
+          "line": 201,
+          "expression": "subprocess.run(\n            [\"/bin/launchctl\", \"bootstrap\", target, str(plist_path)],\n            capture_output=True,\n            timeout=15,\n        )"
+        }
+      ]
+    },
+    {
+      "module": "kirabridge.mcp_gateway",
+      "file": "src/kirabridge/mcp_gateway/__init__.py",
+      "lines": 0,
+      "responsibility": "",
+      "internal_dependencies": [],
+      "classes": 0,
+      "functions": 0,
+      "declared_bounds": []
+    },
+    {
+      "module": "kirabridge.mcp_gateway.client",
+      "file": "src/kirabridge/mcp_gateway/client.py",
+      "lines": 426,
+      "responsibility": "",
+      "internal_dependencies": [
+        "kirabridge.bridge_core.models"
+      ],
+      "classes": 3,
+      "functions": 17,
+      "declared_bounds": [
+        {
+          "line": 155,
+          "expression": "httpx.AsyncClient(\n                                headers={\"Authorization\": f\"Bearer {peer.token}\"}\n                                if peer.token\n                                else {},\n                                "
+        }
+      ]
+    },
+    {
+      "module": "kirabridge.mcp_gateway.file_tools",
+      "file": "src/kirabridge/mcp_gateway/file_tools.py",
+      "lines": 216,
+      "responsibility": "MCP file-tool registration; knows only the file-transfer owner and narrow gateway ports.",
+      "internal_dependencies": [
+        "kirabridge.bridge_core.models",
+        "kirabridge.file_transfer.models"
+      ],
+      "classes": 0,
+      "functions": 12,
+      "declared_bounds": [
+        {
+          "line": 195,
+          "expression": "InventoryInput(after=after, limit=limit)"
+        }
+      ]
+    },
+    {
+      "module": "kirabridge.mcp_gateway.http",
+      "file": "src/kirabridge/mcp_gateway/http.py",
+      "lines": 51,
+      "responsibility": "",
+      "internal_dependencies": [
+        "kirabridge.bridge_core.bridge",
+        "kirabridge.bridge_core.models",
+        "kirabridge.mcp_gateway.server"
+      ],
+      "classes": 1,
+      "functions": 4,
+      "declared_bounds": []
+    },
+    {
+      "module": "kirabridge.mcp_gateway.proxy",
+      "file": "src/kirabridge/mcp_gateway/proxy.py",
+      "lines": 211,
+      "responsibility": "Stdio connection to the shared daemon; tokens stay out of agent configuration files.",
+      "internal_dependencies": [
+        "kirabridge.bridge_core.models",
+        "kirabridge.local_runtime",
+        "kirabridge.mcp_gateway.client"
+      ],
+      "classes": 1,
+      "functions": 10,
+      "declared_bounds": []
+    },
+    {
+      "module": "kirabridge.mcp_gateway.queue_tools",
+      "file": "src/kirabridge/mcp_gateway/queue_tools.py",
+      "lines": 102,
+      "responsibility": "Owner-scoped queue tooling, separate from terminal and receiver implementations.",
+      "internal_dependencies": [
+        "kirabridge.bridge_core.models",
+        "kirabridge.queue_management.models"
+      ],
+      "classes": 0,
+      "functions": 6,
+      "declared_bounds": []
+    },
+    {
+      "module": "kirabridge.mcp_gateway.server",
+      "file": "src/kirabridge/mcp_gateway/server.py",
+      "lines": 874,
+      "responsibility": "",
+      "internal_dependencies": [
+        "kirabridge",
+        "kirabridge.bridge_core.bridge",
+        "kirabridge.bridge_core.models",
+        "kirabridge.development_status",
+        "kirabridge.diagnostics",
+        "kirabridge.discovery",
+        "kirabridge.grok_connector.conversation",
+        "kirabridge.image_manager",
+        "kirabridge.mcp_gateway.file_tools",
+        "kirabridge.mcp_gateway.queue_tools",
+        "kirabridge.message_manager",
+        "kirabridge.operations",
+        "kirabridge.permissions",
+        "kirabridge.read_query",
+        "kirabridge.readiness",
+        "kirabridge.team_manager.models",
+        "kirabridge.terminal_access",
+        "kirabridge.terminal_queries",
+        "kirabridge.threaddesk_dynamic"
+      ],
+      "classes": 0,
+      "functions": 59,
+      "declared_bounds": []
+    },
+    {
+      "module": "kirabridge.message_manager",
+      "file": "src/kirabridge/message_manager/__init__.py",
+      "lines": 504,
+      "responsibility": "Durable, addressed agent messages. Payloads are data, never shell commands.",
+      "internal_dependencies": [
+        "kirabridge.bridge_core.models",
+        "kirabridge.completion_manager",
+        "kirabridge.permissions",
+        "kirabridge.visible_message_evidence",
+        "kirabridge.voice_channel",
+        "kirabridge.voice_message_policy"
+      ],
+      "classes": 2,
+      "functions": 15,
+      "declared_bounds": [
+        {
+          "line": 17,
+          "expression": "Field(min_length=1, max_length=80, pattern=r\"^[a-z][a-z0-9_-]*$\")"
+        },
+        {
+          "line": 18,
+          "expression": "Field(min_length=1, max_length=128, pattern=r\"^[\\w-]+$\")"
+        },
+        {
+          "line": 19,
+          "expression": "Field(min_length=1, max_length=128)"
+        },
+        {
+          "line": 20,
+          "expression": "Field(min_length=1, max_length=65536)"
+        },
+        {
+          "line": 22,
+          "expression": "Field(default=None, min_length=1, max_length=128, pattern=r\"^[\\w-]+$\")"
+        },
+        {
+          "line": 23,
+          "expression": "Field(default=None, min_length=1, max_length=128)"
+        },
+        {
+          "line": 24,
+          "expression": "Field(default=None, min_length=1, max_length=128)"
+        }
+      ]
+    },
+    {
+      "module": "kirabridge.message_manager.receiver",
+      "file": "src/kirabridge/message_manager/receiver.py",
+      "lines": 672,
+      "responsibility": "One bounded worker per recipient; replies use authenticated recipient MCP.",
+      "internal_dependencies": [
+        "kirabridge.bridge_core.models",
+        "kirabridge.completion_manager",
+        "kirabridge.local_runtime",
+        "kirabridge.mcp_gateway.client",
+        "kirabridge.message_manager"
+      ],
+      "classes": 1,
+      "functions": 18,
+      "declared_bounds": [
+        {
+          "line": 569,
+          "expression": "AgentInput(\n                agent=recipient, prompt=prompt, cwd=receiver.cwd, timeout=receiver.timeout\n            )"
+        }
+      ]
+    },
+    {
+      "module": "kirabridge.observation_export",
+      "file": "src/kirabridge/observation_export.py",
+      "lines": 487,
+      "responsibility": "Bounded views of existing owned audit records; no Store, queue or runtime writes.",
+      "internal_dependencies": [
+        "kirabridge.bridge_core.models"
+      ],
+      "classes": 0,
+      "functions": 13,
+      "declared_bounds": [
+        {
+          "line": 257,
+          "expression": "export_configured_observations(\n        bridge.config,\n        principal,\n        task_ids=task_ids,\n        cursor=cursor,\n        limit=limit,\n        through_seq=through_seq,\n    )"
+        },
+        {
+          "line": 292,
+          "expression": "sqlite3.connect(\n            path.as_uri() + \"?mode=ro\", uri=True, timeout=0.2, isolation_level=None\n        )"
+        }
+      ]
+    },
+    {
+      "module": "kirabridge.operations",
+      "file": "src/kirabridge/operations.py",
+      "lines": 123,
+      "responsibility": "Operation properties shared by authorization, catalog and dispatch.",
+      "internal_dependencies": [],
+      "classes": 1,
+      "functions": 3,
+      "declared_bounds": []
+    },
+    {
+      "module": "kirabridge.operations_service",
+      "file": "src/kirabridge/operations_service.py",
+      "lines": 574,
+      "responsibility": "Local configuration ownership and coordinated, durable core activation.",
+      "internal_dependencies": [
+        "kirabridge.bridge_core.bridge",
+        "kirabridge.bridge_core.config",
+        "kirabridge.bridge_core.models",
+        "kirabridge.grok_connector.runtime",
+        "kirabridge.local_runtime",
+        "kirabridge.operations",
+        "kirabridge.permissions",
+        "kirabridge.task_manager.store"
+      ],
+      "classes": 1,
+      "functions": 16,
+      "declared_bounds": [
+        {
+          "line": 377,
+          "expression": "self.rpc(\"bridge_health\", timeout=2)"
+        },
+        {
+          "line": 273,
+          "expression": "self.rpc(\"bridge_health\", timeout=2)"
+        }
+      ]
+    },
+    {
+      "module": "kirabridge.operator_actions",
+      "file": "src/kirabridge/operator_actions.py",
+      "lines": 153,
+      "responsibility": "Durable local operator actions, separate from HTTP and platform execution.",
+      "internal_dependencies": [
+        "kirabridge.bridge_core.models"
+      ],
+      "classes": 3,
+      "functions": 10,
+      "declared_bounds": []
+    },
+    {
+      "module": "kirabridge.operator_application",
+      "file": "src/kirabridge/operator_application.py",
+      "lines": 85,
+      "responsibility": "Composition root for the trusted local operator, never exposed as an MCP tool.",
+      "internal_dependencies": [
+        "kirabridge.audit_manager",
+        "kirabridge.bridge_core.config",
+        "kirabridge.grok_connector.administration",
+        "kirabridge.operations_service",
+        "kirabridge.operator_actions",
+        "kirabridge.operator_control",
+        "kirabridge.operator_platform",
+        "kirabridge.operator_queries"
+      ],
+      "classes": 3,
+      "functions": 3,
+      "declared_bounds": []
+    },
+    {
+      "module": "kirabridge.operator_control",
+      "file": "src/kirabridge/operator_control.py",
+      "lines": 580,
+      "responsibility": "Local operator application behavior, independent of HTTP, SQL and the Bridge object.",
+      "internal_dependencies": [
+        "kirabridge.agent_manager.full_access",
+        "kirabridge.bridge_core.models",
+        "kirabridge.chatgpt_setup",
+        "kirabridge.local_runtime",
+        "kirabridge.operator_actions",
+        "kirabridge.permissions",
+        "kirabridge.session_manager"
+      ],
+      "classes": 1,
+      "functions": 17,
+      "declared_bounds": [
+        {
+          "line": 105,
+          "expression": "self.rpc(\"bridge_health\", timeout=3)"
+        },
+        {
+          "line": 478,
+          "expression": "self.rpc(\"bridge_health\", timeout=2)"
+        },
+        {
+          "line": 487,
+          "expression": "self.rpc(\"bridge_health\", timeout=2)"
+        }
+      ]
+    },
+    {
+      "module": "kirabridge.operator_platform",
+      "file": "src/kirabridge/operator_platform.py",
+      "lines": 72,
+      "responsibility": "OS process observation/execution and the authenticated local MCP transport.",
+      "internal_dependencies": [
+        "kirabridge.bridge_core.models",
+        "kirabridge.local_runtime",
+        "kirabridge.mcp_gateway.client",
+        "kirabridge.terminal_queries"
+      ],
+      "classes": 2,
+      "functions": 4,
+      "declared_bounds": []
+    },
+    {
+      "module": "kirabridge.operator_queries",
+      "file": "src/kirabridge/operator_queries.py",
+      "lines": 83,
+      "responsibility": "Application queries for the local operator, without cross-module SQL.",
+      "internal_dependencies": [],
+      "classes": 1,
+      "functions": 6,
+      "declared_bounds": []
+    },
+    {
+      "module": "kirabridge.output_history",
+      "file": "src/kirabridge/output_history.py",
+      "lines": 269,
+      "responsibility": "Bounded raw terminal captures. Permanent audit and tasks retain references.",
+      "internal_dependencies": [
+        "kirabridge.bridge_core.models"
+      ],
+      "classes": 1,
+      "functions": 11,
+      "declared_bounds": []
+    },
+    {
+      "module": "kirabridge.permissions",
+      "file": "src/kirabridge/permissions.py",
+      "lines": 146,
+      "responsibility": "The three operator permission levels, shared by every authenticated entry point.",
+      "internal_dependencies": [
+        "kirabridge.bridge_core.config",
+        "kirabridge.bridge_core.models",
+        "kirabridge.operations",
+        "kirabridge.session_input_policy"
+      ],
+      "classes": 0,
+      "functions": 7,
+      "declared_bounds": []
+    },
+    {
+      "module": "kirabridge.platform_adapters",
+      "file": "src/kirabridge/platform_adapters/__init__.py",
+      "lines": 226,
+      "responsibility": "",
+      "internal_dependencies": [
+        "kirabridge.bridge_core.models"
+      ],
+      "classes": 5,
+      "functions": 14,
+      "declared_bounds": [
+        {
+          "line": 98,
+          "expression": "asyncio.StreamReader(limit=1024)"
+        },
+        {
+          "line": 75,
+          "expression": "asyncio.create_subprocess_exec(\n                sys.executable,\n                \"-I\",\n                str(Path(__file__).with_name(\"_exec.py\")),\n                str(cwd_fd),\n                str(write_fd),\n               "
+        },
+        {
+          "line": 138,
+          "expression": "asyncio.to_thread(\n                subprocess.run,\n                [\"/bin/ps\", \"-o\", \"stat=\", \"-g\", str(process.pid)],\n                capture_output=True,\n                text=True,\n                timeout=2,\n          "
+        }
+      ]
+    },
+    {
+      "module": "kirabridge.platform_adapters._exec",
+      "file": "src/kirabridge/platform_adapters/_exec.py",
+      "lines": 20,
+      "responsibility": "Internal POSIX trampoline: fchdir without unsafe preexec_fn in a threaded parent.",
+      "internal_dependencies": [],
+      "classes": 0,
+      "functions": 1,
+      "declared_bounds": []
+    },
+    {
+      "module": "kirabridge.platform_adapters.clipboard_lease",
+      "file": "src/kirabridge/platform_adapters/clipboard_lease.py",
+      "lines": 250,
+      "responsibility": "Memory-only macOS clipboard ownership, independent of the killable GUI worker.",
+      "internal_dependencies": [
+        "kirabridge.bridge_core.models"
+      ],
+      "classes": 1,
+      "functions": 5,
+      "declared_bounds": [
+        {
+          "line": 129,
+          "expression": "self.process_factory(\n                \"/usr/bin/osascript\",\n                \"-l\",\n                \"JavaScript\",\n                \"-e\",\n                OWNER_SCRIPT,\n                stdin=asyncio.subprocess.PIPE,\n         "
+        }
+      ]
+    },
+    {
+      "module": "kirabridge.platform_adapters.codex_state",
+      "file": "src/kirabridge/platform_adapters/codex_state.py",
+      "lines": 232,
+      "responsibility": "Read an explicitly bound Codex rollout; never discover or control a process.",
+      "internal_dependencies": [],
+      "classes": 2,
+      "functions": 7,
+      "declared_bounds": []
+    },
+    {
+      "module": "kirabridge.platform_adapters.desktop",
+      "file": "src/kirabridge/platform_adapters/desktop.py",
+      "lines": 80,
+      "responsibility": "Read the macOS console state without opening windows or sending UI events.",
+      "internal_dependencies": [
+        "kirabridge.bridge_core.models"
+      ],
+      "classes": 1,
+      "functions": 4,
+      "declared_bounds": []
+    },
+    {
+      "module": "kirabridge.platform_adapters.shell_prompt",
+      "file": "src/kirabridge/platform_adapters/shell_prompt.py",
+      "lines": 14,
+      "responsibility": "Pure conservative empty-shell predicate shared by transport and coordination.",
+      "internal_dependencies": [],
+      "classes": 0,
+      "functions": 1,
+      "declared_bounds": []
+    },
+    {
+      "module": "kirabridge.platform_adapters.terminal_app",
+      "file": "src/kirabridge/platform_adapters/terminal_app.py",
+      "lines": 452,
+      "responsibility": "Existing Terminal.app transport, independent of principal policy, queue and grants.",
+      "internal_dependencies": [
+        "kirabridge.bridge_core.models",
+        "kirabridge.platform_adapters.clipboard_lease",
+        "kirabridge.platform_adapters.desktop",
+        "kirabridge.platform_adapters.shell_prompt"
+      ],
+      "classes": 1,
+      "functions": 18,
+      "declared_bounds": []
+    },
+    {
+      "module": "kirabridge.platform_adapters.tmux",
+      "file": "src/kirabridge/platform_adapters/tmux.py",
+      "lines": 95,
+      "responsibility": "Existing tmux pane transport. Never creates a server, pane or agent as fallback.",
+      "internal_dependencies": [
+        "kirabridge.bridge_core.models"
+      ],
+      "classes": 1,
+      "functions": 7,
+      "declared_bounds": []
+    },
+    {
+      "module": "kirabridge.private_files",
+      "file": "src/kirabridge/private_files.py",
+      "lines": 27,
+      "responsibility": "Owner-only bounded file IO, independent of daemon clients and UI coordination.",
+      "internal_dependencies": [
+        "kirabridge.bridge_core.models"
+      ],
+      "classes": 0,
+      "functions": 2,
+      "declared_bounds": []
+    },
+    {
+      "module": "kirabridge.process_manager",
+      "file": "src/kirabridge/process_manager/__init__.py",
+      "lines": 17,
+      "responsibility": "",
+      "internal_dependencies": [
+        "kirabridge.terminal_manager"
+      ],
+      "classes": 1,
+      "functions": 2,
+      "declared_bounds": []
+    },
+    {
+      "module": "kirabridge.queue_management",
+      "file": "src/kirabridge/queue_management/__init__.py",
+      "lines": 4,
+      "responsibility": "Queue module public composition interface.",
+      "internal_dependencies": [
+        "kirabridge.queue_management.control",
+        "kirabridge.queue_management.schema"
+      ],
+      "classes": 0,
+      "functions": 0,
+      "declared_bounds": []
+    },
+    {
+      "module": "kirabridge.queue_management.control",
+      "file": "src/kirabridge/queue_management/control.py",
+      "lines": 280,
+      "responsibility": "CAS-controlled delivery withdrawal, safe restoration and uncertain-handoff retirement.",
+      "internal_dependencies": [
+        "kirabridge.bridge_core.models",
+        "kirabridge.queue_management.schema",
+        "kirabridge.queue_management.views"
+      ],
+      "classes": 1,
+      "functions": 5,
+      "declared_bounds": []
+    },
+    {
+      "module": "kirabridge.queue_management.models",
+      "file": "src/kirabridge/queue_management/models.py",
+      "lines": 29,
+      "responsibility": "Queue transport inputs; revisions bind destructive operations to observed entries.",
+      "internal_dependencies": [
+        "kirabridge.bridge_core.models"
+      ],
+      "classes": 2,
+      "functions": 0,
+      "declared_bounds": [
+        {
+          "line": 11,
+          "expression": "Field(min_length=1, max_length=180)"
+        },
+        {
+          "line": 12,
+          "expression": "Field(default=0, ge=0)"
+        },
+        {
+          "line": 13,
+          "expression": "Field(default=50, ge=1, le=100)"
+        },
+        {
+          "line": 18,
+          "expression": "Field(min_length=1, max_length=180)"
+        },
+        {
+          "line": 20,
+          "expression": "Field(default=None, min_length=1, max_length=180)"
+        },
+        {
+          "line": 22,
+          "expression": "Field(min_length=1, max_length=512)"
+        }
+      ]
+    },
+    {
+      "module": "kirabridge.queue_management.schema",
+      "file": "src/kirabridge/queue_management/schema.py",
+      "lines": 28,
+      "responsibility": "Additive delivery holds; immutable source records and audit remain intact.",
+      "internal_dependencies": [],
+      "classes": 0,
+      "functions": 1,
+      "declared_bounds": []
+    },
+    {
+      "module": "kirabridge.queue_management.views",
+      "file": "src/kirabridge/queue_management/views.py",
+      "lines": 277,
+      "responsibility": "Streaming principal-scoped inventory and exact revisions, without delivery effects.",
+      "internal_dependencies": [
+        "kirabridge.bridge_core.models",
+        "kirabridge.operations",
+        "kirabridge.queue_management.schema"
+      ],
+      "classes": 1,
+      "functions": 14,
+      "declared_bounds": []
+    },
+    {
+      "module": "kirabridge.read_query",
+      "file": "src/kirabridge/read_query.py",
+      "lines": 158,
+      "responsibility": "Synchronous, bounded reads; never dispatch work or attach interactive sessions.",
+      "internal_dependencies": [
+        "kirabridge.bridge_core.models",
+        "kirabridge.filesystem_manager",
+        "kirabridge.permissions"
+      ],
+      "classes": 1,
+      "functions": 3,
+      "declared_bounds": [
+        {
+          "line": 19,
+          "expression": "Field(default=None, max_length=4096)"
+        },
+        {
+          "line": 20,
+          "expression": "Field(default=None, max_length=128)"
+        },
+        {
+          "line": 21,
+          "expression": "Field(default=32768, ge=1, le=65536)"
+        },
+        {
+          "line": 22,
+          "expression": "Field(default=0, ge=0, le=2**63 - 1)"
+        }
+      ]
+    },
+    {
+      "module": "kirabridge.readiness",
+      "file": "src/kirabridge/readiness.py",
+      "lines": 334,
+      "responsibility": "Read-only prerequisites for one authenticated identity, never a workflow certificate.",
+      "internal_dependencies": [
+        "kirabridge",
+        "kirabridge.bridge_core.bridge",
+        "kirabridge.bridge_core.config",
+        "kirabridge.bridge_core.models",
+        "kirabridge.diagnostics",
+        "kirabridge.filesystem_manager",
+        "kirabridge.operations",
+        "kirabridge.permissions",
+        "kirabridge.terminal_manager",
+        "kirabridge.workflow_control_adapter"
+      ],
+      "classes": 1,
+      "functions": 18,
+      "declared_bounds": [
+        {
+          "line": 23,
+          "expression": "Field(default_factory=list, max_length=16)"
+        },
+        {
+          "line": 24,
+          "expression": "Field(default_factory=list, max_length=16)"
+        },
+        {
+          "line": 25,
+          "expression": "Field(default_factory=list, max_length=16)"
+        },
+        {
+          "line": 26,
+          "expression": "Field(default_factory=list, max_length=16)"
+        },
+        {
+          "line": 27,
+          "expression": "Field(default_factory=list, max_length=16)"
+        },
+        {
+          "line": 28,
+          "expression": "Field(default=None, max_length=128, pattern=r\"^[a-zA-Z0-9_-]+$\")"
+        }
+      ]
+    },
+    {
+      "module": "kirabridge.review_demo",
+      "file": "src/kirabridge/review_demo.py",
+      "lines": 205,
+      "responsibility": "Isolated, staged acceptance using real MCP; never launches an agent/provider.",
+      "internal_dependencies": [
+        "kirabridge.mcp_gateway.client"
+      ],
+      "classes": 1,
+      "functions": 8,
+      "declared_bounds": []
+    },
+    {
+      "module": "kirabridge.security_manager",
+      "file": "src/kirabridge/security_manager/__init__.py",
+      "lines": 239,
+      "responsibility": "",
+      "internal_dependencies": [
+        "kirabridge.bridge_core.config",
+        "kirabridge.bridge_core.models",
+        "kirabridge.operations",
+        "kirabridge.permissions",
+        "kirabridge.session_manager",
+        "kirabridge.task_manager.store"
+      ],
+      "classes": 1,
+      "functions": 14,
+      "declared_bounds": []
+    },
+    {
+      "module": "kirabridge.session_input_policy",
+      "file": "src/kirabridge/session_input_policy.py",
+      "lines": 166,
+      "responsibility": "Durable, two-step terminal input; shares task/approval transactions.",
+      "internal_dependencies": [
+        "kirabridge.bridge_core.models",
+        "kirabridge.completion_manager",
+        "kirabridge.permissions"
+      ],
+      "classes": 1,
+      "functions": 9,
+      "declared_bounds": []
+    },
+    {
+      "module": "kirabridge.session_manager",
+      "file": "src/kirabridge/session_manager.py",
+      "lines": 573,
+      "responsibility": "Authorize exact existing sessions and invoke their selected transport once.",
+      "internal_dependencies": [
+        "kirabridge.bridge_core.config",
+        "kirabridge.bridge_core.models",
+        "kirabridge.filesystem_manager",
+        "kirabridge.platform_adapters.desktop",
+        "kirabridge.platform_adapters.shell_prompt",
+        "kirabridge.platform_adapters.terminal_app",
+        "kirabridge.platform_adapters.tmux",
+        "kirabridge.session_ports",
+        "kirabridge.terminal_manager"
+      ],
+      "classes": 5,
+      "functions": 22,
+      "declared_bounds": [
+        {
+          "line": 31,
+          "expression": "Field(default=65536, ge=1, le=65536)"
+        },
+        {
+          "line": 35,
+          "expression": "Field(min_length=1, max_length=16384)"
+        },
+        {
+          "line": 42,
+          "expression": "Field(min_length=1, max_length=4096)"
+        },
+        {
+          "line": 43,
+          "expression": "Field(default_factory=list, max_length=256)"
+        },
+        {
+          "line": 44,
+          "expression": "Field(default=\"\", max_length=128)"
+        },
+        {
+          "line": 506,
+          "expression": "self.read(principal, pane_id, expected_pid, max_bytes=max_bytes)"
+        }
+      ]
+    },
+    {
+      "module": "kirabridge.session_ports",
+      "file": "src/kirabridge/session_ports.py",
+      "lines": 50,
+      "responsibility": "Partners used by session coordination, without access to the complete core.",
+      "internal_dependencies": [],
+      "classes": 6,
+      "functions": 15,
+      "declared_bounds": []
+    },
+    {
+      "module": "kirabridge.setup_dependencies",
+      "file": "src/kirabridge/setup_dependencies.py",
+      "lines": 93,
+      "responsibility": "Opt-in original-provider download; no package manager, sudo or key required.",
+      "internal_dependencies": [
+        "kirabridge.bridge_core.config",
+        "kirabridge.bridge_core.models",
+        "kirabridge.local_runtime"
+      ],
+      "classes": 0,
+      "functions": 2,
+      "declared_bounds": [
+        {
+          "line": 59,
+          "expression": "urllib.request.urlopen(url, timeout=15)"
+        }
+      ]
+    },
+    {
+      "module": "kirabridge.task_manager",
+      "file": "src/kirabridge/task_manager/__init__.py",
+      "lines": 1,
+      "responsibility": "Version-1 KiraBridge module.",
+      "internal_dependencies": [],
+      "classes": 0,
+      "functions": 0,
+      "declared_bounds": []
+    },
+    {
+      "module": "kirabridge.task_manager.manager",
+      "file": "src/kirabridge/task_manager/manager.py",
+      "lines": 476,
+      "responsibility": "",
+      "internal_dependencies": [
+        "kirabridge.bridge_core.config",
+        "kirabridge.bridge_core.models",
+        "kirabridge.completion_manager",
+        "kirabridge.operations",
+        "kirabridge.platform_adapters",
+        "kirabridge.security_manager",
+        "kirabridge.session_input_policy",
+        "kirabridge.session_manager",
+        "kirabridge.task_manager.store"
+      ],
+      "classes": 1,
+      "functions": 15,
+      "declared_bounds": []
+    },
+    {
+      "module": "kirabridge.task_manager.store",
+      "file": "src/kirabridge/task_manager/store.py",
+      "lines": 503,
+      "responsibility": "",
+      "internal_dependencies": [
+        "kirabridge.bridge_core.config",
+        "kirabridge.bridge_core.models",
+        "kirabridge.completion_manager",
+        "kirabridge.operations",
+        "kirabridge.queue_management",
+        "kirabridge.voice_channel"
+      ],
+      "classes": 1,
+      "functions": 20,
+      "declared_bounds": [
+        {
+          "line": 86,
+          "expression": "sqlite3.connect(path, isolation_level=None, timeout=5)"
+        }
+      ]
+    },
+    {
+      "module": "kirabridge.team_console",
+      "file": "src/kirabridge/team_console.py",
+      "lines": 861,
+      "responsibility": "Team UI mounted inside the authenticated, loopback-only approval console.",
+      "internal_dependencies": [
+        "kirabridge.bridge_core.models",
+        "kirabridge.permissions",
+        "kirabridge.team_manager.models"
+      ],
+      "classes": 1,
+      "functions": 22,
+      "declared_bounds": []
+    },
+    {
+      "module": "kirabridge.team_manager",
+      "file": "src/kirabridge/team_manager/__init__.py",
+      "lines": 1182,
+      "responsibility": "Durable, permission-scoped teams; team content never becomes executable code.",
+      "internal_dependencies": [
+        "kirabridge.bridge_core.models",
+        "kirabridge.message_manager",
+        "kirabridge.permissions",
+        "kirabridge.team_manager.models",
+        "kirabridge.voice_channel"
+      ],
+      "classes": 1,
+      "functions": 47,
+      "declared_bounds": []
+    },
+    {
+      "module": "kirabridge.team_manager.dispatcher",
+      "file": "src/kirabridge/team_manager/dispatcher.py",
+      "lines": 482,
+      "responsibility": "Bounded team turns through persistent, authenticated ``agent.execute`` tasks.",
+      "internal_dependencies": [
+        "kirabridge.bridge_core.models",
+        "kirabridge.local_runtime",
+        "kirabridge.mcp_gateway.client"
+      ],
+      "classes": 4,
+      "functions": 13,
+      "declared_bounds": [
+        {
+          "line": 26,
+          "expression": "Field(min_length=1, max_length=65536)"
+        },
+        {
+          "line": 28,
+          "expression": "Field(default=None, min_length=1, max_length=128)"
+        },
+        {
+          "line": 34,
+          "expression": "Field(min_length=1, max_length=256)"
+        },
+        {
+          "line": 35,
+          "expression": "Field(min_length=1, max_length=65536)"
+        },
+        {
+          "line": 43,
+          "expression": "Field(max_length=262144)"
+        },
+        {
+          "line": 44,
+          "expression": "Field(default_factory=list, max_length=4)"
+        },
+        {
+          "line": 414,
+          "expression": "parse_team_turn(text, max_bytes=limits.max_result_bytes, framing=framing)"
+        },
+        {
+          "line": 146,
+          "expression": "self.teams.inflight(limit=32)"
+        },
+        {
+          "line": 147,
+          "expression": "self.teams.pending(limit=16)"
+        }
+      ]
+    },
+    {
+      "module": "kirabridge.team_manager.models",
+      "file": "src/kirabridge/team_manager/models.py",
+      "lines": 68,
+      "responsibility": "Versioned team inputs. Acting identities always come from authentication.",
+      "internal_dependencies": [
+        "kirabridge.bridge_core.models"
+      ],
+      "classes": 7,
+      "functions": 0,
+      "declared_bounds": [
+        {
+          "line": 15,
+          "expression": "Field(min_length=1, max_length=128, pattern=r\"^[a-zA-Z0-9_-]+$\")"
+        },
+        {
+          "line": 16,
+          "expression": "Field(min_length=1, max_length=256)"
+        },
+        {
+          "line": 17,
+          "expression": "Field(min_length=1, max_length=16)"
+        },
+        {
+          "line": 18,
+          "expression": "Field(min_length=1, max_length=80, pattern=r\"^[a-z][a-z0-9_-]*$\")"
+        },
+        {
+          "line": 19,
+          "expression": "Field(min_length=1, max_length=128)"
+        },
+        {
+          "line": 23,
+          "expression": "Field(min_length=1, max_length=128)"
+        },
+        {
+          "line": 24,
+          "expression": "Field(min_length=1, max_length=80, pattern=r\"^[a-z][a-z0-9_-]*$\")"
+        },
+        {
+          "line": 27,
+          "expression": "Field(ge=1)"
+        },
+        {
+          "line": 28,
+          "expression": "Field(min_length=1, max_length=128)"
+        },
+        {
+          "line": 32,
+          "expression": "Field(min_length=1, max_length=128)"
+        },
+        {
+          "line": 33,
+          "expression": "Field(min_length=1, max_length=80, pattern=r\"^[a-z][a-z0-9_-]*$\")"
+        },
+        {
+          "line": 34,
+          "expression": "Field(min_length=1, max_length=65536)"
+        },
+        {
+          "line": 36,
+          "expression": "Field(default=None, min_length=1, max_length=128)"
+        },
+        {
+          "line": 37,
+          "expression": "Field(min_length=1, max_length=128)"
+        },
+        {
+          "line": 41,
+          "expression": "Field(min_length=1, max_length=128)"
+        },
+        {
+          "line": 42,
+          "expression": "Field(min_length=1, max_length=80, pattern=r\"^[a-z][a-z0-9_-]*$\")"
+        },
+        {
+          "line": 43,
+          "expression": "Field(min_length=1, max_length=256)"
+        },
+        {
+          "line": 44,
+          "expression": "Field(min_length=1, max_length=65536)"
+        },
+        {
+          "line": 45,
+          "expression": "Field(default=None, min_length=1, max_length=128)"
+        },
+        {
+          "line": 46,
+          "expression": "Field(min_length=1, max_length=128)"
+        },
+        {
+          "line": 50,
+          "expression": "Field(min_length=1, max_length=128)"
+        },
+        {
+          "line": 51,
+          "expression": "Field(min_length=1, max_length=128)"
+        },
+        {
+          "line": 52,
+          "expression": "Field(min_length=1, max_length=128)"
+        },
+        {
+          "line": 56,
+          "expression": "Field(min_length=1, max_length=128)"
+        },
+        {
+          "line": 57,
+          "expression": "Field(min_length=1, max_length=128)"
+        },
+        {
+          "line": 58,
+          "expression": "Field(max_length=65536)"
+        },
+        {
+          "line": 60,
+          "expression": "Field(min_length=1, max_length=128)"
+        },
+        {
+          "line": 64,
+          "expression": "Field(min_length=1, max_length=128)"
+        },
+        {
+          "line": 65,
+          "expression": "Field(min_length=1, max_length=128)"
+        },
+        {
+          "line": 66,
+          "expression": "Field(min_length=1, max_length=128)"
+        },
+        {
+          "line": 68,
+          "expression": "Field(min_length=1, max_length=128)"
+        }
+      ]
+    },
+    {
+      "module": "kirabridge.terminal_access",
+      "file": "src/kirabridge/terminal_access.py",
+      "lines": 57,
+      "responsibility": "Explain granted terminal access separately from optional input confirmation.",
+      "internal_dependencies": [
+        "kirabridge.permissions"
+      ],
+      "classes": 0,
+      "functions": 1,
+      "declared_bounds": []
+    },
+    {
+      "module": "kirabridge.terminal_design",
+      "file": "src/kirabridge/terminal_design.py",
+      "lines": 369,
+      "responsibility": "Bounded Braille presentation, reused from PR34/ada6e37; no runtime or output effects.",
+      "internal_dependencies": [],
+      "classes": 2,
+      "functions": 17,
+      "declared_bounds": []
+    },
+    {
+      "module": "kirabridge.terminal_manager",
+      "file": "src/kirabridge/terminal_manager/__init__.py",
+      "lines": 201,
+      "responsibility": "",
+      "internal_dependencies": [
+        "kirabridge.bridge_core.config",
+        "kirabridge.bridge_core.models",
+        "kirabridge.filesystem_manager",
+        "kirabridge.platform_adapters",
+        "kirabridge.workflow_control_adapter"
+      ],
+      "classes": 2,
+      "functions": 8,
+      "declared_bounds": [
+        {
+          "line": 98,
+          "expression": "spawn_process(\n                        [executable, *args.argv[1:]],\n                        cwd_fd,\n                        env=env if env is not None else self.environment.copy(),\n                        stdin=asyncio."
+        }
+      ]
+    },
+    {
+      "module": "kirabridge.terminal_queries",
+      "file": "src/kirabridge/terminal_queries.py",
+      "lines": 67,
+      "responsibility": "The shared, bounded read path for direct and legacy queued terminal tools.",
+      "internal_dependencies": [
+        "kirabridge.bridge_core.models",
+        "kirabridge.session_manager"
+      ],
+      "classes": 1,
+      "functions": 2,
+      "declared_bounds": [
+        {
+          "line": 56,
+          "expression": "self.sessions.read_observed(\n                    principal,\n                    args.pane_id,\n                    args.expected_pid,\n                    max_bytes=args.max_bytes,\n                )"
+        }
+      ]
+    },
+    {
+      "module": "kirabridge.threaddesk_contract",
+      "file": "src/kirabridge/threaddesk_contract.py",
+      "lines": 294,
+      "responsibility": "Bounded, content-free preflight for the declared ThreadDesk administration contract.",
+      "internal_dependencies": [],
+      "classes": 1,
+      "functions": 9,
+      "declared_bounds": [
+        {
+          "line": 217,
+          "expression": "violation(field, \"maxItems\", source=source, actual=len(value), limit=limit)"
+        },
+        {
+          "line": 206,
+          "expression": "violation(\n                        field,\n                        constraint + \" characters\",\n                        source=spec.get(\"_\" + constraint + \"_source\", source),\n                        actual=len(value),\n    "
+        }
+      ]
+    },
+    {
+      "module": "kirabridge.threaddesk_dynamic",
+      "file": "src/kirabridge/threaddesk_dynamic.py",
+      "lines": 119,
+      "responsibility": "Dynamically expose explicitly read-only tools from an operator-configured ThreadDesk MCP peer.",
+      "internal_dependencies": [
+        "kirabridge.bridge_core.models",
+        "kirabridge.permissions"
+      ],
+      "classes": 0,
+      "functions": 5,
+      "declared_bounds": []
+    },
+    {
+      "module": "kirabridge.threaddesk_manager",
+      "file": "src/kirabridge/threaddesk_manager.py",
+      "lines": 291,
+      "responsibility": "Optional local Fachadapter. Endpoint and workspace are operator configuration.",
+      "internal_dependencies": [
+        "kirabridge.bridge_core.config",
+        "kirabridge.bridge_core.models",
+        "kirabridge.filesystem_manager",
+        "kirabridge.mcp_gateway.client",
+        "kirabridge.threaddesk_contract"
+      ],
+      "classes": 1,
+      "functions": 10,
+      "declared_bounds": []
+    },
+    {
+      "module": "kirabridge.visible_handoff",
+      "file": "src/kirabridge/visible_handoff.py",
+      "lines": 809,
+      "responsibility": "Durable handoffs to exact existing visible terminals; never spawn a fallback.",
+      "internal_dependencies": [
+        "kirabridge.bridge_core.config",
+        "kirabridge.bridge_core.models",
+        "kirabridge.message_manager",
+        "kirabridge.platform_adapters.codex_state",
+        "kirabridge.session_manager",
+        "kirabridge.visible_message_evidence",
+        "kirabridge.visible_readiness",
+        "kirabridge.voice_channel"
+      ],
+      "classes": 2,
+      "functions": 20,
+      "declared_bounds": []
+    },
+    {
+      "module": "kirabridge.visible_message_evidence",
+      "file": "src/kirabridge/visible_message_evidence.py",
+      "lines": 170,
+      "responsibility": "Bounded, participant-only handoff evidence. Reads never reconcile or resend.",
+      "internal_dependencies": [],
+      "classes": 0,
+      "functions": 4,
+      "declared_bounds": []
+    },
+    {
+      "module": "kirabridge.visible_readiness",
+      "file": "src/kirabridge/visible_readiness.py",
+      "lines": 113,
+      "responsibility": "Current input widget plus a separately bound Codex turn observation.",
+      "internal_dependencies": [],
+      "classes": 0,
+      "functions": 4,
+      "declared_bounds": []
+    },
+    {
+      "module": "kirabridge.visible_terminal",
+      "file": "src/kirabridge/visible_terminal.py",
+      "lines": 225,
+      "responsibility": "Direct terminal work in a freshly confirmed visible shell; never a hidden fallback.",
+      "internal_dependencies": [
+        "kirabridge.bridge_core.config",
+        "kirabridge.bridge_core.models",
+        "kirabridge.filesystem_manager",
+        "kirabridge.platform_adapters.shell_prompt",
+        "kirabridge.private_files",
+        "kirabridge.session_manager",
+        "kirabridge.terminal_manager"
+      ],
+      "classes": 2,
+      "functions": 4,
+      "declared_bounds": []
+    },
+    {
+      "module": "kirabridge.voice_channel",
+      "file": "src/kirabridge/voice_channel.py",
+      "lines": 114,
+      "responsibility": "Participant-based voice conversations and immutable shared message archives.",
+      "internal_dependencies": [
+        "kirabridge.bridge_core.models"
+      ],
+      "classes": 1,
+      "functions": 6,
+      "declared_bounds": []
+    },
+    {
+      "module": "kirabridge.voice_message_policy",
+      "file": "src/kirabridge/voice_message_policy.py",
+      "lines": 141,
+      "responsibility": "Immediate normal messages; immutable retry behavior for historical voice buffers.",
+      "internal_dependencies": [
+        "kirabridge.bridge_core.models",
+        "kirabridge.message_manager",
+        "kirabridge.session_input_policy",
+        "kirabridge.team_manager.models",
+        "kirabridge.voice_channel"
+      ],
+      "classes": 1,
+      "functions": 7,
+      "declared_bounds": []
+    },
+    {
+      "module": "kirabridge.workflow_control_adapter",
+      "file": "src/kirabridge/workflow_control_adapter.py",
+      "lines": 518,
+      "responsibility": "Explicit owned CLI stop-only assembly; not a provider-cost enforcement claim.",
+      "internal_dependencies": [
+        "kirabridge.bridge_core.models"
+      ],
+      "classes": 2,
+      "functions": 10,
+      "declared_bounds": []
+    }
+  ]
+}

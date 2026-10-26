@@ -200,7 +200,12 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
     async def read_query(query: dict[str, Any], ctx: Context) -> dict[str, Any]:
         """Direct authorized read without tasks or Events subscriptions.
 
-        query.operation: file.read (path, max_bytes<=65536, offset or tail),
+        query.operation: file.read (path, max_bytes<=65536, offset or tail,
+        encoding=utf-8|base64, expected_identity). For complete/binary logs use
+        data_base64, verify content_sha256, then follow next_offset until eof.
+        Pin the first identity; file_changed requires a stable authorized export.
+        Page budgets do not limit total file size. Text is a display preview;
+        text_lossless=false never means the original data_base64 bytes were lost.
         file.list (path; at most 100 entries), terminal.output (owned task_id,
         max_bytes<=65536). session.catalog lists existing terminal handles;
         session.read requires exact pane_id and expected_pid, max_bytes<=65536.

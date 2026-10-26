@@ -17,7 +17,7 @@ KiraBridge connects an authorized AI conversation to local files, visible agent 
 
 ### Was KiraBridge kann
 
-- Berechtigte Datei-, Prozess- und Terminaloperationen aus einem verbundenen Chat ausführen, mit nachvollziehbarem Ergebnis statt bloßer Annahmebestätigung.
+- Berechtigte Datei-, Prozess- und Terminaloperationen aus einem verbundenen Chat ausführen, mit nachvollziehbarem Ergebnis statt bloßer Annahmebestätigung. [Dateien und Codex-Protokolle vollständig lesen](docs/READ-FULL-FILES.md): echte Byte-Seiten mit Offset, EOF und SHA-256, ohne Ein-Megabyte-Gesamtdateigrenze.
 - Codex-, Grok- und weitere eingerichtete Agentenadapter verwenden. Anbieterzugänge, Modelle und laufende Sitzungen werden nicht durch KiraBridge ersetzt.
 - Sichtbare Terminalfenster frisch katalogisieren und lesen; Eingaben an bestätigte Fenster-/Tab-/TTY-/Prozessidentitäten binden. `submit=false` bedeutet Einfügen ohne Return. Bei echter Aktivität, geänderter Zuordnung oder unbekannter Eingabe verweigert die Bridge den Eingriff.
 - Berechtigte Warteschlangen vollständig einsehen und gezielt verwalten. `withdraw` nimmt unbekannte Ausführungen aus der aktiven Ansicht; ein belegter `retire` kann eine veraltete Zustellreservierung zurücknehmen. Historie bleibt erhalten, eine unbekannte Ausführung wird weder als beendet ausgegeben noch blind wiederholt.
@@ -60,6 +60,8 @@ Erstinstallation legt Benutzerdateien an. Updates erhalten vorhandene Konfigurat
 ## English
 
 KiraBridge connects an authorized chat to local files, processes and visible agent terminals, with separate durable task, delivery and result evidence. It supports configured Codex/Grok and other provider adapters, discoverable operations, scoped queue management and optional project integrations. ThreadDesk and other vendors are optional. A queued task is not proof of execution; unknown work is never silently replayed or declared stopped. File transfer requires actual bytes and a verified durable receiver receipt before it counts as an import.
+
+[Complete authorized file/log reads](docs/READ-FULL-FILES.md) use original byte pages, offsets, EOF and SHA-256; there is no one-megabyte cap on the overall file.
 
 Requirements: normal user account, **Python 3.11, uv 0.11.6, GitHub CLI**, Internet and authenticated access to this private repository/draft. Actual Intel testing used **macOS 15.7.4 x86_64**. Older macOS on a 2015 iMac, macOS 26 and Apple Silicon are not approved by that evidence. Agents and provider accounts require their own setup. No administrator/TCC grants are changed, no compiler is forced. **No Apple signing or notarization**; do not disable Gatekeeper globally.
 
