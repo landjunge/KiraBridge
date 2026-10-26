@@ -104,7 +104,7 @@ exec python3.11 "$bundle/installer/install.py" install --bundle "$bundle" "$@"
         "presentation": presentation,
         "runtime": "Python 3.11, uv 0.11.6; dependencies from hash-locked uv.lock",
         "apple_signed": False,
-        "maturity": "unpublished consolidation candidate; acceptance gates remain",
+        "maturity": "source-pinned artifact; acceptance and publication recorded separately",
     }
     files["release.json"] = (json.dumps(manifest, indent=2) + "\n").encode()
     bundle = output / "KiraBridge-macos.tar.gz"
