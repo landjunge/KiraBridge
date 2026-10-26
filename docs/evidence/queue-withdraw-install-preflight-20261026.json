@@ -1,0 +1,84 @@
+{
+  "base_commit": "afaa7af725c726fbcd5caf699c2919c4b4cf994e",
+  "integration_code_commits": [
+    "e11364e3b96f6d6879d83571cc9cca59a5947237",
+    "7898846",
+    "7d62a56669045a960af11a2a2030adb186b95889"
+  ],
+  "branch": "fix/queue-withdraw-visible-install-20261026",
+  "team": {
+    "terminal_repair": "withdrawal and original-target-gone retirement",
+    "whiteboard_repair": "retired-history diagnostics and package-check preparation",
+    "receiver_contract_audit": "independent read-only security/rollback review; no tests rerun",
+    "root": "review, integration and actual native read-only absence proof"
+  },
+  "unit_scopes": {
+    "withdrawal_agent_phase": 19,
+    "retire_gone_agent_phase": 26,
+    "status_new_cases": 3,
+    "status_direct_regressions": 4,
+    "root_combined_related_cases": 44,
+    "root_combined_seconds": 2.68,
+    "root_combined_command": "uv run --locked --dev pytest -q tests/test_queue_withdrawal.py tests/test_queue_retire_gone.py tests/test_retired_handoff_status.py",
+    "note": "Phase counts overlap direct regression checks; do not sum as distinct cases. Root combined check verifies interactions after merging independent changes."
+  },
+  "root_static_checks": {
+    "ruff": "passed",
+    "format": "14 files unchanged"
+  },
+  "actual_native_probe": {
+    "source_code_head": "7d62a56669045a960af11a2a2030adb186b95889",
+    "system": "Darwin",
+    "macos": "15.7.4",
+    "machine": "x86_64",
+    "handoff_id": "channel-dae0da0ab69449999007d02ef3c137d5",
+    "native_readonly_probe_passed": true,
+    "proof": {
+      "original_binding_sha256": "33c2fd408066fcfb53a95e10b15a69d6850bfd3e2fbb21c2382cf11b3aa80568",
+      "original_window": 22104,
+      "original_pids": [
+        68530,
+        94023
+      ],
+      "original_pids_gone": true,
+      "native_window_absent": true,
+      "native_window_count": 9,
+      "catalog_observed_at": 1793019669.520143,
+      "process_observations": [
+        {
+          "observed_at": 1793019669.092067,
+          "pid_count": 842,
+          "inventory_sha256": "04a97273f6533a5bdb5c96f0a6b44931a0a83e579f0b6d7ba672e6222d57b3cc"
+        },
+        {
+          "observed_at": 1793019669.639555,
+          "pid_count": 842,
+          "inventory_sha256": "3ddb91366527760c22b3a65e407bfbd17c6bd328375fb4b2432f8cf64192303b"
+        }
+      ],
+      "observed_at": 1793019669.639946
+    },
+    "authorization": "actual copied Codex policy, isolated security store; no grants bypassed",
+    "production_store_opened": false,
+    "production_config_changed": false,
+    "window_activation_or_input_sent": false,
+    "retirement_applied": false,
+    "source_sha256": {
+      "src/kirabridge/session_manager.py": "ea82931473a4644fb353a978584195678cc0f966a3b559cf1970df0d6a53460f",
+      "src/kirabridge/platform_adapters/terminal_app.py": "17f4c6e5840f7611771408b7e813bd6c1b0760d26ced6b8adc5c319a388a781a"
+    },
+    "preparation_failures": [
+      "Two isolated wrapper attempts used invalid Config property names and failed before any OS probe or production access; wrapper corrected to data_dir."
+    ]
+  },
+  "production_activation": "not performed; candidate build and isolated upgrade tests follow final source pin",
+  "production_config_permissions_changed": false,
+  "queue_operations_before_activation": {
+    "old_never_claimed_messages_held": 11,
+    "old_delivered_no_job_messages_read_and_acknowledged_then_queue_control_removed": 25,
+    "newly_arrived_message_excluded": "71d83a3e-9c1b-4afe-bbd3-46d7ac02acb0",
+    "old_unknown_handoff_still_active": true,
+    "old_unknown_tasks_still_unknown": 26
+  },
+  "gates": "No merge/release without agreed checks; native local evidence is not hosted macOS/ARM evidence."
+}
