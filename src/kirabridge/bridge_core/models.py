@@ -5,7 +5,7 @@ import json
 from enum import StrEnum
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
 class BridgeError(Exception):
@@ -84,6 +84,16 @@ class PathInput(Input):
 
 class ReadInput(PathInput):
     max_bytes: int = Field(default=65536, ge=1, le=1048576)
+    offset: int = Field(default=0, ge=0, le=2**63 - 1, strict=True)
+    tail: bool = False
+    encoding: Literal["utf-8", "base64"] = "utf-8"
+    expected_identity: str | None = Field(default=None, pattern=r"^[a-f0-9]{64}$")
+
+    @model_validator(mode="after")
+    def range_selector(self):
+        if self.tail and self.offset:
+            raise ValueError("use either tail or offset")
+        return self
 
 
 class ImageInput(Input):

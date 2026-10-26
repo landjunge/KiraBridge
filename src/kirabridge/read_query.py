@@ -1,13 +1,11 @@
 """Synchronous, bounded reads; never dispatch work or attach interactive sessions."""
 
-import hashlib
-import os
-import stat
 from typing import Literal
 
 from pydantic import Field, model_validator
 
 from kirabridge.bridge_core.models import BridgeError, Input
+from kirabridge.file_ranges import read_file_range
 from kirabridge.filesystem_manager import PathScope
 from kirabridge.permissions import state_exclusions
 
@@ -19,13 +17,19 @@ class ReadQuery(Input):
     path: str | None = Field(default=None, max_length=4096)
     task_id: str | None = Field(default=None, max_length=128)
     max_bytes: int = Field(default=32768, ge=1, le=65536)
-    offset: int = Field(default=0, ge=0, le=2**63 - 1)
+    offset: int = Field(default=0, ge=0, le=2**63 - 1, strict=True)
     tail: bool = False
+    encoding: Literal["utf-8", "base64"] = "utf-8"
+    expected_identity: str | None = Field(default=None, pattern=r"^[a-f0-9]{64}$")
     pane_id: str | None = Field(default=None, pattern=r"^(%[0-9]+|terminal:[0-9]+:ttys[0-9]+)$")
     expected_pid: int | None = Field(default=None, gt=0)
 
     @model_validator(mode="after")
     def selector(self):
+        if self.operation != "file.read" and (
+            self.encoding != "utf-8" or self.expected_identity is not None
+        ):
+            raise ValueError("file range encoding and identity require file.read")
         if self.operation.startswith("session."):
             if self.path or self.task_id or self.offset or self.tail:
                 raise ValueError(
@@ -129,30 +133,16 @@ def read_query(bridge, principal: str, query: ReadQuery) -> dict:
             "entries": entries,
             "truncated": result["truncated"] or len(result["entries"]) > 100,
         }
-    try:
-        with scope.parent(query.path) as (parent, name):
-            fd = os.open(name, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK, dir_fd=parent)
-            try:
-                metadata = os.fstat(fd)
-                if not stat.S_ISREG(metadata.st_mode):
-                    raise BridgeError("file_type", "Only regular files can be read")
-                offset = max(0, metadata.st_size - query.max_bytes) if query.tail else query.offset
-                data = os.pread(fd, query.max_bytes + 1, offset)
-            finally:
-                os.close(fd)
-    except OSError:
-        raise BridgeError("read_unavailable", "File unavailable or unsafe to open") from None
-    bounded = data[: query.max_bytes]
     return {
         "operation": query.operation,
         "path": query.path,
-        "text": bounded.decode("utf-8", "replace"),
-        "offset": offset,
-        "next_offset": offset + len(bounded),
-        "bytes": len(bounded),
-        "truncated": len(data) > query.max_bytes,
-        "size_observed": metadata.st_size,
-        "modified_ns": metadata.st_mtime_ns,
-        "content_sha256": hashlib.sha256(bounded).hexdigest(),
-        "scope": "file snapshot; does not prove current agent activity or project completion",
+        **read_file_range(
+            scope,
+            query.path,
+            query.max_bytes,
+            offset=query.offset,
+            tail=query.tail,
+            encoding=query.encoding,
+            expected_identity=query.expected_identity,
+        ),
     }
