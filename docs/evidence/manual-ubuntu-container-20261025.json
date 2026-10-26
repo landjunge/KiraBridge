@@ -1,0 +1,36 @@
+{
+  "platform": "Linux-x86_64",
+  "version": "0.8.0rc17",
+  "source_commit": "16642e2b87ddc0f4e9f96e664b8cb18bf9159710",
+  "archive_sha256": "f1746c57584fa21ee8fbd3dfecdae282d2e5fd8a3a33cc364f9b578df633195e",
+  "packaged_start_command": "passed isolated bundled installer preparation",
+  "installed_authenticated_dispatcher": true,
+  "concrete_preflight_and_loaded_source_match": true,
+  "corrupt_package_rejected_before_install": true,
+  "config_and_credentials_preserved": true,
+  "license_in_bundle_payload_wheel_and_separate_asset": true,
+  "license_sha256": "3316d5eda60ac1fea355aa43d196feea3567384179b55ca88c8636c0322021ec",
+  "license_expression": "LicenseRef-Netzwerkpunkt-Personal-Use-1.0",
+  "real_user_setup_service_tunnel_changed": false,
+  "new_chatgpt_account_call": "not performed",
+  "real_user_service_manager": "not exercised",
+  "ci_container": {
+    "userspace": "Ubuntu 24.04",
+    "uid": 1000,
+    "nonroot": true,
+    "architecture": "x86_64",
+    "base_image": "ubuntu:24.04@sha256:68ee22004a9109b44973313b02ff7b1de250f1de0f5ecb628d73f579aaff33ac",
+    "kernel_scope": "shared host kernel; no native Ubuntu kernel or macOS acceptance"
+  },
+  "proof_scope": {
+    "package_source": "16642e2b87ddc0f4e9f96e664b8cb18bf9159710",
+    "helper_source": "363db4aaefa5e27028a3f90b8a2b0abe7ab18b6f",
+    "whole_helper_exit_code": 0,
+    "owned_container_and_image_absence_independently_observed": true,
+    "not_final_new_source_package_acceptance": true,
+    "retained_failures": [
+      "initial Debian run correctly refused Ubuntu guard",
+      "first Ubuntu helper run refused executing pinned runtime on default noexec tmpfs; explicit exec only on isolated container tmpfs corrected it"
+    ]
+  }
+}

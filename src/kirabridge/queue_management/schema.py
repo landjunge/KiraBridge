@@ -19,3 +19,10 @@ def install_schema(store):
         "actor TEXT NOT NULL,created REAL NOT NULL,reason TEXT NOT NULL,"
         "PRIMARY KEY(queue_id,item_id))"
     )
+    # View-only withdrawal is deliberately separate from delivery holds: old
+    # runtimes ignore it while retaining unknown execution state/reservations.
+    store.db.execute(
+        "CREATE TABLE IF NOT EXISTS queue_withdrawals (queue_id TEXT NOT NULL,"
+        "item_id TEXT NOT NULL,actor TEXT NOT NULL,created REAL NOT NULL,"
+        "reason_sha256 TEXT NOT NULL,PRIMARY KEY(queue_id,item_id))"
+    )

@@ -243,6 +243,14 @@ def validate_management(values, schema):
 
 def safe_peer_error(code, value, *, contract=None):
     """Keep only numeric/schema diagnostics; raw peer messages may contain secrets."""
+    # The frozen legacy peer drops SecretRejected's type, retaining this fixed
+    # public message only. Classify that exact signature; never echo peer text.
+    if (
+        code == "tool_error"
+        and isinstance(value, dict)
+        and value.get("message") == "Keine API-Keys oder Passwörter in Thread-Dateien."
+    ):
+        code = "secret_detected"
     incoming = value.get("details", {}) if isinstance(value, dict) else {}
     if not isinstance(incoming, dict):
         incoming = {}
@@ -276,7 +284,10 @@ def safe_peer_error(code, value, *, contract=None):
             "code": code,
             "details": safe,
             "message": (
-                "ThreadDesk rejected the operation; inspect declared field limits "
+                "ThreadDesk secret protection reported a rejection; preserve input and "
+                "inspect the original operation ID. No automatic replay."
+                if code == "secret_detected"
+                else "ThreadDesk rejected the operation; inspect declared field limits "
                 "and the original operation ID. No automatic replay."
             ),
         }

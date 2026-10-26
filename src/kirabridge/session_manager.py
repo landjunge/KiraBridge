@@ -3,14 +3,17 @@
 from __future__ import annotations
 
 import asyncio
+import re
 import shlex
-from contextlib import asynccontextmanager
+import time
+from contextlib import asynccontextmanager, contextmanager
 from contextvars import ContextVar
+from copy import deepcopy
 from pathlib import Path
 
 from pydantic import Field
 
-from kirabridge.bridge_core.models import BridgeError, Input
+from kirabridge.bridge_core.models import BridgeError, Input, digest
 from kirabridge.filesystem_manager import PathScope
 from kirabridge.platform_adapters.desktop import DESKTOP_MESSAGES
 from kirabridge.platform_adapters.terminal_app import TerminalAppTransport
@@ -60,6 +63,7 @@ class SessionManager:
         self.readiness = ports.readiness
         self.lock = asyncio.Lock()
         self._selection = ContextVar("kirabridge_visible_selection", default=None)
+        self._observation = ContextVar("kirabridge_terminal_observation", default=None)
         self.terminal_app = (
             terminal_app if terminal_app is not None else TerminalAppTransport(ports.clipboard_lock)
         )
@@ -216,8 +220,131 @@ class SessionManager:
             )
         return selection[2] if selection else None
 
+    @contextmanager
+    def observation_scope(self, principal, selected):
+        """Reuse a privately observed row only during this task's single read chain.
+
+        This is not selection authority for input, and is never accepted from MCP.
+        Expiration also invalidates inherited contexts after the operation returns.
+        """
+        observation = {
+            "principal": principal,
+            "row": deepcopy(selected),
+            "task": asyncio.current_task(),
+            "active": True,
+        }
+        token = self._observation.set(observation)
+        try:
+            yield
+        finally:
+            observation["active"] = False
+            self._observation.reset(token)
+
+    async def observed_selected(self, principal, pane_id, expected_pid):
+        observation = self._observation.get()
+        if observation is None:
+            return await self.selected(principal, pane_id, expected_pid)
+        row = observation["row"]
+        if (
+            not observation["active"]
+            or observation["task"] is not asyncio.current_task()
+            or observation["principal"] != principal
+            or row.get("pane_id") != pane_id
+            or expected_pid not in {row.get("expected_pid"), row.get("legacy_expected_pid")}
+        ):
+            raise BridgeError(
+                "session_observation_changed", "Read observation scope changed or expired"
+            )
+        return deepcopy(row)
+
+    async def prove_original_target_gone(self, principal, original):
+        """Fresh read-only evidence for a persisted binding, never a current-target guess."""
+        from kirabridge.bridge_core.config import VisibleTerminalBinding
+
+        self.authorization.principal(principal, "session.inspect")
+        if not self.terminal_app.available:
+            raise BridgeError("visible_absence_unproven", "Native observation is unavailable")
+        try:
+            if (
+                not isinstance(original, dict)
+                or type(original.get("expected_pid")) is not int
+                or type(original.get("agent_pid")) is not int
+            ):
+                raise ValueError("Original PID types must be exact")
+            binding = VisibleTerminalBinding.model_validate(original)
+            window = int(binding.pane_id.split(":")[1])
+            if window <= 0 or binding.expected_pid == binding.agent_pid:
+                raise ValueError("Ambiguous original binding")
+        except (ValueError, TypeError):
+            raise BridgeError("visible_absence_unproven", "Original binding is not exact") from None
+        expected = {binding.expected_pid, binding.agent_pid}
+        observations = []
+
+        async def absent_pids():
+            pids = await self.terminal_app.process_ids()
+            if (
+                not isinstance(pids, (set, frozenset))
+                or not pids
+                or any(type(pid) is not int or pid < 0 for pid in pids)
+                or expected.intersection(pids)
+            ):
+                raise BridgeError(
+                    "visible_absence_unproven", "Original PID exists or inventory is invalid"
+                )
+            observations.append(
+                {
+                    "observed_at": time.time(),
+                    "pid_count": len(pids),
+                    "inventory_sha256": digest(sorted(pids)),
+                }
+            )
+
+        await absent_pids()
+        catalog = await self.terminal_app.window_inventory()
+        catalog_at = time.time()
+        if (
+            not isinstance(catalog, dict)
+            or set(catalog) != {"running", "windows"}
+            or type(catalog.get("running")) is not bool
+            or not isinstance(catalog.get("windows"), list)
+            or not catalog["running"]
+            and catalog["windows"]
+        ):
+            raise BridgeError("visible_absence_unproven", "Native window inventory is invalid")
+        seen = set()
+        for row in catalog["windows"]:
+            if (
+                not isinstance(row, dict)
+                or type(row.get("window_id")) is not int
+                or row["window_id"] <= 0
+                or row["window_id"] in seen
+                or not isinstance(row.get("ttys"), list)
+                or any(
+                    not isinstance(tty, str) or not re.fullmatch(r"/dev/ttys[0-9]+", tty)
+                    for tty in row["ttys"]
+                )
+            ):
+                raise BridgeError(
+                    "visible_absence_unproven", "Native window inventory is incomplete"
+                )
+            seen.add(row["window_id"])
+        if window in seen:
+            raise BridgeError("visible_absence_unproven", "Original window still exists")
+        await absent_pids()
+        return {
+            "original_binding_sha256": digest(binding.model_dump()),
+            "original_window": window,
+            "original_pids": sorted(expected),
+            "original_pids_gone": True,
+            "native_window_absent": True,
+            "native_window_count": len(seen),
+            "catalog_observed_at": catalog_at,
+            "process_observations": observations,
+            "observed_at": time.time(),
+        }
+
     async def read(self, principal, pane_id, expected_pid, *, max_bytes=65536):
-        await self.selected(principal, pane_id, expected_pid)
+        await self.observed_selected(principal, pane_id, expected_pid)
         text = await self.transport(pane_id).read(pane_id)
         text = text.encode("utf-8")[-max_bytes:].decode("utf-8", "ignore")
         return {
@@ -374,12 +501,14 @@ class SessionManager:
         return process["name"]
 
     async def read_observed(self, principal, pane_id, expected_pid, *, max_bytes=65536):
-        result = await self.read(principal, pane_id, expected_pid, max_bytes=max_bytes)
-        if self.readiness:
-            observation = await self.readiness(principal, result)
-            if observation is not None:
-                result = {**result, "input_readiness": observation}
-        return self.audit.observe_terminal(principal, result)
+        selected = await self.selected(principal, pane_id, expected_pid)
+        with self.observation_scope(principal, selected):
+            result = await self.read(principal, pane_id, expected_pid, max_bytes=max_bytes)
+            if self.readiness:
+                observation = await self.readiness(principal, result)
+                if observation is not None:
+                    result = {**result, "input_readiness": observation}
+            return self.audit.observe_terminal(principal, result)
 
     async def open(self, principal, args, *, task_id=None):
         policy = self.authorization.principal(principal, "session.open")

@@ -1,0 +1,121 @@
+{
+  "base": "481eb32eca61ba7ccd287c92644cb8305cdae44b",
+  "version": "0.8.0rc17",
+  "live_installed_source": "012b592caa5b6126342f9148f3b38a7d50b00379",
+  "pagers": [
+    {
+      "pane_id": "terminal:47570:ttys000",
+      "shell_pid": 79304,
+      "git_pid_before": 75434,
+      "less_pid_before": 75435,
+      "q_sent": true,
+      "return_sent": false,
+      "less_absent_after": true,
+      "shell_preserved": true,
+      "signals_sent": false
+    },
+    {
+      "pane_id": "terminal:50666:ttys003",
+      "shell_pid": 31446,
+      "git_pid_before": 61749,
+      "less_pid_before": 61750,
+      "q_sent": true,
+      "return_sent": false,
+      "less_absent_after": true,
+      "shell_preserved": true,
+      "signals_sent": false
+    },
+    {
+      "pane_id": "terminal:51079:ttys005",
+      "shell_pid": 61796,
+      "git_pid_before": 74012,
+      "less_pid_before": 74013,
+      "q_sent": true,
+      "return_sent": false,
+      "less_absent_after": true,
+      "shell_preserved": true,
+      "signals_sent": false
+    },
+    {
+      "pane_id": "terminal:51447:ttys006",
+      "shell_pid": 50325,
+      "git_pid_before": 50494,
+      "less_pid_before": 50495,
+      "q_sent": true,
+      "return_sent": false,
+      "less_absent_after": true,
+      "shell_preserved": true,
+      "signals_sent": false
+    }
+  ],
+  "native_completion_roundtrip": {
+    "task": "kb-direct-completion-20261026-01",
+    "initial_submission_state": "queued",
+    "execution_state": "completed",
+    "submission_seconds": 0.281,
+    "roundtrip_seconds": 3.766,
+    "completion_received": true,
+    "processed_then_acknowledged": true,
+    "inbox_empty_after_ack": true,
+    "independent_chatgpt_ui_delivery": false,
+    "route": "actual loopback MCP HTTP, same client connection; not ChatGPT Apps route",
+    "host_consumer_registration_independently_instrumented": false
+  },
+  "chatgpt_connector": {
+    "task_id": "kb-chatgpt-connector-probe-20261026-01",
+    "principal": "chatgpt",
+    "completion_subscription": "",
+    "state": "completed",
+    "completion_received": true,
+    "processed_then_acknowledged": true,
+    "chat_ui_delivery": "unverified",
+    "unsolicited_wakeup": false
+  },
+  "queues": {
+    "chatgpt_active_task_count": 25,
+    "tasks_has_more": false,
+    "chatgpt_active_handoff_count": 1,
+    "handoffs_has_more": false,
+    "chatgpt_active_message_count": 38,
+    "messages_has_more": false,
+    "catalog_live_error": "internal_error from native team_work.result JSON decoding",
+    "old_sync_task": {
+      "id": "codex_threaddesk_sync_20261021_01",
+      "state": "unknown",
+      "error": "visible_reply_unknown",
+      "origin_version": "0.8.0rc11",
+      "delivery_evidence": "agent_confirmed=true and last observation state confirmed",
+      "terminal": "terminal:22104:ttys000",
+      "expected_pid": 94023,
+      "action": "preserved; no replay, cancellation, retirement or deletion"
+    },
+    "queue_entries_removed": 0
+  },
+  "agents": {
+    "codex_pids_preserved": [
+      12657,
+      60136,
+      45831
+    ],
+    "configured_codex_and_grok_bindings": "stale; operator reassignment required",
+    "grok_visible_session": "not found",
+    "grok_installed_executable": "present and runnable; not live agent proof"
+  },
+  "production_config_sha256": "998d933c4d57e1afdd928b9f0eafd41dfc87f3d541177a93c2dbb5a475623daa",
+  "production_changed": false,
+  "tests": {
+    "queue_new_cases": 5,
+    "health_poll_new_cases": 15,
+    "health_poll_direct_regressions": 4,
+    "root_ruff_check": "passed",
+    "root_ruff_format": "5 files unchanged",
+    "full_suite_repeated_locally": false
+  },
+  "deployment": "patches source only; installed service not replaced/restarted",
+  "remaining": [
+    "ChatGPT host callback/events registration and unsolicited wake-up not available to this Codex session",
+    "stale agent bindings and absent Grok visible session",
+    "daily 2000/global 20000 diagnostic caps and already dropped traces unchanged",
+    "required CI/review/merge/release gates pending"
+  ]
+}

@@ -120,15 +120,21 @@ class FileTransferService:
                 shutil.rmtree(folder)
                 raise
 
-    async def transfer(self, task, args, running):
-        principal, identifier = task["principal"], args.transfer_id
-        self.authorization.check(principal, "files.transfer")
-        record = self.repository.get(principal, identifier)
-        if record["manifest"]["destination_ref"] != self.receiver.identity:
+    def bound_receiver(self, destination_ref):
+        binder = getattr(self.receiver, "bind_destination", None)
+        receiver = binder(destination_ref) if callable(binder) else self.receiver
+        if receiver.identity != destination_ref:
             raise BridgeError(
                 "transfer_destination_changed",
                 "Prepared destination differs from current configuration",
             )
+        return receiver
+
+    async def transfer(self, task, args, running):
+        principal, identifier = task["principal"], args.transfer_id
+        self.authorization.check(principal, "files.transfer")
+        record = self.repository.get(principal, identifier)
+        receiver = self.bound_receiver(record["manifest"]["destination_ref"])
         if record["manifest"]["project_id"] not in self.settings.allowed_projects:
             raise BridgeError("transfer_project_denied", "Project authorization was revoked")
         if record["state"] == "stored":
@@ -144,7 +150,7 @@ class FileTransferService:
         try:
             async with lock:
                 self.repository.reset_pause(principal, identifier)
-                return await self._send(task, record, running)
+                return await self._send(task, record, running, receiver=receiver)
         except asyncio.CancelledError:
             self.repository.update(
                 principal, identifier, "paused", error_code="transfer_interrupted"
@@ -167,7 +173,7 @@ class FileTransferService:
                 # Reconcile ONCE by read after a lost response. Never replay the write,
                 # even if this read proves it did not arrive. Explicit resume is required.
                 try:
-                    status = await self.receiver.status(record["operation_id"])
+                    status = await receiver.status(record["operation_id"])
                     manifest = Manifest.model_validate(record["manifest"])
                     offset = checkpoint(status, record["operation_id"], manifest)
                     if status.get("state") == "committed":
@@ -189,10 +195,13 @@ class FileTransferService:
         finally:
             self.transfer_locks.pop(identifier, None)
 
-    async def _send(self, task, record, running):
+    async def _send(self, task, record, running, *, receiver=None):
         principal, identifier = task["principal"], record["id"]
         manifest = Manifest.model_validate(record["manifest"])
-        if manifest.destination_ref != self.receiver.identity:
+        receiver = (
+            receiver if receiver is not None else self.bound_receiver(manifest.destination_ref)
+        )
+        if manifest.destination_ref != receiver.identity:
             raise BridgeError(
                 "transfer_destination_changed",
                 "Destination configuration changed; explicit new preparation required",
@@ -200,7 +209,7 @@ class FileTransferService:
         path, operation_id = Path(record["snapshot"]), record["operation_id"]
         if await asyncio.to_thread(sha256_file, path) != manifest.sha256:
             raise BridgeError("transfer_integrity", "Staged snapshot changed; no bytes sent")
-        capabilities = await self.receiver.capabilities()
+        capabilities = await receiver.capabilities()
         if (
             capabilities.get("protocol") != PROTOCOL
             or capabilities.get("resumable") is not True
@@ -216,16 +225,14 @@ class FileTransferService:
             raise BridgeError("transfer_size_limit", "Receiver file limit exceeded")
         await running({"phase": "running", "transfer_id": identifier, "bytes_total": manifest.size})
         try:
-            state = await self.receiver.status(operation_id)
+            state = await receiver.status(operation_id)
         except BridgeError as exc:
             if exc.code != "transfer_not_found":
                 raise
-            state = await self.receiver.begin(operation_id, manifest)
+            state = await receiver.begin(operation_id, manifest)
         offset = checkpoint(state, operation_id, manifest)
         if state.get("state") == "committed":
-            receipt = durable_receipt(
-                await self.receiver.receipt(operation_id), operation_id, manifest
-            )
+            receipt = durable_receipt(await receiver.receipt(operation_id), operation_id, manifest)
             return self.repository.public(
                 self.repository.update(
                     principal, identifier, "stored", offset=offset, receipt=receipt
@@ -259,7 +266,7 @@ class FileTransferService:
                     )
                 chunk_hash = hashlib.sha256(data).hexdigest()
                 prefix_hash.update(data)
-                ack = await self.receiver.chunk(operation_id, offset, data, chunk_hash)
+                ack = await receiver.chunk(operation_id, offset, data, chunk_hash)
                 next_offset = checkpoint(ack, operation_id, manifest)
                 if (
                     next_offset != offset + len(data)
@@ -277,10 +284,10 @@ class FileTransferService:
         if offset != manifest.size or await asyncio.to_thread(sha256_file, path) != manifest.sha256:
             raise BridgeError("transfer_integrity", "Source changed before commit")
         self.repository.update(principal, identifier, "transferred", offset=offset)
-        await self.receiver.commit(operation_id)
+        await receiver.commit(operation_id)
         # A second authenticated call reads the durable storage receipt. A chunk
         # acknowledgement, reference or commit response alone never counts as import.
-        receipt = durable_receipt(await self.receiver.receipt(operation_id), operation_id, manifest)
+        receipt = durable_receipt(await receiver.receipt(operation_id), operation_id, manifest)
         record = self.repository.update(
             principal, identifier, "stored", offset=offset, receipt=receipt
         )
@@ -291,8 +298,9 @@ class FileTransferService:
         self.authorization.check(principal, "files.transfer")
         record = self.repository.get(principal, identifier)
         manifest = Manifest.model_validate(record["manifest"])
+        receiver = self.bound_receiver(manifest.destination_ref)
         if (
-            manifest.destination_ref != self.receiver.identity
+            manifest.destination_ref != receiver.identity
             or manifest.project_id not in self.settings.allowed_projects
         ):
             raise BridgeError("transfer_destination_changed", "Transfer scope is no longer granted")
@@ -302,10 +310,10 @@ class FileTransferService:
             raise BridgeError("transfer_already_stored", "Stored files cannot be aborted")
         self.transfer_locks[identifier] = asyncio.Lock()
         try:
-            await self.receiver.capabilities()
+            await receiver.capabilities()
             await running({"phase": "aborting", "transfer_id": identifier})
             # Even a lost begin must first be reconciled. Never create a new ID here.
-            status = await self.receiver.status(record["operation_id"])
+            status = await receiver.status(record["operation_id"])
             if status.get("state") == "committed":
                 receipt = durable_receipt(status, record["operation_id"], manifest)
                 return self.repository.public(
@@ -315,8 +323,8 @@ class FileTransferService:
                 )
             if status.get("state") != "aborted":
                 checkpoint(status, record["operation_id"], manifest)
-                await self.receiver.abort(record["operation_id"])
-                status = await self.receiver.status(record["operation_id"])
+                await receiver.abort(record["operation_id"])
+                status = await receiver.status(record["operation_id"])
             checkpoint(status, record["operation_id"], manifest, allow_aborted=True)
             if (
                 status.get("state") != "aborted"
@@ -340,7 +348,7 @@ class FileTransferService:
                 self.repository.update(principal, identifier, "paused", error_code=exc.code)
                 # The same terminal status can be confirmed without repeating abort.
                 try:
-                    status = await self.receiver.status(record["operation_id"])
+                    status = await receiver.status(record["operation_id"])
                     checkpoint(status, record["operation_id"], manifest, allow_aborted=True)
                     if (
                         status.get("state") == "aborted"

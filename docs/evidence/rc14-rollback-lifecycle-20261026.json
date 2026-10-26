@@ -1,0 +1,300 @@
+{
+  "platform": "macOS-15.7.4-x86_64-i386-64bit",
+  "architecture": "x86_64",
+  "source_commit": "14468ad5e7b28be1c1c4312d2f4517582dbc7701",
+  "label": "com.kirabridge.test.lifecycle-rollback-20261026-b",
+  "lifecycle": true,
+  "scope": "owned isolated launchd fixture only; no GUI or production service access",
+  "script_sha256": "b76687254b7dc577e86663ae39c39dff4964c3c9932cb4ee867218ff552a3064",
+  "installer_sha256": "dd7b6528a09b480c93e91025ca06de73eef94a172e5ec4c5a22f7d40af53a235",
+  "checks": [
+    "isolated RC14 starts",
+    "isolated candidate starts",
+    "kickstart and SIGKILL/KeepAlive each prove a different healthy PID",
+    "rollback readiness passed"
+  ],
+  "passed": true,
+  "kickstart": {
+    "old_pid": 2491,
+    "new_pid": 2533,
+    "observations": [
+      {
+        "at": 1793029308.323474,
+        "launchctl_returncode": 0,
+        "state": "xpcproxy",
+        "pid": "2533",
+        "runs": "2",
+        "last terminating signal": "Terminated: 15",
+        "spawn type": "background (5)"
+      },
+      {
+        "at": 1793029309.910773,
+        "launchctl_returncode": 0,
+        "state": "running",
+        "pid": "2533",
+        "runs": "2",
+        "last terminating signal": "Terminated: 15",
+        "spawn type": "background (5)"
+      }
+    ]
+  },
+  "keepalive": {
+    "old_pid": 2533,
+    "new_pid": 2570,
+    "observations": [
+      {
+        "at": 1793029311.313962,
+        "launchctl_returncode": 0,
+        "state": "xpcproxy",
+        "pid": "2570",
+        "runs": "3",
+        "last terminating signal": "Killed: 9",
+        "spawn type": "background (5)"
+      },
+      {
+        "at": 1793029312.884793,
+        "launchctl_returncode": 0,
+        "state": "running",
+        "pid": "2570",
+        "runs": "3",
+        "last terminating signal": "Killed: 9",
+        "spawn type": "background (5)"
+      }
+    ]
+  },
+  "before_rollback": {
+    "at": 1793029314.312416,
+    "launchctl_returncode": 0,
+    "state": "running",
+    "pid": "2570",
+    "runs": "3",
+    "last terminating signal": "Killed: 9",
+    "spawn type": "background (5)",
+    "previous_client": {
+      "version": "0.8.0rc17",
+      "dispatcher_active": true,
+      "runtime_pid": 2570
+    },
+    "candidate_client": {
+      "version": "0.8.0rc17",
+      "dispatcher_active": true,
+      "runtime_pid": 2570
+    }
+  },
+  "readiness_launchd_observations": [
+    {
+      "at": 1793029316.924292,
+      "launchctl_returncode": 0,
+      "state": "running",
+      "pid": "2570",
+      "runs": "3",
+      "last terminating signal": "Killed: 9",
+      "spawn type": "background (5)"
+    },
+    {
+      "at": 1793029317.26027,
+      "launchctl_returncode": 113
+    },
+    {
+      "at": 1793029317.590525,
+      "launchctl_returncode": 113
+    },
+    {
+      "at": 1793029317.958627,
+      "launchctl_returncode": 113
+    },
+    {
+      "at": 1793029318.320415,
+      "launchctl_returncode": 0,
+      "state": "xpcproxy",
+      "pid": "2632",
+      "runs": "1",
+      "last exit code": "(never exited)",
+      "spawn type": "background (5)"
+    },
+    {
+      "at": 1793029318.735147,
+      "launchctl_returncode": 0,
+      "state": "xpcproxy",
+      "pid": "2632",
+      "runs": "1",
+      "last exit code": "(never exited)",
+      "spawn type": "background (5)"
+    },
+    {
+      "at": 1793029319.0952,
+      "launchctl_returncode": 0,
+      "state": "xpcproxy",
+      "pid": "2632",
+      "runs": "1",
+      "last exit code": "(never exited)",
+      "spawn type": "background (5)"
+    },
+    {
+      "at": 1793029319.436779,
+      "launchctl_returncode": 0,
+      "state": "xpcproxy",
+      "pid": "2632",
+      "runs": "1",
+      "last exit code": "(never exited)",
+      "spawn type": "background (5)"
+    },
+    {
+      "at": 1793029319.823972,
+      "launchctl_returncode": 0,
+      "state": "running",
+      "pid": "2632",
+      "runs": "1",
+      "last exit code": "(never exited)",
+      "spawn type": "background (5)"
+    },
+    {
+      "at": 1793029320.16556,
+      "launchctl_returncode": 0,
+      "state": "running",
+      "pid": "2632",
+      "runs": "1",
+      "last exit code": "(never exited)",
+      "spawn type": "background (5)"
+    },
+    {
+      "at": 1793029320.5049212,
+      "launchctl_returncode": 0,
+      "state": "running",
+      "pid": "2632",
+      "runs": "1",
+      "last exit code": "(never exited)",
+      "spawn type": "background (5)"
+    },
+    {
+      "at": 1793029320.839655,
+      "launchctl_returncode": 0,
+      "state": "running",
+      "pid": "2632",
+      "runs": "1",
+      "last exit code": "(never exited)",
+      "spawn type": "background (5)"
+    },
+    {
+      "at": 1793029321.178451,
+      "launchctl_returncode": 0,
+      "state": "running",
+      "pid": "2632",
+      "runs": "1",
+      "last exit code": "(never exited)",
+      "spawn type": "background (5)"
+    },
+    {
+      "at": 1793029321.5133362,
+      "launchctl_returncode": 0,
+      "state": "running",
+      "pid": "2632",
+      "runs": "1",
+      "last exit code": "(never exited)",
+      "spawn type": "background (5)"
+    },
+    {
+      "at": 1793029321.851031,
+      "launchctl_returncode": 0,
+      "state": "running",
+      "pid": "2632",
+      "runs": "1",
+      "last exit code": "(never exited)",
+      "spawn type": "background (5)"
+    },
+    {
+      "at": 1793029322.195812,
+      "launchctl_returncode": 0,
+      "state": "running",
+      "pid": "2632",
+      "runs": "1",
+      "last exit code": "(never exited)",
+      "spawn type": "background (5)"
+    },
+    {
+      "at": 1793029322.540973,
+      "launchctl_returncode": 0,
+      "state": "running",
+      "pid": "2632",
+      "runs": "1",
+      "last exit code": "(never exited)",
+      "spawn type": "background (5)"
+    },
+    {
+      "at": 1793029322.892738,
+      "launchctl_returncode": 0,
+      "state": "running",
+      "pid": "2632",
+      "runs": "1",
+      "last exit code": "(never exited)",
+      "spawn type": "background (5)"
+    },
+    {
+      "at": 1793029323.236532,
+      "launchctl_returncode": 0,
+      "state": "running",
+      "pid": "2632",
+      "runs": "1",
+      "last exit code": "(never exited)",
+      "spawn type": "background (5)"
+    },
+    {
+      "at": 1793029323.5883899,
+      "launchctl_returncode": 0,
+      "state": "running",
+      "pid": "2632",
+      "runs": "1",
+      "last exit code": "(never exited)",
+      "spawn type": "background (5)"
+    },
+    {
+      "at": 1793029323.932014,
+      "launchctl_returncode": 0,
+      "state": "running",
+      "pid": "2632",
+      "runs": "1",
+      "last exit code": "(never exited)",
+      "spawn type": "background (5)"
+    },
+    {
+      "at": 1793029324.276282,
+      "launchctl_returncode": 0,
+      "state": "running",
+      "pid": "2632",
+      "runs": "1",
+      "last exit code": "(never exited)",
+      "spawn type": "background (5)"
+    },
+    {
+      "at": 1793029324.616939,
+      "launchctl_returncode": 0,
+      "state": "running",
+      "pid": "2632",
+      "runs": "1",
+      "last exit code": "(never exited)",
+      "spawn type": "background (5)"
+    }
+  ],
+  "after_rollback_before_cleanup": {
+    "at": 1793029324.9165509,
+    "launchctl_returncode": 0,
+    "state": "running",
+    "pid": "2632",
+    "runs": "1",
+    "last exit code": "(never exited)",
+    "spawn type": "background (5)",
+    "previous_client": {
+      "version": "0.8.0rc14",
+      "dispatcher_active": true,
+      "runtime_pid": 2632
+    },
+    "candidate_client": {
+      "version": "0.8.0rc14",
+      "dispatcher_active": true,
+      "runtime_pid": 2632
+    }
+  },
+  "config_credentials_preserved": true,
+  "service_cleanup_bootout_returncode": 0,
+  "service_cleanup_absence_verified": true
+}

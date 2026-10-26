@@ -12,23 +12,201 @@ import json
 import os
 import plistlib
 import re
+import selectors
 import shlex
 import shutil
 import signal
 import sqlite3
+import stat
 import subprocess
 import sys
 import tarfile
 import time
 import tomllib
+import types
 import uuid
 from pathlib import Path
 
 LABEL = "com.kirabridge.bridge"
+PRESENTER = None
+OUTPUT_TARGET = None
+
+
+class NonBlockingOutput:
+    """A separately opened owned FD; never changes another stream's flags."""
+
+    def __init__(self, fd, encoding="utf-8"):
+        self.fd, self.encoding = fd, encoding
+
+    def fileno(self):
+        return self.fd
+
+    def isatty(self):
+        return os.isatty(self.fd)
+
+    def flush(self):
+        pass
+
+    def write(self, text):
+        data = text.encode(self.encoding)
+        # Decoration never waits for output space, even with a paused terminal.
+        if os.write(self.fd, data) != len(data):
+            raise BlockingIOError("Decorative output not fully accepted")
+        return len(text)
+
+    def write_bytes(self, data):
+        """One nonblocking attempt; the presenter retains unaccepted bytes."""
+        try:
+            return os.write(self.fd, data)
+        except BlockingIOError:
+            return 0
+
+    def write_child(self, data, deadline, process, timeout):
+        view = memoryview(data)
+        with selectors.DefaultSelector() as selector:
+            selector.register(self.fd, selectors.EVENT_WRITE)
+            while view:
+                if time.monotonic() >= deadline:
+                    raise subprocess.TimeoutExpired(process.args, timeout)
+                try:
+                    count = os.write(self.fd, view)
+                    if count <= 0:
+                        raise OSError("Child output stream closed")
+                    view = view[count:]
+                except BlockingIOError:
+                    selector.select(min(0.05, max(0, deadline - time.monotonic())))
+
+    def close(self):
+        if self.fd is not None:
+            os.close(self.fd)
+            self.fd = None
+
+
+def own_terminal_output(stream):
+    fd = None
+    try:
+        if not stream.isatty():
+            return None
+        original = os.fstat(stream.fileno())
+        fd = os.open(
+            os.ttyname(stream.fileno()),
+            os.O_WRONLY | os.O_NONBLOCK | os.O_NOCTTY | os.O_CLOEXEC | os.O_NOFOLLOW,
+        )
+        opened = os.fstat(fd)
+        if not stat.S_ISCHR(opened.st_mode) or opened.st_rdev != original.st_rdev:
+            raise OSError("TTY identity changed")
+        return NonBlockingOutput(fd, getattr(stream, "encoding", None) or "utf-8")
+    except (AttributeError, OSError, ValueError):
+        if fd is not None:
+            os.close(fd)
+        return None
 
 
 def say(message):
-    print(message, flush=True)
+    if PRESENTER is not None:
+        PRESENTER.say(message)
+    else:
+        print(message, file=sys.stderr, flush=True)
+
+
+def presentation_error(message):
+    if PRESENTER is not None:
+        PRESENTER.error(message)
+    else:
+        print(message, file=sys.stderr, flush=True)
+
+
+def begin_presentation(bundle, *, language="de", motion="auto"):
+    global PRESENTER, OUTPUT_TARGET
+    try:
+        root = Path(bundle).resolve(strict=True)
+        manifest = json.loads((root / "release.json").read_text())
+        path = root / "installer/presentation.py"
+        expected = manifest.get("files", {}).get("installer/presentation.py")
+        if (
+            not isinstance(expected, str)
+            or not re.fullmatch(r"[a-f0-9]{64}", expected)
+            or path.is_symlink()
+            or not path.resolve(strict=True).is_relative_to(root)
+        ):
+            return
+        verified = path.read_bytes()
+        if hashlib.sha256(verified).hexdigest() != expected:
+            return
+        module = types.ModuleType("_kirabridge_installer_presentation")
+        module.__file__ = str(path)
+        exec(compile(verified, str(path), "exec"), module.__dict__)
+        OUTPUT_TARGET = own_terminal_output(sys.stderr)
+        PRESENTER = module.create_presentation(
+            root, language=language, motion=motion, exclusive_output=OUTPUT_TARGET is not None
+        )
+        if PRESENTER is not None and OUTPUT_TARGET is not None:
+            PRESENTER.graphic_stream = OUTPUT_TARGET
+        elif OUTPUT_TARGET is not None:
+            OUTPUT_TARGET.close()
+            OUTPUT_TARGET = None
+    except Exception:
+        # Decoration is optional; the full package-integrity gate remains mandatory.
+        PRESENTER = None
+        if OUTPUT_TARGET is not None:
+            OUTPUT_TARGET.close()
+            OUTPUT_TARGET = None
+
+
+def relay_child_output(process, timeout):
+    """Own both child pipes; real output releases our frame area before forwarding."""
+    deadline = time.monotonic() + timeout
+    output_seen = False
+    with selectors.DefaultSelector() as selector:
+        for stream in (process.stdout, process.stderr):
+            selector.register(stream, selectors.EVENT_READ)
+        while selector.get_map():
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                raise subprocess.TimeoutExpired(process.args, timeout)
+            events = selector.select(min(0.05, remaining))
+            if not events and not output_seen and PRESENTER is not None:
+                PRESENTER.begin()
+                PRESENTER.tick()
+            for key, _ in events:
+                data = os.read(key.fileobj.fileno(), 65536)
+                if not data:
+                    selector.unregister(key.fileobj)
+                    key.fileobj.close()
+                    continue
+                if PRESENTER is not None:
+                    # A partial graphic is discarded, never finalized across logs.
+                    PRESENTER.cancel()
+                output_seen = True
+                prefix = getattr(PRESENTER, "output_prefix", "") if PRESENTER is not None else ""
+                OUTPUT_TARGET.write_child(
+                    prefix.encode(OUTPUT_TARGET.encoding) + data,
+                    deadline,
+                    process,
+                    timeout,
+                )
+                if prefix:
+                    PRESENTER.acknowledge_output_prefix()
+        process.wait(timeout=max(0, deadline - time.monotonic()))
+
+
+def require_visible_terminal(args):
+    if not getattr(args, "require_visible_terminal", False):
+        return
+    path = Path(__file__).with_name("visible_terminal.py")
+    if path.is_symlink():
+        raise RuntimeError("Visible-terminal verifier symlink refused")
+    verified = path.read_bytes()
+    if args.bundle:
+        manifest = json.loads((args.bundle / "release.json").read_text())
+        expected = manifest.get("files", {}).get("installer/visible_terminal.py")
+        if not expected or hashlib.sha256(verified).hexdigest() != expected:
+            raise RuntimeError("Visible-terminal verifier missing or checksum changed")
+    namespace = {"__name__": "kirabridge_visible_installer", "__file__": str(path)}
+    exec(compile(verified, str(path), "exec"), namespace)
+    args.visible_terminal_proof = namespace["confirm_visible_terminal"](
+        getattr(args, "visible_terminal_proof", None)
+    )
 
 
 def run(argv, *, capture=False, timeout=600, **kwargs):
@@ -38,15 +216,20 @@ def run(argv, *, capture=False, timeout=600, **kwargs):
             for k, v in os.environ.items()
             if k not in {"PYTHONPATH", "PYTHONHOME", "UV_PROJECT_ENVIRONMENT", "VIRTUAL_ENV"}
         }
+    controlled = not capture and PRESENTER is not None and OUTPUT_TARGET is not None
     process = subprocess.Popen(
         [str(x) for x in argv],
         start_new_session=True,
-        stdout=subprocess.PIPE if capture else None,
-        stderr=subprocess.PIPE if capture else None,
+        stdout=subprocess.PIPE if capture or controlled else None,
+        stderr=subprocess.PIPE if capture or controlled else None,
         **kwargs,
     )
     try:
-        stdout, _ = process.communicate(timeout=timeout)
+        if controlled:
+            relay_child_output(process, timeout)
+            stdout = None
+        else:
+            stdout, _ = process.communicate(timeout=timeout)
         if process.returncode:
             raise RuntimeError(f"command failed ({process.returncode}): {Path(str(argv[0])).name}")
         return stdout if capture else None
@@ -64,6 +247,10 @@ def run(argv, *, capture=False, timeout=600, **kwargs):
                 pass
             process.wait(timeout=3)
         raise
+    finally:
+        if controlled:
+            for stream in (process.stdout, process.stderr):
+                stream.close()
 
 
 def private_dir(path):
@@ -439,22 +626,29 @@ def stop_service(args):
 def start_service(args):
     if args.service != "none" and args.plist.exists():
         command = ["launchctl", "bootstrap", f"gui/{os.getuid()}", str(args.plist)]
-        # launchd can still be removing the old job after bootout returns.
-        # macOS reports the pending removal as bootstrap exit code 5
-        # ("Operation already in progress"). Retry *only* that transient
-        # exit code, with a fixed bound, before allowing activate() to roll back.
-        for attempt in range(5):
+        # Bootstrap exit code 5 is a generic Input/output error (EIO), not
+        # proof of pending removal. Delayed teardown after bootout is one
+        # possible cause. Retry only code 5 within a fixed bound, then fail
+        # through activate()'s existing rollback path; other errors fail immediately.
+        # Production HTTP long-polls can outlive the old four-second retry
+        # window. Keep both elapsed time and command count bounded; do not change
+        # the operator's launchd exit/KeepAlive options or require root.
+        deadline = time.monotonic() + 30
+        for attempt in range(30):
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                raise RuntimeError("launchctl bootstrap did not settle within 30 seconds")
             completed = subprocess.run(
-                command, capture_output=True, text=True, timeout=20, check=False
+                command, capture_output=True, text=True, timeout=min(20, remaining), check=False
             )
             if completed.returncode == 0:
                 return
-            if completed.returncode != 5 or attempt == 4:
+            if completed.returncode != 5 or attempt == 29:
                 detail = completed.stderr.strip() or completed.stdout.strip()
                 raise RuntimeError(
                     f"launchctl bootstrap failed ({completed.returncode}): {detail[:500]}"
                 )
-            time.sleep(1)
+            time.sleep(min(1, max(0, deadline - time.monotonic())))
 
 
 def wait_health(args, release, version):
@@ -574,6 +768,7 @@ def require_queue_compatibility(config, release):
 
 
 def activate(args, release):
+    require_visible_terminal(args)
     validate_service_owner(args)
     validate_launcher_owner(args)
     fresh_config(args, release)
@@ -645,6 +840,7 @@ def activate(args, release):
                 raise RuntimeError(
                     "Configuration/credentials changed during preparation; no switch"
                 )
+            require_visible_terminal(args)
             jwrite(current, before)  # Durable recovery record before any switch.
             stop_service(args)
             wrapper = (
@@ -697,7 +893,7 @@ def activate(args, release):
     except Exception:
         if current.exists() and json.loads(current.read_text()).get("backup") == str(backup):
             say("Umschaltung fehlgeschlagen. Rückweg wird unter erneuter Leerlaufprüfung versucht.")
-            rollback(args)
+            rollback(args, _compensating=True)
         raise
     assert args.config.read_bytes() == config_before, "Configuration changed"
     assert not credentials or sha(credentials) == credential_hash, "Credentials changed"
@@ -707,7 +903,11 @@ def activate(args, release):
     )
 
 
-def rollback(args):
+def rollback(args, *, _compensating=False):
+    # Recovery restores only the already recorded old definitions. Loss of UI
+    # after a failed switch must not prevent this guarded compensation.
+    if not _compensating:
+        require_visible_terminal(args)
     current = args.prefix / "current.json"
     if not current.exists():
         raise RuntimeError("No activated version/recovery record")
@@ -730,6 +930,8 @@ def rollback(args):
         require_queue_compatibility(
             args.config, Path(previous_release) if previous_release else None
         )
+        if not _compensating:
+            require_visible_terminal(args)
         stop_service(args)
         for path, flag, name in [
             (args.launcher, "had_wrapper", "launcher.before"),
@@ -759,7 +961,7 @@ def rollback(args):
 def status(args):
     current = args.prefix / "current.json"
     if not current.exists():
-        say(json.dumps({"installed_by_versioned_installer": False}))
+        print(json.dumps({"installed_by_versioned_installer": False}), flush=True)
         return
     active = json.loads(current.read_text())
     result = {k: active[k] for k in ("version", "commit", "release")}
@@ -767,15 +969,17 @@ def status(args):
     result["service_managed"] = args.service != "none"
     if args.service != "none":
         result["daemon"] = cli(Path(active["release"]), args.config, "status")
-    say(json.dumps(result, indent=2))
+    print(json.dumps(result, indent=2), flush=True)
 
 
-def main():
+def _main():
     global LABEL
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("action", choices=["prepare", "install", "status", "rollback"])
     parser.add_argument("--repo", type=Path, default=Path(__file__).resolve().parents[1])
     parser.add_argument("--ref")
+    parser.add_argument("--language", choices=("de", "en"), default="de")
+    parser.add_argument("--motion", choices=("auto", "full", "reduced"), default="auto")
     parser.add_argument("--bundle", type=Path, help="Verified extracted release bundle")
     parser.add_argument("--workspace", type=Path, default=Path.home() / "workspace/KiraBridge")
     parser.add_argument(
@@ -804,6 +1008,11 @@ def main():
     parser.add_argument(
         "--test-label", help="Isolated launchd test label; com.kirabridge.test.* only"
     )
+    parser.add_argument(
+        "--require-visible-terminal",
+        action="store_true",
+        help="Require a fresh confirmed visible macOS Terminal window before activation",
+    )
     args = parser.parse_args()
     if args.test_label:
         if not re.fullmatch(r"com\.kirabridge\.test\.[a-z0-9-]{8,64}", args.test_label):
@@ -814,6 +1023,10 @@ def main():
         LABEL = args.test_label
     if os.getuid() == 0:
         parser.error("Run as your normal user without sudo")
+    if args.require_visible_terminal:
+        if args.action not in {"install", "rollback"}:
+            parser.error("Visible-terminal verification applies to install or rollback")
+        require_visible_terminal(args)
     for name in ("repo", "prefix", "config", "launcher", "plist", "cache_dir"):
         setattr(args, name, getattr(args, name).expanduser().absolute())
     if sys.version_info < (3, 11):
@@ -824,6 +1037,13 @@ def main():
 
     signal.signal(signal.SIGTERM, interrupted)
     os.umask(0o077)
+    if args.action != "status":
+        begin_presentation(
+            args.bundle or Path(__file__).resolve().parents[1],
+            language=args.language,
+            motion=args.motion,
+        )
+        say("KiraBridge · Installation/Update")
     for path in (args.config, args.launcher, args.plist, args.prefix, args.cache_dir):
         validate_destination(path, private=path == args.config)
     private_dir(args.prefix)
@@ -838,18 +1058,48 @@ def main():
             rollback(args)
         else:
             status(args)
+        if PRESENTER is not None:
+            # Do not begin a late frame and immediately discard its tail on exit.
+            # Real completion is already reported by activate/rollback/prepare.
+            PRESENTER.cancel()
+            prefix = getattr(PRESENTER, "output_prefix", "")
+            if prefix:
+                written = sys.stderr.write(prefix)
+                if written is not None and written != len(prefix):
+                    raise BlockingIOError("Final terminal cleanup not fully accepted")
+                sys.stderr.flush()
+                PRESENTER.acknowledge_output_prefix()
     finally:
         os.close(fd)
 
 
-if __name__ == "__main__":
+def close_presentation():
+    global PRESENTER, OUTPUT_TARGET
+    presenter, target = PRESENTER, OUTPUT_TARGET
+    PRESENTER, OUTPUT_TARGET = None, None
     try:
-        main()
+        if presenter is not None:
+            presenter.cancel()
+    finally:
+        if target is not None:
+            target.close()
+
+
+def main():
+    try:
+        _main()
+        return 0
     except KeyboardInterrupt:
-        say(
+        presentation_error(
             "ABGEBROCHEN: eigene Build-Unterprozesse gestoppt; Rückweg steht im Transaktionsbackup."
         )
-        sys.exit(130)
+        return 130
     except Exception as exc:
-        say(f"FEHLER: {exc}")
-        sys.exit(1)
+        presentation_error(f"FEHLER: {exc}")
+        return 1
+    finally:
+        close_presentation()
+
+
+if __name__ == "__main__":
+    sys.exit(main())

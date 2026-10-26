@@ -12,6 +12,7 @@ import uuid
 from pathlib import Path
 
 from kirabridge.bridge_core.models import BridgeError, TaskRequest, canonical, digest
+from kirabridge.permissions import automatic_for
 from kirabridge.team_manager.models import (
     TeamCreate,
     TeamMessageSend,
@@ -206,7 +207,7 @@ class TeamManager:
 
     def _automatic(self, principal, capability="team.write"):
         policy = self._principal(principal, capability)
-        if policy.approval_mode != "automatic":
+        if not automatic_for(policy, capability):
             raise BridgeError(
                 "approval_required", "Team writes require local automatic authorization"
             )
@@ -917,7 +918,7 @@ class TeamManager:
         if not worker or not worker.agent or not worker.cwd:
             raise BridgeError("team_worker_unavailable", "No automatic worker is configured")
         policy = self.security.principal(work["assignee"], "agent.execute")
-        if policy.approval_mode != "automatic" or worker.agent not in policy.agents:
+        if not automatic_for(policy, "agent.execute") or worker.agent not in policy.agents:
             raise BridgeError("team_worker_denied", "Worker execution is not authorized")
         if worker.agent not in self.config.agents:
             raise BridgeError("agent_unavailable", "Worker adapter is not configured")

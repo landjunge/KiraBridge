@@ -32,11 +32,22 @@ class VisibleReadinessError(BridgeError):
 
 
 class VisibleHandoffs:
-    def activation_work_count(self, *, active_only=False, context=None):
+    def activation_work_count(
+        self, *, active_only=False, context=None, preserve_external_waits=False
+    ):
+        # Count evidence, without rewriting reservations during a read query.
+        # ACK alone is not completion; transient native input always stays active.
         db = context.db if context is not None else self.store.db
         return db.execute(
-            "SELECT count(*) FROM visible_handoffs WHERE state IN "
-            "('planned','inserting','inserted','submitting','return_sent','sent','confirmed')"
+            "SELECT count(*) FROM visible_handoffs h WHERE state IN "
+            "('planned','inserting','inserted','submitting','return_sent','sent','confirmed') "
+            "AND NOT (h.state IN ('sent','confirmed') AND EXISTS ("
+            "SELECT 1 FROM messages original JOIN messages reply ON reply.reply_to=original.id "
+            "WHERE original.id=h.message_id AND original.sender=h.principal "
+            "AND original.recipient=h.target AND original.acknowledged IS NOT NULL "
+            "AND reply.sender=h.target AND reply.recipient=h.principal "
+            "AND reply.kind IN ('answer','result'))) "
+            + ("AND h.state NOT IN ('sent','confirmed')" if preserve_external_waits else "")
         ).fetchone()[0]
 
     @staticmethod
@@ -134,6 +145,9 @@ class VisibleHandoffs:
                 (identifier,),
             )
         ]
+        from kirabridge.visible_message_evidence import handoff_delivery_status
+
+        result.update(handoff_delivery_status(self.store.db, identifier, result["state"]))
         return result
 
     def reconcile(self, principal, identifier):
@@ -212,7 +226,7 @@ class VisibleHandoffs:
             )
 
     async def observe_readiness(self, principal, output):
-        selected = await self.sessions.selected(
+        selected = await self.sessions.observed_selected(
             principal, output["pane_id"], output["expected_pid"]
         )
         try:
@@ -227,11 +241,14 @@ class VisibleHandoffs:
             }
         if target is None:
             return None
-        return await self.binding_readiness(principal, target, binding, output)
+        with self.sessions.observation_scope(principal, selected):
+            return await self.binding_readiness(principal, target, binding, output)
 
     async def binding_readiness(self, principal, target, binding, output):
-        selected = await self.sessions.selected(principal, binding.pane_id, binding.expected_pid)
-        if not any(
+        selected = await self.sessions.observed_selected(
+            principal, binding.pane_id, binding.expected_pid
+        )
+        if not self.sessions.binding_matches(selected, binding, target) or not any(
             p["pid"] == binding.agent_pid and p["name"] == target
             for p in selected.get("processes", [])
         ):
@@ -383,37 +400,42 @@ class VisibleHandoffs:
 
     async def check_target(self, principal, target, binding, *, ready=False):
         row = await self.sessions.selected(principal, binding.pane_id, binding.expected_pid)
-        matches = [
-            p
-            for p in row.get("processes", [])
-            if p["pid"] == binding.agent_pid and p["name"] == target
-        ]
-        if len(matches) != 1:
-            raise BridgeError(
-                "visible_target_changed", "Bound CLI process is not in this exact terminal"
-            )
-        output = await self.sessions.read(principal, binding.pane_id, binding.expected_pid)
-        if ready:
-            observation = await self.binding_readiness(
-                principal,
-                target,
-                binding,
-                {**output, "pane_id": binding.pane_id, "expected_pid": binding.expected_pid},
-            )
-            if not observation["ready"]:
-                # Store raw contents only in the bounded capture repository.
-                observed = self.sessions.audit.observe_terminal(
+        with self.sessions.observation_scope(principal, row):
+            matches = [
+                p
+                for p in row.get("processes", [])
+                if p["pid"] == binding.agent_pid and p["name"] == target
+            ]
+            if len(matches) != 1:
+                raise BridgeError(
+                    "visible_target_changed", "Bound CLI process is not in this exact terminal"
+                )
+            output = await self.sessions.read(principal, binding.pane_id, binding.expected_pid)
+            if ready:
+                observation = await self.binding_readiness(
                     principal,
+                    target,
+                    binding,
                     {**output, "pane_id": binding.pane_id, "expected_pid": binding.expected_pid},
                 )
-                raise VisibleReadinessError(
-                    {
-                        **observation,
-                        "observed_at": time.time(),
-                        "output_ref": observed.get("output_ref"),
-                    }
-                )
-        return output
+                if not observation["ready"]:
+                    # Store raw contents only in the bounded capture repository.
+                    observed = self.sessions.audit.observe_terminal(
+                        principal,
+                        {
+                            **output,
+                            "pane_id": binding.pane_id,
+                            "expected_pid": binding.expected_pid,
+                        },
+                    )
+                    raise VisibleReadinessError(
+                        {
+                            **observation,
+                            "observed_at": time.time(),
+                            "output_ref": observed.get("output_ref"),
+                        }
+                    )
+            return output
 
     async def submit_inserted(self, identifier, principal, target, binding, running):
         """Exactly one separately recorded Return; never call after an uncertain submit."""

@@ -1,0 +1,14 @@
+{
+  "passed": true,
+  "exact_command": "d=$(mktemp -d) && gh release download v0.8.0rc17 -R landjunge/KiraBridge -p 'KiraBridge-macos-7725bc6.tar.gz*' -D \"$d\" && (cd \"$d\" && shasum -a 256 -c KiraBridge-macos-7725bc6.tar.gz.sha256 && tar -xzf KiraBridge-macos-7725bc6.tar.gz && sh KiraBridge/install.sh --full-access \"$@\")",
+  "shell_download_checksum_extraction_install_exit_code": 0,
+  "source_commit": "7725bc668db5e895b61228a5b0455819fe5ce961",
+  "download_sha256": "896b7d1510cd164459b9cb1767a9b26ffc75164f2f6ca3791b119ddffc272f8c",
+  "cli_version": "cli.py 0.8.0rc17",
+  "fresh_full_grant_operations": 42,
+  "isolation": "explicit --service none; separate prefix/config/credentials/launcher/plist/cache/workspace. OS mktemp scratch; no production paths changed.",
+  "launchd_acceptance": "separate actual warm-responsive-upgrade and productive lifecycle",
+  "harness_failure": "First post-install assertion assumed mktemp would use TMPDIR. Shell command and installation had already succeeded. Corrected only artifact lookup from own recorded wheel URI; did not rerun command/install.",
+  "apple_silicon": "not executed",
+  "release_status": "authenticated private RC17 draft candidate, not published"
+}

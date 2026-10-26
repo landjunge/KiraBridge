@@ -1,5 +1,7 @@
 from types import SimpleNamespace
 
+import pytest
+
 from kirabridge.audit_manager import AuditReader
 from kirabridge.operator_queries import OperatorQueries
 from kirabridge.task_manager.store import Store
@@ -72,3 +74,97 @@ def test_owner_queries_observe_the_callers_shared_uncommitted_transaction(bridge
         assert service.maintenance_counts()["team_work"] == 1
     finally:
         other.close()
+
+
+def authenticated_delivery(bridge):
+    from kirabridge.message_manager import MessageSend
+
+    for name, peer in (("local", "other"), ("other", "local")):
+        policy = bridge.config.principals[name]
+        policy.message_peers = [peer]
+        policy.approval_mode = "automatic"
+        policy.capabilities += ["message.send", "message.read", "message.ack"]
+    original = bridge.messages.send(
+        "local",
+        MessageSend(
+            recipient="other",
+            conversation_id="activation-proof",
+            body="original",
+            idempotency_key="activation-original",
+            dispatch=False,
+        ),
+    )
+    delivered = bridge.messages.receive("other")["messages"][0]
+    return original["id"], delivered["receipt"]
+
+
+def test_activation_does_not_count_authenticated_final_reply_as_pending_handoff(bridge):
+    from kirabridge.message_manager import MessageSend
+
+    message_id, receipt = authenticated_delivery(bridge)
+    bridge.messages.ack("other", message_id, receipt)
+    bridge.messages.send(
+        "other",
+        MessageSend(
+            recipient="local",
+            conversation_id="activation-proof",
+            reply_to=message_id,
+            body="final result",
+            kind="result",
+            idempotency_key="activation-result",
+            dispatch=False,
+        ),
+    )
+    bridge.store.db.execute(
+        "INSERT INTO visible_handoffs VALUES('proved','local','other','hash','{}',?,"
+        "'confirmed',1,1,'{}')",
+        (message_id,),
+    )
+    before = tuple(bridge.store.db.execute("SELECT * FROM visible_handoffs").fetchone())
+    for active_only in (False, True):
+        assert bridge.visible_handoffs.activation_work_count(active_only=active_only) == 0
+    assert tuple(bridge.store.db.execute("SELECT * FROM visible_handoffs").fetchone()) == before
+
+
+def test_activation_queued_ack_is_not_pending_delivery_but_running_stays_active(bridge):
+    message_id, receipt = authenticated_delivery(bridge)
+    bridge.store.db.execute(
+        "INSERT INTO message_jobs(message_id,state) VALUES(?,'queued')",
+        (message_id,),
+    )
+    assert bridge.messages.activation_work_count() == 1
+    bridge.messages.ack("other", message_id, receipt)
+    assert bridge.messages.activation_work_count() == 0
+    assert bridge.store.db.execute("SELECT state FROM message_jobs").fetchone()[0] == "queued"
+    bridge.store.db.execute("UPDATE message_jobs SET state='running'")
+    for active_only in (False, True):
+        assert bridge.messages.activation_work_count(active_only=active_only) == 1
+
+
+@pytest.mark.parametrize("state", ["sent", "confirmed", "inserting", "submitting", "return_sent"])
+@pytest.mark.parametrize("proof", ["ack-only", "reply-only", "ack-and-nonfinal"])
+def test_activation_never_infers_finished_execution_from_incomplete_evidence(bridge, state, proof):
+    from kirabridge.message_manager import MessageSend
+
+    message_id, receipt = authenticated_delivery(bridge)
+    if proof != "reply-only":
+        bridge.messages.ack("other", message_id, receipt)
+    if proof != "ack-only":
+        bridge.messages.send(
+            "other",
+            MessageSend(
+                recipient="local",
+                conversation_id="activation-proof",
+                reply_to=message_id,
+                body="observed",
+                kind="question" if proof == "ack-and-nonfinal" else "result",
+                idempotency_key="activation-observation",
+                dispatch=False,
+            ),
+        )
+    bridge.store.db.execute(
+        "INSERT INTO visible_handoffs VALUES('unproved','local','other','hash','{}',?,?,1,1,'{}')",
+        (message_id, state),
+    )
+    for active_only in (False, True):
+        assert bridge.visible_handoffs.activation_work_count(active_only=active_only) == 1

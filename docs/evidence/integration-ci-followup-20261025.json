@@ -1,0 +1,43 @@
+{
+  "failed_ci_source": "16642e2b87ddc0f4e9f96e664b8cb18bf9159710",
+  "verify_run": 40223059447,
+  "linux_each_python_result": "5failed,1442passed,12skipped on both3.11 and3.13",
+  "release_run": 40223059124,
+  "release_failure": "Ubuntu24.04 installer guard correctly refused Debian13 userspace",
+  "fixes": {
+    "pid_test": "real PID change during read followed by actual SessionManager.insert fresh boundary refusal; no production code change",
+    "receiver_tests": "faults injected into actual MCP abort/status response shared by bound views; unknown/paused/receiptNone/dedupe assertions retained",
+    "linux_package_environment": "pinned Ubuntu24.04 container on Debian host, nonroot, existing Docker, installer OS guard unchanged"
+  },
+  "targeted_cases": {
+    "pid": {
+      "passed": 1,
+      "log": "codex-pid-observation-final.log"
+    },
+    "native_receipt_and_lost_abort": {
+      "passed": 4,
+      "deselected": 7,
+      "log": "receiver-injection-after.log"
+    }
+  },
+  "checks": {
+    "ruff": "passed",
+    "format": "340 files already formatted",
+    "shell_syntax": "passed"
+  },
+  "source_sha256": {
+    "tests/test_codex_binding.py": "5c3b23bbf9b7e1c69c89ac62b61f7a176357d401fc7f03eea3514a2885a59e9c",
+    "tests/test_library_receive_adapter.py": "17741409710cd75603b76e418753f6b86a834acae63d6903f5143450003caf4a",
+    "scripts/ci_linux_release_smoke.sh": "948943398d53e42a16ce443f9a685a0ee40ca2da0d1e861009336b67ae16b707",
+    ".github/linux-smoke/Dockerfile": "cb64933e781d0fcadd7182acca3e163242315ac7b7dd4c8d2030631fc9fd8809",
+    ".github/workflows/release-candidate.yml": "39be02a6c855959649d42a6d416ffca859bcd5bda20b5c0b7cc83c3c2f4d8dfa"
+  },
+  "container_test": "pending real probe; static review is not a passed smoke test",
+  "logs_sha256": {
+    "codex-pid-observation-reproduction.log": "3555feed0b3a87b4c99927c38a064c025c8c9959ab10434a43faf48fd971d646",
+    "codex-pid-observation-fixed.log": "f574bf83729b682055fea4742e2eec06cd32be9f8694d8319d5361875228ed00",
+    "codex-pid-observation-final.log": "976ea3fe6dfa65b827ec05fc16bf49cec94d3fda3b2d6ad4719708e74a38b32d",
+    "receiver-injection-before.log": "64d0f5cef909565c19161774694444652ed2b8bd784857f00d18b19b1e288e0f",
+    "receiver-injection-after.log": "ed4a65fd5d2a515fbfa173a52fa52687e690bbe7c34f4e796eb80359bb515165"
+  }
+}

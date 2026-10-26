@@ -2,14 +2,12 @@
 
 ## Deutsch: den tatsächlichen Anschluss prüfen
 
-Diese Anleitung beschreibt den lokalen Assistenten im Quellstand
-`7af39cd97b58054d6e7333cd3430d00f4b46c3f4` (`0.6.0rc2`), keinen neu
-veröffentlichten Download. Der dokumentierte Betreiber-Mac
-mit `0.5.2`-Backports und das eingefrorene private RC2-Paket `57bee99` sind andere
-Stände. Das alte Paket enthält die späteren Agenten-/Workflowfunktionen nicht und
-akzeptiert nicht jede aktuelle Konfiguration. [Installation DE](INSTALL-DE.md),
-[installation EN](INSTALL-EN.md) und [Releaseabnahme](RELEASE-ABNAHME-20261018.md)
-unterscheiden die Pakete und den Updateweg. Bestehende gesunde Einrichtung nicht
+Aktueller Entwicklungsstand ist `0.8.0rc17`; veröffentlicht bleibt RC14,
+RC17 ist ein Release-Entwurf. Auf dem Betreiber-Mac ist inzwischen RC17 installiert;
+[Build-, Installations- und Eingabenachweis](RC17-INSTALLATION-20261024.md) trennt
+Quellpin, Paket, tatsächlichen Dienst und offene Abnahmen. Ältere RC2-/0.5.2-Pakete
+sind historische Stände, keine aktuelle Installationsanweisung.
+Bestehende gesunde Einrichtung nicht
 für einen Nachweis erneut durchlaufen oder zurücksetzen.
 
 Der normale Installer führt lokale Einrichtung und `kirabridge chatgpt setup`
@@ -134,9 +132,11 @@ der Chat erteilt sich keine Rechte und aktiviert keine optionale Assembly.
 ## English: connect, then confirm the actual task
 
 Use the [English installation guide](INSTALL-EN.md) to identify the package first.
-Current source `7af39cd` (`0.6.0rc2`), the recorded Mac `0.5.2` backport and frozen
-private RC2 `57bee99` are different states. Do not reset a healthy configuration or
-try the old package against newer settings. Inspect `kirabridge status` and
+Current development source is RC17; the published release remains RC14 and RC17
+is a draft. The operator Mac now runs RC17. The [installation evidence](RC17-INSTALLATION-20261024.md)
+distinguishes source pins, assets, actual runtime and remaining acceptance.
+RC2/0.5.2 packages are historical. Do not reset a healthy configuration or use
+historical packages against newer settings. Inspect `kirabridge status` and
 `kirabridge chatgpt status`; only missing setup needs the interactive local command:
 
 ```sh
@@ -295,3 +295,20 @@ Grok Build dokumentiert ACP-Initialisierung, Sitzungsanlage und `session/prompt`
 
 
 </details>
+
+
+## RC17: lightweight health and stale Apps schemas / Leichte Statusabfrage
+
+`bridge_health` reports actual runtime and grants without scanning Terminal windows.
+Its terminal observations are explicitly cached/not_probed; request
+`observe_terminals=true` or use `agent_inventory`/`operation_catalog` for a fresh
+observation. Cached data never authorizes input. / Die normale Statusabfrage belegt
+keine Terminal-Leseplätze; für frische Fenstererkennung ausdrücklich beobachten.
+
+Events are optional. If an already loaded Apps tool still requires the historical
+`completion_subscription` field, use `""`. Do not invent an Events subscription or
+request additional permissions. An actual Kira Whiteboard write and independent
+readback succeeded with this compatible route. Refresh the host's connector
+metadata when possible. / Events sind optional; alte Apps-Schemas können mit dem
+leeren Legacyfeld weiterarbeiten. Ein vorhandener Empfangsbeleg ersetzt weiterhin
+weder tatsächliche Ausführung noch unabhängige Speicherbestätigung.

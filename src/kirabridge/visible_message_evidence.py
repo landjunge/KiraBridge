@@ -51,6 +51,48 @@ def _time(value):
     return value if type(value) in (int, float) and math.isfinite(value) else None
 
 
+def handoff_delivery_status(db, identifier, state, *, tables=None):
+    """Stored delivery retirement is distinct from view-only queue withdrawal.
+
+    Absence of the additive hold table never releases an unknown reservation.
+    These predicates mirror the handoff dispatch guard; no reconciliation occurs.
+    """
+    has_holds = (
+        "queue_holds" in tables
+        if tables is not None
+        else bool(
+            db.execute(
+                "SELECT 1 FROM sqlite_master WHERE type='table' AND name='queue_holds'"
+            ).fetchone()
+        )
+    )
+    retired = bool(
+        has_holds
+        and db.execute(
+            "SELECT 1 FROM queue_holds WHERE queue_id='handoffs' AND item_id=?", (identifier,)
+        ).fetchone()
+    )
+    reserving_states = {
+        "planned",
+        "inserting",
+        "inserted",
+        "submitting",
+        "return_sent",
+        "sent",
+        "confirmed",
+        "unknown",
+    }
+    return {
+        "delivery_retired": retired,
+        "execution_reservation_active": isinstance(state, str)
+        and state in reserving_states
+        and not retired,
+        "next_step": "retired_history_do_not_resend"
+        if retired
+        else "inspect_original_handoff_without_repeating_input",
+    }
+
+
 def visible_message_evidence(
     db: sqlite3.Connection, principal: str, message_id: str, run_id: str | None
 ) -> dict | None:
@@ -66,7 +108,7 @@ def visible_message_evidence(
         row[0]
         for row in db.execute(
             "SELECT name FROM sqlite_master WHERE type='table' AND name IN "
-            "('visible_handoffs','visible_handoff_events')"
+            "('visible_handoffs','visible_handoff_events','queue_holds')"
         )
     }
     if "visible_handoffs" not in tables:
@@ -124,5 +166,5 @@ def visible_message_evidence(
         ],
         "automatic_retry_permitted": False,
         "reconciliation_performed": False,
-        "next_step": "inspect_original_handoff_without_repeating_input",
+        **handoff_delivery_status(db, row[0], row[1], tables=tables),
     }

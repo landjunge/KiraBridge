@@ -106,3 +106,71 @@ therefore refuses unsafe activation/downgrade **before stopping the current serv
 Use a queue-aware runtime or the verified safe restoration flow; never delete holds or
 restore an old database to force rollback. Production RC14 remains unchanged pending
 required review/checks and explicit installation acceptance/authorization.
+
+## Unknown-Eintrag zurücknehmen / Withdraw an unknown entry
+
+`queue.control` unterstützt zusätzlich die Einzelaktion `withdraw`. Zulässig sind
+nur eigene beziehungsweise nach bestehenden Rechten zugängliche `unknown`-Einträge
+in `tasks`, `messages` und `handoffs`. Benötigt werden die frisch gelesene
+Eintragsrevision und ausdrücklich `acknowledge_execution_unknown: true`; diese
+Bestätigung ersetzt keine bestehenden Rechte oder notwendigen Freigaben.
+Andere Zustände, insbesondere laufende oder nur wartende Aufträge, werden verweigert.
+Für mehrere Einträge jede ausgewählte ID separat mit ihrer Revision bearbeiten;
+`clear` bekommt keine neue Bedeutung. Nach einem Versionswechsel Revisionen neu lesen.
+
+Die aktive Queueansicht zeigt danach `delivery_active: false` und Metadaten unter
+`withdrawal`. `state` und `execution_state` bleiben `unknown`; die Historie ist über
+`queue_entry` und `queue_entries(active_only=false)` weiterhin lesbar. Die Antwort
+meldet ausdrücklich `execution_stop_claimed: false` und
+`execution_reservation_released: false`. Dies beendet weder Prozess noch Auftrag,
+quittiert keine Nachricht und erlaubt kein Wiederholen. Unabhängige wartende
+Nachrichten werden nicht storniert. Receiver-/Inbox-Protokolle bleiben unverändert.
+Ein unbekannter Handoff kann weiterhin die Ausführungsreservierung halten:
+`withdraw` umgeht diese Sicherheitssperre nicht. `retire` bleibt eine getrennte
+Aktion mit eigener frischer positiver Bereitschaftsprüfung.
+
+Die additive Tabelle `queue_withdrawals` enthält nur Queue/ID, Akteur, Zeit und
+SHA-256 des Grundes. Ein neuer Audit-Eintrag hält die Rücknahme fest; Quelldatensätze,
+Evidenz, Nachrichten-/Handoff-/Taskhistorie und `queue_holds` werden nicht verändert.
+Ein erneuter Aufruf mit aktueller Revision verändert eine vorhandene Rücknahme nicht.
+Alte Runtime-Versionen ignorieren diese Tabelle: Die Ansicht kann dort erneut
+auftauchen, aber der ursprüngliche Status bleibt `unknown`, nicht `queued` oder
+`cancelled`. Vorhandene Hold-/Rollback-Sicherheitsprüfungen bleiben bestehen.
+
+**English:** The individual `withdraw` action requires an observed entry revision,
+existing owner/capability/approval checks, and explicit
+`acknowledge_execution_unknown: true`. Only unknown tasks, messages and handoffs
+are eligible. It hides the active queue view while retaining the unknown execution
+state, original evidence and complete history. It never stops execution, releases a
+handoff reservation, acknowledges a message, replays work or bulk-cancels pending
+messages. `queue_withdrawals` is separate from `queue_holds`; older runtimes may show
+the entry again but still see its original unknown state and execution reservation.
+
+### Reservierung eines nachweislich verschwundenen Originalziels aufgeben
+
+`retire` ohne zusätzliche Bestätigung behält seine bisherige frische Idle-Prüfung
+am zugewiesenen Ziel. `retire` mit `acknowledge_execution_unknown: true` wählt
+stattdessen ausdrücklich den strengeren Abwesenheitsnachweis der unveränderlichen
+Originalbindung im gespeicherten `unknown`-Handoff: vollständige frische native
+Terminalfenster-Inventur ohne ursprüngliche Window-ID sowie zwei erfolgreiche globale
+PID-Inventuren vor und nach dieser Inventur, in denen ursprüngliche Shell- und
+Agent-PID beide fehlen. Ein noch existierender oder wiederverwendeter PID, ein
+noch vorhandenes Fenster, mehrdeutige Bindung oder Beobachtungs-/Berechtigungsfehler
+verweigert die Rücknahme. Ein bloß veralteter Katalog oder ein anderes aktuelles
+Fenster genügt nicht; tmux ist für diesen nativen Nachweis kein Ersatz.
+
+Der vorhandene Handoff und dessen Originalnachricht erhalten Zustell-Holds; ihre
+Ausführungszustände bleiben unverändert. Der Auditbeleg nennt
+`retirement_basis: original_target_gone` und Beobachtungszeiten, ausdrücklich keinen
+Idle-Nachweis. Die Originalreservierung wird damit aufgegeben, ohne irgendeinen
+Prozess zu beenden, Terminaleingabe zu senden oder einen Auftrag erneut auszuführen.
+Bestehende Eigentümer-, Capability-, Freigabe- und Revisionsprüfungen gelten weiter;
+nach den Beobachtungen wird die gespeicherte Revision erneut geprüft.
+
+**English:** Explicit `retire` with `acknowledge_execution_unknown: true` selects
+proof that the persisted original native window and both original PIDs are gone.
+Complete native window inventory and two successful global PID snapshots are
+required; reused/existing PIDs, ambiguity and observation/permission errors refuse.
+It places holds on only the original handoff/message and records an absence-based
+audit, preserving unknown execution. The original fresh-idle retire path remains
+unchanged when this flag is absent. Neither path sends terminal input or kills an agent.

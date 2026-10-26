@@ -1,0 +1,81 @@
+{
+  "download_command": "not exercised",
+  "os": "macOS-15.7.4-x86_64-i386-64bit",
+  "architecture": "x86_64",
+  "version": "0.8.0rc17",
+  "scope": "isolated real launchd label, config, port, runtime and data; no production paths",
+  "tested_command": "sh KiraBridge/install.sh --prefix /Users/landjunge/KiraBridge-release-20261024/.worktrees/current-release/dist/rc17-resume-20261025/warm-open-read-upgrade-fixed/install --config /Users/landjunge/KiraBridge-release-20261024/.worktrees/current-release/dist/rc17-resume-20261025/warm-open-read-upgrade-fixed/config/config.toml --launcher /Users/landjunge/KiraBridge-release-20261024/.worktrees/current-release/dist/rc17-resume-20261025/warm-open-read-upgrade-fixed/bin/kirabridge --plist /Users/landjunge/KiraBridge-release-20261024/.worktrees/current-release/dist/rc17-resume-20261025/warm-open-read-upgrade-fixed/service.plist --cache-dir /Users/landjunge/KiraBridge-release-20261024/.worktrees/current-release/dist/rc17-resume-20261025/warm-open-read-upgrade-fixed/cache --workspace /Users/landjunge/KiraBridge-release-20261024/.worktrees/current-release/dist/rc17-resume-20261025/warm-open-read-upgrade-fixed/workspace --test-label com.kirabridge.test.warm-open-read-upgrade-fixed",
+  "cwd": "/Users/landjunge/KiraBridge-release-20261024/.worktrees/current-release/dist/rc17-resume-20261025/warm-open-read-upgrade-fixed/extracted",
+  "checks": [
+    "pinned previous 0.8.0rc17 wheel starts under isolated launchd",
+    "upgrade while authenticated completion_receive HTTP request remained open; old read settled without replay and new daemon PID healthy",
+    "built package upgrades 0.8.0rc17; authenticated version/status/start",
+    "config/credentials hashes, database row and user file preserved",
+    "real rollback restarts previous 0.8.0rc17 wheel and preserves secrets"
+  ],
+  "upgrade_only": true,
+  "hold_completion": true,
+  "previous_version": "0.8.0rc17",
+  "previous_commit": "7725bc668db5e895b61228a5b0455819fe5ce961",
+  "previous_wheel_sha256": "6708a174ad6bc1d6d57fc0aec5d2d7665522ec1dfdca3ab4cf79dbb32d399e04",
+  "remote_release_command": "not exercised in this run",
+  "open_completion_read": {
+    "old_pid": 72456,
+    "ready": {
+      "scope": "isolated authenticated completion_receive only",
+      "response_received": false,
+      "started_monotonic": 2048665.226710224,
+      "body_sent": true,
+      "pending_after_seconds": 0.25
+    },
+    "upgrade_started_monotonic": 2048665.510571186,
+    "new_pid": 72503,
+    "helper": {
+      "scope": "isolated authenticated completion_receive only",
+      "response_received": false,
+      "started_monotonic": 2048665.226710224,
+      "body_sent": true,
+      "pending_after_seconds": 0.25,
+      "inner_exception_type": "CancelledError",
+      "request_error_tree": {
+        "type": "CancelledError",
+        "module": "asyncio.exceptions",
+        "cause": {
+          "type": "WouldBlock",
+          "module": "anyio._core._exceptions"
+        }
+      },
+      "settled": "connection_ended",
+      "outcome_type": "ExceptionGroup",
+      "outcome_error_tree": {
+        "type": "ExceptionGroup",
+        "module": "builtins",
+        "children": [
+          {
+            "type": "RemoteProtocolError",
+            "module": "httpx",
+            "cause": {
+              "type": "RemoteProtocolError",
+              "module": "httpcore"
+            }
+          }
+        ],
+        "cause": {
+          "type": "CancelledError",
+          "module": "asyncio.exceptions",
+          "cause": {
+            "type": "CancelledError",
+            "module": "asyncio.exceptions",
+            "cause": {
+              "type": "WouldBlock",
+              "module": "anyio._core._exceptions"
+            }
+          }
+        }
+      },
+      "ended_monotonic": 2048672.758308405
+    },
+    "upgraded_monotonic": 2048677.360606972
+  },
+  "passed": true
+}

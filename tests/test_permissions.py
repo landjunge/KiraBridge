@@ -162,3 +162,19 @@ async def test_revocation_requires_authenticated_local_route(bridge, tmp_path, m
         reloaded = load_config(str(path))
         assert reloaded.principals["chatgpt"].automatic_operations == []
         assert reloaded.principals["chatgpt"].permission_level == "ask"
+
+
+def test_full_operator_selection_grants_actual_operation_capabilities(tmp_path):
+    from kirabridge.operations import OPERATIONS
+
+    path = tmp_path / "full.toml"
+    path.write_text('[principals.chatgpt]\ncapabilities=["bridge.health"]\n')
+    configure_access(path, level="full")
+    config = load_config(str(path))
+    missing = {
+        name: decision(config, "chatgpt", name)["missing_capabilities"]
+        for name in OPERATIONS
+        if not decision(config, "chatgpt", name)["authorized"]
+    }
+    assert missing == {}, missing
+    assert all(decision(config, "chatgpt", name)["automatic"] for name in OPERATIONS)
