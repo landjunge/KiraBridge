@@ -15,7 +15,7 @@ from kirabridge import __version__
 from kirabridge.bridge_core.config import Config
 from kirabridge.bridge_core.models import BridgeError, Input, digest
 from kirabridge.filesystem_manager import PathScope
-from kirabridge.permissions import state_exclusions
+from kirabridge.permissions import decision, state_exclusions
 from kirabridge.terminal_manager import check_executable
 
 
@@ -118,7 +118,7 @@ def readiness(bridge, principal: str, requirements: ReadinessInput) -> dict:
 
         if name not in INPUTS:
             raise BridgeError("unknown_operation", "Unknown operation")
-        bridge.security.principal(principal, name)
+        bridge.security.authorize(principal, name)
         if name == "workflow.stop":
             bridge.security.principal(principal, "task.cancel")
             bridge.security.principal(principal, "process.terminate")
@@ -154,6 +154,27 @@ def readiness(bridge, principal: str, requirements: ReadinessInput) -> dict:
         for p in dict.fromkeys(policy.roots + policy.read_roots)
     ]
     health = bridge.health(principal)
+    from kirabridge.bridge_core.bridge import INPUTS
+
+    for item in operations:
+        permission = (
+            decision(bridge.config, principal, item["operation"])
+            if item["operation"] in INPUTS
+            else None
+        )
+        item.update(
+            permission_decision=permission,
+            authorized=bool(permission and permission["authorized"]),
+            approval_required=bool(permission and permission["approval_required"]),
+            prerequisites_ready=item["ok"],
+            runtime_ready=health["dispatcher_active"],
+            execution_ready=bool(
+                permission
+                and permission["automatic"]
+                and item["ok"]
+                and health["dispatcher_active"]
+            ),
+        )
     requested = bool(paths or images or programs or operations or working_dirs)
     checks = paths + images + programs + operations + working_dirs
     result = {
@@ -180,7 +201,10 @@ def readiness(bridge, principal: str, requirements: ReadinessInput) -> dict:
         else None,
         "scope": "Only requested prerequisites at this instant; no process is started, no file "
         "content is returned. No complete workflow, tunnel, ChatGPT, or future success claim. "
-        "automatic approval does not extend roots or executable permissions.",
+        "automatic approval does not extend roots or executable permissions. "
+        "Operation execution_ready combines only the requested prerequisites, current dispatcher "
+        "and standing permission; it is not exact-task validation, a manual grant "
+        "or execution evidence.",
         "remediation": "path_denied: use file.read inside configured roots/read_roots; "
         "missing roots/config drift: local operator must correct policy and reload safely. "
         "executable_denied: use file tools for file access; no interpreter workaround.",
