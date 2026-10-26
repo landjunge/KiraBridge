@@ -80,7 +80,9 @@ class QueueViews:
             # Whitelist data; receipts/approval tokens are not queue-control capabilities.
             for field in ("receipt", "idem", "request_hash"):
                 value.pop(field, None)
-            for field in ("request", "payload", "evidence", "result"):
+            # team_work.result is native text, including empty/JSON-looking text.
+            # Only storage columns explicitly encoded as JSON may be decoded here.
+            for field in ("request", "payload", "evidence"):
                 if field in value and isinstance(value[field], str):
                     value[field] = json.loads(value[field])
             if family == "session-input":
