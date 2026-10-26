@@ -84,10 +84,7 @@ def test_polling_animation_prioritizes_real_status_prompt_and_error(monkeypatch)
     assert ui.prompt("Fortfahren", "Continue") == "yes"
     ui.error("Fehler", "Real error")
     ui.tick()
-    assert (
-        stream.getvalue()
-        == "FRAME 1\n\x1b[1FFRAME 2\n\x1b[1FFULL KiraBridge\nReal check\nContinue: Real error\n"
-    )
+    assert stream.getvalue() == "FRAME 1\n\x1b[1FFRAME 2\nReal check\nContinue: Real error\n"
     assert module.controllers[0].done
 
 
@@ -102,7 +99,7 @@ def test_graphic_write_failure_cannot_prevent_real_status():
     ui = SetupUI("en", stream, design=design(motion=False))
     ui.begin()
     ui.say("Prüfung", "Real check")
-    assert stream.getvalue() == "Real check\n"
+    assert stream.getvalue() == "\nReal check\n"
 
 
 @pytest.mark.parametrize("failure", ["broken", "interrupt"])
@@ -129,7 +126,12 @@ def test_partial_colored_write_resets_tty_without_swallowing_interrupt(failure):
             ui._graphic("\x1b[35mPARTIAL")
     else:
         ui._graphic("\x1b[35mPARTIAL")
-    assert stream.getvalue().endswith("\x1b[0m\n")
+    # Cancellation records an opaque cleanup prefix; the real-output caller must
+    # transmit it completely before acknowledging it, not retry graphic bytes.
+    assert ui.output_prefix.startswith("\x18\x1b[0m")
+    ui.error("Fehler", "Real error")
+    assert not ui.output_prefix
+    assert stream.getvalue().endswith("\x1b[0m\nReal error\n")
 
 
 @pytest.fixture
