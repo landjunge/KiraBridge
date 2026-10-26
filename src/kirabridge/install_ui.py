@@ -14,6 +14,7 @@ class SetupUI:
     ):
         self.language = language
         self.stream = stream or sys.stderr
+        self.graphic_stream = self.stream
         self.design, self.motion = design, motion
         self._animation = None
         self._begun = False
@@ -34,18 +35,19 @@ class SetupUI:
     def _graphic(self, value):
         if not value:
             return
-        colored_tty = "\x1b[" in value and self.stream.isatty()
+        sink = self.graphic_stream
+        colored_tty = "\x1b[" in value and sink.isatty()
         try:
-            written = self.stream.write(value)
+            written = sink.write(value)
             if written is not None and written != len(value):
                 raise BlockingIOError("Incomplete decorative write")
-            self.stream.flush()
+            sink.flush()
         except BaseException as exc:
             self.cancel()
             if colored_tty:
                 try:
-                    self.stream.write("\x1b[0m\n")
-                    self.stream.flush()
+                    sink.write("\x1b[0m\n")
+                    sink.flush()
                 except BaseException:
                     pass
             # Ordinary decorative I/O failures cannot block installation. User

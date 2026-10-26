@@ -24,7 +24,7 @@ Im bestehenden KiraBridge:
 
 - `src/kirabridge/install_ui.py`: bisheriges ASCII-/Cyan-Setup, menschliche Ausgabe auf stderr.
 - `src/kirabridge/installation.py`: geführtes Setup, andere Frontdoor als das versionierte macOS-Paket.
-- `scripts/build_release.py`, `installer/release-install.sh`, `installer/install.py`: tatsächliche Paket-Frontdoor und Transaktionen, Sicherung, Versions-/Healthprüfung, Rollback und launchd.
+- `scripts/build_release.py`, `scripts/release-install.sh`, `installer/install.py`: tatsächliche Paket-Frontdoor und Transaktionen, Sicherung, Versions-/Healthprüfung, Rollback und launchd.
 - `docs/INSTALLATION-EXPERIENCE.md`, `docs/DEVELOPMENT_PLAN.md`: vorhandene Installationswünsche und eigenständige modulare Architektur. Historische Pläne vom 18.10. ersetzen nicht das Original vom 25.10.
 
 ## Nachgewiesene Lücken

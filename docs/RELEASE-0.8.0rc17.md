@@ -1,84 +1,58 @@
-> Current operator/build continuation: [25 October report](RC17-RESUME-20261025.md).
-> The early5089fca acceptance below is historical. Later7725bc6 native paste/readback
-> and explicitly authorized full ChatGPT access passed; additional review was waived.
-> CI and final merged-source release remain open. / Aktueller Arbeitsstand siehe
-> Fortsetzungsbericht; die ursprünglichen offenen Installations-/Eingabepunkte unten
-> beschreiben den historischen Kandidaten, nicht den heute laufenden Dienst.
+# 0.8.0rc17 · unveröffentlichter Integrationskandidat / unpublished candidate
 
-# 0.8.0rc17 — consolidation candidate / Zusammenführungskandidat
+Published remains [RC14](https://github.com/landjunge/KiraBridge/releases/tag/v0.8.0rc14).
+RC15/RC16 are historical drafts; RC17 is still a draft. The operator's installed
+source14468ad is distinct from this branch and from any eventual merged release.
 
-**Not published or approved. Nicht veröffentlicht oder abgenommen.**
-Latest published release remains [RC14](https://github.com/landjunge/KiraBridge/releases/tag/v0.8.0rc14).
-RC15 and RC16 are historical drafts with their original source-pinned assets.
+## Änderungen / Changes
 
-This candidate combines `main` at `9d03ea8` with the runtime/installer lineage,
-RC15 `efb805a`, RC16 `a890375`, queue repair `de2c2f7` and terminal/Whiteboard
-repairs through `48a512e`. It preserves main's guided setup, native agent adapters,
-owned workflow stop, observations, knowledge integration and portable Linux setup.
-It adds the RC16 discovery/file-byte sender and subsequent queue/visible-input/
-Whiteboard contracts without replacing production configuration or granting access.
+- Retains integrated RC15/RC16/main functionality, native provider adapters,
+  guided setup, durable tasks, queue recovery, workflow stop, knowledge and
+  optional ThreadDesk integrations. No production policy replacement.
+- Preserves explicit visible-input/window/TTY/PID/focus safety, paste-only
+  submit=false, current tool discovery and long Whiteboard contracts.
+- Repairs native textual team-result queue catalog parsing and coalesces
+  repetitive health diagnostics while retaining core audit and limits.
+- Adds explicit unknown withdrawal separate from execution reservation, plus
+  retirement only for proven vanished original targets. History stays; no fake
+  stop/completion, blind repeat or interruption of current agent sessions.
+- Reuses PR34's complete Braille KiraBridge wordmark/perspective bridge with
+  exact#F06DB0 palette, lighter pink and white highlights. Bounded optional
+  point/pulse animation, static reduced-motion and color/encoding/text fallbacks.
+- Packages one stdlib renderer and hashed presenter into the actual versioned
+  installer. Human output stays on stderr; MCP, statusJSON and daemon remain clean.
+- Optional explicit visible installation guard checks current front window,
+  selected tab, TTY and process identities. One owned work window is reused.
+  Automatic recovery retains old-definition/ownership/idle guards even if
+  visibility is lost after a failed switch. launchd remains window-independent.
 
-Dieser Kandidat führt die getrennten Quelllinien zusammen. Die Versionsnummer
-RC17 unterscheidet das kombinierte Paket von den vorhandenen RC15/RC16-Assets;
-deren historische Testbelege werden nicht als RC17-Abnahme ausgegeben.
+## Nachweise und offene Gates / Evidence and open gates
 
-macOS: Python3.11, uv0.11.6, macOS15, Internet and authenticated GitHub access;
-Intel and Apple Silicon artifacts share the wheel/locked dependencies. Actual
-arm64 acceptance remains open. No Apple signing/notarization. The launchd user
-service continues independently of Terminal/browser windows. Linux source packaging
-is preserved from main; its actual installation is not claimed tested on this Mac.
+Source14468ad passed the missing local Intel-macOS Verify axis:1522passed,
+1 optional AA-source case skipped. Original full RC14 package test failed at
+rollback readiness; subsequent targeted original and lifecycle rollback cases
+passed with the unchanged30s deadline. No exact launchd cause or invented
+production fix is claimed. Fresh installation was not reached in the failed run.
 
-Release gates remain: mandatory CI (currently billing blocked), independent review,
-positive native agent input acceptance and protected-main/final release-source validation.
-The exact5089fca candidate passed [isolated Intel-macOS package acceptance](ACCEPTANCE-MACOS-RC17.md), including authenticated draft download, upgrade/restart/data preservation and rollback.
-The existing native focus refusal is not a positive test. ThreadDesk byte receiver/
-index MCP implementation and authorized selected source bytes are still prerequisites
-for an actual user Library import. No Library-wide API or duplicate job is created.
+[Actual Mac results](evidence/local-macos-acceptance-14468ad-20261026.json) ·
+[Focused rollback details](RC14-ROLLBACK-20261026.md) ·
+[Renderer evidence](design-preview/renderer-f06db0-evidence.json) ·
+[Native visibility](evidence/visible-installer-window-20261026.json).
 
-See [consolidation record](CONSOLIDATION-20261024.md),
-[installation and historical commands](INSTALL-MACOS.md),
-[terminal evidence](VISIBLE-SELECTION-20261024.md),
-[Whiteboard evidence](WHITEBOARD-BOUNDARIES-20261024.md) and
-[receiver/index boundaries](RECEIVER-INDEX-CONTRACT-20261024.md).
+New integrated-source and actual built-package tests must be recorded against
+their own final commit before acceptance. Team-scoped cases are not added across
+overlapping phases. No unnecessary local full-suite loop. Mandatory GitHub tests
+remain required; hosted Intel/ARM jobs are billing-blocked and no ARM hardware
+is verified. Local Intel evidence never turns a failed Actions job into success.
+No merge, publication or new productive installation until the agreed gates pass.
 
-Build only from a clean committed source: `uv run python scripts/build_release.py
---out dist/rc17-candidate`. A separately required reproducibility build must use
-another empty destination and compare `SHA256SUMS`. This is a build instruction,
-not a tested public installation command. No download link is invented here.
+## Installation / Update
 
-## Native focus and ChatGPT responsiveness follow-up (PR32, not merged)
+Python3.11, uv0.11.6, authenticated private GitHub access and Internet required.
+Actual tested OS is Intel macOS15.7.4; older macOS/iMac2015 and arm64 need their
+own evidence. No Apple signing/notarization; no permission or billing changes.
+Config, credentials, rights, Whiteboards, database and user files are preserved.
 
-The native focus repair binds immutable window IDs and resolves only unique current
-Window/Fenster menu entries when activation selects another window; exact focus,
-TTY, process and viewport checks remain. Focus-only actual Intel-macOS proof passed;
-installed positive paste acceptance remains pending. Routine bridge_health now avoids
-terminal scans so one-second multi-client polling cannot consume foreground read
-slots. Explicit observe_terminals=true/inventory/catalog provide fresh observations.
-The full operator grant now uses actual capability mappings, including files.inspect.
-The latest user explicitly authorized full ChatGPT access; this does not create a
-missing ThreadDesk byte receiver or an unsupported Library-wide API.
-
-GitHub Actions is still blocked before execution by account billing. PR32 is open;
-RC17 remains draft. Additional external review was waived by the owner; independent
-native-team safety audits were performed. No failed Actions run is called passed.
-
-The extended blocker audit fixes effective Team/ThreadDesk read permissions,
-paginated/refreshed tool discovery, owned visible/admin output and UTF-8 budgets.
-A local one-principal ACL activation mode preserves durable external reply waits
-without changing their state or allowing partial-input interruption. Clipboard
-restoration moves to an independent RAM-only owner, with generation guards and
-stdin transport; killed GUI workers no longer own the only snapshot.
-[Team findings and scoped tests](CHATGPT-BLOCKER-AUDIT-20261024.md).
-Actual final-package/native-paste acceptance remains separately required.
-
-### Verified operator candidate7725bc6 (still unpublished)
-
-Actual Kira paste-only input, independent readback, nonempty-input refusal and
-128-byte authorized log read passed on Intel macOS. All42 ChatGPT operations were
-read back authorized/automatic after explicit operator ACL activation. Package
-bytes reproduced, actual isolated upgrade/rollback and authenticated draft command
-were checked; one earlier direct read timeout is retained. Separately named
-KiraBridge-macos-7725bc6.tar.gz + SHA are actual private draft assets. PR32 remains
-open because Actions did not start due billing. Standard draft assets/main remain
-b54f462; final integrated-main build/publication is still required after checks.
-[Detailed proof and boundaries](CHATGPT-BLOCKER-AUDIT-20261024.md).
+[Deutsch](INSTALL-DE.md) · [English](INSTALL-EN.md) · [Current status](../README.md).
+The existing reviewed source144 asset remains the honest current download
+until a new source-pinned package is actually built, accepted and supplied.
