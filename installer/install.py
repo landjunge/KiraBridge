@@ -31,6 +31,25 @@ def say(message):
     print(message, flush=True)
 
 
+def require_visible_terminal(args):
+    if not getattr(args, "require_visible_terminal", False):
+        return
+    path = Path(__file__).with_name("visible_terminal.py")
+    if path.is_symlink():
+        raise RuntimeError("Visible-terminal verifier symlink refused")
+    verified = path.read_bytes()
+    if args.bundle:
+        manifest = json.loads((args.bundle / "release.json").read_text())
+        expected = manifest.get("files", {}).get("installer/visible_terminal.py")
+        if not expected or hashlib.sha256(verified).hexdigest() != expected:
+            raise RuntimeError("Visible-terminal verifier missing or checksum changed")
+    namespace = {"__name__": "kirabridge_visible_installer", "__file__": str(path)}
+    exec(compile(verified, str(path), "exec"), namespace)
+    args.visible_terminal_proof = namespace["confirm_visible_terminal"](
+        getattr(args, "visible_terminal_proof", None)
+    )
+
+
 def run(argv, *, capture=False, timeout=600, **kwargs):
     if "env" not in kwargs:
         kwargs["env"] = {
@@ -581,6 +600,7 @@ def require_queue_compatibility(config, release):
 
 
 def activate(args, release):
+    require_visible_terminal(args)
     validate_service_owner(args)
     validate_launcher_owner(args)
     fresh_config(args, release)
@@ -652,6 +672,7 @@ def activate(args, release):
                 raise RuntimeError(
                     "Configuration/credentials changed during preparation; no switch"
                 )
+            require_visible_terminal(args)
             jwrite(current, before)  # Durable recovery record before any switch.
             stop_service(args)
             wrapper = (
@@ -704,7 +725,7 @@ def activate(args, release):
     except Exception:
         if current.exists() and json.loads(current.read_text()).get("backup") == str(backup):
             say("Umschaltung fehlgeschlagen. Rückweg wird unter erneuter Leerlaufprüfung versucht.")
-            rollback(args)
+            rollback(args, _compensating=True)
         raise
     assert args.config.read_bytes() == config_before, "Configuration changed"
     assert not credentials or sha(credentials) == credential_hash, "Credentials changed"
@@ -714,7 +735,11 @@ def activate(args, release):
     )
 
 
-def rollback(args):
+def rollback(args, *, _compensating=False):
+    # Recovery restores only the already recorded old definitions. Loss of UI
+    # after a failed switch must not prevent this guarded compensation.
+    if not _compensating:
+        require_visible_terminal(args)
     current = args.prefix / "current.json"
     if not current.exists():
         raise RuntimeError("No activated version/recovery record")
@@ -737,6 +762,8 @@ def rollback(args):
         require_queue_compatibility(
             args.config, Path(previous_release) if previous_release else None
         )
+        if not _compensating:
+            require_visible_terminal(args)
         stop_service(args)
         for path, flag, name in [
             (args.launcher, "had_wrapper", "launcher.before"),
@@ -811,6 +838,11 @@ def main():
     parser.add_argument(
         "--test-label", help="Isolated launchd test label; com.kirabridge.test.* only"
     )
+    parser.add_argument(
+        "--require-visible-terminal",
+        action="store_true",
+        help="Require a fresh confirmed visible macOS Terminal window before activation",
+    )
     args = parser.parse_args()
     if args.test_label:
         if not re.fullmatch(r"com\.kirabridge\.test\.[a-z0-9-]{8,64}", args.test_label):
@@ -821,6 +853,10 @@ def main():
         LABEL = args.test_label
     if os.getuid() == 0:
         parser.error("Run as your normal user without sudo")
+    if args.require_visible_terminal:
+        if args.action not in {"install", "rollback"}:
+            parser.error("Visible-terminal verification applies to install or rollback")
+        require_visible_terminal(args)
     for name in ("repo", "prefix", "config", "launcher", "plist", "cache_dir"):
         setattr(args, name, getattr(args, name).expanduser().absolute())
     if sys.version_info < (3, 11):

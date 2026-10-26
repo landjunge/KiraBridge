@@ -20,3 +20,13 @@ Tests: run only tests necessary for the actual change and relevant effects. No e
 or precautionary repeated whole-suite loops. On failure rerun only the affected test
 and directly related checks. Required security, review, merge and release checks remain
 mandatory; never bypass failed/not-started checks or label an interrupted run passed.
+
+Standing operator preference (26 October 2026): use native subagents for independent
+project work, review their results before integration, and commit/push completed
+authorized changes so the local branch and GitHub stay synchronized. Keep releases
+and the operator Mac current after the required acceptance succeeds; preserve data,
+permissions and running agent sessions. Productive installation must be genuinely
+visible in a confirmed separate macOS Terminal window. Never treat this preference
+as permission to bypass failed/missing gates, publish unverified assets, change
+billing/OS rights, or perform unrelated work. Report concrete blockers and actual
+commit, PR, release and installed-source status.
