@@ -114,6 +114,10 @@ def test_builder_emits_license_asset_and_matching_manifest_for_both_bundles(tmp_
         "pyproject.toml": f'[project]\nversion = "{VERSION}"\nlicense = "{EXPRESSION}"\n'.encode(),
         "uv.lock": b"version = 1\n",
         "installer/install.py": b"# fixture\n",
+        "installer/presentation.py": b"# isolated presentation fixture\n",
+        "installer/visible_terminal.py": b"# isolated visibility fixture\n",
+        "src/kirabridge/terminal_design.py": b"# isolated renderer fixture\n",
+        "src/kirabridge/install_ui.py": b"# isolated UI fixture\n",
         "scripts/release-install.sh": b"# @PLATFORM@ @SOURCE@\n",
         "docs/INSTALL-MACOS.md": b"Fixture\n",
         f"docs/RELEASE-{VERSION}.md": b"Fixture\n",
@@ -154,6 +158,17 @@ def test_builder_emits_license_asset_and_matching_manifest_for_both_bundles(tmp_
         assert pin["license"] == EXPRESSION
         assert pin["license_sha256"] == hashlib.sha256(LICENSE).hexdigest()
         assert pin["source_commit"] == COMMIT
+        descriptor = pin["presentation"]
+        assert descriptor["schema"] == "kirabridge.installer.presentation.v1"
+        assert descriptor["palette"] == "#F06DB0"
+        assert descriptor["output"] == "human-stderr-only"
+        for name, expected in descriptor["assets"].items():
+            with tarfile.open(path) as archive:
+                member = next(item for item in archive if item.name.endswith("/" + name))
+                data = archive.extractfile(member).read()
+            assert hashlib.sha256(data).hexdigest() == expected
+        if path.name == "KiraBridge-macos.tar.gz":
+            assert "installer/visible_terminal.py" in pin["files"]
 
 
 def rewrite_archive(artifacts, change):
