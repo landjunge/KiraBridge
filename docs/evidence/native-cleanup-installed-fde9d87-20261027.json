@@ -1,0 +1,73 @@
+{
+  "schema": "kirabridge.installation.outcome.v1",
+  "at": 1793082235.865556,
+  "package_version": "0.8.0rc17",
+  "source_commit": "fde9d87a36ed6c0bdab4456c3c8812d0378d7fcd",
+  "pr": "https://github.com/landjunge/KiraBridge/pull/46",
+  "merged": true,
+  "productive_installation_verified": true,
+  "actual_visible_terminal": {
+    "window_id": 69741,
+    "tab_index": 0,
+    "tty": "/dev/ttys003"
+  },
+  "runtime_pid": 28646,
+  "dispatcher_active": true,
+  "runtime_source_package_path": "/Users/landjunge/.local/share/kirabridge/install/releases/0.8.0rc17-fde9d87a36ed/source/.venv/lib/python3.11/site-packages/kirabridge",
+  "config_and_credentials_preserved": {
+    "config": true,
+    "credentials": true
+  },
+  "rollback_backup": "/Users/landjunge/.local/share/kirabridge/install/backups/20261027-071536-a5943013",
+  "previous_source": "1cc3d2470d246713fb5f5cef96beb54fbddd8296",
+  "reproducible_builds": 2,
+  "macos_archive_sha256": "f6907e87f4a7c388bfed99ecf7cbe22db186bdc0f61599653413fc2ac08ff890",
+  "manifest_entries_verified": 375,
+  "actual_intel_macos": "15.7.4 x86_64",
+  "isolated_upgrade_rollback_passed": true,
+  "authenticated_exact_one_line_command_passed": true,
+  "tested_one_line_command": "d=$(mktemp -d) && gh release download v0.8.0rc17 -R landjunge/KiraBridge -p 'install-macos.sh*' -D \"$d\" && (cd \"$d\" && shasum -a 256 -c install-macos.sh.sha256 && sh install-macos.sh --require-visible-terminal --motion full \"$@\")",
+  "actual_operator_mcp_paste_only_verified": true,
+  "exact_active_input_readback_verified": true,
+  "separate_explicit_return_receipt_sha256": "bc5e5a02a36ccb902bfd4c5f914689332de26f0d13ee2948a9ece79a3b6e3a48",
+  "actual_voice_chatgpt_host_tested": false,
+  "old_probe_replayed": false,
+  "tasks": [
+    {
+      "id": "kb-terminal-installed-1cc3d247-paste-20261027-01",
+      "state": "unknown",
+      "operation": "session.input",
+      "principal": "codex",
+      "attempt": 1
+    },
+    {
+      "id": "kb-terminal-installed-fde9d87-paste-20261027-01",
+      "state": "completed",
+      "operation": "session.input",
+      "principal": "codex",
+      "attempt": 1
+    }
+  ],
+  "test_window_closed": false,
+  "window_cleanup_blocker": "A separate unsent printf KIRABRIDGE_TEST_OK command appeared after our receipt; preserve foreign input pending operator choice. No automatic close or extra Return.",
+  "daemon_after_window_close_verified": false,
+  "initial_failed_checks_retained": [
+    "initial shell exec identity race refused before install",
+    "manual input changed screen guard refused before launch",
+    "two isolated copy visibility failures; no product update",
+    "helper referenced earlier failed result filename; no MCP input submitted",
+    "whole-screen assertion failed; independently reconciled exact unique current input",
+    "file-existence assertion raced printf write; exact bytes reconciled without reexecution"
+  ],
+  "github_ci": {
+    "pr_run": 40454374795,
+    "main_run": 40457891778,
+    "debian_python311": "1683 passed,16 skipped; Ruff/format/build passed",
+    "debian_python313": "1683 passed,16 skipped; Ruff/format/build passed",
+    "hosted_macos": "did not start: billing; not passed",
+    "arm_mac": "not tested"
+  },
+  "release_status": "draft; not published",
+  "manual_task_or_queue_state_edits": false,
+  "other_agent_sessions_stopped": false
+}
