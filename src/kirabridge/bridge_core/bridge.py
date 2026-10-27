@@ -476,20 +476,25 @@ class Bridge:
                             selected_binding,
                             explicit_paste_task_id=task["id"],
                         )
-                        await running(
-                            {
-                                "evidence_type": "visible_paste_dispatch",
-                                "terminal_input_attempted": True,
-                                "pane_id": args.pane_id,
-                                "expected_pid": args.expected_pid,
-                                "agent_pid": selected_binding.agent_pid,
-                                "return_sent": False,
-                                "agent_confirmed": False,
-                                "automatic_retry": False,
-                            }
-                        )
+
+                        async def paste_attempted():
+                            await running(
+                                {
+                                    "evidence_type": "visible_paste_dispatch",
+                                    "terminal_input_attempted": True,
+                                    "pane_id": args.pane_id,
+                                    "expected_pid": args.expected_pid,
+                                    "agent_pid": selected_binding.agent_pid,
+                                    "return_sent": False,
+                                    "agent_confirmed": False,
+                                    "automatic_retry": False,
+                                }
+                            )
+
                         approved = self.tasks.input_policy.dispatch(principal, args, task["id"])
-                        result = await self.sessions.insert(principal, approved)
+                        result = await self.sessions.insert(
+                            principal, approved, before_transport=paste_attempted
+                        )
                     self.tasks.input_policy.sent(principal, task["id"])
                     return {
                         **result,
@@ -514,8 +519,21 @@ class Bridge:
                 )
                 self.tasks.input_policy.sent(principal, task["id"])
                 return result
-            await running({"evidence_type": "session_input_dispatch", "pane_id": args.pane_id})
-            return await self.sessions.send(principal, args, task_id=task["id"])
+
+            async def session_input_attempted():
+                await running(
+                    {
+                        "evidence_type": "session_input_dispatch",
+                        "terminal_input_attempted": True,
+                        "pane_id": args.pane_id,
+                        "expected_pid": args.expected_pid,
+                        "automatic_retry": False,
+                    }
+                )
+
+            return await self.sessions.send(
+                principal, args, task_id=task["id"], before_transport=session_input_attempted
+            )
         if operation == "session.open":
             await running({"evidence_type": "session_open_dispatch"})
             return await self.sessions.open(principal, args, task_id=task["id"])

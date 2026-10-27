@@ -109,7 +109,11 @@ class SessionInputPolicy:
                 )
 
     def dispatch(self, principal, args, task_id):
-        """Last guard at the transport boundary; direct sends cannot bypass the buffer."""
+        """Reserve released input for an accepted/running owned task before transport.
+
+        Dispatching is a reservation, not evidence that terminal input was attempted.
+        The caller persists its attempt marker only after all remaining preflight checks.
+        """
         from kirabridge.permissions import decision
 
         if not decision(self.config, principal, "session.input")["buffer_enabled"]:
@@ -128,17 +132,19 @@ class SessionInputPolicy:
             buffer = task.get("input_buffer")
             if (
                 task["operation"] != "session.input"
-                or task["state"] != "running"
+                or task["state"] not in {"accepted", "running"}
                 or not buffer
                 or buffer["state"] != "released"
                 or type(args).model_validate(task["args"]).model_dump() != args.model_dump()
             ):
                 raise BridgeError("input_buffer_required", "This exact input has not been released")
-            self.store.db.execute(
+            changed = self.store.db.execute(
                 "UPDATE session_input_buffers SET state='dispatching',dispatch_started=? "
-                "WHERE task_id=?",
+                "WHERE task_id=? AND state='released'",
                 (time.time(), task_id),
-            )
+            ).rowcount
+            if changed != 1:
+                raise BridgeError("input_buffer_required", "This exact input has not been released")
             self.store.audit(
                 "session.input.dispatching",
                 principal,

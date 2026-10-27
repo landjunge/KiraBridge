@@ -509,7 +509,9 @@ async def test_paste_only_is_durable_exact_and_never_replayed(
     config.session_input_policy.principals = ["chatgpt"]
     texts = []
 
-    async def paste(principal, args):
+    async def paste(principal, args, *, before_transport=None):
+        assert before_transport is not None
+        await before_transport()
         assert bridge.sessions.current_selection()[0] == "codex"
         task = bridge.store.get("literal-paste", principal)
         assert task["state"] == "running"
