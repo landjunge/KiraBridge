@@ -1,6 +1,6 @@
 # 0.8.0rc17 · Intel macOS
 
-[Actual release status / tatsächlicher Release-Status](https://github.com/landjunge/KiraBridge/releases/tag/v0.8.0rc17).
+[Actual release status / tatsächlicher Release-Status](https://github.com/landjunge/KiraBridge/releases).
 A GitHub draft remains unpublished. Final assets, source commit, SHA-256 and installed
 service acceptance are recorded separately in the release and associated PRs, never inferred from a tag.
 
@@ -54,12 +54,31 @@ use only their own created process handle; the existing process-group mode is un
 Cancellation and read-versus-uncertain-write semantics are preserved. Fourteen targeted
 Intel cases passed, including one real paused-pipe child and no group signal.
 
-[Detailed evidence and blocker](TERMINAL-CLEANUP-20261027.md): RC17/1cc was visibly
-installed with preserved configuration/credentials. Its once-only productive paste probe
-remains accepted, not completed. The isolated cleanup reproduction does not identify
-that live coroutine conclusively. No duplicate input, forced restart, service_busy bypass
-or published-release claim. The own empty installation window was closed and absence
-confirmed; this invalidates the target but does not claim the task coroutine stopped.
+[Detailed history and final outcome](TERMINAL-CLEANUP-20261027.md): the original
+RC17/1cc probe remained accepted until an explicitly authorized service-only recovery;
+its historical state is now `unknown`/dispatcher_restart and it was never replayed.
+The initial readiness deadline failed; later independent reconciliation confirmed recovery.
+
+PR46 is normally merged as main `fde9d87a36ed6c0bdab4456c3c8812d0378d7fcd`.
+Two final builds reproduce the same hashes,375 manifest entries verified; actual isolated
+1cc→fde→1cc upgrade/rollback preserved data. The final authenticated copy command passed
+in isolation, then fde was visibly installed in the same own window69741/ttys003.
+Responding daemon PID28646, configuration/credentials retained, rollback backup recorded.
+Actual deployed operator-MCP task `kb-terminal-installed-fde9d87-paste-20261027-01`
+completed once with submit=false, return_sent=false and execution_confirmed=false.
+Independent current-line readback matched exactly once, with no receipt before Return;
+a separate explicit Return produced16 exact bytes, SHA256
+`bc5e5a02a36ccb902bfd4c5f914689332de26f0d13ee2948a9ece79a3b6e3a48`.
+Whole-screen and early-file-existence harness failures remain recorded; reconciliation
+was read-only, without another paste or Return.
+
+**Window closure remains blocked:** unrelated unsent `printf KIRABRIDGE_TEST_OK`
+appeared after the receipt. `visible_input_not_empty` correctly preserves it pending
+operator choice. No closure or daemon-after-this-window-close success is claimed.
+[Sanitized final installation/input evidence](evidence/native-cleanup-installed-fde9d87-20261027.json).
+Debian PR/main CI each report1683passed/16skipped on both Python axes. Hosted Mac jobs
+never started because of billing; ARM and actual voice-ChatGPT Host remain untested.
+RC17 remains a draft. These results do not prove input into existing Codex/Grok sessions.
 
 ## Nachweise und Abnahme / Evidence and acceptance
 
