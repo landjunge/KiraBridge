@@ -171,6 +171,9 @@ async def test_desktop_cleanup_failure_preserves_known_lock_else_unknown(monkeyp
 
     from kirabridge.platform_adapters.desktop import MacDesktop
 
+    monkeypatch.setattr(
+        "kirabridge.platform_adapters.desktop.sys", SimpleNamespace(platform="darwin")
+    )
     raw = plistlib.dumps(
         {
             "IOConsoleUsers": [
@@ -196,6 +199,7 @@ async def test_desktop_cleanup_failure_preserves_known_lock_else_unknown(monkeyp
 
 
 async def test_unconfirmed_pid_observation_cleanup_never_proves_absence(monkeypatch):
+    monkeypatch.setattr(TerminalAppTransport, "available", property(lambda self: True))
     child = SimpleNamespace(returncode=0, communicate=AsyncMock(return_value=(b"1\n", b"")))
     monkeypatch.setattr(
         "kirabridge.platform_adapters.terminal_app.asyncio.create_subprocess_exec",

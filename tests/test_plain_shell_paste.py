@@ -190,6 +190,8 @@ async def test_shell_snapshot_requires_positive_complete_os_observation(
     sessions, _, _, native = plain
     child = type("Child", (), {})()
     child.returncode = 1 if failure == "nonzero" else 0
+    child.wait = AsyncMock(return_value=child.returncode)
+    child.stdin = child.stdout = child.stderr = None
     child.communicate = AsyncMock(
         return_value=(
             b"" if failure == "empty" else b"501 900 800 ttys004 Sat Oct 24 12:00:00 2026 /bin/zsh",

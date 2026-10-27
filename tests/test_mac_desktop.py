@@ -63,7 +63,9 @@ async def test_extra_probe_failure_does_not_remove_terminal_permission(monkeypat
 
         async def wait(self):
             events.append("owned probe reaped")
-            self.returncode = -9
+            if self.returncode is None:
+                self.returncode = -9
+            return self.returncode
 
     async def spawn(*argv, **kwargs):
         assert argv == ("/usr/sbin/ioreg", "-n", "Root", "-d1", "-a")
@@ -79,9 +81,12 @@ async def test_extra_probe_failure_does_not_remove_terminal_permission(monkeypat
     await desktop.require_interactive()
     assert desktop.last["state"] == "unknown"
     assert desktop.last["observed_at"] is not None
-    assert events == (
-        ["probe", "owned probe killed", "owned probe reaped"] if failure == "timeout" else ["probe"]
-    )
+    expected = ["probe"]
+    if failure == "timeout":
+        expected += ["owned probe killed", "owned probe reaped"]
+    elif failure != "missing":
+        expected += ["owned probe reaped"]
+    assert events == expected
 
 
 async def test_probe_cancellation_reaps_only_its_own_child(monkeypatch):
