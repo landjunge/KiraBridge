@@ -1,0 +1,151 @@
+{
+  "schema": "kirabridge.terminal_input.acceptance.v1",
+  "version": "0.8.0rc17",
+  "tested_source_commit": "7cbf343c3dc0325a39cefc4e01f7cecfa26af74f",
+  "tested_source_files_sha256": {
+    "src/kirabridge/session_manager.py": "39a862e7a0536c2c7dff98abafb4909d42a602f460fcab6078129ebde4c437bc",
+    "src/kirabridge/platform_adapters/terminal_app.py": "42aecb4b7b820584be1b85de0bb3df05260c000233dcd7f6e863fd8c67a98436",
+    "src/kirabridge/bridge_core/bridge.py": "14a38ddc96a913ae4d52da24fd65d555104229b8deb024a1171986f2012c9b19",
+    "src/kirabridge/session_input_policy.py": "7696a07963604470c52caa6f64cec85581084ea5d52aaad2283b4a7b90fb17e9"
+  },
+  "platform": "macOS15.7.4-x86_64",
+  "scope": "actual native Terminal.app using an isolated Bridge and chatgpt policy; not a call from the actual ChatGPT voice Host",
+  "targeted_tests": {
+    "terminal_adapter_and_session_cases": 47,
+    "dispatch_and_buffer_cases": 21,
+    "combined_real_session_manager_buffer_cases": 3,
+    "full_suite_repeated_locally": false
+  },
+  "native": {
+    "stale_pid_rejected_before_input": {
+      "state": "failed",
+      "error": {
+        "code": "session_selection_changed"
+      },
+      "screen_unchanged": true
+    },
+    "paste_only": {
+      "task_id": "kb-owned-terminal-native-owned-02-paste",
+      "state": "completed",
+      "submitted": false,
+      "exact_screen_readback": true,
+      "output_absent_before_separate_return": true
+    },
+    "explicit_separate_return": {
+      "explicit_separate_own_fixture_action": true,
+      "bytes": 21,
+      "sha256": "e0d553299368b84500be75eee7de96c219ff4bb643ae36e8ee2831a08c3009a9",
+      "later_independent_readback_verified": true
+    },
+    "window_id": 67312,
+    "tty": "/dev/ttys000",
+    "shell_pid": 89831,
+    "one_owned_window_opened": true,
+    "foreign_sessions_modified": false,
+    "production_config_or_service_modified": false,
+    "input_replayed": false,
+    "owned_idle_window_retained_for_next_authorized_step": true
+  },
+  "historical_failures_preserved": [
+    {
+      "stage": "initial_catalog_before_any_window_or_input",
+      "result": "session_transport_unavailable; timeout versus invalid JSON not distinguishable from original error",
+      "followup": "one targeted raw read returned valid 214-byte JSON in0.288s; no root-cause fix claimed"
+    },
+    {
+      "stage": "receipt_check_after_explicit_separate_return",
+      "result": "initial harness asserted before receipt contents settled",
+      "followup": "exact21-byte receipt verified afterward without another paste or Return; original failed harness result preserved"
+    }
+  ],
+  "pending": [
+    "GitHub required checks and normal merge",
+    "final integrated package build and integrity verification",
+    "productive deployment remains separate from this native isolated result",
+    "actual ChatGPT Host terminal control and live Codex/Grok sessions were not exercised"
+  ],
+  "safety": "Auth/roots/credential/window/TTY/process/start-time/busy/focus/screen/clipboard/buffer/idempotency protections preserved; no unknown task replay",
+  "test_command_records": {
+    "A_initial_42": [
+      {
+        "pytest": "tests/test_plain_shell_paste.py",
+        "result": "18 passed, 1 failed fixture expectation",
+        "log": "plain.log"
+      },
+      {
+        "pytest": "tests/test_plain_shell_paste.py::test_control_or_multiline_paste_refuses_before_intent[] tests/test_plain_shell_paste.py::test_control_or_multiline_paste_refuses_before_intent -k '0085 or 009b or 2028'",
+        "result": "1 passed, 9 deselected",
+        "log": "controls.log"
+      },
+      {
+        "pytest": "tests/test_plain_shell_paste.py::test_control_or_multiline_paste_refuses_before_intent tests/test_plain_shell_paste.py::test_agent_insert_callback_follows_readiness_checks tests/test_plain_shell_paste.py::test_agent_insert_callback_failure_blocks_native tests/test_plain_shell_paste.py::test_shell_snapshot_requires_positive_complete_os_observation tests/test_plain_shell_paste.py::test_plain_paste_native_script_compiles_without_executing_ui tests/test_sessions.py::test_native_session_selection_read_and_input tests/test_sessions.py::test_idle_only_input_rejects_busy_target_before_transport tests/test_terminal_clipboard_integration.py",
+        "result": "29 passed",
+        "log": "callback-safety-regressions.log"
+      },
+      {
+        "pytest": "tests/test_plain_shell_paste.py::test_submitted_direct_shell_checks_input_before_intent tests/test_plain_shell_paste.py::test_plain_paste_native_script_compiles_without_executing_ui",
+        "result": "2 passed",
+        "log": "final-boundary.log"
+      }
+    ],
+    "A_additional_5": "CR/LF/CRLF JXA parser cases and2 effective-policy-text cases; original and corrected fixture results preserved in agent evidence",
+    "C_21": [
+      {
+        "tool_output_chunk_id": "b01cc9",
+        "command": "PYTHONPATH=src /Users/landjunge/KiraBridge-release-20261024/.worktrees/rc17-braille-integration-20261026/.venv/bin/python -m pytest -q tests/test_session_dispatch_evidence.py::test_pretransport_rejection_is_failed_without_attempt_evidence -x",
+        "passed": 0,
+        "failed": 1,
+        "note": "Pre-fix regression: shell preflight incorrectly UNKNOWN; stopped after first failure."
+      },
+      {
+        "tool_output_chunk_id": "b5f8c5",
+        "command": "PYTHONPATH=src /Users/landjunge/KiraBridge-release-20261024/.worktrees/rc17-braille-integration-20261026/.venv/bin/python -m pytest -q tests/test_session_dispatch_evidence.py",
+        "passed": 8,
+        "failed": 0,
+        "note": "Initial eight new state/transport/journal-boundary cases after Bridge fix."
+      },
+      {
+        "tool_output_chunk_id": "522bc6",
+        "command": "PYTHONPATH=src /Users/landjunge/KiraBridge-release-20261024/.worktrees/rc17-braille-integration-20261026/.venv/bin/python -m pytest -q tests/test_session_dispatch_evidence.py::test_success_records_attempt_before_transport tests/test_visible_selection.py::test_paste_only_is_durable_exact_and_never_replayed tests/test_visible_selection.py::test_unknown_old_task_cannot_be_rebound_to_a_new_window",
+        "passed": 3,
+        "failed": 2,
+        "note": "Two success cases passed with added persisted-marker assertion; immutable old unknown passed. Two existing buffered paste cases exposed RUNNING-only reservation regression."
+      },
+      {
+        "tool_output_chunk_id": "7c0c63",
+        "command": "PYTHONPATH=src /Users/landjunge/KiraBridge-release-20261024/.worktrees/rc17-braille-integration-20261026/.venv/bin/python -m pytest -q tests/test_visible_selection.py::test_paste_only_is_durable_exact_and_never_replayed tests/test_session_dispatch_evidence.py::test_buffer_reservation_accepts_only_claimed_pretransport_tasks tests/test_session_dispatch_evidence.py::test_released_buffer_cannot_dispatch_outside_active_claim_states",
+        "passed": 2,
+        "failed": 8,
+        "note": "Two existing buffered regressions fixed/passed. Eight new reservation fixtures failed because fixture omitted session.inspect, before code under test."
+      },
+      {
+        "tool_output_chunk_id": "b625b1",
+        "command": "PYTHONPATH=src /Users/landjunge/KiraBridge-release-20261024/.worktrees/rc17-braille-integration-20261026/.venv/bin/python -m pytest -q tests/test_session_dispatch_evidence.py::test_buffer_reservation_accepts_only_claimed_pretransport_tasks tests/test_session_dispatch_evidence.py::test_released_buffer_cannot_dispatch_outside_active_claim_states",
+        "passed": 7,
+        "failed": 1,
+        "note": "Only affected eight fixtures rerun after capability correction. RUNNING fixture needed nonempty transition evidence; remaining seven passed."
+      },
+      {
+        "tool_output_chunk_id": "e08b93",
+        "command": "PYTHONPATH=src /Users/landjunge/KiraBridge-release-20261024/.worktrees/rc17-braille-integration-20261026/.venv/bin/python -m pytest -q 'tests/test_session_dispatch_evidence.py::test_buffer_reservation_accepts_only_claimed_pretransport_tasks[running]' tests/test_session_dispatch_evidence.py::test_accepted_reservation_preserves_owner_and_exact_input",
+        "passed": 3,
+        "failed": 0,
+        "note": "Only remaining failed fixture rerun after evidence correction, plus two new owner/immutable-argument security cases; all passed."
+      }
+    ],
+    "C_evidence_origin": "Recorded functions.exec / exec_command tool results from this agent conversation. Shell output was not tee-captured to log files at execution time. These are retrospective metadata summaries, not fabricated raw logs.",
+    "C_raw_log_files": [],
+    "root_integration": {
+      "command": [
+        "/Users/landjunge/KiraBridge-release-20261024/.worktrees/rc17-braille-integration-20261026/.venv/bin/python",
+        "-m",
+        "pytest",
+        "-q",
+        "tests/test_session_input_policy.py::test_full_permission_still_buffers_then_separate_token_releases_once",
+        "tests/test_session_input_policy.py::test_suffix_persists_buffer_before_immediate_dispatch"
+      ],
+      "returncode": 0,
+      "scope": "new Bridge callback plus real SessionManager and released buffer integration; no full-suite repeat"
+    }
+  }
+}

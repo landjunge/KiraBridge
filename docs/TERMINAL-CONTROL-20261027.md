@@ -69,11 +69,12 @@ Clipboard-Snapshot, Generationsprüfung und bestätigte Wiederherstellung bleibe
 bestehen. Authentifizierung, explizite Rechte und optionale Eingabefreigaben werden
 nicht durch den neuen Transportpfad ersetzt.
 
-## Abnahme: ausstehend
+## Erforderlicher Abnahmeumfang
 
-Für diesen neuen Reparaturstand sind bei Anlage dieses Dokuments **keine Tests oder
-native Eingabe als bestanden behauptet**. Erforderlich sind ausschließlich die
-betroffenen neuen Regressionen und unmittelbar relevanten Sicherheitsprüfungen:
+Der Plan wurde vor der Umsetzung gespeichert. Der nachfolgende Ergebnisabschnitt
+trennt inzwischen ausgeführte Prüfungen von weiter offenen Integrations- und
+Installationsschritten. Erforderlich sind ausschließlich die betroffenen Regressionen
+und unmittelbar relevanten Sicherheitsprüfungen:
 
 - Normale Shell, `submit=false`: exakt autorisierter Text im richtigen Ziel,
   kein Return; Mehrzeilen-/Steuerzeichenablehnung vor möglichem Transport.
@@ -99,6 +100,47 @@ normaler Shell und ruft Return separat auf; das zweite prüft einen breiteren
 Fenster-Lifecycle. Nicht beide vollständig wiederholen, um diesen engen Fix zu testen.
 Genaue Befehle, Quellstände, Ergebnisse, begründete Wiederholungen und verbleibende
 Grenzen werden nach tatsächlicher Ausführung hier beziehungsweise im PR ergänzt.
+
+## Ergebnisse der gezielten Prüfung
+
+Beleg: [strukturierte Intel-Nachweise](evidence/terminal-input-20261027.json).
+Getesteter Programmstand `7cbf343c3dc0325a39cefc4e01f7cecfa26af74f`; die vier
+betroffenen Programmdateien sind dort einzeln mit SHA-256 gepinnt.
+
+- A: 47 gezielte Session-/Adapter-, Clipboard-, Identitäts-, Steuerzeichen- und
+  Policy-Fälle bestanden. Drei Fälle prüfen LF/CRLF/CR tatsächlich mit JXA,
+  aber ohne GUI. Die Shellprüfung normalisiert die vom Mac gelieferten
+  Prozesszeilentrenner und validiert den effektiven Text nach der Freigabe.
+- C: 21 gezielte Dispatch-/Buffer-/Wiederanlauffälle bestanden. Eine freigegebene
+  Eingabe darf im eigentümergebundenen Zustand `accepted` oder `running` einmalig
+  reserviert werden; Reservierung ist noch kein Eingabeversuch. Andere Zustände,
+  falscher Eigentümer, geänderte Argumente und erneute Reservierung bleiben verboten.
+- Root: drei zusätzliche unmittelbar nötige Integrationsfälle verbinden reale
+  SessionManager- und Buffer-Implementierung mit der neuen Bridge-Callbackgrenze.
+  Alle bestanden; keine lokale Gesamtsuite wiederholt. Ruff/Diffprüfungen der
+  Änderungen bestanden. Notwendige Tests wurden nach konkreten Fehlern gezielt
+  korrigiert beziehungsweise wiederholt, keine fehlgeschlagenen Läufe verschwiegen.
+- Echte native Intel-Abnahme in genau einem eigenen Fenster `67312` / `ttys000`:
+  veraltete PID vor Eingabe als `failed` verweigert, Ansicht unverändert.
+  `submit=false` anschließend `completed`, Text exakt zurückgelesen und eigene
+  Ausgabedatei vor Return nicht vorhanden. Erst ein separat ausdrücklich gesendetes
+  Return führte den harmlosen eigenen Prüfbefehl aus. Die Quittung umfasst 21 Bytes,
+  SHA-256 `e0d553299368b84500be75eee7de96c219ff4bb643ae36e8ee2831a08c3009a9`.
+  Keine fremde Agentensitzung und keine produktive Konfiguration verändert.
+
+Zwei Grenzen bleiben im Originalbeleg sichtbar: Der erste reine Katalogaufruf
+scheiterte vor jeder Fensteröffnung mit der mehrdeutigen alten Fehlermeldung
+(Timeout oder ungültiges JSON). Die gezielte Nachdiagnose lieferte wieder gültige
+214-Byte-Metadaten in 0,288 Sekunden; keine bewiesene Ursachenreparatur behauptet.
+Der native Harness prüfte nach dem separaten Return zunächst nur das Vorhandensein
+der Quittung und las zu früh. Der unabhängige spätere Bytevergleich bestätigte sie
+ohne erneute Eingabe; Originalfehler und ergänzte Quittierung bleiben erhalten.
+
+Das eigene leere Prüffenster wird für den nächsten autorisierten Schritt behalten,
+kein weiteres geöffnet. Cleanup/Abwesenheit, final integriertes Paket, verpflichtende
+GitHub-Prüfungen, Merge und tatsächlich installierter Dienst sind zum Zeitpunkt dieses
+isolierten Nachweises noch getrennt abzuschließen. Laufende Codex-/Grok-Sitzungen
+und der tatsächliche ChatGPT-Sprachhost sind durch diesen Fixturetest nicht abgenommen.
 
 ## Integration und Betriebsgrenzen
 
@@ -130,8 +172,10 @@ only single-line text without controls. Agent widgets retain their separate guar
 selection/readiness route. An optional awaited `before_transport` callback records
 possible input only after session prechecks; it does not prove delivery or execution.
 Definite pre-transport refusal and uncertain transport outcomes must remain distinct,
-with no automatic replay. New targeted tests and actual isolated visible Intel-Mac
-acceptance are pending, not claimed passed. Normal review/check gates precede merge;
+with no automatic replay. Targeted session/adapter (47), dispatch/buffer (21), and combined integration (3)
+cases passed. An actual isolated visible Intel-Mac paste-only/readback and stale-PID
+check passed, with original setup/receipt-timing failures preserved. This does not
+claim actual voice-Host or live Codex/Grok input acceptance. Normal review/check gates precede merge;
 only an explicitly approved verified package may be installed visibly with preserved
 state and rollback. No Reader/Host investigation restart, foreign-session input or
 Library-job replay is part of this repair.
