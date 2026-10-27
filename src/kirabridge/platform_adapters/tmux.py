@@ -5,8 +5,10 @@ from __future__ import annotations
 import asyncio
 import re
 import shutil
+import sys
 
 from kirabridge.bridge_core.models import BridgeError, UncertainExecution
+from kirabridge.platform_adapters import reap_process
 
 
 class TmuxTransport:
@@ -52,9 +54,19 @@ class TmuxTransport:
                 ) from None
             raise
         finally:
-            if child.returncode is None:
-                child.kill()
-                await child.wait()
+            was_cancelled = isinstance(sys.exc_info()[1], asyncio.CancelledError)
+            try:
+                await reap_process(child, process_group=False)
+            except BridgeError:
+                if was_cancelled:
+                    raise asyncio.CancelledError from None
+                if mutation:
+                    raise UncertainExecution(
+                        "session_input_unknown", "Worker cleanup unknown; do not resend"
+                    ) from None
+                raise BridgeError(
+                    "session_transport_unavailable", "Tmux worker cleanup unconfirmed"
+                ) from None
 
     async def catalog(self):
         raw = await self.command(

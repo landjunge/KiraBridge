@@ -3,6 +3,7 @@
 import asyncio
 from contextlib import asynccontextmanager
 from types import SimpleNamespace
+from unittest.mock import AsyncMock
 
 import pytest
 
@@ -18,7 +19,7 @@ async def test_native_script_travels_on_stdin_not_process_arguments(monkeypatch)
         calls.append(payload)
         return b'{"ok":true}', b""
 
-    child = SimpleNamespace(communicate=communicate, returncode=0)
+    child = SimpleNamespace(communicate=communicate, returncode=0, wait=AsyncMock(return_value=0))
 
     async def spawn(*args, **kwargs):
         assert source not in args and all("NEVER_IN_ARGV" not in str(arg) for arg in args)

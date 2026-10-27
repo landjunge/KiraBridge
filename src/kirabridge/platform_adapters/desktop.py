@@ -7,6 +7,7 @@ import sys
 import time
 
 from kirabridge.bridge_core.models import BridgeError
+from kirabridge.platform_adapters import reap_process
 
 DESKTOP_MESSAGES = {
     "desktop_locked": "Der Mac ist gesperrt. Bitte die bestehende Benutzersitzung entsperren. "
@@ -61,12 +62,12 @@ class MacDesktop:
         except (OSError, TimeoutError, ValueError, plistlib.InvalidFileException):
             pass  # An unavailable extra probe never removes an existing grant.
         finally:
-            if child is not None and child.returncode is None:
+            if child is not None:
                 try:
-                    child.kill()
-                except ProcessLookupError:
-                    pass
-                await child.wait()
+                    await reap_process(child, process_group=False)
+                except BridgeError:
+                    if state not in DESKTOP_MESSAGES:
+                        state = "unknown"
         self.last = {
             "state": state,
             "observed_at": time.time(),

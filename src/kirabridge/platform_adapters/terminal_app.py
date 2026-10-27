@@ -10,6 +10,7 @@ import sys
 from pathlib import Path
 
 from kirabridge.bridge_core.models import BridgeError, UncertainExecution
+from kirabridge.platform_adapters import reap_process
 from kirabridge.platform_adapters.clipboard_lease import clipboard_lease
 from kirabridge.platform_adapters.desktop import MacDesktop
 
@@ -74,18 +75,19 @@ class TerminalAppTransport:
                 "session_transport_unavailable", "Terminal.app did not return valid data"
             ) from None
         finally:
-            if child.returncode is None:
-                child.kill()
-                reaping = asyncio.create_task(child.wait())
-                cancelled = False
-                while not reaping.done():
-                    try:
-                        await asyncio.shield(reaping)
-                    except asyncio.CancelledError:
-                        cancelled = True
-                reaping.result()
-                if cancelled:
-                    raise asyncio.CancelledError
+            was_cancelled = isinstance(sys.exc_info()[1], asyncio.CancelledError)
+            try:
+                await reap_process(child, process_group=False)
+            except BridgeError:
+                if was_cancelled:
+                    raise asyncio.CancelledError from None
+                if mutation:
+                    raise UncertainExecution(
+                        "session_input_unknown", "Worker cleanup unknown; do not resend"
+                    ) from None
+                raise BridgeError(
+                    "session_transport_unavailable", "Terminal worker cleanup unconfirmed"
+                ) from None
 
     async def window_inventory(self):
         """Unfiltered native window IDs, including windows without a usable shell PID."""
@@ -121,9 +123,13 @@ class TerminalAppTransport:
         except (OSError, TimeoutError):
             raise BridgeError("visible_absence_unproven", "OS PID observation failed") from None
         finally:
-            if child is not None and child.returncode is None:
-                child.kill()
-                await child.wait()
+            if child is not None:
+                try:
+                    await reap_process(child, process_group=False)
+                except BridgeError:
+                    raise BridgeError(
+                        "visible_absence_unproven", "PID observation cleanup unconfirmed"
+                    ) from None
 
     async def catalog(self):
         if sys.platform != "darwin":
@@ -143,12 +149,7 @@ class TerminalAppTransport:
             async with asyncio.timeout(3):
                 output, _ = await child.communicate()
         finally:
-            if child.returncode is None:
-                try:
-                    child.kill()
-                except ProcessLookupError:
-                    pass
-                await child.wait()
+            await reap_process(child, process_group=False)
         processes = [
             parts
             for line in output.decode().splitlines()
@@ -358,9 +359,7 @@ class TerminalAppTransport:
                 ),
             }
         finally:
-            if child.returncode is None:
-                child.kill()
-                await child.wait()
+            await reap_process(child, process_group=False)
 
     async def prepare_shell_paste(self, row):
         from kirabridge.platform_adapters.shell_prompt import empty_shell_prompt
@@ -508,9 +507,7 @@ class TerminalAppTransport:
             async with asyncio.timeout(3):
                 raw, _ = await child.communicate()
         finally:
-            if child.returncode is None:
-                child.kill()
-                await child.wait()
+            await reap_process(child, process_group=False)
         identity = " ".join(raw.decode().split())
         if child.returncode or not identity.startswith(str(os.getuid()) + " "):
             raise BridgeError("visible_target_changed", "Selected target process identity changed")
