@@ -243,3 +243,77 @@ async def test_submitted_direct_shell_checks_input_before_intent(plain, monkeypa
         )
     intent.assert_not_awaited()
     native.assert_not_awaited()
+
+
+@pytest.mark.parametrize("separator", ["\n", "\r\n", "\r"])
+def test_native_shell_snapshot_parser_accepts_macos_line_endings(separator, tmp_path):
+    import json
+    import shutil
+    import subprocess
+
+    from kirabridge.platform_adapters.terminal_app import TerminalAppTransport
+
+    rows = [
+        "0 800 1 ttys004 Sat Oct 24 11:00:00 2026 /usr/bin/login",
+        f"{os.getuid()} 900 800 ttys004 Sat Oct 24 12:00:00 2026 /bin/zsh",
+    ]
+    snapshot = {"rows": sorted(rows), "command": ["/bin/ps", "-t", "ttys004"]}
+    # JXA's StandardAdditions.doShellScript returns CR on macOS, unlike subprocess stdout.
+    source = (
+        "const identityHost={doShellScript:()=>"
+        + json.dumps(separator.join(rows) + separator)
+        + "};const tab={busy:()=>false};"
+    )
+    source += TerminalAppTransport.native_shell_guard(snapshot)
+    compiler = shutil.which("osascript")
+    if compiler:
+        source += "JSON.stringify({matched:true});"
+        result = subprocess.run(
+            [compiler, "-l", "JavaScript", "-"],
+            input=source,
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+    else:
+        node = shutil.which("node")
+        if not node:
+            pytest.skip("No isolated JavaScript runtime")
+        source += "process.stdout.write(JSON.stringify({matched:true}));"
+        result = subprocess.run(
+            [node, "-"], input=source, capture_output=True, text=True, timeout=5
+        )
+    assert result.returncode == 0, result.stderr
+    assert json.loads(result.stdout) == {"matched": True}
+
+
+@pytest.mark.parametrize("effective", ["# harmless", "# first\n# second"])
+async def test_plain_shell_validates_effective_text_after_actual_buffer_framing(
+    plain, bridge, config, effective
+):
+    from conftest import request
+
+    from kirabridge.bridge_core.models import State
+
+    sessions, _, _, native = plain
+    config.session_input_policy.enabled = True
+    config.session_input_policy.principals = ["local"]
+    config.principals["local"].approval_mode = "automatic"
+    args = arguments(effective + "\ngo-go-go\n")
+    task = request("session.input", args.model_dump(), task_id="framed-paste")
+    bridge.prepare("local", task)
+    claimed = bridge.store.claim("fixture-worker", 30)
+    assert claimed["id"] == task.task_id
+    bridge.store.transition(task.task_id, State.RUNNING, {"fixture": True}, owner="fixture-worker")
+    intent = AsyncMock()
+    if "\n" in effective:
+        with pytest.raises(BridgeError, match="single-line"):
+            await sessions.send("local", args, task_id=task.task_id, before_transport=intent)
+        intent.assert_not_awaited()
+        native.assert_not_awaited()
+    else:
+        await sessions.send("local", args, task_id=task.task_id, before_transport=intent)
+        intent.assert_awaited_once()
+        source = native.call_args.args[0]
+        assert "go-go-go" not in source and effective in source
+        assert "keyCode(36)" not in source and "app.doScript" not in source

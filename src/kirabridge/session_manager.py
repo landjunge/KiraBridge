@@ -440,8 +440,6 @@ class SessionManager:
                     "ChatGPT direct input requires a visible Terminal.app window",
                 )
             plain_paste = args.pane_id.startswith("terminal:") and not args.submit
-            if plain_paste:
-                self.terminal_app.validate_shell_paste_text(args.text)
             args = self.input_release.dispatch(principal, args, task_id)
             if plain_paste:
                 self.terminal_app.validate_shell_paste_text(args.text)

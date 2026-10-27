@@ -419,7 +419,7 @@ class TerminalAppTransport:
         return (
             "\nconst shellRows=identityHost.doShellScript("
             + json.dumps(command)
-            + ").trim().split(/\\n/).filter(s=>s.trim())"
+            + ").replace(/\\r\\n?/g,'\\n').trim().split(/\\n/).filter(s=>s.trim())"
             + ".map(s=>s.trim().replace(/\\s+/g,' ')).sort();"
             + "if(JSON.stringify(shellRows)!=="
             + json.dumps(json.dumps(snapshot["rows"], separators=(",", ":")))
