@@ -8,7 +8,8 @@ und tatsächlich wirksam erteilten Erlaubnisse bleiben maßgeblich.
 ## Gegenwärtige Lizenz
 
 Die [LICENSE](../LICENSE) enthält die individuelle **Netzwerkpunkt Personal Use
-License 1.0**. Die deutsche Fassung ist maßgeblich; Englisch ist eine Übersetzung.
+License 1.0**. Die aktuelle Datei enthält ausschließlich die bereits zuvor
+maßgebliche deutsche Fassung.
 Die Lizenz erlaubt private, nicht geschäftliche Nutzung und die dort genannten
 Bearbeitungen. Geschäftliche Nutzung, Weiterverkauf und entgeltliche Dienste
 benötigen eine gesonderte schriftliche Erlaubnis. Eine allgemeine
@@ -57,8 +58,14 @@ geltenden Bedingungen. Sie erteilt keine neue PolyForm-, MIT- oder andere
 historische Lizenz und ändert keine Rechte an 4AllPass. Historische Dateien,
 Tags und Release-Assets werden nicht umgeschrieben oder ersetzt.
 
-Der Copyrightvermerk und §§1–4/6 der deutschen und englischen Lizenz bleiben
-unverändert. Das proprietäre Lizenzmodell bleibt erhalten.
+Bei der §5-Korrektur in `683e342` blieben Copyrightvermerk und §§1–4/6
+beider damaliger Sprachfassungen unverändert. Die anschließende sprachliche
+Vereinheitlichung entfernt die nicht maßgebliche englische Übersetzung aus
+der aktuellen Datei; sämtliche deutschen Bedingungen bleiben bytegleich
+zum Stand `21b6b97008c692a4bfd8f02e2d05a31686460cb0`. Das proprietäre
+Lizenzmodell und bestehende Nutzungsrechte bleiben erhalten. Die frühere
+Übersetzung bleibt im unveränderten Gitverlauf und im externen Belegarchiv
+mit ihrer Herkunft erhalten; siehe [Sprachprüfung](LICENSE-LANGUAGE-CHECK.md).
 
 ## Grenzen und Verkaufsunterlagen
 
@@ -78,20 +85,3 @@ frühere private/kommerzielle Erlaubnisse, Design-/Markenrechte sowie die
 [Drittbestandteile](THIRD-PARTY-LICENSES.md) gesondert zu prüfen. Dieses Dokument
 verspricht weder vollständige Rechteinhaberschaft noch uneingeschränkte
 Exklusivität und ersetzt keine anwaltliche Prüfung.
-
-## English summary
-
-The root LICENSE uses the custom Netzwerkpunkt Personal Use License 1.0;
-German governs. The package's LicenseRef points to that supplied text.
-The 274 commits reachable from the stated source pin contain either the same
-original LICENSE blob (223 trees) or no root LICENSE (51 trees). Its first
-addition was `a2a21e7`; `d5e19ae` adds the identical text on another path.
-
-The erroneous §5 reference to 4AllPass/PolyForm and an unsupported preceding
-all-rights-reserved transition is replaced by KiraBridge-specific wording.
-Previously effective grants and the original terms of earlier versions remain
-unaffected. This correction grants no new historical license and changes no
-4AllPass rights. Historical commits, tags and release assets remain intact.
-Other branches, copies, separate grants, recipient records, title and final
-distribution compliance require separate evidence; unrestricted exclusivity is
-not established by this review.

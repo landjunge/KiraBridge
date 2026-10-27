@@ -125,14 +125,3 @@ Quellbereitstellungspflichten abzugleichen. Die vorhandene Paketierung führt
 Root-LICENSE und ihre Prüfsumme mit; sie erzeugt damit noch keinen Nachweis
 vollständiger Drittanbieter-Compliance. Diese Dokumentation verändert weder
 Buildlogik noch historische Release-Assets oder Rechte von Dritten.
-
-## English summary
-
-The root lock lists 39 third-party package versions; the separate chat-events
-lock lists 33, including nine versions absent from the root list. This is an
-inventory of declared licenses, not a complete distribution SBOM or notice
-bundle. Preserve the actual upstream copyright, license and applicable NOTICE
-texts, verify MPL source-availability duties for Certifi, and inspect native,
-platform and provider components for each final artifact. KiraBridge's custom
-license does not replace these rights or establish exclusive ownership of
-third-party components.
