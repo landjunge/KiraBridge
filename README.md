@@ -78,7 +78,12 @@ Fresh installation creates user-owned state. Updates preserve configuration, cre
 
 ## License / Lizenz
 
-[Netzwerkpunkt Personal Use License 1.0](LICENSE). Private non-business use is free under its terms; business use requires separate written permission. German governs. This is a source-available license, not an OSI approval or legal review. Third-party licenses remain applicable.
+[Netzwerkpunkt Personal Use License 1.0](LICENSE).
 
-Package license reference: `LicenseRef-Netzwerkpunkt-Personal-Use-1.0`.
+**Deutsch:** Private, nicht geschäftliche Nutzung ist nach den Lizenzbedingungen kostenlos; geschäftliche Nutzung benötigt gesonderte schriftliche Erlaubnis. Die deutsche Lizenzfassung ist maßgeblich. Dies ist eine individuelle Source-available-Lizenz, keine OSI-anerkannte Open-Source-Lizenz. Diese Zusammenfassung ist keine rechtliche Prüfung. Drittanbieter-Lizenzen bleiben anwendbar.
+
+**English:** Private non-business use is free under the license terms; business use requires separate written permission. The German license text governs. This is a custom source-available license, not an OSI-approved open-source license. This summary does not constitute legal review. Third-party licenses remain applicable.
+
+Lizenzreferenz / Package license reference: `LicenseRef-Netzwerkpunkt-Personal-Use-1.0`.
 [License history and existing rights / Lizenzhistorie und bestehende Rechte](docs/LICENSE-HISTORY.md) · [Third-party license inventory and notice requirements / Fremdlizenzen und erforderliche Hinweise](docs/THIRD-PARTY-LICENSES.md).
+[DE/EN-Sprachabgleich / Language comparison](docs/LICENSE-LANGUAGE-CHECK.md).
