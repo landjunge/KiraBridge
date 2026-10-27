@@ -354,7 +354,7 @@ class SessionManager:
             "scope": "selected terminal output; not proof of project completion",
         }
 
-    async def insert(self, principal, args):
+    async def insert(self, principal, args, *, before_transport=None):
         self.authorization.principal(principal, "session.input")
         self.authorization.principal(principal, "terminal.execute")
         if args.submit or "\x00" in args.text:
@@ -386,10 +386,14 @@ class SessionManager:
                     raise BridgeError(
                         "visible_target_not_ready", "Current agent widget is not ready"
                     )
+                if before_transport is not None:
+                    await before_transport()
                 await self.terminal_app.insert(
                     args.pane_id, args.text, identity_guard=identities, expected_screen=text
                 )
             else:
+                if before_transport is not None:
+                    await before_transport()
                 await self.transport(args.pane_id).insert(args.pane_id, args.text)
         return {"paste_event_sent": True, "return_sent": False, "agent_confirmed": False}
 
@@ -417,7 +421,7 @@ class SessionManager:
                 await self.transport(pane_id).press_return(pane_id)
         return {"return_sent": True, "agent_confirmed": False}
 
-    async def send(self, principal, args, *, task_id=None):
+    async def send(self, principal, args, *, task_id=None, before_transport=None):
         self.authorization.principal(principal, "session.input")
         self.authorization.principal(principal, "terminal.execute")
         if "\x00" in args.text:
@@ -435,13 +439,30 @@ class SessionManager:
                     "visible_terminal_required",
                     "ChatGPT direct input requires a visible Terminal.app window",
                 )
-            if args.pane_id.startswith("terminal:") and not args.submit:
-                raise BridgeError("session_submit_required", "Terminal.app input submits a line")
+            plain_paste = args.pane_id.startswith("terminal:") and not args.submit
+            if plain_paste:
+                self.terminal_app.validate_shell_paste_text(args.text)
             args = self.input_release.dispatch(principal, args, task_id)
-            if self.direct(principal):
+            if plain_paste:
+                self.terminal_app.validate_shell_paste_text(args.text)
+                context = await self.terminal_app.prepare_shell_paste(selected)
+                if before_transport is not None:
+                    await before_transport()
+                await self.terminal_app.insert(
+                    args.pane_id,
+                    args.text,
+                    identity_guard=context["identities"],
+                    expected_screen=context["screen"],
+                    shell_snapshot=context["snapshot"],
+                )
+            elif self.direct(principal):
                 identity = await self.terminal_app.process_identity(selected["expected_pid"])
-                await self.terminal_app.send_confirmed(selected, args.text, identity)
+                await self.terminal_app.send_confirmed(
+                    selected, args.text, identity, before_transport=before_transport
+                )
             else:
+                if before_transport is not None:
+                    await before_transport()
                 await self.transport(args.pane_id).send(
                     args.pane_id, args.text, submit=args.submit, require_idle=args.require_idle
                 )
@@ -452,6 +473,16 @@ class SessionManager:
             "input_handed_to_transport": True,
             "agent_processed": False,
             "submitted": args.submit,
+            **(
+                {
+                    "paste_event_sent": True,
+                    "return_sent": False,
+                    "agent_confirmed": False,
+                    "execution_confirmed": False,
+                }
+                if plain_paste
+                else {}
+            ),
         }
 
     async def selected(self, principal, pane_id, expected_pid):

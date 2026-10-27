@@ -315,7 +315,121 @@ class TerminalAppTransport:
             + ");}\n"
         )
 
-    async def insert(self, pane_id, text, *, identity_guard=None, expected_screen=None):
+    @staticmethod
+    def validate_shell_paste_text(text):
+        import unicodedata
+
+        if not text or any(
+            unicodedata.category(char) == "Cc" or char in "\u2028\u2029" for char in text
+        ):
+            raise BridgeError(
+                "invalid_arguments", "Plain shell paste requires single-line text without controls"
+            )
+
+    async def shell_process_snapshot(self, tty):
+        if not re.fullmatch(r"/dev/ttys[0-9]+", tty):
+            raise BridgeError("visible_target_changed", "Invalid selected shell TTY")
+        command = [
+            "/bin/ps",
+            "-t",
+            tty.removeprefix("/dev/"),
+            "-o",
+            "uid=,pid=,ppid=,tty=,lstart=,comm=",
+        ]
+        child = await asyncio.create_subprocess_exec(
+            *command,
+            env={**os.environ, "LC_ALL": "C"},
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+        try:
+            async with asyncio.timeout(3):
+                raw, error = await child.communicate()
+            if child.returncode or error.strip() or not raw.strip() or len(raw) > 262144:
+                raise BridgeError(
+                    "visible_target_changed", "Complete selected TTY processes unavailable"
+                )
+            return {
+                "command": command,
+                "rows": sorted(
+                    " ".join(line.split())
+                    for line in raw.decode("utf-8").splitlines()
+                    if line.strip()
+                ),
+            }
+        finally:
+            if child.returncode is None:
+                child.kill()
+                await child.wait()
+
+    async def prepare_shell_paste(self, row):
+        from kirabridge.platform_adapters.shell_prompt import empty_shell_prompt
+
+        if row.get("busy", True) or not row.get("processes"):
+            raise BridgeError("session_busy", "Selected shell must be positively idle")
+        snapshot = await self.shell_process_snapshot(row["tty"])
+        records = {}
+        for line in snapshot["rows"]:
+            parts = line.split(None, 9)
+            if len(parts) != 10 or not all(value.isdigit() for value in parts[:3]):
+                raise BridgeError("visible_target_changed", "Incomplete selected TTY identity")
+            uid, pid, parent = map(int, parts[:3])
+            if pid in records or parts[3] != Path(row["tty"]).name:
+                raise BridgeError("visible_target_changed", "Ambiguous selected TTY identity")
+            records[pid] = (
+                uid,
+                parent,
+                parts[9],
+                " ".join([parts[0], parts[3], *parts[4:9], parts[2], parts[9]]),
+            )
+        own = {pid: data for pid, data in records.items() if data[0] == os.getuid()}
+        observed = {process["pid"]: process for process in row["processes"]}
+        if set(own) != set(observed) or row["expected_pid"] not in own:
+            raise BridgeError("visible_target_changed", "Selected process set changed")
+        for pid, (_, parent, image, _) in own.items():
+            process = observed[pid]
+            if (
+                Path(image).name.lstrip("-") not in {"zsh", "bash", "sh"}
+                or process["ppid"] != parent
+                or process["image"] != image
+            ):
+                raise BridgeError("visible_target_changed", "Selected shell image/parent changed")
+        foreign = set(records) - set(own)
+        boundary = own[row["expected_pid"]][1]
+        if foreign and (
+            foreign != {boundary}
+            or records[boundary][0] != 0
+            or Path(records[boundary][2]).name.lstrip("-") != "login"
+        ):
+            raise BridgeError("session_busy", "Other processes exist on selected TTY")
+        screen = await self.read(row["pane_id"])
+        if not empty_shell_prompt(screen):
+            raise BridgeError("visible_input_not_empty", "Selected terminal has existing input")
+        return {
+            "identities": {pid: data[3] for pid, data in records.items()},
+            "screen": screen,
+            "snapshot": snapshot,
+        }
+
+    @staticmethod
+    def native_shell_guard(snapshot):
+        import shlex
+
+        command = "/usr/bin/env LC_ALL=C " + shlex.join(snapshot["command"])
+        return (
+            "\nconst shellRows=identityHost.doShellScript("
+            + json.dumps(command)
+            + ").trim().split(/\\n/).filter(s=>s.trim())"
+            + ".map(s=>s.trim().replace(/\\s+/g,' ')).sort();"
+            + "if(JSON.stringify(shellRows)!=="
+            + json.dumps(json.dumps(snapshot["rows"], separators=(",", ":")))
+            + ")throw Error('Selected target identity changed');"
+            + "if(tab.busy())throw Error('Selected terminal is busy');"
+        )
+
+    async def insert(
+        self, pane_id, text, *, identity_guard=None, expected_screen=None, shell_snapshot=None
+    ):
         async with self.clipboard_lock:
             # The independent memory-only owner survives a killed/cancelled GUI
             # worker. native() reaps that worker before the lease requests restore.
@@ -345,8 +459,13 @@ class TerminalAppTransport:
           throw Error("Literal Paste action is unavailable; no paste sent");
         }} finally {{ edit.actions.byName("AXCancel").perform(); }}
         if(typeof checkTargetIdentity === 'function') checkTargetIdentity();
-        checkFocus(); checkClipboard();
 """
+                    + (
+                        self.native_shell_guard(shell_snapshot)
+                        if shell_snapshot is not None
+                        else ""
+                    )
+                    + "\ncheckFocus(); checkClipboard();"
                     + self.native_screen_guard(expected_screen)
                     + """
         const beforePaste=tab.contents();
@@ -397,7 +516,7 @@ class TerminalAppTransport:
             raise BridgeError("visible_target_changed", "Selected target process identity changed")
         return identity
 
-    async def send_confirmed(self, row, text, identity):
+    async def send_confirmed(self, row, text, identity, *, before_transport=None):
         """Check process start time/UID/TTY and empty input in the same native dispatch."""
         if identity.split()[1] != Path(row["tty"]).name:
             raise BridgeError("visible_target_changed", "Selected process TTY changed")
@@ -406,6 +525,8 @@ class TerminalAppTransport:
         if not empty_shell_prompt(await self.read(row["pane_id"])):
             raise BridgeError("visible_input_not_empty", "Selected terminal has existing input")
         command = f"/bin/ps -p {int(row['expected_pid'])} -o uid=,tty=,lstart="
+        if before_transport is not None:
+            await before_transport()
         return await self.native(
             self.native_target(row["pane_id"])
             + "\nconst host=Application.currentApplication(); host.includeStandardAdditions=true;"

@@ -155,7 +155,7 @@ async def test_native_session_selection_read_and_input(bridge, config, monkeypat
     args = SessionInput(
         **{k: selected[k] for k in ("pane_id", "expected_pid")}, text='hello "quoted"\nline'
     )
-    with pytest.raises(BridgeError, match="submits a line"):
+    with pytest.raises(BridgeError, match="single-line"):
         await manager.send("local", args.model_copy(update={"submit": False}))
     sent = await manager.send("local", args)
     assert sent["input_handed_to_transport"] and not sent["agent_processed"]
