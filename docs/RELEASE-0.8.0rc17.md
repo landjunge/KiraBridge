@@ -2,7 +2,7 @@
 
 [Actual release status / tatsächlicher Release-Status](https://github.com/landjunge/KiraBridge/releases/tag/v0.8.0rc17).
 A GitHub draft remains unpublished. Final assets, source commit, SHA-256 and installed
-service acceptance are recorded separately in the release/PR43, never inferred from a tag.
+service acceptance are recorded separately in the release and associated PRs, never inferred from a tag.
 
 ## Änderungen / Changes
 
@@ -26,9 +26,29 @@ service acceptance are recorded separately in the release/PR43, never inferred f
   Automatic recovery retains old-definition/ownership/idle guards even if
   visibility is lost after a failed switch. launchd remains window-independent.
 
+## Terminalreparatur / Terminal repair · 27 October
+
+The targeted repair adds guarded single-line paste without Return to confirmed empty
+Terminal.app shells. Existing CLI-agent widget routes remain separate. UID, PID,
+process start, parent/image, full TTY process set, busy state, focus, screen and
+clipboard guards remain active. CR/LF/CRLF process output is normalized for matching;
+only the effective text after the existing release policy is checked for controls.
+
+Input intent is journaled after Python preflight at the transport boundary.
+A confirmed earlier refusal becomes `failed`; possible transport remains `unknown`,
+without automatic replay. Exact owned released buffers are reserved once in an
+accepted/running task; no authorization or production-policy change.
+
+47 targeted adapter/session cases,21 dispatch/buffer cases and3 combined integration
+cases passed. Actual isolated Intel native paste-only/readback, no-Enter output check,
+stale-PID rejection and a separate21-byte execution receipt are recorded in
+[Terminal repair evidence](TERMINAL-CONTROL-20261027.md). Original setup/receipt timing
+failures remain visible. These tests do not establish actual voice-Host or live
+Codex/Grok input acceptance, final deployment or release publication.
+
 ## Nachweise und Abnahme / Evidence and acceptance
 
-Actual Intel macOS15.7.4 / Python3.11.15, program source20a30e8:
+Historical full Intel baseline: macOS15.7.4 / Python3.11.15, program source20a30e8:
 **1609 passed,1 skipped**, Ruff/format, wheel and sdist passed. Actual built package:
 **9/9 RC14 lifecycle checks passed**, including data retention, idempotency, installer-exit
 independence, restart, KeepAlive, actual rollback and fresh launchd installation.
@@ -38,7 +58,7 @@ Temporary test service was removed; production data/config/credentials were unch
 The operator explicitly approved local Intel acceptance for merge and visible installation.
 Hosted Intel/ARM jobs did not start because of account billing/spending restrictions;
 this approval does not claim green Actions or ARM acceptance. **Apple Silicon and macOS26
-remain unverified.** Documentation-only finalization does not change tested program bytes;
+remain unverified.** The historical baseline and the new targeted terminal result remain separate;
 the final merged source and new package hashes must be checked separately.
 
 [Detailed evidence/approval](INTEL-ACCEPTANCE-20261026.md) ·
