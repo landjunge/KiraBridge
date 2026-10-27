@@ -46,6 +46,21 @@ stale-PID rejection and a separate21-byte execution receipt are recorded in
 failures remain visible. These tests do not establish actual voice-Host or live
 Codex/Grok input acceptance, final deployment or release publication.
 
+## Native cleanup follow-up · 27 October
+
+A separate bounded PID-only cleanup path drains stdout/stderr even when a worker's
+exit code is already set. Desktop, Terminal.app/native process probes and tmux clients
+use only their own created process handle; the existing process-group mode is unchanged.
+Cancellation and read-versus-uncertain-write semantics are preserved. Fourteen targeted
+Intel cases passed, including one real paused-pipe child and no group signal.
+
+[Detailed evidence and blocker](TERMINAL-CLEANUP-20261027.md): RC17/1cc was visibly
+installed with preserved configuration/credentials. Its once-only productive paste probe
+remains accepted, not completed. The isolated cleanup reproduction does not identify
+that live coroutine conclusively. No duplicate input, forced restart, service_busy bypass
+or published-release claim. The own empty installation window was closed and absence
+confirmed; this invalidates the target but does not claim the task coroutine stopped.
+
 ## Nachweise und Abnahme / Evidence and acceptance
 
 Historical full Intel baseline: macOS15.7.4 / Python3.11.15, program source20a30e8:

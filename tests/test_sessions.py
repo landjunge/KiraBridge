@@ -4,6 +4,7 @@ import subprocess
 import sys
 import uuid
 from types import SimpleNamespace
+from unittest.mock import AsyncMock
 
 import pytest
 
@@ -36,7 +37,9 @@ async def test_native_catalog_binds_window_tty_and_unambiguous_root_pid(bridge, 
         )
 
     async def process(*args, **kwargs):
-        return SimpleNamespace(communicate=communicate, returncode=0)
+        return SimpleNamespace(
+            communicate=communicate, returncode=0, wait=AsyncMock(return_value=0)
+        )
 
     monkeypatch.setattr(manager.terminal_app, "native", native)
     monkeypatch.setattr(

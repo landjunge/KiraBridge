@@ -168,9 +168,65 @@ async def stop_process(process, grace: float = 2.0) -> None:
         pass
 
 
-async def reap_process(process) -> None:
+async def _reap_worker_process(process) -> None:
+    """Reap an exact created worker handle, never its containing process group."""
+    import asyncio
+
+    async def discard(reader):
+        if reader is not None:
+            while await reader.read(8192):
+                pass
+
+    async def cleanup():
+        try:
+            async with asyncio.timeout(5):
+                if process.returncode is None:
+                    try:
+                        process.kill()
+                    except ProcessLookupError:
+                        pass
+                stdin = getattr(process, "stdin", None)
+                if stdin is not None:
+                    stdin.close()
+                    try:
+                        await stdin.wait_closed()
+                    except (BrokenPipeError, ConnectionResetError):
+                        pass
+                await asyncio.gather(
+                    discard(getattr(process, "stdout", None)),
+                    discard(getattr(process, "stderr", None)),
+                    process.wait(),
+                )
+        except TimeoutError:
+            # Own pipes only; no PID/PGID search, descendant signals or unbounded wait.
+            process._transport.close()
+            raise BridgeError(
+                "process_cleanup_unknown", "Worker cleanup could not be confirmed"
+            ) from None
+
+    reaping = asyncio.create_task(cleanup())
+    cancelled = isinstance(sys.exc_info()[1], asyncio.CancelledError)
+    while not reaping.done():
+        try:
+            await asyncio.shield(reaping)
+        except asyncio.CancelledError:
+            cancelled = True
+        except Exception:
+            break
+    if cancelled:
+        # Retrieve a possible failure without losing the caller's cancellation.
+        if not reaping.cancelled():
+            reaping.exception()
+        raise asyncio.CancelledError
+    reaping.result()
+
+
+async def reap_process(process, *, process_group=True) -> None:
     """Call only after other stream readers stop; drain pipes to avoid transport leaks."""
     import asyncio
+
+    if not process_group:
+        return await _reap_worker_process(process)
 
     async def discard(reader):
         if reader is not None:
