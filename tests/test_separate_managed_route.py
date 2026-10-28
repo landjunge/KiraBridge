@@ -409,6 +409,61 @@ async def test_local_process_replies_without_touching_old_jobs(bridge, config, m
     assert _states(bridge, held_id, unknown_id) == ("queued", "unknown")
 
 
+def _local_program(config, name, events, *, exit_code=0):
+    from pathlib import Path
+
+    program = Path(config.principals["local"].roots[0]) / name
+    lines = ",\n".join(repr(event) for event in events)
+    program.write_text(
+        "#!/usr/bin/env python3\n"
+        "import json, sys\n"
+        "sys.stdin.read()\n"
+        f"for event in ({lines}):\n"
+        "    print(json.dumps(event), flush=True)\n"
+        f"raise SystemExit({exit_code})\n"
+    )
+    program.chmod(0o755)
+    config.agents["probe"].executable = str(program)
+
+
+async def _dispatch_outcome(bridge, config, monkeypatch, key):
+    _arm(monkeypatch, bridge, None, use_process=True)
+    sent = _send_new(bridge, key)
+    await bridge.message_receiver._dispatch_next("probe")
+    processing = bridge.messages.get("chatgpt", sent["id"])["processing"]
+    again = await bridge.message_receiver._dispatch_next("probe")
+    return processing, again
+
+
+async def test_failed_local_process_is_not_retried(bridge, config, monkeypatch):
+    _parties(config)
+    held_id, unknown_id = _plant_old(bridge)
+    _local_program(
+        config,
+        "failed-codex",
+        (
+            {"type": "thread.started", "thread_id": "local-thread"},
+            {"type": "turn.started"},
+            {"type": "turn.failed"},
+        ),
+    )
+    processing, again = await _dispatch_outcome(bridge, config, monkeypatch, "fresh-failed")
+    assert processing["state"] == "failed" and processing["error"] == "agent_failed"
+    assert again is False
+    assert _states(bridge, held_id, unknown_id) == ("queued", "unknown")
+
+
+async def test_unconfirmed_local_process_stays_unknown(bridge, config, monkeypatch):
+    _parties(config)
+    held_id, unknown_id = _plant_old(bridge)
+    _local_program(config, "silent-codex", (), exit_code=1)
+    processing, again = await _dispatch_outcome(bridge, config, monkeypatch, "fresh-unconfirmed")
+    assert processing["state"] == "unknown" and processing["error"] == "agent_unconfirmed"
+    assert again is False
+    assert bridge.message_receiver._claim(held_id) is None
+    assert _states(bridge, held_id, unknown_id) == ("queued", "unknown")
+
+
 async def test_cancelling_the_turn_reaps_only_its_process(bridge, config, monkeypatch):
     import asyncio
     import os
