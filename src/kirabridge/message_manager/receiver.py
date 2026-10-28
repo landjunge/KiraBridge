@@ -19,6 +19,18 @@ from kirabridge.mcp_gateway.client import MCPClientPool
 from kirabridge.message_manager import MessageSend
 
 
+def separate_managed_eligible(config, created: float) -> bool:
+    """True only for messages created at or after an explicit operator cutoff.
+
+    The default cutoff is unset, so existing visible delivery stays unchanged.
+    Holds, unknown jobs and older rows are not made eligible by this check.
+    """
+    cutoff = config.messaging.separate_managed_after
+    if cutoff is None:
+        return False
+    return float(created) >= float(cutoff)
+
+
 class MessageReceiver:
     WAIT_REASONS = {
         "visible_target_busy",
@@ -392,7 +404,10 @@ class MessageReceiver:
                     continue
                 if now < retry.get("next_attempt_at", 0):
                     continue
-                if self.bridge.config.visible_handoffs.enabled:
+                if (
+                    self.bridge.config.visible_handoffs.enabled
+                    and not separate_managed_eligible(self.bridge.config, row["created"])
+                ):
                     try:
                         await self.bridge.visible_handoffs.dispatch_ready(
                             row["sender"], row["recipient"]
@@ -560,7 +575,11 @@ class MessageReceiver:
                         }
                     )
                 )
-            if self.bridge.config.visible_handoffs.enabled:
+            separate_managed = separate_managed_eligible(
+                self.bridge.config, message["created"]
+            )
+            visible = self.bridge.config.visible_handoffs.enabled and not separate_managed
+            if visible:
                 prompt = message["body"]
             if history:
                 prompt += "\nPrior addressed messages (bounded context):\n" + canonical(history)
@@ -573,17 +592,14 @@ class MessageReceiver:
             result = await self.bridge.agents.execute(
                 {
                     "id": run_id,
-                    "principal": message["sender"]
-                    if self.bridge.config.visible_handoffs.enabled
-                    else recipient,
-                    "visible_message_id": message_id
-                    if self.bridge.config.visible_handoffs.enabled
-                    else None,
+                    "principal": message["sender"] if visible else recipient,
+                    "visible_message_id": message_id if visible else None,
                 },
                 args,
                 policy,
                 running,
                 progress,
+                separate_managed=separate_managed,
             )
             if not result.get("success"):
                 await progress(result.get("evidence", {}))
@@ -592,7 +608,7 @@ class MessageReceiver:
                 **result.get("evidence", {}),
                 "run_id": run_id,
                 "session_scope": "existing_visible_terminal"
-                if self.bridge.config.visible_handoffs.enabled
+                if visible
                 else "separate_managed_session",
                 "response_sha256": digest(result.get("text", "")),
                 "response_preview": result.get("text", "")[:320],

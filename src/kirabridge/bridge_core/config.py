@@ -46,6 +46,9 @@ class MessagingConfig(BaseModel):
     max_reply_depth: int = Field(default=8, ge=1, le=32)
     max_runs_per_conversation: int = Field(default=4, ge=1, le=16)
     max_runs_per_hour: int = Field(default=24, ge=1, le=1000)
+    # None keeps every message on the existing visible route. A cutoff admits
+    # only messages created at or after that instant to the separate adapter.
+    separate_managed_after: float | None = Field(default=None, ge=0)
     receivers: dict[str, ReceiverConfig] = Field(default_factory=dict)
 
 
