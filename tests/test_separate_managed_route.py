@@ -405,3 +405,69 @@ async def test_local_process_replies_without_touching_old_jobs(bridge, config, m
     reply = bridge.messages.get("probe", completed["processing"]["reply_id"])
     assert reply["body"] == "Prozessantwort"
     assert _states(bridge, held_id, unknown_id) == ("queued", "unknown")
+
+
+def _queue_old(bridge, recipient, key):
+    from kirabridge.message_manager import MessageSend
+
+    sent = bridge.messages.send(
+        "chatgpt",
+        MessageSend(
+            recipient=recipient,
+            conversation_id=key,
+            idempotency_key=key,
+            body="alter ungehaltener Auftrag",
+            kind="note",
+            dispatch=False,
+        ),
+    )
+    bridge.store.db.execute("UPDATE messages SET created=10 WHERE id=?", (sent["id"],))
+    bridge.store.db.execute(
+        "INSERT INTO message_jobs(message_id,state,evidence) VALUES (?,'queued','{}')",
+        (sent["id"],),
+    )
+    return sent["id"]
+
+
+async def test_cutoff_does_not_execute_or_hide_an_older_unheld_job(bridge, config, monkeypatch):
+    _parties(config)
+    old_id = _queue_old(bridge, "probe", "old-unheld-probe")
+
+    async def adapter(task, args, kwargs):
+        return {"success": True, "text": "nur neu", "evidence": {}}
+
+    _arm(monkeypatch, bridge, adapter)
+    assert await bridge.message_receiver._dispatch_next("probe") is False
+    assert (
+        bridge.store.db.execute("SELECT state FROM message_jobs WHERE message_id=?", (old_id,))
+        .fetchone()[0]
+        == "queued"
+    )
+    sent = _send_new(bridge, "fresh-beside-old")
+    assert await bridge.message_receiver._dispatch_next("probe") is True
+    assert bridge.messages.get("chatgpt", sent["id"])["processing"]["state"] == "completed"
+    assert (
+        bridge.store.db.execute("SELECT state FROM message_jobs WHERE message_id=?", (old_id,))
+        .fetchone()[0]
+        == "queued"
+    )
+
+
+async def test_start_preserves_pre_cutoff_jobs_when_their_receiver_is_absent(
+    bridge, config, monkeypatch
+):
+    from kirabridge.bridge_core.config import ReceiverConfig
+
+    _parties(config)
+    old_id = _queue_old(bridge, "codex", "old-unheld-codex")
+    bridge.config.messaging.receivers["probe"] = ReceiverConfig(
+        cwd=config.principals["probe"].roots[0], timeout=3
+    )
+    await bridge.message_receiver.start()
+    try:
+        state = bridge.store.db.execute(
+            "SELECT state FROM message_jobs WHERE message_id=?", (old_id,)
+        ).fetchone()[0]
+        assert state == "queued"
+    finally:
+        await bridge.message_receiver.stop()

@@ -72,11 +72,16 @@ class MessageReceiver:
                     "interrupted",
                 )
             queued = self.bridge.store.db.execute(
-                "SELECT m.id,m.recipient FROM messages m JOIN message_jobs j ON j.message_id=m.id "
-                "WHERE j.state='queued'"
+                "SELECT m.id,m.recipient,m.created FROM messages m "
+                "JOIN message_jobs j ON j.message_id=m.id WHERE j.state='queued'"
             ).fetchall()
+            cutoff = self.bridge.config.messaging.separate_managed_after
             for row in queued:
                 if row["recipient"] not in self.bridge.config.messaging.receivers:
+                    # A configured cutoff preserves older jobs instead of
+                    # marking them blocked when their receiver is absent.
+                    if cutoff is not None and row["created"] < cutoff:
+                        continue
                     self._finish(row["id"], "blocked", {"reason": "receiver_removed"})
         self.stopping = False
         self.worker = asyncio.create_task(self._loop())
@@ -371,18 +376,23 @@ class MessageReceiver:
 
     async def _dispatch_next(self, recipient=None):
         # One oldest message per recipient: a busy Codex must not hide ready Grok.
+        # A cutoff removes older rows from that contest so they are neither
+        # dispatched nor able to hide a newer eligible message.
+        cutoff = self.bridge.config.messaging.separate_managed_after
         rows = self.bridge.store.db.execute(
             "SELECT m.id,m.sender,m.recipient,m.created,m.acknowledged,j.evidence FROM messages m "
             "JOIN message_jobs j ON j.message_id=m.id WHERE j.state='queued' "
             "AND NOT EXISTS (SELECT 1 FROM queue_holds h WHERE "
             "h.queue_id='messages' AND h.item_id=m.id) "
+            "AND (? IS NULL OR m.created>=?) "
             "AND (? IS NULL OR m.recipient=?) "
             "AND NOT EXISTS (SELECT 1 FROM messages older JOIN message_jobs q "
             "ON q.message_id=older.id WHERE q.state='queued' "
             "AND NOT EXISTS (SELECT 1 FROM queue_holds h WHERE "
             "h.queue_id='messages' AND h.item_id=older.id) "
+            "AND (? IS NULL OR older.created>=?) "
             "AND older.recipient=m.recipient AND older.seq<m.seq) ORDER BY m.seq LIMIT 17",
-            (recipient, recipient),
+            (cutoff, cutoff, recipient, recipient, cutoff, cutoff),
         ).fetchall()
         for row in rows:
             if row["recipient"] not in self.bridge.config.messaging.receivers:
