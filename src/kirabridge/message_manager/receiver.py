@@ -188,7 +188,9 @@ class MessageReceiver:
                 return None
             run_id = "channel-" + uuid.uuid4().hex
             scope = (
-                "existing_visible_terminal"
+                "separate_managed_session"
+                if separate_managed_eligible(self.bridge.config, row["created"])
+                else "existing_visible_terminal"
                 if self.bridge.config.visible_handoffs.enabled
                 else "separate_managed_session"
             )
@@ -201,12 +203,7 @@ class MessageReceiver:
                 message_id,
                 "message.processing_claimed",
                 row["recipient"],
-                {
-                    "run_id": run_id,
-                    "session_scope": "existing_visible_terminal"
-                    if self.bridge.config.visible_handoffs.enabled
-                    else "separate_managed_session",
-                },
+                {"run_id": run_id, "session_scope": scope},
             )
             return dict(row), run_id
 
@@ -631,7 +628,7 @@ class MessageReceiver:
                     # Starting another receiver here can consume its awaited answer.
                     dispatch=False,
                 )
-                if self.bridge.config.visible_handoffs.enabled:
+                if visible:
                     reply = await call(
                         "message_get", {"message_id": result["evidence"]["reply_id"]}
                     )
