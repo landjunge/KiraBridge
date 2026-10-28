@@ -31,6 +31,10 @@ class SessionRead(SessionReference):
     max_bytes: int = Field(default=65536, ge=1, le=65536)
 
 
+class SessionSelect(SessionReference):
+    """Address one current tab without sending text."""
+
+
 class SessionInput(SessionReference):
     text: str = Field(min_length=1, max_length=16384)
     submit: bool = True
@@ -93,21 +97,37 @@ class SessionManager:
         try:
             rows = await self.tmux.catalog()
         except BridgeError as exc:
-            return {
-                "transport": "terminal_app" if native_rows else "tmux",
-                "status": "available"
+            return self._catalog_result(
+                native_rows,
+                transport="terminal_app" if native_rows else "tmux",
+                status="available"
                 if native_rows
                 else errors.get("terminal_app", {}).get("code", exc.code),
-                "sessions": self.describe(native_rows),
-                "transport_errors": {**errors, "tmux": {"code": exc.code}},
-                "scope": "Exact Terminal.app tabs and tmux panes; existing sessions preserved",
-            }
+                errors={**errors, "tmux": {"code": exc.code}},
+            )
+        return self._catalog_result(
+            native_rows + rows,
+            transport="terminal_app_and_tmux" if native_rows else "tmux",
+            status="available",
+            errors=errors,
+            truncated=getattr(self.tmux, "last_catalog_truncated", False),
+        )
+
+    def _catalog_result(self, rows, *, transport, status, errors, truncated=False):
+        sessions = self.describe(rows)
+        visual = {
+            row.get("visual_window_id")
+            for row in sessions
+            if row.get("visual_window_id") is not None
+        }
         return {
-            "transport": "terminal_app_and_tmux" if native_rows else "tmux",
-            "status": "available",
-            "sessions": self.describe(native_rows + rows),
+            "transport": transport,
+            "status": status,
+            "ui_window_count": len(visual),
+            "sessions": sessions,
             "transport_errors": errors,
-            "truncated": getattr(self.tmux, "last_catalog_truncated", False),
+            "truncated": truncated,
+            "scope": "Exact Terminal.app tabs and tmux panes; existing sessions preserved",
         }
 
     def describe(self, rows):
@@ -495,11 +515,54 @@ class SessionManager:
             and expected_pid in {row["expected_pid"], row.get("legacy_expected_pid")}
         ]
         if len(matches) == 1:
-            return matches[0]
+            selected = matches[0]
+            if selected.get("identity_ambiguous") or selected.get("selection_ambiguous"):
+                raise BridgeError(
+                    "visible_target_ambiguous",
+                    "Tab identity is not unique; no input until the catalog is unambiguous",
+                )
+            return selected
         raise BridgeError(
             "session_selection_changed",
             "Select an exact current pane_id and expected_pid from session_catalog",
         )
+
+    async def focus(self, principal, pane_id, expected_pid):
+        self.authorization.principal(principal, "session.input")
+        selected = await self.selected(principal, pane_id, expected_pid)
+        if not pane_id.startswith("terminal:"):
+            raise BridgeError(
+                "visible_terminal_required", "Focus requires a Terminal.app tab"
+            )
+        before = await self.terminal_app.front_tab()
+        await self.terminal_app.focus(pane_id)
+        after = await self.terminal_app.front_tab()
+        return {
+            "pane_id": pane_id,
+            "expected_pid": expected_pid,
+            "visual_window_id": selected.get("visual_window_id"),
+            "tab_index": selected.get("tab_index"),
+            "before": before,
+            "after": after,
+            "focused": after.get("tty") == selected.get("tty"),
+        }
+
+    async def close_tab(self, principal, pane_id, expected_pid):
+        self.authorization.principal(principal, "session.input")
+        selected = await self.selected(principal, pane_id, expected_pid)
+        if selected.get("tab_count", 1) < 2 and selected.get("ui_window_count", 1) < 2:
+            raise BridgeError(
+                "terminal_window_required", "Refusing to close the only visible terminal"
+            )
+        if not pane_id.startswith("terminal:"):
+            raise BridgeError("visible_terminal_required", "Close requires a Terminal.app tab")
+        result = await self.terminal_app.close_tab(pane_id)
+        return {
+            "pane_id": pane_id,
+            "expected_pid": expected_pid,
+            "closed": bool(result.get("closed")),
+            "remaining": result.get("remaining"),
+        }
 
     def assigned_agent(self, selected):
         """Recognized CLI input always needs the persistent original binding."""

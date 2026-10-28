@@ -52,7 +52,13 @@ from kirabridge.permissions import (
 from kirabridge.process_manager import ProcessManager
 from kirabridge.queue_management.models import QueueControl
 from kirabridge.security_manager import SecurityManager
-from kirabridge.session_manager import SessionInput, SessionManager, SessionOpen, SessionRead
+from kirabridge.session_manager import (
+    SessionInput,
+    SessionManager,
+    SessionOpen,
+    SessionRead,
+    SessionSelect,
+)
 from kirabridge.task_manager.manager import TaskManager
 from kirabridge.task_manager.store import Store
 from kirabridge.terminal_manager import TerminalManager
@@ -71,6 +77,8 @@ INPUTS = {
     "session.input": SessionInput,
     "session.catalog": EmptyInput,
     "session.read": SessionRead,
+    "session.focus": SessionSelect,
+    "session.close": SessionSelect,
     "terminal.execute": TerminalInput,
     "terminal.visible": VisibleTerminalInput,
     "file.read": ReadInput,
@@ -437,6 +445,12 @@ class Bridge:
             return await self.terminal_queries.execute(
                 principal, operation, arguments, task_id=task["id"]
             )
+        if operation == "session.focus":
+            await running({"evidence_type": "terminal_focus", "pane_id": args.pane_id})
+            return await self.sessions.focus(principal, args.pane_id, args.expected_pid)
+        if operation == "session.close":
+            await running({"evidence_type": "terminal_close", "pane_id": args.pane_id})
+            return await self.sessions.close_tab(principal, args.pane_id, args.expected_pid)
         if visible_execution(
             self.config,
             principal,
