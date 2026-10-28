@@ -141,6 +141,8 @@ class ThreadDeskReadInput(Input):
         "list_snapshots",
         "thread_operation_status",
         "get_reentry",
+        "whiteboard_list",
+        "whiteboard_get",
     ]
     arguments: dict[str, Any] = Field(default_factory=dict)
 
@@ -158,6 +160,7 @@ class ThreadDeskManageInput(Input):
         "unarchive",
         "delete",
         "switch",
+        "whiteboard_append",
     ]
     id: str | None = Field(default=None, min_length=1, max_length=128)
     expected_revision: int = Field(ge=0)
