@@ -256,6 +256,27 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
             return {"error": {"code": exc.code, "message": str(exc)}}
 
     @server.tool(annotations=read)
+    def whiteboard_read(
+        ctx: Context, thread_id: str | None = None, entry_id: str | None = None
+    ) -> dict[str, Any]:
+        """Read one ThreadDesk whiteboard, or one entry, without switching threads.
+
+        Uses only the configured ThreadDesk workspace files. Does not append,
+        execute whiteboard text, or change the active thread. Omit thread_id to
+        read the active thread. Pass the repair thread id to read that board.
+        """
+        from kirabridge.whiteboard_read import read_whiteboard
+
+        def action():
+            bridge.security.principal(identity(ctx), "threaddesk.read")
+            workspace = bridge.config.threaddesk.workspace
+            if not workspace:
+                raise BridgeError("threaddesk_workspace", "Whiteboard workspace is not configured")
+            return read_whiteboard(workspace, thread_id, entry_id)
+
+        return safe(action)
+
+    @server.tool(annotations=read)
     async def threaddesk_dynamic_call(
         name: str, arguments: dict[str, Any], ctx: Context
     ) -> dict[str, Any]:
