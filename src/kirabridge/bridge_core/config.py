@@ -51,6 +51,14 @@ class MessagingConfig(BaseModel):
     separate_managed_after: float | None = Field(default=None, ge=0)
     receivers: dict[str, ReceiverConfig] = Field(default_factory=dict)
 
+    @model_validator(mode="after")
+    def cutoff_is_not_the_epoch(self):
+        if self.separate_managed_after == 0:
+            raise ValueError(
+                "separate_managed_after of zero would admit every stored message"
+            )
+        return self
+
 
 class TeamWorkerConfig(BaseModel):
     """Operator consent for one authenticated identity and its fixed executor."""

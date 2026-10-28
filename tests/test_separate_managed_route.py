@@ -20,6 +20,8 @@ def test_managed_route_is_off_and_visible_handoff_stays_mandatory(tmp_path):
     assert separate_managed_eligible(config, 10_000) is False
     with pytest.raises(ValidationError):
         Config(data_dir=str(tmp_path), visible_handoffs={"enabled": False})
+    with pytest.raises(ValidationError, match="zero"):
+        Config(data_dir=str(tmp_path), messaging={"separate_managed_after": 0})
 
 
 def test_only_messages_at_or_after_the_cutoff_are_eligible(tmp_path):
