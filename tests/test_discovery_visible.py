@@ -277,6 +277,15 @@ async def test_file_params_descriptor_and_signed_url_never_persist(
         assert inventory["transfers"][0]["state"] == "authorized"
 
 
+def test_background_execution_is_explicit(config):
+    from kirabridge.permissions import visible_execution
+
+    assert visible_execution(config, "chatgpt", "terminal.execute")
+    assert not visible_execution(config, "chatgpt", "terminal.execute", background=True)
+    assert not visible_execution(config, "local", "terminal.execute")
+    assert visible_execution(config, "local", "terminal.visible")
+
+
 def test_trusted_custom_chatgpt_role(config):
     from kirabridge.permissions import direct_terminal_required
 

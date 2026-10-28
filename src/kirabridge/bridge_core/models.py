@@ -71,6 +71,8 @@ class TerminalInput(Input):
     cwd: str
     timeout: float = Field(default=60.0, gt=0, le=3600)
     max_output: int = Field(default=65536, ge=0, le=1048576)
+    # Explicit opt-in. Default stays on the visible Terminal.app route for ChatGPT.
+    background: bool = False
 
 
 class ConnectionCheckInput(Input):

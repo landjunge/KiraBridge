@@ -42,7 +42,13 @@ from kirabridge.filesystem_manager import FilesystemManager, PathScope
 from kirabridge.image_manager import ImageManager
 from kirabridge.message_manager import MessageManager
 from kirabridge.message_manager.receiver import MessageReceiver
-from kirabridge.permissions import LEVELS, direct_terminal_required, level_for, state_exclusions
+from kirabridge.permissions import (
+    LEVELS,
+    direct_terminal_required,
+    level_for,
+    state_exclusions,
+    visible_execution,
+)
 from kirabridge.process_manager import ProcessManager
 from kirabridge.queue_management.models import QueueControl
 from kirabridge.security_manager import SecurityManager
@@ -431,8 +437,11 @@ class Bridge:
             return await self.terminal_queries.execute(
                 principal, operation, arguments, task_id=task["id"]
             )
-        if operation == "terminal.visible" or (
-            operation == "terminal.execute" and direct_terminal_required(self.config, principal)
+        if visible_execution(
+            self.config,
+            principal,
+            operation,
+            background=bool(getattr(args, "background", False)),
         ):
             visible_args = VisibleTerminalInput.model_validate(arguments)
             return await self.visible_terminal.execute(task, visible_args, running)
