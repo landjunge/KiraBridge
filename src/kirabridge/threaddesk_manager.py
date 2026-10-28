@@ -28,7 +28,7 @@ READ_KEYS = {
     "current_thread": set(),
     "list_snapshots": {"id"},
     "thread_operation_status": {"operation_id"},
-    "whiteboard_list": {"id"},
+    "whiteboard_list": {"id", "offset", "limit", "include_content"},
     "whiteboard_get": {"id", "entry_id"},
 }
 ERROR_CODES = {
@@ -114,6 +114,12 @@ class ThreadDeskManager:
             raise BridgeError("invalid_arguments", "include_archived must be boolean")
         if args.tool == "whiteboard_get" and not isinstance(values.get("entry_id"), str):
             raise BridgeError("invalid_arguments", "An exact whiteboard entry id is required")
+        if "include_content" in values and type(values["include_content"]) is not bool:
+            raise BridgeError("invalid_arguments", "include_content must be boolean")
+        if "offset" in values and (type(values["offset"]) is not int or values["offset"] < 0):
+            raise BridgeError("invalid_arguments", "Whiteboard offset is invalid")
+        if "limit" in values and (type(values["limit"]) is not int or not 1 <= values["limit"] <= 40):
+            raise BridgeError("invalid_arguments", "Whiteboard page limit is invalid")
         if args.tool == "thread_operation_status":
             value = values.get("operation_id")
             if not isinstance(value, str):
@@ -304,6 +310,9 @@ class ThreadDeskManager:
             str(self.settings.workspace),
             values.get("id"),
             values.get("entry_id") if args.tool == "whiteboard_get" else None,
+            offset=values.get("offset") or 0,
+            limit=values.get("limit"),
+            include_content=values.get("include_content") is True,
         )
         return {
             "success": True,

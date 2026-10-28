@@ -166,10 +166,14 @@ class CompletionManager:
     def _policy(self, principal, source):
         self.security.principal(principal, "task.read" if source == "task" else "message.read")
 
-    def receive(self, principal, target="default", limit=20):
+    def receive(self, principal, target="default", limit=20, source_id=None):
         valid_target(target)
         if not 1 <= limit <= 50:
             raise BridgeError("invalid_limit", "Use limit 1..50")
+        if source_id is not None and (
+            not isinstance(source_id, str) or not re.fullmatch(r"[A-Za-z0-9_-]{1,128}", source_id)
+        ):
+            raise BridgeError("invalid_arguments", "Completion source id is invalid")
         policy = self.security.principal(principal)
         sources = [
             source
@@ -179,20 +183,38 @@ class CompletionManager:
         if not sources:
             raise BridgeError("capability_denied", "Own task.read or message.read required")
         with self.store.transaction():
-            rows = self.store.db.execute(
-                "SELECT * FROM completion_notices WHERE principal=? AND target=? "
-                "AND acknowledged IS NULL AND source IN (?,?) "
-                "AND NOT EXISTS (SELECT 1 FROM queue_holds h WHERE "
-                "h.queue_id='completions' AND h.item_id=completion_notices.id) "
-                "ORDER BY seq LIMIT ?",
-                (
-                    principal,
-                    target,
-                    "task" if "task" in sources else "-",
-                    "message" if "message" in sources else "-",
-                    limit,
-                ),
-            ).fetchall()
+            if source_id is None:
+                rows = self.store.db.execute(
+                    "SELECT * FROM completion_notices WHERE principal=? AND target=? "
+                    "AND acknowledged IS NULL AND source IN (?,?) "
+                    "AND NOT EXISTS (SELECT 1 FROM queue_holds h WHERE "
+                    "h.queue_id='completions' AND h.item_id=completion_notices.id) "
+                    "ORDER BY seq LIMIT ?",
+                    (
+                        principal,
+                        target,
+                        "task" if "task" in sources else "-",
+                        "message" if "message" in sources else "-",
+                        limit,
+                    ),
+                ).fetchall()
+            else:
+                # A known task is readable even when older unacked notices fill the inbox.
+                rows = self.store.db.execute(
+                    "SELECT * FROM completion_notices WHERE principal=? AND target=? "
+                    "AND source_id=? AND acknowledged IS NULL AND source IN (?,?) "
+                    "AND NOT EXISTS (SELECT 1 FROM queue_holds h WHERE "
+                    "h.queue_id='completions' AND h.item_id=completion_notices.id) "
+                    "ORDER BY seq LIMIT ?",
+                    (
+                        principal,
+                        target,
+                        source_id,
+                        "task" if "task" in sources else "-",
+                        "message" if "message" in sources else "-",
+                        limit,
+                    ),
+                ).fetchall()
             notices = []
             for row in rows:
                 receipt, delivered = row["receipt"], row["delivered"]
@@ -222,12 +244,12 @@ class CompletionManager:
             "chatgpt_chat_delivery": "unverified",
         }
 
-    async def wait(self, principal, target="default", limit=20, wait_seconds=20):
+    async def wait(self, principal, target="default", limit=20, wait_seconds=20, source_id=None):
         if not 0 <= wait_seconds <= 20:
             raise BridgeError("invalid_wait", "Completion wait is bounded to 20 seconds per call")
         deadline = asyncio.get_running_loop().time() + wait_seconds
         while True:
-            value = self.receive(principal, target, limit)
+            value = self.receive(principal, target, limit, source_id)
             remaining = deadline - asyncio.get_running_loop().time()
             if value["notices"] or remaining <= 0:
                 return value

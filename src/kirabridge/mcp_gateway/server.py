@@ -437,10 +437,22 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
         this same task ID before finishing the conversation. This does not attest audio playback.
         """
 
-        def action():
-            principal = identity(ctx)
-            task = bridge.prepare(principal, request, completion_target=completion_target)
-            return {
+        principal = identity(ctx)
+        task = safe(
+            lambda: bridge.prepare(principal, request, completion_target=completion_target)
+        )
+        if (
+            isinstance(task, dict)
+            and task.get("operation") in {"threaddesk.read", "clipboard.read", "clipboard.write"}
+            and task.get("state") in {"queued", "accepted", "running"}
+            and bridge.tasks.workers
+        ):
+            try:
+                task = await bridge.tasks.wait(principal, task["id"], timeout=2)
+            except TimeoutError:
+                task = safe(lambda: bridge.task(principal, task["id"]))
+        if isinstance(task, dict) and task.get("id") and task.get("state"):
+            task = {
                 **task,
                 "local_approval_url": LOCAL_APPROVAL_URL,
                 "approval_required": task["state"] == "created",
@@ -455,12 +467,13 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
                     "receive_tool": "completion_receive",
                     "ack_tool": "completion_ack",
                     "assistant_wakeup": "not_provided_by_current_transport",
+                    "source_id": task["id"],
                 },
             }
 
         from kirabridge.grok_connector.conversation import result_for_conversation
 
-        return await result_for_conversation(bridge, identity(ctx), safe(action))
+        return await result_for_conversation(bridge, identity(ctx), task)
 
     @server.tool(annotations=write)
     async def session_open(
@@ -629,15 +642,20 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
         target: str = "default",
         limit: int = 20,
         wait_seconds: float = 20,
+        source_id: str | None = None,
     ) -> dict[str, Any]:
         """Wait for own durable completion notices, including already finished tasks.
 
+        Pass source_id (the task id) to read that notice even when older unacked
+        notices still sit in the same target. Omit it to keep the oldest-first inbox.
         Run a persistent consumer that rearms this bounded wait; no task-status polling.
         Receipts/IDs remain stable until completion_ack after consumer processing.
         A tool response is client delivery, never proof of unsolicited assistant/chat wake-up.
         """
         try:
-            return await bridge.completions.wait(identity(ctx), target, limit, wait_seconds)
+            return await bridge.completions.wait(
+                identity(ctx), target, limit, wait_seconds, source_id
+            )
         except BridgeError as exc:
             return {"error": {"code": exc.code, "message": str(exc)}}
 

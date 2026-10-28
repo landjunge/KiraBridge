@@ -39,6 +39,75 @@ async def _run(manager, args):
     return result, seen
 
 
+async def test_content_page_returns_one_ordered_slice(tmp_path, monkeypatch):
+    import kirabridge.whiteboard_read as reads
+
+    monkeypatch.setattr(reads, "_PAGE_CONTENT_CHARS", 5)
+    config = _config(tmp_path)
+    board = tmp_path / "desk" / "whiteboard" / "board-1"
+    for ordinal, text in ((1, "abcd"), (2, "zzzzzz"), (3, "end")):
+        (board / f"e{ordinal}.json").write_text(
+            json.dumps(
+                {
+                    "id": f"e{ordinal}",
+                    "ordinal": ordinal,
+                    "entry_type": "note",
+                    "actor": "Grok",
+                    "created_at": "2026-10-28T00:00:00Z",
+                    "content": text,
+                }
+            )
+        )
+    manager = ThreadDeskManager(config)
+    listed, _ = await _run(
+        manager,
+        ThreadDeskReadInput(tool="whiteboard_list", arguments={"id": "board-1"}),
+    )
+    assert "content" not in listed["value"]["entries"][0]
+    page, _seen = await _run(
+        manager,
+        ThreadDeskReadInput(
+            tool="whiteboard_list",
+            arguments={"id": "board-1", "include_content": True, "offset": 0, "limit": 10},
+        ),
+    )
+    assert page["evidence"]["peer_called"] is False
+    assert page["value"]["total"] == 3
+    assert [item["id"] for item in page["value"]["entries"]] == ["e1"]
+    assert page["value"]["entries"][0]["content"] == "abcd"
+    assert page["value"]["next_offset"] == 1
+    assert page["value"]["complete"] is False
+    rest, _ = await _run(
+        manager,
+        ThreadDeskReadInput(
+            tool="whiteboard_list",
+            arguments={
+                "id": "board-1",
+                "include_content": True,
+                "offset": 1,
+                "limit": 10,
+            },
+        ),
+    )
+    assert [item["id"] for item in rest["value"]["entries"]] == ["e2"]
+    assert rest["value"]["next_offset"] == 2
+    last, _ = await _run(
+        manager,
+        ThreadDeskReadInput(
+            tool="whiteboard_list",
+            arguments={
+                "id": "board-1",
+                "include_content": True,
+                "offset": 2,
+                "limit": 10,
+            },
+        ),
+    )
+    assert [item["content"] for item in last["value"]["entries"]] == ["end"]
+    assert last["value"]["complete"] is True
+    assert json.loads((tmp_path / "desk" / "state.json").read_text())["current_id"] == "other"
+
+
 async def test_listed_entries_do_not_call_the_peer(tmp_path):
     manager = ThreadDeskManager(_config(tmp_path))
     args = ThreadDeskReadInput(tool="whiteboard_list", arguments={"id": "board-1"})
