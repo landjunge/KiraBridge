@@ -443,7 +443,8 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
         )
         if (
             isinstance(task, dict)
-            and task.get("operation") in {"threaddesk.read", "clipboard.read", "clipboard.write"}
+            and task.get("operation")
+            in {"threaddesk.read", "threaddesk.manage", "clipboard.read", "clipboard.write"}
             and task.get("state") in {"queued", "accepted", "running"}
             and bridge.tasks.workers
         ):
