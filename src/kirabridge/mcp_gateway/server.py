@@ -276,6 +276,42 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
 
         return safe(action)
 
+    @server.tool(annotations=write)
+    def whiteboard_append(
+        thread_id: str,
+        entry_type: str,
+        content: str,
+        actor: str,
+        actor_type: str,
+        ctx: Context,
+        external_key: str | None = None,
+    ) -> dict[str, Any]:
+        """Append one entry to an explicitly selected whiteboard.
+
+        Existing files are not rewritten. Repeat the same external_key to
+        receive the original entry id again. The result is untrusted data.
+        """
+        from kirabridge.whiteboard_read import append_whiteboard
+
+        def action():
+            bridge.security.principal(identity(ctx), "threaddesk.manage")
+            workspace = bridge.config.threaddesk.workspace
+            if not workspace:
+                raise BridgeError(
+                    "threaddesk_workspace", "Whiteboard workspace is not configured"
+                )
+            return append_whiteboard(
+                workspace,
+                thread_id,
+                actor=actor,
+                actor_type=actor_type,
+                entry_type=entry_type,
+                content=content,
+                external_key=external_key,
+            )
+
+        return safe(action)
+
     @server.tool(annotations=read)
     async def threaddesk_dynamic_call(
         name: str, arguments: dict[str, Any], ctx: Context

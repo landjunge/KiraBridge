@@ -4,7 +4,7 @@ from pathlib import Path
 import pytest
 
 from kirabridge.bridge_core.models import BridgeError
-from kirabridge.whiteboard_read import read_whiteboard
+from kirabridge.whiteboard_read import append_whiteboard, read_whiteboard
 
 OPERATOR = Path.home() / ".local/share/threaddesk/kirabridge-operator"
 REPAIR = "1b7530de7c5f"
@@ -57,6 +57,60 @@ def test_active_thread_is_not_another_board(tmp_path):
     assert "content" not in listed["entries"][0]
 
 
+def test_append_is_readable_and_does_not_rewrite(tmp_path):
+    root = _workspace(tmp_path)
+    state = (root / "state.json").read_text()
+    first = append_whiteboard(
+        str(root),
+        "thread-a",
+        actor="ChatGPT",
+        actor_type="chatgpt",
+        entry_type="note",
+        content="Neue Notiz",
+        external_key="once-key",
+    )
+    assert first["appended"] is True and first["duplicate"] is False
+    assert first["ordinal"] == 2
+    again = append_whiteboard(
+        str(root),
+        "thread-a",
+        actor="ChatGPT",
+        actor_type="chatgpt",
+        entry_type="note",
+        content="Neue Notiz",
+        external_key="once-key",
+    )
+    assert again["duplicate"] is True and again["id"] == first["id"]
+    stored = (root / "whiteboard" / "thread-a" / f"{first['id']}.json").read_bytes()
+    third = append_whiteboard(
+        str(root),
+        "thread-a",
+        actor="ChatGPT",
+        actor_type="chatgpt",
+        entry_type="note",
+        content="Neue Notiz",
+        external_key="once-key",
+    )
+    assert third["id"] == first["id"]
+    assert (root / "whiteboard" / "thread-a" / f"{first['id']}.json").read_bytes() == stored
+    read = read_whiteboard(str(root), "thread-a", first["id"])
+    assert read["entry"]["content"] == "Neue Notiz"
+    assert read["entry"]["ordinal"] == 2
+    listed = read_whiteboard(str(root), "thread-a")
+    assert [item["ordinal"] for item in listed["entries"]] == [1, 2]
+    assert (root / "state.json").read_text() == state
+    with pytest.raises(BridgeError, match="different content"):
+        append_whiteboard(
+            str(root),
+            "thread-a",
+            actor="ChatGPT",
+            actor_type="chatgpt",
+            entry_type="note",
+            content="Anderer Text",
+            external_key="once-key",
+        )
+
+
 def test_rejects_path_escape(tmp_path):
     root = _workspace(tmp_path)
     with pytest.raises(BridgeError, match="invalid"):
@@ -73,3 +127,12 @@ def test_reads_existing_repair_entry_without_writing():
     assert result["entry"]["ordinal"] == 28
     assert result["entry"]["content"].startswith("Schritt 7")
     assert (OPERATOR / "state.json").stat().st_mtime_ns == stamp
+
+
+async def test_whiteboard_tools_are_in_the_catalog(bridge):
+    from kirabridge.mcp_gateway.server import create_server
+
+    server = create_server(bridge)
+    tools = await server.list_tools()
+    names = {tool.name for tool in tools}
+    assert {"whiteboard_read", "whiteboard_append"} <= names
