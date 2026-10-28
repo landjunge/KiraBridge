@@ -41,6 +41,8 @@ def attach_visual_windows(rows: list[dict]) -> list[dict]:
     ui_count = len(groups)
     tty_count: dict[str, int] = {}
     for row in rows:
+        if row.get("ended"):
+            continue
         tty_count[row.get("tty") or ""] = tty_count.get(row.get("tty") or "", 0) + 1
     for members in groups.values():
         members.sort(
@@ -202,6 +204,19 @@ class TerminalAppTransport:
      }));
     }) : []);""")
         rows = attach_visual_windows(rows if isinstance(rows, list) else [])
+        shared = {
+            row.get("tty")
+            for row in rows
+            if sum(item.get("tty") == row.get("tty") for item in rows) > 1
+        }
+        if shared:
+            ended = await self.ended_windows(
+                [int(row["window_id"]) for row in rows if row.get("tty") in shared]
+            )
+            for row in rows:
+                if int(row.get("window_id") or 0) in ended:
+                    row["ended"] = True
+            rows = attach_visual_windows(rows)
         child = await asyncio.create_subprocess_exec(
             "/bin/ps",
             "-axo",
@@ -222,7 +237,7 @@ class TerminalAppTransport:
         sessions = []
         for row in rows[:100]:
             tty = Path(row["tty"]).name
-            if not re.fullmatch(r"ttys[0-9]+", tty):
+            if not re.fullmatch(r"ttys[0-9]+", tty) or row.get("ended"):
                 continue
             all_members = [
                 (int(owner), int(p), int(parent), comm)
@@ -549,6 +564,24 @@ class TerminalAppTransport:
         JSON.stringify({paste_event_sent:true,return_sent:false});""",
                     mutation=True,
                 )
+
+    async def ended_windows(self, window_ids):
+        """Read only the last line of tabs that share a tty. A finished tab must not inherit a reused tty."""
+        if not window_ids:
+            return set()
+        found = await self.native(
+            "const app=Application('Terminal'); const ids="
+            + json.dumps([int(value) for value in window_ids])
+            + """;
+            JSON.stringify(ids.filter(id => {
+             const wins=app.windows().filter(w => w.id()===id);
+             if (wins.length!==1) return false;
+             const tail=((wins[0].selectedTab().contents()||'').replace(/\\s+$/,'')
+              .split('\\n').pop()||'');
+             return /^\\[(Prozess beendet|Process completed)\\]$/.test(tail);
+            }));"""
+        )
+        return {int(value) for value in found} if isinstance(found, list) else set()
 
     async def front_tab(self):
         return await self.native(

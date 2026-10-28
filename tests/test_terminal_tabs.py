@@ -44,6 +44,19 @@ def test_different_bounds_are_separate_windows():
     assert all(row["tab_selected"] for row in rows)
 
 
+def test_ended_tab_does_not_claim_a_reused_tty():
+    rows = attach_visual_windows(
+        [
+            {**_tab(1785, "/dev/ttys002", index=1), "ended": True},
+            _tab(2040, "/dev/ttys002", index=2, frontmost=True),
+        ]
+    )
+    live = next(row for row in rows if row["window_id"] == 2040)
+    ended = next(row for row in rows if row["window_id"] == 1785)
+    assert live["identity_ambiguous"] is False
+    assert ended["identity_ambiguous"] is False
+
+
 def test_duplicate_tty_is_not_addressable():
     rows = attach_visual_windows(
         [
