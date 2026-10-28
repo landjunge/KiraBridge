@@ -211,14 +211,16 @@ def _plant_old(bridge):
     return held["id"], unknown["id"]
 
 
-def _arm(monkeypatch, bridge, adapter, *, replace_execute=True):
+def _arm(monkeypatch, bridge, adapter, *, replace_execute=True, use_process=False):
     pool = _Pool(bridge)
     monkeypatch.setattr(
         "kirabridge.message_manager.receiver.MCPClientPool", lambda **kwargs: pool
     )
     monkeypatch.setattr("kirabridge.message_manager.receiver.peer", lambda *args: None)
 
-    if replace_execute:
+    if use_process:
+        pass
+    elif replace_execute:
 
         async def execute(task, args, principal, running, progress, **kwargs):
             return await adapter(task, args, kwargs)
@@ -368,4 +370,38 @@ async def test_cancelled_turn_stays_unknown_and_a_later_message_still_completes(
     done = bridge.messages.get("chatgpt", second["id"])
     assert done["processing"]["state"] == "completed"
     assert done["acknowledged"] is not None
+    assert _states(bridge, held_id, unknown_id) == ("queued", "unknown")
+
+
+async def test_local_process_replies_without_touching_old_jobs(bridge, config, monkeypatch):
+    from pathlib import Path
+
+    _parties(config)
+    held_id, unknown_id = _plant_old(bridge)
+    workspace = Path(config.principals["local"].roots[0])
+    program = workspace / "fake-codex"
+    program.write_text(
+        "#!/usr/bin/env python3\n"
+        "import json, sys\n"
+        "sys.stdin.read()\n"
+        "for event in (\n"
+        '    {"type": "thread.started", "thread_id": "local-thread"},\n'
+        '    {"type": "turn.started"},\n'
+        '    {"type": "item.completed", "item": {"type": "agent_message", "text": "Prozessantwort"}},\n'
+        '    {"type": "turn.completed"},\n'
+        "):\n"
+        "    print(json.dumps(event), flush=True)\n"
+    )
+    program.chmod(0o755)
+    config.agents["probe"].executable = str(program)
+    _arm(monkeypatch, bridge, None, use_process=True)
+    sent = _send_new(bridge, "fresh-process")
+    assert await bridge.message_receiver._dispatch_next("probe") is True
+    completed = bridge.messages.get("chatgpt", sent["id"])
+    assert completed["acknowledged"] is not None
+    assert completed["processing"]["state"] == "completed"
+    assert completed["processing"]["evidence"]["session_scope"] == "separate_managed_session"
+    assert completed["processing"]["evidence"]["pid"] > 0
+    reply = bridge.messages.get("probe", completed["processing"]["reply_id"])
+    assert reply["body"] == "Prozessantwort"
     assert _states(bridge, held_id, unknown_id) == ("queued", "unknown")
