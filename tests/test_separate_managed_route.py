@@ -407,6 +407,73 @@ async def test_local_process_replies_without_touching_old_jobs(bridge, config, m
     assert _states(bridge, held_id, unknown_id) == ("queued", "unknown")
 
 
+async def test_cancelling_the_turn_reaps_only_its_process(bridge, config, monkeypatch):
+    import asyncio
+    import os
+    import subprocess
+    import sys
+    from pathlib import Path
+
+    from kirabridge.bridge_core.bridge import Bridge
+
+    _parties(config)
+    held_id, unknown_id = _plant_old(bridge)
+    workspace = Path(config.principals["local"].roots[0])
+    program = workspace / "sleeping-codex"
+    program.write_text(
+        "#!/usr/bin/env python3\n"
+        "import os, sys, time\n"
+        "open('owned.pid','w').write(str(os.getpid()))\n"
+        "sys.stdin.read()\n"
+        "time.sleep(30)\n"
+    )
+    program.chmod(0o755)
+    config.agents["probe"].executable = str(program)
+    _arm(monkeypatch, bridge, None, use_process=True)
+    sent = _send_new(bridge, "fresh-interrupt")
+    bystander = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(30)"])
+    turn = asyncio.create_task(bridge.message_receiver._dispatch_next("probe"))
+    pid_path = workspace / "owned.pid"
+    try:
+        for _ in range(50):
+            if pid_path.exists():
+                break
+            await asyncio.sleep(0.05)
+        assert pid_path.exists()
+        owned = int(pid_path.read_text())
+        turn.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await turn
+        for _ in range(50):
+            try:
+                os.kill(owned, 0)
+            except OSError:
+                break
+            await asyncio.sleep(0.05)
+        else:
+            raise AssertionError("owned process still alive")
+        assert bystander.poll() is None
+        cancelled = bridge.messages.get("chatgpt", sent["id"])["processing"]
+        assert cancelled["state"] == "unknown" and cancelled["error"] == "receiver_interrupted"
+        assert _states(bridge, held_id, unknown_id) == ("queued", "unknown")
+        reopened = Bridge(config)
+        try:
+            assert reopened.message_receiver._claim(sent["id"]) is None
+            assert reopened.message_receiver._claim(held_id) is None
+            assert (
+                reopened.store.db.execute(
+                    "SELECT state FROM message_jobs WHERE message_id=?", (held_id,)
+                ).fetchone()[0]
+                == "queued"
+            )
+        finally:
+            reopened.store.close()
+    finally:
+        if bystander.poll() is None:
+            bystander.kill()
+            bystander.wait(timeout=2)
+
+
 def _queue_old(bridge, recipient, key):
     from kirabridge.message_manager import MessageSend
 
