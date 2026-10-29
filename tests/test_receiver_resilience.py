@@ -39,6 +39,35 @@ def _running_handoff(bridge, key, state):
     return sent
 
 
+async def test_restart_completes_a_delivered_handoff_when_the_reply_is_stored(visible):
+    bridge, transport = visible
+    sent = _running_handoff(bridge, "answered", "confirmed")
+    bridge.messages.send(
+        "grok",
+        MessageSend(
+            recipient="chatgpt",
+            conversation_id=sent["conversation_id"],
+            idempotency_key="reply-" + sent["id"],
+            body="stored",
+            kind="result",
+            reply_to=sent["id"],
+            request_reply=False,
+            dispatch=False,
+        ),
+    )
+    receiver = MessageReceiver(bridge)
+    await receiver.start()
+    try:
+        job = bridge.messages.get("chatgpt", sent["id"])["processing"]
+        assert job["state"] == "completed"
+        assert job["evidence"]["reason"] == "reply_already_recorded"
+        assert job["evidence"]["automatic_retry"] is False
+        assert job["reply_id"]
+        assert not transport["calls"]
+    finally:
+        await receiver.stop()
+
+
 @pytest.mark.parametrize("state,kept", [("sent", True), ("inserting", False)])
 async def test_restart_keeps_only_a_delivered_handoff(visible, state, kept):
     bridge, transport = visible

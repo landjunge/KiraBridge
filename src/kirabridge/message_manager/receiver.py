@@ -63,6 +63,14 @@ class MessageReceiver:
             ).fetchall()
             for row in rows:
                 if self._reply_can_finish(row):
+                    reply_id = self._existing_reply(row[0])
+                    if reply_id:
+                        self._finish(
+                            row[0],
+                            "completed",
+                            {"reason": "reply_already_recorded", "automatic_retry": False},
+                            reply_id=reply_id,
+                        )
                     continue  # Return already happened; do not interrupt or paste again.
                 self._finish(
                     row[0],
@@ -113,6 +121,19 @@ class MessageReceiver:
             "SELECT state FROM visible_handoffs WHERE id=?", (handoff_id,)
         ).fetchone()
         return bool(handoff) and handoff["state"] in {"return_sent", "sent", "confirmed"}
+
+    def _existing_reply(self, message_id):
+        original = self.bridge.store.db.execute(
+            "SELECT sender, recipient FROM messages WHERE id=?", (message_id,)
+        ).fetchone()
+        if original is None:
+            return None
+        reply = self.bridge.store.db.execute(
+            "SELECT id FROM messages WHERE reply_to=? AND sender=? AND recipient=? "
+            "AND kind IN ('result','answer') ORDER BY seq LIMIT 1",
+            (message_id, original["recipient"], original["sender"]),
+        ).fetchone()
+        return reply["id"] if reply else None
 
     def _finish(self, message_id, state, evidence, error=None, reply_id=None):
         from kirabridge.completion_manager import completion_payload, record_notice
