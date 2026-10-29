@@ -1,4 +1,8 @@
-# KiraBridge installieren und aktualisieren · 0.8.0rc17
+# KiraBridge installieren und aktualisieren · 0.8.0rc18
+
+RC18 ist veröffentlicht und auf dem geprüften Intel-iMac installiert.
+[Aktuelle Download-, Installations- und Rückwegbelege](RC18-PUBLISH-INSTALL-20261029.md).
+Die anschließend erhaltenen RC17-Abnahmelinks beschreiben die Historie.
 
 RC17: Intel-Abnahme und ausdrückliche Betreiberfreigabe dokumentiert in
 [Intel-Abnahme](INTEL-ACCEPTANCE-20261026.md). Der tatsächliche

@@ -1,0 +1,385 @@
+{
+  "request_id": "rc18_release_install_20261029",
+  "approval_message_id": "visible-5739bafd49338df51d13c125c0d194bb4365b790047c7ae7",
+  "merged": {
+    "49": "fa22b539707c57c2e016cc5d869ea5599d97f846",
+    "50": "c0100d31bc1e75815a1920d33ab0e0371d108d5e",
+    "52": "351944222c964139f09956177cac0252d52aa8bc"
+  },
+  "artifact_source_commit": "15d071ebaa95d3bef2eed506c21fe7bfd043464c",
+  "accepted_documentation_head": "57b0fd22a9b3001cd2cab43c50c14b79c997ea80",
+  "published_download": {
+    "request_id": "rc18_release_install_20261029",
+    "published_url": "https://github.com/landjunge/KiraBridge/releases/tag/v0.8.0rc18",
+    "publishedAt": "2026-10-29T22:20:00Z",
+    "assets_actual_downloads_verified": 31,
+    "bundle_sha256": "8ec622ca2c6a3ff621c017d55c0f4648d55a738929b5b5be80960778637a388d",
+    "tag_ref": "15d071ebaa95d3bef2eed506c21fe7bfd043464c\trefs/tags/v0.8.0rc18"
+  },
+  "published_command_acceptance": {
+    "download_command": "d=$(mktemp -d) && gh release download v0.8.0rc18 -R landjunge/KiraBridge -p 'install-macos.sh*' -D \"$d\" && (cd \"$d\" && shasum -a 256 -c install-macos.sh.sha256 && sh install-macos.sh \"$@\")",
+    "version": "0.8.0rc18",
+    "tested_command": "sh -c 'd=$(mktemp -d) && gh release download v0.8.0rc18 -R landjunge/KiraBridge -p '\"'\"'install-macos.sh*'\"'\"' -D \"$d\" && (cd \"$d\" && shasum -a 256 -c install-macos.sh.sha256 && sh install-macos.sh \"$@\")' kirabridge-isolated-test --prefix /Users/landjunge/.local/share/kirabridge/backups/rc18-release-install-20261029/accept-published-rc18-20261029/install --config /Users/landjunge/.local/share/kirabridge/backups/rc18-release-install-20261029/accept-published-rc18-20261029/config/config.toml --launcher /Users/landjunge/.local/share/kirabridge/backups/rc18-release-install-20261029/accept-published-rc18-20261029/bin/kirabridge --plist /Users/landjunge/.local/share/kirabridge/backups/rc18-release-install-20261029/accept-published-rc18-20261029/service.plist --cache-dir /Users/landjunge/.local/share/kirabridge/backups/rc18-release-install-20261029/accept-published-rc18-20261029/cache --workspace /Users/landjunge/.local/share/kirabridge/backups/rc18-release-install-20261029/accept-published-rc18-20261029/workspace --test-label com.kirabridge.test.accept-published-rc18-20261029",
+    "checks": [
+      "pinned previous 0.8.0rc17 wheel starts under isolated launchd",
+      "upgrade while authenticated completion_receive HTTP request remained open; old read settled without replay and new daemon PID healthy",
+      "built package upgrades 0.8.0rc17; authenticated version/status/start",
+      "config/credentials hashes, database row and user file preserved",
+      "real rollback restarts previous 0.8.0rc17 wheel and preserves secrets"
+    ],
+    "previous_version": "0.8.0rc17",
+    "previous_commit": "fde9d87a36ed6c0bdab4456c3c8812d0378d7fcd",
+    "passed": true,
+    "service_cleanup_absence_verified": true
+  },
+  "production_runtime": {
+    "instance_id": "82cd506b1d854b50b4cc58c5016fc856",
+    "version": "0.8.0rc18",
+    "pid": 18197,
+    "started_at": "2026-10-29T22:45:10.482631+00:00",
+    "config_path": "/Users/landjunge/.config/kirabridge/config.toml",
+    "config_sha256": "52747b8353bef4cc162997c34c30d8e759ca0691725d902f313ce4653cf903c2",
+    "effective_config_sha256": "3709ee5e48b675813b9708c7b634d137ca3c2c2dc19fefd35a04b61f581cf641",
+    "source_tree_sha256": "bea0158935efd09a2304be2eb024ce79d5a100cf754742dcbe52aaddce1dc9ee",
+    "source_file_count": 122,
+    "source_package_path": "/Users/landjunge/.local/share/kirabridge/install/releases/0.8.0rc18-15d071ebaa95/source/.venv/lib/python3.11/site-packages/kirabridge",
+    "source_scope": "package Python files observed at startup; no remote attestation"
+  },
+  "production_lifecycle": [
+    {
+      "name": "stop_start",
+      "old_pid": 14881,
+      "new_runtime": {
+        "instance_id": "a7e8a618fd5a42e783ea84506ea0c040",
+        "version": "0.8.0rc18",
+        "pid": 18176,
+        "started_at": "2026-10-29T22:45:05.140810+00:00",
+        "config_path": "/Users/landjunge/.config/kirabridge/config.toml",
+        "config_sha256": "52747b8353bef4cc162997c34c30d8e759ca0691725d902f313ce4653cf903c2",
+        "effective_config_sha256": "3709ee5e48b675813b9708c7b634d137ca3c2c2dc19fefd35a04b61f581cf641",
+        "source_tree_sha256": "bea0158935efd09a2304be2eb024ce79d5a100cf754742dcbe52aaddce1dc9ee",
+        "source_file_count": 122,
+        "source_package_path": "/Users/landjunge/.local/share/kirabridge/install/releases/0.8.0rc18-15d071ebaa95/source/.venv/lib/python3.11/site-packages/kirabridge",
+        "source_scope": "package Python files observed at startup; no remote attestation"
+      },
+      "stop_absence_returncode": 113,
+      "old_process_absent": true,
+      "endpoint_closed": true
+    },
+    {
+      "name": "guarded_restart",
+      "old_pid": 18176,
+      "new_runtime": {
+        "instance_id": "82cd506b1d854b50b4cc58c5016fc856",
+        "version": "0.8.0rc18",
+        "pid": 18197,
+        "started_at": "2026-10-29T22:45:10.482631+00:00",
+        "config_path": "/Users/landjunge/.config/kirabridge/config.toml",
+        "config_sha256": "52747b8353bef4cc162997c34c30d8e759ca0691725d902f313ce4653cf903c2",
+        "effective_config_sha256": "3709ee5e48b675813b9708c7b634d137ca3c2c2dc19fefd35a04b61f581cf641",
+        "source_tree_sha256": "bea0158935efd09a2304be2eb024ce79d5a100cf754742dcbe52aaddce1dc9ee",
+        "source_file_count": 122,
+        "source_package_path": "/Users/landjunge/.local/share/kirabridge/install/releases/0.8.0rc18-15d071ebaa95/source/.venv/lib/python3.11/site-packages/kirabridge",
+        "source_scope": "package Python files observed at startup; no remote attestation"
+      },
+      "stop_absence_returncode": 113,
+      "old_process_absent": true,
+      "endpoint_closed": true
+    }
+  ],
+  "functional_tasks": {
+    "rc18-install-owned-window-20261029": {
+      "operation": "session.open",
+      "state": "completed",
+      "attempt": 1,
+      "created": 1793312662.323384,
+      "accepted": 1793312662.340343,
+      "started": 1793312662.341939,
+      "finished": 1793312663.5477278,
+      "receipt": "9d4f6119-5f0e-4a26-9a09-5ba5985ef78d",
+      "error": null,
+      "evidence": {
+        "operation_returned": true
+      },
+      "durable_event_count": 5
+    },
+    "rc18-install-start-visible-20261029": {
+      "operation": "session.input",
+      "state": "completed",
+      "attempt": 1,
+      "created": 1793313089.963352,
+      "accepted": 1793313089.981243,
+      "started": 1793313091.283181,
+      "finished": 1793313091.643548,
+      "receipt": "5be20404-610a-40f7-93cd-8e49d49cd1c3",
+      "error": null,
+      "evidence": {
+        "operation_returned": true
+      },
+      "durable_event_count": 5
+    },
+    "rc18-installed-input-round1-20261029": {
+      "operation": "session.input",
+      "state": "completed",
+      "attempt": 1,
+      "created": 1793313456.250408,
+      "accepted": 1793313456.272234,
+      "started": 1793313457.652568,
+      "finished": 1793313458.030405,
+      "receipt": "c940e7d1-b011-49fd-8f48-b0e1135fb82f",
+      "error": null,
+      "evidence": {
+        "operation_returned": true
+      },
+      "durable_event_count": 5
+    },
+    "rc18-installed-input-round2-20261029": {
+      "operation": "session.input",
+      "state": "completed",
+      "attempt": 1,
+      "created": 1793313634.600713,
+      "accepted": 1793313634.605962,
+      "started": 1793313635.851508,
+      "finished": 1793313636.214515,
+      "receipt": "6b3b99c7-db2b-4d34-a252-073ff8921458",
+      "error": null,
+      "evidence": {
+        "operation_returned": true
+      },
+      "durable_event_count": 5
+    },
+    "rc18-installed-busy-fixture-20261029": {
+      "operation": "session.input",
+      "state": "completed",
+      "attempt": 1,
+      "created": 1793313585.4382899,
+      "accepted": 1793313585.4442298,
+      "started": 1793313586.6801002,
+      "finished": 1793313587.016008,
+      "receipt": "d5e5f465-a2ee-486b-9d63-647354fcbd61",
+      "error": null,
+      "evidence": {
+        "operation_returned": true
+      },
+      "durable_event_count": 5
+    },
+    "rc18-installed-busy-refusal-20261029": {
+      "operation": "session.input",
+      "state": "failed",
+      "attempt": 1,
+      "created": 1793313598.837711,
+      "accepted": 1793313598.843355,
+      "started": null,
+      "finished": 1793313600.120466,
+      "receipt": "614020c3-baf7-4dd3-9ba8-fa19eebbd8ef",
+      "error": {
+        "code": "session_busy"
+      },
+      "evidence": {
+        "automatic_retry": false,
+        "exception_type": "BridgeError",
+        "last_observation": {
+          "admission": "direct_native_once",
+          "automatic_retry": false,
+          "receipt_id": "614020c3-baf7-4dd3-9ba8-fa19eebbd8ef",
+          "receiver": "kirabridge.dispatcher",
+          "worker": "fa3b8c5a-8679-48a3-9a4a-9df231078e17"
+        },
+        "provider_error": null,
+        "safe_to_retry": false,
+        "terminal_input_attempted": false
+      },
+      "durable_event_count": 4
+    },
+    "rc18-installed-stale-pid-20261029": {
+      "operation": "session.input",
+      "state": "failed",
+      "attempt": 1,
+      "created": 1793313670.161793,
+      "accepted": 1793313670.168421,
+      "started": null,
+      "finished": 1793313670.7743418,
+      "receipt": "b5ac5503-fbbc-4cbd-bf1c-09754b116468",
+      "error": {
+        "code": "session_selection_changed"
+      },
+      "evidence": {
+        "automatic_retry": false,
+        "exception_type": "BridgeError",
+        "last_observation": {
+          "admission": "direct_native_once",
+          "automatic_retry": false,
+          "receipt_id": "b5ac5503-fbbc-4cbd-bf1c-09754b116468",
+          "receiver": "kirabridge.dispatcher",
+          "worker": "fa3b8c5a-8679-48a3-9a4a-9df231078e17"
+        },
+        "provider_error": null,
+        "safe_to_retry": false,
+        "terminal_input_attempted": false
+      },
+      "durable_event_count": 4
+    },
+    "rc18-lifecycle-start-visible-20261029": {
+      "operation": "session.input",
+      "state": "completed",
+      "attempt": 1,
+      "created": 1793313821.64172,
+      "accepted": 1793313821.690668,
+      "started": 1793313823.220093,
+      "finished": 1793313823.56738,
+      "receipt": "008f5578-7b27-4488-b5aa-88e7acabf004",
+      "error": null,
+      "evidence": {
+        "operation_returned": true
+      },
+      "durable_event_count": 5
+    },
+    "rc18-lifecycle-start-visible-20261029-v2": {
+      "operation": "session.input",
+      "state": "completed",
+      "attempt": 1,
+      "created": 1793313897.6138089,
+      "accepted": 1793313897.635156,
+      "started": 1793313898.871058,
+      "finished": 1793313899.2124748,
+      "receipt": "3c2a5606-5aef-4f15-8d8d-23dc6c933462",
+      "error": null,
+      "evidence": {
+        "operation_returned": true
+      },
+      "durable_event_count": 5
+    }
+  },
+  "receipts_sha256": "1d7a2f83f457f8efeb11ae73b3cba28858ab96bacf08b9bac16ecd3b8f1909ca",
+  "same_completed_id_after_restart_did_not_execute": true,
+  "same_failed_id_after_ready_remained_failed": true,
+  "preservation": {
+    "version": "0.8.0rc18",
+    "final_pid": 18197,
+    "installed_python_files_match_published_wheel": 122,
+    "configuration_credentials_bytes_modes_unchanged": {
+      "config.toml": true,
+      "credentials.json": true,
+      "console-credentials.json": true
+    },
+    "protected_historical_rows_unchanged": true,
+    "queue_control_tables_unchanged": {
+      "queue_holds": true,
+      "queue_withdrawals": true
+    },
+    "other_six_original_processes_alive": true,
+    "old_releases_assets_unchanged": 9,
+    "receipt_file": "RC18_ROUND_1\nRC18_ROUND_2\n",
+    "no_busy_or_stale_effect_file": true
+  },
+  "RC17_restore": {
+    "RC17_source_files_restored_verified": 583,
+    "RC17_environment_copied_preserving_symlinks": true,
+    "source_original_path_retained": true,
+    "productive_restore": false
+  },
+  "RC17_saved_transaction": {
+    "release": "/Users/landjunge/.local/share/kirabridge/install/releases/0.8.0rc18-15d071ebaa95",
+    "backup": "/Users/landjunge/.local/share/kirabridge/install/backups/20261029-233225-bdaf86ef",
+    "source": "15d071ebaa95d3bef2eed506c21fe7bfd043464c",
+    "saved_actual_RC17_plist_matches": true,
+    "saved_actual_launcher_matches": true,
+    "config_unchanged": true
+  },
+  "owned_window_cleanup": {
+    "owned_window3538_independently_absent": true,
+    "unrelated_four_windows_preserved": true,
+    "other_six_processes_alive": true,
+    "remaining": [
+      {
+        "id": 3509,
+        "tty": "/dev/ttys003"
+      },
+      {
+        "id": 3033,
+        "tty": "/dev/ttys001"
+      },
+      {
+        "id": 3206,
+        "tty": "/dev/ttys002"
+      },
+      {
+        "id": 3494,
+        "tty": "/dev/ttys000"
+      }
+    ]
+  },
+  "chatgpt_protocol": {
+    "principal": "chatgpt",
+    "authenticated_HTTP_MCP_initialize_tools_health_catalog": true,
+    "version": "0.8.0rc18",
+    "runtime": {
+      "instance_id": "82cd506b1d854b50b4cc58c5016fc856",
+      "version": "0.8.0rc18",
+      "pid": 18197,
+      "started_at": "2026-10-29T22:45:10.482631+00:00",
+      "config_path": "/Users/landjunge/.config/kirabridge/config.toml",
+      "config_sha256": "52747b8353bef4cc162997c34c30d8e759ca0691725d902f313ce4653cf903c2",
+      "effective_config_sha256": "3709ee5e48b675813b9708c7b634d137ca3c2c2dc19fefd35a04b61f581cf641",
+      "source_tree_sha256": "bea0158935efd09a2304be2eb024ce79d5a100cf754742dcbe52aaddce1dc9ee",
+      "source_file_count": 122,
+      "source_package_path": "/Users/landjunge/.local/share/kirabridge/install/releases/0.8.0rc18-15d071ebaa95/source/.venv/lib/python3.11/site-packages/kirabridge",
+      "source_scope": "package Python files observed at startup; no remote attestation"
+    },
+    "identity": {
+      "name": "Kira",
+      "model": "ChatGPT",
+      "role": "voice"
+    },
+    "tools_count": 67,
+    "tools_names_sha256": "27a3c02bd3ea5e6e684685748aaa8b474afe52a2e5b4243209337123cdc23a1c",
+    "discovery_revision": "6c1c2858c348f25da24b8e6fcc04e5108d62462ba82768fcbdbb895cf39d888f",
+    "terminal_count": 5,
+    "scope": "Actual loopback HTTP MCP roundtrip with existing ChatGPT credentials; no browser/Live/voice Host attestation claimed",
+    "chatgpt_integration_reported_by_server": "unverified",
+    "credentials_exposed": false
+  },
+  "old_RC17_delivery": {
+    "task_id": "rc18_release_install_20261029",
+    "state": "unknown",
+    "error": {
+      "code": "visible_reply_unknown"
+    },
+    "last_observation": {
+      "agent_confirmed": true,
+      "handoff_id": "rc18_release_install_20261029",
+      "state": "confirmed"
+    },
+    "handoff_reason": "reply_unconfirmed",
+    "seconds_from_started_to_unknown": 300.014,
+    "occurred_before_RC18_installation": true,
+    "row_not_edited_or_replayed": true
+  },
+  "issue51": {
+    "state": "OPEN",
+    "reason": "Actual repeatable ready-Codex paste/Return/authenticated takeover remains unverified; current own Codex turn is working; shell/protocol tests do not establish that full criterion."
+  },
+  "remaining_limits": [
+    "ARM/paid hostedMac deferred; automatic jobs that started0steps are not passed tests.",
+    "Actual ChatGPT browser/Live/voice Host attestation remains unverified by the loopback protocol probe.",
+    "Diagnostic observer budget_exhausted at2000/day remains; primary task/receipt/event records exported, no claim of complete new diagnostic observer recording.",
+    "No productive RC17 rollback was necessary; guarded recovery definitions and isolated rollback are verified."
+  ],
+  "test_setup_failures_preserved": [
+    "First lifecycle helper lacked bundle argument and failed before any service action; corrected helper v2 alone reran lifecycle.",
+    "Parallel terminal reads hit one-slot terminal_read_busy; affected reads then succeeded sequentially.",
+    "Cleanup first required only one process; actual owned login+shell pair was verified. Unsupported tab.close returned-1708 without action; only sole-owned-tty window3538 was then closed and absence independently checked."
+  ],
+  "private_evidence_sha256": {
+    "published-command-acceptance.log": "67155f076ae9507f68161f70086f03c4f1655eaada6fca95419795a2440a049b",
+    "visible-terminal-full-history.txt": "390c0b62c302df83a0578eb977a83200f323c5f5ec38465dba120c70e42faba4",
+    "INSTALL_DRIVER.py": "9f938190b99236f9379caaddb005505503703dc1138f35a805703a3f3570f77d",
+    "LIFECYCLE_DRIVER.py": "b69ba19a25626a2f804ae6104ef8347522a2f5cc9970dbc8fd586ad138870ff1",
+    "LIFECYCLE_DRIVER_V2.py": "2db483a7fd89e5e00c4d94aa8ced9d41ec1541bfcee577255c581495ba3adcac",
+    "INSTALL-PROGRESS.json": "711bed7d29a612fd6074c9eae42db0288d9d5d1f4bfcff48fc6088c98823c014",
+    "LIFECYCLE-PROGRESS.json": "075c911e0018e96b443e1522c03b36bd9ee01f56c2f47d88d3da3354c7a44181",
+    "chatgpt-protocol-verification.json": "9e4b69e41a04a23941380c419798a30d6cacc84e7123cbdf8c4efd98d23e93ca",
+    "final-preservation-verification.json": "e6bf3f132454cc62e411d937d49065bec8b9452e56b8d350112e6cb7625e6280",
+    "live-task-events-private.json": "72d622a0d58080c449026f6f1bbadac804046ccbbacc98b5863b0c549ee2dc83"
+  }
+}

@@ -1,6 +1,14 @@
 # Intel release closure · 29 October 2026
 
-## Result and approval boundary
+## Subsequent authorized outcome
+
+Authorization rc18_release_install_20261029 approved integration/publication and
+controlled productive installation. PR49/50/52 are merged; RC18 is published and
+installed. [Current source, download, runtime, tests, backup and remaining gates](RC18-PUBLISH-INSTALL-20261029.md).
+The original acceptance and pending-approval text below is preserved as the dated
+pre-publication record; it is superseded by that linked outcome.
+
+## Historical result and approval boundary
 
 **Intel acceptance PASSED. Publication STILL OPEN.** New version0.8.0rc18 has
 reproducible actual installable assets on GitHub as an **unpublished draft**, with

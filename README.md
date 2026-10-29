@@ -6,12 +6,13 @@ d=$(mktemp -d) && gh release download v0.8.0rc18 -R landjunge/KiraBridge -p 'ins
 
 **[Download und Version: 0.8.0rc18](https://github.com/landjunge/KiraBridge/releases/tag/v0.8.0rc18)** · **[Alle erhaltenen Versionen einschließlich RC17](https://github.com/landjunge/KiraBridge/releases)**
 
-**Status: unveröffentlichter Releaseentwurf.** Der Befehl wurde mit authentifiziertem
-GitHub-Download und Installation in vollständig isolierte Testpfade auf dem Intel-iMac
-geprüft. Entwurfszugriff ist erforderlich. Veröffentlichung, Prüfung des veröffentlichten
-Downloadlinks und produktive Installation benötigen noch getrennte Freigaben.
-Ein Entwurf ist kein öffentlich verfügbares Release. Den aktuellen Prüfstand dokumentiert
-[der Intel-Abschlussbericht](docs/INTEL-RELEASE-20261029.md).
+**Status: veröffentlichtes Intel-Prerelease und auf dem Intel-iMac installiert.**
+Der Befehl wurde nach der Veröffentlichung tatsächlich heruntergeladen, geprüft und
+isoliert ausgeführt; anschließend wurde dasselbe Paket sichtbar produktiv installiert.
+Authentifizierter Zugriff auf dieses private Repository bleibt erforderlich.
+Konfiguration und Credentials sind erhalten; RC17 samt verifiziertem Rückweg bleibt
+verfügbar. [Release, Installation, Diensttests und verbleibende Grenzen](docs/RC18-PUBLISH-INSTALL-20261029.md).
+
 
 ## Funktionen
 
@@ -141,8 +142,8 @@ Nach jeder Testdienstbereinigung muss dessen Abwesenheit unabhängig belegt sein
 
 | Version | Tatsächlicher Stand |
 | --- | --- |
-| 0.8.0rc18 | Neuer Intel-Kandidat aus Queue-Reparatur811b271; unveröffentlichter Entwurf. Vollständige aktuelle Belege im Abschlussbericht. |
-| 0.8.0rc17 | Bestehender Entwurf und unveränderter produktiver Rückweg; authentifizierter separater Download nachgewiesen. |
+| 0.8.0rc18 | Veröffentlichtes Intel-Prerelease; tatsächlicher Download, sichtbare Installation und produktive Stop-/Start-/Neustarttests bestanden. Belege im Installationsbericht. |
+| 0.8.0rc17 | Separater Entwurf und gesicherter Rückweg vor RC18; authentifizierter Download und isolierter Rollback nachgewiesen. |
 | 0.8.0rc16 / rc15 | Historische Entwürfe erhalten; keine neue Abnahme daraus abgeleitet. |
 | 0.8.0rc14 | Veröffentlichtes Prerelease; Originalwheel als geprüfte Upgrade-/Rollbackfixture erhalten. |
 | Frühere Versionen | Unter dem Link „Alle erhaltenen Versionen“ mit ihrem tatsächlichen Veröffentlichungsstatus abrufbar. |

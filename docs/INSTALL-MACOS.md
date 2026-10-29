@@ -1,4 +1,8 @@
-# macOS installation / Installation · RC17
+# macOS installation / Installation · RC18
+
+RC18 is published and visibly installed on the accepted Intel host. Current actual
+download, preservation, service and rollback evidence: [release/install report](RC18-PUBLISH-INSTALL-20261029.md).
+The RC17 acceptance links below are retained historical evidence, not the current release state.
 
 Current supported entrypoints, prerequisites, private authenticated download,
 visible-terminal requirement, status, failure handling and rollback are documented
