@@ -129,9 +129,9 @@ class MessageReceiver:
 
     def _existing_reply(self, message_id):
         original = self.bridge.store.db.execute(
-            "SELECT sender, recipient FROM messages WHERE id=?", (message_id,)
+            "SELECT sender, recipient, acknowledged FROM messages WHERE id=?", (message_id,)
         ).fetchone()
-        if original is None:
+        if original is None or original["acknowledged"] is None:
             return None
         reply = self.bridge.store.db.execute(
             "SELECT id FROM messages WHERE reply_to=? AND sender=? AND recipient=? "
@@ -453,9 +453,8 @@ class MessageReceiver:
                     continue
                 if now < retry.get("next_attempt_at", 0):
                     continue
-                if (
-                    self.bridge.config.visible_handoffs.enabled
-                    and not separate_managed_eligible(self.bridge.config, row["created"])
+                if self.bridge.config.visible_handoffs.enabled and not separate_managed_eligible(
+                    self.bridge.config, row["created"]
                 ):
                     try:
                         await self.bridge.visible_handoffs.dispatch_ready(
@@ -624,9 +623,7 @@ class MessageReceiver:
                         }
                     )
                 )
-            separate_managed = separate_managed_eligible(
-                self.bridge.config, message["created"]
-            )
+            separate_managed = separate_managed_eligible(self.bridge.config, message["created"])
             visible = self.bridge.config.visible_handoffs.enabled and not separate_managed
             if visible:
                 prompt = message["body"]

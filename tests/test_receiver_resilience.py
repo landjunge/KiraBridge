@@ -39,9 +39,14 @@ def _running_handoff(bridge, key, state):
     return sent
 
 
-async def test_restart_completes_a_delivered_handoff_when_the_reply_is_stored(visible):
+@pytest.mark.parametrize("state", ["return_sent", "sent", "confirmed", "completed"])
+@pytest.mark.parametrize("acknowledged", [False, True])
+async def test_restart_requires_ack_and_stored_reply_for_completion(visible, state, acknowledged):
     bridge, transport = visible
-    sent = _running_handoff(bridge, "answered", "completed")
+    sent = _running_handoff(bridge, "answered", state)
+    if acknowledged:
+        incoming = bridge.messages.receive("grok")["messages"][0]
+        bridge.messages.ack("grok", incoming["id"], incoming["receipt"])
     bridge.messages.send(
         "grok",
         MessageSend(
@@ -59,18 +64,20 @@ async def test_restart_completes_a_delivered_handoff_when_the_reply_is_stored(vi
     await receiver.start()
     try:
         job = bridge.messages.get("chatgpt", sent["id"])["processing"]
-        assert job["state"] == "completed"
-        assert job["evidence"]["reason"] == "reply_already_recorded"
-        assert job["evidence"]["automatic_retry"] is False
-        assert job["reply_id"]
+        if acknowledged:
+            assert job["state"] == "completed"
+            assert job["evidence"]["reason"] == "reply_already_recorded"
+            assert job["evidence"]["automatic_retry"] is False
+            assert job["reply_id"]
+        else:
+            assert job["state"] == "running"
+            assert job["reply_id"] is None
         assert not transport["calls"]
     finally:
         await receiver.stop()
 
 
-@pytest.mark.parametrize(
-    "state,kept", [("sent", True), ("completed", True), ("inserting", False)]
-)
+@pytest.mark.parametrize("state,kept", [("sent", True), ("completed", True), ("inserting", False)])
 async def test_restart_keeps_only_a_delivered_handoff(visible, state, kept):
     bridge, transport = visible
     sent = _running_handoff(bridge, state, state)
