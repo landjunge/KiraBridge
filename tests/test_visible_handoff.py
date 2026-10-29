@@ -308,8 +308,9 @@ async def test_in_flight_window_rejects_second_handoff(visible):
             callback,
         )
     first.cancel()
-    with pytest.raises(UncertainExecution):
+    with pytest.raises(asyncio.CancelledError):
         await first
+    assert bridge.visible_handoffs.status("codex", "first")["state"] in {"sent", "confirmed"}
     assert transport["calls"] == ["insert", "return"]
 
 

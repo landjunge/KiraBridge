@@ -329,3 +329,58 @@ macOS-Runner waren durch Billing gesperrt. Die hiesige Dokumentationsänderung
 verändert keinen geprüften Pythonquellcode. Nächster sicherer Schritt: externe
 GitHub-/ARM-/Reviewgates regulär ermöglichen und abschließen; Merge, Release und
 produktive Änderungen benötigen danach eine erneute Freigabe.
+
+# Priorität 1 · direkte Queue-/Terminalzulassung · 29. Oktober 2026
+
+Neuer ausdrücklicher Nutzerauftrag vor Masterplan und ThreadDesk-Aufräumen.
+[Vollständiger Befund und Reparaturvertrag](QUEUE-DIRECT-ADMISSION-20261029.md),
+[minimierter Snapshot](evidence/queue-priority1-20261029.json).
+Die früheren Berichte bleiben unverändert als datierte Belege erhalten.
+
+Produktiv unverändert: RC17/PID60636, Instanz31849a4ff7c346f396b99e31d6fd807d.
+Konfigurationshash52747b8353bef4cc162997c34c30d8e759ca0691725d902f313ce4653cf903c2
+und beide Credentialdateien stimmen mit der Sicherung vor diesem Auftrag überein.
+Beide ursprünglichen Agenten71896/45186 und weitere Codex-Sitzung90216 bestehen.
+Keine produktive Terminaleingabe oder Dienständerung.
+
+Bereinigt wurden **0 historische produktive Einträge**: kein queued Receiver-Job
+im konsistenten Ausgangssnapshot; keine nachweislich nie gestartete aktive
+Ausführungsblockade. Inbox-Ergebnisse und Completionhinweise werden nicht als
+ungestartete Arbeit gelöscht. Historische unknown/blocked einschließlich
+61ccf5a9/ed182f06/013a112e bleiben im erneuten Vergleich unverändert.
+
+Reparatur auf isoliertem Branch `fix/queue-direct-admission-20261029`, Ausgang36a7c5c:
+einmalige sichtbare Nachrichten-/native Taskzulassung, konkrete Fehler statt
+endlosem Warten, unveränderliche Idempotenzbelege, Zielpinning und bestehende
+Eingabe-/Berechtigungsprüfungen. Neue sicher vor Eingabe abgelehnte Nachrichten
+werden über vorhandene Holds von späterer Zustellung ausgeschlossen; keine Holds
+auf vermutete unbekannte Ausführungen. Native Antwortwartende blockieren keinen
+normalen Worker. Frische CLI-Freigaben bleiben möglich; alte queued Historie
+wird nicht automatisch aufgenommen. Shutdown-/Late-Reply- und Cleanup-Rennen
+gezielt korrigiert; kein CWD als Ursache erfunden.
+
+Lokale gezielte Prüfung in mehreren überlappenden Teil-/Korrekturläufen, keine
+erneute Gesamtsuite:55 aktuelle Admission-/Mixed-/Shutdown-/HTTP-Fälle bestanden;
+135 weitere Receiver-/MCP-/Handoffprüfungen bestanden, ein geänderter alter
+Cancellationvertrag anschließend einzeln bestanden. Zuvor196 Bestandsfälle und
+86 Task-/Approval-/Nachrichtenfälle bestanden; ihre Laufmengen überlappen und
+werden nicht addiert. Fünf an den neuen Vertrag angepasste Faultboundary-Fälle
+nach reproduzierten Fehlern gezielt4+1 bestanden. MCP-Rechteentzug nach der neuen
+Wartephase2 Fälle bestanden. Unterbrochene/fehlgeschlagene erste Läufe bleiben
+in den privaten JUnit-/Toolprotokollen sichtbar, kein Gesamtpass daraus behauptet.
+Zusätzlich2 Runlimit-/Inbox-Holdfälle und ein vollständiges Receiver-Stop-/Start-
+Interleaving ergänzt; zuletzt6 direkt betroffene Lifecyclefälle bestanden.
+Ruff vollständig grün;390 Dateien formatiert; `git diff --check` und `uv build`
+bestanden. Tests benutzen private Stores, fake Terminal-I/O und Loopback-MCP.
+
+Backup vor Änderung verifiziert unter
+`~/.local/share/kirabridge/backups/queue-priority1-20261029-201843`.
+Nachsicherung mit isoliertem Quellrestore:
+`~/.local/share/kirabridge/backups/queue-priority1-final-20261029-v2`.
+Der erste Restoreversuch hatte bytegleiche Inhalte, aber durch die private Umask
+0600 statt gespeicherter0644-Dateimodi; er wurde ausdrücklich nicht als bestanden
+gezählt. Der korrigierte Ablauf stellt die im Manifest gespeicherten Modi nur im
+privaten Restoreziel wieder her und vergleicht anschließend Bytes und Modi.
+Commit/Push und neue Head-CI werden mit ihren tatsächlichen Ergebnissen festgehalten.
+Merge, Release, Installation und
+produktiver Neustart benötigen weiterhin neue ausdrückliche Freigabe.

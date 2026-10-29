@@ -49,8 +49,16 @@ class MessageReceiver:
         self.worker = None
         self.stopping = False
         self.recovered_handoffs = set()
+        self._stops_in_progress = 0
+        from kirabridge.message_manager.direct import DirectDelivery
+
+        self.direct = DirectDelivery(self)
 
     async def start(self):
+        if self._stops_in_progress:
+            return
+        if self.direct._stop_task is not None and not self.direct._stop_task.done():
+            return  # A cancelled stop observer must not reopen admission during owned cleanup.
         if self.worker and self.worker.done():
             if not self.worker.cancelled():
                 self.worker.exception()  # Consume the finished task before replacing its handle.
@@ -90,19 +98,81 @@ class MessageReceiver:
                     self._finish(row["id"], "blocked", {"reason": "receiver_removed"})
         self._reconcile_recovered_handoffs()
         self.stopping = False
+        self.direct.accepting = True
+        self.messages.delivery_hook = self._submit_new
         self.worker = asyncio.create_task(self._loop())
 
     async def stop(self):
+        self._stops_in_progress += 1
+        self.messages.delivery_hook = None
         self.stopping = True
         self.messages.wake.set()
         worker = self.worker
-        if worker:
-            # Each adapter invocation has its own configured finite timeout.
+        try:
             try:
-                await asyncio.shield(worker)
+                await self.direct.stop()
             finally:
-                if self.worker is worker and worker.done():
-                    self.worker = None
+                if worker:
+                    # Never observe a replacement worker from a concurrent start.
+                    try:
+                        await asyncio.shield(worker)
+                    finally:
+                        if self.worker is worker and worker.done():
+                            self.worker = None
+        finally:
+            self._stops_in_progress -= 1
+
+    def _submit_new(self, principal, message_id):
+        row = self.bridge.store.db.execute(
+            "SELECT created FROM messages WHERE id=?", (message_id,)
+        ).fetchone()
+        if self.bridge.config.visible_handoffs.enabled and not separate_managed_eligible(
+            self.bridge.config, row["created"]
+        ):
+            self.direct.submit(principal, message_id)
+
+    async def send(self, principal, message, *, completion_target=None):
+        """Observe one new visible admission, never resubmit a recorded ID."""
+        recorded = self.bridge.store.db.execute(
+            "SELECT id FROM messages WHERE sender=? AND idem=?",
+            (principal, message.idempotency_key),
+        ).fetchone()
+        result = self.messages.send(principal, message, completion_target=completion_target)
+        if "id" not in result or result.get("message_buffer"):
+            return result
+        identifier = result["id"]
+        job = result.get("processing")
+        visible = self.bridge.config.visible_handoffs.enabled and not separate_managed_eligible(
+            self.bridge.config, result["created"]
+        )
+        if not job or not visible:
+            return result
+        if not recorded and job["state"] == "queued" and not self.direct.accepting:
+            self.direct.fail(
+                identifier, BridgeError("receiver_unavailable", "Direct receiver is not running")
+            )
+        if identifier in self.direct.active:
+            await self.direct.wait_delivery(identifier)
+        result = self.messages.get(principal, identifier)
+        job = result["processing"]
+        if job["state"] == "queued":
+            # No active runtime attempt means a historical/unadmitted record.
+            # Its ID remains readable, but reading it never starts delivery.
+            result["delivery"] = {
+                "status": "not_admitted",
+                "automatic_retry": False,
+                "next_step": "Inspect the original record; do not resend or release history",
+            }
+            result["error"] = {
+                "code": "delivery_not_admitted",
+                "message": "No active delivery attempt for this record; inspect without replay",
+            }
+        elif job["state"] in {"failed", "blocked", "cancelled", "unknown"}:
+            result["error"] = {
+                "code": job["error"] or job["evidence"].get("reason", "delivery_not_admitted"),
+                "message": "Visible delivery unconfirmed; inspect this message ID, never replay",
+            }
+        return result
 
     def _reply_can_finish(self, row):
         """A delivered visible handoff is waiting for its reply, not for another paste."""
@@ -241,7 +311,7 @@ class MessageReceiver:
             payload,
         )
 
-    def _claim(self, message_id):
+    def _claim(self, message_id, *, direct=False):
         config = self.bridge.config.messaging
         with self.bridge.store.transaction():
             row = self.bridge.store.db.execute(
@@ -258,20 +328,49 @@ class MessageReceiver:
             if row["acknowledged"]:
                 self._finish(message_id, "completed", {"externally_acknowledged": True})
                 return None
+
+            def blocked(reason):
+                evidence = {"reason": reason}
+                if direct:
+                    evidence.update(
+                        phase="direct_admission",
+                        terminal_input_attempted=False,
+                        automatic_retry=False,
+                    )
+                self._finish(message_id, "blocked", evidence)
+                if direct:
+                    # Only this fresh direct attempt was refused before claim.
+                    # Its body must not be delivered later by an inbox poll.
+                    self.bridge.queues._place_hold(
+                        row["sender"], "messages", message_id, "direct_admission_rejected"
+                    )
+                    self.bridge.store.audit(
+                        "queue.admission_rejected",
+                        row["sender"],
+                        None,
+                        {
+                            "queue": "messages",
+                            "item_id": message_id,
+                            "reason": reason,
+                            "terminal_input_attempted": False,
+                            "history_preserved": True,
+                        },
+                    )
+
             count = self.bridge.store.db.execute(
                 "SELECT count(*) FROM message_jobs j JOIN messages m ON m.id=j.message_id "
                 "WHERE m.conversation_id=? AND j.claimed IS NOT NULL",
                 (row["conversation_id"],),
             ).fetchone()[0]
             if count >= config.max_runs_per_conversation:
-                self._finish(message_id, "blocked", {"reason": "conversation_run_limit"})
+                blocked("conversation_run_limit")
                 return None
             count = self.bridge.store.db.execute(
                 "SELECT count(*) FROM message_jobs WHERE claimed>?",
                 (time.time() - 3600,),
             ).fetchone()[0]
             if count >= config.max_runs_per_hour:
-                self._finish(message_id, "blocked", {"reason": "hourly_run_limit"})
+                blocked("hourly_run_limit")
                 return None
             run_id = "channel-" + uuid.uuid4().hex
             scope = (
@@ -456,7 +555,7 @@ class MessageReceiver:
                 evidence["terminal_input_attempted"] = False
             self._finish(message_id, "failed" if unclaimed else "unknown", evidence, code)
 
-    async def _dispatch_next(self, recipient=None):
+    async def _dispatch_next(self, recipient=None, *, include_visible=True):
         # One oldest message per recipient: a busy Codex must not hide ready Grok.
         # A cutoff removes older rows from that contest so they are neither
         # dispatched nor able to hide a newer eligible message.
@@ -477,6 +576,19 @@ class MessageReceiver:
             (cutoff, cutoff, recipient, recipient, cutoff, cutoff),
         ).fetchall()
         for row in rows:
+            if row["acknowledged"] is not None:
+                # External ACK can close only this never-claimed delivery;
+                # it never restarts a historical visible turn.
+                self._claim(row["id"])
+                continue
+            if (
+                not include_visible
+                and self.bridge.config.visible_handoffs.enabled
+                and not separate_managed_eligible(self.bridge.config, row["created"])
+            ):
+                # Old visible backlog is inventory, never fresh authorization.
+                # New visible work has one runtime-owned direct admission.
+                continue
             if row["recipient"] not in self.bridge.config.messaging.receivers:
                 continue
             try:
@@ -542,7 +654,7 @@ class MessageReceiver:
                     if self.stopping:
                         return
                     self._reconcile_recovered_handoffs(recipient)
-                    dispatched = await self._dispatch_next(recipient)
+                    dispatched = await self._dispatch_next(recipient, include_visible=False)
                 fault_recorded = False
                 if dispatched:
                     continue
@@ -566,7 +678,7 @@ class MessageReceiver:
             except TimeoutError:
                 pass
 
-    async def _process(self, pool, message, run_id):
+    async def _process(self, pool, message, run_id, *, delivery_event=None, delivery_binding=None):
         message_id, recipient = message["id"], message["recipient"]
         limits = self.bridge.config.messaging
         receiver = limits.receivers[recipient]
@@ -601,6 +713,8 @@ class MessageReceiver:
                     (time.time(), message_id),
                 )
             await progress(evidence)
+            if delivery_event is not None:
+                delivery_event.set()
 
         try:
             delivered = await call(
@@ -687,6 +801,7 @@ class MessageReceiver:
                 running,
                 progress,
                 separate_managed=separate_managed,
+                **({"visible_binding": delivery_binding} if delivery_binding is not None else {}),
             )
             if not result.get("success"):
                 await progress(result.get("evidence", {}))
@@ -735,6 +850,18 @@ class MessageReceiver:
                 self._finish(message_id, "completed", evidence, reply_id=reply_id)
         except asyncio.CancelledError:
             with self.bridge.store.transaction():
+                job = self.bridge.store.db.execute(
+                    "SELECT message_id,evidence FROM message_jobs WHERE message_id=?",
+                    (message_id,),
+                ).fetchone()
+                if (
+                    delivery_event is not None
+                    and delivery_event.is_set()
+                    and self._reply_can_finish(job)
+                ):
+                    # Shutdown loses only the waiter, not the authenticated
+                    # return path. Startup observes ACK/late reply without input.
+                    raise
                 observed = self.bridge.store.db.execute(
                     "SELECT evidence FROM message_jobs WHERE message_id=?", (message_id,)
                 ).fetchone()[0]
@@ -749,8 +876,13 @@ class MessageReceiver:
                 )
             raise
         except Exception as exc:
-            if isinstance(exc, BridgeError) and self._queue_unsent(
-                message_id, exc.code, run_id, "running"
+            if delivery_event is not None:
+                self.direct.fail(message_id, exc)
+                return  # One admission attempt; no pre-input requeue or replay.
+            if (
+                delivery_event is None
+                and isinstance(exc, BridgeError)
+                and self._queue_unsent(message_id, exc.code, run_id, "running")
             ):
                 return  # Readiness changed before any input attempt.
             state = (

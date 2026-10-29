@@ -43,6 +43,9 @@ class TaskManager:
         from kirabridge.session_input_policy import SessionInputPolicy
 
         self.input_policy = SessionInputPolicy(config, store, security)
+        from kirabridge.task_manager.direct import NativeAdmission
+
+        self.native = NativeAdmission(self)
 
     def enqueue(
         self,
@@ -98,6 +101,7 @@ class TaskManager:
                         raise BridgeError("review_conflict", "Use the original buffered task ID")
                     self.input_policy.release(principal, request, approval)
                     self._approve_in_transaction(existing["id"], "daniel_token")
+                    self.native.submit(existing["id"])
                     self.wake.set()
                 return self.store.get(existing["id"], principal)
             self.store.assert_accepting(
@@ -201,6 +205,8 @@ class TaskManager:
                     },
                 )
         self.wake.set()
+        if not pending:
+            self.native.submit(request.task_id)
         return self.store.get(request.task_id, principal)
 
     def approve(
@@ -231,6 +237,7 @@ class TaskManager:
                 token = self.security.grant_in_transaction(task["principal"], request)
                 self.input_policy.release(task["principal"], request, token, source=source)
             self._approve_in_transaction(task_id, source)
+        self.native.submit(task_id)
         self.wake.set()
         return self.store.get(task_id)
 
@@ -269,6 +276,7 @@ class TaskManager:
         self.lock.acquire()
         try:
             self.store.recover()
+            self.native.start()
             self.workers = [
                 asyncio.create_task(self._worker("normal")) for _ in range(self.config.concurrency)
             ]
@@ -283,6 +291,7 @@ class TaskManager:
             raise
 
     async def stop(self) -> None:
+        await self.native.stop()
         for worker in self.workers:
             worker.cancel()
         await asyncio.gather(*self.workers, return_exceptions=True)
@@ -304,7 +313,12 @@ class TaskManager:
             self.input_policy.expire()
             if self.maintenance:
                 self.maintenance()
-            task = self.store.claim(self.owner, self.config.lease_seconds, lane)
+            task = self.store.claim(
+                self.owner,
+                self.config.lease_seconds,
+                lane,
+                native_visible=self.config.visible_handoffs.enabled,
+            )
             if task is None:
                 try:
                     await asyncio.wait_for(self.wake.wait(), 2.0)
@@ -323,6 +337,7 @@ class TaskManager:
             nonlocal observed_effect
             observed_effect = mutating
             self.store.transition(task["id"], State.RUNNING, evidence, owner=self.owner)
+            self.native.observe(task["id"], evidence)
 
         async def progress(evidence):
             nonlocal observed_effect, progress_count
@@ -346,6 +361,7 @@ class TaskManager:
                     task["id"],
                     {"evidence_hash": digest(evidence)},
                 )
+            self.native.observe(task["id"], evidence)
 
         try:
             # Revalidate policy at dispatch time (config or grants may have changed).
@@ -384,14 +400,18 @@ class TaskManager:
                 owner=self.owner,
             )
         except asyncio.CancelledError:
+            expired = task["id"] in self.native.expired
             self.store.transition(
                 task["id"],
-                State.UNKNOWN,
+                State.FAILED if expired and not observed_effect else State.UNKNOWN,
                 {
-                    "reason": "dispatcher_shutdown",
+                    "reason": "native_admission_timeout" if expired else "dispatcher_shutdown",
                     "side_effect_possible": observed_effect,
+                    "automatic_retry": False,
+                    **({"terminal_input_attempted": False} if not observed_effect else {}),
                     "last_observation": self.store.get(task["id"])["evidence"],
                 },
+                error={"code": "native_admission_timeout"} if expired else None,
                 owner=self.owner,
             )
             raise
@@ -409,7 +429,11 @@ class TaskManager:
                 {
                     "exception_type": type(exc).__name__,
                     "provider_error": getattr(exc, "provider_error", None),
-                    "safe_to_retry": state == State.FAILED and not observed_effect,
+                    "safe_to_retry": state == State.FAILED
+                    and not observed_effect
+                    and not self.native.native(task),
+                    "automatic_retry": False,
+                    **({"terminal_input_attempted": False} if not observed_effect else {}),
                     "last_observation": self.store.get(task["id"])["evidence"],
                 },
                 error={"code": code},
@@ -418,6 +442,10 @@ class TaskManager:
         finally:
             heartbeat.cancel()
             await asyncio.gather(heartbeat, return_exceptions=True)
+
+    async def wait_delivery(self, task_id: str) -> dict:
+        """Observe the original native attempt; never release historical work."""
+        return await self.native.wait(task_id)
 
     def cancel_queued(self, principal: str, task_id: str) -> dict:
         self.security.principal(principal, "task.cancel")

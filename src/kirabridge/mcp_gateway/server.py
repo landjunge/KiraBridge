@@ -54,7 +54,8 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
         "ThreadDesk is a separate access path. Refresh tools/list and operation_catalog after "
         "connection, version or session changes; compare discovery.revision. API v1. "
         "Check per-operation permission_decision; approval_mode is legacy policy metadata. "
-        "Use task_request: automatic mode queues permitted work without a browser click. "
+        "Use task_request: automatic mode admits permitted work without a browser click. "
+        "New visible delivery has one immediate attempt; a blocked target returns a clear error. "
         "Only when approval_required is true, send the operator to local_approval_url. "
         "Do not ask for approval when approval_required is false. "
         "Do not ask them to copy task IDs between chats. "
@@ -395,9 +396,10 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
     async def task_submit(
         request: TaskRequest, ctx: Context, approval: str = "", completion_target: str | None = None
     ) -> dict[str, Any]:
-        """Queue a task; automatic mode needs no token, manual mode requires an exact-task grant.
+        """Submit a task; automatic mode needs no token, manual mode requires an exact-task grant.
 
-        Repeating its idempotency key never executes it twice.
+        Repeating its idempotency key never executes it twice. New native work is
+        admitted once; a busy or changed target fails without a waiting backlog.
         session.input follows the principal's automatic_operations and optional buffer policy.
         A standing session.input grant needs no marker or manual approval.
         For the Grok app, waits briefly and returns conversation_return with the
@@ -408,6 +410,14 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
                 identity(ctx), request, approval, completion_target=completion_target
             )
         )
+        if result.get("id"):
+            observed = await bridge.tasks.wait_delivery(result["id"])
+            if observed.get("delivery"):
+                result = safe(lambda: bridge.task(identity(ctx), result["id"]))
+                if result.get("id"):
+                    result["delivery"] = observed["delivery"]
+                    if observed.get("error"):
+                        result["error"] = observed["error"]
         from kirabridge.grok_connector.conversation import result_for_conversation
 
         return await result_for_conversation(bridge, identity(ctx), result)
@@ -442,7 +452,7 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
     async def task_request(
         request: TaskRequest, ctx: Context, completion_target: str | None = None
     ) -> dict[str, Any]:
-        """Queue permitted work automatically, or request approval if this identity is manual.
+        """Admit permitted work automatically, or request approval if this identity is manual.
 
         No Events subscription is required. completion_target is optional.
         Set a stable unique completion_target for the requesting assistant session.
@@ -452,6 +462,7 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
         Check approval_required: false means no browser click is needed.
         Only when true, give the operator local_approval_url to approve in their Mac browser.
         Do not ask them to copy task IDs between chats. A queued receipt is not proof of execution.
+        New native work is attempted once; blocked targets fail clearly without a waiting backlog.
         For the Grok app, waits briefly and includes conversation_return. Speak its
         actual result when final is true. If continue_required, call task_get with
         this same task ID before finishing the conversation. This does not attest audio playback.
@@ -459,6 +470,14 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
 
         principal = identity(ctx)
         task = safe(lambda: bridge.prepare(principal, request, completion_target=completion_target))
+        if task.get("id"):
+            observed = await bridge.tasks.wait_delivery(task["id"])
+            if observed.get("delivery"):
+                task = safe(lambda: bridge.task(principal, task["id"]))
+                if task.get("id"):
+                    task["delivery"] = observed["delivery"]
+                    if observed.get("error"):
+                        task["error"] = observed["error"]
         timeout = inline_task_timeout(task.get("operation")) if isinstance(task, dict) else None
         if (
             isinstance(task, dict)
@@ -713,18 +732,20 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
         to the requesting assistant's stable target, even on failure or without an auto reply.
         Kinds: question, answer, work, result, note. Reuse the idempotency_key only for the
         exact same message. Work/questions to CLI agents use their assigned visible terminal
-        even with dispatch=false; missing or changed targets block without fallback.
+        even with dispatch=false. One bounded visible attempt is observed before returning;
+        busy/missing/changed targets fail without a waiting backlog or hidden fallback.
         Questions/work request one response
         by default. Answers/results never request another response. No shell interpolation.
         Returned answers stay in the sender's client inbox; they do not automatically
         start another background receiver. Grok app calls wait briefly and include
         conversation_return and reply_message. Acknowledge the reply only after processing it.
         """
-        result = safe(
-            lambda: bridge.messages.send(
+        try:
+            result = await bridge.message_receiver.send(
                 identity(ctx), message, completion_target=completion_target
             )
-        )
+        except BridgeError as exc:
+            result = {"error": {"code": exc.code, "message": str(exc)}}
         from kirabridge.grok_connector.conversation import message_for_conversation
 
         return await message_for_conversation(bridge, identity(ctx), result)

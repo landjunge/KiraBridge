@@ -270,45 +270,34 @@ async def test_recovered_handoff_with_revoked_sender_rights_does_not_block_recei
         await receiver.stop()
 
 
-async def test_same_recipient_stays_ordered_and_shutdown_drains_only_running_work(
+async def test_restart_never_executes_historical_visible_backlog(
     visible,
     monkeypatch,  # noqa: F811
 ):
     bridge, _ = visible
     receiver = bridge.message_receiver
     fake_receiver(monkeypatch, bridge, [])
-    entered, release = asyncio.Event(), asyncio.Event()
     processed = []
-
-    async def process(pool, message, run_id):
-        processed.append(message["id"])
-        entered.set()
-        await release.wait()
-        with bridge.store.transaction():
-            receiver._finish(message["id"], "completed", {})
-
-    monkeypatch.setattr(receiver, "_process", process)
+    fake_receiver(monkeypatch, bridge, processed)
     first = enqueue(bridge, key="ordered-first")
     second = enqueue(bridge, key="ordered-second")
     await receiver.start()
     try:
-        await asyncio.wait_for(entered.wait(), 1)
-        assert processed == [first["id"]]
-        assert bridge.messages.get("chatgpt", second["id"])["processing"]["state"] == "queued"
-        stopping = asyncio.create_task(receiver.stop())
-        await asyncio.sleep(0)
-        assert not stopping.done()
-        release.set()
-        await asyncio.wait_for(stopping, 1)
-        assert processed == [first["id"]]
-        # A new start drains the unchanged second message once, not the first again.
-        entered.clear()
-        await receiver.start()
-        await asyncio.wait_for(entered.wait(), 1)
-    finally:
-        release.set()
+        await asyncio.sleep(0.02)
+        assert processed == []
+        before = [
+            bridge.messages.get("chatgpt", row["id"])["processing"] for row in (first, second)
+        ]
+        assert all(row["state"] == "queued" and row["claimed"] is None for row in before)
         await receiver.stop()
-    assert processed == [first["id"], second["id"]]
+        await receiver.start()
+        await asyncio.sleep(0.02)
+        assert [
+            bridge.messages.get("chatgpt", row["id"])["processing"] for row in (first, second)
+        ] == before
+    finally:
+        await receiver.stop()
+    assert processed == []
 
 
 @pytest.mark.parametrize("recover", [False, True])
@@ -464,7 +453,7 @@ async def test_running_codex_only_holds_the_same_terminal(
     async def ready(*args):
         return None
 
-    async def process(pool, message, run_id):
+    async def process(pool, message, run_id, *, delivery_event=None, delivery_binding=None):
         if message["recipient"] == "codex":
             entered.set()
             await release.wait()
@@ -475,7 +464,7 @@ async def test_running_codex_only_holds_the_same_terminal(
 
     monkeypatch.setattr(bridge.visible_handoffs, "dispatch_ready", ready)
     monkeypatch.setattr(receiver, "_process", process)
-    enqueue(bridge, target="codex", key="audit-running-codex")
+    bridge.config.messaging.receivers["codex"] = ReceiverConfig(cwd="/tmp", timeout=3)
     bridge.config.messaging.receivers["grok"] = ReceiverConfig(
         cwd=bridge.config.principals["grok"].roots[0], timeout=3
     )
@@ -485,6 +474,7 @@ async def test_running_codex_only_holds_the_same_terminal(
         ].model_copy()
     await receiver.start()
     try:
+        enqueue(bridge, target="codex", key="audit-running-codex")
         await asyncio.wait_for(entered.wait(), 1)
         grok = enqueue(bridge, sender="codex", target="grok", key="audit-ready-grok")
         try:
@@ -494,7 +484,11 @@ async def test_running_codex_only_holds_the_same_terminal(
         before_release = bridge.messages.get("codex", grok["id"])["processing"]
         dispatched_while_codex_running = grok_started.is_set()
         release.set()
-        await asyncio.wait_for(grok_started.wait(), 1)
+        if not same_pane:
+            await asyncio.wait_for(grok_started.wait(), 1)
+        else:
+            assert before_release["state"] == "failed"
+            assert before_release["error"] == "visible_target_busy"
     finally:
         release.set()
         await receiver.stop()

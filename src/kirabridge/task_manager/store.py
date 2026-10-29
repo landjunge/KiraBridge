@@ -459,9 +459,18 @@ class Store:
         result.pop("principal", None)
         return result
 
-    def claim(self, owner: str, lease_seconds: float, control: bool | str = False) -> dict | None:
+    def claim(
+        self, owner: str, lease_seconds: float, control: bool | str = False, *, native_visible=False
+    ) -> dict | None:
         with self.transaction():
             selection, names = self.lane_selection(control)
+            if native_visible:
+                selection += (
+                    " AND NOT (operation IN ('agent.execute','terminal.visible') OR "
+                    "(operation='terminal.execute' AND principal='chatgpt') OR "
+                    "(operation='session.input' AND "
+                    "json_extract(args,'$.pane_id') LIKE 'terminal:%'))"
+                )
             row = self.db.execute(
                 "SELECT id,principal,created,operation FROM tasks WHERE state='queued' "
                 "AND " + selection + " ORDER BY created,id LIMIT 1",
@@ -484,6 +493,56 @@ class Store:
             )
             self.audit("task.accepted", row["principal"], row["id"], {"receipt_id": receipt})
         return self.get(row["id"])
+
+    def claim_exact(self, owner: str, lease_seconds: float, task_id: str) -> dict | None:
+        """Accept one newly authorized ID, never select another queued record."""
+        with self.transaction():
+            row = self.db.execute(
+                "SELECT id,principal,created,operation FROM tasks WHERE id=? AND state='queued' "
+                "AND accepted IS NULL AND started IS NULL AND receipt IS NULL "
+                "AND lease_owner IS NULL AND lease_until IS NULL "
+                "AND finished IS NULL AND result IS NULL AND error IS NULL AND evidence='{}' "
+                "AND NOT EXISTS (SELECT 1 FROM events e WHERE e.task_id=tasks.id "
+                "AND e.state NOT IN ('created','queued')) "
+                "AND NOT EXISTS (SELECT 1 FROM queue_holds h WHERE h.queue_id IN "
+                "('tasks','session-input') AND h.item_id=tasks.id) "
+                "AND NOT EXISTS (SELECT 1 FROM queue_withdrawals w WHERE w.queue_id IN "
+                "('tasks','session-input') AND w.item_id=tasks.id)",
+                (task_id,),
+            ).fetchone()
+            if row is None or not self.can_claim(
+                row["created"], task_id=task_id, operation=row["operation"]
+            ):
+                return None
+            has_handoffs = self.db.execute(
+                "SELECT 1 FROM sqlite_master WHERE type='table' AND name='visible_handoffs'"
+            ).fetchone()
+            if (
+                has_handoffs
+                and self.db.execute(
+                    "SELECT 1 FROM visible_handoffs WHERE id=?", (task_id,)
+                ).fetchone()
+            ):
+                return None
+            now, receipt = time.time(), str(uuid.uuid4())
+            evidence = {
+                "receiver": "kirabridge.dispatcher",
+                "receipt_id": receipt,
+                "worker": owner,
+                "admission": "direct_native_once",
+                "automatic_retry": False,
+            }
+            self.db.execute(
+                "UPDATE tasks SET state='accepted',accepted=?,updated=?,receipt=?,evidence=?,"
+                "lease_owner=?,lease_until=? WHERE id=? AND state='queued'",
+                (now, now, receipt, canonical(evidence), owner, now + lease_seconds, task_id),
+            )
+            self.db.execute(
+                "INSERT INTO events(task_id,at,state,evidence) VALUES(?,?,?,?)",
+                (task_id, now, "accepted", canonical(evidence)),
+            )
+            self.audit("task.accepted", row["principal"], task_id, {"receipt_id": receipt})
+        return self.get(task_id)
 
     def recover(self) -> int:
         # Runtime exclusive lock proves the previous dispatcher no longer owns this DB.

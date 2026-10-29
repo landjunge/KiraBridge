@@ -983,6 +983,11 @@ class VisibleHandoffs:
                             "project_completion_verified": False,
                         }
                     await asyncio.sleep(0.25)
+        except asyncio.CancelledError:
+            # Only the reply observer is gone: paste and Return were already
+            # durably recorded above. Preserve them for ACK/late-reply recovery.
+            # Cancellation during input is still handled as uncertain input.
+            raise
         except BaseException as exc:
             self.transition(
                 identifier, "unknown", {"reason": "reply_unconfirmed", "automatic_retry": False}
