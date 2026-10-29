@@ -75,25 +75,22 @@ async def test_cursor_follows_one_pane_and_does_not_reveal_another(bridge):
     first = await bridge.sessions.read_observed("local", "terminal:9:ttys009", 9)
     assert first["follow"] == "full" and first["text"] == "one"
     cursor = first["next_cursor"]
-    assert bridge.outputs.captured_text(
-        "local", "session_capture", "terminal:9:ttys009:9", cursor
-    ) == "one"
+    assert (
+        bridge.outputs.captured_text("local", "session_capture", "terminal:9:ttys009:9", cursor)
+        == "one"
+    )
     assert (
         bridge.outputs.captured_text("other", "session_capture", "terminal:9:ttys009:9", cursor)
         is None
     )
     screen["text"] = "one\ntwo"
-    second = await bridge.sessions.read_observed(
-        "local", "terminal:9:ttys009", 9, since=cursor
-    )
+    second = await bridge.sessions.read_observed("local", "terminal:9:ttys009", 9, since=cursor)
     assert second["follow"] == "append" and second["appended"] == "\ntwo"
     assert second["text"] == "one\ntwo"
     third = await bridge.sessions.read_observed(
         "local", "terminal:9:ttys009", 9, since=second["next_cursor"]
     )
     assert third["follow"] == "unchanged" and third["appended"] == ""
-    foreign = await bridge.sessions.read_observed(
-        "local", "terminal:8:ttys008", 8, since=cursor
-    )
+    foreign = await bridge.sessions.read_observed("local", "terminal:8:ttys008", 8, since=cursor)
     assert foreign["follow"] == "reset" and "appended" not in foreign
     assert foreign["text"] == "one\ntwo"

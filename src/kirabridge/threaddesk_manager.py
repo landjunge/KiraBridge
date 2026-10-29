@@ -118,7 +118,9 @@ class ThreadDeskManager:
             raise BridgeError("invalid_arguments", "include_content must be boolean")
         if "offset" in values and (type(values["offset"]) is not int or values["offset"] < 0):
             raise BridgeError("invalid_arguments", "Whiteboard offset is invalid")
-        if "limit" in values and (type(values["limit"]) is not int or not 1 <= values["limit"] <= 40):
+        if "limit" in values and (
+            type(values["limit"]) is not int or not 1 <= values["limit"] <= 40
+        ):
             raise BridgeError("invalid_arguments", "Whiteboard page limit is invalid")
         if args.tool == "thread_operation_status":
             value = values.get("operation_id")

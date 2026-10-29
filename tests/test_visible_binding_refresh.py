@@ -168,9 +168,7 @@ async def test_still_live_configured_window_is_kept(visible, monkeypatch):
     assert not transport["calls"]
 
 
-async def test_dead_reservation_does_not_busy_lock_the_replacement_or_replay(
-    visible, monkeypatch
-):
+async def test_dead_reservation_does_not_busy_lock_the_replacement_or_replay(visible, monkeypatch):
     bridge, transport = visible
     transport["text"] = IDLE
     previous = bridge.config.visible_handoffs.bindings["grok"].model_copy()

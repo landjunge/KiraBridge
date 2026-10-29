@@ -1,6 +1,7 @@
 import json
 
 import pytest
+from pydantic import ValidationError
 
 from kirabridge.bridge_core.config import Config
 from kirabridge.bridge_core.models import ThreadDeskManageInput, ThreadDeskReadInput
@@ -11,9 +12,7 @@ def _config(tmp_path):
     root = tmp_path / "desk"
     (root / "threads").mkdir(parents=True)
     (root / "whiteboard" / "board-1").mkdir(parents=True)
-    (root / "threads" / "board-1.json").write_text(
-        json.dumps({"id": "board-1", "title": "Probe"})
-    )
+    (root / "threads" / "board-1.json").write_text(json.dumps({"id": "board-1", "title": "Probe"}))
     (root / "state.json").write_text(json.dumps({"current_id": "other"}))
     return Config(
         data_dir=str(tmp_path / "state"),
@@ -153,5 +152,5 @@ def test_catalog_schema_names_the_whiteboard_tools():
     manage = str(ThreadDeskManageInput.model_json_schema())
     assert "whiteboard_list" in read and "whiteboard_get" in read
     assert "whiteboard_append" in manage
-    with pytest.raises(Exception):
+    with pytest.raises(ValidationError):
         ThreadDeskReadInput(tool="not_a_tool", arguments={})

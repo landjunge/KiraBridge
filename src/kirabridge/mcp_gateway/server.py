@@ -319,9 +319,7 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
             bridge.security.principal(identity(ctx), "threaddesk.manage")
             workspace = bridge.config.threaddesk.workspace
             if not workspace:
-                raise BridgeError(
-                    "threaddesk_workspace", "Whiteboard workspace is not configured"
-                )
+                raise BridgeError("threaddesk_workspace", "Whiteboard workspace is not configured")
             return append_whiteboard(
                 workspace,
                 thread_id,
@@ -460,9 +458,7 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
         """
 
         principal = identity(ctx)
-        task = safe(
-            lambda: bridge.prepare(principal, request, completion_target=completion_target)
-        )
+        task = safe(lambda: bridge.prepare(principal, request, completion_target=completion_target))
         timeout = inline_task_timeout(task.get("operation")) if isinstance(task, dict) else None
         if (
             isinstance(task, dict)

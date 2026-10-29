@@ -584,7 +584,10 @@ class TerminalAppTransport:
                 )
 
     async def ended_windows(self, window_ids):
-        """Read only the last line of tabs that share a tty. A finished tab must not inherit a reused tty."""
+        """Read only the last line of tabs that share a tty.
+
+        A finished tab must not inherit a reused tty.
+        """
         if not window_ids:
             return set()
         found = await self.native(

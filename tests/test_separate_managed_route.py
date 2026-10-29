@@ -120,15 +120,11 @@ class _Recipient:
         elif tool == "message_get":
             value = messages.get(self.recipient, arguments["message_id"])
         elif tool == "message_ack":
-            value = messages.ack(
-                self.recipient, arguments["message_id"], arguments["receipt"]
-            )
+            value = messages.ack(self.recipient, arguments["message_id"], arguments["receipt"])
         elif tool == "message_send":
             from kirabridge.message_manager import MessageSend
 
-            value = messages.send(
-                self.recipient, MessageSend.model_validate(arguments["message"])
-            )
+            value = messages.send(self.recipient, MessageSend.model_validate(arguments["message"]))
         else:
             raise AssertionError(tool)
         return type("Call", (), {"structuredContent": value, "isError": False})()
@@ -203,11 +199,13 @@ def _plant_old(bridge):
         "UPDATE messages SET created=10 WHERE id IN (?,?)", (held["id"], unknown["id"])
     )
     bridge.store.db.execute(
-        "INSERT INTO message_jobs(message_id,state,evidence) VALUES (?,'queued','{}'),(?,'unknown','{}')",
+        "INSERT INTO message_jobs(message_id,state,evidence) "
+        "VALUES (?,'queued','{}'),(?,'unknown','{}')",
         (held["id"], unknown["id"]),
     )
     bridge.store.db.execute(
-        "INSERT INTO queue_holds(queue_id,item_id,actor,created,reason) VALUES ('messages',?,?,?,?)",
+        "INSERT INTO queue_holds(queue_id,item_id,actor,created,reason) "
+        "VALUES ('messages',?,?,?,?)",
         (held["id"], "test", 10, "preserved"),
     )
     return held["id"], unknown["id"]
@@ -215,9 +213,7 @@ def _plant_old(bridge):
 
 def _arm(monkeypatch, bridge, adapter, *, replace_execute=True, use_process=False):
     pool = _Pool(bridge)
-    monkeypatch.setattr(
-        "kirabridge.message_manager.receiver.MCPClientPool", lambda **kwargs: pool
-    )
+    monkeypatch.setattr("kirabridge.message_manager.receiver.MCPClientPool", lambda **kwargs: pool)
     monkeypatch.setattr("kirabridge.message_manager.receiver.peer", lambda *args: None)
 
     if use_process:
@@ -389,7 +385,8 @@ async def test_local_process_replies_without_touching_old_jobs(bridge, config, m
         "for event in (\n"
         '    {"type": "thread.started", "thread_id": "local-thread"},\n'
         '    {"type": "turn.started"},\n'
-        '    {"type": "item.completed", "item": {"type": "agent_message", "text": "Prozessantwort"}},\n'
+        '    {"type": "item.completed", "item": '
+        '{"type": "agent_message", "text": "Prozessantwort"}},\n'
         '    {"type": "turn.completed"},\n'
         "):\n"
         "    print(json.dumps(event), flush=True)\n"
@@ -467,7 +464,6 @@ async def test_unconfirmed_local_process_stays_unknown(bridge, config, monkeypat
 async def test_cancelling_the_turn_reaps_only_its_process(bridge, config, monkeypatch):
     import asyncio
     import os
-    import subprocess
     import sys
     from pathlib import Path
 
@@ -488,7 +484,9 @@ async def test_cancelling_the_turn_reaps_only_its_process(bridge, config, monkey
     config.agents["probe"].executable = str(program)
     _arm(monkeypatch, bridge, None, use_process=True)
     sent = _send_new(bridge, "fresh-interrupt")
-    bystander = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(30)"])
+    bystander = await asyncio.create_subprocess_exec(
+        sys.executable, "-c", "import time; time.sleep(30)"
+    )
     turn = asyncio.create_task(bridge.message_receiver._dispatch_next("probe"))
     pid_path = workspace / "owned.pid"
     try:
@@ -509,7 +507,7 @@ async def test_cancelling_the_turn_reaps_only_its_process(bridge, config, monkey
             await asyncio.sleep(0.05)
         else:
             raise AssertionError("owned process still alive")
-        assert bystander.poll() is None
+        assert bystander.returncode is None
         cancelled = bridge.messages.get("chatgpt", sent["id"])["processing"]
         assert cancelled["state"] == "unknown" and cancelled["error"] == "receiver_interrupted"
         assert _states(bridge, held_id, unknown_id) == ("queued", "unknown")
@@ -526,9 +524,9 @@ async def test_cancelling_the_turn_reaps_only_its_process(bridge, config, monkey
         finally:
             reopened.store.close()
     finally:
-        if bystander.poll() is None:
+        if bystander.returncode is None:
             bystander.kill()
-            bystander.wait(timeout=2)
+        await asyncio.wait_for(bystander.wait(), 2)
 
 
 def _queue_old(bridge, recipient, key):
@@ -563,16 +561,18 @@ async def test_cutoff_does_not_execute_or_hide_an_older_unheld_job(bridge, confi
     _arm(monkeypatch, bridge, adapter)
     assert await bridge.message_receiver._dispatch_next("probe") is False
     assert (
-        bridge.store.db.execute("SELECT state FROM message_jobs WHERE message_id=?", (old_id,))
-        .fetchone()[0]
+        bridge.store.db.execute(
+            "SELECT state FROM message_jobs WHERE message_id=?", (old_id,)
+        ).fetchone()[0]
         == "queued"
     )
     sent = _send_new(bridge, "fresh-beside-old")
     assert await bridge.message_receiver._dispatch_next("probe") is True
     assert bridge.messages.get("chatgpt", sent["id"])["processing"]["state"] == "completed"
     assert (
-        bridge.store.db.execute("SELECT state FROM message_jobs WHERE message_id=?", (old_id,))
-        .fetchone()[0]
+        bridge.store.db.execute(
+            "SELECT state FROM message_jobs WHERE message_id=?", (old_id,)
+        ).fetchone()[0]
         == "queued"
     )
 

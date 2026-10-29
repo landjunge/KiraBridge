@@ -54,9 +54,7 @@ class MessagingConfig(BaseModel):
     @model_validator(mode="after")
     def cutoff_is_not_the_epoch(self):
         if self.separate_managed_after == 0:
-            raise ValueError(
-                "separate_managed_after of zero would admit every stored message"
-            )
+            raise ValueError("separate_managed_after of zero would admit every stored message")
         return self
 
 

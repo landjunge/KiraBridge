@@ -11,8 +11,8 @@ import json
 import os
 import re
 from datetime import datetime, timezone
-from uuid import uuid4
 from pathlib import Path
+from uuid import uuid4
 
 from kirabridge.bridge_core.models import BridgeError
 

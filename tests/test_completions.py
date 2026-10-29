@@ -45,9 +45,9 @@ async def test_source_id_reads_a_newer_notice_behind_an_unacked_inbox(bridge, co
         assert {item["payload"]["task_id"] for item in inbox} == {"older-task", "newer-task"}
         later = max(inbox, key=lambda item: item["seq"])
         earlier = min(inbox, key=lambda item: item["seq"])
-        selected = bridge.completions.receive(
-            "local", source_id=later["payload"]["task_id"]
-        )["notices"]
+        selected = bridge.completions.receive("local", source_id=later["payload"]["task_id"])[
+            "notices"
+        ]
         assert [item["payload"]["task_id"] for item in selected] == [later["payload"]["task_id"]]
         assert (
             bridge.completions.receive("local")["notices"][0]["payload"]["task_id"]

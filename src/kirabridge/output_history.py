@@ -135,8 +135,10 @@ class OutputHistory:
             "AND source_key=? AND sha256=?",
             (principal, kind, source_key, sha256),
         ).fetchone()
-        if row is None or row["expires"] <= time.time() or row["created"] <= (
-            time.time() - self.config.retention_seconds
+        if (
+            row is None
+            or row["expires"] <= time.time()
+            or row["created"] <= (time.time() - self.config.retention_seconds)
         ):
             return None
         try:

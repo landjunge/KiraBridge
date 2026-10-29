@@ -9,8 +9,7 @@ def _tab(window_id, tty, *, bounds=None, frontmost=False, index=1, script_tabs=1
         "frontmost": frontmost,
         "selected": selected,
         "script_tab_count": script_tabs,
-        "bounds": bounds
-        or {"x": 0, "y": 25, "width": 1600, "height": 637},
+        "bounds": bounds or {"x": 0, "y": 25, "width": 1600, "height": 637},
     }
 
 
@@ -29,13 +28,23 @@ def test_shared_bounds_are_one_window_of_tabs():
     selected = [row for row in rows if row["tab_selected"]]
     assert len(selected) == 1
     assert selected[0]["tty"] == "/dev/ttys001"
-    assert [row["tab_index"] for row in sorted(rows, key=lambda item: item["index"])] == [1, 2, 3, 4]
+    assert [row["tab_index"] for row in sorted(rows, key=lambda item: item["index"])] == [
+        1,
+        2,
+        3,
+        4,
+    ]
 
 
 def test_different_bounds_are_separate_windows():
     rows = attach_visual_windows(
         [
-            _tab(1, "/dev/ttys001", bounds={"x": 0, "y": 0, "width": 800, "height": 600}, frontmost=True),
+            _tab(
+                1,
+                "/dev/ttys001",
+                bounds={"x": 0, "y": 0, "width": 800, "height": 600},
+                frontmost=True,
+            ),
             _tab(2, "/dev/ttys002", bounds={"x": 900, "y": 0, "width": 800, "height": 600}),
         ]
     )

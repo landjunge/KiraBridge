@@ -117,7 +117,9 @@ def test_rejects_path_escape(tmp_path):
         read_whiteboard(str(root), "../secrets", None)
 
 
-@pytest.mark.skipif(not (OPERATOR / "threads" / f"{REPAIR}.json").is_file(), reason="no operator board")
+@pytest.mark.skipif(
+    not (OPERATOR / "threads" / f"{REPAIR}.json").is_file(), reason="no operator board"
+)
 def test_reads_existing_repair_entry_without_writing():
     stamp = (OPERATOR / "state.json").stat().st_mtime_ns
     result = read_whiteboard(str(OPERATOR), REPAIR, ENTRY)

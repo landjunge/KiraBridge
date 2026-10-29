@@ -489,9 +489,7 @@ class SessionManager:
         for pid in {selected["expected_pid"], process["pid"]}:
             identity = await self.terminal_app.process_identity(pid, detailed=True)
             fields = identity.split(None, 8)
-            owner = next(
-                (item for item in selected["processes"] if item["pid"] == pid), None
-            )
+            owner = next((item for item in selected["processes"] if item["pid"] == pid), None)
             if (
                 len(fields) != 9
                 or not fields[0].isdigit()
@@ -619,9 +617,7 @@ class SessionManager:
         self.authorization.principal(principal, "session.input")
         selected = await self.selected(principal, pane_id, expected_pid)
         if not pane_id.startswith("terminal:"):
-            raise BridgeError(
-                "visible_terminal_required", "Focus requires a Terminal.app tab"
-            )
+            raise BridgeError("visible_terminal_required", "Focus requires a Terminal.app tab")
         before = await self.terminal_app.front_tab()
         await self.terminal_app.focus(pane_id)
         after = await self.terminal_app.front_tab()
@@ -681,9 +677,7 @@ class SessionManager:
             )
         return process["name"]
 
-    async def read_observed(
-        self, principal, pane_id, expected_pid, *, max_bytes=65536, since=""
-    ):
+    async def read_observed(self, principal, pane_id, expected_pid, *, max_bytes=65536, since=""):
         selected = await self.selected(principal, pane_id, expected_pid)
         with self.observation_scope(principal, selected):
             result = await self.read(principal, pane_id, expected_pid, max_bytes=max_bytes)
