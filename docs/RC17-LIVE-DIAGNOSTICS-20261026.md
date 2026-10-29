@@ -115,3 +115,102 @@ ein tatsächliches Grok-Fenster zuordnen und den ChatGPT-Hosttransport aktualisi
 [Maschinenlesbare Live-Nachweise](evidence/rc17-live-diagnostics-20261026.json)
 enthalten nur nötige Metadaten, keine Credentials, Originalauftragsinhalte oder
 Rückmelde-Receipt-Tokens.
+
+## Übernahme und sichere Etappen · 29. Oktober 2026
+
+Auftrag `codex_grok_handoff_20261029_01` wurde über die zugehörige
+KiraBridge-Konversation gelesen und mit deren Receipt quittiert. Initialer
+Arbeitsbaum sauber, Branch `feat/managed-message-route-20261028`, lokaler und
+tatsächlicher GitHub-Head `89b88f8`. Beide Vorgängercommits `4f87340` und `89b88f8`
+wurden gelesen. Groks Tab `terminal:2767:ttys000`, Shell-PID 45159/Grok 45186,
+wurde ausschließlich gelesen; der ursprüngliche Plan wurde zusätzlich aus seiner
+gespeicherten Sitzung rekonstruiert. Die dortigen 14 bestandenen Receiver-Tests
+sind historische Belege, kein neuer Testlauf dieser Übernahme.
+
+Vier abgeschlossene Etappen sind jeweils separat committed und gepusht:
+
+- `8d5774e`: Restartabschluss verlangt die echte Quittierung der Originalnachricht
+  zusätzlich zur passenden finalen Antwort. Acht Zustands-/Ack-Kombinationen grün;
+  vorher vier erwartete Fehler und vier Erfolge.
+- `291d128`: ThreadDesk-Leseproxy prüft lokalen Rechte-/Opt-in-Widerruf nach
+  Lock-Wartezeit und asynchroner Discovery erneut. 20 betroffene Fälle grün;
+  die neue Matrix hatte vorher neun Fehler und drei Erfolge.
+- `10e337d`: Nur beim Start übernommene zugestellte `running`-Jobs werden weiter
+  anhand gespeicherter Belege beobachtet. Spätes Result oder Ack kann Job und
+  Handoff ohne Eingabe abschließen. Beteiligte und aktueller Zustand werden neu
+  geprüft; neue aktive Jobs sowie `unknown`/`blocked` bleiben unberührt. 31
+  Receiver-/HTTP-Fälle bestanden nach drei erwarteten Late-Reply-Fehlern. Der
+  unabhängige Review fand anschließend einen Startblocker bei entzogenen Rechten
+  des historischen Absenders. Beide betroffenen Fälle wurden rot belegt und
+  bestanden nach enger Isolation von `forbidden`; nur diese zwei wurden erneut
+  ausgeführt. Andere Fehler propagieren weiter, Rechte werden nicht erweitert.
+- `76427f9`: [Modulvertrag V1](UNIVERSAL-BRIDGE-PLAN-20261026.md) und
+  [Discovery-Schema](contracts/module-descriptor.v1.schema.json) vorbereitet;
+  keine neue Runtimeintegration. Sechs gültige und 18 ungültige Beispiele geprüft.
+  Der erste Schema-Lauf scheiterte, weil der vorhandene Validator keinen wirksamen
+  `date-time`-Checker registriert hatte. Der gezielte Folgelauf mit explizitem
+  Standardbibliothek-Checker bestand, ohne Installation einer Abhängigkeit.
+
+Native Unteragenten prüften Receiver, Terminal-/Workerinventur und Adapter getrennt.
+Root prüfte ihre Ergebnisse vor Integration; Receiver und Modulvertrag erhielten
+zusätzlich unabhängigen Gegenreview. Ruff/Format der geänderten Pythondateien und
+Diffprüfung bestanden. Anfangs gefundene Formatabweichungen wurden korrigiert.
+Keine zusätzliche lokale Gesamtsuite und kein vorsorgliches Wiederholungstesten.
+
+| Planschritt | Belegter Stand | Offen |
+| --- | --- | --- |
+| 0 Inventur | Branch, Logs, Backups, Grok-Bericht und Live-Zustände gelesen | Kein Produktionsfreigabeschluss daraus |
+| 1 Abschluss/Restart | Ack-/Late-Reply-/Idempotenzreparaturen gezielt geprüft | Kontrollierte produktive Restartabnahme |
+| 2 Terminal/Bindings | Bestehende sichtbare und Hintergrundpfade statisch inventarisiert; Grok-Ziel aktuell | Konfiguriertes Codex-Ziel veraltet; keine automatische Umbindung oder neue Live-Abnahme |
+| 3 Worker/Diagnose | Isolation/Timeout-/Diagnosemechanismen statisch geprüft | Live-Diagnosebudget erschöpft; keine neue Kapazitätsabnahme |
+| 4 Adapter | Konkretes ThreadDesk-Widerrufsrennen repariert | Weitere Runtimeabnahmen und bekannte fehlende Verzeichnispagination |
+| 5 Modulvertrag | Neutraler V1-Vorschlag mit Schema und Produktgrenzen vorbereitet | Consumer, semantische Versionsauflösung, echte Autorisierung und Freshnessprüfung |
+| 6 Wiederherstellung | Quelldateien mit Hashreadback gesichert; isolierte Restartfälle und Test-Tab-Cleanup belegt | Produktiver Restore/Rollback, Paket-/Releaseabnahme |
+
+Die neue Sicherung liegt unter
+`~/.local/share/kirabridge/backups/codex-grok-stability-20261029-01`; die vorhandenen
+Sicherungen `20261029-repair-visible-binding` und `20261029-restart-after-delivery`
+blieben erhalten. Vollständige Testausgaben und das Schema-Prüfskript liegen
+dauerhaft im Unterordner `evidence` der neuen Sicherung; Hashes und genaue Befehle
+stehen im [maschinenlesbaren Nachweis](evidence/stability-handoff-20261029.json).
+
+Ein über die Bridge angeforderter eigener Testfensterauftrag blieb ohne Annahme
+oder Start in `queued`. Er wurde als eigener Auftrag abgebrochen, und der
+Abbruch wurde unabhängig gelesen, bevor Codex intern genau einen eigenen sichtbaren
+Test-Tab öffnete. Terminal.app gruppierte ihn in das bestehende physische Fenster;
+es entstand kein separates Installationsfenster. Zwei Test-Sendeversuche wurden
+vor Eingabe wegen eines falsch maskierten eigenen Shellprompts abgewiesen; eine
+erste Promptkorrektur scheiterte vor Eingabe an der erwarteten Prozessidentität.
+Keiner dieser Versuche zählt als Testlauf. Danach liefen die gezielten Prüfungen
+sichtbar in demselben Tab 3051/ttys002. Vor dessen Schließen wurden Eigentümerschaft,
+exakte Identität und Leerlauf erneut geprüft; ein unabhängiger Katalogread bestätigt
+seine Abwesenheit und den Erhalt beider ursprünglichen Agent-Tabs.
+
+Die drei Problemnachrichten sind am Ende unverändert: `61ccf5a9` bleibt
+`unknown/receiver_restart` trotz gespeicherter Antwort `15445f23`; `ed182f06` und
+`013a112e` bleiben `blocked/conversation_run_limit`, unzugestellt und unquittiert.
+Kein erneutes Senden, kein `resume_unsent`, keine Zustandsumdeutung und kein Librarylauf.
+
+[Draft-PR 49](https://github.com/landjunge/KiraBridge/pull/49) enthält den bestehenden
+Arbeitsbranch einschließlich früherer Managed-/Terminal-/Whiteboardänderungen.
+Die hier dokumentierten lokalen Prüfungen sind keine neue Gesamtabnahme dieser
+Vorgängerarbeit. Aktuelle Verify- und Intel-Paketannotationen melden erneut
+fehlgeschlagene Kontozahlung/Ausgabenlimit und **keinen gestarteten Job**;
+eine ARM-Paketprüfung wartete beim Abruf noch. Pflichtchecks bleiben offen.
+
+Kein Merge, Release oder Dienstneustart. Der Dienst meldet weiterhin PID 60636,
+Instanz `31849a4ff7c346f396b99e31d6fd807d`, Start `2026-10-29T05:14:06Z` und
+Startupquellhash `4bb8e3b9…` für 120 Dateien. Sein Quellpfad ist dieser inzwischen
+geänderte Worktree; dessen aktueller Dateihash `d7cbae44…` ist separat erfasst.
+Keine Behauptung, dass neuer Code vollständig geladen oder als geprüftes Paket
+installiert sei. Veröffentlicht bleibt `v0.8.0rc14`; RC17 bleibt Entwurf.
+
+Work-memory-Whiteboard bleibt ausschließlich `188ce4729a62`. Inventur und
+Codemeilenstein wurden als Einträge 49/50 mit beobachtetem Vorgängerstand und
+stabilen Operations-IDs angehängt und vollständig separat gelesen. Der erste
+Inventur-Schreibversuch wurde mit `invalid_arguments: Whiteboard actor type is
+invalid` vor Mutation abgewiesen. Der unabhängige Katalogread bestätigte weiterhin
+48 Einträge und keinen neuen Marker; derselbe Operationsschlüssel wurde nach
+Korrektur auf `actor_type=codex` verwendet. Kein blinder Retry oder konkurrierendes
+Whiteboard. Als Nächstes sind echte CI-/Paketprüfungen und die kontrollierte
+Produktivabnahme nach erfüllten Gates erforderlich.

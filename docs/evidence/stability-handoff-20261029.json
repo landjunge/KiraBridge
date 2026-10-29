@@ -1,0 +1,540 @@
+{
+  "request_id": "codex_grok_handoff_20261029_01",
+  "branch": "feat/managed-message-route-20261028",
+  "initial_head": "89b88f8b9a5e0decb543c7ec5636cf5dd2c6389c",
+  "initial_worktree_clean": true,
+  "prior_commits_read": [
+    "4f873409762935814e48e64f101fe0b0740560d4",
+    "89b88f8b9a5e0decb543c7ec5636cf5dd2c6389c"
+  ],
+  "prior_grok_tests": {
+    "file": "tests/test_receiver_resilience.py",
+    "passed": 14,
+    "scope": "Grok historical report read in terminal and session log; not repeated for inventory"
+  },
+  "original_plan_source": "Grok session 01a18550-066f-76c1-aeb0-d54ab8ff0c74/chat_history.jsonl line 912, direct_grok_plan_20261029_0609",
+  "code_and_contract_commits": [
+    {
+      "sha": "8d5774ebdb242bdfa7d89fe2af979ed2eef3d0fa",
+      "change": "Require original receipt acknowledgement for restart completion",
+      "push_verified": true
+    },
+    {
+      "sha": "291d128c43d7ba87383180f88fce30ff9f0ac1b4",
+      "change": "Recheck ThreadDesk dynamic read access after lock/discovery",
+      "push_verified": true
+    },
+    {
+      "sha": "10e337dc67aa2f6549bb78ff77237c07a8e51845",
+      "change": "Reconcile only running handoffs inherited at start, including late reply/ack; isolate revoked historical access",
+      "push_verified": true
+    },
+    {
+      "sha": "76427f99df34f566eabb9dae7638d0a3e986aa16",
+      "change": "Prepare proposed module discovery V1 document/schema only",
+      "push_verified": true
+    }
+  ],
+  "pull_request": {
+    "number": 49,
+    "url": "https://github.com/landjunge/KiraBridge/pull/49",
+    "state": "OPEN",
+    "draft": true,
+    "base": "main",
+    "merged": false,
+    "scope": "Existing branch including inherited managed route, terminal and Whiteboard commits; local tests below cover current handoff changes only"
+  },
+  "runtime_before": {
+    "instance_id": "31849a4ff7c346f396b99e31d6fd807d",
+    "version": "0.8.0rc17",
+    "pid": 60636,
+    "started_at": "2026-10-29T05:14:06.133578+00:00",
+    "config_path": "/Users/landjunge/.config/kirabridge/config.toml",
+    "config_sha256": "52747b8353bef4cc162997c34c30d8e759ca0691725d902f313ce4653cf903c2",
+    "effective_config_sha256": "3709ee5e48b675813b9708c7b634d137ca3c2c2dc19fefd35a04b61f581cf641",
+    "source_tree_sha256": "4bb8e3b989a005568ed26a3b0cc1df4459c3cbfd22ca0e53177694455cbf7b8d",
+    "source_file_count": 120,
+    "source_package_path": "/Users/landjunge/KiraBridge-worktrees/managed-message-route-20261028/src/kirabridge",
+    "source_scope": "package Python files observed at startup; no remote attestation"
+  },
+  "runtime_after": {
+    "instance_id": "31849a4ff7c346f396b99e31d6fd807d",
+    "version": "0.8.0rc17",
+    "pid": 60636,
+    "started_at": "2026-10-29T05:14:06.133578+00:00",
+    "config_path": "/Users/landjunge/.config/kirabridge/config.toml",
+    "config_sha256": "52747b8353bef4cc162997c34c30d8e759ca0691725d902f313ce4653cf903c2",
+    "effective_config_sha256": "3709ee5e48b675813b9708c7b634d137ca3c2c2dc19fefd35a04b61f581cf641",
+    "source_tree_sha256": "4bb8e3b989a005568ed26a3b0cc1df4459c3cbfd22ca0e53177694455cbf7b8d",
+    "source_file_count": 120,
+    "source_package_path": "/Users/landjunge/KiraBridge-worktrees/managed-message-route-20261028/src/kirabridge",
+    "source_scope": "package Python files observed at startup; no remote attestation"
+  },
+  "runtime_scope": "Startup source observation only. This mutable source worktree was edited; no service restart, package installation or current installed-source equivalence is claimed.",
+  "production_actions": {
+    "restart": false,
+    "merge": false,
+    "release": false,
+    "credentials_changed": false,
+    "permissions_changed": false,
+    "library_execution": false,
+    "historical_message_replay": false,
+    "resume_unsent": false
+  },
+  "terminal_before": [
+    {
+      "pane_id": "terminal:3033:ttys001",
+      "expected_pid": 70676,
+      "agent_pid": 71896,
+      "tty": "/dev/ttys001"
+    },
+    {
+      "pane_id": "terminal:2767:ttys000",
+      "expected_pid": 45159,
+      "agent_pid": 45186,
+      "tty": "/dev/ttys000"
+    }
+  ],
+  "terminal_after": [
+    {
+      "pane_id": "terminal:3033:ttys001",
+      "expected_pid": 70676,
+      "agent_pid": 71896,
+      "tty": "/dev/ttys001"
+    },
+    {
+      "pane_id": "terminal:2767:ttys000",
+      "expected_pid": 45159,
+      "agent_pid": 45186,
+      "tty": "/dev/ttys000"
+    }
+  ],
+  "owned_test_terminal": {
+    "pane_id": "terminal:3051:ttys002",
+    "expected_pid": 73053,
+    "opened_once": true,
+    "reused": true,
+    "closed": true,
+    "independent_absence_confirmed": true,
+    "scope": "Terminal.app created one owned scripting tab in the existing physical window, not a separate installation window; no installation performed"
+  },
+  "bridge_test_open": {
+    "task_id": "codex-grok-stability-tests-20261029-01",
+    "state": "cancelled",
+    "accepted": null,
+    "started": null,
+    "reason": "Remained queued; independently read back cancelled before the internal Codex native window open. Not replayed."
+  },
+  "pretest_setup": {
+    "test_execution_before_guard_rejections": false,
+    "detail": "Two sends rejected before input with visible_input_not_empty; the task-owned shell prompt used a single percent instead of zsh %% escaping. First guarded prompt correction also rejected before input because the short process identity was supplied to the detailed guard. Corrected using the exact owned shell, fresh detailed identity and screen equality. No test counted from rejected attempts."
+  },
+  "native_reviews": [
+    {
+      "agent": "receiver_review",
+      "scope": "Restart/ack/late reply/idempotency and revoked historical policy",
+      "result": "No remaining commit blockers after narrow forbidden isolation",
+      "reviewed_by_root": true
+    },
+    {
+      "agent": "terminal_worker_audit",
+      "scope": "Step 2-3 inventory; separate Step 5 contract preparation",
+      "result": "No further immediate confirmed code fix for steps 2-3; owned cleanup must independently verify idle/identity",
+      "reviewed_by_root": true
+    },
+    {
+      "agent": "adapter_contract_audit",
+      "scope": "Step 4 race fix and independent Step 5 contract review",
+      "result": "ThreadDesk race reproduced and fixed; no module-contract documentation blocker",
+      "reviewed_by_root": true
+    }
+  ],
+  "work_memory": {
+    "thread_id": "188ce4729a62",
+    "observed_initial_ordinal": 48,
+    "inventory": {
+      "operation_id": "codex-grok-handoff-20261029-inventory-v1",
+      "entry_id": "ffe0ffd42a8b",
+      "ordinal": 49,
+      "independent_full_readback": true
+    },
+    "code_milestone": {
+      "operation_id": "codex-grok-handoff-20261029-code-milestone-v1",
+      "entry_id": "14353695bbe2",
+      "ordinal": 50,
+      "independent_full_readback": true
+    },
+    "rejected_write": {
+      "error": {
+        "code": "invalid_arguments",
+        "message": "Whiteboard actor type is invalid"
+      },
+      "reconciliation": "Independent board read still showed exactly 48 entries and the same final entry. Corrected actor_type to codex using the same stable external_key; saved/read back once."
+    }
+  },
+  "ci_observed": {
+    "head": "76427f99df34f566eabb9dae7638d0a3e986aa16",
+    "verify_run": 40903118407,
+    "package_run": 40903118332,
+    "annotation": "The job was not started because recent account payments have failed or your spending limit needs to be increased. Please check the 'Billing & plans' section in your settings",
+    "verify_jobs": "4 completed/failure with no execution; Intel annotation independently fetched",
+    "package_jobs": "Intel completed/failure with the same annotation; ARM queued at observation",
+    "gate_satisfied": false
+  },
+  "release_observed": {
+    "published_tag": "v0.8.0rc14",
+    "published_at": "2026-10-22T20:54:20Z",
+    "rc17": "draft"
+  },
+  "step_matrix": [
+    {
+      "step": 0,
+      "status": "Completed inventory; clean initial branch, remote/source/runtime/backups/messages observed"
+    },
+    {
+      "step": 1,
+      "status": "Targeted code fixes tested and reviewed; live restart/production acceptance remains open"
+    },
+    {
+      "step": 2,
+      "status": "Static inventory only; current Grok binding valid and Codex binding stale. No automated rebinding or new live acceptance"
+    },
+    {
+      "step": 3,
+      "status": "Static inventory only; existing isolation/timeouts present. Live diagnostic budget exhausted; no new capacity acceptance"
+    },
+    {
+      "step": 4,
+      "status": "Confirmed ThreadDesk revocation race fixed and tested; other adapter runtime acceptance and directory pagination remain open"
+    },
+    {
+      "step": 5,
+      "status": "Versioned neutral discovery contract/schema prepared and reviewed; no runtime adapters added"
+    },
+    {
+      "step": 6,
+      "status": "Private source backups verified; isolated restart/idempotency cases and owned test cleanup passed. Production restart/restore/rollback/package/release acceptance gated"
+    }
+  ],
+  "limitations": [
+    "No full-suite rerun",
+    "The 31-case receiver selection preceded the final narrow forbidden guard; only its 2 affected policy cases were rerun afterwards",
+    "No macOS package or ARM acceptance",
+    "Directory pagination remains limited",
+    "Historical unknown execution state remains explicit"
+  ],
+  "recorded_at": "2026-10-29T15:38:20.368894+00:00",
+  "test_runs": [
+    {
+      "label": "ack-red-final",
+      "argv": [
+        "/Users/landjunge/KiraBridge-worktrees/managed-message-route-20261028/.venv/bin/python",
+        "-m",
+        "pytest",
+        "-q",
+        "tests/test_receiver_resilience.py",
+        "-k",
+        "restart_requires_ack_and_stored_reply_for_completion"
+      ],
+      "exit_code": 1,
+      "finished_at": "2026-10-29T15:23:35.809751+00:00",
+      "expected_red": true,
+      "stdout_sha256": "a8a0f2e129b6a6853eb672d668480e651945f14dc104ed72334971f56d40c4b4",
+      "stdout_last_lines": [
+        "",
+        "tests/test_receiver_resilience.py:73: AssertionError",
+        "=========================== short test summary info ============================",
+        "FAILED tests/test_receiver_resilience.py::test_restart_requires_ack_and_stored_reply_for_completion[False-return_sent]",
+        "FAILED tests/test_receiver_resilience.py::test_restart_requires_ack_and_stored_reply_for_completion[False-sent]",
+        "FAILED tests/test_receiver_resilience.py::test_restart_requires_ack_and_stored_reply_for_completion[False-confirmed]",
+        "FAILED tests/test_receiver_resilience.py::test_restart_requires_ack_and_stored_reply_for_completion[False-completed]",
+        "4 failed, 4 passed, 13 deselected in 0.54s"
+      ],
+      "persistent_log_path": "/Users/landjunge/.local/share/kirabridge/backups/codex-grok-stability-20261029-01/evidence/ack-red-final.log"
+    },
+    {
+      "label": "ack-green",
+      "argv": [
+        "/Users/landjunge/KiraBridge-worktrees/managed-message-route-20261028/.venv/bin/python",
+        "-m",
+        "pytest",
+        "-q",
+        "tests/test_receiver_resilience.py",
+        "-k",
+        "restart_requires_ack_and_stored_reply_for_completion"
+      ],
+      "exit_code": 0,
+      "finished_at": "2026-10-29T15:24:24.508388+00:00",
+      "expected_red": false,
+      "stdout_sha256": "42c130e64d5a0e963e3c5940a4f91574553fd41c6599cc449ee16497777faa65",
+      "stdout_last_lines": [
+        "........                                                                 [100%]",
+        "8 passed, 13 deselected in 0.38s"
+      ],
+      "persistent_log_path": "/Users/landjunge/.local/share/kirabridge/backups/codex-grok-stability-20261029-01/evidence/ack-green.log"
+    },
+    {
+      "label": "td-guard-green",
+      "argv": [
+        "/Users/landjunge/KiraBridge-worktrees/managed-message-route-20261028/.venv/bin/python",
+        "-m",
+        "pytest",
+        "-q",
+        "tests/test_threaddesk_dynamic.py"
+      ],
+      "exit_code": 0,
+      "finished_at": "2026-10-29T15:26:20.991118+00:00",
+      "expected_red": false,
+      "stdout_sha256": "2619c46e511b10a3fd9f0372aa5b0f56dedce98790c9edda7971ae8f6d0504f9",
+      "stdout_last_lines": [
+        "....................                                                     [100%]",
+        "20 passed in 0.19s"
+      ],
+      "persistent_log_path": "/Users/landjunge/.local/share/kirabridge/backups/codex-grok-stability-20261029-01/evidence/td-guard-green.log"
+    },
+    {
+      "label": "late-reply-red",
+      "argv": [
+        "/Users/landjunge/KiraBridge-worktrees/managed-message-route-20261028/.venv/bin/python",
+        "-m",
+        "pytest",
+        "-q",
+        "tests/test_receiver_resilience.py",
+        "-k",
+        "late_reply_or_ack or recovered_handoff_waits or recovery_preserves_other"
+      ],
+      "exit_code": 1,
+      "finished_at": "2026-10-29T15:26:48.462959+00:00",
+      "expected_red": true,
+      "stdout_sha256": "6484df04be4d7b012215501302b88cc2a2405d04c9ebe0acba126b079108c6ab",
+      "stdout_last_lines": [
+        "E               TimeoutError",
+        "",
+        "/usr/local/Cellar/python@3.11/3.11.15_1/Frameworks/Python.framework/Versions/3.11/lib/python3.11/asyncio/timeouts.py:115: TimeoutError",
+        "=========================== short test summary info ============================",
+        "FAILED tests/test_receiver_resilience.py::test_restart_finishes_late_reply_or_ack_without_input[False]",
+        "FAILED tests/test_receiver_resilience.py::test_restart_finishes_late_reply_or_ack_without_input[True]",
+        "FAILED tests/test_receiver_resilience.py::test_recovered_handoff_waits_for_final_reply",
+        "3 failed, 4 passed, 21 deselected in 9.67s"
+      ],
+      "persistent_log_path": "/Users/landjunge/.local/share/kirabridge/backups/codex-grok-stability-20261029-01/evidence/late-reply-red.log"
+    },
+    {
+      "label": "late-reply-green",
+      "argv": [
+        "/Users/landjunge/KiraBridge-worktrees/managed-message-route-20261028/.venv/bin/python",
+        "-m",
+        "pytest",
+        "-q",
+        "tests/test_receiver_resilience.py",
+        "tests/test_visible_dispatch_wait.py::test_real_http_wait_then_one_paste_return_and_authenticated_reply"
+      ],
+      "exit_code": 0,
+      "finished_at": "2026-10-29T15:28:39.679414+00:00",
+      "expected_red": false,
+      "stdout_sha256": "35f6d2fc4d2de3c3e2f7ccc04df39e88b0c7ceb53c2f58b00b20a5a18d1505db",
+      "stdout_last_lines": [
+        "...............................                                          [100%]",
+        "31 passed in 2.07s"
+      ],
+      "persistent_log_path": "/Users/landjunge/.local/share/kirabridge/backups/codex-grok-stability-20261029-01/evidence/late-reply-green.log"
+    },
+    {
+      "label": "revoked-recovery-red",
+      "argv": [
+        "/Users/landjunge/KiraBridge-worktrees/managed-message-route-20261028/.venv/bin/python",
+        "-m",
+        "pytest",
+        "-q",
+        "tests/test_receiver_resilience.py",
+        "-k",
+        "revoked_sender_rights"
+      ],
+      "exit_code": 1,
+      "finished_at": "2026-10-29T15:31:03.647967+00:00",
+      "expected_red": true,
+      "stdout_sha256": "80a604886a8423d069a711d70e74447fcc637c62e4f75aedbeddc87637e233ee",
+      "stdout_last_lines": [
+        ">           raise BridgeError(\"forbidden\", \"Capability not granted\")",
+        "E           kirabridge.bridge_core.models.BridgeError: Capability not granted",
+        "",
+        "src/kirabridge/security_manager/__init__.py:34: BridgeError",
+        "=========================== short test summary info ============================",
+        "FAILED tests/test_receiver_resilience.py::test_recovered_handoff_with_revoked_sender_rights_does_not_block_receiver[task.read]",
+        "FAILED tests/test_receiver_resilience.py::test_recovered_handoff_with_revoked_sender_rights_does_not_block_receiver[message.read]",
+        "2 failed, 30 deselected in 0.39s"
+      ],
+      "persistent_log_path": "/Users/landjunge/.local/share/kirabridge/backups/codex-grok-stability-20261029-01/evidence/revoked-recovery-red.log"
+    },
+    {
+      "label": "revoked-recovery-green",
+      "argv": [
+        "/Users/landjunge/KiraBridge-worktrees/managed-message-route-20261028/.venv/bin/python",
+        "-m",
+        "pytest",
+        "-q",
+        "tests/test_receiver_resilience.py",
+        "-k",
+        "revoked_sender_rights"
+      ],
+      "exit_code": 0,
+      "finished_at": "2026-10-29T15:32:27.742181+00:00",
+      "expected_red": false,
+      "stdout_sha256": "bf67cfb3e2f40ca39d2ab20a8ab3fd73608e734a071ddd16d26738ac9ec32896",
+      "stdout_last_lines": [
+        "..                                                                       [100%]",
+        "2 passed, 30 deselected in 0.25s"
+      ],
+      "persistent_log_path": "/Users/landjunge/.local/share/kirabridge/backups/codex-grok-stability-20261029-01/evidence/revoked-recovery-green.log"
+    }
+  ],
+  "schema_validation": {
+    "task_id": "codex_grok_handoff_20261029_01",
+    "artifact_action": "Recorded the exact body of the earlier successful validation heredoc; not executed again.",
+    "original_command": ".venv/bin/python - <<'PY'\n[body saved as module-contract-validation.py]\nPY",
+    "cwd": "/Users/landjunge/KiraBridge-worktrees/managed-message-route-20261028",
+    "script_sha256": "2add4a4bb64df5e468395828e02d6d37cabd9f37609cb374bcc70b8049a35b48",
+    "successful_run": {
+      "exit_code": 0,
+      "schema_meta_valid": true,
+      "valid_examples_accepted": 6,
+      "invalid_examples_rejected": 18,
+      "valid_names": [
+        "threaddesk",
+        "4allpass",
+        "tollgate",
+        "agent-authority",
+        "synthetic-populated-claims-only",
+        "inert-namespaced-extension"
+      ],
+      "invalid_names": [
+        "unsupported-descriptor-version",
+        "missing-required-protocol-list",
+        "unexpected-token-field",
+        "host-path-as-instance",
+        "self-verified-binding",
+        "claimed-binding-without-revision",
+        "available-without-health-observation",
+        "malformed-health-date",
+        "impossible-calendar-date",
+        "nonpositive-health-ttl",
+        "boolean-health-ttl",
+        "unbounded-protocol-version",
+        "unknown-effect",
+        "unnamespaced-extension",
+        "nonobject-extension",
+        "newline-identifier",
+        "newline-version",
+        "newline-extension"
+      ],
+      "date_time_checker": "explicit standard-library checker registered for UTC/offset timestamp samples"
+    },
+    "earlier_failed_run": {
+      "counted_as_pass": false,
+      "failure": "AssertionError: malformed-health-date",
+      "observed_cause": "The installed jsonschema FormatChecker did not register a date-time checker; observed_at=tomorrow was accepted.",
+      "followup": "Registered an explicit standard-library date-time checker; reran only schema/example validation, yielding 6 accepted and 18 rejected examples.",
+      "dependency_installation": false
+    },
+    "schema_sha256_at_success": "4d108a094068b2790e79b3da96522ddfd5518da31e0e96a0f095fbf4825cf6ca",
+    "plan_sha256_at_success": "06d005ff29d692a8a0d286c27f00bc9d8332e2cc1e4c1776aafa2d238668278f",
+    "scope": "Syntactic discovery validation only; no semantic negotiation, freshness/authority implementation or runtime acceptance.",
+    "validation_rerun_while_recording": false,
+    "persistent_script_path": "/Users/landjunge/.local/share/kirabridge/backups/codex-grok-stability-20261029-01/evidence/module-contract-validation.py"
+  },
+  "td_race_red": {
+    "executor": "native adapter_contract_audit",
+    "command": "uv run pytest -q tests/test_threaddesk_dynamic.py -k test_dynamic_reads_recheck_revocation_after_wait",
+    "failed": 9,
+    "passed": 3,
+    "deselected": 8,
+    "scope": "Against original TD source before its 3-line guard fix; root green is recorded above"
+  },
+  "backup_root": "/Users/landjunge/.local/share/kirabridge/backups/codex-grok-stability-20261029-01",
+  "backup_manifest": {
+    "request_id": "codex_grok_handoff_20261029_01",
+    "created_at": "2026-10-29T15:19:37.608417+00:00",
+    "head": "89b88f8b9a5e0decb543c7ec5636cf5dd2c6389c",
+    "files": {
+      "src/kirabridge/message_manager/receiver.py": "b0dc7bb21beedb02898a12538dea847d0cf9e4a5a892ab4aed1e6f8f0d592819",
+      "tests/test_receiver_resilience.py": "ce18201f25f2bf465c86737d41f7421cc46ce8dfc9feaa60004c22aa446c3cd4",
+      "docs/RC17-LIVE-DIAGNOSTICS-20261026.md": "e1a3c88019ea5a98e8f7be32de6deb53beb4ce9b1b6ed346607e6db9ffa5b287"
+    }
+  },
+  "td_backup_manifest": {
+    "operation_id": "codex-grok-stability-20261029-td-revocation-backup-v1",
+    "files": [
+      {
+        "path": "src/kirabridge/threaddesk_dynamic.py",
+        "bytes": 4701,
+        "sha256": "273ad9ad7788ca736853ae1373a03f7633e9445aa22d94444876b34a265b0fb4",
+        "readback_verified": true
+      },
+      {
+        "path": "tests/test_threaddesk_dynamic.py",
+        "bytes": 6403,
+        "sha256": "c361dcdf6c5d3545616cf9faac053d41e65dc0a6ea7bd8af6e28ab5cf62c53c2",
+        "readback_verified": true
+      }
+    ]
+  },
+  "current_disk_source": {
+    "sha256": "d7cbae44a64b30da48cb59db06329d1a155fccead39ab478143675c75127d50c",
+    "file_count": 120,
+    "scope": "Python package files read after source edits; not loaded-code attestation"
+  },
+  "changed_file_sha256": {
+    "src/kirabridge/message_manager/receiver.py": "7c1506034359e514b864872e9967aee194bdc3e5a51dd3d78cc41c3ce39c1ba5",
+    "tests/test_receiver_resilience.py": "b7ea94598dc82703cb3b0e02d34ac6af6a4c29471ed2e59c7c75279d664eac86",
+    "src/kirabridge/threaddesk_dynamic.py": "08bd70bda3b0a3b32b27f2e1d1e5127c3407d08846fa34b8c1d07acec2439a3d",
+    "tests/test_threaddesk_dynamic.py": "87a9be2f737b13644cd438c83a25e2ed17d398282b8c79b1409607be8de66c6c",
+    "docs/UNIVERSAL-BRIDGE-PLAN-20261026.md": "06d005ff29d692a8a0d286c27f00bc9d8332e2cc1e4c1776aafa2d238668278f",
+    "docs/contracts/module-descriptor.v1.schema.json": "4d108a094068b2790e79b3da96522ddfd5518da31e0e96a0f095fbf4825cf6ca"
+  },
+  "historical_messages_final": [
+    {
+      "id": "61ccf5a9-3f5c-46f4-8bb6-b5930e168a0d",
+      "delivered": 1,
+      "acknowledged": 1,
+      "state": "unknown",
+      "run_id": "channel-2924bd3d9ba84657900a79e53f0dc860",
+      "evidence": {
+        "last_observation": {
+          "agent_confirmed": true,
+          "handoff_id": "channel-2924bd3d9ba84657900a79e53f0dc860",
+          "state": "confirmed"
+        },
+        "reason": "receiver_restart"
+      },
+      "error": "interrupted",
+      "reply_id": null,
+      "unchanged_from_initial_observation": true
+    },
+    {
+      "id": "ed182f06-b5cc-4841-8b8c-5ef5829a137e",
+      "delivered": 0,
+      "acknowledged": 0,
+      "state": "blocked",
+      "run_id": null,
+      "evidence": {
+        "reason": "conversation_run_limit"
+      },
+      "error": null,
+      "reply_id": null,
+      "unchanged_from_initial_observation": true
+    },
+    {
+      "id": "013a112e-b9fc-4271-b9ff-ebd19f279ac7",
+      "delivered": 0,
+      "acknowledged": 0,
+      "state": "blocked",
+      "run_id": null,
+      "evidence": {
+        "reason": "conversation_run_limit"
+      },
+      "error": null,
+      "reply_id": null,
+      "unchanged_from_initial_observation": true
+    }
+  ]
+}
