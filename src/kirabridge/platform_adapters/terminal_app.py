@@ -15,11 +15,85 @@ from kirabridge.platform_adapters.clipboard_lease import clipboard_lease
 from kirabridge.platform_adapters.desktop import MacDesktop
 
 
+def annotate_views(sessions: list[dict]) -> list[dict]:
+    """Mark several on-screen views of one TTY and PID without merging them."""
+    counts: dict[str, int] = {}
+    for row in sessions:
+        key = f"{row.get('tty')}:{row.get('expected_pid')}"
+        row["session_key"] = key
+        row["view_id"] = row.get("window_id")
+        counts[key] = counts.get(key, 0) + 1
+    for row in sessions:
+        row["view_count"] = counts[row["session_key"]]
+        row["duplicate_view"] = row["view_count"] > 1
+    return sessions
+
+
+def attach_visual_windows(rows: list[dict]) -> list[dict]:
+    """Group Terminal.app scripting objects that share one on-screen window.
+
+    With system tabbing set to always, each tab is one scripting window and
+    windows() is not the number of windows on screen. Tabs of one window share
+    bounds. A scripting window that already contains several tabs stays one group.
+    """
+    groups: dict[tuple, list[dict]] = {}
+    for row in rows:
+        bounds = row.get("bounds") or {}
+        if row.get("script_tab_count", 1) > 1:
+            key = ("script", row.get("window_id"))
+        else:
+            key = (
+                "bounds",
+                bounds.get("x"),
+                bounds.get("y"),
+                bounds.get("width"),
+                bounds.get("height"),
+            )
+            if None in key:
+                key = ("script", row.get("window_id"))
+        groups.setdefault(key, []).append(row)
+    ui_count = len(groups)
+    tty_count: dict[str, int] = {}
+    for row in rows:
+        if row.get("ended"):
+            continue
+        tty_count[row.get("tty") or ""] = tty_count.get(row.get("tty") or "", 0) + 1
+    for members in groups.values():
+        members.sort(
+            key=lambda item: (
+                item.get("index") or 0,
+                item.get("tab_index_in_script_window") or 0,
+                item.get("window_id") or 0,
+            )
+        )
+        visual_id = min(item.get("window_id") or 0 for item in members)
+        # Each scripting window reports its own tab as selected. The visible tab
+        # is the frontmost scripting window, or the single selected tab when one
+        # scripting window holds several tabs.
+        fronts = [item for item in members if item.get("frontmost") is True]
+        if not fronts and any(item.get("script_tab_count", 1) > 1 for item in members):
+            fronts = [item for item in members if item.get("selected") is True]
+        if len(members) == 1 and not fronts:
+            fronts = members
+        for index, item in enumerate(members, start=1):
+            item["visual_window_id"] = visual_id
+            item["tab_index"] = index
+            item["tab_count"] = len(members)
+            item["ui_window_count"] = ui_count
+            item["tab_selected"] = len(fronts) == 1 and item is fronts[0]
+            item["identity_ambiguous"] = tty_count.get(item.get("tty") or "", 0) > 1
+            if len(members) > 1 and len(fronts) != 1:
+                item["tab_selected"] = False
+                item["selection_ambiguous"] = True
+    return rows
+
+
 class TerminalAppTransport:
     def __init__(self, clipboard_lock, *, desktop=None, clipboard_owner=clipboard_lease):
         self.clipboard_lock = clipboard_lock
         self.desktop = desktop or MacDesktop()
         self.clipboard_owner = clipboard_owner
+        self.last_catalog_incomplete = False
 
     @property
     def available(self):
@@ -135,9 +209,29 @@ class TerminalAppTransport:
         if sys.platform != "darwin":
             return []
         rows = await self.native("""const app = Application("Terminal");
-    JSON.stringify(app.running() ? app.windows().flatMap(w => w.tabs().map(t => ({
-    window_id:w.id(), tty:t.tty(), busy:t.busy()
-    }))) : []);""")
+    JSON.stringify(app.running() ? app.windows().flatMap(w => {
+     const b = w.bounds();
+     return w.tabs().map((t, i) => ({
+      window_id:w.id(), index:w.index(), frontmost:w.frontmost(),
+      bounds:{x:b.x, y:b.y, width:b.width, height:b.height},
+      script_tab_count:w.tabs().length, tab_index_in_script_window:i+1,
+      tty:t.tty(), busy:t.busy(), selected:t.selected()
+     }));
+    }) : []);""")
+        rows = attach_visual_windows(rows if isinstance(rows, list) else [])
+        shared = {
+            row.get("tty")
+            for row in rows
+            if sum(item.get("tty") == row.get("tty") for item in rows) > 1
+        }
+        if shared:
+            ended = await self.ended_windows(
+                [int(row["window_id"]) for row in rows if row.get("tty") in shared]
+            )
+            for row in rows:
+                if int(row.get("window_id") or 0) in ended:
+                    row["ended"] = True
+            rows = attach_visual_windows(rows)
         child = await asyncio.create_subprocess_exec(
             "/bin/ps",
             "-axo",
@@ -156,9 +250,10 @@ class TerminalAppTransport:
             if len(parts := line.split(None, 4)) == 5 and all(part.isdigit() for part in parts[:3])
         ]
         sessions = []
+        omitted = len(rows) > 100
         for row in rows[:100]:
             tty = Path(row["tty"]).name
-            if not re.fullmatch(r"ttys[0-9]+", tty):
+            if not re.fullmatch(r"ttys[0-9]+", tty) or row.get("ended"):
                 continue
             all_members = [
                 (int(owner), int(p), int(parent), comm)
@@ -175,6 +270,7 @@ class TerminalAppTransport:
             pids = {p for p, _ in members}
             roots = [p for p, parent in members if parent not in pids]
             if len(roots) != 1:
+                omitted = True
                 continue
             if len(legacy_roots) == 1:
                 parents = {p: parent for _, p, parent, _ in all_members}
@@ -188,6 +284,13 @@ class TerminalAppTransport:
                 {
                     "pane_id": f"terminal:{int(row['window_id'])}:{tty}",
                     "window_id": int(row["window_id"]),
+                    "visual_window_id": row.get("visual_window_id"),
+                    "tab_index": row.get("tab_index"),
+                    "tab_count": row.get("tab_count"),
+                    "tab_selected": row.get("tab_selected"),
+                    "ui_window_count": row.get("ui_window_count"),
+                    "identity_ambiguous": bool(row.get("identity_ambiguous")),
+                    "selection_ambiguous": bool(row.get("selection_ambiguous")),
                     "expected_pid": roots[0],
                     **({"legacy_expected_pid": legacy_roots[0]} if len(legacy_roots) == 1 else {}),
                     "process_owner_verified": True,
@@ -202,6 +305,7 @@ class TerminalAppTransport:
                     ],
                 }
             )
+        self.last_catalog_incomplete = omitted
         return sessions
 
     @staticmethod
@@ -478,6 +582,61 @@ class TerminalAppTransport:
         JSON.stringify({paste_event_sent:true,return_sent:false});""",
                     mutation=True,
                 )
+
+    async def ended_windows(self, window_ids):
+        """Read only the last line of tabs that share a tty.
+
+        A finished tab must not inherit a reused tty.
+        """
+        if not window_ids:
+            return set()
+        found = await self.native(
+            "const app=Application('Terminal'); const ids="
+            + json.dumps([int(value) for value in window_ids])
+            + """;
+            JSON.stringify(ids.filter(id => {
+             const wins=app.windows().filter(w => w.id()===id);
+             if (wins.length!==1) return false;
+             const tail=((wins[0].selectedTab().contents()||'').replace(/\\s+$/,'')
+              .split('\\n').pop()||'');
+             return /^\\[(Prozess beendet|Process completed)\\]$/.test(tail);
+            }));"""
+        )
+        return {int(value) for value in found} if isinstance(found, list) else set()
+
+    async def front_tab(self):
+        return await self.native(
+            """const app=Application("Terminal");
+            if(!app.running() || !app.windows().length) JSON.stringify({window_id:null,tty:null});
+            else {
+             const w=app.windows()[0];
+             JSON.stringify({window_id:w.id(), tty:w.selectedTab().tty(), frontmost:w.frontmost()});
+            }"""
+        )
+
+    async def focus(self, pane_id):
+        return await self.native(
+            self.native_focus(pane_id) + "\ncheckFocus(); JSON.stringify({focused:true});",
+            mutation=True,
+        )
+
+    async def close_tab(self, pane_id):
+        """Close one scripting tab. Other tab ids must still exist afterwards."""
+        return await self.native(
+            self.native_target(pane_id)
+            + """
+            const id = targetWindow.id();
+            const others = app.windows().filter(w => w.id() !== id).map(w => w.id());
+            if (!others.length) throw Error("Refusing to close the only Terminal tab");
+            targetWindow.close();
+            delay(0.3);
+            const left = app.windows().map(w => w.id());
+            const missing = others.filter(value => !left.includes(value));
+            if (missing.length) throw Error("Close removed other tabs");
+            JSON.stringify({closed:true, closed_window_id:id, remaining:left.length});
+            """,
+            mutation=True,
+        )
 
     async def read(self, pane_id):
         return await self.native(

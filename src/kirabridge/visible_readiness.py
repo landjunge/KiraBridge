@@ -105,9 +105,14 @@ def assess(target, raw, binding, protocol=None):
     base["input_empty"] = empty
     if not empty:
         return result("input_not_empty", "existing_input_or_unknown_widget")
-    # Grok's existing supported renderer is unchanged in this Codex repair.
-    if binding.busy_pattern and re.search(binding.busy_pattern, text, re.I):
+    # The live status row sits directly above the composer. Older quotations
+    # of Thinking or [stop] stay above that row and do not mean the turn is active.
+    raw_prelude = text[: text.rfind("╭")].splitlines() if "╭" in text else []
+    prelude = [line for line in raw_prelude if line.strip()]
+    status = prelude[-1] if prelude else ""
+    current = status + "\n" + view
+    if binding.busy_pattern and re.search(binding.busy_pattern, current, re.I):
         return result("working", "visible_grok_activity")
-    if re.search(r"Back to bottom|enter/esc latest", text, re.I):
+    if re.search(r"Back to bottom|enter/esc latest", current, re.I):
         return result("scrolled", "current_scroll_controls")
     return result("ready", "current_empty_widget")

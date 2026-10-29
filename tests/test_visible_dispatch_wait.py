@@ -153,7 +153,7 @@ async def test_busy_wait_does_not_claim_insert_or_complete_then_dispatches_once(
     target = "codex" if sender == "grok" else "grok"
     transport["target"] = target
     transport["text"] = (
-        "Thinking…\nesc to interrupt\n› " if target == "codex" else "Thinking…\n╭\n│ ❯ │\n╰"
+        "Thinking…\nesc to interrupt\n› " if target == "codex" else "╭\nThinking…\n│ ❯ │\n╰"
     )
     bridge.config.visible_handoffs.bindings[target].busy_pattern = "Thinking…"
     sent = enqueue(bridge, sender, target)
@@ -376,7 +376,7 @@ async def test_real_http_wait_then_one_paste_return_and_authenticated_reply(
         cwd=config.principals["grok"].roots[0], timeout=3
     )
     config.visible_handoffs.bindings["grok"].busy_pattern = "Thinking…"
-    transport["text"] = "Thinking…\n╭\n│ ❯ │\n╰"
+    transport["text"] = "╭\nThinking…\n│ ❯ │\n╰"
     await bridge.message_receiver.start()
     async with MCPClientPool() as clients:
         await clients.connect(Peer("caller", url=endpoint, token="chatgpt-" + "x" * 48))

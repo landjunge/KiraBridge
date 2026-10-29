@@ -34,6 +34,27 @@ def terminal(config, code, task_id="work", timeout=3):
     )
 
 
+async def test_source_id_reads_a_newer_notice_behind_an_unacked_inbox(bridge, config):
+    automatic(config)
+    bridge.prepare("local", terminal(config, "print('older')", task_id="older-task"))
+    bridge.prepare("local", terminal(config, "print('newer')", task_id="newer-task"))
+    async with bridge:
+        await bridge.tasks.wait("local", "older-task")
+        await bridge.tasks.wait("local", "newer-task")
+        inbox = bridge.completions.receive("local")["notices"]
+        assert {item["payload"]["task_id"] for item in inbox} == {"older-task", "newer-task"}
+        later = max(inbox, key=lambda item: item["seq"])
+        earlier = min(inbox, key=lambda item: item["seq"])
+        selected = bridge.completions.receive("local", source_id=later["payload"]["task_id"])[
+            "notices"
+        ]
+        assert [item["payload"]["task_id"] for item in selected] == [later["payload"]["task_id"]]
+        assert (
+            bridge.completions.receive("local")["notices"][0]["payload"]["task_id"]
+            == earlier["payload"]["task_id"]
+        )
+
+
 async def test_immediate_completion_before_listener_and_route_is_atomic(bridge, config):
     automatic(config)
     value = terminal(config, "print('fast result')")

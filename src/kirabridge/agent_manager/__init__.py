@@ -591,13 +591,14 @@ class AgentManager:
         *,
         owned_resume_session=None,
         handoff_reply=False,
+        separate_managed=False,
     ):
         if args.agent not in principal.agents:
             raise BridgeError("agent_denied", "Agent identity not granted")
         config = self.config.agents.get(args.agent)
         if config is None or config.kind not in self.adapters:
             raise BridgeError("agent_unavailable", "Agent adapter is not configured")
-        if self.config.visible_handoffs.enabled:
+        if self.config.visible_handoffs.enabled and not separate_managed:
             if owned_resume_session is not None or handoff_reply:
                 raise BridgeError(
                     "visible_owned_resume_unsupported",

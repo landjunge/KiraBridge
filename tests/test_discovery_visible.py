@@ -277,6 +277,15 @@ async def test_file_params_descriptor_and_signed_url_never_persist(
         assert inventory["transfers"][0]["state"] == "authorized"
 
 
+def test_background_execution_is_explicit(config):
+    from kirabridge.permissions import visible_execution
+
+    assert visible_execution(config, "chatgpt", "terminal.execute")
+    assert not visible_execution(config, "chatgpt", "terminal.execute", background=True)
+    assert not visible_execution(config, "local", "terminal.execute")
+    assert visible_execution(config, "local", "terminal.visible")
+
+
 def test_trusted_custom_chatgpt_role(config):
     from kirabridge.permissions import direct_terminal_required
 
@@ -304,7 +313,8 @@ async def test_health_monitors_leave_terminal_read_capacity_available(
         await asyncio.sleep(0.05)
         return {"status": "available", "sessions": []}
 
-    async def observed(principal, pane_id, expected_pid, *, max_bytes=65536):
+    async def observed(principal, pane_id, expected_pid, *, max_bytes=65536, since=""):
+        assert since == ""
         return {"pane_id": pane_id, "expected_pid": expected_pid, "text": "FOREGROUND"}
 
     monkeypatch.setattr(bridge.sessions, "catalog", catalog)
@@ -322,6 +332,8 @@ async def test_health_monitors_leave_terminal_read_capacity_available(
             r.structuredContent["discovery"]["terminal_observation"]["freshness"] == "not_probed"
             for r in results[:-1]
         )
+        assert not results[-1].isError, results[-1]
+        assert isinstance(results[-1].structuredContent, dict)
         assert results[-1].structuredContent["text"] == "FOREGROUND"
         assert bridge.terminal_queries.active == 0
 

@@ -123,6 +123,31 @@ class OutputHistory:
                 self.prune()
             return self.reference(row)
 
+    def captured_text(self, principal, kind, source_key, sha256):
+        """Return one unexpired capture for this principal and pane, or None.
+
+        A cursor from another pane or principal does not reveal that capture.
+        """
+        if not isinstance(sha256, str) or not sha256:
+            return None
+        row = self.store.db.execute(
+            "SELECT payload,expires,created FROM output_snapshots WHERE principal=? AND kind=? "
+            "AND source_key=? AND sha256=?",
+            (principal, kind, source_key, sha256),
+        ).fetchone()
+        if (
+            row is None
+            or row["expires"] <= time.time()
+            or row["created"] <= (time.time() - self.config.retention_seconds)
+        ):
+            return None
+        try:
+            payload = json.loads(bytes(row["payload"]))
+        except (json.JSONDecodeError, TypeError, ValueError):
+            return None
+        text = payload.get("text") if isinstance(payload, dict) else None
+        return text if isinstance(text, str) else None
+
     def read(self, principal, reference):
         row = self.store.db.execute(
             "SELECT * FROM output_snapshots WHERE id=? AND principal=?",

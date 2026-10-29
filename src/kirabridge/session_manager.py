@@ -29,6 +29,36 @@ class SessionReference(Input):
 
 class SessionRead(SessionReference):
     max_bytes: int = Field(default=65536, ge=1, le=65536)
+    since: str = Field(default="", max_length=64, pattern=r"^$|[0-9a-f]{64}")
+
+
+def follow_screen(previous: str | None, screen: str, *, since: str) -> dict:
+    """Describe new terminal bytes without dropping the current screen.
+
+    An unknown cursor resets. It never borrows text stored for another pane.
+    Terminal.app rewrites the last prompt, so a short changed tail still counts
+    as appended output. A rewrite earlier in the screen resets instead.
+    """
+    if not since:
+        return {"follow": "full"}
+    if previous is None:
+        return {"follow": "reset"}
+    if previous == screen:
+        return {"follow": "unchanged", "appended": ""}
+    if screen.startswith(previous):
+        return {"follow": "append", "appended": screen[len(previous) :]}
+    common = 0
+    limit = min(len(previous), len(screen))
+    while common < limit and previous[common] == screen[common]:
+        common += 1
+    rewritten = len(previous) - common
+    if common >= 32 and rewritten <= 256:
+        return {"follow": "append", "appended": screen[common:]}
+    return {"follow": "reset"}
+
+
+class SessionSelect(SessionReference):
+    """Address one current tab without sending text."""
 
 
 class SessionInput(SessionReference):
@@ -93,21 +123,41 @@ class SessionManager:
         try:
             rows = await self.tmux.catalog()
         except BridgeError as exc:
-            return {
-                "transport": "terminal_app" if native_rows else "tmux",
-                "status": "available"
+            return self._catalog_result(
+                native_rows,
+                transport="terminal_app" if native_rows else "tmux",
+                status="available"
                 if native_rows
                 else errors.get("terminal_app", {}).get("code", exc.code),
-                "sessions": self.describe(native_rows),
-                "transport_errors": {**errors, "tmux": {"code": exc.code}},
-                "scope": "Exact Terminal.app tabs and tmux panes; existing sessions preserved",
-            }
+                errors={**errors, "tmux": {"code": exc.code}},
+                truncated=getattr(self.terminal_app, "last_catalog_incomplete", False),
+            )
+        return self._catalog_result(
+            native_rows + rows,
+            transport="terminal_app_and_tmux" if native_rows else "tmux",
+            status="available",
+            errors=errors,
+            truncated=getattr(self.tmux, "last_catalog_truncated", False)
+            or getattr(self.terminal_app, "last_catalog_incomplete", False),
+        )
+
+    def _catalog_result(self, rows, *, transport, status, errors, truncated=False):
+        from kirabridge.platform_adapters.terminal_app import annotate_views
+
+        sessions = annotate_views(self.describe(rows))
+        visual = {
+            row.get("visual_window_id")
+            for row in sessions
+            if row.get("visual_window_id") is not None
+        }
         return {
-            "transport": "terminal_app_and_tmux" if native_rows else "tmux",
-            "status": "available",
-            "sessions": self.describe(native_rows + rows),
+            "transport": transport,
+            "status": status,
+            "ui_window_count": len(visual),
+            "sessions": sessions,
             "transport_errors": errors,
-            "truncated": getattr(self.tmux, "last_catalog_truncated", False),
+            "truncated": truncated,
+            "scope": "Exact Terminal.app tabs and tmux panes; existing sessions preserved",
         }
 
     def describe(self, rows):
@@ -421,6 +471,59 @@ class SessionManager:
                 await self.transport(pane_id).press_return(pane_id)
         return {"return_sent": True, "agent_confirmed": False}
 
+    def unbound_agent(self, selected):
+        """A grok or codex process that is not the configured production pane."""
+        agents, bindings = self.agent_registry()
+        matches = [item for item in selected.get("processes", []) if item["name"] in agents]
+        if len(matches) != 1:
+            return None
+        process = matches[0]
+        binding = bindings.get(process["name"])
+        if binding and self.binding_matches(selected, binding, process["name"]):
+            return None
+        return process
+
+    async def paste_and_return(self, args, selected, process):
+        """Paste into one explicit test pane, then send Return. Not the production binding."""
+        identities = {}
+        for pid in {selected["expected_pid"], process["pid"]}:
+            identity = await self.terminal_app.process_identity(pid, detailed=True)
+            fields = identity.split(None, 8)
+            owner = next((item for item in selected["processes"] if item["pid"] == pid), None)
+            if (
+                len(fields) != 9
+                or not fields[0].isdigit()
+                or not fields[7].isdigit()
+                or fields[1] != Path(selected["tty"]).name
+                or owner is None
+                or int(fields[7]) != owner.get("ppid")
+                or fields[8] != owner.get("image")
+            ):
+                raise BridgeError(
+                    "visible_target_changed", "Selected process image/parent/TTY changed"
+                )
+            identities[pid] = identity
+        before = await self.terminal_app.read(args.pane_id)
+        await self.terminal_app.insert(
+            args.pane_id, args.text, identity_guard=identities, expected_screen=before
+        )
+        inserted = await self.terminal_app.read(args.pane_id)
+        if args.text not in inserted:
+            raise BridgeError(
+                "visible_insert_unknown", "Pasted text was not observed; no Return sent"
+            )
+        await self.terminal_app.press_return(
+            args.pane_id, identity_guard=identities, expected_screen=inserted
+        )
+        return {
+            "pane_id": args.pane_id,
+            "expected_pid": args.expected_pid,
+            "paste_event_sent": True,
+            "return_sent": True,
+            "agent_confirmed": False,
+            "production_binding": False,
+        }
+
     async def send(self, principal, args, *, task_id=None, before_transport=None):
         self.authorization.principal(principal, "session.input")
         self.authorization.principal(principal, "terminal.execute")
@@ -428,6 +531,9 @@ class SessionManager:
             raise BridgeError("invalid_arguments", "NUL in input")
         async with self.lock:
             selected = await self.selected(principal, args.pane_id, args.expected_pid)
+            foreign = self.unbound_agent(selected)
+            if foreign and args.submit and args.pane_id.startswith("terminal:"):
+                return await self.paste_and_return(args, selected, foreign)
             if self.assigned_agent(selected):
                 raise BridgeError(
                     "visible_handoff_required", "CLI handoffs require the central route"
@@ -495,11 +601,53 @@ class SessionManager:
             and expected_pid in {row["expected_pid"], row.get("legacy_expected_pid")}
         ]
         if len(matches) == 1:
-            return matches[0]
+            selected = matches[0]
+            if selected.get("identity_ambiguous"):
+                raise BridgeError(
+                    "visible_target_ambiguous",
+                    "Several live tabs report this tty; no input until the view is unique",
+                )
+            return selected
         raise BridgeError(
             "session_selection_changed",
             "Select an exact current pane_id and expected_pid from session_catalog",
         )
+
+    async def focus(self, principal, pane_id, expected_pid):
+        self.authorization.principal(principal, "session.input")
+        selected = await self.selected(principal, pane_id, expected_pid)
+        if not pane_id.startswith("terminal:"):
+            raise BridgeError("visible_terminal_required", "Focus requires a Terminal.app tab")
+        before = await self.terminal_app.front_tab()
+        await self.terminal_app.focus(pane_id)
+        after = await self.terminal_app.front_tab()
+        return {
+            "pane_id": pane_id,
+            "expected_pid": expected_pid,
+            "visual_window_id": selected.get("visual_window_id"),
+            "tab_index": selected.get("tab_index"),
+            "before": before,
+            "after": after,
+            "focused": after.get("tty") == selected.get("tty")
+            and after.get("window_id") == selected.get("window_id"),
+        }
+
+    async def close_tab(self, principal, pane_id, expected_pid):
+        self.authorization.principal(principal, "session.input")
+        selected = await self.selected(principal, pane_id, expected_pid)
+        if selected.get("tab_count", 1) < 2 and selected.get("ui_window_count", 1) < 2:
+            raise BridgeError(
+                "terminal_window_required", "Refusing to close the only visible terminal"
+            )
+        if not pane_id.startswith("terminal:"):
+            raise BridgeError("visible_terminal_required", "Close requires a Terminal.app tab")
+        result = await self.terminal_app.close_tab(pane_id)
+        return {
+            "pane_id": pane_id,
+            "expected_pid": expected_pid,
+            "closed": bool(result.get("closed")),
+            "remaining": result.get("remaining"),
+        }
 
     def assigned_agent(self, selected):
         """Recognized CLI input always needs the persistent original binding."""
@@ -529,7 +677,7 @@ class SessionManager:
             )
         return process["name"]
 
-    async def read_observed(self, principal, pane_id, expected_pid, *, max_bytes=65536):
+    async def read_observed(self, principal, pane_id, expected_pid, *, max_bytes=65536, since=""):
         selected = await self.selected(principal, pane_id, expected_pid)
         with self.observation_scope(principal, selected):
             result = await self.read(principal, pane_id, expected_pid, max_bytes=max_bytes)
@@ -537,7 +685,20 @@ class SessionManager:
                 observation = await self.readiness(principal, result)
                 if observation is not None:
                     result = {**result, "input_readiness": observation}
-            return self.audit.observe_terminal(principal, result)
+            previous = None
+            if since and hasattr(self.audit, "captured_text"):
+                previous = self.audit.captured_text(
+                    principal,
+                    "session_capture",
+                    f"{pane_id}:{expected_pid}",
+                    since,
+                )
+            result.update(follow_screen(previous, result["text"], since=since))
+            result = self.audit.observe_terminal(principal, result)
+            reference = result.get("output_ref") or {}
+            if isinstance(reference, dict) and isinstance(reference.get("sha256"), str):
+                result["next_cursor"] = reference["sha256"]
+            return result
 
     async def open(self, principal, args, *, task_id=None):
         policy = self.authorization.principal(principal, "session.open")

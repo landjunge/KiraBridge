@@ -1,0 +1,163 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:kirabridge:module-descriptor:1",
+  "title": "Proposed source-neutral module discovery descriptor V1",
+  "description": "Discovery claims only. Validation does not authenticate a module, grant permissions, establish a target binding or authorize execution.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "descriptor_version",
+    "revision",
+    "module",
+    "protocols",
+    "schemas",
+    "capabilities",
+    "binding",
+    "health"
+  ],
+  "properties": {
+    "descriptor_version": { "const": "1" },
+    "revision": { "$ref": "#/$defs/identifier" },
+    "module": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "instance_ref"],
+      "properties": {
+        "id": { "$ref": "#/$defs/identifier" },
+        "instance_ref": { "$ref": "#/$defs/identifier" }
+      }
+    },
+    "protocols": {
+      "type": "array",
+      "maxItems": 64,
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/version_support" }
+    },
+    "schemas": {
+      "type": "array",
+      "maxItems": 128,
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/version_support" }
+    },
+    "capabilities": {
+      "type": "array",
+      "maxItems": 128,
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "protocol",
+          "request_schema",
+          "result_schema",
+          "effect",
+          "required_permissions"
+        ],
+        "properties": {
+          "id": { "$ref": "#/$defs/identifier" },
+          "protocol": { "$ref": "#/$defs/version_reference" },
+          "request_schema": { "$ref": "#/$defs/version_reference" },
+          "result_schema": { "$ref": "#/$defs/version_reference" },
+          "effect": { "enum": ["read", "write", "execute"] },
+          "required_permissions": {
+            "type": "array",
+            "maxItems": 64,
+            "uniqueItems": true,
+            "items": { "$ref": "#/$defs/identifier" }
+          }
+        }
+      }
+    },
+    "binding": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["state"],
+          "properties": { "state": { "const": "unbound" } }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["state", "target_ref", "revision"],
+          "properties": {
+            "state": { "const": "claimed" },
+            "target_ref": { "$ref": "#/$defs/identifier" },
+            "revision": { "$ref": "#/$defs/identifier" }
+          }
+        }
+      ]
+    },
+    "health": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["state"],
+          "properties": { "state": { "const": "unknown" } }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["state", "observed_at", "valid_for_seconds"],
+          "properties": {
+            "state": { "enum": ["available", "degraded", "unavailable"] },
+            "observed_at": { "type": "string", "format": "date-time" },
+            "valid_for_seconds": { "type": "integer", "minimum": 1, "maximum": 300 }
+          }
+        }
+      ]
+    },
+    "extensions": {
+      "description": "Optional namespaced metadata only; never authorization, binding or version overrides.",
+      "type": "object",
+      "maxProperties": 32,
+      "propertyNames": { "not": { "pattern": "\\s" } },
+      "patternProperties": {
+        "^[a-z0-9]+(?:[.-][a-z0-9]+)+$": { "type": "object" }
+      },
+      "additionalProperties": false
+    }
+  },
+  "$defs": {
+    "identifier": {
+      "description": "Opaque non-secret reference; no endpoint, credential or host path.",
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[a-z0-9][a-z0-9._:-]*$",
+      "not": { "pattern": "\\s" }
+    },
+    "version": {
+      "type": "string",
+      "maxLength": 32,
+      "pattern": "^[0-9]+(?:\\.[0-9]+){0,2}$",
+      "not": { "pattern": "\\s" }
+    },
+    "version_support": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "versions"],
+      "properties": {
+        "id": { "$ref": "#/$defs/identifier" },
+        "versions": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 16,
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/version" }
+        }
+      }
+    },
+    "version_reference": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "version"],
+      "properties": {
+        "id": { "$ref": "#/$defs/identifier" },
+        "version": { "$ref": "#/$defs/version" }
+      }
+    }
+  }
+}

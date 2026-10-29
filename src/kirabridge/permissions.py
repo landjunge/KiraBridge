@@ -22,6 +22,15 @@ def direct_terminal_required(config, principal):
     return principal == "chatgpt" or bool(policy and policy.client_type == "chatgpt")
 
 
+def visible_execution(config, principal, operation, *, background=False):
+    """ChatGPT commands stay visible unless the caller explicitly asks for a background process."""
+    if operation == "terminal.execute" and background:
+        return False
+    return operation == "terminal.visible" or (
+        operation == "terminal.execute" and direct_terminal_required(config, principal)
+    )
+
+
 def automatic_for(policy: PrincipalConfig, operation: str) -> bool:
     if operation in policy.automatic_operations:
         return True

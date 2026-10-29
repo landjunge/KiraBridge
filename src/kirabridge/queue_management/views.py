@@ -136,6 +136,14 @@ class QueueViews:
             if row["queue_cursor"] > after:
                 cursor = row["queue_cursor"]
             row = dict(row)
+            # Finished tasks do not affect an active queue. Skip them before
+            # loading the stored result, which is the expensive part of a catalog.
+            if (
+                active_only
+                and family == "tasks"
+                and row.get("state") in TERMINAL | {"acknowledged"}
+            ):
+                continue
             try:
                 self._access(principal, family, row)
             except BridgeError:
@@ -225,26 +233,32 @@ class QueueViews:
                 return {"queue_id": queue_id, "count": count, "revision": checksum.hexdigest()}
             cursor = page["next_cursor"]
 
+    def _catalog_targets(self, principal, family):
+        """Queue names only. Task lanes are fixed, so completed task bodies stay unread."""
+        if family == "tasks":
+            return {"", "read", "normal", "stop", "unknown"}
+        rows, cursor = [], 0
+        while True:
+            page = self.entries(principal, family, cursor, 100, False)
+            rows.extend(page["entries"])
+            if not page["has_more"]:
+                break
+            cursor = page["next_cursor"]
+        targets = {""}
+        if family in {"messages", "handoffs", "completions"}:
+            targets |= {row["target"] for row in rows}
+        return targets
+
     def catalog(self, principal):
         result = []
         for family in SPECS:
             try:
-                rows, cursor = [], 0
-                while True:
-                    page = self.entries(principal, family, cursor, 100, False)
-                    rows.extend({"target": r["target"]} for r in page["entries"])
-                    if not page["has_more"]:
-                        break
-                    cursor = page["next_cursor"]
+                self._spec(principal, family)
+                targets = self._catalog_targets(principal, family)
             except BridgeError as exc:
                 if exc.code in {"forbidden", "not_found"}:
                     continue
                 raise
-            targets = {""}
-            if family in {"messages", "handoffs", "completions"}:
-                targets |= {r["target"] for r in rows}
-            if family == "tasks":
-                targets |= {"read", "normal", "stop", "unknown"}
             for target in sorted(targets):
                 queue = family + ("/" + target if target else "")
                 result.append({**self.snapshot(principal, queue), "family": family})

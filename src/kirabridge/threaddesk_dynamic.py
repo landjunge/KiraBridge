@@ -81,7 +81,9 @@ async def catalog(bridge: Any, principal: str) -> dict[str, Any]:
         return {"tools": [], "enabled": False}
     _guard(bridge, principal)
     async with bridge.threaddesk.lock:
+        _guard(bridge, principal)
         tools = await _fresh_tools(bridge.threaddesk)
+        _guard(bridge, principal)
     return {"tools": list(tools.values()), "enabled": True}
 
 
@@ -99,6 +101,7 @@ async def read(bridge: Any, principal: str, name: str, arguments: dict[str, Any]
         # Never trust an old tools/list: recheck annotations, schema and permission now.
         _guard(bridge, principal)
         tools = await _fresh_tools(bridge.threaddesk)
+        _guard(bridge, principal)  # Discovery may yield while the operator revokes access.
         tool = tools.get(name)
         if tool is None:
             raise BridgeError("threaddesk_tool_denied", "Tool is not explicitly read-only")

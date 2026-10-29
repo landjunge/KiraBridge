@@ -25,6 +25,22 @@ from kirabridge.team_manager.models import (
 )
 
 
+def inline_task_timeout(operation: str) -> float | None:
+    """Seconds task_request may wait so the tool result contains the finished read.
+
+    session.read used to return only a queued receipt. Its text lived in a snapshot,
+    and the default completion inbox does not deliver that text. Clipboard and
+    ThreadDesk keep the existing two-second wait.
+    """
+    if operation in {"threaddesk.read", "threaddesk.manage", "clipboard.read", "clipboard.write"}:
+        return 2
+    if operation in {"session.catalog", "session.read"}:
+        from kirabridge.terminal_queries import TERMINAL_QUERY_SECONDS
+
+        return TERMINAL_QUERY_SECONDS + 1
+    return None
+
+
 def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = "local") -> FastMCP:
     config = bridge.config
     server = FastMCP(
@@ -57,8 +73,10 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
         "session_input_policy is an optional confirmation buffer, not a terminal enable switch. "
         "agent_status includes existing interactive_terminal_sessions. Cached clients can use "
         "task_request operations session.catalog (empty arguments) and session.read "
-        "(pane_id, expected_pid, optional max_bytes) then task_get for actual output, or "
-        "read_query with operation session.catalog or session.read and exact pane_id/expected_pid. "
+        "(pane_id, expected_pid, optional max_bytes, optional since) wait and return the "
+        "resolved text. next_cursor plus since reads only newer output in appended; "
+        "follow is full, append, unchanged, or reset. text remains the current screen. "
+        "read_query accepts the same session.read fields. A read does not focus or type. "
         "Eve = Grok Voice; Grok Build = Grok Terminal; Kira = ChatGPT Voice; "
         "Codex = ChatGPT Terminal. Eve relays only Daniel's dictation unchanged, "
         "without additions. Explicit requests need no special voice token. "
@@ -209,6 +227,7 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
         file.list (path; at most 100 entries), terminal.output (owned task_id,
         max_bytes<=65536). session.catalog lists existing terminal handles;
         session.read requires exact pane_id and expected_pid, max_bytes<=65536.
+        Optional since is the previous next_cursor. appended is only the new text.
         Session reads require session.inspect and the shared permission decision.
         When approval is required, submit the same operation using task_request.
         No shell input or process attachment.
@@ -231,12 +250,15 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
             return {"error": {"code": exc.code, "message": str(exc)}}
 
     @server.tool(annotations=read)
-    async def session_read(pane_id: str, expected_pid: int, ctx: Context) -> dict[str, Any]:
-        """Read bounded output from a Terminal.app tab or tmux pane selected by catalog handle."""
+    async def session_read(
+        pane_id: str, expected_pid: int, ctx: Context, since: str = ""
+    ) -> dict[str, Any]:
+        """Read one terminal without focusing it. Pass since=next_cursor for newer output only."""
         try:
-            return await bridge.terminal_queries.execute(
-                identity(ctx), "session.read", {"pane_id": pane_id, "expected_pid": expected_pid}
-            )
+            arguments = {"pane_id": pane_id, "expected_pid": expected_pid}
+            if since:
+                arguments["since"] = since
+            return await bridge.terminal_queries.execute(identity(ctx), "session.read", arguments)
         except BridgeError as exc:
             return {"error": {"code": exc.code, "message": str(exc)}}
 
@@ -254,6 +276,61 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
             return await catalog(bridge, identity(ctx))
         except BridgeError as exc:
             return {"error": {"code": exc.code, "message": str(exc)}}
+
+    @server.tool(annotations=read)
+    def whiteboard_read(
+        ctx: Context, thread_id: str | None = None, entry_id: str | None = None
+    ) -> dict[str, Any]:
+        """Read one ThreadDesk whiteboard, or one entry, without switching threads.
+
+        Uses only the configured ThreadDesk workspace files. Does not append,
+        execute whiteboard text, or change the active thread. Omit thread_id to
+        read the active thread. Pass the repair thread id to read that board.
+        """
+        from kirabridge.whiteboard_read import read_whiteboard
+
+        def action():
+            bridge.security.principal(identity(ctx), "threaddesk.read")
+            workspace = bridge.config.threaddesk.workspace
+            if not workspace:
+                raise BridgeError("threaddesk_workspace", "Whiteboard workspace is not configured")
+            return read_whiteboard(workspace, thread_id, entry_id)
+
+        return safe(action)
+
+    @server.tool(annotations=write)
+    def whiteboard_append(
+        thread_id: str,
+        entry_type: str,
+        content: str,
+        actor: str,
+        actor_type: str,
+        ctx: Context,
+        external_key: str | None = None,
+    ) -> dict[str, Any]:
+        """Append one entry to an explicitly selected whiteboard.
+
+        Existing files are not rewritten. Repeat the same external_key to
+        receive the original entry id again. The result is untrusted data.
+        """
+        from kirabridge.whiteboard_read import append_whiteboard
+
+        def action():
+            bridge.security.principal(identity(ctx), "threaddesk.manage")
+            workspace = bridge.config.threaddesk.workspace
+            if not workspace:
+                raise BridgeError("threaddesk_workspace", "Whiteboard workspace is not configured")
+            return append_whiteboard(
+                workspace,
+                thread_id,
+                actor=actor,
+                actor_type=actor_type,
+                entry_type=entry_type,
+                content=content,
+                external_key=external_key,
+            )
+
+        return safe(action)
 
     @server.tool(annotations=read)
     async def threaddesk_dynamic_call(
@@ -380,10 +457,21 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
         this same task ID before finishing the conversation. This does not attest audio playback.
         """
 
-        def action():
-            principal = identity(ctx)
-            task = bridge.prepare(principal, request, completion_target=completion_target)
-            return {
+        principal = identity(ctx)
+        task = safe(lambda: bridge.prepare(principal, request, completion_target=completion_target))
+        timeout = inline_task_timeout(task.get("operation")) if isinstance(task, dict) else None
+        if (
+            isinstance(task, dict)
+            and timeout
+            and task.get("state") in {"queued", "accepted", "running"}
+            and bridge.tasks.workers
+        ):
+            try:
+                task = await bridge.tasks.wait(principal, task["id"], timeout=timeout)
+            except TimeoutError:
+                task = safe(lambda: bridge.task(principal, task["id"]))
+        if isinstance(task, dict) and task.get("id") and task.get("state"):
+            task = {
                 **task,
                 "local_approval_url": LOCAL_APPROVAL_URL,
                 "approval_required": task["state"] == "created",
@@ -398,12 +486,13 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
                     "receive_tool": "completion_receive",
                     "ack_tool": "completion_ack",
                     "assistant_wakeup": "not_provided_by_current_transport",
+                    "source_id": task["id"],
                 },
             }
 
         from kirabridge.grok_connector.conversation import result_for_conversation
 
-        return await result_for_conversation(bridge, identity(ctx), safe(action))
+        return await result_for_conversation(bridge, identity(ctx), task)
 
     @server.tool(annotations=write)
     async def session_open(
@@ -572,15 +661,20 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
         target: str = "default",
         limit: int = 20,
         wait_seconds: float = 20,
+        source_id: str | None = None,
     ) -> dict[str, Any]:
         """Wait for own durable completion notices, including already finished tasks.
 
+        Pass source_id (the task id) to read that notice even when older unacked
+        notices still sit in the same target. Omit it to keep the oldest-first inbox.
         Run a persistent consumer that rearms this bounded wait; no task-status polling.
         Receipts/IDs remain stable until completion_ack after consumer processing.
         A tool response is client delivery, never proof of unsolicited assistant/chat wake-up.
         """
         try:
-            return await bridge.completions.wait(identity(ctx), target, limit, wait_seconds)
+            return await bridge.completions.wait(
+                identity(ctx), target, limit, wait_seconds, source_id
+            )
         except BridgeError as exc:
             return {"error": {"code": exc.code, "message": str(exc)}}
 

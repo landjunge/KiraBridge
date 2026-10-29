@@ -23,6 +23,7 @@ class ReadQuery(Input):
     expected_identity: str | None = Field(default=None, pattern=r"^[a-f0-9]{64}$")
     pane_id: str | None = Field(default=None, pattern=r"^(%[0-9]+|terminal:[0-9]+:ttys[0-9]+)$")
     expected_pid: int | None = Field(default=None, gt=0)
+    since: str = Field(default="", max_length=64, pattern=r"^$|[0-9a-f]{64}")
 
     @model_validator(mode="after")
     def selector(self):
@@ -40,6 +41,8 @@ class ReadQuery(Input):
                     raise ValueError("session.read requires pane_id and expected_pid")
             elif self.pane_id is not None or self.expected_pid is not None:
                 raise ValueError("session.catalog does not accept a target")
+            elif self.since:
+                raise ValueError("since is only valid for session.read")
         elif self.pane_id is not None or self.expected_pid is not None:
             raise ValueError("terminal handles are only valid for session.read")
         elif self.operation == "terminal.output":
@@ -51,6 +54,8 @@ class ReadQuery(Input):
             raise ValueError("directory reads do not accept byte selectors")
         if self.tail and self.offset:
             raise ValueError("use either tail or offset")
+        if self.since and self.operation != "session.read":
+            raise ValueError("since is only valid for session.read")
         return self
 
 
@@ -69,6 +74,7 @@ async def read_query_async(bridge, principal: str, query: ReadQuery) -> dict:
                 "pane_id": query.pane_id,
                 "expected_pid": query.expected_pid,
                 "max_bytes": query.max_bytes,
+                **({"since": query.since} if query.since else {}),
             },
         )
         return {"operation": query.operation, **result}

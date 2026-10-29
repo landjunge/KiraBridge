@@ -67,6 +67,8 @@ for _name in (
     "files.transfer",
     "session.open",
     "session.input",
+    "session.focus",
+    "session.close",
     "terminal.execute",
     "terminal.visible",
     "file.write",
@@ -92,6 +94,8 @@ for _name in (
         if _name in {"files.inventory", "files.status"}
         else "files.transfer"
         if _name in {"files.pause", "files.abort"}
+        else "session.input"
+        if _name in {"session.focus", "session.close"}
         else "session.inspect"
         if _name in {"session.catalog", "session.read"}
         else "terminal.execute"

@@ -71,6 +71,8 @@ class TerminalInput(Input):
     cwd: str
     timeout: float = Field(default=60.0, gt=0, le=3600)
     max_output: int = Field(default=65536, ge=0, le=1048576)
+    # Explicit opt-in. Default stays on the visible Terminal.app route for ChatGPT.
+    background: bool = False
 
 
 class ConnectionCheckInput(Input):
@@ -141,6 +143,8 @@ class ThreadDeskReadInput(Input):
         "list_snapshots",
         "thread_operation_status",
         "get_reentry",
+        "whiteboard_list",
+        "whiteboard_get",
     ]
     arguments: dict[str, Any] = Field(default_factory=dict)
 
@@ -158,6 +162,7 @@ class ThreadDeskManageInput(Input):
         "unarchive",
         "delete",
         "switch",
+        "whiteboard_append",
     ]
     id: str | None = Field(default=None, min_length=1, max_length=128)
     expected_revision: int = Field(ge=0)

@@ -19,6 +19,18 @@ from kirabridge.mcp_gateway.client import MCPClientPool
 from kirabridge.message_manager import MessageSend
 
 
+def separate_managed_eligible(config, created: float) -> bool:
+    """True only for messages created at or after an explicit operator cutoff.
+
+    The default cutoff is unset, so existing visible delivery stays unchanged.
+    Holds, unknown jobs and older rows are not made eligible by this check.
+    """
+    cutoff = config.messaging.separate_managed_after
+    if cutoff is None:
+        return False
+    return float(created) >= float(cutoff)
+
+
 class MessageReceiver:
     WAIT_REASONS = {
         "visible_target_busy",
@@ -36,6 +48,7 @@ class MessageReceiver:
         self.messages = bridge.messages
         self.worker = None
         self.stopping = False
+        self.recovered_handoffs = set()
 
     async def start(self):
         if self.worker and self.worker.done():
@@ -44,12 +57,16 @@ class MessageReceiver:
             self.worker = None
         if self.worker or not self.bridge.config.messaging.receivers:
             return
+        self.recovered_handoffs.clear()
         # The task dispatcher owns the exclusive runtime lock before this is called.
         with self.bridge.store.transaction():
             rows = self.bridge.store.db.execute(
                 "SELECT message_id,evidence FROM message_jobs WHERE state='running'"
             ).fetchall()
             for row in rows:
+                if self._reply_can_finish(row):
+                    self.recovered_handoffs.add(row["message_id"])
+                    continue  # Return already happened; do not interrupt or paste again.
                 self._finish(
                     row[0],
                     "unknown",
@@ -60,12 +77,18 @@ class MessageReceiver:
                     "interrupted",
                 )
             queued = self.bridge.store.db.execute(
-                "SELECT m.id,m.recipient FROM messages m JOIN message_jobs j ON j.message_id=m.id "
-                "WHERE j.state='queued'"
+                "SELECT m.id,m.recipient,m.created FROM messages m "
+                "JOIN message_jobs j ON j.message_id=m.id WHERE j.state='queued'"
             ).fetchall()
+            cutoff = self.bridge.config.messaging.separate_managed_after
             for row in queued:
                 if row["recipient"] not in self.bridge.config.messaging.receivers:
+                    # A configured cutoff preserves older jobs instead of
+                    # marking them blocked when their receiver is absent.
+                    if cutoff is not None and row["created"] < cutoff:
+                        continue
                     self._finish(row["id"], "blocked", {"reason": "receiver_removed"})
+        self._reconcile_recovered_handoffs()
         self.stopping = False
         self.worker = asyncio.create_task(self._loop())
 
@@ -80,6 +103,82 @@ class MessageReceiver:
             finally:
                 if self.worker is worker and worker.done():
                     self.worker = None
+
+    def _reply_can_finish(self, row):
+        """A delivered visible handoff is waiting for its reply, not for another paste."""
+        try:
+            evidence = json.loads(row["evidence"] or "{}")
+        except (TypeError, ValueError):
+            return False
+        handoff_id = evidence.get("handoff_id") if isinstance(evidence, dict) else None
+        if not handoff_id:
+            return False
+        handoff = self.bridge.store.db.execute(
+            "SELECT h.state FROM visible_handoffs h JOIN messages m ON m.id=h.message_id "
+            "WHERE h.id=? AND m.id=? AND h.principal=m.sender AND h.target=m.recipient",
+            (handoff_id, row["message_id"]),
+        ).fetchone()
+        return bool(handoff) and handoff["state"] in {
+            "return_sent",
+            "sent",
+            "confirmed",
+            "completed",
+        }
+
+    def _existing_reply(self, message_id):
+        original = self.bridge.store.db.execute(
+            "SELECT sender, recipient, acknowledged FROM messages WHERE id=?", (message_id,)
+        ).fetchone()
+        if original is None or original["acknowledged"] is None:
+            return None
+        reply = self.bridge.store.db.execute(
+            "SELECT id FROM messages WHERE reply_to=? AND sender=? AND recipient=? "
+            "AND kind IN ('result','answer') ORDER BY seq LIMIT 1",
+            (message_id, original["recipient"], original["sender"]),
+        ).fetchone()
+        return reply["id"] if reply else None
+
+    def _reconcile_recovered_handoffs(self, recipient=None):
+        """Observe only waiters lost at startup; never touch a new running turn or send input."""
+        for message_id in tuple(self.recovered_handoffs):
+            with self.bridge.store.transaction():
+                row = self.bridge.store.db.execute(
+                    "SELECT j.message_id,j.state,j.evidence,m.sender,m.recipient "
+                    "FROM message_jobs j JOIN messages m ON m.id=j.message_id "
+                    "WHERE j.message_id=?",
+                    (message_id,),
+                ).fetchone()
+                if row is not None and recipient is not None and row["recipient"] != recipient:
+                    continue
+                if row is None or row["state"] != "running" or not self._reply_can_finish(row):
+                    self.recovered_handoffs.discard(message_id)
+                    continue  # In particular, never reconcile an unknown or blocked history.
+                reply_id = self._existing_reply(message_id)
+                if not reply_id:
+                    continue
+                evidence = json.loads(row["evidence"])
+                try:
+                    handoff = self.bridge.visible_handoffs.reconcile(
+                        row["sender"], evidence["handoff_id"]
+                    )
+                except BridgeError as exc:
+                    if exc.code != "forbidden":
+                        raise
+                    continue  # Revoked historical access must not stop other receiver work.
+                if handoff["state"] != "completed":
+                    continue
+                self._finish(
+                    message_id,
+                    "completed",
+                    {
+                        **evidence,
+                        "reason": "reply_already_recorded",
+                        "reconciled_without_input": True,
+                        "automatic_retry": False,
+                    },
+                    reply_id=reply_id,
+                )
+            self.recovered_handoffs.discard(message_id)
 
     def _finish(self, message_id, state, evidence, error=None, reply_id=None):
         from kirabridge.completion_manager import completion_payload, record_notice
@@ -176,7 +275,9 @@ class MessageReceiver:
                 return None
             run_id = "channel-" + uuid.uuid4().hex
             scope = (
-                "existing_visible_terminal"
+                "separate_managed_session"
+                if separate_managed_eligible(self.bridge.config, row["created"])
+                else "existing_visible_terminal"
                 if self.bridge.config.visible_handoffs.enabled
                 else "separate_managed_session"
             )
@@ -189,12 +290,7 @@ class MessageReceiver:
                 message_id,
                 "message.processing_claimed",
                 row["recipient"],
-                {
-                    "run_id": run_id,
-                    "session_scope": "existing_visible_terminal"
-                    if self.bridge.config.visible_handoffs.enabled
-                    else "separate_managed_session",
-                },
+                {"run_id": run_id, "session_scope": scope},
             )
             return dict(row), run_id
 
@@ -362,18 +458,23 @@ class MessageReceiver:
 
     async def _dispatch_next(self, recipient=None):
         # One oldest message per recipient: a busy Codex must not hide ready Grok.
+        # A cutoff removes older rows from that contest so they are neither
+        # dispatched nor able to hide a newer eligible message.
+        cutoff = self.bridge.config.messaging.separate_managed_after
         rows = self.bridge.store.db.execute(
             "SELECT m.id,m.sender,m.recipient,m.created,m.acknowledged,j.evidence FROM messages m "
             "JOIN message_jobs j ON j.message_id=m.id WHERE j.state='queued' "
             "AND NOT EXISTS (SELECT 1 FROM queue_holds h WHERE "
             "h.queue_id='messages' AND h.item_id=m.id) "
+            "AND (? IS NULL OR m.created>=?) "
             "AND (? IS NULL OR m.recipient=?) "
             "AND NOT EXISTS (SELECT 1 FROM messages older JOIN message_jobs q "
             "ON q.message_id=older.id WHERE q.state='queued' "
             "AND NOT EXISTS (SELECT 1 FROM queue_holds h WHERE "
             "h.queue_id='messages' AND h.item_id=older.id) "
+            "AND (? IS NULL OR older.created>=?) "
             "AND older.recipient=m.recipient AND older.seq<m.seq) ORDER BY m.seq LIMIT 17",
-            (recipient, recipient),
+            (cutoff, cutoff, recipient, recipient, cutoff, cutoff),
         ).fetchall()
         for row in rows:
             if row["recipient"] not in self.bridge.config.messaging.receivers:
@@ -392,7 +493,9 @@ class MessageReceiver:
                     continue
                 if now < retry.get("next_attempt_at", 0):
                     continue
-                if self.bridge.config.visible_handoffs.enabled:
+                if self.bridge.config.visible_handoffs.enabled and not separate_managed_eligible(
+                    self.bridge.config, row["created"]
+                ):
                     try:
                         await self.bridge.visible_handoffs.dispatch_ready(
                             row["sender"], row["recipient"]
@@ -438,6 +541,7 @@ class MessageReceiver:
                 async with lock:
                     if self.stopping:
                         return
+                    self._reconcile_recovered_handoffs(recipient)
                     dispatched = await self._dispatch_next(recipient)
                 fault_recorded = False
                 if dispatched:
@@ -560,7 +664,9 @@ class MessageReceiver:
                         }
                     )
                 )
-            if self.bridge.config.visible_handoffs.enabled:
+            separate_managed = separate_managed_eligible(self.bridge.config, message["created"])
+            visible = self.bridge.config.visible_handoffs.enabled and not separate_managed
+            if visible:
                 prompt = message["body"]
             if history:
                 prompt += "\nPrior addressed messages (bounded context):\n" + canonical(history)
@@ -573,17 +679,14 @@ class MessageReceiver:
             result = await self.bridge.agents.execute(
                 {
                     "id": run_id,
-                    "principal": message["sender"]
-                    if self.bridge.config.visible_handoffs.enabled
-                    else recipient,
-                    "visible_message_id": message_id
-                    if self.bridge.config.visible_handoffs.enabled
-                    else None,
+                    "principal": message["sender"] if visible else recipient,
+                    "visible_message_id": message_id if visible else None,
                 },
                 args,
                 policy,
                 running,
                 progress,
+                separate_managed=separate_managed,
             )
             if not result.get("success"):
                 await progress(result.get("evidence", {}))
@@ -592,7 +695,7 @@ class MessageReceiver:
                 **result.get("evidence", {}),
                 "run_id": run_id,
                 "session_scope": "existing_visible_terminal"
-                if self.bridge.config.visible_handoffs.enabled
+                if visible
                 else "separate_managed_session",
                 "response_sha256": digest(result.get("text", "")),
                 "response_preview": result.get("text", "")[:320],
@@ -615,7 +718,7 @@ class MessageReceiver:
                     # Starting another receiver here can consume its awaited answer.
                     dispatch=False,
                 )
-                if self.bridge.config.visible_handoffs.enabled:
+                if visible:
                     reply = await call(
                         "message_get", {"message_id": result["evidence"]["reply_id"]}
                     )
