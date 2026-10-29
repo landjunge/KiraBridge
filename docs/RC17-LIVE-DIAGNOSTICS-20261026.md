@@ -276,3 +276,56 @@ Ruff/Format der Testdatei ebenfalls. Keine lokale Gesamtsuite, kein Produktionsc
 keine Kapazitäts-/Rechteänderung oder unsichtbare Ersatzroute aus diesem Fix.
 Der Fehlerlauf bleibt als fehlgeschlagen erhalten; die nachfolgende Pflicht-CI
 ist gesondert zu beurteilen.
+
+## Lokale Intel-macOS-Abnahme für PR49 · 29. Oktober 2026
+
+Auftrag `channel-042858aeda9a4799b45a547029d1424c` wurde im Gespräch
+`kira-pr49-review-20261029` empfangen und mit Receipt quittiert. Geprüfte Quelle:
+`71bfbb9316481996def5800390e0d8ebe63c3671`, sauberer separater Checkout unter
+`/private/tmp/kb-pr49-review-20261029/source`; keine Änderung produktiver Quellen.
+
+Die Codex-Bindung war bereits aktuell: `terminal:3033:ttys001`, Shell70676,
+Codex71896. Frischer Katalog, UID/TTY/Prozessstart-/Elternidentitäten und sichtbarer
+Auftragsmarker stimmen überein. Deshalb keine Bindungs-/Konfigurationskorrektur.
+Dies ist eine OS-/Sitzungsbeobachtung, keine kryptografische Prozessattestation.
+
+Auf Intel macOS15.7.4 mit Python3.11.15 und den exakt gepinnten TD-/TollGate-Exports
+bestand ein lokaler isolierter Verify-Lauf: **1782 bestanden, 1 übersprungen,
+1 ausdrücklich abgewählt**, 289,24 Sekunden. Der Skip betrifft den optionalen
+tatsächlichen AA-Reader ohne Quelle; abgewählt wurde ausschließlich der Test gegen
+das echte Operator-Whiteboard. Ruff und Format bestanden für383 Dateien.
+Alle **32 Receiver-/Restart-/Late-Reply-Fälle** bestanden im selben Lauf; JUnit
+belegt ihre IDs und Ergebnisse. Keine zusätzliche Suite-/Receiverwiederholung.
+
+Zwei saubere Builds derselben Quelle lieferten identische Artefakthashes. Die
+echte isolierte launchd-Paketabnahme bestand: Original-RC14-Wheelstart, Upgrade,
+authentifizierter Status, Konfigurations-/Credential-/Daten-/Dateierhalt,
+Idempotenz bei gleichem PID, eigener Testdienst-Neustart, Crash-Recovery,
+Rollback und frische Installation. Alle Pfade und der freie Loopbackport gehören
+zur Testinstanz `com.kirabridge.test.accept-pr49-042858ae`. **Keine** dieser
+Serviceaktionen betraf den laufenden RC17-Dienst. Die Label-Abwesenheit wurde
+vorher und nach dem Harness unabhängig mit `launchctl print`-Code113 bestätigt.
+Der Harness verlangt zusätzlich selbst eine geprüfte Abwesenheit beim Cleanup.
+
+Der Paketlauf war im einzigen eigenen Test-Tab3184/ttys002 sichtbar. Nach frischer
+Identitäts-/Leerlaufprüfung wurde genau dieser Tab geschlossen; ein separater
+Katalogread bestätigt seine Abwesenheit und beide ursprünglichen Agent-Tabs.
+Der produktive Dienst behält PID60636, Instanz31849a4f…, Start05:14:06Z und den
+unveränderten Startupquellhash. Die tatsächliche Konfigurationsdatei hat weiterhin
+Hash52747b83…; die drei historischen Problemnachrichten sind exakt unverändert.
+Kein produktiver Restore, kein Replay, Merge, Release oder Deployment.
+
+[Maschinenlesbare Belege](evidence/pr49-local-macos-20261029.json) enthalten Pins,
+Versions-/Hash-/Paket-/Erhaltungsnachweise. Vollständige Logs, JUnit und private
+Artefakte liegen mit geprüftem Hashmanifest unter
+`~/.local/share/kirabridge/backups/pr49-local-macos-20261029-042858ae`.
+Ein anfänglicher Peer-Extraktionsversuch scheiterte vor Tests am älteren
+Shell-Python; das leere Ziel wurde geprüft und die Extraktion mit dem dedizierten
+Python3.11 ausgeführt. Dieser Setupfehler zählt nicht als Test.
+
+Diese lokale Intel-Abnahme ersetzt keine erforderlichen GitHub-Checks. ARM,
+Signierung/Notarisierung und GitHub-Reviewfreigabe bleiben offen; die bisherigen
+macOS-Runner waren durch Billing gesperrt. Die hiesige Dokumentationsänderung
+verändert keinen geprüften Pythonquellcode. Nächster sicherer Schritt: externe
+GitHub-/ARM-/Reviewgates regulär ermöglichen und abschließen; Merge, Release und
+produktive Änderungen benötigen danach eine erneute Freigabe.
