@@ -48,6 +48,7 @@ class MessageReceiver:
         self.messages = bridge.messages
         self.worker = None
         self.stopping = False
+        self.recovered_handoffs = set()
 
     async def start(self):
         if self.worker and self.worker.done():
@@ -56,6 +57,7 @@ class MessageReceiver:
             self.worker = None
         if self.worker or not self.bridge.config.messaging.receivers:
             return
+        self.recovered_handoffs.clear()
         # The task dispatcher owns the exclusive runtime lock before this is called.
         with self.bridge.store.transaction():
             rows = self.bridge.store.db.execute(
@@ -63,14 +65,7 @@ class MessageReceiver:
             ).fetchall()
             for row in rows:
                 if self._reply_can_finish(row):
-                    reply_id = self._existing_reply(row[0])
-                    if reply_id:
-                        self._finish(
-                            row[0],
-                            "completed",
-                            {"reason": "reply_already_recorded", "automatic_retry": False},
-                            reply_id=reply_id,
-                        )
+                    self.recovered_handoffs.add(row["message_id"])
                     continue  # Return already happened; do not interrupt or paste again.
                 self._finish(
                     row[0],
@@ -93,6 +88,7 @@ class MessageReceiver:
                     if cutoff is not None and row["created"] < cutoff:
                         continue
                     self._finish(row["id"], "blocked", {"reason": "receiver_removed"})
+        self._reconcile_recovered_handoffs()
         self.stopping = False
         self.worker = asyncio.create_task(self._loop())
 
@@ -118,7 +114,9 @@ class MessageReceiver:
         if not handoff_id:
             return False
         handoff = self.bridge.store.db.execute(
-            "SELECT state FROM visible_handoffs WHERE id=?", (handoff_id,)
+            "SELECT h.state FROM visible_handoffs h JOIN messages m ON m.id=h.message_id "
+            "WHERE h.id=? AND m.id=? AND h.principal=m.sender AND h.target=m.recipient",
+            (handoff_id, row["message_id"]),
         ).fetchone()
         return bool(handoff) and handoff["state"] in {
             "return_sent",
@@ -139,6 +137,48 @@ class MessageReceiver:
             (message_id, original["recipient"], original["sender"]),
         ).fetchone()
         return reply["id"] if reply else None
+
+    def _reconcile_recovered_handoffs(self, recipient=None):
+        """Observe only waiters lost at startup; never touch a new running turn or send input."""
+        for message_id in tuple(self.recovered_handoffs):
+            with self.bridge.store.transaction():
+                row = self.bridge.store.db.execute(
+                    "SELECT j.message_id,j.state,j.evidence,m.sender,m.recipient "
+                    "FROM message_jobs j JOIN messages m ON m.id=j.message_id "
+                    "WHERE j.message_id=?",
+                    (message_id,),
+                ).fetchone()
+                if row is not None and recipient is not None and row["recipient"] != recipient:
+                    continue
+                if row is None or row["state"] != "running" or not self._reply_can_finish(row):
+                    self.recovered_handoffs.discard(message_id)
+                    continue  # In particular, never reconcile an unknown or blocked history.
+                reply_id = self._existing_reply(message_id)
+                if not reply_id:
+                    continue
+                evidence = json.loads(row["evidence"])
+                try:
+                    handoff = self.bridge.visible_handoffs.reconcile(
+                        row["sender"], evidence["handoff_id"]
+                    )
+                except BridgeError as exc:
+                    if exc.code != "forbidden":
+                        raise
+                    continue  # Revoked historical access must not stop other receiver work.
+                if handoff["state"] != "completed":
+                    continue
+                self._finish(
+                    message_id,
+                    "completed",
+                    {
+                        **evidence,
+                        "reason": "reply_already_recorded",
+                        "reconciled_without_input": True,
+                        "automatic_retry": False,
+                    },
+                    reply_id=reply_id,
+                )
+            self.recovered_handoffs.discard(message_id)
 
     def _finish(self, message_id, state, evidence, error=None, reply_id=None):
         from kirabridge.completion_manager import completion_payload, record_notice
@@ -501,6 +541,7 @@ class MessageReceiver:
                 async with lock:
                     if self.stopping:
                         return
+                    self._reconcile_recovered_handoffs(recipient)
                     dispatched = await self._dispatch_next(recipient)
                 fault_recorded = False
                 if dispatched:

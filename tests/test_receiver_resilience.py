@@ -95,6 +95,181 @@ async def test_restart_keeps_only_a_delivered_handoff(visible, state, kept):
         await receiver.stop()
 
 
+def _receive_handoff(bridge, sent):
+    return bridge.messages.receive("grok", conversation_id=sent["conversation_id"])["messages"][0]
+
+
+def _store_reply(bridge, sent, kind="result"):
+    return bridge.messages.send(
+        "grok",
+        MessageSend(
+            recipient="chatgpt",
+            conversation_id=sent["conversation_id"],
+            idempotency_key=kind + "-" + sent["id"],
+            body="stored reply",
+            kind=kind,
+            reply_to=sent["id"],
+            request_reply=False,
+            dispatch=False,
+        ),
+    )
+
+
+async def _wait_for_completion(bridge, sent):
+    async with asyncio.timeout(3):
+        while bridge.messages.get("chatgpt", sent["id"])["processing"]["state"] != "completed":
+            await asyncio.sleep(0.01)
+
+
+@pytest.mark.parametrize("receipt_last", [False, True])
+async def test_restart_finishes_late_reply_or_ack_without_input(visible, receipt_last):
+    bridge, transport = visible
+    sent = _running_handoff(bridge, "late", "sent")
+    incoming = _receive_handoff(bridge, sent)
+    if receipt_last:
+        reply = _store_reply(bridge, sent)
+    else:
+        bridge.messages.ack("grok", sent["id"], incoming["receipt"])
+    receiver = MessageReceiver(bridge)
+    await receiver.start()
+    try:
+        assert bridge.messages.get("chatgpt", sent["id"])["processing"]["state"] == "running"
+        # Let the replacement worker observe the still-incomplete evidence first.
+        await asyncio.sleep(0)
+        if receipt_last:
+            bridge.messages.ack("grok", sent["id"], incoming["receipt"])
+        else:
+            reply = _store_reply(bridge, sent)
+        await _wait_for_completion(bridge, sent)
+        job = bridge.messages.get("chatgpt", sent["id"])["processing"]
+        assert job["reply_id"] == reply["id"]
+        assert job["evidence"]["handoff_id"] == "channel-late"
+        assert job["evidence"]["reconciled_without_input"] is True
+        assert job["evidence"]["automatic_retry"] is False
+        handoff = bridge.visible_handoffs.status("chatgpt", "channel-late")
+        assert handoff["state"] == "completed"
+        assert handoff["evidence"]["reply_id"] == reply["id"]
+        # A second observation and a second receiver start cannot duplicate completion.
+        await receiver.stop()
+        await receiver.start()
+        await asyncio.sleep(0)
+        assert bridge.store.db.execute("SELECT count(*) FROM completion_notices").fetchone()[0] == 1
+        assert not transport["calls"]
+    finally:
+        await receiver.stop()
+
+
+async def test_recovered_handoff_waits_for_final_reply(visible):
+    bridge, transport = visible
+    sent = _running_handoff(bridge, "nonfinal", "confirmed")
+    incoming = _receive_handoff(bridge, sent)
+    bridge.messages.ack("grok", sent["id"], incoming["receipt"])
+    receiver = MessageReceiver(bridge)
+    await receiver.start()
+    try:
+        _store_reply(bridge, sent, "note")
+        await asyncio.sleep(0.02)
+        assert bridge.messages.get("chatgpt", sent["id"])["processing"]["state"] == "running"
+        reply = _store_reply(bridge, sent)
+        await _wait_for_completion(bridge, sent)
+        assert bridge.messages.get("chatgpt", sent["id"])["processing"]["reply_id"] == reply["id"]
+        assert not transport["calls"]
+    finally:
+        await receiver.stop()
+
+
+@pytest.mark.parametrize(
+    "change",
+    [
+        "new_running",
+        "unknown",
+        "blocked",
+        "unknown_on_start",
+        "blocked_on_start",
+        "handoff_unknown",
+    ],
+)
+async def test_restart_recovery_preserves_other_execution_states(visible, change):
+    bridge, transport = visible
+    receiver = MessageReceiver(bridge)
+    if change == "new_running":
+        bridge.config.messaging.receivers["grok"] = ReceiverConfig(cwd="/tmp", timeout=3)
+        await receiver.start()
+        await asyncio.sleep(0)
+    sent = _running_handoff(bridge, "preserved", "sent")
+    incoming = _receive_handoff(bridge, sent)
+    if change in {"unknown_on_start", "blocked_on_start"}:
+        bridge.store.db.execute(
+            "UPDATE message_jobs SET state=? WHERE message_id=?",
+            (change.removesuffix("_on_start"), sent["id"]),
+        )
+    if change != "new_running":
+        await receiver.start()
+    try:
+        if change in {"unknown", "blocked"}:
+            bridge.store.db.execute(
+                "UPDATE message_jobs SET state=? WHERE message_id=?", (change, sent["id"])
+            )
+        if change == "handoff_unknown":
+            bridge.visible_handoffs.transition(
+                "channel-preserved", "unknown", {"reason": "uncertain", "automatic_retry": False}
+            )
+        bridge.messages.ack("grok", sent["id"], incoming["receipt"])
+        _store_reply(bridge, sent)
+        await asyncio.sleep(0.02)
+        expected = change.removesuffix("_on_start")
+        expected = expected if expected in {"unknown", "blocked"} else "running"
+        assert bridge.messages.get("chatgpt", sent["id"])["processing"]["state"] == expected
+        handoff = bridge.visible_handoffs.status("chatgpt", "channel-preserved")
+        assert handoff["state"] == ("unknown" if change == "handoff_unknown" else "sent")
+        assert bridge.store.db.execute("SELECT count(*) FROM completion_notices").fetchone()[0] == 0
+        assert not transport["calls"]
+    finally:
+        await receiver.stop()
+
+
+@pytest.mark.parametrize("capability", ["task.read", "message.read"])
+async def test_recovered_handoff_with_revoked_sender_rights_does_not_block_receiver(
+    visible, capability
+):
+    bridge, transport = visible
+    sent = _running_handoff(bridge, "revoked", "sent")
+    incoming = _receive_handoff(bridge, sent)
+    bridge.messages.ack("grok", sent["id"], incoming["receipt"])
+    _store_reply(bridge, sent)
+    bridge.config.principals["chatgpt"].capabilities.remove(capability)
+    other = enqueue(bridge, sender="grok_app", key="still-authorized")
+    received = _receive_handoff(bridge, other)
+    bridge.messages.ack("grok", other["id"], received["receipt"])
+    receiver = MessageReceiver(bridge)
+    await receiver.start()
+    try:
+        async with asyncio.timeout(1):
+            while (
+                bridge.messages.get("grok_app", other["id"])["processing"]["state"] != "completed"
+            ):
+                await asyncio.sleep(0.01)
+        original = bridge.store.db.execute(
+            "SELECT state,reply_id FROM message_jobs WHERE message_id=?", (sent["id"],)
+        ).fetchone()
+        assert original["state"] == "running" and original["reply_id"] is None
+        assert (
+            bridge.store.db.execute(
+                "SELECT state FROM visible_handoffs WHERE id='channel-revoked'"
+            ).fetchone()[0]
+            == "sent"
+        )
+        assert not transport["calls"]
+        # Restoring permission permits observation of the same stored evidence, never a resend.
+        bridge.config.principals["chatgpt"].capabilities.append(capability)
+        bridge.messages.wake.set()
+        await _wait_for_completion(bridge, sent)
+        assert bridge.visible_handoffs.status("chatgpt", "channel-revoked")["state"] == "completed"
+        assert not transport["calls"]
+    finally:
+        await receiver.stop()
+
+
 async def test_same_recipient_stays_ordered_and_shutdown_drains_only_running_work(
     visible,
     monkeypatch,  # noqa: F811
