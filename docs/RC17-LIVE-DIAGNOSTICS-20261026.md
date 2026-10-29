@@ -194,14 +194,19 @@ Kein erneutes Senden, kein `resume_unsent`, keine Zustandsumdeutung und kein Lib
 [Draft-PR 49](https://github.com/landjunge/KiraBridge/pull/49) enthält den bestehenden
 Arbeitsbranch einschließlich früherer Managed-/Terminal-/Whiteboardänderungen.
 Die hier dokumentierten lokalen Prüfungen sind keine neue Gesamtabnahme dieser
-Vorgängerarbeit. Aktuelle Verify- und Intel-Paketannotationen melden erneut
-fehlgeschlagene Kontozahlung/Ausgabenlimit und **keinen gestarteten Job**;
-eine ARM-Paketprüfung wartete beim Abruf noch. Pflichtchecks bleiben offen.
+Vorgängerarbeit. Die einzeln gelesenen macOS-Verify- und Paketannotationen melden
+erneut fehlgeschlagene Kontozahlung/Ausgabenlimit und **keinen gestarteten Job**.
+Die frühere pauschale Aussage für sämtliche Verify-Jobs war zu weitgehend:
+Beim späteren Abruf für `6980b39` waren Linux3.11/3.13 tatsächlich gestartet und
+an elf Ruff-Befunden gescheitert; Tests und Build wurden danach übersprungen.
+Dieser fehlgeschlagene Lauf und ältere abgebrochene Läufe bleiben als solche
+erhalten. Pflichtchecks bleiben offen.
 
 Kein Merge, Release oder Dienstneustart. Der Dienst meldet weiterhin PID 60636,
 Instanz `31849a4ff7c346f396b99e31d6fd807d`, Start `2026-10-29T05:14:06Z` und
 Startupquellhash `4bb8e3b9…` für 120 Dateien. Sein Quellpfad ist dieser inzwischen
-geänderte Worktree; dessen aktueller Dateihash `d7cbae44…` ist separat erfasst.
+geänderte Worktree; dessen Dateihash nach den funktionalen Fixes `d7cbae44…` ist
+separat vom späteren Stand nach den Formatkorrekturen erfasst.
 Keine Behauptung, dass neuer Code vollständig geladen oder als geprüftes Paket
 installiert sei. Veröffentlicht bleibt `v0.8.0rc14`; RC17 bleibt Entwurf.
 
@@ -214,3 +219,38 @@ invalid` vor Mutation abgewiesen. Der unabhängige Katalogread bestätigte weite
 Korrektur auf `actor_type=codex` verwendet. Kein blinder Retry oder konkurrierendes
 Whiteboard. Als Nächstes sind echte CI-/Paketprüfungen und die kontrollierte
 Produktivabnahme nach erfüllten Gates erforderlich.
+
+### Nachtrag: tatsächlich gestartete Linux-CI und eng begrenzte Korrektur
+
+`c961d63` behebt ausschließlich die elf konkret gemeldeten Lintstellen und sieben
+zusätzlich vom erforderlichen Formatcheck benannte Dateien des bestehenden Branches.
+Originale wurden vor Änderung separat gesichert und zurückgelesen. Sieben reine
+Formatänderungen sind zusätzlich durch Gleichheit ihrer Python-ASTs belegt.
+Produktionscode erhielt nur Format-, Importreihenfolge- und Docstringkorrekturen.
+Die zwei tatsächlichen Teständerungen ersetzen eine pauschale Exception-Erwartung
+durch `ValidationError` und einen blockierenden Bystanderprozess durch den eigenen
+asynchron gestarteten Kindprozess mit begrenztem Cleanup.
+
+Die zwei betroffenen Prozessfälle und der eine Exceptiontypfall bestanden gezielt;
+die restliche Testsuite wurde lokal nicht wiederholt. Diese zusätzlichen Fälle
+liefen intern über Codex/native Unteragenten, ohne einen weiteren Terminal-Tab zu
+öffnen. Erforderliches `ruff check .` und `ruff format --check .` bestanden für
+alle 383 Pythondateien. Unabhängiger Gegenreview fand keinen Commitblocker.
+
+Der konkrete Fehlerlauf ist Verify40903898329 auf `6980b39`; die Linuxjobs
+123553371698/123553372604 scheiterten an Ruff. Die getrennt gelesenen
+macOS-Verify-/Paketannotationen bestätigen weiterhin 0 ausgeführte Schritte wegen
+Kontozahlung/Ausgabenlimit. Die Folge-CI nach dem gepushten `c961d63` wird anhand
+ihrer tatsächlichen Jobschritte bewertet; kein früherer Start- oder Erfolgsschluss
+wird übertragen. Whiteboardeintrag 51 korrigiert den früheren CI-Wortlaut und wurde
+vollständig unabhängig zurückgelesen. Keine Gateumgehung, produktive Aktivierung
+oder Wiederholung historischer Aufträge.
+
+Tatsächlicher Folgestand auf `c961d63`: Linux3.11 in Verify40904756345 bestand
+Lint, Format und beide gepinnten Peer-Checkouts, wurde aber während pytest durch
+die bestehende Concurrency-Regel abgebrochen. Das ist kein Testsuite-Erfolg.
+Linux3.13 wurde noch als `in_progress` ohne Jobschritte gemeldet; der zweite
+Verify40904765133 wartete ohne Jobs. Beide Paketjobs in40904765086 scheiterten
+ohne Schritte. Es liegt daher weiterhin keine vollständige CI-/Paketabnahme vor.
+Der aktuelle Quell-Dateibaum nach den Formatkorrekturen hat Hash `f54098e1…`;
+der unveränderte Dienst meldet weiterhin seinen Startuphash `4bb8e3b9…`.
