@@ -67,6 +67,9 @@ class MessageManager:
     def __init__(self, config, store, security):
         self.config, self.store, self.security = config, store, security
         self.wake = asyncio.Event()
+        # Runtime-owned admission of NEW records only. Idempotent reads and
+        # historical inbox entries never call this hook.
+        self.delivery_hook = None
         from kirabridge.voice_channel import VoiceChannel
         from kirabridge.voice_message_policy import VoiceMessagePolicy
 
@@ -405,6 +408,8 @@ class MessageManager:
                 },
             )
         self.wake.set()
+        if dispatch and self.delivery_hook is not None:
+            self.delivery_hook(principal, message_id)
         return self.get(principal, message_id)
 
     def receive(self, principal, after=0, limit=20, conversation_id=None):

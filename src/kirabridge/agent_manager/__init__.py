@@ -592,6 +592,7 @@ class AgentManager:
         owned_resume_session=None,
         handoff_reply=False,
         separate_managed=False,
+        visible_binding=None,
     ):
         if args.agent not in principal.agents:
             raise BridgeError("agent_denied", "Agent identity not granted")
@@ -609,7 +610,9 @@ class AgentManager:
                 raise BridgeError(
                     "visible_route_unavailable", "Visible handoff service is required"
                 )
-            return await self.visible_handoffs.execute(task, args, running, progress)
+            return await self.visible_handoffs.execute(
+                task, args, running, progress, binding_override=visible_binding
+            )
         full_access = (
             principal.permission_level is not None
             and config.bridge_tools

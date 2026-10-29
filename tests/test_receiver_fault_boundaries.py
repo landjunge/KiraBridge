@@ -9,6 +9,7 @@ import pytest
 from test_visible_dispatch_wait import enqueue, fake_receiver
 from test_visible_handoff import visible  # noqa: F401
 
+from kirabridge.bridge_core.config import ReceiverConfig
 from kirabridge.bridge_core.models import BridgeError
 
 
@@ -57,8 +58,8 @@ async def test_unexpected_preclaim_error_does_not_cancel_running_sibling(
     bridge, transport = visible
     receiver = bridge.message_receiver
     fake_receiver(monkeypatch, bridge, [])
-    codex = enqueue(bridge, target="codex", key="fault-codex")
-    grok = enqueue(bridge, target="grok", key="fault-grok")
+    for target in ("codex", "grok"):
+        bridge.config.messaging.receivers[target] = ReceiverConfig(cwd="/tmp", timeout=3)
     entered, release, cancelled = asyncio.Event(), asyncio.Event(), asyncio.Event()
 
     async def ready(sender, recipient):
@@ -66,9 +67,10 @@ async def test_unexpected_preclaim_error_does_not_cancel_running_sibling(
             await entered.wait()
             raise error
 
-    async def process(pool, message, run_id):
+    async def process(pool, message, run_id, *, delivery_event, delivery_binding):
         assert message["id"] == grok["id"]
         entered.set()
+        delivery_event.set()
         try:
             await release.wait()
         except asyncio.CancelledError:
@@ -81,6 +83,8 @@ async def test_unexpected_preclaim_error_does_not_cancel_running_sibling(
     monkeypatch.setattr(receiver, "_process", process)
     await receiver.start()
     try:
+        codex = enqueue(bridge, target="codex", key="fault-codex")
+        grok = enqueue(bridge, target="grok", key="fault-grok")
         await asyncio.wait_for(entered.wait(), 1)
 
         async def settled():
@@ -92,46 +96,70 @@ async def test_unexpected_preclaim_error_does_not_cancel_running_sibling(
         await asyncio.wait_for(settled(), 1)
         assert not cancelled.is_set() and not receiver.worker.done()
         failed = bridge.messages.get("chatgpt", codex["id"])["processing"]
-        assert failed["error"] == "receiver_preflight_failed"
+        assert failed["error"] == "delivery_failed"
         assert failed["claimed"] is None and "secret" not in str(failed)
+        assert failed["evidence"]["phase"] == "direct_admission"
+        assert failed["evidence"]["terminal_input_attempted"] is False
+        assert failed["evidence"]["automatic_retry"] is False
         assert bridge.messages.get("chatgpt", grok["id"])["processing"]["state"] == "running"
         assert not transport["calls"]
     finally:
         release.set()
+        await asyncio.gather(*tuple(receiver.direct.active.values()), return_exceptions=True)
         await asyncio.gather(receiver.stop(), return_exceptions=True)
     assert bridge.messages.get("chatgpt", grok["id"])["processing"]["state"] == "completed"
 
 
 async def test_outer_recipient_fault_does_not_stop_other_workers(visible, monkeypatch):
-    bridge, _ = visible
+    bridge, transport = visible
     receiver = bridge.message_receiver
     fake_receiver(monkeypatch, bridge, [])
-    enqueue(bridge, target="codex", key="loop-fault")
-    enqueue(bridge, target="grok", key="loop-sibling")
+    for target in ("codex", "grok"):
+        bridge.config.messaging.receivers[target] = ReceiverConfig(cwd="/tmp", timeout=3)
     entered, release, faulted = asyncio.Event(), asyncio.Event(), asyncio.Event()
     calls = []
 
-    async def dispatch(recipient):
+    async def dispatch(recipient, *, include_visible):
+        assert include_visible is False  # Runtime observation never resumes visible backlog.
         if recipient == "codex":
             await entered.wait()
             calls.append(recipient)
             faulted.set()
             raise OSError("Secret database observation failure")
-        entered.set()
         await release.wait()
         return False
 
+    async def process(pool, message, run_id, *, delivery_event, delivery_binding):
+        assert message["id"] == sibling["id"]
+        entered.set()
+        delivery_event.set()
+        await release.wait()
+        receiver._finish(message["id"], "completed", {})
+
     monkeypatch.setattr(receiver, "_dispatch_next", dispatch)
+    monkeypatch.setattr(receiver, "_process", process)
     await receiver.start()
     try:
+        sibling = enqueue(bridge, target="grok", key="loop-sibling")
         await asyncio.wait_for(faulted.wait(), 1)
         for _ in range(5):
             await asyncio.sleep(0)
         assert not receiver.worker.done()
+        assert bridge.messages.get("chatgpt", sibling["id"])["processing"]["state"] == "running"
+        audit = bridge.store.db.execute(
+            "SELECT metadata FROM audit WHERE kind='message.receiver_loop_failed'"
+        ).fetchall()
+        assert audit and all(
+            json.loads(row[0])["reason"] == "receiver_loop_failed" for row in audit
+        )
+        assert "Secret" not in str([tuple(row) for row in audit])
+        assert not transport["calls"]
     finally:
         release.set()
+        await asyncio.gather(*tuple(receiver.direct.active.values()), return_exceptions=True)
         await asyncio.gather(receiver.stop(), return_exceptions=True)
     assert calls
+    assert bridge.messages.get("chatgpt", sibling["id"])["processing"]["state"] == "completed"
 
 
 async def test_unexpected_postclaim_error_is_unknown_and_never_replayed(visible, monkeypatch):
@@ -192,52 +220,73 @@ async def test_start_replaces_finished_worker_handle(visible, monkeypatch):
 
 
 async def test_cancelled_stop_keeps_running_worker_owned_until_it_finishes(visible, monkeypatch):
-    bridge, _ = visible
+    bridge, transport = visible
     receiver = bridge.message_receiver
     fake_receiver(monkeypatch, bridge, [])
-    sent = enqueue(bridge, key="cancelled-stop")
-    second = enqueue(bridge, key="after-cancelled-stop")
-    entered, release = asyncio.Event(), asyncio.Event()
+    historical = enqueue(bridge, key="historical-before-start")
+    entered, cleanup_entered, release = asyncio.Event(), asyncio.Event(), asyncio.Event()
+    cleanup_finished, cleanup_interrupted = asyncio.Event(), asyncio.Event()
+    delivery_events = []
     calls = []
 
-    async def process(pool, message, run_id):
+    async def process(pool, message, run_id, *, delivery_event, delivery_binding):
         calls.append(message["id"])
+        delivery_events.append(delivery_event)
         entered.set()
-        await release.wait()
-        with bridge.store.transaction():
-            receiver._finish(message["id"], "completed", {})
+        try:
+            await asyncio.Event().wait()
+        except asyncio.CancelledError:
+            cleanup_entered.set()
+            try:
+                await release.wait()
+            except asyncio.CancelledError:
+                cleanup_interrupted.set()
+                raise
+            cleanup_finished.set()
+            raise
 
     monkeypatch.setattr(receiver, "_process", process)
     await receiver.start()
     worker = receiver.worker
+    stopping = None
     try:
+        sent = enqueue(bridge, key="cancelled-stop")
         await asyncio.wait_for(entered.wait(), 1)
         stopping = asyncio.create_task(receiver.stop())
-        await asyncio.sleep(0)
+        await asyncio.wait_for(cleanup_entered.wait(), 1)
         stopping.cancel()
-        with pytest.raises(asyncio.CancelledError):
-            await stopping
-        assert receiver.worker is worker and not worker.done()
+        await asyncio.sleep(0)
+        assert not stopping.done()  # Owned cleanup is still referenced and shielded.
+        assert not cleanup_finished.is_set() and not cleanup_interrupted.is_set()
+        assert sent["id"] in receiver.direct.active
+        assert receiver.direct.targets and not delivery_events[0].is_set()
+        assert receiver.stopping and not receiver.direct.accepting
         await receiver.start()
         assert receiver.worker is worker and calls == [sent["id"]]
-        assert receiver.stopping  # Cancelling the waiter does not withdraw the stop request.
-        assert bridge.messages.get("chatgpt", second["id"])["processing"]["state"] == "queued"
+        assert receiver.stopping and not receiver.direct.accepting
+        assert bridge.messages.get("chatgpt", historical["id"])["processing"]["state"] == "queued"
+        release.set()
+        with pytest.raises(asyncio.CancelledError):
+            await stopping
+        assert cleanup_finished.is_set() and not cleanup_interrupted.is_set()
+        assert delivery_events[0].is_set()
+        assert not receiver.direct.active and not receiver.direct.targets
     finally:
         release.set()
+        if stopping is not None:
+            await asyncio.gather(stopping, return_exceptions=True)
         await asyncio.gather(receiver.stop(), return_exceptions=True)
     assert receiver.worker is None
-    assert bridge.messages.get("chatgpt", sent["id"])["processing"]["state"] == "completed"
-    assert bridge.messages.get("chatgpt", second["id"])["processing"]["state"] == "queued"
-    await receiver.start()  # An explicit later start resumes the preserved next message once.
+    current = bridge.messages.get("chatgpt", sent["id"])["processing"]
+    assert current["state"] == "unknown" and current["evidence"]["automatic_retry"] is False
+    assert bridge.messages.get("chatgpt", historical["id"])["processing"]["state"] == "queued"
+    await receiver.start()
     try:
-
-        async def completed():
-            while (
-                bridge.messages.get("chatgpt", second["id"])["processing"]["state"] != "completed"
-            ):
-                await asyncio.sleep(0)
-
-        await asyncio.wait_for(completed(), 1)
+        for _ in range(5):
+            await asyncio.sleep(0)
+        assert calls == [sent["id"]]
+        assert bridge.messages.get("chatgpt", sent["id"])["processing"] == current
+        assert bridge.messages.get("chatgpt", historical["id"])["processing"]["state"] == "queued"
+        assert not transport["calls"]  # Coroutine shutdown says nothing about a CLI process.
     finally:
         await receiver.stop()
-    assert calls == [sent["id"], second["id"]]
