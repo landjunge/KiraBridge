@@ -29,6 +29,32 @@ class SessionReference(Input):
 
 class SessionRead(SessionReference):
     max_bytes: int = Field(default=65536, ge=1, le=65536)
+    since: str = Field(default="", max_length=64, pattern=r"^$|[0-9a-f]{64}")
+
+
+def follow_screen(previous: str | None, screen: str, *, since: str) -> dict:
+    """Describe new terminal bytes without dropping the current screen.
+
+    An unknown cursor resets. It never borrows text stored for another pane.
+    Terminal.app rewrites the last prompt, so a short changed tail still counts
+    as appended output. A rewrite earlier in the screen resets instead.
+    """
+    if not since:
+        return {"follow": "full"}
+    if previous is None:
+        return {"follow": "reset"}
+    if previous == screen:
+        return {"follow": "unchanged", "appended": ""}
+    if screen.startswith(previous):
+        return {"follow": "append", "appended": screen[len(previous) :]}
+    common = 0
+    limit = min(len(previous), len(screen))
+    while common < limit and previous[common] == screen[common]:
+        common += 1
+    rewritten = len(previous) - common
+    if common >= 32 and rewritten <= 256:
+        return {"follow": "append", "appended": screen[common:]}
+    return {"follow": "reset"}
 
 
 class SessionSelect(SessionReference):
@@ -653,7 +679,9 @@ class SessionManager:
             )
         return process["name"]
 
-    async def read_observed(self, principal, pane_id, expected_pid, *, max_bytes=65536):
+    async def read_observed(
+        self, principal, pane_id, expected_pid, *, max_bytes=65536, since=""
+    ):
         selected = await self.selected(principal, pane_id, expected_pid)
         with self.observation_scope(principal, selected):
             result = await self.read(principal, pane_id, expected_pid, max_bytes=max_bytes)
@@ -661,7 +689,20 @@ class SessionManager:
                 observation = await self.readiness(principal, result)
                 if observation is not None:
                     result = {**result, "input_readiness": observation}
-            return self.audit.observe_terminal(principal, result)
+            previous = None
+            if since and hasattr(self.audit, "captured_text"):
+                previous = self.audit.captured_text(
+                    principal,
+                    "session_capture",
+                    f"{pane_id}:{expected_pid}",
+                    since,
+                )
+            result.update(follow_screen(previous, result["text"], since=since))
+            result = self.audit.observe_terminal(principal, result)
+            reference = result.get("output_ref") or {}
+            if isinstance(reference, dict) and isinstance(reference.get("sha256"), str):
+                result["next_cursor"] = reference["sha256"]
+            return result
 
     async def open(self, principal, args, *, task_id=None):
         policy = self.authorization.principal(principal, "session.open")

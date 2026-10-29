@@ -58,6 +58,7 @@ class TerminalQueries:
                     args.pane_id,
                     args.expected_pid,
                     max_bytes=args.max_bytes,
+                    since=args.since,
                 )
         except TimeoutError:
             raise BridgeError(

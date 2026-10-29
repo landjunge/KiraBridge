@@ -25,6 +25,22 @@ from kirabridge.team_manager.models import (
 )
 
 
+def inline_task_timeout(operation: str) -> float | None:
+    """Seconds task_request may wait so the tool result contains the finished read.
+
+    session.read used to return only a queued receipt. Its text lived in a snapshot,
+    and the default completion inbox does not deliver that text. Clipboard and
+    ThreadDesk keep the existing two-second wait.
+    """
+    if operation in {"threaddesk.read", "threaddesk.manage", "clipboard.read", "clipboard.write"}:
+        return 2
+    if operation in {"session.catalog", "session.read"}:
+        from kirabridge.terminal_queries import TERMINAL_QUERY_SECONDS
+
+        return TERMINAL_QUERY_SECONDS + 1
+    return None
+
+
 def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = "local") -> FastMCP:
     config = bridge.config
     server = FastMCP(
@@ -57,8 +73,10 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
         "session_input_policy is an optional confirmation buffer, not a terminal enable switch. "
         "agent_status includes existing interactive_terminal_sessions. Cached clients can use "
         "task_request operations session.catalog (empty arguments) and session.read "
-        "(pane_id, expected_pid, optional max_bytes) then task_get for actual output, or "
-        "read_query with operation session.catalog or session.read and exact pane_id/expected_pid. "
+        "(pane_id, expected_pid, optional max_bytes, optional since) wait and return the "
+        "resolved text. next_cursor plus since reads only newer output in appended; "
+        "follow is full, append, unchanged, or reset. text remains the current screen. "
+        "read_query accepts the same session.read fields. A read does not focus or type. "
         "Eve = Grok Voice; Grok Build = Grok Terminal; Kira = ChatGPT Voice; "
         "Codex = ChatGPT Terminal. Eve relays only Daniel's dictation unchanged, "
         "without additions. Explicit requests need no special voice token. "
@@ -209,6 +227,7 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
         file.list (path; at most 100 entries), terminal.output (owned task_id,
         max_bytes<=65536). session.catalog lists existing terminal handles;
         session.read requires exact pane_id and expected_pid, max_bytes<=65536.
+        Optional since is the previous next_cursor. appended is only the new text.
         Session reads require session.inspect and the shared permission decision.
         When approval is required, submit the same operation using task_request.
         No shell input or process attachment.
@@ -231,12 +250,15 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
             return {"error": {"code": exc.code, "message": str(exc)}}
 
     @server.tool(annotations=read)
-    async def session_read(pane_id: str, expected_pid: int, ctx: Context) -> dict[str, Any]:
-        """Read bounded output from a Terminal.app tab or tmux pane selected by catalog handle."""
+    async def session_read(
+        pane_id: str, expected_pid: int, ctx: Context, since: str = ""
+    ) -> dict[str, Any]:
+        """Read one terminal without focusing it. Pass since=next_cursor for newer output only."""
         try:
-            return await bridge.terminal_queries.execute(
-                identity(ctx), "session.read", {"pane_id": pane_id, "expected_pid": expected_pid}
-            )
+            arguments = {"pane_id": pane_id, "expected_pid": expected_pid}
+            if since:
+                arguments["since"] = since
+            return await bridge.terminal_queries.execute(identity(ctx), "session.read", arguments)
         except BridgeError as exc:
             return {"error": {"code": exc.code, "message": str(exc)}}
 
@@ -441,15 +463,15 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
         task = safe(
             lambda: bridge.prepare(principal, request, completion_target=completion_target)
         )
+        timeout = inline_task_timeout(task.get("operation")) if isinstance(task, dict) else None
         if (
             isinstance(task, dict)
-            and task.get("operation")
-            in {"threaddesk.read", "threaddesk.manage", "clipboard.read", "clipboard.write"}
+            and timeout
             and task.get("state") in {"queued", "accepted", "running"}
             and bridge.tasks.workers
         ):
             try:
-                task = await bridge.tasks.wait(principal, task["id"], timeout=2)
+                task = await bridge.tasks.wait(principal, task["id"], timeout=timeout)
             except TimeoutError:
                 task = safe(lambda: bridge.task(principal, task["id"]))
         if isinstance(task, dict) and task.get("id") and task.get("state"):
