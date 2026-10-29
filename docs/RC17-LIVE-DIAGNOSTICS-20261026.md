@@ -254,3 +254,25 @@ Verify40904765133 wartete ohne Jobs. Beide Paketjobs in40904765086 scheiterten
 ohne Schritte. Es liegt daher weiterhin keine vollständige CI-/Paketabnahme vor.
 Der aktuelle Quell-Dateibaum nach den Formatkorrekturen hat Hash `f54098e1…`;
 der unveränderte Dienst meldet weiterhin seinen Startuphash `4bb8e3b9…`.
+
+### Nachtrag: einzelner Health-Read-Testfehler im abgeschlossenen Linux-Lauf
+
+Verify40905449753 auf `852a016` beendete beide Linux-Suiten tatsächlich mit
+jeweils **1 Fehler, 1766 bestanden, 17 übersprungen**; Build wurde übersprungen.
+Betroffen war ausschließlich
+`test_health_monitors_leave_terminal_read_capacity_available`. Sein Testdouble
+für `read_observed` kannte den seit `def45ff` übergebenen Cursorparameter `since`
+nicht. Die echte Methode unterstützt ihn bereits. Der Toolfehler lieferte kein
+strukturiertes Ergebnis; erst der anschließende Zugriff erzeugte den sichtbaren
+`NoneType`-Fehler. Die unabhängige Diagnose bestätigt eine Testvertragsabweichung,
+keinen Nachweis erschöpfter Lesekapazität.
+
+Nur dieses Testdouble wurde nach Backup an die reale Signatur angepasst.
+Zusätzlich prüft der Test den leeren Standardcursor und den erfolgreichen
+strukturierten Toolrückweg, bevor er dessen Inhalt liest. Alle sechs parallelen
+Health-Aufrufe, das Verbot von Terminalkatalogproben und die Prüfung des freigegebenen
+Leseslots bleiben erhalten. Der einzelne betroffene HTTP-Fall bestand danach;
+Ruff/Format der Testdatei ebenfalls. Keine lokale Gesamtsuite, kein Produktionscode,
+keine Kapazitäts-/Rechteänderung oder unsichtbare Ersatzroute aus diesem Fix.
+Der Fehlerlauf bleibt als fehlgeschlagen erhalten; die nachfolgende Pflicht-CI
+ist gesondert zu beurteilen.

@@ -757,5 +757,45 @@
         }
       ]
     }
-  ]
+  ],
+  "ci_completed_852a016": {
+    "run": 40905449753,
+    "head": "852a016b6e6bc5d54160ec3843b0038a81f0817c",
+    "linux_3_11": {
+      "job": 123559347504,
+      "failed": 1,
+      "passed": 1766,
+      "skipped": 17,
+      "seconds": 207.19
+    },
+    "linux_3_13": {
+      "job": 123559347678,
+      "failed": 1,
+      "passed": 1766,
+      "skipped": 17,
+      "seconds": 207.18
+    },
+    "failed_test": "tests/test_discovery_visible.py::test_health_monitors_leave_terminal_read_capacity_available",
+    "build": "skipped",
+    "scope": "Both real required Linux suites completed with this one failure; not passes"
+  },
+  "ci_health_read_fixture_fix": {
+    "scope": "Test double only; production SessionManager.read_observed already accepts since. The test double omitted that keyword and returned an MCP tool error without structuredContent.",
+    "change": "Accept since=\"\", assert the default cursor, and assert tool success/structured result before inspecting text. Preserve six concurrent health requests, zero Terminal catalog probes, and released read slot assertion.",
+    "targeted_result": {
+      "label": "ci-health-read-green",
+      "argv": [
+        "/Users/landjunge/KiraBridge-worktrees/managed-message-route-20261028/.venv/bin/python",
+        "-m",
+        "pytest",
+        "-q",
+        "tests/test_discovery_visible.py::test_health_monitors_leave_terminal_read_capacity_available"
+      ],
+      "exit_code": 0,
+      "finished_at": "2026-10-29T15:56:58.558963+00:00"
+    },
+    "changed_file": "tests/test_discovery_visible.py",
+    "sha256": "aa0d6555a2cf849cfd041f7d8a3ffde4d582e31442080ed8bf5a4483ac452d6f",
+    "native_independent_diagnosis": "receiver_review confirmed test-only cursor contract mismatch; no production fallback/capacity/security change needed"
+  }
 }
