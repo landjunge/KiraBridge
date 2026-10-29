@@ -15,6 +15,20 @@ from kirabridge.platform_adapters.clipboard_lease import clipboard_lease
 from kirabridge.platform_adapters.desktop import MacDesktop
 
 
+def annotate_views(sessions: list[dict]) -> list[dict]:
+    """Mark several on-screen views of one TTY and PID without merging them."""
+    counts: dict[str, int] = {}
+    for row in sessions:
+        key = f"{row.get('tty')}:{row.get('expected_pid')}"
+        row["session_key"] = key
+        row["view_id"] = row.get("window_id")
+        counts[key] = counts.get(key, 0) + 1
+    for row in sessions:
+        row["view_count"] = counts[row["session_key"]]
+        row["duplicate_view"] = row["view_count"] > 1
+    return sessions
+
+
 def attach_visual_windows(rows: list[dict]) -> list[dict]:
     """Group Terminal.app scripting objects that share one on-screen window.
 

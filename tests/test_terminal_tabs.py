@@ -1,4 +1,4 @@
-from kirabridge.platform_adapters.terminal_app import attach_visual_windows
+from kirabridge.platform_adapters.terminal_app import annotate_views, attach_visual_windows
 
 
 def _tab(window_id, tty, *, bounds=None, frontmost=False, index=1, script_tabs=1, selected=False):
@@ -55,6 +55,21 @@ def test_ended_tab_does_not_claim_a_reused_tty():
     ended = next(row for row in rows if row["window_id"] == 1785)
     assert live["identity_ambiguous"] is False
     assert ended["identity_ambiguous"] is False
+
+
+def test_same_tty_and_pid_stay_distinct_views():
+    rows = annotate_views(
+        [
+            {"tty": "/dev/ttys001", "expected_pid": 3257, "window_id": 626, "agent_pid": 3297},
+            {"tty": "/dev/ttys001", "expected_pid": 3257, "window_id": 900, "agent_pid": 3297},
+            {"tty": "/dev/ttys004", "expected_pid": 50, "window_id": 901, "agent_pid": 80},
+        ]
+    )
+    assert rows[0]["session_key"] == rows[1]["session_key"]
+    assert rows[0]["view_id"] != rows[1]["view_id"]
+    assert rows[0]["duplicate_view"] is True
+    assert rows[2]["duplicate_view"] is False
+    assert rows[2]["session_key"] != rows[0]["session_key"]
 
 
 def test_duplicate_tty_is_not_addressable():
