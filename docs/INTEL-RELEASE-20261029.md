@@ -10,10 +10,13 @@ then a real download test. Productive RC17 was not replaced or restarted.
 
 [Machine-readable evidence](evidence/intel-release-rc18-20261029.json) is the exact
 source for counts, SHA256, commands, fixture versions and preservation checks.
-[Draft review](https://github.com/landjunge/KiraBridge/releases/tag/untagged-7e6f116bdfb28ec1dc8b) ·
+[Draft review](https://github.com/landjunge/KiraBridge/releases) ·
 [PR52](https://github.com/landjunge/KiraBridge/pull/52) ·
 [future published version](https://github.com/landjunge/KiraBridge/releases/tag/v0.8.0rc18).
 The future link is not represented as a working public download before publication.
+GitHub can change an unpublished draft's temporary untagged HTML URL when its
+metadata is edited; the review link deliberately uses the stable release index.
+The exact URL in the download evidence records its observation time, not a permanent link.
 
 ## Decisions, branches and commits
 
