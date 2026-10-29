@@ -576,10 +576,10 @@ class SessionManager:
         ]
         if len(matches) == 1:
             selected = matches[0]
-            if selected.get("identity_ambiguous") or selected.get("selection_ambiguous"):
+            if selected.get("identity_ambiguous"):
                 raise BridgeError(
                     "visible_target_ambiguous",
-                    "Tab identity is not unique; no input until the catalog is unambiguous",
+                    "Several live tabs report this tty; no input until the view is unique",
                 )
             return selected
         raise BridgeError(
