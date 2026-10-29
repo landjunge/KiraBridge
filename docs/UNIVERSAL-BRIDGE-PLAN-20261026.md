@@ -103,3 +103,133 @@ Arbeitspaket als Release oder vollständige ChatGPT-Abnahme bezeichnen.
 Gemeinsames Arbeitsgedächtnis bleibt ausschließlich Whiteboard188ce4729a62.
 Aktueller Plan, Fortschritt, konkrete Blocker und nächster Schritt werden dort mit
 frischer Revision, stabiler Operation-ID und unabhängigem Readback fortgeschrieben.
+
+## Vorschlag: quellenneutraler Modulvertrag V1 · 29. Oktober 2026
+
+Auftrag `codex_grok_handoff_20261029_01`, ursprünglicher Stabilitätsplan Schritt5.
+Dieser Anhang und das [Discovery-Schema](contracts/module-descriptor.v1.schema.json)
+bereiten einen Vertrag vor. Kein vorhandener Adapter implementiert durch diesen
+Text einen neuen Discovery-Endpunkt; keine Runtimefähigkeit oder Produktivabnahme
+wird daraus abgeleitet. Bestehende Protokolle, Autorisierung und Dispatcher bleiben
+die jeweiligen Eigentümer. Ein Deskriptor enthält keine Ausführungsanfrage.
+
+### Discovery und sichere Auswahl
+
+Ein künftiger Adapter liest den Deskriptor ausschließlich über einen konfigurierten,
+authentifizierten bestehenden Transport. `module.id`, `instance_ref`, `revision`,
+Capabilities und `required_permissions` sind fremde Aussagen, keine Identitäts- oder
+Rechtebelege. Authentifizierte Gegenstelle und lokales Ziel werden separat geprüft.
+Keine Zugangsdaten, Hostpfade, Shellbefehle oder ausführbaren Schemaimporte gehören
+in den Deskriptor. Schema-IDs sind opake Referenzen auf lokal geprüfte Definitionen;
+sie veranlassen keinen Datei-, Netzwerk- oder Codeabruf.
+
+Der vorgeschlagene Auswahlablauf ist verbindlich für eine spätere Implementierung:
+
+1. Nur die ausdrücklich lokal unterstützte `descriptor_version="1"` mit dem lokalen
+   Schema validieren, einschließlich `date-time`-Formatprüfung. Unbekannte Version,
+   unbekanntes Pflichtfeld oder fehlerhafte Form sperrt die Verwendung; kein
+   automatischer Rückfall auf einen älteren Vertrag.
+2. `protocols` und `schemas` nennen exakte unterstützte Versionen, keine Bereiche.
+   Jede Capability referenziert genau eine Protokoll-, Anfrage- und Ergebnisversion.
+   Diese müssen sowohl im Deskriptor als auch in der lokalen Adapterunterstützung
+   enthalten sein. Doppelte IDs innerhalb einer Liste, widersprüchliche Deklarationen
+   und nicht auflösbare Referenzen sperren die Auswahl. Diese Beziehungen benötigen
+   zusätzliche semantische Prüfung; JSON-Schema allein beweist sie nicht.
+3. Die tatsächlich benötigte Capability frisch erkennen und die vorhandene lokale
+   Rechteentscheidung für Principal, Operation und Ressource neu auswerten. Fremde
+   `required_permissions`, `effect` oder Healthwerte können Rechte nur zusätzlich
+   einschränken. Sie ersetzen keine lokale Klassifizierung, Freigabe oder Prüfung
+   weiterer benötigter Rechte. Ablehnung und ausstehende Freigabe bleiben getrennte
+   Zustände; Discovery erteilt keine Ausführungsvollmacht.
+4. `health.state=unknown`, `degraded`, `unavailable` oder veraltete Beobachtung
+   begründet keine Ausführungsbereitschaft. `available` benötigt `observed_at` und
+   `valid_for_seconds` von 1 bis 300. Der Consumer prüft Zeitsinn und maximal erlaubte
+   Uhrabweichung, begrenzt die Gültigkeit zusätzlich mit seiner lokalen TTL und
+   misst seit eigenem Empfang monoton. Fremde Zukunftszeit verlängert keine Frist.
+   Health bleibt eine Beobachtung und ersetzt keine aktionsbezogene Readiness.
+5. `binding.state=claimed` nennt nur `target_ref` und Bindungsrevision. Der Consumer
+   muss diese Referenzen an seine aktuelle authentifizierte Transport-/Instanzbindung
+   koppeln und unmittelbar vor der Operation erneut prüfen. `unbound`, unbekannte
+   Identität, Zielwechsel, Reconnect oder Revisionswechsel sperrt die Fortsetzung
+   bis zur neuen Discovery und lokalen Prüfung. Terminal-Pane/TTY/PID oder konkrete
+   Ressourcen bleiben im bestehenden lokalen Adapter und werden nicht zu allgemeinen
+   Modulidentitäten umgedeutet.
+
+Deskriptoren werden anhand lokaler Byte-/Tiefe-/Zeitbudgets gelesen; eine
+unvollständige Antwort ist ungültig und wird nicht still gekürzt verwendet.
+Ein leeres Capability-/Protokoll-/Schemaverzeichnis ist gültige Discovery, erlaubt
+jedoch keine Operation. Neue Fähigkeiten werden weder aus Produktnamen noch aus
+unbekannten Feldern erraten. Optionale `extensions` dürfen nur benannte Metadaten
+unter einem Namensraum wie `org.example` ergänzen. Unbekannte Erweiterungen bleiben
+inert und dürfen ignoriert werden. Sicherheitsrelevante oder erforderliche neue
+Semantik benötigt eine ausdrücklich unterstützte neue Vertragsversion.
+
+### Operations-ID, Abschluss und Unknown
+
+Eine spätere Ausführungsanbindung verwendet die vorhandene stabile Operations-ID
+mit dauerhaftem Bezug zu Principal, ausgewählter Capability-/Schemaversion,
+ursprünglichem Ziel und Anfragefingerprint. Dieselbe ID mit anderem Inhalt wird
+abgewiesen. Diese Pflicht ist Teil des Operationsvertrags, kein zusätzliches
+Ausführungsfeld dieses Discovery-Schemas. Bestehende Idempotenz-/Receipt-Journale
+werden weiterverwendet, keine zweite Ausführungsqueue aufgebaut.
+
+Nach verlorenem Rückweg, Timeout, Reconnect oder Neustart wird unter der
+ursprünglichen ID ausschließlich der vorhandene Zustand und authentifizierte
+Abschlussbeleg gelesen. `unknown` ist weder fehlgeschlagene noch ungestartete
+Ausführung und wird niemals automatisch wiederholt oder mit neuer ID umgangen.
+Empfang, Quittierung, bestätigte Wirkung und fachlicher Erfolg bleiben getrennt.
+Eine frische Discovery beweist keinen früheren Abschluss und entsperrt keinen
+historischen Handoff. Widersprüchliche Belege oder nicht unterstützte Abfrageverträge
+bleiben sichtbar ungeklärt; kein synthetischer Erfolgsbeleg.
+
+### Vier Produktgrenzen und minimale Referenzdeskriptoren
+
+| Produkt | Hier belegte bestehende Grenze | Keine Aussage dieses Vorschlags |
+| --- | --- | --- |
+| ThreadDesk | Vorhandene getrennte Read-/Manage-/Knowledge-Adapter; zusätzlich begrenzte dynamische Erkennung lesender Tools. Administration besitzt einen produktspezifischen Vertrag in `threaddesk_contract.py`. | Kein implementiertes Mapping auf diesen Moduldeskriptor, keine neue Import-/Indexabnahme oder erneute Library-Ausführung. |
+| 4AllPass | In KiraBridge kein Runtimeadapter. Geschützte konkrete Zugangsnutzung braucht einen gesondert geprüften Vertrag; Rohgeheimnisse gehören nicht in Modell, Prompt, Log oder Deskriptor. | Keine allgemeine Tresorisolation und kein bereits vorhandener vermittelnder Secret-Executor. |
+| TollGate | Optionaler gepinnter `stop_only`-Hostadapter mit begrenzter eigener Dispatch-/Stoppgrenze; [vorhandener Vertrag](WORKFLOW-CONTROL-CONFIGURATION.md). | Keine universelle Kosten-/Budgetkontrolle direkter APIs, CLI-Kontingente oder beliebiger Kindprozesse. |
+| Agent Authority | Begrenzter Beobachtungsexport ausgewählter bestehender Belege; [vorhandener Vertrag](WORKFLOW-OBSERVATION-EXPORT.md). | Kein Rechteissuer, Budgetentscheider oder allgemeiner Stoppdienst. |
+
+Die vier folgenden **synthetischen Referenzen** enthalten bewusst keine behauptete
+Runtimefähigkeit. Sie sind kein Discovery-Ergebnis einer laufenden Installation.
+Jedes einzelne Objekt validiert gegen das V1-Schema; alle bleiben ungebunden und
+ohne beobachtete Health. Eine zukünftige echte Deklaration benötigt eigene Belege.
+
+```json
+[
+  {
+    "descriptor_version": "1",
+    "revision": "example-only",
+    "module": { "id": "threaddesk", "instance_ref": "example-only" },
+    "protocols": [], "schemas": [], "capabilities": [],
+    "binding": { "state": "unbound" }, "health": { "state": "unknown" }
+  },
+  {
+    "descriptor_version": "1",
+    "revision": "example-only",
+    "module": { "id": "4allpass", "instance_ref": "example-only" },
+    "protocols": [], "schemas": [], "capabilities": [],
+    "binding": { "state": "unbound" }, "health": { "state": "unknown" }
+  },
+  {
+    "descriptor_version": "1",
+    "revision": "example-only",
+    "module": { "id": "tollgate", "instance_ref": "example-only" },
+    "protocols": [], "schemas": [], "capabilities": [],
+    "binding": { "state": "unbound" }, "health": { "state": "unknown" }
+  },
+  {
+    "descriptor_version": "1",
+    "revision": "example-only",
+    "module": { "id": "agent-authority", "instance_ref": "example-only" },
+    "protocols": [], "schemas": [], "capabilities": [],
+    "binding": { "state": "unbound" }, "health": { "state": "unknown" }
+  }
+]
+```
+
+Vor Runtimeanbindung bleiben die produktspezifischen Protokoll-/Schemaabgleiche,
+authentifizierte Discovery, lokale Rechte-/Zielbindung, Drift-/Freshnessprüfung und
+gezielte Unknown-/Idempotenzabnahme offen. Schema- und Beispielvalidierung dieses
+Dokumentationsschritts ersetzt keinen dieser Nachweise.
