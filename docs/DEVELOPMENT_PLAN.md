@@ -47,8 +47,11 @@ Keep the repository private. Do not alter existing Agent Authority, ThreadDesk, 
 
 ## Current evidence delta · KB-INTEL-20261029
 
-Intel rc18 packaging, integration tests and isolated lifecycle acceptance are complete;
-merge/publication and productive activation remain separately approval-gated.
-ARM/paid hostedMac remain explicitly deferred/external.
-[Exact source, test counts, immutable artifact SHA256, backup/rollback and pending decisions](INTEL-RELEASE-20261029.md).
+Intel rc18 is merged, published and visibly installed under authorization
+rc18_release_install_20261029. Published-download, guarded productive stop/start/restart,
+input/Return, busy/stale-target refusal, restart idempotency and data preservation
+are verified. [Current release/install evidence and remaining issue51 acceptance](RC18-PUBLISH-INSTALL-20261029.md).
+[Historical build acceptance, hashes and original approval boundary](INTEL-RELEASE-20261029.md)
+are retained. ARM/paid hostedMac remain deferred/external. Native ready-Codex and
+actual ChatGPT Host/voice acceptance remain separate from the tested shell/protocol.
 The existing architecture and modules above are not replanned.

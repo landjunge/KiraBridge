@@ -1,4 +1,8 @@
-# Install and update KiraBridge · 0.8.0rc17
+# Install and update KiraBridge · 0.8.0rc18
+
+RC18 is published and installed on the accepted Intel host.
+[Current download/install/recovery evidence](RC18-PUBLISH-INSTALL-20261029.md).
+The retained RC17 acceptance links below describe historical results.
 
 RC17 Intel acceptance and explicit operator approval are recorded in
 [Intel acceptance](INTEL-ACCEPTANCE-20261026.md). Actual
