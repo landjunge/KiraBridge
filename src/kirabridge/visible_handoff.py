@@ -7,6 +7,14 @@ import time
 from kirabridge.bridge_core.models import BridgeError, UncertainExecution, canonical, digest
 from kirabridge.message_manager import MessageSend
 from kirabridge.session_manager import SessionInput
+from kirabridge.visible_binding import (
+    binding_still_present,
+    catalog_can_replace,
+    identities_disjoint,
+    load_refresh,
+    replacement_binding,
+    save_refresh,
+)
 from kirabridge.visible_readiness import assess, input_view
 from kirabridge.voice_channel import IDENTITIES
 
@@ -104,6 +112,7 @@ class VisibleHandoffs:
         from kirabridge.platform_adapters.codex_state import CodexTurnState
 
         self.codex_state = CodexTurnState()
+        load_refresh(config)
         with store.transaction():
             store.db.execute(
                 "CREATE TABLE IF NOT EXISTS visible_handoffs ("
@@ -309,6 +318,7 @@ class VisibleHandoffs:
         *,
         busy_message="Existing handoff must finish or reconcile",
         explicit_paste_task_id=None,
+        observed_sessions=None,
     ):
         """Keep the input lock until authenticated receipt and verified target readiness."""
         if explicit_paste_task_id is not None:
@@ -341,6 +351,10 @@ class VisibleHandoffs:
                 row, binding, explicit_paste_task_id
             ):
                 continue  # Original state, binding, events and receipt remain untouched.
+            if await self._foreign_dead_reservation(
+                principal, target, row, binding, observed_sessions
+            ):
+                continue  # Dead pane stays recorded. It does not lock the replacement.
             status = self.reconcile(row["principal"], row["id"])
             if status["state"] in {"completed", "interrupted"}:
                 continue
@@ -377,6 +391,23 @@ class VisibleHandoffs:
                     self.transition(row["id"], "unknown", evidence)
                 continue
 
+            if self._pre_paste_refusal(status):
+                await self.check_target(principal, target, binding, ready=True)
+                if status["evidence"].get("reason") != "pre_paste_refusal_lock_released":
+                    self.transition(
+                        row["id"],
+                        "unknown",
+                        {
+                            **status["evidence"],
+                            "reason": "pre_paste_refusal_lock_released",
+                            "previous_reason": status["evidence"].get("reason"),
+                            "terminal_input_attempted": False,
+                            "return_sent": False,
+                            "automatic_retry": False,
+                            "target_readiness": "verified_ready_before_new_input",
+                        },
+                    )
+                continue  # The old message stays unknown and is not sent again.
             error = BridgeError("visible_target_busy", busy_message)
             last = status["events"][-1] if status["events"] else None
             error.observation = {
@@ -390,13 +421,131 @@ class VisibleHandoffs:
             }
             raise error
 
+    @staticmethod
+    def _pre_paste_refusal(status):
+        """A screen mismatch before AXPress sent no paste and no Return."""
+        if status["state"] != "unknown":
+            return False
+        if status["evidence"].get("reason") not in {
+            "visible_input_changed",
+            "pre_paste_refusal_lock_released",
+        }:
+            return False
+        return not any(
+            event["state"] in {"submitting", "return_sent", "sent", "confirmed"}
+            for event in status["events"]
+        )
+
     async def dispatch_ready(self, principal, target):
         """Observe before claiming a message; never paste or settle unknown input."""
         binding = self.config.visible_handoffs.bindings.get(target)
         if binding is None:
             raise BridgeError("visible_target_missing", "No assigned existing visible terminal")
-        await self.reconcile_target_reservations(principal, target, binding)
+        binding, observed = await self.refreshed_binding(principal, target, binding)
+        await self.reconcile_target_reservations(
+            principal, target, binding, observed_sessions=observed
+        )
         await self.check_target(principal, target, binding, ready=True)
+
+    async def refreshed_binding(self, principal, target, binding):
+        """Use the saved binding while its process lives. Replace only a dead unique agent.
+
+        The returned session list is the catalog snapshot that proved the replacement.
+        Callers may use it to ignore reservations on that dead pane. A matched binding
+        returns no snapshot, so an unrelated reservation keeps its existing lock.
+        """
+        try:
+            selected = await self.sessions.selected(
+                principal, binding.pane_id, binding.expected_pid
+            )
+        except BridgeError:
+            selected = None
+        if selected is not None and self.sessions.binding_matches(selected, binding, target):
+            return binding, None
+        try:
+            catalog = await self.sessions.catalog(principal)
+        except BridgeError:
+            return binding, None
+        if not catalog_can_replace(catalog):
+            return binding, None
+        sessions = catalog.get("sessions") or []
+        try:
+            await self.sessions.prove_original_target_gone(principal, binding.model_dump())
+        except BridgeError:
+            return binding, None
+        updated = replacement_binding(target, binding, sessions)
+        if updated is None:
+            return binding, None
+        self.config.visible_handoffs.bindings[target] = updated
+        save_refresh(self.config, target, binding, updated)
+        self.store.audit(
+            "visible_binding_refreshed",
+            principal,
+            None,
+            {
+                "target": target,
+                "previous_pane_id": binding.pane_id,
+                "pane_id": updated.pane_id,
+                "expected_pid": updated.expected_pid,
+                "agent_pid": updated.agent_pid,
+                "automatic_retry": False,
+            },
+        )
+        return updated, sessions
+
+    async def _foreign_dead_reservation(self, principal, target, row, binding, observed_sessions):
+        from kirabridge.bridge_core.config import VisibleTerminalBinding
+
+        try:
+            original = VisibleTerminalBinding.model_validate_json(row["binding"])
+        except (ValueError, TypeError):
+            return False
+        if not identities_disjoint(original, binding):
+            return False
+        if observed_sessions is not None and binding_still_present(original, observed_sessions):
+            return False
+        # Session input has no overlay yet. Only a full OS inventory may release
+        # the lock; a missing catalog row is not absence.
+        try:
+            await self.sessions.prove_original_target_gone(principal, original.model_dump())
+        except BridgeError:
+            return False
+        return True
+
+    async def _park_proven_dead(self, principal, target, binding, observed_sessions):
+        """Move a proven-dead active reservation out of the unique target index.
+
+        The row stays unknown, is not completed, and is not sent again.
+        """
+        import json
+
+        rows = self.store.db.execute(
+            "SELECT id,binding,state,evidence FROM visible_handoffs WHERE target=? AND state IN "
+            "('planned','inserting','inserted','submitting','return_sent','sent','confirmed')",
+            (target,),
+        ).fetchall()
+        for row in rows:
+            if not await self._foreign_dead_reservation(
+                principal, target, row, binding, observed_sessions
+            ):
+                continue
+            try:
+                previous = json.loads(row["evidence"])
+            except (TypeError, ValueError):
+                previous = {}
+            if not isinstance(previous, dict):
+                previous = {}
+            self.transition(
+                row["id"],
+                "unknown",
+                {
+                    **previous,
+                    "reason": "binding_proven_dead",
+                    "previous_state": row["state"],
+                    "automatic_retry": False,
+                    "index_released": True,
+                },
+            )
 
     async def check_target(self, principal, target, binding, *, ready=False):
         row = await self.sessions.selected(principal, binding.pane_id, binding.expected_pid)
@@ -553,10 +702,27 @@ class VisibleHandoffs:
             raise BridgeError(
                 "visible_target_missing", "Bind an exact existing visible CLI terminal"
             )
-        async with self.sessions.agent_selection(task["principal"], args.agent, binding):
-            return await self._execute(task, args, running, progress, binding_override=binding)
+        observed = None
+        if binding_override is None:
+            stored = self.store.db.execute(
+                "SELECT binding FROM visible_handoffs WHERE id=?", (task["id"],)
+            ).fetchone()
+            if stored is None:
+                binding, observed = await self.refreshed_binding(
+                    task["principal"], args.agent, binding
+                )
+            else:
+                from kirabridge.bridge_core.config import VisibleTerminalBinding
 
-    async def _execute(self, task, args, running, progress, *, binding_override=None):
+                binding = VisibleTerminalBinding.model_validate_json(stored["binding"])
+        async with self.sessions.agent_selection(task["principal"], args.agent, binding):
+            return await self._execute(
+                task, args, running, progress, binding_override=binding, observed_sessions=observed
+            )
+
+    async def _execute(
+        self, task, args, running, progress, *, binding_override=None, observed_sessions=None
+    ):
         principal, target, identifier = task["principal"], args.agent, task["id"]
         # All senders use this path. Eve is grok_app; only target selects the CLI window.
         for capability in ("agent.execute", "session.inspect", "session.input", "terminal.execute"):
@@ -602,6 +768,7 @@ class VisibleHandoffs:
                 target,
                 binding,
                 busy_message="Another handoff owns this terminal; reconcile it first",
+                observed_sessions=observed_sessions,
             )
             if "KB-END-" + digest(identifier)[:12] in before["text"]:
                 raise BridgeError(
@@ -622,6 +789,22 @@ class VisibleHandoffs:
             )
             if len(prompt) > 16384 or "\x00" in prompt:
                 raise BridgeError("payload_limit", "Visible prompt exceeds terminal input limit")
+            # The partial unique index still owns sent/confirmed rows. Parking a
+            # proven-dead row as unknown releases that slot and does not resend it.
+            await self._park_proven_dead(principal, target, binding, observed_sessions)
+            held = self.store.db.execute(
+                "SELECT id,binding,state FROM visible_handoffs WHERE target=? AND state IN "
+                "('planned','inserting','inserted','submitting','return_sent',"
+                "'sent','confirmed')",
+                (target,),
+            ).fetchall()
+            released = {
+                row["id"]
+                for row in held
+                if await self._foreign_dead_reservation(
+                    principal, target, row, binding, observed_sessions
+                )
+            }
             with self.store.transaction():
                 self.store.assert_accepting(continuation_id=identifier, owned_execution=True)
                 active = self.store.db.execute(
@@ -629,8 +812,8 @@ class VisibleHandoffs:
                     "('planned','inserting','inserted','submitting','return_sent',"
                     "'sent','confirmed')",
                     (target,),
-                ).fetchone()
-                if active:
+                ).fetchall()
+                if any(row["id"] not in released for row in active):
                     raise BridgeError(
                         "visible_target_busy",
                         "Another handoff owns this terminal; reconcile it first",

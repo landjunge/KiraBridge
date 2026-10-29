@@ -130,13 +130,15 @@ class SessionManager:
                 if native_rows
                 else errors.get("terminal_app", {}).get("code", exc.code),
                 errors={**errors, "tmux": {"code": exc.code}},
+                truncated=getattr(self.terminal_app, "last_catalog_incomplete", False),
             )
         return self._catalog_result(
             native_rows + rows,
             transport="terminal_app_and_tmux" if native_rows else "tmux",
             status="available",
             errors=errors,
-            truncated=getattr(self.tmux, "last_catalog_truncated", False),
+            truncated=getattr(self.tmux, "last_catalog_truncated", False)
+            or getattr(self.terminal_app, "last_catalog_incomplete", False),
         )
 
     def _catalog_result(self, rows, *, transport, status, errors, truncated=False):

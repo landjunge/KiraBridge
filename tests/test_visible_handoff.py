@@ -561,7 +561,7 @@ def test_old_inbox_only_work_retry_does_not_retroactively_dispatch(visible):
 @pytest.mark.parametrize("sender", ["codex", "grok", "chatgpt", "grok_app"])
 async def test_empty_field_with_active_agent_never_receives_a_new_handoff(visible, sender):
     bridge, transport = visible
-    transport["text"] = "Thinking… [stop]\n╭\n│ ❯ │\n╰"
+    transport["text"] = "╭\nThinking… [stop]\n│ ❯ │\n╰"
     with pytest.raises(BridgeError) as exc:
         await bridge.visible_handoffs.execute(
             {"id": "busy-original", "principal": sender},

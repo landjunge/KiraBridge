@@ -17,7 +17,7 @@ def become_busy_before_paste(monkeypatch, bridge, transport):
         if ready:
             checks.append(target)
             if len(checks) == 2:
-                transport["text"] = "Thinking… [stop]\n╭\n│ ❯ │\n╰"
+                transport["text"] = "╭\nThinking… [stop]\n│ ❯ │\n╰"
         return await original(principal, target, binding, ready=ready)
 
     monkeypatch.setattr(bridge.visible_handoffs, "check_target", check)

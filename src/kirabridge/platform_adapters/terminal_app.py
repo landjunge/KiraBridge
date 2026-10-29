@@ -93,6 +93,7 @@ class TerminalAppTransport:
         self.clipboard_lock = clipboard_lock
         self.desktop = desktop or MacDesktop()
         self.clipboard_owner = clipboard_owner
+        self.last_catalog_incomplete = False
 
     @property
     def available(self):
@@ -249,6 +250,7 @@ class TerminalAppTransport:
             if len(parts := line.split(None, 4)) == 5 and all(part.isdigit() for part in parts[:3])
         ]
         sessions = []
+        omitted = len(rows) > 100
         for row in rows[:100]:
             tty = Path(row["tty"]).name
             if not re.fullmatch(r"ttys[0-9]+", tty) or row.get("ended"):
@@ -268,6 +270,7 @@ class TerminalAppTransport:
             pids = {p for p, _ in members}
             roots = [p for p, parent in members if parent not in pids]
             if len(roots) != 1:
+                omitted = True
                 continue
             if len(legacy_roots) == 1:
                 parents = {p: parent for _, p, parent, _ in all_members}
@@ -302,6 +305,7 @@ class TerminalAppTransport:
                     ],
                 }
             )
+        self.last_catalog_incomplete = omitted
         return sessions
 
     @staticmethod
