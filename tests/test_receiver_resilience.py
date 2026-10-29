@@ -12,8 +12,49 @@ from test_visible_dispatch_wait import enqueue, fake_receiver
 from test_visible_handoff import visible  # noqa: F401
 
 from kirabridge.bridge_core.config import ReceiverConfig
-from kirabridge.bridge_core.models import BridgeError
+from kirabridge.bridge_core.models import BridgeError, canonical
 from kirabridge.message_manager import MessageSend
+from kirabridge.message_manager.receiver import MessageReceiver
+
+
+def _running_handoff(bridge, key, state):
+    sent = enqueue(bridge, key=key)
+    binding = bridge.config.visible_handoffs.bindings["grok"]
+    handoff_id = "channel-" + key
+    bridge.store.db.execute(
+        "UPDATE message_jobs SET state='running',run_id=?,evidence=? WHERE message_id=?",
+        (handoff_id, canonical({"handoff_id": handoff_id, "state": state}), sent["id"]),
+    )
+    bridge.store.db.execute(
+        "INSERT INTO visible_handoffs VALUES(?,?, 'grok','hash',?,?, ?,1,1,?)",
+        (
+            handoff_id,
+            "chatgpt",
+            canonical(binding.model_dump()),
+            sent["id"],
+            state,
+            canonical({"automatic_retry": False}),
+        ),
+    )
+    return sent
+
+
+@pytest.mark.parametrize("state,kept", [("sent", True), ("inserting", False)])
+async def test_restart_keeps_only_a_delivered_handoff(visible, state, kept):
+    bridge, transport = visible
+    sent = _running_handoff(bridge, state, state)
+    receiver = MessageReceiver(bridge)
+    await receiver.start()
+    try:
+        job = bridge.messages.get("chatgpt", sent["id"])["processing"]
+        if kept:
+            assert job["state"] == "running"
+        else:
+            assert job["state"] == "unknown" and job["error"] == "interrupted"
+            assert job["evidence"]["reason"] == "receiver_restart"
+        assert not transport["calls"]
+    finally:
+        await receiver.stop()
 
 
 async def test_same_recipient_stays_ordered_and_shutdown_drains_only_running_work(

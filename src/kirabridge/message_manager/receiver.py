@@ -62,6 +62,8 @@ class MessageReceiver:
                 "SELECT message_id,evidence FROM message_jobs WHERE state='running'"
             ).fetchall()
             for row in rows:
+                if self._reply_can_finish(row):
+                    continue  # Return already happened; do not interrupt or paste again.
                 self._finish(
                     row[0],
                     "unknown",
@@ -97,6 +99,20 @@ class MessageReceiver:
             finally:
                 if self.worker is worker and worker.done():
                     self.worker = None
+
+    def _reply_can_finish(self, row):
+        """A delivered visible handoff is waiting for its reply, not for another paste."""
+        try:
+            evidence = json.loads(row["evidence"] or "{}")
+        except (TypeError, ValueError):
+            return False
+        handoff_id = evidence.get("handoff_id") if isinstance(evidence, dict) else None
+        if not handoff_id:
+            return False
+        handoff = self.bridge.store.db.execute(
+            "SELECT state FROM visible_handoffs WHERE id=?", (handoff_id,)
+        ).fetchone()
+        return bool(handoff) and handoff["state"] in {"return_sent", "sent", "confirmed"}
 
     def _finish(self, message_id, state, evidence, error=None, reply_id=None):
         from kirabridge.completion_manager import completion_payload, record_notice
