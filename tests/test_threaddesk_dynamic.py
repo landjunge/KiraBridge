@@ -155,3 +155,60 @@ async def test_full_level_does_not_invent_missing_read_capability(monkeypatch, c
         await catalog(bridge, "local")
     assert exc.value.code == "forbidden"
     bridge.threaddesk.connect.assert_not_awaited()
+
+
+@pytest.mark.parametrize("route", ["read", "catalog"])
+@pytest.mark.parametrize("phase", ["discovery", "lock"])
+@pytest.mark.parametrize(
+    "revocation,code",
+    [
+        ("proxy", "threaddesk_proxy_disabled"),
+        ("capability", "forbidden"),
+        ("permission", "approval_required"),
+    ],
+)
+async def test_dynamic_reads_recheck_revocation_after_wait(
+    monkeypatch, config, route, phase, revocation, code
+):
+    bridge, listing = bridge_fixture(monkeypatch, config)
+
+    def revoke():
+        if revocation == "proxy":
+            config.threaddesk.dynamic_read_proxy = False
+        elif revocation == "capability":
+            config.principals["local"].capabilities.remove("threaddesk.read")
+        else:
+            config.principals["local"].permission_level = "ask"
+
+    async def invoke():
+        if route == "read":
+            return await read(bridge, "local", "new_read", {"id": "abc"})
+        return await catalog(bridge, "local")
+
+    if phase == "discovery":
+
+        async def revoked_listing(*args, **kwargs):
+            revoke()
+            return listing
+
+        bridge.threaddesk.pool.sessions["threaddesk"].list_tools.side_effect = revoked_listing
+        pending = asyncio.create_task(invoke())
+    else:
+        async with bridge.threaddesk.lock:
+            pending = asyncio.create_task(invoke())
+            await asyncio.sleep(0)  # Let the request wait behind the existing lock owner.
+            assert not pending.done()
+            revoke()
+    try:
+        with pytest.raises(BridgeError) as exc:
+            await asyncio.wait_for(pending, 1)
+        assert exc.value.code == code
+        bridge.threaddesk.pool.call.assert_not_awaited()
+        if phase == "lock":
+            bridge.threaddesk.connect.assert_not_awaited()
+        else:
+            bridge.threaddesk.connect.assert_awaited_once()
+    finally:
+        if not pending.done():
+            pending.cancel()
+            await asyncio.gather(pending, return_exceptions=True)
