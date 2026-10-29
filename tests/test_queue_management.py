@@ -174,6 +174,37 @@ async def test_manual_grants_require_exact_approval_and_control_lane(queues, bri
     assert bridge.store.claim("control-worker", 20, "stop")["id"] == task.task_id
 
 
+def test_catalog_skips_completed_task_results(queues, bridge):
+    calls = {"n": 0}
+    original = bridge.store.get
+
+    def counting(task_id, principal=None):
+        calls["n"] += 1
+        return original(task_id, principal)
+
+    bridge.store.get = counting
+    for index in range(40):
+        bridge.store.db.execute(
+            "INSERT INTO tasks (id,principal,idem,request_hash,operation,args,state,"
+            "created,updated,result) VALUES (?,?,?,?,?,?,?,?,?,?)",
+            (
+                f"old-{index}",
+                "local",
+                f"idem-{index}",
+                "hash",
+                "file.list",
+                "{}",
+                "completed",
+                1,
+                1,
+                "x" * 2000,
+            ),
+        )
+    result = queues.catalog("local")
+    assert any(queue["queue_id"] == "tasks/read" for queue in result["queues"])
+    assert calls["n"] < 40
+
+
 def test_queue_catalog_read_has_no_delivery_side_effects(queues, bridge):
     message(bridge)
     result = queues.catalog("local")
