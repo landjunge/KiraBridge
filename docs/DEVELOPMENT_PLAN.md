@@ -43,3 +43,12 @@ Provide secure local file, terminal and process capabilities to multiple authori
 ## Operating constraints
 
 Keep the repository private. Do not alter existing Agent Authority, ThreadDesk, Tollgate or Help Center projects, publish a service, deploy to production, stop existing agents or grant external access without explicit authorization. Minimize tests but never omit necessary safety checks. Keep source and review evidence versioned.
+
+
+## Current evidence delta · KB-INTEL-20261029
+
+Intel rc18 packaging, integration tests and isolated lifecycle acceptance are complete;
+merge/publication and productive activation remain separately approval-gated.
+ARM/paid hostedMac remain explicitly deferred/external.
+[Exact source, test counts, immutable artifact SHA256, backup/rollback and pending decisions](INTEL-RELEASE-20261029.md).
+The existing architecture and modules above are not replanned.

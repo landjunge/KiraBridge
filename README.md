@@ -1,81 +1,153 @@
 # KiraBridge
 
-[English](#english) · [Deutsch](#deutsch) · [RC17 release / Release-Status](https://github.com/landjunge/KiraBridge/releases)
-
-KiraBridge connects an authorized AI conversation to local files, visible agent terminals and optional project tools. KiraBridge verbindet einen berechtigten KI-Chat mit lokalen Dateien, sichtbaren Agententerminals und optionalen Projektwerkzeugen.
-
-## Tatsächlicher Stand / Actual status
-
-- **Paketversion / Package version:** `0.8.0rc17`. [GitHub zeigt den tatsächlichen Veröffentlichungsstatus / actual publication status](https://github.com/landjunge/KiraBridge/releases); ein Entwurf ist keine Veröffentlichung / a draft is not a publication.
-- **Historische vollständige Intel-Abnahme / Historical full Intel acceptance:** macOS15.7.4 x86_64, Python3.11.15, geprüfter Programmstand `20a30e8`: **1.609 Tests bestanden, 1 übersprungen / 1,609 passed, 1 skipped**, Ruff/Format und Wheel/Source-Paketbau bestanden; **9/9 tatsächliche RC14-Pakettests** einschließlich Neustart, KeepAlive, Erstinstallation und Rollback bestanden.
-- **Freigabe / Approval:** Betreiberfreigabe für Merge und sichtbare Intel-Installation nach lokaler Abnahme. Hosted-Mac-Jobs konnten wegen GitHub-Billing nicht starten; lokale Ergebnisse werden nicht als Actions-Erfolg ausgegeben. Apple Silicon und macOS26 bleiben ungeprüft / unverified.
-- **Installierter Stand / Installed state:** RC17 aus main `fde9d87a36ed6c0bdab4456c3c8812d0378d7fcd` nach regulärem [PR46-Merge](https://github.com/landjunge/KiraBridge/pull/46) sichtbar installiert; Dienst PID28646 beim Readback. / RC17 from merged main `fde9d87` was visibly installed; responding PID28646 at verification. `~/.local/bin/kirabridge status` liest den tatsächlich antwortenden Dienst. `installer/install.py status` aus dem erhaltenen Paket nennt zusätzlich den installierten Quellcommit. Ein Branch, ein Release-Asset und ein laufender Dienst sind getrennte Zustände.
-- **Terminal-Nachprüfung / Terminal acceptance:** [Aktueller Nachweis / current evidence](docs/TERMINAL-CLEANUP-20261027.md): tatsächlicher Operator-MCP-Paste-only-Auftrag completed, aktive Eingabe exakt einmal unabhängig gelesen, kein Return; separater ausdrücklicher Return mit exakter 16-Byte-Quittung. Das eigene Testfenster bleibt wegen fremder ungesendeter Eingabe geschützt offen, Operatorentscheidung ausstehend; kein Schließ-/Nach-Fensterschluss-Pass. / Actual operator-MCP paste-only completed with exact readback; separate explicit Return produced the exact 16-byte receipt. Own test window preserved because of unrelated unsent input; closure awaits operator choice. No actual voice-Host acceptance is inferred.
-
-[Intel-Abnahme und Freigabe](docs/INTEL-ACCEPTANCE-20261026.md) · [Historischer Rollbackfehler](docs/RC14-ROLLBACK-20261026.md) · [Braille-Implementierung](docs/BRAILLE-PARTIAL-OUTPUT-20261026.md)
-
-## Deutsch
-
-### Was KiraBridge kann
-
-- Berechtigte Datei-, Prozess- und Terminaloperationen aus einem verbundenen Chat ausführen, mit nachvollziehbarem Ergebnis statt bloßer Annahmebestätigung. [Dateien und Codex-Protokolle vollständig lesen](docs/READ-FULL-FILES.md): echte Byte-Seiten mit Offset, EOF und SHA-256, ohne Ein-Megabyte-Gesamtdateigrenze.
-- Codex-, Grok- und weitere eingerichtete Agentenadapter verwenden. Anbieterzugänge, Modelle und laufende Sitzungen werden nicht durch KiraBridge ersetzt.
-- Sichtbare Terminalfenster frisch katalogisieren und lesen; Eingaben an bestätigte Fenster-/Tab-/TTY-/Prozessidentitäten binden. `submit=false` bedeutet Einfügen ohne Return. Der [gezielte Terminalfix und seine Intel-Nachweise](docs/TERMINAL-CONTROL-20261027.md) ergänzen diesen Weg für bestätigte leere Shells mit einzeiligem Text und trennen sichere Vorabverweigerung von unbekanntem Transportausgang. Bei echter Aktivität, geänderter Zuordnung oder unbekannter Eingabe verweigert die Bridge den Eingriff.
-- Berechtigte Warteschlangen vollständig einsehen und gezielt verwalten. `withdraw` nimmt unbekannte Ausführungen aus der aktiven Ansicht; ein belegter `retire` kann eine veraltete Zustellreservierung zurücknehmen. Historie bleibt erhalten, eine unbekannte Ausführung wird weder als beendet ausgegeben noch blind wiederholt.
-- Werkzeuge über den Operationskatalog auffindbar machen und Freigabe, Erreichbarkeit, Ausführung und Quittierung unterscheiden. Empfangene Rückmeldungen belegen keine automatische Aufweckung eines inaktiven Chatfensters.
-- Optional ThreadDesk, Wissens-/Dateiübertragung, Teamkoordination und Workflowbelege anbinden. Diese Module sind getrennt; KiraBridge benötigt ThreadDesk nicht für den lokalen Kern. Ein Dateiverweis ist kein Byteimport, eine Übertragung ohne bestätigte dauerhafte Speicherquittung kein erfolgreicher Import.
-
-### Voraussetzungen
-
-Normales Benutzerkonto, **Python 3.11**, **uv 0.11.6**, **GitHub CLI (`gh`)** und Internetzugriff auf GitHub/PyPI. Tatsächlich geprüft ist **Intel x86_64 mit macOS 15.7.4**. Das Modell „iMac 2015“ allein belegt keine Unterstützung eines älteren macOS. Apple Silicon wird im Paket berücksichtigt, ist ohne echte ARM-Abnahme aber nicht als geprüft freigegeben; macOS 26 wird vom Einstieg akzeptiert und bleibt unbestätigt.
-
-Bei privaten Releases muss `gh auth login` erfolgt und der Repositoryzugriff vorhanden sein. Keine Tokens in Befehle, Protokolle oder Git schreiben. Der Installer ändert keine OS-/TCC-Rechte und installiert keinen Paketmanager oder Compiler. Agenten und ihre Konten werden separat eingerichtet. **Keine Apple-Signierung oder Notarisierung**; Gatekeeper nicht pauschal deaktivieren.
-
-### Installation und Update · RC17 Intel
-
-**Diesen einen Befehl im eigenen sichtbaren macOS-Terminal kopieren.** Er lädt den authentifizierten RC17-Installer, prüft SHA-256 und startet erst dann die lokale Installation bzw. Aktualisierung. Die Dateien müssen im verlinkten Release tatsächlich vorhanden sein; ein privater Entwurf erfordert zusätzlich Entwurfszugriff.
-
 ```sh
-d=$(mktemp -d) && gh release download v0.8.0rc17 -R landjunge/KiraBridge -p 'install-macos.sh*' -D "$d" && (cd "$d" && shasum -a 256 -c install-macos.sh.sha256 && sh install-macos.sh --require-visible-terminal --motion full "$@")
+d=$(mktemp -d) && gh release download v0.8.0rc18 -R landjunge/KiraBridge -p 'install-macos.sh*' -D "$d" && (cd "$d" && shasum -a 256 -c install-macos.sh.sha256 && sh install-macos.sh "$@")
 ```
 
-Der Bootstrap prüft zusätzlich die fest eingebettete SHA-256 des macOS-Pakets. Prüfsummen vom selben Release erkennen Beschädigung, ersetzen keine unabhängige Herausgebersignatur. Kein `curl | sh`. Die finalen Assets aus Quelle `fde9d87` und ihre Prüfsummen liegen im [RC17-Entwurf](https://github.com/landjunge/KiraBridge/releases). Quellcommit, Prüfergebnisse und endgültige Paketwerte stehen im Release und in [PR46](https://github.com/landjunge/KiraBridge/pull/46).
+**[Download und Version: 0.8.0rc18](https://github.com/landjunge/KiraBridge/releases/tag/v0.8.0rc18)** · **[Alle erhaltenen Versionen einschließlich RC17](https://github.com/landjunge/KiraBridge/releases)**
 
-Der Installer prüft das sichtbare Frontfenster, ausgewählten Tab, TTY und aktuelle Prozessidentitäten vor der Aktivierung. Genau ein eigenes Arbeitsfenster verwenden; keine Eingabe in laufende Codex-/Grok-Sitzungen. `--motion reduced` reduziert Bewegung, `--language en` wählt Englisch. Vollständiger Braille-Schriftzug und Brücke verwenden Pink und Lichtakzente; Ausgabe und Eingaben haben Vorrang, bei ungeeigneter Darstellung gilt ein Text-Fallback.
+**Status: unveröffentlichter Releaseentwurf.** Der Befehl wurde mit authentifiziertem
+GitHub-Download und Installation in vollständig isolierte Testpfade auf dem Intel-iMac
+geprüft. Entwurfszugriff ist erforderlich. Veröffentlichung, Prüfung des veröffentlichten
+Downloadlinks und produktive Installation benötigen noch getrennte Freigaben.
+Ein Entwurf ist kein öffentlich verfügbares Release. Den aktuellen Prüfstand dokumentiert
+[der Intel-Abschlussbericht](docs/INTEL-RELEASE-20261029.md).
 
-Erstinstallation legt Benutzerdateien an. Updates erhalten vorhandene Konfiguration, Zugangsdaten, Rechte, Datenbank und Nutzerdateien. Laufende Arbeit, fremde Dienste, veränderte Launcher oder nicht passende Dienstdefinitionen blockieren die Umschaltung. Solche Prüfungen nicht durch Löschen von Queues oder Prozessabbruch umgehen. Neue Berechtigungen werden nicht durch ein Designupdate erteilt.
+## Funktionen
 
-**Der launchd-Benutzerdienst läuft nach dem Schließen von Terminal- und Browserfenstern weiter.** Anmeldung, Abmeldung, Schlafmodus und Herunterfahren bleiben eigene Systemzustände. Die sichtbare Installation ist vom späteren Hintergrunddienst getrennt.
+KiraBridge verbindet einen berechtigten KI-Chat mit lokalen Dateien, Prozessen,
+sichtbaren Agententerminals und optionalen Projektwerkzeugen. Der lokale Kern
+funktioniert unabhängig von ThreadDesk und anderen Integrationen.
 
-### Status, Fehler und Rückweg
+- Dateien und Logs vollständig über Byte-Seiten, Offset, EOF und SHA256 lesen;
+  Dateireferenzen zählen erst nach echter Übertragung und Speicherquittung als Import.
+- Codex, Grok und weitere konfigurierte Provider über vorhandene Adapter ansprechen.
+  Anbieterzugänge, Modelle und laufende Sitzungen bleiben eigenständig.
+- Sichtbare Terminalziele anhand aktueller Fenster-, Tab-, TTY- und Prozessidentität
+  prüfen. Paste-only und Return sind getrennte Aktionen; unbekannte Wirkung bleibt geschützt.
+- Neue sichtbare Arbeit einmal begrenzt zulassen und Busy-/Selectionfehler konkret
+  zurückgeben. Idempotenz verhindert Doppelzustellung auch nach Reconnect und Restart.
+- Aufgaben, Nachrichten, Zustellung, ACK und fachliche Ergebnisse dauerhaft getrennt
+  belegen; späte Antworten können bestehende Ausführungen ohne neue Eingabe abschließen.
+- Werkzeuge dynamisch über vorhandene Operations-/Modulkataloge entdecken.
+  Optionale ThreadDesk-Datei-/Wissensfunktionen, TollGate-Stopbelege und neutrale
+  Agent-Authority-Beobachtungen benötigen jeweils ihre tatsächliche Konfiguration.
 
-- Dienstversion und Zustand: `~/.local/bin/kirabridge status`.
-- Installierter Quellcommit: `python3.11 KiraBridge/installer/install.py status` aus dem erhaltenen entpackten Paket.
-- Neustart erst nach Klärung laufender Arbeit: `launchctl kickstart -k gui/$(id -u)/com.kirabridge.bridge`, danach Status erneut lesen.
-- Protokolle: `~/.local/share/kirabridge/install/logs/`; Konfiguration/Credentials: `~/.config/kirabridge/`; versionierte Laufzeiten und gesicherter Rückweg: `~/.local/share/kirabridge/install/`.
-- Bei falscher Prüfsumme abbrechen. Bei `BUSY` die genannten Aufträge prüfen, nicht blind löschen oder erneut senden. Bei fehlender Sichtbarkeit das eigene Arbeitsfenster prüfen. Ein Timeout ist kein erfolgreicher Start.
-- Gesicherten Rückweg aus der Transaktionsmeldung verwenden: `python3.11 KiraBridge/installer/install.py rollback`. Aktuelle Nutzer-/Ergebnisdaten und Zugangsdaten werden nicht blind mit alten Datenbanksicherungen ersetzt. Ein Rückfall muss durch tatsächlich antwortende alte Version bestätigt werden.
+[Architektur](docs/DEVELOPMENT_PLAN.md) · [Vollständige Datei-/Logreads](docs/READ-FULL-FILES.md)
+· [Queuevertrag](docs/QUEUE-MANAGEMENT.md) · [RC18-Änderungen](docs/RELEASE-0.8.0rc18.md)
 
-[Ausführliche Installation](docs/INSTALL-DE.md) · [macOS-Vertrag](docs/INSTALL-MACOS.md) · [Queueverwaltung](docs/QUEUE-MANAGEMENT.md) · [Releasehinweise](docs/RELEASE-0.8.0rc17.md)
+## Anforderungen
 
-## English
+Geprüfte Zielumgebung: **iMac17,1 (Intel-iMac2015), macOS15.7.4 x86_64,
+Python3.11.15 und uv0.11.6**. Normales Benutzerkonto ohne sudo, GitHubCLI (`gh`),
+authentifizierter Repository-/Entwurfszugriff und Internet zu GitHub/PyPI sind nötig.
+Das Paket enthält Wheel, Quellstand, Lockdatei, Installer und Integritätsmanifest;
+Abhängigkeiten werden beim Installieren geladen. Es ist kein Offline-Komplettpaket.
 
-KiraBridge connects an authorized chat to local files, processes and visible agent terminals, with separate durable task, delivery and result evidence. It supports configured Codex/Grok and other provider adapters, discoverable operations, scoped queue management and optional project integrations. ThreadDesk and other vendors are optional. A queued task is not proof of execution; unknown work is never silently replayed or declared stopped. File transfer requires actual bytes and a verified durable receiver receipt before it counts as an import.
+Das Hardwaremodell allein bestätigt keine älteren macOS-Versionen. **ARM, macOS26
+und ältere macOS-Versionen sind nicht abgenommen.** Bezahlte GitHub-macOS-Jobs
+bleiben wegen der dokumentierten externen Kontozahlungs-/Ausgabenlimitblockade
+zurückgestellt; lokale Erfolge werden nicht als GitHub- oder ARM-Pass ausgegeben.
+Keine Apple-Signierung/Notarisierung. Gatekeeper nicht pauschal deaktivieren.
 
-[Complete authorized file/log reads](docs/READ-FULL-FILES.md) use original byte pages, offsets, EOF and SHA-256; there is no one-megabyte cap on the overall file.
+## Betrieb
 
-[Targeted terminal repair and actual Intel evidence](docs/TERMINAL-CONTROL-20261027.md) cover guarded single-line paste into a confirmed empty shell without Return. Definite pre-transport refusal and uncertain transport outcomes remain distinct; busy or changed targets are preserved.
+Der oben stehende versionierte Befehl lädt das Bootstrap samt Prüfsumme; dieses
+prüft wiederum die fest eingebettete Paket-SHA256. Keine Remote-Pipe in eine Shell.
+Das Release nennt exakten Artefakt-Quellcommit und Prüfsummen. Branch, Paket und
+antwortender Dienst können unterschiedliche Stände haben und werden getrennt geprüft.
 
-Requirements: normal user account, **Python 3.11, uv 0.11.6, GitHub CLI**, Internet and authenticated access to this private repository/draft. Actual Intel testing used **macOS 15.7.4 x86_64**. Older macOS on a 2015 iMac, macOS 26 and Apple Silicon are not approved by that evidence. Agents and provider accounts require their own setup. No administrator/TCC grants are changed, no compiler is forced. **No Apple signing or notarization**; do not disable Gatekeeper globally.
+Eine produktive Installation erst nach Freigabe in einem eigenen bestätigten
+sichtbaren Terminal ausführen, niemals in laufende Codex-/Grok-Sitzungen eingeben.
+Bei der vom Betreiber ausgeführten produktiven Installation zusätzlich die bestehende
+Option `--require-visible-terminal` verwenden. Die isolierte Abnahme verwendet
+explizite Testpfade und ein eigenes Testlabel; sie ersetzt keine produktive Freigabe.
+Die Optionen `--language de`, `--language en` und `--motion reduced` steuern die
+Darstellung. Echte Fortschritts-/Fehlermeldungen haben Vorrang vor Animation.
 
-**Use the single highlighted command above in your own visible macOS Terminal** for first installation or update. It authenticates the private release download, verifies the bootstrap checksum, then verifies the bootstrap's embedded package checksum before local execution. Release notes identify the exact integrated package/source and final acceptance. Final draft assets are bound to source `fde9d87` ([PR46](https://github.com/landjunge/KiraBridge/pull/46)); a draft remains unpublished until GitHub actually publishes it.
+Der launchd-Benutzerdienst läuft nach dem Schließen von Terminal oder Browser weiter.
+`~/.local/bin/kirabridge status` liest den antwortenden Dienst. Der Installerstatus
+aus dem erhaltenen Paket nennt zusätzlich den installierten Quellcommit. Ein
+Neustart muss vorher laufende Arbeit und den tatsächlichen Dienstbesitz prüfen.
 
-Fresh installation creates user-owned state. Updates preserve configuration, credentials, permissions, database and user files. Busy tasks, foreign services and changed definitions stop activation. The installer requires a freshly confirmed visible front window, selected tab, TTY and process identities; reuse one owned window and never type into agent sessions. Full Braille wordmark and bridge use pink/light accents; bounded optional animation yields to real output and prompts. Use `--motion reduced`, `--language en` and Unicode/color/plain-text fallbacks as needed. Human graphics stay outside MCP and status JSON.
+Updates verwenden die vorhandene versionierte Transaktion mit Backup, Ownership-,
+Leerlauf-, Integritäts- und Healthprüfungen. Konfiguration, Credentials, Rechte,
+Datenbank und Nutzerdateien bleiben erhalten. Der Rückweg verwendet nur die
+passende gesicherte Transaktion; er ist erst durch die antwortende alte Version
+bestätigt. Keine alte Datenbank über neuere Ergebnisse zurückspielen.
 
-**launchd continues running when Terminal or browser windows close.** Check `~/.local/bin/kirabridge status`; the retained package's `installer/install.py status` also reports the installed source. Inspect `~/.local/share/kirabridge/install/logs/` on failure. Do not resolve `BUSY` by killing agents or replaying unknown work. Rollback uses the retained transaction backup and must confirm the responding previous version; it never blindly restores an old database over new results. The original rollback timeout and the subsequent focused passes remain distinct evidence.
+[Installation Deutsch](docs/INSTALL-DE.md) · [Installation English](docs/INSTALL-EN.md)
+· [macOS-Vertrag](docs/INSTALL-MACOS.md)
 
-[English installation](docs/INSTALL-EN.md) · [Architecture](docs/DEVELOPMENT_PLAN.md) · [Terminal safety](docs/VISIBLE-SELECTION-20261024.md) · [Release notes](docs/RELEASE-0.8.0rc17.md)
+## Konfiguration
 
-## License / Lizenz
+Standardkonfiguration und getrennte Credentials liegen unter `~/.config/kirabridge/`.
+Die Konfiguration bestimmt Principals, erlaubte Operationen, Dateiwurzeln,
+Agentenadapter, sichtbare Zielbindungen und optionale Integrationen. Der aktuelle
+Werkzeugkatalog und die Berechtigungsentscheidung der konkreten Operation sind
+maßgeblich. Ein vorhandener Modulname bedeutet weder installierten Adapter noch
+freigegebene Aktion. [ChatGPT-Einrichtung](docs/CHATGPT.md).
 
-[Netzwerkpunkt Personal Use License 1.0](LICENSE). Private non-business use is free under its terms; business use requires separate written permission. German governs. This is a source-available license, not an OSI approval or legal review. Third-party licenses remain applicable.
+Standardlaufzeiten, Transaktionsbackups und Logs liegen unter
+`~/.local/share/kirabridge/install/`; die tatsächlichen Pfade ergeben sich aus dem
+installierten Paket/der Konfiguration. Keine fremden Profile oder Shell-Pfade
+unbesehen überschreiben. Bestehende KiraBridge-Schlüssel bleiben erhalten, bis
+4AllPass eine tatsächlich sichere, ausdrücklich freigegebene Übernahme bietet.
+
+## Sicherheit
+
+Berechtigung, Zulassung, Eingabeversuch, bestätigte Zustellung und Ergebnis sind
+verschiedene Zustände. `unknown` ist kein sicher wiederholbarer Auftrag; `blocked`
+ist keine Erlaubnis zur Freigabe. Keine historischen Nachrichten blind erneut senden,
+keine Queue pauschal löschen, keine Agenten zum Erzwingen einer Installation beenden.
+
+Terminalguards prüfen aktuelle Identität und Bereitschaft. Busy, geänderte Auswahl
+oder unklare Eingabe führen zu einer konkreten Ablehnung statt beliebigem Retargeting.
+Ein inaktives Chatfenster wird durch eine gespeicherte Antwort nicht automatisch geweckt.
+Private Tokens gehören weder in Befehle noch Logs oder Git. Installation erteilt keine
+zusätzlichen OS-/TCC-Rechte. Prüfsummen vom selben Release erkennen Beschädigungen,
+ersetzen aber keine unabhängige Herausgebersignatur.
+
+## Fehlerbehebung
+
+| Beobachtung | Sicherer nächster Schritt |
+| --- | --- |
+| Release/Download nicht erreichbar | Authentifizierung, Repositoryzugriff und Entwurfs-/Veröffentlichungsstatus prüfen. |
+| Prüfsumme stimmt nicht | Abbrechen und Originalartefakt prüfen; nichts ausführen. |
+| `visible_target_busy` | Geschützte Handoffreservierung und ihren tatsächlichen Ausgang prüfen. |
+| `session_busy` | Aktuelle Aktivität prüfen; keinen laufenden Agenten unterbrechen. |
+| `session_selection_changed` | Fenster/Tab/TTY/PID neu lesen; keinen alten Auftrag wiederholen. |
+| `unknown` oder verlorene Antwort | Vorhandene Receipt-/Start-/ACK-/Late-Reply-Belege abgleichen. |
+| Installation meldet `BUSY` | Echte laufende Arbeit geordnet abschließen lassen; Guards nicht umgehen. |
+| Start oder Rollback läuft in Timeout | Logs, Health und tatsächlich antwortende Version lesen; keinen Erfolg behaupten. |
+
+[Ursachen und Reparaturbelege](docs/QUEUE-DIRECT-ADMISSION-20261029.md)
+· [Abschlussbericht mit Rückfallplan](docs/INTEL-RELEASE-20261029.md)
+
+## Entwicklung
+
+Die Entwicklung erfolgt in isolierten Worktrees. Vor riskanten Änderungen lokal
+sichern; passende Tests mit synthetischen Stores, Fake-Terminal-I/O und echten
+lokalen MCP-Roundtrips verwenden. Integrationen werden gegen die im CI-Workflow
+festgelegten Quellstände geprüft. Erst belegte Teilschritte committen und pushen;
+Merge, Veröffentlichung und produktive Installation bleiben getrennte Entscheidungen.
+
+Der deterministische Builder `scripts/build_release.py` verlangt einen sauberen
+exakten Git-Commit. Zwei Builds müssen dieselben SHA256SUMS ergeben.
+`scripts/accept_macos_release.py` prüft echte Installation/Upgrade, Start,
+Idempotenz, Restart, KeepAlive, Rollback und Erstinstallation unter einem eigenen
+Testlabel. Es ist kein Dry-run und darf keine produktiven Pfade erhalten.
+Nach jeder Testdienstbereinigung muss dessen Abwesenheit unabhängig belegt sein.
+
+| Version | Tatsächlicher Stand |
+| --- | --- |
+| 0.8.0rc18 | Neuer Intel-Kandidat aus Queue-Reparatur811b271; unveröffentlichter Entwurf. Vollständige aktuelle Belege im Abschlussbericht. |
+| 0.8.0rc17 | Bestehender Entwurf und unveränderter produktiver Rückweg; authentifizierter separater Download nachgewiesen. |
+| 0.8.0rc16 / rc15 | Historische Entwürfe erhalten; keine neue Abnahme daraus abgeleitet. |
+| 0.8.0rc14 | Veröffentlichtes Prerelease; Originalwheel als geprüfte Upgrade-/Rollbackfixture erhalten. |
+| Frühere Versionen | Unter dem Link „Alle erhaltenen Versionen“ mit ihrem tatsächlichen Veröffentlichungsstatus abrufbar. |
+
+**Lizenz:** [Netzwerkpunkt Personal Use License1.0](LICENSE). Private, nicht geschäftliche
+Nutzung unter den Lizenzbedingungen kostenlos; geschäftliche Nutzung nur mit
+separater schriftlicher Erlaubnis. Deutsch ist maßgeblich. Kein OSI-Standard und
+keine rechtliche Prüfung; Drittanbieterlizenzen gelten weiterhin.
