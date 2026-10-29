@@ -120,7 +120,12 @@ class MessageReceiver:
         handoff = self.bridge.store.db.execute(
             "SELECT state FROM visible_handoffs WHERE id=?", (handoff_id,)
         ).fetchone()
-        return bool(handoff) and handoff["state"] in {"return_sent", "sent", "confirmed"}
+        return bool(handoff) and handoff["state"] in {
+            "return_sent",
+            "sent",
+            "confirmed",
+            "completed",
+        }
 
     def _existing_reply(self, message_id):
         original = self.bridge.store.db.execute(

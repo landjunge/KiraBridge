@@ -41,7 +41,7 @@ def _running_handoff(bridge, key, state):
 
 async def test_restart_completes_a_delivered_handoff_when_the_reply_is_stored(visible):
     bridge, transport = visible
-    sent = _running_handoff(bridge, "answered", "confirmed")
+    sent = _running_handoff(bridge, "answered", "completed")
     bridge.messages.send(
         "grok",
         MessageSend(
@@ -68,7 +68,9 @@ async def test_restart_completes_a_delivered_handoff_when_the_reply_is_stored(vi
         await receiver.stop()
 
 
-@pytest.mark.parametrize("state,kept", [("sent", True), ("inserting", False)])
+@pytest.mark.parametrize(
+    "state,kept", [("sent", True), ("completed", True), ("inserting", False)]
+)
 async def test_restart_keeps_only_a_delivered_handoff(visible, state, kept):
     bridge, transport = visible
     sent = _running_handoff(bridge, state, state)
