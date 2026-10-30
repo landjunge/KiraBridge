@@ -390,12 +390,28 @@ class TerminalAppTransport:
         return source + "\n}\ncheckTargetIdentity();"
 
     @staticmethod
+    def native_input_tail(limit):
+        """Read the current buffer tail, independently of the scroll viewport.
+
+        Terminal's scripting dictionary defines ``contents`` as the currently
+        visible viewport and ``history`` as the entire scrolling buffer. A
+        scrolled viewport can contain old output while the current input lies
+        at the buffer's end. Use one source for observation and native guards;
+        never fall back to a different representation after a failed check.
+        Bound both the intermediate UTF-16 slice and final Unicode-point tail.
+        """
+        return f"Array.from(tab.history().slice(-{2 * limit})).slice(-{limit}).join('')"
+
+    @staticmethod
     def native_screen_guard(expected_screen):
         if expected_screen is None:
             return ""
-        # Freeze the current widget and its adjacent activity/footer, not scrollback.
+        # Freeze the current input and adjacent footer using the same source as
+        # read(), rather than comparing that observation against a stale viewport.
         return (
-            "\nif(Array.from(tab.contents()).slice(-8192).join('')!=="
+            "\nif("
+            + TerminalAppTransport.native_input_tail(8192)
+            + "!=="
             + json.dumps(expected_screen[-8192:])
             + ") throw Error('Selected terminal input changed');"
         )
@@ -574,12 +590,16 @@ class TerminalAppTransport:
                     + "\ncheckFocus(); checkClipboard();"
                     + self.native_screen_guard(expected_screen)
                     + """
-        const beforePaste=tab.contents();
+        const beforePaste="""
+                    + self.native_input_tail(65536)
+                    + """;
         paste.actions.byName("AXPress").perform();
         let echoed=false; const echoDeadline=Date.now()+4000;
         while(Date.now()<echoDeadline) {
          delay(0.1); checkFocus();
-         if(observedPaste(beforePaste,tab.contents())) { echoed=true; break; }
+         if(observedPaste(beforePaste,"""
+                    + self.native_input_tail(65536)
+                    + """)) { echoed=true; break; }
         }
         if(!echoed) throw Error("Paste not observed; no Return sent");
         JSON.stringify({paste_event_sent:true,return_sent:false});""",
@@ -643,7 +663,7 @@ class TerminalAppTransport:
 
     async def read(self, pane_id):
         return await self.native(
-            self.native_target(pane_id) + "\nJSON.stringify(tab.contents().slice(-65536));"
+            self.native_target(pane_id) + "\nJSON.stringify(" + self.native_input_tail(65536) + ");"
         )
 
     async def open(self, command):

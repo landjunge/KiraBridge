@@ -438,12 +438,12 @@ async def test_exec_change_during_identity_capture_cannot_be_pinned(visible, mon
             pytest.fail("A changed executable must not acquire the selection context")
 
 
-def test_native_screen_guard_uses_unicode_codepoints_for_long_emoji_viewport(tmp_path):
+def test_native_screen_guard_uses_unicode_codepoints_for_long_emoji_buffer(tmp_path):
     from kirabridge.platform_adapters.terminal_app import TerminalAppTransport
 
     text = "🧠" * 9000 + "› "
     guard = TerminalAppTransport.native_screen_guard(text)
-    assert "Array.from(tab.contents()).slice(-8192).join('')" in guard
+    assert "Array.from(tab.history().slice(-16384)).slice(-8192).join('')" in guard
     import json
 
     literal = guard.split("!==", 1)[1].split(") throw Error", 1)[0]
@@ -454,7 +454,7 @@ def test_native_screen_guard_uses_unicode_codepoints_for_long_emoji_viewport(tmp
     if sys.platform == "darwin":
         script = tmp_path / "unicode-guard.js"
         script.write_text(
-            "const tab={contents:()=>"
+            "const tab={history:()=>"
             + json.dumps(text)
             + "};"
             + guard

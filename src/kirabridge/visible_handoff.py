@@ -322,6 +322,7 @@ class VisibleHandoffs:
         *,
         busy_message="Existing handoff must finish or reconcile",
         explicit_paste_task_id=None,
+        explicit_handoff_task_id=None,
         observed_sessions=None,
     ):
         """Keep the input lock until authenticated receipt and verified target readiness."""
@@ -355,6 +356,27 @@ class VisibleHandoffs:
                 row, binding, explicit_paste_task_id
             ):
                 continue  # Original state, binding, events and receipt remain untouched.
+            if explicit_handoff_task_id is not None and self.independent_unknown_paste(
+                row, binding, explicit_handoff_task_id
+            ):
+                # An explicitly addressed, independently identified native pane
+                # is a different resource, not a retry/rebind of the old input.
+                # Default agent delivery must never borrow this exception.
+                selection = self.sessions.current_selection()
+                if (
+                    not selection
+                    or selection[0] != target
+                    or selection[1] != binding
+                    or binding.expected_pid == binding.agent_pid
+                    or not isinstance(selection[2], dict)
+                    or not {binding.expected_pid, binding.agent_pid}.issubset(selection[2])
+                ):
+                    raise BridgeError(
+                        "visible_selection_required",
+                        "Explicit handoff requires task-owned native identities",
+                    )
+                await self.check_target(principal, target, binding, ready=True)
+                continue  # Old uncertainty and its own terminal reservation stay intact.
             if await self._foreign_dead_reservation(
                 principal, target, row, binding, observed_sessions
             ):
@@ -783,11 +805,25 @@ class VisibleHandoffs:
                 binding = VisibleTerminalBinding.model_validate_json(stored["binding"])
         async with self.sessions.agent_selection(task["principal"], args.agent, binding):
             return await self._execute(
-                task, args, running, progress, binding_override=binding, observed_sessions=observed
+                task,
+                args,
+                running,
+                progress,
+                binding_override=binding,
+                observed_sessions=observed,
+                explicit_selection=binding_override is not None,
             )
 
     async def _execute(
-        self, task, args, running, progress, *, binding_override=None, observed_sessions=None
+        self,
+        task,
+        args,
+        running,
+        progress,
+        *,
+        binding_override=None,
+        observed_sessions=None,
+        explicit_selection=False,
     ):
         principal, target, identifier = task["principal"], args.agent, task["id"]
         # All senders use this path. Eve is grok_app; only target selects the CLI window.
@@ -834,6 +870,7 @@ class VisibleHandoffs:
                 target,
                 binding,
                 busy_message="Another handoff owns this terminal; reconcile it first",
+                explicit_handoff_task_id=identifier if explicit_selection else None,
                 observed_sessions=observed_sessions,
             )
             if "KB-END-" + digest(identifier)[:12] in before["text"]:
