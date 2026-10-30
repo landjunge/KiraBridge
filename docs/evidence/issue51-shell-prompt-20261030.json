@@ -3519,5 +3519,162 @@
     },
     "dynamic_catalog": "still enabled,34tools after update",
     "release_published": false
+  },
+  "closed_terminal_reuse_20261030": {
+    "operation_id": "closed-terminal-reservation-20261030",
+    "version": "0.8.0rc20",
+    "product_commit": "da1bdaed019c31aa11bb28a39ef8bead7e73c1d4",
+    "source_branch": "fix/closed-terminal-reservation-20261030",
+    "regression_tests": {
+      "immutable_baseline": "99ddc20103f283e766b07ce94fadf6eef63f1bad",
+      "baseline_failures": [
+        "explicit reused TTY visible_target_busy",
+        "default reused TTY visible_target_busy"
+      ],
+      "related_passed": 213,
+      "combined_run_passed": 212,
+      "additional_sent_dead_case_passed": 1,
+      "companion_and_installer_visibility_passed": 21,
+      "whole_suite_repeated": false
+    },
+    "native_lifecycle": {
+      "acceptance": "passed",
+      "version": "0.8.0rc20",
+      "scope": "native owned head fixtures; no Codex/Grok handoff or paste/Return acceptance",
+      "cycles": [
+        {
+          "old_pane": "terminal:6037:ttys002",
+          "new_pane": "terminal:6040:ttys002",
+          "same_tty_observed": true,
+          "baseline_strict_identity_gate": false,
+          "native_absence_backed_release": true
+        },
+        {
+          "old_pane": "terminal:6040:ttys002",
+          "new_pane": "terminal:6043:ttys002",
+          "same_tty_observed": true,
+          "baseline_strict_identity_gate": false,
+          "native_absence_backed_release": true
+        }
+      ],
+      "same_tty_reproduced": true,
+      "unknown_history_sha256": {
+        "owned-old-1": "da95aebe989893f9bbcf2ee25aa9de86cb444979f88b21f56162c63f08c513e8",
+        "owned-old-2": "92885168ffcc370964d00a7d37782f6c9378a31c855b518e15cba3c749dec61b"
+      },
+      "original_process_identities_preserved": true,
+      "cleanup_complete": true,
+      "initial_windows": [
+        6021,
+        6022
+      ],
+      "final_windows": [
+        6021,
+        6022
+      ],
+      "forbidden_input_calls": []
+    },
+    "native_attempts": [
+      {
+        "path": "native-lifecycle",
+        "result": "failed: test confused visual tab count with native scripting window; exact own fixture independently cleaned",
+        "production_changed": false
+      },
+      {
+        "path": "native-lifecycle-v2",
+        "result": "failed: isolated test principal lacked task.read; owned fixture cleanup passed",
+        "production_changed": false
+      },
+      {
+        "path": "native-lifecycle-v3",
+        "result": "passed; both earlier test-setup defects corrected; runtime unchanged",
+        "production_changed": false
+      }
+    ],
+    "actual_failed_case": {
+      "original_binding": {
+        "pane_id": "terminal:3033:ttys001",
+        "expected_pid": 70676,
+        "agent_pid": 71896,
+        "ready_pattern": "(?m)^\\s*›(?: Ask Codex to do anything)?\\s*$",
+        "busy_pattern": "\\[stop\\]|esc to interrupt|Thinking…|Working…|Back to bottom|enter/esc latest",
+        "codex_thread_id": null,
+        "codex_rollout_path": null
+      },
+      "new_binding": {
+        "pane_id": "terminal:6022:ttys001",
+        "expected_pid": 42082,
+        "agent_pid": 42144,
+        "ready_pattern": "(?m)^\\s*›(?: Ask Codex to do anything)?\\s*$",
+        "busy_pattern": "\\[stop\\]|esc to interrupt|Thinking…|Working…|Back to bottom|enter/esc latest",
+        "codex_thread_id": null,
+        "codex_rollout_path": null
+      },
+      "original_window_and_pids_absent": true,
+      "baseline_gate": false,
+      "fixed_native_proof_backed_gate": true,
+      "terminal_input_attempted": false
+    },
+    "artifacts": {
+      "version": "0.8.0rc20",
+      "commit": "da1bdaed019c31aa11bb28a39ef8bead7e73c1d4",
+      "verified_bundle_files": 394,
+      "bundle_sha256": "9afe13793328b746349e28f570e4e03c52cb5af6cb62fdc6d15893fd4ff2ae2e",
+      "app_executable_sha256": "deed4566a39595c84cea140b2a7adbe2b013f4c1220a9efa5ae72b8d77c31d64",
+      "ad_hoc_signature_verified": true
+    },
+    "installation": {
+      "version": "0.8.0rc20",
+      "commit": "da1bdaed019c31aa11bb28a39ef8bead7e73c1d4",
+      "app_commit": "da1bdaed019c31aa11bb28a39ef8bead7e73c1d4",
+      "installed_python_files_wheel_equal": 122,
+      "config_unchanged": true,
+      "both_credentials_unchanged": true,
+      "protected_rows_unchanged": {
+        "tasks": 57,
+        "visible_handoffs": 8,
+        "message_jobs": 24
+      },
+      "rollback": "/Users/landjunge/.local/share/kirabridge/install/backups/20261030-205600-1c16e539",
+      "ad_hoc_signature_verified": true
+    },
+    "runtime": {
+      "instance_id": "9a44e4428ffc42ba86855677f5881b14",
+      "version": "0.8.0rc20",
+      "pid": 47085,
+      "started_at": "2026-10-30T19:56:13.821393+00:00",
+      "config_path": "/Users/landjunge/.config/kirabridge/config.toml",
+      "config_sha256": "0dc8eb5952fe4d986c152d38e1658e06de711d6b1f91ccc9745b184d1adb6370",
+      "effective_config_sha256": "d5de7e63e70636a03ae54ead9990224da6e38137e23c8ba1b74aa233cfe5c012",
+      "source_tree_sha256": "4ddc9c375532fcdaa1e77c9b55f05d3f28eaf5e943ad29ba0a9eca39f55dbbe6",
+      "source_file_count": 122,
+      "source_package_path": "/Users/landjunge/.local/share/kirabridge/install/releases/0.8.0rc20-da1bdaed019c/source/.venv/lib/python3.11/site-packages/kirabridge",
+      "source_scope": "package Python files observed at startup; no remote attestation"
+    },
+    "app_pid": 47104,
+    "terminal_preservation": {
+      "original_windows": [
+        6021,
+        6022
+      ],
+      "shell_pids": [
+        42079,
+        42082
+      ],
+      "codex_pid": 42144,
+      "visible_install_pane": "terminal:6021:ttys000",
+      "installer_pid": 47011,
+      "all_original_process_identities_preserved": true
+    },
+    "dynamic_threaddesk": {
+      "enabled": true,
+      "tools": 34
+    },
+    "private_backup": "/Users/landjunge/.local/share/kirabridge/backups/closed-terminal-reservation-20261030",
+    "limitations": [
+      "Native lifecycle uses owned head fixtures, not a new complete Codex/ChatGPT handoff.",
+      "No main merge or new public release; hosted/platform CI acceptance reported separately.",
+      "Product source/Swift app built at da1bdae; subsequent changes repair the test harness and record evidence only."
+    ]
   }
 }

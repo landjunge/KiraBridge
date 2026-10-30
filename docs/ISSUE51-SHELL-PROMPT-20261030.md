@@ -1,5 +1,92 @@
 # Issue 51: leere macOS-Shells und ChatGPT-Eingabe · 30.10.2026
 
+## Neuester Stand: RC20 behebt die Sperre nach geschlossenem Terminal
+
+Der Nutzer bestätigte das versehentliche Schließen des Terminals und beauftragte
+ausdrücklich die dauerhafte Behebung samt Installation. **RC20 aus
+`da1bdaed019c31aa11bb28a39ef8bead7e73c1d4` ist tatsächlich installiert und aktiv.**
+Die folgenden RC19-Stände bleiben historische Nachweise.
+
+### Ursache und Korrektur
+
+Der neue Auftrag `codex_hallo_test_20261030_2` scheiterte um20:27:51 mit
+`visible_target_busy`: altes UNKNOWN für3033/ttys001/Shell70676/Agent71896,
+neues ausdrücklich adressiertes Fenster6022/ttys001/Shell42082/Agent42144.
+macOS hatte nach dem Schließen dieselbe TTY-Kennung wieder vergeben. Die
+Ressourcenprüfung verlangte auch vor der starken nativen Abwesenheitsprüfung eine
+andere TTY und erreichte den bereits vorhandenen Nachweis deshalb nie.
+
+`distinct_window_processes` erlaubt nun ausschließlich den Einstieg in diesen
+Nachweispfad bei anderer Fenster-ID und disjunkten positiven Shell-/Agent-PIDs.
+Erst eine frische vollständige native Fensterinventur und zwei OS-Prozessinventuren
+vor/nach dieser Inventur bestätigen, dass altes Fenster und beide alten Prozesse
+fehlen. Unveränderte strikte Ressourcenregeln gelten weiterhin für die Ausnahme
+ohne Abwesenheitsnachweis. Lebende/unklare Fenster, überlappende oder wiedervergebene
+PIDs, unvollständige Inventuren und aktuelle Arbeit/Eingabe bleiben geschützt.
+Alte UNKNOWN-Nachrichten werden weder wiederholt noch pauschal abgeschlossen.
+
+Zusätzlich bleibt bei A→B→C-Zielwechseln der ursprüngliche Konfigurationsanker A
+erhalten. Nach einem Dienstneustart wird dadurch C wiederhergestellt. Eine unabhängig
+manuell geänderte Bindung beginnt eine neue Kette. Der native Abwesenheitsnachweis
+und seine Queue-Retirement-Verwendung wurden nicht aufgeweicht.
+
+### Belege
+
+Gegen unveränderter Basis99ddc20 scheiterten beide neuen Übergabewege reproduzierbar
+mit Busy. **213 verschiedene relevante Tests bestanden**: ein gemeinsamer212er-Lauf,
+danach ausschließlich der zusätzliche Reviewfall für eine gesendete, nachweislich
+beendete Reservierung. Weitere21 Tests für Appmetadaten und sichtbare Installation
+bestanden. Ruff/Format/Diff und unabhängige Quellen-/Sicherheitsprüfung bestanden;
+keine wiederholte Gesamtsuite.
+
+Die echte Intel-Abnahme verwendete nacheinander eigene `head`-Prozesse und höchstens
+ein zusätzliches natives Testfenster. Beide Übergänge **6037→6040→6043** verwendeten
+tatsächlich **ttys002**. Der alte Guard war jeweils false, der korrigierte Guard
+bestand mit echten Fenster-/Prozessnachweisen. Live-Reservierung blieb gesperrt;
+nach beiden Schließvorgängen war das neue Ziel bereit. Eine neu geöffnete Bridge
+stellte das dritte Ziel aus der ursprünglichen Konfiguration wieder her. Alte
+Fixturezeilen/-nachrichten/-events blieben hashgleich. Kein Paste, Return oder Replay;
+alle eigenen Fenster/Prozesse unabhängig abwesend, ursprüngliche6021/6022 und ihre
+Prozessidentitäten erhalten. Dies ist keine neue vollständige Codex-ChatGPT-Übergabe.
+
+Zwei vorangegangene Abnahmeläufe bleiben als fehlgeschlagen dokumentiert: zuerst
+verwechselte der Test visuell gruppierte Tabs mit nativen Scriptingfenstern; danach
+fehlte dem isolierten Testzugang `task.read`. Beide Testaufbaufehler sind im Harness
+korrigiert. Das erste eigene Fenster wurde separat über exakte Identitäten und den
+privaten Ausgabedeskriptor kontrolliert bereinigt; der zweite Lauf bereinigte sich
+selbst. Keine Produktionsänderung während dieser Läufe. Der dritte Lauf bestand
+vollständig samt Cleanup. Der Produktcode blieb seit dem Paketbuild unverändert.
+
+Auch der tatsächliche alte Nutzerfall3033→6022 mit wiederverwendeter ttys001 wurde
+gegen echte native Abwesenheitsnachweise ausschließlich lesend bestätigt.
+
+### Installation, Erhalt und Rückweg
+
+Quellgebundenes Paket und native Swift/Cocoa/WebKit-Intel-App aus exakt da1bdae,
+strenge ad-hoc-Signaturprüfung bestanden. Umschaltung durch den vorhandenen
+transaktionalen Installer im frisch bestätigten separaten Terminal6021/ttys000,
+Shell42079/Installer47011. App und Console nur nach Eigentümer-/Leerlaufprüfung
+ersetzt, kein Agent gestoppt. App und Dienst melden beide **0.8.0rc20**; CorePID47085.
+Alle122 installierten Pythondateien stimmen bytegenau mit dem Wheel überein.
+Live-Quellhash: `4ddc9c375532fcdaa1e77c9b55f05d3f28eaf5e943ad29ba0a9eca39f55dbbe6`.
+
+Konfiguration und beide Zugangsdaten-Dateien sind bytegleich. Alle57 vorherigen
+UNKNOWN-Tasks,8 UNKNOWN-Handoffs und24 unknown/blocked Messagejobs sind vollständige
+Zeilenhashgleich. Originale Terminalfenster und Shell-/Codex-Prozesse erhalten,
+Installer kehrte in die ursprüngliche Shell zurück. ThreadDesk-Discovery weiterhin
+aktiv mit34 Werkzeugen. Werkzeugkatalog nach Versionswechsel frisch gelesen.
+
+Sicherung/Logs/Artefakte/native Belege:
+`~/.local/share/kirabridge/backups/closed-terminal-reservation-20261030/`.
+Transaktionaler Rückweg zur vorherigen RC19:
+`~/.local/share/kirabridge/install/backups/20261030-205600-1c16e539/`.
+Keine Konfigurationsmigration und kein Datenbank-Restore. Strukturierter Nachtrag
+im bestehenden JSON unter `closed_terminal_reuse_20261030`.
+Kein main-Merge und kein neues öffentliches Release; breitere Plattform-/Hostabnahme
+bleibt getrennt von dieser konkreten Fehlerbehebung.
+
+## Historischer RC19-Stand vor der Korrektur für wiederverwendete TTYs
+
 ## Neuester Stand: konkrete globale Busy-Sperre behoben, installiert und erfolgreich getestet
 
 Auftrag: dauerhaft sichtbare ChatGPT→Codex-Übergabe reparieren, laufende Sitzungen

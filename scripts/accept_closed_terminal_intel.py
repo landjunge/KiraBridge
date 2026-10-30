@@ -48,7 +48,7 @@ async def accept(root: Path, *, allow_one_owned_visible_window: bool):
         agents={"head": AgentConfig(kind="grok_acp")},
         principals={
             "test": PrincipalConfig(
-                capabilities=["session.inspect", "message.send", "message.read"],
+                capabilities=["session.inspect", "task.read", "message.send", "message.read"],
                 roots=[str(workspace)],
                 message_peers=["head"],
                 agents=["head"],
@@ -61,10 +61,12 @@ async def accept(root: Path, *, allow_one_owned_visible_window: bool):
             ),
         },
     )
+    assert config.visible_handoffs.enabled is True
     bridge = Bridge(config)
     transport = bridge.sessions.terminal_app
     initial_inventory = await transport.window_inventory()
     initial_windows = {row["window_id"] for row in initial_inventory["windows"]}
+    initial_native_ttys = {row["window_id"]: row["ttys"] for row in initial_inventory["windows"]}
     initial_rows = await transport.catalog()
     assert not transport.last_catalog_incomplete, "Initial native catalogue is incomplete"
     initial_ttys = {row["tty"] for row in initial_rows}
@@ -122,7 +124,21 @@ async def accept(root: Path, *, allow_one_owned_visible_window: bool):
         actual = {row["window_id"] for row in inventory["windows"]}
         allowed = initial_windows | ({owned["window_id"]} if owned is not None else set())
         assert actual == allowed, "Native window inventory changed outside the owned fixture"
+        for row in inventory["windows"]:
+            if row["window_id"] in initial_windows:
+                assert row["ttys"] == initial_native_ttys[row["window_id"]], (
+                    "An original scripting window's native tabs changed"
+                )
         return inventory
+
+    async def single_native_tty(window_id, tty):
+        # Visual tab_count groups windows by bounds/preferences; it is not the
+        # scripting window's tabs(). Close only our exact new scripting object.
+        inventory = await transport.window_inventory()
+        matches = [row for row in inventory["windows"] if row["window_id"] == window_id]
+        assert len(matches) == 1 and matches[0]["ttys"] == [tty], (
+            "The owned scripting window must contain exactly its own TTY"
+        )
 
     async def fixture(number):
         nonlocal owned
@@ -155,7 +171,7 @@ async def accept(root: Path, *, allow_one_owned_visible_window: bool):
                         break
                 await asyncio.sleep(0.1)
         assert row["window_id"] not in initial_windows
-        assert row["tab_count"] == 1 and not row["identity_ambiguous"]
+        assert not row["identity_ambiguous"]
         head = heads[0]
         assert head["image"] == "/usr/bin/head" and head["ppid"] == row["expected_pid"]
         assert head["pid"] != row["expected_pid"]
@@ -208,9 +224,13 @@ async def accept(root: Path, *, allow_one_owned_visible_window: bool):
             "receipt_device": stat.st_dev,
             "private_stdout_fd_verified": True,
             "head_termination_attempted": False,
+            "visual_tab_count": row.get("tab_count"),
         }
         evidence["fixtures"].append(owned)
         evidence["latest_open"]["identity_verified"] = True
+        checkpoint()
+        await single_native_tty(owned["window_id"], tty)
+        owned["native_single_tty_script_window_verified"] = True
         await unchanged_originals()
         check("opened one fresh owned head fixture", number=number, pane_id=binding.pane_id)
         return binding
@@ -295,7 +315,8 @@ async def accept(root: Path, *, allow_one_owned_visible_window: bool):
                 ]
                 if binding.agent_pid not in pids and len(rows) == 1:
                     row = rows[0]
-                    assert row["expected_pid"] == binding.expected_pid and row["tab_count"] == 1
+                    assert row["expected_pid"] == binding.expected_pid
+                    assert not row["identity_ambiguous"]
                     if not row["busy"]:
                         screen = await transport.read(binding.pane_id)
                         if empty_shell_prompt(screen):
@@ -305,6 +326,7 @@ async def accept(root: Path, *, allow_one_owned_visible_window: bool):
             await transport.process_identity(binding.expected_pid, detailed=True)
             == item["identities"][binding.expected_pid]
         )
+        await single_native_tty(item["window_id"], item["tty"])
         source = (
             transport.native_target(binding.pane_id)
             + transport.native_identity_guard(
@@ -317,7 +339,13 @@ async def accept(root: Path, *, allow_one_owned_visible_window: bool):
             + "!=="
             + json.dumps(screen)
             + ") throw Error('Owned shell input changed; preserve');"
-            + "\ntargetWindow.close(); JSON.stringify({closed:true});"
+            + "\nconst otherIds=app.windows().filter(w=>w.id()!==targetWindow.id()).map(w=>w.id());"
+            + "\ntargetWindow.close(); delay(0.3);"
+            + "\nconst remainingIds=app.windows().map(w=>w.id());"
+            + "\nif(otherIds.some(id=>!remainingIds.includes(id))) "
+            + "throw Error('Closing owned scripting window removed another window');"
+            + "\nJSON.stringify({closed:true,other_window_ids_preserved:true,"
+            + "remaining:remainingIds});"
         )
         item["close_receipt"] = await transport.native(source, mutation=True)
         async with asyncio.timeout(20):
