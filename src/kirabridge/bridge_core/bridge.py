@@ -30,6 +30,7 @@ from kirabridge.bridge_core.models import (
     State,
     TaskRequest,
     TerminalInput,
+    ThreadDeskDynamicInput,
     ThreadDeskKnowledgeInput,
     ThreadDeskManageInput,
     ThreadDeskReadInput,
@@ -102,6 +103,7 @@ INPUTS = {
     "handoff.inbox": HandoffInboxInput,
     "handoff.reconcile": HandoffReference,
     "handoff.decide": HandoffDecisionInput,
+    "threaddesk.dynamic": ThreadDeskDynamicInput,
     "threaddesk.read": ThreadDeskReadInput,
     "threaddesk.manage": ThreadDeskManageInput,
     "threaddesk.knowledge": ThreadDeskKnowledgeInput,
@@ -587,6 +589,10 @@ class Bridge:
             return await self.workflow_control.stop(
                 principal, args.handoff_id, args.revision, args.stop_id, task_id=task["id"]
             )
+        if operation == "threaddesk.dynamic":
+            from kirabridge.threaddesk_dynamic import execute as dynamic_execute
+
+            return await dynamic_execute(self, task, args, running)
         if operation.startswith("threaddesk."):
             return await self.threaddesk.execute(task, args, running)
         if operation == "observations.read":

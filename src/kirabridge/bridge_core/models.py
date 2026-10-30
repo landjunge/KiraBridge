@@ -135,6 +135,12 @@ class AgentInput(Input):
     timeout: float = Field(default=300.0, gt=0, le=3600)
 
 
+class ThreadDeskDynamicInput(Input):
+    name: str = Field(pattern=r"^[A-Za-z][A-Za-z0-9_-]{0,63}$")
+    arguments: dict[str, Any] = Field(default_factory=dict)
+    contract_sha256: str = Field(pattern=r"^[a-f0-9]{64}$")
+
+
 class ThreadDeskReadInput(Input):
     tool: Literal[
         "list_threads",

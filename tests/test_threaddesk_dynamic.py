@@ -212,3 +212,88 @@ async def test_dynamic_reads_recheck_revocation_after_wait(
         if not pending.done():
             pending.cancel()
             await asyncio.gather(pending, return_exceptions=True)
+
+
+async def test_full_proxy_discovers_all_authorized_effect_classes(monkeypatch, config):
+    bridge, listing = bridge_fixture(monkeypatch, config, enabled=False)
+    config.threaddesk.dynamic_tool_proxy = True
+    unannotated = tool("future_capability")
+    unannotated.annotations = None
+    listing.tools.append(unannotated)
+    discovered = await catalog(bridge, "local")
+    assert discovered["mode"] == "authorized_tools"
+    items = {item["name"]: item for item in discovered["tools"]}
+    assert set(items) == {"new_read", "writer", "future_capability"}
+    assert items["new_read"]["annotations"]["readOnlyHint"] is True
+    for name in ("writer", "future_capability"):
+        assert items[name]["annotations"]["readOnlyHint"] is False
+        assert items[name]["requires_operation_id"] is True
+    assert items["future_capability"]["annotations"]["destructiveHint"] is True
+    bridge.threaddesk.pool.call.assert_not_awaited()
+
+
+@pytest.mark.parametrize("removed", ["threaddesk.manage", "threaddesk.knowledge"])
+async def test_generic_writes_cannot_bypass_existing_write_capabilities(
+    monkeypatch, config, removed
+):
+    from kirabridge.threaddesk_dynamic import call
+
+    bridge, _ = bridge_fixture(monkeypatch, config)
+    config.threaddesk.dynamic_tool_proxy = True
+    config.principals["local"].capabilities.remove(removed)
+    assert {x["name"] for x in (await catalog(bridge, "local"))["tools"]} == {"new_read"}
+    with pytest.raises(BridgeError) as failure:
+        await call(bridge, "local", "writer", {"id": "abc"}, "stable-id")
+    assert failure.value.code == "forbidden"
+    bridge.threaddesk.pool.call.assert_not_awaited()
+
+
+@pytest.mark.parametrize("identifier", [None, "", "unsafe identifier", "x" * 129])
+async def test_generic_mutations_require_stable_id_before_submit(monkeypatch, config, identifier):
+    from kirabridge.threaddesk_dynamic import call
+
+    bridge, _ = bridge_fixture(monkeypatch, config)
+    config.threaddesk.dynamic_tool_proxy = True
+    with pytest.raises(BridgeError) as failure:
+        await call(bridge, "local", "writer", {"id": "abc"}, identifier)
+    assert failure.value.code == "invalid_arguments"
+    bridge.threaddesk.pool.call.assert_not_awaited()
+
+
+def test_proxy_mutation_envelope_preserves_peer_operation_id_schema():
+    from kirabridge.mcp_gateway.proxy import dynamic_call_arguments, dynamic_input_schema
+
+    schema = {"type": "object", "properties": {"operation_id": {"type": "integer"}}}
+    item = {"name": "future_write", "inputSchema": schema, "requires_operation_id": True}
+    wrapped = dynamic_input_schema(item)
+    assert wrapped["properties"]["arguments"] is schema
+    assert wrapped["properties"]["operation_id"]["type"] == "string"
+    args = {"operation_id": "kb-owned-id", "arguments": {"operation_id": 17}}
+    assert dynamic_call_arguments(item, args) == {"name": "future_write", **args}
+    with pytest.raises(BridgeError):
+        dynamic_call_arguments(item, {"operation_id": 17})
+
+
+@pytest.mark.parametrize("arguments", [{"id": float("nan")}, {"id": float("inf")}])
+async def test_dynamic_arguments_reject_non_json_numbers_before_peer(
+    monkeypatch, config, arguments
+):
+    from kirabridge.threaddesk_dynamic import call
+
+    bridge, _ = bridge_fixture(monkeypatch, config)
+    with pytest.raises(BridgeError) as failure:
+        await call(bridge, "local", "new_read", arguments)
+    assert failure.value.code == "invalid_arguments"
+    bridge.threaddesk.connect.assert_not_awaited()
+
+
+async def test_generic_read_uses_one_fresh_catalog_and_retains_read_semantics(monkeypatch, config):
+    from kirabridge.threaddesk_dynamic import call
+
+    bridge, _ = bridge_fixture(monkeypatch, config)
+    result = await call(bridge, "local", "new_read", {"id": "abc"})
+    assert result["success"] and result["scope"] == "threaddesk_dynamic_read"
+    assert result["value"] == {"id": "abc"}
+    bridge.threaddesk.connect.assert_awaited_once()
+    bridge.threaddesk.pool.sessions["threaddesk"].list_tools.assert_awaited_once()
+    bridge.threaddesk.pool.call.assert_awaited_once_with("threaddesk", "new_read", {"id": "abc"})

@@ -270,7 +270,7 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
 
     @server.tool(annotations=read)
     async def threaddesk_dynamic_catalog(ctx: Context) -> dict[str, Any]:
-        """Discover opt-in, operator-approved read-only ThreadDesk tools."""
+        """Discover the configured ThreadDesk tools allowed by current operator policy."""
         from kirabridge.threaddesk_dynamic import catalog
 
         try:
@@ -333,15 +333,17 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
 
         return safe(action)
 
-    @server.tool(annotations=read)
+    @server.tool(
+        annotations=ToolAnnotations(readOnlyHint=False, destructiveHint=True, openWorldHint=True)
+    )
     async def threaddesk_dynamic_call(
-        name: str, arguments: dict[str, Any], ctx: Context
+        name: str, arguments: dict[str, Any], ctx: Context, operation_id: str | None = None
     ) -> dict[str, Any]:
-        """Call a freshly validated read-only ThreadDesk tool."""
-        from kirabridge.threaddesk_dynamic import read as dynamic_read
+        """Call a fresh authorized ThreadDesk tool; mutations require a stable operation_id."""
+        from kirabridge.threaddesk_dynamic import call as dynamic_call
 
         try:
-            return await dynamic_read(bridge, identity(ctx), name, arguments)
+            return await dynamic_call(bridge, identity(ctx), name, arguments, operation_id)
         except BridgeError as exc:
             return {"error": {"code": exc.code, "message": str(exc)}}
 

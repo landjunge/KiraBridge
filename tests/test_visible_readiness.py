@@ -155,3 +155,36 @@ def test_an_old_empty_prompt_does_not_override_the_last_nonempty_widget(binding)
 def test_completed_subagent_is_not_a_completed_main_turn(binding):
     text = "• Completed `/root/readiness_audit`\n\n" + WORKING + "\n\n" + EMPTY + FOOTER
     assert checked(text, binding, {"state": "working"})["state"] == "working"
+
+
+@pytest.mark.parametrize("protocol", [None, {"state": "working"}])
+def test_current_empty_queue_composer_does_not_reuse_submitted_prompt(binding, protocol):
+    # The live working TUI uses U+00BB, while submitted history uses U+203A.
+    text = (
+        "› earlier submitted request\n\n• Completed part of the answer.\n\n"
+        + WORKING
+        + "\n  └ Tip: Press control-t to open the full transcript.\n\n"
+        + "» Ask Codex to do anything"
+        + FOOTER
+    )
+    result = checked(text, binding, protocol)
+    assert result["state"] == "working" and result["input_empty"]
+    assert result["reason"] == "current_queue_composer"
+
+
+def test_bound_idle_cannot_promote_current_queue_composer(binding):
+    result = checked("» Ask Codex to do anything" + FOOTER, binding, {"state": "idle"})
+    assert result["state"] == "unknown" and result["input_empty"]
+    assert result["reason"] == "protocol_display_disagree"
+
+
+@pytest.mark.parametrize("protocol", [None, {"state": "working"}, {"state": "idle"}])
+def test_existing_queued_text_remains_nonempty(binding, protocol):
+    result = checked("› old submitted request\n\n» do not overwrite me" + FOOTER, binding, protocol)
+    assert result["state"] == "input_not_empty" and not result["input_empty"]
+
+
+def test_old_queue_composer_does_not_override_later_idle_widget(binding):
+    text = "» old queued text\n\n• Completed reply.\n\n" + EMPTY + FOOTER
+    result = checked(text, binding, {"state": "idle"})
+    assert result["state"] == "ready" and result["input_empty"]

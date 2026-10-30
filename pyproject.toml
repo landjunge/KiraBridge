@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "kirabridge"
-version = "0.8.0rc18"
+version = "0.8.0rc19"
 description = "Private, permission-scoped desktop and agent bridge"
 license = "LicenseRef-Netzwerkpunkt-Personal-Use-1.0"
 license-files = ["LICENSE"]
