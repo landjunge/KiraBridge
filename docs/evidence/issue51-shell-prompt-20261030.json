@@ -517,5 +517,1533 @@
       "Issue51 complete agent takeover/ACK/ChatGPT receipt acceptance remains open",
       "Test/docs commit skips CI by explicit user scope; skipped mandatory gates remain unmet"
     ]
+  },
+  "intel_race_retest": {
+    "auftrag_id": "channel-8f3be0698a9c44e2822382b88e5f57cb",
+    "message_id": "0a5ed62f-7989-4407-b370-65a187e274b3",
+    "receipt": "bdfba3c0-67c7-4c91-b93c-1afeb4e8e6dc",
+    "tested_base": "651cd19bce5a896dcf0102df9f75f44f0e264c02",
+    "proven_reproduced_cause": "Old exact endswith expectation compared rendered tab.contents suffix to input bytes. Repeated trailing U+0020 existed only in display; actual ZLE BUFFER matched16requested chars, POSTDISPLAY empty, so the predicate stayed false beyond5s. Three repetitions without pre-input probe rule out pre-input probe invocation as a necessary condition of the mismatch; the probe remained installed.",
+    "historical_limit": "OldV1 did not retain post-keystroke screen; exact historical byte sequence cannot be independently recovered. The same event/expectation failure is now repeatedly reproduced. Internal origin of variable rendered blank suffix and separate CtrlU/tab anomaly not established.",
+    "diagnostics": [
+      {
+        "run": "diagnosis",
+        "state": "failed",
+        "owned": {
+          "pane_id": "terminal:4032:ttys003",
+          "expected_pid": 67633,
+          "tty": "/dev/ttys003"
+        },
+        "without_preprobe": false,
+        "trials": [
+          {
+            "number": 1,
+            "method": "keystroke-original",
+            "requested": "# KB_ACCEPT_RACE",
+            "zle": {
+              "buffer": "# KB_ACCEPT_RACE",
+              "postdisplay": ""
+            },
+            "buffer_codepoints": [
+              "U+0023",
+              "U+0020",
+              "U+004B",
+              "U+0042",
+              "U+005F",
+              "U+0041",
+              "U+0043",
+              "U+0043",
+              "U+0045",
+              "U+0050",
+              "U+0054",
+              "U+005F",
+              "U+0052",
+              "U+0041",
+              "U+0043",
+              "U+0045"
+            ],
+            "before_last_line": null,
+            "observations": [
+              {
+                "elapsed": 0.3573597549984697,
+                "last_line": "➜  diagnosis # KB_ACCEPT_RACE ",
+                "matches_old_suffix": false
+              },
+              {
+                "elapsed": 0.8829158029984683,
+                "last_line": "➜  diagnosis # KB_ACCEPT_RACE ",
+                "matches_old_suffix": false
+              },
+              {
+                "elapsed": 1.3950441719789524,
+                "last_line": "➜  diagnosis # KB_ACCEPT_RACE ",
+                "matches_old_suffix": false
+              },
+              {
+                "elapsed": 1.9090315849753097,
+                "last_line": "➜  diagnosis # KB_ACCEPT_RACE ",
+                "matches_old_suffix": false
+              },
+              {
+                "elapsed": 2.418663091986673,
+                "last_line": "➜  diagnosis # KB_ACCEPT_RACE ",
+                "matches_old_suffix": false
+              },
+              {
+                "elapsed": 2.9478413489996456,
+                "last_line": "➜  diagnosis # KB_ACCEPT_RACE ",
+                "matches_old_suffix": false
+              },
+              {
+                "elapsed": 3.4615371389954817,
+                "last_line": "➜  diagnosis # KB_ACCEPT_RACE ",
+                "matches_old_suffix": false
+              },
+              {
+                "elapsed": 3.983440930984216,
+                "last_line": "➜  diagnosis # KB_ACCEPT_RACE ",
+                "matches_old_suffix": false
+              },
+              {
+                "elapsed": 4.500893476972124,
+                "last_line": "➜  diagnosis # KB_ACCEPT_RACE ",
+                "matches_old_suffix": false
+              },
+              {
+                "elapsed": 5.007510828989325,
+                "last_line": "➜  diagnosis # KB_ACCEPT_RACE ",
+                "matches_old_suffix": false
+              }
+            ],
+            "rendered_tail_after_requested": " ",
+            "rendered_tail_codepoints": [
+              "U+0020"
+            ],
+            "clear_witness": null,
+            "screen_sha256": "647dd85497802a5404571fbdc6a51d37195d24f9a4cc5fd2ee9bbc1f013f00b5"
+          }
+        ],
+        "failure_cleanup_independently_verified": true,
+        "failure_cleanup_windows": [
+          3033,
+          3206,
+          3541,
+          3546,
+          3903
+        ],
+        "error": "TimeoutError()",
+        "raw_sha256": "89663850c7828698de50be94c8acc63b6a65e26200c205af093d22886e7a1b7f",
+        "log_sha256": "39a18eb0937b0bb4af585326b54544f2179b010b60293b333e91bb2bdd3aeb31"
+      },
+      {
+        "run": "diagnosis-repeat",
+        "state": "failed",
+        "owned": {
+          "pane_id": "terminal:4035:ttys003",
+          "expected_pid": 68260,
+          "tty": "/dev/ttys003"
+        },
+        "without_preprobe": false,
+        "trials": [
+          {
+            "number": 1,
+            "method": "keystroke-original",
+            "requested": "# KB_ACCEPT_RACE",
+            "zle": {
+              "buffer": "# KB_ACCEPT_RACE",
+              "postdisplay": ""
+            },
+            "buffer_codepoints": [
+              "U+0023",
+              "U+0020",
+              "U+004B",
+              "U+0042",
+              "U+005F",
+              "U+0041",
+              "U+0043",
+              "U+0043",
+              "U+0045",
+              "U+0050",
+              "U+0054",
+              "U+005F",
+              "U+0052",
+              "U+0041",
+              "U+0043",
+              "U+0045"
+            ],
+            "before_last_line": null,
+            "observations": [
+              {
+                "elapsed": 0.3241846519813407,
+                "last_line": "➜  diagnosis-repeat # KB_ACCEPT_RACE  ",
+                "matches_old_suffix": false
+              },
+              {
+                "elapsed": 0.8415625509805977,
+                "last_line": "➜  diagnosis-repeat # KB_ACCEPT_RACE  ",
+                "matches_old_suffix": false
+              },
+              {
+                "elapsed": 1.3539856239804067,
+                "last_line": "➜  diagnosis-repeat # KB_ACCEPT_RACE  ",
+                "matches_old_suffix": false
+              },
+              {
+                "elapsed": 1.8755481989937834,
+                "last_line": "➜  diagnosis-repeat # KB_ACCEPT_RACE  ",
+                "matches_old_suffix": false
+              },
+              {
+                "elapsed": 2.402874344988959,
+                "last_line": "➜  diagnosis-repeat # KB_ACCEPT_RACE  ",
+                "matches_old_suffix": false
+              },
+              {
+                "elapsed": 2.9131466889812145,
+                "last_line": "➜  diagnosis-repeat # KB_ACCEPT_RACE  ",
+                "matches_old_suffix": false
+              },
+              {
+                "elapsed": 3.42820187198231,
+                "last_line": "➜  diagnosis-repeat # KB_ACCEPT_RACE  ",
+                "matches_old_suffix": false
+              },
+              {
+                "elapsed": 3.9354357609990984,
+                "last_line": "➜  diagnosis-repeat # KB_ACCEPT_RACE  ",
+                "matches_old_suffix": false
+              },
+              {
+                "elapsed": 4.449480641982518,
+                "last_line": "➜  diagnosis-repeat # KB_ACCEPT_RACE  ",
+                "matches_old_suffix": false
+              },
+              {
+                "elapsed": 4.9590370139922015,
+                "last_line": "➜  diagnosis-repeat # KB_ACCEPT_RACE  ",
+                "matches_old_suffix": false
+              },
+              {
+                "elapsed": 5.471362370997667,
+                "last_line": "➜  diagnosis-repeat # KB_ACCEPT_RACE  ",
+                "matches_old_suffix": false
+              }
+            ],
+            "rendered_tail_after_requested": "  ",
+            "rendered_tail_codepoints": [
+              "U+0020",
+              "U+0020"
+            ],
+            "clear_witness": {
+              "zle": {
+                "buffer": "",
+                "postdisplay": ""
+              },
+              "last_line": "➜  diagnosis-repeat                   ",
+              "recognized_empty_prompt": false
+            },
+            "screen_sha256": "a85b3f792e2493c56585ffbb80d62208e5c07539802a6db9646ecbaa3e5c2238"
+          },
+          {
+            "number": 2,
+            "method": "keystroke-original",
+            "requested": "# KB_ACCEPT_RACE",
+            "zle": {
+              "buffer": "# KB_ACCEPT_RACE",
+              "postdisplay": ""
+            },
+            "buffer_codepoints": [
+              "U+0023",
+              "U+0020",
+              "U+004B",
+              "U+0042",
+              "U+005F",
+              "U+0041",
+              "U+0043",
+              "U+0043",
+              "U+0045",
+              "U+0050",
+              "U+0054",
+              "U+005F",
+              "U+0052",
+              "U+0041",
+              "U+0043",
+              "U+0045"
+            ],
+            "before_last_line": null,
+            "observations": [
+              {
+                "elapsed": 0.34249898701091297,
+                "last_line": "➜  diagnosis-repeat # KB_ACCEPT_RACE    ",
+                "matches_old_suffix": false
+              },
+              {
+                "elapsed": 0.8624545620114077,
+                "last_line": "➜  diagnosis-repeat # KB_ACCEPT_RACE    ",
+                "matches_old_suffix": false
+              },
+              {
+                "elapsed": 1.3834539510135073,
+                "last_line": "➜  diagnosis-repeat # KB_ACCEPT_RACE    ",
+                "matches_old_suffix": false
+              },
+              {
+                "elapsed": 1.891211011010455,
+                "last_line": "➜  diagnosis-repeat # KB_ACCEPT_RACE    ",
+                "matches_old_suffix": false
+              },
+              {
+                "elapsed": 2.4267450380139053,
+                "last_line": "➜  diagnosis-repeat # KB_ACCEPT_RACE    ",
+                "matches_old_suffix": false
+              },
+              {
+                "elapsed": 2.954433679988142,
+                "last_line": "➜  diagnosis-repeat # KB_ACCEPT_RACE    ",
+                "matches_old_suffix": false
+              },
+              {
+                "elapsed": 3.6576717940042727,
+                "last_line": "➜  diagnosis-repeat # KB_ACCEPT_RACE    ",
+                "matches_old_suffix": false
+              },
+              {
+                "elapsed": 4.302964731992688,
+                "last_line": "➜  diagnosis-repeat # KB_ACCEPT_RACE    ",
+                "matches_old_suffix": false
+              },
+              {
+                "elapsed": 4.855040980997728,
+                "last_line": "➜  diagnosis-repeat # KB_ACCEPT_RACE    ",
+                "matches_old_suffix": false
+              },
+              {
+                "elapsed": 5.375343469000654,
+                "last_line": "➜  diagnosis-repeat # KB_ACCEPT_RACE    ",
+                "matches_old_suffix": false
+              }
+            ],
+            "rendered_tail_after_requested": "    ",
+            "rendered_tail_codepoints": [
+              "U+0020",
+              "U+0020",
+              "U+0020",
+              "U+0020"
+            ],
+            "clear_witness": {
+              "zle": {
+                "buffer": "\t",
+                "postdisplay": ""
+              },
+              "last_line": "➜  diagnosis-repeat                     ",
+              "recognized_empty_prompt": false
+            },
+            "screen_sha256": "e973b33ffdab63d7f18c6ad2e029de092d6a0d8d2c606d33450b345f35ec5db7"
+          }
+        ],
+        "failure_cleanup_independently_verified": true,
+        "failure_cleanup_windows": [
+          3033,
+          3206,
+          3541,
+          3546,
+          3903
+        ],
+        "error": "AssertionError('No Return until actual owned BUFFER is empty')",
+        "raw_sha256": "d6d18dc814839bed65bcac192fa617ec6953d5e5d5bbd235af21204372eea61c",
+        "log_sha256": "52dc9383610cd89ddcddb751380f72069063f02c21e49e02db08972ac65f39d0"
+      },
+      {
+        "run": "diagnosis-controlled",
+        "state": "complete_owned_window_ready",
+        "owned": {
+          "pane_id": "terminal:4098:ttys003",
+          "expected_pid": 68961,
+          "tty": "/dev/ttys003"
+        },
+        "without_preprobe": false,
+        "trials": [
+          {
+            "number": 1,
+            "method": "keystroke-original",
+            "requested": "# KB_ACCEPT_RACE",
+            "zle": {
+              "buffer": "# KB_ACCEPT_RACE",
+              "postdisplay": ""
+            },
+            "buffer_codepoints": [
+              "U+0023",
+              "U+0020",
+              "U+004B",
+              "U+0042",
+              "U+005F",
+              "U+0041",
+              "U+0043",
+              "U+0043",
+              "U+0045",
+              "U+0050",
+              "U+0054",
+              "U+005F",
+              "U+0052",
+              "U+0041",
+              "U+0043",
+              "U+0045"
+            ],
+            "before_last_line": null,
+            "observations": [
+              {
+                "elapsed": 0.37645894900197163,
+                "last_line": "➜  diagnosis-controlled # KB_ACCEPT_RACE   ",
+                "matches_old_suffix": false
+              },
+              {
+                "elapsed": 0.9078900849854108,
+                "last_line": "➜  diagnosis-controlled # KB_ACCEPT_RACE   ",
+                "matches_old_suffix": false
+              },
+              {
+                "elapsed": 1.431741484993836,
+                "last_line": "➜  diagnosis-controlled # KB_ACCEPT_RACE   ",
+                "matches_old_suffix": false
+              },
+              {
+                "elapsed": 1.9745924289745744,
+                "last_line": "➜  diagnosis-controlled # KB_ACCEPT_RACE   ",
+                "matches_old_suffix": false
+              },
+              {
+                "elapsed": 2.4897553589835297,
+                "last_line": "➜  diagnosis-controlled # KB_ACCEPT_RACE   ",
+                "matches_old_suffix": false
+              },
+              {
+                "elapsed": 3.2415454479923937,
+                "last_line": "➜  diagnosis-controlled # KB_ACCEPT_RACE   ",
+                "matches_old_suffix": false
+              },
+              {
+                "elapsed": 3.778917780990014,
+                "last_line": "➜  diagnosis-controlled # KB_ACCEPT_RACE   ",
+                "matches_old_suffix": false
+              },
+              {
+                "elapsed": 4.385322553978767,
+                "last_line": "➜  diagnosis-controlled # KB_ACCEPT_RACE   ",
+                "matches_old_suffix": false
+              },
+              {
+                "elapsed": 4.961011901992606,
+                "last_line": "➜  diagnosis-controlled # KB_ACCEPT_RACE   ",
+                "matches_old_suffix": false
+              },
+              {
+                "elapsed": 5.549361769983079,
+                "last_line": "➜  diagnosis-controlled # KB_ACCEPT_RACE   ",
+                "matches_old_suffix": false
+              }
+            ],
+            "rendered_tail_after_requested": "   ",
+            "rendered_tail_codepoints": [
+              "U+0020",
+              "U+0020",
+              "U+0020"
+            ],
+            "clear_witness": {
+              "zle": {
+                "buffer": "",
+                "postdisplay": ""
+              },
+              "last_line": "➜  diagnosis-controlled                    ",
+              "recognized_empty_prompt": false,
+              "method": "own ZLE widget checks exact expected BUFFER before clearing"
+            },
+            "screen_sha256": "7dbb9e8ba0726b48bd99221febd40cfbae54c5e9ac0a597c79e92f0820325a87"
+          },
+          {
+            "number": 2,
+            "method": "keystroke-original",
+            "requested": "# KB_ACCEPT_RACE",
+            "zle": {
+              "buffer": "# KB_ACCEPT_RACE",
+              "postdisplay": ""
+            },
+            "buffer_codepoints": [
+              "U+0023",
+              "U+0020",
+              "U+004B",
+              "U+0042",
+              "U+005F",
+              "U+0041",
+              "U+0043",
+              "U+0043",
+              "U+0045",
+              "U+0050",
+              "U+0054",
+              "U+005F",
+              "U+0052",
+              "U+0041",
+              "U+0043",
+              "U+0045"
+            ],
+            "before_last_line": null,
+            "observations": [
+              {
+                "elapsed": 0.3495355109917,
+                "last_line": "➜  diagnosis-controlled # KB_ACCEPT_RACE ",
+                "matches_old_suffix": false
+              },
+              {
+                "elapsed": 0.8857428379997145,
+                "last_line": "➜  diagnosis-controlled # KB_ACCEPT_RACE ",
+                "matches_old_suffix": false
+              },
+              {
+                "elapsed": 1.4251470619929023,
+                "last_line": "➜  diagnosis-controlled # KB_ACCEPT_RACE ",
+                "matches_old_suffix": false
+              },
+              {
+                "elapsed": 1.9765784229966812,
+                "last_line": "➜  diagnosis-controlled # KB_ACCEPT_RACE ",
+                "matches_old_suffix": false
+              },
+              {
+                "elapsed": 2.5942852389998734,
+                "last_line": "➜  diagnosis-controlled # KB_ACCEPT_RACE ",
+                "matches_old_suffix": false
+              },
+              {
+                "elapsed": 3.145580076990882,
+                "last_line": "➜  diagnosis-controlled # KB_ACCEPT_RACE ",
+                "matches_old_suffix": false
+              },
+              {
+                "elapsed": 3.6985954499978106,
+                "last_line": "➜  diagnosis-controlled # KB_ACCEPT_RACE ",
+                "matches_old_suffix": false
+              },
+              {
+                "elapsed": 4.2292789639905095,
+                "last_line": "➜  diagnosis-controlled # KB_ACCEPT_RACE ",
+                "matches_old_suffix": false
+              },
+              {
+                "elapsed": 4.760563421994448,
+                "last_line": "➜  diagnosis-controlled # KB_ACCEPT_RACE ",
+                "matches_old_suffix": false
+              },
+              {
+                "elapsed": 5.296998770994833,
+                "last_line": "➜  diagnosis-controlled # KB_ACCEPT_RACE ",
+                "matches_old_suffix": false
+              }
+            ],
+            "rendered_tail_after_requested": " ",
+            "rendered_tail_codepoints": [
+              "U+0020"
+            ],
+            "clear_witness": {
+              "zle": {
+                "buffer": "",
+                "postdisplay": ""
+              },
+              "last_line": "➜  diagnosis-controlled                  ",
+              "recognized_empty_prompt": false,
+              "method": "own ZLE widget checks exact expected BUFFER before clearing"
+            },
+            "screen_sha256": "3ccd101d5c6d66240bdf77241f3e7fac55becfa1ca43a2e90ed464d0fec0d13d"
+          },
+          {
+            "number": 3,
+            "method": "keystroke-original",
+            "requested": "# KB_ACCEPT_RACE",
+            "zle": {
+              "buffer": "# KB_ACCEPT_RACE",
+              "postdisplay": ""
+            },
+            "buffer_codepoints": [
+              "U+0023",
+              "U+0020",
+              "U+004B",
+              "U+0042",
+              "U+005F",
+              "U+0041",
+              "U+0043",
+              "U+0043",
+              "U+0045",
+              "U+0050",
+              "U+0054",
+              "U+005F",
+              "U+0052",
+              "U+0041",
+              "U+0043",
+              "U+0045"
+            ],
+            "before_last_line": null,
+            "observations": [
+              {
+                "elapsed": 0.35262873300234787,
+                "last_line": "➜  diagnosis-controlled # KB_ACCEPT_RACE     ",
+                "matches_old_suffix": false
+              },
+              {
+                "elapsed": 0.8875525280018337,
+                "last_line": "➜  diagnosis-controlled # KB_ACCEPT_RACE     ",
+                "matches_old_suffix": false
+              },
+              {
+                "elapsed": 1.4267722160147969,
+                "last_line": "➜  diagnosis-controlled # KB_ACCEPT_RACE     ",
+                "matches_old_suffix": false
+              },
+              {
+                "elapsed": 1.9869783010217361,
+                "last_line": "➜  diagnosis-controlled # KB_ACCEPT_RACE     ",
+                "matches_old_suffix": false
+              },
+              {
+                "elapsed": 2.5134649830288254,
+                "last_line": "➜  diagnosis-controlled # KB_ACCEPT_RACE     ",
+                "matches_old_suffix": false
+              },
+              {
+                "elapsed": 3.0522990700264927,
+                "last_line": "➜  diagnosis-controlled # KB_ACCEPT_RACE     ",
+                "matches_old_suffix": false
+              },
+              {
+                "elapsed": 3.5839668400003575,
+                "last_line": "➜  diagnosis-controlled # KB_ACCEPT_RACE     ",
+                "matches_old_suffix": false
+              },
+              {
+                "elapsed": 4.119922228012001,
+                "last_line": "➜  diagnosis-controlled # KB_ACCEPT_RACE     ",
+                "matches_old_suffix": false
+              },
+              {
+                "elapsed": 4.646806955017382,
+                "last_line": "➜  diagnosis-controlled # KB_ACCEPT_RACE     ",
+                "matches_old_suffix": false
+              },
+              {
+                "elapsed": 5.234164895024151,
+                "last_line": "➜  diagnosis-controlled # KB_ACCEPT_RACE     ",
+                "matches_old_suffix": false
+              }
+            ],
+            "rendered_tail_after_requested": "     ",
+            "rendered_tail_codepoints": [
+              "U+0020",
+              "U+0020",
+              "U+0020",
+              "U+0020",
+              "U+0020"
+            ],
+            "clear_witness": {
+              "zle": {
+                "buffer": "",
+                "postdisplay": ""
+              },
+              "last_line": "➜  diagnosis-controlled                      ",
+              "recognized_empty_prompt": false,
+              "method": "own ZLE widget checks exact expected BUFFER before clearing"
+            },
+            "screen_sha256": "8db49a40172dca0808fc1bd5eb8d3704f851e11cf5465648a15dc19a23d0561f"
+          },
+          {
+            "number": 4,
+            "method": "keystroke-ascii",
+            "requested": "abc",
+            "zle": {
+              "buffer": "abc",
+              "postdisplay": ""
+            },
+            "buffer_codepoints": [
+              "U+0061",
+              "U+0062",
+              "U+0063"
+            ],
+            "before_last_line": null,
+            "observations": [
+              {
+                "elapsed": 0.3351567589852493,
+                "last_line": "➜  diagnosis-controlled abc",
+                "matches_old_suffix": true
+              },
+              {
+                "elapsed": 0.8761137649999,
+                "last_line": "➜  diagnosis-controlled abc",
+                "matches_old_suffix": true
+              }
+            ],
+            "rendered_tail_after_requested": "",
+            "rendered_tail_codepoints": [],
+            "clear_witness": {
+              "zle": {
+                "buffer": "",
+                "postdisplay": ""
+              },
+              "last_line": "➜  diagnosis-controlled    ",
+              "recognized_empty_prompt": false,
+              "method": "own ZLE widget checks exact expected BUFFER before clearing"
+            },
+            "screen_sha256": "ff0b6693336edad642cf3a8fd70122d81b3adb6730b81aae9870a3a90ca49325"
+          },
+          {
+            "number": 5,
+            "method": "keystroke-symbol",
+            "requested": "_",
+            "zle": {
+              "buffer": "_",
+              "postdisplay": ""
+            },
+            "buffer_codepoints": [
+              "U+005F"
+            ],
+            "before_last_line": null,
+            "observations": [
+              {
+                "elapsed": 1.2652164169994649,
+                "last_line": "➜  diagnosis-controlled _",
+                "matches_old_suffix": true
+              }
+            ],
+            "rendered_tail_after_requested": "",
+            "rendered_tail_codepoints": [],
+            "clear_witness": {
+              "zle": {
+                "buffer": "",
+                "postdisplay": ""
+              },
+              "last_line": "➜  diagnosis-controlled  ",
+              "recognized_empty_prompt": false,
+              "method": "own ZLE widget checks exact expected BUFFER before clearing"
+            },
+            "screen_sha256": "fbd5d997be6de7185ed17c46130b9ab239a1e51ef67dc161b99c3649e5df4700"
+          },
+          {
+            "number": 6,
+            "method": "keystroke-space",
+            "requested": " ",
+            "zle": {
+              "buffer": " ",
+              "postdisplay": ""
+            },
+            "buffer_codepoints": [
+              "U+0020"
+            ],
+            "before_last_line": null,
+            "observations": [
+              {
+                "elapsed": 0.32596023302176036,
+                "last_line": "➜  diagnosis-controlled  ",
+                "matches_old_suffix": true
+              },
+              {
+                "elapsed": 0.8669162120204419,
+                "last_line": "➜  diagnosis-controlled  ",
+                "matches_old_suffix": true
+              }
+            ],
+            "rendered_tail_after_requested": "",
+            "rendered_tail_codepoints": [],
+            "clear_witness": {
+              "zle": {
+                "buffer": "",
+                "postdisplay": ""
+              },
+              "last_line": "➜  diagnosis-controlled  ",
+              "recognized_empty_prompt": false,
+              "method": "own ZLE widget checks exact expected BUFFER before clearing"
+            },
+            "screen_sha256": "2a1f5ab6e55413c5665de12356c1daeeb94e7e01d868497c769d602960f56e79"
+          },
+          {
+            "number": 7,
+            "method": "paste-original",
+            "requested": "# KB_ACCEPT_RACE",
+            "zle": {
+              "buffer": "# KB_ACCEPT_RACE",
+              "postdisplay": ""
+            },
+            "buffer_codepoints": [
+              "U+0023",
+              "U+0020",
+              "U+004B",
+              "U+0042",
+              "U+005F",
+              "U+0041",
+              "U+0043",
+              "U+0043",
+              "U+0045",
+              "U+0050",
+              "U+0054",
+              "U+005F",
+              "U+0052",
+              "U+0041",
+              "U+0043",
+              "U+0045"
+            ],
+            "before_last_line": null,
+            "observations": [
+              {
+                "elapsed": 0.30852537901955657,
+                "last_line": "➜  diagnosis-controlled # KB_ACCEPT_RACE",
+                "matches_old_suffix": true
+              },
+              {
+                "elapsed": 0.8174539979954716,
+                "last_line": "➜  diagnosis-controlled # KB_ACCEPT_RACE",
+                "matches_old_suffix": true
+              }
+            ],
+            "rendered_tail_after_requested": "",
+            "rendered_tail_codepoints": [],
+            "clear_witness": {
+              "zle": {
+                "buffer": "",
+                "postdisplay": ""
+              },
+              "last_line": "➜  diagnosis-controlled                 ",
+              "recognized_empty_prompt": false,
+              "method": "own ZLE widget checks exact expected BUFFER before clearing"
+            },
+            "screen_sha256": "b16f751b9158a756a054cb5b648da15ab92872cae62c05eea17186cfd20dc704"
+          },
+          {
+            "number": 8,
+            "method": "paste-original",
+            "requested": "# KB_ACCEPT_RACE",
+            "zle": {
+              "buffer": "# KB_ACCEPT_RACE",
+              "postdisplay": ""
+            },
+            "buffer_codepoints": [
+              "U+0023",
+              "U+0020",
+              "U+004B",
+              "U+0042",
+              "U+005F",
+              "U+0041",
+              "U+0043",
+              "U+0043",
+              "U+0045",
+              "U+0050",
+              "U+0054",
+              "U+005F",
+              "U+0052",
+              "U+0041",
+              "U+0043",
+              "U+0045"
+            ],
+            "before_last_line": null,
+            "observations": [
+              {
+                "elapsed": 0.32592750500771217,
+                "last_line": "➜  diagnosis-controlled # KB_ACCEPT_RACE",
+                "matches_old_suffix": true
+              },
+              {
+                "elapsed": 0.8376854390080553,
+                "last_line": "➜  diagnosis-controlled # KB_ACCEPT_RACE",
+                "matches_old_suffix": true
+              }
+            ],
+            "rendered_tail_after_requested": "",
+            "rendered_tail_codepoints": [],
+            "clear_witness": {
+              "zle": {
+                "buffer": "",
+                "postdisplay": ""
+              },
+              "last_line": "➜  diagnosis-controlled                 ",
+              "recognized_empty_prompt": false,
+              "method": "own ZLE widget checks exact expected BUFFER before clearing"
+            },
+            "screen_sha256": "850cc8a06b98606f570488278e66a2edefefc25dc5471c33fbb44234e65a3005"
+          },
+          {
+            "number": 9,
+            "method": "paste-original",
+            "requested": "# KB_ACCEPT_RACE",
+            "zle": {
+              "buffer": "# KB_ACCEPT_RACE",
+              "postdisplay": ""
+            },
+            "buffer_codepoints": [
+              "U+0023",
+              "U+0020",
+              "U+004B",
+              "U+0042",
+              "U+005F",
+              "U+0041",
+              "U+0043",
+              "U+0043",
+              "U+0045",
+              "U+0050",
+              "U+0054",
+              "U+005F",
+              "U+0052",
+              "U+0041",
+              "U+0043",
+              "U+0045"
+            ],
+            "before_last_line": null,
+            "observations": [
+              {
+                "elapsed": 0.3263071089750156,
+                "last_line": "➜  diagnosis-controlled # KB_ACCEPT_RACE",
+                "matches_old_suffix": true
+              },
+              {
+                "elapsed": 0.842346910998458,
+                "last_line": "➜  diagnosis-controlled # KB_ACCEPT_RACE",
+                "matches_old_suffix": true
+              }
+            ],
+            "rendered_tail_after_requested": "",
+            "rendered_tail_codepoints": [],
+            "clear_witness": {
+              "zle": {
+                "buffer": "",
+                "postdisplay": ""
+              },
+              "last_line": "➜  diagnosis-controlled                 ",
+              "recognized_empty_prompt": false,
+              "method": "own ZLE widget checks exact expected BUFFER before clearing"
+            },
+            "screen_sha256": "a336f03bc7e6b14b3e5e5d621269440e7400cbd87a7b009ef126a31e12a5f071"
+          }
+        ],
+        "failure_cleanup_independently_verified": null,
+        "failure_cleanup_windows": null,
+        "error": null,
+        "raw_sha256": "cfff6150c567808d06834936a93be57a597f32f85bec42783bc74fc6ded1b4b6",
+        "log_sha256": "d8414fe8b8f5ca2b2e724b681eb267cdf4dd7b0d71e2a98e85e98df7790ce53b"
+      },
+      {
+        "run": "diagnosis-no-preprobe",
+        "state": "complete_owned_window_ready",
+        "owned": {
+          "pane_id": "terminal:4098:ttys003",
+          "expected_pid": 68961,
+          "tty": "/dev/ttys003"
+        },
+        "without_preprobe": true,
+        "trials": [
+          {
+            "number": 1,
+            "method": "keystroke-original",
+            "requested": "# KB_ACCEPT_RACE",
+            "zle": {
+              "buffer": "# KB_ACCEPT_RACE",
+              "postdisplay": ""
+            },
+            "buffer_codepoints": [
+              "U+0023",
+              "U+0020",
+              "U+004B",
+              "U+0042",
+              "U+005F",
+              "U+0041",
+              "U+0043",
+              "U+0043",
+              "U+0045",
+              "U+0050",
+              "U+0054",
+              "U+005F",
+              "U+0052",
+              "U+0041",
+              "U+0043",
+              "U+0045"
+            ],
+            "before_last_line": "➜  diagnosis-controlled ",
+            "observations": [
+              {
+                "elapsed": 0.33984311201493256,
+                "last_line": "➜  diagnosis-controlled # KB_ACCEPT_RACE ",
+                "matches_old_suffix": false
+              },
+              {
+                "elapsed": 0.854638201999478,
+                "last_line": "➜  diagnosis-controlled # KB_ACCEPT_RACE ",
+                "matches_old_suffix": false
+              },
+              {
+                "elapsed": 1.3650545440032147,
+                "last_line": "➜  diagnosis-controlled # KB_ACCEPT_RACE ",
+                "matches_old_suffix": false
+              },
+              {
+                "elapsed": 1.8840437330072746,
+                "last_line": "➜  diagnosis-controlled # KB_ACCEPT_RACE ",
+                "matches_old_suffix": false
+              },
+              {
+                "elapsed": 2.398533863015473,
+                "last_line": "➜  diagnosis-controlled # KB_ACCEPT_RACE ",
+                "matches_old_suffix": false
+              },
+              {
+                "elapsed": 2.9323601920041256,
+                "last_line": "➜  diagnosis-controlled # KB_ACCEPT_RACE ",
+                "matches_old_suffix": false
+              },
+              {
+                "elapsed": 3.615180067019537,
+                "last_line": "➜  diagnosis-controlled # KB_ACCEPT_RACE ",
+                "matches_old_suffix": false
+              },
+              {
+                "elapsed": 4.150475118018221,
+                "last_line": "➜  diagnosis-controlled # KB_ACCEPT_RACE ",
+                "matches_old_suffix": false
+              },
+              {
+                "elapsed": 4.662791719019879,
+                "last_line": "➜  diagnosis-controlled # KB_ACCEPT_RACE ",
+                "matches_old_suffix": false
+              },
+              {
+                "elapsed": 5.179256458999589,
+                "last_line": "➜  diagnosis-controlled # KB_ACCEPT_RACE ",
+                "matches_old_suffix": false
+              }
+            ],
+            "rendered_tail_after_requested": " ",
+            "rendered_tail_codepoints": [
+              "U+0020"
+            ],
+            "clear_witness": {
+              "zle": {
+                "buffer": "",
+                "postdisplay": ""
+              },
+              "last_line": "➜  diagnosis-controlled                  ",
+              "recognized_empty_prompt": false,
+              "method": "own ZLE widget checks exact expected BUFFER before clearing"
+            },
+            "screen_sha256": "dc92b6b5e5e169067aac763d31b043da85d51fd020af065c5753476c8bb76524"
+          },
+          {
+            "number": 2,
+            "method": "keystroke-original",
+            "requested": "# KB_ACCEPT_RACE",
+            "zle": {
+              "buffer": "# KB_ACCEPT_RACE",
+              "postdisplay": ""
+            },
+            "buffer_codepoints": [
+              "U+0023",
+              "U+0020",
+              "U+004B",
+              "U+0042",
+              "U+005F",
+              "U+0041",
+              "U+0043",
+              "U+0043",
+              "U+0045",
+              "U+0050",
+              "U+0054",
+              "U+005F",
+              "U+0052",
+              "U+0041",
+              "U+0043",
+              "U+0045"
+            ],
+            "before_last_line": "➜  diagnosis-controlled ",
+            "observations": [
+              {
+                "elapsed": 0.33466773899272084,
+                "last_line": "➜  diagnosis-controlled # KB_ACCEPT_RACE    ",
+                "matches_old_suffix": false
+              },
+              {
+                "elapsed": 0.8515064030070789,
+                "last_line": "➜  diagnosis-controlled # KB_ACCEPT_RACE    ",
+                "matches_old_suffix": false
+              },
+              {
+                "elapsed": 1.368718493002234,
+                "last_line": "➜  diagnosis-controlled # KB_ACCEPT_RACE    ",
+                "matches_old_suffix": false
+              },
+              {
+                "elapsed": 1.8806157229992095,
+                "last_line": "➜  diagnosis-controlled # KB_ACCEPT_RACE    ",
+                "matches_old_suffix": false
+              },
+              {
+                "elapsed": 2.3989793859946076,
+                "last_line": "➜  diagnosis-controlled # KB_ACCEPT_RACE    ",
+                "matches_old_suffix": false
+              },
+              {
+                "elapsed": 2.9145919969887473,
+                "last_line": "➜  diagnosis-controlled # KB_ACCEPT_RACE    ",
+                "matches_old_suffix": false
+              },
+              {
+                "elapsed": 3.428658382006688,
+                "last_line": "➜  diagnosis-controlled # KB_ACCEPT_RACE    ",
+                "matches_old_suffix": false
+              },
+              {
+                "elapsed": 3.9469788919959683,
+                "last_line": "➜  diagnosis-controlled # KB_ACCEPT_RACE    ",
+                "matches_old_suffix": false
+              },
+              {
+                "elapsed": 4.459946643997682,
+                "last_line": "➜  diagnosis-controlled # KB_ACCEPT_RACE    ",
+                "matches_old_suffix": false
+              },
+              {
+                "elapsed": 4.979475172003731,
+                "last_line": "➜  diagnosis-controlled # KB_ACCEPT_RACE    ",
+                "matches_old_suffix": false
+              },
+              {
+                "elapsed": 5.497946329996921,
+                "last_line": "➜  diagnosis-controlled # KB_ACCEPT_RACE    ",
+                "matches_old_suffix": false
+              }
+            ],
+            "rendered_tail_after_requested": "    ",
+            "rendered_tail_codepoints": [
+              "U+0020",
+              "U+0020",
+              "U+0020",
+              "U+0020"
+            ],
+            "clear_witness": {
+              "zle": {
+                "buffer": "",
+                "postdisplay": ""
+              },
+              "last_line": "➜  diagnosis-controlled                     ",
+              "recognized_empty_prompt": false,
+              "method": "own ZLE widget checks exact expected BUFFER before clearing"
+            },
+            "screen_sha256": "356eb1e8ba8567702ea483cdd34d28887ed033a3d5e47b84cdf172bcc28d7b23"
+          },
+          {
+            "number": 3,
+            "method": "keystroke-original",
+            "requested": "# KB_ACCEPT_RACE",
+            "zle": {
+              "buffer": "# KB_ACCEPT_RACE",
+              "postdisplay": ""
+            },
+            "buffer_codepoints": [
+              "U+0023",
+              "U+0020",
+              "U+004B",
+              "U+0042",
+              "U+005F",
+              "U+0041",
+              "U+0043",
+              "U+0043",
+              "U+0045",
+              "U+0050",
+              "U+0054",
+              "U+005F",
+              "U+0052",
+              "U+0041",
+              "U+0043",
+              "U+0045"
+            ],
+            "before_last_line": "➜  diagnosis-controlled ",
+            "observations": [
+              {
+                "elapsed": 0.3312886109924875,
+                "last_line": "➜  diagnosis-controlled # KB_ACCEPT_RACE        ",
+                "matches_old_suffix": false
+              },
+              {
+                "elapsed": 0.8498207579832524,
+                "last_line": "➜  diagnosis-controlled # KB_ACCEPT_RACE        ",
+                "matches_old_suffix": false
+              },
+              {
+                "elapsed": 1.3736556299845688,
+                "last_line": "➜  diagnosis-controlled # KB_ACCEPT_RACE        ",
+                "matches_old_suffix": false
+              },
+              {
+                "elapsed": 1.8872201039921492,
+                "last_line": "➜  diagnosis-controlled # KB_ACCEPT_RACE        ",
+                "matches_old_suffix": false
+              },
+              {
+                "elapsed": 2.3984659599955194,
+                "last_line": "➜  diagnosis-controlled # KB_ACCEPT_RACE        ",
+                "matches_old_suffix": false
+              },
+              {
+                "elapsed": 2.9181150689837523,
+                "last_line": "➜  diagnosis-controlled # KB_ACCEPT_RACE        ",
+                "matches_old_suffix": false
+              },
+              {
+                "elapsed": 3.4420066949969623,
+                "last_line": "➜  diagnosis-controlled # KB_ACCEPT_RACE        ",
+                "matches_old_suffix": false
+              },
+              {
+                "elapsed": 3.968753722991096,
+                "last_line": "➜  diagnosis-controlled # KB_ACCEPT_RACE        ",
+                "matches_old_suffix": false
+              },
+              {
+                "elapsed": 4.477987454010872,
+                "last_line": "➜  diagnosis-controlled # KB_ACCEPT_RACE        ",
+                "matches_old_suffix": false
+              },
+              {
+                "elapsed": 4.99564239999745,
+                "last_line": "➜  diagnosis-controlled # KB_ACCEPT_RACE        ",
+                "matches_old_suffix": false
+              },
+              {
+                "elapsed": 5.508216740010539,
+                "last_line": "➜  diagnosis-controlled # KB_ACCEPT_RACE        ",
+                "matches_old_suffix": false
+              }
+            ],
+            "rendered_tail_after_requested": "        ",
+            "rendered_tail_codepoints": [
+              "U+0020",
+              "U+0020",
+              "U+0020",
+              "U+0020",
+              "U+0020",
+              "U+0020",
+              "U+0020",
+              "U+0020"
+            ],
+            "clear_witness": {
+              "zle": {
+                "buffer": "",
+                "postdisplay": ""
+              },
+              "last_line": "➜  diagnosis-controlled                         ",
+              "recognized_empty_prompt": false,
+              "method": "own ZLE widget checks exact expected BUFFER before clearing"
+            },
+            "screen_sha256": "c73d405e767ac5a8e5d9665933b7dc446247c1a9f4210fedffa64c7f918d5cf8"
+          }
+        ],
+        "failure_cleanup_independently_verified": null,
+        "failure_cleanup_windows": null,
+        "error": null,
+        "raw_sha256": "6c5814423f2bdc7ac9cfba569e3e7be91dafcedaded797604e30d4a3b7f3f1c3",
+        "log_sha256": "960d76b2cb7cb4814f29cca03e8df90149712d475f25834f0567a2f1203987b6"
+      }
+    ],
+    "full_acceptance": {
+      "acceptance": "passed",
+      "checks": [
+        {
+          "name": "private endpoint rejects unauthenticated requests",
+          "status": 401
+        },
+        {
+          "name": "actual shell output, exit status and exactly one TTY-bound execution",
+          "identifier": "once",
+          "exit_status": 0,
+          "receipt": {
+            "id": "once",
+            "pid": 70408,
+            "tty": "/dev/ttys003"
+          },
+          "screen_sha256": "88413c93dc543d2d24e34a0b46d8a68a9cc0d032aa424205dc79da237857298d"
+        },
+        {
+          "name": "concurrent/late identical delivery deduplicated; changed payload conflicts"
+        },
+        {
+          "name": "actual shell output, exit status and exactly one TTY-bound execution",
+          "identifier": "nonzero",
+          "exit_status": 7,
+          "receipt": {
+            "id": "nonzero",
+            "pid": 70453,
+            "tty": "/dev/ttys003"
+          },
+          "screen_sha256": "98a206fb32bb09ab43f291cf4a75e50602ba419b9a85dd4699ce162f711553a3"
+        },
+        {
+          "name": "session.input task completion distinguished from shell exit 7"
+        },
+        {
+          "name": "rejected before native mutation",
+          "identifier": "nonempty",
+          "code": "visible_input_not_empty"
+        },
+        {
+          "name": "existing owned input preserved byte-for-byte"
+        },
+        {
+          "name": "rejected before native mutation",
+          "identifier": "wrong-pid",
+          "code": "session_selection_changed"
+        },
+        {
+          "name": "rejected before native mutation",
+          "identifier": "wrong-tty",
+          "code": "session_selection_changed"
+        },
+        {
+          "name": "rejected before native mutation",
+          "identifier": "busy-rejected",
+          "code": "session_busy"
+        },
+        {
+          "name": "actual shell output, exit status and exactly one TTY-bound execution",
+          "identifier": "busy",
+          "exit_status": 0,
+          "receipt": {
+            "id": "busy",
+            "pid": 70616,
+            "tty": "/dev/ttys003"
+          },
+          "screen_sha256": "ea3a8cc267272521e5bb3cee7c46678a982b8afb6560f6774e9796d2458e1a66"
+        },
+        {
+          "name": "previously rejected task never starts after shell becomes idle"
+        },
+        {
+          "name": "race fixture inserted own harmless comment before real native guard"
+        },
+        {
+          "name": "real pre-native input change refused; conservative unknown never replayed"
+        },
+        {
+          "name": "no hidden, raw-send or extra-window fallback attempted"
+        }
+      ],
+      "owned": {
+        "pane_id": "terminal:4098:ttys003",
+        "expected_pid": 68961,
+        "tty": "/dev/ttys003"
+      },
+      "reused_owned_certificate": "/Users/landjunge/.local/share/kirabridge/backups/issue51-race-retest-20261030/diagnosis-no-preprobe/owned-window.json",
+      "before_windows": [
+        3033,
+        3206,
+        3541,
+        3546,
+        3903
+      ],
+      "after_windows": [
+        3033,
+        3206,
+        3541,
+        3546,
+        3903
+      ],
+      "before_pids": [
+        20353,
+        21737,
+        22893,
+        41573,
+        70676,
+        71896,
+        90001,
+        90216
+      ],
+      "native_dispatches": [
+        {
+          "source_sha256": "f2bb475a1fcec592b61799dedd2bfde80d5b934d1a5b79d5c5c48166396aab5f",
+          "confirmed": {
+            "sent": true
+          }
+        },
+        {
+          "source_sha256": "d8bb4b45e80a33af5d432ac06dd0922a4d00e2351b1d8ec769825716138f7d08",
+          "confirmed": {
+            "sent": true
+          }
+        },
+        {
+          "source_sha256": "e70ecf9cf36ba0bc3e3f3b7edc7605bdd45d8336eb415ffe81177bf122f3bf01",
+          "confirmed": {
+            "sent": true
+          }
+        },
+        {
+          "source_sha256": "83ed6fa8143116a9265b0f7da184a70df6016b6fd4fbb704655f73ccaf5b40b6",
+          "error": "visible_input_changed"
+        }
+      ],
+      "cleanup_complete": true,
+      "original_process_identities_preserved": true,
+      "private_endpoint_absent": true,
+      "private_port": 57161,
+      "task_results": {
+        "intel-full-once": {
+          "state": "completed",
+          "error": null,
+          "attempt": 1,
+          "attempt_flags_observed": [
+            true
+          ],
+          "terminal_input_attempted": true,
+          "attempt_evidence_source": "retained task events, immutable read-only SQLite",
+          "receipt_count": 1
+        },
+        "intel-full-nonzero": {
+          "state": "completed",
+          "error": null,
+          "attempt": 1,
+          "attempt_flags_observed": [
+            true
+          ],
+          "terminal_input_attempted": true,
+          "attempt_evidence_source": "retained task events, immutable read-only SQLite",
+          "receipt_count": 1
+        },
+        "intel-full-paste-comment": {
+          "state": "completed",
+          "error": null,
+          "attempt": 1,
+          "attempt_flags_observed": [
+            true
+          ],
+          "terminal_input_attempted": true,
+          "attempt_evidence_source": "retained task events, immutable read-only SQLite",
+          "receipt_count": 0
+        },
+        "intel-full-nonempty": {
+          "state": "failed",
+          "error": {
+            "code": "visible_input_not_empty"
+          },
+          "attempt": 1,
+          "attempt_flags_observed": [
+            false
+          ],
+          "terminal_input_attempted": false,
+          "attempt_evidence_source": "retained task events, immutable read-only SQLite",
+          "receipt_count": 0
+        },
+        "intel-full-wrong-pid": {
+          "state": "failed",
+          "error": {
+            "code": "session_selection_changed"
+          },
+          "attempt": 1,
+          "attempt_flags_observed": [
+            false
+          ],
+          "terminal_input_attempted": false,
+          "attempt_evidence_source": "retained task events, immutable read-only SQLite",
+          "receipt_count": 0
+        },
+        "intel-full-wrong-tty": {
+          "state": "failed",
+          "error": {
+            "code": "session_selection_changed"
+          },
+          "attempt": 1,
+          "attempt_flags_observed": [
+            false
+          ],
+          "terminal_input_attempted": false,
+          "attempt_evidence_source": "retained task events, immutable read-only SQLite",
+          "receipt_count": 0
+        },
+        "intel-full-busy": {
+          "state": "completed",
+          "error": null,
+          "attempt": 1,
+          "attempt_flags_observed": [
+            true
+          ],
+          "terminal_input_attempted": true,
+          "attempt_evidence_source": "retained task events, immutable read-only SQLite",
+          "receipt_count": 1
+        },
+        "intel-full-busy-rejected": {
+          "state": "failed",
+          "error": {
+            "code": "session_busy"
+          },
+          "attempt": 1,
+          "attempt_flags_observed": [
+            false
+          ],
+          "terminal_input_attempted": false,
+          "attempt_evidence_source": "retained task events, immutable read-only SQLite",
+          "receipt_count": 0
+        },
+        "intel-full-race-rejected": {
+          "state": "unknown",
+          "error": {
+            "code": "visible_input_changed"
+          },
+          "attempt": 1,
+          "attempt_flags_observed": [
+            true
+          ],
+          "terminal_input_attempted": true,
+          "attempt_evidence_source": "retained task events, immutable read-only SQLite",
+          "receipt_count": 0
+        }
+      },
+      "raw_evidence_sha256": "41f5bb849104a7e5b81174fd7896816de8ea69ea02a128167b96f6974664595f",
+      "log_sha256": "b9c367248e89a1527b7cfaaeafd273a1e87fd94a71576b7a39b94a3deb0a5a93"
+    },
+    "runtime_before_after": {
+      "before": {
+        "instance_id": "82cd506b1d854b50b4cc58c5016fc856",
+        "version": "0.8.0rc18",
+        "pid": 18197,
+        "started_at": "2026-10-29T22:45:10.482631+00:00",
+        "config_path": "/Users/landjunge/.config/kirabridge/config.toml",
+        "config_sha256": "52747b8353bef4cc162997c34c30d8e759ca0691725d902f313ce4653cf903c2",
+        "effective_config_sha256": "3709ee5e48b675813b9708c7b634d137ca3c2c2dc19fefd35a04b61f581cf641",
+        "source_tree_sha256": "bea0158935efd09a2304be2eb024ce79d5a100cf754742dcbe52aaddce1dc9ee",
+        "source_file_count": 122,
+        "source_package_path": "/Users/landjunge/.local/share/kirabridge/install/releases/0.8.0rc18-15d071ebaa95/source/.venv/lib/python3.11/site-packages/kirabridge",
+        "source_scope": "package Python files observed at startup; no remote attestation"
+      },
+      "after": {
+        "instance_id": "82cd506b1d854b50b4cc58c5016fc856",
+        "version": "0.8.0rc18",
+        "pid": 18197,
+        "started_at": "2026-10-29T22:45:10.482631+00:00",
+        "config_path": "/Users/landjunge/.config/kirabridge/config.toml",
+        "config_sha256": "52747b8353bef4cc162997c34c30d8e759ca0691725d902f313ce4653cf903c2",
+        "effective_config_sha256": "3709ee5e48b675813b9708c7b634d137ca3c2c2dc19fefd35a04b61f581cf641",
+        "source_tree_sha256": "bea0158935efd09a2304be2eb024ce79d5a100cf754742dcbe52aaddce1dc9ee",
+        "source_file_count": 122,
+        "source_package_path": "/Users/landjunge/.local/share/kirabridge/install/releases/0.8.0rc18-15d071ebaa95/source/.venv/lib/python3.11/site-packages/kirabridge",
+        "source_scope": "package Python files observed at startup; no remote attestation"
+      }
+    },
+    "script_sha256": {
+      "scripts/diagnose_shell_keystroke_intel.py": "02e52ca5c145fd52250f0586b2158281f5624e04368e2aecec20398b0a0d27c1",
+      "scripts/accept_shell_input_intel.py": "f22b6fc4b2604096eca3adb286e56bd6b2a35d859ae7076fcf9a4bf75bdbadfe"
+    },
+    "protected_baseline_files_verified": 28,
+    "protected_failed_diagnostic_files_verified": [
+      7,
+      8
+    ],
+    "arm_tested": false,
+    "hosted_macos_ci_executed": false,
+    "installer_built": false,
+    "installed": false,
+    "merged": false,
+    "remaining_limits": [
+      "Display-only erased blanks can conservatively refuse an actually empty post-edit shell; no production whitespace trimming or forced Return added",
+      "Only controlled timings tested; no atomic OS-level guarantee against every possible concurrent human input",
+      "Issue51 full agent takeover/ACK/ChatGPT receive acceptance remains open",
+      "Private authenticated MCP is not actual ChatGPT Live/Voice UI attestation",
+      "Mandatory CI gates remain unmet; no hosted/ARM execution in this task"
+    ]
   }
 }

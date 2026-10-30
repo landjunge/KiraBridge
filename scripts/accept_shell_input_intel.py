@@ -47,7 +47,7 @@ sys.exit(int(status))
 """
 
 
-async def accept(root, selection="full"):
+async def accept(root, selection="full", owned_window=None):
     if (platform.system(), platform.machine()) != ("Darwin", "x86_64"):
         raise RuntimeError("This manual acceptance requires the Intel Mac")
     assert (
@@ -98,6 +98,35 @@ async def accept(root, selection="full"):
         for row in before_rows
         for process in row["processes"]
     }
+    certificate = None
+    if owned_window is not None:
+        assert not owned_window.is_symlink() and owned_window.stat().st_uid == os.getuid()
+        assert owned_window.resolve().is_relative_to(root.parent.resolve())
+        certificate = json.loads(owned_window.read_text())
+        assert certificate["owner_uid"] == os.getuid() and certificate["ready_for_acceptance"]
+        assert certificate["task"] == "channel-8f3be0698a9c44e2822382b88e5f57cb"
+        handle = certificate["owned"]
+        expected_windows = set(certificate["original_windows"]) | {
+            int(handle["pane_id"].split(":")[1])
+        }
+        assert before_ids == expected_windows, "Owned-window inventory changed; no adoption"
+        assert (
+            await transport.process_identity(handle["expected_pid"], detailed=True)
+            == certificate["identity"]
+        )
+        matches = [
+            r
+            for r in before_rows
+            if r["pane_id"] == handle["pane_id"]
+            and r["expected_pid"] == handle["expected_pid"]
+            and r["tty"] == handle["tty"]
+        ]
+        assert len(matches) == 1 and not matches[0]["busy"]
+        assert empty_shell_prompt(await transport.read(handle["pane_id"]))
+        before_ids = set(certificate["original_windows"])
+        identities = {int(pid): value for pid, value in certificate["original_identities"].items()}
+        for pid, expected in identities.items():
+            assert await transport.process_identity(pid, detailed=True) == expected
     evidence = {
         "platform": platform.platform(),
         "architecture": platform.machine(),
@@ -221,21 +250,25 @@ async def accept(root, selection="full"):
         )
 
     try:
-        opened = await transport.open("cd -- " + shlex.quote(str(root)))
-        evidence["opened"] = opened
-        checkpoint()
-        async with asyncio.timeout(20):
-            while True:  # noqa: ASYNC110 -- bounded ownership reconciliation
-                matches = [
-                    r
-                    for r in await original_catalog()
-                    if r["tty"] == opened["tty"]
-                    and int(r["pane_id"].split(":")[1]) not in before_ids
-                ]
-                if len(matches) == 1:
-                    owned = matches[0]
-                    break
-                await asyncio.sleep(0.15)
+        if certificate is not None:
+            owned = matches[0]
+            evidence["reused_owned_certificate"] = str(owned_window)
+        else:
+            opened = await transport.open("cd -- " + shlex.quote(str(root)))
+            evidence["opened"] = opened
+            checkpoint()
+            async with asyncio.timeout(20):
+                while True:  # noqa: ASYNC110 -- bounded ownership reconciliation
+                    matches = [
+                        r
+                        for r in await original_catalog()
+                        if r["tty"] == opened["tty"]
+                        and int(r["pane_id"].split(":")[1]) not in before_ids
+                    ]
+                    if len(matches) == 1:
+                        owned = matches[0]
+                        break
+                    await asyncio.sleep(0.15)
         added = {
             r["window_id"] for r in (await transport.window_inventory())["windows"]
         } - before_ids
@@ -497,5 +530,8 @@ if __name__ == "__main__":
     parser.add_argument("--root", type=Path, required=True)
     parser.add_argument("--allow-one-owned-visible-window", action="store_true", required=True)
     parser.add_argument("--case", choices=["full", "state-change"], default="full")
+    parser.add_argument(
+        "--owned-window", type=Path, help="Fresh private diagnostic ownership certificate"
+    )
     options = parser.parse_args()
-    asyncio.run(accept(options.root.resolve(), options.case))
+    asyncio.run(accept(options.root.resolve(), options.case, options.owned_window))

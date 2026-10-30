@@ -12,7 +12,129 @@ Der Shell-Fehler ist im Entwicklungszweig behoben und lokal geprüft.
 [Issue51](https://github.com/landjunge/KiraBridge/issues/51) bleibt offen.
 Keine produktive Installation, kein Neustart, Merge oder Release dieses Auftrags.
 
-## Kontrollierte Intel-Abnahme · Folgeauftrag 30.10.2026
+## Aktueller Stand: Race-Ursache reproduziert, vollständige Abnahme bestanden
+
+Auftrag `channel-8f3be0698a9c44e2822382b88e5f57cb`, Konversation
+`issue51-intel-race-retest-20261030`, Nachricht `0a5ed62f-7989-4407-b370-65a187e274b3`,
+Receipt `bdfba3c0-67c7-4c91-b93c-1afeb4e8e6dc` bestätigt.
+Geprüfte Basis `651cd19bce5a896dcf0102df9f75f44f0e264c02`; nur manuelle Testskripte
+und Belege geändert, kein produktiver Quellcode. PR54 bleibt Draft; Issue51 bleibt offen.
+
+**Der neue vollständige Intel-Abnahmelauf ist durchgehend bestanden: 15 Checkpoints
+und unabhängig bestätigtes Cleanup.** Frühere fehlgeschlagene Läufe bleiben fehlgeschlagen.
+
+### Belegte Ursache der reproduzierten alten Race-Prüfung
+
+Das alte Tastaturereignis `se.keystroke("# KB_ACCEPT_RACE")` lieferte wiederholt
+den korrekten 16-Zeichen-Zsh-Puffer. `POSTDISPLAY` war leer. Trotzdem lieferte
+`tab.contents()` hinter diesem Text zusätzliche `U+0020`-Leerzellen. Die damalige
+Prüfung `last_line.endswith(" # KB_ACCEPT_RACE")` blieb deshalb über das gesamte
+Fünfsekundenfenster falsch; während des gesamten Messfensters blieb dieser
+Inhaltsunterschied bestehen. Der erwartete Text fehlte nicht und wurde in diesen
+Messungen auch nicht durch das Tastaturlayout übersetzt.
+
+| Abgeschlossene Kontrollreihe | Tatsächlicher Puffer | Sichtbarer Suffix | Alte Prüfung |
+| --- | --- | --- | --- |
+| Drei originale Tastaturereignisse | jeweils exakt `# KB_ACCEPT_RACE` | zusätzlich 3 / 1 / 5 Leerzellen | in allen Messungen falsch |
+| Drei weitere Originalereignisse ohne Puffer-Probe vor der Eingabe | jeweils exakt derselbe Text | zusätzlich 1 / 4 / 8 Leerzellen | in allen Messungen falsch |
+| Drei bewachte Paste-Kontrollen desselben Texts | jeweils exakt derselbe Text | exakt, keine zusätzlichen Leerzellen | jeweils richtig |
+| ASCII `abc`, einzelnes `_` | jeweils exakt | exakt | richtig |
+| Einzelnes echtes Eingabeleerzeichen | tatsächlicher Puffer `U+0020` | Leerzeichen vorhanden | zeigt, warum Leerzeichen nicht pauschal entfernt werden dürfen |
+
+Die zweite Reihe begann jeweils mit einer erkannt leeren Promptzeile und führte
+vor dem Tastaturereignis keinen Probe-Widget-Aufruf aus. Dieser Aufruf vor der Eingabe
+ist damit keine notwendige Bedingung des Effekts. Der eigene ZLE-Hook wurde erst nach den
+Bildschirmaufnahmen ausgeführt und schrieb `BUFFER`/`POSTDISPLAY` in private Dateien.
+Sein Name beginnt mit `_`, damit der vorhandene Autosuggestion-Wrapper diese
+Beobachtung nicht vorher durch Leeren von `POSTDISPLAY` verändert.
+
+Präziser Befund: **Die alte Testannahme, gerenderte Terminalzeichen endeten exakt
+mit den Eingabebytes, ist für diesen reproduzierten Tastaturweg falsch.** Der interne
+Ursprung der variablen Leerzellen im Renderer ist nicht nachgewiesen. Der alte V1-Lauf
+enthält keine gespeicherte Bildschirmaufnahme nach seinem Tastaturereignis; seine
+individuellen damaligen Endbytes sind nicht nachträglich rekonstruierbar. Der gleiche
+Ereignis-/Erwartungspfad mit seinem Timeout ist jetzt mehrfach belegt reproduziert.
+Die 5-Sekunden-Beobachtung scheiterte vor dem eigentlichen nativen Guard; die
+15-Sekunden-Native- und 30-Sekunden-Admission-Timeouts sind damit nicht gleichzusetzen.
+
+Der produktive Textpfad verwendet `doScript` bzw. bewachten AX-Paste; ein
+`se.keystroke()`-Textpfad existiert im geprüften `src/kirabridge` nicht. Für die
+Race-Fixture bleibt deshalb der echte bewachte Paste-Weg aus dem vorherigen Auftrag
+maßgeblich. Produktionsguards wurden weder durch `rstrip()` aufgeweicht noch durch
+automatisches Löschen oder Return ersetzt.
+
+### Vollständiger aktueller Intel-Lauf und Datenerhalt
+
+Nach der Ursachenprüfung wurde **dasselbe** eigene Fenster `terminal:4098:ttys003`,
+PID68961, für die komplette authentifizierte MCP-Abnahme wiederverwendet. Die private
+Übernahmebescheinigung wird mit Task, UID, PID/TTY/Startzeit/Image, erkannt leerem
+Prompt und vollständigem ursprünglichem Fenster-/Prozesssatz abgeglichen. Ein
+beliebiges bestehendes Terminal wird anhand einer bloßen gespeicherten pane_id nicht
+als Testfenster übernommen.
+
+Im neuen durchgehenden Lauf bestanden alle vorherigen Fälle: authentifizierter
+ChatGPT-Principal, Eingabe/Submit/Return, echte Ausgabe und Status0/7, gleichzeitige
+und späte identische Anfrage ohne Doppelwirkung, Inhaltskonflikt, vorhandene Eingabe
+bytegleich geschützt, positiv belegtes Busy, falsche PID/TTY vor Mutation, keine
+spätere Ausführung einer abgewiesenen ID, tatsächlicher `visible_input_changed`-Guard
+und kein versteckter Ersatzweg. Genau drei Payload-Ausführungsdateien enthalten
+je eine TTY-gebundene Zeile, Status0/7/0. Alle sechs Ablehnungs-/Konflikt-/Race-Dateien
+fehlen. Der erwartete Race-Task bleibt konservativ `unknown`; auch dessen identische
+Folgeanfrage verursacht keinen weiteren Dispatch. Alle Taskversuche haben Zähler1.
+Inputversuch-Flags wurden aus den erhaltenen Taskevents schreibgeschützt nachgelesen.
+
+Fenster4098 wurde nach dem vollständigen Lauf geschlossen und seine Abwesenheit
+unabhängig verifiziert. Ursprüngliche fünf Tabs und acht Prozessidentitäten sind
+unverändert; der private MCP-Port ist unabhängig unerreichbar. RC18 bleibt PID18197
+mit unveränderten Instanz-/Konfigurations-/Quellhashes. Alle 28 vorab geschützten
+Dateien einschließlich früherer privater Taskzustände und erfasster RC17-Rückwegdateien
+sind hashgleich. Keine Installation, kein Installerbau, Restore, Merge oder Release.
+
+Zwei zusätzliche Diagnoseabbrüche sind vollständig erhalten: `diagnosis` erfasste
+einen Originalversuch und scheiterte danach an der optischen Leerprüfung beim
+Aufräumen; `diagnosis-repeat` erfasste zwei und stoppte vor Return, weil Ctrl-U einen
+tatsächlichen Tab im Puffer zurückließ. Dessen Ursache ist offen. Beide Fenster
+4032 und4035 wurden ausschließlich als eigene, idle Fixtures geschlossen, die
+Abwesenheit und ursprünglichen Identitäten unabhängig geprüft. Danach leert ein
+eigener ZLE-Testhook den Puffer nur nach unmittelbarem Vergleich mit den zuvor erfassten
+eigenen Bytes; eine vollständige Bestätigung und erneute Empty-BUFFER-Prüfung gehen
+dem leeren Return voraus. Unbekannte Eingabe wird niemals mit Return abgeschickt.
+Die erfolgreiche Diagnose und Vollabnahme nutzten anschließend nur Fenster4098.
+
+### Reproduzierbare Befehle und Grenzen
+
+Aus dem Entwicklungs-Worktree, mit neuem, noch nicht vorhandenem privatem Testpfad:
+
+```sh
+KB_TEST_ROOT="$(mktemp -d "${TMPDIR:-/tmp}/kirabridge-race.XXXXXX")"
+uv run python scripts/diagnose_shell_keystroke_intel.py --root "$KB_TEST_ROOT/diagnosis-controlled" --repeats 3 --allow-one-owned-visible-window
+uv run python scripts/diagnose_shell_keystroke_intel.py --root "$KB_TEST_ROOT/diagnosis-no-preprobe" --repeats 3 --allow-one-owned-visible-window --owned-window "$KB_TEST_ROOT/diagnosis-controlled/owned-window.json" --without-preprobe --original-only
+uv run python scripts/accept_shell_input_intel.py --root "$KB_TEST_ROOT/full" --allow-one-owned-visible-window --case full --owned-window "$KB_TEST_ROOT/diagnosis-no-preprobe/owned-window.json"
+```
+
+Tatsächliches `KB_TEST_ROOT` dieses Auftrags:
+`~/.local/share/kirabridge/backups/issue51-race-retest-20261030/`.
+Vorheriges Git-Tar/Bundle und geschützte Dateihashes wurden vor Eingriffen geprüft;
+private vollständige Logs, Screens, ZLE-Zeugen und Taskdatenbanken bleiben erhalten.
+Der bestehende [strukturierte Beleg](evidence/issue51-shell-prompt-20261030.json)
+enthält die Messreihen und den vollständigen Lauf unter `intel_race_retest`.
+Read-only-Review bestätigte die Messungen, Statusdateien, fehlenden Effektdateien,
+Taskevents und Cleanup unabhängig. Ruff/Format/Compile/Diffprüfung bestanden.
+
+Wesentliche Grenze: Nach tatsächlichem Leeren kann eine sichtbare Restfläche aus
+Leerzellen bleiben. Der Produktionsparser kann diese tatsächlich leere Shell weiterhin
+konservativ abweisen. Der nur im eigenen Diagnoseterminal verfügbare BUFFER-Zeuge
+ist keine generelle Voraussetzung oder neue Funktion von KiraBridge. Echtes bereits
+eingegebenes Whitespace muss geschützt bleiben. Die interne Ursache der sichtbaren
+Restzellen und des getrennten Ctrl-U/Tab-Befunds bleibt offen; kein CWD-Kausalbeleg.
+Atomarer Schutz gegen jeden möglichen manuellen Eingabezeitpunkt ist nicht bewiesen.
+
+ARM/gehostete macOS-CI wurden nicht ausgeführt oder vorausgesetzt. Der Test-/Belegcommit
+verwendet `[skip ci]`; fehlende Pflichtgates sind weiterhin kein Erfolg. Die vollständige
+Codex-Übernahme/ACK/ChatGPT-Empfangsabnahme und tatsächliche Live-/Voice-UI-Abnahme
+bleiben offen. Produktiver Wechsel ausschließlich nach neuer Freigabe.
+
+## Kontrollierte Intel-Abnahme · vorheriger Zwischenstand 30.10.2026
 
 Auftrag `channel-6608bf39af4544e891acd84fb7e9cbff`, Konversation
 `issue51-intel-acceptance-20261030`, Nachricht `cb56d321-3d00-4f71-a8a2-cc5c4cb18c15`,
