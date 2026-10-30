@@ -47,7 +47,13 @@ sys.exit(int(status))
 """
 
 
-async def accept(root, selection="full", owned_window=None):
+async def accept(
+    root,
+    selection="full",
+    owned_window=None,
+    operation_id="channel-8f3be0698a9c44e2822382b88e5f57cb",
+    adversarial_inputs=False,
+):
     if (platform.system(), platform.machine()) != ("Darwin", "x86_64"):
         raise RuntimeError("This manual acceptance requires the Intel Mac")
     assert (
@@ -104,7 +110,7 @@ async def accept(root, selection="full", owned_window=None):
         assert owned_window.resolve().is_relative_to(root.parent.resolve())
         certificate = json.loads(owned_window.read_text())
         assert certificate["owner_uid"] == os.getuid() and certificate["ready_for_acceptance"]
-        assert certificate["task"] == "channel-8f3be0698a9c44e2822382b88e5f57cb"
+        assert certificate["task"] == operation_id
         handle = certificate["owned"]
         expected_windows = set(certificate["original_windows"]) | {
             int(handle["pane_id"].split(":")[1])
@@ -427,6 +433,22 @@ async def accept(root, selection="full", owned_window=None):
                 check("existing owned input preserved byte-for-byte")
                 await owned_comment_return("# KB_ACCEPT_PENDING")
 
+                if adversarial_inputs:
+                    for identifier, pending_text in [
+                        ("typed-dollar", "# KB_EXISTING$ "),
+                        ("typed-hash", "# KB_EXISTING# "),
+                        ("typed-percent", "# KB_EXISTING% "),
+                        ("typed-marker", "# KB_EXISTING KiraBridge visible % "),
+                    ]:
+                        pasted = request("paste-" + identifier, pending_text, submit=False)
+                        await submit(pasted)
+                        assert (await finished(pasted))["state"] == "completed"
+                        before_input = await transport.read(owned["pane_id"])
+                        await refused(identifier, request(identifier), "visible_input_not_empty")
+                        assert await transport.read(owned["pane_id"]) == before_input
+                        check("prompt-like existing input preserved", identifier=identifier)
+                        await owned_comment_return(pending_text)
+
                 await refused(
                     "wrong-pid",
                     request("wrong-pid", expected_pid=99999999),
@@ -533,5 +555,15 @@ if __name__ == "__main__":
     parser.add_argument(
         "--owned-window", type=Path, help="Fresh private diagnostic ownership certificate"
     )
+    parser.add_argument("--operation-id", default="channel-8f3be0698a9c44e2822382b88e5f57cb")
+    parser.add_argument("--adversarial-inputs", action="store_true")
     options = parser.parse_args()
-    asyncio.run(accept(options.root.resolve(), options.case, options.owned_window))
+    asyncio.run(
+        accept(
+            options.root.resolve(),
+            options.case,
+            options.owned_window,
+            options.operation_id,
+            options.adversarial_inputs,
+        )
+    )

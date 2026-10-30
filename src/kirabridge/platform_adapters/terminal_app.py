@@ -507,7 +507,10 @@ class TerminalAppTransport:
             raise BridgeError("session_busy", "Other processes exist on selected TTY")
         screen = await self.read(row["pane_id"])
         if not empty_shell_prompt(screen):
-            raise BridgeError("visible_input_not_empty", "Selected terminal has existing input")
+            raise BridgeError(
+                "visible_input_not_empty",
+                "Cannot verify an empty shell prompt; existing or ambiguous input is preserved",
+            )
         return {
             "identities": {pid: data[3] for pid, data in records.items()},
             "screen": screen,
@@ -680,7 +683,10 @@ class TerminalAppTransport:
 
         screen = await self.read(row["pane_id"])
         if not empty_shell_prompt(screen):
-            raise BridgeError("visible_input_not_empty", "Selected terminal has existing input")
+            raise BridgeError(
+                "visible_input_not_empty",
+                "Cannot verify an empty shell prompt; existing or ambiguous input is preserved",
+            )
         command = f"/bin/ps -p {int(row['expected_pid'])} -o uid=,tty=,lstart="
         if before_transport is not None:
             await before_transport()

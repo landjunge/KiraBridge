@@ -2045,5 +2045,990 @@
       "Private authenticated MCP is not actual ChatGPT Live/Voice UI attestation",
       "Mandatory CI gates remain unmet; no hosted/ARM execution in this task"
     ]
+  },
+  "rc18_issue51_finish": {
+    "auftrag_id": "channel-83351b4848674ae399afb12e121a982a",
+    "message_id": "b537340f-dff3-47f0-ba76-1672a21246fa",
+    "receipt": "f42ad006-4ecf-4620-9aca-0e99ebaf9ac2",
+    "baseline_head": "81070628d2bdcf5b42f3065e5bc7f9f6ed61b06a",
+    "product_changes": [
+      "Reserve controlled prompt marker for exact whole line, not arbitrary suffix",
+      "Recognized arrow family cannot fall through to ordinary delimiter matcher",
+      "Keep strict whitespace rejection and stable error code; accurately describe input as existing or ambiguous"
+    ],
+    "pure_before_after": [
+      {
+        "screen": "➜  ~ echo$ ",
+        "old_accepts": true,
+        "fixed_accepts": false
+      },
+      {
+        "screen": "➜  ~ echo# ",
+        "old_accepts": true,
+        "fixed_accepts": false
+      },
+      {
+        "screen": "➜  ~ echo% ",
+        "old_accepts": true,
+        "fixed_accepts": false
+      },
+      {
+        "screen": "➜  ~ # ",
+        "old_accepts": true,
+        "fixed_accepts": false
+      },
+      {
+        "screen": "➜  ~ echo KiraBridge visible % ",
+        "old_accepts": true,
+        "fixed_accepts": false
+      },
+      {
+        "screen": "host% echoKiraBridge visible % ",
+        "old_accepts": true,
+        "fixed_accepts": false
+      },
+      {
+        "screen": "KiraBridge visible % typed KiraBridge visible % ",
+        "old_accepts": true,
+        "fixed_accepts": false
+      },
+      {
+        "screen": "prefix KiraBridge visible % ",
+        "old_accepts": true,
+        "fixed_accepts": false
+      }
+    ],
+    "targeted_tests": [
+      {
+        "command": "uv run pytest -q tests/test_shell_prompt.py tests/test_discovery_visible.py::test_known_empty_shell_prompt tests/test_discovery_visible.py::test_unknown_or_populated_prompt_never_accepts_input",
+        "passed": 55
+      },
+      {
+        "command": "uv run pytest -q tests/test_plain_shell_paste.py tests/test_discovery_visible.py tests/test_session_dispatch_evidence.py tests/test_sessions.py tests/test_terminal_tabs.py",
+        "passed": 93,
+        "overlap_with_previous": 8
+      },
+      {
+        "command": "uv run pytest -q tests/test_shell_prompt.py::test_ambiguous_rendered_whitespace_preserves_input_before_intent",
+        "passed": 1
+      }
+    ],
+    "intel_full_pytest": {
+      "command": "uv run pytest -q -W error::pytest.PytestUnraisableExceptionWarning",
+      "dependency_revisions": [
+        {
+          "repository": "threaddesk",
+          "revision": "770bbc9f0c0a02699cc93cad47d2e2c3782f7080",
+          "copy": "/Users/landjunge/.local/share/kirabridge/backups/rc18-issue51-finish-20261030/ci-threaddesk",
+          "existing_repo_modified": false
+        },
+        {
+          "repository": "tollgate",
+          "revision": "53fc57cc2e082d022e65e5929cb2a1e186fba852",
+          "copy": "/Users/landjunge/.local/share/kirabridge/backups/rc18-issue51-finish-20261030/ci-tollgate",
+          "existing_repo_modified": false
+        }
+      ],
+      "first_result": {
+        "passed": 1890,
+        "failed": 1,
+        "skipped": 1,
+        "seconds": 295.08
+      },
+      "failure": "Old test matched earlier English wording existing input; rejection code and no-intent/native behavior remained correct",
+      "fix": "Test now asserts stable visible_input_not_empty code and retains no-intent/no-native checks",
+      "affected_rerun": {
+        "passed": 2,
+        "seconds": 0.33
+      },
+      "whole_suite_repeated": false,
+      "log_sha256": "99638e7bf3cef30d5764a60f48b67a70404d35bf96777e3e71f97cb0e2f00c10",
+      "affected_log_sha256": "7a20eee6295224dc03c515c61effeca0082f5cf97cc770f7af5dcd2d4e9fd718",
+      "initial_selector_note": "An earlier targeted command used a mistyped selector; no tests ran and it is not counted as a pass"
+    },
+    "intel_hardware": {
+      "acceptance": "passed",
+      "checks": [
+        {
+          "name": "private endpoint rejects unauthenticated requests",
+          "status": 401
+        },
+        {
+          "name": "actual shell output, exit status and exactly one TTY-bound execution",
+          "identifier": "once",
+          "exit_status": 0,
+          "receipt": {
+            "id": "once",
+            "pid": 7792,
+            "tty": "/dev/ttys000"
+          },
+          "screen_sha256": "f913053fc27a6176f76cacccb4348113dc787a4024a8ce339c8be7a8a7c46688"
+        },
+        {
+          "name": "concurrent/late identical delivery deduplicated; changed payload conflicts"
+        },
+        {
+          "name": "actual shell output, exit status and exactly one TTY-bound execution",
+          "identifier": "nonzero",
+          "exit_status": 7,
+          "receipt": {
+            "id": "nonzero",
+            "pid": 7832,
+            "tty": "/dev/ttys000"
+          },
+          "screen_sha256": "8a8db66d329376e2081fb734449affa965b1766249482432e3922ddb837a646d"
+        },
+        {
+          "name": "session.input task completion distinguished from shell exit 7"
+        },
+        {
+          "name": "rejected before native mutation",
+          "identifier": "nonempty",
+          "code": "visible_input_not_empty"
+        },
+        {
+          "name": "existing owned input preserved byte-for-byte"
+        },
+        {
+          "name": "rejected before native mutation",
+          "identifier": "typed-dollar",
+          "code": "visible_input_not_empty"
+        },
+        {
+          "name": "prompt-like existing input preserved",
+          "identifier": "typed-dollar"
+        },
+        {
+          "name": "rejected before native mutation",
+          "identifier": "typed-hash",
+          "code": "visible_input_not_empty"
+        },
+        {
+          "name": "prompt-like existing input preserved",
+          "identifier": "typed-hash"
+        },
+        {
+          "name": "rejected before native mutation",
+          "identifier": "typed-percent",
+          "code": "visible_input_not_empty"
+        },
+        {
+          "name": "prompt-like existing input preserved",
+          "identifier": "typed-percent"
+        },
+        {
+          "name": "rejected before native mutation",
+          "identifier": "typed-marker",
+          "code": "visible_input_not_empty"
+        },
+        {
+          "name": "prompt-like existing input preserved",
+          "identifier": "typed-marker"
+        },
+        {
+          "name": "rejected before native mutation",
+          "identifier": "wrong-pid",
+          "code": "session_selection_changed"
+        },
+        {
+          "name": "rejected before native mutation",
+          "identifier": "wrong-tty",
+          "code": "session_selection_changed"
+        },
+        {
+          "name": "rejected before native mutation",
+          "identifier": "busy-rejected",
+          "code": "session_busy"
+        },
+        {
+          "name": "actual shell output, exit status and exactly one TTY-bound execution",
+          "identifier": "busy",
+          "exit_status": 0,
+          "receipt": {
+            "id": "busy",
+            "pid": 8166,
+            "tty": "/dev/ttys000"
+          },
+          "screen_sha256": "a5d028355b0331f40e88d6fd6f8cc25d840090096e657f0db6990d017d9d035f"
+        },
+        {
+          "name": "previously rejected task never starts after shell becomes idle"
+        },
+        {
+          "name": "race fixture inserted own harmless comment before real native guard"
+        },
+        {
+          "name": "real pre-native input change refused; conservative unknown never replayed"
+        },
+        {
+          "name": "no hidden, raw-send or extra-window fallback attempted"
+        }
+      ],
+      "owned": {
+        "pane_id": "terminal:4449:ttys000",
+        "expected_pid": 5469,
+        "tty": "/dev/ttys000"
+      },
+      "before_windows": [
+        3033,
+        3206,
+        3546
+      ],
+      "after_windows": [
+        3033,
+        3206,
+        3546
+      ],
+      "before_pids": [
+        21737,
+        22893,
+        70676,
+        71896,
+        90001,
+        90216
+      ],
+      "native_dispatches": [
+        {
+          "source_sha256": "113d2d76e01a7813056293fd591fd8fc95deed6029aaeb1509eb63e396c1092e",
+          "confirmed": {
+            "sent": true
+          }
+        },
+        {
+          "source_sha256": "abbd08d6163da1f466c9533690def9a9b8580909e6f2419eda906513c2055f06",
+          "confirmed": {
+            "sent": true
+          }
+        },
+        {
+          "source_sha256": "9ba040fd675f613716a3a8695d9e786ef170bdd182b60bf57d5603878b69008c",
+          "confirmed": {
+            "sent": true
+          }
+        },
+        {
+          "source_sha256": "668ea4fa36a6e28a00bc5b5d271182696fcce6949fe3d61532d034983c35d4c5",
+          "error": "visible_input_changed"
+        }
+      ],
+      "cleanup_complete": true,
+      "original_process_identities_preserved": true,
+      "private_endpoint_absent": true,
+      "task_results": {
+        "intel-full-once": {
+          "state": "completed",
+          "error": null,
+          "attempt": 1,
+          "attempt_flags_observed": [
+            true
+          ],
+          "evidence_source": "retained transition events, immutable read-only SQLite"
+        },
+        "intel-full-nonzero": {
+          "state": "completed",
+          "error": null,
+          "attempt": 1,
+          "attempt_flags_observed": [
+            true
+          ],
+          "evidence_source": "retained transition events, immutable read-only SQLite"
+        },
+        "intel-full-paste-comment": {
+          "state": "completed",
+          "error": null,
+          "attempt": 1,
+          "attempt_flags_observed": [
+            true
+          ],
+          "evidence_source": "retained transition events, immutable read-only SQLite"
+        },
+        "intel-full-nonempty": {
+          "state": "failed",
+          "error": {
+            "code": "visible_input_not_empty"
+          },
+          "attempt": 1,
+          "attempt_flags_observed": [
+            false
+          ],
+          "evidence_source": "retained transition events, immutable read-only SQLite"
+        },
+        "intel-full-paste-typed-dollar": {
+          "state": "completed",
+          "error": null,
+          "attempt": 1,
+          "attempt_flags_observed": [
+            true
+          ],
+          "evidence_source": "retained transition events, immutable read-only SQLite"
+        },
+        "intel-full-typed-dollar": {
+          "state": "failed",
+          "error": {
+            "code": "visible_input_not_empty"
+          },
+          "attempt": 1,
+          "attempt_flags_observed": [
+            false
+          ],
+          "evidence_source": "retained transition events, immutable read-only SQLite"
+        },
+        "intel-full-paste-typed-hash": {
+          "state": "completed",
+          "error": null,
+          "attempt": 1,
+          "attempt_flags_observed": [
+            true
+          ],
+          "evidence_source": "retained transition events, immutable read-only SQLite"
+        },
+        "intel-full-typed-hash": {
+          "state": "failed",
+          "error": {
+            "code": "visible_input_not_empty"
+          },
+          "attempt": 1,
+          "attempt_flags_observed": [
+            false
+          ],
+          "evidence_source": "retained transition events, immutable read-only SQLite"
+        },
+        "intel-full-paste-typed-percent": {
+          "state": "completed",
+          "error": null,
+          "attempt": 1,
+          "attempt_flags_observed": [
+            true
+          ],
+          "evidence_source": "retained transition events, immutable read-only SQLite"
+        },
+        "intel-full-typed-percent": {
+          "state": "failed",
+          "error": {
+            "code": "visible_input_not_empty"
+          },
+          "attempt": 1,
+          "attempt_flags_observed": [
+            false
+          ],
+          "evidence_source": "retained transition events, immutable read-only SQLite"
+        },
+        "intel-full-paste-typed-marker": {
+          "state": "completed",
+          "error": null,
+          "attempt": 1,
+          "attempt_flags_observed": [
+            true
+          ],
+          "evidence_source": "retained transition events, immutable read-only SQLite"
+        },
+        "intel-full-typed-marker": {
+          "state": "failed",
+          "error": {
+            "code": "visible_input_not_empty"
+          },
+          "attempt": 1,
+          "attempt_flags_observed": [
+            false
+          ],
+          "evidence_source": "retained transition events, immutable read-only SQLite"
+        },
+        "intel-full-wrong-pid": {
+          "state": "failed",
+          "error": {
+            "code": "session_selection_changed"
+          },
+          "attempt": 1,
+          "attempt_flags_observed": [
+            false
+          ],
+          "evidence_source": "retained transition events, immutable read-only SQLite"
+        },
+        "intel-full-wrong-tty": {
+          "state": "failed",
+          "error": {
+            "code": "session_selection_changed"
+          },
+          "attempt": 1,
+          "attempt_flags_observed": [
+            false
+          ],
+          "evidence_source": "retained transition events, immutable read-only SQLite"
+        },
+        "intel-full-busy": {
+          "state": "completed",
+          "error": null,
+          "attempt": 1,
+          "attempt_flags_observed": [
+            true
+          ],
+          "evidence_source": "retained transition events, immutable read-only SQLite"
+        },
+        "intel-full-busy-rejected": {
+          "state": "failed",
+          "error": {
+            "code": "session_busy"
+          },
+          "attempt": 1,
+          "attempt_flags_observed": [
+            false
+          ],
+          "evidence_source": "retained transition events, immutable read-only SQLite"
+        },
+        "intel-full-race-rejected": {
+          "state": "unknown",
+          "error": {
+            "code": "visible_input_changed"
+          },
+          "attempt": 1,
+          "attempt_flags_observed": [
+            true
+          ],
+          "evidence_source": "retained transition events, immutable read-only SQLite"
+        }
+      },
+      "raw_evidence_sha256": "bc4e0271668a6716c04ae7b360040d13163872734df2f82866639bae6db137b7"
+    },
+    "input_state_inspection": {
+      "states": [
+        {
+          "name": "initial-empty",
+          "last_line": "➜  owned ",
+          "screen_sha256": "d1394a4a6cc7973eed43bd9832a5013d69d23ec90a9a0cb09b23f6d0d24770ce",
+          "recognized_empty": true,
+          "zle": {
+            "buffer": "",
+            "postdisplay": "",
+            "cursor": "0",
+            "keymap": "main",
+            "lastwidget": "zle-line-init",
+            "keys": "\u0018\u0002"
+          },
+          "ax_metadata": [
+            {
+              "role": "AXTextArea",
+              "selectedRange": {
+                "value": [
+                  4373,
+                  4372
+                ]
+              },
+              "selectedRanges": {
+                "value": []
+              },
+              "insertionLine": {
+                "value": 40
+              },
+              "selectedText": {
+                "value": ""
+              },
+              "visibleRange": {
+                "value": [
+                  954,
+                  4373
+                ]
+              },
+              "numberOfCharacters": {
+                "value": 4373
+              },
+              "ax_value_sha256": "80bbceaa664667112e45b12853d4045eed7326d34d1a42b4685672d97210a70c"
+            }
+          ],
+          "complete_ax_data_sha256": "43ce77ac0ef3ce682b4b94f669af1fb7656c5c4ae31989b0cf710fd41f5c692e"
+        },
+        {
+          "name": "ctrl-u-1",
+          "last_line": "➜  owned            ",
+          "screen_sha256": "530983bfb4ade953bbcbc666a9171bfbb1b46ba09fb4612a8b5a3eb1bf868b28",
+          "recognized_empty": false,
+          "zle": {
+            "buffer": "",
+            "postdisplay": "",
+            "cursor": "0",
+            "keymap": "main",
+            "lastwidget": "kill-whole-line",
+            "keys": "\u0018\u0002"
+          },
+          "ax_metadata": [
+            {
+              "role": "AXTextArea",
+              "selectedRange": {
+                "value": [
+                  4383,
+                  4382
+                ]
+              },
+              "selectedRanges": {
+                "value": []
+              },
+              "insertionLine": {
+                "value": 41
+              },
+              "selectedText": {
+                "value": ""
+              },
+              "visibleRange": {
+                "value": [
+                  1083,
+                  4394
+                ]
+              },
+              "numberOfCharacters": {
+                "value": 4394
+              },
+              "ax_value_sha256": "bc4027e585b60597dd4c4a529e41b5b9ef9f944ecd630afeef74fef3128ecc2c"
+            }
+          ],
+          "complete_ax_data_sha256": "a158c33635ff0e028e052c90aa5ebb8a5ea7f30ae87464423769bcfd987973c8"
+        },
+        {
+          "name": "ctrl-u-2",
+          "last_line": "➜  owned            ",
+          "screen_sha256": "6fc16df410fd421f5994fedf639f1d96e1c04670a99fed22734cc2f31199956d",
+          "recognized_empty": false,
+          "zle": {
+            "buffer": "",
+            "postdisplay": "",
+            "cursor": "0",
+            "keymap": "main",
+            "lastwidget": "kill-whole-line",
+            "keys": "\u0018\u0002"
+          },
+          "ax_metadata": [
+            {
+              "role": "AXTextArea",
+              "selectedRange": {
+                "value": [
+                  4404,
+                  4403
+                ]
+              },
+              "selectedRanges": {
+                "value": []
+              },
+              "insertionLine": {
+                "value": 42
+              },
+              "selectedText": {
+                "value": ""
+              },
+              "visibleRange": {
+                "value": [
+                  1212,
+                  4415
+                ]
+              },
+              "numberOfCharacters": {
+                "value": 4415
+              },
+              "ax_value_sha256": "94b3b71315a235274ab056a2942c14c11a83e3233e36d28e30f935e634bd592c"
+            }
+          ],
+          "complete_ax_data_sha256": "17baeb1d8dec39cb248abd5f82648f3b306261f6cf08ec6c2201e9a56b1606f0"
+        },
+        {
+          "name": "ctrl-u-3",
+          "last_line": "➜  owned            ",
+          "screen_sha256": "d4aeaa8c840020a7dc6f67f6377784a3951991f594444d6713067c03091ccc74",
+          "recognized_empty": false,
+          "zle": {
+            "buffer": "",
+            "postdisplay": "",
+            "cursor": "0",
+            "keymap": "main",
+            "lastwidget": "kill-whole-line",
+            "keys": "\u0018\u0002"
+          },
+          "ax_metadata": [
+            {
+              "role": "AXTextArea",
+              "selectedRange": {
+                "value": [
+                  4425,
+                  4424
+                ]
+              },
+              "selectedRanges": {
+                "value": []
+              },
+              "insertionLine": {
+                "value": 43
+              },
+              "selectedText": {
+                "value": ""
+              },
+              "visibleRange": {
+                "value": [
+                  1341,
+                  4436
+                ]
+              },
+              "numberOfCharacters": {
+                "value": 4436
+              },
+              "ax_value_sha256": "29ea872927e49b6b6a67f39f0d186e0436316527c861462d7ff4babe08b61d47"
+            }
+          ],
+          "complete_ax_data_sha256": "db5396c22477c47feca14f16a28abd4df69ba62c765ce3e7194ea75bc5143204"
+        },
+        {
+          "name": "empty-erased-padding",
+          "last_line": "➜  owned       ",
+          "screen_sha256": "07098f7e4a2d414d62705ad284098ee75c810879d9afb27a4a49c5b6fc099976",
+          "recognized_empty": false,
+          "zle": {
+            "buffer": "",
+            "postdisplay": "",
+            "cursor": "0",
+            "keymap": "main",
+            "lastwidget": "_kb_issue51_probe",
+            "keys": "\u0018\u0002"
+          },
+          "ax_metadata": [
+            {
+              "role": "AXTextArea",
+              "selectedRange": {
+                "value": [
+                  4446,
+                  4445
+                ]
+              },
+              "selectedRanges": {
+                "value": []
+              },
+              "insertionLine": {
+                "value": 44
+              },
+              "selectedText": {
+                "value": ""
+              },
+              "visibleRange": {
+                "value": [
+                  1470,
+                  4452
+                ]
+              },
+              "numberOfCharacters": {
+                "value": 4452
+              },
+              "ax_value_sha256": "417e909dd89678c13189100ad4ac5643fc4a2d6549664874b0280199969428d0"
+            }
+          ],
+          "complete_ax_data_sha256": "780b0a37d2c9685da7d28038a9a503d55c5e29a6c87e620165c77f6d1d74d04f"
+        },
+        {
+          "name": "pending-spaces-home",
+          "last_line": "➜  owned       ",
+          "screen_sha256": "07098f7e4a2d414d62705ad284098ee75c810879d9afb27a4a49c5b6fc099976",
+          "recognized_empty": false,
+          "zle": {
+            "buffer": "   ",
+            "postdisplay": "",
+            "cursor": "0",
+            "keymap": "main",
+            "lastwidget": "_kb_issue51_probe",
+            "keys": "\u0018\u0002"
+          },
+          "ax_metadata": [
+            {
+              "role": "AXTextArea",
+              "selectedRange": {
+                "value": [
+                  4446,
+                  4445
+                ]
+              },
+              "selectedRanges": {
+                "value": []
+              },
+              "insertionLine": {
+                "value": 44
+              },
+              "selectedText": {
+                "value": ""
+              },
+              "visibleRange": {
+                "value": [
+                  1470,
+                  4452
+                ]
+              },
+              "numberOfCharacters": {
+                "value": 4452
+              },
+              "ax_value_sha256": "417e909dd89678c13189100ad4ac5643fc4a2d6549664874b0280199969428d0"
+            }
+          ],
+          "complete_ax_data_sha256": "780b0a37d2c9685da7d28038a9a503d55c5e29a6c87e620165c77f6d1d74d04f"
+        }
+      ],
+      "raw_key_phases": [
+        {
+          "phase": "ctrl-u-1",
+          "expected_hex": "15",
+          "actual_hex": "15",
+          "matches": true
+        },
+        {
+          "phase": "ctrl-u-2",
+          "expected_hex": "15",
+          "actual_hex": "15",
+          "matches": true
+        },
+        {
+          "phase": "ctrl-u-3",
+          "expected_hex": "15",
+          "actual_hex": "15",
+          "matches": true
+        },
+        {
+          "phase": "tab-control-1",
+          "expected_hex": "09",
+          "actual_hex": "09",
+          "matches": true
+        },
+        {
+          "phase": "tab-control-2",
+          "expected_hex": "09",
+          "actual_hex": "09",
+          "matches": true
+        },
+        {
+          "phase": "tab-control-3",
+          "expected_hex": "09",
+          "actual_hex": "09",
+          "matches": true
+        },
+        {
+          "phase": "probe-chord-1",
+          "expected_hex": "1802",
+          "actual_hex": "1802",
+          "matches": true
+        },
+        {
+          "phase": "probe-chord-2",
+          "expected_hex": "1802",
+          "actual_hex": "1802",
+          "matches": true
+        },
+        {
+          "phase": "probe-chord-3",
+          "expected_hex": "1802",
+          "actual_hex": "1802",
+          "matches": true
+        }
+      ],
+      "all_nine_raw_phases_match_expected": true,
+      "termios_restoration": {
+        "restored": true
+      },
+      "ctrl_u_binding": "\"^U\" kill-whole-line",
+      "state": "complete_owned_window_ready",
+      "critical_pair_identical_native_and_queried_ax": true,
+      "historical_tab": "Not reproduced in current three GUI Ctrl-U and three raw Ctrl-U trials; historical cause remains unproven",
+      "raw_evidence_sha256": "2596912a67d91a5333e5afef110b8ed82c48a0ab30c78ebe1bdba72b32e0e574"
+    },
+    "host_zsh_wire": {
+      "state": "passed",
+      "platform": "macOS-15.7.4-x86_64-i386-64bit",
+      "zsh_version": "zsh 5.9 (x86_64-apple-darwin24.0)",
+      "term": "xterm-256color",
+      "profiles": "private HOME/ZDOTDIR; -f/-d; compiled mandatory zshenv may still run",
+      "owned_child_pid": 6661,
+      "owned_session_id": 6661,
+      "child_reaped": true,
+      "child_wait_status": 0,
+      "elapsed_seconds": 2.2965381289832294,
+      "clear_and_delete_traces": [
+        {
+          "label": "original-ctrl-u",
+          "sent_hex": "15",
+          "sent_escaped": "b'\\x15'",
+          "received_hex": "1b5b313644202020202020202020202020202020201b5b313644",
+          "received_escaped": "b'\\x1b[16D                \\x1b[16D'",
+          "received_bytes": 26,
+          "literal_space_count": 16,
+          "backspace_count": 0,
+          "carriage_return_count": 0,
+          "erase_sequences_hex": [],
+          "wire_sha256": "854c0bc30ff39330e7bdf20e77c349f68852963796f47443ec519f739a094309"
+        },
+        {
+          "label": "original-cleared-widget",
+          "sent_hex": "1802",
+          "sent_escaped": "b'\\x18\\x02'",
+          "received_hex": "",
+          "received_escaped": "b''",
+          "received_bytes": 0,
+          "literal_space_count": 0,
+          "backspace_count": 0,
+          "carriage_return_count": 0,
+          "erase_sequences_hex": [],
+          "wire_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "zle_witness": {
+            "buffer": "",
+            "postdisplay": "",
+            "cursor": "0"
+          }
+        },
+        {
+          "label": "five-backspaces",
+          "sent_hex": "7f7f7f7f7f",
+          "sent_escaped": "b'\\x7f\\x7f\\x7f\\x7f\\x7f'",
+          "received_hex": "082008082008082008082008082008",
+          "received_escaped": "b'\\x08 \\x08\\x08 \\x08\\x08 \\x08\\x08 \\x08\\x08 \\x08'",
+          "received_bytes": 15,
+          "literal_space_count": 5,
+          "backspace_count": 10,
+          "carriage_return_count": 0,
+          "erase_sequences_hex": [],
+          "wire_sha256": "22ef90a6f8aff74b64958735db530c091834283fc7e9cf4f04fd13a70e14d61c"
+        },
+        {
+          "label": "shortened-ctrl-u",
+          "sent_hex": "15",
+          "sent_escaped": "b'\\x15'",
+          "received_hex": "1b5b313944202020202020202020202020202020202020201b5b313944",
+          "received_escaped": "b'\\x1b[19D                   \\x1b[19D'",
+          "received_bytes": 29,
+          "literal_space_count": 19,
+          "backspace_count": 0,
+          "carriage_return_count": 0,
+          "erase_sequences_hex": [],
+          "wire_sha256": "c1113814f4dc973147868c1461533f4abc1777346de4f853a12b1bb87bb5e580"
+        },
+        {
+          "label": "shortened-cleared-widget",
+          "sent_hex": "1802",
+          "sent_escaped": "b'\\x18\\x02'",
+          "received_hex": "",
+          "received_escaped": "b''",
+          "received_bytes": 0,
+          "literal_space_count": 0,
+          "backspace_count": 0,
+          "carriage_return_count": 0,
+          "erase_sequences_hex": [],
+          "wire_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "zle_witness": {
+            "buffer": "",
+            "postdisplay": "",
+            "cursor": "0"
+          }
+        },
+        {
+          "label": "short-ctrl-u",
+          "sent_hex": "15",
+          "sent_escaped": "b'\\x15'",
+          "received_hex": "080808202020080808",
+          "received_escaped": "b'\\x08\\x08\\x08   \\x08\\x08\\x08'",
+          "received_bytes": 9,
+          "literal_space_count": 3,
+          "backspace_count": 6,
+          "carriage_return_count": 0,
+          "erase_sequences_hex": [],
+          "wire_sha256": "cdc675c165b2a811549d07add5802d063914fd0fb5f711e3e86ddc8cbc57ddc9"
+        },
+        {
+          "label": "short-cleared-widget",
+          "sent_hex": "1802",
+          "sent_escaped": "b'\\x18\\x02'",
+          "received_hex": "",
+          "received_escaped": "b''",
+          "received_bytes": 0,
+          "literal_space_count": 0,
+          "backspace_count": 0,
+          "carriage_return_count": 0,
+          "erase_sequences_hex": [],
+          "wire_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "zle_witness": {
+            "buffer": "",
+            "postdisplay": "",
+            "cursor": "0"
+          }
+        }
+      ]
+    },
+    "apple_source": {
+      "commit": "666e91a595af505ef61d5f9b87df7a014a4937c6",
+      "path": "zsh/Src/Zle/zle_refresh.c",
+      "padding_lines": "1890-1916",
+      "cursor_move_lines": "1790-1792",
+      "url": "https://github.com/apple-oss-distributions/zsh/blob/666e91a595af505ef61d5f9b87df7a014a4937c6/zsh/Src/Zle/zle_refresh.c#L1890",
+      "scope": "Primary source explains renderer mechanism; not claimed to attest exact host build source revision"
+    },
+    "runtime_before_after": {
+      "before": {
+        "instance_id": "82cd506b1d854b50b4cc58c5016fc856",
+        "version": "0.8.0rc18",
+        "pid": 18197,
+        "started_at": "2026-10-29T22:45:10.482631+00:00",
+        "config_path": "/Users/landjunge/.config/kirabridge/config.toml",
+        "config_sha256": "52747b8353bef4cc162997c34c30d8e759ca0691725d902f313ce4653cf903c2",
+        "effective_config_sha256": "3709ee5e48b675813b9708c7b634d137ca3c2c2dc19fefd35a04b61f581cf641",
+        "source_tree_sha256": "bea0158935efd09a2304be2eb024ce79d5a100cf754742dcbe52aaddce1dc9ee",
+        "source_file_count": 122,
+        "source_package_path": "/Users/landjunge/.local/share/kirabridge/install/releases/0.8.0rc18-15d071ebaa95/source/.venv/lib/python3.11/site-packages/kirabridge",
+        "source_scope": "package Python files observed at startup; no remote attestation"
+      },
+      "after": {
+        "instance_id": "82cd506b1d854b50b4cc58c5016fc856",
+        "version": "0.8.0rc18",
+        "pid": 18197,
+        "started_at": "2026-10-29T22:45:10.482631+00:00",
+        "config_path": "/Users/landjunge/.config/kirabridge/config.toml",
+        "config_sha256": "52747b8353bef4cc162997c34c30d8e759ca0691725d902f313ce4653cf903c2",
+        "effective_config_sha256": "3709ee5e48b675813b9708c7b634d137ca3c2c2dc19fefd35a04b61f581cf641",
+        "source_tree_sha256": "bea0158935efd09a2304be2eb024ce79d5a100cf754742dcbe52aaddce1dc9ee",
+        "source_file_count": 122,
+        "source_package_path": "/Users/landjunge/.local/share/kirabridge/install/releases/0.8.0rc18-15d071ebaa95/source/.venv/lib/python3.11/site-packages/kirabridge",
+        "source_scope": "package Python files observed at startup; no remote attestation"
+      }
+    },
+    "protected_baseline_files_verified": 88,
+    "ci_at_document_creation": {
+      "head": "81070628d2bdcf5b42f3065e5bc7f9f6ed61b06a",
+      "head_runs": 0,
+      "head_check_runs": 0,
+      "latest_previous_verify": 40988258435,
+      "previous_linux_passed_each": 1853,
+      "previous_linux_skipped_each": 24,
+      "previous_hosted_mac_jobs": "zero steps, payment/spending annotation",
+      "configured_required_contexts_observed": [],
+      "admin_rules_endpoints": "403; do not infer full admin visibility",
+      "user_gate": "verified green remains mandatory independent of repository enforcement"
+    },
+    "final_ci_plan": {
+      "workflow_id": 387778812,
+      "event": "workflow_dispatch",
+      "scope": "linux",
+      "status": "pending exact repaired commit dispatch after this evidence is committed",
+      "outcome_location": "PR54 latest result comment and exact-head Actions run; this pre-dispatch snapshot is not a CI pass",
+      "limits": [
+        "Automatic four-platform matrix unchanged",
+        "Manual Linux checks do not satisfy PR required-check event source restrictions",
+        "Omitted ARM/hosted macOS checks remain unpassed"
+      ]
+    },
+    "merge": {
+      "performed": false,
+      "reason": "Functional empty-input ambiguity unresolved and full integration gates not green"
+    },
+    "installation": {
+      "performed": false,
+      "version_unchanged": "0.8.0rc18",
+      "pid_unchanged": 18197,
+      "reason": "Preserve active connection/other sessions/RC17 return path; no verified deployment gate"
+    },
+    "script_source_sha256": {
+      "scripts/accept_shell_input_intel.py": "531ba72526fdafa774b5deafbe4a7549af8bab442e8029053b1722b86084bb7b",
+      "scripts/diagnose_shell_keystroke_intel.py": "70a590fa6b3890370527a2230fb6fda2b6842a5493380f1b36aa937fbdff0203",
+      "scripts/inspect_terminal_input_intel.py": "ddb58ee70445ea9426f04ff37fce5dd49efded82b594e352890ce925fc8101b9",
+      "scripts/probe_zle_output.py": "10896edc7f4a401aad89a47d8351700bdf53ef64f5b67644e0ac29bde286247f"
+    },
+    "product_source_sha256": {
+      "src/kirabridge/platform_adapters/shell_prompt.py": "5489a11457e10f52f00951ac055160fb2da164881121d1092d72575236a441fd",
+      "src/kirabridge/platform_adapters/terminal_app.py": "52afcfae75753cc672c6edb26ac3af08d990d42105573dc86a1441cf1731eea1"
+    },
+    "private_test_execution_runtime": null
   }
 }

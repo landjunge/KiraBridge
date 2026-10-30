@@ -26,6 +26,9 @@ from kirabridge.session_manager import SessionInput
         "Last login: Friday\n➜  ~ cd -- /Users/operator\n➜  ~ \n\n",
         "host project% ",
         "host:project user$ \n\n",
+        "KiraBridge visible % ",
+        "previous output\nKiraBridge visible % \n\n",
+        "KiraBridge fixture % ",
     ],
 )
 def test_known_empty_prompts(screen):
@@ -121,6 +124,56 @@ async def test_chatgpt_refusal_never_enters_native_dispatch(direct_shell, failur
     terminal.send.assert_not_awaited()
     if failure != "intent":
         intent.assert_not_awaited()
+
+
+@pytest.mark.parametrize(
+    "screen",
+    [
+        "➜  ~ echo# ",
+        "➜  ~ echo$ ",
+        "➜  ~ echo% ",
+        "➜  ~ # ",
+        "➜ ~ echo$ ",
+        " ➜  ~ echo# ",
+        "\t➜  ~ echo% ",
+        "➜  ~ echo KiraBridge visible % ",
+        "host% echoKiraBridge visible % ",
+        "KiraBridge visible % typed KiraBridge visible % ",
+        "prefix KiraBridge visible % ",
+    ],
+)
+async def test_typed_prompt_suffix_never_enters_transport_or_intent(direct_shell, screen):
+    bridge, row, _ = direct_shell
+    terminal = bridge.sessions.terminal_app
+    terminal.read.return_value = screen
+    intent = AsyncMock()
+    with pytest.raises(BridgeError) as failure:
+        await bridge.sessions.send("local", arguments(row), before_transport=intent)
+    assert failure.value.code == "visible_input_not_empty"
+    intent.assert_not_awaited()
+    terminal.native.assert_not_awaited()
+    terminal.send.assert_not_awaited()
+
+
+async def test_ambiguous_rendered_whitespace_preserves_input_before_intent(direct_shell):
+    bridge, row, _ = direct_shell
+    terminal = bridge.sessions.terminal_app
+    # Erased cells and genuine pending spaces can share this visible line. No
+    # visual normalization may turn either case into permission to send input.
+    screen = "previous output\n➜  owned       \n\n"
+    terminal.read.return_value = screen
+    intent = AsyncMock()
+    with pytest.raises(BridgeError) as failure:
+        await bridge.sessions.send("local", arguments(row), before_transport=intent)
+    assert failure.value.code == "visible_input_not_empty"
+    assert str(failure.value) == (
+        "Cannot verify an empty shell prompt; existing or ambiguous input is preserved"
+    )
+    terminal.read.assert_awaited_once_with(row["pane_id"])
+    assert terminal.read.return_value == screen
+    intent.assert_not_awaited()
+    terminal.native.assert_not_awaited()
+    terminal.send.assert_not_awaited()
 
 
 async def run_dispatch_js(source, state):

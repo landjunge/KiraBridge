@@ -23,7 +23,15 @@ from kirabridge.platform_adapters.terminal_app import TerminalAppTransport
 TASK = "channel-8f3be0698a9c44e2822382b88e5f57cb"
 
 
-async def diagnose(root, repeats, owned_window=None, without_preprobe=False, original_only=False):
+async def diagnose(
+    root,
+    repeats,
+    owned_window=None,
+    without_preprobe=False,
+    original_only=False,
+    operation_id=TASK,
+    prepare_only=False,
+):
     if (platform.system(), platform.machine()) != ("Darwin", "x86_64"):
         raise RuntimeError("Intel macOS required")
     if repeats < 3 or repeats > 5:
@@ -43,7 +51,7 @@ async def diagnose(root, repeats, owned_window=None, without_preprobe=False, ori
         assert not owned_window.is_symlink() and owned_window.stat().st_uid == os.getuid()
         assert owned_window.resolve().is_relative_to(root.parent.resolve())
         certificate = json.loads(owned_window.read_text())
-        assert certificate["task"] == TASK and certificate["owner_uid"] == os.getuid()
+        assert certificate["task"] == operation_id and certificate["owner_uid"] == os.getuid()
         assert certificate["ready_for_acceptance"]
         handle = certificate["owned"]
         assert set(original_ids) == set(certificate["original_windows"]) | {
@@ -56,12 +64,13 @@ async def diagnose(root, repeats, owned_window=None, without_preprobe=False, ori
         original_ids = certificate["original_windows"]
         identities = certificate["original_identities"]
     evidence = {
-        "task": TASK,
+        "task": operation_id,
         "trials": [],
         "original_windows": original_ids,
         "original_identities": identities,
         "state": "in_progress",
         "without_preprobe": without_preprobe,
+        "prepare_only": prepare_only,
     }
     selected = plistlib.loads(
         (Path.home() / "Library/Preferences/com.apple.HIToolbox.plist").read_bytes()
@@ -191,6 +200,8 @@ async def diagnose(root, repeats, owned_window=None, without_preprobe=False, ori
                 ("keystroke-space", " ", 0.5),
             ]
             sequence += [("paste-original", "# KB_ACCEPT_RACE", 0.5)] * repeats
+        if prepare_only:
+            sequence = []
         for number, (method, requested, duration) in enumerate(sequence, 1):
             before = await idle()
             if not without_preprobe:
@@ -290,7 +301,7 @@ async def diagnose(root, repeats, owned_window=None, without_preprobe=False, ori
             assert await terminal.process_identity(int(pid), detailed=True) == expected
         evidence["state"] = "complete_owned_window_ready"
         certificate = {
-            "task": TASK,
+            "task": operation_id,
             "owner_uid": os.getuid(),
             "owned": evidence["owned"],
             "identity": evidence["owned_identity"],
@@ -340,6 +351,8 @@ if __name__ == "__main__":
     parser.add_argument("--owned-window", type=Path)
     parser.add_argument("--without-preprobe", action="store_true")
     parser.add_argument("--original-only", action="store_true")
+    parser.add_argument("--operation-id", default=TASK)
+    parser.add_argument("--prepare-only", action="store_true")
     args = parser.parse_args()
     asyncio.run(
         diagnose(
@@ -348,5 +361,7 @@ if __name__ == "__main__":
             args.owned_window,
             args.without_preprobe,
             args.original_only,
+            args.operation_id,
+            args.prepare_only,
         )
     )

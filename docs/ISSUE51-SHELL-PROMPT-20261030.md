@@ -12,7 +12,134 @@ Der Shell-Fehler ist im Entwicklungszweig behoben und lokal geprüft.
 [Issue51](https://github.com/landjunge/KiraBridge/issues/51) bleibt offen.
 Keine produktive Installation, kein Neustart, Merge oder Release dieses Auftrags.
 
-## Aktueller Stand: Race-Ursache reproduziert, vollständige Abnahme bestanden
+## Aktueller Abschlussauftrag: sichere Korrekturen, Merge und Installation gesperrt
+
+Auftrag `channel-83351b4848674ae399afb12e121a982a`, Konversation
+`rc18-issue51-finish-20261030`, Nachricht `b537340f-dff3-47f0-ba76-1672a21246fa`,
+Receipt `f42ad006-4ecf-4620-9aca-0e99ebaf9ac2` bestätigt. Ausgangs-HEAD
+`81070628d2bdcf5b42f3065e5bc7f9f6ed61b06a` war sauber, PR54 offen/Draft, main
+`307004e5b2e4285c19e8d7544bedf45b28297a0b`. Kein Merge oder Installationsversuch:
+die sichere Eingabeleerheit ist in einem nachgewiesenen Fall nicht entscheidbar,
+und vollständige Integrationsgates sind nicht grün.
+
+### Tatsächliche Produktionsfehler korrigiert
+
+Der bisherige Parser akzeptierte beispielsweise `➜  ~ echo$ ` als leer: Nach
+Ablehnung durch die strikte Theme-Regel fiel die Zeile in die allgemeine `$`-/`#`-/`%`-
+Regel. Außerdem akzeptierte `endswith("KiraBridge visible % ")` einen kontrollierten
+Marker innerhalb vorhandener Eingabe. Acht konkrete alte Falschannahmen wurden
+als reine Funktionen reproduziert; alle werden jetzt abgewiesen.
+
+Die erkennbare Pfeil-Promptfamilie kann nicht mehr in die allgemeine Regel fallen.
+Der reservierte kontrollierte Marker verlangt die vollständige exakte Promptzeile.
+Es wird kein Whitespace entfernt oder vorhandene Eingabe gelöscht. Der bisherige
+Fehlercode `visible_input_not_empty` bleibt kompatibel; die Meldung beschreibt
+jetzt korrekt, dass die Leerheit nicht bestätigt werden kann und vorhandene oder
+mehrdeutige Eingabe erhalten bleibt.
+
+Neue ChatGPT-Pfadtests prüfen promptähnliche Eingabe und Marker-Spoofing vor dem
+Intent-/Native-Schritt. Im echten MCP-/Intel-Lauf wurden zusätzlich vorhandene
+Kommentare mit `$ `, `# `, `% ` und kontrolliertem Marker getestet: alle vor Mutation
+abgewiesen und bytegleich erhalten. Die gewöhnlichen unterstützten Prompts bleiben
+positiv getestet.
+
+### Renderer und Ctrl-U anhand aktueller Bytes untersucht
+
+Das lokale `/bin/zsh`, Version5.9, wurde auf einem neu erzeugten privaten PTY ohne
+Benutzerprofile gemessen. Nach Eingabebyte `0x15` erzeugte es beispielsweise
+`ESC[16D`, **16 echte Ausgabeleerzeichen**, anschließend wieder `ESC[16D`.
+Der eigene ZLE-Zeuge bestätigte gleichzeitig leeren `BUFFER`, leeres `POSTDISPLAY`
+und Cursor0. Rücklöschen und kürzere Zeilen zeigten denselben Bereinigungsmechanismus.
+Der eigene Kindprozess endete normal und wurde bestätigt eingesammelt.
+
+Damit ist für das Leeren einer Zeile ein konkreter Ursprung der sichtbaren Restzellen
+im tatsächlichen lokalen Zsh-Ausgabestrom belegt. Apples veröffentlichter
+[Rendererquellstand](https://github.com/apple-oss-distributions/zsh/blob/666e91a595af505ef61d5f9b87df7a014a4937c6/zsh/Src/Zle/zle_refresh.c#L1890)
+beschreibt das Auffüllen einer verkürzten Anzeige auf die alte Breite; später wird
+der Cursor zurückgesetzt. Dieser Quellstand wird nicht als Build-Attest des lokalen
+Binaries ausgegeben. Der genaue historische Renderzweig beim ursprünglichen
+Tastatureinfügen bleibt ohne damaligen Wiretrace nicht rekonstruierbar.
+
+Ein begrenzter Vordergrund-Rohdatenleser im eigenen sichtbaren Fenster empfing
+dreimal Ctrl-U als `15`, dreimal die Tab-Kontrolle als `09` und dreimal den
+Probe-Tastengriff als `18 02`. Alle neun Phasen haben Bytebestätigung und Ruhefenster;
+die gespeicherten TTY-Attribute waren nachher exakt wiederhergestellt. In drei aktuellen
+ZLE-Ctrl-U-Versuchen war der Puffer anschließend leer; aktives Binding war
+`kill-whole-line`. Eine allgemeine Ctrl-U-zu-Tab-Übersetzung ist damit nicht belegt.
+Der einzelne frühere Tab-Befund wurde nicht reproduziert und bleibt ungeklärt.
+
+### Warum die falsche Leerablehnung nicht sicher durch Trimmen reparierbar ist
+
+Ein gezieltes Gegenbeispiel lieferte **identische native Bildschirmbytes und identische
+erfasste AX-Werte einschließlich Text, Auswahlbereichen und Einfügezeile** für:
+
+- tatsächlich leeren ZLE-Puffer, Cursor0, verbliebene gerenderte Leerzellen;
+- drei tatsächlich eingegebene Leerzeichen im ZLE-Puffer, Cursor0 vor diesen Zeichen.
+
+Nur der ausdrücklich im eigenen Testterminal eingerichtete logische BUFFER-Zeuge
+unterschied diese Zustände. Identische beobachtbare Daten können nicht gleichzeitig
+als sicher leer und als vorhandene Eingabe klassifiziert werden. Eine Cursor- oder
+`rstrip()`-Heuristik würde daher reale Eingabe freigeben. Produktiv bleibt dieser
+Fall sicher abgewiesen. Eine allgemeine Lösung benötigt einen zusätzlich autorisierten,
+zuverlässigen logischen Eingabekanal; der Diagnose-Hook wird nicht in fremde oder
+laufende Benutzershells injiziert. Diese Funktionsgrenze ist ein Mergeblocker dieses
+Abschlussauftrags, kein behaupteter vollständig behobener Befund.
+
+### Tests, CI und Erhalt des Rückwegs
+
+- Gezielter erster Lauf: 55 bestanden, davon47 Shelltests und8 Discovery-Prüfungen.
+  Verwandter sichtbarer Intel-Lauf: 93 bestanden, einschließlich derselben8.
+  Neuer Mehrdeutigkeitsfall einzeln: 1 bestanden.
+- Vollständiger Intel-Testlauf mit den unveränderten CI-Pins für ThreadDesk/TollGate:
+  **1.890 bestanden, 1 fehlgeschlagen, 1 übersprungen**, 295,08 Sekunden. Der Fehler
+  war der alte Test auf die frühere englische Formulierung. Der Test prüft jetzt den
+  weiterhin gleichen Fehlercode und weiterhin keinen Intent-/Native-Aufruf.
+  Betroffener und direkt verwandter Test danach: **2 bestanden**, 0,33 Sekunden.
+  Kein wiederholter Gesamtsuitenlauf und kein umetikettierter grüner Erstlauf.
+- Neuer vollständiger realer Intel-/MCP-Lauf: **23 Checkpoints plus unabhängiges
+  Cleanup bestanden**. Alle17 Tasks haben Versuchszähler1; acht Abweisungen erfolgten
+  vor Eingabeversuch. Drei Payloads liefen je einmal, der Race-Task blieb geschützt.
+  Task-`completed` bestätigt nur die Eingabeübergabe; Exitstatus und Ausgabe wurden
+  über getrennte Shell-Zeugen belegt.
+- Ruff/Format/Compile/Diffprüfung sowie unabhängige Read-only-Sicherheits- und
+  Belegprüfung wurden durchgeführt. Einzelne CI-Ergebnisse werden getrennt bewertet.
+
+Am Ausgangs-HEAD gab es **0 Actions-Läufe, 0 Checkruns, 0 Statusmeldungen**.
+`MERGEABLE/CLEAN` bedeutete lediglich Konfliktfreiheit. Die letzten Linux-Erfolge
+lagen auf älterem HEAD106a777; die dortigen Hosted-Mac-/Paketjobs hatten null Schritte
+und eine Zahlungs-/Ausgabenlimitannotation. Lesbare Metadaten zeigen keine erzwungenen
+Checkkontexte; administrative Regeln sind nicht vollständig lesbar. Unabhängig davon
+gilt die ausdrückliche Betreiberbedingung eines verifiziert grünen Ergebnisses.
+
+Der bestehende Verify-Workflow erhält einen expliziten manuellen Linux-Scope auf den
+vorhandenen Debian-Runnern3.11/3.13; automatische Push-/PR-Ereignisse behalten ihre
+unveränderte Vier-Plattform-Matrix. Der endgültige Commit wird nach dem Committen
+einmal mit `scope=linux` angefordert. Ergebnis und exakter HEAD werden im zugehörigen
+Actions-Lauf und im aktuellen PR54-/Issue51-Ergebnis festgehalten; dieser vor Dispatch
+geschriebene Bericht ist **kein** CI-Erfolgsnachweis. Manuelle Linux-Jobs erfüllen
+keine eventuell geforderten PR-Ereignischecks und machen ausgelassene Mac-/ARM-Jobs
+nicht grün. Keine Billingänderung, kein manuelles Hosted-Mac-/ARM-Dispatch.
+
+Alle Hardwarephasen nutzten nur das eigene Fenster4449/PID5469. Es wurde abschließend
+geschlossen und unabhängig abwesend geprüft. Die aktuellen ursprünglichen drei
+Codex-Tabs3033/3206/3546 und sechs Prozessidentitäten blieben erhalten. RC18 blieb
+PID18197 mit gleicher Instanz, Quelle und Konfiguration; alle88 geschützten
+Ausgangsdateien einschließlich früherer Aufträge und erfasster RC17-Rückwegdateien
+sind unverändert. Keine historische Unknown-/Blocked-/Library-Ausführung.
+
+Private Sicherung, Rohdaten, Testlogs und Gitbundles:
+`~/.local/share/kirabridge/backups/rc18-issue51-finish-20261030/`.
+Der unveränderte RC17-Rückweg bleibt unter
+`~/.local/share/kirabridge/install/backups/20261029-233225-bdaf86ef/` erhalten;
+kein produktiver Restore wurde versucht. Strukturierte Belege stehen im bestehenden
+JSON unter `rc18_issue51_finish`. Kein Installer oder Release wurde gebaut/veröffentlicht,
+keine produktive Installation geändert. Solange Funktions- und Integrationsgates
+offen sind, wird die laufende KiraBridge-Verbindung für keinen Installationsversuch
+unterbrochen; PR54 und Issue51 bleiben offen. Die vollständige Agentenübernahme mit
+ACK/ChatGPT-Empfang und die tatsächliche Live-/Voice-Oberfläche sind durch die
+isolierte Shellabnahme ebenfalls nicht abgenommen.
+
+## Vorheriger Stand: Race-Ursache reproduziert, vollständige Abnahme bestanden
 
 Auftrag `channel-8f3be0698a9c44e2822382b88e5f57cb`, Konversation
 `issue51-intel-race-retest-20261030`, Nachricht `0a5ed62f-7989-4407-b370-65a187e274b3`,
