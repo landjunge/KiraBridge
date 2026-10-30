@@ -3038,5 +3038,127 @@
       "version": "0.8.0rc18"
     },
     "private_test_runtime_samples": 9
+  },
+  "intel_terminal_install_20261030": {
+    "request": "explicit team fix/test/build/install/commit/push on Intel iMac 2015",
+    "branch": "fix/intel-terminal-install-20261030",
+    "product_commit": "4a2d32f7383196f2eb089fe6443c64322d3ea1a6",
+    "base": "40a2e89d293d9584408051368c67c2cf4e8688c4",
+    "architecture": {
+      "existing": "Swift/Cocoa/WebKit companion plus Python daemon",
+      "tauri_sources": "absent, NOT built",
+      "public_release": false
+    },
+    "full_intel_pytest": {
+      "passed": 1912,
+      "skipped": 1,
+      "failed": 0,
+      "duration_s": 317.28,
+      "integrations": "existing exact pinned ThreadDesk/TollGate sources"
+    },
+    "lint_format": "passed, 400 files",
+    "independent_review": "passed with explicit limits",
+    "native_acceptance": {
+      "acceptance": "passed",
+      "checkpoints": 23,
+      "cleanup_complete": true
+    },
+    "isolated_install_rollback": {
+      "checks": [
+        "pinned previous 0.8.0rc18 wheel starts under isolated launchd",
+        "upgrade while authenticated completion_receive HTTP request remained open; old read settled without replay and new daemon PID healthy",
+        "built package upgrades 0.8.0rc18; authenticated version/status/start",
+        "config/credentials hashes, database row and user file preserved",
+        "real rollback restarts previous 0.8.0rc18 wheel and preserves secrets"
+      ],
+      "cleanup_absence_verified": true,
+      "open_completion_read": true,
+      "upgrade_only": true
+    },
+    "runtime": {
+      "instance_id": "e6b4ba7bb3f349c696ccf450177c288a",
+      "version": "0.8.0rc18",
+      "pid": 20011,
+      "started_at": "2026-10-30T16:40:18.587997+00:00",
+      "config_path": "/Users/landjunge/.config/kirabridge/config.toml",
+      "config_sha256": "52747b8353bef4cc162997c34c30d8e759ca0691725d902f313ce4653cf903c2",
+      "effective_config_sha256": "3709ee5e48b675813b9708c7b634d137ca3c2c2dc19fefd35a04b61f581cf641",
+      "source_tree_sha256": "59d434c982c77d9787a0cc9426a9f6e8ba3dfca4d98366e49a91624014c649df",
+      "source_file_count": 122,
+      "source_package_path": "/Users/landjunge/.local/share/kirabridge/install/releases/0.8.0rc18-4a2d32f73831/source/.venv/lib/python3.11/site-packages/kirabridge",
+      "source_scope": "package Python files observed at startup; no remote attestation"
+    },
+    "first_installed_verifier": {
+      "overall": "failed_do_not_resend",
+      "error": "visible_focus_changed",
+      "http_task": {
+        "id": "intel-terminal-installed-e2e-20261030",
+        "state": "completed",
+        "attempt": 1,
+        "created": 1793378466.479798,
+        "started": 1793378468.250858,
+        "updated": 1793378469.168617
+      },
+      "http_append_receipts": 1,
+      "http_exit": 0,
+      "identical_key_attempt": 1,
+      "uncertain_native_probe_replayed": false
+    },
+    "fresh_native_return_probe": {
+      "id": "installed-separate-return-v2-20261030",
+      "acceptance": "passed",
+      "proves": "paste observed, no effect before Return, Return then output/effect; not independent exactly-once proof"
+    },
+    "final": {
+      "at": 1793378858.2282739,
+      "cleanup_complete": true,
+      "owned_window_absent": true,
+      "other_windows_preserved": [
+        3033,
+        3206,
+        3546,
+        4572
+      ],
+      "other_process_ids_preserved": [
+        "70676",
+        "71896",
+        "90001",
+        "90216",
+        "21737",
+        "22893",
+        "13589"
+      ],
+      "historical_rows_unchanged": {
+        "tasks": 55,
+        "message_jobs": 24,
+        "visible_handoffs": 7
+      },
+      "protected_files_unchanged": 88,
+      "installed": "/Users/landjunge/.local/share/kirabridge/install/releases/0.8.0rc18-4a2d32f73831",
+      "source_commit": "4a2d32f7383196f2eb089fe6443c64322d3ea1a6",
+      "app_path": "/Users/landjunge/Applications/KiraBridge.app",
+      "app_source": "4a2d32f7383196f2eb089fe6443c64322d3ea1a6",
+      "console_pid": 20033,
+      "console_runtime_path_verified": true,
+      "core_pid": 20011,
+      "productive_database_restored": false
+    },
+    "artifact_sha256": {
+      "KiraBridge-macos.tar.gz": "a54a9bb4a919e9899b3dee024f0325f0d854ec594701387b52fa539f242d64dc",
+      "kirabridge-0.8.0rc18-py3-none-any.whl": "b6cf48b84ad28d69642ecb07affb55b28788791c61f7468020299a395c74de8c",
+      "KiraBridge": "b632ad409d96a4898bf8593f88bce30711adc19bb8eebedd6add828e4bebd2f4"
+    },
+    "backup_root": "/Users/landjunge/.local/share/kirabridge/backups/intel-terminal-install-20261030",
+    "transaction_backup": "~/.local/share/kirabridge/install/backups/20261030-174012-8dfa1e9d",
+    "rc17_return_preserved": true,
+    "limits": [
+      "Tauri absent, native companion built/installed",
+      "ambiguous logical-buffer emptiness remains fail-closed",
+      "historical Ctrl-U/Tab remains unexplained",
+      "snapshot comparison protects after first paste observation only",
+      "no full ready-Codex/Live/Voice host acceptance",
+      "no ARM/paid hosted Mac/notarization/public release",
+      "first installed verifier remains failed; independent affected-path probe passed"
+    ]
   }
 }

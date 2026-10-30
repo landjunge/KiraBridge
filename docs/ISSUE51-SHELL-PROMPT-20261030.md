@@ -1,5 +1,143 @@
 # Issue 51: leere macOS-Shells und ChatGPT-Eingabe · 30.10.2026
 
+## Neuester Stand: Teamauftrag vom 30.10.2026, Build tatsächlich installiert
+
+Der ausdrückliche Folgeauftrag autorisierte Fehlerbehebung, Teamarbeit, Tests,
+Build, produktive lokale Installation und Push. Produktcommit
+`4a2d32f7383196f2eb089fe6443c64322d3ea1a6`, isolierter Branch
+`fix/intel-terminal-install-20261030`, Basis PR54/`40a2e89`. Die nachfolgenden
+Nichtinstallationsaussagen sind historische Stände. Kein Merge nach main und
+kein öffentliches Release/Ersetzen vorhandener Release-Artefakte.
+
+### Ursache und Korrektur
+
+`visible_handoff.py` markierte den Eingabeversuch vor der letzten Sessionprüfung.
+Eine Ablehnung `visible_target_not_ready` vor Paste konnte so als
+`visible_handoff_unknown` eine Busy-Reservierung hinterlassen. Jetzt setzt der
+vorhandene `before_transport`-Callback die Markierung erst nach finaler Prüfung,
+unmittelbar vor Transport. Nachweislich frühe Ablehnungen senden nichts und
+sperren keine neue unabhängige ID. Dieselbe alte ID wird nicht erneut ausgeführt.
+Echte Unsicherheit nach Transportbeginn bleibt geschützt, ohne automatische Wiederholung.
+
+`session_manager.py` hatte einen Sonderpfad für ungebundene Agenten, der
+Idle-/Readiness-/Freigabe-/Intentprüfungen umging. Reproduktion: Busy-Codex,
+`require_idle=True`, dennoch Paste/Return, kein Intent-/Freigabeaufruf. Dieser
+Sonderpfad ist entfernt; Agenteneingaben brauchen die zentrale geprüfte Route.
+
+Die beobachtete Eingabe wird vor Return erneut verglichen; eine nach der ersten
+Paste-Beobachtung veränderte Eingabe wird auch mit erhaltenem Endmarker abgewiesen.
+Das beweist keine beliebigen Änderungen vor der ersten Beobachtung. Ein begrenztes
+Diagnoseereignis je Handoff enthält Zeit, ID, Dauer, Phase, Status und normalisierte
+Fehler-/Ursachencodes, keine Inhalte oder Geheimnisse. Annahme, Übergabe, Return
+und tatsächliche Ausführung bleiben getrennt; Busy wird nicht in Erfolg umgedeutet.
+
+Im privaten Snapshot: 26 visible_target_busy, vier visible_handoff_unknown und ein
+session_input_unknown-Task. Konkreter jüngster Installations-Handoff:
+`codex-kirabridge-install-20261030-1712`, attempt1, started=null, Grund
+visible_target_not_ready. Historische Ausführung wird daraus nicht rückwirkend
+freigegeben. Kein unbelegter Bezug zu Arbeitsverzeichnis oder Diagnosequote.
+
+Geänderte Implementierung: `visible_handoff.py`, `session_manager.py`,
+`scripts/build_desktop_app.py`; Regressionen in `test_visible_handoff.py`,
+`test_session_ports.py`, neu `test_desktop_builder.py`. Der Appbuilder schützt
+vorhandene/Symlink-Ziele, verlangt einen sauberen Commit und bindet RC/Commit/Swift-SHA.
+
+### Abnahme und tatsächlicher Build
+
+- Vollständiger Intel-Lauf mit exakt gepinnten ThreadDesk-/TollGate-Quellen:
+  **1912 bestanden, 1 übersprungen**, 317,28s. Ruff/Format (400 Dateien), Diffprüfung
+  und unabhängige Quellprüfung bestanden. Gezielte Teilläufe 121/92/4 bestanden;
+  überlappende Tests nicht addieren. Zwischenzeitliche gezielte Fehler wurden vor
+  dem vollständigen grünen Lauf korrigiert, nicht nachträglich als grün umetikettiert.
+- **23 echte Intel-/MCP-Checkpoints plus unabhängiges Cleanup bestanden**:
+  vorhandene Eingabe erhalten, Busy/falsche PID/Race geschützt, Idempotenz belegt.
+- Echter isolierter launchd-Upgrade-/Rollbacklauf vom veröffentlichten RC18-Wheel
+  zum neuen Paket und zurück bestanden, samt offener authentifizierter HTTP-
+  Completion-Abfrage ohne Replay. Konfiguration/Zugänge/Datenbankzeile/Benutzerdatei
+  erhalten, Testdienst abschließend unabhängig abwesend (113). `--upgrade-only`
+  behauptet keinen neuen Crash-/Fresh-Install-Gesamtlauf.
+- Vollständiges vorhandenes Dienstpaket und native App gebaut. **Tauri-Quellen
+  existieren in KiraBridge weder im aktuellen Stand noch in erreichbarer Historie.**
+  Tatsächlich gebaut/installiert wurde die bestehende Swift/Cocoa/WebKit-App.
+  Mach-O x86_64, strenge ad-hoc-Codesignprüfung bestanden, nicht notarisiert.
+  Bestehende WebKit-Sendable-Warnung dokumentiert, Compiler Exit0.
+
+| Lokales Artefakt | SHA256 |
+| --- | --- |
+| KiraBridge-macos.tar.gz | `a54a9bb4a919e9899b3dee024f0325f0d854ec594701387b52fa539f242d64dc` |
+| kirabridge-0.8.0rc18-py3-none-any.whl | `b6cf48b84ad28d69642ecb07affb55b28788791c61f7468020299a395c74de8c` |
+| App-Binärdatei KiraBridge | `b632ad409d96a4898bf8593f88bce30711adc19bb8eebedd6add828e4bebd2f4` |
+
+Artefakte liegen privat im unten genannten Backupverzeichnis unter `artifacts/`.
+Kein neues GitHub-Release, keine neue öffentliche Versionsnummer.
+
+### Installierter Stand und Ausführungsbelege
+
+Der vorhandene transaktionale Installer lief mit `--require-visible-terminal`
+in eigenem bestätigten Terminal4906/ttys003/PID19932. Kontrollierter Wechsel von
+PID18197 auf **Core-PID20011**, Instanz `e6b4ba7bb3f349c696ccf450177c288a`.
+**0.8.0rc18 aus Commit4a2d32f** ist installiert unter
+`~/.local/share/kirabridge/install/releases/0.8.0rc18-4a2d32f73831/`.
+Alle122 installierten Pythondateien entsprechen dem Wheel. Live-Quellhash
+`59d434c982c77d9787a0cc9426a9f6e8ba3dfca4d98366e49a91624014c649df`.
+Konfigurationshash unverändert
+`52747b8353bef4cc162997c34c30d8e759ca0691725d902f313ce4653cf903c2`.
+
+App `~/Applications/KiraBridge.app`, **PID20022**, sichtbares Fenster „KiraBridge“,
+keine Fehlersheets, Version/Quellcommit im Info.plist und Signatur geprüft.
+Console **PID20033**, neuer Runtimepfad durch launchd-PID/Argumente und tatsächlich
+geöffnete neue venv-Erweiterungen bestätigt. Die alte Console-Plist war positiv
+abwesend (113), Port8766 geschlossen; nach Sicherung wurden nur ihr Runtimeargument
+und der alte Freigabenstarter aktualisiert. Übrige Plistfelder/Console-Schlüssel
+blieben erhalten. Signierter HMAC-Probe bestanden. Eine anfängliche reine
+Pfadassertion scheiterte am kanonisierten Homebrew-Python.app-Pfad in ps;
+die korrigierte nur lesende Herkunftsprüfung bestand. Keine neue Produktänderung nötig.
+
+Echte HTTP-MCP-Initialisierung als **chatgpt**, 67 Tools/Health bestanden.
+Task `intel-terminal-installed-e2e-20261030`: Annahme, completed/attempt1, sichtbare
+Ausgabe/Exit0/ein append-only TTY-Beleg. Identische Wiederholung nach bewiesenem
+Erfolg bleibt completed/attempt1, Beleg weiterhin einmalig. Der folgende getrennte
+native Teil brach mit visible_focus_changed ab; der Gesamtlauf bleibt
+**failed_do_not_resend**, die unklare Probe wurde nicht wiederholt.
+
+Danach eigene leere/idle Shell ohne alten Probeinhalt beobachtet; reine Fokusprüfung
+ohne Eingabe bestanden. Neue unabhängige Probe `installed-separate-return-v2-20261030`:
+Paste sichtbar und noch kein Effekt; anschließend expliziter Return und erwartete
+sichtbare Ausgabe/Dateiinhalt bestanden. Diese mit `>` geschriebene Datei beweist
+allein keine Genau-einmal-Ausführung; dafür gilt der erste HTTP-Task mit append-only
+Beleg. Keine bestimmte externe Ursache des früheren Fokuswechsels wird behauptet.
+
+Eigenen Installations-Terminal nur im bestätigten leeren Idle-Zustand geschlossen,
+Abwesenheit unabhängig bestätigt. Vier vorher vorhandene Ansichten
+3033/3206/3546/4572 und sieben frisch erfasste Prozessidentitäten erhalten.
+Ein zwischen früheren Aufträgen hinzugekommener Operator-Tab blieb unangetastet.
+Neue App/Dienste laufen nach Fensterschluss weiter; MCP antwortet.
+
+### Sicherung, Rückweg, offene Punkte
+
+Privat: `~/.local/share/kirabridge/backups/intel-terminal-install-20261030/`:
+Gitbundle, alte App/Console-Dateien, aktuelle konsistente SQLite-Sicherung,
+Artefakte/Hashes, Installationssteuerung, Testlogs und getrennte fehlgeschlagene/
+bestandene Belege. Vollständige alte RC18-Laufzeit zusätzlich unter
+`../install-request-20261030-preflight/installed-rc18.tar` verifiziert.
+Transaktionaler Rückweg zur vorherigen RC18:
+`~/.local/share/kirabridge/install/backups/20261030-174012-8dfa1e9d/`.
+RC17-Rückweg `~/.local/share/kirabridge/install/backups/20261029-233225-bdaf86ef/`
+unverändert. Produktiver Rollback war nicht erforderlich; keine alte Datenbank
+zurückspielen. App/Console-Rückweg wird unabhängig vom Core geführt.
+
+**88 geschützte Dateien hashgleich; 55 unknown Tasks, 24 unknown/blocked Messagejobs
+und 7 unknown Handoffs vollständig zeilenhashgleich.** Keine historische Bereinigung,
+Freigabe oder Doppelzustellung. Keine OS-Rechte geändert oder umgangen.
+
+Offen bleiben Tauri (keine Quellen), allgemeine logische Eingabeleerheit bei
+identischen Anzeigedaten, historischer einzelner Ctrl-U/Tab-Befund und vollständige
+Ready-Codex-/Live-/Voice-Host-Abnahme. ARM/Hosted-Mac/Notarisierung nicht abgenommen.
+PR54 bleibt Draft, Issue51 offen; lokale Installation war durch neuen Auftrag autorisiert.
+Strukturierte Belege stehen unter `intel_terminal_install_20261030` im bestehenden JSON.
+
+## Historischer Einstieg: vorherige Aufträge
+
 Auftrag `channel-fa23a557d4a44e8da2e2be149c9d2564`, Konversation
 `shell-control-issue51-oct30`, Nachricht `0416af39-7e3a-4ae5-8849-46be8c9dcf7f`.
 Empfang gelesen, Receipt `184202e8-c676-459e-adb0-699743d6d3a9` bestätigt.
