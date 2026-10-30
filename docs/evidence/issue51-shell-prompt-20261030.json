@@ -3159,6 +3159,24 @@
       "no full ready-Codex/Live/Voice host acceptance",
       "no ARM/paid hosted Mac/notarization/public release",
       "first installed verifier remains failed; independent affected-path probe passed"
-    ]
+    ],
+    "github_ci": {
+      "run_id": 41090776653,
+      "head": "4a2d32f7383196f2eb089fe6443c64322d3ea1a6",
+      "overall": "failure",
+      "url": "https://github.com/landjunge/KiraBridge/actions/runs/41090776653",
+      "linux311": {
+        "passed": 1889,
+        "skipped": 24,
+        "job_id": 124183770895
+      },
+      "linux313": {
+        "passed": 1889,
+        "skipped": 24,
+        "job_id": 124183770349
+      },
+      "hosted_macos_intel_arm": "0 steps, not started because account payments/spending limit; not passed; no manual rerun/billing change",
+      "head_note": "later documentation-only commits do not alter tested/installed product source"
+    }
   }
 }

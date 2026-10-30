@@ -71,6 +71,15 @@ vorhandene/Symlink-Ziele, verlangt einen sauberen Commit und bindet RC/Commit/Sw
 Artefakte liegen privat im unten genannten Backupverzeichnis unter `artifacts/`.
 Kein neues GitHub-Release, keine neue öffentliche Versionsnummer.
 
+### GitHub-CI auf dem tatsächlichen Produktcommit
+
+[Verify41090776653](https://github.com/landjunge/KiraBridge/actions/runs/41090776653)
+auf exakt4a2d32f: Linux3.11/3.13 jeweils **1889 bestanden, 24 übersprungen**,
+Ruff/Format/Build grün. Gesamtstatus trotzdem **failure**: beide Hosted-Mac-Jobs
+(Intel/ARM) starteten mit0Schritten wegen Kontozahlung/Ausgabenlimit nicht.
+Kein manueller Hosted-Rerun, keine Billingänderung und kein bestandenes Plattformgate.
+Der spätere reine Dokumentationsstand ändert die getestete/installierte Quelle nicht.
+
 ### Installierter Stand und Ausführungsbelege
 
 Der vorhandene transaktionale Installer lief mit `--require-visible-terminal`
