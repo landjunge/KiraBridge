@@ -10,7 +10,7 @@ from kirabridge.session_manager import SessionInput
 from kirabridge.visible_binding import (
     binding_still_present,
     catalog_can_replace,
-    identities_disjoint,
+    distinct_window_processes,
     load_refresh,
     replacement_binding,
     save_refresh,
@@ -526,12 +526,13 @@ class VisibleHandoffs:
             original = VisibleTerminalBinding.model_validate_json(row["binding"])
         except (ValueError, TypeError):
             return False
-        if not identities_disjoint(original, binding):
+        if not distinct_window_processes(original, binding):
             return False
         if observed_sessions is not None and binding_still_present(original, observed_sessions):
             return False
-        # Session input has no overlay yet. Only a full OS inventory may release
-        # the lock; a missing catalog row is not absence.
+        # A tty can be reused as soon as its old window closes. That name is not
+        # the session identity. Only a full native window inventory plus absence
+        # of both original PIDs may release the lock, never a missing catalog row.
         try:
             await self.sessions.prove_original_target_gone(principal, original.model_dump())
         except BridgeError:
