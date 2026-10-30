@@ -64,6 +64,7 @@ def visible(bridge, config, monkeypatch):
             if transport.get("target") == "codex"
             else "╭\n│ ❯ " + args.text + "\n╰"
         )
+        return {"paste_event_sent": True, "return_sent": False, "agent_confirmed": False}
 
     async def submit(principal, pane, pid, *, expected_screen=None):
         transport["calls"].append("return")
@@ -73,6 +74,8 @@ def visible(bridge, config, monkeypatch):
             raise UncertainExecution("uncertain_return", "Unknown return delivery")
         target = transport.get("target", "grok")
         messages = bridge.messages.receive(target)["messages"]
+        if not addressed:
+            return  # Literal session.input sends no work message and requires no ACK.
         message = next(m for m in messages if m["id"] == addressed[1]) if addressed else messages[0]
         if transport["ack"]:
             bridge.messages.ack(target, message["id"], message["receipt"])
@@ -235,15 +238,22 @@ async def callback(evidence):
     pass
 
 
-async def test_eve_session_input_returns_actual_confirmed_reply_in_conversation(visible, config):
+async def test_eve_literal_session_input_reports_delivery_without_claiming_a_reply(
+    visible, config, monkeypatch
+):
+    from test_visible_selection import new_native_selection, new_row
+
     from kirabridge.bridge_core.config import GrokConnectorConfig
     from kirabridge.grok_connector.conversation import result_for_conversation
 
     bridge, transport = visible
     config.grok_connector = GrokConnectorConfig(enabled=True, public_origin="https://voice.example")
+    row = new_row()
+    row["processes"][-1].update(name="grok", image="/bin/grok")
+    await new_native_selection(bridge, monkeypatch, row)
     value = request(
         "session.input",
-        {"pane_id": "terminal:100:ttys001", "expected_pid": 123, "text": "First line\nSecond line"},
+        {"pane_id": row["pane_id"], "expected_pid": 900, "text": "First line\nSecond line"},
     )
     async with bridge:
         bridge.prepare("grok_app", value)
@@ -251,9 +261,13 @@ async def test_eve_session_input_returns_actual_confirmed_reply_in_conversation(
         assert task["state"] == "completed", task
         result = await result_for_conversation(bridge, "grok_app", task)
     returned = result["conversation_return"]
-    assert returned["final"] and not returned["continue_required"]
-    assert returned["text"] == "independent review"
-    assert returned["scope"] == "addressed_agent_reply" and returned["next_call"] is None
+    assert not returned["final"] and returned["continue_required"]
+    assert "Eine Antwort ist noch nicht bestätigt" in returned["text"]
+    assert returned["scope"] == "terminal_input_delivery"
+    assert returned["next_call"] == {
+        "tool": "session_read",
+        "arguments": {"pane_id": row["pane_id"], "expected_pid": 900},
+    }
     assert returned["audio_playback"] == "not_observed_by_bridge"
     assert transport["calls"] == ["insert", "return"]
 
@@ -571,17 +585,18 @@ def test_persisted_configuration_cannot_disable_visible_route():
 
 
 @pytest.mark.parametrize("sender", ["chatgpt", "grok_app", "codex", "grok"])
-async def test_raw_cli_input_also_enters_central_route(visible, monkeypatch, sender):
+async def test_raw_cli_input_uses_the_literal_owner_for_every_sender(visible, monkeypatch, sender):
     bridge, transport = visible
     called = []
 
-    async def central(task, args, *callbacks, binding_override=None):
-        assert binding_override.pane_id == "terminal:100:ttys001"
-        assert binding_override.agent_pid == 456
-        called.append((task["id"], task["principal"], args.agent, args.prompt))
-        return {"success": True}
+    async def literal(owner, task, args, target, binding, *callbacks):
+        assert owner is bridge
+        assert binding.pane_id == "terminal:100:ttys001"
+        assert binding.agent_pid == 456
+        called.append((task["id"], task["principal"], target, args.text))
+        return {"submitted": True}
 
-    monkeypatch.setattr(bridge.visible_handoffs, "execute", central)
+    monkeypatch.setattr("kirabridge.literal_session_input.execute", literal)
     task = {
         "id": "raw-input",
         "principal": sender,
@@ -592,7 +607,7 @@ async def test_raw_cli_input_also_enters_central_route(visible, monkeypatch, sen
             "text": "explicit instruction",
         },
     }
-    assert (await bridge.execute(task, callback, callback))["success"]
+    assert (await bridge.execute(task, callback, callback))["submitted"]
     assert called == [("raw-input", sender, "grok", "explicit instruction")]
     assert not transport["calls"]
 

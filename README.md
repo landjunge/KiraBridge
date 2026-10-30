@@ -34,6 +34,14 @@ funktioniert unabhängig von ThreadDesk und anderen Integrationen.
   Optionale ThreadDesk-Datei-/Wissensfunktionen, TollGate-Stopbelege und neutrale
   Agent-Authority-Beobachtungen benötigen jeweils ihre tatsächliche Konfiguration.
 
+Direkte Terminaleingaben wie `/resume` verwenden `task_request` mit
+`operation="session.input"` und den aktuellen `pane_id`-/`expected_pid`-Werten.
+`text` wird unverändert eingefügt; `submit=true` sendet anschließend einmal Enter,
+`submit=false` belässt den Text im Eingabefeld. Agentenaufträge verwenden
+`agent.execute` oder `message_send(kind="work")` mit Empfangs- und Ergebnisprotokoll.
+Die [lokale RC20-Reparatur und ihre Tests](docs/RC20-TERMINAL-INPUT-20261030.md)
+dokumentieren den Stand vor einer gesondert freizugebenden Installation.
+
 [Architektur](docs/DEVELOPMENT_PLAN.md) · [Vollständige Datei-/Logreads](docs/READ-FULL-FILES.md)
 · [Queuevertrag](docs/QUEUE-MANAGEMENT.md) · [RC18-Änderungen](docs/RELEASE-0.8.0rc18.md)
 

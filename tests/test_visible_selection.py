@@ -232,7 +232,7 @@ async def test_explicit_current_agent_handle_enters_current_window_without_mutat
     bridge, transport = visible
     transport.update(target="codex", text="› ")
     row = new_row()
-    await new_selection(bridge, monkeypatch, row)
+    await new_native_selection(bridge, monkeypatch, row)
     before = config.visible_handoffs.bindings["codex"].model_dump()
     result = await bridge.execute(
         {
@@ -248,10 +248,10 @@ async def test_explicit_current_agent_handle_enters_current_window_without_mutat
         callback,
         callback,
     )
-    assert result["success"] and transport["calls"] == ["insert", "return"]
-    stored = bridge.visible_handoffs.status("chatgpt", "fresh-explicit")
-    assert stored["binding"]["pane_id"] == row["pane_id"]
-    assert stored["binding"]["agent_pid"] == 901
+    assert result["submitted"] and transport["calls"] == ["insert", "return"]
+    assert result["agent_confirmed"] is False
+    assert not bridge.store.db.execute("SELECT 1 FROM visible_handoffs").fetchone()
+    assert not bridge.store.db.execute("SELECT 1 FROM messages").fetchone()
     assert config.visible_handoffs.bindings["codex"].model_dump() == before
     assert bridge.sessions._selection.get() is None
     # Automatic/default delivery still uses the old assignment; it never silently follows.

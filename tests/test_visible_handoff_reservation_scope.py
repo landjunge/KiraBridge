@@ -1,6 +1,7 @@
 """Explicit native resources do not borrow another pane's unknown delivery lock."""
 
 import pytest
+from conftest import request
 from test_visible_handoff import callback, visible  # noqa: F401
 from test_visible_selection import new_native_selection, new_row, new_selection
 
@@ -21,7 +22,7 @@ from kirabridge.message_manager import MessageSend
         "unverified-native",
     ],
 )
-async def test_submitted_explicit_handoff_preserves_other_unknown_resource(
+async def test_submitted_literal_input_preserves_other_unknown_resource(
     visible,  # noqa: F811
     config,
     monkeypatch,
@@ -88,32 +89,39 @@ async def test_submitted_explicit_handoff_preserves_other_unknown_resource(
             "require_idle": True,
         },
     }
-    if reservation == "independent":
-        result = await bridge.execute(task, callback, callback)
-        assert result["success"] and transport["calls"] == ["insert", "return"]
-        assert bridge.visible_handoffs.status("chatgpt", task["id"])["state"] == "completed"
-        # A positively completed new task can be read again, never pasted again.
-        repeated = await bridge.execute(task, callback, callback)
-        assert repeated["success"] and transport["calls"] == ["insert", "return"]
-    else:
-        with pytest.raises(BridgeError) as error:
-            await bridge.execute(task, callback, callback)
-        expected = (
-            "handoff_conflict"
-            if reservation == "same-task"
-            else "visible_selection_required"
-            if reservation == "unverified-native"
-            else "visible_target_busy"
+    async with bridge:
+        if reservation == "independent":
+            value = request("session.input", task["args"], task_id=task["id"])
+            bridge.prepare("chatgpt", value)
+            completed = await bridge.tasks.wait("chatgpt", value.task_id, timeout=5)
+            assert completed["state"] == "completed", completed
+            result = completed["result"]
+            assert result["submitted"] and result["return_sent"]
+            assert result["agent_confirmed"] is False
+            assert transport["calls"] == ["insert", "return"]
+            # The durable dispatcher returns the original result for this key;
+            # the executor is never called directly a second time.
+            repeated = bridge.submit("chatgpt", value, "")
+            assert repeated["state"] == "completed"
+            assert repeated["result"] == result
+            assert transport["calls"] == ["insert", "return"]
+        else:
+            with pytest.raises(BridgeError) as error:
+                await bridge.execute(task, callback, callback)
+            expected = (
+                "visible_selection_required"
+                if reservation == "unverified-native"
+                else "visible_target_busy"
+            )
+            assert error.value.code == expected and not transport["calls"]
+        after = dict(
+            bridge.store.db.execute(
+                "SELECT * FROM visible_handoffs WHERE id=?", (identifier,)
+            ).fetchone()
         )
-        assert error.value.code == expected and not transport["calls"]
-    after = dict(
-        bridge.store.db.execute(
-            "SELECT * FROM visible_handoffs WHERE id=?", (identifier,)
+        assert after == before
+        assert not bridge.store.db.execute(
+            "SELECT 1 FROM visible_handoff_events WHERE id=?", (identifier,)
         ).fetchone()
-    )
-    assert after == before
-    assert not bridge.store.db.execute(
-        "SELECT 1 FROM visible_handoff_events WHERE id=?", (identifier,)
-    ).fetchone()
-    assert bridge.messages.get("chatgpt", message["id"])["acknowledged"] is None
-    assert config.visible_handoffs.bindings["codex"].model_dump() == original_default
+        assert bridge.messages.get("chatgpt", message["id"])["acknowledged"] is None
+        assert config.visible_handoffs.bindings["codex"].model_dump() == original_default

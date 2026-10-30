@@ -1,0 +1,145 @@
+"""Paste literal CLI input and, when requested, send exactly one guarded Return.
+
+The durable session.input task owns this attempt. Agent work messages keep their
+separate receipt/reply protocol; literal input never creates such a message.
+"""
+
+import re
+
+from kirabridge.bridge_core.models import BridgeError, UncertainExecution
+from kirabridge.visible_readiness import display_text, input_view
+
+
+def _without_viewport_padding(suffix):
+    """Discard only final whitespace-only display rows, not payload or footer text."""
+    lines = suffix.split("\n")
+    while lines and not lines[-1].strip(" \t"):
+        lines.pop()
+    return "\n".join(lines)
+
+
+def _codex_renderer_suffix(suffix):
+    """Pin footer rows while allowing Codex to show/hide its inline F2 badge."""
+    rows = []
+    for line in _without_viewport_padding(suffix).split("\n"):
+        badge = re.fullmatch(r"([ \t]*GPT-\S+[^\n]*?)[ \t]+⚠ [0-9]+ warnings? · f2 to view", line)
+        # Only the exact optional badge is decoration. The same model/path row
+        # must remain, in order; no standalone or added footer row is discarded.
+        rows.append(badge[1] if badge else line)
+    return "\n".join(rows)
+
+
+def insertion_observed(target, raw, text, before):
+    """Recognize the exact payload in the current widget, never a history match."""
+    cleaned, controls = display_text(raw)
+    previous, previous_controls = display_text(before)
+    if controls or previous_controls:
+        return False
+    view = input_view(target, cleaned)
+    previous_view = input_view(target, previous)
+    if target == "codex":
+        marker = re.match(r"[ \t]*› ?", view)
+        previous_marker = re.match(r"[ \t]*› ?", previous_view)
+        if marker is None or previous_marker is None:
+            return False
+        content = view[marker.end() :]
+        # Only the input row may change. Pin the actual ready widget's suffix,
+        # including every footer line, before pasting. A payload continuation
+        # resembling GPT/status/navigation chrome must never be discarded.
+        newline = previous_view.find("\n")
+        suffix = previous_view[newline:] if newline >= 0 else ""
+        # Codex can collapse multiline pasted text. The empty pre-state,
+        # clipboard transaction and exact count bind this view to this paste.
+        collapsed = f"[Pasted Content {len(text)} chars]"
+        for expected in (text, text.replace("\n", "\n  "), collapsed):
+            if not content.startswith(expected):
+                continue
+            actual_suffix = content[len(expected) :]
+            if actual_suffix and not actual_suffix.startswith("\n"):
+                continue
+            if _codex_renderer_suffix(actual_suffix) == _codex_renderer_suffix(suffix):
+                return True
+        return False
+    if target == "grok":
+        marker = re.search(r"(?m)^[ \t]*│[ \t]*❯ ?", view)
+        if marker is None:
+            return False
+        previous_bottom = re.search(r"(?m)^[ \t]*╰[─┴╯ \t]*$", previous_view)
+        bottom = re.search(r"(?m)^[ \t]*╰[─┴╯ \t]*$", view)
+        if (
+            previous_bottom is None
+            or bottom is None
+            or view[bottom.start() :] != previous_view[previous_bottom.start() :]
+        ):
+            return False
+        content = view[marker.end() : bottom.start()].removesuffix("\n")
+        # Borders are display decoration, not user input. Keep all interior
+        # characters, so an added or changed continuation cannot be submitted.
+        lines = content.splitlines()
+        normalized = "\n".join(re.sub(r"[ \t]*│[ \t]*$", "", line) for line in lines)
+        return normalized == text
+    return False
+
+
+async def execute(bridge, task, args, target, binding, running, progress):
+    principal = task["principal"]
+    policy = bridge.security.principal(principal, "agent.execute")
+    if target not in policy.agents:
+        raise BridgeError("agent_denied", "Selected agent is not granted")
+    bridge.security.principal(principal, "terminal.execute")
+    async with bridge.sessions.agent_selection(principal, target, binding):
+        await bridge.visible_handoffs.reconcile_target_reservations(
+            principal, target, binding, explicit_paste_task_id=task["id"]
+        )
+
+        def evidence(**details):
+            return {
+                "evidence_type": "visible_literal_input",
+                "terminal_input_attempted": True,
+                "pane_id": args.pane_id,
+                "expected_pid": args.expected_pid,
+                "agent_pid": binding.agent_pid,
+                "return_sent": False,
+                "agent_confirmed": False,
+                "automatic_retry": False,
+                **details,
+            }
+
+        async def paste_attempted():
+            await running(evidence(phase="inserting"))
+
+        approved = bridge.tasks.input_policy.dispatch(principal, args, task["id"])
+        before = (
+            await bridge.visible_handoffs.check_target(principal, target, binding, ready=True)
+            if args.submit
+            else None
+        )
+        result = await bridge.sessions.insert(
+            principal,
+            approved.model_copy(update={"submit": False}),
+            before_transport=paste_attempted,
+        )
+        if args.submit:
+            view = await bridge.visible_handoffs.check_target(principal, target, binding)
+            if not insertion_observed(target, view["text"], approved.text, before["text"]):
+                raise UncertainExecution(
+                    "visible_insert_unknown", "Literal insertion not verified; no Return sent"
+                )
+            await progress(evidence(phase="submitting", paste_event_sent=True))
+            # This transport checks both native identities and the exact screen
+            # again. A menu after Return is a valid result; no agent ACK is due.
+            await bridge.sessions.press_return(
+                principal, args.pane_id, args.expected_pid, expected_screen=view["text"]
+            )
+            result = {**result, "return_sent": True}
+            await progress(evidence(phase="sent", paste_event_sent=True, return_sent=True))
+    bridge.tasks.input_policy.sent(principal, task["id"])
+    return {
+        **result,
+        "pane_id": args.pane_id,
+        "expected_pid": args.expected_pid,
+        "input_handed_to_transport": True,
+        "submitted": args.submit,
+        "execution_confirmed": False,
+        "scope": "literal terminal input; no agent work message or acknowledgement",
+    }

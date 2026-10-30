@@ -109,6 +109,67 @@ def test_idle_protocol_allows_empty_prompt_with_current_new_activity_footer(bind
     assert result["state"] == "ready" and result["input_empty"]
 
 
+@pytest.mark.parametrize(
+    "navigation",
+    [
+        "New activity · ↓ Back to bottom · esc",
+        "New activity · enter/esc latest",
+        "New activity · enter/esc latest    ⚠ 1 warning · f2 to view",
+        "New activity · enter/esc latest    ⚠ 3 warnings · f2 to view",
+    ],
+)
+def test_transcript_navigation_does_not_hide_a_current_empty_composer(binding, navigation):
+    text = navigation + "\n\n" + EMPTY + FOOTER
+    result = checked(text, binding)
+    assert result["state"] == "ready" and result["input_empty"]
+
+
+@pytest.mark.parametrize(
+    "warnings", ["", "    ⚠ 1 warning · f2 to view", "    ⚠ 3 warnings · f2 to view"]
+)
+def test_current_new_activity_footer_does_not_require_a_rollout_binding(binding, warnings):
+    text = (
+        "New activity · ↓ Back to bottom · esc\n\n"
+        + EMPTY
+        + FOOTER
+        + "New activity · enter/esc latest"
+        + warnings
+        + "\n"
+    )
+    assert checked(text, binding)["state"] == "ready"
+
+
+@pytest.mark.parametrize("protocol", [None, {"state": "idle"}, {"state": "working"}])
+def test_transcript_navigation_cannot_override_current_activity_or_a_dialog(binding, protocol):
+    navigation = "New activity · ↓ Back to bottom · esc\n"
+    for text in (
+        WORKING + "\n" + navigation + "\n" + EMPTY + FOOTER,
+        navigation + "\n» Ask Codex to do anything" + FOOTER,
+        navigation + "\n› existing draft" + FOOTER,
+        navigation + "\n" + EMPTY + "\nApproval required\n" + FOOTER,
+        navigation + "\n" + EMPTY + "\n  tab to queue message\n",
+    ):
+        assert not checked(text, binding, protocol)["ready"]
+
+
+def test_old_transcript_navigation_is_not_current_activity(binding):
+    text = "New activity · enter/esc latest\n\n• Finished reply.\n\n" + EMPTY + FOOTER
+    assert checked(text, binding)["state"] == "ready"
+
+
+@pytest.mark.parametrize(
+    "navigation",
+    [
+        "Back to bottom",
+        "enter/esc latest",
+        "New activity · Back to bottom · unknown dialog",
+        "New activity · enter/esc latest    Approval required",
+    ],
+)
+def test_unrecognized_navigation_is_not_an_idle_proof(binding, navigation):
+    assert not checked(navigation + "\n\n" + EMPTY + FOOTER, binding)["ready"]
+
+
 def test_old_scroll_quotation_does_not_poison_current_idle_widget(binding):
     text = '• Früher stand hier "Back to bottom".\n\n• Fertige Antwort.\n\n' + EMPTY + FOOTER
     assert checked(text, binding, {"state": "idle"})["state"] == "ready"

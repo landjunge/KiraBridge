@@ -71,6 +71,8 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
         "check message_channel_status and message_get for actual evidence. "
         "For visible macOS terminals use session_catalog/session_read and session_open. "
         "Send input only to an exact pane_id and expected_pid using operation session.input. "
+        "session.input sends literal text and slash commands; submit=false pastes without Return. "
+        "Use agent.execute or message_send(kind=work) for addressed agent assignments. "
         "session_input_policy is an optional confirmation buffer, not a terminal enable switch. "
         "agent_status includes existing interactive_terminal_sessions. Cached clients can use "
         "task_request operations session.catalog (empty arguments) and session.read "

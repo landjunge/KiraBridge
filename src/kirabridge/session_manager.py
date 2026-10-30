@@ -62,6 +62,8 @@ class SessionSelect(SessionReference):
 
 
 class SessionInput(SessionReference):
+    """Literal terminal text; submit sends one Return after a verified CLI paste."""
+
     text: str = Field(min_length=1, max_length=16384)
     submit: bool = True
     require_idle: bool = False
