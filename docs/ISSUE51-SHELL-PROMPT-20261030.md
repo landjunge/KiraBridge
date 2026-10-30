@@ -1,5 +1,145 @@
 # Issue 51: leere macOS-Shells und ChatGPT-Eingabe · 30.10.2026
 
+## Neuester Stand: RC19 installiert, Terminal-Live-Gate fehlgeschlagen, kein Release
+
+Der neue Teamauftrag verlangt gezielte Reparatur von Terminal und ThreadDesk-Discovery.
+Der folgende ausdrückliche Auftrag beschränkt die Fortsetzung auf Build/Installation/
+Live-Abnahme, ohne neue Entwicklungsrunde oder unnötige Wiederholungstests. Push und
+Release sind an erfolgreiche Abnahme gebunden; bei Kernfehler soll kein fertiges Release
+erscheinen. Daher **kein RC19-Release, kein neuer Download-/Installationsbefehl als
+funktionierend ausgegeben und kein Push des Kandidaten**. Der vorhandene README-Befehl
+bleibt beim tatsächlich veröffentlichten RC18. Neue lokale Quelle:
+`8538ec80744de9f90821c9bbe763179d7a54fb75`, Branch
+`fix/terminal-dynamic-tools-20261030`, Version `0.8.0rc19`.
+Ein lokaler Commit vor dem Build war für den bestehenden quellgebundenen Builder nötig.
+
+### Vorbereitete Fehlerkorrekturen und Prüfungen
+
+Codex verwendet im laufenden Turn den Composer-Marker **» U+00BB**, während
+abgeschickte alte Texte **› U+203A** behalten. Der bisherige Parser fand nur › und
+klassifizierte damit alten Text als aktuelle Eingabe. Aktuelle Aufnahmen3033/3206
+belegen das;3546 war im früheren Beobachtungszeitpunkt tatsächlich bereit.
+Der neue Parser erkennt den aktuellen »-Composer. Leer während laufender Arbeit
+bleibt **working und nicht ready**; vorhandener Text und widersprüchlicher Zustand
+bleiben geschützt. Die Regex-Escape-Vermutung wurde durch direkte Prüfung widerlegt.
+
+ThreadDesk war konfiguriert, aber `dynamic_read_proxy` fehlte, also Defaultfalse.
+Zusätzlich konnten bisher nur explizit lesende Tools weitergereicht werden. Der neue
+explizite `dynamic_tool_proxy` ermöglicht alle angebotenen und aktuell autorisierten
+Tools mit frischer Schema-/Berechtigungsprüfung. Mutationen verlangen stabile IDs,
+dauerhafte Tasks und Vertragsprüfung; verlorene/fehlerhafte Antworten nach möglichem
+Effekt bleiben UNKNOWN ohne Replay. Eine erhaltene Antwort ist keine allgemeine
+Effektbestätigung. Kein ThreadDesk-Nachbau und keine Änderung seiner Codex-Sitzung.
+Die konfigurierte gepinnte ThreadDesk-MCP-Quelle770bbc9 bietet34 Tools an; dies ist
+keine Behauptung über alle uncommitteten Funktionen des getrennten ThreadDesk-Projekts.
+Research Monitor unter `/Users/landjunge/KiraBridge-Test-Monitor` liefert vorhandene
+Ressourcenmessungen, keinen Beweis einer Terminal-/MCP-Ursache; kein neuer Messloop.
+
+Code: `visible_readiness.py`, `threaddesk_dynamic.py`, Config/Modelle/Operations/
+Bridge und MCP-Server/Proxy. Gezielte Regressionen liegen in den vorhandenen Tests
+sowie `test_codex_queue_widget.py` und `test_threaddesk_dynamic_lifecycle.py`.
+Codex-Verwandte151 bestanden; zusätzliche Route/Readiness54, davon52 überlappend.
+Dynamic31 Unitfälle und6 eindeutige Lifecyclefälle bestanden; kein behaupteter
+abschließender gemeinsamer37er-Lauf. MCP/Berechtigung/Readiness50 bestanden.
+Ruff/Format403Dateien und Diffprüfung bestanden. **Keine Gesamtsuite wiederholt.**
+
+### Tatsächlicher Build und kontrollierte Installation
+
+Native Swift/Cocoa/WebKit-App und vollständiges vorhandenes Dienstpaket aus exakt
+8538ec8 gebaut. x86_64-Mach-O, strenge ad-hoc-Signaturprüfung bestanden; bekannte
+WebKit-Concurrency-Warnung, Compiler Exit0. Keine Notarisierung oder ARM-Abnahme.
+
+| Artefakt | SHA256 |
+| --- | --- |
+| KiraBridge-macos.tar.gz | `e1ff2174924ffd04c3b609731db874b8a8865f9eb26c79877a358040b468ed0a` |
+| kirabridge-0.8.0rc19-py3-none-any.whl | `1bbff209abbddc9444e51f9a4351032f3c943231d854dac774f5af507d7f931e` |
+| App-Binärdatei | `dce17d25620a636006ec95e5ea3dc34cdabff8815dd3556821f54569689a74ad` |
+
+Vorher vollständige aktuelle RC18-Laufzeit/venv, App, Konfiguration, Schlüssel,
+Dienstdefinitionen und konsistente SQLite-Sicherung lokal erstellt und rückgeprüft.
+Nur eindeutig eigene AppPID20022 und ConsolePID20033 kontrolliert beendet; keine
+Eingabe oder Stop-Anweisung an andere Codex-Sitzungen. Der vorhandene transaktionale
+Installer lief in eigenem bestätigten sichtbaren Terminal5358/ttys004/PID28934 mit
+`--require-visible-terminal`. Erst RC19 mit originalkompatibler Konfiguration aktiviert,
+danach ausschließlich die beiden Discovery-Flags unter Hash-/Inode-Prüfung ergänzt,
+Core mit bestehenden Ownership-/Idle-Guards gestoppt und neu gestartet. Beide
+Dienstdefinitionen und App stammen aus der neuen Runtime. Keine Sicherheitsrechte
+umgangen; Zugangsdaten unverändert.
+
+Installiert: **RC19-Kandidat**, `~/Applications/KiraBridge.app`, AppPID29090,
+CorePID29067, ConsolePID29114. Dienstpfad:
+`~/.local/share/kirabridge/install/releases/0.8.0rc19-8538ec80744d/`.
+Alle122 Pythondateien entsprechen dem gebauten Wheel. Live-Quellhash
+`31765b83324db2ac4276a037ffbee372c6e300bfcb25d2e957c3888d9ec16942`.
+Konfiguration nach exakt den eigenen Flags:
+`0dc8eb5952fe4d986c152d38e1658e06de711d6b1f91ccc9745b184d1adb6370`.
+Ein kritischer Installationsfehler hätte den gesicherten Rückweg ausgelöst; produktiver
+Rollback war nicht nötig. Die sichere Terminalablehnung ist kein Ausführungsbeleg.
+
+### Echte Live-Abnahme: ein Gate bestanden, ein Gate nicht bestanden
+
+**ThreadDesk PASS:** echte authentifizierte HTTP-MCP-Verbindung als chatgpt,67 Tools
+am Bridge-Endpunkt. Dynamiccatalog enabled=true/modeauthorized_tools, **34 angebotene
+Schemas vollständig mit der konfigurierten Quelle abgeglichen** (12 lesende/22
+konservativ mutierende). Ein schema-validierter echter `get_thread(id188ce4729a62)`
+lieferte erwartete ID, Titel, Revision439 und Status; unabhängig gegen Threaddatei
+geprüft. Thread und aktive Threadzustandsdatei bytegleich, kein Umschalten.
+Weiterer frischer Katalog identisch; Flags sind dauerhaft in der Konfiguration und
+nach dem tatsächlichen RC19-Neustart geladen. Keine Live-Mutation aller22 Tools
+behauptet; deren Wiederholungs-/Timeout-/Restart-Schutz ist gezielt regressionsgeprüft.
+Katalogschemahash `cd6f3adf91d24a66a0547eb6632a26a30f3ed300f065a2b2912228cd02959336`.
+
+**Terminal FAILED vor Dispatch:** nach reinem Fokusieren des eigenen bestätigten
+Fensters verweigerte `prepare_shell_paste` mit `visible_input_not_empty`. Es wurde
+kein Task `rc19-installed-e2e-20261030` angelegt, kein Text eingefügt, kein Return
+und kein Testpayload ausgeführt. Keine Wiederholung oder Umgehung vorgenommen.
+Reine anschließende Leseprüfung im selben eigenen Fenster belegt:
+
+- `tab.contents()`:2014 Zeichen, älterer Installationsausschnitt, keine kontrollierte
+  Promptzeile; endet in einer Abhängigkeitsausgabe. Predicatefalse.
+- `tab.history()`:3434 Zeichen, endet in der aktuellen exakten leeren kontrollierten
+  Promptzeile; Predicatetrue.
+
+Dies ist ein belegter Unterschied der gelesenen Darstellungen/Ansichten. Der
+bestehende Vorprüfpfad verwendet `contents()`, also wurde die tatsächliche sichtbare
+Einfüge-/Return-/Ergebnisstrecke nicht abgenommen. Keine erfolgreiche Ausführung aus
+Shell-Idle, Fokus oder leerer History abgeleitet. Kein weiterer Quellfix, kein neuer
+Testloop und **kein fertiges Release gemäß ausdrücklicher Betreiberbedingung**.
+Nächster eng begrenzter Entwicklungsbedarf wäre ein konsistenter aktueller
+Ansichts-/Inputnachweis in Python UND nativer Transportprüfung; kein blindes Trimmen
+oder bloßer History-Fallback. Dies wurde in diesem Abschlusslauf nicht implementiert.
+
+### Erhalt, Rückweg und Git-Status
+
+Eigenes Fenster nur nach erneut stabiler aktueller leerer History und bestätigter
+Shell-only-/PID-/TTY-Identität geschlossen und unabhängig abwesend geprüft. Während
+des Laufs verschwanden ursprüngliche fremde Ansichten5342/5344 samt Prozessen vor
+unserem Close; Verursacher nicht belegt. Deshalb kein pauschaler Nachweis des gesamten
+ursprünglichen Inventarerhalts. Die unmittelbar vor unserem Close vorhandenen
+anderen Ansichten3033/5346 und ihre vier Prozessidentitäten blieben dabei erhalten.
+Keine Aktion an verschwundene fremde Fenster gerichtet. **55unknownTasks,
+24unknown/blockedJobs und7unknownHandoffs vollständig zeilenhashgleich.**
+
+Private Sicherung/Artefakte/Installationssteuerung und getrennte Live-Belege:
+`~/.local/share/kirabridge/backups/terminal-dynamic-tools-20261030/`.
+Transaktionaler RC18-Rückweg:
+`~/.local/share/kirabridge/install/backups/20261030-185924-0015dd2e/`.
+Die alte RC18-Definition verwirft das neue Feld `dynamic_tool_proxy`: **vor Start
+der alten Runtime ausschließlich die eigene Deltaänderung mit dem hashgebundenen
+CONFIG_REVERT.py zurücknehmen**, dann den passenden vorhandenen Installer-Rollback
+im bestätigten eigenen Terminal nutzen. Bei fremden Änderungen abbruch statt
+Überschreiben; App/Console separat aus gesicherter eigener Definition zurückführen.
+Keine Datenbank restaurieren. RC17-Rückweg bleibt vorhanden. Ein tatsächlicher
+produktiver Rollback wurde nicht durchgeführt und nicht als bestanden ausgegeben.
+
+Der Kandidat bleibt lokal installiert und geschützt ablehnend; ThreadDesk funktioniert.
+Release-Link: **keiner**, RC19 nicht veröffentlicht. Neuer Ein-Befehl-Download nicht
+als funktionierend ausgegeben. Lokale Build-/Belegcommits werden wegen fehlender
+vollständiger Abnahme nicht als fertiger Stand nach GitHub gepusht. Kein main-Merge.
+Strukturierter Nachtrag im bestehenden JSON unter `terminal_dynamic_rc19_20261030`.
+
+## Historische Stände vor dem RC19-Abschlusslauf
+
 ## Neuester Stand: Teamauftrag vom 30.10.2026, Build tatsächlich installiert
 
 Der ausdrückliche Folgeauftrag autorisierte Fehlerbehebung, Teamarbeit, Tests,

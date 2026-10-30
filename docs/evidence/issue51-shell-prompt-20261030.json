@@ -3178,5 +3178,197 @@
       "hosted_macos_intel_arm": "0 steps, not started because account payments/spending limit; not passed; no manual rerun/billing change",
       "head_note": "later documentation-only commits do not alter tested/installed product source"
     }
+  },
+  "terminal_dynamic_rc19_20261030": {
+    "status": "installed_candidate_release_blocked",
+    "product_commit": "8538ec80744de9f90821c9bbe763179d7a54fb75",
+    "branch": "fix/terminal-dynamic-tools-20261030",
+    "version": "0.8.0rc19",
+    "runtime": {
+      "instance_id": "43066eca506a4da899072a9ae7851360",
+      "version": "0.8.0rc19",
+      "pid": 29067,
+      "started_at": "2026-10-30T17:59:37.339844+00:00",
+      "config_path": "/Users/landjunge/.config/kirabridge/config.toml",
+      "config_sha256": "0dc8eb5952fe4d986c152d38e1658e06de711d6b1f91ccc9745b184d1adb6370",
+      "effective_config_sha256": "d5de7e63e70636a03ae54ead9990224da6e38137e23c8ba1b74aa233cfe5c012",
+      "source_tree_sha256": "31765b83324db2ac4276a037ffbee372c6e300bfcb25d2e957c3888d9ec16942",
+      "source_file_count": 122,
+      "source_package_path": "/Users/landjunge/.local/share/kirabridge/install/releases/0.8.0rc19-8538ec80744d/source/.venv/lib/python3.11/site-packages/kirabridge",
+      "source_scope": "package Python files observed at startup; no remote attestation"
+    },
+    "dynamic_live": {
+      "phase": "post-install",
+      "at": 1793383215.460379,
+      "acceptance": "passed",
+      "source_commit": "8538ec80744de9f90821c9bbe763179d7a54fb75",
+      "source_tree_sha256": "31765b83324db2ac4276a037ffbee372c6e300bfcb25d2e957c3888d9ec16942",
+      "installed_release": "/Users/landjunge/.local/share/kirabridge/install/releases/0.8.0rc19-8538ec80744d",
+      "full_proxy_persisted": true,
+      "checks": [
+        {
+          "name": "actual authenticated HTTP MCP initialization and installed runtime verified",
+          "at": 1793383215.608023,
+          "mcp_tools": 67
+        },
+        {
+          "name": "fresh dynamic discovery active and nonempty; schemas valid",
+          "at": 1793383216.505295,
+          "tools": 34
+        },
+        {
+          "name": "ThreadDesk get_thread independently verified; thread and active-state bytes unchanged",
+          "at": 1793383216.6795819
+        },
+        {
+          "name": "subsequent fresh catalog stable and same installed daemon responds",
+          "at": 1793383216.994717
+        }
+      ],
+      "thread_mutated": false,
+      "active_thread_switched": false,
+      "raw_thread_contents_saved": false,
+      "runtime": {
+        "version": "0.8.0rc19",
+        "pid": 29067,
+        "instance_id": "43066eca506a4da899072a9ae7851360",
+        "source_tree_sha256": "31765b83324db2ac4276a037ffbee372c6e300bfcb25d2e957c3888d9ec16942",
+        "config_sha256": "0dc8eb5952fe4d986c152d38e1658e06de711d6b1f91ccc9745b184d1adb6370"
+      },
+      "tool_names": [
+        "add_note",
+        "answer_handoff_question",
+        "bind_gnom_job",
+        "bind_handoff_run",
+        "check_gate",
+        "current_thread",
+        "dashboard",
+        "export_gnom",
+        "export_grok",
+        "export_handoff",
+        "generate_prompt",
+        "get_issued_handoff",
+        "get_reentry",
+        "get_return",
+        "get_thread",
+        "import_return",
+        "issue_handoff",
+        "knowledge_manage",
+        "library_file_info",
+        "library_receive",
+        "library_receive_status",
+        "library_search",
+        "list_gnom_jobs",
+        "list_returns",
+        "list_snapshots",
+        "list_threads",
+        "receive_gnom_callback",
+        "record_handoff_question",
+        "restore_snapshot",
+        "review_return",
+        "save_snapshot",
+        "switch_thread",
+        "thread_manage",
+        "thread_operation_status"
+      ],
+      "tool_count": 34,
+      "catalog_schema_sha256": "cd6f3adf91d24a66a0547eb6632a26a30f3ed300f065a2b2912228cd02959336",
+      "actual_peer_contract_matched": true,
+      "verified_thread": {
+        "id": "188ce4729a62",
+        "title": "ThreadDesk und KiraBridge – Wechselentwicklung durch Codex",
+        "revision": 439,
+        "status": "idea"
+      },
+      "active_state_sha256": "1ac80570dacceabbd5eb0c7846cfe0fff9e929591cf251a292ef5cd6dfe84d4b",
+      "finished_at": 1793383216.9952042
+    },
+    "terminal_live": {
+      "acceptance": "failed_before_dispatch",
+      "error": "visible_input_not_empty",
+      "task_created": false,
+      "text_inserted": false,
+      "return_sent": false,
+      "execution_confirmed": false,
+      "representation_comparison": {
+        "scope": "read-only own tab contents versus history, no scroll/input/Return",
+        "tty": "/dev/ttys004",
+        "busy": false,
+        "contents": {
+          "length": 2014,
+          "sha256": "5f74424fab3425285a64ad2a75fdb4b3aede66d4de3c7d4449fe7e5d03f08c53",
+          "controlled_marker_present": false,
+          "predicate": false,
+          "lastline_length": 16
+        },
+        "history": {
+          "length": 3434,
+          "sha256": "7567c29a76d82cd691d590562c83dfb6f98041143c856264e15319817e75c308",
+          "controlled_marker_present": true,
+          "predicate": true,
+          "lastline_length": 21
+        }
+      },
+      "repeat_attempted": false
+    },
+    "final_state": {
+      "owned_window_closed_and_absent": true,
+      "other_current_windows_preserved_during_our_close": [
+        3033,
+        5346
+      ],
+      "other_current_processes_preserved_during_our_close": [
+        70676,
+        71896,
+        27237,
+        27351
+      ],
+      "original_window_absent_before_our_close": [
+        5342,
+        5344
+      ],
+      "full_original_inventory_preservation_not_claimed": true,
+      "historical_rows_unchanged": {
+        "tasks": 55,
+        "message_jobs": 24,
+        "visible_handoffs": 7
+      },
+      "terminal_test_task_created": false,
+      "terminal_payload_executed": false,
+      "terminal_gate": "failed_before_dispatch_visible_input_not_empty",
+      "dynamic_gate": "passed_34_tools_verified_get_thread",
+      "finished_release_authorized_by_test_result": false,
+      "release_published": false,
+      "installed_commit": "8538ec80744de9f90821c9bbe763179d7a54fb75",
+      "installed_version": "0.8.0rc19",
+      "installed_path": "/Users/landjunge/.local/share/kirabridge/install/releases/0.8.0rc19-8538ec80744d",
+      "rollback_backup": "/Users/landjunge/.local/share/kirabridge/install/backups/20261030-185924-0015dd2e",
+      "config_only_own_flags_preserved": true,
+      "productive_database_restored": false
+    },
+    "feature_regressions": {
+      "codex_related_passed": 151,
+      "additional_route_readiness_passed": 54,
+      "overlap": 52,
+      "dynamic_unit_passed": 31,
+      "lifecycle_unique_passed": 6,
+      "dynamic_combined_run_note": "36 combined passed before last peer_error case; last additional case1passed, not a final37single-run claim",
+      "crossfile_mcp_permissions_readiness_passed": 50,
+      "full_suite_repeated": false,
+      "lint_format": "passed,403files"
+    },
+    "config_migration": "only dynamic_read_proxy/dynamic_tool_proxy enabled, other configuration preserved; exact hashes recorded by helpers; reverse before oldruntime rollback",
+    "backup_root": "/Users/landjunge/.local/share/kirabridge/backups/terminal-dynamic-tools-20261030",
+    "artifact_sha256": {
+      "KiraBridge-macos.tar.gz": "e1ff2174924ffd04c3b609731db874b8a8865f9eb26c79877a358040b468ed0a",
+      "kirabridge-0.8.0rc19-py3-none-any.whl": "1bbff209abbddc9444e51f9a4351032f3c943231d854dac774f5af507d7f931e",
+      "KiraBridge": "dce17d25620a636006ec95e5ea3dc34cdabff8815dd3556821f54569689a74ad"
+    },
+    "release_published": false,
+    "release_link": null,
+    "push": "held because latest operator requested push/publication after successful acceptance",
+    "rollback_performed": false,
+    "full_codex_agent_takeover_verified": false,
+    "research_monitor": "existing resource measurement baseline only, no handoff causality asserted"
   }
 }
