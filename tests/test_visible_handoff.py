@@ -1,4 +1,6 @@
 import asyncio
+import json
+import re
 import time
 
 import pytest
@@ -52,8 +54,10 @@ def visible(bridge, config, monkeypatch):
     async def read(*args):
         return {"text": transport["text"]}
 
-    async def insert(principal, args):
+    async def insert(principal, args, *, before_transport=None):
         assert not args.submit
+        if before_transport is not None:
+            await before_transport()
         transport["calls"].append("insert")
         transport["text"] = (
             "› " + args.text
@@ -63,12 +67,13 @@ def visible(bridge, config, monkeypatch):
 
     async def submit(principal, pane, pid, *, expected_screen=None):
         transport["calls"].append("return")
+        addressed = re.search(r"Nachricht (\S+) mit deren receipt", transport["text"])
         transport["text"] = "› " if transport.get("target") == "codex" else "╭\n│ ❯ │\n╰"
         if transport["fail"]:
             raise UncertainExecution("uncertain_return", "Unknown return delivery")
         target = transport.get("target", "grok")
         messages = bridge.messages.receive(target)["messages"]
-        message = messages[0]
+        message = next(m for m in messages if m["id"] == addressed[1]) if addressed else messages[0]
         if transport["ack"]:
             bridge.messages.ack(target, message["id"], message["receipt"])
         if transport["reply"]:
@@ -91,6 +96,139 @@ def visible(bridge, config, monkeypatch):
     monkeypatch.setattr(bridge.sessions, "insert", insert)
     monkeypatch.setattr(bridge.sessions, "press_return", submit)
     return bridge, transport
+
+
+@pytest.mark.parametrize(
+    "code", ["visible_target_not_ready", "session_busy", "session_selection_changed"]
+)
+async def test_final_session_preflight_refusal_is_not_an_uncertain_paste(
+    visible, monkeypatch, code
+):
+    bridge, transport = visible
+    original_insert = bridge.sessions.insert
+
+    async def refused(principal, args, *, before_transport=None):
+        # The real session manager checks readiness/identity before this callback.
+        assert before_transport is not None
+        raise BridgeError(code, "Synthetic final preflight refusal")
+
+    monkeypatch.setattr(bridge.sessions, "insert", refused)
+    task = {"id": "final-preflight", "principal": "chatgpt"}
+    args = AgentInput(agent="grok", prompt="Only this authorized task", cwd="/tmp")
+    with pytest.raises(BridgeError) as exc:
+        await bridge.visible_handoffs.execute(task, args, callback, callback)
+    assert exc.value.code == code
+    assert not isinstance(exc.value, UncertainExecution)
+    status = bridge.visible_handoffs.status("chatgpt", task["id"])
+    assert status["state"] == "interrupted"
+    assert status["evidence"]["terminal_input_attempted"] is False
+    assert status["evidence"]["preinput_abort"] is True
+    assert not any(e["state"] == "inserting" for e in status["events"])
+    assert transport["calls"] == []
+    # A fresh independent request is not locked by a paste that never started.
+    await bridge.visible_handoffs.dispatch_ready("chatgpt", "grok")
+    monkeypatch.setattr(bridge.sessions, "insert", original_insert)
+    result = await bridge.visible_handoffs.execute(
+        {"id": "new-after-final-preflight", "principal": "chatgpt"}, args, callback, callback
+    )
+    assert result["success"] and transport["calls"] == ["insert", "return"]
+    # The old id is still not automatically replayed.
+    with pytest.raises(UncertainExecution):
+        await bridge.visible_handoffs.execute(task, args, callback, callback)
+    assert transport["calls"] == ["insert", "return"]
+
+
+@pytest.mark.parametrize("target", ["codex", "grok"])
+async def test_marker_preserving_edit_between_paste_and_return_never_submits(visible, target):
+    bridge, transport = visible
+    transport["target"] = target
+    transport["text"] = "› " if target == "codex" else "╭\n│ ❯ │\n╰"
+
+    async def edited(evidence):
+        assert evidence["state"] == "inserted"
+        transport["text"] = transport["text"].replace("AUTHORIZED", "UNAUTHORIZED")
+
+    task = {"id": "edited-paste", "principal": "chatgpt"}
+    args = AgentInput(agent=target, prompt="AUTHORIZED request", cwd="/tmp")
+    with pytest.raises(UncertainExecution):
+        await bridge.visible_handoffs.execute(task, args, callback, edited)
+    assert transport["calls"] == ["insert"]
+    status = bridge.visible_handoffs.status("chatgpt", task["id"])
+    assert status["state"] == "unknown"
+    assert not any(e["state"] == "return_sent" for e in status["events"])
+    with pytest.raises(UncertainExecution):
+        await bridge.visible_handoffs.execute(task, args, callback, callback)
+    assert transport["calls"] == ["insert"]
+
+
+@pytest.mark.parametrize("failure", ["timeout", "cancelled", "focus_changed"])
+async def test_failure_after_native_boundary_stays_unknown_and_blocks_new_input(
+    visible, monkeypatch, failure
+):
+    bridge, transport = visible
+
+    async def uncertain(principal, args, *, before_transport=None):
+        await before_transport()
+        transport["calls"].append("native_attempt")
+        if failure == "timeout":
+            raise TimeoutError("A secret exception detail must not enter diagnostics")
+        if failure == "cancelled":
+            raise asyncio.CancelledError()
+        raise BridgeError("visible_focus_changed", "A secret terminal detail")
+
+    monkeypatch.setattr(bridge.sessions, "insert", uncertain)
+    task = {"id": "native-boundary", "principal": "chatgpt"}
+    args = AgentInput(agent="grok", prompt="PRIVATE_AUTHORIZED_BODY", cwd="/tmp")
+    with pytest.raises(UncertainExecution):
+        await bridge.visible_handoffs.execute(task, args, callback, callback)
+    status = bridge.visible_handoffs.status("chatgpt", task["id"])
+    assert status["state"] == "unknown"
+    assert any(e["state"] == "inserting" for e in status["events"])
+    assert not any(e["state"] == "return_sent" for e in status["events"])
+    with pytest.raises(BridgeError) as blocked:
+        await bridge.visible_handoffs.execute(
+            {"id": "fresh-after-uncertain", "principal": "chatgpt"}, args, callback, callback
+        )
+    assert blocked.value.code == "visible_target_busy"
+    with pytest.raises(UncertainExecution):
+        await bridge.visible_handoffs.execute(task, args, callback, callback)
+    assert transport["calls"] == ["native_attempt"]
+    records = [
+        json.loads(row[0])
+        for row in bridge.store.db.execute(
+            "SELECT metadata FROM audit WHERE kind='control.handoff.diagnostic' ORDER BY seq"
+        )
+    ]
+    assert len(records) == 3
+    assert records[0]["phase"] == "inserting"
+    assert records[0]["error"] == "visible_handoff_unknown"
+    assert records[0]["duration_ms"] >= 0 and records[0]["at"] > 0
+    encoded = json.dumps(records)
+    assert "PRIVATE_AUTHORIZED_BODY" not in encoded
+    assert "secret" not in encoded
+    assert "text" not in records[0] and "screen" not in records[0]
+
+
+async def test_missing_return_acceptance_never_claims_execution_or_resends(visible, monkeypatch):
+    bridge, transport = visible
+
+    async def no_clear(principal, pane, pid, *, expected_screen=None):
+        transport["calls"].append("return")
+
+    monkeypatch.setattr(bridge.sessions, "press_return", no_clear)
+    monkeypatch.setattr("kirabridge.visible_handoff.RETURN_OBSERVATION_TIMEOUT", 0)
+    task = {"id": "return-not-accepted", "principal": "chatgpt"}
+    args = AgentInput(agent="grok", prompt="Only once", cwd="/tmp")
+    with pytest.raises(UncertainExecution):
+        await bridge.visible_handoffs.execute(task, args, callback, callback)
+    status = bridge.visible_handoffs.status("chatgpt", task["id"])
+    assert status["state"] == "unknown"
+    assert status["evidence"]["reason"] == "visible_submit_unknown"
+    assert any(e["state"] == "return_sent" for e in status["events"])
+    assert not any(e["state"] in {"sent", "confirmed", "completed"} for e in status["events"])
+    with pytest.raises(UncertainExecution):
+        await bridge.visible_handoffs.execute(task, args, callback, callback)
+    assert transport["calls"] == ["insert", "return"]
 
 
 async def callback(evidence):

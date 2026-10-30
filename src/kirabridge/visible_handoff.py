@@ -18,6 +18,8 @@ from kirabridge.visible_binding import (
 from kirabridge.visible_readiness import assess, input_view
 from kirabridge.voice_channel import IDENTITIES
 
+RETURN_OBSERVATION_TIMEOUT = 8.0
+
 
 class VisibleReadinessError(BridgeError):
     def __init__(self, observation):
@@ -30,9 +32,11 @@ class VisibleReadinessError(BridgeError):
             "target_changed": "visible_target_changed",
         }[observation["state"]]
         message = {
-            "working": "Der Agent arbeitet noch; die Nachricht wartet ohne Eingabe.",
+            "working": (
+                "Der Agent arbeitet noch; keine Eingabe und keine automatische Wiederholung."
+            ),
             "input_not_empty": "Im Eingabefeld steht bereits Text; er wird nicht überschrieben.",
-            "scrolled": "Die aktuelle Eingabeansicht ist nicht erreichbar; Nachricht wartet.",
+            "scrolled": "Die aktuelle Eingabeansicht ist nicht erreichbar; keine Eingabe.",
             "unknown": "Die aktuelle Eingabebereitschaft ist nicht eindeutig; keine Eingabe.",
             "target_changed": "Die zugeordnete CLI-Sitzung hat sich geändert; keine Eingabe.",
         }[observation["state"]]
@@ -586,10 +590,19 @@ class VisibleHandoffs:
                     )
             return output
 
-    async def submit_inserted(self, identifier, principal, target, binding, running):
+    async def submit_inserted(
+        self, identifier, principal, target, binding, running, *, expected_input_view=None
+    ):
         """Exactly one separately recorded Return; never call after an uncertain submit."""
         self.transition(identifier, "submitting", {"agent_confirmed": False})
         view = await self.check_target(principal, target, binding)
+        if (
+            expected_input_view is not None
+            and self.input_view(target, view["text"]) != expected_input_view
+        ):
+            raise UncertainExecution(
+                "visible_insert_unknown", "Inserted input changed; no Return sent"
+            )
         status = self.status(principal, identifier)
         message = self.messages.get(principal, status["message_id"])
         expected_prompt = self.prompt(
@@ -609,7 +622,7 @@ class VisibleHandoffs:
         )
         self.transition(identifier, "return_sent", {"return_sent": True, "agent_confirmed": False})
         # Return transport is separate from observable CLI acceptance.
-        deadline = time.monotonic() + 8
+        deadline = time.monotonic() + RETURN_OBSERVATION_TIMEOUT
         while time.monotonic() < deadline:
             view = await self.check_target(principal, target, binding)
             if re.search(binding.ready_pattern, self.input_view(target, view["text"])):
@@ -692,6 +705,59 @@ class VisibleHandoffs:
         return self.status(principal, identifier)
 
     async def execute(self, task, args, running, progress, *, binding_override=None):
+        started = time.monotonic()
+        error = None
+        cause_error = None
+        try:
+            return await self._execute_selected(
+                task, args, running, progress, binding_override=binding_override
+            )
+        except BaseException as exc:
+            code = getattr(exc, "code", None)
+            error = (
+                code
+                if isinstance(code, str) and re.fullmatch(r"[a-z][a-z0-9_]{0,79}", code)
+                else "cancelled"
+                if isinstance(exc, asyncio.CancelledError)
+                else "timeout"
+                if isinstance(exc, TimeoutError)
+                else "unexpected_error"
+            )
+            cause = exc.__cause__
+            cause_code = getattr(cause, "code", None)
+            if isinstance(cause_code, str) and re.fullmatch(r"[a-z][a-z0-9_]{0,79}", cause_code):
+                cause_error = cause_code
+            elif isinstance(cause, TimeoutError):
+                cause_error = "timeout"
+            raise
+        finally:
+            # One bounded diagnostic per invocation. No screen, prompt, payload,
+            # exception message or credentials enter this diagnostic event.
+            row = self.store.db.execute(
+                "SELECT state FROM visible_handoffs WHERE id=?", (task["id"],)
+            ).fetchone()
+            last = self.store.db.execute(
+                "SELECT state FROM visible_handoff_events WHERE id=? "
+                "AND state NOT IN ('unknown','interrupted') ORDER BY seq DESC LIMIT 1",
+                (task["id"],),
+            ).fetchone()
+            self.store.audit(
+                "control.handoff.diagnostic",
+                task["principal"],
+                None,
+                {
+                    "handoff_id": task["id"],
+                    "at": time.time(),
+                    "duration_ms": round((time.monotonic() - started) * 1000, 3),
+                    "state": row[0] if row else "not_started",
+                    "phase": last[0] if last else "preflight",
+                    "error": error,
+                    "cause_error": cause_error,
+                    "automatic_retry": False,
+                },
+            )
+
+    async def _execute_selected(self, task, args, running, progress, *, binding_override=None):
         policy = self.security.principal(task["principal"], "agent.execute")
         if args.agent not in policy.agents:
             raise BridgeError("agent_denied", "Selected agent is not granted to this identity")
@@ -849,8 +915,14 @@ class VisibleHandoffs:
                     ),
                 )
             input_attempted = False
-            try:
-                await self.check_target(principal, target, binding, ready=True)
+
+            async def before_paste():
+                nonlocal input_attempted
+                # SessionManager invokes this only after its final native
+                # identity/readiness checks, immediately before transport.
+                # Refusal before this boundary sent no input, while any later
+                # failure stays uncertain and must never be automatically retried.
+                input_attempted = True
                 self.transition(
                     identifier,
                     "inserting",
@@ -861,7 +933,19 @@ class VisibleHandoffs:
                         "terminal_input_attempted": True,
                     },
                 )
-                input_attempted = True
+                await running(
+                    {
+                        "handoff_id": identifier,
+                        "state": "inserting",
+                        "terminal_input_attempted": True,
+                        "return_sent": False,
+                        "agent_confirmed": False,
+                        "automatic_retry": False,
+                    }
+                )
+
+            try:
+                await self.check_target(principal, target, binding, ready=True)
                 await self.sessions.insert(
                     principal,
                     SessionInput(
@@ -870,6 +954,7 @@ class VisibleHandoffs:
                         text=prompt,
                         submit=False,
                     ),
+                    before_transport=before_paste,
                 )
                 inserted = await self.check_target(principal, target, binding)
                 observed = self.insertion_observed(target, inserted["text"], prompt, identifier)
@@ -890,9 +975,16 @@ class VisibleHandoffs:
                 await progress(
                     {"handoff_id": identifier, "state": "inserted", "agent_confirmed": False}
                 )
-                await self.submit_inserted(identifier, principal, target, binding, running)
+                await self.submit_inserted(
+                    identifier,
+                    principal,
+                    target,
+                    binding,
+                    progress,
+                    expected_input_view=self.input_view(target, inserted["text"]),
+                )
             except BaseException as exc:
-                if not input_attempted:
+                if not input_attempted and not isinstance(exc, UncertainExecution):
                     self.transition(
                         identifier,
                         "interrupted",

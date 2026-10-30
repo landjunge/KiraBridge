@@ -471,59 +471,6 @@ class SessionManager:
                 await self.transport(pane_id).press_return(pane_id)
         return {"return_sent": True, "agent_confirmed": False}
 
-    def unbound_agent(self, selected):
-        """A grok or codex process that is not the configured production pane."""
-        agents, bindings = self.agent_registry()
-        matches = [item for item in selected.get("processes", []) if item["name"] in agents]
-        if len(matches) != 1:
-            return None
-        process = matches[0]
-        binding = bindings.get(process["name"])
-        if binding and self.binding_matches(selected, binding, process["name"]):
-            return None
-        return process
-
-    async def paste_and_return(self, args, selected, process):
-        """Paste into one explicit test pane, then send Return. Not the production binding."""
-        identities = {}
-        for pid in {selected["expected_pid"], process["pid"]}:
-            identity = await self.terminal_app.process_identity(pid, detailed=True)
-            fields = identity.split(None, 8)
-            owner = next((item for item in selected["processes"] if item["pid"] == pid), None)
-            if (
-                len(fields) != 9
-                or not fields[0].isdigit()
-                or not fields[7].isdigit()
-                or fields[1] != Path(selected["tty"]).name
-                or owner is None
-                or int(fields[7]) != owner.get("ppid")
-                or fields[8] != owner.get("image")
-            ):
-                raise BridgeError(
-                    "visible_target_changed", "Selected process image/parent/TTY changed"
-                )
-            identities[pid] = identity
-        before = await self.terminal_app.read(args.pane_id)
-        await self.terminal_app.insert(
-            args.pane_id, args.text, identity_guard=identities, expected_screen=before
-        )
-        inserted = await self.terminal_app.read(args.pane_id)
-        if args.text not in inserted:
-            raise BridgeError(
-                "visible_insert_unknown", "Pasted text was not observed; no Return sent"
-            )
-        await self.terminal_app.press_return(
-            args.pane_id, identity_guard=identities, expected_screen=inserted
-        )
-        return {
-            "pane_id": args.pane_id,
-            "expected_pid": args.expected_pid,
-            "paste_event_sent": True,
-            "return_sent": True,
-            "agent_confirmed": False,
-            "production_binding": False,
-        }
-
     async def send(self, principal, args, *, task_id=None, before_transport=None):
         self.authorization.principal(principal, "session.input")
         self.authorization.principal(principal, "terminal.execute")
@@ -531,9 +478,9 @@ class SessionManager:
             raise BridgeError("invalid_arguments", "NUL in input")
         async with self.lock:
             selected = await self.selected(principal, args.pane_id, args.expected_pid)
-            foreign = self.unbound_agent(selected)
-            if foreign and args.submit and args.pane_id.startswith("terminal:"):
-                return await self.paste_and_return(args, selected, foreign)
+            # Recognition, exact assignment and central handoff are mandatory for
+            # every CLI tab, including an unbound idle-looking tab. A raw shortcut
+            # cannot establish readiness or the task's durable input intent.
             if self.assigned_agent(selected):
                 raise BridgeError(
                     "visible_handoff_required", "CLI handoffs require the central route"
