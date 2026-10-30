@@ -1,0 +1,133 @@
+{
+  "auftrag_id": "channel-fa23a557d4a44e8da2e2be149c9d2564",
+  "base": "307004e5b2e4285c19e8d7544bedf45b28297a0b",
+  "code_commit": "f869aa53ed84edfa00bb8e7b26538b0d58aa5be4",
+  "pr": "https://github.com/landjunge/KiraBridge/pull/54",
+  "environment": {
+    "os": "macOS15.7.4",
+    "build": "24G517",
+    "arch": "x86_64",
+    "python": "3.11.15",
+    "uv": "0.11.6"
+  },
+  "live_probe": {
+    "scope": "development-code, isolated state; no live daemon API writes",
+    "before_windows": [
+      3033,
+      3206,
+      3541,
+      3546,
+      3903
+    ],
+    "before_pids": [
+      20353,
+      21737,
+      22893,
+      41573,
+      70676,
+      71896,
+      90001,
+      90216
+    ],
+    "opened": {
+      "tty": "/dev/ttys003",
+      "opened": true
+    },
+    "owned": {
+      "pane_id": "terminal:3912:ttys003",
+      "expected_pid": 43881,
+      "tty": "/dev/ttys003"
+    },
+    "prompt": "➜  owned-shell ",
+    "screen_sha256": "5e243bb66db594a1e6834222b5fc27242001b88beaba560b24c26a721fdf3256",
+    "baseline_accepts": false,
+    "fix_accepts": true,
+    "rounds": [
+      {
+        "marker": "ISSUE51_OWNED_SHELL_ROUND_1_20261030",
+        "count": 1,
+        "result": {
+          "pane_id": "terminal:3912:ttys003",
+          "expected_pid": 43881,
+          "input_handed_to_transport": true,
+          "agent_processed": false,
+          "submitted": true
+        }
+      },
+      {
+        "marker": "ISSUE51_OWNED_SHELL_ROUND_2_20261030",
+        "count": 1,
+        "result": {
+          "pane_id": "terminal:3912:ttys003",
+          "expected_pid": 43881,
+          "input_handed_to_transport": true,
+          "agent_processed": false,
+          "submitted": true
+        }
+      }
+    ],
+    "receipt_sha256": "338c2c7480c8208f1094273d58589e9bbba6b82ca41370264af029d9768e4bf9",
+    "cleanup": {
+      "closed": true,
+      "closed_window_id": 3912,
+      "remaining": 5
+    },
+    "after_windows": [
+      3033,
+      3206,
+      3541,
+      3546,
+      3903
+    ],
+    "original_process_identities_preserved": true
+  },
+  "private_probe_sha256": "5ae533a8739df826d987c8b6a3647085c0491d7f53dfa0becdbb1a8ef81a3eea",
+  "private_probe_result_sha256": "3e17fddd54b8063214a04ed28581f372a50fdba32356512a3edd5d80b2d34b66",
+  "backup_sha256": {
+    "main-before.tar": "2f2404cb4b185e6044cba9e8b3370d118de25db000c4d6da0a6ec29831f4fd39",
+    "before.bundle": "b5978654aa1b726b49bd92d4996fbfb5726eb6ec74e8c56dc91705eb1c464992"
+  },
+  "changed_code_test_sha256": {
+    "src/kirabridge/platform_adapters/shell_prompt.py": "8fb7596c2642fcdcb747f8d54c9c16e624b0b29e443d5073114462fee0da6cc8",
+    "src/kirabridge/platform_adapters/terminal_app.py": "b9426cdf2ac8ab7af87784b28a0bac3262043150921f84ff9428e924850eec8e",
+    "tests/test_shell_prompt.py": "1949f7cbb428b9c0872734f5b963920ec3c2db58095d1ca7ced2b46be18938fc",
+    "tests/test_plain_shell_paste.py": "91f6022df996bd45b42f0fdb828cbde8f6d96c3c0fe83b756dc4f8da3b6cc2db"
+  },
+  "tests": {
+    "first_targeted_run": {
+      "passed": 124,
+      "failed": 1,
+      "failure": "new test referenced nonexistent State.SUCCEEDED"
+    },
+    "affected_rerun": {
+      "passed": 1,
+      "failed": 0
+    },
+    "added_shared_paste_case": {
+      "passed": 1,
+      "failed": 0
+    },
+    "native_js_after_harness_cleanup": {
+      "passed": 7,
+      "failed": 0
+    },
+    "distinct_targeted_passed": 126,
+    "ruff": "passed",
+    "format": "passed",
+    "diff_check": "passed"
+  },
+  "production_unchanged": {
+    "version": "0.8.0rc18",
+    "pid": 18197,
+    "instance_id": "82cd506b1d854b50b4cc58c5016fc856",
+    "source_tree_sha256": "bea0158935efd09a2304be2eb024ce79d5a100cf754742dcbe52aaddce1dc9ee",
+    "config_sha256": "52747b8353bef4cc162997c34c30d8e759ca0691725d902f313ce4653cf903c2"
+  },
+  "limitations": [
+    "Development only; not installed or merged",
+    "Optional git decorations, whitespace paths and unknown themes fail closed",
+    "Observed viewport equality is not an OS lock",
+    "Hosted macOS jobs not started due payment/spending gate; ARM deferred",
+    "Issue51 complete agent takeover and ChatGPT receive acceptance remains open"
+  ]
+}

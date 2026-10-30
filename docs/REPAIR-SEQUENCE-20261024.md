@@ -1,4 +1,13 @@
-# Aktueller Reparaturstand · 26. Oktober 2026
+# Nachtrag · 30. Oktober 2026
+
+Produktiver Stand ist inzwischen RC18, zuletzt PID18197; maßgeblicher
+[Installationsbeleg](RC18-PUBLISH-INSTALL-20261029.md). Der neue Shell-Prompt-Fix
+für direkte ChatGPT-Eingabe ist ausschließlich in [Draft-PR54](https://github.com/landjunge/KiraBridge/pull/54)
+vorbereitet, mit [lokalen Intel- und Regressionstestbelegen](ISSUE51-SHELL-PROMPT-20261030.md).
+Er ist nicht installiert; Issue51 bleibt offen. Frühere Angaben und Gates unten
+sind historische Nachweise und keine aktuelle Freigabe.
+
+# Reparaturstand · 26. Oktober 2026
 
 Vier bestätigte `less`-Pager wurden ausschließlich durch `q` geschlossen; Shells
 und Codex-Sitzungen blieben erhalten. Rückmeldung und Quittierung funktionieren
