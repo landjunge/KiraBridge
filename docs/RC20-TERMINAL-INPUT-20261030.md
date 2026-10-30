@@ -1,5 +1,10 @@
 # RC20: direkte Terminaleingabe und sichtbares Codex-Eingabefeld
 
+Nachtrag 31. Oktober 2026: Die Reparatur aus `881a53f` wurde anschließend
+ausdrücklich zur Installation freigegeben, lokal gebaut und auf dem Intel-Mac
+installiert und abgenommen. [Tatsächlicher Installations-/Neustartbeleg](RC20-881A53F-INSTALL-20261031.md).
+Die folgenden Freigabeaussagen beschreiben den ursprünglichen Reparaturauftrag.
+
 ## Auftrag und Stand
 
 Reparatur auf Basis `da1bdaed019c31aa11bb28a39ef8bead7e73c1d4`

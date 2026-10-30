@@ -1,17 +1,16 @@
 # KiraBridge
 
-```sh
-d=$(mktemp -d) && gh release download v0.8.0rc18 -R landjunge/KiraBridge -p 'install-macos.sh*' -D "$d" && (cd "$d" && shasum -a 256 -c install-macos.sh.sha256 && sh install-macos.sh "$@")
-```
+**Lokal auf Intel installiert: `0.8.0rc20` aus Reparaturcommit `881a53f`.**
+Der laufende Dienst, Paketquellhash, Neustart, Datenerhalt und die tatsächliche
+Terminalabnahme sind [im Installationsbericht dokumentiert](docs/RC20-881A53F-INSTALL-20261031.md).
+Das geprüfte Paket liegt lokal; für diese Reparatur gab es keinen Push und keine
+öffentliche Veröffentlichung. Der Bericht nennt den exakten Installer und Rückweg.
 
-**[Download und Version: 0.8.0rc18](https://github.com/landjunge/KiraBridge/releases/tag/v0.8.0rc18)** · **[Alle erhaltenen Versionen einschließlich RC17](https://github.com/landjunge/KiraBridge/releases)**
-
-**Status: veröffentlichtes Intel-Prerelease und auf dem Intel-iMac installiert.**
-Der Befehl wurde nach der Veröffentlichung tatsächlich heruntergeladen, geprüft und
-isoliert ausgeführt; anschließend wurde dasselbe Paket sichtbar produktiv installiert.
-Authentifizierter Zugriff auf dieses private Repository bleibt erforderlich.
-Konfiguration und Credentials sind erhalten; RC17 samt verifiziertem Rückweg bleibt
-verfügbar. [Release, Installation, Diensttests und verbleibende Grenzen](docs/RC18-PUBLISH-INSTALL-20261029.md).
+[Erhaltene veröffentlichte Versionen](https://github.com/landjunge/KiraBridge/releases)
+und der [frühere RC18-Download-/Installationsbeleg](docs/RC18-PUBLISH-INSTALL-20261029.md)
+bleiben als historische Quellen verfügbar. Deren Downloadstarter installieren
+den jeweiligen veröffentlichten Quellstand. Für die lokale Reparatur wird das
+im aktuellen Bericht verifizierte Bundle verwendet.
 
 
 ## Funktionen
@@ -39,8 +38,9 @@ Direkte Terminaleingaben wie `/resume` verwenden `task_request` mit
 `text` wird unverändert eingefügt; `submit=true` sendet anschließend einmal Enter,
 `submit=false` belässt den Text im Eingabefeld. Agentenaufträge verwenden
 `agent.execute` oder `message_send(kind="work")` mit Empfangs- und Ergebnisprotokoll.
-Die [lokale RC20-Reparatur und ihre Tests](docs/RC20-TERMINAL-INPUT-20261030.md)
-dokumentieren den Stand vor einer gesondert freizugebenden Installation.
+Die [RC20-Reparatur und ihre Tests](docs/RC20-TERMINAL-INPUT-20261030.md) sowie die
+[anschließend autorisierte Installation](docs/RC20-881A53F-INSTALL-20261031.md)
+dokumentieren Quellstand und tatsächlich laufenden Dienst getrennt.
 
 [Architektur](docs/DEVELOPMENT_PLAN.md) · [Vollständige Datei-/Logreads](docs/READ-FULL-FILES.md)
 · [Queuevertrag](docs/QUEUE-MANAGEMENT.md) · [RC18-Änderungen](docs/RELEASE-0.8.0rc18.md)
@@ -61,9 +61,9 @@ Keine Apple-Signierung/Notarisierung. Gatekeeper nicht pauschal deaktivieren.
 
 ## Betrieb
 
-Der oben stehende versionierte Befehl lädt das Bootstrap samt Prüfsumme; dieses
+Ein veröffentlichter versionierter Befehl lädt das Bootstrap samt Prüfsumme; dieses
 prüft wiederum die fest eingebettete Paket-SHA256. Keine Remote-Pipe in eine Shell.
-Das Release nennt exakten Artefakt-Quellcommit und Prüfsummen. Branch, Paket und
+Release oder lokaler Installationsbeleg nennen Artefakt-Quellcommit und Prüfsummen. Branch, Paket und
 antwortender Dienst können unterschiedliche Stände haben und werden getrennt geprüft.
 
 Eine produktive Installation erst nach Freigabe in einem eigenen bestätigten
@@ -150,6 +150,7 @@ Nach jeder Testdienstbereinigung muss dessen Abwesenheit unabhängig belegt sein
 
 | Version | Tatsächlicher Stand |
 | --- | --- |
+| 0.8.0rc20 / 881a53f | Lokal auf Intel installiert und am laufenden Dienst abgenommen; kein neuer öffentlicher Release. Installer und Rückweg im Reparatur-Installationsbericht. |
 | 0.8.0rc18 | Veröffentlichtes Intel-Prerelease; tatsächlicher Download, sichtbare Installation und produktive Stop-/Start-/Neustarttests bestanden. Belege im Installationsbericht. |
 | 0.8.0rc17 | Separater Entwurf und gesicherter Rückweg vor RC18; authentifizierter Download und isolierter Rollback nachgewiesen. |
 | 0.8.0rc16 / rc15 | Historische Entwürfe erhalten; keine neue Abnahme daraus abgeleitet. |
