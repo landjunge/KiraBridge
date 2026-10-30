@@ -3370,5 +3370,154 @@
     "rollback_performed": false,
     "full_codex_agent_takeover_verified": false,
     "research_monitor": "existing resource measurement baseline only, no handoff causality asserted"
+  },
+  "visible_busy_reservation_20261030": {
+    "status": "installed_user_test_completed",
+    "product_commit": "b3aaabaa55965c3d59497454cc2281b60b4865b4",
+    "branch": "fix/visible-busy-reservation-20261030",
+    "root_cause": "global codex reservation on3033 blocked explicitly selected independent5527 and5346; exemption previously paste-only",
+    "fix": "explicit submitTrue task-owned disjoint native resource; fresh ready; oldUNKNOWN remains untouched; default routing unchanged",
+    "native_current_source": "consistent bounded history for observation/preinput/paste/Return, no viewportfallback or trim",
+    "targeted_tests": {
+      "reservation_related": 155,
+      "native_related": 80,
+      "portable_unicode_affected_rerun": 1,
+      "overlap_not_summed": true,
+      "lint_format": "passed405files",
+      "whole_suite_repeated": false
+    },
+    "runtime": {
+      "instance_id": "d07aae86a1ca4c03b064e616d66952ea",
+      "version": "0.8.0rc19",
+      "pid": 36706,
+      "started_at": "2026-10-30T18:41:15.939526+00:00",
+      "config_path": "/Users/landjunge/.config/kirabridge/config.toml",
+      "config_sha256": "0dc8eb5952fe4d986c152d38e1658e06de711d6b1f91ccc9745b184d1adb6370",
+      "effective_config_sha256": "d5de7e63e70636a03ae54ead9990224da6e38137e23c8ba1b74aa233cfe5c012",
+      "source_tree_sha256": "22c2933b005b649fb3b4f6e7a16c998c9ba28ebdd9d3b94d39455c24f52ecf7f",
+      "source_file_count": 122,
+      "source_package_path": "/Users/landjunge/.local/share/kirabridge/install/releases/0.8.0rc19-b3aaabaa5596/source/.venv/lib/python3.11/site-packages/kirabridge",
+      "source_scope": "package Python files observed at startup; no remote attestation"
+    },
+    "operator_confirmed_test": {
+      "id": "hello_codex_free_20261030_second",
+      "state": "completed",
+      "attempt": 1,
+      "pane": "terminal:5527:ttys000",
+      "handoff": "completed",
+      "acknowledged": true,
+      "reply_count": 1
+    },
+    "additional_retest": "not dispatched; fresh view+buffer both scrolled, inputempty, readyfalse",
+    "owned_auxiliary_test": {
+      "id": "busy-owned-codex-20261030-v1",
+      "one_inserting_return_sent_sent": true,
+      "authenticated_ack": true,
+      "exact_payload": {
+        "source": "exact owned Codex session only; no clipboard read",
+        "session_file": "/Users/landjunge/.codex/sessions/2026/10/30/rollout-2026-10-30T19-46-23-01a18e22-6d0e-74b0-997b-c5ccd86144d2.jsonl",
+        "expected_chars": 1298,
+        "expected_sha256": "12bcca01cf66a49f0f12b95c973785b11cd6a344982314ff87eb3f7e6ab66e36",
+        "user_turns": [
+          {
+            "line": 8,
+            "kind": "response_item",
+            "chars": 1044,
+            "sha256": "1d9e5b665a2f3039bc50ea2edc0754b8d5ae207ba30c116353e023a6bfd6fbe6",
+            "contains_test_id": false,
+            "exact_authorized_prompt": false,
+            "newline_normalized_equal": false,
+            "authorized_prompt_contained": false,
+            "extra_chars_if_contained": null
+          },
+          {
+            "line": 12,
+            "kind": "response_item",
+            "chars": 1298,
+            "sha256": "12bcca01cf66a49f0f12b95c973785b11cd6a344982314ff87eb3f7e6ab66e36",
+            "contains_test_id": true,
+            "exact_authorized_prompt": true,
+            "newline_normalized_equal": true,
+            "authorized_prompt_contained": true,
+            "extra_chars_if_contained": 0
+          }
+        ],
+        "assistant_final_markers": 0
+      },
+      "actor_attribution": {
+        "scope": "exact owned rollout metadata only, no clipboard access",
+        "first_user_turn_is_fixture_context": true,
+        "mcp_calls": [
+          {
+            "at": "2026-10-30T18:47:29.379Z",
+            "tool": "exec",
+            "receive_call": true,
+            "ack_call": true,
+            "original_message_id_used": false,
+            "original_conversation_id_used": false,
+            "original_receipt_used": false
+          },
+          {
+            "at": "2026-10-30T18:47:33.660Z",
+            "tool": "exec",
+            "receive_call": true,
+            "ack_call": false,
+            "original_message_id_used": true,
+            "original_conversation_id_used": true,
+            "original_receipt_used": false
+          },
+          {
+            "at": "2026-10-30T18:47:37.698Z",
+            "tool": "exec",
+            "receive_call": false,
+            "ack_call": true,
+            "original_message_id_used": true,
+            "original_conversation_id_used": true,
+            "original_receipt_used": true
+          }
+        ]
+      },
+      "closed_by_operator": true,
+      "reply_missing_after_close": "unknown remains explicit; no replay"
+    },
+    "preservation": {
+      "installed_commit": "b3aaabaa55965c3d59497454cc2281b60b4865b4",
+      "installed_version": "0.8.0rc19",
+      "app_path": "/Users/landjunge/Applications/KiraBridge.app",
+      "rollback_backup": "/Users/landjunge/.local/share/kirabridge/install/backups/20261030-194109-1b8cad4f",
+      "config_and_credentials_byte_equal": true,
+      "protected_historical_rows_unchanged": {
+        "tasks": 55,
+        "message_jobs": 24,
+        "visible_handoffs": 7
+      },
+      "original_windows_preserved": [
+        3033,
+        5346,
+        5527
+      ],
+      "original_processes_preserved": [
+        "70676",
+        "71896",
+        "27237",
+        "27351",
+        "31668",
+        "31962"
+      ],
+      "owned_test_window_and_processes_absent": true,
+      "owned_test_closed_by_operator": true,
+      "user_confirmed_test": "hello_codex_free_20261030_second",
+      "user_confirmed_state": "completed",
+      "user_confirmed_attempt": 1,
+      "closed_auxiliary_test_not_retried": true
+    },
+    "clipboard_audit": "No clipboard read after operator warning; actual1298-character input SHA equals full authorized prompt exactly. Offline renderer limitations are not proof of wrong clipboard delivery.",
+    "artifacts_sha256": {
+      "KiraBridge-macos.tar.gz": "0a5390826146c57658258a7d334ca2881fca6c3a4c5237132de04dfe1b20e83e",
+      "kirabridge-0.8.0rc19-py3-none-any.whl": "8c072b443b6573eccce608e1f0e0992dad5543954f507b36fa53cb0ea66dfdfa",
+      "KiraBridge": "6f198c8e8f747e980e5e387046b27bd772d55ffd6595d4591a9da7832f8103a2"
+    },
+    "dynamic_catalog": "still enabled,34tools after update",
+    "release_published": false
   }
 }

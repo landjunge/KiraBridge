@@ -1,5 +1,129 @@
 # Issue 51: leere macOS-Shells und ChatGPT-Eingabe · 30.10.2026
 
+## Neuester Stand: konkrete globale Busy-Sperre behoben, installiert und erfolgreich getestet
+
+Auftrag: dauerhaft sichtbare ChatGPT→Codex-Übergabe reparieren, laufende Sitzungen
+schützen, im Team arbeiten, installieren/committen/pushen. Quelle:
+`b3aaabaa55965c3d59497454cc2281b60b4865b4`, Branch
+`fix/visible-busy-reservation-20261030`. Die früheren Abnahmesperren unten bleiben
+historische Belege; der neue erfolgreiche Nutzerlauf wird separat vollständig bestätigt.
+Kein main-Merge und kein neues öffentliches Release dieses Auftrags.
+
+### Konkrete Ursache und begrenzte Korrektur
+
+`codex_hello_20261030` adressierte ausdrücklich Terminal5527/ttys000/PID31668;
+ein früherer Versuch adressierte5346/PID27237. Beide wurden dennoch durch die alte
+UNKNOWN-Reservierung `codex-kirabridge-install-20261030-1712` für **3033/ttys001/
+Shell70676/Agent71896** blockiert. Der Guard scannte global nach Agentenname codex.
+Die vorhandene Ausnahme für unabhängig identifizierte Terminals galt nur für
+Paste ohne Return, nicht für `submit=True`.
+
+`visible_handoff.py` führt nun explizite Caller-Provenienz bis zum Guard. Die Ausnahme
+gilt ausschließlich für eine andere Task-ID, ursprünglichen Zustand UNKNOWN und
+eine eindeutig andere native Ressource: andere Fenster-ID UND TTY, disjunkte Shell-/
+Agent-PIDs, taskgebundene UID/Startzeit/Image/Parent-Identitäten und erneut positive
+Bereitschaft. Aktive Reservierungen, gleiche Pane/TTY/Fenster/PIDs, alte IDs und
+unbestätigte Identitäten bleiben geschützt. Default-Agent-Routing wird nicht auf
+einen anderen Tab umgebogen. Alte Zeile, Nachricht, Events und Defaultbindung bleiben
+unverändert; keine Bereinigung, automatische Wiederholung oder falsche Erfolgsmeldung.
+
+Zusätzlich korrigiert `platform_adapters/terminal_app.py` den belegten alten
+Ansichtsfehler. Apples lokale Terminal.sdef beschreibt contents als sichtbaren
+Ausschnitt und history als gesamten Scrollpuffer. Pythonread, nativer Preinput-/
+Return-Guard und Paste-Beobachtung verwenden jetzt durchgehend denselben aktuellen
+begrenzten History-Tail. Kein bedingter Fallback, Trimmen, Scrollen oder Löschen;
+Identitäts-/Fokusprüfungen bleiben erhalten. Getestet sind auch aktuelle echte Eingabe
+bei alter leerer Ansicht, Änderung vor Transport, mehrere Tabs/TTYs und Unicode-Grenzen.
+
+Geänderte Produktdateien: `visible_handoff.py`, `terminal_app.py`. Tests:
+`test_visible_handoff_reservation_scope.py`, `test_terminal_current_buffer.py` und
+angepasste `test_visible_selection.py`. Gegenbeispiele scheiterten am Originalcode.
+Danach **155** verwandte Reservierungs-/Handoff-/Selection-/Admissiontests und
+**80** native verwandte Tests bestanden; der portabel angepasste Unicode-Fall danach
+einzeln bestanden. Überlappende Tests nicht addieren. Ruff/Format405Dateien,
+Diffprüfung und unabhängige gegenseitige Review bestanden. Keine Gesamtsuite wiederholt.
+
+### Gebaut, tatsächlich installiert und im Betrieb geprüft
+
+Nativer Swift/Cocoa/WebKit-Intel-Build mit strenger ad-hoc-Signaturprüfung und
+quellgebundenes Paket aus exaktb3aaaba gebaut. Bekannte WebKit-Warnung dokumentiert,
+Compiler Exit0. Vollständige vorherige RC19-Installation/venv, App, Dienste,
+Konfiguration, Zugangsdaten und konsistente SQLite-Sicherung vorab rückgeprüft.
+Aktivierung durch vorhandenen transaktionalen Installer mit sichtbarer TTY-Prüfung
+im eigenen Fenster5621/ttys002/Shell36619. Nur eigene KiraBridge-App/Console
+kontrolliert ersetzt, keine fremden Agenten gestoppt.
+
+Installiert: **0.8.0rc19 aus b3aaaba**, `~/Applications/KiraBridge.app` (PID36721),
+CorePID36706; Dienstpfad
+`~/.local/share/kirabridge/install/releases/0.8.0rc19-b3aaabaa5596/`.
+Alle122 Pythondateien wheelgleich; Live-Quellhash
+`22c2933b005b649fb3b4f6e7a16c998c9ba28ebdd9d3b94d39455c24f52ecf7f`.
+Konfiguration und beide Zugangsdaten-Dateien **bytegleich**; Konfigurationshash
+`0dc8eb5952fe4d986c152d38e1658e06de711d6b1f91ccc9745b184d1adb6370`.
+ThreadDesk-Discovery bleibt aktiv mit34Tools. Keine Konfigurationsmigration nötig.
+
+Eigene echte Codex-CLI0.165.0 wurde sichtbar als Kind der eigenen Shell gestartet,
+`--no-daemon --no-alt-screen -s read-only -a never`, keine Modellüberschreibung.
+Der beobachtete Update-Dialog wurde nur in dieser eigenen Sitzung mit Esc übersprungen;
+kein Codex-Update und keine globale Trust-/Berechtigungsänderung. Ein Fehler im
+privaten Starter vor jeglicher Übermittlung (Datenverzeichnis statt SQLite-Datei)
+wurde korrigiert; danach Startertask completed/attempt1. Keine unsichere ID wiederholt.
+
+**Vollständig erfolgreicher tatsächlicher ChatGPT-Nutzerlauf:**
+`hello_codex_free_20261030_second`, Ziel5527/31668, Task UND Handoff completed,
+Versuch1, authentifizierte Empfangsquittung und genau eine Abschlussantwort.
+Der Nutzer bestätigte die vollständig eingefügte Übergabe ausdrücklich. Dies ist
+ein vollständiger erfolgreicher Lauf, keine bloße Annahme oder Return-Behauptung.
+
+Die zusätzliche Wiederholung wurde vor dem Senden gestoppt: aktuelle Viewport- UND
+Bufferprüfung übereinstimmend scrolled/input_empty=true/ready=false. Kein neuer
+Testauftrag angelegt, keine Schutzprüfung umgangen; der bereits vollständige Lauf
+bleibt als Abnahme erhalten.
+
+**Getrennter eigener Hilfstest:** `busy-owned-codex-20261030-v1` wurde einmal in
+5621 eingefügt, Return einmal gesendet, authentifiziertes ACK empfangen. Der Nutzer
+schloss die Sitzung vor ihrer Abschlussantwort. Diese alte ID bleibt UNKNOWN ohne
+Replay; sie wird nicht mit dem vollständig erfolgreichen neuen Nutzerlauf verwechselt.
+
+Nach Zwischenablage-Warnung sofort alle Live-Eingaben gestoppt, keine Zwischenablage
+ausgelesen. Die einzig betroffene eigene Codex-Rolloutdatei belegt den empfangenen
+Userturn **exakt1298Zeichen, SHA256
+`12bcca01cf66a49f0f12b95c973785b11cd6a344982314ff87eb3f7e6ab66e36`**,
+identisch zum vollständigen autorisierten Prompt, **0 zusätzliche Zeichen**.
+Der erste andere Userturn ist nachweislich Fixture-/Umgebungskontext, kein Beleg
+für alten Clipboardtext. Dieselbe eigene Rolloutdatei enthält Receive/ACK für die
+exakte Nachricht und Quittung; nicht bloß gemeinsame principalcodex-Attribution.
+Der Nutzer bestätigte anschließend ebenfalls erfolgreiche vollständige Einfügung.
+
+Offline gefundene Grenzen einer reinen gefalteten Zeichenanzahlbeobachtung werden
+separat festgehalten, beweisen aber keine falsche Clipboardzustellung in diesem
+Lauf. Es wurde weder die Clipboardlesung wiederholt noch der Transport durch eine
+funktional sperrende hypothetische Änderung erweitert. Der Volltextbeleg dieses
+Laufs stammt aus dem tatsächlichen Rollout; nicht aus Zeichenanzahl allein.
+
+### Erhalt und Rückweg
+
+Alle **55** vorab geschützten UNKNOWN-Tasks, **24** unknown/blocked Messagejobs und
+**7** UNKNOWN-Handoffs zeilenhashgleich. Alle drei ursprünglichen Terminalansichten
+3033/5346/5527 und sechs Shell-/Codex-Prozessidentitäten unverändert. Das eigene
+Fenster und seine beiden Prozesse wurden nach der Nutzer-Schließung unabhängig
+abwesend bestätigt; kein weiteres Fenster geöffnet oder fremder Tab angesprochen.
+
+Private Sicherung/Hashes/Artefakte, ursprünglicher DB-Snapshot, Code-/Testbelege:
+`~/.local/share/kirabridge/backups/visible-busy-reservation-20261030/`.
+Transaktionaler Rückweg zur vorherigen RC19-Quelle8538ec8:
+`~/.local/share/kirabridge/install/backups/20261030-194109-1b8cad4f/`.
+Diese vorherige RC19 versteht dieselbe Konfiguration; keine Flagänderung bei diesem
+Update. Frühere RC18-/RC17-Rückwege bleiben erhalten. Kein produktiver Rollback und
+keine Datenbankrestaurierung. Source-/App- und Config-Hashes unterscheiden tatsächliche
+Installation eindeutig von anderen Builds mit gleicher RC19-Versionsnummer.
+
+Strukturierte Belege im bestehenden JSON unter `visible_busy_reservation_20261030`.
+Push erfolgt auf dem neuen isolierten Branch und nur bei unverändertem/abstammendem
+Remote per Fast-forward im vorhandenen PR54-Branch; kein Forcepush oder main-Merge.
+
+## Historische Stände vor der gezielten Busy-Reservierungskorrektur
+
 ## Neuester Stand: RC19 installiert, Terminal-Live-Gate fehlgeschlagen, kein Release
 
 Der neue Teamauftrag verlangt gezielte Reparatur von Terminal und ThreadDesk-Discovery.
