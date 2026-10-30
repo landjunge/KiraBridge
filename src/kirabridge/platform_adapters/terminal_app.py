@@ -678,7 +678,8 @@ class TerminalAppTransport:
             raise BridgeError("visible_target_changed", "Selected process TTY changed")
         from kirabridge.platform_adapters.shell_prompt import empty_shell_prompt
 
-        if not empty_shell_prompt(await self.read(row["pane_id"])):
+        screen = await self.read(row["pane_id"])
+        if not empty_shell_prompt(screen):
             raise BridgeError("visible_input_not_empty", "Selected terminal has existing input")
         command = f"/bin/ps -p {int(row['expected_pid'])} -o uid=,tty=,lstart="
         if before_transport is not None:
@@ -693,13 +694,11 @@ class TerminalAppTransport:
             + json.dumps(identity)
             + ") throw Error('Selected target identity changed');"
             + "\nif(tab.busy()) throw Error('Selected terminal is busy');"
-            + "\n"
-            + r"const last=tab.contents().replace(/\n+$/,'').split('\n').pop().replace(/\r$/,'');"
-            + "\n"
-            + r"if(!last.endsWith('KiraBridge visible % ') && "
-            + r"!/^[^\n%$#]{1,240}[%$#] $/.test(last)) "
-            + "throw Error('Selected terminal has existing input');"
+            # Use the accepted screen, not a second prompt parser that can drift.
+            + self.native_screen_guard(screen)
             + "\ntargetWindow.selectedTab=tab; targetWindow.index=1; app.activate();"
+            + "\nif(tab.busy()) throw Error('Selected terminal is busy');"
+            + self.native_screen_guard(screen)
             + "\napp.doScript("
             + json.dumps(text)
             + ", {in:tab}); JSON.stringify({sent:true});",
