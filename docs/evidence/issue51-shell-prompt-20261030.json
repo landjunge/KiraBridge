@@ -129,5 +129,393 @@
     "Observed viewport equality is not an OS lock",
     "Hosted macOS jobs not started due payment/spending gate; ARM deferred",
     "Issue51 complete agent takeover and ChatGPT receive acceptance remains open"
-  ]
+  ],
+  "intel_acceptance": {
+    "auftrag_id": "channel-6608bf39af4544e891acd84fb7e9cbff",
+    "message_id": "cb56d321-3d00-4f71-a8a2-cc5c4cb18c15",
+    "receipt": "255c6c1b-2b7c-4fc0-9db4-c3f3f2775987",
+    "tested_pr_head": "106a777c6ae195847b31adc456a4dcd14857adb8",
+    "method": "isolated authenticated HTTP MCP action_request as chatgpt, actual preflight/native admission and real owned Terminal.app dispatch, output via read_query/session.read",
+    "result_scope": "requested cases evidenced across12confirmed V1 checkpoints and targeted V2 state-change run; V1 remains failed; no uninterrupted full passing run claimed",
+    "runs": [
+      {
+        "acceptance": "failed",
+        "checks": [
+          {
+            "name": "private endpoint rejects unauthenticated requests",
+            "status": 401
+          },
+          {
+            "name": "actual shell output, exit status and exactly one TTY-bound execution",
+            "identifier": "once",
+            "exit_status": 0,
+            "receipt": {
+              "id": "once",
+              "pid": 52371,
+              "tty": "/dev/ttys003"
+            },
+            "screen_sha256": "04764ce92f6dd0d97c6ea7d76903820b6442306cbf0f0920e55597cdba153d51"
+          },
+          {
+            "name": "concurrent/late identical delivery deduplicated; changed payload conflicts"
+          },
+          {
+            "name": "actual shell output, exit status and exactly one TTY-bound execution",
+            "identifier": "nonzero",
+            "exit_status": 7,
+            "receipt": {
+              "id": "nonzero",
+              "pid": 52420,
+              "tty": "/dev/ttys003"
+            },
+            "screen_sha256": "39d6238c374da141b9211445916351a1ffa83c1d263b0d83b7eed3b23f417fdb"
+          },
+          {
+            "name": "session.input task completion distinguished from shell exit 7"
+          },
+          {
+            "name": "rejected before native mutation",
+            "identifier": "nonempty",
+            "code": "visible_input_not_empty"
+          },
+          {
+            "name": "existing owned input preserved byte-for-byte"
+          },
+          {
+            "name": "rejected before native mutation",
+            "identifier": "wrong-pid",
+            "code": "session_selection_changed"
+          },
+          {
+            "name": "rejected before native mutation",
+            "identifier": "wrong-tty",
+            "code": "session_selection_changed"
+          },
+          {
+            "name": "rejected before native mutation",
+            "identifier": "busy-rejected",
+            "code": "session_busy"
+          },
+          {
+            "name": "actual shell output, exit status and exactly one TTY-bound execution",
+            "identifier": "busy",
+            "exit_status": 0,
+            "receipt": {
+              "id": "busy",
+              "pid": 52567,
+              "tty": "/dev/ttys003"
+            },
+            "screen_sha256": "28579c37466a109cec7e0ca3f4197fa4205dfff244db13a7f02e6c94c1433674"
+          },
+          {
+            "name": "previously rejected task never starts after shell becomes idle"
+          }
+        ],
+        "owned": {
+          "pane_id": "terminal:3922:ttys003",
+          "expected_pid": 52314,
+          "tty": "/dev/ttys003"
+        },
+        "before_windows": [
+          3033,
+          3206,
+          3541,
+          3546,
+          3903
+        ],
+        "after_windows": [
+          3033,
+          3206,
+          3541,
+          3546,
+          3903
+        ],
+        "before_pids": [
+          20353,
+          21737,
+          22893,
+          41573,
+          70676,
+          71896,
+          90001,
+          90216
+        ],
+        "native_dispatches": [
+          {
+            "source_sha256": "8d692bd3da9a13f347e0986dac744146a3f0025427593b373945318d1e13ee7d",
+            "confirmed": {
+              "sent": true
+            }
+          },
+          {
+            "source_sha256": "5061068f623ff9e2479990eb533175a5f2de96e8dff1bf6b54becb0bae32dd8a",
+            "confirmed": {
+              "sent": true
+            }
+          },
+          {
+            "source_sha256": "7841dcc73325d0f1dcd4a6b25c56537dfe9c56ac940c9093e5ff377f21584615",
+            "confirmed": {
+              "sent": true
+            }
+          }
+        ],
+        "cleanup_complete": true,
+        "original_process_identities_preserved": true,
+        "private_endpoint_absent": true,
+        "private_port": 64298,
+        "run": "run-v1",
+        "case": "full",
+        "task_results": {
+          "intel-once": {
+            "state": "completed",
+            "error": null,
+            "attempt": 1,
+            "terminal_input_attempted": true,
+            "submitted": true,
+            "attempt_evidence_source": "retained task transition events (read-only private database)",
+            "attempt_flags_observed": [
+              true
+            ]
+          },
+          "intel-nonzero": {
+            "state": "completed",
+            "error": null,
+            "attempt": 1,
+            "terminal_input_attempted": true,
+            "submitted": true,
+            "attempt_evidence_source": "retained task transition events (read-only private database)",
+            "attempt_flags_observed": [
+              true
+            ]
+          },
+          "intel-paste-comment": {
+            "state": "completed",
+            "error": null,
+            "attempt": 1,
+            "terminal_input_attempted": true,
+            "submitted": false,
+            "attempt_evidence_source": "retained task transition events (read-only private database)",
+            "attempt_flags_observed": [
+              true
+            ]
+          },
+          "intel-nonempty": {
+            "state": "failed",
+            "error": {
+              "code": "visible_input_not_empty"
+            },
+            "attempt": 1,
+            "terminal_input_attempted": false,
+            "submitted": null,
+            "attempt_evidence_source": "retained task transition events (read-only private database)",
+            "attempt_flags_observed": [
+              false
+            ]
+          },
+          "intel-wrong-pid": {
+            "state": "failed",
+            "error": {
+              "code": "session_selection_changed"
+            },
+            "attempt": 1,
+            "terminal_input_attempted": false,
+            "submitted": null,
+            "attempt_evidence_source": "retained task transition events (read-only private database)",
+            "attempt_flags_observed": [
+              false
+            ]
+          },
+          "intel-wrong-tty": {
+            "state": "failed",
+            "error": {
+              "code": "session_selection_changed"
+            },
+            "attempt": 1,
+            "terminal_input_attempted": false,
+            "submitted": null,
+            "attempt_evidence_source": "retained task transition events (read-only private database)",
+            "attempt_flags_observed": [
+              false
+            ]
+          },
+          "intel-busy": {
+            "state": "completed",
+            "error": null,
+            "attempt": 1,
+            "terminal_input_attempted": true,
+            "submitted": true,
+            "attempt_evidence_source": "retained task transition events (read-only private database)",
+            "attempt_flags_observed": [
+              true
+            ]
+          },
+          "intel-busy-rejected": {
+            "state": "failed",
+            "error": {
+              "code": "session_busy"
+            },
+            "attempt": 1,
+            "terminal_input_attempted": false,
+            "submitted": null,
+            "attempt_evidence_source": "retained task transition events (read-only private database)",
+            "attempt_flags_observed": [
+              false
+            ]
+          },
+          "intel-race-rejected": {
+            "state": "unknown",
+            "error": {
+              "code": "execution_error"
+            },
+            "attempt": 1,
+            "terminal_input_attempted": true,
+            "submitted": null,
+            "attempt_evidence_source": "retained task transition events (read-only private database)",
+            "attempt_flags_observed": [
+              true
+            ]
+          }
+        },
+        "raw_evidence_sha256": "4ad83cad71beb85cf94838f496ce71ae4c6b3461e7fd5e591ac8cdf40b0243e5",
+        "log_sha256": "81e1270311a93bc75cdc19ff5809d733976a7e0ef7f77b035ef8c6701f4c8001",
+        "failed_case": {
+          "fixture": "keystroke race comment not confirmed within5seconds",
+          "task_state": "unknown",
+          "code": "execution_error",
+          "exception": "TimeoutError",
+          "underlying_fixture_cause": "not established; no final fixture screen recorded"
+        }
+      },
+      {
+        "acceptance": "passed",
+        "checks": [
+          {
+            "name": "private endpoint rejects unauthenticated requests",
+            "status": 401
+          },
+          {
+            "name": "race fixture inserted own harmless comment before real native guard"
+          },
+          {
+            "name": "real pre-native input change refused; conservative unknown never replayed"
+          },
+          {
+            "name": "no hidden, raw-send or extra-window fallback attempted"
+          }
+        ],
+        "owned": {
+          "pane_id": "terminal:3928:ttys003",
+          "expected_pid": 53092,
+          "tty": "/dev/ttys003"
+        },
+        "before_windows": [
+          3033,
+          3206,
+          3541,
+          3546,
+          3903
+        ],
+        "after_windows": [
+          3033,
+          3206,
+          3541,
+          3546,
+          3903
+        ],
+        "before_pids": [
+          20353,
+          21737,
+          22893,
+          41573,
+          70676,
+          71896,
+          90001,
+          90216
+        ],
+        "native_dispatches": [
+          {
+            "source_sha256": "e44cdb773be838d71c9996967824063e0645e90c3b58e25a252e43f6bcf1ed30",
+            "error": "visible_input_changed"
+          }
+        ],
+        "cleanup_complete": true,
+        "original_process_identities_preserved": true,
+        "private_endpoint_absent": true,
+        "private_port": 65295,
+        "run": "run-v2",
+        "case": "state-change",
+        "task_results": {
+          "intel-run-v2-race-rejected": {
+            "state": "unknown",
+            "error": {
+              "code": "visible_input_changed"
+            },
+            "attempt": 1,
+            "terminal_input_attempted": true,
+            "submitted": null,
+            "attempt_evidence_source": "retained task transition events (read-only private database)",
+            "attempt_flags_observed": [
+              true
+            ]
+          }
+        },
+        "raw_evidence_sha256": "2bbb55736ef65ecfdb94854c32ab1af9df8733e56625623f8527f35997476141",
+        "log_sha256": "0d900fdd4e6ce3e1c86e19e10af7856a3bf0e7032d4b95af256f4da38ac52149"
+      }
+    ],
+    "return_mechanism": "session.input submit=true uses Terminal.app doScript submission; separate guarded Return only for own fixture comment cleanup",
+    "exit_status_scope": "session.input task completed attests input dispatch; anchored screen output and explicit shell status witnesses establish actual exits0and7",
+    "runtime_before_after": {
+      "before": {
+        "instance_id": "82cd506b1d854b50b4cc58c5016fc856",
+        "version": "0.8.0rc18",
+        "pid": 18197,
+        "started_at": "2026-10-29T22:45:10.482631+00:00",
+        "config_path": "/Users/landjunge/.config/kirabridge/config.toml",
+        "config_sha256": "52747b8353bef4cc162997c34c30d8e759ca0691725d902f313ce4653cf903c2",
+        "effective_config_sha256": "3709ee5e48b675813b9708c7b634d137ca3c2c2dc19fefd35a04b61f581cf641",
+        "source_tree_sha256": "bea0158935efd09a2304be2eb024ce79d5a100cf754742dcbe52aaddce1dc9ee",
+        "source_file_count": 122,
+        "source_package_path": "/Users/landjunge/.local/share/kirabridge/install/releases/0.8.0rc18-15d071ebaa95/source/.venv/lib/python3.11/site-packages/kirabridge",
+        "source_scope": "package Python files observed at startup; no remote attestation"
+      },
+      "after": {
+        "instance_id": "82cd506b1d854b50b4cc58c5016fc856",
+        "version": "0.8.0rc18",
+        "pid": 18197,
+        "started_at": "2026-10-29T22:45:10.482631+00:00",
+        "config_path": "/Users/landjunge/.config/kirabridge/config.toml",
+        "config_sha256": "52747b8353bef4cc162997c34c30d8e759ca0691725d902f313ce4653cf903c2",
+        "effective_config_sha256": "3709ee5e48b675813b9708c7b634d137ca3c2c2dc19fefd35a04b61f581cf641",
+        "source_tree_sha256": "bea0158935efd09a2304be2eb024ce79d5a100cf754742dcbe52aaddce1dc9ee",
+        "source_file_count": 122,
+        "source_package_path": "/Users/landjunge/.local/share/kirabridge/install/releases/0.8.0rc18-15d071ebaa95/source/.venv/lib/python3.11/site-packages/kirabridge",
+        "source_scope": "package Python files observed at startup; no remote attestation"
+      }
+    },
+    "harness_sha256": "15a00d73ac45862cc048457ff796016a9b7eb99d46770ddf86913cfd58005207",
+    "backup_before": {
+      "head": "106a777c6ae195847b31adc456a4dcd14857adb8",
+      "sha256": {
+        "before.tar": "910e0bbcaa821313f5c1c323cf8af596537552f376d6a80db558cc234e8a9d82",
+        "before.bundle": "b637598ea2b12c5458c650f3fe711939226288c6d3083adc19354da1c8f6222f",
+        "/Users/landjunge/.config/kirabridge/config.toml": "52747b8353bef4cc162997c34c30d8e759ca0691725d902f313ce4653cf903c2"
+      }
+    },
+    "protected_v1_files_verified": 14,
+    "rc17_return_files_verified_unchanged": 7,
+    "arm_tested": false,
+    "hosted_macos_ci_executed": false,
+    "production_installed": false,
+    "merged": false,
+    "limits": [
+      "V1 race fixture failed before real native guard; retained as failure",
+      "Controlled timing fixture is not an atomic OS lock against every human input timing",
+      "Private MCP principal is not actual ChatGPT Live/Voice UI acceptance",
+      "Unknown themes/git decoration/whitespace paths remain unaccepted",
+      "Issue51 complete agent takeover/ACK/ChatGPT receipt acceptance remains open",
+      "Test/docs commit skips CI by explicit user scope; skipped mandatory gates remain unmet"
+    ]
+  }
 }

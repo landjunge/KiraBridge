@@ -12,6 +12,86 @@ Der Shell-Fehler ist im Entwicklungszweig behoben und lokal geprüft.
 [Issue51](https://github.com/landjunge/KiraBridge/issues/51) bleibt offen.
 Keine produktive Installation, kein Neustart, Merge oder Release dieses Auftrags.
 
+## Kontrollierte Intel-Abnahme · Folgeauftrag 30.10.2026
+
+Auftrag `channel-6608bf39af4544e891acd84fb7e9cbff`, Konversation
+`issue51-intel-acceptance-20261030`, Nachricht `cb56d321-3d00-4f71-a8a2-cc5c4cb18c15`,
+Receipt `255c6c1b-2b7c-4fc0-9db4-c3f3f2775987` bestätigt.
+Geprüfte PR54-Basis `106a777c6ae195847b31adc456a4dcd14857adb8` unverändert.
+Produktionscode wurde in diesem Folgeauftrag nicht verändert.
+
+Die angeforderten Shell-Fälle sind durch den ersten Lauf und die gezielte Wiederholung
+des fehlerhaften Testfixture-Falls belegt. **Der erste Gesamtlauf bleibt fehlgeschlagen**;
+es wird kein durchgehend erfolgreicher Gesamtlauf behauptet. Die Wiederholung prüfte
+ausschließlich den Zustandswechsel und direkt zugehörige Schutz-/Cleanup-Prüfungen.
+
+Methode: [manuelles Intel-Abnahmeskript](../scripts/accept_shell_input_intel.py),
+leerer privater Zustandsordner, flüchtiger zufälliger Token für Principal `chatgpt`,
+authentifizierter lokaler HTTP-MCP-Endpunkt auf freiem Loopback-Port. Der Weg ist
+`action_request` → echte Autorisierung/Preflight/native Admission → `session.input`
+→ bestätigter nativer Transport. Es wurden weder `_execute` direkt aufgerufen noch
+die Bereitschaft erfunden. Die reale Katalogbeobachtung wurde auf das eigene Fenster
+eingegrenzt. Raw-send, unsichtbare Kommandoausführung und weitere Fensteröffnungen
+waren mit fehlschlagenden Testfallen versehen; kein solcher Ersatzweg wurde aufgerufen.
+Die Token wurden weder ausgegeben noch versioniert.
+
+| Fall | Bestätigtes Ergebnis |
+| --- | --- |
+| Eingabe und Return | Native `doScript`-Übermittlung mit `submitted=true`; tatsächliche Kommandos auf der eigenen `/dev/ttys003` ausgeführt. Kein behauptetes separates Tastatur-Return-Ereignis für diesen Submit-Zweig. |
+| Ausgabe und Abschluss | Standalone-Ausgabezeilen über MCP `read_query/session.read` gelesen, Shell-Statusmarker und private Statusdateien für Exit0 und Exit7 verglichen. |
+| Genau einmal | Zwei gleichzeitige identische HTTP-Anfragen und eine späte identische Anfrage: ein Taskversuch, ein nativer Dispatch, eine Ausführungszeile. Geänderter Inhalt bei gleichem Schlüssel: `idempotency_conflict`, keine Ausführung. |
+| Vorhandene Eingabe | Eigener harmloser Kommentar per echtem Paste-only-Weg eingefügt; neue Eingabe mit `visible_input_not_empty` vor Mutation abgewiesen, Puffer bytegleich erhalten. Erst danach eigener verifizierter Kommentar mit bewachtem Return abgeschlossen. |
+| Busy | Eigene begrenzte Vordergrundfixture positiv als busy beobachtet; `session_busy` vor Mutation. Dieselbe abgewiesene ID blieb nach Idle fehlgeschlagen und wurde nicht nachgeholt. |
+| PID/TTY | Falsche PID und nicht vorhandene TTY ausschließlich innerhalb der eigenen Fenster-ID: `session_selection_changed`, keine Mutation und keine Ersatzfenster. |
+| Zustandswechsel | Im gezielten zweiten Lauf eigenen Kommentar über bewachten Paste-Weg unmittelbar vor dem echten nativen Guard eingefügt und sichtbar gelesen; `visible_input_changed`, kein Prüfkommando ausgeführt. Der Task blieb konservativ `unknown`; identische Folgeanfrage bewirkte keinen neuen Dispatch. |
+| Isolation | Unauthentifizierte Anfrage: HTTP401. Beide privaten Endpunkte nach Ende unabhängig unerreichbar. |
+
+`session.input` meldet weiterhin nur den Abschluss der Eingabeübergabe, keinen eigenen
+Shell-Exitstatus. Die Abnahme trennt daher diesen Taskstatus von den tatsächlichen
+Ausgabe-/Exitstatuszeugen; insbesondere ist der Inputtask bei Shell-Exit7 `completed`.
+Das ist keine neue produktive Funktion zur allgemeinen Prozessüberwachung.
+
+Erster Lauf `run-v1`: zwölf bestätigte Checkpoints, dann Timeout beim Beobachten der
+per Tastaturereignis erzeugten Race-Fixture. Deshalb privater Testtask
+`intel-race-rejected` = `unknown/execution_error`, Exceptiontyp `TimeoutError`;
+kein Ausführungsreceipt. Mangels gespeicherter endgültiger Fixture-Zeile ist die genaue
+Ursache dieses Tastatur-Fixture-Verhaltens offen. Der eigentliche native Race-Guard
+war in diesem Lauf nicht als geprüft zu werten. Log und privater Taskzustand wurden
+geschützt, nicht umgeschrieben oder erneut ausgeführt; alle 14 geschützten Dateien
+blieben nach dem zweiten Lauf hashgleich.
+
+Danach ausschließlich die Testfixture auf den bereits geprüften bewachten Paste-Weg
+umgestellt. `run-v2 --case state-change` verwendete einen neuen privaten Zustandsordner
+und neue IDs; vier Checkpoints und vollständiges Cleanup erfolgreich. Das ist die
+gezielte Nachprüfung des betroffenen Falls, keine Wiederholung historischer Nachrichten.
+Die erwartete konservative `unknown/visible_input_changed`-Test-ID bleibt erhalten.
+Read-only-Review des Abnahmeskripts vor beiden Läufen: keine verbleibenden Blocker.
+
+Fenster nacheinander, nie gleichzeitig: v1 `terminal:3922:ttys003`/PID52314,
+v2 `terminal:3928:ttys003`/PID53092. Beide geschlossen und jeweils durch neue Inventur
+unabhängig abwesend. Vorher/nachher dieselben fünf ursprünglichen Tab-IDs
+3033/3206/3541/3546/3903 und dieselben acht UID/PID/TTY/Startzeit/Parent/Image-Identitäten.
+RC18 blieb PID18197, Instanz-, Quell-, Konfigurations- und effektiver Konfigurationshash
+vor/nachher identisch. Sieben erfasste RC17-Rückweg-/Manifestdateien blieben hashgleich.
+
+Neue private Sicherung `~/.local/share/kirabridge/backups/issue51-intel-acceptance-20261030/`:
+verifiziertes Vorab-Tar/Gitbundle, Harnessstände, vollständige lokale Logs, Screens,
+Status-/Ausführungsreceipts, beide privaten Taskdatenbanken und SHA256-Manifeste.
+Der bestehende [strukturierte Beleg](evidence/issue51-shell-prompt-20261030.json)
+enthält den Nachtrag unter `intel_acceptance`; ursprüngliche Belege bleiben erhalten.
+
+ARM und gehostete macOS-CI wurden in diesem Auftrag **nicht ausgeführt**. Der reine
+Test-/Dokumentationscommit verwendet wegen dieses ausdrücklichen Auftrags `[skip ci]`;
+übersprungene CI ist kein Erfolg und ersetzt keine offenen Integrationsgates.
+Keine Installation, kein produktiver Neustart, keine Änderung am RC17-Rückweg,
+kein Merge, Release oder Schließen von Issue51. Offen bleiben beliebige Prompt-Themes,
+atomarer Schutz gegen jeden möglichen manuellen Eingabezeitpunkt und die vollständige
+Codex-Paste/Return/ACK/ChatGPT-Empfangsabnahme. Die private MCP-Authentifizierung ist
+kein Nachweis der Bedienoberfläche einer tatsächlichen ChatGPT-Live-/Voice-Sitzung.
+
+Nächster sicherer Schritt: diese Belege in Draft-PR54 prüfen und Integrationsgates
+getrennt entscheiden; produktiver Wechsel erst nach neuer ausdrücklicher Freigabe.
+
 ## Belegte Ursache
 
 1. Ein vorhandener freier Shell-Tab wurde ausschließlich gelesen. Seine letzte
@@ -137,8 +217,7 @@ noch bereinigt. Die aktuelle Übergabe wurde tatsächlich empfangen, hat aber ei
 separaten `delivery_timeout`/unknown-Status nahe Return; sie wurde nicht erneut gesendet.
 Dieser Zeitablauf ist kein Beleg für eine Ursache im Shell-Promptparser.
 
-Nächster sicherer Schritt: Draft-PR54 und Pflichtchecks prüfen; getrennte Freigabe
-für Integration und spätere produktive Installation abwarten. Danach echte
-ChatGPT-API-Shellabnahme einschließlich Ausgabe/Exitstatus und vollständige
-Codex-Paste/Return/ACK/ChatGPT-Empfangsabnahme durchführen. Issue51 erst nach dessen
-eigenen vollständigen, wiederholbaren Abnahmekriterien schließen.
+Der damalige nächste Schritt war die Shellabnahme einschließlich Ausgabe/Exitstatus;
+der Folgeauftrag oben belegt diese im privaten authentifizierten MCP-Test. Die
+vollständige Codex-Paste/Return/ACK/ChatGPT-Empfangsabnahme und separate Freigaben
+bleiben offen. Issue51 erst nach seinen vollständigen Abnahmekriterien schließen.
