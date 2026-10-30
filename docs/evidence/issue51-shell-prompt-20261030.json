@@ -3029,6 +3029,14 @@
       "src/kirabridge/platform_adapters/shell_prompt.py": "5489a11457e10f52f00951ac055160fb2da164881121d1092d72575236a441fd",
       "src/kirabridge/platform_adapters/terminal_app.py": "52afcfae75753cc672c6edb26ac3af08d990d42105573dc86a1441cf1731eea1"
     },
-    "private_test_execution_runtime": null
+    "private_test_execution_runtime": {
+      "config_sha256": null,
+      "effective_config_sha256": "8e876f265c10f24397264d59aefe750333c645e6963a90374d28e19eebecf553",
+      "instance_id": "3fa1f38822644a5583c68bf893b118ae",
+      "source_tree_sha256": "d03c08ad409793b7e33ddcab07dfeed4234ef7badf7865e3029902c8c4d68220",
+      "started_at": "2026-10-30T14:40:28.102282+00:00",
+      "version": "0.8.0rc18"
+    },
+    "private_test_runtime_samples": 9
   }
 }
