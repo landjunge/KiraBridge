@@ -5,14 +5,16 @@ Branch `docs/macos-adapter-phases1-3-20261031`. Arbeitswhiteboard
 `0ab8b95a7369`. Der Nutzer hat anschließend ausdrücklich Implementierung,
 Fehlerkorrektur, Modultrennung und gemeinsame echte Integrationstests beauftragt.
 Die frühere Begrenzung auf reine Analyse ist damit für diese Arbeiten aufgehoben.
-Push, produktive Installation und Dienstneustart wurden nicht stillschweigend
-freigegeben und in dieser Umsetzung nicht vorgenommen.
+Dieser Bericht hält die abgeschlossene Kandidatenumsetzung fest. Die danach
+mit „weiter install“ ausdrücklich freigegebene produktive Installation,
+Laufzeitabnahme und separate Tunnelreparatur sind im
+[Installationsbericht](MACOS-ADAPTER-INSTALLATION-20261031.md) dokumentiert.
 
 [Maschinenlesbare Quell-, Test- und Livebelege](evidence/macos-adapter-implementation-20261031.json).
 
 ## Tatsächlicher Ausgangsstand und Sicherung
 
-Core weiterhin `ecb76cb2082a`, PID 15207, Start 11:25:14 UTC,
+Vor der Umsetzung: Core `ecb76cb2082a`, PID 15207, Start 11:25:14 UTC,
 Startup-Quellhash `878e18a5970fc601a74bb67b32a6536151391d840e273d4335fc2d2d25cb6eb1`.
 macOS 15.7.4/24G517, Intel iMac17,1. Vorhandene Return-/Installationsdokumentation
 wurde wiederverwendet; der hier untersuchte neue Fehler wird von den früheren

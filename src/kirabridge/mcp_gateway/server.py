@@ -815,6 +815,10 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
         exact same message. Work/questions to CLI agents use their assigned visible terminal
         even with dispatch=false. One bounded visible attempt is observed before returning;
         busy/missing/changed targets fail without a waiting backlog or hidden fallback.
+        For guidance to an already-working cooperating agent, use a NEW note with
+        dispatch=false and request_reply=false on its agreed conversation_id.
+        The recipient must poll message_receive and deduplicate IDs before applying/ACK;
+        this inbox route does not wake or automatically steer the active session.
         Questions/work request one response
         by default. Answers/results never request another response. No shell interpolation.
         Returned answers stay in the sender's client inbox; they do not automatically

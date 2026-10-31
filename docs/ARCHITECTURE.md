@@ -1,8 +1,11 @@
 # Architektur
 
 Stand 31.10.2026: [modularer macOS-Provider und getrennte Eingabewege](MACOS-ADAPTER-IMPLEMENTATION-20261031.md)
-als lokaler Entwicklungskandidat; produktiver Core zuletzt `ecb76cb2082a` (RC20).
-Kandidatenprüfung und produktive Installation sind getrennte Nachweise.
+produktiv als `7dff6f21d4bf` (RC20) installiert und mit echtem Prompt/Return
+geprüft: [Installationsbelege](MACOS-ADAPTER-INSTALLATION-20261031.md).
+Laufende Anweisungen verwenden den vereinbarten kooperativen
+[Postfachweg](WORKING-SESSION-MESSAGING-20261031.md); eine abgewiesene
+sichtbare Übergabe wird nicht automatisch nachgeliefert.
 
 Historischer Konsolidierungsstand vom 24.10.2026: unveröffentlichter RC17-Kandidat;
 [Zusammenführung](CONSOLIDATION-20261024.md), damals produktive RC14 unverändert.

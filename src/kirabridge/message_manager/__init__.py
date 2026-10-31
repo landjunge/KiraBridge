@@ -130,6 +130,12 @@ class MessageManager:
             scope = result["processing"]["evidence"].get("session_scope")
             if scope == "existing_visible_terminal":
                 result["processing_route"] = scope
+            elif (
+                not visible
+                and job["state"] in {"failed", "blocked"}
+                and result["processing"]["evidence"].get("phase") == "direct_admission"
+            ):
+                result["processing_route"] = "failed_visible_admission"
             elif job["state"] == "queued":
                 result["processing_route"] = (
                     "pending_visible_terminal"
