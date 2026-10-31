@@ -15,6 +15,83 @@ def native_facts(bridge):
     bridge.macos.capability_probe.executable = lambda path: True
 
 
+async def test_explicit_helper_diagnostics_share_status_routes_without_grants(
+    http_bridge,  # noqa: F811 -- shared HTTP fixture
+    monkeypatch,
+):
+    bridge, endpoint = http_bridge
+    native_facts(bridge)
+    calls = []
+    diagnostic = {
+        "diagnostic_only": True,
+        "authorizes_future_helpers": False,
+        "identity": {"pid": 123, "executable": "/usr/bin/osascript"},
+    }
+
+    async def observe():
+        calls.append("explicit")
+        return diagnostic
+
+    monkeypatch.setattr(
+        "kirabridge.platform_adapters.macos.helper_permissions.inspect_helper_permissions",
+        observe,
+    )
+    monkeypatch.setattr(
+        bridge.macos.permission_probe,
+        "reader",
+        lambda resource: {"state": "unknown", "method": "isolated_test"},
+    )
+    async with MCPClientPool() as clients:
+        await clients.connect(Peer("local", url=endpoint, token="local-test-" + "a" * 40))
+        await clients.list_tools("local")
+        await clients.call("local", "bridge_health", {})
+        ordinary = (await clients.call("local", "macos_status", {})).structuredContent
+        assert not calls
+        assert "helper_diagnostics" not in ordinary
+        before = bridge.macos.snapshot()["revision"]
+        direct = (
+            await clients.call("local", "macos_status", {"check_helpers": True})
+        ).structuredContent
+        cached = (
+            await clients.call(
+                "local",
+                "read_query",
+                {"query": {"operation": "platform.status", "check_helpers": True}},
+            )
+        ).structuredContent
+        value = request("platform.status", {"check_helpers": True}, task_id="helper-status")
+        token = bridge.security.grant("local", value)
+        bridge.submit("local", value, token)
+        task = await bridge.tasks.wait("local", value.task_id, 10)
+        assert task["state"] == "completed", task
+        queued = task["result"]
+        assert calls == ["explicit"] * 3
+        assert direct["helper_diagnostics"] == cached["helper_diagnostics"] == diagnostic
+        assert queued["helper_diagnostics"] == diagnostic
+        assert bridge.macos.snapshot()["revision"] == before
+        assert bridge.macos.actor_identities == {}
+        assert all(row["actor"] == "core" for row in bridge.macos.permission_probe.snapshot())
+        bridge.config.principals["local"].capabilities.remove("bridge.health")
+        denied = (
+            await clients.call("local", "macos_status", {"check_helpers": True})
+        ).structuredContent
+        assert denied["error"]["code"] == "forbidden"
+        assert len(calls) == 3
+
+
+def test_helper_diagnostic_selector_is_strict_and_status_only():
+    from pydantic import ValidationError
+
+    from kirabridge.platform_adapters.macos.status import PlatformStatusInput
+
+    with pytest.raises(ValidationError):
+        ReadQuery(operation="session.catalog", check_helpers=True)
+    with pytest.raises(ValidationError):
+        PlatformStatusInput(check_helpers="true")
+    with pytest.raises(ValidationError):
+        PlatformStatusInput(check_helpers=True, target="arbitrary.application")
+
+
 async def test_http_status_and_catalog_share_provider_revision_without_ui(
     http_bridge,  # noqa: F811 -- shared HTTP fixture
     config,

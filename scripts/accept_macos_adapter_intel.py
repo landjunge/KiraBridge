@@ -564,6 +564,17 @@ async def accept(
             evidence["macos_status"] = status
             evidence["discovery_revision"] = catalogue["discovery"]["revision"]
             check("new status tool and generic operation discovered through authenticated HTTP")
+            helper_status = await call("macos_status", {"check_helpers": True})
+            diagnostic = helper_status.get("helper_diagnostics", {})
+            assert diagnostic.get("status") == "observed", diagnostic
+            assert diagnostic.get("authorizes_future_helpers") is False, diagnostic
+            assert diagnostic.get("updates_provider_permissions") is False, diagnostic
+            assert diagnostic.get("cleanup_confirmed") is True, diagnostic
+            assert not bridge.macos.actor_identities
+            evidence["helper_diagnostics"] = diagnostic
+            check(
+                "explicit native helper diagnostics are identity-bound and never execution grants"
+            )
             generic_status = await submit(request("platform-status", "platform.status"))
             assert generic_status["state"] == "completed", generic_status
             check("platform.status executed through the existing task/policy path")

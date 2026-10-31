@@ -1,5 +1,10 @@
 # macOS-Kompatibilität: ergänzte API- und Identitätsbelege
 
+Späterer Umsetzungsschritt: Der [Planabschluss](MACOS-PLAN-COMPLETION-20261031.md)
+ergänzt inzwischen eine explizite, prozessgebundene Helperdiagnose. Die folgenden
+Angaben dokumentieren den vorausgegangenen reinen Quellen-/Symbolabgleich;
+sie bleiben einschließlich ihrer damaligen Installationsgrenze erhalten.
+
 Revision 1 · 31.10.2026 · Fortsetzung auf Nutzerwahl „Kompatibilitätslücken
 abschließen“. Arbeitswhiteboard `0ab8b95a7369`, Ausgangsrevision 17.
 Kira-Skill verwendet; bestehende Implementierung und Prompt-Reparatur beibehalten.

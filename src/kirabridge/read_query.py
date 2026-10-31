@@ -29,9 +29,12 @@ class ReadQuery(Input):
     pane_id: str | None = Field(default=None, pattern=r"^(%[0-9]+|terminal:[0-9]+:ttys[0-9]+)$")
     expected_pid: int | None = Field(default=None, gt=0)
     since: str = Field(default="", max_length=64, pattern=r"^$|[0-9a-f]{64}")
+    check_helpers: bool = False
 
     @model_validator(mode="after")
     def selector(self):
+        if self.check_helpers and self.operation != "platform.status":
+            raise ValueError("helper permission diagnostics require platform.status")
         if self.operation != "file.read" and (
             self.encoding != "utf-8" or self.expected_identity is not None
         ):
@@ -70,7 +73,7 @@ class ReadQuery(Input):
 async def read_query_async(bridge, principal: str, query: ReadQuery) -> dict:
     """Existing dictionary-shaped tool also works with cached client tool lists."""
     if query.operation == "platform.status":
-        return await bridge.platform_status(principal)
+        return await bridge.platform_status(principal, check_helpers=query.check_helpers)
     if query.operation == "session.catalog":
         return {
             "operation": query.operation,

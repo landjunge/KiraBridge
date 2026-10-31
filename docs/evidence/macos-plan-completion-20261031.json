@@ -1,0 +1,133 @@
+{
+  "schema_version": 1,
+  "baseline_commit": "480e3c9e68926d0480512c9144dec434ee430c82",
+  "whiteboard_id": "0ab8b95a7369",
+  "backup_path": "/Users/landjunge/.local/share/kirabridge/backups/macos-plan-completion-20261031T150132Z",
+  "source_tree_sha256": "9244aa9fb6fa39e792e7439edab5895f0f031231b2b365f3f1c2cf82b4a01685",
+  "python_files": 134,
+  "targeted_status_regression": {
+    "passed": 70,
+    "junit_private_path": "/Users/landjunge/.local/share/kirabridge/backups/macos-plan-completion-20261031T150132Z/status-regression.xml",
+    "sha256": "13a15e17410433ad16d47274f2897de0b9345120dc9ad523171b88afa47622ea"
+  },
+  "helper_tests": {
+    "initial_cases_passed": 37,
+    "later_cancellation_cases_passed": 2,
+    "new_jxa_binding_case_passed": 1,
+    "last_selected_run": {
+      "passed": 2,
+      "deselected": 38
+    },
+    "counts_are_incremental_not_a_new_combined_suite": true
+  },
+  "independent_review": "no_remaining_material_findings",
+  "native_helper": {
+    "private_path": "/Users/landjunge/.local/share/kirabridge/backups/macos-plan-completion-20261031T150132Z/helper-native-final.json",
+    "sha256": "573bd6ba98cfa18381ec9199e5eade7103714efd761f2c8bddd5e9d8c97ba110",
+    "value": {
+      "schema_version": 1,
+      "scope": "completed_diagnostic_process_only",
+      "status": "observed",
+      "observed_at": 1793459128.153789,
+      "identity": {
+        "pid": 38751,
+        "executable": "/usr/bin/osascript"
+      },
+      "permissions": [
+        {
+          "resource": "accessibility",
+          "target": null,
+          "method": "AXIsProcessTrusted",
+          "state": "granted",
+          "raw_granted": true
+        },
+        {
+          "resource": "screen_capture",
+          "target": null,
+          "method": "CGPreflightScreenCaptureAccess",
+          "state": "granted",
+          "raw_granted": true
+        },
+        {
+          "resource": "automation",
+          "target": "com.apple.Terminal",
+          "method": "AEDeterminePermissionToAutomateTarget",
+          "state": "granted",
+          "event_class": "****",
+          "event_id": "****",
+          "ask_user_if_needed": false,
+          "target_pid": 36845,
+          "os_status": 0
+        },
+        {
+          "resource": "automation",
+          "target": "com.apple.systemevents",
+          "method": "AEDeterminePermissionToAutomateTarget",
+          "state": "unknown",
+          "event_class": "****",
+          "event_id": "****",
+          "ask_user_if_needed": false,
+          "reason": "target_not_running"
+        }
+      ],
+      "authorizes_future_helpers": false,
+      "updates_provider_permissions": false,
+      "clipboard_content_read": false,
+      "permission_requested": false,
+      "target_started": false,
+      "cleanup_confirmed": true,
+      "probe_recorded_at": "2026-10-31T15:05:28.461256+00:00",
+      "helper_script_sha256": "4e8c494aa8e05754f50014a3ad53de61d58b833a480fa3bb482290a3e8c6dd74"
+    }
+  },
+  "native_source_acceptance": {
+    "summary_path": "/Users/landjunge/.local/share/kirabridge/backups/macos-plan-completion-20261031T150132Z/native-e2e/summary.json",
+    "sha256": "f604ccc441d288d44d566b19661b3497e8bce8477c3748ec0bddb220bcbe5587",
+    "value": {
+      "acceptance": "passed",
+      "private_evidence": "/Users/landjunge/.local/share/kirabridge/backups/macos-plan-completion-20261031T150132Z/native-e2e/evidence.private.json",
+      "source_tree_sha256": "9244aa9fb6fa39e792e7439edab5895f0f031231b2b365f3f1c2cf82b4a01685",
+      "literal_replay": {
+        "before_sha256": "06c8b939e63472cfc4ffb7ab7b6564fc5b1ef1e643e153b79069f1bca77685c9",
+        "after_sha256": "3a623f0e6c2454fd695c1b7205800f01255f5b4e61393f7737b3da2b8a397193",
+        "old_verifier": false,
+        "new_verifier": true,
+        "observed_columns": 129,
+        "collapsed_marker_observed": false,
+        "regression_reproduced_in_real_task": true
+      },
+      "checks": [
+        "private endpoint rejects unauthenticated request",
+        "new status tool and generic operation discovered through authenticated HTTP",
+        "explicit native helper diagnostics are identity-bound and never execution grants",
+        "platform.status executed through the existing task/policy path",
+        "manual approval waits without effect; exact grant executes once; reuse denied",
+        "real busy shell rejected before native mutation",
+        "own Codex reached two identical ready frames",
+        "stale PID rejected; invalid_arguments rejected before persisted task/native input",
+        "empty literal without key and Return without cursor both rejected before effects; these are concrete schema cases, not a replay of unavailable historical arguments",
+        "exactly once paste/Return completed and completion consumed",
+        "real Codex response independently confirmed in current screen and own rollout",
+        "expanded multiline input with a blank payload row and Return confirmed",
+        "explicit session_enter sends one Return without paste at own empty Codex prompt",
+        "live slash-command menu contains exactly one selected own CWD/bound thread title",
+        "session_enter confirmed only the owned resume-menu selection, no paste",
+        "no hidden, raw-send or additional-window fallback attempted"
+      ],
+      "production_modified": false,
+      "cleanup": {
+        "owned_window_absent": false,
+        "owned_shell_absent": false,
+        "reused_existing_idle_shell_preserved": true,
+        "owned_agent_absent": true,
+        "original_windows_and_process_identities_preserved": true
+      }
+    }
+  },
+  "external_evidence_gaps": [
+    "Original two plan documents and Desktop Commander research unavailable despite targeted search",
+    "No native acceptance of other macOS versions or arm64 on this Intel Mac",
+    "Public equivalent of full lock heuristic not established"
+  ],
+  "deployment_status": "pending_package_and_productive_installation"
+}

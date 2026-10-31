@@ -1,5 +1,10 @@
 # Architektur
 
+Ergänzter Abschlusskandidat vom 31.10.2026: [prozessgebundene Helperdiagnostik
+und gemeinsame native Abnahme](MACOS-PLAN-COMPLETION-20261031.md).
+Die explizite Diagnose ergänzt den vorhandenen Statusweg; sie überträgt keine
+Rechte auf spätere Worker. Paket- und Installationsstand stehen im Bericht.
+
 Stand 31.10.2026: [modularer macOS-Provider und getrennte Eingabewege](MACOS-ADAPTER-IMPLEMENTATION-20261031.md)
 produktiv als `acc1c850ba3d` (RC20) installiert; kurze umbrochene Prompts und
 echte Leerzeilen wurden über den produktiven Connector mit Return geprüft:

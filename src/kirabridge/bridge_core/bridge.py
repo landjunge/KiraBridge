@@ -50,6 +50,7 @@ from kirabridge.permissions import (
     state_exclusions,
     visible_execution,
 )
+from kirabridge.platform_adapters.macos.status import PlatformStatusInput
 from kirabridge.process_manager import ProcessManager
 from kirabridge.queue_management.models import QueueControl
 from kirabridge.security_manager import SecurityManager
@@ -66,7 +67,7 @@ from kirabridge.terminal_manager import TerminalManager
 from kirabridge.visible_terminal import VisibleTerminal, VisibleTerminalInput
 
 INPUTS = {
-    "platform.status": EmptyInput,
+    "platform.status": PlatformStatusInput,
     "queue.control": QueueControl,
     "files.prepare": PrepareInput,
     "files.transfer": TransferInput,
@@ -443,13 +444,13 @@ class Bridge:
                 return None
         return operation if operation in self.macos.descriptors else None
 
-    async def platform_status(self, principal):
+    async def platform_status(self, principal, *, check_helpers=False):
         from kirabridge.permissions import decision
 
         self.security.authorize(principal, "platform.status")
         # Explicit no-prompt checks run only for status, never tools/list.
         await asyncio.to_thread(self.macos.permission_probe.refresh_core)
-        return {
+        result = {
             **self.macos.snapshot(),
             "operations": [
                 row
@@ -460,6 +461,15 @@ class Bridge:
             ],
             "scope": "technical availability and OS observations; no execution grant",
         }
+        if check_helpers:
+            from kirabridge.platform_adapters.macos.helper_permissions import (
+                inspect_helper_permissions,
+            )
+
+            # A transient diagnostic process cannot authorize another worker.
+            # Keep its identity out of PermissionProbe and discovery revisions.
+            result["helper_diagnostics"] = await inspect_helper_permissions()
+        return result
 
     async def _execute_operation(self, task: dict, running, progress) -> dict[str, Any]:
         operation, arguments, principal = task["operation"], task["args"], task["principal"]
@@ -472,7 +482,7 @@ class Bridge:
         scope = PathScope(roots, excluded=state_exclusions(self.config, policy))
         if operation == "platform.status":
             await running({"evidence_type": "platform_status_query"})
-            return await self.platform_status(principal)
+            return await self.platform_status(principal, check_helpers=args.check_helpers)
         if operation == "queue.control":
             # Rejections before any mutation remain definite failures, not unknown effects.
             result = await self.queues.control(

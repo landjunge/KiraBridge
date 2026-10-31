@@ -128,18 +128,20 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
     read = ToolAnnotations(readOnlyHint=True, destructiveHint=False, openWorldHint=False)
 
     @server.tool(annotations=read)
-    async def macos_status(ctx: Context) -> dict[str, Any]:
+    async def macos_status(ctx: Context, check_helpers: bool = False) -> dict[str, Any]:
         """Inspect native capabilities and public no-prompt Core permission checks.
 
         Core checks never authorize osascript, Clipboard helpers or the desktop app.
         Unknown helper permissions still require the existing native target guards.
+        check_helpers adds bounded no-prompt diagnostics from one transient helper;
+        its observations never authorize future helpers or change OS permissions.
         """
         from kirabridge.discovery import snapshot
 
         name = identity(ctx)
         try:
             before = snapshot(bridge, name)["revision"]
-            result = await bridge.platform_status(name)
+            result = await bridge.platform_status(name, check_helpers=check_helpers)
             if snapshot(bridge, name)["revision"] != before:
                 await ctx.session.send_tool_list_changed()
             return result
@@ -254,6 +256,8 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
         Session reads require session.inspect and the shared permission decision.
         When approval is required, submit the same operation using task_request.
         No shell input or process attachment.
+        platform.status accepts check_helpers=true for explicit no-prompt helper
+        diagnostics. These transient observations never authorize later workers.
         """
         from kirabridge.read_query import ReadQuery, read_query_async
 
