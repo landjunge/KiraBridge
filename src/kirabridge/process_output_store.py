@@ -5,6 +5,7 @@ queue, retry or public arbitrary-file lookup. Storage exhaustion stops capture
 explicitly; retained output is never automatically deleted to make room.
 """
 
+import base64
 import hashlib
 import os
 import stat
@@ -19,6 +20,8 @@ from pydantic import Field
 from kirabridge.bridge_core.models import BridgeError, Input
 from kirabridge.file_ranges import _identity, read_file_range
 from kirabridge.filesystem_manager import PathScope
+
+MAX_STREAM_BYTES = 64 * 1024 * 1024
 
 
 class OutputRangeInput(Input):
@@ -36,7 +39,7 @@ class ProcessOutputStore:
         root,
         store,
         *,
-        max_stream_bytes=64 * 1024 * 1024,
+        max_stream_bytes=MAX_STREAM_BYTES,
         max_total_bytes=256 * 1024 * 1024,
         max_streams=4096,
     ):
@@ -44,6 +47,8 @@ class ProcessOutputStore:
         for value in (max_stream_bytes, max_total_bytes, max_streams):
             if type(value) is not int or value <= 0:
                 raise ValueError("Output resource budgets must be positive integers")
+        if max_stream_bytes > MAX_STREAM_BYTES:
+            raise ValueError("A captured stream cannot exceed the 64 MiB verification budget")
         self.max_stream_bytes = max_stream_bytes
         self.max_total_bytes = max_total_bytes
         self.max_streams = max_streams
@@ -251,15 +256,92 @@ class ProcessOutputStore:
                 "error": row["error"],
                 "state": "complete" if row["complete"] else "recording" if live else "incomplete",
             }
+        return {"streams": result, "limits": self._limits()}
+
+    def _limits(self):
         return {
-            "streams": result,
-            "limits": {
-                "max_stream_bytes": self.max_stream_bytes,
-                "max_total_bytes": self.max_total_bytes,
-                "max_streams": self.max_streams,
-                "automatic_deletion": False,
-            },
+            "max_stream_bytes": self.max_stream_bytes,
+            "max_total_bytes": self.max_total_bytes,
+            "max_streams": self.max_streams,
+            "automatic_deletion": False,
         }
+
+    @staticmethod
+    def _matches_file(info, row):
+        return (
+            stat.S_ISREG(info.st_mode)
+            and info.st_nlink == 1
+            and info.st_uid == os.getuid()
+            and not info.st_mode & 0o077
+            and info.st_size == row["bytes"]
+            and _identity(info) == row["identity"]
+        )
+
+    def _verified_page(self, row, **selectors):
+        """Bind the page bytes to one committed row and its full stream digest.
+
+        Metadata can collide within a filesystem clock tick. Hash all bounded
+        stream bytes and collect the requested range from that same hash pass;
+        compare it with the existing file reader's canonical bytes. An append
+        racing this observation is refused, never treated as a completed prefix.
+        """
+        if type(row["bytes"]) is not int or not 0 <= row["bytes"] <= MAX_STREAM_BYTES:
+            raise BridgeError("process_output_limit", "Stored stream exceeds verification budget")
+        try:
+            with self._directory() as parent:
+                info = os.stat(row["file_name"], dir_fd=parent, follow_symlinks=False)
+                if not self._matches_file(info, row):
+                    raise BridgeError("process_output_changed", "Stored output file changed")
+                fd = os.open(
+                    row["file_name"],
+                    os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK,
+                    dir_fd=parent,
+                )
+                try:
+                    if not self._matches_file(os.fstat(fd), row):
+                        raise BridgeError("process_output_changed", "Output changed before read")
+                    page = read_file_range(
+                        self.scope, str(self.root / row["file_name"]), **selectors
+                    )
+                    if page["identity"] != row["identity"] or page["size_observed"] != row["bytes"]:
+                        raise BridgeError(
+                            "process_output_changed", "Output changed during page read"
+                        )
+                    hasher, position, observed_range = hashlib.sha256(), 0, bytearray()
+                    while position < row["bytes"]:
+                        chunk = os.pread(fd, min(65536, row["bytes"] - position), position)
+                        if not chunk:
+                            raise BridgeError(
+                                "process_output_changed", "Stored output prefix ended early"
+                            )
+                        hasher.update(chunk)
+                        lower = max(position, page["offset"])
+                        upper = min(position + len(chunk), page["next_offset"])
+                        if lower < upper:
+                            observed_range.extend(chunk[lower - position : upper - position])
+                        position += len(chunk)
+                    if (
+                        hasher.hexdigest() != row["sha256"]
+                        or observed_range != base64.b64decode(page["data_base64"], validate=True)
+                        or not self._matches_file(os.fstat(fd), row)
+                    ):
+                        raise BridgeError(
+                            "process_output_changed", "Stored output digest or bytes changed"
+                        )
+                    with self._directory() as current:
+                        if not self._matches_file(
+                            os.stat(row["file_name"], dir_fd=current, follow_symlinks=False), row
+                        ):
+                            raise BridgeError(
+                                "process_output_changed", "Stored output path changed"
+                            )
+                finally:
+                    os.close(fd)
+        except OSError:
+            raise BridgeError(
+                "process_output_changed", "Stored output unavailable during verification"
+            ) from None
+        return page
 
     def read(
         self,
@@ -272,28 +354,17 @@ class ProcessOutputStore:
         encoding="utf-8",
         expected_identity=None,
     ):
+        if type(max_bytes) is not int or not 1 <= max_bytes <= 65536:
+            raise BridgeError("invalid_arguments", "Output pages must be 1 through 65536 bytes")
         row = self._row(principal, task_id, stream)
-        with self._directory() as parent:
-            info = os.stat(row["file_name"], dir_fd=parent, follow_symlinks=False)
-            if (
-                not stat.S_ISREG(info.st_mode)
-                or info.st_nlink != 1
-                or info.st_uid != os.getuid()
-                or info.st_mode & 0o077
-                or _identity(info) != row["identity"]
-            ):
-                raise BridgeError("process_output_changed", "Stored output file changed")
-        page = read_file_range(
-            self.scope,
-            str(self.root / row["file_name"]),
-            max_bytes,
+        live = (principal, task_id, stream) in self._writers
+        page = self._verified_page(
+            row,
+            max_bytes=max_bytes,
             offset=offset,
             encoding=encoding,
             expected_identity=expected_identity,
         )
-        if page["identity"] != row["identity"] or page["size_observed"] != row["bytes"]:
-            raise BridgeError("process_output_changed", "Output changed during page read")
-        state = self.status(principal, task_id)
         return {
             **page,
             "task_id": task_id,
@@ -301,8 +372,12 @@ class ProcessOutputStore:
             "stream_sha256": row["sha256"],
             "stream_complete": bool(row["complete"]),
             "capture_error": row["error"],
-            "capture_state": state["streams"][stream]["state"],
-            "limits": state["limits"],
-            "scope": "owned process stream page; EOF is for observed bytes, "
-            "not a live completion claim",
+            "capture_state": "complete"
+            if row["complete"]
+            else "recording"
+            if live
+            else "incomplete",
+            "limits": self._limits(),
+            "scope": "owned committed process prefix, verified against its full SHA-256; "
+            "EOF is for the observed prefix, not a live completion claim",
         }

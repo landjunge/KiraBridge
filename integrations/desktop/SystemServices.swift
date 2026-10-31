@@ -2,9 +2,11 @@ import Foundation
 import AppKit
 import Darwin
 import CryptoKit
+import Security
 
 /// Public sysctl process metadata observations. No argv/environment, shell, attachment,
-/// process groups, scheduler or automatic retry is part of this interface.
+/// process groups, scheduler or effect retry is part of this interface. Only a
+/// changed process census permits up to three read-only snapshot acquisitions.
 @MainActor
 enum SystemServices {
     struct Record: Equatable {
@@ -17,6 +19,7 @@ enum SystemServices {
         let path: String?
         let start: String
         let tty: Bool
+        var terminalDevice: Int64? = nil
         var json: [String: Any] {
             ["pid": Int(pid), "ppid": Int(parent), "uid": Int(uid), "real_uid": Int(realUID),
              "saved_uid": Int(savedUID), "name": name, "path": path as Any? ?? NSNull(),
@@ -59,27 +62,57 @@ enum SystemServices {
         }
         return info
     }
-    static func read(_ pid: pid_t) throws -> Record {
+    static func kernelRecord(_ pid: pid_t) throws -> Record {
         var info = try processInfo(pid)
-        // Public AppKit identifies GUI application executables. CLI/non-app
-        // paths remain unknown: no private libproc or argument/environment read.
-        var path: String?
-        if let app = NSRunningApplication(processIdentifier: pid), !app.isTerminated,
-           app.bundleURL != nil, let executable = app.executableURL,
-           executable.isFileURL, executable.path.hasPrefix("/") { path = executable.path }
-        var after = try processInfo(pid)
-        guard started(info) == started(after), info.kp_eproc.e_ppid == after.kp_eproc.e_ppid,
-              info.kp_eproc.e_ucred.cr_uid == after.kp_eproc.e_ucred.cr_uid,
-              info.kp_eproc.e_pcred.p_ruid == after.kp_eproc.e_pcred.p_ruid,
-              info.kp_eproc.e_pcred.p_svuid == after.kp_eproc.e_pcred.p_svuid,
-              info.kp_eproc.e_tdev == after.kp_eproc.e_tdev,
-              string(&info.kp_proc.p_comm) == string(&after.kp_proc.p_comm) else {
-            throw failure("macos_process_changed", "Process changed during its public metadata observation")
-        }
         return Record(pid: pid, parent: info.kp_eproc.e_ppid, uid: info.kp_eproc.e_ucred.cr_uid,
             realUID: info.kp_eproc.e_pcred.p_ruid, savedUID: info.kp_eproc.e_pcred.p_svuid,
-            name: string(&info.kp_proc.p_comm), path: path, start: started(info),
-            tty: info.kp_eproc.e_tdev != -1)
+            name: string(&info.kp_proc.p_comm), path: nil, start: started(info),
+            tty: info.kp_eproc.e_tdev != -1, terminalDevice: Int64(info.kp_eproc.e_tdev))
+    }
+    static func guiApplicationPIDs() -> Set<pid_t> {
+        // AppKit's list can be cached until a main-run-loop turn. It selects
+        // candidates only and never supplies a path or a kernel start token.
+        Set(NSWorkspace.shared.runningApplications.compactMap { app in
+            let pid = app.processIdentifier
+            return pid > 0 && !app.isTerminated && app.bundleURL != nil ? pid : nil
+        })
+    }
+    static func codeExecutablePath(_ pid: pid_t) -> String? {
+        // Public Security kernel guest: no LaunchServices executable-path cache,
+        // private libproc or argv/environment access. A code path observation is
+        // not signature validity, developer trust or an execution grant.
+        var guest: SecCode?
+        let attributes = [kSecGuestAttributePid as String: NSNumber(value: pid)] as CFDictionary
+        guard SecCodeCopyGuestWithAttributes(nil, attributes, [], &guest) == errSecSuccess,
+              let guest else { return nil }
+        var code: SecStaticCode?
+        guard SecCodeCopyStaticCode(guest, [], &code) == errSecSuccess,
+              let code else { return nil }
+        var information: CFDictionary?
+        guard SecCodeCopySigningInformation(code, [], &information) == errSecSuccess,
+              let values = information as? [String: Any],
+              let executable = values[kSecCodeInfoMainExecutable as String] as? URL,
+              executable.isFileURL, executable.path.hasPrefix("/") else { return nil }
+        return executable.path
+    }
+    static func observedRecord(_ pid: pid_t, applications: Set<pid_t>,
+                               kernel: (pid_t) throws -> Record,
+                               executable: (pid_t) -> String?) throws -> Record {
+        let before = try kernel(pid)
+        // CLI/non-app PIDs retain unknown paths. An old AppKit candidate cannot
+        // transfer its old path: only the current Security kernel guest is read.
+        let path = applications.contains(pid) ? executable(pid) : nil
+        let after = try kernel(pid)
+        guard before.pid == pid, after.pid == pid, before == after else {
+            throw failure("macos_process_changed", "Process changed during its public metadata observation")
+        }
+        return Record(pid: pid, parent: before.parent, uid: before.uid,
+            realUID: before.realUID, savedUID: before.savedUID, name: before.name,
+            path: path, start: before.start, tty: before.tty, terminalDevice: before.terminalDevice)
+    }
+    static func read(_ pid: pid_t, applications: Set<pid_t>? = nil) throws -> Record {
+        try observedRecord(pid, applications: applications ?? guiApplicationPIDs(),
+            kernel: kernelRecord, executable: codeExecutablePath)
     }
     static func identifiers() throws -> [pid_t] {
         // Apple QA1123: CTL_KERN/KERN_PROC/KERN_PROC_ALL, bounded size query
@@ -111,15 +144,33 @@ enum SystemServices {
         }
         return result
     }
-    static func snapshot() throws -> Snapshot {
-        let pids = try identifiers()
-        var records: [Record] = [], unavailable: [pid_t] = []
-        for pid in pids {
-            do { records.append(try read(pid)) }
-            catch { unavailable.append(pid) }
+    static func acquireSnapshot(census: () throws -> [pid_t],
+                                applications: () -> Set<pid_t>,
+                                read: (pid_t, Set<pid_t>) throws -> Record) throws -> Snapshot {
+        // This function never performs an effect. Census churn discards the
+        // whole partial observation; no row or path is reused on a new attempt.
+        for attempt in 0..<3 {
+            do {
+                let pids = try census()
+                let apps = applications()
+                var records: [Record] = [], unavailable: [pid_t] = []
+                for pid in pids {
+                    do { records.append(try read(pid, apps)) }
+                    catch { unavailable.append(pid) }
+                }
+                guard try census() == pids else {
+                    throw failure("macos_process_changed", "Process inventory changed during observation; refresh")
+                }
+                return Snapshot(records: records, unavailable: unavailable)
+            } catch let error as SystemBridgeFailure {
+                guard error.code == "macos_process_changed", attempt < 2 else { throw error }
+            }
         }
-        guard try identifiers() == pids else { throw failure("macos_process_changed", "Process inventory changed during observation; refresh") }
-        return Snapshot(records: records, unavailable: unavailable)
+        throw failure("macos_process_changed", "Process inventory did not stabilize within three read-only observations")
+    }
+    static func snapshot() throws -> Snapshot {
+        try acquireSnapshot(census: identifiers, applications: guiApplicationPIDs,
+            read: { pid, apps in try read(pid, applications: apps) })
     }
     static func hash(_ object: Any) throws -> String {
         SHA256.hash(data: try JSONSerialization.data(withJSONObject: object, options: [.sortedKeys])).map { String(format: "%02x", $0) }.joined()
@@ -142,7 +193,7 @@ enum SystemServices {
             "observation_complete": observation.unavailable.isEmpty,
             "unavailable_pid_count": observation.unavailable.count,
             "include_system": includeSystem, "default_uid": Int(uid), "effect": "none",
-            "scope": "Public sysctl PID/UID/PPID/name/start and AppKit GUI paths; CLI paths can be unavailable; no command arguments or environment; live observations can change"]
+            "scope": "Public sysctl PID/UID/PPID/name/start and Security kernel-guest executable paths for AppKit GUI candidates; CLI paths remain unknown; no signature trust, arguments or environment; live observations can change"]
         if includeSystem { result["unavailable_pids"] = observation.unavailable.map(Int.init) }
         if offset + selected.count < visible.count { result["next_offset"] = offset + selected.count }
         return result

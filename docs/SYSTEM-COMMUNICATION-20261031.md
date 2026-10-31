@@ -1,6 +1,6 @@
 # macOS system and communication modules · 31 October 2026
 
-Revision 1, RC22 candidate. Continues the completed RC21 adapter and body-only
+Revision 2, RC22 candidate. Continues the completed RC21 adapter and body-only
 handoff work; it does not replay historical uncertain tasks. The operator explicitly
 requested the remaining system communication modules, team review and deployment.
 
@@ -19,7 +19,7 @@ replay follows an uncertain native effect.
 | Module | Operations | Contract |
 | --- | --- | --- |
 | System | `system.info`, `system.displays`, `system.volumes` | Public native inventory; display revision is also used by capture. |
-| Processes | `system.processes`, `system.process`, `system.signal` | Public `sysctl` metadata, exact PID/kernel start token, bounded revision pages; no argument/environment reads. Signals require fresh ownership, identity, path and protected-lineage checks. |
+| Processes | `system.processes`, `system.process`, `system.signal` | Public `sysctl` metadata and Security kernel-guest GUI executable paths, exact PID/kernel start token, bounded revision pages; no argument/environment reads. Signals require fresh ownership, identity, path and protected-lineage checks. |
 | Permissions | `system.permissions`, `system.permission_request` | Status never prompts. A separate explicit write operation requests only AX, screen capture or notifications. The OS decides. |
 | Applications | `apps.list`, `apps.inspect`, `apps.launch`, `apps.quit`, `app.focus` | Public NSWorkspace/NSRunningApplication; exact PID/start and path scope. Existing agent terminals are protected. |
 | Windows | `windows.list`, `windows.inspect`, `windows.focus` | Public CG/AX inventory, target PID/start, revisions and unique AX identifier for focus. Titles are opt-in. |
@@ -41,7 +41,9 @@ and continuation order; each `element.revision` binds an actual mutation.
 Tokens also require the same worker PID/generation and observed application start.
 Window/process start tokens are kernel epoch-microsecond strings; application/AX
 start identities use NSRunningApplication launch timestamps. They are not
-interchangeable.
+interchangeable. The own acceptance fixture actually observed Cocoa launch
+`1793469332.226911` and kernel start `1793469332.231754`; exact equality between
+those two different start timestamps would incorrectly refuse a legitimate app.
 
 ## Communication behavior
 
@@ -63,8 +65,12 @@ local protocol retain the authenticated mailbox path.
 
 Process output keeps raw owned stdout/stderr separately from response previews.
 Per-stream/total limits, capture failures and EOF versus completed capture are
-explicit. Directory pages bind path and directory generation; a concurrent change
-requires a new inventory rather than silently skipping entries.
+explicit. Directory pages bind path, metadata and an order-independent namespace checksum
+verified by a second scan. This detects changes within one filesystem clock tick;
+it is a change checksum, not an authenticated or immutable snapshot. Output pages
+are checked against the persisted complete stream SHA-256 and the same observed
+range bytes, with a 64 MiB stream verification bound. A concurrent change requires
+a fresh read rather than silently returning mixed data.
 
 ## Public API and compatibility limits
 
@@ -75,9 +81,14 @@ will apply only to the actual Intel Mac used. No ARM or other-OS native pass is
 inferred from compilation or mocks.
 
 Process enumeration uses Apple's public `sysctl`/`kinfo_proc` approach, not
-`libproc` interfaces marked private/unstable by the SDK. GUI executable paths
-come from NSRunningApplication. A CLI executable path that cannot be obtained
-through that public path is explicitly unavailable; signal control then refuses.
+`libproc` interfaces marked private/unstable by the SDK. NSWorkspace supplies only GUI candidate PIDs. The path comes from the current
+Security kernel guest via `SecCodeCopyGuestWithAttributes`, `SecCodeCopyStaticCode`
+and `SecCodeCopySigningInformation` / `kSecCodeInfoMainExecutable`, bounded by
+unchanged kernel metadata before/after. An AppKit cache never supplies that path.
+These public APIs do not establish signature trust or grant execution rights.
+CLI paths remain explicitly unavailable; signal control then refuses. A changing
+PID census allows at most three read-only snapshot acquisitions before any effect.
+A signal itself is never repeated. See [Apple Code Signing Services](https://developer.apple.com/documentation/security/seccodecopyguestwithattributes(_:_:_:_:)).
 `kill` cannot atomically compare a kernel process-start token: the documented
 guarantee is a fresh preflight followed by one positive-PID call, not a promise
 that PID reuse is impossible. A signal acknowledgement is not proof of termination.
@@ -109,3 +120,32 @@ installation, capability activation, running identity/data/session verification
 and owned-target cleanup. The previous verified productive RC21 remains installed
 until these gates succeed. Actual release/runtime results belong in the later
 revision and structured evidence, not in advance success claims.
+
+## Candidate gate findings and corrections
+
+The first clean candidate `696d38a` passed the real 18-check Codex chain and an
+independent byte/turn/cleanup review. It reproduced a noncollapsed wrap rejected
+by the old verifier and accepted by the corrected one. Default local reply, exact
+body, blank lines, one Paste/Return, duplicate task ID, explicit Return, resume menu
+and busy/stale/approval guards all passed. The private package smoke passed too.
+
+Its actual installed isolated native worker passed own-window focus/inspection,
+AX value set/button press/secure-field redaction, own-window PNG capture and own
+preference write/reset/restoration. Process census churn refused the inventory,
+so no signal was attempted. The fixture and worker were removed and the preference
+restored. The new bounded census/Security-path acquisition addresses that concrete
+pre-effect failure; real final-binary acceptance is still required.
+
+Both Linux jobs exposed same-clock-tick directory/output tampering gaps, corrected
+with namespace and full-stream content verification. Two old tests still assumed
+a single Swift source and an injected managed-message header; their fixtures now
+assert all four native sources and the exact original body. No failure is hidden
+by weakening the relevant guard.
+
+The first isolated upgrade stopped while starting the unchanged RC21 predecessor,
+before any RC22 upgrade. A targeted fresh unique-label diagnosis then confirmed
+that same RC21 code healthy. Its runner reported a redundant cleanup-stop error;
+subsequent independent reads proved the exact owned label and PID absent. The
+first 30-second readiness failure has no established cause. Original failure logs
+are retained; the final candidate must pass a fresh real upgrade/rollback gate.
+No candidate has been published or installed productively at this revision.

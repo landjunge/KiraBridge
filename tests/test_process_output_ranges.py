@@ -142,6 +142,112 @@ def test_spool_tampering_fails_closed(output, tmp_path, change):
     assert exc.value.code == "process_output_changed"
 
 
+def freeze_file_identity(monkeypatch):
+    import kirabridge.file_ranges as files
+    import kirabridge.process_output_store as streams
+
+    monkeypatch.setattr(files, "_identity", lambda info: "f" * 64)
+    monkeypatch.setattr(streams, "_identity", lambda info: "f" * 64)
+
+
+@pytest.mark.parametrize("offset", [0, 2, 7])
+def test_committed_digest_detects_same_size_rewrite_with_frozen_stat(output, monkeypatch, offset):
+    freeze_file_identity(monkeypatch)
+    output.start("owner", "task")
+    output.append("owner", "task", "stdout", b"private")
+    output.finish("owner", "task", complete=True)
+    assert output.read("owner", "task", offset=offset, max_bytes=2)["stream_complete"]
+    path = output.root / output._row("owner", "task", "stdout")["file_name"]
+    path.write_bytes(b"changed")
+    with pytest.raises(BridgeError) as exc:
+        output.read("owner", "task", offset=offset, max_bytes=2)
+    assert exc.value.code == "process_output_changed"
+
+
+def test_page_bytes_are_bound_to_verified_digest_even_if_file_changes_back(output, monkeypatch):
+    import kirabridge.process_output_store as streams
+
+    freeze_file_identity(monkeypatch)
+    output.start("owner", "task")
+    output.append("owner", "task", "stdout", b"private")
+    path = output.root / output._row("owner", "task", "stdout")["file_name"]
+    original = streams.read_file_range
+
+    def forged_page(*args, **kwargs):
+        path.write_bytes(b"changed")
+        page = original(*args, **kwargs)
+        path.write_bytes(b"private")
+        return page
+
+    monkeypatch.setattr(streams, "read_file_range", forged_page)
+    with pytest.raises(BridgeError) as exc:
+        output.read("owner", "task", offset=2, max_bytes=2)
+    assert exc.value.code == "process_output_changed"
+
+
+def test_append_during_digest_observation_never_mix_snapshots(output, monkeypatch):
+    import kirabridge.process_output_store as streams
+
+    output.start("owner", "task")
+    output.append("owner", "task", "stdout", b"prefix")
+    original, calls = streams.os.pread, []
+
+    def append_after_read(fd, size, position):
+        data = original(fd, size, position)
+        calls.append(True)
+        # First pread belongs to file_ranges; second to the digest pass.
+        if len(calls) == 2:
+            output.append("owner", "task", "stdout", b"suffix")
+        return data
+
+    with monkeypatch.context() as scoped:
+        scoped.setattr(streams.os, "pread", append_after_read)
+        with pytest.raises(BridgeError) as exc:
+            output.read("owner", "task")
+        assert exc.value.code == "process_output_changed"
+    page = output.read("owner", "task")
+    assert page["text"] == "prefixsuffix" and page["capture_state"] == "recording"
+    assert not page["stream_complete"]
+
+
+def test_verification_observes_pinned_completion_metadata(output, monkeypatch):
+    import kirabridge.process_output_store as streams
+
+    output.start("owner", "task")
+    output.append("owner", "task", "stdout", b"prefix")
+    original = streams.read_file_range
+
+    def finished(*args, **kwargs):
+        page = original(*args, **kwargs)
+        output.finish("owner", "task", complete=True)
+        return page
+
+    with monkeypatch.context() as scoped:
+        scoped.setattr(streams, "read_file_range", finished)
+        page = output.read("owner", "task")
+    assert page["capture_state"] == "recording" and not page["stream_complete"]
+    assert output.read("owner", "task")["stream_complete"]
+
+
+def test_verified_binary_range_crosses_hash_chunks_without_collecting_whole_stream(output):
+    payload = b"a" * 65535 + "🙂".encode() + b"b" * 131072
+    output.start("owner", "task")
+    for position in range(0, len(payload), 65536):
+        output.append("owner", "task", "stdout", payload[position : position + 65536])
+    output.finish("owner", "task", complete=True)
+    page = output.read("owner", "task", offset=65534, max_bytes=6, encoding="base64")
+    assert base64.b64decode(page["data_base64"]) == payload[65534:65540]
+    assert page["stream_sha256"] == hashlib.sha256(payload).hexdigest()
+    assert page["stream_complete"] and not page["eof"]
+
+
+def test_stream_budget_cannot_exceed_bounded_full_digest_contract(output):
+    from kirabridge.process_output_store import MAX_STREAM_BYTES
+
+    with pytest.raises(ValueError, match="64 MiB"):
+        ProcessOutputStore(output.root, output.store, max_stream_bytes=MAX_STREAM_BYTES + 1)
+
+
 async def test_managed_child_drains_beyond_preview_and_can_read_both_streams(output, tmp_path):
     manager = TerminalManager(output_store=output)
     running = []

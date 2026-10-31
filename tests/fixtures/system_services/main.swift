@@ -28,7 +28,98 @@ func row(_ pid: pid_t, parent: pid_t = 1, uid: uid_t = 501, real: uid_t? = nil,
 }
 
 @MainActor
+func acquisitionFixture() throws {
+    let old = row(20, path: nil)
+    var reads = 0, paths = 0
+    let cli = try SystemServices.observedRecord(20, applications: [], kernel: { pid in
+        reads += 1; try check(pid == 20, "wrong CLI identity requested"); return old
+    }, executable: { _ in paths += 1; return "/must/not/be/queried" })
+    try check(reads == 2 && paths == 0 && cli.path == nil, "CLI gained an application path or lost kernel guards")
+    let current = row(20, path: nil, start: "1700000001.123456")
+    let gui = try SystemServices.observedRecord(20, applications: [20], kernel: { _ in current },
+        executable: { pid in paths += 1; return pid == 20 ? "/Applications/New.app/Contents/MacOS/New" : nil })
+    try check(gui.start == current.start && gui.path == "/Applications/New.app/Contents/MacOS/New",
+              "AppKit PID candidate transferred an old application path/start")
+    let denied = try SystemServices.observedRecord(20, applications: [20], kernel: { _ in old },
+        executable: { _ in nil })
+    try check(denied.path == nil, "Unavailable public code identity invented a path")
+    var terminalBefore = row(20, path: nil, tty: true); terminalBefore.terminalDevice = 1
+    var terminalAfter = terminalBefore; terminalAfter.terminalDevice = 2
+    for changed in [current, row(20, parent: 30, path: nil), row(20, uid: 502, path: nil),
+                    row(20, real: 502, path: nil), row(20, saved: 502, path: nil),
+                    row(20, name: "replacement", path: nil), row(21, path: nil),
+                    row(20, path: nil, tty: true)] {
+        var count = 0
+        try refusal(["macos_process_changed"]) {
+            _ = try SystemServices.observedRecord(20, applications: [20], kernel: { _ in
+                count += 1; return count == 1 ? old : changed
+            }, executable: { _ in "/Applications/Old.app/Contents/MacOS/Old" })
+        }
+    }
+    var ttyReads = 0
+    try refusal(["macos_process_changed"]) {
+        _ = try SystemServices.observedRecord(20, applications: [20], kernel: { _ in
+            ttyReads += 1; return ttyReads == 1 ? terminalBefore : terminalAfter
+        }, executable: { _ in "/Applications/Old.app/Contents/MacOS/Old" })
+    }
+    var census = 0, maps = 0, rows = 0
+    let stable = try SystemServices.acquireSnapshot(census: { census += 1; return [10, 20, 30] },
+        applications: { maps += 1; return [20] }, read: { pid, apps in
+            rows += 1
+            return try SystemServices.observedRecord(pid, applications: apps,
+                kernel: { row($0, path: nil) }, executable: { _ in "/Applications/One.app/Contents/MacOS/One" })
+        })
+    try check(census == 2 && maps == 1 && rows == 3, "Stable census repeated application discovery per PID")
+    try check(stable.records.filter { $0.path != nil }.map { $0.pid } == [20], "CLI path scope expanded")
+    census = 0; maps = 0
+    let sequences: [[pid_t]] = [[10, 20], [10, 30], [10, 30], [10, 30]]
+    let refreshed = try SystemServices.acquireSnapshot(census: {
+        defer { census += 1 }; return sequences[census]
+    }, applications: { maps += 1; return maps == 1 ? [20] : [30] }, read: { pid, apps in
+        row(pid, path: apps.contains(pid) ? "/Applications/Current.app/Contents/MacOS/Current" : nil)
+    })
+    try check(census == 4 && maps == 2 && refreshed.records.map { $0.pid } == [10, 30],
+              "Changed census reused stale rows or failed to reacquire")
+    try check(refreshed.records.first(where: { $0.pid == 30 })?.path != nil,
+              "Changed census reused the preceding application map")
+    census = 0; maps = 0
+    try refusal(["macos_process_changed"]) {
+        _ = try SystemServices.acquireSnapshot(census: {
+            census += 1; return census % 2 == 1 ? [10] : [10, 20]
+        }, applications: { maps += 1; return [] }, read: { pid, _ in row(pid, path: nil) })
+    }
+    try check(census == 6 && maps == 3, "Census acquisition exceeded three read-only attempts")
+    census = 0; maps = 0
+    let buffered = try SystemServices.acquireSnapshot(census: {
+        census += 1
+        if census == 1 { throw SystemServices.failure("macos_process_changed", "synthetic census buffer churn") }
+        return [10]
+    }, applications: { maps += 1; return [] }, read: { pid, _ in row(pid, path: nil) })
+    try check(census == 3 && maps == 1 && buffered.records.count == 1,
+              "Read-only census buffer churn did not reacquire once")
+    census = 0; maps = 0
+    try refusal(["macos_process_unavailable"]) {
+        _ = try SystemServices.acquireSnapshot(census: {
+            census += 1; throw SystemServices.failure("macos_process_unavailable", "synthetic unavailable inventory")
+        }, applications: { maps += 1; return [] }, read: { pid, _ in row(pid, path: nil) })
+    }
+    try check(census == 1 && maps == 0, "Non-census failure was silently retried")
+    for code in ["macos_process_unavailable", "macos_process_changed"] {
+        census = 0; maps = 0
+        let incomplete = try SystemServices.acquireSnapshot(census: { census += 1; return [10, 20] },
+            applications: { maps += 1; return [] }, read: { pid, _ in
+                if pid == 20 { throw SystemServices.failure(code, "synthetic missing or changed row") }
+                return row(pid, path: nil)
+            })
+        try check(incomplete.records.map { $0.pid } == [10] && incomplete.unavailable == [20],
+                  "Missing process metadata was silently accepted as complete")
+        try check(census == 2 && maps == 1, "Individual identity failure retried a stable census")
+    }
+}
+
+@MainActor
 func runFixture() throws {
+    try acquisitionFixture()
     let worker = row(10, parent: 11, name: "KiraBridge", path: "/private/KiraBridge")
     let core = row(11, parent: 12, name: "Python", path: "/opt/python3")
     let ancestor = row(12, name: "Supervisor", path: "/private/Supervisor")
@@ -101,7 +192,12 @@ func runFixture() throws {
     let actual = try SystemServices.read(getpid())
     try check(actual.pid == getpid() && actual.uid == geteuid() && actual.parent == getppid(), "public sysctl self binding failed")
     try check(actual.json["path_available"] as? Bool == (actual.path != nil), "public path availability is not explicit")
-    print("native service primitive/lineage/pagination/self-metadata checks passed; signals_sent=0")
+    if let path = SystemServices.codeExecutablePath(getpid()) {
+        let actualPath = URL(fileURLWithPath: path).resolvingSymlinksInPath().path
+        let fixturePath = URL(fileURLWithPath: CommandLine.arguments[0]).resolvingSymlinksInPath().path
+        try check(actualPath == fixturePath, "public Security self path does not identify this exact fixture executable")
+    }
+    print("native service acquisition/lineage/pagination/owned-self-metadata checks passed; signals_sent=0")
 }
 
 Task { @MainActor in

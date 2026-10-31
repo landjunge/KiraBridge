@@ -296,8 +296,7 @@ async def test_new_message_roundtrip_leaves_old_jobs_untouched(bridge, config, m
         is None
     )
     assert seen["separate"] is True and seen["visible_id"] is None
-    assert "Neue isolierte Frage" in seen["prompt"]
-    assert "KiraBridge addressed communication" in seen["prompt"]
+    assert seen["prompt"] == completed["body"] == "Neue isolierte Frage"
     assert _states(bridge, held_id, unknown_id) == ("queued", "unknown")
     assert bridge.message_receiver._claim(held_id) is None
     assert bridge.message_receiver._claim(unknown_id) is None

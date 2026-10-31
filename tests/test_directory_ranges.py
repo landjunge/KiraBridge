@@ -1,5 +1,6 @@
 import base64
 import json
+from contextlib import contextmanager
 
 import pytest
 from pydantic import ValidationError
@@ -117,3 +118,81 @@ def test_directory_mutation_during_enumeration_fails_whole_page(tmp_path, monkey
     with pytest.raises(BridgeError) as exc:
         list_directory(PathScope([str(tmp_path)]), str(tmp_path))
     assert exc.value.code == "directory_changed"
+
+
+def test_directory_generation_detects_mutation_with_frozen_stat_tick(tmp_path, monkeypatch):
+    import kirabridge.directory_ranges as ranges
+
+    monkeypatch.setattr(ranges, "_identity", lambda value: "f" * 64)
+    for name in ("a", "b"):
+        (tmp_path / name).touch()
+    scope = PathScope([str(tmp_path)])
+    first = list_directory(scope, str(tmp_path), limit=1)
+    (tmp_path / "c").touch()
+    for selectors in ({"cursor": first["next_cursor"]}, {"expected_identity": first["identity"]}):
+        with pytest.raises(BridgeError) as exc:
+            list_directory(scope, str(tmp_path), **selectors)
+        assert exc.value.code == "directory_changed"
+
+
+def test_verifying_scan_detects_mutation_even_with_frozen_stat_tick(tmp_path, monkeypatch):
+    import kirabridge.directory_ranges as ranges
+
+    monkeypatch.setattr(ranges, "_identity", lambda value: "f" * 64)
+    (tmp_path / "a").touch()
+    smallest = ranges.heapq.nsmallest
+
+    def changed(*args, **kwargs):
+        selected = smallest(*args, **kwargs)
+        (tmp_path / "b").touch()
+        return selected
+
+    monkeypatch.setattr(ranges.heapq, "nsmallest", changed)
+    with pytest.raises(BridgeError) as exc:
+        list_directory(PathScope([str(tmp_path)]), str(tmp_path))
+    assert exc.value.code == "directory_changed"
+
+
+@pytest.mark.parametrize("change", ["replacement", "kind"])
+def test_same_name_count_binds_entry_inode_and_kind_with_frozen_stat(tmp_path, monkeypatch, change):
+    import kirabridge.directory_ranges as ranges
+
+    directory = tmp_path / "directory"
+    directory.mkdir()
+    for name in ("a", "b"):
+        (directory / name).touch()
+    replacement = tmp_path / "replacement"
+    replacement.touch()
+    monkeypatch.setattr(ranges, "_identity", lambda value: "f" * 64)
+    scope = PathScope([str(directory)])
+    page = list_directory(scope, str(directory), limit=1)
+    if change == "replacement":
+        replacement.replace(directory / "b")
+    else:
+        (directory / "b").unlink()
+        (directory / "b").mkdir()
+    with pytest.raises(BridgeError) as exc:
+        list_directory(scope, str(directory), cursor=page["next_cursor"])
+    assert exc.value.code == "directory_changed"
+
+
+def test_directory_checksum_is_independent_of_enumeration_order(tmp_path, monkeypatch):
+    import kirabridge.directory_ranges as ranges
+
+    for name in ("a", "b", "c"):
+        (tmp_path / name).touch()
+    original, calls = ranges.os.scandir, []
+
+    @contextmanager
+    def reordered(fd):
+        with original(fd) as source:
+            entries = list(source)
+        calls.append(True)
+        yield iter(entries if len(calls) % 2 else list(reversed(entries)))
+
+    monkeypatch.setattr(ranges.os, "scandir", reordered)
+    scope = PathScope([str(tmp_path)])
+    first = list_directory(scope, str(tmp_path), limit=1)
+    second = list_directory(scope, str(tmp_path), limit=1, cursor=first["next_cursor"])
+    assert first["identity"] == second["identity"]
+    assert [row["name"] for row in first["entries"] + second["entries"]] == ["a", "b"]

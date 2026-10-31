@@ -63,6 +63,8 @@ def build(destination=None):
             "CryptoKit",
             "-framework",
             "SystemConfiguration",
+            "-framework",
+            "Security",
             *map(str, native_sources),
             "-o",
             str(binary),

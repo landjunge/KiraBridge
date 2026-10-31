@@ -49,8 +49,17 @@ def test_companion_metadata_binds_release_and_source(tmp_path, builder, monkeypa
     root = tmp_path / "repository"
     (root / "scripts").mkdir(parents=True)
     (root / "integrations/desktop").mkdir(parents=True)
-    source = root / "integrations/desktop/main.swift"
-    source.write_text("// isolated fixture\n")
+    sources = [
+        root / "integrations/desktop" / name
+        for name in (
+            "main.swift",
+            "SystemBridge.swift",
+            "SystemControl.swift",
+            "SystemServices.swift",
+        )
+    ]
+    for source in sources:
+        source.write_text("// isolated fixture: " + source.name + "\n")
     (root / "pyproject.toml").write_text('[project]\nversion = "0.8.0rc18"\n')
     monkeypatch.setattr(builder, "__file__", str(root / "scripts/build_desktop_app.py"))
     commit = "1" * 40
@@ -74,7 +83,16 @@ def test_companion_metadata_binds_release_and_source(tmp_path, builder, monkeypa
     assert info["KiraBridgeVersion"] == "0.8.0rc18"
     assert info["KiraBridgeSourceCommit"] == commit
     assert (
-        info["KiraBridgeCompanionSourceSHA256"] == hashlib.sha256(source.read_bytes()).hexdigest()
+        info["KiraBridgeCompanionSourceSHA256"]
+        == hashlib.sha256(
+            b"".join(source.name.encode() + b"\0" + source.read_bytes() for source in sources)
+        ).hexdigest()
     )
-    assert calls[0][-3:] == [str(source), "-o", str(destination / "Contents/MacOS/KiraBridge")]
+    assert info["KiraBridgeSystemProtocol"] == 1
+    assert calls[0][-6:] == [
+        *map(str, sources),
+        "-o",
+        str(destination / "Contents/MacOS/KiraBridge"),
+    ]
     assert calls[1] == ["/usr/bin/codesign", "--force", "--sign", "-", str(destination)]
+    assert calls[2] == ["/usr/bin/codesign", "--verify", "--deep", "--strict", str(destination)]

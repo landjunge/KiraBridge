@@ -24,11 +24,53 @@ def _identity(value):
     ).hexdigest()
 
 
+def _scan(fd, *, after="", limit=None):
+    """Bounded page plus order-independent namespace change checksum.
+
+    This is a generation checksum, not an authenticated multiset or immutable
+    snapshot. Count and summed SHA-512 entry hashes need constant memory; unlike
+    timestamps alone they detect ordinary namespace changes within one FS tick.
+    """
+    count, total = 0, 0
+    mask = (1 << 512) - 1
+    # Each pass uses our own directory descriptor, starting from its beginning.
+    os.lseek(fd, 0, os.SEEK_SET)
+
+    def entries():
+        nonlocal count, total
+        with os.scandir(fd) as iterator:
+            for entry in iterator:
+                item = {
+                    "name": entry.name,
+                    "directory": entry.is_dir(follow_symlinks=False),
+                    "symlink": entry.is_symlink(),
+                }
+                encoded = os.fsencode(entry.name)
+                digest = hashlib.sha512(
+                    len(encoded).to_bytes(8, "big")
+                    + encoded
+                    + bytes((item["directory"], item["symlink"]))
+                    + str(entry.inode()).encode("ascii")
+                ).digest()
+                count += 1
+                total = (total + int.from_bytes(digest, "big")) & mask
+                if entry.name > after:
+                    yield item
+
+    if limit is None:
+        for _ in entries():
+            pass
+        selected = None
+    else:
+        selected = heapq.nsmallest(limit + 1, entries(), key=lambda entry: entry["name"])
+    return selected, (count, format(total, "0128x"))
+
+
 def list_directory(scope, path, *, limit=1000, cursor="", expected_identity=None):
     """Rescan with bounded page memory; a mutation invalidates the entire page.
 
     A cursor is an untrusted position, never an authorization token. Every page
-    traverses PathScope again and binds the exact directory metadata generation.
+    traverses PathScope again and verifies a namespace checksum twice.
     Entry count is not silently capped; only the returned page has a size limit.
     """
     if type(limit) is not int or not 1 <= limit <= 1000:
@@ -70,28 +112,22 @@ def list_directory(scope, path, *, limit=1000, cursor="", expected_identity=None
         raise BridgeError("invalid_arguments", "Invalid directory identity")
     try:
         with scope.directory(path) as fd:
-            identity = _identity(os.fstat(fd))
+            metadata_identity = _identity(os.fstat(fd))
+            selected, content = _scan(fd, after=after, limit=limit)
+            if _identity(os.fstat(fd)) != metadata_identity:
+                raise BridgeError("directory_changed", "Directory changed during enumeration")
+            _, verified = _scan(fd)
+            if verified != content or _identity(os.fstat(fd)) != metadata_identity:
+                raise BridgeError("directory_changed", "Directory changed during verification")
+            identity = hashlib.sha256(canonical([metadata_identity, content]).encode()).hexdigest()
             if any(
                 x is not None and x != identity for x in (continuation_identity, expected_identity)
             ):
                 raise BridgeError("directory_changed", "Directory changed; start a new traversal")
 
-            def entries():
-                with os.scandir(fd) as iterator:
-                    for entry in iterator:
-                        if entry.name > after:
-                            yield {
-                                "name": entry.name,
-                                "directory": entry.is_dir(follow_symlinks=False),
-                                "symlink": entry.is_symlink(),
-                            }
-
-            selected = heapq.nsmallest(limit + 1, entries(), key=lambda entry: entry["name"])
-            if _identity(os.fstat(fd)) != identity:
-                raise BridgeError("directory_changed", "Directory changed during enumeration")
             # Reopening the full descriptor path also detects replacement of an ancestor.
             with scope.directory(path) as current:
-                if _identity(os.fstat(current)) != identity:
+                if _identity(os.fstat(current)) != metadata_identity:
                     raise BridgeError(
                         "directory_changed", "Directory path changed during enumeration"
                     )
@@ -118,5 +154,6 @@ def list_directory(scope, path, *, limit=1000, cursor="", expected_identity=None
         "identity": identity,
         "next_cursor": next_cursor,
         "returned_count": len(page),
-        "scope": "ordered directory page; continuation requires unchanged directory generation",
+        "scope": "ordered directory page; metadata/namespace change checksum, "
+        "not an authenticated or immutable snapshot",
     }

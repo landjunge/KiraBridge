@@ -1,5 +1,6 @@
 """Typed process selectors and pure native guards; never signal a real process."""
 
+import platform
 import shutil
 import subprocess
 import sys
@@ -79,7 +80,17 @@ def test_native_process_primitive_guards_without_signals(tmp_path):
         root / "integrations/desktop/SystemBridge.swift",
         root / "integrations/desktop/SystemControl.swift",
     ]
-    command = ["xcrun", "swiftc", "-swift-version", "5", *map(str, sources), "-o", str(binary)]
+    command = [
+        "xcrun",
+        "swiftc",
+        "-swift-version",
+        "5",
+        "-target",
+        f"{platform.machine()}-apple-macosx12.0",
+        *map(str, sources),
+        "-o",
+        str(binary),
+    ]
     for framework in (
         "Cocoa",
         "ApplicationServices",
@@ -89,6 +100,7 @@ def test_native_process_primitive_guards_without_signals(tmp_path):
         "ImageIO",
         "UniformTypeIdentifiers",
         "SystemConfiguration",
+        "Security",
     ):
         command.extend(["-framework", framework])
     compiled = subprocess.run(command, capture_output=True, text=True, timeout=120)
