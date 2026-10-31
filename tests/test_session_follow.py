@@ -1,4 +1,5 @@
-import inspect
+import asyncio
+import re
 
 import pytest
 from pydantic import ValidationError
@@ -47,13 +48,23 @@ def test_since_is_only_a_session_read_cursor():
         ReadQuery(operation="file.read", path="/tmp/example", since="ab" * 32)
 
 
-def test_terminal_read_source_does_not_focus_or_type():
-    source = inspect.getsource(TerminalAppTransport.read)
-    assert "contents()" in source
-    assert "frontmost" not in source
-    assert "selected" not in source
-    assert "keyCode" not in source
-    assert "doScript" not in source
+async def test_terminal_read_source_does_not_focus_or_type(monkeypatch):
+    transport = TerminalAppTransport(asyncio.Lock())
+    calls = []
+
+    async def native(source, *, mutation=False):
+        calls.append((source, mutation))
+        return "observed buffer tail"
+
+    monkeypatch.setattr(transport, "native", native)
+    assert await transport.read("terminal:9:ttys009") == "observed buffer tail"
+    assert len(calls) == 1
+    source, mutation = calls[0]
+    assert mutation is False
+    assert "tab.history()" in source and ".slice(-65536)" in source
+    assert not re.search(r"\.selected\s*=", source)
+    for action in ("frontmost", "activate()", "keyCode", "keystroke", "doScript", ".click()"):
+        assert action not in source
 
 
 async def test_cursor_follows_one_pane_and_does_not_reveal_another(bridge):

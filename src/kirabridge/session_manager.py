@@ -10,8 +10,9 @@ from contextlib import asynccontextmanager, contextmanager
 from contextvars import ContextVar
 from copy import deepcopy
 from pathlib import Path
+from typing import Literal
 
-from pydantic import Field
+from pydantic import Field, model_validator
 
 from kirabridge.bridge_core.models import BridgeError, Input, digest
 from kirabridge.filesystem_manager import PathScope
@@ -62,11 +63,23 @@ class SessionSelect(SessionReference):
 
 
 class SessionInput(SessionReference):
-    """Literal terminal text; submit sends one Return after a verified CLI paste."""
+    """Literal text, or key='enter' bound to an observed cursor and current agent PID."""
 
-    text: str = Field(min_length=1, max_length=16384)
+    text: str = Field(default="", max_length=16384)
     submit: bool = True
     require_idle: bool = False
+    key: Literal["enter"] | None = None
+    expected_cursor: str = Field(default="", pattern=r"^$|^[0-9a-f]{64}$")
+    expected_agent_pid: int | None = Field(default=None, gt=0)
+
+    @model_validator(mode="after")
+    def explicit_input_mode(self):
+        if self.key == "enter":
+            if self.text or not self.submit or not self.expected_cursor:
+                raise ValueError("Return requires empty text, submit=true and an observed cursor")
+        elif not self.text or self.expected_cursor or self.expected_agent_pid is not None:
+            raise ValueError("Literal text must be nonempty and cannot include Return-only guards")
+        return self
 
 
 class SessionOpen(Input):
@@ -472,6 +485,47 @@ class SessionManager:
             else:
                 await self.transport(pane_id).press_return(pane_id)
         return {"return_sent": True, "agent_confirmed": False}
+
+    async def return_key(self, principal, args, *, expected_screen, before_transport):
+        """One key for the separately authorized, observed view; never paste text."""
+        self.authorization.principal(principal, "session.input")
+        self.authorization.principal(principal, "terminal.execute")
+        if args.key != "enter" or args.text or not args.submit:
+            raise BridgeError("invalid_arguments", "A standalone Return requires explicit key mode")
+        async with self.lock:
+            selected = await self.selected(principal, args.pane_id, args.expected_pid)
+            if selected.get("transport") != "terminal_app":
+                raise BridgeError(
+                    "visible_terminal_required", "Return requires a visible native tab"
+                )
+            target = self.assigned_agent(selected)
+            snapshot = None
+            if target:
+                identities = self.selected_identities(selected)
+                selection = self.current_selection()
+                if (
+                    identities is None
+                    or not selection
+                    or args.expected_agent_pid != selection[1].agent_pid
+                ):
+                    raise BridgeError("visible_target_changed", "Observed agent identity changed")
+            else:
+                if args.expected_agent_pid is not None:
+                    raise BridgeError(
+                        "visible_target_changed", "Observed agent is no longer present"
+                    )
+                context = await self.terminal_app.prepare_shell_paste(selected)
+                if context["screen"] != expected_screen:
+                    raise BridgeError("visible_input_changed", "Observed terminal view changed")
+                identities, snapshot = context["identities"], context["snapshot"]
+            await before_transport()
+            await self.terminal_app.press_return(
+                args.pane_id,
+                identity_guard=identities,
+                expected_screen=expected_screen,
+                **({"shell_snapshot": snapshot} if snapshot is not None else {}),
+            )
+        return {"paste_event_sent": False, "return_sent": True, "agent_confirmed": False}
 
     async def send(self, principal, args, *, task_id=None, before_transport=None):
         self.authorization.principal(principal, "session.input")

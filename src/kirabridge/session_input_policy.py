@@ -25,8 +25,9 @@ class SessionInputPolicy:
     def stage(self, request, principal):
         """Inside enqueue's transaction, after the immutable task has been stored."""
         now = time.time()
-        immediate = marked(request.arguments["text"])
-        if immediate and not request.arguments["text"].rstrip()[: -len(SUFFIX)].strip():
+        text = request.arguments.get("text", "")
+        immediate = marked(text)
+        if immediate and not text.rstrip()[: -len(SUFFIX)].strip():
             raise BridgeError("invalid_arguments", "Input is empty after removing go-go-go")
         self.store.db.execute(
             "INSERT INTO session_input_buffers"

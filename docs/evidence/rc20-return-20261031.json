@@ -1,0 +1,456 @@
+{
+  "schema": "kirabridge.rc20.return-repair.v1",
+  "task_id": "rc20-return-key-20261031",
+  "recorded_at": "2026-10-31T10:11:14.855614+00:00",
+  "status": "source checks; package and productive activation recorded separately after their gates",
+  "source_baseline": "515e846f305511318d6dd73b88188f57a6e9a3b4",
+  "runtime_baseline_commit": "881a53f7107c4c60e2a86e747e8e5ad7eab9111d",
+  "branch": "fix/rc20-return-key-20261031",
+  "source_files_sha256": {
+    "src/kirabridge/bridge_core/bridge.py": "d9e5db3c660f885cf592736491d12adcaf839debd6f83d140e0c36605989ae4a",
+    "src/kirabridge/console_assets/center.html": "34a3a2d22a6a2843fb9c1be09ff548875c3cf84dc17f0c5e1377597a953341d5",
+    "src/kirabridge/console_assets/center.js": "a7d7fc6010eb500ecb1ae286ac4dde8247fcad79c9c6f1b747d93e6fd467077d",
+    "src/kirabridge/control_center.py": "79e583756135c40ae525bb3a3e45771ed261009d2f57781aa4414bea0e1ea300",
+    "src/kirabridge/operator_control.py": "1db94ed7b87c42df1178fcfd59cdc8e59a9a9390273a091ce0432512ef8ff4e0",
+    "src/kirabridge/output_history.py": "fccbe8ea93ac15a84902c891a3ab802c3526b48f37b65abdb6f292fa2f90e85b",
+    "src/kirabridge/platform_adapters/terminal_app.py": "2bb339282c84c8990864eea1f03391d05399cb8d18de97dede368ce8549d9015",
+    "src/kirabridge/session_input_policy.py": "3d713480b0bf567c382c4ea364005c073769594988abcbdce7123ecb22c2cf84",
+    "src/kirabridge/session_manager.py": "fca63149a57ca3f09880aee34440d16c89fdc2c24e8a9a41488208a94d560c11",
+    "src/kirabridge/session_return.py": "41cc812653557f59cf587bece5e59b7f37a3cfaf164f6f675c6afb5fdf8f522e",
+    "src/kirabridge/visible_handoff.py": "d6cc8e05ff28025d651928a786ac3ffcaff3b5c1be3da6fbfac9db840ee12bdd",
+    "tests/console_return_browser_probe.py": "c3319736a0c501fc74ae12bd22289dd388a13d625956e28ee64ad4e8b023bd63",
+    "tests/test_operator_terminal_input.py": "b40e2d0a5ee9769470a12d26b123b4b6c7702aa3797ec7edc8638a429605b2ad",
+    "tests/test_session_follow.py": "e9745315bf8f0a91c1542fb1671ede8a927a119fb235713496167f1ee9b6cc74",
+    "tests/test_session_return.py": "7839aa786614b87befc42836f9391f763b0b3f161e5e1f28d370f9083717deb5"
+  },
+  "team": {
+    "implementation_backend": "raw_terminal_input",
+    "implementation_ui_browser": "native_resume_acceptance",
+    "independent_review": "review_terminal_repairs",
+    "integration_release": "root",
+    "skill": "kira"
+  },
+  "tests": {
+    "backend_new_unique_cases_passed": 55,
+    "backend_summary_sha256": "058f7a3ddb065f6e53010b5c1e7758d01345deafa1112e99a3de9e97a9bcbdfe",
+    "existing_backend_regression": {
+      "initial_passed": 236,
+      "initial_failed": 1,
+      "preexisting_stale_static_assertion_corrected_without_runtime_change": true,
+      "only_failed_case_rerun_passed": 1,
+      "all_unique_selected_passed": 237
+    },
+    "existing_console_operator_handoff_selected_passed": 45,
+    "new_operator_status_cases_passed": 15,
+    "unique_pytest_cases_passed_incrementally": 352,
+    "whole_suite_rerun": false,
+    "browser_baseline": {
+      "total": 9,
+      "passed": 2,
+      "failed": 7,
+      "ordinary_text_enter_passed_both_engines": true
+    },
+    "browser_incremental_runs": [
+      {
+        "run": "final",
+        "passed": 45,
+        "failed": 4,
+        "total": 49,
+        "result_sha256": "29048864d9ff4cf84a6770bad6c6b200dff0f97d02e0d57d42a4e7b0f8f0d86c",
+        "source_hashes": {
+          "center.html": "34a3a2d22a6a2843fb9c1be09ff548875c3cf84dc17f0c5e1377597a953341d5",
+          "center.js": "cb87ee74bc99385d2b25fd46d8054e29b7a9d54919075c834da08753091c4653"
+        }
+      },
+      {
+        "run": "focused-freeze",
+        "passed": 2,
+        "failed": 0,
+        "total": 2,
+        "result_sha256": "a5cfb46ad3454385953022e3cfccd1108409dbfc6701b742c5915fafa5f341d2",
+        "source_hashes": {
+          "center.html": "34a3a2d22a6a2843fb9c1be09ff548875c3cf84dc17f0c5e1377597a953341d5",
+          "center.js": "cb87ee74bc99385d2b25fd46d8054e29b7a9d54919075c834da08753091c4653"
+        }
+      },
+      {
+        "run": "focused-mobile-output",
+        "passed": 4,
+        "failed": 0,
+        "total": 4,
+        "result_sha256": "7e99e19c093725b65b9ab45ab903750f8b0e63ec34b82aac11cbcecb04414707",
+        "source_hashes": {
+          "center.html": "34a3a2d22a6a2843fb9c1be09ff548875c3cf84dc17f0c5e1377597a953341d5",
+          "center.js": "a7d7fc6010eb500ecb1ae286ac4dde8247fcad79c9c6f1b747d93e6fd467077d"
+        }
+      }
+    ],
+    "browser_unique_cases_passed": 51,
+    "browser_whole_suite_repeated": false,
+    "browser_cases": [
+      {
+        "engine": "chromium",
+        "case": "typed_enter",
+        "passed": true,
+        "run": "final"
+      },
+      {
+        "engine": "chromium",
+        "case": "empty_enter",
+        "passed": true,
+        "run": "final"
+      },
+      {
+        "engine": "chromium",
+        "case": "held_enter",
+        "passed": true,
+        "run": "final"
+      },
+      {
+        "engine": "chromium",
+        "case": "double_click",
+        "passed": true,
+        "run": "final"
+      },
+      {
+        "engine": "chromium",
+        "case": "return_button",
+        "passed": true,
+        "run": "final"
+      },
+      {
+        "engine": "chromium",
+        "case": "send_button_enter",
+        "passed": true,
+        "run": "final"
+      },
+      {
+        "engine": "chromium",
+        "case": "return_button_enter",
+        "passed": true,
+        "run": "final"
+      },
+      {
+        "engine": "chromium",
+        "case": "empty_send_button",
+        "passed": true,
+        "run": "final"
+      },
+      {
+        "engine": "chromium",
+        "case": "whitespace_text",
+        "passed": true,
+        "run": "final"
+      },
+      {
+        "engine": "chromium",
+        "case": "missing_observation",
+        "passed": true,
+        "run": "final"
+      },
+      {
+        "engine": "chromium",
+        "case": "freeze_displayed_view_before_queue",
+        "passed": true,
+        "run": "focused-freeze"
+      },
+      {
+        "engine": "chromium",
+        "case": "freeze_selection_before_queue",
+        "passed": true,
+        "run": "focused-freeze"
+      },
+      {
+        "engine": "chromium",
+        "case": "pending_until_terminal",
+        "passed": true,
+        "run": "final"
+      },
+      {
+        "engine": "chromium",
+        "case": "failed_preserves_draft",
+        "passed": true,
+        "run": "final"
+      },
+      {
+        "engine": "chromium",
+        "case": "unknown_preserves_intent",
+        "passed": true,
+        "run": "final"
+      },
+      {
+        "engine": "chromium",
+        "case": "network_error_preserves_intent",
+        "passed": true,
+        "run": "final"
+      },
+      {
+        "engine": "chromium",
+        "case": "ack_pending_preserves_intent",
+        "passed": true,
+        "run": "final"
+      },
+      {
+        "engine": "chromium",
+        "case": "completed_missing_result",
+        "passed": true,
+        "run": "final"
+      },
+      {
+        "engine": "chromium",
+        "case": "completed_explicit_false",
+        "passed": true,
+        "run": "final"
+      },
+      {
+        "engine": "chromium",
+        "case": "legacy_shell_text_result",
+        "passed": true,
+        "run": "final"
+      },
+      {
+        "engine": "chromium",
+        "case": "key_requires_return_proof",
+        "passed": true,
+        "run": "final"
+      },
+      {
+        "engine": "chromium",
+        "case": "new_draft_while_pending",
+        "passed": true,
+        "run": "final"
+      },
+      {
+        "engine": "chromium",
+        "case": "same_value_new_draft_while_pending",
+        "passed": true,
+        "run": "final"
+      },
+      {
+        "engine": "chromium",
+        "case": "mobile_empty_enter",
+        "passed": true,
+        "run": "focused-mobile-output"
+      },
+      {
+        "engine": "chromium",
+        "case": "composition_enter",
+        "passed": true,
+        "run": "final"
+      },
+      {
+        "engine": "webkit",
+        "case": "typed_enter",
+        "passed": true,
+        "run": "final"
+      },
+      {
+        "engine": "webkit",
+        "case": "empty_enter",
+        "passed": true,
+        "run": "final"
+      },
+      {
+        "engine": "webkit",
+        "case": "held_enter",
+        "passed": true,
+        "run": "final"
+      },
+      {
+        "engine": "webkit",
+        "case": "double_click",
+        "passed": true,
+        "run": "final"
+      },
+      {
+        "engine": "webkit",
+        "case": "return_button",
+        "passed": true,
+        "run": "final"
+      },
+      {
+        "engine": "webkit",
+        "case": "send_button_enter",
+        "passed": true,
+        "run": "final"
+      },
+      {
+        "engine": "webkit",
+        "case": "return_button_enter",
+        "passed": true,
+        "run": "final"
+      },
+      {
+        "engine": "webkit",
+        "case": "empty_send_button",
+        "passed": true,
+        "run": "final"
+      },
+      {
+        "engine": "webkit",
+        "case": "whitespace_text",
+        "passed": true,
+        "run": "final"
+      },
+      {
+        "engine": "webkit",
+        "case": "missing_observation",
+        "passed": true,
+        "run": "final"
+      },
+      {
+        "engine": "webkit",
+        "case": "freeze_displayed_view_before_queue",
+        "passed": true,
+        "run": "final"
+      },
+      {
+        "engine": "webkit",
+        "case": "freeze_selection_before_queue",
+        "passed": true,
+        "run": "final"
+      },
+      {
+        "engine": "webkit",
+        "case": "pending_until_terminal",
+        "passed": true,
+        "run": "final"
+      },
+      {
+        "engine": "webkit",
+        "case": "failed_preserves_draft",
+        "passed": true,
+        "run": "final"
+      },
+      {
+        "engine": "webkit",
+        "case": "unknown_preserves_intent",
+        "passed": true,
+        "run": "final"
+      },
+      {
+        "engine": "webkit",
+        "case": "network_error_preserves_intent",
+        "passed": true,
+        "run": "final"
+      },
+      {
+        "engine": "webkit",
+        "case": "ack_pending_preserves_intent",
+        "passed": true,
+        "run": "final"
+      },
+      {
+        "engine": "webkit",
+        "case": "completed_missing_result",
+        "passed": true,
+        "run": "final"
+      },
+      {
+        "engine": "webkit",
+        "case": "completed_explicit_false",
+        "passed": true,
+        "run": "final"
+      },
+      {
+        "engine": "webkit",
+        "case": "legacy_shell_text_result",
+        "passed": true,
+        "run": "final"
+      },
+      {
+        "engine": "webkit",
+        "case": "key_requires_return_proof",
+        "passed": true,
+        "run": "final"
+      },
+      {
+        "engine": "webkit",
+        "case": "new_draft_while_pending",
+        "passed": true,
+        "run": "final"
+      },
+      {
+        "engine": "webkit",
+        "case": "same_value_new_draft_while_pending",
+        "passed": true,
+        "run": "final"
+      },
+      {
+        "engine": "webkit",
+        "case": "mobile_empty_enter",
+        "passed": true,
+        "run": "focused-mobile-output"
+      },
+      {
+        "engine": "chromium",
+        "case": "output_enter",
+        "passed": true,
+        "run": "focused-mobile-output"
+      },
+      {
+        "engine": "webkit",
+        "case": "output_enter",
+        "passed": true,
+        "run": "focused-mobile-output"
+      }
+    ],
+    "browser_scope": "Real headless Chromium and WebKit over actual assets with synthetic intercepted HTTP; trusted CDP IME only in Chromium. Separate native deployed acceptance required.",
+    "mobile_scope": "Existing global horizontal overflow is unchanged; targeted Return tests verify functional action and form-local controls, not full-page mobile layout.",
+    "evidence_hashes": {
+      "regression-backend.log": "ee1c6c183dd62751479ea879adada2079ce4d7729584141f811707033908fb5c",
+      "regression-backend.xml": "3cbdd65b1e168ada483f65fb800958f12a58368e8e6fc340150e174030223a79",
+      "regression-follow-correction.log": "e8c2ebdecc6c68bd31c948de0b0c1dd4c57dd47d093194a6c1d241c65727824d",
+      "regression-follow-correction.xml": "36a0e0eae463ea6fd2ceb0b25860411538a128a9221b4c8fd850c22939649ad2",
+      "regression-console-handoff.log": "e277810610fe68b77f82037b2e9c9e8b622d91c812f0f6b22facadfeb042b67a",
+      "regression-console-handoff.xml": "96a40d43301bfdc7f0ea8368e335c9f2ac4c155657707235bfef71802392951a",
+      "ruff-final-check.log": "82b3e6a6c090a57601d22943bd23fca9218d1031dbe5a7b754092f9a156b4f18",
+      "ruff-final-format.log": "04eb0d6e6734823dcd2b2b704729e976f683df7a8f334da7216520ef1cb319bf",
+      "node-final-check.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "ui-acceptance/checkpoint.json": "6dbc66641713b6d8bd19b044a287213dee998f836c4801e5a9cd0de72b6c3539",
+      "ui-acceptance/operator-after.log": "b9a76fcd2bde5686a753cbd55e635e9f9837a40067d8a7e6bac433e1d5a36fa1",
+      "ui-acceptance/operator-status-header-initial.log": "d4f6ddf396cd4cdc311a6b109ec06b905f576b6d7ae1cc253aba9b7a71351658",
+      "node-output-listener-check.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "operator_header_followup": {
+      "initial_failed": 1,
+      "cause": "Redundant per-route no-store header combined with existing global header; removed redundant addition",
+      "affected_case_rerun_passed": 1,
+      "seconds": 0.11,
+      "global_no_store_protection_preserved": true
+    },
+    "ui_checkpoint_sha256": "6dbc66641713b6d8bd19b044a287213dee998f836c4801e5a9cd0de72b6c3539"
+  },
+  "safety": {
+    "single_return_no_paste": true,
+    "exact_observed_owner_pane_pid_cursor": true,
+    "expected_agent_pid_for_codex": true,
+    "native_identity_focus_and_screen_guard": true,
+    "durable_attempt_before_transport": true,
+    "unknown_never_replayed": true,
+    "ui_unknown_intent_latched_and_pollable": true,
+    "normal_agent_work_protocol_preserved": true
+  },
+  "backup": {
+    "private_root": "/Users/landjunge/.local/share/kirabridge/backups/rc20-return-key-20261031-01",
+    "baseline_directory": "preinstall-20261031T093902Z",
+    "runtime_entries_verified": 1330,
+    "active_config_files_saved": 8,
+    "sqlite_integrity": "ok",
+    "original_installer_and_wheel_preserved": true,
+    "console_definition_saved": true
+  },
+  "deployment": {
+    "performed_at_source_checkpoint": false,
+    "separate_console_upgrade_required": true,
+    "swift_rebuild_required": false,
+    "no_push": true,
+    "no_public_release": true
+  },
+  "source_review": {
+    "independent": "review_terminal_repairs",
+    "result": "no_remaining_identified_blocker",
+    "js_final_sha256": "a7d7fc6010eb500ecb1ae286ac4dde8247fcad79c9c6f1b747d93e6fd467077d",
+    "scope": "Source review only; package and actual deployed native acceptance remain separate gates"
+  }
+}

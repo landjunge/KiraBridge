@@ -1,6 +1,7 @@
 "use strict";
 const $=id=>document.getElementById(id);
 let statusData=null,connections=null,identity="chatgpt",sessions=[],activeView="overview",busy=false;
+let displayedTerminal=null,terminalIntent=null,terminalLastIntent=null,terminalDraftVersion=0,terminalComposing=false,terminalComposeEnter=false;
 let serviceFingerprint="";
 const names={local:"Du",chatgpt:"Kira · ChatGPT",grok_app:"Grok · App",codex:"Codex",grok:"Grok · Terminal"};
 function node(tag,text,cls){const n=document.createElement(tag);if(text!==undefined)n.textContent=text;if(cls)n.className=cls;return n;}
@@ -30,9 +31,102 @@ function renderConnections(){if(!connections)return;const kira=identity==="chatg
 async function refresh(announce=false){if(busy&&!announce)return;try{const results=await Promise.all([api("/api/control/status"),api("/api/control/connections")]);renderStatus(results[0]);connections=results[1];renderConnections();if(announce)notice(results[0].bridge.dispatcher_active?"Zustände geprüft. KiraBridge antwortet.":"KiraBridge antwortet nicht. Start ist links direkt möglich.",!results[0].bridge.dispatcher_active);}catch(e){notice(e.message,true);$("bridge-indicator").className="bridge-indicator inactive";$("bridge-indicator").replaceChildren(node("span",undefined,"dot"),node("span","Zustand nicht erreichbar"));}}
 let actionQueue=Promise.resolve();function perform(callback){const pending=actionQueue.then(async()=>{busy=true;try{await callback();}catch(e){notice(e.message,true);}finally{busy=false;}});actionQueue=pending.catch(()=>{});return pending;}
 async function doctor(repair){notice(repair?"Der Doktor behebt erreichbare Probleme …":"Der Doktor prüft …");const result=await api("/api/control/doctor",repair?{method:"POST",body:"{}"}:{});$("doctor-checks").replaceChildren(...result.checks.map(c=>{const n=node("div",undefined,"doctor-check");n.append(node("span",c.ok?"✓":"!",c.ok?"ok":"problem"));const t=node("div");t.append(node("strong",c.name),node("p",c.message));n.append(t);return n;}));const missing=result.checks.filter(c=>!c.ok).length;$("doctor-summary").textContent=missing?missing+" Punkt(e) brauchen Aufmerksamkeit.":"Alle geprüften Punkte funktionieren.";const peers=result.checks.find(c=>c.name==="Agenten untereinander");if(peers)$("peer-summary").textContent=peers.message;notice(result.repaired.length?result.repaired.join(" · "):missing?"Prüfung abgeschlossen. Fehlende Punkte sind sichtbar.":"Prüfung abgeschlossen: Alles Geprüfte funktioniert.");if(repair)await refresh(true);}
-async function loadTerminals(){try{const result=await api("/api/control/terminals");sessions=result.sessions||[];const previous=$("terminal-select").value;$("terminal-select").replaceChildren(...sessions.map(s=>{const n=node("option",s.pane_id+" · "+(s.busy===true?"Programm läuft":s.busy===false?"Terminal wartet":"Prozess erkannt"));n.value=s.pane_id;return n;}));if(!sessions.length)$("terminal-select").append(node("option","Keine erreichbare Sitzung"));if(sessions.some(s=>s.pane_id===previous))$("terminal-select").value=previous;$("terminal-state").textContent=sessions.length+" erreichbare Sitzung(en). Bereitschaft wird bei der Übergabe geprüft.";if(sessions.length)await readTerminal();}catch(e){notice(e.message,true);}}
+async function loadTerminals(){displayedTerminal=null;updateTerminalInputControls();try{const result=await api("/api/control/terminals");sessions=result.sessions||[];const previous=$("terminal-select").value;$("terminal-select").replaceChildren(...sessions.map(s=>{const n=node("option",s.pane_id+" · "+(s.busy===true?"Programm läuft":s.busy===false?"Terminal wartet":"Prozess erkannt"));n.value=s.pane_id;return n;}));if(!sessions.length)$("terminal-select").append(node("option","Keine erreichbare Sitzung"));if(sessions.some(s=>s.pane_id===previous))$("terminal-select").value=previous;$("terminal-state").textContent=sessions.length+" erreichbare Sitzung(en). Bereitschaft wird bei der Übergabe geprüft.";if(sessions.length)await readTerminal();}catch(e){notice(e.message,true);}}
 function selectedTerminal(){return sessions.find(s=>s.pane_id===$("terminal-select").value);}
-async function readTerminal(selected=selectedTerminal()){if(!selected)return;const result=await api("/api/control/terminal/read",{method:"POST",body:JSON.stringify({pane_id:selected.pane_id,expected_pid:selected.expected_pid})});if(selectedTerminal()?.pane_id!==selected.pane_id||selectedTerminal()?.expected_pid!==selected.expected_pid)return;$("terminal-output").textContent=result.text;$("terminal-output").scrollTop=$("terminal-output").scrollHeight;}
+async function readTerminal(selected=selectedTerminal()){if(!selected)return;const result=await api("/api/control/terminal/read",{method:"POST",body:JSON.stringify({pane_id:selected.pane_id,expected_pid:selected.expected_pid})});if(selectedTerminal()?.pane_id!==selected.pane_id||selectedTerminal()?.expected_pid!==selected.expected_pid)return;$("terminal-output").textContent=result.text;$("terminal-output").scrollTop=$("terminal-output").scrollHeight;const agent=result.input_readiness?.binding?.agent_pid;displayedTerminal=typeof result.next_cursor==="string"&&result.next_cursor?{pane_id:selected.pane_id,expected_pid:selected.expected_pid,cursor:result.next_cursor,agent_pid:Number.isSafeInteger(agent)&&agent>0?agent:null}:null;updateTerminalInputControls();}
+function displayedTerminalFor(selected=selectedTerminal()){
+ return selected&&displayedTerminal?.pane_id===selected.pane_id&&displayedTerminal?.expected_pid===selected.expected_pid?displayedTerminal:null;
+}
+function updateTerminalInputControls(){
+ const waiting=!!terminalIntent;
+ $("terminal-send").disabled=waiting||terminalComposing;
+ $("terminal-return").disabled=waiting||terminalComposing||!displayedTerminalFor();
+ $("terminal-form").setAttribute("aria-busy",String(waiting));
+}
+function terminalDeliveryConfirmed(intent,delivery){
+ if(delivery.state!=="completed")return false;
+ const result=delivery.result;
+ return result?.return_sent===true||(intent.kind==="text"&&result?.input_handed_to_transport===true&&result?.submitted===true&&result?.return_sent!==false);
+}
+function terminalDeliveryMessage(intent,delivery){
+ const label=intent.kind==="key"?"Tastendruck":"Eingabe";
+ if(delivery.ui_completion?.pending)return "Die Rückmeldung wird noch abgeglichen. Deine Eingabe bleibt erhalten.";
+ if(delivery.state==="completed")return terminalDeliveryConfirmed(intent,delivery)?(intent.kind==="key"?"Return zugestellt.":"Eingabe an das Terminal übergeben.")+" Die Terminalausgabe zeigt das Ergebnis.":"Der Auftrag ist beendet, die Übergabe aber noch nicht bestätigt. Eingabe und Auftrag bleiben erhalten.";
+ if(delivery.state==="unknown")return "Die Zustellung ist unklar. Eingabe und Auftrag bleiben erhalten. Bitte das Protokoll prüfen; nicht erneut senden.";
+ if(["failed","rejected","blocked","cancelled"].includes(delivery.state)){
+  const error=delivery.error?.message||delivery.error?.code;
+  return label+" wurde nicht bestätigt"+(error?" ("+error+")":"")+". Deine Eingabe bleibt erhalten.";
+ }
+ return delivery.state==="created"?"Der Auftrag wartet unter Rechte auf deine Erlaubnis.":label+" wird zugestellt. Deine Eingabe bleibt bis zur Bestätigung erhalten.";
+}
+async function applyTerminalDelivery(intent,value){
+ const delivery=value.task||value;
+ if(terminalIntent!==intent)return;
+ if(delivery.id!=="input-"+intent.actionId)throw Error("Die Rückmeldung konnte dem Eingabeauftrag nicht zugeordnet werden.");
+ intent.delivery=delivery;
+ const finished=["completed","failed","rejected","unknown","cancelled","blocked"].includes(delivery.state);
+ if(!finished||delivery.ui_completion?.pending||delivery.state==="unknown"||(delivery.state==="completed"&&!terminalDeliveryConfirmed(intent,delivery))){notice(terminalDeliveryMessage(intent,delivery),!!delivery.ui_completion?.error||delivery.state==="unknown"||(delivery.state==="completed"&&!terminalDeliveryConfirmed(intent,delivery)));return;}
+ intent.settling=true;
+ const selected=selectedTerminal(),same=selected?.pane_id===intent.body.pane_id&&selected?.expected_pid===intent.body.expected_pid;
+ let readError=null;
+ if(same){try{await readTerminal(selected);}catch(e){displayedTerminal=null;readError=e;}}
+ if(terminalIntent!==intent)return;
+ if(terminalDeliveryConfirmed(intent,delivery)&&intent.kind==="text"&&same&&terminalDraftVersion===intent.draftVersion&&$("terminal-text").value===intent.draft){$("terminal-text").value="";terminalDraftVersion++;}
+ terminalIntent=null;updateTerminalInputControls();
+ notice(terminalDeliveryMessage(intent,delivery)+(readError?" Die Terminalausgabe konnte noch nicht aktualisiert werden.":""),delivery.state!=="completed"||!!readError);
+}
+async function pollTerminalInput(intent=terminalIntent){
+ if(!intent||terminalIntent!==intent||intent.polling||intent.settling)return;
+ intent.polling=true;
+ try{await applyTerminalDelivery(intent,await api("/api/control/terminal/input/"+encodeURIComponent(intent.actionId),{cache:"no-store"}));}
+ catch(e){if(terminalIntent===intent)notice("Der Zustellstatus ist noch unklar. Eingabe und Auftrag bleiben erhalten. "+e.message,true);}
+ finally{intent.polling=false;}
+}
+function sendTerminalInput(kind){
+ if(terminalIntent||terminalComposing||terminalComposeEnter)return;
+ const selected=selectedTerminal();
+ if(!selected){notice("Bitte zuerst eine Sitzung wählen.",true);return;}
+ const draft=$("terminal-text").value;
+ if(kind==="text"&&draft===""){notice("Text eingeben oder Return verwenden.",true);return;}
+ const body={pane_id:selected.pane_id,expected_pid:selected.expected_pid,text:kind==="key"?"":draft,action_id:uuid()};
+ if(kind==="key"){
+  const observed=displayedTerminalFor(selected);
+  if(!observed){notice("Bitte zuerst die aktuelle Terminalansicht prüfen.",true);return;}
+  body.key="enter";body.expected_cursor=observed.cursor;
+  if(observed.agent_pid!==null)body.expected_agent_pid=observed.agent_pid;
+ }
+ // Freeze the displayed view and identity at the physical intent, before the
+ // shared action queue can run another refresh or selection change.
+ const intent={kind,body:Object.freeze(body),actionId:body.action_id,draft,draftVersion:terminalDraftVersion,polling:false,settling:false};
+ terminalIntent=intent;terminalLastIntent=intent;updateTerminalInputControls();notice("Eingabe wird zugestellt …");
+ perform(async()=>{
+  try{await applyTerminalDelivery(intent,await api("/api/control/terminal/input",{method:"POST",body:JSON.stringify(intent.body)}));}
+  catch(e){if(terminalIntent===intent)notice("Die Zustellung ist noch unklar. Eingabe und Auftrag bleiben erhalten. "+e.message,true);}
+  if(terminalIntent===intent)pollTerminalInput(intent);
+ });
+}
+function bindTerminalInput(){
+ const form=$("terminal-form");
+ $("terminal-text").addEventListener("input",()=>{terminalDraftVersion++;});
+ form.addEventListener("compositionstart",()=>{terminalComposing=true;updateTerminalInputControls();});
+ form.addEventListener("compositionend",()=>{terminalComposing=false;updateTerminalInputControls();});
+ form.addEventListener("keydown",event=>{
+  if(event.key!=="Enter")return;
+  if(event.isComposing||terminalComposing||event.keyCode===229){terminalComposeEnter=true;setTimeout(()=>{terminalComposeEnter=false;},0);return;}
+  event.preventDefault();
+  if(event.repeat||terminalIntent)return;
+  sendTerminalInput(event.target===$("terminal-return")||(event.target===$("terminal-text")&&$("terminal-text").value==="")?"key":"text");
+ });
+ form.addEventListener("submit",event=>{event.preventDefault();sendTerminalInput("text");});
+ $("terminal-return").addEventListener("click",()=>sendTerminalInput("key"));
+ $("terminal-output").addEventListener("keydown",event=>{
+  if(event.key!=="Enter")return;
+  event.preventDefault();
+  if(event.repeat||event.isComposing||event.keyCode===229||terminalComposing||terminalIntent)return;
+  sendTerminalInput("key");
+ });
+ updateTerminalInputControls();
+}
 async function loadApprovals(){
   try{
     const data=await api("/api/tasks");
@@ -56,6 +150,6 @@ async function loadApprovals(){
   }catch(e){notice(e.message,true);}
 }
 document.querySelectorAll("[data-view]").forEach(b=>b.addEventListener("click",()=>showView(b.dataset.view)));document.querySelectorAll("[data-go]").forEach(b=>b.addEventListener("click",()=>showView(b.dataset.go)));document.querySelectorAll("[data-identity]").forEach(b=>b.addEventListener("click",()=>{identity=b.dataset.identity;renderConnections();}));document.querySelectorAll('input[name="permission"]').forEach(n=>n.addEventListener("change",()=>{document.querySelectorAll('input[name="permission"]').forEach(r=>delete r.dataset.edited);n.dataset.edited="true";}));
-$("permissions-save").addEventListener("click",()=>{const chosen=document.querySelector('input[name="permission"]:checked');perform(async()=>{if(!chosen)throw Error("Bitte eine der drei Stufen wählen.");notice("Rechte werden übernommen …");const result=await api("/api/control/permissions",{method:"POST",body:JSON.stringify({level:chosen.value})});document.querySelectorAll('input[name="permission"]').forEach(n=>delete n.dataset.edited);notice(result.label+" ist jetzt aktiv.");await refresh(true);});});$("refresh").addEventListener("click",()=>refresh(true));$("doctor-check").addEventListener("click",()=>perform(()=>doctor(false)));$("doctor-repair").addEventListener("click",()=>perform(()=>doctor(true)));$("protocol-open").addEventListener("click",()=>window.open("/protocol","kirabridge-protocol","width=1000,height=750,resizable=yes,scrollbars=yes"));$("terminal-refresh").addEventListener("click",()=>perform(loadTerminals));$("terminal-select").addEventListener("change",()=>{const selection=selectedTerminal();perform(()=>readTerminal(selection));});for(const name of ["codex","grok"])$("terminal-new-"+name).addEventListener("click",()=>perform(async()=>{await act(name,"start");await loadTerminals();}));$("terminal-form").addEventListener("submit",event=>{event.preventDefault();const selected=selectedTerminal();const submittedText=$("terminal-text").value;perform(async()=>{if(!selected)throw Error("Bitte zuerst eine Sitzung wählen.");const delivery=await api("/api/control/terminal/input",{method:"POST",body:JSON.stringify({pane_id:selected.pane_id,expected_pid:selected.expected_pid,text:submittedText,action_id:uuid()})});if($("terminal-text").value===submittedText)$("terminal-text").value="";notice(delivery.state==="completed"?"Eingabe zugestellt. Die Terminalausgabe zeigt die tatsächliche Antwort.":delivery.state==="created"?"Die Eingabe wartet unter Rechte auf deine Erlaubnis.":delivery.state==="failed"?"Die Eingabe ist fehlgeschlagen. Fehler im Protokoll.":"Eingabe gespeichert; die Zustellung ist noch nicht bestätigt.",delivery.state==="failed");await readTerminal();});});setInterval(()=>{if(!document.hidden){refresh();if(activeView==="permissions"&&!busy)loadApprovals();if(activeView==="terminals"&&!busy)readTerminal().catch(e=>notice(e.message,true));}},4000);refresh(true);
+$("permissions-save").addEventListener("click",()=>{const chosen=document.querySelector('input[name="permission"]:checked');perform(async()=>{if(!chosen)throw Error("Bitte eine der drei Stufen wählen.");notice("Rechte werden übernommen …");const result=await api("/api/control/permissions",{method:"POST",body:JSON.stringify({level:chosen.value})});document.querySelectorAll('input[name="permission"]').forEach(n=>delete n.dataset.edited);notice(result.label+" ist jetzt aktiv.");await refresh(true);});});$("refresh").addEventListener("click",()=>refresh(true));$("doctor-check").addEventListener("click",()=>perform(()=>doctor(false)));$("doctor-repair").addEventListener("click",()=>perform(()=>doctor(true)));$("protocol-open").addEventListener("click",()=>window.open("/protocol","kirabridge-protocol","width=1000,height=750,resizable=yes,scrollbars=yes"));$("terminal-refresh").addEventListener("click",()=>perform(async()=>{await loadTerminals();await pollTerminalInput();}));$("terminal-select").addEventListener("change",()=>{displayedTerminal=null;terminalDraftVersion++;updateTerminalInputControls();const selection=selectedTerminal();perform(()=>readTerminal(selection));});for(const name of ["codex","grok"])$("terminal-new-"+name).addEventListener("click",()=>perform(async()=>{await act(name,"start");await loadTerminals();}));bindTerminalInput();setInterval(()=>{if(!document.hidden){if(terminalIntent)pollTerminalInput();refresh();if(activeView==="permissions"&&!busy)loadApprovals();if(activeView==="terminals"&&!busy)readTerminal().catch(e=>notice(e.message,true));}},4000);refresh(true);
 
 $("mobile-process").addEventListener("change",mobileControls);$("mobile-start").addEventListener("click",()=>{const service=$("mobile-process").value;perform(()=>act(service,"start"));});$("mobile-restart").addEventListener("click",()=>{const service=$("mobile-process").value;perform(()=>act(service,"restart"));});

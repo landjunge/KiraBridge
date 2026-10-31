@@ -36,7 +36,12 @@ funktioniert unabhängig von ThreadDesk und anderen Integrationen.
 Direkte Terminaleingaben wie `/resume` verwenden `task_request` mit
 `operation="session.input"` und den aktuellen `pane_id`-/`expected_pid`-Werten.
 `text` wird unverändert eingefügt; `submit=true` sendet anschließend einmal Enter,
-`submit=false` belässt den Text im Eingabefeld. Agentenaufträge verwenden
+`submit=false` belässt den Text im Eingabefeld. Eine einzelne Return-Taste nutzt
+ausdrücklich `key="enter"`, leeren Text und den `next_cursor` der angezeigten
+Sitzung; bei Codex gehört dessen beobachtete Agenten-PID dazu. Die Oberfläche
+bietet dafür eine Return-Schaltfläche und behandelt Text, Tastenwiederholung
+und unklare Zustellung getrennt. Vertrag und Prüfstand stehen im
+[Return-Reparaturbericht](docs/RC20-RETURN-20261031.md). Agentenaufträge verwenden
 `agent.execute` oder `message_send(kind="work")` mit Empfangs- und Ergebnisprotokoll.
 Die [RC20-Reparatur und ihre Tests](docs/RC20-TERMINAL-INPUT-20261030.md) sowie die
 [anschließend autorisierte Installation](docs/RC20-881A53F-INSTALL-20261031.md)

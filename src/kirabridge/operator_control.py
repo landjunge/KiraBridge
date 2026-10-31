@@ -37,6 +37,7 @@ NAMES = {
     "copilot": "Copilot",
     "console": "Steuerfenster",
 }
+INPUT_TERMINAL_STATES = {"completed", "failed", "cancelled", "unknown", "blocked", "rejected"}
 
 
 class OperatorControl:
@@ -234,6 +235,15 @@ class OperatorControl:
 
     async def terminal_input(self, value):
         identity = action_identity(value)
+        arguments = {
+            "pane_id": value.get("pane_id"),
+            "expected_pid": value.get("expected_pid"),
+            "text": value.get("text", ""),
+            "submit": True,
+        }
+        for name in ("key", "expected_cursor", "expected_agent_pid"):
+            if name in value:
+                arguments[name] = value[name]
         result = await self.rpc(
             "action_request",
             {
@@ -242,35 +252,78 @@ class OperatorControl:
                     "task_id": "input-" + identity,
                     "idempotency_key": "input-" + identity,
                     "operation": "session.input",
-                    "arguments": {
-                        "pane_id": value.get("pane_id"),
-                        "expected_pid": value.get("expected_pid"),
-                        "text": value.get("text"),
-                        "submit": True,
-                    },
+                    "arguments": arguments,
                 },
             },
         )
-        if result.get("state") == "queued":
+        return await self.terminal_input_status(
+            identity, wait_seconds=5 if result.get("state") == "queued" else 0
+        )
+
+    async def terminal_input_status(self, identity, *, wait_seconds=0):
+        """Read this UI intent and acknowledge only its processed completion.
+
+        Status requests never enqueue or repeat input. Outcome and completion
+        notice commit atomically; an absent notice after a terminal task can
+        also mean it was already acknowledged or explicitly retired.
+        """
+        identity = action_identity({"action_id": identity})
+        task_id, target = "input-" + identity, "ui-input:" + identity
+
+        async def current():
+            task = await self.rpc("task_get", {"task_id": task_id})
+            if task.get("id") != task_id or task.get("operation") != "session.input":
+                raise BridgeError("terminal_task_mismatch", "Terminalauftrag nicht zugeordnet")
+            return task
+
+        task = await current()
+        processed = 0
+        try:
             delivery = await self.rpc(
                 "completion_receive",
                 {
-                    "target": "ui-input:" + identity,
-                    "limit": 1,
-                    "wait_seconds": 5,
+                    "target": target,
+                    "source_id": task_id,
+                    "limit": 20,
+                    "wait_seconds": 0 if task["state"] in INPUT_TERMINAL_STATES else wait_seconds,
                 },
             )
-            for notice in delivery.get("notices", []):
-                if notice["payload"].get("task_id") == "input-" + identity:
-                    result = await self.rpc("task_get", {"task_id": "input-" + identity})
-                    await self.rpc(
-                        "completion_ack",
-                        {
-                            "notice_id": notice["id"],
-                            "receipt": notice["receipt"],
-                        },
+            notices = delivery.get("notices", [])
+            for notice in notices:
+                payload = notice.get("payload", {})
+                if (
+                    notice.get("target") != target
+                    or payload.get("task_id") != task_id
+                    or payload.get("source") != "task"
+                ):
+                    raise BridgeError(
+                        "completion_scope_mismatch", "Rückmeldung gehört nicht zu dieser Eingabe"
                     )
-        return result
+                # A late notice may supersede an older unknown result. Read the
+                # actual task immediately before acknowledging the observation.
+                task = await current()
+                if task["state"] not in INPUT_TERMINAL_STATES:
+                    return {**task, "ui_completion": {"pending": True, "processed": processed}}
+                await self.rpc(
+                    "completion_ack",
+                    {"notice_id": notice["id"], "receipt": notice["receipt"]},
+                )
+                processed += 1
+            return {
+                **task,
+                "ui_completion": {"pending": len(notices) == 20, "processed": processed},
+            }
+        except BridgeError as exc:
+            # Keep the original task identity/result. The next scoped status
+            # read can reconcile a missing ACK reply; it never resends input.
+            return {
+                **task,
+                "ui_completion": {
+                    "pending": True,
+                    "processed": processed,
+                    "error": {"code": exc.code},
+                },
+            }
 
     async def reload_bridge(self):
         health = await self.operations.activate()

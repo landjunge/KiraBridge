@@ -731,10 +731,13 @@ class TerminalAppTransport:
             mutation=True,
         )
 
-    async def press_return(self, pane_id, *, identity_guard=None, expected_screen=None):
+    async def press_return(
+        self, pane_id, *, identity_guard=None, expected_screen=None, shell_snapshot=None
+    ):
         await self.native(
             self.native_focus(pane_id)
             + self.native_identity_guard(identity_guard)
+            + (self.native_shell_guard(shell_snapshot) if shell_snapshot is not None else "")
             + "\ncheckFocus();"
             + self.native_screen_guard(expected_screen)
             + "\nse.keyCode(36); JSON.stringify({return_sent:true});",

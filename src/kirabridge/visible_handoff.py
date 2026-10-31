@@ -323,6 +323,7 @@ class VisibleHandoffs:
         busy_message="Existing handoff must finish or reconcile",
         explicit_paste_task_id=None,
         explicit_handoff_task_id=None,
+        explicit_return_task_id=None,
         observed_sessions=None,
     ):
         """Keep the input lock until authenticated receipt and verified target readiness."""
@@ -342,6 +343,23 @@ class VisibleHandoffs:
                     "Literal paste requires task-owned native identities",
                 )
             await self.check_target(principal, target, binding, ready=True)
+        if explicit_return_task_id is not None:
+            # The key owner has already validated its scoped observation and
+            # current Return frame. This is a resource check, never Paste-ready
+            # permission for a menu or a nonempty composer.
+            selection = self.sessions.current_selection()
+            if (
+                not explicit_return_task_id
+                or not selection
+                or selection[0] != target
+                or selection[1] != binding
+                or binding.expected_pid == binding.agent_pid
+                or not isinstance(selection[2], dict)
+                or not {binding.expected_pid, binding.agent_pid}.issubset(selection[2])
+            ):
+                raise BridgeError(
+                    "visible_selection_required", "Return requires task-owned native identities"
+                )
         active = self.store.db.execute(
             "SELECT id,principal,state,binding FROM visible_handoffs WHERE target=? "
             "AND NOT EXISTS (SELECT 1 FROM queue_holds h WHERE "
@@ -352,6 +370,10 @@ class VisibleHandoffs:
             (target,),
         ).fetchall()
         for row in active:
+            if explicit_return_task_id is not None and self.independent_unknown_paste(
+                row, binding, explicit_return_task_id
+            ):
+                continue  # Another proven-independent resource retains its complete uncertainty.
             if explicit_paste_task_id is not None and self.independent_unknown_paste(
                 row, binding, explicit_paste_task_id
             ):

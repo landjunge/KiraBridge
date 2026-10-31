@@ -484,6 +484,10 @@ class Bridge:
                 },
             }
         if operation == "session.input":
+            if args.key == "enter":
+                from kirabridge.session_return import execute
+
+                return await execute(self, task, args, running, progress)
             selected = await self.sessions.selected(principal, args.pane_id, args.expected_pid)
             target, selected_binding = self.sessions.explicit_agent_binding(selected)
             if target:
