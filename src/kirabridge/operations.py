@@ -7,8 +7,13 @@ manager, platform adapter or configuration and cannot start work.
 from dataclasses import asdict, dataclass
 from typing import Literal
 
+from kirabridge.system_operations import SYSTEM_LEAVES, SYSTEM_READ_OPERATIONS
+
 READ_OPERATIONS = frozenset(
     {
+        *SYSTEM_READ_OPERATIONS,
+        "process.output",
+        "system.report",
         "platform.status",
         "files.inventory",
         "files.status",
@@ -65,6 +70,7 @@ OPERATIONS = {}
 for _name in (
     *READ_OPERATIONS,
     *STOP_OPERATIONS,
+    *SYSTEM_LEAVES,
     "files.prepare",
     "files.transfer",
     "session.open",
@@ -91,7 +97,9 @@ for _name in (
     "admin.execute",
 ):
     OPERATIONS[_name] = Operation(
-        capability="bridge.health"
+        capability="process.inspect"
+        if _name == "process.output"
+        else "bridge.health"
         if _name == "platform.status"
         else "threaddesk.manage"
         if _name == "threaddesk.dynamic"

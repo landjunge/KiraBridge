@@ -4,10 +4,11 @@ Run against worktree source with PYTHONPATH=src. This starts a private authentic
 HTTP MCP instance, never installs/restarts a service, and never types into an
 existing agent. Captures under --root are private, not publication artifacts.
 An unknown input outcome stops the test; the input is never replayed.
-Known separate limitation: a short, noncollapsed multiline draft may wrap so
-native_paste_observation cannot prove its full last logical line. Run04 stopped
-with visible_paste_unconfirmed before Return; this harness does not relax that
-product guard. The optional agent setup fixture is explicitly one short line.
+Historical Run04 refused a short noncollapsed multiline paste before Return;
+that failed evidence remains historical. Current source supports bounded simple
+logical newlines plus softwrap, exercised by the new default local-reply fixture.
+Unsupported representations still fail closed; only the new physical run decides
+acceptance. The optional agent setup fixture is explicitly one short line.
 """
 
 from __future__ import annotations
@@ -59,6 +60,13 @@ while not (root/'release-busy').exists():
 
 def sha(text):
     return hashlib.sha256(text.encode()).hexdigest()
+
+
+def bounded_rollout_bytes(path):
+    with path.open("rb") as stream:
+        raw = stream.read(8 * 1024 * 1024 + 1)
+    assert len(raw) <= 8 * 1024 * 1024, "Own rollout exceeds the private acceptance budget"
+    return raw
 
 
 def old_insertion_verifier(source_root):
@@ -175,6 +183,66 @@ def owned_turn_messages(records, thread_id, expected_prompt, expected_answer):
         "assistant_answer_count": 1,
         "task_complete_observed": True,
         "response_item_mirrors_counted": False,
+    }
+
+
+def local_reply_protocol_proof(result, binding, body, marker, raw, workspace):
+    """Independently bind the returned local proof to bytes of this own rollout."""
+    assert result["scope"] == "local_agent_turn" and result["text"] == marker, result
+    assert result["reply_source"] == "bound_local_codex_rollout"
+    assert result["agent_confirmed"] is False and result["request_reply_satisfied"] is True
+    assert result["work_completion_verified"] is False
+    assert result["project_completion_verified"] is False
+    proof = result["evidence"]
+    assert proof["binding"] == binding.model_dump()
+    assert binding.codex_thread_id is None and binding.codex_rollout_path is None
+    assert proof["process_writer_verified"] is True and proof["task_complete_observed"] is True
+    assert proof["agent_confirmed"] is False and proof.get("reply_id") is None
+    assert "authenticated_principal" not in proof
+    assert proof["expected_payload_sha256"] == sha(body)
+    protocol = proof["protocol_binding"]
+    assert protocol["origin"] == "process_writer_discovery"
+    assert protocol["cwd"] == str(workspace)
+    assert isinstance(raw, bytes) and len(raw) <= 8 * 1024 * 1024
+    baseline = proof["baseline_offset"]
+    assert type(baseline) is int and 0 < baseline < len(raw)
+    assert raw[:baseline].endswith(b"\n")
+    assert hashlib.sha256(raw[:baseline]).hexdigest() == proof["baseline_sha256"]
+    header = json.loads(raw.split(b"\n", 1)[0])
+    assert header["type"] == "session_meta"
+    assert header["payload"]["id"] == protocol["thread_id"]
+    assert header["payload"]["originator"] == "codex-tui"
+    assert header["payload"]["cwd"] == str(workspace)
+    # More metadata can be appended after the adapter's final observation.
+    # Find only the exact newline-delimited prefix its hash attests, never
+    # reinterpret a changed/partial line or search arbitrary text for markers.
+    digest = hashlib.sha256()
+    consumed, records, observed = baseline, [header], None
+    for line in raw[baseline:].splitlines(keepends=True):
+        if not line.endswith(b"\n"):
+            break
+        digest.update(line)
+        consumed += len(line)
+        records.append(json.loads(line))
+        if digest.hexdigest() == proof["appended_sha256"]:
+            observed = owned_turn_messages(records, protocol["thread_id"], body, marker)
+            break
+    assert observed is not None, "No complete own turn inside the exact returned protocol proof"
+    assert observed["event_family"] == "item_completed"
+    assert observed["turn_id"] == proof["turn_id"]
+    assert observed["user_item_id"] == proof["user_item_id"]
+    assert observed["answer_item_id"] == proof["final_item_id"]
+    return {
+        **observed,
+        "binding_origin": protocol["origin"],
+        "baseline_offset": baseline,
+        "proof_end_offset": consumed,
+        "baseline_sha256": proof["baseline_sha256"],
+        "appended_sha256": proof["appended_sha256"],
+        "expected_payload_sha256": sha(body),
+        "process_writer_verified": True,
+        "agent_confirmed": False,
+        "request_reply_satisfied": True,
     }
 
 
@@ -340,8 +408,9 @@ async def accept(
         "acceptance": "in_progress",
         "production_modified": False,
         "known_native_input_limitation": (
-            "Short noncollapsed multiline input can remain visible_paste_unconfirmed; "
-            "no Return/replay. Separate from the corrected disappearing shortcut footer."
+            "Historical Run04 multiline refusal retained. Current bounded logical-newline/"
+            "softwrap support is exercised by this run's default local-reply fixture; "
+            "unsupported representations still stop without Return or replay."
         ),
     }
     owned = binding = rollout = None
@@ -544,8 +613,8 @@ async def accept(
                 assert isinstance(result.structuredContent, dict), result
                 return result.structuredContent
 
-            async def completed(value, *, peer="chatgpt"):
-                async with asyncio.timeout(45):
+            async def completed(value, *, peer="chatgpt", timeout=45):
+                async with asyncio.timeout(timeout):
                     while True:  # noqa: ASYNC110 -- own persisted task state readback
                         task = await call("task_get", {"task_id": value.task_id}, peer=peer)
                         if task.get("state") in TERMINAL:
@@ -555,13 +624,13 @@ async def accept(
                             return task
                         await asyncio.sleep(0.15)
 
-            async def submit(value):
+            async def submit(value, *, timeout=45):
                 result = await call("action_request", {"request": value.model_dump()})
                 # Immediate native admission can already return the terminal
                 # task's expected failure (busy/stale); this is still an
                 # accepted, persisted task, distinct from schema rejection.
                 assert result.get("id") == value.task_id, result
-                return await completed(value)
+                return await completed(value, timeout=timeout)
 
             tools = await clients.list_tools("chatgpt")
             names = {tool.name for tool in tools}
@@ -979,6 +1048,136 @@ async def accept(
                     **blank_answer,
                 )
 
+            # No earlier session.input request creates an agent work reservation.
+            # Clear only protocol metadata in this private fixture, retaining the
+            # exact owned pane/shell/Codex. The adapter must discover its writer
+            # from that PID; the independently known rollout is not supplied.
+            assert not bridge.store.db.execute("SELECT 1 FROM visible_handoffs").fetchone()
+            local_binding = binding.model_copy(
+                update={"codex_thread_id": None, "codex_rollout_path": None}
+            )
+            binding = local_binding
+            config.visible_handoffs.bindings["codex"] = local_binding
+            local_marker = marker + "_LOCAL_DEFAULT"
+            local_body = (
+                "Antworte ausschließlich mit dieser Kennung: " + local_marker + "\n"
+                "Dies ist nur ein isolierter Kommunikationstest mit mehreren sichtbaren "
+                "Bildschirmzeilen. Der Text ist absichtlich länger als eine Terminalzeile. "
+                "Verwende keine Werkzeuge, ändere keine Dateien und führe keine Befehle aus. "
+                "Der Inhalt benötigt weder Recherche noch Entwicklung. Lies diese Nachricht "
+                "und gib ausschließlich die oben genannte Kennung ohne zusätzlichen Text zurück."
+            )
+            assert local_body.count("\n") == 1 and 300 < len(local_body) < 1000
+            (root / "default-local-body.private.txt").write_text(local_body)
+            local_request = request(
+                "local-default-reply",
+                "agent.execute",
+                {
+                    "agent": "codex",
+                    "prompt": local_body,
+                    "cwd": str(workspace),
+                    "timeout": response_timeout,
+                },
+            )
+            assert "wait_for_reply" not in local_request.arguments
+            active_literal_label = "local-default-reply"
+            before_mutations = len(evidence["native_mutations"])
+            local_task = await submit(local_request, timeout=response_timeout + 30)
+            assert local_task["state"] == "completed" and local_task["attempt"] == 1, local_task
+            assert local_task["args"].get("wait_for_reply", True) is True
+            local_result = local_task["result"]
+            protocol = local_result["evidence"]["protocol_binding"]
+            path = Path(protocol["rollout_path"])
+            assert rollout is not None and path.resolve() == rollout.resolve()
+            raw_rollout = await asyncio.to_thread(bounded_rollout_bytes, path)
+            local_proof = local_reply_protocol_proof(
+                local_result, local_binding, local_body, local_marker, raw_rollout, workspace
+            )
+            original_id = local_result["evidence"]["message_id"]
+            original = await call("message_get", {"message_id": original_id})
+            assert original["body"] == local_body and original["request_reply"] is True
+            assert original["acknowledged"] is None
+            assert not bridge.store.db.execute(
+                "SELECT 1 FROM messages WHERE reply_to=?", (original_id,)
+            ).fetchone(), "Local result must not fabricate a mailbox reply"
+            handoff = bridge.visible_handoffs.status("chatgpt", local_request.task_id)
+            assert handoff["state"] == "completed"
+            assert handoff["binding"] == local_binding.model_dump()
+            assert handoff["evidence"]["local_reply_result"] == local_result
+            new_mutations = evidence["native_mutations"][before_mutations:]
+            assert (
+                sum(m.get("result", {}).get("paste_event_sent") is True for m in new_mutations) == 1
+            )
+            assert sum(m.get("result", {}).get("return_sent") is True for m in new_mutations) == 1
+            local_frames = [
+                frame for frame in captures if frame["input_label"] == "local-default-reply"
+            ]
+            inserted_view = next(
+                input_view("codex", frame["text"])
+                for frame in local_frames
+                if not frame["ready_required"]
+                and local_marker in input_view("codex", frame["text"])
+            )
+            assert "[Pasted Content " not in inserted_view, (
+                "No mixed-wrap pass from a collapsed paste"
+            )
+            footer = re.search(r"(?m)^[ \t]*GPT-\S+[^\n]*", inserted_view)
+            assert footer, "Cannot separate the own composer from its model footer"
+            painted_rows = inserted_view[: footer.start()].splitlines()
+            while painted_rows and not painted_rows[-1].strip():
+                painted_rows.pop()
+            assert len(painted_rows) > len(local_body.splitlines()), "No real softwrap observed"
+            notices = await call(
+                "completion_receive", {"source_id": local_request.task_id, "wait_seconds": 0}
+            )
+            assert len(notices["notices"]) == 1, notices
+            notice = notices["notices"][0]["payload"]
+            assert notice["completion_scope"] == "local_agent_turn"
+            assert notice["agent_confirmed"] is False and notice["request_reply_satisfied"] is True
+            assert notice["reply_source"] == "bound_local_codex_rollout"
+            local_completion_ack = await call(
+                "completion_ack",
+                {
+                    "notice_id": notices["notices"][0]["id"],
+                    "receipt": notices["notices"][0]["receipt"],
+                },
+            )
+            assert local_completion_ack.get("acknowledged"), local_completion_ack
+            assert local_completion_ack["ack_scope"] == "consumer_processed"
+            mutations = len(evidence["native_mutations"])
+            duplicate = await call("action_request", {"request": local_request.model_dump()})
+            assert duplicate["id"] == local_request.task_id and duplicate["state"] == "completed"
+            assert duplicate["attempt"] == 1 and duplicate["result"] == local_result
+            assert len(evidence["native_mutations"]) == mutations
+            answer = await wait_owned_answer(local_body, local_marker, "default-local-response")
+            assert answer["turn_id"] == local_proof["turn_id"]
+            assert answer["user_prompt_count"] == answer["assistant_answer_count"] == 1
+            assert (await call("message_get", {"message_id": original_id}))["acknowledged"] is None
+            assert not bridge.store.db.execute(
+                "SELECT 1 FROM messages WHERE reply_to=?", (original_id,)
+            ).fetchone()
+            evidence["default_local_reply"] = {
+                "task_id": local_request.task_id,
+                "message_id": original_id,
+                "wait_for_reply_argument_omitted": True,
+                "message_request_reply": True,
+                "reply_scope": local_result["scope"],
+                "body_sha256": sha(local_body),
+                "answer_sha256": sha(local_result["text"]),
+                "task_id_replay_without_input": True,
+                "mailbox_acknowledged": False,
+                "synthetic_mailbox_replies": 0,
+                "completion_ack_scope": local_completion_ack["ack_scope"],
+                "noncollapsed_softwrap_observed": True,
+                "painted_payload_rows": len(painted_rows),
+                "protocol": local_proof,
+                "independent_rollout": answer,
+            }
+            check(
+                "default reply wait returns exact local Codex answer with process-FD binding, "
+                "mixed newline/softwrap and no synthetic ACK/reply; Task-ID replay sends no input"
+            )
+
             # Exercise agent.execute itself: session.input was already literal
             # and cannot demonstrate removal of the generated handoff wrapper.
             body_handoffs = []
@@ -1179,6 +1378,7 @@ async def accept(
                 await asyncio.wait_for(server_task, 10)
             if started:
                 await bridge.tasks.stop()
+            await bridge.system_modules.close()
             await bridge.threaddesk.close()
             bridge.store.close()
             if sock is not None:

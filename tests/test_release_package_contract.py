@@ -108,6 +108,9 @@ def test_smoke_reaches_correct_isolated_preparation_for_actual_bundle_layout(
 
 def test_builder_emits_license_asset_and_matching_manifest_for_both_bundles(tmp_path, monkeypatch):
     module = script("build_release")
+    # This fixture exercises source/license packaging; native Darwin packaging
+    # has its own signed-app fixture and must never invoke Swift here.
+    monkeypatch.setattr(module.sys, "platform", "linux")
     monkeypatch.chdir(tmp_path)
     inputs = {
         "LICENSE": LICENSE,

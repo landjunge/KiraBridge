@@ -400,7 +400,18 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
                 "terminal_access": terminal_access(bridge.config, identity(ctx)),
                 "automatic_operations": policy.automatic_operations,
                 "voice_messaging": bridge.config.voice_messaging.model_dump(),
-                "visible_handoffs": bridge.config.visible_handoffs.model_dump(),
+                "visible_handoffs": {
+                    **bridge.config.visible_handoffs.model_dump(),
+                    "payload_contract": "unchanged_body_only",
+                    "maximum_visible_prompt_characters": 16384,
+                    "reply_sources": {
+                        "authenticated_mailbox": True,
+                        "bound_local_codex_rollout": (
+                            "requires independent process/thread/file/cursor proof"
+                        ),
+                    },
+                    "automatic_prompt_additions": False,
+                },
                 **bridge.messages.voice_channel.profile(identity(ctx)),
                 "operations": {
                     name: {
@@ -473,7 +484,7 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
 
     @server.tool(annotations=read)
     async def task_get(task_id: str, ctx: Context) -> dict[str, Any]:
-        """Read own task and evidence; completed file.image also returns bounded MCP image content.
+        """Read own task and evidence; completed image/capture tasks include MCP images.
 
         The PNG is a saved snapshot, not a fresh read. Other tasks retain their JSON format.
         For the Grok app, waits for ongoing work and returns conversation_return.

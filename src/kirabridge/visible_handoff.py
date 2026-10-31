@@ -162,9 +162,11 @@ class VisibleHandoffs:
     def __init__(self, config, store, security, sessions, messages):
         self.config, self.store, self.security = config, store, security
         self.sessions, self.messages = sessions, messages
+        from kirabridge.platform_adapters.codex_reply import CodexReplyObserver
         from kirabridge.platform_adapters.codex_state import CodexTurnState
 
         self.codex_state = CodexTurnState()
+        self.codex_reply = CodexReplyObserver()
         load_refresh(config)
         with store.transaction():
             store.db.execute(
@@ -838,6 +840,11 @@ class VisibleHandoffs:
                 "return_reconciliation_required", "Original reply preference is not consistent"
             )
         observed = "same_previously_verified_literal_widget"
+        local_reply = verified.get("local_reply_observer")
+        if isinstance(local_reply, dict) and local_reply.get("state") == "ready":
+            local_reply = await self.codex_reply.before_submit(
+                local_reply["cursor"], binding, body=message["body"]
+            )
         self.transition(
             identifier,
             "inserted",
@@ -846,6 +853,7 @@ class VisibleHandoffs:
                 "reconciled_without_paste": True,
                 "return_sent": False,
                 "agent_confirmed": False,
+                **({"local_reply_observer": local_reply} if isinstance(local_reply, dict) else {}),
             },
         )
         try:
@@ -967,6 +975,7 @@ class VisibleHandoffs:
         explicit_selection=False,
     ):
         principal, target, identifier = task["principal"], args.agent, task["id"]
+        local_reply = {"state": "unavailable", "reason": "independent_thread_binding_unavailable"}
         # All senders use this path. Eve is grok_app; only target selects the CLI window.
         for capability in ("agent.execute", "session.inspect", "session.input", "terminal.execute"):
             self.security.principal(principal, capability)
@@ -1002,6 +1011,15 @@ class VisibleHandoffs:
                     "handoff_conflict", "Original visible handoff and target are immutable"
                 )
             reconciled = self.reconcile(principal, identifier)
+            local_reply = next(
+                (
+                    event["evidence"]["local_reply_observer"]
+                    for event in reversed(reconciled["events"])
+                    if event["state"] == "inserted"
+                    and isinstance(event["evidence"].get("local_reply_observer"), dict)
+                ),
+                local_reply,
+            )
             existing = {**dict(existing), "state": reconciled["state"]}
             if existing["state"] not in {"sent", "confirmed", "completed"} and not (
                 self.body_only_delivery(reconciled)
@@ -1103,7 +1121,24 @@ class VisibleHandoffs:
             input_attempted = False
 
             async def before_paste():
-                nonlocal input_attempted
+                nonlocal input_attempted, local_reply
+                if target == "codex" and args.wait_for_reply:
+                    selection = self.sessions.current_selection()
+                    expected_identity = (
+                        selection[2].get(binding.agent_pid)
+                        if selection
+                        and selection[0] == target
+                        and selection[1] == binding
+                        and isinstance(selection[2], dict)
+                        else None
+                    )
+                    local_reply = await self.codex_reply.prepare(
+                        binding,
+                        process_identity=self.sessions.terminal_app.process_identity,
+                        expected_identity=expected_identity,
+                        body=prompt,
+                        cwd=args.cwd,
+                    )
                 # SessionManager invokes this only after its final native
                 # identity/readiness checks, immediately before transport.
                 # Refusal before this boundary sent no input, while any later
@@ -1118,6 +1153,7 @@ class VisibleHandoffs:
                         "wait_for_reply": args.wait_for_reply,
                         "empty_input_observed": True,
                         "terminal_input_attempted": True,
+                        "local_reply_observer": local_reply,
                     },
                 )
                 await running(
@@ -1158,6 +1194,10 @@ class VisibleHandoffs:
                     raise UncertainExecution(
                         "visible_insert_unknown", "Prompt insertion not observed; no Return sent"
                     )
+                if local_reply.get("state") == "ready":
+                    local_reply = await self.codex_reply.before_submit(
+                        local_reply["cursor"], binding, body=prompt
+                    )
                 self.transition(
                     identifier,
                     "inserted",
@@ -1172,6 +1212,7 @@ class VisibleHandoffs:
                         "insertion_representation": observed,
                         "return_sent": False,
                         "agent_confirmed": False,
+                        "local_reply_observer": local_reply,
                     },
                 )
                 await progress(
@@ -1213,12 +1254,19 @@ class VisibleHandoffs:
                     "Input outcome requires reconciliation; no automatic resend",
                 ) from exc
         current = self.reconcile(principal, identifier)
+        cached_local = current["evidence"].get("local_reply_result")
         original = self.messages.get(principal, message_id)
         replied = self.store.db.execute(
             "SELECT 1 FROM messages WHERE reply_to=? AND sender=? AND recipient=? "
             "AND kind IN ('answer','result') LIMIT 1",
             (message_id, target, principal),
         ).fetchone()
+        if (
+            current["state"] == "completed"
+            and isinstance(cached_local, dict)
+            and not (original["acknowledged"] and replied)
+        ):
+            return cached_local  # Same immutable task/body/binding; never another input.
         if (
             not args.wait_for_reply
             and self.body_only_delivery(current)
@@ -1316,6 +1364,65 @@ class VisibleHandoffs:
                             "scope": "agent_turn",
                             "project_completion_verified": False,
                         }
+                    if local_reply.get("state") == "ready":
+                        observed = await self.codex_reply.observe(
+                            local_reply["cursor"],
+                            binding,
+                            body=args.prompt,
+                            process_identity=self.sessions.terminal_app.process_identity,
+                        )
+                        if observed["state"] == "completed":
+                            await self.check_target(principal, target, binding)
+                            if reply_binding:
+                                await self.check_target(principal, principal, reply_binding)
+                            # A genuine mailbox return can arrive while the local
+                            # descriptor is checked. It retains its existing priority.
+                            original = self.messages.get(principal, message_id)
+                            authenticated_reply = self.store.db.execute(
+                                "SELECT 1 FROM messages WHERE reply_to=? AND sender=? "
+                                "AND recipient=? AND kind IN ('answer','result') LIMIT 1",
+                                (message_id, target, principal),
+                            ).fetchone()
+                            if original["acknowledged"] and authenticated_reply:
+                                continue
+                            evidence = {
+                                **observed["evidence"],
+                                "handoff_id": identifier,
+                                "message_id": message_id,
+                                "route": "existing_visible_terminal",
+                                "reply_route": "active_request_and_durable_processing_result",
+                                "reply_visible_rendering": "client_not_attested",
+                                "completion_scope": "local_agent_turn",
+                                "agent_confirmed": False,
+                                "request_reply_satisfied": True,
+                                "automatic_retry": False,
+                            }
+                            result = {
+                                "success": True,
+                                "text": observed["text"],
+                                "scope": "local_agent_turn",
+                                "reply_source": "bound_local_codex_rollout",
+                                "agent_confirmed": False,
+                                "request_reply_satisfied": True,
+                                "work_completion_verified": False,
+                                "project_completion_verified": False,
+                                "evidence": evidence,
+                            }
+                            self.transition(
+                                identifier,
+                                "completed",
+                                {**evidence, "local_reply_result": result},
+                            )
+                            return result
+                        if observed["state"] == "unavailable":
+                            local_reply = observed
+                            await progress(
+                                {
+                                    "handoff_id": identifier,
+                                    "local_reply_observer": observed,
+                                    "agent_confirmed": False,
+                                }
+                            )
                     await asyncio.sleep(0.25)
         except asyncio.CancelledError:
             # Only the reply observer is gone: paste and Return were already
@@ -1331,7 +1438,13 @@ class VisibleHandoffs:
                     "automatic_retry": False,
                 }
                 if self.body_only_input_released(current)
-                else {"reason": "reply_unconfirmed", "automatic_retry": False}
+                else {
+                    "reason": "reply_unconfirmed",
+                    "automatic_retry": False,
+                    "local_reply_observer": {
+                        key: local_reply[key] for key in ("state", "reason") if key in local_reply
+                    },
+                }
             )
             self.transition(identifier, "unknown", evidence)
             raise UncertainExecution(

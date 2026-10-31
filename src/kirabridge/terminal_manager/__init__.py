@@ -3,12 +3,13 @@ from __future__ import annotations
 import asyncio
 import os
 import shutil
+import sqlite3
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Awaitable, Callable
 
 from kirabridge.bridge_core.config import TerminalConfig
-from kirabridge.bridge_core.models import BridgeError, TerminalInput
+from kirabridge.bridge_core.models import BridgeError, TerminalInput, UncertainExecution
 from kirabridge.filesystem_manager import PathScope
 from kirabridge.platform_adapters import reap_process, spawn_process, stop_process
 from kirabridge.workflow_control_adapter import process_dispatch
@@ -54,8 +55,9 @@ def check_executable(
 
 
 class TerminalManager:
-    def __init__(self, settings: TerminalConfig | None = None):
+    def __init__(self, settings: TerminalConfig | None = None, *, output_store=None):
         self.sessions: dict[str, Session] = {}
+        self.output_store = output_store
         self.environment = minimal_environment()
         if settings:
             for value in settings.search_path + ([settings.home] if settings.home else []):
@@ -88,6 +90,7 @@ class TerminalManager:
         scope = PathScope(roots)
         # Pin cwd, then fchdir in a separate exec trampoline (macOS has no directory /dev/fd).
         process = None
+        spool_started = False
         try:
             async with process_dispatch(task_id, principal):
                 if task_id in self.sessions:
@@ -95,6 +98,9 @@ class TerminalManager:
                         "process_state_conflict", "Task already has an active process"
                     )
                 with scope.directory(args.cwd) as cwd_fd:
+                    if self.output_store is not None:
+                        self.output_store.start(principal, task_id)
+                        spool_started = True
                     process = await spawn_process(
                         [executable, *args.argv[1:]],
                         cwd_fd,
@@ -118,12 +124,27 @@ class TerminalManager:
                         pass
                 self.sessions.pop(task_id, None)
                 cleanup.result()
+            if spool_started:
+                self.output_store.finish(
+                    principal, task_id, complete=False, error="process_start_failed"
+                )
             raise
 
         async def drain(reader, buffer, events=False):
             pending = bytearray()
-            while chunk := await reader.read(8192):
+            while chunk := await reader.read(65536):
                 session.total += len(chunk)
+                if self.output_store is not None:
+                    try:
+                        self.output_store.append(
+                            principal, task_id, "stdout" if events else "stderr", chunk
+                        )
+                    except (BridgeError, OSError, sqlite3.Error) as exc:
+                        raise UncertainExecution(
+                            getattr(exc, "code", "process_output_storage"),
+                            "Output capture failed after process start; "
+                            "retained bytes remain readable; do not replay",
+                        ) from exc
                 room = max(0, args.max_output - len(session.stdout) - len(session.stderr))
                 buffer.extend(chunk[:room])
                 if events and line_callback:
@@ -152,6 +173,8 @@ class TerminalManager:
             asyncio.create_task(drain(process.stderr, session.stderr)),
             asyncio.create_task(send_input()),
         ]
+        failure = None
+        output_ranges = None
         try:
             await running({"pid": process.pid, "evidence_type": "local_process_spawned"})
             try:
@@ -159,12 +182,59 @@ class TerminalManager:
                     await asyncio.gather(process.wait(), *readers)
             except TimeoutError:
                 session.timed_out = True
+        except BaseException as exc:
+            failure = exc
+            raise
         finally:
             for reader in readers:
                 reader.cancel()
-            await asyncio.gather(*readers, return_exceptions=True)
-            await reap_process(process)
-            self.sessions.pop(task_id, None)
+
+            async def cleanup():
+                await asyncio.gather(*readers, return_exceptions=True)
+                await reap_process(process)
+
+            reaping = asyncio.create_task(cleanup())
+            cleanup_cancelled = False
+            failure_before_cleanup = failure
+            try:
+                while not reaping.done():
+                    try:
+                        await asyncio.shield(reaping)
+                    except asyncio.CancelledError as exc:
+                        cleanup_cancelled = True
+                        failure = failure or exc
+                reaping.result()
+            except BaseException as exc:
+                if failure is None:
+                    failure = exc
+                    raise
+                failure.add_note("Process cleanup also failed")
+            finally:
+                # Reaping intentionally preserves cancellation after killing the child.
+                # Durable state must still leave recording, even on that path.
+                self.sessions.pop(task_id, None)
+                if self.output_store is not None:
+                    try:
+                        output_ranges = self.output_store.finish(
+                            principal,
+                            task_id,
+                            complete=failure is None and not session.timed_out,
+                            error=getattr(failure, "code", type(failure).__name__)
+                            if failure is not None
+                            else "timeout"
+                            if session.timed_out
+                            else None,
+                        )
+                    except (BridgeError, OSError, sqlite3.Error) as exc:
+                        if failure is not None:
+                            failure.add_note("Durable process output finalization also failed")
+                        else:
+                            raise UncertainExecution(
+                                "process_output_storage",
+                                "Process ran but output finalization failed; do not replay",
+                            ) from exc
+            if cleanup_cancelled and failure_before_cleanup is None:
+                raise asyncio.CancelledError
         return {
             "exit_code": process.returncode,
             "stdout": session.stdout.decode("utf-8", "replace"),
@@ -174,6 +244,7 @@ class TerminalManager:
             "timed_out": session.timed_out,
             "terminated": session.terminated,
             "pid": process.pid,
+            **({"output_ranges": output_ranges} if output_ranges is not None else {}),
         }
 
     def inspect(self, principal: str, task_id: str) -> dict:
@@ -187,7 +258,13 @@ class TerminalManager:
             "stdout": session.stdout.decode("utf-8", "replace"),
             "stderr": session.stderr.decode("utf-8", "replace"),
             "output_bytes": session.total,
+            "truncated": session.total > len(session.stdout) + len(session.stderr),
         }
+
+    def read_output(self, principal, task_id, stream="stdout", **selectors):
+        if self.output_store is None:
+            raise BridgeError("not_found", "Durable owned process output is unavailable")
+        return self.output_store.read(principal, task_id, stream, **selectors)
 
     async def terminate(self, principal: str, task_id: str) -> dict:
         self.inspect(principal, task_id)

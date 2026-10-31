@@ -15,6 +15,7 @@ class ReadQuery(Input):
         "file.read",
         "file.list",
         "terminal.output",
+        "process.output",
         "session.catalog",
         "session.read",
         "platform.status",
@@ -30,15 +31,26 @@ class ReadQuery(Input):
     expected_pid: int | None = Field(default=None, gt=0)
     since: str = Field(default="", max_length=64, pattern=r"^$|[0-9a-f]{64}")
     check_helpers: bool = False
+    limit: int = Field(default=100, ge=1, le=1000, strict=True)
+    cursor: str = Field(default="", max_length=4096)
+    stream: Literal["stdout", "stderr"] | None = None
 
     @model_validator(mode="after")
     def selector(self):
         if self.check_helpers and self.operation != "platform.status":
             raise ValueError("helper permission diagnostics require platform.status")
-        if self.operation != "file.read" and (
-            self.encoding != "utf-8" or self.expected_identity is not None
-        ):
-            raise ValueError("file range encoding and identity require file.read")
+        if self.encoding != "utf-8" and self.operation not in {"file.read", "process.output"}:
+            raise ValueError("range encoding requires file.read or process.output")
+        if self.expected_identity is not None and self.operation not in {
+            "file.read",
+            "file.list",
+            "process.output",
+        }:
+            raise ValueError("identity requires a file, directory or process range")
+        if (self.cursor or self.limit != 100) and self.operation != "file.list":
+            raise ValueError("directory selectors require file.list")
+        if self.stream is not None and self.operation != "process.output":
+            raise ValueError("stream selector requires process.output")
         if self.operation.startswith("session."):
             if self.path or self.task_id or self.offset or self.tail:
                 raise ValueError(
@@ -59,6 +71,9 @@ class ReadQuery(Input):
         elif self.operation == "terminal.output":
             if not self.task_id or self.path is not None or self.offset or self.tail:
                 raise ValueError("terminal.output requires only task_id and max_bytes")
+        elif self.operation == "process.output":
+            if not self.task_id or self.path is not None or self.tail:
+                raise ValueError("process.output requires task_id and forward range selectors")
         elif not self.path or self.task_id is not None:
             raise ValueError("file reads require path, not task_id")
         if self.operation == "file.list" and (self.offset or self.tail):
@@ -95,21 +110,40 @@ async def read_query_async(bridge, principal: str, query: ReadQuery) -> dict:
 
 
 def read_query(bridge, principal: str, query: ReadQuery) -> dict:
-    capability = "process.inspect" if query.operation == "terminal.output" else query.operation
+    capability = (
+        "process.inspect"
+        if query.operation in {"terminal.output", "process.output"}
+        else query.operation
+    )
     policy = bridge.security.principal(principal, capability)
     if query.operation in {"file.read", "file.list"}:
         platform_operation = bridge.platform_operation(query.operation)
         if platform_operation is not None:
             bridge.macos.require(platform_operation)
-    if query.operation == "terminal.output":
+    if query.operation in {"terminal.output", "process.output"}:
         task = bridge.task(principal, query.task_id)
         if task["operation"] not in {
             "terminal.execute",
             "terminal.visible",
             "admin.execute",
             "agent.execute",
+            "system.report",
         }:
             raise BridgeError("invalid_operation", "Task has no terminal output")
+        if query.operation == "process.output":
+            return {
+                "operation": query.operation,
+                "state": task["state"],
+                **bridge.terminal.read_output(
+                    principal,
+                    query.task_id,
+                    query.stream or "stdout",
+                    offset=query.offset,
+                    max_bytes=query.max_bytes,
+                    encoding=query.encoding,
+                    expected_identity=query.expected_identity,
+                ),
+            }
         try:
             source = bridge.terminal.inspect(principal, query.task_id)
             origin = "managed_terminal_buffer"
@@ -118,7 +152,12 @@ def read_query(bridge, principal: str, query: ReadQuery) -> dict:
                 raise
             source = task.get("result") or {}
             origin = "persisted_task_result"
-        remaining, output, truncated = query.max_bytes, {}, False
+        remaining, output = query.max_bytes, {}
+        truncated = bool(
+            source.get("truncated")
+            or source.get("output_truncated")
+            or (source.get("output_ref") or {}).get("truncated")
+        )
         keys = ("stdout", "stderr") + (("terminal_output",) if "terminal_output" in source else ())
         for key in keys:
             raw = str(source.get(key, "")).encode("utf-8")
@@ -148,13 +187,17 @@ def read_query(bridge, principal: str, query: ReadQuery) -> dict:
         policy.roots + policy.read_roots, excluded=state_exclusions(bridge.config, policy)
     )
     if query.operation == "file.list":
-        result = bridge.filesystem.list(scope, query.path)
-        entries = result["entries"][:100]
+        result = bridge.filesystem.list(
+            scope,
+            query.path,
+            limit=query.limit,
+            cursor=query.cursor,
+            expected_identity=query.expected_identity,
+        )
         return {
             "operation": query.operation,
             "path": query.path,
-            "entries": entries,
-            "truncated": result["truncated"] or len(result["entries"]) > 100,
+            **result,
         }
     return {
         "operation": query.operation,

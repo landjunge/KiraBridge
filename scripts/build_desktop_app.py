@@ -2,6 +2,7 @@
 
 import argparse
 import hashlib
+import platform
 import plistlib
 import re
 import subprocess
@@ -27,18 +28,42 @@ def build(destination=None):
     if not numeric_version or not re.fullmatch(r"[a-f0-9]{40}", commit):
         raise RuntimeError("Cannot identify companion source version")
     source = root / "integrations/desktop/main.swift"
+    native_sources = [
+        source,
+        root / "integrations/desktop/SystemBridge.swift",
+        root / "integrations/desktop/SystemControl.swift",
+        root / "integrations/desktop/SystemServices.swift",
+    ]
     binary = bundle / "Contents/MacOS/KiraBridge"
     binary.parent.mkdir(parents=True, exist_ok=True)
     subprocess.run(
         [
             "/usr/bin/xcrun",
             "swiftc",
+            "-swift-version",
+            "5",
+            "-target",
+            f"{platform.machine()}-apple-macosx12.0",
             "-O",
             "-framework",
             "Cocoa",
             "-framework",
             "WebKit",
-            str(source),
+            "-framework",
+            "ScreenCaptureKit",
+            "-framework",
+            "UserNotifications",
+            "-framework",
+            "ImageIO",
+            "-framework",
+            "UniformTypeIdentifiers",
+            "-framework",
+            "ApplicationServices",
+            "-framework",
+            "CryptoKit",
+            "-framework",
+            "SystemConfiguration",
+            *map(str, native_sources),
             "-o",
             str(binary),
         ],
@@ -58,7 +83,12 @@ def build(destination=None):
                 "CFBundleGetInfoString": f"KiraBridge {version} ({commit[:12]})",
                 "KiraBridgeVersion": version,
                 "KiraBridgeSourceCommit": commit,
-                "KiraBridgeCompanionSourceSHA256": hashlib.sha256(source.read_bytes()).hexdigest(),
+                "KiraBridgeCompanionSourceSHA256": hashlib.sha256(
+                    b"".join(
+                        path.name.encode() + b"\0" + path.read_bytes() for path in native_sources
+                    )
+                ).hexdigest(),
+                "KiraBridgeSystemProtocol": 1,
                 "CFBundlePackageType": "APPL",
                 "NSHighResolutionCapable": True,
                 "LSMinimumSystemVersion": "12.0",
@@ -67,6 +97,19 @@ def build(destination=None):
     )
     subprocess.run(
         ["/usr/bin/codesign", "--force", "--sign", "-", str(bundle)],
+        check=True,
+        capture_output=True,
+        timeout=30,
+    )
+    # A private build directory may use umask077. The runtime manifest still
+    # needs deterministic signed app member modes on every operator machine.
+    for member in bundle.rglob("*"):
+        if member.is_symlink():
+            raise RuntimeError("Unexpected symlink in the generated companion")
+        if member.is_file():
+            member.chmod(0o755 if member == binary else 0o644)
+    subprocess.run(
+        ["/usr/bin/codesign", "--verify", "--deep", "--strict", str(bundle)],
         check=True,
         capture_output=True,
         timeout=30,

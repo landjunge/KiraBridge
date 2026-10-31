@@ -424,24 +424,37 @@ class TerminalAppTransport:
         # A historical suffix or empty trailing line is not a new paste observation.
         last = next((line for line in reversed(text.splitlines()) if line.strip()), "").rstrip()
         # This is only the fresh-echo check. Codex's caller separately verifies
-        # the WHOLE current widget before Return. A long logical line can wrap,
-        # so its final word is a bounded echo marker; plain shells keep the
-        # original complete-line requirement.
-        if target == "codex" and last:
-            last = last.split()[-1]
+        # the WHOLE current widget and pinned footer before Return. Use complete
+        # forward-rendered payloads, never a word from old output or chrome.
+        if target == "codex":
+            from kirabridge.literal_session_input import codex_payload_forms, codex_wrap_words
+
             return (
-                "\nfunction observedPaste(before, after) {"
+                "\nfunction observedPaste(before, after, columns) {"
                 "if(before===after) return false;"
                 "const prompts=Array.from(after.matchAll(/^[ \\t]*›[^\\n]*/gm));"
                 "if(!prompts.length) return false;"
-                "let current=after.slice(prompts[prompts.length-1].index);"
-                "const models=Array.from(current.matchAll(/^[ \\t]*GPT-\\S+[^\\n]*/gm));"
-                "if(models.length) current=current.slice(0,models[models.length-1].index);"
-                "return current.includes("
-                + json.dumps(last)
-                + ") || current.includes("
-                + json.dumps(f"[Pasted Content {len(text)} chars]")
-                + ");}\n"
+                "const current=after.slice(prompts[prompts.length-1].index)"
+                ".replace(/^[ \\t]*› ?/,'');"
+                "const forms="
+                + json.dumps(codex_payload_forms(text))
+                + "; const lines="
+                + json.dumps(codex_wrap_words(text))
+                + ";"
+                "if(lines && Number.isInteger(columns) && columns>=20 && columns<=4096) {"
+                "for(const width of [columns-3,columns-4]) {"
+                "if(lines.some(words=>words.some(word=>word.length>=width))) continue;"
+                "let rows=[], wrapped=false;"
+                "for(const words of lines) { let logical=words.length?[words[0]]:[''];"
+                "for(const word of words.slice(1)) {"
+                "if(logical[logical.length-1].length+1+word.length<=width)"
+                "logical[logical.length-1]+=' '+word;"
+                "else {logical.push(word); wrapped=true;} } rows=rows.concat(logical); }"
+                "if(wrapped) { forms.push(rows.join('\\n  '));"
+                "if(rows.slice(1).includes('')) forms.push(rows[0]+rows.slice(1)"
+                ".map(row=>row?'\\n  '+row:'\\n ').join('')); } } }"
+                "return forms.some(form=>current.startsWith(form) && "
+                "(current.length===form.length || current[form.length]==='\\n'));}\n"
             )
         return (
             "\nfunction observedPaste(before, after) {"
@@ -639,7 +652,7 @@ class TerminalAppTransport:
          delay(0.1); checkFocus();
          if(observedPaste(beforePaste,"""
                     + self.native_input_tail(65536)
-                    + """)) { echoed=true; break; }
+                    + """,Number(tab.numberOfColumns()))) { echoed=true; break; }
         }
         if(!echoed) throw Error("Paste not observed; no Return sent");
         JSON.stringify({paste_event_sent:true,return_sent:false});""",

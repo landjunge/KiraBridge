@@ -9,6 +9,7 @@ from dataclasses import dataclass
 from kirabridge.bridge_core.models import BridgeError, digest
 from kirabridge.platform_adapters.macos.capabilities import CapabilityProbe
 from kirabridge.platform_adapters.macos.permissions import PermissionProbe
+from kirabridge.system_operations import SYSTEM_LEAVES, SYSTEM_PERMISSIONS
 
 
 @dataclass(frozen=True)
@@ -62,6 +63,10 @@ DESCRIPTORS = tuple(
 )
 
 
+DESCRIPTORS += tuple(OperationDescriptor(op, leaf) for op, leaf in SYSTEM_LEAVES.items())
+DESCRIPTORS += (OperationDescriptor("system.report", "system_reports"),)
+
+
 class MacOSProvider:
     provider_id = "macos.existing_native"
     provider_version = "1"
@@ -76,6 +81,8 @@ class MacOSProvider:
         capabilities=None,
         permissions=None,
         actor_identities=None,
+        system_modules=None,
+        system_reports=None,
     ):
         self.leaves = {
             "terminal_app": terminal_app,
@@ -84,7 +91,11 @@ class MacOSProvider:
             "files": files,
             "processes": processes,
         }
-        self.capability_probe = capabilities or CapabilityProbe()
+        self.leaves.update({leaf: system_modules for leaf in set(SYSTEM_LEAVES.values())})
+        self.leaves["system_reports"] = system_reports
+        self.capability_probe = capabilities or CapabilityProbe(
+            native_metadata=system_modules.snapshot_metadata if system_modules is not None else None
+        )
         self.permission_probe = permissions or PermissionProbe()
         self.actor_identities = dict(actor_identities or {})
         self.descriptors = {item.operation: item for item in DESCRIPTORS}
@@ -154,6 +165,16 @@ class MacOSProvider:
                     "approval_required": bool(policy.get("approval_required")),
                     "requires_fresh_policy_and_target_check": True,
                     "os_permission_state": "requires_native_target_check",
+                    **(
+                        {
+                            "permission_scope": "executing_native_app_worker",
+                            "permission_check": SYSTEM_PERMISSIONS[descriptor.operation],
+                            "permission_requested_automatically": False,
+                            "requires_same_process_preflight": True,
+                        }
+                        if descriptor.operation in SYSTEM_LEAVES
+                        else {}
+                    ),
                 }
             )
         return rows

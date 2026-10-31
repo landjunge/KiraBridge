@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+from pathlib import Path
 from typing import Any
 
 from pydantic import ValidationError
@@ -38,6 +39,7 @@ from kirabridge.bridge_core.models import (
     WriteInput,
 )
 from kirabridge.clipboard_manager import ClipboardManager
+from kirabridge.directory_ranges import DirectoryInput
 from kirabridge.file_transfer.models import InventoryInput, PrepareInput, TransferInput
 from kirabridge.filesystem_manager import FilesystemManager, PathScope
 from kirabridge.image_manager import ImageManager
@@ -51,7 +53,11 @@ from kirabridge.permissions import (
     visible_execution,
 )
 from kirabridge.platform_adapters.macos.status import PlatformStatusInput
+from kirabridge.platform_adapters.macos.system_identity import installed_native_contract
+from kirabridge.platform_adapters.macos.system_models import SYSTEM_INPUTS
+from kirabridge.platform_adapters.macos.system_transport import SystemModules
 from kirabridge.process_manager import ProcessManager
+from kirabridge.process_output_store import OutputRangeInput, ProcessOutputStore
 from kirabridge.queue_management.models import QueueControl
 from kirabridge.security_manager import SecurityManager
 from kirabridge.session_manager import (
@@ -61,12 +67,17 @@ from kirabridge.session_manager import (
     SessionRead,
     SessionSelect,
 )
+from kirabridge.system_operations import SYSTEM_LEAVES, SYSTEM_READ_OPERATIONS
+from kirabridge.system_reports import REPORT_TYPES, SystemReportInput
 from kirabridge.task_manager.manager import TaskManager
 from kirabridge.task_manager.store import Store
 from kirabridge.terminal_manager import TerminalManager
 from kirabridge.visible_terminal import VisibleTerminal, VisibleTerminalInput
 
 INPUTS = {
+    **SYSTEM_INPUTS,
+    "process.output": OutputRangeInput,
+    "system.report": SystemReportInput,
     "platform.status": PlatformStatusInput,
     "queue.control": QueueControl,
     "files.prepare": PrepareInput,
@@ -86,7 +97,7 @@ INPUTS = {
     "terminal.visible": VisibleTerminalInput,
     "file.read": ReadInput,
     "file.image": ImageInput,
-    "file.list": PathInput,
+    "file.list": DirectoryInput,
     "file.write": WriteInput,
     "file.mkdir": PathInput,
     "file.move": MoveInput,
@@ -166,7 +177,8 @@ class Bridge:
         )
         self.outputs = OutputHistory(config.output_history, self.store)
         self.store.result_codec = self.outputs
-        self.terminal = TerminalManager(config.terminal)
+        self.process_outputs = ProcessOutputStore(config.state_path / "process-output", self.store)
+        self.terminal = TerminalManager(config.terminal, output_store=self.process_outputs)
         self.filesystem = FilesystemManager()
         self.images = ImageManager()
         self.clipboard = ClipboardManager()
@@ -217,11 +229,16 @@ class Bridge:
         )
         from kirabridge.platform_adapters.macos import MacOSProvider
 
+        self.system_modules = SystemModules(
+            authorize=self.security.authorize, **installed_native_contract(Path(__file__))
+        )
         self.macos = MacOSProvider(
             terminal_app=self.sessions.terminal_app,
             clipboard=self.clipboard,
             files=self.filesystem,
             processes=self.processes,
+            system_modules=self.system_modules,
+            system_reports=self.terminal,
         )
         self.sessions.terminal_app.platform_guard = lambda: self.macos.require("terminal.native")
         self.agents.visible_handoffs = self.visible_handoffs
@@ -483,6 +500,73 @@ class Bridge:
         if operation == "platform.status":
             await running({"evidence_type": "platform_status_query"})
             return await self.platform_status(principal, check_helpers=args.check_helpers)
+        if operation == "system.report":
+            self.macos.require(operation)
+            roots = policy.terminal_roots or policy.roots
+            if not roots:
+                raise BridgeError("path_denied", "A permitted working directory is required")
+            report = TerminalInput(
+                argv=[
+                    "/usr/sbin/system_profiler",
+                    "-json",
+                    "-detailLevel",
+                    args.detail,
+                    REPORT_TYPES[args.report],
+                ],
+                cwd=roots[0],
+                timeout=args.timeout,
+                max_output=args.max_output,
+                background=True,
+            )
+            result = await self.terminal.execute(
+                task["id"],
+                principal,
+                report,
+                roots,
+                ["/usr/sbin/system_profiler"],
+                running,
+                allow_any_executable=False,
+            )
+            return {
+                **result,
+                "report": args.report,
+                "format": "json",
+                "success": result["exit_code"] == 0
+                and not result["timed_out"]
+                and not result["terminated"],
+                "full_output": {
+                    "operation": "process.output",
+                    "task_id": task["id"],
+                    "streams": ["stdout", "stderr"],
+                },
+                "scope": (
+                    "Fixed public system_profiler report; complete owned byte streams "
+                    "remain separately pageable"
+                ),
+            }
+        if operation in SYSTEM_LEAVES:
+            if operation == "apps.launch":
+                # Launching a bundle does not bypass the caller's filesystem roots.
+                with scope.directory(args.app_path):
+                    pass
+            await running(
+                {
+                    "evidence_type": "native_system_operation",
+                    "operation": operation,
+                    "effect_attempted": operation not in SYSTEM_READ_OPERATIONS,
+                    "automatic_retry": False,
+                }
+            )
+            return await self.system_modules.execute(
+                operation,
+                args.model_dump(exclude_none=True),
+                principal=principal,
+                task_id=task["id"],
+            )
+        if operation == "process.output":
+            self.store.get(args.task_id, principal)
+            await running({"evidence_type": "owned_process_output_read"})
+            return self.terminal.read_output(principal, **args.model_dump())
         if operation == "queue.control":
             # Rejections before any mutation remain definite failures, not unknown effects.
             result = await self.queues.control(
@@ -753,5 +837,6 @@ class Bridge:
                 await self.message_receiver.stop()
         finally:
             await self.tasks.stop()
+            await self.system_modules.close()
             await self.threaddesk.close()
             self.store.close()

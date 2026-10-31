@@ -113,6 +113,20 @@ def completion_payload(task, event_seq, *, source="task"):
             request_reply_satisfied=False,
             summary="Message text submitted; agent acknowledgement and reply unconfirmed",
         )
+    if state == "completed" and result.get("scope") == "local_agent_turn":
+        payload.update(
+            completion_scope="local_agent_turn",
+            reply_source="bound_local_codex_rollout",
+            agent_confirmed=False,
+            agent_turn_completed=True,
+            agent_work_completion_verified=False,
+            project_completion_verified=False,
+            request_reply_satisfied=True,
+            summary=(
+                "Agent reply observed in the bound local Codex protocol; "
+                "mailbox acknowledgement unconfirmed"
+            ),
+        )
     return payload
 
 

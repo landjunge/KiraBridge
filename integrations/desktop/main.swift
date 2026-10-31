@@ -14,7 +14,19 @@ final class KiraBridgeApp: NSObject, NSApplicationDelegate, WKUIDelegate, WKNavi
         applicationMenu.addItem(withTitle: "KiraBridge beenden", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
         item.submenu = applicationMenu
         NSApp.mainMenu = menu
-        mainView = makeWindow(title: "KiraBridge", width: 1120, height: 780)
+        let domain = "de.netzwerkpunkt.kirabridge" as CFString
+        func preference(_ key: String) -> CFPropertyList? {
+            CFPreferencesCopyValue(key as CFString, domain, kCFPreferencesCurrentUser, kCFPreferencesAnyHost)
+        }
+        if let appearance = preference("appearance") as? String {
+            if appearance == "light" { NSApp.appearance = NSAppearance(named: .aqua) }
+            else if appearance == "dark" { NSApp.appearance = NSAppearance(named: .darkAqua) }
+        }
+        let storedWidth = (preference("window_width") as? NSNumber)?.doubleValue ?? 1120
+        let storedHeight = (preference("window_height") as? NSNumber)?.doubleValue ?? 780
+        let width = storedWidth.isFinite && (820...4096).contains(storedWidth) ? storedWidth : 1120
+        let height = storedHeight.isFinite && (620...4096).contains(storedHeight) ? storedHeight : 780
+        mainView = makeWindow(title: "KiraBridge", width: width, height: height)
         bootstrap()
         NSApp.activate(ignoringOtherApps: true)
     }
@@ -114,6 +126,10 @@ final class KiraBridgeApp: NSObject, NSApplicationDelegate, WKUIDelegate, WKNavi
         }
         decisionHandler(.allow)
     }
+}
+
+if CommandLine.arguments == [CommandLine.arguments[0], "--system-operation"] {
+    runSystemOperationMode()
 }
 
 let delegate = KiraBridgeApp()

@@ -83,20 +83,14 @@ class FilesystemManager:
             expected_identity=expected_identity,
         )
 
-    def list(self, scope: PathScope, path: str) -> dict:
-        entries = []
-        with scope.directory(path) as fd, os.scandir(fd) as iterator:
-            for entry in iterator:
-                if len(entries) == 1000:
-                    return {"entries": entries, "truncated": True}
-                entries.append(
-                    {
-                        "name": entry.name,
-                        "directory": entry.is_dir(follow_symlinks=False),
-                        "symlink": entry.is_symlink(),
-                    }
-                )
-        return {"entries": sorted(entries, key=lambda x: x["name"]), "truncated": False}
+    def list(
+        self, scope: PathScope, path: str, *, limit=1000, cursor="", expected_identity=None
+    ) -> dict:
+        from kirabridge.directory_ranges import list_directory
+
+        return list_directory(
+            scope, path, limit=limit, cursor=cursor, expected_identity=expected_identity
+        )
 
     def write(self, scope: PathScope, path: str, text: str, overwrite: bool) -> dict:
         data = text.encode("utf-8")

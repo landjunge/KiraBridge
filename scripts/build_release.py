@@ -5,17 +5,105 @@ from __future__ import annotations
 import argparse
 import gzip
 import hashlib
+import importlib.util
 import io
 import json
 import os
+import platform
+import plistlib
+import stat
 import subprocess
+import sys
 import tarfile
+import tempfile
 import tomllib
 from pathlib import Path
 
 
 def git(*args):
     return subprocess.check_output(["git", *args], text=True).strip()
+
+
+def build_native_app(destination):
+    """Use the existing companion builder, never a second compilation/signing path."""
+    source = Path(__file__).with_name("build_desktop_app.py")
+    spec = importlib.util.spec_from_file_location("_kirabridge_companion_builder", source)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return Path(module.build(destination))
+
+
+def native_payload(output, commit, version):
+    """Capture exact signed app bytes and modes without retaining a mutable source app."""
+    with tempfile.TemporaryDirectory(prefix=".native-build-", dir=output) as temporary:
+        requested = Path(temporary) / "KiraBridge.app"
+        app = build_native_app(requested)
+        if app.is_symlink() or app.resolve() != requested.resolve() or not app.is_dir():
+            raise RuntimeError("Companion builder returned an unexpected destination")
+        subprocess.run(
+            ["/usr/bin/codesign", "--verify", "--strict", str(app)],
+            check=True,
+            capture_output=True,
+            timeout=30,
+        )
+        architecture = (
+            subprocess.check_output(
+                ["/usr/bin/lipo", "-archs", str(app / "Contents/MacOS/KiraBridge")], timeout=15
+            )
+            .decode("ascii")
+            .split()
+        )
+        if architecture != [platform.machine()] or architecture[0] not in {"x86_64", "arm64"}:
+            raise RuntimeError("Native app CPU architecture differs from build host")
+        metadata = plistlib.loads((app / "Contents/Info.plist").read_bytes())
+        if (
+            metadata.get("CFBundleIdentifier") != "de.netzwerkpunkt.kirabridge"
+            or metadata.get("CFBundleExecutable") != "KiraBridge"
+            or metadata.get("KiraBridgeSourceCommit") != commit
+            or metadata.get("KiraBridgeVersion") != version
+            or type(metadata.get("KiraBridgeSystemProtocol")) is not int
+            or metadata.get("KiraBridgeSystemProtocol") != 1
+        ):
+            raise RuntimeError("Built companion identity differs from release")
+        files, modes, total = {}, {}, 0
+        for path in sorted(app.rglob("*")):
+            if path.is_symlink():
+                raise RuntimeError("Native app symlinks are not supported")
+            if path.is_dir():
+                continue
+            info = path.stat()
+            mode = stat.S_IMODE(info.st_mode)
+            if not stat.S_ISREG(info.st_mode) or mode not in {0o644, 0o755}:
+                raise RuntimeError("Unsafe native app file type or mode")
+            if info.st_size > 32 * 1024 * 1024 or len(files) >= 1000:
+                raise RuntimeError("Native app exceeds package limits")
+            data = path.read_bytes()
+            total += len(data)
+            if total > 64 * 1024 * 1024:
+                raise RuntimeError("Native app exceeds package limits")
+            member = "native/KiraBridge.app/" + path.relative_to(app).as_posix()
+            files[member], modes[member] = data, mode
+        binary = "native/KiraBridge.app/Contents/MacOS/KiraBridge"
+        required = {
+            binary,
+            "native/KiraBridge.app/Contents/Info.plist",
+            "native/KiraBridge.app/Contents/_CodeSignature/CodeResources",
+        }
+        if not required.issubset(files) or modes[binary] != 0o755:
+            raise RuntimeError("Signed native app files are incomplete")
+        return (
+            files,
+            modes,
+            {
+                "schema": "kirabridge.native-app.v1",
+                "path": "native/KiraBridge.app",
+                "protocol": 1,
+                "source_commit": commit,
+                "binary_sha256": hashlib.sha256(files[binary]).hexdigest(),
+                "signing": "ad-hoc",
+                "architecture": architecture[0],
+            },
+        )
 
 
 def build(output):
@@ -40,6 +128,10 @@ def build(output):
     )
     wheel = next(output.glob("*.whl"))
     files = {"wheel/" + wheel.name: wheel.read_bytes()}
+    file_modes, native_app = {}, None
+    if sys.platform == "darwin":
+        native_files, file_modes, native_app = native_payload(output, commit, version)
+        files.update(native_files)
     for name in git("ls-files").splitlines():
         if name.startswith(("src/", "docs/", "examples/")) or name in {
             "pyproject.toml",
@@ -98,46 +190,55 @@ exec python3.11 "$bundle/installer/install.py" install --bundle "$bundle" "$@"
         "commit": commit,
         "source_commit": commit,
         **license_fields,
-        "platforms": ["Darwin-x86_64", "Darwin-arm64"],
+        "platforms": ["Darwin-" + platform.machine()],
         "wheel": "wheel/" + wheel.name,
         "files": {name: hashlib.sha256(data).hexdigest() for name, data in sorted(files.items())},
+        "native_app_required": True,
         "presentation": presentation,
         "runtime": "Python 3.11, uv 0.11.6; dependencies from hash-locked uv.lock",
         "apple_signed": False,
         "maturity": "source-pinned artifact; acceptance and publication recorded separately",
     }
+    if native_app is not None:
+        manifest.update(native_app=native_app, file_modes=file_modes)
     files["release.json"] = (json.dumps(manifest, indent=2) + "\n").encode()
-    bundle = output / "KiraBridge-macos.tar.gz"
-    with (
-        bundle.open("xb") as raw,
-        gzip.GzipFile(fileobj=raw, mode="wb", mtime=0, filename="") as gz,
-    ):
-        with tarfile.open(fileobj=gz, mode="w") as archive:
-            for name, data in sorted(files.items()):
-                item = tarfile.TarInfo("KiraBridge/" + name)
-                item.size, item.mode, item.mtime = len(data), 0o644, 0
-                archive.addfile(item, io.BytesIO(data))
-    for artifact in [bundle, wheel]:
-        (output / (artifact.name + ".sha256")).write_text(
-            hashlib.sha256(artifact.read_bytes()).hexdigest() + "  " + artifact.name + "\n"
+    bundle = bootstrap = None
+    if sys.platform == "darwin":
+        bundle = output / "KiraBridge-macos.tar.gz"
+        with (
+            bundle.open("xb") as raw,
+            gzip.GzipFile(fileobj=raw, mode="wb", mtime=0, filename="") as gz,
+        ):
+            with tarfile.open(fileobj=gz, mode="w") as archive:
+                for name, data in sorted(files.items()):
+                    item = tarfile.TarInfo("KiraBridge/" + name)
+                    item.size, item.mode, item.mtime = len(data), file_modes.get(name, 0o644), 0
+                    archive.addfile(item, io.BytesIO(data))
+        for artifact in [bundle, wheel]:
+            (output / (artifact.name + ".sha256")).write_text(
+                hashlib.sha256(artifact.read_bytes()).hexdigest() + "  " + artifact.name + "\n"
+            )
+        bootstrap = output / "install-macos.sh"
+        bootstrap.write_text(
+            "#!/bin/sh\nset -eu\numask 077\n"
+            'command -v gh >/dev/null || { echo "GitHub CLI/auth required" >&2; exit 1; }\n'
+            'scratch=$(mktemp -d "${TMPDIR:-/tmp}/kirabridge-release.XXXXXXXX")\n'
+            "trap 'rm -rf \"$scratch\"' EXIT\n"
+            f"gh release download v{version} -R landjunge/KiraBridge "
+            '-p KiraBridge-macos.tar.gz -D "$scratch"\n'
+            f"printf '%s  %s\\n' {hashlib.sha256(bundle.read_bytes()).hexdigest()} "
+            'KiraBridge-macos.tar.gz > "$scratch/expected.sha256"\n'
+            '(cd "$scratch" && shasum -a 256 -c expected.sha256)\n'
+            'tar -xpzf "$scratch/KiraBridge-macos.tar.gz" -C "$scratch"\n'
+            'sh "$scratch/KiraBridge/install.sh" "$@"\n'
         )
-    bootstrap = output / "install-macos.sh"
-    bootstrap.write_text(
-        "#!/bin/sh\nset -eu\numask 077\n"
-        'command -v gh >/dev/null || { echo "GitHub CLI/auth required" >&2; exit 1; }\n'
-        'scratch=$(mktemp -d "${TMPDIR:-/tmp}/kirabridge-release.XXXXXXXX")\n'
-        "trap 'rm -rf \"$scratch\"' EXIT\n"
-        f"gh release download v{version} -R landjunge/KiraBridge "
-        '-p KiraBridge-macos.tar.gz -D "$scratch"\n'
-        f"printf '%s  %s\\n' {hashlib.sha256(bundle.read_bytes()).hexdigest()} "
-        'KiraBridge-macos.tar.gz > "$scratch/expected.sha256"\n'
-        '(cd "$scratch" && shasum -a 256 -c expected.sha256)\n'
-        'tar -xzf "$scratch/KiraBridge-macos.tar.gz" -C "$scratch"\n'
-        'sh "$scratch/KiraBridge/install.sh" "$@"\n'
-    )
-    (output / "install-macos.sh.sha256").write_text(
-        hashlib.sha256(bootstrap.read_bytes()).hexdigest() + "  install-macos.sh\n"
-    )
+        (output / "install-macos.sh.sha256").write_text(
+            hashlib.sha256(bootstrap.read_bytes()).hexdigest() + "  install-macos.sh\n"
+        )
+    else:
+        (output / (wheel.name + ".sha256")).write_text(
+            hashlib.sha256(wheel.read_bytes()).hexdigest() + "  " + wheel.name + "\n"
+        )
     # Preserve main's Linux source-install route. macOS uses the guarded updater
     # above; there is no second macOS installer implementation in this build.
     linux_name = f"KiraBridge-{version}-Linux-x86_64"
@@ -209,9 +310,15 @@ exec python3.11 "$bundle/installer/install.py" install --bundle "$bundle" "$@"
         "".join(
             hashlib.sha256(p.read_bytes()).hexdigest() + "  " + p.name + "\n"
             for p in [bundle, wheel, bootstrap, linux_bundle, output / "LICENSE"]
+            if p is not None
         )
     )
-    print(json.dumps({"version": version, "commit": commit, "bundle": str(bundle)}, indent=2))
+    print(
+        json.dumps(
+            {"version": version, "commit": commit, "bundle": str(bundle) if bundle else None},
+            indent=2,
+        )
+    )
 
 
 if __name__ == "__main__":

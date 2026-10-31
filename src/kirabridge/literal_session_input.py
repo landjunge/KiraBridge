@@ -96,43 +96,76 @@ def _same_bound_cwd_footer(before, after, cwd, home):
     return _displays_cwd(old_path, cwd, home) and _displays_cwd(new_path, cwd, home)
 
 
-def single_line_renderings(text, columns):
-    """Forward-render a bounded simple logical line; never normalize a readback.
+def codex_wrap_words(text):
+    """A bounded forward-rendering specification, preserving every logical row.
 
-    Codex 0.166 reserves two prefix columns, one right margin, and optionally
-    one scroll-indicator column. Only single-cell words with exactly one ASCII
-    separator are supported here. Real newlines, tabs, complex graphemes and
-    whitespace runs still require the existing exact/collapsed verifier.
+    Spaces inside a row must be single ASCII separators. Empty logical rows are
+    explicit; tabs, whitespace runs, edge spaces and complex graphemes require
+    exact/collapsed verification instead. Never tokenize the observed screen.
     """
     if (
-        type(columns) is not int
-        or not 20 <= columns <= 4096
-        or not text
+        not text
         or len(text) > 1000
-        or text != text.strip(" ")
-        or "  " in text
         or any(
-            (char.isspace() and char != " ")
-            or unicodedata.category(char)[0] in {"C", "M"}
+            (char.isspace() and char not in " \n")
+            or (char != "\n" and unicodedata.category(char)[0] in {"C", "M"})
             or unicodedata.east_asian_width(char) in {"W", "F"}
+            or ord(char) > 65535
             for char in text
         )
     ):
+        return None
+    lines = text.split("\n")
+    if any(line != line.strip(" ") or "  " in line for line in lines):
+        return None
+    return [line.split(" ") if line else [] for line in lines]
+
+
+def codex_wrapped_renderings(text, columns):
+    """Forward-render logical newlines and softwraps using bound live geometry.
+
+    Codex 0.166 reserves two prefix columns, one right margin, and optionally
+    one scroll-indicator column. Only requested empty rows may use Terminal's
+    one-cell padding representation. The entire resulting widget is compared.
+    """
+    words_by_line = codex_wrap_words(text)
+    if type(columns) is not int or not 20 <= columns <= 4096 or words_by_line is None:
         return []
-    words = text.split(" ")
     results = []
     for width in (columns - 3, columns - 4):
-        if any(len(word) >= width for word in words):
+        if any(len(word) >= width for words in words_by_line for word in words):
             continue
-        rows = [words[0]]
-        for word in words[1:]:
-            if len(rows[-1]) + 1 + len(word) <= width:
-                rows[-1] += " " + word
-            else:
-                rows.append(word)
-        if len(rows) > 1:
+        rows, wrapped = [], False
+        for words in words_by_line:
+            logical = [words[0]] if words else [""]
+            for word in words[1:]:
+                if len(logical[-1]) + 1 + len(word) <= width:
+                    logical[-1] += " " + word
+                else:
+                    logical.append(word)
+                    wrapped = True
+            rows.extend(logical)
+        if wrapped:
             results.append("\n  ".join(rows))
+            if "" in rows[1:]:
+                results.append(
+                    rows[0] + "".join("\n  " + row if row else "\n " for row in rows[1:])
+                )
     return results
+
+
+def single_line_renderings(text, columns):
+    """Compatibility API: this variant accepts only one logical payload line."""
+    return [] if "\n" in text else codex_wrapped_renderings(text, columns)
+
+
+def codex_payload_forms(text, columns=None):
+    """Exact known representations; shared by native echo and final verification."""
+    forms = [text, text.replace("\n", "\n  "), f"[Pasted Content {len(text)} chars]"]
+    rows = text.split("\n")
+    if any(row == "" for row in rows[1:-1]):
+        forms.append(rows[0] + "".join("\n " if row == "" else "\n  " + row for row in rows[1:]))
+    return forms + codex_wrapped_renderings(text, columns)
 
 
 def insertion_observed(target, raw, text, before, *, cwd=None, home=None, columns=None):
@@ -162,18 +195,7 @@ def insertion_observed(target, raw, text, before, *, cwd=None, home=None, column
             before_variants.append(without_hint)
         # Codex can collapse multiline pasted text. The empty pre-state,
         # clipboard transaction and exact count bind this view to this paste.
-        collapsed = f"[Pasted Content {len(text)} chars]"
-        expected_forms = [text, text.replace("\n", "\n  "), collapsed]
-        # Terminal.history represents an empty painted row by one padding cell.
-        # Change ONLY rows known to be empty in the requested payload; preserve
-        # every nonempty/space-containing payload row and the exact row count.
-        payload_rows = text.split("\n")
-        if any(row == "" for row in payload_rows[1:-1]):
-            expected_forms.append(
-                payload_rows[0]
-                + "".join("\n " if row == "" else "\n  " + row for row in payload_rows[1:])
-            )
-        expected_forms.extend(single_line_renderings(text, columns))
+        expected_forms = codex_payload_forms(text, columns)
         for expected in expected_forms:
             if not content.startswith(expected):
                 continue
