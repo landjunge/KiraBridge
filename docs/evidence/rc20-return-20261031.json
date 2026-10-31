@@ -13,15 +13,19 @@
     "src/kirabridge/control_center.py": "79e583756135c40ae525bb3a3e45771ed261009d2f57781aa4414bea0e1ea300",
     "src/kirabridge/operator_control.py": "1db94ed7b87c42df1178fcfd59cdc8e59a9a9390273a091ce0432512ef8ff4e0",
     "src/kirabridge/output_history.py": "fccbe8ea93ac15a84902c891a3ab802c3526b48f37b65abdb6f292fa2f90e85b",
-    "src/kirabridge/platform_adapters/terminal_app.py": "2bb339282c84c8990864eea1f03391d05399cb8d18de97dede368ce8549d9015",
+    "src/kirabridge/platform_adapters/terminal_app.py": "48bec37013a950228e52015b040f1f70a176006e7a13d88029ea91bc507ad8a6",
     "src/kirabridge/session_input_policy.py": "3d713480b0bf567c382c4ea364005c073769594988abcbdce7123ecb22c2cf84",
     "src/kirabridge/session_manager.py": "fca63149a57ca3f09880aee34440d16c89fdc2c24e8a9a41488208a94d560c11",
-    "src/kirabridge/session_return.py": "41cc812653557f59cf587bece5e59b7f37a3cfaf164f6f675c6afb5fdf8f522e",
+    "src/kirabridge/session_return.py": "cf94ab80058296af9ef99e004be5f9ef3485856d08f8c729f24ce15552684ff9",
     "src/kirabridge/visible_handoff.py": "d6cc8e05ff28025d651928a786ac3ffcaff3b5c1be3da6fbfac9db840ee12bdd",
     "tests/console_return_browser_probe.py": "c3319736a0c501fc74ae12bd22289dd388a13d625956e28ee64ad4e8b023bd63",
     "tests/test_operator_terminal_input.py": "b40e2d0a5ee9769470a12d26b123b4b6c7702aa3797ec7edc8638a429605b2ad",
     "tests/test_session_follow.py": "e9745315bf8f0a91c1542fb1671ede8a927a119fb235713496167f1ee9b6cc74",
-    "tests/test_session_return.py": "7839aa786614b87befc42836f9391f763b0b3f161e5e1f28d370f9083717deb5"
+    "tests/test_session_return.py": "7839aa786614b87befc42836f9391f763b0b3f161e5e1f28d370f9083717deb5",
+    "src/kirabridge/literal_session_input.py": "1c4db40b05acb233d22934787c9a05a59d0ade77ff5339483a3e53796bb5f0ca",
+    "src/kirabridge/session_ports.py": "a03b9fde05699b0d8330c81aac17c7ecae78153fc8be6719d22f151ca16e8d3a",
+    "tests/test_literal_cwd_elision.py": "7283eefb699919c395a6dd94eba04793680f658d9197d0899e6a6ca1d348526f",
+    "tests/test_session_return_captured_picker.py": "96e4a31aba457f88bbfac055eebbc93a2b603e40c7475f287901915be13a6d5e"
   },
   "team": {
     "implementation_backend": "raw_terminal_input",
@@ -42,7 +46,7 @@
     },
     "existing_console_operator_handoff_selected_passed": 45,
     "new_operator_status_cases_passed": 15,
-    "unique_pytest_cases_passed_incrementally": 352,
+    "unique_pytest_cases_passed_incrementally": 393,
     "whole_suite_rerun": false,
     "browser_baseline": {
       "total": 9,
@@ -452,5 +456,39 @@
     "result": "no_remaining_identified_blocker",
     "js_final_sha256": "a7d7fc6010eb500ecb1ae286ac4dde8247fcad79c9c6f1b747d93e6fd467077d",
     "scope": "Source review only; package and actual deployed native acceptance remain separate gates"
+  },
+  "followup": {
+    "base_commit": "3eb67c6258f3e6836968876099dfa666e826fe1e",
+    "new_unique_tests": 41,
+    "existing_affected_rechecked": 47,
+    "followup_total": 88,
+    "source_test_summary_sha256": "3562cf0db6bd1eca7056fc3505a47c622c302ac51e3b3c62c7c9991594efe3ec",
+    "additional_own_readonly_os_smoke": true,
+    "original_literal_task": {
+      "id": "kb-return-open-resume-20261031-01",
+      "state": "unknown",
+      "error": "visible_insert_unknown",
+      "submit_phase_reached": false,
+      "replayed": false
+    },
+    "separate_observed_draft_return": {
+      "id": "kb-return-submit-observed-draft-20261031-01",
+      "completed": true,
+      "paste_event_sent": false,
+      "return_sent": true
+    },
+    "first_native_compact_picker": "observed but not yet supported; no selector Return attempted",
+    "productive_rollback": {
+      "performed": true,
+      "verified": true,
+      "restored_core_commit": "881a53f7107c4c60e2a86e747e8e5ad7eab9111d",
+      "core_pid": 11720,
+      "console_pid": 11483,
+      "database_restored": false,
+      "unknown_preserved": true,
+      "proof_sha256": "474d875aeebabf179b315b8ef96465d139c928e06825e159812658225fd973fe"
+    },
+    "next_deployment": "pending exact package and native acceptance gates",
+    "private_phase_root": "/Users/landjunge/.local/share/kirabridge/backups/rc20-return-key-20261031-01/renderer-followup"
   }
 }

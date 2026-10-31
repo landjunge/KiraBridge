@@ -5,6 +5,7 @@ separate receipt/reply protocol; literal input never creates such a message.
 """
 
 import re
+from pathlib import Path
 
 from kirabridge.bridge_core.models import BridgeError, UncertainExecution
 from kirabridge.visible_readiness import display_text, input_view
@@ -29,7 +30,57 @@ def _codex_renderer_suffix(suffix):
     return "\n".join(rows)
 
 
-def insertion_observed(target, raw, text, before):
+def _cwd_footer(suffix):
+    rows = _without_viewport_padding(suffix).split("\n")
+    found = []
+    for index, row in enumerate(rows):
+        badge = re.fullmatch(r"([ \t]*GPT-\S+[^\n]*?)[ \t]+⚠ [0-9]+ warnings? · f2 to view", row)
+        base = badge[1] if badge else row
+        model = re.fullmatch(r"([ \t]*GPT-[^·\n]+[ \t]+·[ \t]+)([^\n]+)", base)
+        if model:
+            found.append((index, model[1], model[2], badge is not None))
+    return (rows, *found[0]) if len(found) == 1 else None
+
+
+def _displays_cwd(display, cwd, home):
+    spellings = [cwd]
+    if home and (cwd == home or cwd.startswith(home + "/")):
+        spellings.append("~" + cwd[len(home) :])
+    return any(
+        display == spelling
+        or (
+            display.endswith("…")
+            and display.count("…") == 1
+            and 0 < len(display) - 1 < len(spelling)
+            and spelling.startswith(display[:-1])
+        )
+        for spelling in spellings
+    )
+
+
+def _same_bound_cwd_footer(before, after, cwd, home):
+    if not isinstance(cwd, str) or not Path(cwd).is_absolute():
+        return False
+    old, new = _cwd_footer(before), _cwd_footer(after)
+    if old is None or new is None:
+        return False
+    old_rows, old_index, old_model, old_path, old_badge = old
+    new_rows, new_index, new_model, new_path, new_badge = new
+    if (
+        old_index != new_index
+        or old_model != new_model
+        or len(old_rows) != len(new_rows)
+        or not old_badge
+        or new_badge
+        or not old_path.endswith("…")
+        or not new_path.startswith(old_path[:-1])
+        or any(old_rows[i] != new_rows[i] for i in range(len(old_rows)) if i != old_index)
+    ):
+        return False
+    return _displays_cwd(old_path, cwd, home) and _displays_cwd(new_path, cwd, home)
+
+
+def insertion_observed(target, raw, text, before, *, cwd=None, home=None):
     """Recognize the exact payload in the current widget, never a history match."""
     cleaned, controls = display_text(raw)
     previous, previous_controls = display_text(before)
@@ -59,6 +110,8 @@ def insertion_observed(target, raw, text, before):
                 continue
             if _codex_renderer_suffix(actual_suffix) == _codex_renderer_suffix(suffix):
                 return True
+            if _same_bound_cwd_footer(suffix, actual_suffix, cwd, home or str(Path.home())):
+                return True
         return False
     if target == "grok":
         marker = re.search(r"(?m)^[ \t]*│[ \t]*❯ ?", view)
@@ -79,6 +132,40 @@ def insertion_observed(target, raw, text, before):
         normalized = "\n".join(re.sub(r"[ \t]*│[ \t]*$", "", line) for line in lines)
         return normalized == text
     return False
+
+
+def _needs_cwd_proof(text):
+    view = input_view("codex", text)
+    newline = view.find("\n")
+    footer = _cwd_footer(view[newline:]) if newline >= 0 else None
+    return bool(
+        footer
+        and footer[-1]
+        and footer[-2].startswith(("/", "~/"))
+        and footer[-2].endswith("…")
+        and footer[-2].count("…") == 1
+    )
+
+
+async def _task_cwd(sessions, binding):
+    selection = sessions.current_selection()
+    if (
+        not selection
+        or selection[0] != "codex"
+        or selection[1] != binding
+        or not isinstance(selection[2], dict)
+        or binding.agent_pid not in selection[2]
+    ):
+        return None
+    observe = getattr(sessions.terminal_app, "process_working_directory", None)
+    if observe is None:
+        return None
+    try:
+        return await observe(binding.agent_pid, expected_identity=selection[2][binding.agent_pid])
+    except BridgeError as exc:
+        if exc.code != "process_cwd_unavailable":
+            raise
+        return None
 
 
 async def execute(bridge, task, args, target, binding, running, progress):
@@ -114,6 +201,11 @@ async def execute(bridge, task, args, target, binding, running, progress):
             if args.submit
             else None
         )
+        before_cwd = (
+            await _task_cwd(bridge.sessions, binding)
+            if target == "codex" and before is not None and _needs_cwd_proof(before["text"])
+            else None
+        )
         result = await bridge.sessions.insert(
             principal,
             approved.model_copy(update={"submit": False}),
@@ -121,7 +213,14 @@ async def execute(bridge, task, args, target, binding, running, progress):
         )
         if args.submit:
             view = await bridge.visible_handoffs.check_target(principal, target, binding)
-            if not insertion_observed(target, view["text"], approved.text, before["text"]):
+            verified = insertion_observed(target, view["text"], approved.text, before["text"])
+            if not verified and before_cwd is not None:
+                after_cwd = await _task_cwd(bridge.sessions, binding)
+                if after_cwd == before_cwd:
+                    verified = insertion_observed(
+                        target, view["text"], approved.text, before["text"], cwd=before_cwd
+                    )
+            if not verified:
                 raise UncertainExecution(
                     "visible_insert_unknown", "Literal insertion not verified; no Return sent"
                 )

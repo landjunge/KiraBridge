@@ -695,6 +695,80 @@ class TerminalAppTransport:
             raise BridgeError("visible_target_changed", "Selected target process identity changed")
         return identity
 
+    async def process_working_directory(self, pid, *, expected_identity):
+        """Read one task-bound process CWD; never discover or follow another PID."""
+        if (
+            type(pid) is not int
+            or pid <= 0
+            or not isinstance(expected_identity, str)
+            or not expected_identity.startswith(str(os.getuid()) + " ")
+        ):
+            raise BridgeError("visible_target_changed", "Task-owned process identity required")
+        child = None
+        readers = []
+
+        async def bounded_pipe(stream, limit):
+            data = bytearray()
+            while len(data) <= limit:
+                chunk = await stream.read(min(4096, limit + 1 - len(data)))
+                if not chunk:
+                    break
+                data.extend(chunk)
+            return bytes(data)
+
+        try:
+            if await self.process_identity(pid, detailed=True) != expected_identity:
+                raise BridgeError("visible_target_changed", "Selected target identity changed")
+            child = await asyncio.create_subprocess_exec(
+                "/usr/sbin/lsof",
+                "-a",
+                "-p",
+                str(pid),
+                "-d",
+                "cwd",
+                "-F0pfn",
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+            )
+            async with asyncio.timeout(3):
+                readers = [
+                    asyncio.create_task(bounded_pipe(child.stdout, 65536)),
+                    asyncio.create_task(bounded_pipe(child.stderr, 4096)),
+                ]
+                raw, error = await asyncio.gather(*readers)
+                if len(raw) > 65536 or len(error) > 4096:
+                    raise BridgeError("process_cwd_unavailable", "CWD observation exceeds limit")
+                await child.wait()
+            if await self.process_identity(pid, detailed=True) != expected_identity:
+                raise BridgeError("visible_target_changed", "Selected target identity changed")
+            fields = []
+            for field in raw.split(b"\x00"):
+                if field in {b"", b"\n"}:
+                    continue
+                fields.append(field.removeprefix(b"\n"))
+            if (
+                child.returncode
+                or error
+                or len(fields) != 3
+                or fields[:2] != [f"p{pid}".encode(), b"fcwd"]
+                or not fields[2].startswith(b"n/")
+            ):
+                raise BridgeError("process_cwd_unavailable", "Exact process CWD unavailable")
+            cwd = fields[2][1:].decode("utf-8")
+            if len(cwd.encode()) > 4096 or any(ord(char) < 32 or ord(char) == 127 for char in cwd):
+                raise BridgeError("process_cwd_unavailable", "Unsupported CWD representation")
+            return cwd
+        except (OSError, TimeoutError, UnicodeError) as exc:
+            raise BridgeError("process_cwd_unavailable", "Exact process CWD unavailable") from exc
+        finally:
+            for reader in readers:
+                if not reader.done():
+                    reader.cancel()
+            if readers:
+                await asyncio.gather(*readers, return_exceptions=True)
+            if child is not None:
+                await reap_process(child, process_group=False)
+
     async def send_confirmed(self, row, text, identity, *, before_transport=None):
         """Check process start time/UID/TTY and empty input in the same native dispatch."""
         if identity.split()[1] != Path(row["tty"]).name:

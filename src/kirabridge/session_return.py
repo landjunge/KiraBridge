@@ -15,13 +15,16 @@ def _resume_selector(text):
     lines = [line.strip(" \t") for line in text[titles[-1].start() :].splitlines()]
     while lines and not lines[-1]:
         lines.pop()
-    return bool(
-        len(lines) >= 6
-        and re.fullmatch(
-            r"─{3,}[ \t]*[0-9]+[ \t]*/[ \t]*[0-9]+[ \t]*·[ \t]*[0-9]+%[ \t]*─+",
-            lines[-3],
-        )
-        and re.fullmatch(
+    if len(lines) < 6:
+        return False
+    position = re.fullmatch(
+        r"─{3,}[ \t]*([0-9]+)[ \t]*/[ \t]*([0-9]+)[ \t]*·[ \t]*[0-9]+%[ \t]*─+",
+        lines[-3],
+    )
+    if position is None:
+        return False
+    wide = bool(
+        re.fullmatch(
             r"enter resume[ \t]+esc exit[ \t]+⌃c exit[ \t]+tab focus sort/filter"
             r"[ \t]+←/→ change option",
             lines[-2],
@@ -30,6 +33,19 @@ def _resume_selector(text):
             r"⌃o comfortable view[ \t]+⌃t transcript[ \t]+⌃e expand[ \t]+↑/↓ browse",
             lines[-1],
         )
+    )
+    compact_nonempty = bool(
+        1 <= int(position[1]) <= int(position[2])
+        and any(re.match(r"›[ \t]+\S", line) for line in lines[1:-3])
+        and re.fullmatch(
+            r"enter resume[ \t]+⌃a archive[ \t]+esc exit[ \t]+⌃c exit"
+            r"[ \t]+tab focus[ \t]+←/→ option",
+            lines[-2],
+        )
+        and re.fullmatch(r"⌃o comfy[ \t]+⌃t preview[ \t]+⌃e exp[ \t]+↑/↓ browse", lines[-1])
+    )
+    return bool(
+        (wide or compact_nonempty)
         and any(
             re.fullmatch(
                 r"Filter:[ \t]+Cwd[ \t]+All[ \t]+Status:[ \t]+Active[ \t]+Archived"
