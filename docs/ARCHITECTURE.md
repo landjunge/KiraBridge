@@ -1,8 +1,10 @@
 # Architektur
 
 Stand 31.10.2026: [modularer macOS-Provider und getrennte Eingabewege](MACOS-ADAPTER-IMPLEMENTATION-20261031.md)
-produktiv als `c573709df915` (RC20) installiert; die unveränderten nativen
-Eingabewege wurden auf `7dff6f21d4bf` mit echtem Prompt/Return geprüft:
+produktiv als `acc1c850ba3d` (RC20) installiert; kurze umbrochene Prompts und
+echte Leerzeilen wurden über den produktiven Connector mit Return geprüft:
+[aktuelle Reparatur](WRAPPED-PROMPT-REPAIR-20261031.md).
+Frühere Eingabe-/Adapterabnahmen:
 [Installationsbelege](MACOS-ADAPTER-INSTALLATION-20261031.md).
 Laufende Anweisungen verwenden den vereinbarten kooperativen
 [Postfachweg](WORKING-SESSION-MESSAGING-20261031.md); eine abgewiesene

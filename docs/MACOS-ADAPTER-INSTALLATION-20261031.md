@@ -1,5 +1,9 @@
 # macOS-Adapter: produktive Installation und Wiederherstellung
 
+Späterer aktueller Stand `acc1c850`: [Reparatur kurzer umbrochener Prompts,
+produktive Installation und echte Connector-Abnahme](WRAPPED-PROMPT-REPAIR-20261031.md).
+Die folgenden früheren Installationsbelege bleiben historisch erhalten.
+
 Stand 31.10.2026. Der Nutzer hat mit „weiter install“ die Installation und
 danach die Fortsetzung bis zum Planabschluss beauftragt. Kira-Skill und
 vorhandener Installer verwendet. Whiteboard `0ab8b95a7369`: Installation in

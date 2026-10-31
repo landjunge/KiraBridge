@@ -1,6 +1,8 @@
 # Reparatur des tatsächlich fehlgeschlagenen kurzen Prompts
 
 31.10.2026, Fortsetzung mit Kira-Skill und Whiteboard `0ab8b95a7369`.
+Produktiv repariert und über den echten ChatGPT-Connector abgenommen:
+Codecommit `acc1c850ba3d2ff384e02da78e489b48ebbbf27a`.
 Die bisher offengelassene Grenze war für den normalen Nutzungsfall unzureichend.
 Dieser Bericht ergänzt die früheren erfolgreichen Longprompt-/Postfachtests.
 
@@ -80,6 +82,51 @@ und `native-final/final-continuation-summary.json`. Der vorhandene Harness
 `scripts/accept_macos_adapter_intel.py` unterstützt nun explizites Wiederverwenden
 eines leeren exakten Pane/PID und den kurzen einzeiligen Regressionstest.
 
-Der bisherige produktive Core ist während dieser Quellprüfung `c573709`.
-Commit/Paket/Installation und produktive Abnahme folgen separat. Andere komplexe
-Unicode-/Whitespace-/Softwrapformen bleiben ohne positiven Beleg gesperrt.
+Während der obigen Quellprüfung lief produktiv noch `c573709`.
+Andere komplexe Unicode-/Whitespace-/Softwrapformen bleiben ohne positiven
+Beleg gesperrt; keine allgemeine Rohtext-/Exactly-once-Garantie behauptet.
+
+## Tatsächliche Installation und produktiver End-to-End-Test
+
+`acc1c850ba3d2ff384e02da78e489b48ebbbf27a` auf dem bestehenden Entwicklungsbranch
+gepusht und remote bestätigt. Offline gebautes Bundle SHA256
+`551fd4118c700795e960838507684321db26a4c3048db7c00fd0fb7adf36f502`;
+420 Manifestdateien und alle 132 Pythondateien im Quellbaum/Wheel/Payload
+bytegleich geprüft. Ein erster isolierter Testdienststart brach vor Readiness
+ab; die damalige Ausgabeunterdrückung ließ keine Ursache erkennen. Eine
+diagnostische Wiederholung mit stderr-Log bestand ohne Code-/Paketänderung.
+Erster Fehlbeleg bleibt erhalten, Ursache dieses einzelnen Abbruchs ungeklärt.
+
+Unterstützter Installer in derselben bestehenden Shell, 14:30:18–14:30:30Z,
+Exit 0. Aktiver Core PID **35746**, Start `2026-10-31T14:30:28.259044+00:00`,
+Instanz `a7da137f455f408bb26b95b875b99006`, Paketquellhash
+`aef9319b72cce81a4b5d8702a7eccb69984bba43077c21bca881cd879a87c848`.
+Unabhängig launchd/current/authentifizierter Status und alle 143 installierten
+Wheel-Dateien geprüft. Versionslabel weiterhin RC20, Commit/Quellhash maßgeblich.
+
+Über den tatsächlichen externen ChatGPT-App-Connector zum neuen produktiven Core:
+
+| Task | Inhalt | Ergebnis |
+|---|---|---|
+| `wrapped-installed-singleline-20261031` | 886 Zeichen, eine logische Zeile mit sichtbarem Umbruch | completed, Attempt 1, Return=true |
+| `wrapped-installed-blankline-20261031` | 125 Zeichen, echte innere Leerzeile | completed, Attempt 1, Return=true |
+
+Beide Completions empfangen und ACK. Kein manueller Nach-Return in diesen beiden
+produktiven Tests. Sichtbare Kennungsantworten und jeweils genau ein User- und
+Finalantwortitem unabhängig im eigenen Rollout nachgewiesen, Thread
+`01a1925f-f626-7f82-b7dd-0eeebcfbadfb`. Eigener Test-Codex 35856 nach Abschluss
+mit frischer Identitäts-/Leer-/Screenprüfung beendet. Vorhandene Shell 29930,
+Fenster 7864, alle ursprünglichen Fenster-IDs und andere Codexidentitäten erhalten.
+Kein neues Terminal geöffnet. Die ursprüngliche README-Sitzung blieb erhalten.
+
+Konfiguration/Credentials/Modi/Berechtigungsrevision/launchd-Optionen, 28 Holds
+und historische Datensätze einschließlich beider konkreten README-Fehler
+unverändert. Unabhängige Belege in `productive/independent-running-verification.json`;
+produktive Abnahme in `productive/acceptance/actual-productive-e2e-proof.json`.
+[Versionierte Belegübersicht](evidence/wrapped-prompt-repair-20261031.json).
+Whiteboard-Meilensteine Revisionen 14–16 jeweils gespeichert und zurückgelesen.
+
+Vollständiges privates Preinstallbackup unter `productive/preinstall`.
+Unterstützter Installer-Rollbackpunkt
+`~/.local/share/kirabridge/install/backups/20261031-153021-014baa7c`;
+kein Rollback nötig. Keine Veröffentlichung und kein Merge.
