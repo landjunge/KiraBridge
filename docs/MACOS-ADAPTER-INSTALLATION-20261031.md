@@ -8,6 +8,12 @@ gespeichert und unabhängig zurückgelesen.
 
 [Strukturierte Laufzeit-, Abnahme- und Sicherungsbelege](evidence/macos-adapter-installation-20261031.json).
 
+Aktueller Core nach der anschließend geprüften Nachrichten-Statuskorrektur:
+`c573709df915`, PID 29698, Start 13:41:11Z, Quellhash `c95246ef…`.
+Der folgende erste Nachweis für `7dff6f2` bleibt als tatsächlich durchgeführte
+native Prompt-/Returnabnahme erhalten. Der spätere Abschnitt dokumentiert
+die eng begrenzte Aktualisierung separat.
+
 ## Installierter und tatsächlich getesteter Stand
 
 Lokales Bundle aus Codecommit `7dff6f21d4bfe61da50b82092446b2e12eb50f59`,
@@ -77,6 +83,50 @@ unterscheiden nicht zuverlässig jedes Leerzeichen von echten Zeilenumbrüchen;
 kein unsicherer Whitespacevergleich und kein Replay eingeführt. Nicht alle
 Eingabeformen sind daher als behoben bezeichnet.
 
-Die spätere Nachrichten-Statuskorrektur wird gesondert versioniert. Dieser
-produktive Prompt-/Installationsnachweis bezieht sich präzise auf `7dff6f2`.
-Kein Merge und kein öffentlicher GitHub-Release.
+## Anschließende Nachrichten-Statuskorrektur
+
+Codecommit `c573709df91544f4094265e61d351ad00827cfbf` auf
+`origin/docs/macos-adapter-phases1-3-20261031` gepusht und remote bestätigt.
+Änderung gegenüber dem nativ getesteten `7dff6f2`: sechs Zeilen lesende
+Nachrichtenstatusannotation und vier Zeilen MCP-Werkzeugbeschreibung.
+Die übrigen 130 Pythondateien einschließlich aller Eingabewege bytegleich.
+88 Nachrichten-/Zulassungs-/Belegtests bestanden, unabhängiges Review ohne
+materielle Befunde, Ruff/Format/diffcheck grün.
+
+Offline gebautes Paket SHA256
+`7c7d313f56ececdcdbc017ced1942e1c4e3d3f59dfbfef4bb81876fa78e30646`,
+419 Manifestdateien und alle 132 Pythondateien in Quellbaum/Wheel/Payload
+geprüft. Isolierter `release_smoke` auf Darwin-x86_64 bestanden. Der erste
+Offline-Smoke scheiterte am leeren expliziten temporären Cache für das fest
+gepinnte `cryptography==48.0.1`; mit Netzwerk und unveränderter Lockdatei
+bestand derselbe isolierte Smoke. Fehlbeleg erhalten; produktiv dadurch keine
+Änderung. Kein Testfehler übersprungen.
+
+Frisches vollständiges Backup unter `working-messaging-install-c573709/preinstall`;
+vor Installation keine aktiven Tasks/Empfängerjobs. Unterstützter sichtbarer
+Installer in eigenem Tab 7857/Shell 29574, 13:41:01Z bis 13:41:13Z, Exit 0.
+Laufender Core PID **29698**, Instanz `ab78040027c846169d1e3d85dc25e4cb`,
+Start `2026-10-31T13:41:11.017772+00:00`, Quellhash
+`c95246efe9d208bb0ec7141a35fa31e39aaad433e9965babd77b3987feb02fc4`.
+Echter externer Connector erreicht den neuen Core und zeigt die korrigierte
+Annotation am ursprünglichen gehaltenen Fehler. Vorhandene Inbox-Receipt/ACK
+überleben unverändert; kein neuer Auftrag. Frisches HTTP-Werkzeugverzeichnis
+enthält die neue Anleitung. Ursprüngliche native Abnahme wird nicht wiederholt
+oder als neuer Test dieses kosmetischen Updates ausgegeben.
+
+Eigenen installerfertigen Shellprompt vor dem Schließen geprüft; Tab/Shell
+anschließend abwesend, andere Fenster und Parent-Codex erhalten. Belege im
+Unterordner `working-messaging-install-c573709`, einschließlich
+`package-verification.json`, `productive-install-result.json`, `cleanup-proof.json`
+und privatem externem Laufzeitreadback. Kein Rollback nötig. Kein Merge und
+kein öffentlicher GitHub-Release.
+
+Unabhängiger Abschlussabgleich: launchd und tatsächlicher Core identisch,
+143 Wheel-Dateien bytegleich; Konfiguration, Credentials, Modi,
+Berechtigungsrevision und launchd-Optionen erhalten. Exakte Originalnachricht
+samt Job, alle 28 Holds, quittierte seq-374-Notiz samt Receipt und beide alten
+Unknown-Tasks unverändert. Alter Core 25826 abwesend, Parent 57091,
+Console 15308 und Tunnel 25909 erhalten. Beleg
+`working-messaging-install-c573709/independent-running-verification.json`.
+Aktueller unterstützter Installer-Rollbackpunkt:
+`~/.local/share/kirabridge/install/backups/20261031-144104-82dfec47`.

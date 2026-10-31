@@ -64,5 +64,20 @@
     "https://learn.chatgpt.com/docs/app-server#steer-an-active-turn",
     "https://developers.openai.com/blog/mastering-codex-remote-for-engineering"
   ],
-  "private_evidence": "~/.local/share/kirabridge/backups/macos-implementation-20261031T121031Z/working-session-live-20261031.private.json"
+  "private_evidence": "~/.local/share/kirabridge/backups/macos-implementation-20261031T121031Z/working-session-live-20261031.private.json",
+  "deployment": {
+    "commit": "c573709df91544f4094265e61d351ad00827cfbf",
+    "source_tree_sha256": "c95246efe9d208bb0ec7141a35fa31e39aaad433e9965babd77b3987feb02fc4",
+    "pid": 29698,
+    "started_at": "2026-10-31T13:41:11.017772+00:00",
+    "actual_external_original_message_route": "failed_visible_admission",
+    "original_stored_record_and_job_unchanged": true,
+    "all_28_holds_unchanged": true,
+    "existing_note_receipt_and_ack_preserved_after_restart": true,
+    "repeat_receive_after_ack_messages": 0,
+    "fresh_tool_catalog_guidance_verified": true,
+    "independent_verification_path": "/Users/landjunge/.local/share/kirabridge/backups/macos-implementation-20261031T121031Z/working-messaging-install-c573709/independent-running-verification.json",
+    "private_postinstall_proof_sha256": "f2c795d4e69dd5b52247b9b1bea90ff43bf7dafdf8f63722fdfa36d9e6e6bb9b",
+    "whiteboard_milestone_revision": 12
+  }
 }

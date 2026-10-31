@@ -90,3 +90,19 @@ Busy-Nachweis; kein zusätzlicher nativer Busy-Sendeversuch behauptet.
 Private Rohbelege:
 `~/.local/share/kirabridge/backups/macos-implementation-20261031T121031Z/working-session-live-20261031.private.json`.
 Weitere Laufzeitbelege im [Installationsbericht](MACOS-ADAPTER-INSTALLATION-20261031.md).
+
+## Produktive Bestätigung der Korrektur
+
+Codecommit `c573709df91544f4094265e61d351ad00827cfbf` auf dem bestehenden
+Entwicklungsbranch gepusht und remote exakt bestätigt, anschließend geprüft
+gebaut und sichtbar unterstützt installiert. Neuer Core PID 29698,
+Start `2026-10-31T13:41:11.017772+00:00`, Quellhash
+`c95246efe9d208bb0ec7141a35fa31e39aaad433e9965babd77b3987feb02fc4`.
+
+Der echte externe ChatGPT-App-Readback des ursprünglichen Datensatzes liefert
+jetzt `failed_visible_admission`; Job und Nichtzustellungsbelege sind erhalten.
+Dieselbe bereits quittierte Testnotiz liefert auch nach dem Core-Neustart
+unverändert ID/seq/Receipt/ACK zurück; das Empfängerpostfach ist leer.
+Frisches authentifiziertes HTTP-`tools/list` enthält die neue Anleitung zu
+kooperierenden laufenden Empfängern. Whiteboard-Meilenstein Revision 12
+gespeichert und zurückgelesen. Kein Replay und kein neuer Agentenauftrag.
