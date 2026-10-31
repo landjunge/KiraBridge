@@ -64,7 +64,8 @@ enum SystemControl {
     static func protectLiveTerminalDescendants(_ targetPID: pid_t) throws {
         // Public process metadata only. Editors hosting shells/agents must use
         // their guarded terminal route rather than a generic AX write/quit.
-        let observation = try SystemServices.snapshot()
+        let observation = try SystemServices.guardedSnapshot(targetPID: targetPID,
+            workerPID: getpid(), corePID: getppid())
         guard observation.unavailable.isEmpty,
               observation.records.contains(where: { $0.pid == targetPID }) else {
             throw failure("macos_process_observation", "Target descendant inventory is incomplete")

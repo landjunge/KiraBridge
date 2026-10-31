@@ -108,3 +108,6 @@ def test_native_process_primitive_guards_without_signals(tmp_path):
     result = subprocess.run([str(binary)], capture_output=True, text=True, timeout=10)
     assert result.returncode == 0, result.stdout + result.stderr
     assert "signals_sent=0" in result.stdout
+    assert (
+        "bulk interval and relevant-graph churn guards passed; effects_attempted=0" in result.stdout
+    )

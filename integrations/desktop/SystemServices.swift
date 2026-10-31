@@ -6,7 +6,8 @@ import Security
 
 /// Public sysctl process metadata observations. No argv/environment, shell, attachment,
 /// process groups, scheduler or effect retry is part of this interface. Only a
-/// changed process census permits up to three read-only snapshot acquisitions.
+/// changed bounded census or relevant write projection permits at most three
+/// read-only acquisitions. Observations do not freeze the process graph.
 @MainActor
 enum SystemServices {
     struct Record: Equatable {
@@ -20,6 +21,14 @@ enum SystemServices {
         let start: String
         let tty: Bool
         var terminalDevice: Int64? = nil
+        var kernel: Record {
+            Record(pid: pid, parent: parent, uid: uid, realUID: realUID, savedUID: savedUID,
+                name: name, path: nil, start: start, tty: tty, terminalDevice: terminalDevice)
+        }
+        func withPath(_ value: String?) -> Record {
+            Record(pid: pid, parent: parent, uid: uid, realUID: realUID, savedUID: savedUID,
+                name: name, path: value, start: start, tty: tty, terminalDevice: terminalDevice)
+        }
         var json: [String: Any] {
             ["pid": Int(pid), "ppid": Int(parent), "uid": Int(uid), "real_uid": Int(realUID),
              "saved_uid": Int(savedUID), "name": name, "path": path as Any? ?? NSNull(),
@@ -29,6 +38,13 @@ enum SystemServices {
     struct Snapshot {
         let records: [Record]
         let unavailable: [pid_t]
+        var pathUnavailable: [pid_t] = []
+        var began: Double = 0
+        var ended: Double = 0
+    }
+    struct Projection: Equatable {
+        let records: [Record]
+        let descendants: Set<pid_t>
     }
     static let protectedNames: Set<String> = [
         "codex", "grok", "grok-cli", "claude", "chatgpt", "gemini", "opencode", "copilot", "aider",
@@ -63,7 +79,16 @@ enum SystemServices {
         return info
     }
     static func kernelRecord(_ pid: pid_t) throws -> Record {
-        var info = try processInfo(pid)
+        try kernelRecord(processInfo(pid))
+    }
+    static func kernelRecord(_ value: kinfo_proc) throws -> Record {
+        var info = value
+        let pid = info.kp_proc.p_pid
+        guard pid > 0, info.kp_proc.p_un.__p_starttime.tv_sec > 0,
+              info.kp_proc.p_un.__p_starttime.tv_usec >= 0,
+              info.kp_proc.p_un.__p_starttime.tv_usec < 1000000 else {
+            throw failure("macos_process_unavailable", "Kernel process row has no valid PID/start identity")
+        }
         return Record(pid: pid, parent: info.kp_eproc.e_ppid, uid: info.kp_eproc.e_ucred.cr_uid,
             realUID: info.kp_eproc.e_pcred.p_ruid, savedUID: info.kp_eproc.e_pcred.p_svuid,
             name: string(&info.kp_proc.p_comm), path: nil, start: started(info),
@@ -114,7 +139,26 @@ enum SystemServices {
         try observedRecord(pid, applications: applications ?? guiApplicationPIDs(),
             kernel: kernelRecord, executable: codeExecutablePath)
     }
-    static func identifiers() throws -> [pid_t] {
+    static func decodeCensus(_ rows: [kinfo_proc], workerPID: pid_t) throws -> Snapshot {
+        guard rows.count <= 100000 else { throw failure("macos_process_limit", "Process inventory exceeds observation budget") }
+        var records: [Record] = [], unavailable: [pid_t] = [], seen: Set<pid_t> = []
+        for row in rows {
+            let pid = row.kp_proc.p_pid
+            // PID zero is the documented kernel task, outside the positive-PID API.
+            if pid == 0 { continue }
+            guard pid > 0, seen.insert(pid).inserted else {
+                throw failure("macos_process_unavailable", "Kernel inventory contains invalid or duplicate PIDs")
+            }
+            do { records.append(try kernelRecord(row)) }
+            catch { unavailable.append(pid) }
+        }
+        guard seen.contains(workerPID) else {
+            throw failure("macos_process_unavailable", "Calling worker is absent from kernel inventory")
+        }
+        return Snapshot(records: records.sorted { $0.pid < $1.pid }, unavailable: unavailable.sorted())
+    }
+    static func kernelSnapshot() throws -> Snapshot {
+        let began = Date().timeIntervalSince1970
         // Apple QA1123: CTL_KERN/KERN_PROC/KERN_PROC_ALL, bounded size query
         // followed by a metadata-only kinfo_proc snapshot. No KERN_PROCARGS.
         var mib: [Int32] = [CTL_KERN, KERN_PROC, KERN_PROC_ALL]
@@ -137,39 +181,134 @@ enum SystemServices {
             throw failure("macos_process_changed", "Process inventory changed or could not be observed within its bounded buffer")
         }
         let count = size / MemoryLayout<kinfo_proc>.stride
-        let pids = rows.prefix(count).map { $0.kp_proc.p_pid }.filter { $0 > 0 }
-        let result = Array(Set(pids)).sorted()
-        guard result.count == pids.count, result.contains(getpid()) else {
-            throw failure("macos_process_unavailable", "Calling worker is absent or process identities are duplicated")
-        }
+        var result = try decodeCensus(Array(rows.prefix(count)), workerPID: getpid())
+        result.began = began; result.ended = Date().timeIntervalSince1970
         return result
     }
-    static func acquireSnapshot(census: () throws -> [pid_t],
+    static func acquireSnapshot(census: () throws -> Snapshot,
                                 applications: () -> Set<pid_t>,
                                 read: (pid_t, Set<pid_t>) throws -> Record) throws -> Snapshot {
-        // This function never performs an effect. Census churn discards the
-        // whole partial observation; no row or path is reused on a new attempt.
+        // Read-only inventory is an observation interval, not an atomic world.
+        // Optional enrichment cannot erase a valid historical kernel row.
         for attempt in 0..<3 {
             do {
-                let pids = try census()
+                let result = try census()
                 let apps = applications()
-                var records: [Record] = [], unavailable: [pid_t] = []
-                for pid in pids {
-                    do { records.append(try read(pid, apps)) }
-                    catch { unavailable.append(pid) }
+                var pathUnavailable: [pid_t] = []
+                let records = result.records.map { baseline in
+                    guard apps.contains(baseline.pid) else { return baseline.kernel }
+                    if let fresh = try? read(baseline.pid, apps), fresh.kernel == baseline.kernel,
+                       fresh.path != nil { return baseline.withPath(fresh.path) }
+                    pathUnavailable.append(baseline.pid)
+                    return baseline.kernel
                 }
-                guard try census() == pids else {
-                    throw failure("macos_process_changed", "Process inventory changed during observation; refresh")
-                }
-                return Snapshot(records: records, unavailable: unavailable)
+                return Snapshot(records: records, unavailable: result.unavailable,
+                    pathUnavailable: pathUnavailable, began: result.began, ended: Date().timeIntervalSince1970)
             } catch let error as SystemBridgeFailure {
                 guard error.code == "macos_process_changed", attempt < 2 else { throw error }
             }
         }
-        throw failure("macos_process_changed", "Process inventory did not stabilize within three read-only observations")
+        throw failure("macos_process_changed", "Kernel inventory exceeded three read-only attempts")
     }
     static func snapshot() throws -> Snapshot {
-        try acquireSnapshot(census: identifiers, applications: guiApplicationPIDs,
+        try acquireSnapshot(census: kernelSnapshot, applications: guiApplicationPIDs,
+            read: { pid, apps in try read(pid, applications: apps) })
+    }
+    static func projection(_ observation: Snapshot, targetPID: pid_t,
+                           workerPID: pid_t, corePID: pid_t) throws -> Projection {
+        guard observation.unavailable.isEmpty, observation.records.count <= 100000 else {
+            throw failure("macos_process_observation", "Write requires a complete bounded kernel census")
+        }
+        var table: [pid_t: Record] = [:]
+        for record in observation.records {
+            guard record.pid > 0, table[record.pid] == nil else {
+                throw failure("macos_process_observation", "Kernel census contains invalid or duplicate identities")
+            }
+            table[record.pid] = record.kernel
+        }
+        func chain(_ pid: pid_t) throws -> Set<pid_t> {
+            var result: Set<pid_t> = [], next = pid
+            var child: Record?
+            while true {
+                guard next > 0, result.count < 256, !result.contains(next), let row = table[next] else {
+                    throw failure("macos_process_observation", "Relevant ancestry is missing, cyclic or exceeds depth")
+                }
+                if let child, !noLater(row.start, than: child.start) {
+                    throw failure("macos_process_changed", "Relevant parent identity was reused")
+                }
+                result.insert(next)
+                if next == 1 { return result }
+                child = row; next = row.parent
+            }
+        }
+        let targetChain = try chain(targetPID), ownChain = try chain(workerPID)
+        guard corePID > 1, ownChain.contains(corePID), table[workerPID]?.parent == corePID else {
+            throw failure("macos_process_observation", "Worker/Core ancestry cannot be established")
+        }
+        let coreChain = try chain(corePID)
+        var descendants: Set<pid_t> = [targetPID], complete = false
+        for _ in 0..<256 {
+            let old = descendants
+            for record in observation.records where descendants.contains(record.parent) {
+                descendants.insert(record.pid)
+            }
+            if descendants == old { complete = true; break }
+        }
+        guard complete else { throw failure("macos_process_limit", "Relevant subtree exceeds observation depth") }
+        for pid in descendants where pid != targetPID {
+            guard let child = table[pid], let parent = table[child.parent],
+                  noLater(parent.start, than: child.start) else {
+                throw failure("macos_process_changed", "Relevant descendant parent identity was reused")
+            }
+        }
+        let relevant = targetChain.union(ownChain).union(coreChain).union(descendants)
+        guard relevant.allSatisfy({ table[$0]?.name.isEmpty == false }) else {
+            throw failure("macos_process_observation", "Relevant kernel executable name is unavailable")
+        }
+        return Projection(records: relevant.sorted().compactMap { table[$0] }, descendants: descendants)
+    }
+    static func acquireGuardedSnapshot(targetPID: pid_t, workerPID: pid_t, corePID: pid_t,
+                                       census: () throws -> Snapshot,
+                                       applications: () -> Set<pid_t>,
+                                       read: (pid_t, Set<pid_t>) throws -> Record) throws -> Snapshot {
+        // Two complete kernel observations independently establish the relevant
+        // graph. Unrelated churn is not a permission grant and need not block it.
+        // All slower path bindings occur between K0 and K1; no effect is retried.
+        // Equal observations are not an atomic graph/exec lock: public macOS
+        // APIs cannot prevent a fork/exec/reparent after K1 or bind kill to start.
+        for attempt in 0..<3 {
+            do {
+                let first = try census()
+                let before = try projection(first, targetPID: targetPID, workerPID: workerPID, corePID: corePID)
+                let apps = applications()
+                var paths: [pid_t: String] = [:]
+                for baseline in before.records where apps.contains(baseline.pid) {
+                    let one = try read(baseline.pid, apps)
+                    let two = try read(baseline.pid, apps)
+                    guard one.kernel == baseline, two.kernel == baseline, one.path == two.path else {
+                        throw failure("macos_process_changed", "Relevant executable identity changed during observation")
+                    }
+                    guard let path = two.path else {
+                        throw failure("macos_process_observation", "Relevant GUI executable identity is unavailable")
+                    }
+                    paths[baseline.pid] = path
+                }
+                let last = try census()
+                let after = try projection(last, targetPID: targetPID, workerPID: workerPID, corePID: corePID)
+                guard before == after else {
+                    throw failure("macos_process_changed", "Relevant process graph changed; no effect was attempted")
+                }
+                return Snapshot(records: after.records.map { $0.withPath(paths[$0.pid]) }, unavailable: [],
+                    began: first.began, ended: last.ended)
+            } catch let error as SystemBridgeFailure {
+                guard error.code == "macos_process_changed", attempt < 2 else { throw error }
+            }
+        }
+        throw failure("macos_process_changed", "Relevant graph exceeded three read-only attempts")
+    }
+    static func guardedSnapshot(targetPID: pid_t, workerPID: pid_t, corePID: pid_t) throws -> Snapshot {
+        try acquireGuardedSnapshot(targetPID: targetPID, workerPID: workerPID, corePID: corePID,
+            census: kernelSnapshot, applications: guiApplicationPIDs,
             read: { pid, apps in try read(pid, applications: apps) })
     }
     static func hash(_ object: Any) throws -> String {
@@ -181,19 +320,30 @@ enum SystemServices {
             throw failure("invalid_arguments", "Process page bounds are invalid")
         }
         let visible = observation.records.filter { includeSystem || $0.uid == uid }.sorted { $0.pid < $1.pid }
+        let kernelRevision = try hash(["include_system": includeSystem, "uid": Int(uid),
+            "processes": visible.map { row -> [String: Any] in
+                var value = row.kernel.json
+                value["terminal_device_identity"] = row.terminalDevice as Any? ?? NSNull()
+                return value
+            }, "unavailable_pids": observation.unavailable.map(Int.init)])
         let revision = try hash(["include_system": includeSystem, "uid": Int(uid),
-            "processes": visible.map { $0.json }, "unavailable_pids": observation.unavailable.map(Int.init)])
+            "kernel_revision": kernelRevision, "processes": visible.map { $0.json },
+            "unavailable_pids": observation.unavailable.map(Int.init)])
         guard (offset == 0 || expectedRevision != nil), expectedRevision == nil || expectedRevision == revision else {
             throw failure("macos_process_changed", "Process inventory revision changed; restart traversal")
         }
         let selected = Array(visible.dropFirst(offset).prefix(limit)).map { $0.json }
-        var result: [String: Any] = ["processes": selected, "revision": revision, "offset": offset,
+        var result: [String: Any] = ["processes": selected, "revision": revision, "kernel_revision": kernelRevision, "offset": offset,
             "total": visible.count, "eof": offset + selected.count >= visible.count,
             "truncated": offset + selected.count < visible.count,
             "observation_complete": observation.unavailable.isEmpty,
+            "kernel_observation_complete": observation.unavailable.isEmpty,
+            "path_enrichment_complete": observation.pathUnavailable.isEmpty,
+            "observation_started_at": observation.began, "observation_finished_at": observation.ended,
+            "observation_atomic": false, "path_unavailable_count": observation.pathUnavailable.count,
             "unavailable_pid_count": observation.unavailable.count,
             "include_system": includeSystem, "default_uid": Int(uid), "effect": "none",
-            "scope": "Public sysctl PID/UID/PPID/name/start and Security kernel-guest executable paths for AppKit GUI candidates; CLI paths remain unknown; no signature trust, arguments or environment; live observations can change"]
+            "scope": "Bounded kernel observation interval, not an atomic/current-existence guarantee; completeness describes kernel rows, optional GUI paths are separately bound by Security/kernel observations and may be unavailable; CLI paths remain unknown; no signature trust, arguments or environment"]
         if includeSystem { result["unavailable_pids"] = observation.unavailable.map(Int.init) }
         if offset + selected.count < visible.count { result["next_offset"] = offset + selected.count }
         return result
@@ -300,13 +450,13 @@ enum SystemServices {
         let name = try SystemBridge.text(args, "signal")
         guard let value = signals[name] else { throw failure("invalid_arguments", "Use TERM, INT, HUP or KILL for one exact process") }
         let target = try exact(args)
-        let observation = try snapshot()
+        let worker = getpid(), core = getppid(), uid = geteuid()
+        let observation = try guardedSnapshot(targetPID: target.pid, workerPID: worker, corePID: core)
         // Missing records could conceal terminal/agent lineage or descendants.
         guard observation.unavailable.isEmpty else { throw failure("macos_process_observation", "Signal requires a complete process ancestry observation") }
-        let worker = getpid(), core = getppid(), uid = geteuid()
         try authorizeSignal(target, records: observation.records, workerPID: worker, corePID: core, ownUID: uid)
-        let current = try exact(args)
-        guard current == target, getppid() == core, getuid() == uid else {
+        let current = try kernelRecord(target.pid)
+        guard current == target.kernel, getppid() == core, getuid() == uid, geteuid() == uid else {
             throw failure("macos_process_changed", "Process credentials or identity changed before signal")
         }
         // Exactly one positive-PID call. A return of zero confirms only kernel
@@ -314,7 +464,7 @@ enum SystemServices {
         guard Darwin.kill(target.pid, value) == 0 else {
             throw failure("macos_signal_unknown", "Signal outcome cannot be established; do not replay", unknown: true)
         }
-        let after = try? read(target.pid)
+        let after = try? kernelRecord(target.pid)
         return ["pid": Int(target.pid), "start": target.start, "signal": name,
             "signal_accepted": true, "termination_confirmed": false, "automatic_retry": false,
             "same_process_observed_after": after?.start == target.start,

@@ -1,6 +1,6 @@
 # macOS system and communication modules · 31 October 2026
 
-Revision 2, RC22 candidate. Continues the completed RC21 adapter and body-only
+Revision 3, RC22 candidate. Continues the completed RC21 adapter and body-only
 handoff work; it does not replay historical uncertain tasks. The operator explicitly
 requested the remaining system communication modules, team review and deployment.
 
@@ -86,9 +86,12 @@ Security kernel guest via `SecCodeCopyGuestWithAttributes`, `SecCodeCopyStaticCo
 and `SecCodeCopySigningInformation` / `kSecCodeInfoMainExecutable`, bounded by
 unchanged kernel metadata before/after. An AppKit cache never supplies that path.
 These public APIs do not establish signature trust or grant execution rights.
-CLI paths remain explicitly unavailable; signal control then refuses. A changing
-PID census allows at most three read-only snapshot acquisitions before any effect.
-A signal itself is never repeated. See [Apple Code Signing Services](https://developer.apple.com/documentation/security/seccodecopyguestwithattributes(_:_:_:_:)).
+CLI paths remain explicitly unavailable; signal control then refuses. The
+read-only inventory uses the complete bounded kernel rows as an observation
+interval. Before a mutation, two complete bulk observations must agree on the
+target, its ancestors and entire descendant set, and worker/Core ancestry. Only
+those relevant GUI paths are bound twice between the two observations. At most
+three pre-effect attempts are allowed; the signal itself is never repeated. See [Apple Code Signing Services](https://developer.apple.com/documentation/security/seccodecopyguestwithattributes(_:_:_:_:)).
 `kill` cannot atomically compare a kernel process-start token: the documented
 guarantee is a fresh preflight followed by one positive-PID call, not a promise
 that PID reuse is impossible. A signal acknowledgement is not proof of termination.
@@ -149,3 +152,17 @@ subsequent independent reads proved the exact owned label and PID absent. The
 first 30-second readiness failure has no established cause. Original failure logs
 are retained; the final candidate must pass a fresh real upgrade/rollback gate.
 No candidate has been published or installed productively at this revision.
+
+The second native run still refused AX/process operations because the entire
+world PID set changed during 391–608 ms of path inspection. A subsequent read-only
+diagnosis identified a terminated own `sed` and an unrelated `bash` birth/death;
+all six kernel buffer calls succeeded. The fix consumes the complete kernel rows
+directly. Read inventory reports its observation interval and optional path
+completeness separately. Mutation guards independently compare full relevant
+process projections before/after fresh path checks; an unrelated process change
+can be ignored only when both complete graphs place it outside that projection.
+Relevant membership, reparenting, start/UID/TTY/name/path changes and incomplete
+observations still refuse before any effect. The final signal check is kernel-only
+and the existing single signal call is unchanged. Public fork/exec races after
+preflight remain an explicit limit. Compiled pure cases and independent review
+passed; the final shipped native binary still requires its real fixture gate.

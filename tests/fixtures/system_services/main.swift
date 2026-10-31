@@ -63,63 +63,145 @@ func acquisitionFixture() throws {
         }, executable: { _ in "/Applications/Old.app/Contents/MacOS/Old" })
     }
     var census = 0, maps = 0, rows = 0
-    let stable = try SystemServices.acquireSnapshot(census: { census += 1; return [10, 20, 30] },
-        applications: { maps += 1; return [20] }, read: { pid, apps in
-            rows += 1
-            return try SystemServices.observedRecord(pid, applications: apps,
-                kernel: { row($0, path: nil) }, executable: { _ in "/Applications/One.app/Contents/MacOS/One" })
-        })
-    try check(census == 2 && maps == 1 && rows == 3, "Stable census repeated application discovery per PID")
-    try check(stable.records.filter { $0.path != nil }.map { $0.pid } == [20], "CLI path scope expanded")
-    census = 0; maps = 0
-    let sequences: [[pid_t]] = [[10, 20], [10, 30], [10, 30], [10, 30]]
-    let refreshed = try SystemServices.acquireSnapshot(census: {
-        defer { census += 1 }; return sequences[census]
-    }, applications: { maps += 1; return maps == 1 ? [20] : [30] }, read: { pid, apps in
-        row(pid, path: apps.contains(pid) ? "/Applications/Current.app/Contents/MacOS/Current" : nil)
+    let stable = try SystemServices.acquireSnapshot(census: {
+        census += 1
+        return SystemServices.Snapshot(records: [row(10, path: nil), old, row(30, path: nil)], unavailable: [])
+    }, applications: { maps += 1; return [20] }, read: { pid, apps in
+        rows += 1
+        return try SystemServices.observedRecord(pid, applications: apps,
+            kernel: { row($0, path: nil) }, executable: { _ in "/Applications/One.app/Contents/MacOS/One" })
     })
-    try check(census == 4 && maps == 2 && refreshed.records.map { $0.pid } == [10, 30],
-              "Changed census reused stale rows or failed to reacquire")
-    try check(refreshed.records.first(where: { $0.pid == 30 })?.path != nil,
-              "Changed census reused the preceding application map")
-    census = 0; maps = 0
-    try refusal(["macos_process_changed"]) {
-        _ = try SystemServices.acquireSnapshot(census: {
-            census += 1; return census % 2 == 1 ? [10] : [10, 20]
-        }, applications: { maps += 1; return [] }, read: { pid, _ in row(pid, path: nil) })
+    try check(census == 1 && maps == 1 && rows == 1, "Bulk inventory still performs per-PID kernel observations")
+    try check(stable.records.filter { $0.path != nil }.map { $0.pid } == [20], "CLI path scope expanded")
+    for code in ["macos_process_changed", "macos_process_unavailable"] {
+        let historical = try SystemServices.acquireSnapshot(census: {
+            SystemServices.Snapshot(records: [old], unavailable: [])
+        }, applications: { [20] }, read: { _, _ in throw SystemServices.failure(code, "enrichment churn") })
+        try check(historical.records == [old] && historical.unavailable.isEmpty && historical.pathUnavailable == [20],
+                  "Optional path churn erased a kernel row or invented full path coverage")
     }
-    try check(census == 6 && maps == 3, "Census acquisition exceeded three read-only attempts")
+    let changed = try SystemServices.acquireSnapshot(census: {
+        SystemServices.Snapshot(records: [old], unavailable: [99])
+    }, applications: { [20] }, read: { _, _ in current.withPath("/Applications/New.app/Contents/MacOS/New") })
+    try check(changed.records == [old] && changed.unavailable == [99] && changed.pathUnavailable == [20],
+              "Read-only path enrichment transferred a reused PID path or hid missing kernel metadata")
     census = 0; maps = 0
     let buffered = try SystemServices.acquireSnapshot(census: {
         census += 1
-        if census == 1 { throw SystemServices.failure("macos_process_changed", "synthetic census buffer churn") }
-        return [10]
-    }, applications: { maps += 1; return [] }, read: { pid, _ in row(pid, path: nil) })
-    try check(census == 3 && maps == 1 && buffered.records.count == 1,
-              "Read-only census buffer churn did not reacquire once")
-    census = 0; maps = 0
+        if census == 1 { throw SystemServices.failure("macos_process_changed", "synthetic bounded buffer churn") }
+        return SystemServices.Snapshot(records: [old], unavailable: [])
+    }, applications: { maps += 1; return [] }, read: { _, _ in throw FixtureFailure.assertion("CLI read") })
+    try check(census == 2 && maps == 1 && buffered.records == [old], "Bounded buffer retry changed the observation")
+    census = 0
+    try refusal(["macos_process_changed"]) {
+        _ = try SystemServices.acquireSnapshot(census: {
+            census += 1; throw SystemServices.failure("macos_process_changed", "buffer churn")
+        }, applications: { [] }, read: { _, _ in old })
+    }
+    try check(census == 3, "Read-only acquisition exceeded three attempts")
+    census = 0
     try refusal(["macos_process_unavailable"]) {
         _ = try SystemServices.acquireSnapshot(census: {
-            census += 1; throw SystemServices.failure("macos_process_unavailable", "synthetic unavailable inventory")
-        }, applications: { maps += 1; return [] }, read: { pid, _ in row(pid, path: nil) })
+            census += 1; throw SystemServices.failure("macos_process_unavailable", "bad header")
+        }, applications: { [] }, read: { _, _ in old })
     }
-    try check(census == 1 && maps == 0, "Non-census failure was silently retried")
-    for code in ["macos_process_unavailable", "macos_process_changed"] {
-        census = 0; maps = 0
-        let incomplete = try SystemServices.acquireSnapshot(census: { census += 1; return [10, 20] },
-            applications: { maps += 1; return [] }, read: { pid, _ in
-                if pid == 20 { throw SystemServices.failure(code, "synthetic missing or changed row") }
-                return row(pid, path: nil)
+    try check(census == 1, "Invalid census was retried as ordinary churn")
+    var raw = kinfo_proc()
+    raw.kp_proc.p_pid = 20; raw.kp_eproc.e_ppid = 1
+    raw.kp_eproc.e_ucred.cr_uid = 501; raw.kp_eproc.e_pcred.p_ruid = 501; raw.kp_eproc.e_pcred.p_svuid = 501
+    raw.kp_proc.p_un.__p_starttime.tv_sec = 1700000000
+    raw.kp_proc.p_un.__p_starttime.tv_usec = 7
+    raw.kp_eproc.e_tdev = -1
+    let decoded = try SystemServices.decodeCensus([kinfo_proc(), raw], workerPID: 20)
+    try check(decoded.records.count == 1 && decoded.records[0].start == "1700000000.000007"
+              && decoded.records[0].uid == 501 && decoded.records[0].parent == 1,
+              "Bulk census lost kernel identity fields")
+    try refusal(["macos_process_unavailable"]) { _ = try SystemServices.decodeCensus([raw, raw], workerPID: 20) }
+    try refusal(["macos_process_unavailable"]) { _ = try SystemServices.decodeCensus([raw], workerPID: 21) }
+    raw.kp_proc.p_un.__p_starttime.tv_usec = 1000000
+    let malformed = try SystemServices.decodeCensus([raw], workerPID: 20)
+    try check(malformed.records.isEmpty && malformed.unavailable == [20], "Malformed row disappeared from completeness")
+}
+
+@MainActor
+func guardedAcquisitionFixture() throws {
+    let launchd = row(1, parent: 0, uid: 0, name: "launchd", path: nil, start: "1600000000.000000")
+    let worker = row(10, parent: 11, name: "Worker", path: nil)
+    let core = row(11, parent: 12, name: "Core", path: nil)
+    let ancestor = row(12, name: "Supervisor", path: nil)
+    let target = row(20, parent: 21, name: "Fixture", path: "/Applications/Fixture.app/Contents/MacOS/Fixture")
+    let parent = row(21, name: "Launcher", path: "/Applications/Launcher.app/Contents/MacOS/Launcher")
+    let child = row(22, parent: 20, name: "Child", path: "/Applications/Child.app/Contents/MacOS/Child")
+    let irrelevant = row(90, name: "background", path: nil)
+    let base = [launchd, worker, core, ancestor, target, parent, child]
+    func acquire(_ before: [SystemServices.Record], _ after: [SystemServices.Record],
+                 missing: [pid_t] = [], lastMissing: [pid_t] = [], pathChange: Bool = false,
+                 pathUnknown: Bool = false) throws -> (SystemServices.Snapshot, Int, Int) {
+        var censuses = 0, reads = 0
+        let table = Dictionary(uniqueKeysWithValues: before.map { ($0.pid, $0) })
+        let result = try SystemServices.acquireGuardedSnapshot(targetPID: 20, workerPID: 10, corePID: 11,
+            census: {
+                censuses += 1
+                return SystemServices.Snapshot(records: (censuses % 2 == 1 ? before : after).map { $0.kernel },
+                    unavailable: censuses % 2 == 1 ? missing : lastMissing)
+            }, applications: { Set(before.filter { $0.path != nil }.map { $0.pid }) }, read: { pid, _ in
+                reads += 1
+                guard let row = table[pid] else { throw FixtureFailure.assertion("unrelated process path queried") }
+                if pathUnknown { return row.kernel }
+                return pathChange && reads % 2 == 0 ? row.withPath("/Applications/Changed.app/Contents/MacOS/Changed") : row
             })
-        try check(incomplete.records.map { $0.pid } == [10] && incomplete.unavailable == [20],
-                  "Missing process metadata was silently accepted as complete")
-        try check(census == 2 && maps == 1, "Individual identity failure retried a stable census")
+        return (result, censuses, reads)
     }
+    for pair in [(base + [irrelevant], base), (base, base + [irrelevant])] {
+        let (safe, censuses, reads) = try acquire(pair.0, pair.1)
+        try check(censuses == 2 && reads == 6 && safe.records.map { $0.pid } == [1, 10, 11, 12, 20, 21, 22],
+                  "Unrelated birth/death blocked a stable relevant graph or gained a path")
+        try check(safe.records.first(where: { $0.pid == 20 }) == target, "Bound target path lost")
+    }
+    var ttyOne = child; ttyOne.terminalDevice = 1
+    var ttyTwo = child; ttyTwo.terminalDevice = 2
+    let replacements = [
+        row(20, parent: 21, start: "1700000001.123456"), row(20, parent: 21, uid: 502),
+        row(20, parent: 21, real: 502), row(20, parent: 21, saved: 502),
+        row(20, parent: 21, name: "replacement"), row(20, parent: 21, tty: true),
+        row(20, parent: 12), row(11, parent: 12, start: "1700000001.123456"),
+        row(11, parent: 1), row(11, parent: 12, uid: 502), row(11, parent: 12, name: "changedCore"),
+        row(21, start: "1700000001.123456"),
+        row(22, parent: 21), row(22, parent: 20, start: "1700000001.123456"),
+    ]
+    for replacement in replacements {
+        let after = base.map { $0.pid == replacement.pid ? replacement : $0 }
+        try refusal(["macos_process_changed", "macos_process_observation"]) { _ = try acquire(base, after) }
+    }
+    try refusal(["macos_process_changed"]) { _ = try acquire(base, base + [row(23, parent: 20)]) }
+    try refusal(["macos_process_changed"]) { _ = try acquire(base, base.filter { $0.pid != 22 }) }
+    try refusal(["macos_process_changed"]) { _ = try acquire(base.map { $0.pid == 22 ? ttyOne : $0 }, base.map { $0.pid == 22 ? ttyTwo : $0 }) }
+    try refusal(["macos_process_changed"]) { _ = try acquire(base, base, pathChange: true) }
+    try refusal(["macos_process_observation"]) { _ = try acquire(base, base, pathUnknown: true) }
+    try refusal(["macos_process_observation"]) { _ = try acquire(base, base, missing: [99]) }
+    try refusal(["macos_process_observation"]) { _ = try acquire(base, base, lastMissing: [99]) }
+    try refusal(["macos_process_observation"]) { _ = try acquire(base, base.filter { $0.pid != 10 }) }
+    try refusal(["macos_process_observation"]) { _ = try acquire(base, base.filter { $0.pid != 11 }) }
+    let unknownName = base.map { $0.pid == 22 ? row(22, parent: 20, name: "") : $0 }
+    try refusal(["macos_process_observation"]) { _ = try acquire(unknownName, unknownName) }
+    try refusal(["macos_process_observation"]) { _ = try acquire(base.filter { $0.pid != 1 }, base) }
+    try refusal(["macos_process_observation"]) { _ = try acquire(base.filter { $0.pid != 21 }, base) }
+    var calls = 0, pathReads = 0
+    try refusal(["macos_process_changed"]) {
+        _ = try SystemServices.acquireGuardedSnapshot(targetPID: 20, workerPID: 10, corePID: 11,
+            census: {
+                calls += 1
+                return SystemServices.Snapshot(records: calls % 2 == 1 ? base : base + [row(23, parent: 20)], unavailable: [])
+            }, applications: { [] }, read: { _, _ in pathReads += 1; return target })
+    }
+    try check(calls == 6 && pathReads == 0, "Relevant churn exceeded three pure read attempts")
+    print("bulk interval and relevant-graph churn guards passed; effects_attempted=0")
 }
 
 @MainActor
 func runFixture() throws {
     try acquisitionFixture()
+    try guardedAcquisitionFixture()
     let worker = row(10, parent: 11, name: "KiraBridge", path: "/private/KiraBridge")
     let core = row(11, parent: 12, name: "Python", path: "/opt/python3")
     let ancestor = row(12, name: "Supervisor", path: "/private/Supervisor")
@@ -171,6 +253,16 @@ func runFixture() throws {
     let first = try SystemServices.page(observation, includeSystem: false, uid: 501, offset: 0, limit: 1, expectedRevision: nil)
     try check(first["total"] as? Int == 2, "default scope leaked other UID")
     try check(first["unavailable_pids"] == nil, "default scope exposed unknown-owner PIDs")
+    try check(first["observation_atomic"] as? Bool == false
+              && first["kernel_observation_complete"] as? Bool == false,
+              "Read-only interval claimed an atomic or complete kernel observation")
+    try check((first["kernel_revision"] as? String)?.count == 64, "Kernel revision is absent")
+    let noPath = SystemServices.Snapshot(records: [target.kernel], unavailable: [], pathUnavailable: [20])
+    let noPathPage = try SystemServices.page(noPath, includeSystem: false, uid: 501, offset: 0, limit: 1, expectedRevision: nil)
+    try check(noPathPage["kernel_observation_complete"] as? Bool == true
+              && noPathPage["path_enrichment_complete"] as? Bool == false
+              && noPathPage["path_unavailable_count"] as? Int == 1,
+              "Optional path failure misreported kernel/path completeness")
     let firstRows = first["processes"] as! [[String: Any]]
     try check(firstRows[0]["pid"] as? Int == 10, "page not sorted")
     let revision = first["revision"] as! String
