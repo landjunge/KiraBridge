@@ -38,3 +38,24 @@ ohne dem Auftrag dafür Text hinzuzufügen. Alte unklare Übergaben bleiben erha
 
 Der Release übernimmt den bestehenden Adapterstand und die ausdrücklich verlangte
 Korrektur der sichtbaren Übergabe.
+
+
+## Verified release state · 31 October 2026
+
+Tag and source commit: `7ea0f24ae6c36f689d0889d41071fa8bca8aaf65`.
+Both Linux CI axes passed 2347 tests, 38 skipped each. Local Intel native acceptance
+passed 17 checks against the exact shipped Python source. Isolated launchd upgrade,
+rollback, fresh install and the downloaded GitHub bootstrap passed. All 15 published
+assets were freshly downloaded and their GitHub digests verified.
+
+The operator Mac runs RC21 Core PID50602, started 2026-10-31T16:17:49.751678Z;
+134 Python files hash `c3f75aa22e4f54b0b61a6af026cc2bbe7a5cd5d92f839e658e878642b3f3f7fd`.
+Companion App PID50637 is updated too. Data, persistent credentials and existing
+agent sessions were preserved. A supplementary live prompt was correctly refused
+before input because the original cooperative release handoff still reserved the
+canonical Codex slot; that supplementary delivery is not claimed as passed.
+
+Hosted Mac jobs did not start because of billing limits. Short noncollapsed
+multiline wrap states can still refuse with `visible_paste_unconfirmed` before
+Return. These and retained failed intermediate probes are documented in
+[the final release report](RC21-RELEASE-20261031.md).

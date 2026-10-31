@@ -2,13 +2,14 @@
   "order_id": "channel-4f8c697b60c046a083e55fd7dc1e577d",
   "version": "0.8.0rc21",
   "baseline_commit": "56a0b79c16b10acafa7142d206a0fc347f837d63",
-  "source_tree_sha256": "4c4db59f7fc20523514dd8ba3001b21c39c72039ecea2736080dc716ba9e2023",
+  "source_tree_sha256": "c3f75aa22e4f54b0b61a6af026cc2bbe7a5cd5d92f839e658e878642b3f3f7fd",
   "python_files": 134,
   "scope": "remove unsolicited visible prompt additions and finish authorized release",
   "targeted_regression": {
     "passed": 289,
     "junit_sha256": "c62d8326f3e64cb9e93eb8a693a856bcbb4be0cf7ddbb8c2e191b3898a6ec5e8",
-    "private_path": "/Users/landjunge/.local/share/kirabridge/backups/release-rc21-20261031T153818Z/body-only-regression.xml"
+    "private_path": "/Users/landjunge/.local/share/kirabridge/backups/release-rc21-20261031T153818Z/body-only-regression.xml",
+    "stage": "earlier body-only candidate before final compatibility adjustments"
   },
   "menu_regression": {
     "selected_passed": 9,
@@ -29,7 +30,102 @@
     "private_path": "/Users/landjunge/.local/share/kirabridge/backups/release-rc21-20261031T153818Z/native-source-rc21/evidence.private.json",
     "sha256": "7185825f4400b4b47891eb7fd8124017c7b3a750b2780bfa7a47248fc5655fb4"
   },
-  "independent_review": "no_remaining_material_findings; native followup and release gates pending",
+  "independent_review": "implementation/native/packages/download/core/data/companion passed; productive additional body refused by expected active canonical handoff",
   "ci_baseline": "Linux real six fixture failures per Python axis; hosted Mac jobs not started due current billing annotations",
-  "publication": "pending"
+  "publication": {
+    "url": "https://github.com/landjunge/KiraBridge/releases/tag/v0.8.0rc21",
+    "release_id": 430042031,
+    "assets": 15,
+    "source_commit": "7ea0f24ae6c36f689d0889d41071fa8bca8aaf65",
+    "published_at": "2026-10-31T16:16:23Z",
+    "fresh_draft_and_published_download_bytes_and_github_digests": "all_verified",
+    "rc20_unchanged": true
+  },
+  "source_commit": "7ea0f24ae6c36f689d0889d41071fa8bca8aaf65",
+  "native_final": {
+    "passed": true,
+    "checks": 17,
+    "source_tree_sha256": "c3f75aa22e4f54b0b61a6af026cc2bbe7a5cd5d92f839e658e878642b3f3f7fd",
+    "summary_sha256": "4d200dddcbab168f41ac9a9df9a08a7408a9c48e1cc3b6c5233b05cc133e7bc9"
+  },
+  "ci_final": {
+    "run_id": 41218257374,
+    "linux_python_3_11": {
+      "passed": 2347,
+      "skipped": 38
+    },
+    "linux_python_3_13": {
+      "passed": 2347,
+      "skipped": 38
+    },
+    "macos_jobs": "zero_steps_billing_blocked",
+    "overall_run": "failure_from_mac_jobs"
+  },
+  "installation": {
+    "version": "0.8.0rc21",
+    "source_commit": "7ea0f24ae6c36f689d0889d41071fa8bca8aaf65",
+    "pid": 50602,
+    "started_at": "2026-10-31T16:17:49.751678Z",
+    "source_tree_sha256": "c3f75aa22e4f54b0b61a6af026cc2bbe7a5cd5d92f839e658e878642b3f3f7fd",
+    "source_file_count": 134,
+    "visible_tty": "/dev/ttys001",
+    "exit_code": 0,
+    "companion_pid": 50637,
+    "companion_started_at": "2026-10-31T16:18:06Z",
+    "independent_core_and_companion_checks": "passed",
+    "rollback": "~/.local/share/kirabridge/install/backups/20261031-171742-2f348ed7"
+  },
+  "productive_extra_literal": {
+    "result": "intentional_preinput_refusal",
+    "error": "visible_target_busy",
+    "input_attempted": false,
+    "blocking_handoff": "channel-4f8c697b60c046a083e55fd7dc1e577d",
+    "new_live_body_delivery_proven": false,
+    "unknown_replay": false
+  },
+  "data_preservation": {
+    "queue_holds": 28,
+    "unknown_handoffs": 9,
+    "unknown_queued_message_jobs": 23,
+    "unknown_tasks": 69,
+    "persistent_config_files_byte_equal": 7,
+    "all_config_modes_preserved": 8,
+    "expected_rotated_file": "approval-login.html",
+    "tunnel_and_console_pids_preserved": [
+      25909,
+      15308
+    ]
+  },
+  "cleanup": {
+    "owned_pane_absent": 8422,
+    "owned_agent_and_shell_and_proxy_absent": [
+      50730,
+      43782,
+      50737
+    ],
+    "original_panes_preserved": [
+      8193,
+      8382
+    ]
+  },
+  "artifacts": {
+    "intel_zip_sha256": "4250e2f53407ac8e4b4e4b18c409c16c4e2e0de274d496807e6796a2d4d9cbdf",
+    "runtime_tar_sha256": "a27123c37fbbb22a6f8734c2fc09a0ae03cc3b8b1d442ba3b1095ae74aefe61c"
+  },
+  "remaining_limits": [
+    "short_noncollapsed_multiline_wrap_can_still_refuse_before_Return",
+    "hosted_Mac_CI_billing_blocked",
+    "other_macos_versions_ARM_and_LiveVoice_unverified",
+    "original_plan_research_sources_missing",
+    "desktop_lock_heuristic"
+  ],
+  "final_compatibility_regression": {
+    "passed": 160,
+    "includes_all_ten_prior_CI_failures": true,
+    "root_receiver_completion_cases_passed": 28,
+    "final_metadata_cases_passed": 19,
+    "final_continuation_cases_passed": 3,
+    "counts_overlap": true,
+    "final_entire_suite": "CI2347passed38skipped per Linux axis"
+  }
 }
