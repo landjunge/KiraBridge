@@ -41,6 +41,28 @@ def test_captured_warning_hide_extends_only_the_same_bound_cwd():
     assert insertion_observed("codex", AFTER, "/resume", BEFORE, cwd=CWD, home=HOME)
 
 
+def test_hint_and_warning_can_hide_together_only_with_matching_bound_cwd():
+    before = BEFORE + "  ← for agents · ? for shortcuts\n"
+    assert not insertion_observed("codex", AFTER, "/resume", before)
+    assert insertion_observed("codex", AFTER, "/resume", before, cwd=CWD, home=HOME)
+
+
+@pytest.mark.parametrize(
+    "after,before,cwd",
+    [
+        (AFTER, BEFORE, HOME + "/.local/share/kirabridge/backups/another-project"),
+        (AFTER.replace("GPT-6.1-Sol", "GPT-OTHER"), BEFORE, CWD),
+        (AFTER + "Confirm another operation?\n", BEFORE, CWD),
+        (AFTER, BEFORE + "  UNAUTHORIZED\n", CWD),
+        (AFTER.replace("› /resume\n", "› /resume EXTRA\n"), BEFORE, CWD),
+        (AFTER, BEFORE.replace("  ⚠ 2 warnings · f2 to view", ""), CWD),
+    ],
+)
+def test_combined_hint_cwd_reflow_preserves_all_other_guards(after, before, cwd):
+    before += "  ← for agents · ? for shortcuts\n"
+    assert not insertion_observed("codex", after, "/resume", before, cwd=cwd, home=HOME)
+
+
 @pytest.mark.parametrize(
     "after,before,cwd",
     [
@@ -75,7 +97,14 @@ def test_bound_cwd_full_path_is_an_exact_valid_renderer_variant(absolute):
 
 @pytest.mark.parametrize(
     "condition",
-    ["same", "changed", "before-unavailable", "after-unavailable", "strict-unavailable"],
+    [
+        "same",
+        "same-hidden-hint",
+        "changed",
+        "before-unavailable",
+        "after-unavailable",
+        "strict-unavailable",
+    ],
 )
 async def test_literal_submit_binds_cwd_observations_to_the_selected_task(
     literal_visible,  # noqa: F811
@@ -86,7 +115,10 @@ async def test_literal_submit_binds_cwd_observations_to_the_selected_task(
     bridge.config.visible_handoffs.bindings[
         "codex"
     ].ready_pattern = r"(?m)^›(?: Ask Codex to do anything)?\s*$"
-    transport["text"] = BEFORE
+    before = BEFORE
+    if condition == "same-hidden-hint":
+        before += "  ← for agents · ? for shortcuts\n"
+    transport["text"] = before
     probes = []
     actual_cwd = str(Path.home()) + CWD.removeprefix(HOME)
 
@@ -104,7 +136,7 @@ async def test_literal_submit_binds_cwd_observations_to_the_selected_task(
         return actual_cwd
 
     async def paste(pane, text, **guards):
-        assert text == "/resume" and guards["expected_screen"] == BEFORE
+        assert text == "/resume" and guards["expected_screen"] == before
         transport["literal_calls"].append(("paste", text))
         transport["text"] = AFTER
         if condition == "strict-unavailable":
@@ -123,7 +155,7 @@ async def test_literal_submit_binds_cwd_observations_to_the_selected_task(
     async with bridge:
         bridge.prepare("chatgpt", value)
         task = await bridge.tasks.wait("chatgpt", value.task_id, timeout=5)
-        if condition in {"same", "strict-unavailable"}:
+        if condition in {"same", "same-hidden-hint", "strict-unavailable"}:
             assert task["state"] == "completed", task
             assert task["result"]["return_sent"] is True
             assert transport["literal_calls"] == [("paste", "/resume"), ("return", None)]

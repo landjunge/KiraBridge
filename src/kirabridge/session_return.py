@@ -4,58 +4,9 @@ import re
 from contextlib import AsyncExitStack
 
 from kirabridge.bridge_core.models import BridgeError
+from kirabridge.codex_menu import resume_readiness, resume_selector, unsupported_confirmation_frame
 from kirabridge.visible_handoff import VisibleReadinessError
 from kirabridge.visible_readiness import assess, display_text, input_view
-
-
-def _resume_selector(text):
-    titles = list(re.finditer(r"(?m)^[ \t]*Resume a previous session[ \t]*$", text))
-    if not titles:
-        return False
-    lines = [line.strip(" \t") for line in text[titles[-1].start() :].splitlines()]
-    while lines and not lines[-1]:
-        lines.pop()
-    if len(lines) < 6:
-        return False
-    position = re.fullmatch(
-        r"─{3,}[ \t]*([0-9]+)[ \t]*/[ \t]*([0-9]+)[ \t]*·[ \t]*[0-9]+%[ \t]*─+",
-        lines[-3],
-    )
-    if position is None:
-        return False
-    wide = bool(
-        re.fullmatch(
-            r"enter resume[ \t]+esc exit[ \t]+⌃c exit[ \t]+tab focus sort/filter"
-            r"[ \t]+←/→ change option",
-            lines[-2],
-        )
-        and re.fullmatch(
-            r"⌃o comfortable view[ \t]+⌃t transcript[ \t]+⌃e expand[ \t]+↑/↓ browse",
-            lines[-1],
-        )
-    )
-    compact_nonempty = bool(
-        1 <= int(position[1]) <= int(position[2])
-        and any(re.match(r"›[ \t]+\S", line) for line in lines[1:-3])
-        and re.fullmatch(
-            r"enter resume[ \t]+⌃a archive[ \t]+esc exit[ \t]+⌃c exit"
-            r"[ \t]+tab focus[ \t]+←/→ option",
-            lines[-2],
-        )
-        and re.fullmatch(r"⌃o comfy[ \t]+⌃t preview[ \t]+⌃e exp[ \t]+↑/↓ browse", lines[-1])
-    )
-    return bool(
-        (wide or compact_nonempty)
-        and any(
-            re.fullmatch(
-                r"Filter:[ \t]+Cwd[ \t]+All[ \t]+Status:[ \t]+Active[ \t]+Archived"
-                r"[ \t]+Sort:[ \t]+Updated[ \t]+Created",
-                line,
-            )
-            for line in lines[1:-1]
-        )
-        and "Type to search" in lines
-    )
 
 
 def return_readiness(target, raw, binding, protocol=None):
@@ -72,13 +23,10 @@ def return_readiness(target, raw, binding, protocol=None):
             "working" if protocol.get("state") == "working" else "unknown",
             "bound_codex_turn_active_or_unknown",
         )
-    if _resume_selector(text):
-        title = list(re.finditer(r"(?m)^[ \t]*Resume a previous session[ \t]*$", text))[-1]
-        prelude = text[: title.start()].rstrip()
-        current = re.split(r"\n[ \t]*\n", prelude)[-1] if prelude else ""
-        if re.search(r"(?m)^[ \t]*[•◦]\s+[^\n]*\([^\n]*esc to interrupt", current):
-            return result("working", "current_progress_row")
-        return result("ready", "observed_codex_resume_selector")
+    if resume_selector(text):
+        return resume_readiness(text)
+    if unsupported_confirmation_frame(text):
+        return result("unknown", "unsupported_confirmation_dialog")
     view = input_view(target, text)
     if not view:
         return result("unknown", "current_input_frame_not_found")
@@ -98,6 +46,7 @@ def return_readiness(target, raw, binding, protocol=None):
 
 async def execute(bridge, task, args, running, progress):
     principal = task["principal"]
+    input_kind = "observed_return"
     for capability in ("session.input", "session.inspect", "terminal.execute"):
         bridge.security.principal(principal, capability)
     expected = bridge.outputs.captured_input_view(
@@ -133,6 +82,8 @@ async def execute(bridge, task, args, running, progress):
             readiness = return_readiness(target, expected, binding, observed.get("protocol"))
             if not readiness["ready"]:
                 raise VisibleReadinessError(readiness)
+            if readiness["reason"] == "observed_codex_resume_selector":
+                input_kind = "menu_confirmation"
             await bridge.visible_handoffs.reconcile_target_reservations(
                 principal, target, binding, explicit_return_task_id=task["id"]
             )
@@ -147,6 +98,7 @@ async def execute(bridge, task, args, running, progress):
                 "expected_cursor": args.expected_cursor,
                 "agent_pid": args.expected_agent_pid,
                 "key": "enter",
+                "input_kind": input_kind,
                 "paste_event_sent": False,
                 "return_sent": return_sent,
                 "agent_confirmed": False,
@@ -164,6 +116,7 @@ async def execute(bridge, task, args, running, progress):
     return {
         **result,
         "key": "enter",
+        "input_kind": input_kind,
         "pane_id": args.pane_id,
         "expected_pid": args.expected_pid,
         "input_handed_to_transport": True,

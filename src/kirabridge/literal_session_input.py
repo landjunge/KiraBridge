@@ -4,6 +4,7 @@ The durable session.input task owns this attempt. Agent work messages keep their
 separate receipt/reply protocol; literal input never creates such a message.
 """
 
+import hashlib
 import re
 from pathlib import Path
 
@@ -28,6 +29,20 @@ def _codex_renderer_suffix(suffix):
         # must remain, in order; no standalone or added footer row is discarded.
         rows.append(badge[1] if badge else line)
     return "\n".join(rows)
+
+
+def _without_empty_composer_hint(suffix):
+    """Codex hides this last shortcut row when the empty composer receives text."""
+    rows = suffix.split("\n")
+    if (
+        len(rows) >= 2
+        and re.fullmatch(r"[ \t]*← for agents · \? for shortcuts", rows[-1])
+        and re.fullmatch(r"[ \t]*GPT-\S+[^\n]*", rows[-2])
+    ):
+        # Operate only on the already-separated, pre-paste footer. Never strip
+        # hint-shaped payload continuations or newly added post-paste rows.
+        return "\n".join(rows[:-1])
+    return None
 
 
 def _cwd_footer(suffix):
@@ -94,11 +109,17 @@ def insertion_observed(target, raw, text, before, *, cwd=None, home=None):
         if marker is None or previous_marker is None:
             return False
         content = view[marker.end() :]
-        # Only the input row may change. Pin the actual ready widget's suffix,
-        # including every footer line, before pasting. A payload continuation
+        # Pin the actual ready widget's suffix before pasting. Only explicitly
+        # supported renderer decoration may change; a payload continuation
         # resembling GPT/status/navigation chrome must never be discarded.
         newline = previous_view.find("\n")
         suffix = previous_view[newline:] if newline >= 0 else ""
+        before_variants = [suffix]
+        without_hint = _without_empty_composer_hint(_without_viewport_padding(suffix))
+        if without_hint is not None:
+            # Preserve the original warning badge for the separately bound
+            # CWD-reflow proof; normalization would erase its prerequisite.
+            before_variants.append(without_hint)
         # Codex can collapse multiline pasted text. The empty pre-state,
         # clipboard transaction and exact count bind this view to this paste.
         collapsed = f"[Pasted Content {len(text)} chars]"
@@ -108,10 +129,14 @@ def insertion_observed(target, raw, text, before, *, cwd=None, home=None):
             actual_suffix = content[len(expected) :]
             if actual_suffix and not actual_suffix.startswith("\n"):
                 continue
-            if _codex_renderer_suffix(actual_suffix) == _codex_renderer_suffix(suffix):
-                return True
-            if _same_bound_cwd_footer(suffix, actual_suffix, cwd, home or str(Path.home())):
-                return True
+            rendered_after = _codex_renderer_suffix(actual_suffix)
+            for before_variant in before_variants:
+                if rendered_after == _codex_renderer_suffix(before_variant):
+                    return True
+                if _same_bound_cwd_footer(
+                    before_variant, actual_suffix, cwd, home or str(Path.home())
+                ):
+                    return True
         return False
     if target == "grok":
         marker = re.search(r"(?m)^[ \t]*│[ \t]*❯ ?", view)
@@ -168,7 +193,18 @@ async def _task_cwd(sessions, binding):
         return None
 
 
-async def execute(bridge, task, args, target, binding, running, progress):
+async def execute(
+    bridge,
+    task,
+    args,
+    target,
+    binding,
+    running,
+    progress,
+    *,
+    verifier=insertion_observed,
+    verifier_version="literal-widget-v2",
+):
     principal = task["principal"]
     policy = bridge.security.principal(principal, "agent.execute")
     if target not in policy.agents:
@@ -213,18 +249,41 @@ async def execute(bridge, task, args, target, binding, running, progress):
         )
         if args.submit:
             view = await bridge.visible_handoffs.check_target(principal, target, binding)
-            verified = insertion_observed(target, view["text"], approved.text, before["text"])
+            verified = verifier(target, view["text"], approved.text, before["text"])
             if not verified and before_cwd is not None:
                 after_cwd = await _task_cwd(bridge.sessions, binding)
                 if after_cwd == before_cwd:
-                    verified = insertion_observed(
+                    verified = verifier(
                         target, view["text"], approved.text, before["text"], cwd=before_cwd
                     )
+            verification = {
+                "verifier_version": verifier_version,
+                "reason": "exact_widget_match" if verified else "exact_widget_mismatch",
+                "before_screen_sha256": hashlib.sha256(before["text"].encode()).hexdigest(),
+                "after_screen_sha256": hashlib.sha256(view["text"].encode()).hexdigest(),
+                "expected_payload_sha256": hashlib.sha256(approved.text.encode()).hexdigest(),
+                "expected_payload_chars": len(approved.text),
+            }
             if not verified:
+                await progress(
+                    evidence(
+                        phase="insertion_unverified",
+                        paste_event_sent=True,
+                        insertion_verified=False,
+                        verification=verification,
+                    )
+                )
                 raise UncertainExecution(
                     "visible_insert_unknown", "Literal insertion not verified; no Return sent"
                 )
-            await progress(evidence(phase="submitting", paste_event_sent=True))
+            await progress(
+                evidence(
+                    phase="submitting",
+                    paste_event_sent=True,
+                    insertion_verified=True,
+                    verification=verification,
+                )
+            )
             # This transport checks both native identities and the exact screen
             # again. A menu after Return is a valid result; no agent ACK is due.
             await bridge.sessions.press_return(

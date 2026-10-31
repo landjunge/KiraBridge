@@ -66,6 +66,7 @@ from kirabridge.terminal_manager import TerminalManager
 from kirabridge.visible_terminal import VisibleTerminal, VisibleTerminalInput
 
 INPUTS = {
+    "platform.status": EmptyInput,
     "queue.control": QueueControl,
     "files.prepare": PrepareInput,
     "files.transfer": TransferInput,
@@ -213,6 +214,15 @@ class Bridge:
         self.visible_handoffs = VisibleHandoffs(
             config, self.store, self.security, self.sessions, self.messages
         )
+        from kirabridge.platform_adapters.macos import MacOSProvider
+
+        self.macos = MacOSProvider(
+            terminal_app=self.sessions.terminal_app,
+            clipboard=self.clipboard,
+            files=self.filesystem,
+            processes=self.processes,
+        )
+        self.sessions.terminal_app.platform_guard = lambda: self.macos.require("terminal.native")
         self.agents.visible_handoffs = self.visible_handoffs
 
         def maintain():
@@ -241,7 +251,10 @@ class Bridge:
             model.model_validate(request.arguments)
         except ValidationError:
             raise BridgeError(
-                "invalid_arguments", "Arguments do not match the operation schema"
+                "invalid_arguments",
+                "For Return without text use session_enter with the observed cursor and agent PID"
+                if request.operation == "session.input" and not request.arguments.get("text")
+                else "Arguments do not match the operation schema",
             ) from None
 
     def submit(
@@ -397,6 +410,58 @@ class Bridge:
         }
 
     async def execute(self, task: dict, running, progress) -> dict[str, Any]:
+        operation = self.platform_operation(task["operation"], task["args"], task["principal"])
+        if operation is not None:
+            return await self.macos.execute(
+                operation,
+                lambda: self._execute_operation(task, running, progress),
+                revalidate=lambda: self.security.authorize(
+                    task["principal"], task["operation"], text=task["args"].get("text")
+                ),
+            )
+        return await self._execute_operation(task, running, progress)
+
+    def platform_operation(self, operation, arguments=None, principal=None):
+        """Select the existing native provider without changing tmux/portable routes."""
+        if self.macos.snapshot()["host"]["platform"] != "darwin":
+            return None
+        if operation in {"session.catalog", "platform.status", "clipboard.info"}:
+            return None  # The terminal catalogue can contain tmux as well.
+        if operation in {"terminal.execute", "admin.execute"}:
+            if visible_execution(
+                self.config,
+                principal,
+                operation,
+                background=bool((arguments or {}).get("background", False)),
+            ) or (
+                operation == "admin.execute" and direct_terminal_required(self.config, principal)
+            ):
+                return "terminal.visible"
+            return None
+        if operation.startswith("session.") and operation != "session.open":
+            if not str((arguments or {}).get("pane_id", "")).startswith("terminal:"):
+                return None
+        return operation if operation in self.macos.descriptors else None
+
+    async def platform_status(self, principal):
+        from kirabridge.permissions import decision
+
+        self.security.authorize(principal, "platform.status")
+        # Explicit no-prompt checks run only for status, never tools/list.
+        await asyncio.to_thread(self.macos.permission_probe.refresh_core)
+        return {
+            **self.macos.snapshot(),
+            "operations": [
+                row
+                for row in self.macos.operation_catalog(
+                    lambda op: decision(self.config, principal, op)
+                )
+                if row["operation"] in INPUTS and row["policy"]["authorized"]
+            ],
+            "scope": "technical availability and OS observations; no execution grant",
+        }
+
+    async def _execute_operation(self, task: dict, running, progress) -> dict[str, Any]:
         operation, arguments, principal = task["operation"], task["args"], task["principal"]
         args = INPUTS[operation].model_validate(arguments)
         self.security.authorize(principal, operation, text=arguments.get("text"))
@@ -405,6 +470,9 @@ class Bridge:
             policy.read_roots if operation in {"file.read", "file.image", "file.list"} else []
         )
         scope = PathScope(roots, excluded=state_exclusions(self.config, policy))
+        if operation == "platform.status":
+            await running({"evidence_type": "platform_status_query"})
+            return await self.platform_status(principal)
         if operation == "queue.control":
             # Rejections before any mutation remain definite failures, not unknown effects.
             result = await self.queues.control(
@@ -491,7 +559,7 @@ class Bridge:
             selected = await self.sessions.selected(principal, args.pane_id, args.expected_pid)
             target, selected_binding = self.sessions.explicit_agent_binding(selected)
             if target:
-                from kirabridge.literal_session_input import execute
+                from kirabridge.session_input_router import execute
 
                 return await execute(self, task, args, target, selected_binding, running, progress)
 

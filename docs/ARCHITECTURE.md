@@ -1,6 +1,11 @@
 # Architektur
 
-Aktueller Quellstand: unveröffentlichter RC17-Konsolidierungskandidat; [Zusammenführung](CONSOLIDATION-20261024.md). Produktive RC14 unverändert.
+Stand 31.10.2026: [modularer macOS-Provider und getrennte Eingabewege](MACOS-ADAPTER-IMPLEMENTATION-20261031.md)
+als lokaler Entwicklungskandidat; produktiver Core zuletzt `ecb76cb2082a` (RC20).
+Kandidatenprüfung und produktive Installation sind getrennte Nachweise.
+
+Historischer Konsolidierungsstand vom 24.10.2026: unveröffentlichter RC17-Kandidat;
+[Zusammenführung](CONSOLIDATION-20261024.md), damals produktive RC14 unverändert.
 
 Historischer Nachweis vom 20. Oktober 2026: damals produktiv `0.8.0rc11`; gesicherter Ausgangspunkt `0.8.0rc3`, Quellpin
 `4188f001d405a9f04ee63f6bbe1b088c6f39d26e`, Dokumentation `d9727ac1`,

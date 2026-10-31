@@ -1,5 +1,8 @@
 """Literal terminal input must not become an addressed agent work message."""
 
+import hashlib
+import json
+
 import pytest
 from conftest import request
 from test_visible_handoff import callback, visible  # noqa: F401
@@ -151,6 +154,96 @@ def test_native_resume_viewport_padding_does_not_hide_exact_payload():
     assert insertion_observed("codex", after, "/resume", before)
 
 
+@pytest.mark.parametrize("size", [1388, 1022])
+def test_captured_collapsed_paste_hides_only_empty_composer_shortcut_row(size):
+    from kirabridge.literal_session_input import insertion_observed
+
+    # Captured terminal:6369 before 3a1d3b35 and after ff529772/041a8dc6.
+    # Counts match the two failed task payloads; their footer hint disappears
+    # while model, directory, thread title and workspace remain byte-identical.
+    payload = ("Prüfe die Übergabe. " * size)[:size]
+    footer = "\n \n  GPT-6.1-Sol high · ~ · Prüfe KiraBridge-Phasen 1 bis 3 · Main [default]"
+    before = "› Ask Codex to do anything" + footer + "\n  ← for agents · ? for shortcuts\n"
+    after = f"› [Pasted Content {size} chars]" + footer + "\n \n"
+    assert insertion_observed("codex", after, payload, before)
+    assert not insertion_observed("codex", after, payload + "X", before)
+
+
+@pytest.mark.parametrize(
+    "changed",
+    [
+        "\n \n  GPT-6.1-Sol high · MUTATED",
+        "\n \n  GPT-6.1-Sol high · ~\n  UNAUTHORIZED",
+        "\n  ← for agents · ? for shortcuts\n \n  GPT-6.1-Sol high · ~",
+        "\n \n  GPT-6.1-Sol high · ~\n  ← for agents · ? for shortcuts EXTRA",
+        "\n \n  GPT-6.1-Sol high · ~\n  ← for agents · ? for shortcuts\n  extra draft",
+    ],
+)
+def test_hidden_composer_hint_does_not_discard_changed_footer_or_continuation(changed):
+    from kirabridge.literal_session_input import insertion_observed
+
+    before = "› \n \n  GPT-6.1-Sol high · ~\n  ← for agents · ? for shortcuts\n"
+    assert not insertion_observed("codex", "› /resume" + changed, "/resume", before)
+
+
+@pytest.mark.parametrize("hint", ["← for agents · ? for shortcuts EXTRA", "← for agents", "custom"])
+def test_unknown_pre_paste_hint_cannot_disappear(hint):
+    from kirabridge.literal_session_input import insertion_observed
+
+    footer = "\n \n  GPT-6.1-Sol high · ~"
+    before = "› " + footer + "\n  " + hint + "\n"
+    assert not insertion_observed("codex", "› /resume" + footer, "/resume", before)
+
+
+async def test_collapsed_paste_with_hidden_shortcuts_sends_exactly_one_return(
+    literal_visible, monkeypatch
+):
+    bridge, transport, row = literal_visible
+    footer = "\n \n  GPT-6.1-Sol high · ~"
+    payload = "Prüfe diese tatsächliche Übergabe. " * 45
+    transport["text"] = "› " + footer + "\n  ← for agents · ? for shortcuts\n"
+
+    async def insert(pane, text, **guards):
+        assert guards["expected_screen"] == transport["text"]
+        transport["literal_calls"].append(("paste", text))
+        transport["text"] = f"› [Pasted Content {len(text)} chars]" + footer + "\n \n"
+
+    monkeypatch.setattr(bridge.sessions.terminal_app, "insert", insert)
+    value = request(
+        "session.input",
+        {"pane_id": row["pane_id"], "expected_pid": 900, "text": payload},
+        task_id="collapsed-paste-shortcut-row",
+    )
+    async with bridge:
+        bridge.prepare("chatgpt", value)
+        task = await bridge.tasks.wait("chatgpt", value.task_id, timeout=5)
+        assert task["state"] == "completed", task
+        assert task["result"]["return_sent"] is True
+        assert bridge.submit("chatgpt", value, "")["state"] == "completed"
+        observations = [
+            json.loads(event[0])
+            for event in bridge.store.db.execute(
+                "SELECT evidence FROM events WHERE task_id=?", (value.task_id,)
+            )
+        ]
+        submitting = next(item for item in observations if item.get("phase") == "submitting")
+        assert submitting["insertion_verified"] is True
+        assert submitting["return_sent"] is False
+        assert submitting["verification"] == {
+            "verifier_version": "literal-widget-v2",
+            "reason": "exact_widget_match",
+            "before_screen_sha256": hashlib.sha256(
+                ("› " + footer + "\n  ← for agents · ? for shortcuts\n").encode()
+            ).hexdigest(),
+            "after_screen_sha256": hashlib.sha256(
+                (f"› [Pasted Content {len(payload)} chars]" + footer + "\n \n").encode()
+            ).hexdigest(),
+            "expected_payload_sha256": hashlib.sha256(payload.encode()).hexdigest(),
+            "expected_payload_chars": len(payload),
+        }
+    assert transport["literal_calls"] == [("paste", payload), ("return", None)]
+
+
 @pytest.mark.parametrize("continuation", ["\u00a0", "\u2003"])
 def test_unicode_whitespace_continuation_is_not_viewport_padding(continuation):
     from kirabridge.literal_session_input import insertion_observed
@@ -230,6 +323,23 @@ async def test_literal_input_uncertainty_never_repeats_paste_or_return(
         task = await bridge.tasks.wait("chatgpt", value.task_id, timeout=5)
         assert task["state"] == "unknown", task
         assert task["evidence"]["safe_to_retry"] is False
+        if failure == "changed":
+            observation = task["evidence"]["last_observation"]
+            assert observation["phase"] == "insertion_unverified"
+            assert observation["insertion_verified"] is False
+            assert observation["return_sent"] is False
+            assert observation["verification"] == {
+                "verifier_version": "codex-slash-widget-v1",
+                "reason": "exact_widget_mismatch",
+                "before_screen_sha256": hashlib.sha256("› ".encode()).hexdigest(),
+                "after_screen_sha256": hashlib.sha256(
+                    "› /resume UNAUTHORIZED".encode()
+                ).hexdigest(),
+                "expected_payload_sha256": hashlib.sha256(b"/resume").hexdigest(),
+                "expected_payload_chars": len("/resume"),
+            }
+            serialized = json.dumps(observation["verification"])
+            assert "/resume" not in serialized and "UNAUTHORIZED" not in serialized
         assert bridge.submit("chatgpt", value, "")["state"] == "unknown"
         assert not bridge.store.db.execute("SELECT 1 FROM messages").fetchone()
     from kirabridge.bridge_core.bridge import Bridge

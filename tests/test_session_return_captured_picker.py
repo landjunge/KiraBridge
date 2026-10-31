@@ -15,6 +15,11 @@ COMPACT_PICKER = (
     " ⌃o comfy   ⌃t preview   ⌃e exp   ↑/↓ browse\n\n"
 )
 
+# Exact full-width footer with archive action from native E2E07 (31.10.2026).
+WIDE_ARCHIVE_PICKER = COMPACT_PICKER.replace(
+    "tab focus   ←/→ option", "tab focus sort/filter   ←/→ change option"
+).replace("⌃o comfy   ⌃t preview   ⌃e exp", "⌃o comfortable view   ⌃t transcript   ⌃e expand")
+
 
 def binding():
     return VisibleTerminalBinding(
@@ -25,6 +30,27 @@ def binding():
 def test_captured_compact_nonempty_picker_is_return_ready():
     result = return_readiness("codex", COMPACT_PICKER, binding())
     assert result["ready"] and result["reason"] == "observed_codex_resume_selector"
+
+
+def test_captured_wide_archive_picker_is_return_ready():
+    result = return_readiness("codex", WIDE_ARCHIVE_PICKER, binding())
+    assert result["ready"] and result["reason"] == "observed_codex_resume_selector"
+
+
+@pytest.mark.parametrize(
+    "frame",
+    [
+        WIDE_ARCHIVE_PICKER.replace("⌃a archive", "⌃a approve"),
+        WIDE_ARCHIVE_PICKER.replace("1 / 1", "0 / 0"),
+        WIDE_ARCHIVE_PICKER.replace(
+            "  › 10m ago     Owned diagnostic chat", "  No selected session"
+        ),
+        WIDE_ARCHIVE_PICKER.replace("⌃t transcript", "⌃t approve"),
+        WIDE_ARCHIVE_PICKER + "Approve another operation?\n",
+    ],
+)
+def test_wide_archive_picker_keeps_selection_and_exact_footer_guards(frame):
+    assert not return_readiness("codex", frame, binding())["ready"]
 
 
 @pytest.mark.parametrize(

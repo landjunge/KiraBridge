@@ -13,6 +13,7 @@ def snapshot(bridge, principal):
     policy = bridge.security.principal(principal)
     observed = getattr(bridge, "discovery_observations", {}).get(principal)
     current_permissions = permission_revision(bridge.config)
+    platform = bridge.macos.snapshot()
     access = decision(bridge.config, principal, "session.catalog")
     if observed and observed.get("permission_revision") != current_permissions:
         observed = None
@@ -27,6 +28,7 @@ def snapshot(bridge, principal):
             "version": __version__,
             "instance": bridge.runtime["instance_id"],
             "permissions": permission_revision(bridge.config),
+            "platform": platform["revision"],
             "agents": {
                 name: value.model_dump()
                 for name, value in bridge.config.agents.items()
@@ -41,9 +43,17 @@ def snapshot(bridge, principal):
         "principal": principal,
         "revision": revision,
         "permission_revision": permission_revision(bridge.config),
+        "platform": platform,
         "capabilities": sorted(policy.capabilities),
         "refresh": {
-            "on": ["connection", "version", "instance", "permissions", "terminal_session"],
+            "on": [
+                "connection",
+                "version",
+                "instance",
+                "permissions",
+                "terminal_session",
+                "platform",
+            ],
             "tools_list": "fresh per request; stdio proxy forwards list-change notifications",
             "client_action": (
                 "Refresh tools/list and operation_catalog when revision changes; "

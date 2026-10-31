@@ -9,6 +9,7 @@ from typing import Literal
 
 READ_OPERATIONS = frozenset(
     {
+        "platform.status",
         "files.inventory",
         "files.status",
         "connection.check",
@@ -33,6 +34,7 @@ STOP_OPERATIONS = frozenset(
 )
 RESERVED_READ_OPERATIONS = frozenset(
     {
+        "platform.status",
         "session.catalog",
         "session.read",
         "files.inventory",
@@ -89,7 +91,9 @@ for _name in (
     "admin.execute",
 ):
     OPERATIONS[_name] = Operation(
-        capability="threaddesk.manage"
+        capability="bridge.health"
+        if _name == "platform.status"
+        else "threaddesk.manage"
         if _name == "threaddesk.dynamic"
         else "task.cancel"
         if _name == "queue.control"

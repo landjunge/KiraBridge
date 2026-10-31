@@ -126,6 +126,26 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
             }
 
     read = ToolAnnotations(readOnlyHint=True, destructiveHint=False, openWorldHint=False)
+
+    @server.tool(annotations=read)
+    async def macos_status(ctx: Context) -> dict[str, Any]:
+        """Inspect native capabilities and public no-prompt Core permission checks.
+
+        Core checks never authorize osascript, Clipboard helpers or the desktop app.
+        Unknown helper permissions still require the existing native target guards.
+        """
+        from kirabridge.discovery import snapshot
+
+        name = identity(ctx)
+        try:
+            before = snapshot(bridge, name)["revision"]
+            result = await bridge.platform_status(name)
+            if snapshot(bridge, name)["revision"] != before:
+                await ctx.session.send_tool_list_changed()
+            return result
+        except BridgeError as exc:
+            return {"error": {"code": exc.code, "message": str(exc)}}
+
     write = ToolAnnotations(
         readOnlyHint=False, destructiveHint=True, idempotentHint=True, openWorldHint=True
     )
@@ -360,6 +380,12 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
             from kirabridge.terminal_queries import TERMINAL_QUERY_SECONDS
 
             policy = bridge.security.principal(identity(ctx))
+            platform_rows = {
+                row["operation"]: row
+                for row in bridge.macos.operation_catalog(
+                    lambda op: decision(bridge.config, identity(ctx), op)
+                )
+            }
             return {
                 "api_version": "1",
                 "approval_mode": policy.approval_mode,
@@ -383,9 +409,24 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
                             "approval_required"
                         ],
                         "permission_decision": decision(bridge.config, identity(ctx), name),
+                        **({"platform": platform_rows[name]} if name in platform_rows else {}),
                     }
                     for name, model in INPUTS.items()
                     if decision(bridge.config, identity(ctx), name)["authorized"]
+                    and (
+                        name not in platform_rows
+                        or name
+                        in {
+                            "session.catalog",
+                            "session.read",
+                            "session.input",
+                            "session.focus",
+                            "session.close",
+                            "clipboard.info",
+                        }
+                        or bridge.macos.snapshot()["host"]["platform"] != "darwin"
+                        or platform_rows[name]["eligible_for_submission"]
+                    )
                 },
             }
 
@@ -516,6 +557,42 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
         from kirabridge.grok_connector.conversation import result_for_conversation
 
         return await result_for_conversation(bridge, identity(ctx), task)
+
+    @server.tool(annotations=write)
+    async def session_enter(
+        task_id: str,
+        idempotency_key: str,
+        pane_id: str,
+        expected_pid: int,
+        expected_cursor: str,
+        ctx: Context,
+        expected_agent_pid: int | None = None,
+        approval: str = "",
+        completion_target: str | None = None,
+    ) -> dict[str, Any]:
+        """Send one Return without pasting, bound to a fresh session_read cursor.
+
+        Pass next_cursor and the observed agent PID from that read. This confirms
+        only a supported draft/menu and never approves an unknown permission dialog.
+        Empty session.input text is not a Return instruction.
+        """
+        return await task_submit(
+            TaskRequest(
+                task_id=task_id,
+                idempotency_key=idempotency_key,
+                operation="session.input",
+                arguments={
+                    "pane_id": pane_id,
+                    "expected_pid": expected_pid,
+                    "key": "enter",
+                    "expected_cursor": expected_cursor,
+                    "expected_agent_pid": expected_agent_pid,
+                },
+            ),
+            ctx,
+            approval,
+            completion_target,
+        )
 
     @server.tool(annotations=write)
     async def session_open(
@@ -989,10 +1066,24 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
             "instance_id": epoch["instance_id"],
             "revision": epoch["revision"],
             "principal": name,
+            "platform_revision": epoch["platform"]["revision"],
         }
+        from kirabridge.permissions import decision
+
+        rows = {
+            row["operation"].replace(".", "_"): row
+            for row in bridge.macos.operation_catalog(lambda op: decision(config, name, op))
+        }
+        if "session_input" in rows:
+            rows["session_enter"] = rows["session_input"]
+        native_host = epoch["platform"]["host"]["platform"] == "darwin"
         return [
             tool.model_copy(update={"meta": {**(tool.meta or {}), "kirabridge": metadata}})
             for tool in await server.list_tools()
+            if tool.name not in rows
+            or tool.name in {"session_catalog", "session_read", "clipboard_info"}
+            or not native_host
+            or rows[tool.name]["eligible_for_submission"]
         ]
 
     return server

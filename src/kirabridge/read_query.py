@@ -12,7 +12,12 @@ from kirabridge.permissions import state_exclusions
 
 class ReadQuery(Input):
     operation: Literal[
-        "file.read", "file.list", "terminal.output", "session.catalog", "session.read"
+        "file.read",
+        "file.list",
+        "terminal.output",
+        "session.catalog",
+        "session.read",
+        "platform.status",
     ]
     path: str | None = Field(default=None, max_length=4096)
     task_id: str | None = Field(default=None, max_length=128)
@@ -45,6 +50,9 @@ class ReadQuery(Input):
                 raise ValueError("since is only valid for session.read")
         elif self.pane_id is not None or self.expected_pid is not None:
             raise ValueError("terminal handles are only valid for session.read")
+        elif self.operation == "platform.status":
+            if self.path or self.task_id or self.offset or self.tail:
+                raise ValueError("platform.status does not accept file/task selectors")
         elif self.operation == "terminal.output":
             if not self.task_id or self.path is not None or self.offset or self.tail:
                 raise ValueError("terminal.output requires only task_id and max_bytes")
@@ -61,6 +69,8 @@ class ReadQuery(Input):
 
 async def read_query_async(bridge, principal: str, query: ReadQuery) -> dict:
     """Existing dictionary-shaped tool also works with cached client tool lists."""
+    if query.operation == "platform.status":
+        return await bridge.platform_status(principal)
     if query.operation == "session.catalog":
         return {
             "operation": query.operation,
@@ -84,6 +94,10 @@ async def read_query_async(bridge, principal: str, query: ReadQuery) -> dict:
 def read_query(bridge, principal: str, query: ReadQuery) -> dict:
     capability = "process.inspect" if query.operation == "terminal.output" else query.operation
     policy = bridge.security.principal(principal, capability)
+    if query.operation in {"file.read", "file.list"}:
+        platform_operation = bridge.platform_operation(query.operation)
+        if platform_operation is not None:
+            bridge.macos.require(platform_operation)
     if query.operation == "terminal.output":
         task = bridge.task(principal, query.task_id)
         if task["operation"] not in {

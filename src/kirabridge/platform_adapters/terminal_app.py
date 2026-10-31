@@ -102,6 +102,9 @@ class TerminalAppTransport:
     async def native(self, source, *, mutation=False):
         if sys.platform != "darwin":
             raise BridgeError("session_transport_unavailable", "Terminal.app requires macOS")
+        guard = getattr(self, "platform_guard", None)
+        if guard is not None:
+            guard()
         await self.desktop.require_interactive()
         child = await asyncio.create_subprocess_exec(
             "/usr/bin/osascript",

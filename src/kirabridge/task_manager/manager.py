@@ -78,7 +78,7 @@ class TaskManager:
             raise BridgeError("payload_limit", "Task exceeds configured byte limit")
         with self.store.transaction():
             existing = self.store.db.execute(
-                "SELECT id,request_hash FROM tasks WHERE principal=? AND idem=?",
+                "SELECT id,request_hash,state FROM tasks WHERE principal=? AND idem=?",
                 (principal, request.idempotency_key),
             ).fetchone()
             if existing:
@@ -95,11 +95,17 @@ class TaskManager:
                     raise BridgeError(
                         "completion_route_conflict", "Original return target is fixed"
                     )
-                if approval and self.input_policy.waiting(existing["id"]):
+                if approval and existing["state"] == State.CREATED:
                     self.store.assert_accepting()
                     if request.task_id != existing["id"]:
-                        raise BridgeError("review_conflict", "Use the original buffered task ID")
-                    self.input_policy.release(principal, request, approval)
+                        raise BridgeError("review_conflict", "Use the original pending task ID")
+                    if self.input_policy.waiting(existing["id"]):
+                        self.input_policy.release(principal, request, approval)
+                    else:
+                        # A prepared non-input task already owns its immutable
+                        # request and queue slot. Consume the operator's exact
+                        # grant atomically with the existing approval transition.
+                        self.security.consume(principal, request, approval)
                     self._approve_in_transaction(existing["id"], "daniel_token")
                     self.native.submit(existing["id"])
                     self.wake.set()
