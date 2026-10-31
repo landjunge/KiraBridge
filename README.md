@@ -9,8 +9,9 @@
 
 **Talk to your AI. Get the work done on your computer.**
 
-Tell ChatGPT what you need. KiraBridge passes the task to Codex or Grok on your
-computer. You stay in control and choose what the AI is allowed to do.
+KiraBridge connects ChatGPT to **Grok Build and Codex running in terminal windows
+on your computer**. Discuss what you need in chat, pass the work to those terminal
+agents and follow their replies while choosing what they may access.
 
 **macOS · Intel — [0.8.0rc20](https://github.com/landjunge/KiraBridge/releases/tag/v0.8.0rc20) · October 30, 2026 · Preview**
 
@@ -27,8 +28,8 @@ This is a preview; there is no stable release yet. RC20 is available for Intel M
 
 - **Work on local projects:** let your connected AI read project files and logs,
   edit files or run commands within the access you have granted.
-- **Pass work to agents:** send tasks to configured Codex or Grok sessions on
-  your computer.
+- **Work with terminal agents:** send tasks to Grok Build and Codex in their
+  configured terminal sessions on your computer.
 - **Follow the work:** see requests, messages and results in the local control window.
 - **Choose the permissions:** decide which folders and actions are allowed and
   when a task needs your approval.
@@ -50,6 +51,8 @@ ThreadDesk and other integrations are optional. KiraBridge's core works independ
 already available in Terminal; internet access to download dependencies.
 Install with your regular user account. AI accounts and any provider charges are
 separate; the chat connection needs the corresponding account permissions.
+For terminal-agent tasks, install and sign in to Grok Build or Codex, then
+configure its terminal session as a target in KiraBridge.
 
 This preview has known terminal limitations, and the app is not Apple-notarized.
 Read [installation and help](docs/INSTALL-EN.md) for setup, updates and known issues.

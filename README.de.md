@@ -9,9 +9,9 @@
 
 **Du redest mit der KI. Die Arbeit landet auf deinem Rechner.**
 
-Besprich mit ChatGPT, was du erledigen möchtest. KiraBridge gibt den Auftrag an
-Codex oder Grok auf deinem Computer weiter. Du behältst den Überblick und
-bestimmst, was die KI dort tun darf.
+KiraBridge verbindet ChatGPT mit **Grok Build und Codex, die in Terminalfenstern
+auf deinem Computer laufen**. Besprich im Chat, was du erledigen möchtest, gib die
+Arbeit an diese Terminalagenten weiter und verfolge ihre Antworten — mit den von dir erlaubten Zugriffen.
 
 **macOS · Intel — [0.8.0rc20](https://github.com/landjunge/KiraBridge/releases/tag/v0.8.0rc20) · 30. Oktober 2026 · Vorabversion**
 
@@ -28,8 +28,8 @@ Dies ist eine Vorabversion; eine stabile Version gibt es noch nicht. RC20 ist f�
 
 - **An lokalen Projekten arbeiten:** Lass deine verbundene KI Projektdateien und
   Protokolle lesen, Dateien bearbeiten oder Befehle ausführen — im erlaubten Rahmen.
-- **Arbeit an Agenten weitergeben:** Schicke Aufträge an eingerichtete Codex- oder
-  Grok-Sitzungen auf deinem Computer.
+- **Mit Terminalagenten arbeiten:** Schicke Aufträge an Grok Build und Codex
+  in ihren eingerichteten Terminalsitzungen auf deinem Computer.
 - **Die Arbeit verfolgen:** Sieh Anfragen, Nachrichten und Ergebnisse im lokalen Steuerfenster.
 - **Den Zugriff bestimmen:** Lege fest, welche Ordner und Aktionen erlaubt sind
   und wann ein Auftrag deine Freigabe braucht.
@@ -51,6 +51,8 @@ ThreadDesk und andere Integrationen sind optional. Der Kern von KiraBridge funkt
 bereits im Terminal verfügbar; Internet zum Laden von Abhängigkeiten.
 Installiere mit deinem normalen Benutzerkonto. KI-Konten und mögliche Anbieterkosten
 bleiben getrennt; die Chatverbindung braucht die passenden Kontoberechtigungen.
+Für Terminalaufträge müssen Grok Build oder Codex installiert und angemeldet sein.
+Richte ihre Terminalsitzung in KiraBridge als Ziel ein.
 
 Diese Vorabversion hat bekannte Einschränkungen bei der Terminalbedienung; die App
 ist nicht von Apple notarisiert. Unter [Installation und Hilfe](docs/INSTALL-DE.md)
