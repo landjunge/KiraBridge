@@ -1,14 +1,14 @@
 # Architektur
 
-Ergänzter Abschlusskandidat vom 31.10.2026: [prozessgebundene Helperdiagnostik
+Produktiver Planabschluss vom 31.10.2026, Code `831150a9b973`: [prozessgebundene Helperdiagnostik
 und gemeinsame native Abnahme](MACOS-PLAN-COMPLETION-20261031.md).
 Die explizite Diagnose ergänzt den vorhandenen Statusweg; sie überträgt keine
 Rechte auf spätere Worker. Paket- und Installationsstand stehen im Bericht.
 
-Stand 31.10.2026: [modularer macOS-Provider und getrennte Eingabewege](MACOS-ADAPTER-IMPLEMENTATION-20261031.md)
-produktiv als `acc1c850ba3d` (RC20) installiert; kurze umbrochene Prompts und
+Vorheriger produktiver Stand vom 31.10.2026: [modularer macOS-Provider und getrennte Eingabewege](MACOS-ADAPTER-IMPLEMENTATION-20261031.md)
+als `acc1c850ba3d` (RC20) installiert; kurze umbrochene Prompts und
 echte Leerzeilen wurden über den produktiven Connector mit Return geprüft:
-[aktuelle Reparatur](WRAPPED-PROMPT-REPAIR-20261031.md).
+[Prompt-Reparatur](WRAPPED-PROMPT-REPAIR-20261031.md). Der aktuelle Core ist der oben verlinkte Planabschluss.
 Frühere Eingabe-/Adapterabnahmen:
 [Installationsbelege](MACOS-ADAPTER-INSTALLATION-20261031.md).
 Laufende Anweisungen verwenden den vereinbarten kooperativen

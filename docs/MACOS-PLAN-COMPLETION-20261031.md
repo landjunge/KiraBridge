@@ -94,12 +94,56 @@ Eigener Test-Codex beendet; die wiederverwendete kontrollierte Shell und die
 ursprünglichen Fenster/Prozessidentitäten sind erhalten. Prüfquellhash:
 `9244aa9fb6fa39e792e7439edab5895f0f031231b2b365f3f1c2cf82b4a01685`.
 
-Paket und produktive Installation werden erst nach ihren konkreten Ergebnissen
-als bestanden eingetragen. Bis dahin läuft unverändert Core `acc1c85`, PID 35746, Start
-`2026-10-31T14:30:28.259044+00:00`, Quellhash
-`aef9319b72cce81a4b5d8702a7eccb69984bba43077c21bca881cd879a87c848`.
-Für Test und Installation wird genau ein eigenes kontrolliertes Terminal
-wiederverwendet; fremde Codexsitzungen bleiben erhalten.
+## Produktive Installation und Abschluss
+
+Codecommit `831150a9b973410fd7eaca90dafd0996818234fc` auf dem bestehenden
+Entwicklungsbranch gepusht und remote exakt bestätigt. Offline gebautes Bundle
+SHA256 `d8ca6950fbada6d60b97aa26106df532ff7f231397559bc62b3ff44e2f451874`.
+Unabhängig alle 427 Manifestdateien und 134 Pythondateien in Git/Wheel/Payload
+bytegleich geprüft; isolierter Darwin-x86_64-Installationssmoke bestanden.
+Das ist keine zusätzliche ARM-Abnahme oder öffentliche Veröffentlichung.
+
+Vor Installation: vollständige vorige Installation mit 1348 Einträgen, acht
+Konfigurationsdateien samt Credentials/Modi und konsistente SQLitekopie frisch
+gesichert. Integrität `ok`; keine aktiven Bridge-Tasks oder Empfängerjobs.
+Unterstützter Installer sichtbar im selben eigenen Terminal 8356/ttys001,
+Shell 38838: 15:11:49–15:12:00 UTC, Exit 0. Neuer Core PID **40636**, Start
+`2026-10-31T15:11:58.839455+00:00`, Instanz
+`7d05de2ba3f04290981bee2d6290ee29`, Quellhash
+`9244aa9fb6fa39e792e7439edab5895f0f031231b2b365f3f1c2cf82b4a01685`.
+Versionlabel bleibt 0.8.0rc20; Commit und Hash identifizieren die Installation.
+
+Der tatsächliche externe ChatGPT-App-Connector erreicht die neue Helperfunktion:
+eigener Diagnoseprozess 40652, AX/CG und beide inzwischen laufenden AE-Ziele
+positiv, weiterhin keine übertragbare Freigabe. Derselbe produktive Core stellte
+den 886-Zeichen-Prompt `macos-plan-installed-prompt-20261031-v2` genau einmal zu:
+`completed`, Attempt 1, Return=true, Completion empfangen/ACK. Sichtbare Antwort
+und genau ein User-/Finalantwortitem im eigenen Rollout
+`01a19285-4839-7581-a5c8-60b4fd0a973b` unabhängig geprüft.
+Ein vorgelagerter eigener Testaufruf enthielt irrtümlich einen Return-only-Guard
+im Textmodus und wurde `invalid_arguments/not_submitted` vor jeder Eingabe
+abgewiesen. Er bleibt als Prüferfehler erhalten und wurde nicht als Unknown-
+Übergabe wiederholt. Ein anfänglicher Cleanup-Modellfehler wurde ebenfalls vor
+jeder Cleanup-Eingabe erkannt und dokumentiert. Die produktive Reparatur benötigte
+keinen zusätzlichen Codefix oder manuellen Nach-Return.
+
+Unabhängige Installationsprüfung bestätigt current/release/launchd und laufenden
+Code, 149 originale Wheeldateien bytegleich sowie alle 155 Zeilen des vom
+Installer erweiterten RECORDs. Konfiguration/Credentials/Modi, Berechtigungsrevision,
+Dienstoptionen außer Interpreterpfad, alle 28 Holds, ursprüngliche dc4-Nachricht
+mit Job, seq374-ACK und vier benannte historische Fehleraufträge sind unverändert.
+Die volle frische Vorherdatenbank ist die Vergleichsbasis; kein historischer
+Task wurde erneut ausgeführt. Alter Core 35746 abwesend; Nutzer-Codex 36878,
+Tunnel 25909 und Konsole 15308 erhalten.
+
+Eigenen Test-Codex 40722 erst nach leerem, bereitem und protokollgebundenem
+Zustand beendet; danach nur das eigene leere Terminal 8356 samt Shell geschlossen.
+Prozessidentitäten anderer Sitzungen erhalten; gesonderter produktiver Katalogabruf
+bestätigt die Absenz des eigenen Panes. Ein währenddessen anderweitig entstandenes
+Terminal 8382 blieb erhalten. Kein weiteres eigenes Testfenster geöffnet.
+Rückweg `~/.local/share/kirabridge/install/backups/20261031-161152-1fdbd7a1`,
+kein Rollback erforderlich. Abschlussbelege stehen im strukturierten Nachweis
+und im vorhandenen Whiteboard; abschließender Dokumentationscommit separat.
 
 ## Externe Nachweisgrenzen
 
@@ -122,5 +166,5 @@ Basissicherung und private Prüfbelege:
 `baseline-source.tar` SHA256
 `637aa3ec803d60d2aa413cc95a020d33397528c7ce11488d105573a2929a5da0`;
 gegen Git abgeglichen, `BASELINE.json` und `RECOVERY.md` vorhanden.
-Vor Installation folgt eine frische vollständige private Sicherung; der
-bisherige Rückweg `install/backups/20261031-153021-014baa7c` bleibt erhalten.
+Die frische vollständige private Sicherung liegt unter `productive/preinstall`;
+auch der bisherige Rückweg `install/backups/20261031-153021-014baa7c` bleibt erhalten.
