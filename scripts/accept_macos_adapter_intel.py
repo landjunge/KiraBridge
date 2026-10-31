@@ -988,7 +988,13 @@ async def accept(
                 value = request(
                     "body-only-" + suffix.lower(),
                     "agent.execute",
-                    {"agent": "codex", "prompt": body, "cwd": str(workspace), "timeout": 20},
+                    {
+                        "agent": "codex",
+                        "prompt": body,
+                        "cwd": str(workspace),
+                        "timeout": 20,
+                        "wait_for_reply": False,
+                    },
                 )
                 active_literal_label = "body-only-" + suffix.lower()
                 delivered = await submit(value)

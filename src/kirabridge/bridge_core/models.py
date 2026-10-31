@@ -129,6 +129,7 @@ class ProcessInput(Input):
 
 class AgentInput(Input):
     local_tools: bool = False
+    wait_for_reply: bool = True
     agent: str = Field(pattern=r"^[a-z][a-z0-9_-]{0,40}$")
     prompt: str = Field(min_length=1, max_length=262144)
     cwd: str

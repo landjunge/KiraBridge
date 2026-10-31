@@ -805,7 +805,11 @@ class MessageReceiver:
             if len(prompt) > 262144:
                 raise BridgeError("payload_limit", "Receiver prompt exceeds the adapter limit")
             args = AgentInput(
-                agent=recipient, prompt=prompt, cwd=receiver.cwd, timeout=receiver.timeout
+                agent=recipient,
+                prompt=prompt,
+                cwd=receiver.cwd,
+                timeout=receiver.timeout,
+                wait_for_reply=bool(message["request_reply"]),
             )
             policy = self.bridge.security.principal(recipient, "message.read")
             result = await self.bridge.agents.execute(

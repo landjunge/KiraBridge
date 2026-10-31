@@ -6,9 +6,13 @@ Sender, message ID, receipt, routing and duplicate protection remain internal me
 The current input widget and original empty state are checked before Return;
 historical uncertain handoffs are never reinterpreted or replayed.
 
-A confirmed Paste/Return is reported as `visible_input_delivery`. It does not claim
+A confirmed Paste/Return with explicit `wait_for_reply=false` is reported as
+`visible_input_delivery`. It does not claim
 that the agent acknowledged, answered or completed the work. Genuine subsequent
-mailbox ACKs and replies remain separately observable. New delivery reservations
+mailbox ACKs and replies remain separately observable. The compatible default
+continues to wait for a genuine authenticated reply; it adds no instructions to
+the user body. Already recorded genuine replies always take precedence.
+New delivery reservations
 are released only after a fresh matching target is ready with empty input.
 
 Includes the already implemented modular macOS provider, repaired wrapped/blank-line
@@ -27,8 +31,10 @@ existing desktop lock heuristic remain documented evidence limits.
 Sichtbare Codex-/Grok-Übergaben enthalten ausschließlich den übergebenen Text:
 kein automatisch hinzugefügter Kopf, keine Quittierungs-/Rückmeldeanweisungen,
 keine angehängte Nachrichtenhistorie und kein Endmarker. Die Auftragszuordnung
-bleibt intern. Bestätigtes Einfügen und Return belegen die Zustellung, keine
-Agentenantwort oder Auftragsfertigstellung. Alte unklare Übergaben bleiben erhalten.
+bleibt intern. Bei ausdrücklich gewähltem `wait_for_reply=false` belegen Einfügen
+und Return die Zustellung, keine Agentenantwort oder Auftragsfertigstellung.
+Der bisherige Standard wartet weiterhin auf eine echte authentifizierte Antwort,
+ohne dem Auftrag dafür Text hinzuzufügen. Alte unklare Übergaben bleiben erhalten.
 
 Der Release übernimmt den bestehenden Adapterstand und die ausdrücklich verlangte
 Korrektur der sichtbaren Übergabe.

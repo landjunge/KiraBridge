@@ -45,6 +45,7 @@ async def test_visible_receiver_preserves_body_and_reports_delivery_only(
     received = []
 
     async def execute(task, args, policy, running, progress, **kwargs):
+        assert args.wait_for_reply is request_reply
         received.append(args.prompt)
         await running({"return_sent": True})
         return {

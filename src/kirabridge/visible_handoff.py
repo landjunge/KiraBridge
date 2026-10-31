@@ -100,6 +100,17 @@ class VisibleHandoffs:
         )
 
     @classmethod
+    def body_only_transport_delivery(cls, status):
+        return cls.body_only_delivery(status) and any(
+            event["state"] == "sent"
+            and event["evidence"].get("prompt_format") == "body_only_v1"
+            and event["evidence"].get("return_sent") is True
+            and event["evidence"].get("input_field_cleared") is True
+            and event["evidence"].get("wait_for_reply") is False
+            for event in status["events"]
+        )
+
+    @classmethod
     def body_only_input_released(cls, status):
         evidence = status["evidence"]
         return (
@@ -448,6 +459,10 @@ class VisibleHandoffs:
                 self.body_only_delivery(status)
                 and status["binding"] == binding.model_dump()
                 and (
+                    self.body_only_transport_delivery(status)
+                    or self.body_only_input_released(status)
+                )
+                and (
                     status["state"] in {"sent", "confirmed"}
                     or (
                         status["state"] == "unknown"
@@ -472,6 +487,7 @@ class VisibleHandoffs:
                             "reason": "body_only_target_ready",
                             "input_reservation_released": True,
                             "prompt_format": "body_only_v1",
+                            "wait_for_reply": False,
                             "return_sent": True,
                             "previous_state": status["state"],
                             "agent_confirmed": False,
@@ -710,7 +726,15 @@ class VisibleHandoffs:
             return output
 
     async def submit_inserted(
-        self, identifier, principal, target, binding, running, *, expected_input_view=None
+        self,
+        identifier,
+        principal,
+        target,
+        binding,
+        running,
+        *,
+        expected_input_view=None,
+        wait_for_reply=True,
     ):
         """Exactly one separately recorded Return; never call after an uncertain submit."""
         self.transition(identifier, "submitting", {"agent_confirmed": False})
@@ -751,6 +775,7 @@ class VisibleHandoffs:
                 "agent_confirmed": False,
                 "request_reply_satisfied": False,
                 "prompt_format": "body_only_v1",
+                "wait_for_reply": wait_for_reply,
             },
         )
         await running({"handoff_id": identifier, "state": "sent", "agent_confirmed": False})
@@ -807,6 +832,11 @@ class VisibleHandoffs:
                 "return_reconciliation_required",
                 "Original literal input was not verified; inspect it and use an explicit Return",
             )
+        wait_for_reply = verified.get("wait_for_reply", True)
+        if type(wait_for_reply) is not bool or wait_for_reply != bool(message["request_reply"]):
+            raise BridgeError(
+                "return_reconciliation_required", "Original reply preference is not consistent"
+            )
         observed = "same_previously_verified_literal_widget"
         self.transition(
             identifier,
@@ -826,6 +856,7 @@ class VisibleHandoffs:
                 binding,
                 running,
                 expected_input_view=current_view,
+                wait_for_reply=wait_for_reply,
             )
         except BaseException as exc:
             self.transition(
@@ -954,7 +985,12 @@ class VisibleHandoffs:
                     "The requesting CLI needs its assigned visible window",
                 )
             await self.check_target(principal, principal, reply_binding)
-        hashed = digest({"principal": principal, "args": args.model_dump()})
+        hash_args = args.model_dump()
+        if args.wait_for_reply:
+            # Preserve historical handoff hashes for the unchanged reply-wait
+            # default. Explicit transport-only mode remains part of identity.
+            hash_args.pop("wait_for_reply")
+        hashed = digest({"principal": principal, "args": hash_args})
         existing = self.store.db.execute(
             "SELECT * FROM visible_handoffs WHERE id=?", (identifier,)
         ).fetchone()
@@ -1044,7 +1080,7 @@ class VisibleHandoffs:
                             idempotency_key=message_id,
                             kind="work",
                             body=args.prompt,
-                            request_reply=True,
+                            request_reply=args.wait_for_reply,
                             dispatch=False,
                         ),
                         visible_internal=True,
@@ -1079,6 +1115,7 @@ class VisibleHandoffs:
                     {
                         "agent_confirmed": False,
                         "prompt_format": "body_only_v1",
+                        "wait_for_reply": args.wait_for_reply,
                         "empty_input_observed": True,
                         "terminal_input_attempted": True,
                     },
@@ -1127,6 +1164,7 @@ class VisibleHandoffs:
                     {
                         "prompt_observed": True,
                         "prompt_format": "body_only_v1",
+                        "wait_for_reply": args.wait_for_reply,
                         "expected_payload_sha256": _text_sha256(prompt),
                         "verified_input_view_sha256": _text_sha256(
                             self.input_view(target, inserted["text"])
@@ -1146,6 +1184,7 @@ class VisibleHandoffs:
                     binding,
                     progress,
                     expected_input_view=self.input_view(target, inserted["text"]),
+                    wait_for_reply=args.wait_for_reply,
                 )
             except BaseException as exc:
                 if not input_attempted and not isinstance(exc, UncertainExecution):
@@ -1174,7 +1213,17 @@ class VisibleHandoffs:
                     "Input outcome requires reconciliation; no automatic resend",
                 ) from exc
         current = self.reconcile(principal, identifier)
-        if self.body_only_delivery(current):
+        original = self.messages.get(principal, message_id)
+        replied = self.store.db.execute(
+            "SELECT 1 FROM messages WHERE reply_to=? AND sender=? AND recipient=? "
+            "AND kind IN ('answer','result') LIMIT 1",
+            (message_id, target, principal),
+        ).fetchone()
+        if (
+            not args.wait_for_reply
+            and self.body_only_delivery(current)
+            and not (original["acknowledged"] and replied)
+        ):
             # This is a delivery receipt, never a fabricated agent answer. Real
             # later mailbox ACK/replies retain their own reconciliation path.
             return {
@@ -1215,6 +1264,7 @@ class VisibleHandoffs:
                         message["acknowledged"]
                         and not confirmed
                         and current["state"] != "completed"
+                        and not self.body_only_input_released(current)
                     ):
                         confirmed = True
                         self.transition(
@@ -1273,9 +1323,17 @@ class VisibleHandoffs:
             # Cancellation during input is still handled as uncertain input.
             raise
         except BaseException as exc:
-            self.transition(
-                identifier, "unknown", {"reason": "reply_unconfirmed", "automatic_retry": False}
+            current = self.status(principal, identifier)
+            evidence = (
+                {
+                    **current["evidence"],
+                    "reply_observer_error": "reply_unconfirmed",
+                    "automatic_retry": False,
+                }
+                if self.body_only_input_released(current)
+                else {"reason": "reply_unconfirmed", "automatic_retry": False}
             )
+            self.transition(identifier, "unknown", evidence)
             raise UncertainExecution(
                 "visible_reply_unknown", "No confirmed final reply; do not resubmit"
             ) from exc

@@ -3,9 +3,12 @@
 Ab RC21 enthalten sichtbare Übergaben ausschließlich den unveränderten Nachrichtenbody.
 KiraBridge hängt keine Arbeits-, ACK- oder Rückmeldeanweisungen und keine frühere
 Nachrichtenhistorie an. Auftragszuordnung und Receipts bleiben intern. Bestätigtes
-Paste/Return meldet `visible_input_delivery`, keine Agentenantwort oder
+Paste/Return mit ausdrücklich gesetztem `wait_for_reply=false` meldet
+`visible_input_delivery`, keine Agentenantwort oder
 Arbeitsfertigstellung. Echte explizite MCP-ACKs und Replies bleiben separat möglich;
 ein wiederholter Inboxabruf derselben ID/Receipt ist kein neuer Arbeitsauftrag.
+Der kompatible Standard `wait_for_reply=true` wartet auf einen echten
+authentifizierten Reply, ohne entsprechende Anweisungen in den Body einzubauen.
 
 Stand 31.10.2026. SQLite und authentifizierte MCP-Werkzeuge transportieren
 adressierte Nachrichten. Absender, Rechte und gegenseitige `message_peers`
