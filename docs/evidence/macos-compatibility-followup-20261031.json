@@ -1,0 +1,256 @@
+{
+  "schema_version": 1,
+  "recorded_at": "2026-10-31T14:51:59.554794+00:00",
+  "scope": "documentation and read-only compatibility evidence; production source unchanged",
+  "baseline": {
+    "baseline_commit": "388e5c9e2655e43a36ea8de11e38d3e18bf859d2",
+    "archive_sha256": "e97b37e5ff9077b20e85ac0f8071f24b9a328b2c1bb906d3fe03170ba5cb1108",
+    "installed_commit": "acc1c850ba3d2ff384e02da78e489b48ebbbf27a",
+    "installed_release": "/Users/landjunge/.local/share/kirabridge/install/releases/0.8.0rc20-acc1c850ba3d",
+    "existing_installer_rollback": "/Users/landjunge/.local/share/kirabridge/install/backups/20261031-153021-014baa7c",
+    "existing_rollback_present": true,
+    "scope": "compatibility documentation only; no runtime changes, no deployment or push",
+    "relevant_docs_byte_verified": [
+      "docs/MACOS-ADAPTER-PHASES-1-3-20261031.md",
+      "docs/MACOS-ADAPTER-IMPLEMENTATION-20261031.md",
+      "docs/ARCHITECTURE.md"
+    ]
+  },
+  "backup_path": "/Users/landjunge/.local/share/kirabridge/backups/macos-compatibility-20261031T145121Z",
+  "headers": [
+    {
+      "sdk": "MacOSX12.1.sdk",
+      "header": "AppKit.framework/Headers/NSPasteboard.h",
+      "absolute_path": "/Library/Developer/CommandLineTools/SDKs/MacOSX12.1.sdk/System/Library/Frameworks/AppKit.framework/Headers/NSPasteboard.h",
+      "sha256": "4ba21ba47e4fafdc64b83ba6a7edcaefaebcd6f5ea1bfaa5bf08092fd530d18b",
+      "symbols": {
+        "accessBehavior": {
+          "declared": false,
+          "line": null
+        },
+        "detectPatternsForPatterns:": {
+          "declared": false,
+          "line": null
+        },
+        "detectValuesForPatterns:": {
+          "declared": false,
+          "line": null
+        },
+        "detectMetadataForTypes:": {
+          "declared": false,
+          "line": null
+        }
+      }
+    },
+    {
+      "sdk": "MacOSX12.1.sdk",
+      "header": "CoreGraphics.framework/Headers/CGSession.h",
+      "absolute_path": "/Library/Developer/CommandLineTools/SDKs/MacOSX12.1.sdk/System/Library/Frameworks/CoreGraphics.framework/Headers/CGSession.h",
+      "sha256": "6fcc1a789b0d517bc90641289971839554d77bf9ecb6010f5b3e9a1b8896ef6a",
+      "symbols": {
+        "CGSessionCopyCurrentDictionary": {
+          "declared": true,
+          "line": 23
+        },
+        "kCGSessionOnConsoleKey": {
+          "declared": true,
+          "line": 46
+        },
+        "kCGSessionUserIDKey": {
+          "declared": true,
+          "line": 31
+        },
+        "CGSSessionScreenIsLocked": {
+          "declared": false,
+          "line": null
+        }
+      }
+    },
+    {
+      "sdk": "MacOSX15.4.sdk",
+      "header": "AppKit.framework/Headers/NSPasteboard.h",
+      "absolute_path": "/Library/Developer/CommandLineTools/SDKs/MacOSX15.4.sdk/System/Library/Frameworks/AppKit.framework/Headers/NSPasteboard.h",
+      "sha256": "d7c69957f0efca70aa98727d381c646cf2ff870627fcb6f1fa0c6eddb60be99d",
+      "symbols": {
+        "accessBehavior": {
+          "declared": true,
+          "line": 170,
+          "introduced_macos": "15.4"
+        },
+        "detectPatternsForPatterns:": {
+          "declared": true,
+          "line": 250,
+          "introduced_macos": "15.4"
+        },
+        "detectValuesForPatterns:": {
+          "declared": true,
+          "line": 262,
+          "introduced_macos": "15.4"
+        },
+        "detectMetadataForTypes:": {
+          "declared": true,
+          "line": 274,
+          "introduced_macos": "15.4"
+        }
+      }
+    },
+    {
+      "sdk": "MacOSX15.4.sdk",
+      "header": "CoreGraphics.framework/Headers/CGSession.h",
+      "absolute_path": "/Library/Developer/CommandLineTools/SDKs/MacOSX15.4.sdk/System/Library/Frameworks/CoreGraphics.framework/Headers/CGSession.h",
+      "sha256": "471b7f3720173a1f638254ce6e3f97c97631d9dcd1aee185aebc48885b10f9b9",
+      "symbols": {
+        "CGSessionCopyCurrentDictionary": {
+          "declared": true,
+          "line": 23,
+          "introduced_macos": "10.3"
+        },
+        "kCGSessionOnConsoleKey": {
+          "declared": true,
+          "line": 46
+        },
+        "kCGSessionUserIDKey": {
+          "declared": true,
+          "line": 31
+        },
+        "CGSSessionScreenIsLocked": {
+          "declared": false,
+          "line": null
+        }
+      }
+    },
+    {
+      "sdk": "MacOSX26.2.sdk",
+      "header": "AppKit.framework/Headers/NSPasteboard.h",
+      "absolute_path": "/Library/Developer/CommandLineTools/SDKs/MacOSX26.2.sdk/System/Library/Frameworks/AppKit.framework/Headers/NSPasteboard.h",
+      "sha256": "8cad206027ff2bb2b3175d7fe60d0ff93a488ce95428b845be11ea8d578d95c9",
+      "symbols": {
+        "accessBehavior": {
+          "declared": true,
+          "line": 170,
+          "introduced_macos": "15.4"
+        },
+        "detectPatternsForPatterns:": {
+          "declared": true,
+          "line": 276,
+          "introduced_macos": "15.4"
+        },
+        "detectValuesForPatterns:": {
+          "declared": true,
+          "line": 314,
+          "introduced_macos": "15.4"
+        },
+        "detectMetadataForTypes:": {
+          "declared": true,
+          "line": 346,
+          "introduced_macos": "15.4"
+        }
+      }
+    },
+    {
+      "sdk": "MacOSX26.2.sdk",
+      "header": "CoreGraphics.framework/Headers/CGSession.h",
+      "absolute_path": "/Library/Developer/CommandLineTools/SDKs/MacOSX26.2.sdk/System/Library/Frameworks/CoreGraphics.framework/Headers/CGSession.h",
+      "sha256": "471b7f3720173a1f638254ce6e3f97c97631d9dcd1aee185aebc48885b10f9b9",
+      "symbols": {
+        "CGSessionCopyCurrentDictionary": {
+          "declared": true,
+          "line": 23,
+          "introduced_macos": "10.3"
+        },
+        "kCGSessionOnConsoleKey": {
+          "declared": true,
+          "line": 46
+        },
+        "kCGSessionUserIDKey": {
+          "declared": true,
+          "line": 31
+        },
+        "CGSSessionScreenIsLocked": {
+          "declared": false,
+          "line": null
+        }
+      }
+    }
+  ],
+  "runtime_method_probe": {
+    "probe": "Objective-C runtime method table only",
+    "pid": 37617,
+    "executable": "/Users/landjunge/KiraBridge/.venv/bin/python",
+    "architecture": "x86_64",
+    "NSPasteboard_class_present": true,
+    "selectors": {
+      "accessBehavior": true,
+      "detectPatternsForPatterns:completionHandler:": true,
+      "detectValuesForPatterns:completionHandler:": true,
+      "detectMetadataForTypes:completionHandler:": true
+    },
+    "pasteboard_object_obtained": false,
+    "objective_c_messages_sent": false,
+    "clipboard_content_read": false,
+    "permission_checked_or_requested": false
+  },
+  "private_probe_script_sha256": "6e3a644715c00253af81aeb45eb3aa9c204e197c3bc2f040e2e097924538dee0",
+  "actual_native_os_tested": [
+    "15.7.4 / 24G517 x86_64"
+  ],
+  "not_natively_accepted": [
+    "12",
+    "13",
+    "14",
+    "26",
+    "27",
+    "arm64"
+  ],
+  "new_clipboard_api_minimum_macos": "15.4",
+  "new_clipboard_api_invoked": false,
+  "permission_states_measured_by_symbol_probe": false,
+  "public_session_key_scope": "CGSessionCopyCurrentDictionary; ioreg return semantics not established by this API",
+  "lock_key_public_contract_established": false,
+  "helper_permission_observations": "unknown; no production actor identities bound",
+  "optional_providers_enabled": false,
+  "library_search": {
+    "0ab8b95a7369": {
+      "status": "missing",
+      "documents": 0
+    },
+    "188ce4729a62": {
+      "status": "missing",
+      "documents": 0
+    }
+  },
+  "official_sources": [
+    "https://developer.apple.com/documentation/appkit/nspasteboard/accessbehavior-swift.enum",
+    "https://developer.apple.com/documentation/coregraphics/kcgsessiononconsolekey",
+    "https://developer.apple.com/documentation/coregraphics/cgsessioncopycurrentdictionary()"
+  ],
+  "observed_core": {
+    "instance_id": "a7da137f455f408bb26b95b875b99006",
+    "version": "0.8.0rc20",
+    "pid": 35746,
+    "started_at": "2026-10-31T14:30:28.259044+00:00",
+    "config_path": "/Users/landjunge/.config/kirabridge/config.toml",
+    "config_sha256": "0dc8eb5952fe4d986c152d38e1658e06de711d6b1f91ccc9745b184d1adb6370",
+    "effective_config_sha256": "d5de7e63e70636a03ae54ead9990224da6e38137e23c8ba1b74aa233cfe5c012",
+    "source_tree_sha256": "aef9319b72cce81a4b5d8702a7eccb69984bba43077c21bca881cd879a87c848",
+    "source_file_count": 132,
+    "source_package_path": "/Users/landjunge/.local/share/kirabridge/install/releases/0.8.0rc20-acc1c850ba3d/source/.venv/lib/python3.11/site-packages/kirabridge",
+    "source_scope": "package Python files observed at startup; no remote attestation"
+  },
+  "starting_whiteboard_revision": 17,
+  "user_authorization": {
+    "work": "Kompatibilitätslücken abschließen (empfohlen)",
+    "push_and_installation": true
+  },
+  "verification": {
+    "six_sdk_header_hashes_and_symbol_lines": "passed",
+    "baseline_archive_and_private_probe_hashes": "passed",
+    "private_probe_result_matches_recorded_evidence": true,
+    "local_document_links_verified": 10,
+    "git_diff_check": "passed",
+    "independent_document_review": "no_material_findings",
+    "reviewer": "native next_plan_review agent",
+    "runtime_or_terminal_tests_rerun": false,
+    "reason": "documentation-only change; existing productive code and acceptance unchanged"
+  }
+}

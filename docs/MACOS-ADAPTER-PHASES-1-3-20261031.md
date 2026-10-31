@@ -1,6 +1,12 @@
 # macOS-Adapter: Bestandsaufnahme, Apple-Recherche und Architekturvorlage
 
 Revision 1 · 31.10.2026 · **Entwurf zur Freigabe; keine Implementierungsfreigabe**.
+Historischer Entwurf: Die später ausdrücklich beauftragte Umsetzung und produktive
+Reparatur sind in [Implementierung](MACOS-ADAPTER-IMPLEMENTATION-20261031.md) und
+[Prompt-Reparatur](WRAPPED-PROMPT-REPAIR-20261031.md) belegt.
+Der [Kompatibilitätsnachtrag](MACOS-COMPATIBILITY-FOLLOWUP-20261031.md) klärt
+inzwischen Clipboard-Availability ab 15.4 und präzisiert die öffentliche
+Console-Keydefinition gegenüber der weiter heuristischen `ioreg`-/Lockauswertung.
 Maschinenlesbarer Ausgangs-/Prüfbeleg:
 [macos-adapter-phases1-3-20261031.json](evidence/macos-adapter-phases1-3-20261031.json).
 Arbeitsboard: ThreadDesk `0ab8b95a7369`, Entwicklungsplan Revision 3,

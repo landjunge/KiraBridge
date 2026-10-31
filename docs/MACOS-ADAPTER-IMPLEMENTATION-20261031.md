@@ -1,5 +1,10 @@
 # Modulare macOS-Integration und getrennte Eingabewege
 
+Aktueller Quellenabgleich: Der [Kompatibilitätsnachtrag](MACOS-COMPATIBILITY-FOLLOWUP-20261031.md)
+belegt Clipboard-Availability ab 15.4, die lokale Symbolverfügbarkeit und die
+Core-/Helper-/App-Identitätsgrenzen. Er präzisiert die öffentliche Console-Keydefinition,
+erweitert aber keine OS-/Architekturabnahme oder produktive Berechtigung.
+
 Stand 31.10.2026, Fortsetzung des Entwurfs `fa863a6` auf dem bestehenden
 Branch `docs/macos-adapter-phases1-3-20261031`. Arbeitswhiteboard
 `0ab8b95a7369`. Der Nutzer hat anschließend ausdrücklich Implementierung,
