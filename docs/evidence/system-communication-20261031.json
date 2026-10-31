@@ -1,0 +1,127 @@
+{
+  "revision": 4,
+  "recorded_at": "2026-10-31T18:53:30.587394+00:00",
+  "product_code_commit": "f97ab1cdeebe1d06648febe685f7ebb738ca93a9",
+  "version": "0.8.0rc22",
+  "source": {
+    "python_files": 144,
+    "canonical_path_file_sha256_manifest": "03bae2fd8715d4a7581e007096bf03633f7d978d6c590aec044a026512ab3986",
+    "path_nul_source_bytes_sha256": "59dab86ea7cdc854269c3ade334bba0928ab94feef360294d9719ab4f6d81524",
+    "native_binary_sha256": "bc923f131efc1de41249aae93c4eebab8dcea343268a386a14fae19de3fbd2f5",
+    "native_four_source_sha256": "e4ef79cfa6c74f36e029bb9fd2b6c3aaec684b603e0b5ea29513dd1b28e12141"
+  },
+  "native_fixture": {
+    "fully_verified": true,
+    "stages": [
+      {
+        "name": "permissions_read_only",
+        "state": "passed"
+      },
+      {
+        "name": "owned_window_list_inspect_focus",
+        "state": "passed"
+      },
+      {
+        "name": "owned_ax_set_press_secure",
+        "state": "passed"
+      },
+      {
+        "name": "owned_window_capture_png",
+        "state": "passed"
+      },
+      {
+        "name": "own_preference_write_reset_restore",
+        "state": "passed"
+      },
+      {
+        "name": "public_process_inventory_inspect",
+        "state": "passed"
+      },
+      {
+        "name": "notifications_status_read_only",
+        "state": "passed"
+      },
+      {
+        "name": "owned_signal",
+        "state": "passed"
+      }
+    ],
+    "cleanup": {
+      "complete": true,
+      "fixture_absent_independently": true,
+      "preference_restored": true,
+      "worker_reaped": true
+    },
+    "scope": "own synthetic app/window; direct installed SystemModules, no productive daemon claim",
+    "permission_requests": 0,
+    "notifications_posted": 0
+  },
+  "communication": {
+    "checks": 18,
+    "passed": true,
+    "source_manifest_sha256": "03bae2fd8715d4a7581e007096bf03633f7d978d6c590aec044a026512ab3986",
+    "original_body_exact": true,
+    "local_codex_reply": true,
+    "synthetic_agent_ack_or_reply": false,
+    "replay_sends_input": false,
+    "independently_reviewed": true
+  },
+  "linux_ci": {
+    "run_id": 41230158504,
+    "python311": {
+      "passed": 2688,
+      "skipped": 40,
+      "ruff_format_build": "success"
+    },
+    "python313": {
+      "passed": 2688,
+      "skipped": 40,
+      "ruff_format_build": "success"
+    }
+  },
+  "hosted_macos_ci": {
+    "executed_steps": 0,
+    "status": "billing_refusal_not_a_pass"
+  },
+  "package_smoke_f97": "passed",
+  "launchd_context_probe": {
+    "passed": true,
+    "cleanup_complete": true,
+    "accessibility_granted": true,
+    "screen_capture_granted": true,
+    "notification_authorization_status": 0,
+    "os_permissions_requested": false,
+    "live_core_assertion": false
+  },
+  "release": {
+    "published": false,
+    "final_download_gate": "pending"
+  },
+  "productive_install": {
+    "started": false,
+    "previous_version": "0.8.0rc21",
+    "previous_code_commit": "7ea0f24ae6c36f689d0889d41071fa8bca8aaf65"
+  },
+  "private_evidence_directory": "~/.local/share/kirabridge/backups/system-communication-20261031T163358Z/",
+  "historical_failed_candidates_preserved": [
+    "696d38a CI+initialRC21startup failure",
+    "306a364 native global-census failure",
+    "f97ab1c native03 initial-window tester failure"
+  ],
+  "limits": [
+    "Intel local OS only; no ARM/otherOS certification",
+    "Notifications permission not determined; no actual notification post",
+    "Public process/AX/preference observations are not globally atomic",
+    "Missing original planning/research sources remain an evidence limit"
+  ],
+  "separate_original_process_observation": {
+    "former_idle_shell_pid": 40801,
+    "current_state": "absent",
+    "cause": "unproven",
+    "matching_recorded_bridge_session_close": false,
+    "active_original_codex_pid": 36878,
+    "active_original_identity": "unchanged",
+    "new_unrelated_terminal": "8818/ttys003/64891, busy, preserved",
+    "not_a_fixture_target": true
+  }
+}

@@ -166,3 +166,229 @@ def test_capture_minimum_and_no_live_core_scope_are_explicit(harness_module, tmp
     assert value.evidence["capture_minimum_macos"] == "14.0"
     assert "Direct SystemModules" in value.evidence["scope"]
     assert "system.permission_request" not in harness_module.ALLOWED
+
+
+def window_fixture(value):
+    value.fixture = {"pid": 42, "started_at": 123.5}
+    value.receipt = {
+        "fixture_uuid": value.nonce,
+        "state": "present",
+        "phase": "ready",
+        "pid": 42,
+        "uid": os.getuid(),
+        "start": "123.500007",  # Kernel token deliberately differs from AppKit launchDate.
+        "window_id": 77,
+    }
+    return value
+
+
+def window_row(identifier=77, **changes):
+    return {
+        "window_id": identifier,
+        "owner_pid": 42,
+        "application_start": "123.500000",
+        "layer": 0,
+        "on_screen": True,
+        "revision": "a" * 64,
+        **changes,
+    }
+
+
+def window_inventory(*rows, **changes):
+    return {
+        "windows": list(rows),
+        "total": len(rows),
+        "offset": 0,
+        "truncated": False,
+        "revision": "b" * 64,
+        **changes,
+    }
+
+
+def test_exact_receipt_window_selected_among_other_owned_windows(harness_module, tmp_path):
+    value = window_fixture(runner(harness_module, tmp_path))
+    assert (
+        harness_module.select_owned_window(
+            window_inventory(window_row(88, layer=3), window_row()),
+            value.fixture,
+            value.receipt,
+            value.nonce,
+        )
+        == window_row()
+    )
+    assert (
+        harness_module.select_owned_window(
+            window_inventory(window_row(88)), value.fixture, value.receipt, value.nonce
+        )
+        is None
+    )
+
+
+@pytest.mark.parametrize(
+    "changes",
+    [
+        {"fixture_uuid": "foreign"},
+        {"pid": 99},
+        {"pid": True},
+        {"uid": -1},
+        {"state": "unknown"},
+        {"phase": "terminating"},
+        {"start": "unknown"},
+        {"window_id": None},
+        {"window_id": True},
+        {"window_id": 0},
+        {"window_id": 2**32},
+    ],
+)
+def test_window_receipt_binding_refuses(harness_module, tmp_path, changes):
+    value = window_fixture(runner(harness_module, tmp_path))
+    value.receipt.update(changes)
+    with pytest.raises(harness_module.AcceptanceError):
+        harness_module.select_owned_window(
+            window_inventory(window_row()), value.fixture, value.receipt, value.nonce
+        )
+
+
+@pytest.mark.parametrize(
+    "inventory",
+    [
+        window_inventory(window_row(), window_row()),
+        window_inventory(window_row(), window_row(88), window_row(88)),
+        window_inventory(window_row(owner_pid=99)),
+        window_inventory(window_row(), window_row(88, owner_pid=99)),
+        window_inventory(window_row(owner_pid=True)),
+        window_inventory(window_row(application_start="123.500007")),
+        window_inventory(window_row(layer=3)),
+        window_inventory(window_row(on_screen=False)),
+        window_inventory(window_row(revision="bad")),
+        window_inventory(window_row(window_id=True)),
+        window_inventory(window_row(), truncated=True),
+        window_inventory(window_row(), total=2),
+        window_inventory(window_row(), offset=1),
+        window_inventory(window_row(), revision=None),
+    ],
+)
+def test_window_inventory_refuses_incomplete_duplicate_or_foreign_identity(
+    harness_module, tmp_path, inventory
+):
+    value = window_fixture(runner(harness_module, tmp_path))
+    with pytest.raises(harness_module.AcceptanceError):
+        harness_module.select_owned_window(inventory, value.fixture, value.receipt, value.nonce)
+
+
+async def test_window_readiness_polls_only_missing_exact_id_then_inspects_and_focuses(
+    harness_module, tmp_path, monkeypatch
+):
+    value = window_fixture(runner(harness_module, tmp_path))
+    calls, sleeps = [], []
+    inventories = [window_inventory(), window_inventory(window_row(88), window_row())]
+
+    async def sleep(delay):
+        sleeps.append(delay)
+
+    async def call(operation, arguments):
+        calls.append(operation)
+        if operation == "windows.list":
+            assert arguments == {
+                "owner_pid": 42,
+                "expected_start": "123.500000",
+                "include_titles": False,
+                "limit": 100,
+            }
+            return inventories.pop(0)
+        if operation == "windows.inspect":
+            assert arguments["window_id"] == 77 and arguments["expected_pid"] == 42
+            return {"window": window_row()}
+        assert operation == "app.focus" and arguments["expected_pid"] == 42
+        return {}
+
+    value.call = call
+    monkeypatch.setattr(harness_module.asyncio, "sleep", sleep)
+    assert (await value.windows())["window_id"] == 77
+    assert calls == ["windows.list", "windows.list", "windows.inspect", "app.focus"]
+    assert len(sleeps) == 1
+    assert value.evidence["window_probes"][0]["row_count"] == 0
+    assert [r["window_id"] for r in value.evidence["window_probes"][1]["owned_rows"]] == [
+        88,
+        77,
+    ]
+
+
+async def test_window_missing_deadline_never_selects_other_owned_window(
+    harness_module, tmp_path, monkeypatch
+):
+    value = window_fixture(runner(harness_module, tmp_path))
+    clock, calls = [0.0], []
+
+    async def sleep(delay):
+        clock[0] += delay
+
+    async def call(operation, arguments):
+        calls.append(operation)
+        assert operation == "windows.list"
+        return window_inventory(window_row(88))
+
+    value.call = call
+    monkeypatch.setattr(harness_module, "time", SimpleNamespace(monotonic=lambda: clock[0]))
+    monkeypatch.setattr(harness_module.asyncio, "sleep", sleep)
+    with pytest.raises(harness_module.AcceptanceError, match="77 missing before 8-second"):
+        await value.windows()
+    assert 8 <= clock[0] <= 8.001 and len(calls) <= 81
+    assert set(calls) == {"windows.list"}
+
+
+async def test_window_result_arriving_after_deadline_does_not_focus(
+    harness_module, tmp_path, monkeypatch
+):
+    value = window_fixture(runner(harness_module, tmp_path))
+    clock = [0.0]
+
+    async def call(operation, arguments):
+        assert operation == "windows.list"
+        clock[0] = 9
+        return window_inventory(window_row())
+
+    async def sleep(delay):
+        assert delay == 0
+
+    value.call = call
+    monkeypatch.setattr(harness_module, "time", SimpleNamespace(monotonic=lambda: clock[0]))
+    monkeypatch.setattr(harness_module.asyncio, "sleep", sleep)
+    with pytest.raises(harness_module.AcceptanceError, match="missing before 8-second"):
+        await value.windows()
+
+
+async def test_foreign_window_inventory_fails_without_poll_or_foreign_probe_data(
+    harness_module, tmp_path
+):
+    value = window_fixture(runner(harness_module, tmp_path))
+    calls = []
+
+    async def call(operation, arguments):
+        calls.append(operation)
+        return window_inventory(window_row(999, owner_pid=99))
+
+    value.call = call
+    with pytest.raises(harness_module.AcceptanceError, match="foreign"):
+        await value.windows()
+    assert calls == ["windows.list"]
+    assert value.evidence["window_probes"][0]["owned_rows"] == []
+    assert "999" not in (value.root / "evidence.json").read_text()
+
+
+async def test_capture_uses_same_exact_receipt_window_selector(harness_module, tmp_path):
+    value = window_fixture(runner(harness_module, tmp_path))
+    calls = []
+
+    async def call(operation, arguments):
+        calls.append(operation)
+        if operation == "windows.list":
+            return window_inventory(window_row(88), window_row())
+        assert operation == "capture.window"
+        assert arguments["window_id"] == 77 and arguments["expected_pid"] == 42
+        raise LookupError("stop before synthetic capture effect")
+
+    value.call = call
+    with pytest.raises(LookupError, match="stop before"):
+        await value.capture()
+    assert calls == ["windows.list", "capture.window"]

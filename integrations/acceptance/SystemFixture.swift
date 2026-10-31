@@ -42,6 +42,7 @@ final class OwnedFixture: NSObject, NSApplicationDelegate {
     func receipt(_ phase: String) {
         var value = processIdentity(getpid())
         value["fixture_uuid"] = nonce; value["phase"] = phase; value["clicks"] = clicks
+        if let window, window.windowNumber > 0 { value["window_id"] = window.windowNumber }
         if let data = try? JSONSerialization.data(withJSONObject: value, options: [.sortedKeys]) {
             try? data.write(to: state, options: [.atomic])
             try? FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: state.path)

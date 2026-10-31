@@ -1,6 +1,6 @@
 # macOS system and communication modules · 31 October 2026
 
-Revision 3, RC22 candidate. Continues the completed RC21 adapter and body-only
+Revision 4, RC22 release acceptance. Continues the completed RC21 adapter and body-only
 handoff work; it does not replay historical uncertain tasks. The operator explicitly
 requested the remaining system communication modules, team review and deployment.
 
@@ -166,3 +166,54 @@ observations still refuse before any effect. The final signal check is kernel-on
 and the existing single signal call is unchanged. Public fork/exec races after
 preflight remain an explicit limit. Compiled pure cases and independent review
 passed; the final shipped native binary still requires its real fixture gate.
+
+## Final product-code acceptance · F97
+
+Product code is `f97ab1cdeebe1d06648febe685f7ebb738ca93a9`. The following
+acceptance-only change does not alter any shipped Python source, any of the four
+compiled desktop Swift sources, installer or build code: the synthetic fixture now
+records its public NSWindow.windowNumber and the tester waits, read-only and
+bounded, for exactly that owned ID. It no longer assumes an immediate singleton
+CG-window list. The failed first-window assertion in run03 remains recorded.
+
+Run04 passed all eight native stages against the managed F97 package and exact
+`bc923f131efc1de41249aae93c4eebab8dcea343268a386a14fae19de3fbd2f5`
+app binary: window inspection/focus, AX text/button/secure redaction, own-window
+PNG, preference restoration, complete public process inventory, exact process
+inspection and one TERM to the owned fixture. Fixture and worker absence were
+independently checked. The synthetic fixture's preference was restored. No user
+window or historical task was used. Notification status was read; no notification
+was posted and no OS permission was requested.
+
+The same F97 app was also observed in a separate launchd-parented read-only probe.
+That worker reported current AX and Screen Recording grants and notification
+authorization status0 (not determined). It closed cleanly and its temporary label
+was removed. This is a separate actor/process-context observation, not an assertion
+that the productive Core had already been upgraded.
+
+Both Linux CI jobs for F97 passed 2688 tests/40 skips, Ruff/format and build.
+Hosted Mac jobs executed zero steps due to current billing refusal. Local compiled
+Intel evidence is used explicitly; no hosted Mac or ARM pass is substituted.
+The packaged F97 smoke passed. The preceding complete RC21 upgrade/rollback,
+fresh-install/restart/open-completion test passed for the byte-identical Python
+source03bae2fd… and installer; the final downloaded F97 bundle must still pass
+its own supported download/upgrade/rollback gate before publication.
+
+The native permission and UI observations use the same Python source as the
+18-check independently reviewed communication chain:144 files, canonical
+path-to-file-SHA manifest hash
+`03bae2fd8715d4a7581e007096bf03633f7d978d6c590aec044a026512ab3986`.
+The native harness separately hashes path+NUL+raw bytes, producing
+`59dab86ea7cdc854269c3ade334bba0928ab94feef360294d9719ab4f6d81524`
+for those same source bytes. The algorithms are explicitly distinct.
+
+Publication, productive installation/activation and final running-identity/data
+verification are the remaining operator gates at this documentation revision.
+
+A separate later observation found former idle shell40801 absent; a bounded
+read-only check found no recorded KiraBridge `session.close` for its PID/pane.
+The cause is not established. The active original Codex36878 remains with its
+previous identity. A newly observed unrelated busy Terminal8818 is preserved.
+The final operator report must distinguish that external-state observation from
+cleanup of the positively owned fixture/worker, and must not claim every historic
+original process still exists. No fixture operation targeted40801.

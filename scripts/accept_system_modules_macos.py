@@ -159,6 +159,70 @@ def valid_start(value):
     return isinstance(value, str) and re.fullmatch(r"[0-9]{1,12}\.[0-9]{6}", value) is not None
 
 
+def owned_window_id(fixture, receipt, nonce):
+    require(
+        isinstance(receipt, dict)
+        and type(fixture.get("pid")) is int
+        and fixture["pid"] > 0
+        and receipt.get("fixture_uuid") == nonce
+        and receipt.get("state") == "present"
+        and receipt.get("phase") == "ready"
+        and type(receipt.get("pid")) is int
+        and receipt["pid"] == fixture["pid"]
+        and type(receipt.get("uid")) is int
+        and receipt["uid"] == os.getuid()
+        and valid_start(receipt.get("start"))
+        and type(receipt.get("window_id")) is int
+        and 0 < receipt["window_id"] <= 2**32 - 1,
+        "Owned ready receipt has no exact window identity",
+    )
+    return receipt["window_id"]
+
+
+def select_owned_window(result, fixture, receipt, nonce):
+    """None means only that our exact ready window is not yet in the CG inventory."""
+    wanted = owned_window_id(fixture, receipt, nonce)
+    rows = result.get("windows")
+    require(
+        isinstance(rows, list)
+        and len(rows) <= 100
+        and result.get("truncated") is False
+        and type(result.get("total")) is int
+        and result["total"] == len(rows)
+        and result.get("offset") == 0,
+        "Owned window inventory is incomplete or malformed",
+    )
+    require(
+        isinstance(result.get("revision"), str)
+        and re.fullmatch(r"[a-f0-9]{64}", result["revision"]),
+        "Owned window inventory revision unavailable",
+    )
+    seen, selected = set(), None
+    expected_start = f"{fixture['started_at']:.6f}"
+    for row in rows:
+        require(
+            isinstance(row, dict)
+            and type(row.get("window_id")) is int
+            and 0 < row["window_id"] <= 2**32 - 1
+            and row["window_id"] not in seen
+            and type(row.get("owner_pid")) is int
+            and row["owner_pid"] == fixture["pid"]
+            and row.get("application_start") == expected_start
+            and type(row.get("layer")) is int
+            and isinstance(row.get("revision"), str)
+            and re.fullmatch(r"[a-f0-9]{64}", row["revision"]),
+            "Owned window inventory has a foreign, duplicate or changed identity",
+        )
+        seen.add(row["window_id"])
+        if row["window_id"] == wanted:
+            require(
+                row["layer"] == 0 and row.get("on_screen") is True,
+                "Owned ready window is not an on-screen application window",
+            )
+            selected = row
+    return selected
+
+
 def original_absent(observed, identity):
     if (
         type(identity.get("pid")) is not int
@@ -334,26 +398,61 @@ class Harness:
                     re.fullmatch(r"[0-9]{1,12}\.[0-9]{6}", value.get("start", "")),
                     "Fixture kernel start token unavailable",
                 )
+                require(value.get("phase") == "ready", "Fixture did not report ready")
+                owned_window_id(self.fixture, value, self.nonce)
                 self.receipt = value
                 return
             except FileNotFoundError:
                 await asyncio.sleep(0.1)
         raise AcceptanceError("Owned fixture did not produce its identity receipt")
 
+    async def owned_window(self):
+        wanted = owned_window_id(self.fixture, self.receipt, self.nonce)
+        deadline = time.monotonic() + 8
+        probes = self.evidence.setdefault("window_probes", [])
+        while time.monotonic() < deadline:
+            try:
+                async with asyncio.timeout(deadline - time.monotonic()):
+                    result = await self.call(
+                        "windows.list",
+                        {
+                            "owner_pid": self.fixture["pid"],
+                            "expected_start": self.window_target()["expected_start"],
+                            "include_titles": False,
+                            "limit": 100,
+                        },
+                    )
+            except TimeoutError:
+                break
+            rows = result.get("windows")
+            probes.append(
+                {
+                    "expected_window_id": wanted,
+                    "owner_pid": self.fixture["pid"],
+                    "row_count": len(rows) if isinstance(rows, list) else None,
+                    "truncated": result.get("truncated"),
+                    "revision": result.get("revision"),
+                    "owned_rows": [
+                        {key: row.get(key) for key in ("window_id", "layer", "revision")}
+                        for row in rows[:100]
+                        if isinstance(row, dict)
+                        and type(row.get("owner_pid")) is int
+                        and row["owner_pid"] == self.fixture["pid"]
+                    ]
+                    if isinstance(rows, list)
+                    else [],
+                    "probe_rows_capped": isinstance(rows, list) and len(rows) > 100,
+                }
+            )
+            self.save()
+            row = select_owned_window(result, self.fixture, self.receipt, self.nonce)
+            if row is not None and time.monotonic() < deadline:
+                return row
+            await asyncio.sleep(min(0.1, max(0, deadline - time.monotonic())))
+        raise AcceptanceError(f"Owned ready window {wanted} missing before 8-second deadline")
+
     async def windows(self):
-        result = await self.call(
-            "windows.list",
-            {
-                "owner_pid": self.fixture["pid"],
-                "expected_start": self.window_target()["expected_start"],
-                "include_titles": False,
-                "limit": 100,
-            },
-        )
-        rows = result["windows"]
-        require(len(rows) == 1 and not result.get("truncated"), "Owned fixture window is ambiguous")
-        row = rows[0]
-        require(row["owner_pid"] == self.fixture["pid"], "Foreign window in fixture inventory")
+        row = await self.owned_window()
         target = {
             **self.window_target(),
             "window_id": row["window_id"],
@@ -361,7 +460,11 @@ class Harness:
         }
         inspected = await self.call("windows.inspect", target)
         require(
-            inspected["window"]["window_id"] == row["window_id"], "Window inspect identity changed"
+            inspected["window"]["window_id"] == row["window_id"]
+            and inspected["window"]["owner_pid"] == self.fixture["pid"]
+            and inspected["window"]["application_start"] == self.window_target()["expected_start"]
+            and inspected["window"]["revision"] == row["revision"],
+            "Window inspect identity changed",
         )
         await self.call("app.focus", self.window_target())
         return {"window_id": row["window_id"], "owner_pid": row["owner_pid"]}
@@ -458,16 +561,7 @@ class Harness:
     async def capture(self, filename="fixture-window.png", max_side=1024):
         from kirabridge.image_manager import validate_png
 
-        listed = await self.call(
-            "windows.list",
-            {
-                "owner_pid": self.fixture["pid"],
-                "expected_start": self.window_target()["expected_start"],
-                "include_titles": False,
-            },
-        )
-        require(len(listed["windows"]) == 1, "Fixture capture window is ambiguous")
-        row = listed["windows"][0]
+        row = await self.owned_window()
         args = {
             **self.window_target(),
             "window_id": row["window_id"],
