@@ -1,0 +1,161 @@
+{
+  "schema_version": 1,
+  "observed_date": "2026-10-31",
+  "scope": "macOS integration phases 1-3; documentation only",
+  "board": {
+    "id": "0ab8b95a7369",
+    "plan_revision": 3,
+    "read_method": "threaddesk_dynamic_call/get_thread",
+    "whiteboard_entries_initially": 0
+  },
+  "runtime": {
+    "instance_id": "938c88dce527450eaed07deddd1eaade",
+    "version": "0.8.0rc20",
+    "pid": 15207,
+    "started_at": "2026-10-31T11:25:14.230578+00:00",
+    "config_path": "/Users/landjunge/.config/kirabridge/config.toml",
+    "config_sha256": "0dc8eb5952fe4d986c152d38e1658e06de711d6b1f91ccc9745b184d1adb6370",
+    "effective_config_sha256": "d5de7e63e70636a03ae54ead9990224da6e38137e23c8ba1b74aa233cfe5c012",
+    "source_tree_sha256": "878e18a5970fc601a74bb67b32a6536151391d840e273d4335fc2d2d25cb6eb1",
+    "source_file_count": 124,
+    "source_package_path": "/Users/landjunge/.local/share/kirabridge/install/releases/0.8.0rc20-ecb76cb2082a/source/.venv/lib/python3.11/site-packages/kirabridge",
+    "source_scope": "package Python files observed at startup; no remote attestation"
+  },
+  "discovery": {
+    "revision": "abf81fab97c820ca9c13241915bb5feb30d424d74b18305fb2f2d56f9cd409e7",
+    "permission_revision": "14a406b04ed5730fdb5644ec4f28824a4f3bd8ec0dbb38f51de6ee4f1a8f9a40",
+    "terminal_observation": {
+      "status": "not_probed",
+      "sessions": [],
+      "freshness": "not_probed",
+      "usable_for_input": false
+    }
+  },
+  "dispatcher_active": true,
+  "diagnostics_storage": {
+    "recording": "budget_exhausted",
+    "records": 20000,
+    "today": 196,
+    "max_records": 20000,
+    "max_events_per_day": 2000,
+    "dropped_by_this_observer": 49,
+    "retention": "existing audit preserved; bounded explicit export, no automatic deletion"
+  },
+  "host": {
+    "model": "iMac17,1",
+    "architecture": "x86_64",
+    "ram_bytes": 34359738368,
+    "macos": "15.7.4",
+    "build": "24G517"
+  },
+  "git": {
+    "analysis_base": "2a081b9",
+    "installed_source": "ecb76cb2082a863d5dfdcba3aef848a0ee0c9f33",
+    "observed_remote_main": "307004e5b2e4285c19e8d7544bedf45b28297a0b",
+    "main_checkout_head": "dfbae4802fb0b15975581b045f7129e10b69c8d6",
+    "main_checkout_dirty": true,
+    "documentation_branch": "docs/macos-adapter-phases1-3-20261031",
+    "main_checkout_status_porcelain": [
+      " M README.md",
+      " M src/kirabridge/cli.py",
+      " M src/kirabridge/image_manager.py",
+      "?? docs/ACCEPTANCE-TURNFEED-CAMERA-20261018.md",
+      "?? docs/CHATGPT-EVENTS-20261019.md",
+      "?? docs/CHATGPT-EVENTS-ACTIVATION-20261019.md",
+      "?? docs/CHATGPT-EVENTS-RECOVERY-20261019.md",
+      "?? docs/CODEX-BAUAUFTRAG-SIEBEN-TOOLS-20261018-1833.md",
+      "?? docs/DOCTOR-LINUX-CREDENTIALS.md",
+      "?? docs/KIRA-THREADDESK-INTEGRATION-HANDOFF-20261021.md",
+      "?? docs/MCP-SCHEMA-CACHE-20261019.md",
+      "?? docs/SECURITY-MODES-DECISION-20261022.md",
+      "?? docs/brainstorm/",
+      "?? docs/evidence/cli-providers-20261019.json",
+      "?? docs/plans/",
+      "?? examples/chat-events/",
+      "?? examples/completion-demo/README.md",
+      "?? examples/completion-demo/run-20261019-01/acceptance-summary.json",
+      "?? examples/completion-demo/run-20261019-01/activation-2.json",
+      "?? examples/completion-demo/run-20261019-01/activation.json",
+      "?? examples/completion-demo/run-20261019-01/baseline-test-check.json",
+      "?? examples/completion-demo/run-20261019-01/installed-ack-verification.json",
+      "?? examples/completion-demo/run-20261019-01/installed-delivery.json",
+      "?? examples/completion-demo/run-20261019-01/installed-submission.json",
+      "?? examples/completion-demo/run-20261019-01/workspace/",
+      "?? examples/message-receiver/",
+      "?? examples/review-demo/automatic-20261019-01/",
+      "?? examples/review-demo/automatic-20261019-02/browser/desktop-dark.png",
+      "?? examples/review-demo/automatic-20261019-02/browser/desktop-light.png",
+      "?? examples/review-demo/automatic-20261019-02/browser/mobile-dark.png",
+      "?? examples/systemd/",
+      "?? kirabridge-threaddesk-front-20261023-small.jpg",
+      "?? kirabridge-threaddesk-front-20261023-small.png",
+      "?? kirabridge-threaddesk-front-20261023.png",
+      "?? src/kirabridge/doctor_key_provider.py",
+      "?? src/kirabridge/doctor_repair.py",
+      "?? tests/test_doctor_key_provider.py",
+      "?? tests/test_doctor_repair_isolated.py",
+      "?? tests/test_image_metadata.py"
+    ],
+    "analysis_base_full": "2a081b94d5320bb056c25a30613b0c2c7839fdc3"
+  },
+  "source_comparison": {
+    "python_files": 124,
+    "installed_matches_analysis_checkout": true,
+    "recomputed_sha256": "878e18a5970fc601a74bb67b32a6536151391d840e273d4335fc2d2d25cb6eb1"
+  },
+  "services": {
+    "core": {
+      "pid": 15207,
+      "start_utc": "2026-10-31T11:25:14.230578+00:00"
+    },
+    "approvals": {
+      "pid": 15308,
+      "start_cet": "2026-10-31 12:26:21"
+    },
+    "tunnel": {
+      "pid": 44533,
+      "start_cet": "2026-10-29 02:28:53"
+    },
+    "desktop": {
+      "pid": 47104,
+      "start_cet": "2026-10-30 20:56:21",
+      "plist_commit": "da1bdaed019c31aa11bb28a39ef8bead7e73c1d4",
+      "live_asset_acceptance": false
+    }
+  },
+  "tests": {
+    "command": "PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=<documentation-worktree>/src /Users/landjunge/KiraBridge/.venv/bin/python -m pytest -q -p no:cacheprovider tests/test_platforms.py tests/test_mac_desktop.py::test_console_state_uses_matching_user_and_actual_lock_flag tests/test_mac_desktop.py::test_another_users_active_desktop_does_not_confirm_our_session tests/test_mac_desktop.py::test_absent_or_unrecognized_console_data_is_unknown",
+    "exit_code": 0,
+    "result": "12 passed in 0.05s",
+    "native_ui_invoked": false,
+    "full_suite": false
+  },
+  "missing_sources": {
+    "library_search": {
+      "threads": [
+        "0ab8b95a7369",
+        "188ce4729a62"
+      ],
+      "status": "missing",
+      "documents": 0
+    },
+    "names": [
+      "KiraBridge_macOS_Integration_Arbeitsplan_2026-10-31.md",
+      "KiraBridge_ThreadDesk_Whiteboard_Fortsetzung_2026-10-31.md",
+      "original Desktop Commander research"
+    ],
+    "effect": "Phase 1 source comparison remains incomplete"
+  },
+  "prohibited_actions_performed": [],
+  "implementation": false,
+  "pushed": false,
+  "installed": false,
+  "restarted": false,
+  "changed_running_sessions": false,
+  "review": {
+    "agent": "apple_research",
+    "mode": "read-only",
+    "material_findings": 0,
+    "clarification": "AX false does not uniquely distinguish denied from not_determined; normalized unknown/non-granted and raw observation documented"
+  }
+}
