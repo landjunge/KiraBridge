@@ -1,0 +1,35 @@
+{
+  "order_id": "channel-4f8c697b60c046a083e55fd7dc1e577d",
+  "version": "0.8.0rc21",
+  "baseline_commit": "56a0b79c16b10acafa7142d206a0fc347f837d63",
+  "source_tree_sha256": "4c4db59f7fc20523514dd8ba3001b21c39c72039ecea2736080dc716ba9e2023",
+  "python_files": 134,
+  "scope": "remove unsolicited visible prompt additions and finish authorized release",
+  "targeted_regression": {
+    "passed": 289,
+    "junit_sha256": "c62d8326f3e64cb9e93eb8a693a856bcbb4be0cf7ddbb8c2e191b3898a6ec5e8",
+    "private_path": "/Users/landjunge/.local/share/kirabridge/backups/release-rc21-20261031T153818Z/body-only-regression.xml"
+  },
+  "menu_regression": {
+    "selected_passed": 9,
+    "deselected": 112,
+    "test_scope": "new released body-only reservation, current menu/Return and late ACK guards"
+  },
+  "first_native_acceptance": {
+    "overall": "failed_before_menu_input",
+    "body_only_handoffs_passed": 2,
+    "exact_user_body_rollout_proven": true,
+    "cleanup": {
+      "owned_window_absent": false,
+      "owned_shell_absent": false,
+      "reused_existing_idle_shell_preserved": true,
+      "owned_agent_absent": true,
+      "original_windows_and_process_identities_preserved": true
+    },
+    "private_path": "/Users/landjunge/.local/share/kirabridge/backups/release-rc21-20261031T153818Z/native-source-rc21/evidence.private.json",
+    "sha256": "7185825f4400b4b47891eb7fd8124017c7b3a750b2780bfa7a47248fc5655fb4"
+  },
+  "independent_review": "no_remaining_material_findings; native followup and release gates pending",
+  "ci_baseline": "Linux real six fixture failures per Python axis; hosted Mac jobs not started due current billing annotations",
+  "publication": "pending"
+}

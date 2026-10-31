@@ -288,6 +288,16 @@ class MessageReceiver:
             "finished": now,
             "result": {"text": evidence.get("response_preview", "")},
         }
+        delivery_only = evidence.get("completion_scope") == "visible_input_delivery"
+        if delivery_only:
+            task["operation"] = "message.visible_input_delivery"
+            task["result"] = {
+                "submitted": True,
+                "agent_confirmed": False,
+                "agent_work_completion_verified": False,
+                "request_reply_satisfied": False,
+                "scope": "visible_input_delivery",
+            }
         payload = completion_payload(task, seq, source="message")
         payload.update(
             message_id=message_id,
@@ -295,6 +305,14 @@ class MessageReceiver:
             conversation_id=row["conversation_id"],
             reply_id=reply_id,
         )
+        if delivery_only:
+            payload.update(
+                completion_scope="visible_input_delivery",
+                agent_confirmed=False,
+                agent_work_completion_verified=False,
+                request_reply_satisfied=False,
+                summary="Message text submitted; agent acknowledgement and reply unconfirmed",
+            )
         if evidence.get("externally_acknowledged"):
             payload["outcome"] = "not_executed"
             payload["summary"] = "Message acknowledged externally; no receiver turn executed"
@@ -728,9 +746,11 @@ class MessageReceiver:
             if not delivered["messages"] or delivered["messages"][0]["id"] != message_id:
                 raise BridgeError("receiver_delivery", "Message was consumed by another client")
             receipt = delivered["messages"][0]["receipt"]
+            separate_managed = separate_managed_eligible(self.bridge.config, message["created"])
+            visible = self.bridge.config.visible_handoffs.enabled and not separate_managed
             history = []
             parent_id = message["reply_to"]
-            while parent_id and len(history) < 4:
+            while not visible and parent_id and len(history) < 4:
                 parent = await call("message_get", {"message_id": parent_id})
                 item = {key: parent[key] for key in ("id", "sender", "kind", "body")}
                 if len(canonical([item, *history]).encode()) > 32768:
@@ -778,11 +798,9 @@ class MessageReceiver:
                         }
                     )
                 )
-            separate_managed = separate_managed_eligible(self.bridge.config, message["created"])
-            visible = self.bridge.config.visible_handoffs.enabled and not separate_managed
             if visible:
                 prompt = message["body"]
-            if history:
+            if history and not visible:
                 prompt += "\nPrior addressed messages (bounded context):\n" + canonical(history)
             if len(prompt) > 262144:
                 raise BridgeError("payload_limit", "Receiver prompt exceeds the adapter limit")
@@ -806,6 +824,22 @@ class MessageReceiver:
             if not result.get("success"):
                 await progress(result.get("evidence", {}))
                 raise BridgeError("agent_failed", "Receiving agent did not complete successfully")
+            if visible and result.get("scope") == "visible_input_delivery":
+                # Native Paste+Return confirms delivery only. No protocol text
+                # was injected, so do not invent a recipient ACK or final reply.
+                evidence = {
+                    **result.get("evidence", {}),
+                    "run_id": run_id,
+                    "session_scope": "existing_visible_terminal",
+                    "completion_scope": "visible_input_delivery",
+                    "agent_confirmed": False,
+                    "agent_work_completion_verified": False,
+                    "request_reply_satisfied": False,
+                    "automatic_retry": False,
+                }
+                with self.bridge.store.transaction():
+                    self._finish(message_id, "completed", evidence)
+                return
             evidence = {
                 **result.get("evidence", {}),
                 "run_id": run_id,

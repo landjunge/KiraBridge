@@ -1,5 +1,7 @@
 """Provider integration across authenticated discovery, cached and queued calls."""
 
+from types import SimpleNamespace
+
 import pytest
 from conftest import request
 from test_mcp import http_bridge  # noqa: F401 -- shared authenticated HTTP fixture
@@ -135,6 +137,9 @@ async def test_http_status_and_catalog_share_provider_revision_without_ui(
 
 async def test_matching_native_denial_blocks_transport_before_any_worker(bridge, monkeypatch):
     native_facts(bridge)
+    monkeypatch.setattr(
+        "kirabridge.platform_adapters.terminal_app.sys", SimpleNamespace(platform="darwin")
+    )
     identity = {"pid": 123, "start": "bound-test-helper"}
     bridge.macos.actor_identities["/usr/bin/osascript"] = identity
     bridge.macos.permission_probe.record(

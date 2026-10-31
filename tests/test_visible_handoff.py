@@ -1,6 +1,5 @@
 import asyncio
 import json
-import re
 import time
 
 import pytest
@@ -59,6 +58,7 @@ def visible(bridge, config, monkeypatch):
         if before_transport is not None:
             await before_transport()
         transport["calls"].append("insert")
+        transport["inserted_body"] = args.text
         transport["text"] = (
             "› " + args.text
             if transport.get("target") == "codex"
@@ -68,15 +68,20 @@ def visible(bridge, config, monkeypatch):
 
     async def submit(principal, pane, pid, *, expected_screen=None):
         transport["calls"].append("return")
-        addressed = re.search(r"Nachricht (\S+) mit deren receipt", transport["text"])
+        target = transport.get("target", "grok")
+        # The cooperating test receiver reads its authenticated mailbox. Routing
+        # metadata is no longer extracted from injected instructions in the UI.
+        addressed = bridge.store.db.execute(
+            "SELECT message_id FROM visible_handoffs WHERE target=? AND state='submitting'",
+            (target,),
+        ).fetchone()
         transport["text"] = "› " if transport.get("target") == "codex" else "╭\n│ ❯ │\n╰"
         if transport["fail"]:
             raise UncertainExecution("uncertain_return", "Unknown return delivery")
-        target = transport.get("target", "grok")
         messages = bridge.messages.receive(target)["messages"]
         if not addressed:
             return  # Literal session.input sends no work message and requires no ACK.
-        message = next(m for m in messages if m["id"] == addressed[1]) if addressed else messages[0]
+        message = next(m for m in messages if m["id"] == addressed[0])
         if transport["ack"]:
             bridge.messages.ack(target, message["id"], message["receipt"])
         if transport["reply"]:
@@ -142,7 +147,7 @@ async def test_final_session_preflight_refusal_is_not_an_uncertain_paste(
 
 
 @pytest.mark.parametrize("target", ["codex", "grok"])
-async def test_marker_preserving_edit_between_paste_and_return_never_submits(visible, target):
+async def test_body_edit_between_paste_and_return_never_submits(visible, target):
     bridge, transport = visible
     transport["target"] = target
     transport["text"] = "› " if target == "codex" else "╭\n│ ❯ │\n╰"
@@ -236,6 +241,202 @@ async def test_missing_return_acceptance_never_claims_execution_or_resends(visib
 
 async def callback(evidence):
     pass
+
+
+@pytest.mark.parametrize("sender", ["chatgpt", "grok_app", "codex", "grok"])
+@pytest.mark.parametrize("target", ["codex", "grok"])
+@pytest.mark.parametrize(
+    "body", ["Nur diesen Auftrag bearbeiten.", "  KiraBridge ACK KB-END-user\nÄnderung 最後  "]
+)
+async def test_body_only_handoff_never_adds_text_or_requires_agent_protocol(
+    visible, sender, target, body
+):
+    import hashlib
+
+    bridge, transport = visible
+    transport.update(target=target, ack=False, reply=False)
+    transport["text"] = "› " if target == "codex" else "╭\n│ ❯ │\n╰"
+    task = {"id": "literal-body", "principal": sender}
+    args = AgentInput(agent=target, prompt=body, cwd="/tmp", timeout=0.01)
+    result = await bridge.visible_handoffs.execute(task, args, callback, callback)
+    assert transport["inserted_body"].encode("utf-8") == body.encode("utf-8")
+    assert result["scope"] == "visible_input_delivery" and result["return_sent"]
+    assert not result["agent_confirmed"] and not result["request_reply_satisfied"]
+    assert not result["project_completion_verified"] and not result["work_completion_verified"]
+    assert "text" not in result and "reply_id" not in result["evidence"]
+    assert (
+        result["evidence"]["expected_payload_sha256"] == hashlib.sha256(body.encode()).hexdigest()
+    )
+    message = bridge.messages.get(sender, result["message_id"])
+    assert message["body"] == body and message["acknowledged"] is None
+    repeated = await bridge.visible_handoffs.execute(task, args, callback, callback)
+    assert repeated["scope"] == "visible_input_delivery"
+    assert transport["calls"] == ["insert", "return"]
+
+
+@pytest.mark.parametrize(
+    "body", ["", " leading\ttext \n\n", "› user text\nKB-END-original", "\\x00"]
+)
+def test_prompt_builder_preserves_every_character_without_interpreting_user_markers(body):
+    from kirabridge.visible_handoff import VisibleHandoffs
+
+    assert VisibleHandoffs.prompt("chatgpt", "codex", "id", body, "message", "channel") == body
+
+
+async def test_body_only_input_slot_releases_only_after_fresh_same_target_ready(visible):
+    bridge, transport = visible
+    transport.update(ack=False, reply=False)
+    args = AgentInput(agent="grok", prompt="One exact request", cwd="/tmp", timeout=0.01)
+    first = {"id": "first-delivery", "principal": "chatgpt"}
+    result = await bridge.visible_handoffs.execute(first, args, callback, callback)
+    old_message = bridge.messages.get("chatgpt", result["message_id"])
+    second = await bridge.visible_handoffs.execute(
+        {"id": "second-delivery", "principal": "chatgpt"}, args, callback, callback
+    )
+    assert second["scope"] == "visible_input_delivery"
+    old = bridge.visible_handoffs.status("chatgpt", first["id"])
+    assert old["state"] == "unknown"
+    assert old["evidence"]["reason"] == "body_only_target_ready"
+    assert old["evidence"]["input_reservation_released"] is True
+    assert old["evidence"]["target_readiness"] == "verified_ready_before_new_input"
+    assert bridge.messages.get("chatgpt", old_message["id"])["acknowledged"] is None
+    assert (await bridge.visible_handoffs.execute(first, args, callback, callback))["submitted"]
+    assert transport["calls"] == ["insert", "return", "insert", "return"]
+
+
+@pytest.mark.parametrize("frame", ["Known /resume menu", "› existing authorized draft"])
+@pytest.mark.parametrize("late_ack", [False, True])
+async def test_released_body_only_slot_does_not_override_current_return_guards(
+    visible, monkeypatch, frame, late_ack
+):
+    bridge, transport = visible
+    transport.update(target="codex", text="› ", ack=False, reply=False)
+    args = AgentInput(agent="codex", prompt="Original body", cwd="/tmp", timeout=0.01)
+    result = await bridge.visible_handoffs.execute(
+        {"id": "released-before-menu", "principal": "chatgpt"}, args, callback, callback
+    )
+    binding = bridge.config.visible_handoffs.bindings["codex"]
+    await bridge.visible_handoffs.reconcile_target_reservations("chatgpt", "codex", binding)
+    before = bridge.visible_handoffs.status("chatgpt", "released-before-menu")
+    assert bridge.visible_handoffs.body_only_input_released(before)
+    if late_ack:
+        original = bridge.messages.receive("codex")["messages"][0]
+        assert original["id"] == result["message_id"]
+        bridge.messages.ack("codex", original["id"], original["receipt"])
+    transport["text"] = frame
+
+    async def forbidden(*args, **kwargs):
+        raise AssertionError("A released historical slot cannot require a new empty composer")
+
+    monkeypatch.setattr(bridge.visible_handoffs, "check_target", forbidden)
+    monkeypatch.setattr(
+        bridge.sessions,
+        "current_selection",
+        lambda: ("codex", binding, {binding.expected_pid: {}, binding.agent_pid: {}}),
+    )
+    await bridge.visible_handoffs.reconcile_target_reservations(
+        "chatgpt", "codex", binding, explicit_return_task_id="current-observed-return"
+    )
+    after = bridge.visible_handoffs.status("chatgpt", "released-before-menu")
+    assert bridge.visible_handoffs.body_only_input_released(after)
+    assert after["events"] == before["events"]
+    assert transport["calls"] == ["insert", "return"]
+
+
+@pytest.mark.parametrize(
+    "invalid_release",
+    [
+        None,
+        {"input_reservation_released": False},
+        {"prompt_format": "legacy"},
+        {"return_sent": False},
+        {"target_readiness": "cached"},
+    ],
+)
+async def test_active_or_incompletely_released_body_only_slot_still_requires_fresh_ready(
+    visible, invalid_release
+):
+    bridge, transport = visible
+    transport.update(target="codex", text="› ", ack=False, reply=False)
+    args = AgentInput(agent="codex", prompt="Original body", cwd="/tmp", timeout=0.01)
+    await bridge.visible_handoffs.execute(
+        {"id": "active-before-menu", "principal": "chatgpt"}, args, callback, callback
+    )
+    binding = bridge.config.visible_handoffs.bindings["codex"]
+    if invalid_release is not None:
+        await bridge.visible_handoffs.reconcile_target_reservations("chatgpt", "codex", binding)
+        released = bridge.visible_handoffs.status("chatgpt", "active-before-menu")
+        bridge.visible_handoffs.transition(
+            "active-before-menu", "unknown", {**released["evidence"], **invalid_release}
+        )
+    transport["text"] = "› existing authorized draft"
+    with pytest.raises(BridgeError) as error:
+        await bridge.visible_handoffs.reconcile_target_reservations("chatgpt", "codex", binding)
+    assert error.value.code == "visible_input_not_empty"
+    assert transport["calls"] == ["insert", "return"]
+
+
+def retain_legacy_handoff(bridge, args, *, state="sent", reason="legacy", identifier="legacy"):
+    from kirabridge.bridge_core.models import canonical, digest
+
+    original = bridge.messages._send(
+        "chatgpt",
+        MessageSend(
+            recipient=args.agent,
+            conversation_id=identifier,
+            idempotency_key=identifier,
+            body=args.prompt,
+            dispatch=False,
+        ),
+        visible_internal=True,
+    )
+    binding = bridge.config.visible_handoffs.bindings[args.agent]
+    bridge.store.db.execute(
+        "INSERT INTO visible_handoffs VALUES(?,?,?,?,?,?,?,?,?,?)",
+        (
+            identifier,
+            "chatgpt",
+            args.agent,
+            digest({"principal": "chatgpt", "args": args.model_dump()}),
+            canonical(binding.model_dump()),
+            original["id"],
+            state,
+            1,
+            1,
+            canonical({"reason": reason}),
+        ),
+    )
+    bridge.store.db.execute(
+        "INSERT INTO visible_handoff_events(id,at,state,evidence) VALUES(?,1,?,?)",
+        (identifier, state, canonical({"reason": reason})),
+    )
+    return original
+
+
+async def test_legacy_sent_handoff_is_not_reinterpreted_as_body_only_delivery(visible):
+    bridge, transport = visible
+    args = AgentInput(agent="grok", prompt="Historical body", cwd="/tmp", timeout=0.01)
+    retain_legacy_handoff(bridge, args)
+    with pytest.raises(UncertainExecution) as error:
+        await bridge.visible_handoffs.execute(
+            {"id": "legacy", "principal": "chatgpt"}, args, callback, callback
+        )
+    assert error.value.code == "visible_reply_unknown"
+    with pytest.raises(BridgeError) as busy:
+        await bridge.visible_handoffs.execute(
+            {"id": "new", "principal": "chatgpt"}, args, callback, callback
+        )
+    assert busy.value.code == "visible_target_busy" and not transport["calls"]
+
+
+async def test_legacy_unknown_marker_cannot_authorize_a_new_return(visible):
+    bridge, transport = visible
+    args = AgentInput(agent="grok", prompt="Historical body", cwd="/tmp", timeout=0.01)
+    retain_legacy_handoff(bridge, args, state="unknown", reason="visible_insert_unknown")
+    transport["text"] = "╭\n│ ❯ Historical body\nKB-END-old-marker\n╰"
+    with pytest.raises(BridgeError) as error:
+        await bridge.visible_handoffs.continue_unsubmitted("chatgpt", "legacy", callback)
+    assert error.value.code == "return_reconciliation_required" and not transport["calls"]
 
 
 async def test_eve_literal_session_input_reports_delivery_without_claiming_a_reply(
@@ -357,7 +558,12 @@ async def test_already_claimed_visible_turn_and_return_complete_while_draining(v
         callback,
     )
     assert result["success"]
-    reply = bridge.messages.get(sender, result["evidence"]["reply_id"])
+    assert result["scope"] == "visible_input_delivery"
+    assert not result["agent_confirmed"] and "reply_id" not in result["evidence"]
+    reply_id = bridge.store.db.execute(
+        "SELECT id FROM messages WHERE reply_to=?", (original["id"],)
+    ).fetchone()[0]
+    reply = bridge.messages.get(sender, reply_id)
     assert reply["recipient"] == sender and reply["sender"] == target
     assert reply["reply_to"] == original["id"]
     assert transport["calls"] == ["insert", "return"]
@@ -375,7 +581,9 @@ async def test_four_senders_use_same_visible_route_and_distinct_confirmation(vis
     result = await bridge.agents.execute(
         task, args, bridge.config.principals[sender], callback, callback
     )
-    assert result["success"] and result["evidence"]["agent_confirmed"]
+    assert result["success"] and not result["evidence"]["agent_confirmed"]
+    assert result["scope"] == "visible_input_delivery" and "text" not in result
+    assert transport["inserted_body"] == args.prompt
     assert transport["calls"] == ["insert", "return"]
     bridge.visible_handoffs.transition(task["id"], "unknown", {"reason": "late_callback"})
     assert bridge.visible_handoffs.status(sender, task["id"])["state"] == "completed"
@@ -430,11 +638,17 @@ async def test_unclear_transport_or_reply_is_never_repeated(visible, failure):
     transport[{"return": "fail", "ack": "ack", "reply": "reply"}[failure]] = failure == "return"
     task = {"id": "unknown-test", "principal": "codex"}
     args = AgentInput(agent="grok", prompt="test", cwd="/tmp", timeout=0.02)
-    with pytest.raises(UncertainExecution):
-        await bridge.visible_handoffs.execute(task, args, callback, callback)
-    assert bridge.visible_handoffs.status("codex", task["id"])["state"] == "unknown"
-    with pytest.raises(UncertainExecution):
-        await bridge.visible_handoffs.execute(task, args, callback, callback)
+    if failure == "return":
+        with pytest.raises(UncertainExecution):
+            await bridge.visible_handoffs.execute(task, args, callback, callback)
+        assert bridge.visible_handoffs.status("codex", task["id"])["state"] == "unknown"
+        with pytest.raises(UncertainExecution):
+            await bridge.visible_handoffs.execute(task, args, callback, callback)
+    else:
+        result = await bridge.visible_handoffs.execute(task, args, callback, callback)
+        assert result["scope"] == "visible_input_delivery" and not result["agent_confirmed"]
+        repeated = await bridge.visible_handoffs.execute(task, args, callback, callback)
+        assert repeated["scope"] == "visible_input_delivery"
     assert transport["calls"] == ["insert", "return"]
 
 
@@ -442,26 +656,19 @@ async def test_in_flight_window_rejects_second_handoff(visible):
     bridge, transport = visible
     transport["reply"] = False
     args = AgentInput(agent="grok", prompt="test", cwd="/tmp", timeout=2)
-    first = asyncio.create_task(
-        bridge.visible_handoffs.execute(
-            {"id": "first", "principal": "codex"},
-            args,
-            callback,
-            callback,
-        )
+    first = await bridge.visible_handoffs.execute(
+        {"id": "first", "principal": "codex"}, args, callback, callback
     )
-    await asyncio.sleep(0.01)
-    transport["text"] = "› " if transport.get("target") == "codex" else "╭\n│ ❯ │\n╰"
-    with pytest.raises(BridgeError, match="owns this terminal"):
+    assert first["scope"] == "visible_input_delivery"
+    transport["text"] = "╭\nThinking… [stop]\n│ ❯ │\n╰"
+    with pytest.raises(BridgeError) as error:
         await bridge.visible_handoffs.execute(
             {"id": "second", "principal": "chatgpt"},
             args,
             callback,
             callback,
         )
-    first.cancel()
-    with pytest.raises(asyncio.CancelledError):
-        await first
+    assert error.value.code == "visible_target_working"
     assert bridge.visible_handoffs.status("codex", "first")["state"] in {"sent", "confirmed"}
     assert transport["calls"] == ["insert", "return"]
 
@@ -471,7 +678,7 @@ async def test_prompt_limit_rejects_before_creating_inbox_or_pasting(visible):
     with pytest.raises(BridgeError, match="input limit"):
         await bridge.visible_handoffs.execute(
             {"id": "oversized", "principal": "codex"},
-            AgentInput(agent="grok", prompt="x" * 16384, cwd="/tmp"),
+            AgentInput(agent="grok", prompt="x" * 16385, cwd="/tmp"),
             callback,
             callback,
         )
@@ -485,8 +692,8 @@ async def test_late_authenticated_reply_reconciles_without_paste_or_return(visib
     transport["reply"] = False
     task = {"id": "late-reply", "principal": "codex"}
     args = AgentInput(agent="grok", prompt="test", cwd="/tmp", timeout=0.02)
-    with pytest.raises(UncertainExecution):
-        await bridge.visible_handoffs.execute(task, args, callback, callback)
+    result = await bridge.visible_handoffs.execute(task, args, callback, callback)
+    assert result["scope"] == "visible_input_delivery" and not result["agent_confirmed"]
     status = bridge.visible_handoffs.status("codex", task["id"])
     message = bridge.messages.get("codex", status["message_id"])
     bridge.messages.send(
@@ -503,7 +710,14 @@ async def test_late_authenticated_reply_reconciles_without_paste_or_return(visib
         ),
     )
     result = await bridge.visible_handoffs.execute(task, args, callback, callback)
-    assert result["text"] == "late actual result"
+    assert result["scope"] == "visible_input_delivery" and "text" not in result
+    assert bridge.messages.get("codex", message["id"])["acknowledged"]
+    assert (
+        bridge.store.db.execute(
+            "SELECT body FROM messages WHERE reply_to=?", (message["id"],)
+        ).fetchone()[0]
+        == "late actual result"
+    )
     assert bridge.visible_handoffs.status("codex", task["id"])["state"] == "completed"
     assert transport["calls"] == ["insert", "return"]
 
@@ -521,7 +735,11 @@ def test_real_codex_multiline_collapsed_paste_representation(target, delta, obse
 
     prompt = "First line\nSecond line with spaces and (punctuation)."
     view = f"› [Pasted Content {len(prompt) + delta} chars]\n"
-    assert bool(VisibleHandoffs.insertion_observed(target, view, prompt, "test")) == observed
+    before = "› " if target == "codex" else "╭\n│ ❯ │\n╰"
+    assert (
+        bool(VisibleHandoffs.insertion_observed(target, view, prompt, "test", before=before))
+        == observed
+    )
 
 
 @pytest.mark.parametrize("sender", ["chatgpt", "grok_app", "codex", "grok"])
@@ -623,14 +841,17 @@ async def test_team_style_self_turn_still_uses_existing_visible_window(visible):
     assert result["success"] and transport["calls"] == ["insert", "return"]
 
 
-def test_grok_collapsed_paste_requires_count_and_the_exact_preview_marker():
+def test_old_marker_and_line_count_do_not_prove_a_literal_body():
     from kirabridge.bridge_core.models import digest
     from kirabridge.visible_handoff import VisibleHandoffs
 
     identifier, prompt = "grok-collapse", "First\nSecond\nThird"
     preview = "╭\nKB-END-" + digest(identifier)[:12] + "\n╰─ paste again or double-cli…"
     field = "\n╭\n│ ❯ [Pasted: 3 lines]\n╰"
-    assert VisibleHandoffs.insertion_observed("grok", preview + field, prompt, identifier)
+    before = "╭\n│ ❯ │\n╰"
+    assert not VisibleHandoffs.insertion_observed(
+        "grok", preview + field, prompt, identifier, before=before
+    )
     assert not VisibleHandoffs.insertion_observed("grok", field, prompt, identifier)
     assert not VisibleHandoffs.insertion_observed(
         "grok", preview + field, prompt + "\nMore", identifier
@@ -687,7 +908,13 @@ async def test_real_http_receiver_keeps_original_message_and_exactly_one_agent_r
                     break
                 await asyncio.sleep(0.02)
         assert current["processing"]["state"] == "completed", current
-        reply = bridge.messages.get("chatgpt", current["processing"]["reply_id"])
+        assert current["processing"]["completion_scope"] == "visible_input_delivery"
+        assert not current["processing"]["request_reply_satisfied"]
+        assert current["processing"]["reply_id"] is None
+        reply_id = bridge.store.db.execute(
+            "SELECT id FROM messages WHERE reply_to=?", (sent["id"],)
+        ).fetchone()[0]
+        reply = bridge.messages.get("chatgpt", reply_id)
         assert reply["reply_to"] == sent["id"] and reply["sender"] == "grok"
         assert reply["body"] == "independent review" and reply["processing"] is None
         assert current["processing_route"] == "existing_visible_terminal"
@@ -747,11 +974,11 @@ async def test_reply_to_closed_original_requester_never_opens_another_window(
 
     monkeypatch.setattr(bridge.sessions, "selected", selected)
     monkeypatch.setattr(bridge.sessions, "open", forbidden)
-    with pytest.raises(UncertainExecution):
-        await bridge.visible_handoffs.execute(
-            {"id": "closed-reply-window", "principal": sender},
-            AgentInput(agent=target, prompt="test", cwd="/tmp"),
-            callback,
-            callback,
-        )
+    result = await bridge.visible_handoffs.execute(
+        {"id": "closed-reply-window", "principal": sender},
+        AgentInput(agent=target, prompt="test", cwd="/tmp"),
+        callback,
+        callback,
+    )
+    assert result["scope"] == "visible_input_delivery" and not result["agent_confirmed"]
     assert transport["calls"] == ["insert", "return"]

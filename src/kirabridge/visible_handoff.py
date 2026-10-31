@@ -1,6 +1,7 @@
 """Durable handoffs to exact existing visible terminals; never spawn a fallback."""
 
 import asyncio
+import hashlib
 import re
 import time
 
@@ -16,9 +17,12 @@ from kirabridge.visible_binding import (
     save_refresh,
 )
 from kirabridge.visible_readiness import assess, input_view
-from kirabridge.voice_channel import IDENTITIES
 
 RETURN_OBSERVATION_TIMEOUT = 8.0
+
+
+def _text_sha256(value):
+    return hashlib.sha256(value.encode("utf-8")).hexdigest()
 
 
 class VisibleReadinessError(BridgeError):
@@ -69,46 +73,80 @@ class VisibleHandoffs:
 
     @staticmethod
     def prompt(principal, target, identifier, body, message_id=None, conversation_id=None):
-        message_id = message_id or "visible-" + digest(identifier)[:48]
-        conversation_id = conversation_id or message_id
-        name = IDENTITIES.get(principal, {}).get("name", principal)
+        """Only the authorized body is terminal input; routing stays internal."""
+        return body
+
+    @staticmethod
+    def insertion_observed(target, text, prompt, identifier, *, before=None, **options):
+        """Reuse the strict literal verifier with the real empty pre-paste frame."""
+        from kirabridge.literal_session_input import insertion_observed
+
+        if before is None:
+            return None
         return (
-            f"[KiraBridge Auftrag {identifier}] Von {name} ({principal}) an {target}. "
-            "Diese KiraBridge-Übergabe verwendet die bestehende sichtbare Sitzung. "
-            "Codex/Grok bestimmen ihre internen Arbeitsweisen nach ihren eigenen Regeln. "
-            f"Zuerst über KiraBridge message_receive die Konversation {conversation_id} lesen und "
-            f"Nachricht {message_id} mit deren receipt per message_ack bestätigen. "
-            "Danach den folgenden Auftrag bearbeiten. Antworte am Ende sichtbar hier UND mit "
-            f"message_send an {principal}, conversation_id={conversation_id}, "
-            f"reply_to={message_id}, "
-            "kind=result, request_reply=false, dispatch=false, eigener stabiler idempotency_key. "
-            f"Die Auftrags-ID immer angeben. Auftrag:\n{body}\nKB-END-{digest(identifier)[:12]}"
+            "literal_widget_exact_payload"
+            if insertion_observed(target, text, prompt, before, **options)
+            else None
         )
 
     @staticmethod
-    def insertion_observed(target, text, prompt, identifier):
-        raw_text = text
-        text = VisibleHandoffs.input_view(target, text)
-        if target == "grok":
-            collapsed = re.search(r"\[Pasted: (\d+) lines\]", text)
-            preceding = raw_text[: raw_text.rfind("╭")]
-            preview = preceding[preceding.rfind("╭") :]
-            if (
-                collapsed
-                and int(collapsed[1]) == prompt.count("\n") + 1
-                and "KB-END-" + digest(identifier)[:12] in preview
-                and "paste again or double-cli" in preview
-            ):
-                return "grok_collapsed_paste_lines_and_unique_preview_marker"
-        if "KB-END-" + digest(identifier)[:12] in text:
-            return "visible_end_marker"
-        # Real Codex collapses multiline pastes; the empty pre-state and exact
-        # length bind this observable representation to the just-authorized paste.
-        if target == "codex":
-            match = re.search(r"(?m)^\s*› \[Pasted Content (\d+) chars\]\s*$", text)
-            if match and int(match[1]) == len(prompt):
-                return "codex_collapsed_paste_exact_character_count"
-        return None
+    def body_only_delivery(status):
+        return any(
+            event["state"] == "sent"
+            and event["evidence"].get("prompt_format") == "body_only_v1"
+            and event["evidence"].get("return_sent") is True
+            and event["evidence"].get("input_field_cleared") is True
+            for event in status["events"]
+        )
+
+    @classmethod
+    def body_only_input_released(cls, status):
+        evidence = status["evidence"]
+        return (
+            status["state"] == "unknown"
+            and evidence.get("prompt_format") == "body_only_v1"
+            and evidence.get("reason") == "body_only_target_ready"
+            and evidence.get("input_reservation_released") is True
+            and evidence.get("return_sent") is True
+            and evidence.get("target_readiness") == "verified_ready_before_new_input"
+            and cls.body_only_delivery(status)
+        )
+
+    async def verify_inserted_body(self, principal, target, binding, prompt, before, after, cwd):
+        from kirabridge.literal_session_input import _task_cwd
+
+        options = {}
+        observed = self.insertion_observed(
+            target, after["text"], prompt, None, before=before["text"]
+        )
+        if not observed and target == "codex":
+            selection = self.sessions.current_selection()
+            if selection and len(prompt) <= 1000:
+                try:
+                    columns = await self.sessions.terminal_app.input_columns(
+                        binding.pane_id,
+                        identity_guard=selection[2],
+                        expected_screen=after["text"],
+                    )
+                except BridgeError:
+                    columns = None
+                if columns is not None:
+                    options["columns"] = columns
+                    observed = self.insertion_observed(
+                        target, after["text"], prompt, None, before=before["text"], **options
+                    )
+            if not observed and cwd is not None:
+                if await _task_cwd(self.sessions, binding) == cwd:
+                    observed = self.insertion_observed(
+                        target,
+                        after["text"],
+                        prompt,
+                        None,
+                        before=before["text"],
+                        cwd=cwd,
+                        **options,
+                    )
+        return observed
 
     def __init__(self, config, store, security, sessions, messages):
         self.config, self.store, self.security = config, store, security
@@ -170,7 +208,7 @@ class VisibleHandoffs:
         idle_reply_pending = (
             status["state"] == "unknown"
             and status["evidence"].get("reason") == "target_idle_reply_unconfirmed"
-        )
+        ) or self.body_only_input_released(status)
         if message["acknowledged"] and status["state"] not in {"completed", "interrupted"}:
             evidence = {
                 "authenticated_principal": status["target"],
@@ -405,6 +443,42 @@ class VisibleHandoffs:
                 continue  # Dead pane stays recorded. It does not lock the replacement.
             status = self.reconcile(row["principal"], row["id"])
             if status["state"] in {"completed", "interrupted"}:
+                continue
+            if (
+                self.body_only_delivery(status)
+                and status["binding"] == binding.model_dump()
+                and (
+                    status["state"] in {"sent", "confirmed"}
+                    or (
+                        status["state"] == "unknown"
+                        and status["evidence"].get("reason") == "body_only_target_ready"
+                    )
+                )
+            ):
+                if self.body_only_input_released(status):
+                    # The old input slot was already released. The current
+                    # operation owns its fresh input/menu/key checks; an old
+                    # empty-composer requirement must not override those guards.
+                    continue
+                # Delivery does not claim an answer. A later *fresh* empty/idle
+                # observation of this same exact target releases its input slot.
+                await self.check_target(principal, target, binding, ready=True)
+                if status["evidence"].get("reason") != "body_only_target_ready":
+                    self.transition(
+                        row["id"],
+                        "unknown",
+                        {
+                            **status["evidence"],
+                            "reason": "body_only_target_ready",
+                            "input_reservation_released": True,
+                            "prompt_format": "body_only_v1",
+                            "return_sent": True,
+                            "previous_state": status["state"],
+                            "agent_confirmed": False,
+                            "automatic_retry": False,
+                            "target_readiness": "verified_ready_before_new_input",
+                        },
+                    )
                 continue
             message = self.messages.get(row["principal"], status["message_id"])
             reply = self.store.db.execute(
@@ -648,19 +722,9 @@ class VisibleHandoffs:
             raise UncertainExecution(
                 "visible_insert_unknown", "Inserted input changed; no Return sent"
             )
-        status = self.status(principal, identifier)
-        message = self.messages.get(principal, status["message_id"])
-        expected_prompt = self.prompt(
-            principal,
-            target,
-            identifier,
-            message["body"],
-            message["id"],
-            message["conversation_id"],
-        )
-        if not self.insertion_observed(target, view["text"], expected_prompt, identifier):
+        if expected_input_view is None:
             raise UncertainExecution(
-                "visible_insert_unknown", "Inserted input changed; no Return sent"
+                "visible_insert_unknown", "No previously verified input frame; no Return sent"
             )
         await self.sessions.press_return(
             principal, binding.pane_id, binding.expected_pid, expected_screen=view["text"]
@@ -681,7 +745,13 @@ class VisibleHandoffs:
         self.transition(
             identifier,
             "sent",
-            {"return_sent": True, "input_field_cleared": True, "agent_confirmed": False},
+            {
+                "return_sent": True,
+                "input_field_cleared": True,
+                "agent_confirmed": False,
+                "request_reply_satisfied": False,
+                "prompt_format": "body_only_v1",
+            },
         )
         await running({"handoff_id": identifier, "state": "sent", "agent_confirmed": False})
 
@@ -717,17 +787,27 @@ class VisibleHandoffs:
         if self.config.visible_handoffs.bindings.get(status["target"]) != binding:
             raise BridgeError("handoff_conflict", "Original binding changed")
         view = await self.check_target(principal, status["target"], binding)
-        prompt = self.prompt(
-            principal,
-            status["target"],
-            identifier,
-            message["body"],
-            message["id"],
-            message["conversation_id"],
+        verified = next(
+            (
+                event["evidence"]
+                for event in reversed(status["events"])
+                if event["state"] == "inserted"
+                and event["evidence"].get("prompt_format") == "body_only_v1"
+                and event["evidence"].get("prompt_observed") is True
+            ),
+            None,
         )
-        observed = self.insertion_observed(status["target"], view["text"], prompt, identifier)
-        if not observed:
-            raise BridgeError("visible_insert_unknown", "Original unsubmitted paste is not visible")
+        current_view = self.input_view(status["target"], view["text"])
+        if (
+            verified is None
+            or verified.get("expected_payload_sha256") != _text_sha256(message["body"])
+            or verified.get("verified_input_view_sha256") != _text_sha256(current_view)
+        ):
+            raise BridgeError(
+                "return_reconciliation_required",
+                "Original literal input was not verified; inspect it and use an explicit Return",
+            )
+        observed = "same_previously_verified_literal_widget"
         self.transition(
             identifier,
             "inserted",
@@ -739,7 +819,14 @@ class VisibleHandoffs:
             },
         )
         try:
-            await self.submit_inserted(identifier, principal, status["target"], binding, running)
+            await self.submit_inserted(
+                identifier,
+                principal,
+                status["target"],
+                binding,
+                running,
+                expected_input_view=current_view,
+            )
         except BaseException as exc:
             self.transition(
                 identifier,
@@ -880,7 +967,10 @@ class VisibleHandoffs:
                 )
             reconciled = self.reconcile(principal, identifier)
             existing = {**dict(existing), "state": reconciled["state"]}
-            if existing["state"] not in {"sent", "confirmed", "completed"}:
+            if existing["state"] not in {"sent", "confirmed", "completed"} and not (
+                self.body_only_delivery(reconciled)
+                and reconciled["evidence"].get("reason") == "body_only_target_ready"
+            ):
                 raise UncertainExecution(
                     "visible_handoff_unknown",
                     "Prior input must be reconciled; never repeat automatically",
@@ -896,16 +986,16 @@ class VisibleHandoffs:
                 explicit_handoff_task_id=identifier if explicit_selection else None,
                 observed_sessions=observed_sessions,
             )
-            if "KB-END-" + digest(identifier)[:12] in before["text"]:
-                raise BridgeError(
-                    "visible_marker_collision", "This handoff marker was already visible"
-                )
             addressed = task.get("visible_message_id")
             if addressed:
                 original = self.messages.get(principal, addressed)
                 if original["sender"] != principal or original["recipient"] != target:
                     raise BridgeError(
                         "handoff_conflict", "Original addressed message does not match"
+                    )
+                if original["body"] != args.prompt:
+                    raise BridgeError(
+                        "handoff_conflict", "Visible input must match the original addressed body"
                     )
                 message_id, conversation = addressed, original["conversation_id"]
             else:
@@ -988,7 +1078,7 @@ class VisibleHandoffs:
                     "inserting",
                     {
                         "agent_confirmed": False,
-                        "marker_preexisting": False,
+                        "prompt_format": "body_only_v1",
                         "empty_input_observed": True,
                         "terminal_input_attempted": True,
                     },
@@ -1005,7 +1095,14 @@ class VisibleHandoffs:
                 )
 
             try:
-                await self.check_target(principal, target, binding, ready=True)
+                before = await self.check_target(principal, target, binding, ready=True)
+                from kirabridge.literal_session_input import _needs_cwd_proof, _task_cwd
+
+                before_cwd = (
+                    await _task_cwd(self.sessions, binding)
+                    if target == "codex" and _needs_cwd_proof(before["text"])
+                    else None
+                )
                 await self.sessions.insert(
                     principal,
                     SessionInput(
@@ -1017,7 +1114,9 @@ class VisibleHandoffs:
                     before_transport=before_paste,
                 )
                 inserted = await self.check_target(principal, target, binding)
-                observed = self.insertion_observed(target, inserted["text"], prompt, identifier)
+                observed = await self.verify_inserted_body(
+                    principal, target, binding, prompt, before, inserted, before_cwd
+                )
                 if not observed:
                     raise UncertainExecution(
                         "visible_insert_unknown", "Prompt insertion not observed; no Return sent"
@@ -1027,6 +1126,11 @@ class VisibleHandoffs:
                     "inserted",
                     {
                         "prompt_observed": True,
+                        "prompt_format": "body_only_v1",
+                        "expected_payload_sha256": _text_sha256(prompt),
+                        "verified_input_view_sha256": _text_sha256(
+                            self.input_view(target, inserted["text"])
+                        ),
                         "insertion_representation": observed,
                         "return_sent": False,
                         "agent_confirmed": False,
@@ -1069,6 +1173,34 @@ class VisibleHandoffs:
                     "visible_handoff_unknown",
                     "Input outcome requires reconciliation; no automatic resend",
                 ) from exc
+        current = self.reconcile(principal, identifier)
+        if self.body_only_delivery(current):
+            # This is a delivery receipt, never a fabricated agent answer. Real
+            # later mailbox ACK/replies retain their own reconciliation path.
+            return {
+                "success": True,
+                "submitted": True,
+                "return_sent": True,
+                "agent_confirmed": False,
+                "request_reply_satisfied": False,
+                "message_id": message_id,
+                "scope": "visible_input_delivery",
+                "work_completion_verified": False,
+                "project_completion_verified": False,
+                "evidence": {
+                    "handoff_id": identifier,
+                    "message_id": message_id,
+                    "route": "existing_visible_terminal",
+                    "prompt_format": "body_only_v1",
+                    "agent_confirmed": False,
+                    "request_reply_satisfied": False,
+                    "return_sent": True,
+                    "input_field_cleared": True,
+                    "binding": binding.model_dump(),
+                    "automatic_retry": False,
+                    "expected_payload_sha256": _text_sha256(args.prompt),
+                },
+            }
         try:
             async with asyncio.timeout(args.timeout):
                 confirmed = False

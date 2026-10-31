@@ -1,5 +1,12 @@
 # Agentenkanal
 
+Ab RC21 enthalten sichtbare Übergaben ausschließlich den unveränderten Nachrichtenbody.
+KiraBridge hängt keine Arbeits-, ACK- oder Rückmeldeanweisungen und keine frühere
+Nachrichtenhistorie an. Auftragszuordnung und Receipts bleiben intern. Bestätigtes
+Paste/Return meldet `visible_input_delivery`, keine Agentenantwort oder
+Arbeitsfertigstellung. Echte explizite MCP-ACKs und Replies bleiben separat möglich;
+ein wiederholter Inboxabruf derselben ID/Receipt ist kein neuer Arbeitsauftrag.
+
 Stand 31.10.2026. SQLite und authentifizierte MCP-Werkzeuge transportieren
 adressierte Nachrichten. Absender, Rechte und gegenseitige `message_peers`
 stammen aus dem aktuellen Zugang und der lokalen Konfiguration.

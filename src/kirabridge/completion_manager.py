@@ -77,7 +77,7 @@ def completion_payload(task, event_seq, *, source="task"):
     text = result.get("final_message") or result.get("text") or result.get("stdout") or ""
     preview = " ".join(text.split())[:320] if isinstance(text, str) else ""
     exit_code = find_evidence(evidence, "exit_code")
-    return {
+    payload = {
         "task_id": task["id"],
         "parent_id": task.get("parent_id"),
         "session_id": find_evidence(evidence, "session_id"),
@@ -105,6 +105,15 @@ def completion_payload(task, event_seq, *, source="task"):
         if source == "task"
         else {"message_get": task["message_id"]},
     }
+    if state == "completed" and result.get("scope") == "visible_input_delivery":
+        payload.update(
+            completion_scope="visible_input_delivery",
+            agent_confirmed=False,
+            agent_work_completion_verified=False,
+            request_reply_satisfied=False,
+            summary="Message text submitted; agent acknowledgement and reply unconfirmed",
+        )
+    return payload
 
 
 def record_notice(store, principal, target, source, source_id, event_seq, payload):

@@ -127,6 +127,13 @@ class MessageManager:
         )
         if job:
             result["processing"]["evidence"] = json.loads(job["evidence"])
+            if result["processing"]["evidence"].get("completion_scope") == "visible_input_delivery":
+                result["processing"].update(
+                    completion_scope="visible_input_delivery",
+                    agent_confirmed=False,
+                    agent_work_completion_verified=False,
+                    request_reply_satisfied=False,
+                )
             scope = result["processing"]["evidence"].get("session_scope")
             if scope == "existing_visible_terminal":
                 result["processing_route"] = scope

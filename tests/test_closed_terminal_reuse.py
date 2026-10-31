@@ -2,10 +2,10 @@
 
 import json
 import os
-import re
 from copy import deepcopy
 
 import pytest
+from conftest import request
 from test_visible_handoff import callback, visible  # noqa: F401
 
 from kirabridge.bridge_core.bridge import Bridge
@@ -140,15 +140,19 @@ def install_native_model(monkeypatch, bridge, model):
             await before_transport()
         model["input_calls"].append(("insert", args.pane_id, args.text))
         model["text"] = "› " + args.text
+        return {"paste_event_sent": True, "return_sent": False, "agent_confirmed": False}
 
     async def submit(principal, pane, pid, *, expected_screen=None):
         model["input_calls"].append(("return", pane, pid))
-        addressed = re.search(r"Nachricht (\S+) mit deren receipt", model["text"])
-        assert addressed
-        message = next(
-            m for m in bridge.messages.receive("codex")["messages"] if m["id"] == addressed[1]
-        )
+        addressed = bridge.store.db.execute(
+            "SELECT message_id FROM visible_handoffs WHERE target='codex' AND state='submitting'"
+        ).fetchone()
         model["text"] = "› "
+        if addressed is None:
+            return  # Raw session.input has no internal work message or agent ACK.
+        message = next(
+            m for m in bridge.messages.receive("codex")["messages"] if m["id"] == addressed[0]
+        )
         bridge.messages.ack("codex", message["id"], message["receipt"])
         bridge.messages.send(
             "codex",
@@ -191,6 +195,22 @@ def input_task(row, identifier="fresh-after-close"):
     }
 
 
+async def durable_literal_input(bridge, task):
+    """Idempotency belongs to the real task owner, not direct executor calls."""
+    value = request(task["operation"], task["args"], task_id=task["id"])
+    await bridge.tasks.start()
+    try:
+        bridge.prepare(task["principal"], value)
+        first = await bridge.tasks.wait(task["principal"], task["id"], timeout=3)
+        assert first["state"] == "completed", first
+        bridge.prepare(task["principal"], value)
+        repeated = await bridge.tasks.wait(task["principal"], task["id"], timeout=3)
+        assert repeated["state"] == "completed" and repeated["attempt"] == 1
+        return first["result"], repeated["result"]
+    finally:
+        await bridge.tasks.stop()
+
+
 @pytest.mark.parametrize("route", ["explicit", "default"])
 async def test_closed_terminal_reused_tty_accepts_new_handoff_without_replaying_old(
     visible, monkeypatch, route
@@ -202,21 +222,25 @@ async def test_closed_terminal_reused_tty_accepts_new_handoff_without_replaying_
     install_native_model(monkeypatch, bridge, model)
     if route == "explicit":
         task = input_task(model["row"])
-        result = await bridge.execute(task, callback, callback)
-        repeated = await bridge.execute(task, callback, callback)
+        result, repeated = await durable_literal_input(bridge, task)
+        assert result["return_sent"] and repeated["return_sent"]
+        assert not result["execution_confirmed"]
     else:
         await bridge.visible_handoffs.dispatch_ready("chatgpt", "codex")
         task = {"id": "fresh-default-after-close", "principal": "chatgpt"}
         args = AgentInput(agent="codex", prompt="Only this newly authorized request", cwd="/tmp")
         result = await bridge.visible_handoffs.execute(task, args, callback, callback)
         repeated = await bridge.visible_handoffs.execute(task, args, callback, callback)
-    assert result["success"] and repeated["success"]
+        assert result["success"] and repeated["success"]
     assert [call[0] for call in model["input_calls"]] == ["insert", "return"]
     assert model["proof_calls"][:3] == ["ps", "windows", "ps"]
     assert original_history(bridge, "old-unknown") == before
     assert bridge.messages.get("chatgpt", message_id)["acknowledged"] is None
-    assert bridge.visible_handoffs.status("chatgpt", task["id"])["state"] == "completed"
-    assert bridge.store.db.execute("SELECT count(*) FROM visible_handoffs").fetchone()[0] == 2
+    if route == "default":
+        assert bridge.visible_handoffs.status("chatgpt", task["id"])["state"] == "completed"
+    assert bridge.store.db.execute("SELECT count(*) FROM visible_handoffs").fetchone()[0] == (
+        2 if route == "default" else 1
+    )
 
 
 @pytest.mark.parametrize(
@@ -302,7 +326,7 @@ async def test_reused_tty_keeps_inflight_old_process_reservation(visible, monkey
     assert not model["input_calls"] and original_history(bridge, "old-unknown") == before
 
 
-async def test_reused_tty_parks_proven_dead_sent_reservation_without_replaying_it(
+async def test_raw_input_bypasses_proven_dead_sent_reservation_without_rewriting_or_replay(
     visible, monkeypatch
 ):
     bridge, _ = visible
@@ -311,25 +335,13 @@ async def test_reused_tty_parks_proven_dead_sent_reservation_without_replaying_i
     model = {"row": successor(), "text": "› ", "proof_calls": [], "input_calls": []}
     install_native_model(monkeypatch, bridge, model)
     task = input_task(model["row"])
-    result = await bridge.execute(task, callback, callback)
-    repeated = await bridge.execute(task, callback, callback)
-    assert result["success"] and repeated["success"]
+    result, repeated = await durable_literal_input(bridge, task)
+    assert result["return_sent"] and repeated["return_sent"]
     assert [call[0] for call in model["input_calls"]] == ["insert", "return"]
     after = original_history(bridge, "old-unknown")
-    assert after["row"]["state"] == "unknown"
-    assert json.loads(after["row"]["evidence"]) == {
-        "terminal_input_attempted": True,
-        "automatic_retry": False,
-        "reason": "binding_proven_dead",
-        "previous_state": "sent",
-        "index_released": True,
-    }
-    for key in ("id", "principal", "target", "request_hash", "binding", "message_id", "created"):
-        assert after["row"][key] == before["row"][key]
-    assert after["events"][: len(before["events"])] == before["events"]
-    assert len(after["events"]) == len(before["events"]) + 1
+    assert after == before
     assert bridge.messages.get("chatgpt", message_id)["acknowledged"] is None
-    assert bridge.visible_handoffs.status("chatgpt", task["id"])["state"] == "completed"
+    assert bridge.store.get(task["id"], "chatgpt")["state"] == "completed"
 
 
 async def test_two_closed_successors_and_daemon_reopen_keep_original_overlay_anchor(

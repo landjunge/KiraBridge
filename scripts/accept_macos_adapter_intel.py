@@ -280,6 +280,7 @@ async def accept(
                 terminal_roots=[str(root)],
                 executables=[sys.executable, "/bin/zsh", str(codex)],
                 agents=["codex"],
+                message_peers=["codex"],
                 capabilities=[
                     "session.open",
                     "session.inspect",
@@ -289,7 +290,15 @@ async def accept(
                     "bridge.health",
                     "task.read",
                     "task.cancel",
+                    "message.send",
+                    "message.read",
+                    "message.ack",
                 ],
+            ),
+            "codex": PrincipalConfig(
+                roots=[str(root)],
+                message_peers=["chatgpt"],
+                capabilities=["message.send", "message.read", "message.ack"],
             ),
             "ask": PrincipalConfig(
                 permission_level="ask",
@@ -969,6 +978,40 @@ async def accept(
                     "expanded multiline input with a blank payload row and Return confirmed",
                     **blank_answer,
                 )
+
+            # Exercise agent.execute itself: session.input was already literal
+            # and cannot demonstrate removal of the generated handoff wrapper.
+            body_handoffs = []
+            for suffix in ("FIRST", "SECOND"):
+                body_marker = marker + "_BODY_" + suffix
+                body = "Antworte ausschließlich mit dieser Kennung:\n\n" + body_marker
+                value = request(
+                    "body-only-" + suffix.lower(),
+                    "agent.execute",
+                    {"agent": "codex", "prompt": body, "cwd": str(workspace), "timeout": 20},
+                )
+                active_literal_label = "body-only-" + suffix.lower()
+                delivered = await submit(value)
+                assert delivered["state"] == "completed", delivered
+                result = delivered["result"]
+                assert result["scope"] == "visible_input_delivery", result
+                assert result["return_sent"] and not result["agent_confirmed"], result
+                assert result["request_reply_satisfied"] is False
+                original = bridge.messages.get("chatgpt", result["message_id"])
+                assert original["body"] == body and original["acknowledged"] is None
+                answer = await wait_owned_answer(body, body_marker, active_literal_label)
+                assert answer["user_prompt_count"] == answer["assistant_answer_count"] == 1
+                mutations = len(evidence["native_mutations"])
+                duplicate = await call("action_request", {"request": value.model_dump()})
+                assert duplicate["id"] == value.task_id and duplicate["state"] == "completed"
+                assert len(evidence["native_mutations"]) == mutations
+                body_handoffs.append({"task_id": value.task_id, "body_sha256": sha(body), **answer})
+            await bridge.visible_handoffs.reconcile_target_reservations("chatgpt", "codex", binding)
+            evidence["body_only_handoffs"] = body_handoffs
+            check(
+                "two real agent handoffs preserve exact body without wrapper or ACK instruction; "
+                "duplicate IDs send no input and fresh ready target releases only the new slot"
+            )
 
             async def enter_from_fresh_read(
                 label, *, expected_reason=None, expected_menu_screen=None

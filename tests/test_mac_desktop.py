@@ -122,6 +122,8 @@ async def test_probe_cancellation_reaps_only_its_own_child(monkeypatch):
 async def test_known_unavailable_desktop_blocks_osascript_before_any_ui_action(
     bridge, monkeypatch, code
 ):
+    bridge.macos.capability_probe.facts.update(platform="darwin", os_version="15.7.4")
+    bridge.macos.capability_probe.executable = lambda path: True
     monkeypatch.setattr(
         "kirabridge.platform_adapters.terminal_app.sys", SimpleNamespace(platform="darwin")
     )
