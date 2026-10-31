@@ -6,6 +6,7 @@ separate receipt/reply protocol; literal input never creates such a message.
 
 import hashlib
 import re
+import unicodedata
 from pathlib import Path
 
 from kirabridge.bridge_core.models import BridgeError, UncertainExecution
@@ -95,7 +96,46 @@ def _same_bound_cwd_footer(before, after, cwd, home):
     return _displays_cwd(old_path, cwd, home) and _displays_cwd(new_path, cwd, home)
 
 
-def insertion_observed(target, raw, text, before, *, cwd=None, home=None):
+def single_line_renderings(text, columns):
+    """Forward-render a bounded simple logical line; never normalize a readback.
+
+    Codex 0.166 reserves two prefix columns, one right margin, and optionally
+    one scroll-indicator column. Only single-cell words with exactly one ASCII
+    separator are supported here. Real newlines, tabs, complex graphemes and
+    whitespace runs still require the existing exact/collapsed verifier.
+    """
+    if (
+        type(columns) is not int
+        or not 20 <= columns <= 4096
+        or not text
+        or len(text) > 1000
+        or text != text.strip(" ")
+        or "  " in text
+        or any(
+            (char.isspace() and char != " ")
+            or unicodedata.category(char)[0] in {"C", "M"}
+            or unicodedata.east_asian_width(char) in {"W", "F"}
+            for char in text
+        )
+    ):
+        return []
+    words = text.split(" ")
+    results = []
+    for width in (columns - 3, columns - 4):
+        if any(len(word) >= width for word in words):
+            continue
+        rows = [words[0]]
+        for word in words[1:]:
+            if len(rows[-1]) + 1 + len(word) <= width:
+                rows[-1] += " " + word
+            else:
+                rows.append(word)
+        if len(rows) > 1:
+            results.append("\n  ".join(rows))
+    return results
+
+
+def insertion_observed(target, raw, text, before, *, cwd=None, home=None, columns=None):
     """Recognize the exact payload in the current widget, never a history match."""
     cleaned, controls = display_text(raw)
     previous, previous_controls = display_text(before)
@@ -123,7 +163,18 @@ def insertion_observed(target, raw, text, before, *, cwd=None, home=None):
         # Codex can collapse multiline pasted text. The empty pre-state,
         # clipboard transaction and exact count bind this view to this paste.
         collapsed = f"[Pasted Content {len(text)} chars]"
-        for expected in (text, text.replace("\n", "\n  "), collapsed):
+        expected_forms = [text, text.replace("\n", "\n  "), collapsed]
+        # Terminal.history represents an empty painted row by one padding cell.
+        # Change ONLY rows known to be empty in the requested payload; preserve
+        # every nonempty/space-containing payload row and the exact row count.
+        payload_rows = text.split("\n")
+        if any(row == "" for row in payload_rows[1:-1]):
+            expected_forms.append(
+                payload_rows[0]
+                + "".join("\n " if row == "" else "\n  " + row for row in payload_rows[1:])
+            )
+        expected_forms.extend(single_line_renderings(text, columns))
+        for expected in expected_forms:
             if not content.startswith(expected):
                 continue
             actual_suffix = content[len(expected) :]
@@ -203,7 +254,7 @@ async def execute(
     progress,
     *,
     verifier=insertion_observed,
-    verifier_version="literal-widget-v2",
+    verifier_version="literal-widget-v3",
 ):
     principal = task["principal"]
     policy = bridge.security.principal(principal, "agent.execute")
@@ -250,11 +301,31 @@ async def execute(
         if args.submit:
             view = await bridge.visible_handoffs.check_target(principal, target, binding)
             verified = verifier(target, view["text"], approved.text, before["text"])
+            verifier_options = {}
+            if not verified and target == "codex" and verifier is insertion_observed:
+                selection = bridge.sessions.current_selection()
+                if selection and len(approved.text) <= 1000:
+                    try:
+                        columns = await bridge.sessions.terminal_app.input_columns(
+                            args.pane_id, identity_guard=selection[2], expected_screen=view["text"]
+                        )
+                    except BridgeError:
+                        columns = None
+                    if columns is not None:
+                        verifier_options["columns"] = columns
+                        verified = verifier(
+                            target, view["text"], approved.text, before["text"], **verifier_options
+                        )
             if not verified and before_cwd is not None:
                 after_cwd = await _task_cwd(bridge.sessions, binding)
                 if after_cwd == before_cwd:
                     verified = verifier(
-                        target, view["text"], approved.text, before["text"], cwd=before_cwd
+                        target,
+                        view["text"],
+                        approved.text,
+                        before["text"],
+                        cwd=before_cwd,
+                        **verifier_options,
                     )
             verification = {
                 "verifier_version": verifier_version,
@@ -263,6 +334,7 @@ async def execute(
                 "after_screen_sha256": hashlib.sha256(view["text"].encode()).hexdigest(),
                 "expected_payload_sha256": hashlib.sha256(approved.text.encode()).hexdigest(),
                 "expected_payload_chars": len(approved.text),
+                **({"observed_columns": verifier_options["columns"]} if verifier_options else {}),
             }
             if not verified:
                 await progress(

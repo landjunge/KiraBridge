@@ -39,6 +39,11 @@ async def literal_visible(visible, config, monkeypatch):  # noqa: F811
     monkeypatch.setattr(bridge.sessions.terminal_app, "read", read)
     monkeypatch.setattr(bridge.sessions.terminal_app, "insert", insert)
     monkeypatch.setattr(bridge.sessions.terminal_app, "press_return", press_return)
+
+    async def no_geometry(*args, **kwargs):
+        return None
+
+    monkeypatch.setattr(bridge.sessions.terminal_app, "input_columns", no_geometry)
     monkeypatch.setattr(bridge.sessions, "insert", SessionManager.insert.__get__(bridge.sessions))
     monkeypatch.setattr(
         bridge.sessions, "press_return", SessionManager.press_return.__get__(bridge.sessions)
@@ -230,7 +235,7 @@ async def test_collapsed_paste_with_hidden_shortcuts_sends_exactly_one_return(
         assert submitting["insertion_verified"] is True
         assert submitting["return_sent"] is False
         assert submitting["verification"] == {
-            "verifier_version": "literal-widget-v2",
+            "verifier_version": "literal-widget-v3",
             "reason": "exact_widget_match",
             "before_screen_sha256": hashlib.sha256(
                 ("› " + footer + "\n  ← for agents · ? for shortcuts\n").encode()

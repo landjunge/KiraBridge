@@ -420,9 +420,29 @@ class TerminalAppTransport:
         )
 
     @staticmethod
-    def native_paste_observation(text):
+    def native_paste_observation(text, *, target=None):
         # A historical suffix or empty trailing line is not a new paste observation.
         last = next((line for line in reversed(text.splitlines()) if line.strip()), "").rstrip()
+        # This is only the fresh-echo check. Codex's caller separately verifies
+        # the WHOLE current widget before Return. A long logical line can wrap,
+        # so its final word is a bounded echo marker; plain shells keep the
+        # original complete-line requirement.
+        if target == "codex" and last:
+            last = last.split()[-1]
+            return (
+                "\nfunction observedPaste(before, after) {"
+                "if(before===after) return false;"
+                "const prompts=Array.from(after.matchAll(/^[ \\t]*›[^\\n]*/gm));"
+                "if(!prompts.length) return false;"
+                "let current=after.slice(prompts[prompts.length-1].index);"
+                "const models=Array.from(current.matchAll(/^[ \\t]*GPT-\\S+[^\\n]*/gm));"
+                "if(models.length) current=current.slice(0,models[models.length-1].index);"
+                "return current.includes("
+                + json.dumps(last)
+                + ") || current.includes("
+                + json.dumps(f"[Pasted Content {len(text)} chars]")
+                + ");}\n"
+            )
         return (
             "\nfunction observedPaste(before, after) {"
             "const a=Array.from(before), b=Array.from(after); "
@@ -552,8 +572,25 @@ class TerminalAppTransport:
             + "if(tab.busy())throw Error('Selected terminal is busy');"
         )
 
+    async def input_columns(self, pane_id, *, identity_guard, expected_screen):
+        value = await self.native(
+            self.native_target(pane_id)
+            + self.native_identity_guard(identity_guard)
+            + self.native_screen_guard(expected_screen)
+            + "\nJSON.stringify({columns:tab.numberOfColumns()});"
+        )
+        columns = value.get("columns")
+        return columns if type(columns) is int and 20 <= columns <= 4096 else None
+
     async def insert(
-        self, pane_id, text, *, identity_guard=None, expected_screen=None, shell_snapshot=None
+        self,
+        pane_id,
+        text,
+        *,
+        identity_guard=None,
+        expected_screen=None,
+        shell_snapshot=None,
+        agent_target=None,
     ):
         async with self.clipboard_lock:
             # The independent memory-only owner survives a killed/cancelled GUI
@@ -562,7 +599,7 @@ class TerminalAppTransport:
                 await self.native(
                     self.native_focus(pane_id)
                     + self.native_identity_guard(identity_guard)
-                    + self.native_paste_observation(text)
+                    + self.native_paste_observation(text, target=agent_target)
                     + f"""
         ObjC.import("AppKit");
         function checkClipboard() {{

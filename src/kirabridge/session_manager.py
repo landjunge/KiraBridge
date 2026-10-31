@@ -426,7 +426,7 @@ class SessionManager:
             raise BridgeError("invalid_arguments", "Insertion must not submit a line")
         async with self.lock:
             selected = await self.selected(principal, args.pane_id, args.expected_pid)
-            self.assigned_agent(selected)
+            target = self.assigned_agent(selected)
             identities = self.selected_identities(selected)
             # Native agent process presence is not turn activity. A task-owned
             # identity requires the fresh widget/readiness check below instead.
@@ -454,7 +454,11 @@ class SessionManager:
                 if before_transport is not None:
                     await before_transport()
                 await self.terminal_app.insert(
-                    args.pane_id, args.text, identity_guard=identities, expected_screen=text
+                    args.pane_id,
+                    args.text,
+                    identity_guard=identities,
+                    expected_screen=text,
+                    agent_target=target,
                 )
             else:
                 if before_transport is not None:

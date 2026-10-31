@@ -197,7 +197,15 @@ def resume_row_title_matches(selected_row, bound_title):
     )
 
 
-async def accept(root, *, response_timeout=90, reproduce_agent_hint=False):
+async def accept(
+    root,
+    *,
+    response_timeout=90,
+    reproduce_agent_hint=False,
+    existing_pane=None,
+    existing_pid=None,
+    short_single_line=False,
+):
     if (platform.system(), platform.machine()) != ("Darwin", "x86_64"):
         raise RuntimeError("This manual acceptance requires Intel macOS")
     source_root = Path(__file__).resolve().parents[1]
@@ -222,7 +230,18 @@ async def accept(root, *, response_timeout=90, reproduce_agent_hint=False):
         + filler * 5
         + f"Die einzig gewünschte Antwort ist: {marker}"
     )
-    assert 1000 < len(prompt) < 16384
+    if short_single_line:
+        words = filler.replace("\n", " ").split() * 3
+        body = ""
+        for word in words:
+            if len(body) + len(word) > 730:
+                break
+            body += (" " if body else "") + word
+        prompt = marker + " Antworte ausschließlich mit dieser Kennung. " + body
+        prompt += " Die einzig gewünschte Antwort ist: " + marker
+        assert 750 < len(prompt) < 1000 and "\n" not in prompt
+    else:
+        assert 1000 < len(prompt) < 16384
     (root / "prompt.private.txt").write_text(prompt)
     busy_script = root / "busy.py"
     busy_script.write_text(BUSY_SOURCE)
@@ -237,7 +256,9 @@ async def accept(root, *, response_timeout=90, reproduce_agent_hint=False):
         "-c",
         'history.persistence="none"',
     ]
-    launcher.write_text("#!/bin/zsh -f\n" + shlex.join(codex_argv) + "\n")
+    launcher.write_text(
+        "#!/bin/zsh -f\ncd -- " + shlex.quote(str(workspace)) + "\n" + shlex.join(codex_argv) + "\n"
+    )
     token_name = "KB_MACOS_ISOLATED_ACCEPT_TOKEN"
     previous_token = os.environ.get(token_name)
     ask_token_name = "KB_MACOS_ISOLATED_APPROVAL_TOKEN"
@@ -297,7 +318,9 @@ async def accept(root, *, response_timeout=90, reproduce_agent_hint=False):
         "package": str(package),
         "runtime": bridge.runtime,
         "root": str(root),
-        "scope": "private authenticated HTTP MCP, one new owned visible terminal",
+        "scope": "private authenticated HTTP MCP, confirmed existing idle terminal"
+        if existing_pane
+        else "private authenticated HTTP MCP, one new owned visible terminal",
         "prompt_sha256": sha(prompt),
         "prompt_chars": len(prompt),
         "marker": marker,
@@ -464,19 +487,21 @@ async def accept(root, *, response_timeout=90, reproduce_agent_hint=False):
         assert empty_shell_prompt(raw)
         row = await current_owned()
         assert [p["pid"] for p in row["processes"]] == [owned["expected_pid"]]
-        evidence["close"] = await transport.close_tab(owned["pane_id"])
+        if existing_pane is None:
+            evidence["close"] = await transport.close_tab(owned["pane_id"])
         after = await transport.window_inventory()
         after_ids = {r["window_id"] for r in after["windows"]}
         assert after_ids == original_windows, "Original windows changed"
         pids = await transport.process_ids()
-        assert owned["expected_pid"] not in pids
+        assert (owned["expected_pid"] in pids) == (existing_pane is not None)
         if binding is not None:
             assert binding.agent_pid not in pids
         for pid, expected in identities.items():
             assert await transport.process_identity(pid, detailed=True) == expected
         evidence["cleanup"] = {
-            "owned_window_absent": True,
-            "owned_shell_absent": True,
+            "owned_window_absent": existing_pane is None,
+            "owned_shell_absent": existing_pane is None,
+            "reused_existing_idle_shell_preserved": existing_pane is not None,
             "owned_agent_absent": binding is not None,
             "original_windows_and_process_identities_preserved": True,
         }
@@ -591,20 +616,24 @@ async def accept(root, *, response_timeout=90, reproduce_agent_hint=False):
             assert sum(event["state"] == "running" for event in approved_events["events"]) == 1
             check("manual approval waits without effect; exact grant executes once; reuse denied")
 
-            opened = await submit(
-                request(
-                    "open",
-                    "session.open",
-                    {"cwd": str(workspace), "controlled_shell": True},
+            if existing_pane is None:
+                opened = await submit(
+                    request(
+                        "open", "session.open", {"cwd": str(workspace), "controlled_shell": True}
+                    )
                 )
-            )
-            assert opened["state"] == "completed", opened
-            result = opened["result"]
+                assert opened["state"] == "completed", opened
+                result = opened["result"]
+            else:
+                result = next(row for row in original_rows if row["pane_id"] == existing_pane)
+                assert result["expected_pid"] == existing_pid and not result["busy"]
+                assert [p["pid"] for p in result["processes"]] == [existing_pid]
+                assert empty_shell_prompt(await transport.read(existing_pane))
             owned = {key: result[key] for key in ("pane_id", "expected_pid", "tty")}
             added = {
                 row["window_id"] for row in (await transport.window_inventory())["windows"]
             } - original_windows
-            assert added == {int(owned["pane_id"].split(":")[1])}
+            assert added == (set() if existing_pane else {int(owned["pane_id"].split(":")[1])})
             evidence["owned"] = owned
             checkpoint()
             await wait_shell()
@@ -880,11 +909,23 @@ async def accept(root, *, response_timeout=90, reproduce_agent_hint=False):
                 record for record in frames[frames.index(pre) + 1 :] if not record["ready_required"]
             )
             original_verifier = old_insertion_verifier(source_root)
+            events = await call("task_events", {"task_id": value.task_id})
+            columns = next(
+                (
+                    event["evidence"]["verification"].get("observed_columns")
+                    for event in events["events"]
+                    if "verification" in event["evidence"]
+                ),
+                None,
+            )
             replay = {
                 "before_sha256": sha(pre["text"]),
                 "after_sha256": sha(post["text"]),
                 "old_verifier": original_verifier("codex", post["text"], prompt, pre["text"]),
-                "new_verifier": insertion_observed("codex", post["text"], prompt, pre["text"]),
+                "new_verifier": insertion_observed(
+                    "codex", post["text"], prompt, pre["text"], columns=columns
+                ),
+                "observed_columns": columns,
                 "collapsed_marker_observed": f"[Pasted Content {len(prompt)} chars]"
                 in input_view("codex", post["text"]),
             }
@@ -901,6 +942,22 @@ async def accept(root, *, response_timeout=90, reproduce_agent_hint=False):
                 "real Codex response independently confirmed in current screen and own rollout",
                 **answer,
             )
+            if short_single_line:
+                blank_marker = marker + "_BLANK"
+                blank_prompt = (
+                    "Dies ist nur ein Eingabetest. Keine Werkzeuge verwenden.\n\n"
+                    "Antworte ausschließlich mit " + blank_marker
+                )
+                active_literal_label = "expanded-blank-line"
+                blank_task = await submit(input_request("expanded-blank-line", blank_prompt))
+                assert blank_task["state"] == "completed", blank_task
+                assert blank_task["result"]["return_sent"] and blank_task["attempt"] == 1
+                blank_answer = await wait_owned_answer(blank_prompt, blank_marker, "blank-response")
+                evidence["expanded_blank_line"] = blank_answer
+                check(
+                    "expanded multiline input with a blank payload row and Return confirmed",
+                    **blank_answer,
+                )
 
             async def enter_from_fresh_read(
                 label, *, expected_reason=None, expected_menu_screen=None
@@ -1097,11 +1154,17 @@ if __name__ == "__main__":
     parser.add_argument("--allow-one-owned-visible-window", action="store_true", required=True)
     parser.add_argument("--response-timeout", type=int, default=90, choices=range(20, 181))
     parser.add_argument("--reproduce-agent-hint", action="store_true")
+    parser.add_argument("--existing-pane")
+    parser.add_argument("--existing-pid", type=int)
+    parser.add_argument("--short-single-line", action="store_true")
     options = parser.parse_args()
     asyncio.run(
         accept(
             options.root.resolve(),
             response_timeout=options.response_timeout,
             reproduce_agent_hint=options.reproduce_agent_hint,
+            existing_pane=options.existing_pane,
+            existing_pid=options.existing_pid,
+            short_single_line=options.short_single_line,
         )
     )
