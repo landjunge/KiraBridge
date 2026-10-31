@@ -2,7 +2,7 @@
   "schema": "kirabridge.rc20.return-repair.v1",
   "task_id": "rc20-return-key-20261031",
   "recorded_at": "2026-10-31T10:11:14.855614+00:00",
-  "status": "source checks; package and productive activation recorded separately after their gates",
+  "status": "final candidate installed, actual native menu and UI acceptance passed, owned window cleaned",
   "source_baseline": "515e846f305511318d6dd73b88188f57a6e9a3b4",
   "runtime_baseline_commit": "881a53f7107c4c60e2a86e747e8e5ad7eab9111d",
   "branch": "fix/rc20-return-key-20261031",
@@ -445,9 +445,29 @@
     "console_definition_saved": true
   },
   "deployment": {
-    "performed_at_source_checkpoint": false,
-    "separate_console_upgrade_required": true,
-    "swift_rebuild_required": false,
+    "accepted": true,
+    "source_commit": "ecb76cb2082a863d5dfdcba3aef848a0ee0c9f33",
+    "runtime": {
+      "instance_id": "938c88dce527450eaed07deddd1eaade",
+      "version": "0.8.0rc20",
+      "pid": 15207,
+      "started_at": "2026-10-31T11:25:14.230578+00:00",
+      "config_path": "/Users/landjunge/.config/kirabridge/config.toml",
+      "config_sha256": "0dc8eb5952fe4d986c152d38e1658e06de711d6b1f91ccc9745b184d1adb6370",
+      "effective_config_sha256": "d5de7e63e70636a03ae54ead9990224da6e38137e23c8ba1b74aa233cfe5c012",
+      "source_tree_sha256": "878e18a5970fc601a74bb67b32a6536151391d840e273d4335fc2d2d25cb6eb1",
+      "source_file_count": 124,
+      "source_package_path": "/Users/landjunge/.local/share/kirabridge/install/releases/0.8.0rc20-ecb76cb2082a/source/.venv/lib/python3.11/site-packages/kirabridge",
+      "source_scope": "package Python files observed at startup; no remote attestation"
+    },
+    "console_pid": 15308,
+    "installer": "/Users/landjunge/.local/share/kirabridge/backups/rc20-return-key-20261031-01/renderer-followup/verified-local-bundle/KiraBridge/installer/install.py",
+    "mac_tar": "/Users/landjunge/.local/share/kirabridge/backups/rc20-return-key-20261031-01/renderer-followup/build-a/KiraBridge-macos.tar.gz",
+    "mac_tar_sha256": "d48fdb379f36f75f7e90a583db33faa3e2eecfb42bc0216242be58960d8edaef",
+    "wheel_sha256": "ea41da110eb5d9dfe1696c4d0830b53bba65c527f1d65df0f3f5be0488c2de1d",
+    "same_owned_window_reused_and_closed": 6830,
+    "productive_rollback_of_first_candidate": true,
+    "final_candidate_rollback_required": false,
     "no_push": true,
     "no_public_release": true
   },
@@ -488,7 +508,95 @@
       "unknown_preserved": true,
       "proof_sha256": "474d875aeebabf179b315b8ef96465d139c928e06825e159812658225fd973fe"
     },
-    "next_deployment": "pending exact package and native acceptance gates",
+    "next_deployment": "completed and accepted; see final_acceptance and deployment",
     "private_phase_root": "/Users/landjunge/.local/share/kirabridge/backups/rc20-return-key-20261031-01/renderer-followup"
-  }
+  },
+  "final_acceptance": {
+    "task_id": "rc20-return-key-20261031",
+    "completed_at": "2026-10-31T11:42:25.023158+00:00",
+    "status": "accepted",
+    "source_commit": "ecb76cb2082a863d5dfdcba3aef848a0ee0c9f33",
+    "runtime": {
+      "instance_id": "938c88dce527450eaed07deddd1eaade",
+      "version": "0.8.0rc20",
+      "pid": 15207,
+      "started_at": "2026-10-31T11:25:14.230578+00:00",
+      "config_path": "/Users/landjunge/.config/kirabridge/config.toml",
+      "config_sha256": "0dc8eb5952fe4d986c152d38e1658e06de711d6b1f91ccc9745b184d1adb6370",
+      "effective_config_sha256": "d5de7e63e70636a03ae54ead9990224da6e38137e23c8ba1b74aa233cfe5c012",
+      "source_tree_sha256": "878e18a5970fc601a74bb67b32a6536151391d840e273d4335fc2d2d25cb6eb1",
+      "source_file_count": 124,
+      "source_package_path": "/Users/landjunge/.local/share/kirabridge/install/releases/0.8.0rc20-ecb76cb2082a/source/.venv/lib/python3.11/site-packages/kirabridge",
+      "source_scope": "package Python files observed at startup; no remote attestation"
+    },
+    "console_pid": 15308,
+    "console_instance": "52748fc47b8e02f8e182b843028f1a6d",
+    "console_assets": {
+      "center.html": "34a3a2d22a6a2843fb9c1be09ff548875c3cf84dc17f0c5e1377597a953341d5",
+      "center.js": "a7d7fc6010eb500ecb1ae286ac4dde8247fcad79c9c6f1b747d93e6fd467077d"
+    },
+    "wheel_package_files_equal": 135,
+    "python_files_equal": 124,
+    "source_pytest_unique_incremental": 393,
+    "browser_cases_unique_incremental": 51,
+    "actual_live_browser_cases": 3,
+    "actual_live_input_posts": 3,
+    "native_literal_resume_completed": true,
+    "native_compact_menu_return_completed": true,
+    "native_return_exact_once": {
+      "attempt": 1,
+      "sent": 1,
+      "paste": false
+    },
+    "menu_text_and_busy_refusal_before_input": true,
+    "installed_real_http_synthetic_ui_probe_passed": true,
+    "all_own_completions_processed": true,
+    "completion_target_empty": true,
+    "unknown_original_preserved": {
+      "id": "kb-return-open-resume-20261031-01",
+      "state": "unknown",
+      "replayed": false
+    },
+    "protected_records_unchanged": {
+      "queue_holds": 27,
+      "visible_handoffs": 9,
+      "message_jobs": 22,
+      "tasks": 62,
+      "messages": 25
+    },
+    "cleanup": {
+      "owned_window_absent": true,
+      "other_original_windows_preserved": true,
+      "owned_shell_absent": true,
+      "owned_agent_absent": true
+    },
+    "parent_codex_57091_preserved": true,
+    "desktop_pid_47104_preserved": true,
+    "new_model_turn_in_final_acceptance": false,
+    "productive_first_candidate_rollback_performed_and_verified": true,
+    "final_candidate_productive_rollback_required": false,
+    "transaction_backup": "/Users/landjunge/.local/share/kirabridge/install/backups/20261031-122507-d482dbad",
+    "mac_installer_sha256": "d48fdb379f36f75f7e90a583db33faa3e2eecfb42bc0216242be58960d8edaef",
+    "wheel_sha256": "ea41da110eb5d9dfe1696c4d0830b53bba65c527f1d65df0f3f5be0488c2de1d",
+    "no_push": true,
+    "no_public_release": true,
+    "evidence_sha256": {
+      "running-install-verification.json": "9eec6fce3c80a73c50d18ecf6c1eb1499afe4e92684775c4f772aa4e5902a55e",
+      "recovery-point-verification.json": "d70588717b9acb4feb934a0c417d8f307287caa02a86c7a21069d0d26f86937d",
+      "console-install-result.json": "f01cb0174441cd8653a5fa0c1eb939d60db9fccafbbf1a292b327310469c5ba5",
+      "ui-live-final/result.json": "21fa4a350e299a43a46a92af1364cb66e1656c978a7cc1e63e4afea5e0bc8941",
+      "ui-live-final/summary.json": "ed424bb708197440559e0376088155f77de0cc73db9f1353e8208aeb91b0a47a",
+      "native-acceptance/final-native-menu-evidence.private.json": "73a6afea1ae263f0d4a6e068ce2bd6c8ca3929ff7a68fc7df29a26a8acda2010",
+      "native-acceptance/final-task-evidence.private.json": "57d68ed6a41e5735f75256e1348dafa92daf853ea42962e858a682a4f65be525",
+      "native-acceptance/cleanup-proof.json": "c6b14b289103d20c1c6252fdbc9626f1c32a8ca96031c916b739bd77450072ec",
+      "installed-http-fixture.log": "0d70d5e3025d41820ee8d7865e5ffaa062debd9f4fd30ca4b26f7820dfb180f9",
+      "isolated-upgrade/evidence.json": "c3be1904374fd62e81578abc72afdb140357667675990509bb96201cc9b61bad",
+      "isolated-upgrade-cleanup-independent.json": "66455ef09b29d65530bbf91ffeaadcc8c98716e1e43f2aeb90897534b9024772"
+    },
+    "summary_sha256": "5a2b101821b210ae69d37be8feee4a492bdcf70a7cad5b245d1bc08245b5639d",
+    "native_menu_effect": "Already viewing the same owned diagnostic session; picker closed and ready composer restored; no session switch claimed"
+  },
+  "source_checkpoint_recorded_at": "2026-10-31T10:11:14.855614+00:00",
+  "updated_at": "2026-10-31T11:44:22.194032+00:00",
+  "completed_at": "2026-10-31T11:42:25.023158+00:00"
 }

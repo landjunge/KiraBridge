@@ -1,8 +1,8 @@
 # KiraBridge
 
-**Lokal auf Intel installiert: `0.8.0rc20` aus Reparaturcommit `881a53f`.**
+**Lokal auf Intel installiert: `0.8.0rc20` aus Return-Reparaturcommit `ecb76cb`.**
 Der laufende Dienst, Paketquellhash, Neustart, Datenerhalt und die tatsächliche
-Terminalabnahme sind [im Installationsbericht dokumentiert](docs/RC20-881A53F-INSTALL-20261031.md).
+Terminalabnahme sind [im Return-Reparaturbericht dokumentiert](docs/RC20-RETURN-20261031.md).
 Das geprüfte Paket liegt lokal; für diese Reparatur gab es keinen Push und keine
 öffentliche Veröffentlichung. Der Bericht nennt den exakten Installer und Rückweg.
 
@@ -155,7 +155,7 @@ Nach jeder Testdienstbereinigung muss dessen Abwesenheit unabhängig belegt sein
 
 | Version | Tatsächlicher Stand |
 | --- | --- |
-| 0.8.0rc20 / 881a53f | Lokal auf Intel installiert und am laufenden Dienst abgenommen; kein neuer öffentlicher Release. Installer und Rückweg im Reparatur-Installationsbericht. |
+| 0.8.0rc20 / ecb76cb | Lokal auf Intel installiert; Text-Return und reales nichtleeres Codex-Menü abgenommen, Quellhash und laufende Dienste verifiziert. Kein Push oder neuer öffentlicher Release. |
 | 0.8.0rc18 | Veröffentlichtes Intel-Prerelease; tatsächlicher Download, sichtbare Installation und produktive Stop-/Start-/Neustarttests bestanden. Belege im Installationsbericht. |
 | 0.8.0rc17 | Separater Entwurf und gesicherter Rückweg vor RC18; authentifizierter Download und isolierter Rollback nachgewiesen. |
 | 0.8.0rc16 / rc15 | Historische Entwürfe erhalten; keine neue Abnahme daraus abgeleitet. |
