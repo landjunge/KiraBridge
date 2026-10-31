@@ -1,6 +1,6 @@
 # macOS system and communication modules · 31 October 2026
 
-Revision 4, RC22 release acceptance. Continues the completed RC21 adapter and body-only
+Revision 5, RC22 published, installed and running acceptance. Continues the completed RC21 adapter and body-only
 handoff work; it does not replay historical uncertain tasks. The operator explicitly
 requested the remaining system communication modules, team review and deployment.
 
@@ -116,13 +116,10 @@ files in that directory. Ruff and format pass across current Python sources.
 Swift full-source typecheck passed; a previous development prototype is not a
 final shipped-binary or running-Core acceptance claim.
 
-Remaining gates at this revision: final independent integration review, real
-owned native fixture and Codex reply acceptance, exact clean-commit build,
-upgrade/rollback and fresh release-download checks, publication, visible supported
-installation, capability activation, running identity/data/session verification
-and owned-target cleanup. The previous verified productive RC21 remains installed
-until these gates succeed. Actual release/runtime results belong in the later
-revision and structured evidence, not in advance success claims.
+The final gates below are completed. Earlier candidate findings are retained as
+history, with their then-current pending gates; they do not describe the final
+installed state. The detailed final identities and failure/recovery history are
+also recorded in [structured evidence](evidence/system-communication-20261031.json).
 
 ## Candidate gate findings and corrections
 
@@ -151,7 +148,7 @@ that same RC21 code healthy. Its runner reported a redundant cleanup-stop error;
 subsequent independent reads proved the exact owned label and PID absent. The
 first 30-second readiness failure has no established cause. Original failure logs
 are retained; the final candidate must pass a fresh real upgrade/rollback gate.
-No candidate has been published or installed productively at this revision.
+At that candidate stage nothing had been published or installed productively.
 
 The second native run still refused AX/process operations because the entire
 world PID set changed during 391–608 ms of path inspection. A subsequent read-only
@@ -208,7 +205,7 @@ The native harness separately hashes path+NUL+raw bytes, producing
 for those same source bytes. The algorithms are explicitly distinct.
 
 Publication, productive installation/activation and final running-identity/data
-verification are the remaining operator gates at this documentation revision.
+verification subsequently passed, as recorded below.
 
 A separate later observation found former idle shell40801 absent; a bounded
 read-only check found no recorded KiraBridge `session.close` for its PID/pane.
@@ -217,3 +214,94 @@ previous identity. A newly observed unrelated busy Terminal8818 is preserved.
 The final operator report must distinguish that external-state observation from
 cleanup of the positively owned fixture/worker, and must not claim every historic
 original process still exists. No fixture operation targeted40801.
+
+
+## Final release and productive running state
+
+Release [v0.8.0rc22](https://github.com/landjunge/KiraBridge/releases/tag/v0.8.0rc22)
+is published on exact product commit `f97ab1cdeebe1d06648febe685f7ebb738ca93a9`.
+The branch also contains acceptance-harness and documentation-only commits; those
+do not change the shipped runtime. All 15 assets were freshly downloaded after
+publication and compared bytewise with local files and GitHub digests. The exact
+downloaded bootstrap passed ten actual isolated checks: RC21 upgrade, configuration/
+credentials/database/user-file preservation, idempotence, restart, KeepAlive,
+rollback and fresh installation. An open authenticated completion read settled by
+connection closure without replay. The isolated service was independently absent.
+
+| Actual component | Identity |
+| --- | --- |
+| Productive launchd Core | RC22, PID73332, started `2026-10-31T19:18:46.037312Z`, instance `56196e47d725461f96f6704ae1686e8a` |
+| Installed Python | 144 files, canonical SHA `03bae2fd8715d4a7581e007096bf03633f7d978d6c590aec044a026512ab3986`; each file byte-equal to F97 Git |
+| Core-owned native worker | PID73364, actual parent73332, generation `235F3F03-F08F-4046-AE40-A5ABB93BA2B0`, native SHA `bc923f131efc1de41249aae93c4eebab8dcea343268a386a14fae19de3fbd2f5` |
+| Visible Companion | PID73375, local start31Oct20:18:58 CET, `~/Applications/KiraBridge.app`; exact F97/native bytes and strict signature verified |
+| Full Intel ZIP | SHA `550fe51f2e9a2b78c30e149da5379ab6f01345569a94d4e4aa847fa7d54a9f37` |
+| Runtime tar | SHA `a79ca78943e27e8089873335c90761e99b621c44028b10646242e63606203e10` |
+| Wheel | SHA `0bb0ece82e37d97d0891e774e6400e6bf5d9e42110067bc3032e43fb5df2f192` |
+
+Installation used the supported installer in the already owned visible Terminal
+8743/TTY001. Only the existing full profiles gained the new module capabilities
+through supported compare-and-swap activation. This does not grant OS consent.
+Actual Core-owned permission status reports AX=true, Screen Capture=true and
+notifications0/not determined; no permission request or notification post occurred.
+Final health confirms `maintenance=null`, dispatcher active and accepting new work.
+The eight configuration files and modes were checked; exceptions are exactly the
+authorized capability lists and private600 login-ticket rotation. Protected rows
+remain exact:28 holds,9 unknown handoffs,23 unknown/queued jobs,70 unknown tasks,
+26 associated messages. SQLite integrity is `ok`; no historical task was replayed.
+
+The actual installed Core then started a new owned Codex in8743, verified readiness,
+pasted the exact374-character German body with a blank line and129-column wrapping,
+and sent one Return after `literal-widget-v3` exact-widget verification. Output
+showed the expected `KB_RC22_PRODUCTIVE_20261031_01` final answer. This literal task
+correctly reports `agent_confirmed=false` and `execution_confirmed=false`; it is
+not a fabricated work/mailbox acknowledgement. The default local reply protocol
+was independently tested in the separate18-check chain with the exact144 shipped
+Python bytes; a second productive default-reply roundtrip was not claimed.
+A second actual task was refused `session_busy` before input while the own shell
+was running an own sleep. Only own Codex73592/proxy73622/shell58164/tab8743 were
+closed. Separate absence and preservation checks retain original Codex36878,
+Terminal8193 and unrelated8818, Console15308 and Tunnel25909. The older unexplained
+40801 absence remains a separate observation, not an attributed fixture effect.
+
+### Refusals and recovery retained in the final record
+
+The first visible install refused its second visibility check before changing
+current.json, launcher or service. Their prior hashes/modes and Core50602 remained
+unchanged; a fresh explicit visible attempt succeeded. No rollback was applied to
+that untouched RC21, which would otherwise have reverted the wrong installation.
+The first capability activation reached a new Core but failed restart verification,
+compensated configuration bytes and held `failed_blocked`. Supported
+`operations.recover()` restored and verified the previous loaded configuration.
+A new explicit activation succeeded with unchanged predicates, timeouts and effect
+semantics. Its eight RPC observations include two successful health reads and six
+transient `peer_connection` failures during restart. The first failure's cause is
+unproven; a short verification/readiness window remains an operational limit.
+No barrier was cleared with manual SQL and no unknown effect was retried.
+
+The verified fresh private backup is
+`~/.local/share/kirabridge/backups/system-communication-20261031T163358Z/productive/preinstall/`:
+full database,1352 previous-release entries, old App,8 configuration files and
+Git bundle/archive. The active supported code rollback point is
+`~/.local/share/kirabridge/install/backups/20261031-201543-c582d365`.
+It retains RC21; rollback preserves new database results and credentials. No code
+rollback was required productively. The actual configuration recovery described
+above was required and verified. Retained installer rollback and old App/source
+artifacts provide recovery without deleting current development or new results.
+
+Remaining limits are explicit: notifications have no OS consent/post test;
+hosted MacCI could not start due billing, ARM/other OS versions are untested;
+short activation readiness can require explicit recovery; public API observations
+and process preflights are not globally atomic. Missing original research and the
+existing lock heuristic remain evidence/compatibility limits. Core health proves
+this Core and performed operations, not every configured external peer/device.
+
+The actual connected ChatGPT app independently returned the same live Core73332,
+instance/source hash and79 authorized capabilities. This is a concrete connector
+health check, not proof of every external peer or every operation from that client.
+
+The requested earlier17264-character clipboard report was written and read back
+exactly. A later independent read found45 characters with a different hash; its
+cause is unattributed and no unchanged-clipboard preservation claim is made. The
+reviewer neither disclosed nor restored that later content. The user's requested
+updated report is copied as the final separate operator step and gets its own
+readback receipt outside Git; the old report remains in the private backup.

@@ -1,6 +1,6 @@
 {
-  "revision": 4,
-  "recorded_at": "2026-10-31T18:53:30.587394+00:00",
+  "revision": 5,
+  "recorded_at": "2026-10-31T19:23:19.098208+00:00",
   "product_code_commit": "f97ab1cdeebe1d06648febe685f7ebb738ca93a9",
   "version": "0.8.0rc22",
   "source": {
@@ -94,13 +94,73 @@
     "live_core_assertion": false
   },
   "release": {
-    "published": false,
-    "final_download_gate": "pending"
+    "published": true,
+    "url": "https://github.com/landjunge/KiraBridge/releases/tag/v0.8.0rc22",
+    "source_commit": "f97ab1cdeebe1d06648febe685f7ebb738ca93a9",
+    "published_assets": 15,
+    "all_published_assets_byte_and_github_digest_verified": true,
+    "runtime_tar_sha256": "a79ca78943e27e8089873335c90761e99b621c44028b10646242e63606203e10",
+    "full_intel_zip_sha256": "550fe51f2e9a2b78c30e149da5379ab6f01345569a94d4e4aa847fa7d54a9f37",
+    "wheel_sha256": "0bb0ece82e37d97d0891e774e6400e6bf5d9e42110067bc3032e43fb5df2f192",
+    "final_download_gate": {
+      "passed": true,
+      "checks": 10,
+      "actual_downloaded_bootstrap": true,
+      "previous_version": "0.8.0rc21",
+      "upgrade_rollback_fresh_install_keepalive_idempotence": true,
+      "open_completion_read": "connection_ended without replay",
+      "isolated_service_absent": true
+    }
   },
   "productive_install": {
-    "started": false,
+    "started": true,
+    "completed": true,
+    "visible_tty": "/dev/ttys001",
+    "source_commit": "f97ab1cdeebe1d06648febe685f7ebb738ca93a9",
+    "version": "0.8.0rc22",
+    "core_pid": 73332,
+    "started_at": "2026-10-31T19:18:46.037312+00:00",
+    "instance_id": "56196e47d725461f96f6704ae1686e8a",
+    "source_tree_sha256": "03bae2fd8715d4a7581e007096bf03633f7d978d6c590aec044a026512ab3986",
+    "source_file_count": 144,
+    "source_package_path": "/Users/landjunge/.local/share/kirabridge/install/releases/0.8.0rc22-f97ab1cdeebe/source/.venv/lib/python3.11/site-packages/kirabridge",
+    "config_sha256": "05831e145f9d395f419f7510a068e40c8fda7ae17ea96f38efc94394ede0af39",
+    "maintenance": null,
+    "accepting_new_work": true,
+    "companion_pid": 73375,
+    "companion_started_at_local": "Sat Oct 31 20:18:58 2026",
+    "native_worker_pid": 73364,
+    "native_worker_parent_pid": 73332,
+    "native_worker_generation": "235F3F03-F08F-4046-AE40-A5ABB93BA2B0",
+    "actual_worker_permissions": {
+      "accessibility_granted": true,
+      "screen_capture_granted": true,
+      "notification_authorization_status": 0,
+      "permission_requested": false
+    },
+    "capabilities": "only new capabilities for nine existing full profiles via supported CAS activation",
     "previous_version": "0.8.0rc21",
-    "previous_code_commit": "7ea0f24ae6c36f689d0889d41071fa8bca8aaf65"
+    "previous_code_commit": "7ea0f24ae6c36f689d0889d41071fa8bca8aaf65",
+    "independent_full_verification": true,
+    "protected_records_preserved": {
+      "queue_holds": 28,
+      "visible_handoffs": 9,
+      "message_jobs": 23,
+      "tasks": 70,
+      "messages": 26
+    },
+    "database_integrity": "ok",
+    "configuration_files": 8,
+    "configuration_exceptions": [
+      "exact authorized capability-list extension",
+      "private mode600 approval-login ticket rotation"
+    ],
+    "console_pid_unchanged": 15308,
+    "tunnel_pid_unchanged": 25909,
+    "active_original_codex_pid_unchanged": 36878,
+    "supported_rollback_backup": "~/.local/share/kirabridge/install/backups/20261031-201543-c582d365",
+    "productive_rollback_needed": false,
+    "capability_recovery_performed_and_verified": true
   },
   "private_evidence_directory": "~/.local/share/kirabridge/backups/system-communication-20261031T163358Z/",
   "historical_failed_candidates_preserved": [
@@ -123,5 +183,75 @@
     "active_original_identity": "unchanged",
     "new_unrelated_terminal": "8818/ttys003/64891, busy, preserved",
     "not_a_fixture_target": true
+  },
+  "productive_terminal_acceptance": {
+    "passed": true,
+    "scope": "actual installed Core and explicitly owned synthetic Codex73592 in pane8743/shell58164",
+    "startup_discovery": true,
+    "exact_body_chars": 374,
+    "logical_blank_line": true,
+    "observed_columns": 129,
+    "verifier": "literal-widget-v3 exact_widget_match",
+    "prompt_sha256": "9e677689feabaff6a38c0d8ecef9cb8183c85a07ca6f40a2df9596ff8c94245c",
+    "one_return": true,
+    "visible_answer_marker": "KB_RC22_PRODUCTIVE_20261031_01",
+    "native_mailbox_ack_or_reply_created": false,
+    "agent_confirmed": false,
+    "execution_confirmed": false,
+    "default_reply_roundtrip_on_productive_core": "not separately tested; exact Python bytes passed private18-check chain",
+    "busy_refusal": "session_busy before input to own shell while own sleep20 active",
+    "owned_codex_proxy_shell_pane_cleanup": true,
+    "remaining_unrelated_panes": [
+      "terminal:8193:ttys000",
+      "terminal:8818:ttys003"
+    ]
+  },
+  "productive_failure_history": [
+    {
+      "stage": "first visible install",
+      "result": "refused second visibility guard before durable current record/service switch; all prior bytes/modes and same RC21 PID independently unchanged",
+      "resolution": "fresh explicit visible retry passed; original receipts preserved; rollback would have incorrectly reverted untouched RC21"
+    },
+    {
+      "stage": "first capability activation",
+      "result": "activation_unconfirmed; config bytes compensated but running config differed; failed_blocked barrier retained",
+      "resolution": "supported operations.recover passed, then new explicit activation retry passed without predicate/timeout/effect changes",
+      "root_cause": "unproven; narrow startup readiness window plausible",
+      "successful_retry_observations": {
+        "total": 8,
+        "pre_and_final_health": 2,
+        "transient_peer_connection": 6
+      },
+      "remaining_limit": "short activation verification budget can refuse a slow restart; explicit supported recovery remains required"
+    }
+  ],
+  "private_final_evidence": {
+    "downloaded-f97-and-preinstall-independent.json": "1ac1478a829cd68b137d301045e6a2dbc82487a52144f98d744944df086986c8",
+    "published-release-final-independent.json": "c56defc058a19d5da278d0a370874ca0ec188f6aa3086a1cbfc62c8dbd114e9c",
+    "productive/installed-full-independent.json": "0922cda2e367e24af5b97948d5b48a86a34e1559571f5371607094558261dd27",
+    "productive/acceptance/actual-productive-e2e-proof.json": "9d65e6a31e38d8a394779aed16ae0df8067f1029f77df8bf70448ad86b1e3a0a",
+    "productive/acceptance/actual-busy-refusal-proof.json": "169b46e5eecb671962a266ca571456e44b71eae4b5bc5f5c69a3ceff6c24f970",
+    "productive/cleanup-proof.json": "2c55179a1bd6424324ca37c82b7c9605484d3891da1c3f63b80703d64e9449b8",
+    "productive/cleanup-clipboard-final-independent.json": "b2b7f3433d38f1567a3ebed2d996eee5940ca88431205e128f2b00267f49fc87",
+    "productive/docs-revision5-independent.json": "10bd1338bb19cbd0c4e66dc15007c69a3d5bcfc6099d16c656f6b4aec7edb7ab"
+  },
+  "actual_chatgpt_connector": {
+    "health_verified": true,
+    "principal": "chatgpt",
+    "capability_count": 79,
+    "core_pid": 73332,
+    "source_hash_matches_installed": true,
+    "scope": "actual connected app health call; no assertion every external peer/device works"
+  },
+  "clipboard_observation": {
+    "initial_requested_report_written_and_read_back": true,
+    "initial_chars": 17264,
+    "initial_sha256": "746f3ff8ca43762ea0f717b0a682c64741377150b0f0e4973f3f8c909532f1c0",
+    "later_content_differed": true,
+    "later_chars": 45,
+    "later_sha256": "e5221d163421a164bab948807e1a2a834671985488c21f69fce47ed9307e5bc3",
+    "cause": "unattributed; content not disclosed or restored by reviewer",
+    "preserved_unchanged_claim": false,
+    "final_user_requested_updated_report_copy": "separate final clipboard receipt outside Git"
   }
 }
