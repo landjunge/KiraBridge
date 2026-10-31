@@ -222,6 +222,22 @@ nachträglicher positiver Gesamtabschluss des Runs.
 
 ## Offene Grenzen und nächste Freigabe
 
+Lokaler Code-/Testcommit: `7dff6f21d4bfe61da50b82092446b2e12eb50f59`.
+Offline gebautes lokales Paket:
+`~/.local/share/kirabridge/backups/macos-implementation-20261031T121031Z/candidate-build/KiraBridge-macos.tar.gz`,
+SHA256 `ac2f1d4575044516528373ba5bf2073660840a46e6097eb0162d98b9b2f55e7f`.
+[Paketvergleich](evidence/macos-adapter-build-20261031.json): alle 414
+Manifestdateien geprüft, alle 132 Pythondateien im Wheel und Quellpaket
+bytegleich zum tatsächlich getesteten finalen Quellstand. Keine Installation
+für diese Prüfung. Quellenhistorie zusätzlich als geprüftes Git-Bundle im
+privaten Backup erhalten. Versionlabel weiter RC20; nur Commit und Quellhash
+identifizieren diesen unveröffentlichten Kandidaten eindeutig.
+
+Der generierte GitHub-Downloadbootstrap referenziert das früher veröffentlichte
+RC20 und ist ausdrücklich **nicht** die Installationsroute dieses lokalen
+Kandidaten. Nach Freigabe ausschließlich dessen geprüftes lokales Bundle mit
+dem vorhandenen unterstützten Installer und gesichertem Rückweg verwenden.
+
 Die beiden ursprünglichen Bibliothekspläne und die Desktop-Commander-Recherche
 bleiben fehlende Quellen; auf ausdrückliche Nutzersteuerung wurde deshalb keine
 neue Architekturschleife begonnen. Clipboard-Symbole neuer SDKs und Ersatz für
