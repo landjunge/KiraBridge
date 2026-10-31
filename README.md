@@ -1,154 +1,63 @@
+[Deutsch](README.de.md)
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="assets/design/icons/dark/KiraBridge-dark-256.png">
+  <img src="assets/design/icons/light/KiraBridge-light-256.png" alt="KiraBridge" width="160" height="160">
+</picture>
+
 # KiraBridge
 
-```sh
-d=$(mktemp -d) && gh release download v0.8.0rc18 -R landjunge/KiraBridge -p 'install-macos.sh*' -D "$d" && (cd "$d" && shasum -a 256 -c install-macos.sh.sha256 && sh install-macos.sh "$@")
-```
+**Talk to your AI. Get the work done on your computer.**
 
-**[Download und Version: 0.8.0rc18](https://github.com/landjunge/KiraBridge/releases/tag/v0.8.0rc18)** · **[Alle erhaltenen Versionen einschließlich RC17](https://github.com/landjunge/KiraBridge/releases)**
+Tell ChatGPT what you need. KiraBridge passes the task to Codex or Grok on your
+computer. You stay in control and choose what the AI is allowed to do.
 
-**Status: veröffentlichtes Intel-Prerelease und auf dem Intel-iMac installiert.**
-Der Befehl wurde nach der Veröffentlichung tatsächlich heruntergeladen, geprüft und
-isoliert ausgeführt; anschließend wurde dasselbe Paket sichtbar produktiv installiert.
-Authentifizierter Zugriff auf dieses private Repository bleibt erforderlich.
-Konfiguration und Credentials sind erhalten; RC17 samt verifiziertem Rückweg bleibt
-verfügbar. [Release, Installation, Diensttests und verbleibende Grenzen](docs/RC18-PUBLISH-INSTALL-20261029.md).
+**macOS · Intel — [0.8.0rc20](https://github.com/landjunge/KiraBridge/releases/tag/v0.8.0rc20) · October 30, 2026 · Preview**
 
+### [Download KiraBridge — app and installer](https://github.com/landjunge/KiraBridge/releases/download/v0.8.0rc20/KiraBridge-0.8.0rc20-Intel-macOS.zip)
 
-## Funktionen
+[App only, if the service is already installed](https://github.com/landjunge/KiraBridge/releases/download/v0.8.0rc20/KiraBridge-App-0.8.0rc20-Intel.zip)
+· [Checksums](https://github.com/landjunge/KiraBridge/releases/download/v0.8.0rc20/SHA256SUMS-INTEL)
+· [All releases](https://github.com/landjunge/KiraBridge/releases)
 
-KiraBridge verbindet einen berechtigten KI-Chat mit lokalen Dateien, Prozessen,
-sichtbaren Agententerminals und optionalen Projektwerkzeugen. Der lokale Kern
-funktioniert unabhängig von ThreadDesk und anderen Integrationen.
+Downloads require a GitHub account with access to this private repository.
+This is a preview; there is no stable release yet. RC20 is available for Intel Macs.
 
-- Dateien und Logs vollständig über Byte-Seiten, Offset, EOF und SHA256 lesen;
-  Dateireferenzen zählen erst nach echter Übertragung und Speicherquittung als Import.
-- Codex, Grok und weitere konfigurierte Provider über vorhandene Adapter ansprechen.
-  Anbieterzugänge, Modelle und laufende Sitzungen bleiben eigenständig.
-- Sichtbare Terminalziele anhand aktueller Fenster-, Tab-, TTY- und Prozessidentität
-  prüfen. Paste-only und Return sind getrennte Aktionen; unbekannte Wirkung bleibt geschützt.
-- Neue sichtbare Arbeit einmal begrenzt zulassen und Busy-/Selectionfehler konkret
-  zurückgeben. Idempotenz verhindert Doppelzustellung auch nach Reconnect und Restart.
-- Aufgaben, Nachrichten, Zustellung, ACK und fachliche Ergebnisse dauerhaft getrennt
-  belegen; späte Antworten können bestehende Ausführungen ohne neue Eingabe abschließen.
-- Werkzeuge dynamisch über vorhandene Operations-/Modulkataloge entdecken.
-  Optionale ThreadDesk-Datei-/Wissensfunktionen, TollGate-Stopbelege und neutrale
-  Agent-Authority-Beobachtungen benötigen jeweils ihre tatsächliche Konfiguration.
+## What KiraBridge helps you do
 
-[Architektur](docs/DEVELOPMENT_PLAN.md) · [Vollständige Datei-/Logreads](docs/READ-FULL-FILES.md)
-· [Queuevertrag](docs/QUEUE-MANAGEMENT.md) · [RC18-Änderungen](docs/RELEASE-0.8.0rc18.md)
+- **Work on local projects:** let your connected AI read project files and logs,
+  edit files or run commands within the access you have granted.
+- **Pass work to agents:** send tasks to configured Codex or Grok sessions on
+  your computer.
+- **Follow the work:** see requests, messages and results in the local control window.
+- **Choose the permissions:** decide which folders and actions are allowed and
+  when a task needs your approval.
 
-## Anforderungen
+ThreadDesk and other integrations are optional. KiraBridge's core works independently.
 
-Geprüfte Zielumgebung: **iMac17,1 (Intel-iMac2015), macOS15.7.4 x86_64,
-Python3.11.15 und uv0.11.6**. Normales Benutzerkonto ohne sudo, GitHubCLI (`gh`),
-authentifizierter Repository-/Entwurfszugriff und Internet zu GitHub/PyPI sind nötig.
-Das Paket enthält Wheel, Quellstand, Lockdatei, Installer und Integritätsmanifest;
-Abhängigkeiten werden beim Installieren geladen. Es ist kein Offline-Komplettpaket.
+## Get started
 
-Das Hardwaremodell allein bestätigt keine älteren macOS-Versionen. **ARM, macOS26
-und ältere macOS-Versionen sind nicht abgenommen.** Bezahlte GitHub-macOS-Jobs
-bleiben wegen der dokumentierten externen Kontozahlungs-/Ausgabenlimitblockade
-zurückgestellt; lokale Erfolge werden nicht als GitHub- oder ARM-Pass ausgegeben.
-Keine Apple-Signierung/Notarisierung. Gatekeeper nicht pauschal deaktivieren.
+1. **Install the service.** Download and fully extract the app-and-installer ZIP.
+   Open `KiraBridge-Installieren.command` and follow the installer in Terminal.
+2. **Open the app.** Copy `KiraBridge.app` to the `Applications` folder in your
+   home folder (`~/Applications`; create it if needed), then open it. The app
+   uses the service installed in step 1.
+3. **Connect your chat.** Follow the [ChatGPT connection guide](docs/CHATGPT.md#english-connect-then-confirm-the-actual-task).
+   Start by asking it to read a small file from an allowed folder. Approve the
+   request if asked, then check the result in your chat.
 
-## Betrieb
+**Requirements:** Intel Mac, tested on macOS 15.7.4; Python 3.11 and uv 0.11.6
+already available in Terminal; internet access to download dependencies.
+Install with your regular user account. AI accounts and any provider charges are
+separate; the chat connection needs the corresponding account permissions.
 
-Der oben stehende versionierte Befehl lädt das Bootstrap samt Prüfsumme; dieses
-prüft wiederum die fest eingebettete Paket-SHA256. Keine Remote-Pipe in eine Shell.
-Das Release nennt exakten Artefakt-Quellcommit und Prüfsummen. Branch, Paket und
-antwortender Dienst können unterschiedliche Stände haben und werden getrennt geprüft.
+This preview has known terminal limitations, and the app is not Apple-notarized.
+Read [installation and help](docs/INSTALL-EN.md) for setup, updates and known issues.
 
-Eine produktive Installation erst nach Freigabe in einem eigenen bestätigten
-sichtbaren Terminal ausführen, niemals in laufende Codex-/Grok-Sitzungen eingeben.
-Bei der vom Betreiber ausgeführten produktiven Installation zusätzlich die bestehende
-Option `--require-visible-terminal` verwenden. Die isolierte Abnahme verwendet
-explizite Testpfade und ein eigenes Testlabel; sie ersetzt keine produktive Freigabe.
-Die Optionen `--language de`, `--language en` und `--motion reduced` steuern die
-Darstellung. Echte Fortschritts-/Fehlermeldungen haben Vorrang vor Animation.
+## License
 
-Der launchd-Benutzerdienst läuft nach dem Schließen von Terminal oder Browser weiter.
-`~/.local/bin/kirabridge status` liest den antwortenden Dienst. Der Installerstatus
-aus dem erhaltenen Paket nennt zusätzlich den installierten Quellcommit. Ein
-Neustart muss vorher laufende Arbeit und den tatsächlichen Dienstbesitz prüfen.
+Private, non-business use is free under the
+[Netzwerkpunkt Personal Use License 1.0](LICENSE). Business use requires separate
+written permission. The German license text governs.
 
-Updates verwenden die vorhandene versionierte Transaktion mit Backup, Ownership-,
-Leerlauf-, Integritäts- und Healthprüfungen. Konfiguration, Credentials, Rechte,
-Datenbank und Nutzerdateien bleiben erhalten. Der Rückweg verwendet nur die
-passende gesicherte Transaktion; er ist erst durch die antwortende alte Version
-bestätigt. Keine alte Datenbank über neuere Ergebnisse zurückspielen.
-
-[Installation Deutsch](docs/INSTALL-DE.md) · [Installation English](docs/INSTALL-EN.md)
-· [macOS-Vertrag](docs/INSTALL-MACOS.md)
-
-## Konfiguration
-
-Standardkonfiguration und getrennte Credentials liegen unter `~/.config/kirabridge/`.
-Die Konfiguration bestimmt Principals, erlaubte Operationen, Dateiwurzeln,
-Agentenadapter, sichtbare Zielbindungen und optionale Integrationen. Der aktuelle
-Werkzeugkatalog und die Berechtigungsentscheidung der konkreten Operation sind
-maßgeblich. Ein vorhandener Modulname bedeutet weder installierten Adapter noch
-freigegebene Aktion. [ChatGPT-Einrichtung](docs/CHATGPT.md).
-
-Standardlaufzeiten, Transaktionsbackups und Logs liegen unter
-`~/.local/share/kirabridge/install/`; die tatsächlichen Pfade ergeben sich aus dem
-installierten Paket/der Konfiguration. Keine fremden Profile oder Shell-Pfade
-unbesehen überschreiben. Bestehende KiraBridge-Schlüssel bleiben erhalten, bis
-4AllPass eine tatsächlich sichere, ausdrücklich freigegebene Übernahme bietet.
-
-## Sicherheit
-
-Berechtigung, Zulassung, Eingabeversuch, bestätigte Zustellung und Ergebnis sind
-verschiedene Zustände. `unknown` ist kein sicher wiederholbarer Auftrag; `blocked`
-ist keine Erlaubnis zur Freigabe. Keine historischen Nachrichten blind erneut senden,
-keine Queue pauschal löschen, keine Agenten zum Erzwingen einer Installation beenden.
-
-Terminalguards prüfen aktuelle Identität und Bereitschaft. Busy, geänderte Auswahl
-oder unklare Eingabe führen zu einer konkreten Ablehnung statt beliebigem Retargeting.
-Ein inaktives Chatfenster wird durch eine gespeicherte Antwort nicht automatisch geweckt.
-Private Tokens gehören weder in Befehle noch Logs oder Git. Installation erteilt keine
-zusätzlichen OS-/TCC-Rechte. Prüfsummen vom selben Release erkennen Beschädigungen,
-ersetzen aber keine unabhängige Herausgebersignatur.
-
-## Fehlerbehebung
-
-| Beobachtung | Sicherer nächster Schritt |
-| --- | --- |
-| Release/Download nicht erreichbar | Authentifizierung, Repositoryzugriff und Entwurfs-/Veröffentlichungsstatus prüfen. |
-| Prüfsumme stimmt nicht | Abbrechen und Originalartefakt prüfen; nichts ausführen. |
-| `visible_target_busy` | Geschützte Handoffreservierung und ihren tatsächlichen Ausgang prüfen. |
-| `session_busy` | Aktuelle Aktivität prüfen; keinen laufenden Agenten unterbrechen. |
-| `session_selection_changed` | Fenster/Tab/TTY/PID neu lesen; keinen alten Auftrag wiederholen. |
-| `unknown` oder verlorene Antwort | Vorhandene Receipt-/Start-/ACK-/Late-Reply-Belege abgleichen. |
-| Installation meldet `BUSY` | Echte laufende Arbeit geordnet abschließen lassen; Guards nicht umgehen. |
-| Start oder Rollback läuft in Timeout | Logs, Health und tatsächlich antwortende Version lesen; keinen Erfolg behaupten. |
-
-[Ursachen und Reparaturbelege](docs/QUEUE-DIRECT-ADMISSION-20261029.md)
-· [Abschlussbericht mit Rückfallplan](docs/INTEL-RELEASE-20261029.md)
-
-## Entwicklung
-
-Die Entwicklung erfolgt in isolierten Worktrees. Vor riskanten Änderungen lokal
-sichern; passende Tests mit synthetischen Stores, Fake-Terminal-I/O und echten
-lokalen MCP-Roundtrips verwenden. Integrationen werden gegen die im CI-Workflow
-festgelegten Quellstände geprüft. Erst belegte Teilschritte committen und pushen;
-Merge, Veröffentlichung und produktive Installation bleiben getrennte Entscheidungen.
-
-Der deterministische Builder `scripts/build_release.py` verlangt einen sauberen
-exakten Git-Commit. Zwei Builds müssen dieselben SHA256SUMS ergeben.
-`scripts/accept_macos_release.py` prüft echte Installation/Upgrade, Start,
-Idempotenz, Restart, KeepAlive, Rollback und Erstinstallation unter einem eigenen
-Testlabel. Es ist kein Dry-run und darf keine produktiven Pfade erhalten.
-Nach jeder Testdienstbereinigung muss dessen Abwesenheit unabhängig belegt sein.
-
-| Version | Tatsächlicher Stand |
-| --- | --- |
-| 0.8.0rc18 | Veröffentlichtes Intel-Prerelease; tatsächlicher Download, sichtbare Installation und produktive Stop-/Start-/Neustarttests bestanden. Belege im Installationsbericht. |
-| 0.8.0rc17 | Separater Entwurf und gesicherter Rückweg vor RC18; authentifizierter Download und isolierter Rollback nachgewiesen. |
-| 0.8.0rc16 / rc15 | Historische Entwürfe erhalten; keine neue Abnahme daraus abgeleitet. |
-| 0.8.0rc14 | Veröffentlichtes Prerelease; Originalwheel als geprüfte Upgrade-/Rollbackfixture erhalten. |
-| Frühere Versionen | Unter dem Link „Alle erhaltenen Versionen“ mit ihrem tatsächlichen Veröffentlichungsstatus abrufbar. |
-
-**Lizenz:** [Netzwerkpunkt Personal Use License1.0](LICENSE). Private, nicht geschäftliche
-Nutzung unter den Lizenzbedingungen kostenlos; geschäftliche Nutzung nur mit
-separater schriftlicher Erlaubnis. Deutsch ist maßgeblich. Kein OSI-Standard und
-keine rechtliche Prüfung; Drittanbieterlizenzen gelten weiterhin.
+[Developer documentation](docs/DEVELOPERS.md)

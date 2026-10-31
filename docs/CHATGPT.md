@@ -2,16 +2,16 @@
 
 ## Deutsch: den tatsächlichen Anschluss prüfen
 
-Aktueller Entwicklungsstand ist `0.8.0rc17`; veröffentlicht bleibt RC14,
-RC17 ist ein Release-Entwurf. Auf dem Betreiber-Mac ist inzwischen RC17 installiert;
-[Build-, Installations- und Eingabenachweis](RC17-INSTALLATION-20261024.md) trennt
-Quellpin, Paket, tatsächlichen Dienst und offene Abnahmen. Ältere RC2-/0.5.2-Pakete
-sind historische Stände, keine aktuelle Installationsanweisung.
+Für den aktuellen Download gilt die [README](../README.de.md): veröffentlicht ist
+RC20 vom 30. Oktober 2026, ein Intel-Prerelease. Der installierte Dienst und ein
+lokaler Quellcheckout können andere Stände haben; `kirabridge status` zeigt den
+antwortenden Dienst. Ältere RC17-/RC14-Berichte unten sind historische Belege.
 Bestehende gesunde Einrichtung nicht
 für einen Nachweis erneut durchlaufen oder zurücksetzen.
 
-Der normale Installer führt lokale Einrichtung und `kirabridge chatgpt setup`
-zusammen. Bei einer bereits eingerichteten lokalen Bridge zeigen zunächst diese
+Der veröffentlichte macOS-Dienst-Installer richtet die lokale Bridge ein.
+Die ChatGPT-Kontoverbindung wird separat mit `kirabridge chatgpt setup` eingerichtet.
+Bei einer bereits eingerichteten lokalen Bridge zeigen zunächst diese
 Befehle den vorhandenen Zustand; sie legen keine neuen Aufträge an:
 
 ```sh
@@ -120,7 +120,7 @@ Eine Aktualisierung des App-Katalogs ist vom laufenden Dienst getrennt.
 | PNG-Entwurf ansehen | Eigene `file.image`-Capability, begrenzter Bildsnapshot über eigenen Task. Datei-Leserecht allein genügt nicht. [Bildweg](IMAGE-READ-20261018.md). |
 | ThreadDesk-Kontext oder Wissen | Fester Betreiberpeer, eigene `threaddesk.read`/`threaddesk.manage`/`threaddesk.knowledge`-Rechte je Operation und Revision. [Adapter](THREADDESK-ADAPTER-20261018.md), [Wissen](THREADDESK-KNOWLEDGE-20261018.md). |
 | Vorhandene Workflowbelege ansehen | `observations.read` plus `task.read`, nur ausgewählte eigene Tasks, begrenzte Metadaten. Kein Autoritäts-/Budgetnachweis. [Beobachtungsexport](WORKFLOW-OBSERVATION-EXPORT.md). |
-| Eigenen gebundenen Workflow stoppen | Optionales, standardmäßig deaktiviertes `stop_only`-Wiring; Kosten unbekannt, kein harter Dollarcap. Anfrage, dauerhafte Sperre, Prozessende und externe Restwirkung getrennt. [Betreiberanleitung](WORKFLOW-CONTROL-CONFIGURATION.md). |
+| Eigenen gebundenen Workflow stoppen | Optionales, standardmäßig deaktiviertes `stop_only`-Wiring; Kosten unbekannt, kein harter Dollarcap. Anfrage, dauerhafte Sperre, Prozessende und externe Restwirkung getrennt. [Betreiberanleitung](https://github.com/landjunge/KiraBridge/blob/307004e5b2e4285c19e8d7544bedf45b28297a0b/docs/WORKFLOW-CONTROL-CONFIGURATION.md). |
 
 Nativer Codex-MCP-Zugang, ChatGPT-App-Principal, verwalteter Agentenkindprozess und
 bestehende interaktive Sitzung sind verschiedene Kontexte. Ein engerer nativer
@@ -132,10 +132,10 @@ der Chat erteilt sich keine Rechte und aktiviert keine optionale Assembly.
 ## English: connect, then confirm the actual task
 
 Use the [English installation guide](INSTALL-EN.md) to identify the package first.
-Current development source is RC17; the published release remains RC14 and RC17
-is a draft. The operator Mac now runs RC17. The [installation evidence](RC17-INSTALLATION-20261024.md)
-distinguishes source pins, assets, actual runtime and remaining acceptance.
-RC2/0.5.2 packages are historical. Do not reset a healthy configuration or use
+The current download is the published Intel preview RC20, dated October 30, 2026.
+The installed service and a local checkout may differ; `kirabridge status` reads the
+responding service. RC17/RC14 reports below are historical evidence.
+Do not reset a healthy configuration or use
 historical packages against newer settings. Inspect `kirabridge status` and
 `kirabridge chatgpt status`; only missing setup needs the interactive local command:
 
@@ -143,7 +143,8 @@ historical packages against newer settings. Inspect `kirabridge status` and
 kirabridge chatgpt setup --language en
 ```
 
-The installer includes this same guided connection step. Follow the official
+The published macOS service installer sets up the local bridge; connect the
+ChatGPT account separately with this guided command. Follow the official
 account pages yourself. A restricted tunnel runtime key is required, not a Codex
 login or ordinary API key. Enter it hidden locally, never in chat, process arguments
 or logs. Existing keys, data and permissions are retained; incomplete setup is
@@ -181,7 +182,7 @@ contexts. Grok ACP local tools require configuration, principal and task opt-ins
 together; its API text adapter does not gain local tools or universal cost control.
 PNG images, ThreadDesk knowledge and observation export each require their specific
 rights, as linked in the table. None enables another or proves imported context
-trusted. Optional [owned workflow control](WORKFLOW-CONTROL-CONFIGURATION.md) is
+trusted. Optional [owned workflow control](https://github.com/landjunge/KiraBridge/blob/307004e5b2e4285c19e8d7544bedf45b28297a0b/docs/WORKFLOW-CONTROL-CONFIGURATION.md) is
 disabled by default and stop_only: cost unknown, no hard dollar cap. Stop intent,
 confirmed durable barrier, owned process exit and unknown external effects differ.
 Local status alone does not establish a successful call from a target ChatGPT account.
@@ -205,21 +206,24 @@ External documentation links are preserved historical references, not newly veri
 <details>
 <summary>Archiv: Anschlussnotiz vom 17.–18.10.2026 / archived connection note</summary>
 
+Archivverweise auf hier fehlende Dateien sind als Text erhalten. / References to
+archive files absent from this checkout are retained as plain text.
+
 # ChatGPT-Anbindung: Tunnel aktiv, Statusabfrage zurückgemeldet
 
-**Aktueller Stand:** [Korrigierte Events-Anbindung erneut aktiviert; echter Empfang im ursprünglichen Chat weiterhin offen](MCP-SCHEMA-CACHE-20261019.md). Die nachfolgenden Betriebsstände sind historische Nachweise.
+**Aktueller Stand:** Korrigierte Events-Anbindung erneut aktiviert; echter Empfang im ursprünglichen Chat weiterhin offen (Archivverweis `MCP-SCHEMA-CACHE-20261019.md`, in diesem Checkout nicht enthalten). Die nachfolgenden Betriebsstände sind historische Nachweise.
 
-**Aktueller Vorrang:** [Events-Fassade zurückgerollt; ursprünglicher Anschluss wiederhergestellt](CHATGPT-EVENTS-RECOVERY-20261019.md).
+**Aktueller Vorrang:** Events-Fassade zurückgerollt; ursprünglicher Anschluss wiederhergestellt (Archivverweis `CHATGPT-EVENTS-RECOVERY-20261019.md`, in diesem Checkout nicht enthalten).
 Die nachfolgenden Aktivierungsangaben sind historisch. Vor erneuter Aktivierung
 müssen Pflicht-Subscription für normale Aufträge und Sender-Startbereitschaft
 korrigiert werden. Die App benötigt jetzt Refresh/Rescan der alten Werkzeugdefinition.
 
-**Produktionsaktivierung:** [Ereignissender und bestehender Tunnel sind aktiviert](CHATGPT-EVENTS-ACTIVATION-20261019.md).
+**Produktionsaktivierung:** Ereignissender und bestehender Tunnel sind aktiviert (Archivverweis `CHATGPT-EVENTS-ACTIVATION-20261019.md`, in diesem Checkout nicht enthalten).
 Die vorhandene App-Verbindung funktioniert weiter. Private Verbindung jetzt über
 chatgpt.com/plugins → KiraBridge → Refresh neu einlesen; echte Host-Subscription
 und Empfang im ursprünglichen Chat sind noch offen.
 
-**MCP-Events-Ausbau:** [Isolierter Adapter und konkrete Plattformschritte](CHATGPT-EVENTS-20261019.md).
+**MCP-Events-Ausbau:** Isolierter Adapter und konkrete Plattformschritte (Archivverweis `CHATGPT-EVENTS-20261019.md`, in diesem Checkout nicht enthalten).
 Offizieller Webhookweg verifiziert, vorhandene Tunnelbinary lokal mit MCP 2 geprüft.
 Noch kein echter ChatGPT-Callback und keine belegte Zustellung im ursprünglichen Chat.
 
