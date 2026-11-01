@@ -200,7 +200,35 @@
       "passed": 34,
       "seconds": 0.26
     },
-    "test_counts_overlap": true
+    "test_counts_overlap": true,
+    "first_final_ci": {
+      "commit": "f387ac9eeb310165e3e981c432717b93a7573daf",
+      "run": 41328932770,
+      "status": "failed_no_release_or_install",
+      "linux_311": {
+        "passed": 2999,
+        "skipped": 121
+      },
+      "linux_313": {
+        "passed": 2999,
+        "skipped": 121
+      },
+      "macos_arm": {
+        "passed": 3116,
+        "skipped": 4
+      },
+      "macos_intel": {
+        "passed": 3114,
+        "failed": 2,
+        "skipped": 4,
+        "seconds": 547.2
+      },
+      "corrections": {
+        "system_acceptance_harness": "deterministic UUID999 collision and exact persisted window_probes whitelist; 50 module cases passed; reviewed by review_macos",
+        "managed_route": "three fake shebangs pinned to test interpreter, real process tested with no host PATH Python, processing diagnostics; 14 targeted cases passed; original CI cause remains unproven; reviewed by Root"
+      },
+      "production_delta": false
+    }
   },
   "independent_reviews": {
     "filesystem": "review_mcp + Root",

@@ -359,8 +359,12 @@ async def test_window_result_arriving_after_deadline_does_not_focus(
 
 
 async def test_foreign_window_inventory_fails_without_poll_or_foreign_probe_data(
-    harness_module, tmp_path
+    harness_module, tmp_path, monkeypatch
 ):
+    # A legitimate fixture UUID may contain the foreign numeric window ID.
+    monkeypatch.setattr(
+        harness_module.uuid, "uuid4", lambda: SimpleNamespace(hex="a" * 13 + "999" + "a" * 16)
+    )
     value = window_fixture(runner(harness_module, tmp_path))
     calls = []
 
@@ -373,7 +377,19 @@ async def test_foreign_window_inventory_fails_without_poll_or_foreign_probe_data
         await value.windows()
     assert calls == ["windows.list"]
     assert value.evidence["window_probes"][0]["owned_rows"] == []
-    assert "999" not in (value.root / "evidence.json").read_text()
+    persisted = json.loads((value.root / "evidence.json").read_text())
+    assert "999" in persisted["fixture_uuid"]
+    assert persisted["window_probes"] == [
+        {
+            "expected_window_id": 77,
+            "owner_pid": 42,
+            "row_count": 1,
+            "truncated": False,
+            "revision": "b" * 64,
+            "owned_rows": [],
+            "probe_rows_capped": False,
+        }
+    ]
 
 
 async def test_capture_uses_same_exact_receipt_window_selector(harness_module, tmp_path):

@@ -110,3 +110,37 @@ Verträge unabhängig geprüft. Der endgültige 145-Dateien-Produktbaum ist
 `9b3c03ccf40e13e2cfcbdeb8f89b359141455026a8620a2c3b8d8dd0a3881f36`.
 [Strukturierte Abschlussprüfungen](evidence/reliability-followup-20261101.json)
 enthalten die getrennten Teststände und noch ausstehenden Betriebsgates.
+
+## Erster plattformübergreifender Endlauf und gezielte Korrekturen
+
+Commit `f387ac9eeb310165e3e981c432717b93a7573daf`, Verify
+[41328932770](https://github.com/landjunge/KiraBridge/actions/runs/41328932770):
+Linux Python 3.11/3.13 jeweils **2.999 bestanden, 121 übersprungen**;
+ARM-macOS **3.116 bestanden, vier übersprungen**. Intel-macOS meldete
+**3.114 bestanden, zwei fehlgeschlagen, vier übersprungen (547,20 s)**.
+Damit bleibt dieser Kandidat für Veröffentlichung/Installation gesperrt.
+
+Der Fenster-Harnesstest verbot die Zeichenfolge `999` im gesamten JSON. Sie war
+in einer zufälligen Fixture-UUID vorhanden, nicht in protokollierten Fremdfensterdaten.
+Eine feste UUID mit derselben Kollision reproduzierte den Fehler deterministisch.
+Die Korrektur prüft den tatsächlich gespeicherten `window_probes`-Whitelistblock
+exakt und behält No-Poll/No-Focus sowie leere `owned_rows` bei. **50 Modulfälle
+bestanden (0,43 s)**; unabhängiger macOS-Agent freigegeben.
+
+Der zweite Fehler hatte eine nicht quittierte synthetische Prozessantwort.
+Die damalige CI-Ursache ist mangels Processingdiagnose nicht eindeutig belegt.
+Gesichert ist eine unbeabsichtigte Hostabhängigkeit: die drei Fake-Programme
+benutzten `/usr/bin/env python3`, während der minimale Prozess-PATH auf diesem
+Mac Apples Xcode-Python 3.9.6 statt des Testinterpreters 3.11 auswählt. Ein echter
+gegengerichteter Test ohne PATH-Python reproduzierte unknown/AckNone; nach Pinning
+auf `sys.executable` bestand er. Die reale positive Prozessrunde prüft nun ebenfalls
+einen PATH ohne Python. Timeout 5 s und alle Spawn-/Reap-/No-Replay-/Altauftragsprüfungen
+bleiben unverändert; bei einem Fehler zeigen die Assertions den Processingbeleg.
+**14 gezielte Fälle bestanden (4,10 s)**, unabhängig von Root gelesen/freigegeben.
+
+Diese Änderungen betreffen ausschließlich zwei Testdateien. Der Produktbaum bleibt
+bytegleich bei `9b3c03cc…`. Das bereits gebaute Intelpaket bestand isolierten Smoke
+und unabhängigen Manifest-/Wheel-/Git-/Signaturvergleich; ARM-Smoketest war ebenfalls
+grün. Das ersetzt keine erfolgreiche End-CI. Ein neuer sauberer Commit wird erneut
+mit exakten Commitpins gebaut und geprüft. Kein zusätzliches lokales Gesamtsuite-
+Loop und keine produktive Umschaltung aus dem fehlgeschlagenen Kandidaten.
