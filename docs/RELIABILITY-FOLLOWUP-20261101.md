@@ -250,3 +250,70 @@ Der enge unabhängige Aktivierungsreview ist freigegeben; Produkt406 unveränder
 Auch der vorherige Harnesscommit8820744 bestand Verify41337223245 auf allen
 vier Plattformen. Der nächste tatsächliche Ablauf verwendet einen neuen,
 sauberen Harness-Pin und wiederum frische IDs; kein alter Auftrag wird wiederholt.
+
+### Physische Probe 03 und engere Mitgliedschaftsbindung
+
+`actual-codex-4064755-03` bestand Aktivierung und Shell-Startup, stoppte aber vor
+Detach, Testeingabe und Codex: Beim Wechsel zum neuen Tab änderte Terminal die
+CG- und AX-Parentkennungen. Die vollständige Reihenfolge der drei ursprünglichen
+opaken AXRadioButton-Tokens blieb erhalten; genau ein neues Token war ausgewählt.
+Die Radio-Titel enthielten den eigenen Nonce nicht. Das sind belegte Grenzen des
+Prüfprogramms; der Produktcode wurde deshalb nicht geändert. Der eigene frische
+Shell-Receipt wurde einmal sicher geschlossen. Ursprüngliche Views und
+Prozessgenerationen blieben erhalten, privater Endpoint ist abwesend.
+
+Der korrigierte manuelle Helfer bindet zunächst genau eine beobachtete Baseline-
+Gruppe über ihre vollständigen geordneten Radio-Tokens. Er verlangt den stabilen
+App-/Worker-Owner, genau ein neues ausgewähltes Own-Token, aktuelle exakt gleiche
+CG-/AX-Fenstertitel und unabhängig gelesene Geometrie. Parentkennungen und
+Radio-Titel werden als volatil behandelt. Fehlende/regenerierte Own-Tokens,
+Fremdersatz, Duplikate und umgeordnete Originale bleiben gesperrt. Nach genau
+einem Aktivieren darf eine nicht kohärente Titelmessung nur begrenzt erneut
+gelesen werden; keine Normalisierung, Eingabe oder Präferenzänderung.
+**98 Repository- und sieben private Actual03-Gegenproben bestanden (6,84 s).**
+Die gespeicherte Probe bestätigt nur Mitgliedschaft; ihre unterschiedlich
+gelesenen Spinner-Titel erfüllen die neue vollständige Baseline nicht rückwirkend.
+Das reale Verhalten nach Detach bleibt vor dem nächsten frischen Lauf offen.
+
+Der Verifikationscommit154d77 bestand Linux3.11/3.13 und Intel; ARM scheiterte in
+einem Bootstrap-`stderr_limit`-Fall mit `process_failed` statt `output_limit`
+(3172 bestanden, ein Fehler, vier übersprungen). Der Originalfehler enthält keinen
+Kind-Exitstatus oder Bytezähler. Vier direkte lokale Kontrollen und 16 begrenzte
+Wiederholungen bestanden; ein Produktfehler ist bislang nicht belegt. Der Fehler
+wird nicht als bestanden umgedeutet; zusätzliche reine Testdiagnostik soll den
+nächsten ohnehin erforderlichen CI-Lauf auswertbar machen. Paket406 und dessen
+vier erfolgreiche Produkt-CI-Prüfungen bleiben davon getrennt.
+
+### Kostenstopp nach Budgetmeldung des Nutzers
+
+Der Nutzer meldet, dass die GitHub-Actions-Nutzung an einem Tag seinen
+Monatsrahmen verbraucht hat. Auf diesem Arbeitszweig lösten auch Änderungen
+an manuellen Prüfprogrammen wiederholt die vollständige Vier-Plattform-Matrix
+mit zwei gehosteten macOS-Runnern aus. Das hätte vor den wiederholten Pushes
+begrenzt werden müssen. Eine genaue Rechnungssumme wurde nicht unabhängig
+ermittelt. Keine Behauptung, die bisherigen Kosten rückgängig machen zu können.
+
+Der noch wartende eigene Paketworkflow41330303010 wurde abgebrochen und
+anschließend als `completed/cancelled` zurückgelesen. Zwei unabhängige
+Statusabfragen ergaben für das gesamte KiraBridge-Repository keine laufenden
+und keine eingereihten Workflows. Es erfolgen keine weiteren Actions,
+automatischen Pushes oder Testschleifen. Der aktuelle Stand wird nur gesichert;
+keine Installation, Veröffentlichung oder weitere reale Terminalprobe. RC22
+bleibt produktiv. Die ARM-Ursache und die physische Abnahme bleiben offen.
+
+Der Radio-Delta6d623ff3 hat inzwischen ein unabhängiges Go: zehn enge reine
+Prädikatfälle bestanden (0,21 s). Die zuletzt ergänzte Bootstrap-Testdiagnostik
+ist dagegen **nicht ausgeführt oder kompiliert** und gilt ausdrücklich nicht
+als verifiziert. Beide Arbeitsstände bleiben getrennt nachvollziehbar erhalten.
+
+### Lokale Fortsetzung zur fertigen App
+
+Der Nutzer hat klargestellt, dass die fertige App weiterhin das Ziel ist.
+Die Fortsetzung nutzt den bereits gebauten und auf allen vier Plattformen
+verifizierten Produktstand406. Nur der unabhängig freigegebene manuelle
+Harness-Delta wird lokal committed. Keine GitHub Actions, kein automatischer
+Push und keine erneute vollständige Testmatrix. Nächster Schritt ist eine
+frische lokale Endabnahme mit genau einem eigenen Fenster; erst nach positivem
+Nachweis folgen die unterstützte sichtbare Installation und Runtimeprüfung.
+Die ungetestete zusätzliche ARM-Testdiagnostik bleibt separat gespeichert
+und gehört nicht zum Paket oder zum freigegebenen Harness-Commit.

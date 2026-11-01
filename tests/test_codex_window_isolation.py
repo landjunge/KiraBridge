@@ -198,8 +198,8 @@ class Scene:
                 children = [
                     {
                         "role": "AXRadioButton",
-                        "element_token": f"{1000 + index * 20 + i:032x}",
-                        "title": TITLE if title == TITLE and i == count - 1 else f"tab-{i}",
+                        "element_token": f"{1003 if index == 1 and i == 0 else 1000 + i:032x}",
+                        "title": f"volatile-tab-{i}",
                         "title_truncated": False,
                         "value": title == TITLE and i == count - 1,
                     }
@@ -213,6 +213,8 @@ class Scene:
                     "subrole": "AXStandardWindow" if role == "AXWindow" else "",
                     "title_truncated": False,
                     "minimized": False,
+                    "position": [0, 0],
+                    "size": [800, 600],
                 },
                 children=children,
             )
@@ -259,15 +261,15 @@ async def test_same_bounds_but_authoritatively_separate_needs_no_detach(module, 
     assert scene.effects == ["title"]
 
 
-async def test_no_ax_group_counts_as_one_only_after_known_successful_move(module, tmp_path):
+async def test_missing_own_radio_after_move_is_unproven_and_never_retries(module, tmp_path):
     scene = await prepared(module, tmp_path)
     scene.no_own_group = True
-    assert (await scene.controller.isolate(CREATED, SHELL))["tab_count"] == 1
-    scene = await prepared(module, tmp_path)
-    scene.no_own_group = scene.already_isolated = True
-    with pytest.raises(RuntimeError, match="not a standalone"):
+    with pytest.raises(RuntimeError, match="membership is incomplete"):
         await scene.controller.isolate(CREATED, SHELL)
-    assert scene.effects == ["title"]
+    assert scene.effects == ["title", "move"] and not scene.controller.confirmed
+    with pytest.raises(RuntimeError, match="never be replayed"):
+        await scene.controller.isolate(CREATED, SHELL)
+    assert scene.effects == ["title", "move"]
 
 
 @pytest.mark.parametrize("change", ["cwd", "generation", "worker", "target", "owner"])
@@ -338,24 +340,54 @@ async def test_equal_count_replacement_cannot_substitute_baseline_physical_ident
             for name in ("general", "profiles", "groups")
         ],
     )
-    with pytest.raises(RuntimeError, match="baseline"):
+    with pytest.raises(RuntimeError):
         scene.controller.topology(snapshot, after_move=True)
 
 
-@pytest.mark.parametrize("change", ["radio", "cg-reused"])
-async def test_ax_membership_or_reused_baseline_cg_also_refuses(module, tmp_path, change):
+@pytest.mark.parametrize("change", ["radio", "reordered", "duplicate", "worker", "layout"])
+async def test_baseline_membership_generation_or_layout_change_refuses(module, tmp_path, change):
     scene = await prepared(module, tmp_path)
     scene.phase = "detached"
-    scene.controller.move_accepted = True
     snapshot = await scene.controller.snapshot()
     if change == "radio":
         snapshot["ax"][0]["radios"][0]["element_token"] = "replacement-tab"
+    elif change == "reordered":
+        snapshot["ax"][0]["radios"].reverse()
+    elif change == "duplicate":
+        snapshot["ax"][0]["radios"][0]["element_token"] = snapshot["ax"][0]["radios"][1][
+            "element_token"
+        ]
+    elif change == "worker":
+        snapshot["worker"][1] = "different-generation"
     else:
-        snapshot["cg"][0]["window_id"] = 999
-        snapshot["cg"][1]["window_id"] = 231
-        snapshot["cg"][1]["revision"] = snapshot["cg"][0]["revision"]
-    with pytest.raises(RuntimeError, match="baseline"):
+        snapshot["cg"][0]["bounds"]["Width"] += 1
+        snapshot["ax"][0]["size"][0] += 1
+    with pytest.raises(RuntimeError):
         scene.controller.topology(snapshot, after_move=True)
+
+
+async def test_stable_radio_membership_allows_observed_parent_cg_and_title_changes(
+    module, tmp_path
+):
+    scene = await prepared(module, tmp_path)
+    scene.phase = "tagged"
+    snapshot = await scene.controller.snapshot()
+    snapshot["cg"][0].update(window_id=841, revision="9" * 64)
+    snapshot["ax"][0]["token"] = "different-parent-window"
+    for radio in snapshot["ax"][0]["radios"]:
+        radio["title"] = "same generic title"  # no nonce in any radio title
+    proof = scene.controller.topology(snapshot)
+    assert proof["tab_count"] == 4 and proof["cg_window_id"] == 841
+    own = proof["own_radio_token"]
+    scene.phase = "detached"
+    detached = await scene.controller.snapshot()
+    detached["cg"][0].update(window_id=999, revision="8" * 64)
+    detached["cg"][1]["window_id"] = 231  # CG identity is not membership authority
+    detached["ax"][0]["token"] = "another-original-parent"
+    assert scene.controller.topology(detached, after_move=True)["own_radio_token"] == own
+    detached["ax"][1]["radios"][0]["element_token"] = "regenerated-own-radio"
+    with pytest.raises(RuntimeError, match="Own radio token changed"):
+        scene.controller.topology(detached, after_move=True)
 
 
 async def test_unknown_title_result_never_retries_display(module, tmp_path):
@@ -526,3 +558,59 @@ def test_standard_activation_source_checks_full_generation_before_appleevent(mod
     assert javascript(scene, source) == {"clicks": 0, "activations": 1}
     result = javascript(scene, source, change="app-generation")
     assert result["activations"] == 0 and result["error"]
+
+
+async def test_baseline_spinner_mismatch_is_read_again_exactly_without_reactivation(
+    module, tmp_path
+):
+    scene = Scene(module, tmp_path)
+    scene.terminal.native = AsyncMock(return_value={"activation_sent": True, "pid": 775})
+    snapshot = scene.controller.snapshot
+    attempts = 0
+
+    async def changing_title():
+        nonlocal attempts
+        current = await snapshot()
+        attempts += 1
+        current["cg"][0]["title"] = "⠧ Running original task"
+        current["ax"][0]["title"] = (
+            "⠇ Running original task" if attempts == 1 else "⠧ Running original task"
+        )
+        return current
+
+    scene.controller.snapshot = changing_title
+    baseline = await scene.controller.prepare_visible_baseline(poll_interval=0)
+    assert (
+        attempts == 2
+        and baseline["native"]["cg"][0]["title"] == baseline["native"]["ax"][0]["title"]
+    )
+    scene.terminal.native.assert_awaited_once()
+    assert scene.effects == [] and any(
+        event.get("reason") == "BaselineTitlesUnsettled" for event in scene.records
+    )
+
+
+async def test_noncoherent_baseline_never_normalizes_titles_or_opens(module, tmp_path):
+    scene = Scene(module, tmp_path)
+    scene.terminal.native = AsyncMock(return_value={"activation_sent": True, "pid": 775})
+    snapshot = scene.controller.snapshot
+
+    async def mismatched():
+        current = await snapshot()
+        current["cg"][0]["title"] = "⠧ Running original task"
+        current["ax"][0]["title"] = "⠇ Running original task"
+        return current
+
+    scene.controller.snapshot = mismatched
+    with pytest.raises(TimeoutError):
+        await scene.controller.prepare_visible_baseline(timeout=0.005, poll_interval=0)
+    assert scene.controller.baseline is None and scene.effects == []
+    scene.terminal.native.assert_awaited_once()
+
+
+async def test_multiple_baseline_physical_groups_are_outside_observed_boundary(module, tmp_path):
+    scene = Scene(module, tmp_path)
+    scene.groups = lambda: [(231, "first", 2), (232, "second", 1)]
+    with pytest.raises(RuntimeError, match="Only one observed baseline"):
+        await scene.controller.capture_baseline()
+    assert scene.controller.baseline is None and scene.effects == []

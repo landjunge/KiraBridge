@@ -11,12 +11,15 @@ import asyncio
 import hashlib
 import json
 import re
-from collections import Counter
 
 
 def require(value, message):
     if not value:
         raise RuntimeError(message)
+
+
+class BaselineTitlesUnsettled(RuntimeError):
+    """Separate native reads have not supplied one exact CG/AX title pair."""
 
 
 class BaselineNotVisible(RuntimeError):
@@ -62,6 +65,7 @@ class PhysicalIsolation:
         self.tag_attempted = self.move_attempted = self.confirmed = False
         self.move_accepted = False
         self.activation_attempted = False
+        self.own_radio_token = None
 
     def activation_source(self, identity):
         return (
@@ -123,8 +127,14 @@ class PhysicalIsolation:
             while True:  # noqa: ASYNC110 -- only observe after exactly one activation
                 try:
                     return await self.capture_baseline()
-                except BaselineNotVisible:
-                    self.record({"baseline_surface_pending": True, "activation_retry": False})
+                except (BaselineNotVisible, BaselineTitlesUnsettled) as error:
+                    self.record(
+                        {
+                            "baseline_surface_pending": True,
+                            "reason": type(error).__name__,
+                            "activation_retry": False,
+                        }
+                    )
                     await asyncio.sleep(poll_interval)
 
     async def read(self, operation, arguments):
@@ -298,6 +308,8 @@ class PhysicalIsolation:
                     "token": window["element_token"],
                     "radios": radios,
                     "tabs": len(radios) if radios is not None else None,
+                    "position": observed["element"].get("position"),
+                    "size": observed["element"].get("size"),
                 }
             )
         result = {
@@ -342,11 +354,14 @@ class PhysicalIsolation:
         if logical["rows"] and not native["cg"] and not native["ax"]:
             raise BaselineNotVisible("Existing logical Terminal views have no physical surface")
         require(
-            all(group["tabs"] is not None for group in native["ax"]),
-            "Baseline AX tab counts unavailable",
+            len(native["cg"]) == len(native["ax"]) == 1,
+            "Only one observed baseline physical tab group is supported",
         )
+        if native["cg"][0]["title"] != native["ax"][0]["title"]:
+            raise BaselineTitlesUnsettled("Baseline CG/AX titles have not matched exactly")
+        self.physical_pairs(native)
         require(
-            sum(group["tabs"] for group in native["ax"]) == len(logical["rows"]),
+            native["ax"][0]["tabs"] == len(logical["rows"]) and native["ax"][0]["radios"],
             "Baseline AX/logical topology differs",
         )
         self.baseline = {"logical": logical, "native": native}
@@ -396,103 +411,115 @@ class PhysicalIsolation:
         )
         return row
 
-    def topology(self, snapshot, *, after_move=False):
-        own_cg = [window for window in snapshot["cg"] if window["title"].count(self.nonce)]
-        own_ax = [group for group in snapshot["ax"] if group["title"].count(self.nonce)]
+    @staticmethod
+    def physical_pairs(snapshot):
+        """Match current native surfaces by exact title and independently read layout."""
+        require(len(snapshot["cg"]) == len(snapshot["ax"]), "Incomplete physical topology")
+        pairs = []
+        for group in snapshot["ax"]:
+            matches = [window for window in snapshot["cg"] if window["title"] == group["title"]]
+            require(len(matches) == 1, "Current CG/AX titles are not uniquely coherent")
+            window = matches[0]
+            bounds = window.get("bounds", {})
+            require(
+                group.get("position") == [bounds.get("X"), bounds.get("Y")]
+                and group.get("size") == [bounds.get("Width"), bounds.get("Height")]
+                and all(
+                    type(bounds.get(key)) in {int, float} for key in ("X", "Y", "Width", "Height")
+                ),
+                "Current CG/AX layout is unavailable or differs",
+            )
+            pairs.append((group, window))
         require(
-            len(own_cg) == len(own_ax) == 1
-            and own_cg[0]["title"].count(self.nonce) == own_ax[0]["title"].count(self.nonce) == 1,
+            len({window["window_id"] for _, window in pairs}) == len(pairs),
+            "Current CG/AX pairing is ambiguous",
+        )
+        return pairs
+
+    def topology(self, snapshot, *, after_move=False):
+        baseline = self.baseline["native"]
+        require(
+            len(baseline["cg"]) == len(baseline["ax"]) == 1,
+            "Only one observed baseline physical tab group is supported",
+        )
+        require(
+            snapshot["worker"] == baseline["worker"]
+            and all(
+                snapshot["app"][key] == baseline["app"][key]
+                for key in ("pid", "started_at", "bundle_id")
+            )
+            and all(
+                window["owner_pid"] == baseline["app"]["pid"]
+                and window["application_start"] == f"{baseline['app']['started_at']:.6f}"
+                for window in snapshot["cg"]
+            ),
+            "Physical owner or worker generation changed",
+        )
+        pairs = self.physical_pairs(snapshot)
+        own_pairs = [(group, window) for group, window in pairs if self.nonce in group["title"]]
+        require(
+            len(own_pairs) == 1 and own_pairs[0][0]["title"].count(self.nonce) == 1,
             "Own nonce title is missing or ambiguous",
         )
-        own = own_ax[0]
-        others = [group["tabs"] for group in snapshot["ax"] if group is not own]
-        require(all(count is not None for count in others), "Other AX tab topology is incomplete")
-        baseline = Counter(group["tabs"] for group in self.baseline["native"]["ax"])
-        count = own["tabs"]
-        baseline_cg = self.baseline["native"]["cg"]
-        baseline_ax = self.baseline["native"]["ax"]
-        shared_ax = shared_cg = None
-        if count is not None and count > 1:
-            matched = [group for group in baseline_ax if group["token"] == own["token"]]
-            require(len(matched) == 1, "Shared baseline AX identity is not preserved")
-            shared_ax = matched[0]
-            original_radios = [item["element_token"] for item in shared_ax["radios"]]
-            remaining_radios = [
-                item["element_token"]
-                for item in own["radios"]
-                if not item["title"].count(self.nonce)
+        own, own_cg = own_pairs[0]
+        require(
+            all(group["radios"] and group["tabs"] == len(group["radios"]) for group, _ in pairs),
+            "Current AX tab membership is incomplete; no hidden-group inference is permitted",
+        )
+        original = [radio["element_token"] for radio in baseline["ax"][0]["radios"]]
+        tokens = [radio["element_token"] for group, _ in pairs for radio in group["radios"]]
+        require(
+            len(tokens) == len(set(tokens))
+            and set(original).issubset(tokens)
+            and len(tokens) == len(original) + 1,
+            "Original baseline radio membership changed or is ambiguous",
+        )
+        added = set(tokens) - set(original)
+        require(len(added) == 1, "Exactly one new own radio token is required")
+        own_token = added.pop()
+        require(
+            self.own_radio_token in {None, own_token},
+            "Own radio token changed after its first positive binding",
+        )
+        own_tokens = [radio["element_token"] for radio in own["radios"]]
+        require(own_token in own_tokens, "New own radio is outside the nonce-bound window")
+        selected = [radio["element_token"] for radio in own["radios"] if radio.get("value") is True]
+        require(selected == [own_token], "Own AX tab is not uniquely selected")
+        hosts = [
+            (group, window)
+            for group, window in pairs
+            if any(radio["element_token"] in original for radio in group["radios"])
+        ]
+        require(len(hosts) == 1, "Original baseline radios no longer share one physical group")
+        host, host_cg = hosts[0]
+        require(
+            [
+                radio["element_token"]
+                for radio in host["radios"]
+                if radio["element_token"] != own_token
             ]
-            require(original_radios == remaining_radios, "Shared baseline tab identities changed")
-            matched_cg = [
-                window for window in baseline_cg if window["window_id"] == own_cg[0]["window_id"]
-            ]
-            if not matched_cg and len(baseline_cg) == len(baseline_ax) == 1:
-                matched_cg = baseline_cg
-            require(len(matched_cg) == 1, "Shared baseline CG identity is ambiguous")
-            shared_cg = matched_cg[0]
-        for original in baseline_cg:
-            if original is shared_cg:
-                continue
-            fields = (
-                "window_id",
-                "owner_pid",
-                "application_start",
-                "bounds",
-                "layer",
-                "on_screen",
-                "revision",
-            )
-            require(all(key in original for key in fields), "Baseline CG fingerprint unavailable")
-            matches = [
-                window for window in snapshot["cg"] if window["window_id"] == original["window_id"]
-            ]
-            require(
-                len(matches) == 1
-                and matches[0] is not own_cg[0]
-                and all(matches[0].get(key) == original[key] for key in fields),
-                "Original baseline CG physical identity changed",
-            )
-        for original in baseline_ax:
-            if original is shared_ax:
-                continue
-            matches = [
-                group
-                for group in snapshot["ax"]
-                if group is not own and group["token"] == original["token"]
-            ]
-            require(
-                len(matches) == 1
-                and matches[0]["tabs"] == original["tabs"]
-                and [item["element_token"] for item in matches[0]["radios"] or []]
-                == [item["element_token"] for item in original["radios"] or []],
-                "Original baseline AX tab identities changed",
-            )
-        if count is None:
-            require(
-                after_move and self.move_accepted and Counter(others) == baseline,
-                "Missing own AX tab group is not a standalone-window proof",
-            )
-            require(
-                own_cg[0]["window_id"] not in {window["window_id"] for window in baseline_cg},
-                "Missing own AX group needs a new non-baseline CG binding",
-            )
-            count = 1
-        if count == 1:
-            require(Counter(others) == baseline, "Remaining physical tab groups changed")
+            == original,
+            "Original baseline radio order changed",
+        )
+        require(
+            host_cg["bounds"] == baseline["cg"][0]["bounds"],
+            "Original baseline host layout changed",
+        )
+        if host is own:
+            require(len(pairs) == 1, "Shared baseline physical topology changed")
         else:
             require(
-                count > 1 and Counter(others + [count - 1]) == baseline,
-                "Shared own tab does not match baseline physical topology",
+                len(pairs) == 2 and own_tokens == [own_token],
+                "Detached own radio or remaining baseline topology is unproven",
             )
-            radios = [item for item in own["radios"] if item["title"].count(self.nonce)]
-            require(
-                len(radios) == 1 and radios[0].get("value") is True,
-                "Own AX tab is not uniquely selected",
-            )
+        # Parent AX and CG identifiers, and radio titles, are volatile on this host.
+        # Bind the sole added radio only after all positive membership checks pass.
+        self.own_radio_token = own_token
         return {
-            "tab_count": count,
-            "cg_window_id": own_cg[0]["window_id"],
+            "tab_count": len(own_tokens),
+            "cg_window_id": own_cg["window_id"],
             "ax_window_token": own["token"],
+            "own_radio_token": own_token,
         }
 
     async def context(self):

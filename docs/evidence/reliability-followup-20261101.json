@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "created_at": "2026-11-01T16:56:54.355718+00:00",
-  "status": "reviewed_source_frozen_package_live_gates_pending",
+  "status": "local_completion_resumed_no_github_actions_or_push",
   "base_commit": "a6ecafa3b84729a41b07beba43013fb5863e3499",
   "branch": "fix/reliability-review-20261101",
   "source_sha256": "9b3c03ccf40e13e2cfcbdeb8f89b359141455026a8620a2c3b8d8dd0a3881f36",
@@ -152,7 +152,7 @@
     "whiteboard_read.py": "71fc4410b9e024f0069ed865b1d6530aa1865c5d906714da4835526dd7e9b083",
     "workflow_control_adapter.py": "1611680e5d75387feadeae9bc7258955c6b45e5b5f8397c7da6d946197ac0d04"
   },
-  "manual_harness_sha256": "b97673657d5a08afdc4e3affe6c41f02dd33de22659a36059489be4c296a840d",
+  "manual_harness_sha256": "a10142628775755868016930599a598a7500db647fbaef9466400ad644b016a5",
   "tests": {
     "local_full_suite": {
       "passed": 3075,
@@ -197,8 +197,10 @@
       "seconds": 2.96
     },
     "manual_harness_offline": {
-      "passed": 34,
-      "seconds": 0.26
+      "repository_passed": 98,
+      "private_actual03_passed": 7,
+      "seconds": 6.84,
+      "scope": "membership only; no actual acceptance pass"
     },
     "test_counts_overlap": true,
     "first_final_ci": {
@@ -228,6 +230,18 @@
         "managed_route": "three fake shebangs pinned to test interpreter, real process tested with no host PATH Python, processing diagnostics; 14 targeted cases passed; original CI cause remains unproven; reviewed by Root"
       },
       "production_delta": false
+    },
+    "verification_154d77": {
+      "run": 41338571258,
+      "status": "failed ARM bootstrap stderr_limit classification; original cause unproven",
+      "linux_311": "success",
+      "linux_313": "success",
+      "macos_intel": "success",
+      "macos_arm": {
+        "passed": 3172,
+        "failed": 1,
+        "skipped": 4
+      }
     }
   },
   "independent_reviews": {
@@ -235,7 +249,8 @@
     "terminal": "review_mcp + Root",
     "mcp": "review_terminal/review_macos + Root",
     "native": "review_mcp + Root",
-    "harness": "review_mcp + Root"
+    "harness": "review_mcp + Root",
+    "radio_membership": "review_mcp Go for helper6d623ff3; 10 local pure predicate cases,0.21s; real post-detach unproven"
   },
   "decisions": {
     "output_store": "covering-index experiment slower; no code/durability change",
@@ -244,9 +259,8 @@
     "codex_geometry": "12670 original renderer vectors matched only documented bounded profile; broader probes rejected"
   },
   "pending": [
-    "final exact-commit four-platform CI",
-    "package build and isolated smoke",
-    "actual one-owned-window Codex acceptance",
+    "resolve failed verification ARM case without weaker assertion",
+    "fresh actual one-owned-window Codex acceptance",
     "supported visible upgrade and running source/commit identity",
     "release publication"
   ],
@@ -266,9 +280,30 @@
     "intel_package_sha256": "1d65cf1e840b2fc194329ebebe1b3aa0b5d5e38656f0fb7a6137b6afe9b10a5d",
     "independent_intel_zip_arm_reviews": "passed",
     "manual_ubuntu_smoke": "one actual official helper run passed; own cleanup independently verified; not an Actions-pass claim",
-    "physical_acceptance": "failed before test input/Codex; own view safely closed and original views/processes preserved",
+    "physical_acceptance": "runs01/02/03 stopped before test input/Codex; run03 parent AX/CG volatility; owned shell and private endpoint cleanup confirmed; originals preserved",
     "product_changes_since_checkpoint": false,
-    "pending": "only manual harness startup/physical isolation, physical acceptance, supported visible install/runtime verification and release",
+    "pending": "independent radio-membership delta review; fresh actual acceptance; supported visible install/runtime identity; release",
     "production": "RC22 unchanged"
+  },
+  "physical_helper_sha256": "6d623ff3a1e166086c97aff5a11c83f44336f84202af54e7bde2a755d754547f",
+  "budget_stop": {
+    "user_report": "monthly GitHub budget consumed in one day; exact billing amount not independently checked",
+    "cancelled_run": 41330303010,
+    "cancelled_run_readback": "completed/cancelled",
+    "repository_queued_runs": 0,
+    "repository_in_progress_runs": 0,
+    "further_actions": false,
+    "further_pushes": false,
+    "further_test_loops": false,
+    "production_changed": false,
+    "bootstrap_test_diagnostics": "implemented but unexecuted, uncompiled, not verified"
+  },
+  "local_completion": {
+    "user_intent": "finished functioning app remains the objective",
+    "actions": false,
+    "push": false,
+    "repeat_full_matrix": false,
+    "next": "one fresh local end-to-end acceptance using reviewed helper and unchanged verified product406",
+    "unverified_bootstrap_diagnostics_excluded": true
   }
 }
