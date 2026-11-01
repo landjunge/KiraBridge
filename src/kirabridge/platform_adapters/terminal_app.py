@@ -757,6 +757,33 @@ class TerminalAppTransport:
             self.native_target(pane_id) + "\nJSON.stringify(" + self.native_input_tail(65536) + ");"
         )
 
+    def native_existing_app_activation_source(self, app_pid, identity):
+        parts = identity.split(None, 8) if isinstance(identity, str) else []
+        if (
+            type(app_pid) is not int
+            or app_pid <= 0
+            or len(parts) != 9
+            or parts[0] != str(os.getuid())
+            or not parts[7].isdigit()
+        ):
+            raise BridgeError(
+                "visible_target_changed", "Full owned Terminal application identity required"
+            )
+        return (
+            'const app=Application("Terminal");'
+            + self.native_identity_guard({app_pid: identity})
+            + "\nconst se=Application('System Events');"
+            + "const owners=se.processes().filter(p=>p.unixId()==="
+            + str(app_pid)
+            + ");"
+            + "if(owners.length!==1||owners[0].bundleIdentifier()!=='com.apple.Terminal'"
+            "||!app.running())"
+            + "throw Error('Existing Terminal owner changed');"
+            + "checkTargetIdentity();app.activate();JSON.stringify({activation_sent:true,pid:"
+            + str(app_pid)
+            + ",frontmost:app.frontmost()});"
+        )
+
     def native_open_source(self, command, nonce, proof):
         prior = json.dumps(proof.logical_before)
         guard = (

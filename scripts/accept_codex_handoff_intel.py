@@ -787,7 +787,8 @@ async def accept(args):
         "known_local_managed_files_present": managed_absence,
     }
     server = serving = sock = None
-    open_attempts = 0
+    open_attempts = activation_attempts = 0
+    expected_activation_source = None
     submitted = set()
 
     def save(name, data):
@@ -843,11 +844,18 @@ async def accept(args):
                 await asyncio.sleep(0.15)
 
     async def traced_native(source, *, mutation=False):
-        nonlocal open_attempts
+        nonlocal open_attempts, activation_attempts
         if not mutation:
             return await native(source, mutation=False)
         created = evidence.get("product_creation_receipt")
-        if owned is None and created is None:
+        activating = expected_activation_source is not None and source == expected_activation_source
+        if activating:
+            require(
+                owned is None and created is None and open_attempts == activation_attempts == 0,
+                "Only one exact existing-app activation is permitted before creation",
+            )
+            activation_attempts += 1
+        elif owned is None and created is None:
             require(
                 "app.doScript(" in source and open_attempts == 0, "No additional window attempt"
             )
@@ -861,6 +869,8 @@ async def accept(args):
                 "Native mutation is not bound to owned window",
             )
         receipt = {"source_sha256": text_sha(source), "at": time.time()}
+        if activating:
+            receipt["existing_app_activation"] = True
         evidence["mutations"].append(receipt)
         checkpoint()
         try:
@@ -909,7 +919,12 @@ async def accept(args):
                 require(not evidence["mutations"], "Unknown effect without baseline; preserve")
                 evidence["cleanup_complete"] = True
                 return
-            require(not evidence["mutations"], "Unestablished open effect; preserve, never adopt")
+            require(
+                open_attempts == 0
+                and all(m.get("existing_app_activation") is True for m in evidence["mutations"]),
+                "Unestablished open effect; preserve, never adopt",
+            )
+            evidence["cleanup_scope"] = "No window creation attempted; existing-app activation only"
             await observe_originals()
             evidence["cleanup_complete"] = True
             return
@@ -986,6 +1001,27 @@ async def accept(args):
                     and transport.system_transport is system_transport,
                     "Physical proof must reuse the exact installed native transport",
                 )
+                applications = await system_transport.request(
+                    "apps.list", {"limit": 1000}, principal="chatgpt"
+                )
+                terminals = [
+                    app
+                    for app in applications["applications"]
+                    if app.get("bundle_id") == "com.apple.Terminal"
+                ]
+                require(len(terminals) <= 1, "Existing Terminal app is ambiguous")
+                if terminals:
+                    pid = terminals[0]["pid"]
+                    identity = await transport.process_identity(pid, detailed=True)
+                    expected_activation_source = transport.native_existing_app_activation_source(
+                        pid, identity
+                    )
+                    evidence["allowed_existing_app_activation"] = {
+                        "pid": pid,
+                        "identity_sha256": text_sha(identity),
+                        "source_sha256": text_sha(expected_activation_source),
+                    }
+                    checkpoint()
                 baseline_ready = True
                 transport.native = traced_native
                 transport.open = tracked_product_open

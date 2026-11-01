@@ -14,7 +14,7 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from kirabridge.bridge_core.models import UncertainExecution
+from kirabridge.bridge_core.models import BridgeError, UncertainExecution
 from kirabridge.platform_adapters.terminal_app import TerminalAppTransport
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -351,3 +351,39 @@ async def test_preopen_original_radio_replacement_stops_before_any_move(product)
         await leaf.open("cd -- /private/work", on_created=created, principal="chatgpt")
     assert error.value.provider_error["creation_receipt"] == receipt
     assert events == ["create", "receipt", "focus"]
+
+
+async def test_existing_terminal_in_other_space_activates_once_then_only_bounded_reads(product):
+    from kirabridge.platform_adapters.macos.terminal_window import TerminalWindowProof
+
+    scene, leaf, events, _, _ = product
+    fixture = fixture_module("test_codex_window_isolation")
+    original_groups = scene.groups
+    scene.groups = lambda: (
+        [] if sum(op == "windows.list" for op, _ in scene.calls) < 3 else original_groups()
+    )
+    leaf.native = AsyncMock(return_value={"activation_sent": True, "pid": 775})
+    proof = TerminalWindowProof(leaf, leaf.system_transport, "chatgpt")
+    await proof.prepare()
+    leaf.native.assert_awaited_once()
+    source = leaf.native.await_args.args[0]
+    assert source == leaf.native_existing_app_activation_source(775, fixture.TERMINAL)
+    assert source.count("app.activate()") == 1
+    assert all(word not in source for word in ("doScript(", "windows", "keystroke", "keyCode"))
+    assert sum(op == "windows.list" for op, _ in scene.calls) == 3
+    assert len(proof.before["cg"]) == len(proof.before["ax"]) == 1 and events == []
+    assert await asyncio.to_thread(fixture.javascript, scene, source) == {
+        "clicks": 0,
+        "activations": 1,
+    }
+    changed = await asyncio.to_thread(fixture.javascript, scene, source, change="app-generation")
+    assert changed["activations"] == 0 and changed["error"]
+
+    scene.groups = lambda: []
+    leaf.native.reset_mock()
+    previous = sum(op == "windows.list" for op, _ in scene.calls)
+    with pytest.raises(BridgeError, match="Existing Terminal surfaces are not observable"):
+        await TerminalWindowProof(leaf, leaf.system_transport, "chatgpt").prepare()
+    leaf.native.assert_awaited_once()
+    assert sum(op == "windows.list" for op, _ in scene.calls) - previous == 4
+    assert events == []

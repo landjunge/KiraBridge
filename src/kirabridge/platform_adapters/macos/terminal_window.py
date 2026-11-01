@@ -204,14 +204,29 @@ class TerminalWindowProof:
             "Terminal before-inventory is unavailable",
         )
         self.before = await self.snapshot() if self.app else {"cg": [], "ax": []}
-        require(
-            not self.logical_before or self.before["cg"],
-            "Existing Terminal surfaces are not observable",
-        )
         self.app_identity = (
             await self.terminal.process_identity(self.app["pid"], detailed=True)
             if self.app
             else None
+        )
+        if self.logical_before and not self.before["cg"] and not self.before["ax"]:
+            source = self.terminal.native_existing_app_activation_source(
+                self.app["pid"], self.app_identity
+            )
+            activated = await self.terminal.native(source, mutation=True)
+            require(
+                activated.get("activation_sent") is True
+                and activated.get("pid") == self.app["pid"],
+                "Existing Terminal activation is unconfirmed; never repeat",
+            )
+            for _ in range(3):
+                await asyncio.sleep(0.15)
+                self.before = await self.snapshot()
+                if self.before["cg"] or self.before["ax"]:
+                    break
+        require(
+            not self.logical_before or self.before["cg"],
+            "Existing Terminal surfaces are not observable",
         )
 
     @staticmethod

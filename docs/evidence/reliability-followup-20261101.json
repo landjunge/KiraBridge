@@ -4,7 +4,7 @@
   "status": "new_product_window_fix_reviewed_local_package_and_actual_acceptance_pending",
   "base_commit": "a6ecafa3b84729a41b07beba43013fb5863e3499",
   "branch": "fix/reliability-review-20261101",
-  "source_sha256": "c0af2bb8c428c137e0f87c68354cfa43225eb8ff73887f09bf1d2809f3d65c15",
+  "source_sha256": "a44d09dfdb0ed7830c42f3b566975c3a85c40387501fcdac38ab4d0950c1e5ba",
   "source_python_files": {
     "__init__.py": "b4263b16e5d119a7e2ccd5124f5a28bb5001b9ff94ee771b96001f09e9c15deb",
     "admin_manager.py": "bd5b83ed4e2103a3a74079a3056e6b779182d85138f8acd55e1a7dd865912ef3",
@@ -103,9 +103,9 @@
     "platform_adapters/macos/system_models.py": "1afb53b276c53f7981f1a67a356760873dccb90a3ec301a45004cb5efe3d73ac",
     "platform_adapters/macos/system_services_models.py": "bf1202d16cc340f6b5e44859e9d5134091730d45c7b3fd1ff259a6dac42cad21",
     "platform_adapters/macos/system_transport.py": "3cad47d9d0f385c3aa44f808c37a2aee281f34687fb1b3593cb77378d7a32fd8",
-    "platform_adapters/macos/terminal_window.py": "6b4b6e24fb839f266f03efe2ff87068462da34caa4a8dceb541a89adf7ed9928",
+    "platform_adapters/macos/terminal_window.py": "b6b892539532c94ae8fd58c84e7178e2be9cf43bee5086d67cb5da4c02a50af5",
     "platform_adapters/shell_prompt.py": "5489a11457e10f52f00951ac055160fb2da164881121d1092d72575236a441fd",
-    "platform_adapters/terminal_app.py": "7445fe453514b7fa21816021454c864c0edee44a399e1a09b1a26f25f8bde20c",
+    "platform_adapters/terminal_app.py": "92aa3a0daf20956306d0c690d951f31090c3fc6ce85f25c596ae76226b5b7687",
     "platform_adapters/tmux.py": "f4c7723b5c6ea2aff7ec459c981bc1a7995d53f6d956bb55529aa5dd7ebe557f",
     "private_files.py": "c32d5da10076534af47d8d4792cd7d686195abee07559e7e8b3900afa9b3f687",
     "process_manager/__init__.py": "c0b13af45655dae5b814fbd9587dbc7156d3766a1214e1d4a6ad1b213add9a3f",
@@ -153,7 +153,7 @@
     "whiteboard_read.py": "71fc4410b9e024f0069ed865b1d6530aa1865c5d906714da4835526dd7e9b083",
     "workflow_control_adapter.py": "1611680e5d75387feadeae9bc7258955c6b45e5b5f8397c7da6d946197ac0d04"
   },
-  "manual_harness_sha256": "eccca80bddb4215ec2a99e54a92dd64e6808357e7b5b34176db42a6adadc5753",
+  "manual_harness_sha256": "dd6933e06837712ee3b054ed5bc82189c098a68d0b3b100149a06686bd2b6d45",
   "tests": {
     "local_full_suite": {
       "passed": 3075,
@@ -349,5 +349,14 @@
     "real_acceptance": "pending new exact package; old406 runs are not acceptance of this new fix",
     "github_actions": false,
     "push": false
+  },
+  "prior_source_dd561c0": "c0af2bb8c428c137e0f87c68354cfa43225eb8ff73887f09bf1d2809f3d65c15",
+  "active_space_delta": {
+    "actual_dd561c0_open": "stopped unknown before any UI mutation;0 native mutations;cleanup confirmed;no Task replay",
+    "readonly_probe_error": "Existing Terminal surfaces are not observable;logical3 CG0 AX0",
+    "product_fix": "one bound existing-app activate then at most3 pure reads",
+    "review": "review_macos Go",
+    "code_local_test": "one direct regression with3 scenarios passed",
+    "actions": false
   }
 }

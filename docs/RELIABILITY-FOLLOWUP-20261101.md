@@ -386,3 +386,16 @@ verify_opened-Pfad. Er erzeugt keinen eigenen Tag-/Move-/Physical-Controller meh
 Sein unabhängiger Review ist freigegeben; echte lokale Native-Abnahme und
 Installation sind noch offen. Neuer Pythonquellbaum (146 Dateien):
 `c0af2bb8c428c137e0f87c68354cfa43225eb8ff73887f09bf1d2809f3d65c15`; Harness-SHA `eccca80bddb4215ec2a99e54a92dd64e6808357e7b5b34176db42a6adadc5753`.
+
+Das Paketdd561c0 wurde exakt gebaut und bestand den offiziellen isolierten
+Darwin-x86_64-Smoke (Auth/geladener Quellbaum/Korruptpaket/Config-/Credentialerhalt).
+Die erste normale Open-Abnahme stoppte ohne jede UI-Mutation: drei logische
+Views, aber null beobachtbare CG-/AX-Flächen auf der aktiven Oberfläche.
+Eine reine lesende Paketprobe bestätigte den genauen Vor-Open-Abbruch. Der
+Produktpfad aktiviert deshalb ausschließlich in diesem Fall einmal die
+vollständig prozess-/bundlegebundene bestehende Terminal-App; maximal drei
+weitere Snapshots sind rein lesend. Ohne Erholung erfolgt kein Open. Ein
+direkter Regressionstest (Erholung, unverfügbar, echte JS-Generationsabweichung)
+bestand1,52s. Unabhängiger Mac-Review von Produkt und exakter Tracerfreigabe
+ist grün. Kein Task wurde wiederholt, kein Testfenster entstand, RC22 unverändert.
+Neuer Pythonbaum `a44d09dfdb0ed7830c42f3b566975c3a85c40387501fcdac38ab4d0950c1e5ba`; nächste Abnahme verwendet einen neuen exakten Build.

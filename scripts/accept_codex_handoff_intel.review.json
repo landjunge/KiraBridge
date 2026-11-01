@@ -144,6 +144,12 @@
       "harness_sha256": "eccca80bddb4215ec2a99e54a92dd64e6808357e7b5b34176db42a6adadc5753",
       "actions_started": 0,
       "repeated_full_suites": 0
+    },
+    "active_space_delta": {
+      "product": "one full-generation-bound activation only if logical views exist and both CG/AX are zero; maximum3 fresh reads",
+      "author": "one direct test with recovery, unavailable and JS-generation negative paths passed1.52s",
+      "review": "review_macos exact product and harness Go",
+      "harness_sha256": "dd6933e06837712ee3b054ed5bc82189c098a68d0b3b100149a06686bd2b6d45"
     }
   }
 }
