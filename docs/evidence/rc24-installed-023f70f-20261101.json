@@ -1,0 +1,67 @@
+{
+  "version": "0.8.0rc24",
+  "source_commit": "023f70feefcf8fcaa17b0637738b02644ad6b357",
+  "python_source_sha256": "5dcf092905b1f89db76439d12b8a93039e1f5d4d479baf9ddf91f74c229beb25",
+  "python_files": 146,
+  "bundle_sha256": "ec72a0796f7160887a335a32d5564f28601eafb937e9d33a2387532da5d10800",
+  "platform": "Darwin-x86_64",
+  "os_version": "15.7.4",
+  "official_bundle_smoke_passed": true,
+  "real_native_acceptance": {
+    "passed": true,
+    "tests_passed": true,
+    "cleanup_complete": true,
+    "private_endpoint_absent": true,
+    "checks": [
+      "busy shell refused before any new native mutation",
+      "131-column ambiguous literal/handoff refused with zero paste and unchanged draft",
+      "long literal exact one paste/Return and own rollout/screen response",
+      "unchanged body_only_v1 handoff and independently bound local answer"
+    ],
+    "separate_physical_window": true,
+    "codex_version": "codex-cli 0.166.0",
+    "historical_tasks_replayed": false
+  },
+  "supported_visible_install": {
+    "core": true,
+    "console": true,
+    "app": true,
+    "verify": true,
+    "owned_install_window_closed_and_independently_absent": true,
+    "runtime": {
+      "version": "0.8.0rc24",
+      "pid": 78414,
+      "instance_id": "6c6077f4315f4fe59b1379cea2d8670e",
+      "started_at": "2026-11-01T21:58:48.712921+00:00",
+      "source_tree_sha256": "5dcf092905b1f89db76439d12b8a93039e1f5d4d479baf9ddf91f74c229beb25",
+      "source_file_count": 146
+    },
+    "app_pid": 78865,
+    "console_pid": 78630,
+    "app_binary_sha256": "bd1d85664810ed319b084e5268bcb809ff398de80c7746c93c723b54a5ecb8db",
+    "config_credentials_and_protected_records_preserved": true,
+    "protected_record_counts": {
+      "message_jobs": 23,
+      "queue_holds": 30,
+      "queue_withdrawals": 28,
+      "tasks": 88,
+      "visible_handoffs": 10
+    },
+    "existing_agent_sessions_preserved": true,
+    "rollback_exercised": false,
+    "previous_release_retained": "f97ab1cdeebe1d06648febe685f7ebb738ca93a9"
+  },
+  "post_install_current_connector": {
+    "new_runtime_identity_verified": true,
+    "own_terminal_output_read": true,
+    "original_three_terminal_views_retained": true
+  },
+  "limits": [
+    "No new GitHub Actions, push or GitHub publication per user budget.",
+    "Final local changes have no fresh full four-platform CI.",
+    "Native end-to-end executed with exact packaged source in an isolated dispatcher; deployed daemon separately confirmed by runtime identity, current MCP connector, terminal read and no-prompt permission status.",
+    "tmux transport unavailable on this Mac; native Terminal path passed.",
+    "Existing diagnostic history limit remains exhausted; task, message and audit evidence preserved."
+  ],
+  "created_at": 1793570544.676386
+}

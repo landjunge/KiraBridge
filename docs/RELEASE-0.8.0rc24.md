@@ -1,5 +1,11 @@
 # KiraBridge 0.8.0rc24 · terminal and connection reliability
 
+Current local outcome: source `023f70feefcf8fcaa17b0637738b02644ad6b357`
+passed real Intel macOS Terminal/Codex acceptance and is installed with Core,
+Console and Companion verified. See the [installation evidence](RC24-INSTALLED-20261101.md).
+No new hosted CI, push or GitHub publication was performed under the user's
+budget constraint. Earlier candidate statements below are historical checkpoints.
+
 An explicitly selected Terminal.app tab now uses only its native catalogue.
 An unrelated tmux read failure can no longer block that selection. Explicit
 tmux selection likewise avoids unrelated native observations. General discovery

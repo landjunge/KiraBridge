@@ -1,5 +1,10 @@
 # Fortsetzung des Zuverlässigkeitsreviews · 1. November 2026
 
+Aktueller Abschluss: RC24 ist auf dem Intel-Mac installiert; echte native
+Codex-Abnahme und Verifikation der laufenden Installation bestanden.
+[Installationsbeleg und verbleibende Grenzen](RC24-INSTALLED-20261101.md).
+Frühere offene Zustände weiter unten bleiben als zeitliche Checkpoints erhalten.
+
 Nutzerauftrag: die Befunde im Team Punkt für Punkt bis zum Abschluss bearbeiten.
 Basis ist Commit `257e72221f751a06767c485ebad253203bdca121`; [Review und Evidenz](RELIABILITY-REVIEW-20261101.md).
 Ein Prüfpunkt endet mit repariert/getestet oder einer belegten technischen Entscheidung.
