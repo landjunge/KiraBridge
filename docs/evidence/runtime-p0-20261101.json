@@ -1,0 +1,63 @@
+{
+  "revision": 2,
+  "recorded_at": "2026-11-01T08:24:04.720845+00:00",
+  "version": "0.8.0rc23",
+  "phase": "reviewed implementation; packaged acceptance and deployment pending",
+  "source_files": 144,
+  "source_manifest_sha256": "a8f8f3915531ed5e6464f5ccb613a163523a526e2a3ee199bea9b0bf0d2b807c",
+  "baseline_code_commit": "f97ab1cdeebe1d06648febe685f7ebb738ca93a9",
+  "baseline_docs_commit": "0107d154e472710e3f65f077ddee871eac70a220",
+  "original_tasks_replayed": false,
+  "production_modified": false,
+  "scope": [
+    "background native admission lifecycle",
+    "pinned own-session process group cleanup"
+  ],
+  "admission": {
+    "implemented": true,
+    "owner_tests": 51,
+    "independent_tests": 7,
+    "independently_reviewed": true,
+    "actual_http_tests": 2,
+    "status": "process_started is admission only; task completes independently"
+  },
+  "cleanup": {
+    "implemented": true,
+    "original_owner_tests_before_census_review_fix": 52,
+    "final_census_owner_cases": 21,
+    "independent_final_cases": 11,
+    "exact_pid_worker_path_changed": false,
+    "terminal_manager_changed": false,
+    "cleanup_budget_seconds": 5,
+    "term_grace_seconds": 2,
+    "escaped_session_or_incomplete_census": "unknown, never success"
+  },
+  "combined_regression": {
+    "passed": 310,
+    "scope": "before caller completeness anchor refinement; final21 owner/11 independent and2 HTTP separately passed after refinement",
+    "overlapping_counts_not_summed": true
+  },
+  "lint_format_lock": "passed",
+  "packaged_runtime_acceptance": "pending exact clean commit package",
+  "release": {
+    "published": false,
+    "installed": false
+  },
+  "private_evidence_directory": "~/.local/share/kirabridge/backups/runtime-p0-20261101T080015Z/",
+  "private_evidence_sha256": {
+    "native-admission-p0a-checkpoint.json": "eae247253a146607a86549378ab17756decbe20c7bf4b252b38df6b6c091ae1f",
+    "native-p0a-independent-review.json": "e8cd31f48c72e77f3fadbdd0c1158783ac7edcb575461a7027f3a0195416755c",
+    "p0b-implementation-checkpoint-v2.json": "72735182722ef1855cf8ac7bbc564f24eeec6286f15f0887c7417ceb1342d845",
+    "p0b-v2-independent-review.json": "3f36baaef59f30c77828b957291f5f6d6eed92f900cfd7d68b5a9764590373e5",
+    "runtime-p0-harness-independent-review.json": "80f37772135d7d206793bdeb1b505c9a1313dc5d7bd14a145181b43e8dad044b",
+    "combined-runtime-regressions.log": "5fe69aa72a8fc89ce6365466f716721e92b6197bec60d73f90651ef5ff1094dc",
+    "managed-admission-real-http-census-v2.log": "8ce35df22afa0df0231b1b950a9959987e910f49bc3e7de0e5414e122e1fd5d5",
+    "p0b-applications-timeout1/diagnosis.json": "35023388e9347095315d45e7a42815bfbb2b38bff3becc59e715e6b62d8bf899"
+  },
+  "limits": [
+    "P1 calculator focus/pagination/Brave unchanged",
+    "No historical task outcome rewritten",
+    "POSIX preflight and signal are not atomic",
+    "No new OS permission requests; notifications already authorized"
+  ]
+}

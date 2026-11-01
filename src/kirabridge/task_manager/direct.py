@@ -2,7 +2,7 @@
 
 import asyncio
 
-from kirabridge.bridge_core.models import State
+from kirabridge.bridge_core.models import State, TerminalInput, canonical
 
 
 class NativeAdmission:
@@ -15,6 +15,7 @@ class NativeAdmission:
         self.events = {}
         self.targets = {}
         self.status = {}
+        self.managed_admissions = {}
         self.expired = set()
         self.observer = None
         self.after_event = 0
@@ -117,6 +118,8 @@ class NativeAdmission:
             self.status.pop(task_id, None)
             return
         self.targets[target] = task_id
+        if self._managed_background(task):
+            self.managed_admissions[task_id] = self._route_identity(task)
         self.status[task_id] = "admitting"
         running = self.active[task_id] = asyncio.create_task(self._run(task, target, event))
 
@@ -130,7 +133,12 @@ class NativeAdmission:
         event = self.events.get(task_id)
         if event is None:
             return
-        if evidence.get("state") in {"sent", "confirmed", "completed"} and evidence.get(
+        if self._managed_spawn_observed(task_id, evidence):
+            # The trusted executor has durably observed this exact managed
+            # process start. Admission ends; execution and its reservation do not.
+            self.status[task_id] = "process_started"
+            event.set()
+        elif evidence.get("state") in {"sent", "confirmed", "completed"} and evidence.get(
             "handoff_id"
         ):
             self.status[task_id] = "confirmed_input"
@@ -143,6 +151,44 @@ class NativeAdmission:
             # it a confirmed paste/Return; the existing executor owns the result.
             self.status[task_id] = "input_attempted"
             event.set()
+
+    @staticmethod
+    def _route_identity(task):
+        return task["operation"], task["principal"], canonical(task.get("args", {}))
+
+    @staticmethod
+    def _managed_background(task):
+        if task["operation"] != "terminal.execute" or task.get("principal") != "chatgpt":
+            return False
+        try:
+            # Match the executor's strict typed route, not arbitrary truthy args.
+            return TerminalInput.model_validate(task.get("args", {})).background
+        except ValueError:
+            return False
+
+    def _managed_spawn_observed(self, task_id, evidence):
+        if (
+            not self.accepting
+            or task_id not in self.active
+            or task_id in self.expired
+            or self.status.get(task_id) != "admitting"
+            or task_id not in self.managed_admissions
+            or evidence.get("evidence_type") != "local_process_spawned"
+            or type(evidence.get("pid")) is not int
+            or not 0 < evidence["pid"] <= 2**31 - 1
+        ):
+            return False
+        # This is an internal executor callback, never a user-supplied PID or
+        # historical event. running()/progress() must have persisted the same
+        # evidence under this runtime's lease before notifying admission.
+        task = self.manager.store.get(task_id)
+        return (
+            self._managed_background(task)
+            and self._route_identity(task) == self.managed_admissions[task_id]
+            and task["state"] == State.RUNNING
+            and task.get("lease_owner") == self.manager.owner
+            and canonical(task.get("evidence")) == canonical(evidence)
+        )
 
     async def _watch(self, task_id, event, execution):
         try:
@@ -168,6 +214,7 @@ class NativeAdmission:
             self.active.pop(task_id, None)
             self.events.pop(task_id, None)
             self.status.pop(task_id, None)
+            self.managed_admissions.pop(task_id, None)
             self.expired.discard(task_id)
             if self.targets.get(target) == task_id:
                 self.targets.pop(target)
@@ -193,7 +240,11 @@ class NativeAdmission:
             result["delivery"] = {
                 "status": status,
                 "automatic_retry": False,
-                "scope": "native input observation; input_attempted is not confirmed delivery",
+                "scope": (
+                    "managed process admission; process_started is not process completion"
+                    if self._managed_background(result)
+                    else "native input observation; input_attempted is not confirmed delivery"
+                ),
             }
             if result["state"] == State.QUEUED and event is None:
                 result["error"] = {
@@ -256,6 +307,7 @@ class NativeAdmission:
                 self.active.pop(identifier, None)
             self.events.pop(identifier, None)
             self.status.pop(identifier, None)
+            self.managed_admissions.pop(identifier, None)
             self.expired.discard(identifier)
             for target, holder in list(self.targets.items()):
                 if holder == identifier:

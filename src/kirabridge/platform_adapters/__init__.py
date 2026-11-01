@@ -4,6 +4,7 @@ import os
 import shutil
 import signal
 import sys
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Protocol
 
@@ -61,6 +62,156 @@ def subprocess_options() -> dict:
     raise BridgeError("unsupported_platform", "A Windows process-tree adapter is required")
 
 
+@dataclass(frozen=True)
+class _OwnedSession:
+    sid: int
+    uid: int
+
+
+def _pin_owned_session(process) -> None:
+    # Only spawn_process calls this, for its own start_new_session child. A
+    # supplied PID, ancestry guess or already-exited leader cannot grant scope.
+    try:
+        if (
+            process.returncode is None
+            and process.pid > 1
+            and os.getsid(process.pid) == os.getpgid(process.pid) == process.pid
+            and process.pid not in {os.getsid(0), os.getpgrp()}
+        ):
+            process._kirabridge_owned_session = _OwnedSession(process.pid, os.geteuid())
+    except ProcessLookupError:
+        pass
+
+
+def _session_members(process, pin):
+    """Bounded public metadata only; no arguments, environment or ancestry grants."""
+    import subprocess
+
+    if (
+        pin.sid != process.pid
+        or pin.sid <= 1
+        or pin.sid in {os.getsid(0), os.getpgrp()}
+        or pin.uid != os.geteuid()
+    ):
+        raise UncertainExecution("process_cleanup_unknown", "Owned session identity changed")
+    try:
+        result = subprocess.run(
+            ["/bin/ps", "-axo", "pid=,uid=,pgid=,stat="],
+            capture_output=True,
+            text=True,
+            timeout=0.5,
+            check=False,
+        )
+        if result.returncode or result.stderr or len(result.stdout) > 2 * 1024 * 1024:
+            raise ValueError("Incomplete process census")
+        rows, seen, caller_observed = [], set(), False
+        for line in result.stdout.splitlines():
+            parts = line.split()
+            if len(parts) != 4 or len(rows) >= 100000:
+                raise ValueError("Malformed process census")
+            pid, uid, group = map(int, parts[:3])
+            if pid == 0:  # Kernel task is outside this positive-PID interface.
+                continue
+            if pid < 0 or pid in seen:
+                raise ValueError("Duplicate process identity")
+            seen.add(pid)
+            if pid == os.getpid():
+                if uid != os.geteuid() or group != os.getpgrp() or parts[3].startswith("Z"):
+                    raise ValueError("Caller process census identity changed")
+                caller_observed = True
+            try:
+                sid = os.getsid(pid)
+            except ProcessLookupError:
+                continue  # This observed process is now absent, not unidentified.
+            if pid == pin.sid and process.returncode is not None:
+                raise ValueError("Reused session leader PID")
+            if sid == pin.sid:
+                try:
+                    if group != os.getpgid(pid):
+                        raise ValueError("Changing process group")
+                except ProcessLookupError:
+                    continue
+            rows.append((pid, uid, group, sid, parts[3]))
+        if not caller_observed:
+            raise ValueError("Process census lacks its live caller anchor")
+        members = tuple(row for row in rows if row[3] == pin.sid)
+        groups = {row[2] for row in members if not row[4].startswith("Z")}
+        if len(members) > 4096 or len(groups) > 128:
+            raise ValueError("Owned session exceeds cleanup budget")
+        if any(group <= 1 or group == os.getpgrp() for group in groups):
+            raise ValueError("Protected process group")
+        # A PGID cannot legitimately span sessions. Do not signal on a partial
+        # ownership observation, including a foreign-UID member of the same group.
+        if any(row[1] != pin.uid or row[3] != pin.sid for row in rows if row[2] in groups):
+            raise ValueError("Unconfirmed session/group ownership")
+        return members
+    except (OSError, ValueError, subprocess.TimeoutExpired) as error:
+        raise UncertainExecution(
+            "process_cleanup_unknown", "Owned process session cannot be confirmed"
+        ) from error
+
+
+async def _owned_session_groups(process, pin):
+    import asyncio
+
+    return await asyncio.to_thread(_session_members, process, pin)
+
+
+async def _signal_owned_session(process, pin, value):
+    members = await _owned_session_groups(process, pin)
+    groups = {row[2] for row in members if not row[4].startswith("Z")}
+    for group in sorted(groups):
+        # No await between these final positive identity checks and the syscall.
+        # Public killpg is still not an atomic session/start-token operation.
+        if group <= 1 or group == os.getpgrp() or pin.sid == os.getsid(0):
+            raise UncertainExecution("process_cleanup_unknown", "Protected cleanup group")
+        current_members = 0
+        for pid, uid, pgid, sid, _state in members:
+            if pgid != group:
+                continue
+            if uid != pin.uid or sid != pin.sid:
+                raise UncertainExecution("process_cleanup_unknown", "Session ownership changed")
+            try:
+                if os.getsid(pid) != pin.sid or os.getpgid(pid) != group:
+                    raise UncertainExecution(
+                        "process_cleanup_unknown", "Session membership changed"
+                    )
+                current_members += 1
+            except ProcessLookupError:
+                continue
+        if not current_members:
+            continue  # Never signal a stale numeric PGID after its last anchor exited.
+        try:
+            os.killpg(group, value)
+        except ProcessLookupError:
+            pass
+        except PermissionError as error:
+            # Darwin may refuse a group that became entirely zombie/absent.
+            # Only a fresh verified observation can establish that no live member
+            # still needs termination; EPERM alone never proves cleanup.
+            current = await _owned_session_groups(process, pin)
+            if any(row[2] == group and not row[4].startswith("Z") for row in current):
+                raise UncertainExecution(
+                    "process_cleanup_unknown", "Session signal refused"
+                ) from error
+
+
+async def _stop_owned_session(process, pin, grace):
+    import asyncio
+
+    await _signal_owned_session(process, pin, signal.SIGTERM)
+    try:
+        await asyncio.wait_for(process.wait(), grace)
+    except TimeoutError:
+        pass
+    await _signal_owned_session(process, pin, signal.SIGKILL)
+    await process.wait()
+    if any(not row[4].startswith("Z") for row in await _owned_session_groups(process, pin)):
+        raise UncertainExecution(
+            "process_cleanup_unknown", "Owned session still has live processes"
+        )
+
+
 async def spawn_process(
     argv: list[str], cwd_fd: int, env: dict, *, stdin, stdout, stderr, limit: int = 1048576
 ):
@@ -91,8 +242,15 @@ async def spawn_process(
         try:
             process = await asyncio.shield(creation)
         except asyncio.CancelledError:
-            process = await creation
+            while not creation.done():
+                try:
+                    await asyncio.shield(creation)
+                except asyncio.CancelledError:
+                    pass
+            process = creation.result()
+            _pin_owned_session(process)
             raise
+        _pin_owned_session(process)
         os.close(write_fd)
         write_fd = -1
         reader = asyncio.StreamReader(limit=1024)
@@ -123,6 +281,10 @@ async def spawn_process(
 
 async def stop_process(process, grace: float = 2.0) -> None:
     import asyncio
+
+    pin = getattr(process, "_kirabridge_owned_session", None)
+    if isinstance(pin, _OwnedSession):
+        return await _stop_owned_session(process, pin, grace)
 
     async def signal_group(value):
         try:
@@ -233,26 +395,50 @@ async def reap_process(process, *, process_group=True) -> None:
             while await reader.read(8192):
                 pass
 
-    stopping = asyncio.create_task(stop_process(process))
-    try:
-        async with asyncio.timeout(5):
-            if process.stdin is not None:
-                process.stdin.close()
-                try:
-                    await process.stdin.wait_closed()
-                except (BrokenPipeError, ConnectionResetError):
-                    pass
-            await asyncio.gather(stopping, discard(process.stdout), discard(process.stderr))
-    except TimeoutError:
-        # asyncio exposes no public Process.close(); force-close pipes after an escaped descendant.
-        process._transport.close()
-        raise UncertainExecution(
-            "process_cleanup_unknown", "Process cleanup could not be confirmed"
-        ) from None
-    finally:
-        if not stopping.done():
-            stopping.cancel()
-        await asyncio.gather(stopping, return_exceptions=True)
+    async def cleanup():
+        stopping = asyncio.create_task(stop_process(process))
+        drains = [
+            asyncio.create_task(discard(process.stdout)),
+            asyncio.create_task(discard(process.stderr)),
+        ]
+        try:
+            async with asyncio.timeout(5):
+                if process.stdin is not None:
+                    process.stdin.close()
+                    try:
+                        await process.stdin.wait_closed()
+                    except (BrokenPipeError, ConnectionResetError):
+                        pass
+                await asyncio.gather(stopping, *drains)
+        except TimeoutError:
+            # Close only our transport; a child that changed SID remains unknown.
+            process._transport.close()
+            raise UncertainExecution(
+                "process_cleanup_unknown", "Process cleanup could not be confirmed"
+            ) from None
+        except BaseException:
+            process._transport.close()
+            raise
+        finally:
+            for task in [stopping, *drains]:
+                if not task.done():
+                    task.cancel()
+            await asyncio.gather(stopping, *drains, return_exceptions=True)
+
+    reaping = asyncio.create_task(cleanup())
+    cancelled = isinstance(sys.exc_info()[1], asyncio.CancelledError)
+    while not reaping.done():
+        try:
+            await asyncio.shield(reaping)
+        except asyncio.CancelledError:
+            cancelled = True
+        except Exception:
+            break
+    if cancelled:
+        if not reaping.cancelled():
+            reaping.exception()
+        raise asyncio.CancelledError
+    reaping.result()
 
 
 class RuntimeLock:
