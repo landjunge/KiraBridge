@@ -149,7 +149,7 @@ async def test_selected_native_target_retains_concrete_desktop_error(
 ):
     config.principals["local"].capabilities += ["session.inspect"]
 
-    async def catalog(principal):
+    async def catalog(principal, *, transport=None):
         return {
             "status": "available",  # An unrelated tmux pane does not unblock Terminal.app.
             "sessions": [{"pane_id": "%1", "expected_pid": 100}],

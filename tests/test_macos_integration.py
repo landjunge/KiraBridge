@@ -102,6 +102,12 @@ async def test_http_status_and_catalog_share_provider_revision_without_ui(
     bridge, endpoint = http_bridge
     config.principals["local"].capabilities.append("session.inspect")
     native_facts(bridge)
+    # This fixture models an absent native app, regardless of the operator's
+    # actual desktop. Permission denial and transport presence are distinct.
+    bridge.macos.capability_probe.native_metadata = lambda: {
+        "available": False,
+        "reason": "native_app_protocol_unavailable",
+    }
     probes = []
 
     def permission(resource):
@@ -110,7 +116,7 @@ async def test_http_status_and_catalog_share_provider_revision_without_ui(
 
     bridge.macos.permission_probe.reader = permission
 
-    async def empty_catalog(principal):
+    async def empty_catalog(principal, *, transport=None):
         return {"status": "available", "sessions": []}
 
     monkeypatch.setattr(bridge.sessions, "catalog", empty_catalog)
@@ -254,7 +260,7 @@ async def test_native_unavailability_keeps_mixed_tmux_tools_and_status_visible(
     config.principals["local"].capabilities.append("session.inspect")
     bridge.macos.capability_probe.executable = lambda path: False
 
-    async def catalog(principal):
+    async def catalog(principal, *, transport=None):
         return {"status": "available", "sessions": [{"pane_id": "%1", "transport": "tmux"}]}
 
     monkeypatch.setattr(bridge.sessions, "catalog", catalog)

@@ -15,6 +15,14 @@ from kirabridge.platform_adapters.clipboard_lease import clipboard_lease
 from kirabridge.platform_adapters.desktop import MacDesktop
 
 
+def _process_observation_timeout(phase):
+    error = BridgeError(
+        "session_observation_timeout", "Read-only terminal process observation timed out"
+    )
+    error.provider_error = {"phase": phase, "reason": "timeout"}
+    return error
+
+
 def annotate_views(sessions: list[dict]) -> list[dict]:
     """Mark several on-screen views of one TTY and PID without merging them."""
     counts: dict[str, int] = {}
@@ -245,6 +253,8 @@ class TerminalAppTransport:
         try:
             async with asyncio.timeout(3):
                 output, _ = await child.communicate()
+        except TimeoutError:
+            raise _process_observation_timeout("native_process_catalog") from None
         finally:
             await reap_process(child, process_group=False)
         processes = [
@@ -514,6 +524,8 @@ class TerminalAppTransport:
                     if line.strip()
                 ),
             }
+        except TimeoutError:
+            raise _process_observation_timeout("native_shell_snapshot") from None
         finally:
             await reap_process(child, process_group=False)
 
@@ -741,6 +753,8 @@ class TerminalAppTransport:
         try:
             async with asyncio.timeout(3):
                 raw, _ = await child.communicate()
+        except TimeoutError:
+            raise _process_observation_timeout("native_process_identity") from None
         finally:
             await reap_process(child, process_group=False)
         identity = " ".join(raw.decode().split())

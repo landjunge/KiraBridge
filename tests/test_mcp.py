@@ -64,7 +64,7 @@ async def test_cached_tools_expose_existing_terminal_targets_over_real_http(
     }
     reads = []
 
-    async def catalog(principal):
+    async def catalog(principal, *, transport=None):
         bridge.security.principal(principal, "session.inspect")
         return {"status": "available", "sessions": [target]}
 

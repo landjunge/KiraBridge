@@ -93,7 +93,7 @@ def install_native_model(monkeypatch, bridge, model):
             raise BridgeError("session_selection_changed", "Original terminal is closed")
         return deepcopy(row)
 
-    async def catalog(principal):
+    async def catalog(principal, *, transport=None):
         return {"status": "available", "sessions": [deepcopy(model["row"])]}
 
     async def identity(pid, **kwargs):

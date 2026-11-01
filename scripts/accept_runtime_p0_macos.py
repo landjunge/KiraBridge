@@ -85,7 +85,7 @@ async def main(args):
         "checks": [],
         "passed": False,
     }
-    require(kirabridge.__version__ == "0.8.0rc23", "Exact RC23 candidate required")
+    require(kirabridge.__version__ == args.expected_version, "Exact candidate version required")
     require(evidence["source_sha256"] == args.source_sha256, "Candidate source differs")
     contract = installed_native_contract(kirabridge.__file__)
     require(contract.get("expected_commit") == args.commit, "Managed candidate pin differs")
@@ -388,7 +388,12 @@ if __name__ == "__main__":
     parser.add_argument("--root", required=True)
     parser.add_argument("--commit", required=True)
     parser.add_argument("--source-sha256", required=True)
+    parser.add_argument("--expected-version", default="0.8.0rc23")
     args = parser.parse_args()
     require(re.fullmatch(r"[a-f0-9]{40}", args.commit), "Explicit commit required")
     require(re.fullmatch(r"[a-f0-9]{64}", args.source_sha256), "Explicit source hash required")
+    require(
+        re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+(?:rc[1-9][0-9]*)?", args.expected_version),
+        "Explicit release version required",
+    )
     asyncio.run(main(args))

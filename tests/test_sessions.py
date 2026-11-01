@@ -61,7 +61,7 @@ async def test_idle_only_input_rejects_busy_target_before_transport(bridge, conf
     config.principals["local"].capabilities += ["session.inspect"]
     target = {"pane_id": "terminal:123:ttys004", "expected_pid": 345, "busy": True}
 
-    async def catalog(principal):
+    async def catalog(principal, *, transport=None):
         return {"sessions": [target]}
 
     async def no_transport(*args, **kwargs):
@@ -140,7 +140,7 @@ async def test_native_session_selection_read_and_input(bridge, config, monkeypat
     }
     calls = []
 
-    async def catalog(principal):
+    async def catalog(principal, *, transport=None):
         bridge.security.principal(principal, "session.inspect")
         return {"sessions": [selected]}
 

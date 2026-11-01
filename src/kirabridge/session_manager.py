@@ -16,7 +16,6 @@ from pydantic import Field, model_validator
 
 from kirabridge.bridge_core.models import BridgeError, Input, digest
 from kirabridge.filesystem_manager import PathScope
-from kirabridge.platform_adapters.desktop import DESKTOP_MESSAGES
 from kirabridge.platform_adapters.terminal_app import TerminalAppTransport
 from kirabridge.platform_adapters.tmux import TmuxTransport
 from kirabridge.session_ports import SessionPorts, SessionTransport, TerminalAppPort
@@ -127,14 +126,38 @@ class SessionManager:
     def transport(self, pane_id):
         return self.terminal_app if pane_id.startswith("terminal:") else self.tmux
 
-    async def catalog(self, principal):
+    async def catalog(self, principal, *, transport=None):
+        """Discover both transports, or observe only an explicitly selected one."""
         self.authorization.principal(principal, "session.inspect")
+        if transport not in {None, "terminal_app", "tmux"}:
+            raise BridgeError("invalid_arguments", "Unknown session catalog transport")
         native_rows, errors = [], {}
-        if self.terminal_app.available and self.socket_name is None:
+        if transport != "tmux" and self.terminal_app.available and self.socket_name is None:
             try:
                 native_rows = await self.terminal_app.catalog()
             except BridgeError as exc:
-                errors["terminal_app"] = {"code": exc.code, "message": str(exc)}
+                errors["terminal_app"] = {
+                    "code": exc.code,
+                    "message": str(exc),
+                    **(
+                        {"provider_error": exc.provider_error}
+                        if getattr(exc, "provider_error", None) is not None
+                        else {}
+                    ),
+                }
+        elif transport == "terminal_app":
+            errors["terminal_app"] = {
+                "code": "session_transport_unavailable",
+                "message": "Native Terminal.app catalog is unavailable",
+            }
+        if transport == "terminal_app":
+            return self._catalog_result(
+                native_rows,
+                transport="terminal_app",
+                status=errors.get("terminal_app", {}).get("code", "available"),
+                errors=errors,
+                truncated=getattr(self.terminal_app, "last_catalog_incomplete", False),
+            )
         try:
             rows = await self.tmux.catalog()
         except BridgeError as exc:
@@ -144,8 +167,19 @@ class SessionManager:
                 status="available"
                 if native_rows
                 else errors.get("terminal_app", {}).get("code", exc.code),
-                errors={**errors, "tmux": {"code": exc.code}},
-                truncated=getattr(self.terminal_app, "last_catalog_incomplete", False),
+                errors={
+                    **errors,
+                    "tmux": {
+                        "code": exc.code,
+                        **(
+                            {"provider_error": exc.provider_error}
+                            if getattr(exc, "provider_error", None) is not None
+                            else {}
+                        ),
+                    },
+                },
+                truncated=transport != "tmux"
+                and getattr(self.terminal_app, "last_catalog_incomplete", False),
             )
         return self._catalog_result(
             native_rows + rows,
@@ -153,7 +187,8 @@ class SessionManager:
             status="available",
             errors=errors,
             truncated=getattr(self.tmux, "last_catalog_truncated", False)
-            or getattr(self.terminal_app, "last_catalog_incomplete", False),
+            or transport != "tmux"
+            and getattr(self.terminal_app, "last_catalog_incomplete", False),
         )
 
     def _catalog_result(self, rows, *, transport, status, errors, truncated=False):
@@ -597,10 +632,16 @@ class SessionManager:
         }
 
     async def selected(self, principal, pane_id, expected_pid):
-        catalog = await self.catalog(principal)
-        native_error = catalog.get("transport_errors", {}).get("terminal_app", {})
-        if pane_id.startswith("terminal:") and native_error.get("code") in DESKTOP_MESSAGES:
-            raise BridgeError(native_error["code"], native_error["message"])
+        transport = "terminal_app" if pane_id.startswith("terminal:") else "tmux"
+        catalog = await self.catalog(principal, transport=transport)
+        error = catalog.get("transport_errors", {}).get(transport, {})
+        if error:
+            failure = BridgeError(
+                error["code"], error.get("message", "Selected session observation failed")
+            )
+            if error.get("provider_error") is not None:
+                failure.provider_error = error["provider_error"]
+            raise failure
         matches = [
             row
             for row in catalog["sessions"]
