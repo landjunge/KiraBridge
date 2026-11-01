@@ -30,8 +30,12 @@ native metadata reads, and event parsing avoids repeated remainder copies.
 Regression evidence, measurements and remaining risks are recorded in the
 [reliability review](RELIABILITY-REVIEW-20261101.md).
 
-This remains an unpublished candidate. Concurrent external replacement during
-`file.move` can still lose the replacement source file; its attempted atomic
-rename change was rejected after independent review found a directory-substitution
-regression. The earlier native Codex handoff acceptance is also unresolved.
+This remains an unpublished candidate. `file.move` now captures into a private
+regular-file sentinel, verifies a pinned inode and publishes without replacing an
+existing destination. It never unlinks the public source path after capture, so
+a concurrently recreated source survives. The kernel rejects directory capture.
+Interrupted or conflicting attempts retain recovery data and never replay
+automatically. The [move contract](FILE-MOVE-CONTRACT.md) explains temporary private
+reachability, retained/unknown receipts and explicit local recovery.
+The earlier native Codex handoff acceptance remains unresolved at this checkpoint.
 The working RC22 installation is preserved.

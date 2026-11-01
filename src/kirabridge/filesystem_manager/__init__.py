@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import re
 import stat
 import uuid
 from contextlib import contextmanager
@@ -22,6 +23,10 @@ class PathScope:
         path = Path(value)
         if not path.is_absolute() or ".." in path.parts or "\x00" in value:
             raise BridgeError("path_denied", "Use an absolute path inside an allowed root")
+        if any(
+            re.fullmatch(r"\.kirabridge-move-[0-9a-f]{32}", part.casefold()) for part in path.parts
+        ):
+            raise BridgeError("path_denied", "Private move recovery data requires local recovery")
         if any(path.is_relative_to(excluded) for excluded in self.excluded):
             raise BridgeError("path_denied", "Bridge state is not available through file tools")
         for root in self.roots:
@@ -154,16 +159,6 @@ class FilesystemManager:
         return {"deleted": True}
 
     def move(self, scope: PathScope, path: str, destination: str) -> dict:
-        # Atomic no-clobber link/unlink of regular files, only on the same filesystem.
-        with (
-            scope.parent(path) as (source_fd, source),
-            scope.parent(destination) as (dest_fd, dest),
-        ):
-            mode = os.stat(source, dir_fd=source_fd, follow_symlinks=False).st_mode
-            if not stat.S_ISREG(mode):
-                raise BridgeError("file_type", "Move supports regular files only")
-            os.link(source, dest, src_dir_fd=source_fd, dst_dir_fd=dest_fd, follow_symlinks=False)
-            os.fsync(dest_fd)
-            os.unlink(source, dir_fd=source_fd)
-            os.fsync(source_fd)
-        return {"moved": True}
+        from kirabridge.filesystem_manager.move import move_file
+
+        return move_file(scope, path, destination)
