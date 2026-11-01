@@ -317,3 +317,10 @@ frische lokale Endabnahme mit genau einem eigenen Fenster; erst nach positivem
 Nachweis folgen die unterstützte sichtbare Installation und Runtimeprüfung.
 Die ungetestete zusätzliche ARM-Testdiagnostik bleibt separat gespeichert
 und gehört nicht zum Paket oder zum freigegebenen Harness-Commit.
+
+Die frische lokale Probe04 stoppte ohne Open-/UI-Effekt bereits beim nativen
+AX-Lesen mit `macos_tree_changed`; Cleanup ist bestätigt. Der Harness wiederholt
+nun ausschließlich denselben AX-Request vor der Baseline nach einmaliger
+Aktivierung höchstens dreimal. Andere Fehler oder Änderungen an App-/Worker-/
+Tokenidentität bleiben gesperrt; keine Effektwiederholung. Drei zuvor rote
+direkte Fälle bestanden (0,59 s). Produkt406 bleibt unverändert.

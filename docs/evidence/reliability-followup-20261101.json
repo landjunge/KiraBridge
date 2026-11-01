@@ -242,6 +242,12 @@
         "failed": 1,
         "skipped": 4
       }
+    },
+    "ax_read_retry_delta": {
+      "passed": 3,
+      "seconds": 0.59,
+      "scope": "three direct tests; no full module or CI rerun",
+      "product_changed": false
     }
   },
   "independent_reviews": {
@@ -285,7 +291,7 @@
     "pending": "independent radio-membership delta review; fresh actual acceptance; supported visible install/runtime identity; release",
     "production": "RC22 unchanged"
   },
-  "physical_helper_sha256": "6d623ff3a1e166086c97aff5a11c83f44336f84202af54e7bde2a755d754547f",
+  "physical_helper_sha256": "07633820aaf791a488944243caaa4b7294ea108cd06ab042df71647b845ec168",
   "budget_stop": {
     "user_report": "monthly GitHub budget consumed in one day; exact billing amount not independently checked",
     "cancelled_run": 41330303010,
@@ -304,6 +310,12 @@
     "push": false,
     "repeat_full_matrix": false,
     "next": "one fresh local end-to-end acceptance using reviewed helper and unchanged verified product406",
-    "unverified_bootstrap_diagnostics_excluded": true
+    "unverified_bootstrap_diagnostics_excluded": true,
+    "actual04": {
+      "error": "macos_tree_changed during baseline AX inspect",
+      "ui_mutations": 0,
+      "cleanup_complete": true,
+      "replayed": false
+    }
   }
 }

@@ -130,6 +130,7 @@
     "product_source_sha256": "9b3c03ccf40e13e2cfcbdeb8f89b359141455026a8620a2c3b8d8dd0a3881f36",
     "activation_delta_review": "review_mcp independently read final c3950b57/a1014262; no open findings",
     "radio_membership_delta": "review_mcp Go for helper6d623ff3; 10 independent pure predicate checks passed in0.21s; actual post-detach remains unproven",
-    "actual_run03": "Stopped before detach, test input and Codex because selected virtual tab changed parent AX/CG IDs; exact original radio tokens/order retained; own shell closed once, private endpoint absent, originals preserved"
+    "actual_run03": "Stopped before detach, test input and Codex because selected virtual tab changed parent AX/CG IDs; exact original radio tokens/order retained; own shell closed once, private endpoint absent, originals preserved",
+    "ax_read_delta": "Helper07633820 independently approved by review_mcp and Root; at most3 identical AX requests for exactly macos_tree_changed only before baseline after one activation;3 direct cases passed in0.59s; no product delta"
   }
 }

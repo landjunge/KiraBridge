@@ -614,3 +614,118 @@ async def test_multiple_baseline_physical_groups_are_outside_observed_boundary(m
     with pytest.raises(RuntimeError, match="Only one observed baseline"):
         await scene.controller.capture_baseline()
     assert scene.controller.baseline is None and scene.effects == []
+
+
+async def test_baseline_ax_tree_changed_repeats_same_request_without_effect_retry(module, tmp_path):
+    from kirabridge.bridge_core.models import BridgeError
+
+    scene = Scene(module, tmp_path)
+    scene.terminal.native = AsyncMock(return_value={"activation_sent": True, "pid": 775})
+    native_request = scene.controller.native.request
+    failures = []
+
+    async def changing_tree(operation, arguments, **kwargs):
+        if (
+            operation == "accessibility.inspect"
+            and arguments.get("element_token") == f"{1:032x}"
+            and not failures
+        ):
+            failures.append(deepcopy(arguments))
+            raise BridgeError("macos_tree_changed", "Native system operation refused or failed")
+        return await native_request(operation, arguments, **kwargs)
+
+    scene.controller.native.request = changing_tree
+    assert await scene.controller.prepare_visible_baseline(poll_interval=0)
+    failed = [
+        event["native_read_failed"] for event in scene.records if "native_read_failed" in event
+    ]
+    assert len(failed) == 1 and failed[0]["code"] == "macos_tree_changed"
+    assert failed[0]["arguments"] == failures[0]
+    assert failed[0]["worker"] == [99, "a" * 36, "b" * 40]
+    assert sum(operation == "windows.list" for operation, _ in scene.calls) == 1
+    successful = [
+        args
+        for operation, args in scene.calls
+        if operation == "accessibility.inspect" and args.get("element_token") == f"{1:032x}"
+    ]
+    assert successful == failures
+    scene.terminal.native.assert_awaited_once()
+    assert scene.effects == []
+
+
+async def test_persistent_baseline_ax_tree_change_stops_after_three_failures(module, tmp_path):
+    from kirabridge.bridge_core.models import BridgeError
+
+    scene = Scene(module, tmp_path)
+    scene.terminal.native = AsyncMock(return_value={"activation_sent": True, "pid": 775})
+    native_request = scene.controller.native.request
+    errors = []
+
+    async def changing_tree(operation, arguments, **kwargs):
+        if operation == "accessibility.inspect" and arguments.get("element_token") == f"{1:032x}":
+            error = BridgeError("macos_tree_changed", "Native system operation refused or failed")
+            errors.append(error)
+            raise error
+        return await native_request(operation, arguments, **kwargs)
+
+    scene.controller.native.request = changing_tree
+    with pytest.raises(BridgeError) as raised:
+        await scene.controller.prepare_visible_baseline(poll_interval=0)
+    assert len(errors) == 3 and raised.value is errors[-1]
+    assert sum("native_read_failed" in event for event in scene.records) == 3
+    scene.terminal.native.assert_awaited_once()
+    assert scene.controller.baseline is None and scene.effects == []
+
+
+async def test_ax_retry_preserves_error_scope_and_app_worker_token_guards(module, tmp_path):
+    from kirabridge.bridge_core.models import BridgeError
+
+    for change in ("other-error", "worker", "app", "token", "non-ax-tree-error"):
+        scene = Scene(module, tmp_path)
+        scene.terminal.native = AsyncMock(return_value={"activation_sent": True, "pid": 775})
+        native_request = scene.controller.native.request
+        errors = []
+
+        async def changing_tree(
+            operation,
+            arguments,
+            *,
+            errors=errors,
+            change=change,
+            scene=scene,
+            native_request=native_request,
+            **kwargs,
+        ):
+            target = (
+                operation == "accessibility.inspect"
+                and arguments.get("element_token") == f"{1:032x}"
+            )
+            if not errors and (
+                target or change == "non-ax-tree-error" and operation == "windows.list"
+            ):
+                code = (
+                    "macos_permission_denied" if change == "other-error" else "macos_tree_changed"
+                )
+                error = BridgeError(code, "Native system operation refused or failed")
+                errors.append(error)
+                if change == "worker":
+                    scene.worker["generation"] = "c" * 36
+                if change == "app":
+                    scene.app["started_at"] += 1
+                raise error
+            result = await native_request(operation, arguments, **kwargs)
+            if change == "token" and errors and target:
+                result["element_token"] = "f" * 32
+            return result
+
+        scene.controller.native.request = changing_tree
+        with pytest.raises(
+            BridgeError if change in {"other-error", "non-ax-tree-error"} else RuntimeError
+        ):
+            await scene.controller.prepare_visible_baseline(poll_interval=0)
+        assert len(errors) == 1
+        assert sum("native_read_failed" in event for event in scene.records) == 1
+        if change in {"other-error", "non-ax-tree-error"}:
+            assert sum(operation == "windows.list" for operation, _ in scene.calls) <= 1
+        scene.terminal.native.assert_awaited_once()
+        assert scene.controller.baseline is None and scene.effects == []

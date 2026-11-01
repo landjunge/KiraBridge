@@ -12,6 +12,8 @@ import hashlib
 import json
 import re
 
+from kirabridge.bridge_core.models import BridgeError
+
 
 def require(value, message):
     if not value:
@@ -142,7 +144,34 @@ class PhysicalIsolation:
             operation in {"apps.list", "apps.inspect", "windows.list", "accessibility.inspect"},
             "Physical observation cannot dispatch a mutating native operation",
         )
-        result = await self.native.request(operation, arguments, principal="chatgpt")
+        for attempt in range(1, 4):
+            try:
+                result = await self.native.request(operation, arguments, principal="chatgpt")
+                break
+            except BridgeError as error:
+                retry = (
+                    operation == "accessibility.inspect"
+                    and error.code == "macos_tree_changed"
+                    and self.activation_attempted
+                    and self.baseline is None
+                    and attempt < 3
+                )
+                self.record(
+                    {
+                        "native_read_failed": {
+                            "operation": operation,
+                            "arguments": dict(arguments),
+                            "code": error.code,
+                            "worker": list(self.worker) if self.worker else None,
+                            "application": dict(self.app) if self.app else None,
+                            "attempt": attempt,
+                            "same_request_retry": retry,
+                        }
+                    }
+                )
+                if not retry:
+                    raise
+                await asyncio.sleep(0.05)
         helper = result["native_helper"]
         worker = (helper["pid"], helper["generation"], helper["source_commit"])
         require(self.worker in {None, worker}, "Native observation worker changed")
