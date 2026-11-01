@@ -914,6 +914,7 @@ entries[0].click();JSON.stringify({detached:true});
                 "creation_receipt": receipt,
                 "automatic_retry": False,
                 "cause_code": getattr(cause, "code", type(cause).__name__),
+                "cause_message": str(cause)[:512],
             }
             raise error from cause
 

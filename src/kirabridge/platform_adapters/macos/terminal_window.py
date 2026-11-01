@@ -300,7 +300,6 @@ class TerminalWindowProof:
         logical = await self.logical(receipt)
         before = await self.snapshot()
         own_cg, own = self.own(before, nonce=receipt["nonce"])
-        binding = {"cg_window_id": own_cg["window_id"], "ax_window_token": own["token"]}
         radios = own["radios"]
         selected = [r["token"] for r in radios or [] if r["selected"]]
         if radios is not None:
@@ -323,7 +322,8 @@ class TerminalWindowProof:
             await self.terminal.move_created_tab(receipt)
             for attempt in range(10):
                 after = await self.snapshot()
-                new_cg, new_own = self.own(after, binding=binding)
+                new_cg, new_own = self.own(after, nonce=receipt["nonce"])
+                require(new_own["token"] == own["token"], "Detached own AX window anchor changed")
                 if self.members(new_own) == self.members(own) and len(after["ax"]) == len(
                     before["ax"]
                 ):
@@ -347,14 +347,21 @@ class TerminalWindowProof:
                             "Unrelated native CG surface changed",
                         )
                 host = hosts[0]
-                new_hosts = [
-                    w
-                    for w in after["cg"]
-                    if w["window_id"] not in {old["window_id"] for old in before["cg"]}
-                ]
+                unrelated_ids = {w["window_id"] for w in before["cg"]} - {own_cg["window_id"]}
+                split = [w for w in after["cg"] if w["window_id"] not in unrelated_ids]
+                split_ids = {w["window_id"] for w in split}
+                old_ids = {w["window_id"] for w in before["cg"]}
                 require(
-                    len(new_hosts) == 1
-                    and new_hosts[0]["bounds"] == own_cg["bounds"]
+                    len(split) == 2
+                    and own_cg["window_id"] in split_ids
+                    and len(split_ids - old_ids) == 1
+                    and new_cg["window_id"] in split_ids,
+                    "Shared CG surface did not split into one retained and one new surface",
+                )
+                host_surfaces = [w for w in split if w["window_id"] != new_cg["window_id"]]
+                require(
+                    len(host_surfaces) == 1
+                    and host_surfaces[0]["bounds"] == own_cg["bounds"]
                     and host["position"] == own["position"]
                     and host["size"] == own["size"],
                     "Original host native layout changed",
@@ -387,7 +394,8 @@ class TerminalWindowProof:
                 )
         logical = await self.logical(receipt)
         return {
-            **binding,
+            "cg_window_id": own_cg["window_id"],
+            "ax_window_token": own["token"],
             "app": self.app,
             "worker": list(self.worker),
             "own_radio_token": own_radio,

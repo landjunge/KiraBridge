@@ -399,3 +399,21 @@ direkter Regressionstest (Erholung, unverfügbar, echte JS-Generationsabweichung
 bestand1,52s. Unabhängiger Mac-Review von Produkt und exakter Tracerfreigabe
 ist grün. Kein Task wurde wiederholt, kein Testfenster entstand, RC22 unverändert.
 Neuer Pythonbaum `a44d09dfdb0ed7830c42f3b566975c3a85c40387501fcdac38ab4d0950c1e5ba`; nächste Abnahme verwendet einen neuen exakten Build.
+
+Nach Nutzerrückmeldung sichtbares Terminal: Read-only-Probe bestätigte1CG-/
+1AX-Fenster mit3Radios. Frische Abnahme91-02 bestätigte genau einen Create-,
+Focus- und Move-Effekt, stoppte danach aber ungewiss; kein argv/Testtext/Codex.
+Der Endzustand war eigenesCG1342 und Originalhost590. Ohne gespeicherte native
+VorMove-Bilder bleibt die konkrete historische Refusalursache ungeklärt;
+Browser-/Desktopwechsel des Nutzers werden nicht als Produktfehler ausgegeben.
+
+Unabhängig davon fand der Review einen gesicherten Sourcefehler: die alte
+geteilte CG-Kennung wurde pauschal Own und die neue Kennung Host zugewiesen.
+Nun werden Own/Host nach dem einmalig bestätigten Move positiv zugeordnet;
+Split muss genau eine alte und eine neue Fläche enthalten. EigenesAX-Token,
+Originalradiofolge und übrige Gruppen bleiben geschützt, Endbinding wird danach
+erzeugt. Beide CG-Zuweisungsmodelle bestanden0,23s; vertauschter Fall war vorher
+rot. Mac-Review ist grün. Private vorhandene Fehlerbelege enthalten nun auch die
+kurze konkrete Refusalnachricht. Ein separat reviewter Once-Helfer schloss nur
+Own1342 mit voller Geburts-/Parent-/CWD-/Promptbindung; danach Own zweimal
+abwesend, alle Originale erhalten. Neue Quelle `8dce340e0ff2e163ef55efb1949fda01c6ab357ec3b873189cc1ee63bec5eb28`; keine GitHub-Läufe.

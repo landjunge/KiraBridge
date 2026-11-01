@@ -864,5 +864,6 @@ class SessionManager:
                     "creation_receipt": result,
                     "automatic_retry": False,
                     "cause_code": getattr(cause, "code", type(cause).__name__),
+                    "cause_message": str(cause)[:512],
                 }
                 raise error from cause

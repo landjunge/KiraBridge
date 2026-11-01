@@ -387,3 +387,42 @@ async def test_existing_terminal_in_other_space_activates_once_then_only_bounded
     leaf.native.assert_awaited_once()
     assert sum(op == "windows.list" for op, _ in scene.calls) - previous == 4
     assert events == []
+
+
+@pytest.mark.parametrize("swapped", [False, True])
+async def test_one_confirmed_move_allows_either_split_surface_to_keep_shared_cg(product, swapped):
+    scene, leaf, events, _, created = product
+    groups = scene.groups
+    own_id = 888 if swapped else 777
+
+    def split_groups():
+        if scene.phase == "detached" and swapped:
+            return [(777, "original", 3), (888, TITLE, None)]
+        return groups()
+
+    scene.groups = split_groups
+    request = leaf.system_transport.request
+
+    async def moved_geometry(operation, arguments, **kwargs):
+        value = await request(operation, arguments, **kwargs)
+        if scene.phase == "detached":
+            if operation == "windows.list":
+                next(w for w in value["windows"] if w["window_id"] == own_id)["bounds"] = {
+                    "X": 0,
+                    "Y": 30,
+                    "Width": 800,
+                    "Height": 580,
+                }
+            elif (
+                operation == "accessibility.inspect"
+                and arguments.get("element_token") == f"{1:032x}"
+            ):
+                value["element"]["position"], value["element"]["size"] = [0, 30], [800, 580]
+        return value
+
+    leaf.system_transport.request = moved_geometry
+    result = await leaf.open("cd -- /private/work", on_created=created, principal="chatgpt")
+    assert result["physical_window"]["cg_window_id"] == own_id
+    assert result["physical_window"]["ax_window_token"] == f"{1:032x}"
+    assert events == ["create", "receipt", "focus", "move"]
+    await leaf.verify_opened(result, principal="chatgpt")
