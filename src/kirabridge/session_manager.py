@@ -788,7 +788,13 @@ class SessionManager:
             self.authorization.window_outcome(principal, task_id, "opened")
             for _ in range(20):
                 sessions = await self.terminal_app.catalog()
-                selected = next((s for s in sessions if s["tty"] == result["tty"]), None)
+                matches = [s for s in sessions if s["tty"] == result["tty"]]
+                if len(matches) > 1 or any(s.get("identity_ambiguous") for s in matches):
+                    raise BridgeError(
+                        "visible_target_ambiguous",
+                        "New terminal TTY has several live views; select an unambiguous view",
+                    )
+                selected = matches[0] if matches else None
                 if selected:
                     if self.direct(principal) and argv:
                         from kirabridge.platform_adapters.shell_prompt import empty_shell_prompt

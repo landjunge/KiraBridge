@@ -441,7 +441,7 @@ class Bridge:
 
     def platform_operation(self, operation, arguments=None, principal=None):
         """Select the existing native provider without changing tmux/portable routes."""
-        if self.macos.snapshot()["host"]["platform"] != "darwin":
+        if self.macos.host_platform != "darwin":
             return None
         if operation in {"session.catalog", "platform.status", "clipboard.info"}:
             return None  # The terminal catalogue can contain tmux as well.

@@ -18,6 +18,8 @@ def host_facts():
                 raw = stream.read(65537)
             if len(raw) <= 65536:
                 facts = plistlib.loads(raw)
+                if not isinstance(facts, dict):
+                    raise ValueError("OS version metadata must be a dictionary")
                 version = str(facts.get("ProductVersion", ""))
                 build = str(facts.get("ProductBuildVersion", ""))
         except (OSError, ValueError, plistlib.InvalidFileException):

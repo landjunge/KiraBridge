@@ -93,6 +93,8 @@ class NativeSystemTransport:
                 raise ValueError("Symlink app refused")
             info, _ = _private_file(self.app_path / "Contents/Info.plist", 65536)
             metadata = plistlib.loads(info)
+            if not isinstance(metadata, dict):
+                raise ValueError("Native protocol metadata must be a dictionary")
             commit = metadata.get("KiraBridgeSourceCommit", "")
             if (
                 type(metadata.get("KiraBridgeSystemProtocol")) is not int

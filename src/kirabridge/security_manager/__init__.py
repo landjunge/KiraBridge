@@ -45,11 +45,11 @@ class SecurityManager:
         return result
 
     def authenticate(self, token: str) -> str:
-        if len(token) < 32:
+        if len(token) < 32 or not token.isascii():
             raise BridgeError("unauthorized", "Authentication required")
         for name, principal in self.config.principals.items():
             expected = os.environ.get(principal.token_env, "") if principal.token_env else ""
-            if expected and hmac.compare_digest(token, expected):
+            if expected and expected.isascii() and hmac.compare_digest(token, expected):
                 return name
         raise BridgeError("unauthorized", "Authentication required")
 

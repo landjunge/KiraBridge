@@ -1,0 +1,87 @@
+{
+  "schema": "kirabridge.reliability-review.v1",
+  "at": "2026-11-01T14:06:22.108823+00:00",
+  "baseline_commit": "5fdb454d03d3cda6c0777eb7ccbcf1e54449950d",
+  "branch": "fix/reliability-review-20261101",
+  "scope": {
+    "python_source_files": 144,
+    "python_lines": 38709,
+    "swift_files": 4,
+    "swift_lines": 1473
+  },
+  "full_suite": {
+    "command": ".venv/bin/python -m pytest -q -W error::pytest.PytestUnraisableExceptionWarning",
+    "passed": 2887,
+    "skipped": 1,
+    "seconds": 430.34,
+    "log_sha256": "c086482402913021a7c55c41512d6786d931cd43fecd79cc0b1b96af28edf7a6",
+    "scope": "collected before final MCP pre-dispatch guard and three additional tests; final guard separately validated"
+  },
+  "final_mcp_targeted": {
+    "command": ".venv/bin/python -m pytest -q tests/test_mcp_connection_races.py tests/test_mcp.py tests/test_diagnostics.py tests/test_health_poll_audit.py tests/test_threaddesk_dynamic_lifecycle.py",
+    "result": "58 passed in 12.47s",
+    "new_test_cases": 14,
+    "red_evidence": [
+      "Initial concurrent disconnect: second observer raised KeyError(peer)",
+      "Initial notification-during-list: 1 catalog read instead of required 2",
+      "Initial generation change during list published old catalog",
+      "Cancelled owner: CancelledError escaped and retained capacity",
+      "Late old EOF/Timeout: replacement connection ID in diagnostic; both cases failed before guard"
+    ],
+    "independent_repro": "review_terminal reported its own late-EOF reproduction red before and 1 passed in 0.59s after fix",
+    "style": "ruff format/check passed",
+    "diff_check": "git diff --check passed"
+  },
+  "other_targeted": {
+    "terminal_visible": 875,
+    "macos": 97,
+    "routing_auth": 29,
+    "overlap": "selections overlap; do not add counts"
+  },
+  "independent_reviews": {
+    "macos_and_routing_auth": "review_macos approved; report independently checked",
+    "terminal_session": "review_mcp approved",
+    "mcp_final": "review_terminal approved; 3 private barrier tests passed in 0.64s"
+  },
+  "checks": {
+    "ruff": "passed",
+    "format": "489 Python files already formatted",
+    "git_diff_check": "passed"
+  },
+  "dependencies": {
+    "threaddesk": "770bbc9f0c0a02699cc93cad47d2e2c3782f7080",
+    "tollgate": "53fc57cc2e082d022e65e5929cb2a1e186fba852"
+  },
+  "sha256": {
+    "docs/RELEASE-0.8.0rc24.md": "91898b2dd2e4c6b79bef4ad5f3d0a4dfbc7f5fd4678b91937b300d784e75a68d",
+    "docs/RELIABILITY-REVIEW-20261101.md": "9026c84282bd67929226614cd660ab59a4a3927cda3e74582572b70fc6ce57ca",
+    "src/kirabridge/bridge_core/bridge.py": "16ba9071e0c24495fcf1170c013d4e58b8afa32ae8432d2cc7ab1dd335df2bc6",
+    "src/kirabridge/bridge_core/config.py": "3537621cb8e09177adc0bc75f7443f3474e09e36cd2cde4d42018a2fbb62fb4f",
+    "src/kirabridge/mcp_gateway/client.py": "ea9efb0d36d5a00dd8ea5e7fe337797172b898f2ca98c6653aa13e7c12c3858d",
+    "src/kirabridge/platform_adapters/macos/capabilities.py": "1112dec242df4392c2abddce4aac665d6a8978168ed8fd694c9060cee8056df1",
+    "src/kirabridge/platform_adapters/macos/provider.py": "b34c4280d84016cab85cf6b1960098dc68a44b3e0e1ee1b518b850f15177635e",
+    "src/kirabridge/platform_adapters/macos/system_transport.py": "3cad47d9d0f385c3aa44f808c37a2aee281f34687fb1b3593cb77378d7a32fd8",
+    "src/kirabridge/security_manager/__init__.py": "1ced3366f26b5ecc31056a381fcad79715692e9215955f0db59a096501b44e71",
+    "src/kirabridge/session_manager.py": "eaf5a40d8f7a711f7f3edd8dd850ecba4fa6bf79b154061c43ca16ccf910a119",
+    "src/kirabridge/terminal_manager/__init__.py": "10891b51b276b1bdcb01cfe6547b83ae7c31ee2ce93f843aae91bd1c471efcfa",
+    "tests/test_macos_metadata_boundaries.py": "f4f9a34b076addb7b3ce5c816814003eca2c5db7a1bdb0f8e7bff8584475d010",
+    "tests/test_mcp_connection_races.py": "c2344ce198ba384826e3ccbaac59ddb541c028dbd171db616066fab8fe253a4d",
+    "tests/test_routing_and_auth_safety.py": "2656ec0a8b903b93e50d1408c2e68348223ed0acbc302067274bcca453de419e",
+    "tests/test_session_open_ambiguity.py": "0a968160c911da96a1c471a99fbd93339312c351feb5d01ae90ee0f40bca4ace",
+    "tests/test_terminal_event_framing.py": "e861658fb6616d3e3a4e7c8b9a03be8016038692c4ffc95ca0020043d141f0bc"
+  },
+  "open_gates": [
+    "P1 file.move replacement data-loss race remains; unsafe directory-moving proposal rejected",
+    "prior native Codex wrapped-input/handoff acceptance unresolved",
+    "final remote CI and local artifact verification recorded separately"
+  ],
+  "production": {
+    "installation_changed": false,
+    "restarted": false,
+    "version": "0.8.0rc22",
+    "core_pid": 4837,
+    "runtime_instance": "1018a5a4e4b44df783963c76fe6cfe87",
+    "source_tree_sha256": "03bae2fd8715d4a7581e007096bf03633f7d978d6c590aec044a026512ab3986"
+  },
+  "private_evidence_dir": "/Users/landjunge/.local/share/kirabridge/backups/reliability-review-20261101T134010Z"
+}

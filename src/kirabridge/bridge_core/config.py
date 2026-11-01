@@ -395,9 +395,9 @@ class Config(BaseModel):
         if not any(p.token_env for p in self.principals.values()):
             raise BridgeError("auth_config", "HTTP requires a configured bearer token environment")
         tokens = [os.environ.get(p.token_env, "") for p in self.principals.values() if p.token_env]
-        if any(len(t) < 32 for t in tokens) or len(set(tokens)) != len(tokens):
+        if any(len(t) < 32 or not t.isascii() for t in tokens) or len(set(tokens)) != len(tokens):
             raise BridgeError(
-                "auth_config", "HTTP tokens must be unique and at least 32 characters"
+                "auth_config", "HTTP tokens must be unique ASCII strings of at least 32 characters"
             )
 
 

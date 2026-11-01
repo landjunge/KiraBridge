@@ -73,9 +73,12 @@ class MCPClientPool:
         self.catalog_locks = {}
         self.catalog_dirty = set()
         self.health_epochs = {}
+        self._disconnects: dict[asyncio.Task, asyncio.Task] = {}
 
     def notice(self, peer_id, phase, **metadata):
-        self.phases[peer_id] = phase
+        connection_id = metadata.get("connection_id", self.connection_ids.get(peer_id))
+        if connection_id == self.connection_ids.get(peer_id):
+            self.phases[peer_id] = phase
         if self.observer:
             try:
                 self.observer(
@@ -232,27 +235,43 @@ class MCPClientPool:
 
     async def list_tools(self, peer_id):
         """Fresh bounded pagination; catalogs never survive a connection generation."""
-        if peer_id not in self.sessions:
+        session = self.sessions.get(peer_id)
+        if session is None:
             raise self.failure(peer_id, "peer_disconnected", "MCP peer is not connected")
         async with self.catalog_locks.setdefault(peer_id, asyncio.Lock()):
+            if self.sessions.get(peer_id) is not session:
+                raise self.failure(peer_id, "peer_disconnected", "MCP connection changed")
+            # Consume only invalidations preceding this refresh. A notification
+            # arriving while a page is in flight still requires another refresh.
+            self.catalog_dirty.discard(peer_id)
             tools, cursor, seen = [], None, set()
-            async with asyncio.timeout(self.call_timeout):
-                for _ in range(8):
-                    page = await self.sessions[peer_id].list_tools(cursor=cursor)
-                    tools.extend(page.tools)
-                    if len(tools) > 512 or len({t.name for t in tools}) != len(tools):
-                        raise BridgeError(
-                            "tool_catalog_invalid", "Ambiguous/oversized tool catalog"
-                        )
-                    cursor = page.nextCursor
-                    if not cursor:
-                        self.catalogs[peer_id] = tools
-                        self.catalog_dirty.discard(peer_id)
-                        return tools
-                    if cursor in seen:
-                        raise BridgeError("tool_catalog_invalid", "Tool pagination cursor repeated")
-                    seen.add(cursor)
-            raise BridgeError("tool_catalog_invalid", "Tool pagination budget exceeded")
+            try:
+                async with asyncio.timeout(self.call_timeout):
+                    for _ in range(8):
+                        page = await session.list_tools(cursor=cursor)
+                        if self.sessions.get(peer_id) is not session:
+                            raise self.failure(
+                                peer_id, "peer_disconnected", "MCP connection changed"
+                            )
+                        tools.extend(page.tools)
+                        if len(tools) > 512 or len({t.name for t in tools}) != len(tools):
+                            raise BridgeError(
+                                "tool_catalog_invalid", "Ambiguous/oversized tool catalog"
+                            )
+                        cursor = page.nextCursor
+                        if not cursor:
+                            self.catalogs[peer_id] = tools
+                            return tools
+                        if cursor in seen:
+                            raise BridgeError(
+                                "tool_catalog_invalid", "Tool pagination cursor repeated"
+                            )
+                        seen.add(cursor)
+                raise BridgeError("tool_catalog_invalid", "Tool pagination budget exceeded")
+            except BaseException:
+                if self.sessions.get(peer_id) is session:
+                    self.catalog_dirty.add(peer_id)
+                raise
 
     def health_epoch(self, peer_id, result):
         """A successful passive observation; never include volatile counts or raw contents."""
@@ -295,6 +314,8 @@ class MCPClientPool:
         if not isinstance(task_id, str) or not re.fullmatch(r"[a-zA-Z0-9_-]{1,128}", task_id):
             task_id = None
         session = self.sessions.get(peer_id)
+        owner = self.owners.get(peer_id)
+        connection_id = self.connection_ids.get(peer_id)
         if session is None:
             raise self.failure(
                 peer_id,
@@ -303,28 +324,83 @@ class MCPClientPool:
                 task_id=task_id,
                 operation=tool,
             )
-        if peer_id in self.catalog_dirty:
-            await self.list_tools(peer_id)
         # Only the internal passive poll may defer successful diagnostics. Explicit
         # reads and all execution/receipt tools retain the existing observation path.
         quiet = routine_health and tool == "bridge_health" and arguments == {} and task_id is None
         started = False
+        call_phase = self.phases.get(peer_id, "unknown")
+
+        def current_generation():
+            return (
+                self.sessions.get(peer_id) is session
+                and self.owners.get(peer_id) is owner
+                and self.connection_ids.get(peer_id) == connection_id
+            )
+
+        def notice_call(phase, **metadata):
+            nonlocal call_phase
+            call_phase = phase
+            self.notice(peer_id, phase, connection_id=connection_id, **metadata)
+
+        def fail_call(message):
+            failure = self.failure(
+                peer_id, "peer_unknown", message, task_id=task_id, operation=tool
+            )
+            failure.diagnostic.update(connection_id=connection_id, phase=call_phase)
+            return failure
+
+        def not_dispatched():
+            notice_call("call.not_dispatched", tool=tool, task_id=task_id)
+            failure = self.failure(
+                peer_id,
+                "peer_disconnected",
+                "MCP connection changed before this client dispatched the request",
+                task_id=task_id,
+                operation=tool,
+            )
+            failure.diagnostic.update(
+                connection_id=connection_id,
+                phase=call_phase,
+                accepted="no",
+                started="no",
+                completed="no",
+                evidence_scope="this_client_request_dispatch",
+                guidance="This client did not dispatch this request. This is not evidence "
+                "about other requests or activity on the remote server. Refresh the "
+                "connection and catalog before deciding on a new request; no automatic retry.",
+            )
+            return failure
 
         def observe_start():
             nonlocal started
             if not started:
-                self.notice(peer_id, "call.started", tool=tool, task_id=task_id)
+                notice_call("call.started", tool=tool, task_id=task_id)
                 started = True
 
+        if peer_id in self.catalog_dirty:
+            try:
+                await self.list_tools(peer_id)
+            except BridgeError as exc:
+                if exc.code == "peer_disconnected" and not current_generation():
+                    raise not_dispatched() from None
+                raise
         if not quiet:
             observe_start()
         # No automatic retries: a timed-out tool may have already executed remotely.
+        predispatch_failure = None
         try:
             async with self.gate, asyncio.timeout(self.call_timeout):
+                if not current_generation():
+                    predispatch_failure = not_dispatched()
+                    raise predispatch_failure
                 result = await session.call_tool(tool, arguments)
-                if tool == "bridge_health" and self.health_epoch(peer_id, result) is None:
+                if (
+                    current_generation()
+                    and tool == "bridge_health"
+                    and self.health_epoch(peer_id, result) is None
+                ):
                     self.health_epochs.pop(peer_id, None)
-                if quiet:
+                if quiet and current_generation():
                     epoch = self.health_epoch(peer_id, result)
                     if epoch is not None and self.health_epochs.get(peer_id) == epoch:
                         self.phases[peer_id] = "call.returned"
@@ -334,8 +410,9 @@ class MCPClientPool:
                     else:
                         self.health_epochs[peer_id] = epoch
                     observe_start()
-                self.notice(
-                    peer_id,
+                if quiet:
+                    observe_start()
+                notice_call(
                     "call.returned",
                     tool=tool,
                     task_id=task_id,
@@ -343,72 +420,77 @@ class MCPClientPool:
                 )
                 return result
         except TimeoutError:
-            if tool == "bridge_health":
+            if tool == "bridge_health" and current_generation():
                 self.health_epochs.pop(peer_id, None)
             observe_start()
-            self.notice(
-                peer_id,
+            notice_call(
                 "call.outcome_unknown",
                 tool=tool,
                 task_id=task_id,
                 error_code="peer_unknown",
             )
-            raise self.failure(
-                peer_id,
-                "peer_unknown",
-                "Tool outcome unknown; do not retry blindly",
-                task_id=task_id,
-                operation=tool,
-            ) from None
+            raise fail_call("Tool outcome unknown; do not retry blindly") from None
         except Exception as exc:
-            if tool == "bridge_health":
+            if exc is predispatch_failure:
+                raise
+            if tool == "bridge_health" and current_generation():
                 self.health_epochs.pop(peer_id, None)
             observe_start()
-            self.notice(
-                peer_id,
+            notice_call(
                 "call.outcome_unknown",
                 tool=tool,
                 task_id=task_id,
                 error_code="peer_unknown",
             )
-            failure = self.failure(
-                peer_id,
-                "peer_unknown",
-                "Tool outcome unknown; reconcile before retry",
-                task_id=task_id,
-                operation=tool,
-            )
-            if isinstance(exc, McpError) and exc.error.code == types.CONNECTION_CLOSED:
+            failure = fail_call("Tool outcome unknown; reconcile before retry")
+            if (
+                isinstance(exc, McpError)
+                and exc.error.code == types.CONNECTION_CLOSED
+                and self.owners.get(peer_id) is owner
+            ):
                 # SDK EOF does not end its owner's stop.wait(). Close only this
                 # proven dead connection; never replay the uncertain tool call.
                 await self.disconnect(peer_id)
             raise failure from None
         except asyncio.CancelledError:
-            if tool == "bridge_health":
+            if tool == "bridge_health" and current_generation():
                 self.health_epochs.pop(peer_id, None)
             observe_start()
-            self.notice(
-                peer_id, "call.interrupted", tool=tool, task_id=task_id, error_code="peer_unknown"
-            )
+            notice_call("call.interrupted", tool=tool, task_id=task_id, error_code="peer_unknown")
             raise
 
     async def disconnect(self, peer_id: str) -> None:
         owner = self.owners.get(peer_id)
-        if owner:
-            self.notice(peer_id, "disconnect.requested")
-            self.stops[peer_id].set()
-            try:
-                async with asyncio.timeout(5):
-                    await asyncio.shield(owner)
-            except TimeoutError:
-                owner.cancel()
-                await asyncio.gather(owner, return_exceptions=True)
-            self.owners.pop(peer_id, None)
-            self.stops.pop(peer_id, None)
-            self.previous_ids[peer_id] = self.connection_ids.pop(peer_id)
-            self.phases.pop(peer_id, None)
-            while len(self.previous_ids) > self.max_connections:
-                self.previous_ids.pop(next(iter(self.previous_ids)))
+        if owner is None:
+            return
+        closing = self._disconnects.get(owner)
+        if closing is None:
+
+            async def close_owner():
+                try:
+                    if self.owners.get(peer_id) is not owner:
+                        return
+                    self.notice(peer_id, "disconnect.requested")
+                    self.stops[peer_id].set()
+                    try:
+                        async with asyncio.timeout(5):
+                            await asyncio.shield(asyncio.gather(owner, return_exceptions=True))
+                    except TimeoutError:
+                        owner.cancel()
+                        await asyncio.gather(owner, return_exceptions=True)
+                    self.owners.pop(peer_id, None)
+                    self.stops.pop(peer_id, None)
+                    self.previous_ids[peer_id] = self.connection_ids.pop(peer_id)
+                    self.phases.pop(peer_id, None)
+                    while len(self.previous_ids) > self.max_connections:
+                        self.previous_ids.pop(next(iter(self.previous_ids)))
+                finally:
+                    self._disconnects.pop(owner, None)
+
+            closing = self._disconnects[owner] = asyncio.create_task(close_owner())
+        # Concurrent EOFs share one teardown. Cancelling an observer must not
+        # abandon cleanup or let an old teardown remove a new connection.
+        await asyncio.shield(closing)
 
     async def close(self) -> None:
         for peer_id in list(self.owners):

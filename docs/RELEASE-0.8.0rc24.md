@@ -1,4 +1,4 @@
-# KiraBridge 0.8.0rc24 · terminal selection and observation failures
+# KiraBridge 0.8.0rc24 · terminal and connection reliability
 
 An explicitly selected Terminal.app tab now uses only its native catalogue.
 An unrelated tmux read failure can no longer block that selection. Explicit
@@ -21,3 +21,17 @@ unbeteiligten tmux-Abfragen ab. Lesetimeouts melden ihre zuständige Phase.
 Die Prüfungen von Prozessidentität, mehrdeutigen Ansichten und beschäftigten
 Zielen bleiben bestehen. Die vollständige Prompt-/Return-Abnahme ist gesondert
 nachzuweisen.
+
+The subsequent independent team review repairs concurrent MCP teardown, stale
+connection results and catalog invalidation races; validates macOS plist roots
+and ASCII token configuration; rejects ambiguous newly opened terminal handles;
+and fixes JSONL event framing at chunk/size boundaries. Routing avoids unrelated
+native metadata reads, and event parsing avoids repeated remainder copies.
+Regression evidence, measurements and remaining risks are recorded in the
+[reliability review](RELIABILITY-REVIEW-20261101.md).
+
+This remains an unpublished candidate. Concurrent external replacement during
+`file.move` can still lose the replacement source file; its attempted atomic
+rename change was rejected after independent review found a directory-substitution
+regression. The earlier native Codex handoff acceptance is also unresolved.
+The working RC22 installation is preserved.

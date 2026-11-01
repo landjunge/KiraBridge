@@ -149,12 +149,17 @@ class TerminalManager:
                 buffer.extend(chunk[:room])
                 if events and line_callback:
                     pending.extend(chunk)
+                    # Pipe chunks are not protocol event boundaries. Split once
+                    # before checking each event, rather than counting bytes of
+                    # the following event against the previous one's budget.
+                    lines = pending.split(b"\n")
+                    pending = bytearray(lines.pop())
+                    for line in lines:
+                        if len(line) > 1048576:
+                            raise BridgeError("agent_protocol", "Agent event exceeds byte limit")
+                        await line_callback(line.decode("utf-8", errors="replace"))
                     if len(pending) > 1048576:
                         raise BridgeError("agent_protocol", "Agent event exceeds byte limit")
-                    while b"\n" in pending:
-                        line, _, rest = pending.partition(b"\n")
-                        pending = bytearray(rest)
-                        await line_callback(line.decode("utf-8", errors="replace"))
             if events and pending and line_callback:
                 await line_callback(pending.decode("utf-8", errors="replace"))
 

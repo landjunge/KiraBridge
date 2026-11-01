@@ -100,6 +100,10 @@ class MacOSProvider:
         self.actor_identities = dict(actor_identities or {})
         self.descriptors = {item.operation: item for item in DESCRIPTORS}
 
+    @property
+    def host_platform(self):
+        return self.capability_probe.facts.get("platform")
+
     def snapshot(self):
         """Metadata only. No leaf/native probe, task, clipboard or window access."""
         technical = self.capability_probe.snapshot()
