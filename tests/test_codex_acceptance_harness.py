@@ -42,6 +42,19 @@ def native_row():
     }
 
 
+@pytest.mark.parametrize(
+    "raw,accepted",
+    [
+        ("  %  KiraBridge visible % ", True),
+        ("x KiraBridge visible % ", False),
+        ("KiraBridge visible % pending", False),
+        ("KiraBridge visible % KiraBridge visible % ", False),
+    ],
+)
+def test_cleanup_repaint_exception_is_narrow_and_does_not_admit_drafts(harness, raw, accepted):
+    assert harness.controlled_cleanup_prompt(raw) is accepted
+
+
 def test_default_entrypoint_prints_only_review_plan(harness, monkeypatch, capsys):
     def forbid(*args, **kwargs):
         pytest.fail("Plan-only invocation performed work")

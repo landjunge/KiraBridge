@@ -30,7 +30,9 @@ def manager_for_open(tmp_path, rows):
         desktop=object(),
         open=AsyncMock(return_value={"tty": "/dev/ttys004", "opened": True}),
         catalog=AsyncMock(return_value=deepcopy(rows)),
-        process_identity=AsyncMock(return_value="501 ttys004 exact-start-time"),
+        process_identity=AsyncMock(return_value="501 ttys004 Sun Nov 1 12:00:00 2026 344 /bin/zsh"),
+        process_working_directory=AsyncMock(return_value=str(tmp_path)),
+        verify_opened=AsyncMock(),
         send_confirmed=AsyncMock(),
     )
     ports = SessionPorts(

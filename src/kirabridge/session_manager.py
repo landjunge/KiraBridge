@@ -14,7 +14,7 @@ from typing import Literal
 
 from pydantic import Field, model_validator
 
-from kirabridge.bridge_core.models import BridgeError, Input, digest
+from kirabridge.bridge_core.models import BridgeError, Input, UncertainExecution, digest
 from kirabridge.filesystem_manager import PathScope
 from kirabridge.platform_adapters.terminal_app import TerminalAppTransport
 from kirabridge.platform_adapters.tmux import TmuxTransport
@@ -763,7 +763,7 @@ class SessionManager:
                 result["next_cursor"] = reference["sha256"]
             return result
 
-    async def open(self, principal, args, *, task_id=None):
+    async def open(self, principal, args, *, task_id=None, on_created=None):
         policy = self.authorization.principal(principal, "session.open")
         self.authorization.principal(principal, "terminal.execute")
         self.authorization.validate_window(principal, task_id, args)
@@ -791,42 +791,78 @@ class SessionManager:
                 + shlex.quote("KiraBridge visible %% ")
                 + " /bin/zsh -f"
             )
-        if argv and not self.direct(principal):
-            command += " && " + shlex.join(argv)
         async with self.lock:
             self.authorization.check_window(principal, task_id, args)
             try:
-                result = await self.terminal_app.open(command)
+                result = await self.terminal_app.open(
+                    command, on_created=on_created, principal=principal
+                )
             except BaseException:
                 self.authorization.window_outcome(principal, task_id, "unknown")
                 raise
             self.authorization.window_outcome(principal, task_id, "opened")
-            for _ in range(20):
-                sessions = await self.terminal_app.catalog()
-                matches = [s for s in sessions if s["tty"] == result["tty"]]
-                if len(matches) > 1 or any(s.get("identity_ambiguous") for s in matches):
-                    raise BridgeError(
-                        "visible_target_ambiguous",
-                        "New terminal TTY has several live views; select an unambiguous view",
-                    )
-                selected = matches[0] if matches else None
-                if selected:
-                    if self.direct(principal) and argv:
-                        from kirabridge.platform_adapters.shell_prompt import empty_shell_prompt
+            try:
+                for _ in range(20):
+                    sessions = await self.terminal_app.catalog()
+                    matches = [s for s in sessions if s["tty"] == result["tty"]]
+                    if len(matches) > 1 or any(s.get("identity_ambiguous") for s in matches):
+                        raise BridgeError(
+                            "visible_target_ambiguous",
+                            "New terminal TTY has several live views; select an unambiguous view",
+                        )
+                    selected = matches[0] if matches else None
+                    if selected:
+                        if argv:
+                            from kirabridge.platform_adapters.shell_prompt import empty_shell_prompt
 
-                        if selected.get("busy", True):
-                            await asyncio.sleep(0.1)
-                            continue
-                        view = await self.read(
-                            principal, selected["pane_id"], selected["expected_pid"]
-                        )
-                        if not empty_shell_prompt(view["text"]):
-                            await asyncio.sleep(0.1)
-                            continue
-                        identity = await self.terminal_app.process_identity(
-                            selected["expected_pid"]
-                        )
-                        await self.terminal_app.send_confirmed(selected, shlex.join(argv), identity)
-                    return {**selected, "opened": True, "agent_processed": False}
-                await asyncio.sleep(0.05)
-        return {**result, "session_handle_pending": True, "agent_processed": False}
+                            if selected.get("busy", True):
+                                await asyncio.sleep(0.1)
+                                continue
+                            view = await self.read(
+                                principal, selected["pane_id"], selected["expected_pid"]
+                            )
+                            if not empty_shell_prompt(view["text"]):
+                                await asyncio.sleep(0.1)
+                                continue
+                            identity = await self.terminal_app.process_identity(
+                                selected["expected_pid"], detailed=True
+                            )
+                            actual_cwd = await self.terminal_app.process_working_directory(
+                                selected["expected_pid"], expected_identity=identity
+                            )
+                            if actual_cwd != cwd:
+                                await asyncio.sleep(0.1)
+                                continue
+                            await self.terminal_app.send_confirmed(
+                                selected,
+                                shlex.join(argv),
+                                identity,
+                                expected_cwd=cwd,
+                                before_transport=lambda: self.terminal_app.verify_opened(
+                                    result, principal=principal
+                                ),
+                            )
+                        return {
+                            **selected,
+                            "opened": True,
+                            "agent_processed": False,
+                            "creation_receipt": result,
+                            "separate_window": result.get("separate_window", False),
+                        }
+                    await asyncio.sleep(0.05)
+                if argv:
+                    raise UncertainExecution(
+                        "session_open_pending", "Window opened; argv was not dispatched"
+                    )
+                return {**result, "session_handle_pending": True, "agent_processed": False}
+            except Exception as cause:
+                error = UncertainExecution(
+                    getattr(cause, "code", "session_open_unknown"),
+                    "Window opened; later outcome unconfirmed; never reopen or resend",
+                )
+                error.provider_error = {
+                    "creation_receipt": result,
+                    "automatic_retry": False,
+                    "cause_code": getattr(cause, "code", type(cause).__name__),
+                }
+                raise error from cause

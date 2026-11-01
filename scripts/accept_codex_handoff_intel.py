@@ -584,6 +584,15 @@ async def close_owned_idle(transport, owned, shell_identity, raw, workspace):
     return await transport.native(close, mutation=True)
 
 
+def controlled_cleanup_prompt(raw):
+    """Only own-shell cleanup may accept the observed post-Codex repaint residue."""
+    line = raw.rstrip("\n").split("\n")[-1]
+    return (
+        line.count("KiraBridge visible % ") == 1
+        and re.fullmatch(r"[ %]*KiraBridge visible % ", line) is not None
+    )
+
+
 def require_commit_pins(head, installed, package_commit, harness_commit):
     require(
         all(
@@ -745,10 +754,10 @@ async def accept(args):
         os.environ.pop(token_name, None)
         raise
     transport = bridge.sessions.terminal_app
-    catalog, native = transport.catalog, transport.native
+    catalog, native, product_open = transport.catalog, transport.native, transport.open
     original_check = bridge.visible_handoffs.check_target
     owned = binding = shell_identity = agent_identity = None
-    isolation = None
+    product_receipt = None
     baseline_ready = False
     active_label, frames = "startup", []
     original_windows, original_identities = set(), {}
@@ -792,19 +801,6 @@ async def accept(args):
         checkpoint()
         print(json.dumps(evidence["checks"][-1]), flush=True)
 
-    physical_bytes = 0
-
-    def physical_record(event):
-        nonlocal physical_bytes
-        data = json.dumps(event, ensure_ascii=False) + "\n"
-        physical_bytes += len(data.encode())
-        require(physical_bytes <= 16 * 1024 * 1024, "Private physical-proof budget exceeded")
-        with (root / "physical-windows.private.jsonl").open("a") as output:
-            output.write(data)
-        if "baseline_activation" in event:
-            evidence["baseline_activation"] = event["baseline_activation"]
-            checkpoint()
-
     async def observe_originals():
         try:
             observation = await original_deltas(
@@ -821,8 +817,9 @@ async def accept(args):
     async def current(*, cleanup=False):
         if cleanup:
             row = physical_helper().created_row(await catalog(), owned, original_windows)
-        elif isolation is not None and isolation.confirmed:
-            row = await isolation.current()
+        elif product_receipt is not None:
+            await transport.verify_opened(product_receipt, principal="chatgpt")
+            row = physical_helper().created_row(await catalog(), owned, original_windows)
         else:
             row = owned_row(await catalog(), owned, original_windows)
         require(
@@ -840,7 +837,7 @@ async def accept(args):
                 if (
                     not row["busy"]
                     and [p["pid"] for p in row["processes"]] == [owned["expected_pid"]]
-                    and empty_shell_prompt(raw)
+                    and (empty_shell_prompt(raw) or cleanup and controlled_cleanup_prompt(raw))
                 ):
                     return raw
                 await asyncio.sleep(0.15)
@@ -849,14 +846,18 @@ async def accept(args):
         nonlocal open_attempts
         if not mutation:
             return await native(source, mutation=False)
-        if owned is None:
+        created = evidence.get("product_creation_receipt")
+        if owned is None and created is None:
             require(
                 "app.doScript(" in source and open_attempts == 0, "No additional window attempt"
             )
             open_attempts += 1
         else:
+            window_id = (
+                int(owned["pane_id"].split(":")[1]) if owned is not None else created["window_id"]
+            )
             require(
-                f"app.windows.byId({int(owned['pane_id'].split(':')[1])})" in source,
+                f"app.windows.byId({window_id})" in source,
                 "Native mutation is not bound to owned window",
             )
         receipt = {"source_sha256": text_sha(source), "at": time.time()}
@@ -871,6 +872,22 @@ async def accept(args):
             raise
         finally:
             checkpoint()
+
+    async def tracked_product_open(command, *, on_created=None, principal="session_open"):
+        async def created(receipt):
+            if on_created is not None:
+                await on_created(receipt)
+            evidence["product_creation_receipt"] = dict(receipt)
+            checkpoint()
+            require(
+                receipt.get("opened") is True
+                and receipt.get("tty") not in original_ttys
+                and type(receipt.get("window_id")) is int
+                and receipt["window_id"] not in original_windows,
+                "Product creation receipt is not a fresh owned target",
+            )
+
+        return await product_open(command, on_created=created, principal=principal)
 
     async def forbidden(*args, **kwargs):
         raise RuntimeError("No hidden, raw-send, extra-window or tmux fallback allowed")
@@ -965,28 +982,13 @@ async def accept(args):
                     and system_transport.expected_commit == args.commit
                     and system_transport.app_path == contract["app_path"]
                     and system_transport.expected_binary_sha256
-                    == contract["expected_binary_sha256"],
+                    == contract["expected_binary_sha256"]
+                    and transport.system_transport is system_transport,
                     "Physical proof must reuse the exact installed native transport",
-                )
-                isolation = physical_helper().PhysicalIsolation(
-                    transport,
-                    system_transport,
-                    nonce=nonce,
-                    workspace=workspace,
-                    record=physical_record,
-                )
-                physical_baseline = await isolation.prepare_visible_baseline()
-                require(
-                    {r["window_id"] for r in physical_baseline["logical"]["rows"]}
-                    == original_windows
-                    and all(
-                        physical_baseline["logical"]["identities"].get(pid) == identity
-                        for pid, identity in original_identities.items()
-                    ),
-                    "Complete baseline changed before window creation",
                 )
                 baseline_ready = True
                 transport.native = traced_native
+                transport.open = tracked_product_open
                 bridge.visible_handoffs.check_target = traced_check
                 sock = socket.socket()
                 sock.bind(("127.0.0.1", 0))
@@ -1110,8 +1112,17 @@ async def accept(args):
                     evidence["owned"] = owned
                     evidence["owned_shell_identity"] = shell_identity
                     checkpoint()
-                    active_label = "physical-isolation"
-                    evidence["physical_proof"] = await isolation.isolate(owned, shell_identity)
+                    product_receipt = opened["result"]["creation_receipt"]
+                    require(
+                        opened["result"].get("separate_window") is True
+                        and product_receipt.get("separate_window") is True
+                        and product_receipt["tty"] == owned["tty"]
+                        and product_receipt["window_id"] == int(owned["pane_id"].split(":")[1]),
+                        "Product did not confirm its own separate window",
+                    )
+                    await transport.verify_opened(product_receipt, principal="chatgpt")
+                    evidence["physical_proof"] = product_receipt["physical_window"]
+                    evidence["physical_proof_route"] = "product_session_open_and_verify_opened"
                     checkpoint()
                     await observe_originals()
                     await wait_shell()

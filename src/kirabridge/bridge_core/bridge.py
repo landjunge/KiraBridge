@@ -232,6 +232,7 @@ class Bridge:
         self.system_modules = SystemModules(
             authorize=self.security.authorize, **installed_native_contract(Path(__file__))
         )
+        self.sessions.terminal_app.system_transport = self.system_modules.transport
         self.macos = MacOSProvider(
             terminal_app=self.sessions.terminal_app,
             clipboard=self.clipboard,
@@ -622,7 +623,9 @@ class Bridge:
             background=bool(getattr(args, "background", False)),
         ):
             visible_args = VisibleTerminalInput.model_validate(arguments)
-            return await self.visible_terminal.execute(task, visible_args, running)
+            return await self.visible_terminal.execute(
+                task, visible_args, running, progress=progress
+            )
         if operation == "terminal.execute":
             result = await self.terminal.execute(
                 task["id"],
@@ -673,7 +676,19 @@ class Bridge:
             )
         if operation == "session.open":
             await running({"evidence_type": "session_open_dispatch"})
-            return await self.sessions.open(principal, args, task_id=task["id"])
+
+            async def session_window_created(receipt):
+                await progress(
+                    {
+                        "evidence_type": "session_window_created",
+                        "creation_receipt": receipt,
+                        "automatic_retry": False,
+                    }
+                )
+
+            return await self.sessions.open(
+                principal, args, task_id=task["id"], on_created=session_window_created
+            )
         if operation == "agent.execute":
             self.teams.authorize_execution(task)
             return await self.agents.execute(task, args, policy, running, progress)
@@ -718,7 +733,11 @@ class Bridge:
         if operation == "admin.execute":
             if direct_terminal_required(self.config, principal):
                 return await self.visible_terminal.execute(
-                    task, VisibleTerminalInput.model_validate(arguments), running, privileged=True
+                    task,
+                    VisibleTerminalInput.model_validate(arguments),
+                    running,
+                    progress=progress,
+                    privileged=True,
                 )
             from kirabridge.admin_manager import execute_admin
 

@@ -6,6 +6,7 @@ import asyncio
 import json
 import os
 import re
+import secrets
 import sys
 from collections import Counter
 from pathlib import Path
@@ -756,12 +757,144 @@ class TerminalAppTransport:
             self.native_target(pane_id) + "\nJSON.stringify(" + self.native_input_tail(65536) + ");"
         )
 
-    async def open(self, command):
-        return await self.native(
-            'const app=Application("Terminal"); const tab=app.doScript('
+    def native_open_source(self, command, nonce, proof):
+        prior = json.dumps(proof.logical_before)
+        guard = (
+            self.native_identity_guard({proof.app["pid"]: proof.app_identity}) if proof.app else ""
+        )
+        return (
+            'const app=Application("Terminal");'
+            + guard
+            + "const prior=app.running()?app.windows().map(w=>[w.id(),w.tabs()."
+            "map(t=>t.tty()).sort()]).sort((a,b)=>a[0]-b[0]):[];"
+            + "if(JSON.stringify(prior)!==JSON.stringify("
+            + prior
+            + "))throw Error('Open inventory changed before creation');"
+            + "const oldTTYs=prior.flatMap(w=>w[1]);const tab=app.doScript("
             + json.dumps(command)
-            + "); app.activate(); JSON.stringify({tty:tab.tty(),opened:true});",
-            mutation=True,
+            + ");"
+            + "const receipt={opened:true,tty:tab.tty(),nonce:"
+            + json.dumps(nonce)
+            + ",creation_bound:false};"
+            + "try{if(!/^\\/dev\\/tty[A-Za-z0-9]+$/.test(receipt.tty)||oldTTYs.in"
+            "cludes(receipt.tty))throw Error('Returned TTY is not new');"
+            + "const matches=app.windows().filter(w=>w.tabs().some(t=>t.tty()===receipt.tty));"
+            + "if(matches.length!==1||app.windows().flatMap(w=>w.tabs()).filter"
+            "(t=>t.tty()===receipt.tty).length!==1)throw Error('Created TTY i"
+            "s ambiguous');" + "const w=matches[0];receipt.window_id=w.id();receipt.script_tab_c"
+            "ount=w.tabs().length;"
+            + "const se=Application('System Events'),owners=se.processes().filt"
+            "er(p=>{try{return p.bundleIdentifier()==='com.apple.Terminal';}c"
+            "atch(e){return false;}});"
+            + "if(owners.length!==1)throw Error('Created Terminal owner is ambi"
+            "guous');receipt.app_pid=owners[0].unixId();"
+            + "const host=Application.currentApplication();host.includeStandardAdditions=true;"
+            + "receipt.app_identity=host.doShellScript('/usr/bin/env LC_ALL=C /"
+            "bin/ps -p '+receipt.app_pid+' -o uid=,tty=,lstart=,ppid=,comm=')"
+            ".trim().replace(/\\s+/g,' ');"
+            + "receipt.creation_bound=true;tab.customTitle="
+            + json.dumps(nonce)
+            + ";tab.titleDisplaysCustomTitle=true;receipt.tagged=true;"
+            + "}catch(error){receipt.preparation_error=String(error);}JSON.stringify(receipt);"
+        )
+
+    def created_tab_guard(self, receipt):
+        pane = f"terminal:{receipt['window_id']}:{Path(receipt['tty']).name}"
+        return (
+            self.native_target(pane)
+            + self.native_identity_guard({receipt["app_pid"]: receipt["app_identity"]})
+            + "\nfunction checkCreatedTab(){checkTargetIdentity();"
+            + "if(targetWindow.tabs().length!==1||app.windows().flatMap(w=>w.ta"
+            "bs()).filter(t=>t.tty()==="
+            + json.dumps(receipt["tty"])
+            + ").length!==1||!targetWindow.name().includes("
+            + json.dumps(receipt["nonce"])
+            + "))throw Error('Created terminal identity changed');}checkCreatedTab();"
+        )
+
+    async def move_created_tab(self, receipt):
+        source = (
+            self.created_tab_guard(receipt)
+            + """
+const se=Application('System Events'), owners=se.processes().filter(p=>p.unixId()===__PID__);
+if(owners.length!==1||owners[0].bundleIdentifier()!=='com.apple.Terminal')
+ throw Error('Created Terminal owner changed');
+const owner=owners[0];
+function named(item){try{return item.name();}catch(error){return '';}}
+function selected(){const ws=app.windows();return owner.frontmost()&&ws.length&&
+ ws[0].id()===__WINDOW__&&ws[0].selectedTab().tty()===__TTY__;}
+if(!selected())throw Error('Created terminal focus changed');
+const visible=owner.windows().filter(w=>named(w).includes(__NONCE__));
+if(visible.length!==1)throw Error('Created UI window is ambiguous');
+const menus=owner.menuBars()[0].menuBarItems().filter(m=>['Window','Fenster'].includes(named(m)));
+if(menus.length!==1)throw Error('Detach menu is unavailable');
+const entries=menus[0].menus()[0].menuItems().filter(m=>
+ ['Move Tab to New Window','Tab in ein neues Fenster bewegen'].includes(named(m)));
+if(entries.length!==1||!entries[0].enabled())throw Error('Detach menu is unavailable');
+checkCreatedTab();
+if(!selected()||owner.windows().filter(w=>named(w).includes(__NONCE__)).length!==1||
+ !['Move Tab to New Window','Tab in ein neues Fenster bewegen'].includes(named(entries[0]))||
+ !entries[0].enabled())throw Error('Detach target changed');
+entries[0].click();JSON.stringify({detached:true});
+"""
+        )
+        source = (
+            source.replace("__PID__", str(receipt["app_pid"]))
+            .replace("__WINDOW__", str(receipt["window_id"]))
+            .replace("__TTY__", json.dumps(receipt["tty"]))
+            .replace("__NONCE__", json.dumps(receipt["nonce"]))
+        )
+        result = await self.native(source, mutation=True)
+        if result.get("detached") is not True:
+            raise UncertainExecution("session_open_unknown", "Detach result unknown; never replay")
+
+    async def open(self, command, *, on_created=None, principal="session_open"):
+        from kirabridge.platform_adapters.macos.terminal_window import TerminalWindowProof, require
+
+        proof = TerminalWindowProof(self, getattr(self, "system_transport", None), principal)
+        await proof.prepare()
+        receipt = None
+        try:
+            source = self.native_open_source(command, "KiraBridge_" + secrets.token_hex(16), proof)
+            receipt = await self.native(source, mutation=True)
+            if on_created is not None:
+                await on_created(dict(receipt))
+            require(
+                receipt.get("opened") is True
+                and receipt.get("creation_bound") is True
+                and receipt.get("tagged") is True
+                and not receipt.get("preparation_error")
+                and receipt.get("script_tab_count") == 1,
+                "Created Terminal receipt is incomplete",
+            )
+            pane = f"terminal:{receipt['window_id']}:{Path(receipt['tty']).name}"
+            target = self.native_target(pane)
+            focus = self.native_focus(pane)[len(target) :]
+            await self.native(
+                self.created_tab_guard(receipt)
+                + focus
+                + "\ncheckCreatedTab();checkFocus();JSON.stringify({focused:true});",
+                mutation=True,
+            )
+            binding = await proof.isolate(receipt)
+            return {**receipt, "physical_window": binding, "separate_window": True}
+        except Exception as cause:
+            error = UncertainExecution(
+                "session_open_unknown",
+                "Window creation/isolation is unconfirmed; never reopen or resend",
+            )
+            error.provider_error = {
+                "creation_receipt": receipt,
+                "automatic_retry": False,
+                "cause_code": getattr(cause, "code", type(cause).__name__),
+            }
+            raise error from cause
+
+    async def verify_opened(self, opened, *, principal="session_open"):
+        from kirabridge.platform_adapters.macos.terminal_window import TerminalWindowProof
+
+        await TerminalWindowProof(self, self.system_transport, principal).verify(
+            opened, opened["physical_window"]
         )
 
     async def process_identity(self, pid, *, detailed=False):
@@ -861,7 +994,9 @@ class TerminalAppTransport:
             if child is not None:
                 await reap_process(child, process_group=False)
 
-    async def send_confirmed(self, row, text, identity, *, before_transport=None):
+    async def send_confirmed(
+        self, row, text, identity, *, before_transport=None, expected_cwd=None
+    ):
         """Check process start time/UID/TTY and empty input in the same native dispatch."""
         if identity.split()[1] != Path(row["tty"]).name:
             raise BridgeError("visible_target_changed", "Selected process TTY changed")
@@ -873,11 +1008,41 @@ class TerminalAppTransport:
                 "visible_input_not_empty",
                 "Cannot verify an empty shell prompt; existing or ambiguous input is preserved",
             )
-        command = f"/bin/ps -p {int(row['expected_pid'])} -o uid=,tty=,lstart="
+        detailed = len(identity.split(None, 8)) == 9
+        if expected_cwd is not None:
+            if not detailed or any(ord(c) < 32 or ord(c) == 127 for c in str(expected_cwd)):
+                raise BridgeError(
+                    "visible_target_changed", "Full process identity and literal CWD required"
+                )
+            identity_guard = self.native_identity_guard({row["expected_pid"]: identity})
+            cwd_command = f"/usr/sbin/lsof -a -p {int(row['expected_pid'])} -d cwd -Fpfn"
+            identity_guard += (
+                "\nif(identityHost.doShellScript("
+                + json.dumps(cwd_command)
+                + ").replace(/\\r\\n?/g,'\\n').replace(/\\n$/,'')!=="
+                + json.dumps(f"p{row['expected_pid']}\nfcwd\nn{expected_cwd}")
+                + ")throw Error('Selected target identity changed: CWD');checkTargetIdentity();"
+            )
+        else:
+            identity_guard = ""
+        command = (
+            ("/usr/bin/env LC_ALL=C " if detailed else "")
+            + f"/bin/ps -p {int(row['expected_pid'])} -o "
+            + ("uid=,tty=,lstart=,ppid=,comm=" if detailed else "uid=,tty=,lstart=")
+        )
+        own_boundary = (
+            "\nif(targetWindow.tabs().length!==1||app.windows().flatMap(w=>w.tabs()).filter(t=>t.tty()==="
+            + json.dumps(row["tty"])
+            + ").length!==1)throw Error('Selected target identity changed');"
+            if expected_cwd is not None
+            else ""
+        )
         if before_transport is not None:
             await before_transport()
         return await self.native(
             self.native_target(row["pane_id"])
+            + identity_guard
+            + own_boundary
             + "\nconst host=Application.currentApplication(); host.includeStandardAdditions=true;"
             + "\nconst observed=host.doShellScript("
             + json.dumps(command)
@@ -889,6 +1054,8 @@ class TerminalAppTransport:
             # Use the accepted screen, not a second prompt parser that can drift.
             + self.native_screen_guard(screen)
             + "\ntargetWindow.selectedTab=tab; targetWindow.index=1; app.activate();"
+            + ("\ncheckTargetIdentity();" if expected_cwd is not None else "")
+            + own_boundary
             + "\nif(tab.busy()) throw Error('Selected terminal is busy');"
             + self.native_screen_guard(screen)
             + "\napp.doScript("

@@ -54,7 +54,7 @@ class VisibleTerminal:
         output = await self.sessions.read(principal, row["pane_id"], row["expected_pid"])
         return empty_shell_prompt(output["text"])
 
-    async def execute(self, task, args, running, *, privileged=False):
+    async def execute(self, task, args, running, *, progress=None, privileged=False):
         bridge, principal = self, task["principal"]
         policy = bridge.security.principal(principal, "terminal.execute")
         bridge.security.principal(principal, "session.inspect")
@@ -110,8 +110,21 @@ class VisibleTerminal:
             else:
                 reference = None
         if reference is None:
+
+            async def window_created(receipt):
+                await progress(
+                    {
+                        "evidence_type": "session_window_created",
+                        "creation_receipt": receipt,
+                        "automatic_retry": False,
+                    }
+                )
+
+            open_options = {"task_id": task["id"]}
+            if progress is not None:
+                open_options["on_created"] = window_created
             opened = await bridge.sessions.open(
-                principal, SessionOpen(cwd=cwd, controlled_shell=True), task_id=task["id"]
+                principal, SessionOpen(cwd=cwd, controlled_shell=True), **open_options
             )
             if opened.get("session_handle_pending"):
                 raise UncertainExecution(

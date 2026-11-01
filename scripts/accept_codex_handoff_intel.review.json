@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "status": "independently_reviewed_offline_live_acceptance_pending",
+  "status": "product_window_code_and_simplified_harness_independently_reviewed_live_acceptance_pending",
   "harness": "scripts/accept_codex_handoff_intel.py",
   "offline_tests": "tests/test_codex_acceptance_harness.py",
   "runner": "Root only, after review and candidate source freeze",
@@ -49,11 +49,11 @@
     "Persist creation receipt before any startup trust; first PID birth and parent must match the original OpenTask interval/process receipt",
     "Read-only startup allows login-to-exec comm transition only within the exact PID/UID/TTY/birth/parent generation, then requires two consistent controlled empty prompt/CWD/idle/child-free samples",
     "A shell-ready receipt does not grant input; use existing native AX/CG APIs to bind a private nonce title to physical topology before geometry or Codex",
-    "Own-tab title and at most one documented Move Tab to New Window action require fresh native process/CWD/screen/single-script-tab/uniqueTTY and current focus/selection/menu guards",
-    "Bind the one observed baseline group by its complete ordered opaque radio tokens and unchanged native owner/app/worker generations; current exact CG/AX titles and independently read layout pair surfaces; parent IDs and radio titles are volatile; require exactly one fresh selected own radio before Move; after known successful Move only, a hidden own tabbar requires the preserved pre-move Own AXWindow token and a complete ordered original radio partition in exactly the other current group",
     "No equality assumption between Terminal scripting IDs, AX tokens and Window Server numbers",
-    "Before physical baseline, activate exactly the freshly identified existing Terminal application once by guarded standard AppleEvent; persist attempt/sourcehash/result separately; this does not open a window or send input",
-    "Only zero CG and zero AX windows with existing logical views, or incoherent current CG/AX titles, permits bounded read-only resampling after that single activation; no title normalization or mutation; every other identity/topology failure stops"
+    "Normal product session.open must itself return separate_window=true with positive native physical binding; the harness never tags or moves a tab",
+    "Wrap on_created only to forward the product durable callback first and observe exact fresh TTY/window receipt; subsequent traced native mutations must name that exact logical window",
+    "Use product verify_opened with stable native IDs after initial binding, allowing legitimate own geometry and CLI title changes; preserve other native partitions",
+    "Only cleanup may accept ASCII spaces/percent repaint residue before exactly one complete owned controlled prompt; input/startup parsing remains unchanged"
   ],
   "acceptance_matrix": [
     {
@@ -133,6 +133,17 @@
     "actual_run03": "Stopped before detach, test input and Codex because selected virtual tab changed parent AX/CG IDs; exact original radio tokens/order retained; own shell closed once, private endpoint absent, originals preserved",
     "ax_read_delta": "Helper07633820 independently approved by review_mcp and Root; at most3 identical AX requests for exactly macos_tree_changed only before baseline after one activation;3 direct cases passed in0.59s; no product delta",
     "hidden_tabbar_delta": "Helpere083a277 independently read and approved by Root, design approved by review_mcp;3 narrow author cases passed in0.46s including private original actual05; no product delta",
-    "tooltip_count_delta": "Helperab01eab7: compare AXWindow roles consistently in both native inventories; one regression red then green0.25s; Root independent diff approved; no product delta"
+    "tooltip_count_delta": "Helperab01eab7: compare AXWindow roles consistently in both native inventories; one regression red then green0.25s; Root independent diff approved; no product delta",
+    "final_product_window_fix": {
+      "source_sha256": "c0af2bb8c428c137e0f87c68354cfa43225eb8ff73887f09bf1d2809f3d65c15",
+      "files": 146,
+      "author_local_cases": 14,
+      "review": "review_macos final code Go; two native partition/geometry findings closed",
+      "root_dispatcher_cases": 2,
+      "root_cleanup_string_cases": 4,
+      "harness_sha256": "eccca80bddb4215ec2a99e54a92dd64e6808357e7b5b34176db42a6adadc5753",
+      "actions_started": 0,
+      "repeated_full_suites": 0
+    }
   }
 }

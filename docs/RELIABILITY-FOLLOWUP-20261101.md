@@ -335,3 +335,54 @@ aktuelle Flächen und die positive Originalpartition. Drei direkte Fälle
 bestanden (0,46 s), einschließlich echter gespeicherter Probe05 und zwölf
 Negativvarianten. Root hat den implementierten Delta unabhängig gelesen und
 freigegeben; MCP bestätigte das Design. Keine Produkt- oder CI-Änderung.
+
+### Gesicherter Produktrest: physisch separates Terminalfenster
+
+Die unabhängige Quellenprüfung bestätigt eine echte Vertragslücke:
+`mcp_gateway/server.py:621` und `:655` versprechen ein neues beziehungsweise
+separates sichtbares Terminalfenster. `platform_adapters/terminal_app.py:759`
+verwendet nur `app.doScript`; `session_manager.py:803` bestätigt eine neue TTY.
+`visible_terminal.py:113` übernimmt diesen Pfad. Bei automatischem Systemtabbing
+ist ein separates physisches Fenster damit produktiv noch nicht sichergestellt.
+Der bisherige tatsächliche Detach lebt ausschließlich im manuellen Prüfhelfer
+und darf **nicht als Produktreparatur ausgegeben** werden. Der Produktrest ist
+jetzt Hauptpriorität; weitere alte406-Abnahmewiederholungen sind gestoppt.
+
+Actual07 bestätigte die physische Isolation und den Busy-Negativfall und startete
+einen eigenen Codex. Codex überschrieb den Noncetitel; der physische Prüfer
+verweigerte daraufhin. Der Harness beendete den eigenen Codex58495 genau einmal
+mit SIGTERM. Ein Prompt-Repaintrest führte danach zum Cleanup-Timeout. Ein
+separat unabhängig gelesener Once-Helfer prüfte vollständige ursprüngliche
+Ownership, zweifache Codexabsenz, unveränderte Shellgeneration, eigenen CWD,
+Child-Freiheit, Idle, SingleTab und letzten Screen. Er akzeptierte ausschließlich
+Spaces/Prozent-Repaintreste vor dem exakt einen kontrollierten Prompt, keine
+Zeichen danach. Genau ein Close985; Codex, Shell58097 und Fenster waren danach
+zweimal abwesend, alle Originalviews/-generationen erhalten. Keine zusätzlichen
+Signale, Tasten oder Returns. Abnahme bleibt fehlgeschlagen; kein Testprompt
+oder Handoff wurde gesendet. Keine eigenen Zusatzfenster verbleiben.
+
+### Produktfix des separaten Fensters: Code freigegeben, lokale Abnahme ausstehend
+
+Der normale Produktpfad wurde jetzt korrigiert: genau ein `doScript` bindet
+die neue TTY und das Rückgabeobjekt; der Erzeugungsbeleg wird vor Focus,
+nativem Nachweis oder Move dauerhaft am Task gespeichert. Der bestehende
+Systemtransport prüft die ursprüngliche und neue physische Partition. Höchstens
+ein gezielter Move ist erlaubt. Befehle aller Principals starten erst danach
+einmalig mit frischen vollständigen Prozess-, CWD- und Promptguards. Die weitere
+Bindung verwendet native IDs, App-/Worker-Generation und TTY; CLI-Titeländerungen
+oder legitime Größenänderung des eigenen Fensters zerstören sie nicht.
+
+Der unabhängige Mac-Review schloss zwei konkrete Befunde: nur fremde Geometrie
+bleibt im dauerhaften Partitionsfingerprint; die ursprünglichen Hostradios
+werden bereits gegen die Vor-Open-Partition geprüft. Unbeobachtbare Partitionen
+bleiben ungewiss mit erhaltener Erzeugungsreceipt und ohne argv/Replay.
+**14 notwendige Autorenfälle**, **zwei reale Dispatcher-/Storefälle** für
+Creationreceipt/Unknown/NoReplay sowie **vier reine Cleanup-Promptfälle**
+bestanden. Keine vollständige lokale Testsuite oder GitHub-Matrix wiederholt.
+Ruff und Formatprüfung aller 516 Repositorydateien waren grün.
+
+Der manuelle Abnahmehelfer verwendet jetzt genau den produktiven Open-/
+verify_opened-Pfad. Er erzeugt keinen eigenen Tag-/Move-/Physical-Controller mehr.
+Sein unabhängiger Review ist freigegeben; echte lokale Native-Abnahme und
+Installation sind noch offen. Neuer Pythonquellbaum (146 Dateien):
+`c0af2bb8c428c137e0f87c68354cfa43225eb8ff73887f09bf1d2809f3d65c15`; Harness-SHA `eccca80bddb4215ec2a99e54a92dd64e6808357e7b5b34176db42a6adadc5753`.
