@@ -426,3 +426,41 @@ async def test_one_confirmed_move_allows_either_split_surface_to_keep_shared_cg(
     assert result["physical_window"]["ax_window_token"] == f"{1:032x}"
     assert events == ["create", "receipt", "focus", "move"]
     await leaf.verify_opened(result, principal="chatgpt")
+
+
+@pytest.mark.parametrize("persistent", [False, True])
+async def test_postmove_only_count_mismatch_reads_again_without_repeating_move(product, persistent):
+    scene, leaf, events, receipt, created = product
+    request = leaf.system_transport.request
+    postmove_reads = 0
+
+    async def asynchronous_move(operation, arguments, **kwargs):
+        nonlocal postmove_reads
+        value = await request(operation, arguments, **kwargs)
+        if (
+            scene.phase == "detached"
+            and operation == "accessibility.inspect"
+            and not arguments.get("element_token")
+        ):
+            postmove_reads += 1
+            if persistent or postmove_reads == 1:
+                value["children"] = value["children"][:1]
+                value["total_children"] = 1
+        return value
+
+    leaf.system_transport.request = asynchronous_move
+    if persistent:
+        with pytest.raises(UncertainExecution) as error:
+            await leaf.open("cd -- /private/work", on_created=created, principal="chatgpt")
+        assert error.value.provider_error["cause_code"] == "session_window_inventory_pending"
+        assert error.value.provider_error["cause_message"] == (
+            "Native AX/CG window inventory differs (CG=2, AX=1, AX-list=2)"
+        )
+        assert error.value.provider_error["creation_receipt"] == receipt
+        assert postmove_reads == 10
+    else:
+        result = await leaf.open("cd -- /private/work", on_created=created, principal="chatgpt")
+        assert result["separate_window"] and result["physical_window"]["move_confirmed"]
+        assert postmove_reads == 2
+    assert events == ["create", "receipt", "focus", "move"]
+    assert leaf.native.await_count == 3

@@ -4,7 +4,7 @@
   "status": "new_product_window_fix_reviewed_local_package_and_actual_acceptance_pending",
   "base_commit": "a6ecafa3b84729a41b07beba43013fb5863e3499",
   "branch": "fix/reliability-review-20261101",
-  "source_sha256": "8dce340e0ff2e163ef55efb1949fda01c6ab357ec3b873189cc1ee63bec5eb28",
+  "source_sha256": "5dcf092905b1f89db76439d12b8a93039e1f5d4d479baf9ddf91f74c229beb25",
   "source_python_files": {
     "__init__.py": "b4263b16e5d119a7e2ccd5124f5a28bb5001b9ff94ee771b96001f09e9c15deb",
     "admin_manager.py": "bd5b83ed4e2103a3a74079a3056e6b779182d85138f8acd55e1a7dd865912ef3",
@@ -103,7 +103,7 @@
     "platform_adapters/macos/system_models.py": "1afb53b276c53f7981f1a67a356760873dccb90a3ec301a45004cb5efe3d73ac",
     "platform_adapters/macos/system_services_models.py": "bf1202d16cc340f6b5e44859e9d5134091730d45c7b3fd1ff259a6dac42cad21",
     "platform_adapters/macos/system_transport.py": "3cad47d9d0f385c3aa44f808c37a2aee281f34687fb1b3593cb77378d7a32fd8",
-    "platform_adapters/macos/terminal_window.py": "e05d292f309283bc22471bf07da13fadbc2671abae07091b5b3d01364a8aafeb",
+    "platform_adapters/macos/terminal_window.py": "b9373d88b6bfc01c792ec6a9f2292c953134aa603880e5e72555d6bfe4f764f3",
     "platform_adapters/shell_prompt.py": "5489a11457e10f52f00951ac055160fb2da164881121d1092d72575236a441fd",
     "platform_adapters/terminal_app.py": "556ef794c0922562e72329c31d20118a8ca525f26fe7cbccc63860a16e02e588",
     "platform_adapters/tmux.py": "f4c7723b5c6ea2aff7ec459c981bc1a7995d53f6d956bb55529aa5dd7ebe557f",
@@ -366,6 +366,15 @@
     "cleanup": "own1342/Shell69233 closed once, twice absence, all originals preserved",
     "review": "review_macos exact frozen Go",
     "tests": "two targeted models passed0.23s; swapped model previously failed",
+    "github_actions": false
+  },
+  "prior_source_3c2ffa1": "8dce340e0ff2e163ef55efb1949fda01c6ab357ec3b873189cc1ee63bec5eb28",
+  "post_move_count_fix": {
+    "actual": "3c-02 creation/focus/move confirmed, then exact cause Native AX/CG window inventory differs",
+    "fix": "specific transient inventory_pending reread only inside existing10 post-confirmed-Move attempts; no repeated effects",
+    "tests": "one direct test,2 cases, previouslyred nowgreen1.21s; persistent mismatch unknown/1Move/noargv",
+    "review": "review_macos exact Go",
+    "user_context": "Browser/desktop changes are normal user activity; operator may foreground own work windows",
     "github_actions": false
   }
 }

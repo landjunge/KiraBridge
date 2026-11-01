@@ -417,3 +417,17 @@ rot. Mac-Review ist grün. Private vorhandene Fehlerbelege enthalten nun auch di
 kurze konkrete Refusalnachricht. Ein separat reviewter Once-Helfer schloss nur
 Own1342 mit voller Geburts-/Parent-/CWD-/Promptbindung; danach Own zweimal
 abwesend, alle Originale erhalten. Neue Quelle `8dce340e0ff2e163ef55efb1949fda01c6ab357ec3b873189cc1ee63bec5eb28`; keine GitHub-Läufe.
+
+Abnahme3c-01 stoppte ausschließlich im nicht beobachtbaren Desktopkontext,
+ohne Open; einmal gezieltes Vorholen eines vorhandenen Fensters stellte
+1CG/1AX wieder her, ohne Eingabe oder neue Fenster. Abnahme3c-02 bestätigte
+Create/Focus/Move und meldete nun konkret `Native AX/CG window inventory
+differs`. Die bestehende PostMove-Warteschleife fing diesen Übergangszustand
+nicht ab. Ausschließlich dieser Zählfehler erhält jetzt einen spezifischen
+Code und wird nach bekanntem Move innerhalb der vorhandenen zehn Lesungen
+frisch nachgelesen. Duplikat-, Token- und Generationsfehler bleiben hart;
+kein Effekt wird wiederholt. Zwei direkte Fälle (vorher rot) bestanden1,21s,
+transienter Erfolg gegen begrenztes Unknown bei anhaltendem Mismatch.
+Unabhängiger enger Review ist grün. Neuer Pythonbaum `5dcf092905b1f89db76439d12b8a93039e1f5d4d479baf9ddf91f74c229beb25`.
+Browser-/Desktopwechsel sind vom Nutzer ausdrücklich als normale Nutzung
+gemeldet; die Arbeit darf eigene Prüf-/Installationsfenster nach vorn holen.

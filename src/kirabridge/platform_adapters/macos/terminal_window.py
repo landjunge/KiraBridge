@@ -145,12 +145,16 @@ class TerminalWindowProof:
         require(root["element"]["role"] == "AXApplication", "Native AX application is unavailable")
         ax_windows = [w for w in root["children"] if w["role"] == "AXWindow"]
         require(
-            len(ax_windows)
-            == len(windows)
-            == sum(w.get("role") == "AXWindow" for w in cg["accessibility_windows"])
-            and len({w["element_token"] for w in ax_windows}) == len(ax_windows),
-            "Native AX/CG window inventory differs",
+            len({w["element_token"] for w in ax_windows}) == len(ax_windows),
+            "Duplicate native AX window identity",
         )
+        ax_list_count = sum(w.get("role") == "AXWindow" for w in cg["accessibility_windows"])
+        if not len(ax_windows) == len(windows) == ax_list_count:
+            raise BridgeError(
+                "session_window_inventory_pending",
+                f"Native AX/CG window inventory differs (CG={len(windows)}, "
+                f"AX={len(ax_windows)}, AX-list={ax_list_count})",
+            )
         groups = []
         for window in ax_windows:
             observed = await self.ax(window["element_token"])
@@ -321,7 +325,13 @@ class TerminalWindowProof:
             self.retained(self.before, before, exclude=old_host)
             await self.terminal.move_created_tab(receipt)
             for attempt in range(10):
-                after = await self.snapshot()
+                try:
+                    after = await self.snapshot()
+                except BridgeError as error:
+                    if error.code != "session_window_inventory_pending" or attempt == 9:
+                        raise
+                    await asyncio.sleep(0.1)
+                    continue
                 new_cg, new_own = self.own(after, nonce=receipt["nonce"])
                 require(new_own["token"] == own["token"], "Detached own AX window anchor changed")
                 if self.members(new_own) == self.members(own) and len(after["ax"]) == len(
