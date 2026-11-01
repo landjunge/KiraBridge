@@ -1,67 +1,71 @@
-# KiraBridge 0.8.0rc24 · terminal and connection reliability
+# KiraBridge 0.8.0rc24 – Intel macOS: Terminal und Zuverlässigkeit
 
-Current local outcome: source `023f70feefcf8fcaa17b0637738b02644ad6b357`
-passed real Intel macOS Terminal/Codex acceptance and is installed with Core,
-Console and Companion verified. See the [installation evidence](RC24-INSTALLED-20261101.md).
-No new hosted CI, push or GitHub publication was performed under the user's
-budget constraint. Earlier candidate statements below are historical checkpoints.
+Dieses Prerelease veröffentlicht den auf Intel macOS geprüften und installierten
+Quellstand **023f70feefcf8fcaa17b0637738b02644ad6b357**. Das ZIP enthält genau
+diesen Commit; spätere Dokumentationscommits ändern die Paketquelle nicht.
 
-An explicitly selected Terminal.app tab now uses only its native catalogue.
-An unrelated tmux read failure can no longer block that selection. Explicit
-tmux selection likewise avoids unrelated native observations. General discovery
-continues to report both transports and their individual availability.
+## Änderungen
 
-Read-only process catalogue, identity and shell-snapshot timeouts now preserve
-their responsible phase as a typed observation error. A read failure never proves
-input, Return, successful execution or permission to replay an uncertain task.
-Existing observation deadlines, owned-subprocess cleanup and target guards remain.
+- Terminal.app erzeugt und bestätigt ein separates physisches Fenster, bevor
+  Befehle starten. Nonce, TTY, App-/Worker- und Prozessgeneration binden das Ziel;
+  eine Creationreceipt bleibt bei ungewissem Ausgang erhalten. Nach bestätigtem
+  Tab-Move werden wechselnde CG-Rollen korrekt zugeordnet und kurze AX-/CG-
+  Übergangsdifferenzen begrenzt rein lesend beobachtet. Kein automatischer Replay.
+- Konkrete Terminalauswahl hängt nicht mehr von unbeteiligten tmux-Abfragen ab.
+  Eingabe prüft die vollständige Prozessgeneration unmittelbar vor dem Effekt;
+  beschäftigte, veraltete oder mehrdeutige Ziele werden verweigert.
+- MCP-Verbindungen behandeln konkurrierenden Verbindungsabbau und veraltete
+  Kataloge konsistent. Admission, Locks und Gesamtaufrufe sind zeitlich begrenzt;
+  validierte Kataloge sind größenbegrenzt, redundantes Listing entfällt.
+- Native macOS-Kommunikation begrenzt Bootstrap-Ausgaben, Laufzeit und Frames.
+  Accessibility setzt Beobachtungstimeouts früh; Console-Navigation bleibt auf
+  die vorgesehene Origin und den eigenen Starterbeleg begrenzt.
+- Dateiverschieben verwendet private Inode-/Sentinelbindung und überschreibt kein
+  vorhandenes Ziel. Eine gleichzeitig neu angelegte Quelle bleibt erhalten;
+  unterbrochene Vorgänge behalten Wiederherstellungsdaten statt automatischem Replay.
 
-This continues the RC23 investigation. The historical pre-paste TimeoutError has
-no uniquely established cause; these are independently reproducible failure paths.
-Actual tests, package verification and physical acceptance are recorded separately
-in [the continuation report](RC24-PREFLIGHT-20261101.md). Publication or installation
-is not established by this candidate document.
+## Tatsächlich geprüft
 
-Deutsch: Die Auswahl eines konkreten Terminalfensters hängt nicht mehr von
-unbeteiligten tmux-Abfragen ab. Lesetimeouts melden ihre zuständige Phase.
-Die Prüfungen von Prozessidentität, mehrdeutigen Ansichten und beschäftigten
-Zielen bleiben bestehen. Die vollständige Prompt-/Return-Abnahme ist gesondert
-nachzuweisen.
+Auf **Intel x86_64, macOS 15.7.4**, mit **Codex CLI 0.166.0**:
 
-The subsequent independent team review repairs concurrent MCP teardown, stale
-connection results and catalog invalidation races; validates macOS plist roots
-and ASCII token configuration; rejects ambiguous newly opened terminal handles;
-and fixes JSONL event framing at chunk/size boundaries. Routing avoids unrelated
-native metadata reads, and event parsing avoids repeated remainder copies.
-Regression evidence, measurements and remaining risks are recorded in the
-[reliability review](RELIABILITY-REVIEW-20261101.md).
+- Exakter offizieller Paket-Smoke: authentifizierter Dispatcher, geladener
+  Quellvergleich, Korruptpaketverweigerung, Konfigurations- und Credentialerhalt.
+- Reale native Abnahme desselben Pakets in einem isolierten Dispatcher: ein
+  separates eigenes Terminalfenster, bestätigte Shell und Codex-Start,
+  Ausgabelesen, lange Literalnachricht mit genau einem Paste/Return sowie
+  `body_only_v1`-Handoff mit unabhängig gebundener Antwort.
+- Busy-, Stale-PID- und mehrdeutige Geometrie wurden vor Eingabe verweigert.
+- Unterstützte sichtbare Aktualisierung von Core, Freigabekonsole und App;
+  tatsächliche Laufzeit-, Quellen-, Codesign- und Authentifizierungsprüfung.
+  Der aktuelle MCP-Anschluss erreichte danach den neuen Dienst und las dessen
+  Terminalausgabe. Konfiguration, Zugangsdaten und bestehende Agentensitzungen
+  blieben erhalten; eigene Test-/Installationsfenster wurden geschlossen.
 
-This remains an unpublished candidate. `file.move` now captures into a private
-regular-file sentinel, verifies a pinned inode and publishes without replacing an
-existing destination. It never unlinks the public source path after capture, so
-a concurrently recreated source survives. The kernel rejects directory capture.
-Interrupted or conflicting attempts retain recovery data and never replay
-automatically. The [move contract](FILE-MOVE-CONTRACT.md) explains temporary private
-reachability, retained/unknown receipts and explicit local recovery.
-The earlier native Codex handoff acceptance remains unresolved at this checkpoint.
-The working RC22 installation is preserved.
+## Grenzen
 
+- **Kein neuer vollständiger CI-Lauf und kein neuer plattformübergreifender
+  Freigabenachweis.** Die finalen lokalen Änderungen sind hier für Intel macOS
+  belegt. Dieses ZIP enthält eine native **x86_64**-App; es ist keine neue
+  Apple-Silicon-, Linux- oder Windows-Abnahme.
+- Die komplette Codex-Abnahme lief im isolierten Dispatcher mit exakt derselben
+  Paketquelle. Die produktive Instanz wurde anschließend gesondert geprüft;
+  eine zweite komplette Codex-Ausführung im Produktivdienst wird nicht behauptet.
+- tmux war auf dem geprüften Mac nicht verfügbar. Bei unbeobachtbarem Desktop
+  verweigert der Fensterpfad sicher. Das begrenzte geprüfte Codex-Eingabeprofil
+  bedeutet keine allgemeine Unicode-/Geometriegarantie.
+- Die bestehende Diagnosehistorie bleibt am Kapazitätslimit. Task-, Nachrichten-
+  und Auditbelege bleiben unabhängig davon verfügbar.
+- Native App ad hoc signiert; keine Apple-Notarisierung wird behauptet.
+- Das Repository ist privat. Release und Download benötigen GitHub-Zugriff auf
+  `landjunge/KiraBridge`; ein anonymer öffentlicher Download ist nicht verfügbar.
 
-The follow-up team review also bounds native app bootstrap pipes and execution,
-limits web navigation to the owned starter receipt and Console origin, sets AX
-timeouts before observation and uses chunked native request framing. Terminal
-submission revalidates the exact process generation at the effect boundary;
-malformed process inventories fail explicitly. Indexed TTY observation reduces
-repeated catalogue scans without changing catalogue results.
+## Download und Integrität
 
-MCP admission, catalogue locks and connection waits have deadlines; complete
-validated catalogues have an 8 MiB serialized budget. Expired backoffs and settled
-delivery markers are pruned while uncertain storage states retain No-Replay
-protection. A narrow, renderer-verified Codex input profile refuses ambiguous
-full-row geometry before paste. It does not expand acceptance of other Unicode
-or wrapping forms. The unchanged strict post-paste evidence remains required.
+**KiraBridge-0.8.0rc24-Intel-macOS.zip** – 2.900.052 Bytes.
 
-The [follow-up report](RELIABILITY-FOLLOWUP-20261101.md) separates measured
-improvements, rejected optimizations, actual test results and pending live gates.
-Diagnostic history and its exhausted production cap were preserved; ordinary
-task/message/audit evidence remains available independently of optional diagnostics.
+SHA256: `ba68a3f42b09abf7c7aec11eaf913a994d5bfe2ed6036fe5c61d9a70e033dcd9`
+
+Die gleichnamige `.sha256`-Datei und `PACKAGE-ACCEPTANCE-INTEL.json` liegen als
+zusätzliche Release-Assets bei. Frühere Kandidatenhinweise innerhalb des
+unveränderten ZIPs sind historische Checkpoints; diese Release Notes und der
+Abnahmebeleg beschreiben den erreichten Stand.
