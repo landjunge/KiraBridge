@@ -1,28 +1,37 @@
-[Deutsch](README.de.md)
+**English** · [Deutsch](README.de.md)
 
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="assets/design/icons/dark/KiraBridge-dark-256.png">
-  <img src="assets/design/icons/light/KiraBridge-light-256.png" alt="KiraBridge" width="160" height="160">
-</picture>
+<p align="center">
+  <img src="assets/readme/normalized/KiraBridge-large.svg" alt="KiraBridge" width="256" height="256">
+</p>
 
-# KiraBridge
+<p align="center">
+  <a href="https://github.com/landjunge/threaddesk/blob/docs/product-family-readme-20261031/README.md" title="ThreadDesk"><img src="assets/readme/normalized/ThreadDesk-small.svg" alt="ThreadDesk" width="48" height="48"></a>
+  &nbsp;
+  <a href="https://github.com/landjunge/4AllPass/blob/docs/product-family-readme-20261031/README.md" title="4AllPass"><img src="assets/readme/normalized/4AllPass-small.svg" alt="4AllPass" width="48" height="48"></a>
+  &nbsp;
+  <a href="https://github.com/landjunge/tollgate/blob/docs/product-family-readme-20261031/README.md" title="TollGate"><img src="assets/readme/normalized/TollGate-small.svg" alt="TollGate" width="48" height="48"></a>
+  &nbsp;
+  <a href="https://github.com/landjunge/agent-authority-lab/blob/docs/product-family-readme-20261031/README.md" title="Agent Authority"><img src="assets/readme/normalized/Agent-Authority-small.svg" alt="Agent Authority" width="48" height="48"></a>
+</p>
 
-**Talk to your AI. Get the work done on your computer.**
+<h1 align="center">KiraBridge</h1>
+
+<p align="center"><strong>Talk to your AI. Get the work done on your computer.</strong></p>
 
 KiraBridge connects ChatGPT to **Grok Build and Codex running in terminal windows
 on your computer**. Discuss what you need in chat, pass the work to those terminal
 agents and follow their replies while choosing what they may access.
 
-**macOS · Intel — [0.8.0rc20](https://github.com/landjunge/KiraBridge/releases/tag/v0.8.0rc20) · October 30, 2026 · Preview**
+**macOS · Intel — [0.8.0rc21](https://github.com/landjunge/KiraBridge/releases/tag/v0.8.0rc21) · October 31, 2026 · Preview**
 
-### [Download KiraBridge — app and installer](https://github.com/landjunge/KiraBridge/releases/download/v0.8.0rc20/KiraBridge-0.8.0rc20-Intel-macOS.zip)
+### [Download KiraBridge — app and installer](https://github.com/landjunge/KiraBridge/releases/download/v0.8.0rc21/KiraBridge-0.8.0rc21-Intel-macOS.zip)
 
-[App only, if the service is already installed](https://github.com/landjunge/KiraBridge/releases/download/v0.8.0rc20/KiraBridge-App-0.8.0rc20-Intel.zip)
-· [Checksums](https://github.com/landjunge/KiraBridge/releases/download/v0.8.0rc20/SHA256SUMS-INTEL)
+[App only, if the service is already installed](https://github.com/landjunge/KiraBridge/releases/download/v0.8.0rc21/KiraBridge-App-0.8.0rc21-Intel.zip)
+· [Checksums](https://github.com/landjunge/KiraBridge/releases/download/v0.8.0rc21/SHA256SUMS-INTEL)
 · [All releases](https://github.com/landjunge/KiraBridge/releases)
 
 Downloads require a GitHub account with access to this private repository.
-This is a preview; there is no stable release yet. RC20 is available for Intel Macs.
+This is a preview; there is no stable release yet. RC21 is available for Intel Macs.
 
 ## What KiraBridge helps you do
 
@@ -55,7 +64,23 @@ For terminal-agent tasks, install and sign in to Grok Build or Codex, then
 configure its terminal session as a target in KiraBridge.
 
 This preview has known terminal limitations, and the app is not Apple-notarized.
-Read [installation and help](docs/INSTALL-EN.md) for setup, updates and known issues.
+Read [installation and help](docs/INSTALL-RC21.md) for setup, updates and known issues.
+
+Visible handoffs to terminal agents send your text unchanged. Confirmed delivery is separate from an agent reply or completed work.
+
+## Planned collaboration
+
+The five products remain independent. The goal is a shared workflow with **KiraBridge as the communication hub**:
+
+| Product | Role in the shared workflow |
+| --- | --- |
+| [ThreadDesk](https://github.com/landjunge/threaddesk/blob/docs/product-family-readme-20261031/README.md) | Keeps project context, knowledge and results. |
+| [KiraBridge](https://github.com/landjunge/KiraBridge/blob/docs/product-family-readme-20261031/README.md) | Relays tasks, questions and replies between chat, local agents and tools. |
+| [4AllPass](https://github.com/landjunge/4AllPass/blob/docs/product-family-readme-20261031/README.md) | Manages credentials; is intended to enable specifically approved access. |
+| [TollGate](https://github.com/landjunge/tollgate/blob/docs/product-family-readme-20261031/README.md) | Checks connected calls and enforces usage limits and stops. |
+| [Agent Authority](https://github.com/landjunge/agent-authority-lab/blob/docs/product-family-readme-20261031/README.md) | Shows observations, contradictions and missing evidence; does not approve actions. |
+
+Some interfaces already exist. A fully configured and verified workflow across all five products is still planned. Approvals stay with the responsible tool and the human. KiraBridge and Agent Authority require access to their private repositories.
 
 ## License
 
