@@ -236,3 +236,17 @@ Für diese Probe wurde das vorhandene Terminal einmal regulär per AppleEvent
 aktiviert, nachdem die aktuellen Ansichten auf der aktiven Oberfläche nicht
 beobachtbar waren. Keine neue Shell, Tasteneingabe oder Sitzung wurde dafür erzeugt.
 Die nächsten Modell-/Inputaufträge bleiben ein neuer separater Abnahmelauf.
+
+Der frische Lauf `actual-codex-4064755-02` hielt korrekt noch vor jeder
+Fenstererzeugung an: dieselben drei logischen Sitzungen, aber zu diesem Zeitpunkt
+null beobachtbare AX-/CG-Fenster. Es gab null Open-/Tag-/Paste-/Codex-Effekte;
+privater Core und Worker sind beendet. Ein vorgeschalteter standardmäßiger
+AppleEvent-Aktivierungsschritt wird deshalb unmittelbar vor der Baseline
+explizit an die bestehende Terminal-Appgeneration gebunden und separat belegt.
+Er erfolgt genau einmal; anschließend sind nur begrenzte Leseproben für den
+belegten Null-Oberflächenfall erlaubt. Kein Fenster-/Tastatur-/Prefs-Fallback.
+Drei neue Fälle und die relevanten Module bestanden **91 Tests (6,70 s)**.
+Der enge unabhängige Aktivierungsreview ist freigegeben; Produkt406 unverändert.
+Auch der vorherige Harnesscommit8820744 bestand Verify41337223245 auf allen
+vier Plattformen. Der nächste tatsächliche Ablauf verwendet einen neuen,
+sauberen Harness-Pin und wiederum frische IDs; kein alter Auftrag wird wiederholt.

@@ -380,23 +380,25 @@ def javascript(scene, source, *, change=None):
         "cwd": f"p345\nfcwd\nn{scene.workspace}",
         "change": change,
         "is_tag": "tab.customTitle=" in source,
+        "is_activation": "activation_sent:true" in source,
     }
     script = (
         "const cfg="
         + json.dumps(config)
         + ";"
         + r"""
-const vm=require('node:vm');let clicks=0,tags=0,title=cfg.is_tag?'fresh':cfg.nonce;
+const vm=require('node:vm');let clicks=0,tags=0,activations=0,title=cfg.is_tag?'fresh':cfg.nonce;
 let busy=false,screen='KiraBridge visible % ';
 const tab={tty:()=>'/dev/ttys004',busy:()=>busy,history:()=>screen,selected:true};
 Object.defineProperty(tab,'customTitle',{set:value=>{title=value;tags++;}});
 const win={id:()=>123,tabs:()=>[tab],selectedTab:()=>tab,name:()=>title};
 function windows(){return [win];}windows.byId=()=>win;
-const app={running:()=>true,windows,activate:()=>{}};
+const app={running:()=>true,windows,activate:()=>{activations++;},frontmost:()=>true};
 const entry={name:()=>cfg.change==='label'?'Other':'Tab in ein neues Fenster bewegen',
  enabled:()=>cfg.change!=='disabled',click:()=>{clicks++;}};
 const entries=()=>cfg.change==='duplicate-menu'?[entry,entry]:[entry];
 const process={unixId:()=>775,frontmost:()=>cfg.change!=='focus',
+ bundleIdentifier:()=>'com.apple.Terminal',
  windows:()=>cfg.change==='duplicate-nonce'?[win,win]:[win],
  menuBars:()=>[{menuBarItems:()=>[{name:()=>'Fenster',menus:()=>[{menuItems:entries}]}]}]};
 function processes(){return [process];}processes.byName=()=>process;
@@ -406,10 +408,12 @@ Application.currentApplication=()=>({doShellScript:(command)=>{
   if(cfg.change==='late-screen')screen+='foreign input';
   return cfg.change==='cwd'?'p345\nfcwd\nn/wrong':cfg.cwd;}
  if(command.includes(' -t '))return 'exact-shell-row';
- return command.includes('-p 775 ')?cfg.terminal:cfg.change==='generation'?'changed':cfg.shell;
+ if(command.includes('-p 775 '))return cfg.change==='app-generation'?'changed':cfg.terminal;
+ return cfg.change==='generation'?'changed':cfg.shell;
 }});
 let error;try{vm.runInNewContext(cfg.source,{Application,delay:()=>{}});}catch(e){error=e.message;}
-process.stdout.write(JSON.stringify({clicks,error,...(cfg.is_tag?{tags}:{} )}));
+process.stdout.write(JSON.stringify({clicks,error,...(cfg.is_tag?{tags}:{} ),
+ ...(cfg.is_activation?{activations}:{})}));
 """
     )
     # The synthetic process object above must not shadow Node's stdout owner.
@@ -463,3 +467,62 @@ async def test_title_rechecks_busy_and_screen_after_slow_reads(module, tmp_path,
         assert result == {"clicks": 0, "tags": 1}
     else:
         assert result["tags"] == 0 and result["error"]
+
+
+async def test_baseline_activates_existing_app_once_then_only_reads_until_visible(module, tmp_path):
+    scene = Scene(module, tmp_path)
+    actual_groups = scene.groups
+    scene.groups = lambda: (
+        [] if sum(op == "windows.list" for op, _ in scene.calls) == 1 else actual_groups()
+    )
+    scene.terminal.native = AsyncMock(
+        return_value={"activation_sent": True, "pid": 775, "frontmost": True}
+    )
+    baseline = await scene.controller.prepare_visible_baseline(poll_interval=0)
+    assert len(baseline["logical"]["rows"]) == 3 and len(baseline["native"]["cg"]) == 1
+    scene.terminal.native.assert_awaited_once()
+    source = scene.terminal.native.await_args.args[0]
+    assert source.count("app.activate()") == 1
+    assert all(
+        word not in source
+        for word in ("doScript", "windows", "keystroke", "keyCode", "customTitle")
+    )
+    activations = [
+        event["baseline_activation"] for event in scene.records if "baseline_activation" in event
+    ]
+    assert [event["state"] for event in activations] == ["attempted", "returned"]
+    assert (
+        activations[0]["process_identity"] == TERMINAL
+        and len(activations[0]["source_sha256"]) == 64
+    )
+    assert any(event.get("baseline_surface_pending") for event in scene.records)
+    calls = len(scene.calls)
+    with pytest.raises(RuntimeError, match="never be replayed"):
+        await scene.controller.prepare_visible_baseline()
+    assert len(scene.calls) == calls and scene.terminal.native.await_count == 1
+
+
+async def test_unknown_activation_or_never_visible_surface_never_reactivates(module, tmp_path):
+    for unknown in (True, False):
+        scene = Scene(module, tmp_path)
+        scene.groups = lambda: []
+        scene.terminal.native = AsyncMock(
+            side_effect=RuntimeError("lost activation") if unknown else None,
+            return_value={"activation_sent": True, "pid": 775},
+        )
+        with pytest.raises(RuntimeError if unknown else TimeoutError):
+            await scene.controller.prepare_visible_baseline(timeout=0, poll_interval=0)
+        scene.terminal.native.assert_awaited_once()
+        with pytest.raises(RuntimeError, match="never be replayed"):
+            await scene.controller.prepare_visible_baseline()
+        assert scene.terminal.native.await_count == 1 and scene.controller.baseline is None
+        assert scene.effects == []  # no open, title, menu or input
+
+
+def test_standard_activation_source_checks_full_generation_before_appleevent(module, tmp_path):
+    scene = Scene(module, tmp_path)
+    scene.controller.app = scene.app
+    source = scene.controller.activation_source(TERMINAL)
+    assert javascript(scene, source) == {"clicks": 0, "activations": 1}
+    result = javascript(scene, source, change="app-generation")
+    assert result["activations"] == 0 and result["error"]

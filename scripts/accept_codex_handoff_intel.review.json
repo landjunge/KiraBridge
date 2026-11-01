@@ -51,7 +51,9 @@
     "A shell-ready receipt does not grant input; use existing native AX/CG APIs to bind a private nonce title to physical topology before geometry or Codex",
     "Own-tab title and at most one documented Move Tab to New Window action require fresh native process/CWD/screen/single-script-tab/uniqueTTY and current focus/selection/menu guards",
     "Preserve original CG/AX physical identities and radio membership, not only counts; missing own tab group after Move requires known success and strict positive preservation",
-    "No equality assumption between Terminal scripting IDs, AX tokens and Window Server numbers"
+    "No equality assumption between Terminal scripting IDs, AX tokens and Window Server numbers",
+    "Before physical baseline, activate exactly the freshly identified existing Terminal application once by guarded standard AppleEvent; persist attempt/sourcehash/result separately; this does not open a window or send input",
+    "Only zero CG and zero AX windows with existing logical views permits bounded read-only observation after that single activation; every other identity/topology failure stops"
   ],
   "acceptance_matrix": [
     {
@@ -119,12 +121,13 @@
     "https://developer.apple.com/documentation/coregraphics/kcgwindownumber"
   ],
   "offline_checkpoint": {
-    "author_tests": "88 passed in 6.67s",
+    "author_tests": "91 passed in6.70s, including3 new activation cases",
     "independent_counterexamples": "13 passed in0.16s against d41b79; same topology AST in final2bc78; final restrictive metadata delta read independently",
     "startup_and_cleanup_review": "review_macos final59790300",
     "physical_helper_review": "review_mcp final2bc78cce",
     "actual_read_only_baseline": "passed with UI mutations hard-disabled: one CG/AX physical window, three radio tabs, three logical views",
     "product_source_commit": "4064755e12b5524ad5d07ea4a4305bf0530057ac",
-    "product_source_sha256": "9b3c03ccf40e13e2cfcbdeb8f89b359141455026a8620a2c3b8d8dd0a3881f36"
+    "product_source_sha256": "9b3c03ccf40e13e2cfcbdeb8f89b359141455026a8620a2c3b8d8dd0a3881f36",
+    "activation_delta_review": "review_mcp independently read final c3950b57/a1014262; no open findings"
   }
 }

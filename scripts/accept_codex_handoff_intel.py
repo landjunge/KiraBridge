@@ -801,6 +801,9 @@ async def accept(args):
         require(physical_bytes <= 16 * 1024 * 1024, "Private physical-proof budget exceeded")
         with (root / "physical-windows.private.jsonl").open("a") as output:
             output.write(data)
+        if "baseline_activation" in event:
+            evidence["baseline_activation"] = event["baseline_activation"]
+            checkpoint()
 
     async def observe_originals():
         try:
@@ -972,7 +975,7 @@ async def accept(args):
                     workspace=workspace,
                     record=physical_record,
                 )
-                physical_baseline = await isolation.capture_baseline()
+                physical_baseline = await isolation.prepare_visible_baseline()
                 require(
                     {r["window_id"] for r in physical_baseline["logical"]["rows"]}
                     == original_windows

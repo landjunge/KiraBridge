@@ -8,6 +8,7 @@ module never opens terminals, sends keys, changes preferences or retries effects
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import json
 import re
 from collections import Counter
@@ -16,6 +17,10 @@ from collections import Counter
 def require(value, message):
     if not value:
         raise RuntimeError(message)
+
+
+class BaselineNotVisible(RuntimeError):
+    """Existing logical views have no current physical surface; read again only."""
 
 
 def cwd_guard(pid, workspace):
@@ -56,6 +61,71 @@ class PhysicalIsolation:
         self.created = self.identity = None
         self.tag_attempted = self.move_attempted = self.confirmed = False
         self.move_accepted = False
+        self.activation_attempted = False
+
+    def activation_source(self, identity):
+        return (
+            'const app=Application("Terminal");'
+            + self.terminal.native_identity_guard({self.app["pid"]: identity})
+            + "\nconst se=Application('System Events');"
+            "const owners=se.processes().filter(p=>p.unixId()===" + str(self.app["pid"]) + ");"
+            "if(owners.length!==1 || owners[0].bundleIdentifier()!=='com.apple.Terminal' ||"
+            "!app.running())throw Error('Existing Terminal owner changed');"
+            "checkTargetIdentity();app.activate();JSON.stringify({activation_sent:true,pid:"
+            + str(self.app["pid"])
+            + ",frontmost:app.frontmost()});"
+        )
+
+    async def prepare_visible_baseline(self, *, timeout=10, poll_interval=0.15):
+        require(not self.activation_attempted, "Baseline activation must never be replayed")
+        _, applications = await self.pages("apps.list", {"limit": 1000}, "applications")
+        matches = [app for app in applications if app.get("bundle_id") == "com.apple.Terminal"]
+        require(len(matches) == 1, "Exact existing Terminal application required")
+        require(
+            self.app is None
+            or all(self.app[key] == matches[0][key] for key in ("pid", "started_at", "bundle_id")),
+            "Terminal activation generation changed",
+        )
+        self.app = matches[0]
+        identity = await self.terminal.process_identity(self.app["pid"], detailed=True)
+        require(
+            isinstance(identity, str) and len(identity.split(None, 8)) == 9,
+            "Full Terminal process generation required",
+        )
+        await self.read(
+            "apps.inspect", {"pid": self.app["pid"], "expected_started_at": self.app["started_at"]}
+        )
+        source = self.activation_source(identity)
+        receipt = {
+            "state": "attempted",
+            "pid": self.app["pid"],
+            "bundle_id": self.app["bundle_id"],
+            "started_at": self.app["started_at"],
+            "process_identity": identity,
+            "source_sha256": hashlib.sha256(source.encode()).hexdigest(),
+            "automatic_retry": False,
+        }
+        self.activation_attempted = True
+        self.record({"baseline_activation": dict(receipt)})
+        try:
+            result = await self.terminal.native(source, mutation=True)
+            receipt.update(state="returned", result=result)
+            self.record({"baseline_activation": dict(receipt)})
+            require(
+                result.get("activation_sent") is True and result.get("pid") == self.app["pid"],
+                "Baseline activation result unknown; never retry",
+            )
+        except BaseException as error:
+            receipt.update(state="unconfirmed", error_type=type(error).__name__)
+            self.record({"baseline_activation": dict(receipt)})
+            raise
+        async with asyncio.timeout(timeout):
+            while True:  # noqa: ASYNC110 -- only observe after exactly one activation
+                try:
+                    return await self.capture_baseline()
+                except BaselineNotVisible:
+                    self.record({"baseline_surface_pending": True, "activation_retry": False})
+                    await asyncio.sleep(poll_interval)
 
     async def read(self, operation, arguments):
         require(
@@ -269,6 +339,8 @@ class PhysicalIsolation:
 
     async def capture_baseline(self):
         logical, native = await self.logical(), await self.snapshot()
+        if logical["rows"] and not native["cg"] and not native["ax"]:
+            raise BaselineNotVisible("Existing logical Terminal views have no physical surface")
         require(
             all(group["tabs"] is not None for group in native["ax"]),
             "Baseline AX tab counts unavailable",
