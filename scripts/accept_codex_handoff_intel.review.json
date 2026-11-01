@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "status": "prepared_for_independent_review_not_executed",
+  "status": "independently_reviewed_offline_live_acceptance_pending",
   "harness": "scripts/accept_codex_handoff_intel.py",
   "offline_tests": "tests/test_codex_acceptance_harness.py",
   "runner": "Root only, after review and candidate source freeze",
@@ -29,7 +29,10 @@
     "Effective features list must confirm disabled flags; effective mcp list must match expected names with enabled=false; unexpected managed entries stop before UI",
     "No --strict-config for the mcp management subcommand: pinned source explicitly rejects it; interactive TUI still requires it",
     "CLI management listing is read-only but may inspect auth status; it is not claimed to be offline or a no-network command",
-    "Config input hashes and binary hash rechecked immediately before startup; no config/auth/HOME/CODEX_HOME rewrite or repair"
+    "Config input hashes and binary hash rechecked immediately before startup; no config/auth/HOME/CODEX_HOME rewrite or repair",
+    "Separate --commit for the installed package manifest and --harness-commit for clean tracked verification sources; both are exact40hex pins",
+    "Live physical proof requires the packaged matching native worker contract; no global UI-app fallback",
+    "Both main harness and physical helper must be tracked and clean at the pinned harness commit"
   ],
   "ownership_gates": [
     "Private in-process Core, fresh DB, random private bearer token, dynamically bound loopback socket; endpoint cannot be supplied by operator",
@@ -42,7 +45,13 @@
     "Repeat actual effective features/MCP listings after that shell-context check and immediately before Codex start; recheck local config hashes and known managed-file absence",
     "Later native mutations must explicitly address the exact owned window ID; open, raw send, managed terminal execution and tmux fallback disabled",
     "Start only the locally pinned CLI binary directly from the same verified controlled shell with --no-alt-screen --no-daemon --strict-config -s read-only -a never -C privateWorkspace; no extra launch shell can reload user startup files",
-    "Bind one fresh Codex PID, exact process image and generation inside the owned TTY; never rebind a replacement generation"
+    "Bind one fresh Codex PID, exact process image and generation inside the owned TTY; never rebind a replacement generation",
+    "Persist creation receipt before any startup trust; first PID birth and parent must match the original OpenTask interval/process receipt",
+    "Read-only startup allows login-to-exec comm transition only within the exact PID/UID/TTY/birth/parent generation, then requires two consistent controlled empty prompt/CWD/idle/child-free samples",
+    "A shell-ready receipt does not grant input; use existing native AX/CG APIs to bind a private nonce title to physical topology before geometry or Codex",
+    "Own-tab title and at most one documented Move Tab to New Window action require fresh native process/CWD/screen/single-script-tab/uniqueTTY and current focus/selection/menu guards",
+    "Preserve original CG/AX physical identities and radio membership, not only counts; missing own tab group after Move requires known success and strict positive preservation",
+    "No equality assumption between Terminal scripting IDs, AX tokens and Window Server numbers"
   ],
   "acceptance_matrix": [
     {
@@ -75,7 +84,8 @@
     "Authoritative typed Codex event family with exactly one own prompt, exact final answer and task_complete; mirrors never counted",
     "Independent local handoff protocol prefix/hash proof, unchanged body and body_only_v1 event",
     "Private cleanup screen, SIGTERM target if any, exact close receipt, independent own PID/window absence and private endpoint absence",
-    "Foreign process/window deltas recorded read-only; natural foreign activity neither authorizes mutation nor blocks owned cleanup"
+    "Foreign process/window deltas recorded read-only; natural foreign activity neither authorizes mutation nor blocks owned cleanup",
+    "Full private native read records and physical baseline/nonce/owner/generation/topology receipts; no raw UI/config/auth data in public assets"
   ],
   "failure_and_cleanup": [
     "No previously unknown task is replayed; each fresh ID is reserved before HTTP dispatch and cannot be submitted again",
@@ -86,7 +96,8 @@
     "Close only the exact owned generation-bound single-tab idle shell with matching last observed screen and a fresh identity-bound private workspace CWD check immediately before close",
     "Verify own IDs absent independently; do not require foreign window/process inventory to remain static",
     "If an open effect cannot be bound to a successful owned receipt or ownership changes, preserve it and report incomplete cleanup for manual reconciliation",
-    "Retain private evidence and workspace; do not publish captures or credentials as release assets"
+    "Retain private evidence and workspace; do not publish captures or credentials as release assets",
+    "If physical proof fails after shell readiness, cleanup may close only the confirmed original logical receipt under final CWD/identity/idle/single-tab/screen guards; unconfirmed startup remains preserved"
   ],
   "review_focus": [
     "Review all CLI isolation gates against pinned upstream source and current local help; no missing feature/server may be ignored",
@@ -103,6 +114,17 @@
     "https://github.com/openai/codex/blob/6ff1e1ca3b30fc8b914720681fcf5fe62e95f856/codex-rs/config/src/merge.rs",
     "https://github.com/openai/codex/blob/6ff1e1ca3b30fc8b914720681fcf5fe62e95f856/codex-rs/features/src/lib.rs",
     "https://github.com/openai/codex/blob/6ff1e1ca3b30fc8b914720681fcf5fe62e95f856/codex-rs/cli/src/mcp_cmd.rs",
-    "https://github.com/openai/codex/blob/6ff1e1ca3b30fc8b914720681fcf5fe62e95f856/codex-rs/codex-mcp/src/mcp/auth.rs"
-  ]
+    "https://github.com/openai/codex/blob/6ff1e1ca3b30fc8b914720681fcf5fe62e95f856/codex-rs/codex-mcp/src/mcp/auth.rs",
+    "https://developer.apple.com/documentation/appkit/nswindow/movetabtonewwindow(_:)",
+    "https://developer.apple.com/documentation/coregraphics/kcgwindownumber"
+  ],
+  "offline_checkpoint": {
+    "author_tests": "88 passed in 6.67s",
+    "independent_counterexamples": "13 passed in0.16s against d41b79; same topology AST in final2bc78; final restrictive metadata delta read independently",
+    "startup_and_cleanup_review": "review_macos final59790300",
+    "physical_helper_review": "review_mcp final2bc78cce",
+    "actual_read_only_baseline": "passed with UI mutations hard-disabled: one CG/AX physical window, three radio tabs, three logical views",
+    "product_source_commit": "4064755e12b5524ad5d07ea4a4305bf0530057ac",
+    "product_source_sha256": "9b3c03ccf40e13e2cfcbdeb8f89b359141455026a8620a2c3b8d8dd0a3881f36"
+  }
 }

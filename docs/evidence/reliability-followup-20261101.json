@@ -258,5 +258,17 @@
     "permissions": "baseline read-only AX and screen capture granted; no rights modified"
   },
   "private_evidence_root": "~/.local/share/kirabridge/backups/reliability-continuation-20261101T144926Z/",
-  "sensitive_evidence_published": false
+  "sensitive_evidence_published": false,
+  "verified_product_checkpoint": {
+    "commit": "4064755e12b5524ad5d07ea4a4305bf0530057ac",
+    "all_four_verify_jobs_passed": true,
+    "verify_run": 41330279134,
+    "intel_package_sha256": "1d65cf1e840b2fc194329ebebe1b3aa0b5d5e38656f0fb7a6137b6afe9b10a5d",
+    "independent_intel_zip_arm_reviews": "passed",
+    "manual_ubuntu_smoke": "one actual official helper run passed; own cleanup independently verified; not an Actions-pass claim",
+    "physical_acceptance": "failed before test input/Codex; own view safely closed and original views/processes preserved",
+    "product_changes_since_checkpoint": false,
+    "pending": "only manual harness startup/physical isolation, physical acceptance, supported visible install/runtime verification and release",
+    "production": "RC22 unchanged"
+  }
 }

@@ -5,6 +5,8 @@ import json
 import os
 import runpy
 import signal
+import time
+from copy import deepcopy
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, Mock
@@ -321,3 +323,371 @@ async def test_cleanup_changed_cwd_preserves_owned_window_without_close(harness,
         await harness.close_owned_idle(transport, owned(), IDENTITY, "owned idle prompt", tmp_path)
     transport.process_working_directory.assert_awaited_once_with(345, expected_identity=IDENTITY)
     transport.native.assert_not_awaited()
+
+
+LOGIN = IDENTITY.replace("/bin/codex", "-zsh")
+SHELL = IDENTITY.replace("/bin/codex", "/bin/zsh")
+
+
+def startup_receipt():
+    started = time.mktime(time.strptime("Sun Nov 1 12:00:00 2026", "%a %b %d %H:%M:%S %Y"))
+    return {
+        "task_created_at": started + 0.01,
+        "task_finished_at": started + 2,
+        "result": {"processes": [{"pid": 345, "ppid": 344}]},
+    }
+
+
+def startup_transport(frames):
+    index = -1
+
+    def frame():
+        return frames[max(index, 0)]
+
+    async def catalog():
+        nonlocal index
+        index = min(index + 1, len(frames) - 1)
+        return [
+            {
+                **native_row(),
+                "busy": frame().get("busy", False),
+                "processes": [
+                    {"pid": pid} for pid in frame().get("process_ids", [owned()["expected_pid"]])
+                ],
+                **frame().get("view", {}),
+            }
+        ]
+
+    async def identity(pid, *, detailed):
+        assert pid == owned()["expected_pid"] and detailed is True
+        return frame()["identity"]
+
+    async def read(pane):
+        assert pane == owned()["pane_id"]
+        return frame().get("text", "KiraBridge visible % ")
+
+    async def cwd(pid, *, expected_identity):
+        assert pid == owned()["expected_pid"] and expected_identity == frame()["identity"]
+        return frame()["cwd"]
+
+    return SimpleNamespace(
+        catalog=AsyncMock(side_effect=catalog),
+        process_identity=AsyncMock(side_effect=identity),
+        read=AsyncMock(side_effect=read),
+        process_working_directory=AsyncMock(side_effect=cwd),
+        native=AsyncMock(side_effect=AssertionError("Startup must remain read-only")),
+        send=AsyncMock(side_effect=AssertionError("Startup must not send input")),
+        open=AsyncMock(side_effect=AssertionError("Never replay the open")),
+    )
+
+
+def test_creation_receipt_survives_before_any_startup_or_identity_proof(harness, tmp_path):
+    evidence, snapshots = {}, []
+    opened = {
+        "id": f"codex-accept-{NONCE}-open",
+        "receipt": "original-created-effect",
+        "result": {**native_row(), "legacy_expected_pid": 344, "busy": True},
+    }
+    target = harness.remember_created_shell(
+        evidence, opened, NONCE, tmp_path, lambda: snapshots.append(deepcopy(evidence))
+    )
+    assert target == owned()
+    first = snapshots[0]
+    assert first["creation_receipt"]["task_receipt"] == "original-created-effect"
+    assert first["creation_receipt"]["result"]["legacy_expected_pid"] == 344
+    assert first["creation_receipt"]["requested_cwd"] == str(tmp_path)
+    assert first["shell_startup"] == {"state": "unconfirmed", "input_permitted": False}
+    assert "owned" not in first and "owned_shell_identity" not in first
+    assert evidence["created_handle"] == owned() and evidence["open_request_nonce_bound"] is True
+
+
+async def test_login_to_exec_keeps_same_birth_and_pins_only_ready_full_identity(harness, tmp_path):
+    transport = startup_transport(
+        [
+            {"identity": LOGIN, "busy": True, "text": "Login shell still starting"},
+            {"identity": SHELL, "cwd": str(tmp_path)},
+            {"identity": SHELL, "cwd": str(tmp_path)},
+        ]
+    )
+    records = []
+    result = await harness.wait_created_shell(
+        transport,
+        owned(),
+        {17},
+        tmp_path,
+        records.append,
+        receipt=startup_receipt(),
+        poll_interval=0,
+    )
+    assert result == SHELL and result != LOGIN
+    assert records[0]["initial_identity"] == LOGIN
+    assert records[-1]["state"] == "confirmed" and records[-1]["input_permitted"] is False
+    assert all(not record["input_permitted"] for record in records[:-1])
+    assert transport.catalog.await_count == 3
+    assert transport.process_working_directory.await_count == 2
+    transport.native.assert_not_awaited()
+    transport.open.assert_not_awaited()
+    transport.send.assert_not_awaited()
+
+
+async def test_startup_waits_for_exact_cwd_after_controlled_prompt(harness, tmp_path):
+    transport = startup_transport(
+        [
+            {"identity": SHELL, "cwd": str(tmp_path / "not-ready")},
+            {"identity": SHELL, "cwd": str(tmp_path)},
+            {"identity": SHELL, "cwd": str(tmp_path)},
+        ]
+    )
+    records = []
+    assert (
+        await harness.wait_created_shell(
+            transport,
+            owned(),
+            {17},
+            tmp_path,
+            records.append,
+            receipt=startup_receipt(),
+            poll_interval=0,
+        )
+        == SHELL
+    )
+    assert any(record.get("cwd") == str(tmp_path / "not-ready") for record in records)
+    assert transport.catalog.await_count == 3
+    transport.native.assert_not_awaited()
+
+
+async def test_startup_requires_no_child_and_exact_controlled_prompt(harness, tmp_path):
+    transport = startup_transport(
+        [
+            {"identity": SHELL, "process_ids": [345, 999]},
+            {"identity": SHELL, "text": "ordinary shell % "},
+            {"identity": SHELL, "cwd": str(tmp_path)},
+            {"identity": SHELL, "cwd": str(tmp_path)},
+        ]
+    )
+    records = []
+    assert (
+        await harness.wait_created_shell(
+            transport,
+            owned(),
+            {17},
+            tmp_path,
+            records.append,
+            receipt=startup_receipt(),
+            poll_interval=0,
+        )
+        == SHELL
+    )
+    assert transport.catalog.await_count == 4
+    assert transport.process_working_directory.await_count == 2
+    transport.native.assert_not_awaited()
+
+
+@pytest.mark.parametrize(
+    "changed",
+    [
+        SHELL.replace("12:00:00", "12:00:01"),
+        SHELL.replace("ttys004", "ttys099"),
+        SHELL.replace("2026 344", "2026 999"),
+    ],
+)
+async def test_startup_never_adopts_changed_birth_tty_or_parent(harness, tmp_path, changed):
+    transport = startup_transport(
+        [
+            {"identity": LOGIN, "busy": True},
+            {"identity": changed, "cwd": str(tmp_path)},
+        ]
+    )
+    records = []
+    with pytest.raises(RuntimeError, match="identity changed"):
+        await harness.wait_created_shell(
+            transport,
+            owned(),
+            {17},
+            tmp_path,
+            records.append,
+            receipt=startup_receipt(),
+            poll_interval=0,
+        )
+    assert records[-1]["state"] == "unconfirmed" and records[-1]["input_permitted"] is False
+    transport.process_working_directory.assert_not_awaited()
+    transport.native.assert_not_awaited()
+    transport.open.assert_not_awaited()
+
+
+async def test_shared_visual_startup_read_does_not_grant_physical_input_authority(
+    harness, tmp_path
+):
+    transport = startup_transport(
+        [
+            {
+                "identity": SHELL,
+                "cwd": str(tmp_path),
+                "view": {"tab_count": 4, "visual_window_id": 17},
+            }
+        ]
+    )
+    records = []
+    assert (
+        await harness.wait_created_shell(
+            transport,
+            owned(),
+            {17},
+            tmp_path,
+            records.append,
+            receipt=startup_receipt(),
+            poll_interval=0,
+        )
+        == SHELL
+    )
+    assert records[-1]["state"] == "confirmed" and records[-1]["input_permitted"] is False
+    with pytest.raises(RuntimeError, match="Owned native identity changed"):
+        harness.owned_row([{**native_row(), "tab_count": 4, "visual_window_id": 17}], owned(), {17})
+    transport.native.assert_not_awaited()
+
+
+async def test_unconfirmed_startup_timeout_retains_cleanup_receipt_and_never_closes(
+    harness, tmp_path
+):
+    evidence = {}
+    opened = {
+        "id": f"codex-accept-{NONCE}-open",
+        "receipt": "retain-original-receipt",
+        "result": native_row(),
+    }
+    persist = Mock()
+    target = harness.remember_created_shell(evidence, opened, NONCE, tmp_path, persist)
+    transport = startup_transport([{"identity": SHELL, "cwd": str(tmp_path / "unready")}])
+    with pytest.raises(TimeoutError):
+        await harness.wait_created_shell(
+            transport,
+            target,
+            {17},
+            tmp_path,
+            lambda observation: evidence.update(shell_startup=observation),
+            receipt=startup_receipt(),
+            timeout=0,
+            poll_interval=0,
+        )
+    with pytest.raises(RuntimeError, match="startup unconfirmed"):
+        harness.require_shell_ready_for_cleanup(evidence, None, persist)
+    assert evidence["creation_receipt"]["task_receipt"] == "retain-original-receipt"
+    assert evidence["cleanup_preserved"]["created_handle"] == owned()
+    assert evidence["cleanup_preserved"]["cleanup_action_attempted"] is False
+    assert evidence["shell_startup"]["state"] == "unconfirmed"
+    assert evidence["shell_startup"]["input_permitted"] is False
+    assert "owned_shell_identity" not in evidence
+    transport.native.assert_not_awaited()
+    transport.open.assert_not_awaited()
+    transport.send.assert_not_awaited()
+
+
+@pytest.mark.parametrize("control", ["\x00", "\x1b"])
+async def test_startup_control_characters_before_prompt_never_confirm(harness, tmp_path, control):
+    transport = startup_transport(
+        [{"identity": SHELL, "text": control + "old line\nKiraBridge visible % "}]
+    )
+    records = []
+    with pytest.raises(TimeoutError):
+        await harness.wait_created_shell(
+            transport,
+            owned(),
+            {17},
+            tmp_path,
+            records.append,
+            receipt=startup_receipt(),
+            timeout=0,
+            poll_interval=0,
+        )
+    assert records[-1]["state"] == "unconfirmed" and records[-1]["input_permitted"] is False
+    transport.process_working_directory.assert_not_awaited()
+
+
+@pytest.mark.parametrize(
+    "initial",
+    [
+        SHELL.replace("12:00:00", "11:59:59"),
+        SHELL.replace("12:00:00", "12:00:03"),
+        SHELL.replace("2026 344", "2026 999"),
+    ],
+)
+async def test_first_probe_cannot_adopt_pid_replaced_before_observation(harness, tmp_path, initial):
+    transport = startup_transport([{"identity": initial, "cwd": str(tmp_path)}])
+    records = []
+    with pytest.raises(RuntimeError, match="original open task receipt"):
+        await harness.wait_created_shell(
+            transport,
+            owned(),
+            {17},
+            tmp_path,
+            records.append,
+            receipt=startup_receipt(),
+            poll_interval=0,
+        )
+    assert records[-1]["initial_identity"] == initial
+    transport.catalog.assert_not_awaited()
+    transport.native.assert_not_awaited()
+
+
+PACKAGE_COMMIT = "4064755e12b5524ad5d07ea4a4305bf0530057ac"
+HARNESS_COMMIT = "a" * 40
+
+
+def test_separate_harness_and_installed_package_commits_are_both_explicit(harness):
+    harness.require_commit_pins(HARNESS_COMMIT, PACKAGE_COMMIT, PACKAGE_COMMIT, HARNESS_COMMIT)
+    args = harness.parser().parse_args(
+        ["--commit", PACKAGE_COMMIT, "--harness-commit", HARNESS_COMMIT]
+    )
+    assert args.commit == PACKAGE_COMMIT and args.harness_commit == HARNESS_COMMIT
+    # Source-checkout mode still needs one exact shared commit.
+    harness.require_commit_pins(PACKAGE_COMMIT, None, PACKAGE_COMMIT, PACKAGE_COMMIT)
+
+
+@pytest.mark.parametrize(
+    "head,installed,package,harness_pin",
+    [
+        (PACKAGE_COMMIT, PACKAGE_COMMIT, PACKAGE_COMMIT, HARNESS_COMMIT),
+        (HARNESS_COMMIT, HARNESS_COMMIT, PACKAGE_COMMIT, HARNESS_COMMIT),
+        (HARNESS_COMMIT, "", PACKAGE_COMMIT, HARNESS_COMMIT),
+        (HARNESS_COMMIT, None, PACKAGE_COMMIT, HARNESS_COMMIT),
+        (HARNESS_COMMIT, PACKAGE_COMMIT, "short", HARNESS_COMMIT),
+        (HARNESS_COMMIT, PACKAGE_COMMIT, PACKAGE_COMMIT, None),
+    ],
+)
+def test_wrong_or_missing_commit_pin_cannot_bypass_other_identity_checks(
+    harness, head, installed, package, harness_pin
+):
+    with pytest.raises(RuntimeError):
+        harness.require_commit_pins(head, installed, package, harness_pin)
+
+
+def test_execute_missing_harness_commit_stops_before_any_run(harness, monkeypatch, tmp_path):
+    run = Mock(side_effect=AssertionError("Missing pin must never start acceptance"))
+    monkeypatch.setattr(harness.asyncio, "run", run)
+    root = tmp_path / "not-created"
+    monkeypatch.setattr(
+        harness.sys,
+        "argv",
+        [
+            harness.__file__,
+            "--execute",
+            "--root",
+            str(root),
+            "--expected-python",
+            harness.sys.executable,
+            "--package-root",
+            str(tmp_path / "package"),
+            "--expected-version",
+            "0.8.0rc24",
+            "--source-sha256",
+            "b" * 64,
+            "--commit",
+            PACKAGE_COMMIT,
+            "--codex-sha256",
+            "c" * 64,
+        ],
+    )
+    with pytest.raises(RuntimeError, match="every exact candidate pin"):
+        runpy.run_path(harness.__file__, run_name="__main__")
+    assert not root.exists()
+    run.assert_not_called()

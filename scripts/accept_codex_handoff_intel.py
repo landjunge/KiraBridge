@@ -1,7 +1,8 @@
 """Reviewable manual acceptance: private HTTP Core, one fresh native Codex window.
 
 Without --execute this prints the review plan and performs no work. Execution
-requires exact interpreter/package/source/commit/version and Codex binary pins.
+requires exact interpreter/package/source/version, separate package/harness
+commit pins and a Codex binary pin.
 Root must review this harness before enabling its single owned visible window.
 Never pass an existing pane, previous task ID, config file, HOME or CODEX_HOME.
 
@@ -18,6 +19,7 @@ import asyncio
 import hashlib
 import importlib.util
 import json
+import math
 import os
 import platform
 import pwd
@@ -49,7 +51,11 @@ from kirabridge.literal_session_input import codex_full_row_widths
 from kirabridge.mcp_gateway.client import MCPClientPool, Peer
 from kirabridge.mcp_gateway.http import create_http_app
 from kirabridge.operations_service import installed_source_sha
-from kirabridge.platform_adapters.macos.system_identity import installed_source_commit
+from kirabridge.platform_adapters.macos.system_identity import (
+    installed_native_contract,
+    installed_source_commit,
+)
+from kirabridge.platform_adapters.macos.system_transport import NativeSystemTransport
 from kirabridge.platform_adapters.shell_prompt import empty_shell_prompt
 from kirabridge.visible_readiness import assess, input_view
 
@@ -146,7 +152,8 @@ def review_plan():
         "execute": False,
         "scope": "one new owned Intel Terminal.app window and private loopback Core",
         "steps": [
-            "Verify exact package/interpreter/source/commit/version and local Codex help/hash.",
+            "Verify exact package/interpreter/source/version, separate package/harness "
+            "commits and local Codex help/hash.",
             "Verify invocation-only MCP entries/features are disabled; retain auth and home.",
             "Record original complete native inventory and exact process identities.",
             "Open exactly one fresh controlled shell; reject adoption or another window.",
@@ -328,6 +335,176 @@ def owned_row(rows, owned, original_windows):
     return row
 
 
+_physical_helper = None
+
+
+def physical_helper():
+    global _physical_helper
+    if _physical_helper is None:
+        path = Path(__file__).with_name("codex_window_isolation.py")
+        require(not path.is_symlink(), "Physical helper must be the tracked regular script")
+        spec = importlib.util.spec_from_file_location("codex_physical_acceptance", path)
+        _physical_helper = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(_physical_helper)
+    return _physical_helper
+
+
+def remember_created_shell(evidence, opened, nonce, workspace, persist):
+    """Keep the creation effect before observing or trusting shell readiness."""
+    evidence["creation_receipt"] = {
+        "task_id": opened["id"],
+        "task_receipt": opened.get("receipt"),
+        "nonce": nonce,
+        "requested_cwd": str(workspace),
+        "task_created_at": opened.get("created"),
+        "task_finished_at": opened.get("finished"),
+        "result": opened["result"],
+        "scope": "creation receipt only; startup and input authority remain unconfirmed",
+        "automatic_retry": False,
+    }
+    evidence["shell_startup"] = {"state": "unconfirmed", "input_permitted": False}
+    persist()
+    evidence["open_request_nonce_bound"] = opened["id"] == f"codex-accept-{nonce}-open"
+    require(evidence["open_request_nonce_bound"], "Open receipt nonce differs")
+    created = {key: opened["result"][key] for key in ("pane_id", "expected_pid", "tty")}
+    evidence["created_handle"] = created
+    persist()
+    return created
+
+
+def startup_generation(identity, created):
+    require(isinstance(identity, str), "Detailed created shell identity unavailable")
+    fields = identity.split(None, 8)
+    require(
+        len(fields) == 9
+        and fields[0] == str(os.getuid())
+        and fields[1] == Path(created["tty"]).name,
+        "Created shell UID/TTY identity changed",
+    )
+    # Only during this read-only startup phase: exec changes comm while retaining
+    # the exact PID, UID, TTY, start time and parent. Mutations later pin all fields.
+    return tuple(fields[:8])
+
+
+def require_created_birth(identity, created, receipt):
+    generation = startup_generation(identity, created)
+    times = [receipt.get(key) for key in ("task_created_at", "task_finished_at")]
+    require(
+        all(type(value) in {int, float} and math.isfinite(value) and value > 0 for value in times)
+        and times[0] <= times[1],
+        "Creation task time interval is unavailable",
+    )
+    started = time.mktime(time.strptime(" ".join(generation[2:7]), "%a %b %d %H:%M:%S %Y"))
+    roots = [
+        p for p in receipt["result"].get("processes", []) if p["pid"] == created["expected_pid"]
+    ]
+    require(
+        math.floor(times[0]) <= started <= math.floor(times[1])
+        and len(roots) == 1
+        and int(generation[7]) == roots[0]["ppid"],
+        "Created PID birth/parent does not match the original open task receipt",
+    )
+    return generation
+
+
+async def wait_created_shell(
+    transport,
+    created,
+    original_windows,
+    workspace,
+    record,
+    *,
+    receipt,
+    timeout=25,
+    poll_interval=0.15,
+):
+    observation = {"state": "unconfirmed", "input_permitted": False, "observations": 0}
+    try:
+        initial = await transport.process_identity(created["expected_pid"], detailed=True)
+        observation["initial_identity"] = initial
+        record(dict(observation))
+        generation = require_created_birth(initial, created, receipt)
+        observation.update(generation=list(generation))
+        record(dict(observation))
+        previous = None
+        async with asyncio.timeout(timeout):
+            while True:  # noqa: ASYNC110 -- bounded observations of one created shell only
+                # Read-only logical receipt binding, including startup in a tab
+                # group. It grants no input/geometry authority to that group.
+                row = physical_helper().created_row(
+                    await transport.catalog(), created, original_windows
+                )
+                identity = await transport.process_identity(created["expected_pid"], detailed=True)
+                require(
+                    startup_generation(identity, created) == generation,
+                    "Created shell birth identity changed; never adopt a replacement",
+                )
+                raw = await transport.read(created["pane_id"])
+                controlled = raw.rstrip("\n").split("\n")[-1].rstrip("\r") == (
+                    "KiraBridge visible % "
+                )
+                pids = [process["pid"] for process in row["processes"]]
+                observation.update(
+                    observations=observation["observations"] + 1,
+                    identity=identity,
+                    busy=row["busy"],
+                    process_ids=pids,
+                    screen_sha256=text_sha(raw),
+                    controlled_prompt=controlled,
+                    cwd=None,
+                )
+                record(dict(observation))
+                ready = (
+                    not row["busy"]
+                    and pids == [created["expected_pid"]]
+                    and controlled
+                    and empty_shell_prompt(raw)
+                    and identity.split(None, 8)[8] == "/bin/zsh"
+                )
+                sample = None
+                if ready:
+                    cwd = await transport.process_working_directory(
+                        created["expected_pid"], expected_identity=identity
+                    )
+                    observation["cwd"] = cwd
+                    record(dict(observation))
+                    if cwd == str(workspace):
+                        sample = (identity, raw, cwd)
+                        if sample == previous:
+                            observation.update(
+                                state="confirmed", input_permitted=False, shell_ready=True
+                            )
+                            record(dict(observation))
+                            return identity
+                previous = sample
+                await asyncio.sleep(poll_interval)
+    except BaseException as exc:
+        observation.update(
+            state="unconfirmed",
+            input_permitted=False,
+            error_type=type(exc).__name__,
+            error_code=getattr(exc, "code", None),
+            automatic_retry=False,
+        )
+        record(dict(observation))
+        raise
+
+
+def require_shell_ready_for_cleanup(evidence, shell_identity, persist):
+    if shell_identity is None:
+        evidence["cleanup_preserved"] = {
+            "reason": "created_shell_startup_unconfirmed",
+            "created_handle": evidence.get("created_handle"),
+            "creation_task_id": evidence.get("creation_receipt", {}).get("task_id"),
+            "cleanup_action_attempted": False,
+            "automatic_retry": False,
+        }
+        persist()
+        raise RuntimeError(
+            "Created shell startup unconfirmed; preserve creation receipt and target"
+        )
+
+
 async def terminate_owned(transport, binding, expected_identity):
     require(
         isinstance(expected_identity, str)
@@ -392,13 +569,35 @@ async def close_owned_idle(transport, owned, shell_identity, raw, workspace):
     )
     close = (
         transport.native_target(owned["pane_id"])
+        + "\nconst otherOwnedIds=app.windows().filter(w=>w.id()!==targetWindow.id())"
+        ".map(w=>w.id());"
         + transport.native_identity_guard({owned["expected_pid"]: shell_identity})
+        + physical_helper().cwd_guard(owned["expected_pid"], workspace)
         + "\nif(tab.busy() || targetWindow.tabs().length!==1)"
         "throw Error('Owned shell not alone and idle');"
         + transport.native_screen_guard(raw)
-        + "\ntargetWindow.close();JSON.stringify({closed:true});"
+        + "targetWindow.close();delay(0.3);"
+        "if(otherOwnedIds.some(id=>!app.windows().some(w=>w.id()===id)))"
+        "throw Error('Other logical tabs changed during close; reconcile');"
+        "JSON.stringify({closed:true});"
     )
     return await transport.native(close, mutation=True)
+
+
+def require_commit_pins(head, installed, package_commit, harness_commit):
+    require(
+        all(
+            re.fullmatch(r"[a-f0-9]{40}", value or "") for value in (package_commit, harness_commit)
+        ),
+        "Exact package and harness commit pins required",
+    )
+    require(head == harness_commit, "Harness checkout commit differs")
+    require(installed in {None, package_commit}, "Installed release commit differs or is invalid")
+    if installed is None:
+        require(
+            package_commit == harness_commit,
+            "Separate harness commit requires an installed package manifest",
+        )
 
 
 def validate_candidate(args):
@@ -415,20 +614,27 @@ def validate_candidate(args):
     head = subprocess.check_output(
         ["git", "-C", str(source), "rev-parse", "HEAD"], text=True
     ).strip()
-    require(head == args.commit, "Harness checkout commit differs")
+    installed = installed_source_commit(kirabridge.__file__)
+    require_commit_pins(head, installed, args.commit, args.harness_commit)
     subprocess.run(
         ["git", "-C", str(source), "diff", "--quiet", "HEAD", "--", "src", "scripts"],
         check=True,
         timeout=5,
     )
     subprocess.run(
-        ["git", "-C", str(source), "ls-files", "--error-unmatch", str(Path(__file__).resolve())],
+        [
+            "git",
+            "-C",
+            str(source),
+            "ls-files",
+            "--error-unmatch",
+            str(Path(__file__).resolve()),
+            str(Path(__file__).with_name("codex_window_isolation.py").resolve()),
+        ],
         check=True,
         capture_output=True,
         timeout=5,
     )
-    installed = installed_source_commit(kirabridge.__file__)
-    require(installed in {None, args.commit}, "Installed release commit differs or is invalid")
     if installed is None:
         require(
             args.package_root.resolve() == source / "src/kirabridge", "Wrong development source"
@@ -542,6 +748,7 @@ async def accept(args):
     catalog, native = transport.catalog, transport.native
     original_check = bridge.visible_handoffs.check_target
     owned = binding = shell_identity = agent_identity = None
+    isolation = None
     baseline_ready = False
     active_label, frames = "startup", []
     original_windows, original_identities = set(), {}
@@ -553,6 +760,7 @@ async def accept(args):
         "version": kirabridge.__version__,
         "source_sha256": args.source_sha256,
         "commit": args.commit,
+        "harness_commit": args.harness_commit,
         "python": sys.executable,
         "package": str(args.package_root),
         "private_root": str(root),
@@ -584,6 +792,16 @@ async def accept(args):
         checkpoint()
         print(json.dumps(evidence["checks"][-1]), flush=True)
 
+    physical_bytes = 0
+
+    def physical_record(event):
+        nonlocal physical_bytes
+        data = json.dumps(event, ensure_ascii=False) + "\n"
+        physical_bytes += len(data.encode())
+        require(physical_bytes <= 16 * 1024 * 1024, "Private physical-proof budget exceeded")
+        with (root / "physical-windows.private.jsonl").open("a") as output:
+            output.write(data)
+
     async def observe_originals():
         try:
             observation = await original_deltas(
@@ -597,8 +815,13 @@ async def accept(args):
         evidence.setdefault("foreign_observations", []).append(observation)
         checkpoint()
 
-    async def current():
-        row = owned_row(await catalog(), owned, original_windows)
+    async def current(*, cleanup=False):
+        if cleanup:
+            row = physical_helper().created_row(await catalog(), owned, original_windows)
+        elif isolation is not None and isolation.confirmed:
+            row = await isolation.current()
+        else:
+            row = owned_row(await catalog(), owned, original_windows)
         require(
             await transport.process_identity(owned["expected_pid"], detailed=True)
             == shell_identity,
@@ -606,10 +829,10 @@ async def accept(args):
         )
         return row
 
-    async def wait_shell():
+    async def wait_shell(*, cleanup=False):
         async with asyncio.timeout(25):
             while True:  # noqa: ASYNC110 -- bounded own native shell observation
-                row = await current()
+                row = await current(cleanup=cleanup)
                 raw = await transport.read(owned["pane_id"])
                 if (
                     not row["busy"]
@@ -670,8 +893,9 @@ async def accept(args):
             await observe_originals()
             evidence["cleanup_complete"] = True
             return
+        require_shell_ready_for_cleanup(evidence, shell_identity, checkpoint)
         await observe_originals()
-        row = await current()
+        row = await current(cleanup=True)
         save("cleanup-before-screen.private.json", {"text": await transport.read(owned["pane_id"])})
         if binding is not None and any(p["pid"] == binding.agent_pid for p in row["processes"]):
             require(
@@ -679,7 +903,7 @@ async def accept(args):
             )
             await terminate_owned(transport, binding, agent_identity)
             evidence["owned_codex_sigterm"] = binding.agent_pid
-        raw = await wait_shell()
+        raw = await wait_shell(cleanup=True)
         await observe_originals()
         evidence["close"] = await close_owned_idle(transport, owned, shell_identity, raw, workspace)
         async with asyncio.timeout(25):
@@ -729,6 +953,34 @@ async def accept(args):
                 save(
                     "baseline.private.json",
                     {"inventory": before, "catalog": rows, "identities": original_identities},
+                )
+                contract = installed_native_contract(kirabridge.__file__)
+                system_transport = bridge.system_modules.transport
+                require(
+                    isinstance(system_transport, NativeSystemTransport)
+                    and contract.get("expected_commit") == args.commit
+                    and system_transport.expected_commit == args.commit
+                    and system_transport.app_path == contract["app_path"]
+                    and system_transport.expected_binary_sha256
+                    == contract["expected_binary_sha256"],
+                    "Physical proof must reuse the exact installed native transport",
+                )
+                isolation = physical_helper().PhysicalIsolation(
+                    transport,
+                    system_transport,
+                    nonce=nonce,
+                    workspace=workspace,
+                    record=physical_record,
+                )
+                physical_baseline = await isolation.capture_baseline()
+                require(
+                    {r["window_id"] for r in physical_baseline["logical"]["rows"]}
+                    == original_windows
+                    and all(
+                        physical_baseline["logical"]["identities"].get(pid) == identity
+                        for pid, identity in original_identities.items()
+                    ),
+                    "Complete baseline changed before window creation",
                 )
                 baseline_ready = True
                 transport.native = traced_native
@@ -833,29 +1085,30 @@ async def accept(args):
                     opened = await submit(
                         "open", "session.open", {"cwd": str(workspace), "controlled_shell": True}
                     )
-                    owned = {
-                        key: opened["result"][key] for key in ("pane_id", "expected_pid", "tty")
-                    }
+                    owned = remember_created_shell(evidence, opened, nonce, workspace, checkpoint)
                     require(
                         owned["tty"] not in original_ttys
                         and int(owned["pane_id"].split(":")[1]) not in original_windows,
                         "Never adopt an old resource",
                     )
-                    shell_identity = await transport.process_identity(
-                        owned["expected_pid"], detailed=True
+
+                    def startup_observed(observation):
+                        evidence["shell_startup"] = observation
+                        checkpoint()
+
+                    shell_identity = await wait_created_shell(
+                        transport,
+                        owned,
+                        original_windows,
+                        workspace,
+                        startup_observed,
+                        receipt=evidence["creation_receipt"],
                     )
-                    require(
-                        await transport.process_working_directory(
-                            owned["expected_pid"], expected_identity=shell_identity
-                        )
-                        == str(workspace),
-                        "Fresh shell receipt is not bound to this run's private workspace",
-                    )
-                    evidence["open_request_nonce_bound"] = opened["id"] == (
-                        f"codex-accept-{nonce}-open"
-                    )
-                    require(evidence["open_request_nonce_bound"], "Open receipt nonce differs")
                     evidence["owned"] = owned
+                    evidence["owned_shell_identity"] = shell_identity
+                    checkpoint()
+                    active_label = "physical-isolation"
+                    evidence["physical_proof"] = await isolation.isolate(owned, shell_identity)
                     checkpoint()
                     await observe_originals()
                     await wait_shell()
@@ -1219,6 +1472,7 @@ def parser():
     value.add_argument("--expected-version")
     value.add_argument("--source-sha256")
     value.add_argument("--commit")
+    value.add_argument("--harness-commit")
     value.add_argument("--codex", type=Path, default=Path.home() / ".local/bin/codex")
     value.add_argument("--codex-sha256")
     value.add_argument("--codex-version", default="codex-cli 0.166.0")
@@ -1241,6 +1495,7 @@ if __name__ == "__main__":
                     "expected_version",
                     "source_sha256",
                     "commit",
+                    "harness_commit",
                     "codex_sha256",
                 )
             ),

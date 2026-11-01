@@ -144,3 +144,95 @@ und unabhängigen Manifest-/Wheel-/Git-/Signaturvergleich; ARM-Smoketest war ebe
 grün. Das ersetzt keine erfolgreiche End-CI. Ein neuer sauberer Commit wird erneut
 mit exakten Commitpins gebaut und geprüft. Kein zusätzliches lokales Gesamtsuite-
 Loop und keine produktive Umschaltung aus dem fehlgeschlagenen Kandidaten.
+
+## Produktstand 4064755 und tatsächliche Betriebsgates
+
+Die nachfolgenden Prüfungen betreffen exakt den gebauten Produktcommit
+`4064755e12b5524ad5d07ea4a4305bf0530057ac`, nicht einen bloßen Versionsnamen.
+[Verify 41330279134](https://github.com/landjunge/KiraBridge/actions/runs/41330279134)
+ist auf allen vier Jobs erfolgreich: Linux 3.11 **2.999/121 skip (276,72 s)**,
+Linux 3.13 **2.999/121 skip (277,93 s)**, ARM-macOS **3.116/4 skip (294,50 s)**,
+Intel-macOS **3.116/4 skip (483,05 s)**. Die zuvor fehlgeschlagene CI bleibt erhalten.
+
+Der Intel-Tarball SHA256
+`1d65cf1e840b2fc194329ebebe1b3aa0b5d5e38656f0fb7a6137b6afe9b10a5d`
+bestand isolierten authentifizierten Dispatcher-/Source-/Korruptpaket-Smoke.
+Unabhängige Reviews bestätigten alle 460 Manifestdateien, 452 Git-Payloaddateien,
+145 Pythondateien, Wheel und signierte native x86_64-App sowie beide ZIPs.
+ARM-Paketjob und anschließender statischer ARM-Review bestanden ebenfalls.
+Der offizielle Linux-Smokehelper lief genau einmal im privaten Ubuntu-24.04-Container
+auf dem vorhandenen Debianhost: Exit 0, exakter Commit/Archivhash, UID1000,
+Dispatcher/Source/Korruptpaket/Datenbewahrung grün. Eigene Container/Images waren
+anschließend unabhängig abwesend. Das ist ein manueller Paketnachweis; der mangels
+kurzlebigem Runner wartende Actions-Linuxjob wird nicht als erfolgreich ausgegeben.
+
+### Konkrete Reparaturen im Produktcode
+
+Die folgenden Fundstellen beziehen sich auf den unveränderten Produktbaum
+`9b3c03ccf40e13e2cfcbdeb8f89b359141455026a8620a2c3b8d8dd0a3881f36`.
+Die ausführlichen Befunde, Risiken und Tests stehen in den geordneten Punkten oben
+und im ersten [Review](RELIABILITY-REVIEW-20261101.md).
+
+| Priorität | Reparatur / Fundstelle | Konkreter Nutzen und verbleibende Grenze |
+| --- | --- | --- |
+| Hoch | `filesystem_manager/move.py:277` und Scope-Namensschutz | Konkurrierend neu angelegte Quellen nicht löschen; No-Clobber/Sentinel/Hardlink-Pin. Ungewisse Restdaten mit Recoverybeleg bewahren, kein automatisches Replay. |
+| Hoch | `mcp_gateway/client.py:247`, `:338` | Verbindungsowner/Generation, Katalog-EOF und Dispatchfrist korrekt binden. Nach möglichem Dispatch bleibt UNKNOWN, keine behauptete Remote-Nichtausführung. |
+| Hoch | `session_manager.py:569`, `platform_adapters/terminal_app.py:913` | Nichtdirekte Eingaben prüfen die Prozessgeneration unmittelbar vor dem nativen Submit. Keine PID-Ersetzung als neues Ziel adoptieren. |
+| Hoch | `literal_session_input.py:168`, `visible_handoff.py` | Belegte volle Cursorzeilen vor Paste verweigern; strikte Nachprüfung bleibt. Kein allgemeiner Unicode-/Whitespace-Freibrief. |
+| Mittel | `mcp_gateway/proxy.py:24`, `:46` | Connection-Lock begrenzen und redundantes Katalogpolling entfernen. Vor Tool-Dispatch nur lokal belegte Nichtzustellung melden. |
+| Mittel | `mcp_gateway/client.py:263` | Vollständige validierte Kataloge auf 8 MiB begrenzen; invalides JSON/Unicode nicht cachen. SDK-Wire-Puffer ist davon getrennt. |
+| Mittel | `message_manager/direct.py:103`, `team_manager/dispatcher.py` | Dauerhaft erledigte Marker und abgelaufene Backoffs vergessen; Storagefehler behalten No-Replay-Sperren. |
+| Mittel | `integrations/desktop/main.swift:19`, `:161` | Bootstrap-Pipes/Frist und eigene Child-Bereinigung; erfolgreiche Receipt begrenzt Navigation und frühe Open-Events. |
+| Mittel | `integrations/desktop/SystemControl.swift:107` | AX-Timeout vor erster Abfrage, Attribute einmal lesen; geschützte Werte nicht lesen. |
+| Mittel | `integrations/desktop/SystemBridge.swift:27` | Gepufferte POSIX-Frames antworten auch vor stdin-EOF; Größen-/Serialisierungsvertrag erhalten. |
+| Leistung | `platform_adapters/terminal_app.py:265`, `:290` | TTY-Counter/Prozessindex ersetzen wiederholte Scans; vollständige Kataloghashes identisch. Gemessener synthetischer CPU-Median 58,07→26,40 ms. |
+
+### Fehlgeschlagene physische Probe und sichere Bereinigung
+
+Der neue eigene Lauf `actual-codex-4064755-01` stoppte nach genau einem Open-Effekt,
+vor Test-Paste, Busy-Fixture und Codex-Start. Der Open-Task war abgeschlossen,
+der neue Harness las aber unmittelbar den CWD und pinnte die volle comm-Identität
+der noch startenden Login-Shell. `session.open` bestätigt Öffnung/Handle; bereits
+bestehende Verbraucher warten anschließend auf Bereitschaft. Deshalb wird der
+Harness-Verbrauch korrigiert, kein unbewiesener Produkt-API-Defekt behauptet.
+Eine spätere rein lesende Probe belegte denselben frischen Shell-PID, privaten
+Run-CWD, kontrollierten leeren Prompt und Idle-Zustand.
+
+`visual_window_id` und katalogisches `tab_count` werden aus Bounds gruppiert und
+sind kein eigenständiger physischer Fensternachweis. Aktuelle native Leseproben
+zeigen tatsächlich ein AX-/Window-Server-Fenster mit drei logischen Terminal-Views.
+Der unveränderte Produkt-AX-Inspector bestätigt drei AXRadioButton-Tabs plus
+Add-Button. SystemEvents-AXTabs lieferte dagegen leer und wird nicht als Beweis
+verwendet. Nummernräume von Terminal-Scripting, AX und Window Server werden
+nicht gleichgesetzt.
+
+Der eigene Shell-/Window-Receipt wurde erst frisch abgeglichen, dann durch einen
+separat unabhängig geprüften Once-Helfer geschlossen. UID/TTY/Birth/PPID/Image,
+privater CWD, eigener leerer Prompt, Child-/Busy-/Single-Script-Tab-Grenze sowie
+alle ursprünglichen View-/Prozessidentitäten wurden geprüft; letzte Guards standen
+unmittelbar vor dem einen exakten Close. Danach waren eigener PID und logische
+Window-ID zweimal unabhängig abwesend; alle drei ursprünglichen Views und fünf
+Prozessidentitäten blieben erhalten. Keine Taste, kein Signal, kein zweites Open
+und kein Replay. Die Abnahme bleibt trotzdem fehlgeschlagen.
+
+Offen ist ausschließlich die praktische Freigabe: der manuelle Harness muss
+Shell-Startup korrekt abwarten und sein eigenes Fenster anhand nativer Topologie
+isolieren, bevor er Geometrie oder Codex-Eingaben ausführt. Produktcode/Paket
+bleiben bei 4064755. Ein separat gepinnter Harness-Commit erlaubt die streng
+getrennte Prüfung des korrigierten Prüfprogramms. Erst nach erfolgreicher
+physischen Probe folgen unterstützte sichtbare Installation, tatsächlicher
+Runtime-/Datenabgleich und Veröffentlichung. RC22 bleibt bis dahin produktiv.
+
+Der korrigierte manuelle Ablauf ist anschließend unabhängig geprüft: **88 gezielte
+Autor-Fälle bestanden (6,67 s)**. Der separate Gegenreview reproduzierte zunächst
+zwei falsche Freigaben durch bloße Tabanzahl; nach positiver CG-/AX-Identitäts- und
+Radio-Mitgliedschaftsprüfung bestanden **13 unabhängige Fälle (0,16 s)**.
+Der finale Helper behält diese Topologielogik und verschärft zusätzlich Token-/
+Titel-/Metadatenvollständigkeit. Der Startup-/Cleanup-Review bestätigte beide
+Reparaturen und die letzten Guards unmittelbar vor dem einzigen Close.
+Ein echter Baseline-Vortest mit hart ausgeschlossenen UI-Mutationen bestätigte
+**ein physisches CG-/AX-Fenster, drei native Radiotabs und drei logische Views**.
+Für diese Probe wurde das vorhandene Terminal einmal regulär per AppleEvent
+aktiviert, nachdem die aktuellen Ansichten auf der aktiven Oberfläche nicht
+beobachtbar waren. Keine neue Shell, Tasteneingabe oder Sitzung wurde dafür erzeugt.
+Die nächsten Modell-/Inputaufträge bleiben ein neuer separater Abnahmelauf.
