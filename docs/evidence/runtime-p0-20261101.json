@@ -1,8 +1,8 @@
 {
-  "revision": 2,
-  "recorded_at": "2026-11-01T08:24:04.720845+00:00",
+  "revision": 3,
+  "recorded_at": "2026-11-01T08:40:19.973068+00:00",
   "version": "0.8.0rc23",
-  "phase": "reviewed implementation; packaged acceptance and deployment pending",
+  "phase": "isolated packaged runtime accepted; final fixture CI and deployment pending",
   "source_files": 144,
   "source_manifest_sha256": "a8f8f3915531ed5e6464f5ccb613a163523a526e2a3ee199bea9b0bf0d2b807c",
   "baseline_code_commit": "f97ab1cdeebe1d06648febe685f7ebb738ca93a9",
@@ -38,7 +38,30 @@
     "overlapping_counts_not_summed": true
   },
   "lint_format_lock": "passed",
-  "packaged_runtime_acceptance": "pending exact clean commit package",
+  "packaged_runtime_acceptance": {
+    "commit": "a9b55f3dc644851ed46bcfd08a8cb1e03caed5c9",
+    "passed": true,
+    "source_unchanged_for_final_candidate": true,
+    "background35": {
+      "admission_seconds": 0.195245739,
+      "execution_seconds": 35.739996744,
+      "crossed30s": true,
+      "spawn_count_after_id_reuse": 1
+    },
+    "applications60": {
+      "state": "completed",
+      "seconds": 24.695211852,
+      "bytes": 578524,
+      "records": 1407,
+      "live_owned_members": []
+    },
+    "applications1": {
+      "state": "failed",
+      "seconds": 2.084845012,
+      "live_owned_members": []
+    },
+    "first_private_policy_fixture": "forbidden before any task; preserved; session.input dependency added only to private policy"
+  },
   "release": {
     "published": false,
     "installed": false
@@ -52,12 +75,22 @@
     "runtime-p0-harness-independent-review.json": "80f37772135d7d206793bdeb1b505c9a1313dc5d7bd14a145181b43e8dad044b",
     "combined-runtime-regressions.log": "5fe69aa72a8fc89ce6365466f716721e92b6197bec60d73f90651ef5ff1094dc",
     "managed-admission-real-http-census-v2.log": "8ce35df22afa0df0231b1b950a9959987e910f49bc3e7de0e5414e122e1fd5d5",
-    "p0b-applications-timeout1/diagnosis.json": "35023388e9347095315d45e7a42815bfbb2b38bff3becc59e715e6b62d8bf899"
+    "p0b-applications-timeout1/diagnosis.json": "35023388e9347095315d45e7a42815bfbb2b38bff3becc59e715e6b62d8bf899",
+    "ci-fixture-hermetic-v2-independent-review.json": "442dfff0c89aac1f081be32e8072289567d86ec7bcdf9b0db5c92e3cefdf78f9",
+    "runtime-p0-harness-policy-independent-review.json": "d9ab0f1dd41fc359e6f1766840d209f72e2793fd67919d298f38f063095e6dc0",
+    "actual-p0-acceptance-a9b55f3-02/evidence.json": "2ba8fb50c223969c7ad4964e3a1d028a28ecf7bfa3004edf48a0465bc03e8c52"
   },
   "limits": [
     "P1 calculator focus/pagination/Brave unchanged",
     "No historical task outcome rewritten",
     "POSIX preflight and signal are not atomic",
     "No new OS permission requests; notifications already authorized"
-  ]
+  ],
+  "ci_initial": {
+    "run": 41288752537,
+    "commit": "a9b55f3dc644851ed46bcfd08a8cb1e03caed5c9",
+    "linux_jobs": "both2776passed40skipped",
+    "macos_jobs": "both2806passed4skipped6fixturefailures",
+    "final_fixture_review": "passed; product source unchanged; exact new CI required"
+  }
 }

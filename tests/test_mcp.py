@@ -2,6 +2,7 @@ import asyncio
 import json
 import socket
 import sys
+from pathlib import Path
 
 import httpx
 import pytest
@@ -11,6 +12,7 @@ from conftest import request
 from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
 
+import kirabridge
 from kirabridge.bridge_core.models import BridgeError
 from kirabridge.mcp_gateway.client import MCPClientPool, Peer
 from kirabridge.mcp_gateway.http import create_http_app
@@ -216,17 +218,28 @@ async def test_real_stdio_roundtrip(tmp_path):
     config = tmp_path / "bridge.toml"
     config.write_text("data_dir = " + json.dumps(str(tmp_path / "stdio-state")) + "\n")
     parameters = StdioServerParameters(
-        command=sys.executable, args=["-m", "kirabridge.cli", "--config", str(config), "serve"]
+        command=sys.executable,
+        args=["-m", "kirabridge.cli", "--config", str(config), "serve"],
+        env={"PYTHONPATH": str(Path(kirabridge.__file__).resolve().parent.parent)},
     )
     async with stdio_client(parameters) as (read, write), ClientSession(read, write) as session:
         initialized = await session.initialize()
         assert initialized.protocolVersion
         tools = await session.list_tools()
-        assert {"clipboard_read", "clipboard_write", "clipboard_info", "task_submit"} <= {
-            tool.name for tool in tools.tools
-        }
+        names = {tool.name for tool in tools.tools}
+        assert {"clipboard_info", "task_submit"} <= names
         health = await session.call_tool("bridge_health", {})
         assert health.structuredContent["dispatcher_active"]
+        assert health.structuredContent["version"] == kirabridge.__version__
+        catalog = (await session.call_tool("operation_catalog", {})).structuredContent
+        assert not {"clipboard.read", "clipboard.write"}.intersection(catalog["operations"])
+        if sys.platform == "darwin":
+            # The minimal principal has no clipboard read/write grant. Darwin
+            # does not advertise these ineligible native operations as tools.
+            assert not {"clipboard_read", "clipboard_write"}.intersection(names)
+        else:
+            # Preserve the explicitly broader legacy non-native tool catalog.
+            assert {"clipboard_read", "clipboard_write"} <= names
         denied = await session.call_tool("clipboard_info", {})
         assert denied.structuredContent["error"]["code"] == "forbidden"
 

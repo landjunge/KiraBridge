@@ -101,6 +101,7 @@ async def main(args):
         "bridge.health",
         "terminal.execute",
         "session.inspect",
+        "session.input",
         "system.report",
         "process.inspect",
         "task.read",
@@ -146,6 +147,11 @@ async def main(args):
                     async def call(tool, arguments):
                         result = await client.call("candidate", tool, arguments)
                         value = result.structuredContent
+                        if isinstance(value, dict) and isinstance(value.get("error"), dict):
+                            evidence["last_call_error"] = {
+                                "tool": tool,
+                                "code": value["error"].get("code"),
+                            }
                         require(
                             not result.isError
                             and isinstance(value, dict)

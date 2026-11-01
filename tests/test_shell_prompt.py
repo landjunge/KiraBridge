@@ -187,7 +187,8 @@ async def run_dispatch_js(source, state):
         pytest.skip("native dispatch JS requires node or macOS JavaScript runtime")
     harness = (
         "const state=" + json.dumps(state) + "; const calls=[];"
-        "const tab={tty:()=>'/dev/ttys004',busy:()=>state.busy,contents:()=>state.screen};"
+        "const tab={tty:()=>'/dev/ttys004',busy:()=>state.busy,"
+        "contents:()=>state.screen,history:()=>state.screen};"
         "const win={id:()=>123,tabs:()=>[tab]};"
         "const windows=()=>[win]; windows.byId=()=>win;"
         "const app={running:()=>true,windows,activate:()=>{"
