@@ -324,3 +324,14 @@ nun ausschließlich denselben AX-Request vor der Baseline nach einmaliger
 Aktivierung höchstens dreimal. Andere Fehler oder Änderungen an App-/Worker-/
 Tokenidentität bleiben gesperrt; keine Effektwiederholung. Drei zuvor rote
 direkte Fälle bestanden (0,59 s). Produkt406 bleibt unverändert.
+
+Probe05 belegte Open, eigenes Titel-Tag und Move erfolgreich; danach gab es
+zwei echte CG-/AX-Fenster. Terminal blendet beim einzelnen eigenen Tab die
+AXTabGroup aus; der eigene AXWindow-Token blieb exakt gleich. Alle ursprünglichen
+Radios blieben vollständig und gleichgeordnet im anderen Fenster. Der enge
+Helferzweig bindet ausschließlich diesen Fall an den bestätigten Move, den
+vorher positiv gebundenen Own-Radio-/AXWindow-Token, genau zwei vollständige
+aktuelle Flächen und die positive Originalpartition. Drei direkte Fälle
+bestanden (0,46 s), einschließlich echter gespeicherter Probe05 und zwölf
+Negativvarianten. Root hat den implementierten Delta unabhängig gelesen und
+freigegeben; MCP bestätigte das Design. Keine Produkt- oder CI-Änderung.

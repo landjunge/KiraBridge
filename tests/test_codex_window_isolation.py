@@ -175,7 +175,12 @@ class Scene:
                 children = [
                     {
                         "role": "AXWindow",
-                        "element_token": f"{index + 1:032x}",
+                        "element_token": format(
+                            2 - index
+                            if self.phase == "detached" and self.no_own_group
+                            else index + 1,
+                            "032x",
+                        ),
                         "title": title,
                         "title_truncated": False,
                         "minimized": False,
@@ -186,6 +191,8 @@ class Scene:
                     result.update(total_children=len(children) + 1, truncated=True, eof=False)
             elif int(token, 16) < 100:
                 index = int(token, 16) - 1
+                if self.phase == "detached" and self.no_own_group:
+                    index = 1 - index
                 _, title, count = groups[index]
                 role = "AXWindow"
                 children = [{"role": "AXSplitGroup", "element_token": "e" * 32}]
@@ -261,12 +268,17 @@ async def test_same_bounds_but_authoritatively_separate_needs_no_detach(module, 
     assert scene.effects == ["title"]
 
 
-async def test_missing_own_radio_after_move_is_unproven_and_never_retries(module, tmp_path):
+async def test_known_move_preserves_hidden_own_window_and_positive_original_partition(
+    module, tmp_path
+):
     scene = await prepared(module, tmp_path)
     scene.no_own_group = True
-    with pytest.raises(RuntimeError, match="membership is incomplete"):
-        await scene.controller.isolate(CREATED, SHELL)
-    assert scene.effects == ["title", "move"] and not scene.controller.confirmed
+    proof = await scene.controller.isolate(CREATED, SHELL)
+    assert proof["tab_count"] == 1 and proof["own_tabbar_hidden"] is True
+    assert proof["evidence"] == "known_move_preserved_own_ax_and_ordered_original_radios"
+    assert proof["own_radio_token"] == f"{1003:032x}"
+    assert (await scene.controller.current())["expected_pid"] == CREATED["expected_pid"]
+    assert scene.effects == ["title", "move"] and scene.controller.confirmed
     with pytest.raises(RuntimeError, match="never be replayed"):
         await scene.controller.isolate(CREATED, SHELL)
     assert scene.effects == ["title", "move"]
@@ -729,3 +741,66 @@ async def test_ax_retry_preserves_error_scope_and_app_worker_token_guards(module
             assert sum(operation == "windows.list" for operation, _ in scene.calls) <= 1
         scene.terminal.native.assert_awaited_once()
         assert scene.controller.baseline is None and scene.effects == []
+
+
+async def test_hidden_own_tabbar_cannot_adopt_unknown_move_parent_or_foreign_partition(
+    module, tmp_path
+):
+    for change in (
+        "unknown-move",
+        "before-move",
+        "unbound-radio",
+        "parent",
+        "replace-none",
+        "replace-one",
+        "reorder",
+        "duplicate",
+        "extra",
+        "worker",
+        "layout",
+        "cwd",
+    ):
+        scene = await prepared(module, tmp_path)
+        scene.controller.created, scene.controller.identity = CREATED, SHELL
+        scene.phase = "tagged"
+        scene.controller.topology(await scene.controller.snapshot())
+        scene.controller.move_attempted = scene.controller.move_accepted = True
+        scene.phase, scene.no_own_group = "detached", True
+        snapshot = await scene.controller.snapshot()
+        own = next(group for group in snapshot["ax"] if group["title"] == TITLE)
+        host = next(group for group in snapshot["ax"] if group is not own)
+        if change == "unknown-move":
+            scene.controller.move_accepted = False
+        elif change == "unbound-radio":
+            scene.controller.own_radio_token = None
+        elif change == "parent":
+            own["token"] = "replacement-parent"
+        elif change in {"replace-none", "replace-one"}:
+            host["radios"] = [
+                {"element_token": name, "value": False}
+                for name in ("general", "profiles", "groups")
+            ]
+            if change == "replace-one":
+                own.update(tabs=1, radios=[{"element_token": f"{1003:032x}", "value": True}])
+        elif change == "reorder":
+            host["radios"].reverse()
+        elif change == "duplicate":
+            host["radios"][0]["element_token"] = host["radios"][1]["element_token"]
+        elif change == "extra":
+            host["radios"].append({"element_token": "extra", "value": False})
+            host["tabs"] += 1
+        elif change == "worker":
+            snapshot["worker"][1] = "replacement-worker"
+        elif change == "layout":
+            window = next(window for window in snapshot["cg"] if window["title"] != TITLE)
+            window["bounds"]["Width"] += 1
+            host["size"][0] += 1
+        elif change == "cwd":
+            scene.workspace += "-changed"
+            scene.controller.confirmed = True
+        with pytest.raises(RuntimeError):
+            if change == "cwd":
+                await scene.controller.current()
+            else:
+                scene.controller.topology(snapshot, after_move=change != "before-move")
+        assert scene.effects == []

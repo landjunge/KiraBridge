@@ -68,6 +68,7 @@ class PhysicalIsolation:
         self.move_accepted = False
         self.activation_attempted = False
         self.own_radio_token = None
+        self.pre_move_ax_window_token = None
 
     def activation_source(self, identity):
         return (
@@ -491,11 +492,40 @@ class PhysicalIsolation:
             "Own nonce title is missing or ambiguous",
         )
         own, own_cg = own_pairs[0]
+        original = [radio["element_token"] for radio in baseline["ax"][0]["radios"]]
+        if own["tabs"] is None:
+            require(
+                after_move
+                and self.move_attempted
+                and self.move_accepted
+                and self.own_radio_token is not None
+                and self.own_radio_token not in original
+                and self.pre_move_ax_window_token == own["token"]
+                and own["radios"] is None
+                and len(pairs) == 2,
+                "Hidden own tabbar lacks the known move and preserved pre-move own binding",
+            )
+            host, host_cg = next(pair for pair in pairs if pair[0] is not own)
+            require(
+                host["radios"]
+                and host["tabs"] == len(original)
+                and [radio["element_token"] for radio in host["radios"]] == original
+                and host_cg["bounds"] == baseline["cg"][0]["bounds"],
+                "Hidden own tabbar has no complete ordered original baseline partition",
+            )
+            return {
+                "tab_count": 1,
+                "cg_window_id": own_cg["window_id"],
+                "ax_window_token": own["token"],
+                "own_radio_token": self.own_radio_token,
+                "own_tabbar_hidden": True,
+                "own_radio_observation": "pre_move_only",
+                "evidence": "known_move_preserved_own_ax_and_ordered_original_radios",
+            }
         require(
             all(group["radios"] and group["tabs"] == len(group["radios"]) for group, _ in pairs),
             "Current AX tab membership is incomplete; no hidden-group inference is permitted",
         )
-        original = [radio["element_token"] for radio in baseline["ax"][0]["radios"]]
         tokens = [radio["element_token"] for group, _ in pairs for radio in group["radios"]]
         require(
             len(tokens) == len(set(tokens))
@@ -544,11 +574,14 @@ class PhysicalIsolation:
         # Parent AX and CG identifiers, and radio titles, are volatile on this host.
         # Bind the sole added radio only after all positive membership checks pass.
         self.own_radio_token = own_token
+        if not self.move_attempted:
+            self.pre_move_ax_window_token = own["token"]
         return {
             "tab_count": len(own_tokens),
             "cg_window_id": own_cg["window_id"],
             "ax_window_token": own["token"],
             "own_radio_token": own_token,
+            "own_tabbar_hidden": False,
         }
 
     async def context(self):
