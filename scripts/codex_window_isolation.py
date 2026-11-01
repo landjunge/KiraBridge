@@ -296,7 +296,9 @@ class PhysicalIsolation:
             "Duplicate AX window identity",
         )
         require(
-            len(ax_windows) == len(windows) == len(cg["accessibility_windows"]),
+            len(ax_windows)
+            == len(windows)
+            == sum(window.get("role") == "AXWindow" for window in cg["accessibility_windows"]),
             "AX/CG physical inventory differs",
         )
         groups = []

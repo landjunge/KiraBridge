@@ -158,7 +158,7 @@ class Scene:
                 total=len(groups),
                 next_offset=len(groups),
                 titles_redacted=False,
-                accessibility_windows=[{} for _ in groups],
+                accessibility_windows=[{"role": "AXWindow"} for _ in groups],
             )
         else:
             groups = self.groups()
@@ -804,3 +804,30 @@ async def test_hidden_own_tabbar_cannot_adopt_unknown_move_parent_or_foreign_par
             else:
                 scene.controller.topology(snapshot, after_move=change != "before-move")
         assert scene.effects == []
+
+
+async def test_tooltip_cg_layer_and_ax_help_tag_do_not_count_as_physical_windows(module, tmp_path):
+    scene = Scene(module, tmp_path)
+    native_request = scene.controller.native.request
+
+    async def with_tooltip(operation, arguments, **kwargs):
+        result = await native_request(operation, arguments, **kwargs)
+        if operation == "windows.list":
+            tooltip = {**result["windows"][0], "window_id": 124, "layer": 103, "title": "tooltip"}
+            result["windows"].insert(0, tooltip)
+            result.update(total=2, next_offset=2)
+            result["accessibility_windows"] = [
+                {"role": "AXHelpTag", "ax_identifier": "tooltip"},
+                {"role": "AXWindow", "ax_identifier": "main"},
+            ]
+        elif operation == "accessibility.inspect" and not arguments.get("element_token"):
+            result["children"].insert(0, {"role": "AXHelpTag", "element_token": "d" * 32})
+            result["total_children"] += 1
+        return result
+
+    scene.controller.native.request = with_tooltip
+    baseline = await scene.controller.capture_baseline()
+    assert len(baseline["native"]["cg"]) == len(baseline["native"]["ax"]) == 1
+    assert baseline["native"]["cg"][0]["window_id"] == 231
+    assert not any(args.get("element_token") == "d" * 32 for _, args in scene.calls)
+    assert scene.effects == []
