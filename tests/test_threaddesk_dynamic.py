@@ -6,6 +6,7 @@ from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
 import pytest
+from mcp.types import Tool, ToolAnnotations
 
 from kirabridge.bridge_core.models import BridgeError
 from kirabridge.mcp_gateway.client import MCPClientPool
@@ -13,10 +14,10 @@ from kirabridge.threaddesk_dynamic import _read_tool, catalog, read
 
 
 def tool(name, *, readonly=True, destructive=False, schema=None):
-    return SimpleNamespace(
+    return Tool(
         name=name,
         description="Example read",
-        annotations=SimpleNamespace(readOnlyHint=readonly, destructiveHint=destructive),
+        annotations=ToolAnnotations(readOnlyHint=readonly, destructiveHint=destructive),
         inputSchema=schema
         or {
             "type": "object",

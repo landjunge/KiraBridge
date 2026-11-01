@@ -134,6 +134,9 @@ def install_native_model(monkeypatch, bridge, model):
     async def native_read(*args, **kwargs):
         return model["text"]
 
+    async def no_geometry(*args, **kwargs):
+        return None
+
     async def insert(principal, args, *, before_transport=None):
         assert args.submit is False
         if before_transport is not None:
@@ -173,6 +176,7 @@ def install_native_model(monkeypatch, bridge, model):
     monkeypatch.setattr(bridge.sessions.terminal_app, "process_ids", processes)
     monkeypatch.setattr(bridge.sessions.terminal_app, "window_inventory", windows)
     monkeypatch.setattr(bridge.sessions.terminal_app, "read", native_read)
+    monkeypatch.setattr(bridge.sessions.terminal_app, "input_columns", no_geometry)
     monkeypatch.setattr(bridge.sessions, "selected", selected)
     monkeypatch.setattr(bridge.sessions, "catalog", catalog)
     monkeypatch.setattr(bridge.sessions, "read", read)

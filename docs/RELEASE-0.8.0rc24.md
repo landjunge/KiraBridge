@@ -39,3 +39,23 @@ automatically. The [move contract](FILE-MOVE-CONTRACT.md) explains temporary pri
 reachability, retained/unknown receipts and explicit local recovery.
 The earlier native Codex handoff acceptance remains unresolved at this checkpoint.
 The working RC22 installation is preserved.
+
+
+The follow-up team review also bounds native app bootstrap pipes and execution,
+limits web navigation to the owned starter receipt and Console origin, sets AX
+timeouts before observation and uses chunked native request framing. Terminal
+submission revalidates the exact process generation at the effect boundary;
+malformed process inventories fail explicitly. Indexed TTY observation reduces
+repeated catalogue scans without changing catalogue results.
+
+MCP admission, catalogue locks and connection waits have deadlines; complete
+validated catalogues have an 8 MiB serialized budget. Expired backoffs and settled
+delivery markers are pruned while uncertain storage states retain No-Replay
+protection. A narrow, renderer-verified Codex input profile refuses ambiguous
+full-row geometry before paste. It does not expand acceptance of other Unicode
+or wrapping forms. The unchanged strict post-paste evidence remains required.
+
+The [follow-up report](RELIABILITY-FOLLOWUP-20261101.md) separates measured
+improvements, rejected optimizations, actual test results and pending live gates.
+Diagnostic history and its exhausted production cap were preserved; ordinary
+task/message/audit evidence remains available independently of optional diagnostics.

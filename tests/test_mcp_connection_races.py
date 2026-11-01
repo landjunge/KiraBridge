@@ -328,9 +328,11 @@ async def test_failed_refresh_remains_dirty_and_never_calls_the_remote_tool():
         raise TimeoutError
 
     session.list_tools = fail
-    with pytest.raises(TimeoutError):
+    with pytest.raises(BridgeError) as error:
         await pool.call("peer", "safe_read", {})
 
+    assert error.value.code == "peer_timeout"
+    assert error.value.diagnostic["accepted"] == "no"
     assert pool.catalogs["peer"] == ["old-catalog"]
     assert "peer" in pool.catalog_dirty
     assert session.tool_calls == []

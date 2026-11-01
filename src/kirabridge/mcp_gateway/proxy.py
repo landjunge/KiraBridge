@@ -22,10 +22,26 @@ class DaemonConnection:
         self.change_generation = 0
 
     async def ensure_connection(self):
-        async with self.lock:
-            if self.endpoint.id not in self.pool.sessions:
-                await self.pool.disconnect(self.endpoint.id)
-                await self.pool.connect(self.endpoint)
+        try:
+            async with asyncio.timeout(self.pool.call_timeout), self.lock:
+                if self.endpoint.id not in self.pool.sessions:
+                    await self.pool.disconnect(self.endpoint.id)
+                    await self.pool.connect(self.endpoint)
+        except TimeoutError:
+            failure = self.pool.failure(
+                self.endpoint.id,
+                "peer_connection_timeout",
+                "MCP connection step timed out before tool dispatch",
+            )
+            failure.diagnostic.update(
+                phase="connection.step.timed_out",
+                tool_dispatch="no",
+                evidence_scope="this_client_tool_dispatch",
+                guidance="This connection step did not dispatch a tool request. Connection "
+                "or initialization may have started; this is not evidence about other "
+                "callers or remote activity. No automatic retry.",
+            )
+            raise failure from None
 
     async def call_tool(self, name, arguments, *, routine_health=False):
         tools = await self.list_tools()

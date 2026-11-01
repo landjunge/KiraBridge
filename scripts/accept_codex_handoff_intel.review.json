@@ -1,0 +1,108 @@
+{
+  "schema": 1,
+  "status": "prepared_for_independent_review_not_executed",
+  "harness": "scripts/accept_codex_handoff_intel.py",
+  "offline_tests": "tests/test_codex_acceptance_harness.py",
+  "runner": "Root only, after review and candidate source freeze",
+  "purpose": "Actual Intel Terminal.app/Codex acceptance of literal input, one Return, body_only_v1 handoff, authoritative local answer and pre-effect refusals",
+  "reuse": {
+    "scheduler": "Unchanged Bridge action_request/task_get routes; no second scheduler",
+    "proof_helpers": "scripts/accept_macos_adapter_intel.py::owned_turn_messages and local_reply_protocol_proof",
+    "native_and_cleanup_patterns": [
+      "scripts/accept_shell_input_intel.py",
+      "scripts/accept_closed_terminal_intel.py"
+    ],
+    "renderer_evidence": "Private cursor-design-01/FINAL-CURSOR-REVIEW.json and official 0.166.0 renderer matrix",
+    "previous_ui_evidence": "Private actual-ui-candidate-01 is reference only; no task, pane or uncertain input is resumed"
+  },
+  "candidate_gates": [
+    "Default invocation prints the review plan and creates no resource",
+    "Execution requires explicit --execute and --allow-one-owned-visible-window",
+    "Exact Python executable path, imported package directory, package version, Python tree hash, Git commit and Codex binary hash/version",
+    "Harness must be tracked; src and scripts must match HEAD; installed release commit must match if present",
+    "Intel macOS only; assertions enabled; pinned codex-cli 0.166.0; required flags verified against actual local --help",
+    "Fresh nonsymlink private root, private workspace and random run nonce; existing CODEX_HOME refused without changing it",
+    "Read/hash local Codex config inputs without saving credentials; selected profiles and final config symlinks refused",
+    "Known local requirements/legacy managed TOML and Codex preference-domain files must be absent before UI and immediately before model start; their observed presence causes refusal, not repair",
+    "Invocation-only scalar overrides disable hooks, plugins, remote plugins, apps, MCP apps, skill MCP dependency installation and shell tools",
+    "Disable every locally discovered MCP server by name; do not assume mcp_servers={} clears recursively merged tables",
+    "Effective features list must confirm disabled flags; effective mcp list must match expected names with enabled=false; unexpected managed entries stop before UI",
+    "No --strict-config for the mcp management subcommand: pinned source explicitly rejects it; interactive TUI still requires it",
+    "CLI management listing is read-only but may inspect auth status; it is not claimed to be offline or a no-network command",
+    "Config input hashes and binary hash rechecked immediately before startup; no config/auth/HOME/CODEX_HOME rewrite or repair"
+  ],
+  "ownership_gates": [
+    "Private in-process Core, fresh DB, random private bearer token, dynamically bound loopback socket; endpoint cannot be supplied by operator",
+    "Unauthenticated HTTP request must return 401; private health must match expected candidate source hash",
+    "Record complete initial native window catalog and process identities as private evidence",
+    "One session.open action with fresh nonce/task ID is the only permitted new-window attempt",
+    "Adopt only that action's successful receipt: root PID, TTY and pane; never adopt a window inferred from inventory differences",
+    "New window ID and TTY must not exist in baseline; unique single-tab visual window required; root generation and private workspace CWD verified",
+    "The existing own busy fixture records only HOME, CODEX_HOME, four XDG root fields and two profile-context fields; every field must equal the Python/preflight environment and effective default Codex reader root",
+    "Repeat actual effective features/MCP listings after that shell-context check and immediately before Codex start; recheck local config hashes and known managed-file absence",
+    "Later native mutations must explicitly address the exact owned window ID; open, raw send, managed terminal execution and tmux fallback disabled",
+    "Start only the locally pinned CLI binary directly from the same verified controlled shell with --no-alt-screen --no-daemon --strict-config -s read-only -a never -C privateWorkspace; no extra launch shell can reload user startup files",
+    "Bind one fresh Codex PID, exact process image and generation inside the owned TTY; never rebind a replacement generation"
+  ],
+  "acceptance_matrix": [
+    {
+      "case": "real busy shell before Codex",
+      "expect": "Typed session_busy and zero additional native mutation; own bounded fixture released through its own private release file"
+    },
+    {
+      "case": "stale PID",
+      "expect": "Typed session_selection_changed and zero additional native mutation"
+    },
+    {
+      "case": "131-column supported full-row cursor ambiguity",
+      "expect": "Fresh literal and handoff actions both fail visible_input_geometry_ambiguous before paste, with zero native mutation and unchanged screen"
+    },
+    {
+      "case": "130-column long literal",
+      "expect": "One unchanged >1000-character literal paste and exactly one confirmed Return; unique exact own user prompt and final answer in the bound rollout plus answer on screen"
+    },
+    {
+      "case": "130-column body_only_v1 handoff",
+      "expect": "One unchanged short-word body paste and one Return through ordinary agent.execute; completed handoff, exact local reply proof and independent screen/rollout match in the same fresh thread"
+    }
+  ],
+  "evidence": [
+    "Nonce, candidate runtime identity, CLI/help hashes and private endpoint",
+    "Initial catalog, own action receipts and detailed owned identities",
+    "All native mutation source hashes and receipts; input frames labeled by own task only",
+    "Fresh persisted task results, attempt=1, no retry on admission/call/turn uncertainty",
+    "Rollout discovered through exact owned process writer and CWD, anchored no-follow descriptor, regular file/UID/device/inode/prefix checks and 8MiB bound",
+    "Authoritative typed Codex event family with exactly one own prompt, exact final answer and task_complete; mirrors never counted",
+    "Independent local handoff protocol prefix/hash proof, unchanged body and body_only_v1 event",
+    "Private cleanup screen, SIGTERM target if any, exact close receipt, independent own PID/window absence and private endpoint absence",
+    "Foreign process/window deltas recorded read-only; natural foreign activity neither authorizes mutation nor blocks owned cleanup"
+  ],
+  "failure_and_cleanup": [
+    "No previously unknown task is replayed; each fresh ID is reserved before HTTP dispatch and cannot be submitted again",
+    "Any unknown result stops dependent acceptance; no automatic retry, keyboard reset, prompt editing or substitute target",
+    "Stop only the private Core and its private scheduler",
+    "Signal only the fresh pinned owned Codex PID after immediate generation recheck; no process group or SIGKILL",
+    "Release own bounded busy fixture by file; never signal a discovered foreign child",
+    "Close only the exact owned generation-bound single-tab idle shell with matching last observed screen and a fresh identity-bound private workspace CWD check immediately before close",
+    "Verify own IDs absent independently; do not require foreign window/process inventory to remain static",
+    "If an open effect cannot be bound to a successful owned receipt or ownership changes, preserve it and report incomplete cleanup for manual reconciliation",
+    "Retain private evidence and workspace; do not publish captures or credentials as release assets"
+  ],
+  "review_focus": [
+    "Review all CLI isolation gates against pinned upstream source and current local help; no missing feature/server may be ignored",
+    "Confirm the observed local managed/legacy absence, exact shell config context and repeated effective disabled listings; reject an observed override or drift. Do not claim external cloud configuration is immutable or that the known file list is exhaustive",
+    "Confirm native mutation receipts really cover one paste and one Return, and refusals cover zero attempted native mutation",
+    "Check failure paths before/after session.open and Codex readiness, including lost receipts and missing identities",
+    "Check independent helper assertions, own rollout descriptor binding and output proof scope",
+    "Run only the offline harness test file before source freeze; actual acceptance remains a separate Root-controlled step"
+  ],
+  "official_sources": [
+    "https://developers.openai.com/codex/cli/reference",
+    "https://developers.openai.com/codex/config-reference",
+    "https://github.com/openai/codex/blob/6ff1e1ca3b30fc8b914720681fcf5fe62e95f856/codex-rs/cli/src/main.rs",
+    "https://github.com/openai/codex/blob/6ff1e1ca3b30fc8b914720681fcf5fe62e95f856/codex-rs/config/src/merge.rs",
+    "https://github.com/openai/codex/blob/6ff1e1ca3b30fc8b914720681fcf5fe62e95f856/codex-rs/features/src/lib.rs",
+    "https://github.com/openai/codex/blob/6ff1e1ca3b30fc8b914720681fcf5fe62e95f856/codex-rs/cli/src/mcp_cmd.rs",
+    "https://github.com/openai/codex/blob/6ff1e1ca3b30fc8b914720681fcf5fe62e95f856/codex-rs/codex-mcp/src/mcp/auth.rs"
+  ]
+}

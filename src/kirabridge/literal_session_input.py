@@ -154,6 +154,73 @@ def codex_wrapped_renderings(text, columns):
     return results
 
 
+def _codex_cursor_words(text):
+    words = codex_wrap_words(text)
+    # textwrap's hyphen splitter and Unicode line-break opportunities can alter
+    # word placement. Only classify Latin words with ordinary trailing sentence
+    # punctuation here; the existing verifier still owns all other input forms.
+    word = r"[A-Za-z0-9_À-ÖØ-öø-ÿ]+[.,:;!?]?"
+    if words is None or any(not re.fullmatch(word, item) for line in words for item in line):
+        return None
+    return words
+
+
+def codex_full_row_widths(text, columns):
+    """Identify bounded logical-line ends that need an unprovable blank row.
+
+    Codex 0.166 reserves an insertion row at a full logical-line end. Its cell
+    buffer cannot distinguish that blank row from an additional ASCII space.
+    Check both possible composer widths; geometry does not bind scrollbar state.
+    Long words, hyphenation and other Unicode break forms remain outside this
+    narrow classification; they gain no new verification or submission rights.
+    """
+    words_by_line = _codex_cursor_words(text)
+    if type(columns) is not int or not 20 <= columns <= 4096 or words_by_line is None:
+        return ()
+    ambiguous = []
+    for width in (columns - 3, columns - 4):
+        if any(len(word) > width for words in words_by_line for word in words):
+            continue
+        for words in words_by_line:
+            occupied = 0
+            for word in words:
+                if occupied and occupied + 1 + len(word) <= width:
+                    occupied += 1 + len(word)
+                else:
+                    occupied = len(word)
+            if occupied == width:
+                ambiguous.append(width)
+                break
+    return tuple(ambiguous)
+
+
+async def check_codex_paste_geometry(sessions, target, binding, text, before):
+    """Refuse a known unprovable representation before input, without widening verification."""
+    words = _codex_cursor_words(text) if target == "codex" else None
+    if words is None or max(map(len, text.split("\n")), default=0) < 16:
+        return
+    selection = sessions.current_selection()
+    if not selection or not isinstance(selection[2], dict):
+        return
+    columns = await sessions.terminal_app.input_columns(
+        binding.pane_id, identity_guard=selection[2], expected_screen=before["text"]
+    )
+    widths = codex_full_row_widths(text, columns)
+    if widths:
+        failure = BridgeError(
+            "visible_input_geometry_ambiguous",
+            "Codex's current width produces an unprovable blank cursor row; no text was pasted",
+        )
+        failure.observation = {
+            "target": target,
+            "observed_columns": columns,
+            "ambiguous_content_widths": widths,
+            "terminal_input_attempted": False,
+            "automatic_retry": False,
+        }
+        raise failure
+
+
 def single_line_renderings(text, columns):
     """Compatibility API: this variant accepts only one logical payload line."""
     return [] if "\n" in text else codex_wrapped_renderings(text, columns)
@@ -310,6 +377,10 @@ async def execute(
             if args.submit
             else None
         )
+        if before is not None:
+            await check_codex_paste_geometry(
+                bridge.sessions, target, binding, approved.text, before
+            )
         before_cwd = (
             await _task_cwd(bridge.sessions, binding)
             if target == "codex" and before is not None and _needs_cwd_proof(before["text"])

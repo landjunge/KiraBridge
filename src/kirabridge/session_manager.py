@@ -607,10 +607,25 @@ class SessionManager:
                     selected, args.text, identity, before_transport=before_transport
                 )
             else:
+                identities = None
+                if args.pane_id.startswith("terminal:"):
+                    identity = await self.terminal_app.process_identity(
+                        selected["expected_pid"], detailed=True
+                    )
+                    fields = identity.split(None, 8)
+                    if len(fields) != 9 or fields[1] != args.pane_id.rsplit(":", 1)[1]:
+                        raise BridgeError(
+                            "visible_target_changed", "Selected process TTY identity changed"
+                        )
+                    identities = {selected["expected_pid"]: identity}
                 if before_transport is not None:
                     await before_transport()
                 await self.transport(args.pane_id).send(
-                    args.pane_id, args.text, submit=args.submit, require_idle=args.require_idle
+                    args.pane_id,
+                    args.text,
+                    submit=args.submit,
+                    require_idle=args.require_idle,
+                    **({"identity_guard": identities} if identities is not None else {}),
                 )
             self.input_release.sent(principal, task_id)
         return {

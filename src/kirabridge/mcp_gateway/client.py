@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import re
 import time
 import uuid
@@ -57,8 +58,18 @@ class MCPClientPool:
 
     interface_version = "1"
 
-    def __init__(self, max_connections: int = 8, call_timeout: float = 30, observer=None):
+    def __init__(
+        self,
+        max_connections: int = 8,
+        call_timeout: float = 30,
+        observer=None,
+        *,
+        max_catalog_bytes: int = 8 * 1024 * 1024,
+    ):
+        if type(max_catalog_bytes) is not int or max_catalog_bytes < 2:
+            raise ValueError("Catalog byte budget must be an integer of at least 2")
         self.max_connections, self.call_timeout = max_connections, call_timeout
+        self.max_catalog_bytes = max_catalog_bytes
         self.owners: dict[str, asyncio.Task] = {}
         self.sessions: dict[str, ClientSession] = {}
         self.stops: dict[str, asyncio.Event] = {}
@@ -236,41 +247,69 @@ class MCPClientPool:
     async def list_tools(self, peer_id):
         """Fresh bounded pagination; catalogs never survive a connection generation."""
         session = self.sessions.get(peer_id)
+        owner = self.owners.get(peer_id)
         if session is None:
             raise self.failure(peer_id, "peer_disconnected", "MCP peer is not connected")
-        async with self.catalog_locks.setdefault(peer_id, asyncio.Lock()):
+        async with (
+            asyncio.timeout(self.call_timeout),
+            self.catalog_locks.setdefault(peer_id, asyncio.Lock()),
+        ):
             if self.sessions.get(peer_id) is not session:
                 raise self.failure(peer_id, "peer_disconnected", "MCP connection changed")
             # Consume only invalidations preceding this refresh. A notification
             # arriving while a page is in flight still requires another refresh.
             self.catalog_dirty.discard(peer_id)
             tools, cursor, seen = [], None, set()
+            catalog_bytes = 2  # Compact JSON array brackets; commas count below.
             try:
-                async with asyncio.timeout(self.call_timeout):
-                    for _ in range(8):
-                        page = await session.list_tools(cursor=cursor)
-                        if self.sessions.get(peer_id) is not session:
-                            raise self.failure(
-                                peer_id, "peer_disconnected", "MCP connection changed"
-                            )
-                        tools.extend(page.tools)
-                        if len(tools) > 512 or len({t.name for t in tools}) != len(tools):
+                for _ in range(8):
+                    page = await session.list_tools(cursor=cursor)
+                    if self.sessions.get(peer_id) is not session:
+                        raise self.failure(peer_id, "peer_disconnected", "MCP connection changed")
+                    if len(tools) + len(page.tools) > 512:
+                        raise BridgeError(
+                            "tool_catalog_invalid", "Ambiguous/oversized tool catalog"
+                        )
+                    for tool in page.tools:
+                        try:
+                            encoded = json.dumps(
+                                # JSON mode normalizes NaN/Infinity to null;
+                                # strict encoding must reject those values.
+                                tool.model_dump(mode="python", by_alias=True, exclude_none=True),
+                                ensure_ascii=False,
+                                allow_nan=False,
+                                separators=(",", ":"),
+                            ).encode("utf-8")
+                        except (TypeError, ValueError, UnicodeError):
                             raise BridgeError(
-                                "tool_catalog_invalid", "Ambiguous/oversized tool catalog"
-                            )
-                        cursor = page.nextCursor
-                        if not cursor:
-                            self.catalogs[peer_id] = tools
-                            return tools
-                        if cursor in seen:
+                                "tool_catalog_invalid", "Tool catalog is not valid JSON"
+                            ) from None
+                        catalog_bytes += len(encoded) + bool(tools)
+                        if catalog_bytes > self.max_catalog_bytes:
                             raise BridgeError(
-                                "tool_catalog_invalid", "Tool pagination cursor repeated"
+                                "tool_catalog_invalid", "Tool catalog exceeds byte budget"
                             )
-                        seen.add(cursor)
+                        tools.append(tool)
+                    if len({t.name for t in tools}) != len(tools):
+                        raise BridgeError("tool_catalog_invalid", "Ambiguous tool catalog")
+                    cursor = page.nextCursor
+                    if not cursor:
+                        self.catalogs[peer_id] = tools
+                        return tools
+                    if cursor in seen:
+                        raise BridgeError("tool_catalog_invalid", "Tool pagination cursor repeated")
+                    seen.add(cursor)
                 raise BridgeError("tool_catalog_invalid", "Tool pagination budget exceeded")
-            except BaseException:
+            except BaseException as exc:
                 if self.sessions.get(peer_id) is session:
                     self.catalog_dirty.add(peer_id)
+                if (
+                    isinstance(exc, McpError)
+                    and exc.error.code == types.CONNECTION_CLOSED
+                    and owner is not None
+                    and self.owners.get(peer_id) is owner
+                ):
+                    await self.disconnect(peer_id)
                 raise
 
     def health_epoch(self, peer_id, result):
@@ -305,6 +344,8 @@ class MCPClientPool:
         task_id: str | None = None,
         routine_health: bool = False,
     ):
+        loop = asyncio.get_running_loop()
+        deadline = loop.time() + self.call_timeout
         request = arguments.get("request")
         task_id = (
             task_id
@@ -349,12 +390,15 @@ class MCPClientPool:
             failure.diagnostic.update(connection_id=connection_id, phase=call_phase)
             return failure
 
-        def not_dispatched():
+        def not_dispatched(
+            code="peer_disconnected",
+            message="MCP connection changed before this client dispatched the request",
+        ):
             notice_call("call.not_dispatched", tool=tool, task_id=task_id)
             failure = self.failure(
                 peer_id,
-                "peer_disconnected",
-                "MCP connection changed before this client dispatched the request",
+                code,
+                message,
                 task_id=task_id,
                 operation=tool,
             )
@@ -379,7 +423,18 @@ class MCPClientPool:
 
         if peer_id in self.catalog_dirty:
             try:
-                await self.list_tools(peer_id)
+                async with asyncio.timeout_at(deadline):
+                    await self.list_tools(peer_id)
+            except TimeoutError:
+                raise not_dispatched(
+                    "peer_timeout", "MCP catalog read timed out before tool dispatch"
+                ) from None
+            except McpError as exc:
+                if exc.error.code == types.CONNECTION_CLOSED:
+                    raise not_dispatched(
+                        "peer_disconnected", "MCP catalog connection closed before tool dispatch"
+                    ) from None
+                raise
             except BridgeError as exc:
                 if exc.code == "peer_disconnected" and not current_generation():
                     raise not_dispatched() from None
@@ -388,11 +443,15 @@ class MCPClientPool:
             observe_start()
         # No automatic retries: a timed-out tool may have already executed remotely.
         predispatch_failure = None
+        dispatched = False
         try:
-            async with self.gate, asyncio.timeout(self.call_timeout):
+            async with asyncio.timeout_at(deadline), self.gate:
+                if loop.time() >= deadline:
+                    raise TimeoutError
                 if not current_generation():
                     predispatch_failure = not_dispatched()
                     raise predispatch_failure
+                dispatched = True
                 result = await session.call_tool(tool, arguments)
                 if (
                     current_generation()
@@ -420,6 +479,10 @@ class MCPClientPool:
                 )
                 return result
         except TimeoutError:
+            if not dispatched:
+                raise not_dispatched(
+                    "peer_timeout", "MCP request deadline elapsed before dispatch"
+                ) from None
             if tool == "bridge_health" and current_generation():
                 self.health_epochs.pop(peer_id, None)
             observe_start()

@@ -7,6 +7,7 @@ import json
 import os
 import re
 import sys
+from collections import Counter
 from pathlib import Path
 
 from kirabridge.bridge_core.models import BridgeError, UncertainExecution
@@ -21,6 +22,37 @@ def _process_observation_timeout(phase):
     )
     error.provider_error = {"phase": phase, "reason": "timeout"}
     return error
+
+
+def _parse_process_catalog(output, returncode):
+    def invalid(reason):
+        error = BridgeError(
+            "session_observation_invalid", "Complete native process catalog unavailable"
+        )
+        error.provider_error = {"phase": "native_process_catalog", "reason": reason}
+        return error
+
+    if returncode != 0:
+        raise invalid("process_failed")
+    try:
+        lines = output.decode("utf-8").splitlines()
+    except UnicodeDecodeError:
+        raise invalid("invalid_encoding") from None
+    processes, pids = [], set()
+    for line in lines:
+        if not line.strip():
+            continue
+        parts = line.split(None, 4)
+        if len(parts) != 5 or any(not re.fullmatch(r"[0-9]+", part) for part in parts[:3]):
+            raise invalid("malformed_row")
+        pid = int(parts[1])
+        if pid in pids:
+            raise invalid("duplicate_pid")
+        pids.add(pid)
+        processes.append(parts)
+    if not processes:
+        raise invalid("empty_inventory")
+    return processes
 
 
 def annotate_views(sessions: list[dict]) -> list[dict]:
@@ -230,11 +262,8 @@ class TerminalAppTransport:
      }));
     }) : []);""")
         rows = attach_visual_windows(rows if isinstance(rows, list) else [])
-        shared = {
-            row.get("tty")
-            for row in rows
-            if sum(item.get("tty") == row.get("tty") for item in rows) > 1
-        }
+        tty_counts = Counter(row.get("tty") for row in rows)
+        shared = {tty for tty, count in tty_counts.items() if count > 1}
         if shared:
             ended = await self.ended_windows(
                 [int(row["window_id"]) for row in rows if row.get("tty") in shared]
@@ -257,23 +286,19 @@ class TerminalAppTransport:
             raise _process_observation_timeout("native_process_catalog") from None
         finally:
             await reap_process(child, process_group=False)
-        processes = [
-            parts
-            for line in output.decode().splitlines()
-            if len(parts := line.split(None, 4)) == 5 and all(part.isdigit() for part in parts[:3])
-        ]
+        processes = _parse_process_catalog(output, child.returncode)
+        processes_by_tty = {}
+        for owner, pid, parent, tty, comm in processes:
+            processes_by_tty.setdefault(tty, []).append((int(owner), int(pid), int(parent), comm))
+        uid = os.getuid()
         sessions = []
         omitted = len(rows) > 100
         for row in rows[:100]:
             tty = Path(row["tty"]).name
             if not re.fullmatch(r"ttys[0-9]+", tty) or row.get("ended"):
                 continue
-            all_members = [
-                (int(owner), int(p), int(parent), comm)
-                for owner, p, parent, t, comm in processes
-                if t == tty
-            ]
-            members = [(p, parent) for owner, p, parent, _ in all_members if owner == os.getuid()]
+            all_members = processes_by_tty.get(tty, [])
+            members = [(p, parent) for owner, p, parent, _ in all_members if owner == uid]
             all_pids = {p for _, p, _, _ in all_members}
             legacy_roots = [
                 p
@@ -312,9 +337,9 @@ class TerminalAppTransport:
                     "busy": row["busy"],
                     "agent_identity_verified": False,
                     "processes": [
-                        {"pid": int(p), "ppid": int(parent), "name": Path(comm).name, "image": comm}
-                        for owner, p, parent, t, comm in processes
-                        if t == tty and int(owner) == os.getuid()
+                        {"pid": p, "ppid": parent, "name": Path(comm).name, "image": comm}
+                        for owner, p, parent, comm in all_members
+                        if owner == uid
                     ],
                 }
             )
@@ -885,12 +910,17 @@ class TerminalAppTransport:
             mutation=True,
         )
 
-    async def send(self, pane_id, text, *, submit, require_idle):
+    async def send(self, pane_id, text, *, submit, require_idle, identity_guard=None):
         if not submit:
             raise BridgeError("session_submit_required", "Terminal.app input submits a line")
+        if not identity_guard:
+            raise BridgeError(
+                "visible_selection_required", "Native submit requires a bound process identity"
+            )
         await self.native(
             self.native_target(pane_id)
             + ('\nif(tab.busy()) throw Error("Selected terminal is busy");' if require_idle else "")
+            + self.native_identity_guard(identity_guard)
             + "\napp.doScript("
             + json.dumps(text)
             + ", {in:tab}); JSON.stringify({sent:true});",

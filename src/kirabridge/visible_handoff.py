@@ -1059,6 +1059,9 @@ class VisibleHandoffs:
             )
             if len(prompt) > 16384 or "\x00" in prompt:
                 raise BridgeError("payload_limit", "Visible prompt exceeds terminal input limit")
+            from kirabridge.literal_session_input import check_codex_paste_geometry
+
+            await check_codex_paste_geometry(self.sessions, target, binding, prompt, before)
             # The partial unique index still owns sent/confirmed rows. Parking a
             # proven-dead row as unknown releases that slot and does not resend it.
             await self._park_proven_dead(principal, target, binding, observed_sessions)

@@ -150,6 +150,13 @@ async def test_native_session_selection_read_and_input(bridge, config, monkeypat
 
     monkeypatch.setattr(manager, "catalog", catalog)
     monkeypatch.setattr(manager.terminal_app, "native", native)
+    monkeypatch.setattr(
+        manager.terminal_app,
+        "process_identity",
+        AsyncMock(
+            return_value=f"{__import__('os').getuid()} ttys004 Sun Nov 1 12:00:00 2026 1 /bin/zsh"
+        ),
+    )
     with pytest.raises(BridgeError, match="exact current"):
         await manager.read("local", selected["pane_id"], 346)
     assert not calls

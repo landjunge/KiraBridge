@@ -223,6 +223,11 @@ async def new_native_selection(bridge, monkeypatch, row):
 
     monkeypatch.setattr(bridge.sessions.terminal_app, "process_identity", identity)
 
+    async def no_geometry(*args, **kwargs):
+        return None
+
+    monkeypatch.setattr(bridge.sessions.terminal_app, "input_columns", no_geometry)
+
 
 async def test_explicit_current_agent_handle_enters_current_window_without_mutating_default(
     visible,  # noqa: F811

@@ -5,7 +5,7 @@ from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
 import pytest
-from mcp.types import CallToolResult
+from mcp.types import CallToolResult, Tool
 
 from kirabridge.bridge_core.models import (
     BridgeError,
@@ -20,7 +20,7 @@ BASE = {"list_threads", "get_thread", "thread_manage"}
 
 
 def declared(name):
-    return SimpleNamespace(name=name, inputSchema={})
+    return Tool(name=name, inputSchema={})
 
 
 def peer(config, names, stale):
@@ -109,7 +109,7 @@ async def test_fresh_management_schema_still_rejects_before_mutation(config):
     session.list_tools.side_effect = None
     session.list_tools.return_value = SimpleNamespace(
         tools=[
-            SimpleNamespace(
+            Tool(
                 name="thread_manage",
                 inputSchema={
                     "oneOf": [

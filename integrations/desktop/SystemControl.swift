@@ -105,19 +105,38 @@ enum SystemControl {
         string(element, kAXRoleAttribute).contains("Secure") || string(element, kAXSubroleAttribute).contains("Secure")
     }
     static func summary(_ element: AXUIElement) throws -> [String: Any] {
-        let isSecure = secure(element)
-        guard !string(element, kAXRoleAttribute).isEmpty else {
+        try observedSummary(prepare: {
+                guard AXUIElementSetMessagingTimeout(element, 1.0) == .success else {
+                    throw failure("macos_accessibility_unavailable", "Accessibility timeout could not be configured")
+                }
+            },
+            read: { attribute(element, $0) }, actionNames: {
+                var actions: CFArray?
+                guard AXUIElementCopyActionNames(element, &actions) == .success else { return nil }
+                return actions as? [String] ?? []
+            })
+    }
+    static func observedSummary(prepare: () throws -> Void,
+                                read: (String) -> CFTypeRef?,
+                                actionNames: () -> [String]?) throws -> [String: Any] {
+        func text(_ name: String) -> String { read(name) as? String ?? "" }
+        try prepare()
+        let role = text(kAXRoleAttribute)
+        guard !role.isEmpty else {
             throw failure("macos_accessibility_unavailable", "Accessibility element attributes are not currently observable")
         }
-        var result: [String: Any] = ["role": string(element, kAXRoleAttribute),
-            "subrole": string(element, kAXSubroleAttribute),
-            "identifier": string(element, kAXIdentifierAttribute),
-            "title": String(string(element, kAXTitleAttribute).prefix(4096)),
-            "description": String(string(element, kAXDescriptionAttribute).prefix(4096)),
-            "title_truncated": string(element, kAXTitleAttribute).count > 4096,
-            "description_truncated": string(element, kAXDescriptionAttribute).count > 4096,
+        let subrole = text(kAXSubroleAttribute)
+        let isSecure = role.contains("Secure") || subrole.contains("Secure")
+        let title = text(kAXTitleAttribute), description = text(kAXDescriptionAttribute)
+        var result: [String: Any] = ["role": role,
+            "subrole": subrole,
+            "identifier": text(kAXIdentifierAttribute),
+            "title": String(title.prefix(4096)),
+            "description": String(description.prefix(4096)),
+            "title_truncated": title.count > 4096,
+            "description_truncated": description.count > 4096,
             "secure_value_redacted": isSecure]
-        if !isSecure, let value = attribute(element, kAXValueAttribute) {
+        if !isSecure, let value = read(kAXValueAttribute) {
             if let text = value as? String {
                 result["value_sha256"] = SHA256.hash(data: Data(text.utf8)).map { String(format: "%02x", $0) }.joined()
                 result["value_characters"] = text.count
@@ -126,11 +145,11 @@ enum SystemControl {
         for (key, attr) in [("enabled", kAXEnabledAttribute), ("focused", kAXFocusedAttribute),
                             ("selected", kAXSelectedAttribute), ("expanded", kAXExpandedAttribute),
                             ("minimized", kAXMinimizedAttribute)] {
-            if let value = attribute(element, attr) as? NSNumber { result[key] = value }
+            if let value = read(attr) as? NSNumber { result[key] = value }
         }
         for (key, attr, type) in [("position", kAXPositionAttribute, AXValueType.cgPoint),
                                   ("size", kAXSizeAttribute, AXValueType.cgSize)] {
-            if let raw = attribute(element, attr), CFGetTypeID(raw) == AXValueGetTypeID() {
+            if let raw = read(attr), CFGetTypeID(raw) == AXValueGetTypeID() {
                 let value = unsafeBitCast(raw, to: AXValue.self)
                 if type == .cgPoint {
                     var point = CGPoint.zero
@@ -141,11 +160,26 @@ enum SystemControl {
                 }
             }
         }
-        var actions: CFArray?
-        if AXUIElementCopyActionNames(element, &actions) == .success {
-            result["actions"] = actions as? [String] ?? []
-        }
+        if let actions = actionNames() { result["actions"] = actions }
         result["revision"] = try hash(result)
+        return result
+    }
+    // The revision covers the full observed catalog, including focus/hidden flags.
+    // Keeping those flags stable across pages is intentional; focus changes restart traversal.
+    static func applicationPage(_ all: [[String: Any]], args: [String: Any]) throws -> [String: Any] {
+        let revision = try hash(all)
+        if let expected = args["expected_revision"] as? String, expected != revision {
+            throw failure("macos_catalog_changed", "Running application catalog changed")
+        }
+        let offset = integer(args, "offset", 0), limit = integer(args, "limit", 100)
+        guard offset >= 0, offset <= all.count, limit >= 1, limit <= 1000 else {
+            throw failure("invalid_cursor", "Invalid application catalog page")
+        }
+        let page = Array(all.dropFirst(offset).prefix(limit))
+        var result: [String: Any] = ["applications": page, "revision": revision,
+            "offset": offset, "total": all.count, "eof": offset + page.count >= all.count,
+            "truncated": offset + page.count < all.count, "effect": "none"]
+        if offset + page.count < all.count { result["next_offset"] = offset + page.count }
         return result
     }
     static func remember(_ element: AXUIElement, app: NSRunningApplication) throws -> String {
@@ -373,18 +407,7 @@ enum SystemControl {
         case "apps.list":
             let all = try NSWorkspace.shared.runningApplications.filter { !$0.isTerminated && $0.launchDate != nil }
                 .sorted { $0.processIdentifier < $1.processIdentifier }.map { try appIdentity($0) }
-            let revision = try hash(all)
-            if let expected = args["expected_revision"] as? String, expected != revision {
-                throw failure("macos_catalog_changed", "Running application catalog changed")
-            }
-            let offset = integer(args, "offset", 0), limit = integer(args, "limit", 100)
-            guard offset >= 0, offset <= all.count, limit >= 1, limit <= 1000 else { throw failure("invalid_cursor", "Invalid application catalog page") }
-            let page = Array(all.dropFirst(offset).prefix(limit))
-            var result: [String: Any] = ["applications": page, "revision": revision,
-                "offset": offset, "total": all.count, "eof": offset + page.count >= all.count,
-                "truncated": offset + page.count < all.count, "effect": "none"]
-            if offset + page.count < all.count { result["next_offset"] = offset + page.count }
-            return result
+            return try applicationPage(all, args: args)
         case "apps.inspect":
             return ["application": try appIdentity(target(args)), "effect": "none"]
         case "apps.launch":

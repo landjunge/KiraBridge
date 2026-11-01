@@ -1,4 +1,5 @@
 import AppKit
+import Darwin
 import ApplicationServices
 import CoreGraphics
 import CryptoKit
@@ -21,6 +22,43 @@ enum SystemBridgeRuntime {
 
 /// This mode is entered before NSApplication is created. It has no windows, OS
 /// authorization requests or fallback scripts. EOF terminates the child.
+enum SystemRequestFrameFailure: Error { case oversized }
+
+enum SystemRequestFrames {
+    static func read(from input: FileHandle, consume: (Data) throws -> Void) throws {
+        try read({ requested in
+            var data = Data(count: requested)
+            while true {
+                let count = data.withUnsafeMutableBytes { pointer in
+                    Darwin.read(input.fileDescriptor, pointer.baseAddress, requested)
+                }
+                if count >= 0 {
+                    data.removeSubrange(count..<data.count)
+                    return data
+                }
+                if errno != EINTR { throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO) }
+            }
+        }, consume: consume)
+    }
+    static func read(_ reader: (Int) throws -> Data,
+                     consume: (Data) throws -> Void) throws {
+        var line = Data()
+        while true {
+            let chunk = try reader(8192)
+            if chunk.isEmpty { return }  // Partial final frames are never dispatched.
+            for byte in chunk {
+                if byte == 10 {
+                    try consume(line)
+                    line.removeAll(keepingCapacity: true)
+                } else {
+                    guard line.count < 65535 else { throw SystemRequestFrameFailure.oversized }
+                    line.append(byte)
+                }
+            }
+        }
+    }
+}
+
 func runSystemOperationMode() -> Never {
     let ownerPID = getppid()
     guard ownerPID > 1 else { exit(0) }
@@ -33,32 +71,25 @@ func runSystemOperationMode() -> Never {
     RunLoop.main.add(Timer(timeInterval: 3600, repeats: true) { _ in }, forMode: .default)
     DispatchQueue.global(qos: .userInitiated).async {
         let input = FileHandle.standardInput
-        var line = Data()
-        while true {
-            let byte: Data
-            do { byte = try input.read(upToCount: 1) ?? Data() }
-            catch { exit(0) }
-            if byte.isEmpty { exit(0) }
-            if byte[0] != 10 {
-                line.append(byte)
-                if line.count > 65535 { exit(65) }
-                continue
+        do {
+            try SystemRequestFrames.read(from: input) { request in
+                let completed = DispatchSemaphore(value: 0)
+                Task { @MainActor in
+                    let response = await SystemBridge.respond(request)
+                    do {
+                        var output = try JSONSerialization.data(withJSONObject: response, options: [.sortedKeys])
+                        guard output.count < 12 * 1024 * 1024 else { exit(65) }
+                        output.append(10)
+                        try FileHandle.standardOutput.write(contentsOf: output)
+                    } catch { exit(74) }
+                    completed.signal()
+                }
+                // handle() may await while principal is worker-global. Finish it before the next frame.
+                completed.wait()
             }
-            let request = line
-            line.removeAll(keepingCapacity: true)
-            let completed = DispatchSemaphore(value: 0)
-            Task { @MainActor in
-                let response = await SystemBridge.respond(request)
-                do {
-                    var output = try JSONSerialization.data(withJSONObject: response, options: [.sortedKeys])
-                    guard output.count < 12 * 1024 * 1024 else { exit(65) }
-                    output.append(10)
-                    try FileHandle.standardOutput.write(contentsOf: output)
-                } catch { exit(74) }
-                completed.signal()
-            }
-            completed.wait()
-        }
+            exit(0)
+        } catch SystemRequestFrameFailure.oversized { exit(65) }
+        catch { exit(0) }
     }
     withExtendedLifetime(parentWatch) { RunLoop.main.run() }
     exit(0)
