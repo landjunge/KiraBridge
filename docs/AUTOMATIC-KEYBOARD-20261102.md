@@ -5,7 +5,15 @@ Tastatursteuerung ohne Profilpflicht, automatische Programmerkennung, einfache
 Oberfläche, Funktions- und ChatGPT-Nachweis. Bestehende Clipboard-, Terminal-,
 Profil-, Shortcut- und Freigabefunktionen bleiben erhalten. Keine großen CI-Läufe.
 
-## Gesicherte Probleme
+## Abschlussstand
+
+Installiert ist `34f768ba1b561df08e2947c2e9452149d0822985` als commitqualifizierter
+RC24-Entwicklungsstand auf Intel macOS15.7.4. Automatische Programmerkennung,
+profilfreie Tasten/Kombinationen/Text und die einfache Oberfläche sind umgesetzt.
+Die tatsächliche Apps-Connector-Abnahme ist erfolgreich; Details und Grenzen unten.
+Die folgenden Abschnitte bewahren auch die historischen Zwischenstände und Fehler.
+
+## Gesicherte Ausgangsprobleme
 
 1. Der alte Inspectpfad verlangte selbst für Escape oder Command+A ein vollständig
    lesbares Textfeld. Buttons, Listen und andere fokussierte Elemente wurden dadurch
@@ -140,14 +148,15 @@ Ein kleiner separater Sessionhelfer verwaltet ausschließlich eine neue UUID-App
 ihre Prozessgeneration und Receiverdateien; er sendet keine Tastatureingaben und
 startet keinen alternativen MCP-Server. Code-/Offlineprüfungen und ein einzelner
 Fixturecompile sind belegt. Erst Root sendet die tatsächlichen Eingaben über den
-vorhandenen authentifizierten ChatGPT-Connector. Die vorbereitete Fixture ist
-noch kein Liveeingabenachweis.
+vorhandenen authentifizierten ChatGPT-Connector. Die vorbereitete Fixture allein war
+noch kein Liveeingabenachweis; der tatsächliche Abschluss ist unten dokumentiert.
 
 ## Paket, Installation und tatsächliche ChatGPT-Prüfung
 
-Noch ausstehend. Die bisherigen isolierten Belege werden wiederverwendet;
-keine wiederholte Vollsuite, kein neuer Codex-Agentlauf und keine großen CI-Läufe.
-Bis zur Paket-/Laufzeitabnahme bleibt der installierte Stand unverändert.
+Historischer Planungscheckpoint: Zu diesem Zeitpunkt war die Installation noch
+ausstehend. Die bisherigen isolierten Belege wurden wiederverwendet; keine
+wiederholte Vollsuite und kein neuer Codex-Agentlauf. Die abgeschlossene
+Installation und tatsächliche Connectorprüfung stehen am Ende dieses Berichts.
 
 Die vorhandene öffentliche MCP-Abnahme erhielt dafür ausschließlich das neue
 Szenario `direct-control`: kurzer BOM-/Unicode-Text, Appauswahl nur durch UUID-
@@ -209,3 +218,157 @@ wurden ausgelassen. Darunter verzögerte Aktivierung, alle festen Identitätswec
 unvollständiger Katalog, Berechtigungswiderruf und ein hängender Leseaufruf mit
 strikter Gesamtdeadline vor jeglicher Texteingabe. Ruff-/Diffprüfung und
 unabhängiger enger Core-Review sind grün.
+
+
+### Sichtbare Installation bei gemeinsam benutztem Desktop
+
+Der neue Hintergrundfix `34f768b` wurde erneut exakt gebaut und isoliert geprüft.
+Die reale Hintergrundabnahme `background-control-live-fixed-01` bestand alle
+Abnahme- und Bereinigungsprüfungen. Die Fixture war vor dem direkten Auftrag
+nachweislich inaktiv, danach waren Unicode-Text, Cursor, Return und unveränderte
+Clipboardgeneration unabhängig bestätigt. Source156:
+`da4489cfe7ce1f39ff2abcb3c449f7ba4d21be2d76acbe9e028de56866e9a757`.
+
+Das einzige neu erstellte Installationsfenster wurde als eigene physische Fläche
+bestätigt. Die erste Sicherung stoppte, weil die bisherige GUI-App nicht mehr lief.
+Ihre alten73d4ea0-Dateien wurden gegen Manifest, Commit und Signatur geprüft und
+die vorhandene App einmal gestartet. Vor einer weiteren Eingabe wurde dasselbe
+Fenster anhand Prozessgeneration, TTY, Arbeitsverzeichnis, Leerlauf und ursprünglichem
+Öffnungsbeleg neu gebunden; keine zusätzliche Terminalinstanz wurde erzeugt.
+
+Mehrfach waren zwischen den Schritten sowohl CG- als auch AX-Fenstersnapshots leer,
+obwohl das eigene logische Terminal und seine Generation unverändert existierten.
+Eine gezielt eigene Fokusakquisition stellte die physische Beobachtbarkeit wieder
+her. Desktop-/Space-/Fokuswechsel sind mögliche Ursachen, bisher nicht abschließend
+isoliert. Die private Fortsetzung verglich außerdem ein älteres globales Layout;
+aktive andere Tabs dürfen inzwischen Titel oder Auswahl ändern. Der Ersatz hält
+unverändert die eindeutige eigene CG-/Nonce-/AX-Bindung und alle Prozess-/TTY-/CWD-
+Prüfungen fest und übernimmt das aktuelle Layout als neuen Lese-Ausgangspunkt.
+Es wurde kein produktiver Terminaladapter verändert.
+
+Ein Core-Upgrade war bestätigt, der folgende Konsolenschritt wurde wegen fehlender
+Fenstersichtbarkeit bereits vor der Eingabe gestoppt. Der unterstützte Core-Rollback
+stellte73d4ea0 mit Sourcehash801ba911… und laufendem Dienst wieder her; Konfiguration
+und geschützte Daten blieben erhalten, die Datenbank wurde nicht zurückgespielt.
+Alle ursprünglichen fehlgeschlagenen Belege bleiben unverändert erhalten.
+
+Die abschließend vorbereitete Installationssequenz erstellt im selben bestätigten
+sichtbaren Terminalbefehl eine frische Sicherung und ruft die vorhandenen vier
+geprüften Upgradephasen einzeln auf. Jede Phase verlangt ihre eigene erfolgreiche
+Receipt, bevor die nächste startet; bei jedem Fehler stoppt sie. Damit sind zwischen
+Core-, Konsolen- und App-Start keine weiteren Tastatureingaben erforderlich.
+Alle bestehenden Quell-/Paket-/Konfigurations-/Prozess-/Rückfallprüfungen bleiben
+aktiv. Der neue kleine Ablauf und seine Pins wurden unabhängig geprüft; seine
+endgültige Laufzeitabnahme folgt getrennt unten.
+
+
+## Tatsächlicher Abschluss und Nachweise
+
+Die sichtbare Sequenz `install-f747933c224056fe` hat Sicherung, Core, Konsole,
+App und Verifikation mit jeweils eigener erfolgreicher Receipt abgeschlossen.
+Der private Controller wartete standardmäßig nur30Sekunden und meldete deshalb
+zunächst Timeout. Der ursprüngliche Auftrag lief weiter und endete nachweislich
+mit `completed`, `success=true`, Exit0 und `timed_out=false`; alle fünf Receipts
+sind erfolgreich. Es gab keinen erneuten Installationsauftrag. Der lokale Timeout
+wird ausdrücklich getrennt vom tatsächlichen Auftragsausgang dokumentiert.
+
+Tatsächlicher Core: PID54695, Start `2026-11-02T12:54:14.368343+00:00`,156 Pythondateien
+mit dem oben genannten Sourcehash. Konsole PID54756 und App PID54818 wurden mit
+ihren eigenen Prozessgenerationen und dem34f768b-Quellstand geprüft. Die vier
+Consoleassets und der native App-Binärcode gehören zum selben Paket.
+
+### Eingabe über den vorhandenen ChatGPT-Connector
+
+Der tatsächliche Aufrufweg war `mcp__codex_apps__kirabridge_action_request`,
+Operation `keyboard.control`, authentifizierter Principal `chatgpt`, vorhandene
+umfassende Full-Freigabe. Kein Profil wurde erstellt, keine Policy oder OS-Freigabe
+geändert. Die allgemeine Operation funktioniert auch bei einer gecachten älteren
+Werkzeugliste; ein Events-Abonnement war nicht nötig.
+
+Der Aufruf erfolgte aus dieser Codex-Umgebung über den verbundenen ChatGPT-Apps-
+Connector. Ein zusätzlicher menschlicher ChatGPT-Browser-/Mobil-/Sprachchat wurde
+nicht unabhängig bedient. Der Connector-/Principal-/Native-/Empfangsnachweis ist
+real; eine separate Chatoberfläche oder deren automatische Aufweckfunktion wird
+nicht behauptet.
+
+- Die eigene UUID-Fixture war vor dem Auftrag nachweislich nicht das aktive
+  Eingabefenster. Die direkte Operation löste sie automatisch auf und aktivierte sie.
+- 5891 UTF8-Bytes bzw.4865 UTF16-Einheiten mit führendem BOM, Umlaut, kombinierendem
+  Zeichen, Emoji und Zeilenumbrüchen kamen exakt an. Native Staging-, Text- und
+  Caretbelege sowie unabhängiger Empfängerhash stimmen überein. Optionales Return
+  war Teil desselben Auftrags und wurde genau einmal am Empfänger registriert.
+- Command+A über dieselbe profilfreie Operation erzeugte unabhängig bestätigt
+  Auswahl `(0,4865)`, ohne Textänderung.
+- Ein echter fokussierter Nicht-Text-Button erhielt Escape: genau1 Down und1 Up,
+  bestätigt durch seine eigenen Eventzähler. Text und vorheriger Return blieben gleich.
+- Die Clipboardgeneration blieb vor und nach allen Eingaben50. Der neue Textweg
+  verwendet die Zwischenablage nicht. Jede der drei Eingaben hatte genau einen
+  Versuch; keine Eingabe wurde nachgesendet.
+- Alle eigenen Completionmeldungen wurden nach Verarbeitung bestätigt. Die Fixture
+  wurde kontrolliert geschlossen und ihre Prozessabwesenheit zweimal geprüft.
+
+Das einzige eigene Installationsfenster wurde geschlossen. Eine zusätzliche lokale
+Protokollprüfung enthielt danach einen fehlerhaften asynchronen Generator; nur diese
+Leseprüfung wurde separat korrigiert, kein zweiter Schließauftrag ausgeführt. Zwei
+Abwesenheitsprüfungen und ein unabhängiger aktueller MCP-Katalog bestätigen das
+fehlende Fenster3063 und den fehlenden eigenen Shell-PID51180. Die beiden fremden
+Shellgenerationen3524/43904 und ihre laufenden Codex-Prozesse blieben erhalten.
+
+Private maschinenlesbare Nachweise im Backuproot:
+`actual-chatgpt-keyboard-evidence.json`, `actual-chatgpt-keyboard-verification.json`,
+`chatgpt-receiver-*.json`, `owned-install-closed.json`, die unveränderten
+Installations-/Rollback-/Paketreceipts sowie `checkpoint.json`.
+
+### Verbleibende Grenzen und offene Beobachtungen
+
+1. Kein universeller Schreibbeleg für beliebige Programme: sichere Felder,
+   unzureichendes Accessibility, eigene Textengines/IMEs und geschützte laufende
+   Terminal-/Agentkontexte können begründet verweigern. Die generische Steuerung
+   benötigt keine manuellen Profile; macOS-Rechte und eine verifizierbare Eingabestelle
+   bleiben erforderlich. Ein größerer produktiver Appvergleich wurde nicht behauptet.
+2. Das Zurückkehren eines nativen Postcalls ist allgemein keine Empfangs- oder
+   Sendebestätigung eines fremden Programms. Hier bestätigen eigene unabhängige
+   Empfänger Text, Auswahl und Events. Return kann je nach Anwendung eine andere
+   Bedeutung haben; eine universelle Nachrichtensendebestätigung gibt es nicht.
+3. Leere CG-/AX-Fenstersnapshots bei weiter vorhandenem logischem Terminal bleiben
+   als Umwelt-/Beobachtungsproblem dokumentiert. Die Ursache wurde nicht abschließend
+   isoliert und kein Terminal-Produktfix behauptet. Der sichtbare Installationsablauf
+   wurde dafür lokal stabilisiert; fremde Sitzungen wurden nicht verändert.
+4. Ein separater ChatGPT-Chat auf Web, Mobil oder Voice ist zusätzlich zum hier real
+   geprüften Apps-Connector noch kein belegter Testumfang.
+
+Git: alle Quellschritte einzeln auf `feature/automatic-keyboard-20261102` gepusht
+und mit `ls-remote` nachgelesen. Keine Tags, PRs oder GitHub-Actions-Läufe gestartet;
+eine Branchabfrage ergab0 Läufe. Die vorhandenen RC24-Releases wurden nicht dupliziert.
+Der aktualisierte Intelinstaller wird separat unter dem Commit34f768b ausgeliefert.
+
+
+### Unabhängiger Abschlusscheck und Auslieferung
+
+Der zusätzliche einmalige unabhängige Lesecheck bestätigte die tatsächlichen
+Core-/Konsolen-/App-Generationen, Source156, Nativehash, Signatur und alle vier
+HTTP-Assets. Unverändert erhalten sind8 Konfigurationsdateien,1 Keyboarddatei,
+14 geschützte Prozesse und188 geschützte Datensätze; die beiden fremden
+Shellgenerationen wurden zusätzlich vollständig gegen ihre Besitzbeobachtung
+verglichen. Beleg: `installed-independent-verification.json` im Backuproot.
+Es wurden keine bestandenen Suites dafür wiederholt.
+
+Geprüfte lokale Auslieferung mit15 Dateien:
+`~/Downloads/KiraBridge-RC24-Intel-34f768b/`.
+
+- Intel-ZIP: `KiraBridge-0.8.0rc24-Intel-macOS.zip`
+- ZIP-SHA256: `d2d7ba8b87170a19d33dad9b01e91b2c64c22dd3d8079b5cd2e7473eeb7ccd4b`
+- Runtimearchiv-SHA256: `d5ceb6b7aca6b26f7dc045b59ec980fb587e12accdf91ce87da864541211d4e2`
+- Native-SHA256: `a069fdd7dccffda74b7ab3c5d60d0763ceeacddacdfa574410509ebd080f27b8`
+- `PACKAGE-ACCEPTANCE-INTEL.json` enthält den abgegrenzten tatsächlichen Teststatus;
+  `SHA256SUMS-INTEL` wurde für jede ausgelieferte Datei nachgelesen.
+- Die App ist ad-hoc signiert; eine Apple-Notarisierung ist nicht belegt.
+
+Backup-/Rückfallroot:
+`~/.local/share/kirabridge/backups/automatic-keyboard-20261102T112207Z/`.
+Die abschließende konsistente Sicherung liegt unter
+`visible-install-background-sequence-01/baseline/`; der unterstützte Installer
+hat seinen eigenen Rückweg gesichert. Frühere Pakete, Originalbelege und der
+Quellcode wurden erhalten; keine Zugangsdaten oder privaten Logs wurden in die
+Auslieferung oder Git übernommen. Abschließende Dokumentationscommits ändern
+keinen Produktcode des installierten Buildcommits34f768b.
