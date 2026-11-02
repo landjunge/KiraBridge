@@ -9,13 +9,16 @@ und Grenzen stehen im [Tastaturbericht](docs/MACOS-KEYBOARD-COMPLETE-20261102.md
 Die App aktualisiert Dienst, Bedienoberfläche und die vorhandene ChatGPT-Anbindung
 über den geprüften Installer mit Sicherung und Rückweg. Einstellungen und Zugänge
 bleiben erhalten. Lokale Prüfungen, Paketidentität und der tatsächliche
-Installationsstand stehen im [aktuellen Bericht](docs/BOOT-RECOVERY-INSTALLER-20261102.md).
+Installationsablauf stehen im [Wiederanlauf- und Installerbericht](docs/BOOT-RECOVERY-INSTALLER-20261102.md).
 
 [Intel-Installationspaket und Releasehinweise](https://github.com/landjunge/KiraBridge/releases/tag/v0.8.0rc26) ·
 [ältere Veröffentlichungen](https://github.com/landjunge/KiraBridge/releases)
 
 Lokal auf Intel installiert und über den echten ChatGPT-Connector geprüft:
-**RC25, Build `7d862e5`**, einschließlich automatischem Tunnel-Wiederanlauf.
+**RC26, Build `34f5e6d`**: Notizen, Return und Lautstärke über den echten Connector
+bestätigt; Control-Pfeile werden automatisch als Systemkombinationen gesendet.
+Desktopwechsel sind zusätzlich visuell abgenommen. Die RC25-Wiederanlaufreparatur
+bleibt enthalten.
 Die bisherigen [Terminal-/Return-Belege](docs/RC20-RETURN-20261031.md) und
 [RC18-Installationsbelege](docs/RC18-PUBLISH-INSTALL-20261029.md) bleiben erhalten.
 
