@@ -1,0 +1,244 @@
+{
+  "schema_version": 1,
+  "date": "2026-11-02",
+  "scope": "private HTTP/MCP with privately built commit-pinned native app; no installation",
+  "passed": true,
+  "product_commit": "c036dfa361054f01269267dcc7bb70cae348f07d",
+  "native_binary_sha256": "19ffc3b59c8d6a9c7f4d8bf5470035089143b949ad635171ebbca40299535dbb",
+  "native_worker": {
+    "pid": 44830,
+    "generation": "A7259B93-D206-49A1-AAC0-B5A3C79608AA"
+  },
+  "initial_permissions": {
+    "accessibility": true,
+    "post_events": true
+  },
+  "initial_field": {
+    "classification_source": "system_notes_writable_body",
+    "enabled": null,
+    "focused": true,
+    "optional_attributes_absent": [
+      "AXSubrole",
+      "AXEnabled"
+    ],
+    "role": "AXTextArea",
+    "secure": false,
+    "selected_text_settable": true,
+    "selection_utf16": {
+      "length": 0,
+      "location": 0
+    },
+    "subrole": null,
+    "value_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "value_sha256_encoding": "utf-8",
+    "value_source": "system_notes_empty_no_value",
+    "value_utf8_bytes": 0,
+    "value_utf16_units": 0
+  },
+  "records": [
+    {
+      "kind": "task_text",
+      "task_id": "kbd-notes-207fc5a2cd9f4cd8932e87786dd2869e-text",
+      "state": "completed",
+      "execution_seconds": 0.51,
+      "requested_count": 1,
+      "completed_count": 1,
+      "post_calls_returned": 0,
+      "app_processing_confirmed": false,
+      "text_verified": true,
+      "field_change_observed": true,
+      "automatic_retry": false
+    },
+    {
+      "kind": "task_return-twice",
+      "task_id": "kbd-notes-207fc5a2cd9f4cd8932e87786dd2869e-return-twice",
+      "state": "completed",
+      "execution_seconds": 0.481,
+      "requested_count": 2,
+      "completed_count": 2,
+      "post_calls_returned": 4,
+      "app_processing_confirmed": false,
+      "text_verified": null,
+      "field_change_observed": true,
+      "automatic_retry": false
+    },
+    {
+      "kind": "exact_two_linebreaks",
+      "data": {
+        "verified": true,
+        "field": {
+          "classification_source": "system_notes_writable_body",
+          "enabled": null,
+          "focused": true,
+          "optional_attributes_absent": [
+            "AXSubrole",
+            "AXEnabled"
+          ],
+          "role": "AXTextArea",
+          "secure": false,
+          "selected_text_settable": true,
+          "selection_utf16": {
+            "length": 0,
+            "location": 38
+          },
+          "subrole": null,
+          "value_sha256": "fa3b3e61edc6ff84f538fb13f6bfdc0ebc4f042fcd9df02e01fd9105ca80db6e",
+          "value_sha256_encoding": "utf-8",
+          "value_source": "ax_value",
+          "value_utf8_bytes": 38,
+          "value_utf16_units": 38
+        }
+      }
+    },
+    {
+      "kind": "idempotency",
+      "data": {
+        "same_task": "kbd-notes-207fc5a2cd9f4cd8932e87786dd2869e-return-twice",
+        "extra_input": false
+      }
+    },
+    {
+      "kind": "task_key-left",
+      "task_id": "kbd-notes-207fc5a2cd9f4cd8932e87786dd2869e-key-left",
+      "state": "completed",
+      "execution_seconds": 0.201,
+      "requested_count": 1,
+      "completed_count": 1,
+      "post_calls_returned": 2,
+      "app_processing_confirmed": false,
+      "text_verified": null,
+      "field_change_observed": true,
+      "automatic_retry": false
+    },
+    {
+      "kind": "task_key-right",
+      "task_id": "kbd-notes-207fc5a2cd9f4cd8932e87786dd2869e-key-right",
+      "state": "completed",
+      "execution_seconds": 0.203,
+      "requested_count": 1,
+      "completed_count": 1,
+      "post_calls_returned": 2,
+      "app_processing_confirmed": false,
+      "text_verified": null,
+      "field_change_observed": true,
+      "automatic_retry": false
+    },
+    {
+      "kind": "task_chord-select-all",
+      "task_id": "kbd-notes-207fc5a2cd9f4cd8932e87786dd2869e-chord-select-all",
+      "state": "completed",
+      "execution_seconds": 0.21,
+      "requested_count": 1,
+      "completed_count": 1,
+      "post_calls_returned": 2,
+      "app_processing_confirmed": false,
+      "text_verified": null,
+      "field_change_observed": true,
+      "automatic_retry": false
+    },
+    {
+      "kind": "chord_selection_verified",
+      "data": {
+        "classification_source": "system_notes_writable_body",
+        "enabled": null,
+        "focused": true,
+        "optional_attributes_absent": [
+          "AXSubrole",
+          "AXEnabled"
+        ],
+        "role": "AXTextArea",
+        "secure": false,
+        "selected_text_settable": true,
+        "selection_utf16": {
+          "length": 38,
+          "location": 0
+        },
+        "subrole": null,
+        "value_sha256": "fa3b3e61edc6ff84f538fb13f6bfdc0ebc4f042fcd9df02e01fd9105ca80db6e",
+        "value_sha256_encoding": "utf-8",
+        "value_source": "ax_value",
+        "value_utf8_bytes": 38,
+        "value_utf16_units": 38
+      }
+    },
+    {
+      "kind": "task_collapse-selection",
+      "task_id": "kbd-notes-207fc5a2cd9f4cd8932e87786dd2869e-collapse-selection",
+      "state": "completed",
+      "execution_seconds": 0.211,
+      "requested_count": 1,
+      "completed_count": 1,
+      "post_calls_returned": 2,
+      "app_processing_confirmed": false,
+      "text_verified": null,
+      "field_change_observed": true,
+      "automatic_retry": false
+    }
+  ],
+  "catalog_restart": {
+    "passed": true,
+    "scope": "two private HTTP/MCP lifetimes; no native effects, no production restart",
+    "runs": [
+      {
+        "run": 1,
+        "instance_id": "adf893c25ea248d8b7021c03d9927244",
+        "revision": "bbcdb5e4f74ae92d4a1a91de40009d728ee4245d32208cea6ec6b11e7ce92fc1",
+        "authorized": true,
+        "technical_available": true,
+        "schema_sha256": "87cdf186afe19acf3c845e47015ff37350214c5e906f5517518c47bd4b08a10c",
+        "argument_names": [
+          "app",
+          "text",
+          "key",
+          "modifiers",
+          "repeat",
+          "submit"
+        ],
+        "repeat_range": [
+          1,
+          20
+        ],
+        "profile_required": false
+      },
+      {
+        "run": 2,
+        "instance_id": "e6d5ded3a0e54f56a642244075d87562",
+        "revision": "ca3bfc73cf6155baa6c4682d4051e3320529ec79378dd01266ded376df05a47e",
+        "authorized": true,
+        "technical_available": true,
+        "schema_sha256": "87cdf186afe19acf3c845e47015ff37350214c5e906f5517518c47bd4b08a10c",
+        "argument_names": [
+          "app",
+          "text",
+          "key",
+          "modifiers",
+          "repeat",
+          "submit"
+        ],
+        "repeat_range": [
+          1,
+          20
+        ],
+        "profile_required": false
+      }
+    ]
+  },
+  "independent_review": "Reviewer recomputed marker plus two LF hash from private original input, verified field/caret/counts, native commit/binary and distinct private instances without replay.",
+  "limits": [
+    "Single owned Notes test note; no arbitrary-app reliability or p95 claim.",
+    "Private HTTP/MCP ChatGPT principal; actual external ChatGPT connector not switched to candidate.",
+    "No productive installation or core restart; live 87-operation catalog does not expose new keyboard.input.",
+    "Unknown private preflight task retained without replay; preceding failed fixtures are not counted as successful."
+  ],
+  "installed_baseline_and_final": {
+    "version": "0.8.0rc24",
+    "commit": "73d4ea0dc09979367400574b9163d5263ba151bf",
+    "core_pid": 38560,
+    "instance_id": "faec61562c94490f88f68afd29f9c299",
+    "source_sha256": "801ba911c186be211436b30df70643688f09e815ebcd9585babe35d1203884e7",
+    "operation_count": 87,
+    "direct_input_available": false,
+    "configuration_and_install_hashes_unchanged": true
+  },
+  "process_observation": "Original Core and Codex terminal remain; earlier GUI companion PID27279 disappeared, cause unknown. No stop action targeted it."
+}

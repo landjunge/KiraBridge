@@ -66,22 +66,96 @@ Beobachtung ersetzt keine spätere eigene Post-Event-Prüfung.
   tatsächlicher Notizen-Tasteneffekt. Unabhängiger Source-Review freigegeben.
 - Ruff, Format, JavaScript-Syntax und Diffprüfungen bestanden im jeweiligen Delta.
 
-## Noch getrennt abzunehmen
+## Tatsächliche private Abnahme: bestanden
 
-Private Native-App aus dem überprüften Commit bauen; ausschließlich private
-HTTP/MCP-Instanz und eigene leere Testnotiz verwenden. Text, exakt zwei Return,
-unabhängigen Feld-/Auswahlnachweis, weitere einfache Tasten/Chord und Idempotenz
-prüfen. Katalog nach privatem Neustart prüfen. Produktive Installation und
-Neustart bleiben ausgeschlossen; bestehende Freigaben werden nicht geändert.
+Produktcode-Commit **c036dfa361054f01269267dcc7bb70cae348f07d**; eigener
+nativer App-Build, ausschließlich private HTTP/MCP-Instanz mit Principal
+`chatgpt`. Dem Principal waren keine Profilverwaltungsrechte eingeräumt.
+Die tatsächlich ausführende private Native-App bestätigte Accessibility und
+Post-Event-Rechte. Keine Berechtigung wurde angefordert oder geändert.
+Die normale externe ChatGPT-Verbindung wurde nicht auf diesen Kandidaten umgestellt.
+
+Eine eigene neue leere Notiz wurde über die vorhandene Notizen-Menüaktion
+erzeugt. Erst nach Nachweis des fokussierten, schreibbaren Body-Felds und seiner
+leeren Auswahl wurde geschrieben. Die Testnotiz bleibt als Beleg erhalten.
+
+| Aktion | Tatsächlicher Beleg | Ausführungszeit, ein Messwert |
+| --- | --- | --- |
+| Text | text_verified=true, ein Versuch, 36 UTF-16-Einheiten | 0,510 s |
+| Return, Anzahl 2 | requested/completed=2/2, vier Down-/Up-Postcalls; anschließender Feldbeleg: 38 UTF-16-Einheiten, Cursor 38/0 | 0,481 s |
+| Gleiche Return-Auftrags-ID erneut abfragen | ursprünglicher abgeschlossener Auftrag; Feld unverändert, keine zusätzliche Eingabe | kein neuer Auftrag |
+| Pfeil links / rechts | Cursor 37, anschließend 38 | 0,201 / 0,203 s |
+| ⌘A | Auswahl 0/38 | 0,210 s |
+| Auswahl mit rechts kollabieren | Cursor wieder 38/0 | 0,211 s |
+
+SHA256 des Felds nach Return:
+`fa3b3e61edc6ff84f538fb13f6bfdc0ebc4f042fcd9df02e01fd9105ca80db6e`.
+Der unabhängige Reviewer berechnete ihn erneut aus dem ursprünglichen privaten
+Testtext **plus genau zwei LF**. Postcalls allein werden weiterhin nicht als
+Appverarbeitungsbeweis ausgegeben: app_processing_confirmed bleibt false;
+der zusätzliche AX-Feldbeleg weist den tatsächlichen Effekt nach.
+Sämtliche erfolgreichen Eingabeaufträge hatten genau einen Versuch und
+keinen automatischen Retry. Einzelmesswerte erlauben keine p95-Zusage.
+
+Zwei private Core-Laufzeiten mit unterschiedlichen Instanz-IDs und
+Katalogrevisionen lieferten nach Neustart dasselbe autorisierte, technisch
+verfügbare keyboard.input-Schema einschließlich Anzahl1–20 und ohne Profilpflicht.
+Kein produktiver Dienst wurde dafür neu gestartet. Der unabhängige Reviewer
+prüfte die gespeicherten Originalbelege, ohne Eingaben zu wiederholen.
+Die bereinigten Metadaten stehen in
+[evidence/keyboard-direct-repair-20261102.json](evidence/keyboard-direct-repair-20261102.json).
+Keine Feldinhalte oder nativen Zieltoken werden dort gespeichert.
+
+## Fehlgeschlagene Vorversuche und Grenzen
 
 Die erste private Beobachtungsfixture scheiterte vor jeder Eingabe. Ihr
 Diagnose-Streamwrapper unterstützte beim Cleanup zunächst read() nicht; der
-private Wrapper wurde korrigiert. Der ursprüngliche Fehler und Logs bleiben
-erhalten. Ein vermuteter Double-Roundtripfehler wurde rein lesend nicht
-reproduziert; an der Startidentitätsprüfung wurde nichts gelockert.
+private Wrapper wurde korrigiert. Ein vermuteter Double-Roundtripfehler wurde
+lesend nicht reproduziert; die Startidentitätsprüfung blieb unverändert.
+Der zweite Versuch verweigerte das leere Notes-Feld korrekt vor jeder Eingabe,
+bis die beschriebene eng begrenzte noValue-Regel ergänzt und geprüft war.
 
-Private Baseline, Quellarchiv und Testbelege:
-`~/.local/share/kirabridge/backups/keyboard-direct-repair-20261102/`.
-Das ursprüngliche Archiv hat SHA256
-`efd04d422db42359659f1580c342bfcacc1699d427b7c2d1077a4d06e5e09fbb`.
-Die Live-Abnahme wird erst nach tatsächlicher Durchführung ergänzt.
+Versuch03 scheiterte an einer falschen Assertion im privaten Testharness:
+Ein zulässiges error=null wurde als Fehler behandelt. Sein akzeptierter
+Textauftrag bleibt explizit unknown; private Datenbank und Workerzustand wurden
+lesend abgeglichen: kein Ausführungsbeginn, side_effect_possible=false,
+dispatcher_shutdown, Worker beendet, Testfeld zweimal weiterhin leer.
+Kein Replay dieses Auftrags. Der korrigierte Harness wurde erst danach mit
+neuer Auftragsidentität ausgeführt. Originaldatenbank und Logs bleiben erhalten.
+
+Die Scope-Beschriftung des erfolgreichen Harness war zunächst aus der alten
+Fixture übernommen. Sie wurde transparent korrigiert; ursprüngliche Beschriftung
+und Korrektur sind im privaten Beleg enthalten. Native Pfad-/Commitbelege
+verwiesen durchgehend auf den eigenen Kandidaten, nie auf einen installierten Patch.
+
+Bestanden sind die gezielten Vertrags-, Sicherheits-, Native-, UI- und privaten
+Notizenprüfungen. Keine pauschale Aussage über sämtliche Programme, fremde
+Eingabefelder oder eine vollständige Release-Regression. Ein öffentliches
+Release-Paket wurde nicht veröffentlicht. Installation und Abnahme über die
+produktive ChatGPT-Verbindung bleiben ein gesonderter autorisierter Schritt.
+
+## Artefakte und unveränderte produktive Installation
+
+- Produktänderungen: f5d2e84; gezieltes Empty-Notes-Delta: c036dfa.
+- Privater Build: `~/.local/share/kirabridge/backups/keyboard-direct-repair-20261102/native-candidate-empty/KiraBridge.app`.
+- Native Binärdatei SHA256: `19ffc3b59c8d6a9c7f4d8bf5470035089143b949ad635171ebbca40299535dbb`.
+  Der App-Build ist auf Produktcommit c036dfa gepinnt; spätere reine Berichtscommits
+  ändern diesen gebauten Produktstand nicht.
+- Quellbackup vor Änderungen: `source-before.tar.gz`, SHA256
+  `efd04d422db42359659f1580c342bfcacc1699d427b7c2d1077a4d06e5e09fbb`.
+  Private vollständige Logs und Testbelege liegen neben diesem Archiv; sie bleiben lokal.
+- Installiert bleibt **0.8.0rc24 / 73d4ea0**, produktiver Core PID38560 mit
+  identischer Instanz und Startzeit. Katalog weiterhin87 Operationen;
+  der neue keyboard.input-Befehl ist dort erwartungsgemäß noch nicht enthalten.
+  Konfiguration, Installationsmanifest und globaler Native-Binärhash blieben gleich.
+- Ursprüngliche Entwicklungsarbeitskopie sauber und unverändert. Codex PID3552
+  und seine Shell PID3524 blieben erhalten. Die frühere GUI-Companion-PID27279
+  war bei Abschluss nicht mehr vorhanden; Ursache unbekannt, keine gezielte
+  Stop-/Quit-Aktion durch diese Reparatur. Deshalb keine Behauptung, alle
+  GUI-Prozesse seien unverändert geblieben.
+
+Für eine spätere Installation: überprüften Produktstand über den vorhandenen
+Upgradeweg übernehmen, Rechte der tatsächlich ausgeführten Native-App prüfen,
+Core-/Katalogidentität abgleichen und dieselbe eigene Testnotiz über die reale
+ChatGPT-Verbindung abnehmen. Aktuell ist keine weitere manuelle Profileinrichtung
+oder pauschale erneute Freigabe als Voraussetzung belegt.
