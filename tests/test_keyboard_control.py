@@ -6,7 +6,7 @@ from unittest.mock import AsyncMock
 import pytest
 from pydantic import ValidationError
 
-from kirabridge.bridge_core.models import BridgeError, UncertainExecution
+from kirabridge.bridge_core.models import BridgeError, TaskRequest, UncertainExecution
 from kirabridge.keyboard_control import KeyboardControlInput
 
 APP = {
@@ -186,6 +186,33 @@ async def test_revoked_control_dependency_blocks_commit(bridge, config):
     with pytest.raises(BridgeError):
         await execute(bridge, {"text": "native", "submit": True})
     assert not any(op == "keyboard.text.commit" for op, _ in calls)
+
+
+async def test_real_task_lifecycle_enters_running_only_once(bridge, config):
+    calls, _, _ = setup(bridge, config)
+    bridge.tasks.preflight = None  # Only the native technical probe is synthetic.
+    request = TaskRequest(
+        task_id="control",
+        idempotency_key="control",
+        operation="keyboard.control",
+        arguments={"app": "Editor", "text": "native", "submit": True},
+    )
+    created = bridge.prepare("local", request)
+    assert created["state"] == "created"
+    bridge.tasks.approve("control")
+    claimed = bridge.store.claim_exact(bridge.tasks.owner, config.lease_seconds, "control")
+    await bridge.tasks._execute(claimed)
+    result = bridge.task("local", "control")
+    assert result["state"] == "completed", result
+    assert result["result"]["automatic_target"] is True
+    events = bridge.events("local", "control")["events"]
+    # Progress entries also carry state=running; they are not transitions.
+    assert (
+        sum(e["evidence"].get("evidence_type") == "automatic_keyboard_resolution" for e in events)
+        == 1
+    )
+    assert sum(e["evidence"].get("evidence_type") == "native_keyboard_attempt" for e in events) == 1
+    assert sum(op == "keyboard.text.commit" for op, _ in calls) == 1
 
 
 @pytest.mark.parametrize(

@@ -64,6 +64,10 @@ class KeyboardControl:
                 operation, arguments, principal=principal, before_send=lambda: authorize(operation)
             )
 
+        async def observe(evidence):
+            if progress is not None:
+                await progress(evidence)
+
         async with k.desktop_input.transaction() as turn:
             authorize()
             await running(
@@ -141,7 +145,7 @@ class KeyboardControl:
             else:
                 operation = "keyboard.key"
                 request = KeyboardKeyInput(target=target, key=args.key)
-            await (progress or running)(
+            await observe(
                 {
                     "evidence_type": "automatic_keyboard_target_bound",
                     "resolved_application": observed,
@@ -153,7 +157,7 @@ class KeyboardControl:
             result = await k.execute_in_turn(
                 {**task, "operation": operation},
                 request,
-                running,
+                observe,
                 turn,
                 progress,
                 before_send=authorize,

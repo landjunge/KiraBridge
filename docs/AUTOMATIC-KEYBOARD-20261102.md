@@ -156,3 +156,24 @@ automatisch ermittelte Appgeneration. Die bisherigen Default-/Profilfälle werde
 nicht erneut ausgeführt. Syntax-/Ruff-/Deltareview sind grün; ein Lauf wurde bis
 zu diesem Sourcecheckpoint noch nicht behauptet. Danach folgt getrennt der
 tatsächliche Apps-Connector mit authentifiziertem Principal `chatgpt`.
+
+### Reale Abnahme fand einen Übergabefehler
+
+Das erste saubere Paket `b1853e0` bestand offiziellen Build, isolierten Smoke und
+unabhängigen Manifest-/Wheel-/Nativevergleich. Der anschließende einzelne reale
+`direct-control`-MCP-Auftrag scheiterte jedoch vor Eingabe mit `state_conflict`:
+Facade und delegierter Schreibmanager riefen beide den zustandsändernden
+`running`-Callback auf. Die isolierten Adaptertests hatten einen permissiven
+Callback und konnten diesen Dispatcher-Vertrag nicht belegen.
+
+Die produktive Installation wurde deshalb nicht umgeschaltet. Fixture, eigener
+Worker und privater Endpunkt wurden nachweislich bereinigt; der fehlgeschlagene
+Originalbeleg bleibt unter `direct-control-live-01` erhalten. Die Facade setzt
+jetzt nur einmal `running`; weitere native Phasen benutzen den vorhandenen
+`progress`-Callback. Ein neuer gezielter Regressionstest verwendet den echten
+Aufgabenstore und TaskManager von prepare/approve/claim bis completed und genau
+einem Commit. Er bestand in0,31s. Eine anfängliche Testzählung verwechselte
+Fortschrittszeilen mit Zustandsübergängen; nur die Zählung nach Evidence-Typ
+wurde korrigiert, der Beleg bleibt erhalten. Unabhängiger Deltareview grün.
+Nur wegen dieses tatsächlichen Corefixes ist ein neues exaktes Paket nötig;
+Native-, Rechte- und Browsermatrizen werden nicht erneut ausgeführt.
