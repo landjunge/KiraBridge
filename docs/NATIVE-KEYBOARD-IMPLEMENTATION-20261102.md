@@ -237,3 +237,31 @@ Ablaufzeit bestehen. Der Marker wird jetzt nach erfolgreicher abschließender
 Autorisierung direkt vor dem Transportwrite gesetzt. Der neue Widerruffall und
 die beiden betroffenen Unknown-/Receiptfälle bestanden zusammen (3/3,15 nicht
 ausgeführt); übrige bereits grüne Nachweise wurden nicht wiederholt.
+
+## Schritt 8 – Optionales Return innerhalb desselben Auftrags
+
+`submit` bleibt standardmäßig `false`. Die tatsächliche Booleanabsicht wird im
+Stagingmanifest und nativen Puffer gespeichert. Core akzeptiert nur einen
+Commitbeleg mit genau dieser Returnabsicht. Lange und kurze Texte benutzen
+denselben Weg; es gibt weder Clipboardpflicht noch separaten Returntask.
+
+Bei `submit=true` folgt nach dem exakten Text-/Cursorbeleg eine erneute Prüfung
+von Appgeneration, Fenster, Feld, Inhalt, Auswahl, Layout und Eingabeberechtigung.
+Gehaltene Hardwaretasten/Modifier und Abbruch verhindern den Return. Genau ein
+eigenes Return-Down/Up-Paar wird versandt. Jeder Fehler nach begonnener Texteingabe
+bleibt Unknown ohne Textreplay oder weiteren Submitversuch. Der Bericht trennt
+`text_verified/selection_verified` vor Return und `return_posted` als reine
+Versandbestätigung; `submitted/app_processing_confirmed` bleiben ausdrücklich
+false. Ein Programm kann Return anders behandeln oder seine Folgeaktion ablehnen.
+
+Sechs gezielte Corefälle bestanden in0,58s (15 nicht ausgeführt): beide
+Submitabsichten mit kurzem und großem Unicode-/BOM-Text sowie widersprüchliche
+Returnbelege ohne Replay. Unbetroffene Tests wurden nicht wiederholt. Die native
+Hardwarekonfliktmeldung enthält jetzt konfliktierende Flagbits und den Held-
+Zustand, damit die nächste Liveprobe den bisherigen Stop konkret erklären kann.
+Der native Harness bestand genau einen Compile-/Testlauf in16,68s:158
+Checkgruppen, davon14 neue Returnchecks plus ein Staging-Submit-Roundtrip.
+Enthalten sind wirkungsfreie CGEvent-Returnfactory, Text-vor-Return-Reihenfolge,
+Teiltext, Verifikations-/Guardfehler, Abbruch und Teilpost-Unknown ohne Replay.
+Gegenseitige Review freigegeben, Ruff/Diffprüfung grün. Noch keine Liveabnahme
+des Returnpfads. Die produktive RC24 bleibt während dieser Entwicklung unverändert.

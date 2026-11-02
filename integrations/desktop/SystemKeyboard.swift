@@ -297,8 +297,9 @@ enum SystemKeyboard {
         guard postAccess else {
             throw SystemControl.failure("macos_permission_denied", "Native event post access is absent; no request was made")
         }
-        try require(flags.intersection([.maskCommand, .maskControl, .maskAlternate, .maskShift, .maskSecondaryFn]).isEmpty
-                    && !keyHeld, "Held user keys or modifiers conflict with this key pair")
+        let conflict = flags.intersection([.maskCommand, .maskControl, .maskAlternate, .maskShift, .maskSecondaryFn])
+        try require(conflict.isEmpty && !keyHeld,
+                    "Held user keys or modifiers conflict with this key pair (conflict_mask=\(conflict.rawValue), key_held=\(keyHeld))")
     }
     /// The callback is an attempted native post, not a processing acknowledgement.
     static func postPair(validate: () throws -> Void, sameGeneration: () -> Bool,
@@ -434,7 +435,7 @@ enum SystemKeyboard {
         return (down, up)
     }
     /// No field value is read here: own insertion changes it. Identity/layout/security remain mandatory.
-    static func textRoute(_ target: [String: Any], initial: Snapshot) throws {
+    static func textRoute(_ target: [String: Any], initial: Snapshot, keyCode: CGKeyCode = 0) throws {
         let app = try SystemControl.target(target, mutating: true)
         try SystemControl.axGranted()
         var reference = target; reference["element_token"] = target["target_token"]
@@ -461,11 +462,12 @@ enum SystemKeyboard {
         }
         try matchingLayout(initial.response["layout"] as? [String: Any] ?? [:], inputSource())
         try inputAllowed(postAccess: CGPreflightPostEventAccess(), flags: CGEventSource.flagsState(.combinedSessionState),
-                         keyHeld: CGEventSource.keyState(.hidSystemState, key: 0))
+                         keyHeld: CGEventSource.keyState(.hidSystemState, key: keyCode))
     }
     static func writeText(_ chunks: [[UniChar]], prepare: ([UniChar]) throws -> Void,
                           validate: (Int) throws -> Void, sameGeneration: () -> Bool,
-                          post: (Bool) throws -> Void, verify: () async throws -> Bool) async throws -> [String: Any] {
+                          post: (Bool) throws -> Void, verify: () async throws -> Bool,
+                          submit: Bool = false, returnPair: (() throws -> Void)? = nil) async throws -> [String: Any] {
         var attempted = false
         try require(!chunks.isEmpty, "Literal text has no native units")
         do {
@@ -479,21 +481,34 @@ enum SystemKeyboard {
             }
             let verified = try await verify()
             try require(verified, "Literal text or final selection could not be verified")
-            return ["scope": "literal_text_and_selection_observed", "post_calls_returned": chunks.count * 2,
+            if submit {
+                try Task.checkCancellation()
+                guard let returnPair = returnPair else { throw SystemControl.failure("keyboard_unsupported", "Guarded Return pair is unavailable") }
+                try returnPair()
+            }
+            return ["scope": "literal_text_and_selection_observed", "post_calls_returned": chunks.count * 2 + (submit ? 2 : 0),
+                    "text_post_calls_returned": chunks.count * 2, "return_post_calls_returned": submit ? 2 : 0,
                     "input_attempted": attempted, "text_verified": true, "selection_verified": true,
-                    "submitted": false, "return_posted": false, "permission_requested": false,
+                    "verification_scope": "before_optional_return", "return_scope": submit ? "native_post_calls" : "none",
+                    "submitted": false, "return_posted": submit, "permission_requested": false,
                     "app_processing_confirmed": false, "effect": "text_insertion_observed"]
         } catch {
-            if attempted { throw SystemControl.failure("keyboard_input_unknown", "Literal text attempt is uncertain; no replay or Return is permitted", unknown: true) }
+            if attempted { throw SystemControl.failure("keyboard_input_unknown", "Literal text/Return attempt is uncertain; no replay is permitted", unknown: true) }
             throw error
         }
+    }
+    static func submitIntent(_ args: [String: Any]) throws -> Bool {
+        guard let value = args["submit"] else { return false }
+        guard let flag = value as? NSNumber, CFGetTypeID(flag) == CFBooleanGetTypeID() else {
+            throw SystemControl.failure("keyboard_unsupported", "Text submit must be a Boolean")
+        }
+        return flag.boolValue
     }
     static func text(_ args: [String: Any]) async throws -> [String: Any] {
         guard let target = args["target"] as? [String: Any], let text = args["text"] as? String else {
             throw SystemControl.failure("invalid_arguments", "Literal text requires an exact target and text")
         }
-        try require(args["submit"] == nil || (args["submit"] as? NSNumber)?.boolValue == false,
-                    "Text submission is not supported in this step")
+        let submit = try submitIntent(args)
         let chunks = try textChunks(text), initial = try boundSnapshot(target)
         try textFieldAllowed(initial.field, text: text)
         let expected = try expectedText(initial.field, inserting: Array(text.utf16))
@@ -515,6 +530,18 @@ enum SystemKeyboard {
                 if attempt < 4 { try await Task.sleep(nanoseconds: 20_000_000) }
             }
             return false
+        }, submit: submit, returnPair: {
+            let (down, up) = try events(layout, code: CGKeyCode(kVK_Return), flags: [])
+            _ = try postPair(validate: {
+                let current = try boundSnapshot(target, revision: false)
+                try require(CFEqual(current.window, initial.window) && CFEqual(current.element, initial.element)
+                            && expected.matches(current.field), "Text or selection changed before optional Return")
+                try textRoute(target, initial: initial, keyCode: CGKeyCode(kVK_Return))
+                try Task.checkCancellation()
+            }, sameGeneration: { (try? SystemControl.target(target)) != nil }, post: { isDown in
+                let app = try SystemControl.target(target)
+                (isDown ? down : up).postToPid(app.processIdentifier)
+            })
         })
         result["utf8_bytes"] = text.utf8.count
         result["utf16_units"] = text.utf16.count
@@ -525,13 +552,15 @@ enum SystemKeyboard {
     @MainActor final class TextTransfer {
         let id: String, principal: String, taskID: String, digest: String, epoch: String
         let target: [String: Any]
+        let submit: Bool
         let byteCount: Int, unitCount: Int, chunkCount: Int, expires: Double
         var units: [UniChar] = []
         var nextIndex = 0
         init(id: String, principal: String, task: String, digest: String, target: [String: Any],
-             bytes: Int, units: Int, chunks: Int, now: Double) {
+             submit: Bool, bytes: Int, units: Int, chunks: Int, now: Double) {
             self.id = id; self.principal = principal; taskID = task; self.digest = digest; self.target = target
             byteCount = bytes; unitCount = units; chunkCount = chunks; expires = now + 60
+            self.submit = submit
             epoch = SystemBridgeRuntime.generation
             self.units.reserveCapacity(units)
         }
@@ -575,7 +604,7 @@ enum SystemKeyboard {
               try stageInteger(target, "helper_pid", max: Int(Int32.max)) == Int(getpid()),
               target["worker_generation"] as? String == SystemBridgeRuntime.generation,
               stageHex(target["target_token"], length: 32), stageHex(target["expected_revision"], length: 64),
-              let submit = args["submit"] as? NSNumber, CFGetTypeID(submit) == CFBooleanGetTypeID(), !submit.boolValue,
+              let submit = args["submit"] as? NSNumber, CFGetTypeID(submit) == CFBooleanGetTypeID(),
               args["encoding"] as? String == "utf-16-le", stageHex(args["sha256"], length: 64),
               let digest = args["sha256"] as? String else {
             throw SystemControl.failure("keyboard_staging_invalid", "Text staging binding, owner or encoding is invalid")
@@ -588,7 +617,7 @@ enum SystemKeyboard {
         try require(transfer == nil && !consumedTransfers.contains(id) && consumedTransfers.count < 256,
                     "Text staging is occupied, consumed or its epoch budget is exhausted")
         transfer = TextTransfer(id: id, principal: principal, task: task, digest: digest, target: target,
-                                bytes: bytes, units: units, chunks: count, now: now)
+                                submit: submit.boolValue, bytes: bytes, units: units, chunks: count, now: now)
         return ["transfer_id": id, "state": "accepted", "input_attempted": false]
     }
     static func ownedTransfer(_ args: [String: Any], now: Double) throws -> TextTransfer {
@@ -627,7 +656,7 @@ enum SystemKeyboard {
                     && text.utf16.elementsEqual(current.units) && text.utf8.count == current.byteCount
                     && SHA256.hash(data: Data(text.utf8)).map({ String(format: "%02x", $0) }).joined() == current.digest,
                     "Staged text is incomplete or its length/digest differs")
-        var result = try await writer(["target": current.target, "text": text, "submit": false])
+        var result = try await writer(["target": current.target, "text": text, "submit": current.submit])
         result["transfer_id"] = current.id; result["task_id"] = current.taskID; result["staging_verified"] = true
         return result
     }

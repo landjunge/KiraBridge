@@ -143,13 +143,14 @@ async def test_chord_failure_never_falls_back_to_a_key_operation(bridge):
 @pytest.mark.parametrize(
     "literal", [" /resume go-go-go \r\n e\u0301 👩‍💻 ", "\ufeff" + "ä😀x" * 20000]
 )
-async def test_native_text_is_literal_and_does_not_touch_clipboard(bridge, literal):
+@pytest.mark.parametrize("submit", [False, True])
+async def test_native_text_is_literal_and_does_not_touch_clipboard(bridge, literal, submit):
     task = setup_keyboard(bridge)
     task["operation"] = "keyboard.text"
     task["args"] = {
         "target": TARGET,
         "text": literal,
-        "submit": False,
+        "submit": submit,
     }
     bridge.clipboard.read = AsyncMock(
         side_effect=AssertionError("Native text must not read clipboard")
@@ -161,6 +162,7 @@ async def test_native_text_is_literal_and_does_not_touch_clipboard(bridge, liter
     bridge.keyboard.transport.request = AsyncMock(side_effect=receiver)
     result = await bridge.execute(task, AsyncMock(), AsyncMock())
     assert result["text_verified"] is True
+    assert receiver.manifest["submit"] is submit and result["return_posted"] is submit
     assert receiver.raw.decode("utf-16-le") == literal
     operations = [call.args[0] for call in bridge.keyboard.transport.request.await_args_list]
     assert operations[0] == "keyboard.text.begin" and operations[-1] == "keyboard.text.commit"
@@ -171,17 +173,24 @@ async def test_native_text_is_literal_and_does_not_touch_clipboard(bridge, liter
     bridge.clipboard.write.assert_not_awaited()
 
 
-async def test_unfinished_submit_refuses_before_running_or_native_send(bridge):
+@pytest.mark.parametrize("submit", [False, True])
+async def test_text_return_receipt_must_match_bound_intent_without_replay(bridge, submit):
     task = setup_keyboard(bridge)
     task["operation"] = "keyboard.text"
-    task["args"] = {"target": TARGET, "text": "literal", "submit": True}
-    running = AsyncMock()
-    bridge.keyboard.transport.request = AsyncMock()
-    with pytest.raises(BridgeError) as caught:
-        await bridge.execute(task, running, running)
-    assert caught.value.code == "keyboard_submit_pending"
-    running.assert_not_awaited()
-    bridge.keyboard.transport.request.assert_not_awaited()
+    task["args"] = {"target": TARGET, "text": "literal", "submit": submit}
+    receiver = staged_receiver(bridge, task)
+
+    async def send(operation, arguments, **context):
+        reply = await receiver(operation, arguments, **context)
+        if operation == "keyboard.text.commit":
+            reply["return_posted"] = not submit
+        return reply
+
+    bridge.keyboard.transport.request = AsyncMock(side_effect=send)
+    with pytest.raises(UncertainExecution):
+        await bridge.execute(task, AsyncMock(), AsyncMock())
+    operations = [call.args[0] for call in bridge.keyboard.transport.request.await_args_list]
+    assert operations.count("keyboard.text.commit") == 1 and "keyboard.text.abort" not in operations
 
 
 def staged_receiver(bridge, task):
@@ -228,7 +237,7 @@ def staged_receiver(bridge, task):
             "staging_verified": True,
             "text_verified": True,
             "selection_verified": True,
-            "return_posted": False,
+            "return_posted": receive.manifest["submit"],
             "text_sha256": receive.manifest["sha256"],
         }
 

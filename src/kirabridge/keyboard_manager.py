@@ -22,10 +22,6 @@ class KeyboardManager:
         principal, operation = task["principal"], task["operation"]
         arguments = args.model_dump(exclude_none=True)
         if operation == "keyboard.text":
-            if args.submit:
-                raise BridgeError(
-                    "keyboard_submit_pending", "Transactional Return is not enabled yet"
-                )
             plan = plan_text(args, task_id=task["id"], principal=principal)
             manifest = plan.manifest
             begin = {
@@ -120,7 +116,7 @@ class KeyboardManager:
                 or result.get("staging_verified") is not True
                 or result.get("text_verified") is not True
                 or result.get("selection_verified") is not True
-                or result.get("return_posted") is not False
+                or result.get("return_posted") is not manifest["submit"]
                 or result.get("text_sha256") != manifest["sha256"]
             ):
                 raise UncertainExecution(

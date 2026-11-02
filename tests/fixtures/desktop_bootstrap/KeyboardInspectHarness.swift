@@ -281,7 +281,7 @@ struct KeyboardInspectHarness {
         precondition(textReceipt["text_verified"] as? Bool == true && textReceipt["return_posted"] as? Bool == false)
         textChecks += 1
         for scenario in ["target_before", "target_after", "capacity_before", "capacity_after", "verification"] {
-            var prepared = 0, postCount = 0
+            var prepared = 0, postCount = 0, returnCount = 0
             do {
                 _ = try await SystemKeyboard.writeText(pieces, prepare: { _ in
                     let index = prepared; prepared += 1
@@ -292,19 +292,86 @@ struct KeyboardInspectHarness {
                     if scenario == "target_\(index == 0 ? "before" : "after")" {
                         throw SystemControl.failure("target", "fixture")
                     }
-                }, sameGeneration: { true }, post: { _ in postCount += 1 }, verify: { false })
+                }, sameGeneration: { true }, post: { _ in postCount += 1 }, verify: { false },
+                    submit: true, returnPair: { returnCount += 1 })
                 fatalError("Unsafe text write completed")
             } catch let error as SystemBridgeFailure {
                 let before = scenario.hasSuffix("before")
                 precondition(error.effectUnknown == !before)
                 precondition(postCount == (before ? 0 : scenario == "verification" ? 4 : 2))
+                precondition(returnCount == 0)
                 textChecks += 1
             }
         }
         do {
-            _ = try await SystemKeyboard.text(["target": [:], "text": "x", "submit": true])
-            fatalError("Unexpected text submit")
+            _ = try SystemKeyboard.submitIntent(["submit": 1])
+            fatalError("Non-Boolean text submit")
         } catch let error as SystemBridgeFailure { precondition(!error.effectUnknown); textChecks += 1 }
+        var returnChecks = 0
+        let defaultSubmit = try SystemKeyboard.submitIntent([:])
+        let falseSubmit = try SystemKeyboard.submitIntent(["submit": false])
+        let trueSubmit = try SystemKeyboard.submitIntent(["submit": true])
+        precondition(!defaultSubmit && !falseSubmit && trueSubmit); returnChecks += 1
+        let invalidSubmit: [Any] = [0, 1, "false", NSNull()]
+        for value in invalidSubmit {
+            do { _ = try SystemKeyboard.submitIntent(["submit": value]); fatalError("Coerced submit") }
+            catch let error as SystemBridgeFailure { precondition(!error.effectUnknown); returnChecks += 1 }
+        }
+        var noReturn = 0
+        let withoutReturn = try await SystemKeyboard.writeText([pieces[0]], prepare: { _ in }, validate: { _ in },
+            sameGeneration: { true }, post: { _ in }, verify: { true }, returnPair: { noReturn += 1 })
+        precondition(noReturn == 0 && withoutReturn["return_posted"] as? Bool == false); returnChecks += 1
+        var returnOrder: [String] = []
+        let withReturn = try await SystemKeyboard.writeText(pieces, prepare: { _ in }, validate: { _ in },
+            sameGeneration: { true }, post: { returnOrder.append($0 ? "text_down" : "text_up") },
+            verify: { returnOrder.append("verified"); return true }, submit: true, returnPair: {
+                _ = try SystemKeyboard.postPair(validate: { returnOrder.append("return_guard") }, sameGeneration: { true },
+                    post: { returnOrder.append($0 ? "return_down" : "return_up") })
+            })
+        precondition(returnOrder == ["text_down", "text_up", "text_down", "text_up", "verified", "return_guard", "return_down", "return_up"])
+        precondition(withReturn["return_posted"] as? Bool == true && withReturn["post_calls_returned"] as? Int == 6)
+        precondition(withReturn["submitted"] as? Bool == false && withReturn["app_processing_confirmed"] as? Bool == false)
+        returnChecks += 1
+        let actualReturn = try SystemKeyboard.events(textLayout, code: UInt16(kVK_Return), flags: [])
+        precondition(actualReturn.0.getIntegerValueField(.keyboardEventKeycode) == 36
+                     && actualReturn.1.getIntegerValueField(.keyboardEventKeycode) == 36)
+        precondition(actualReturn.0.flags.isEmpty && actualReturn.1.flags.isEmpty); returnChecks += 1
+        do { try SystemKeyboard.inputAllowed(postAccess: true, flags: [], keyHeld: true); fatalError("Held Return accepted") }
+        catch let error as SystemBridgeFailure {
+            precondition(error.message.contains("conflict_mask=0") && error.message.contains("key_held=true")); returnChecks += 1
+        }
+        for scenario in ["verify", "guard", "post"] {
+            var textPosts = 0, returnPosts: [Bool] = []
+            do {
+                _ = try await SystemKeyboard.writeText([pieces[0]], prepare: { _ in }, validate: { _ in },
+                    sameGeneration: { true }, post: { _ in textPosts += 1 }, verify: { scenario != "verify" },
+                    submit: true, returnPair: {
+                        _ = try SystemKeyboard.postPair(validate: {
+                            if scenario == "guard" { throw SystemControl.failure("changed", "fixture") }
+                        }, sameGeneration: { true }, post: { down in
+                            returnPosts.append(down)
+                            if down && scenario == "post" { throw SystemControl.failure("lost", "fixture") }
+                        })
+                    })
+                fatalError("Unsafe optional Return accepted")
+            } catch let error as SystemBridgeFailure {
+                precondition(error.effectUnknown && textPosts == 2)
+                precondition(returnPosts == (scenario == "post" ? [true, false] : [])); returnChecks += 1
+            }
+        }
+        var cancelReturn = 0
+        let cancelledText = Task { @MainActor in
+            try await SystemKeyboard.writeText([pieces[0]], prepare: { _ in }, validate: { _ in }, sameGeneration: { true },
+                post: { _ in }, verify: { withUnsafeCurrentTask { $0?.cancel() }; return true },
+                submit: true, returnPair: { cancelReturn += 1 })
+        }
+        do { _ = try await cancelledText.value; fatalError("Return after cancellation") }
+        catch let error as SystemBridgeFailure { precondition(error.effectUnknown && cancelReturn == 0); returnChecks += 1 }
+        do {
+            _ = try await SystemKeyboard.writeText([pieces[0]], prepare: { _ in }, validate: { _ in },
+                sameGeneration: { true }, post: { _ in }, verify: { true }, submit: true)
+            fatalError("Missing Return callback accepted")
+        } catch let error as SystemBridgeFailure { precondition(error.effectUnknown); returnChecks += 1 }
         let fixture = try JSONSerialization.jsonObject(with: FileHandle.standardInput.readDataToEndOfFile()) as! [String: Any]
         var manifest = fixture["begin"] as! [String: Any]
         var stageTarget = manifest["target"] as! [String: Any]
@@ -382,7 +449,7 @@ struct KeyboardInspectHarness {
         oldTarget["worker_generation"] = "00000000-0000-0000-0000-000000000000"; oldWorker["target"] = oldTarget
         oldWorker = try signed(oldWorker)
         try await refusedStage { _ = try SystemKeyboard.beginTransfer(oldWorker, now: 10) }
-        let invalidManifestFields: [(String, Any)] = [("principal", "foreign"), ("submit", true), ("encoding", "utf-16-be"), ("utf8_bytes", 1048577)]
+        let invalidManifestFields: [(String, Any)] = [("principal", "foreign"), ("submit", 1), ("encoding", "utf-16-be"), ("utf8_bytes", 1048577)]
         for (key, value) in invalidManifestFields {
             var invalid = try fresh(); invalid[key] = value; invalid = try signed(invalid)
             try await refusedStage { _ = try SystemKeyboard.beginTransfer(invalid, now: 10) }
@@ -442,12 +509,22 @@ struct KeyboardInspectHarness {
         do { _ = try SystemKeyboard.beginTransfer(uncertain, now: 10); fatalError("Uncertain stage replayed") }
         catch let error as SystemBridgeFailure { precondition(!error.effectUnknown && writes == 2) }
         stageChecks += 1
+        var submitManifest = try fresh(); submitManifest["submit"] = true; submitManifest = try signed(submitManifest)
+        try fill(submitManifest)
+        precondition(SystemKeyboard.transfer?.submit == true)
+        var sawSubmit = false
+        _ = try await SystemKeyboard.commitTransfer(["transfer_id": submitManifest["transfer_id"]!], now: 10, writer: {
+            sawSubmit = $0["submit"] as? Bool == true
+            return ["return_posted": true]
+        })
+        precondition(sawSubmit && SystemKeyboard.transfer == nil); stageChecks += 1
         SystemKeyboard.transfer = nil; SystemKeyboard.consumedTransfers = []; SystemBridgeRuntime.principal = ""
         let result: [String: Any] = ["checks": checks, "field": observed.metadata,
                                    "key_checks": keyChecks, "named_key_codes": SystemKeyboard.namedKeys,
                                    "layout_checks": layoutChecks, "layout_positions": layoutPositions,
                                    "text_checks": textChecks,
                                    "stage_checks": stageChecks,
+                                   "return_checks": returnChecks,
                                    "native_ui_calls": 0, "event_posts": 0, "permission_requests": 0]
         print(String(data: try JSONSerialization.data(withJSONObject: result, options: [.sortedKeys]), encoding: .utf8)!)
     }

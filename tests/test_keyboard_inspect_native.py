@@ -101,7 +101,8 @@ def test_keyboard_snapshot_guards_and_utf16_without_ui(tmp_path):
     assert observed["key_checks"] == 22
     assert observed["layout_checks"] == 53
     assert observed["text_checks"] == 27
-    assert observed["stage_checks"] == 26
+    assert observed["stage_checks"] == 27
+    assert observed["return_checks"] == 14
     assert observed["layout_positions"] == {
         "com.apple.keylayout.US": {"z": 6, "Z": 6, "y": 16, "Y": 16},
         "com.apple.keylayout.German": {"z": 16, "Z": 16, "y": 6, "Y": 6},
