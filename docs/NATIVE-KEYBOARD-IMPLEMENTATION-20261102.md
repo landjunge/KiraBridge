@@ -97,4 +97,33 @@ Dispatcherfälle bestanden (76 unbetroffene deselected), dazu der bestehende
 konkrete app.focus-Dispatcherfall separat bestanden. Unabhängiger enger Review
 freigegeben; Ruff grün. Der Trace einer simulierten Text+Return-Transaktion
 schließt konkurrierende vorhandene Sessioneingabe zwischen beiden aus; dies ist
-noch kein nativer Text-/Return-UI-Nachweis. Schritt4 erst nach Remote-SHA-Abgleich.
+noch kein nativer Text-/Return-UI-Nachweis. Schritt3-Commit/Remote: `de90c2285f9c2d8e9bc9f6e58f36fdd559c94f55`, unabhängig abgeglichen.
+
+
+## Schritt 4 – Native einzelne Taste
+
+`keyboard.key` führt über den eigenen KeyboardManager, `keyboard.execute`, die
+bestehende Desktop-/Sessiontransaktion und denselben nativen Transport. Die
+Autorisierung wird unmittelbar vor Sendung erneut geprüft. Die Operation geht
+nicht am Manager vorbei durch den generischen SYSTEM_LEAVES-Dispatch.
+
+Der Swift-Worker unterstützt 27 benannte Tasten mittels Carbon-Keycodes und
+prozessgerichtetem CGEvent-Down/Up. Logische Zeichen/physische Positionen bleiben
+bis Schritt5 ausdrücklich unsupported. Vor Down werden Tokenbesitzer/-ablauf,
+Worker/Appgeneration, frischer Fokus-/Feld-/Layoutzustand, native Postrechte sowie
+konfliktfreie physische Modifier/Tasten geprüft. Nach Postbeginn bleibt jeder
+Fehler Unknown; nur ein eigener Key-up wird bestmöglich an dieselbe noch gültige
+Appgeneration geschickt. Kein globaler Versand, kein Modifierreset und kein Replay.
+Der Ergebnisbereich `native_post_calls` bestätigt zurückgekehrte Post-Aufrufe,
+keine Appverarbeitung (`app_processing_confirmed=false`).
+
+Nachweise: fünf gezielte Corefälle bestanden (exaktes Ziel/Owner/Lock,
+Reautorisierung, Unknown ohne zweiten Aufruf, Serialisierung und Key/Submittrennung).
+Ein gemeinsamer Swiftcompile/Harnesslauf bestand in8,46s mit22 neuen Key-/Binding-/
+Fehlergrenzenchecks plus15 bestehenden Snapshotchecks. Alle27 Namen stimmen
+mit dem Pythonvertrag überein. Gegenseitiger enger Autor-/Rootreview grün;
+keine zweite Reviewrunde oder Gesamtsuite.
+
+Noch keine echte OS-Eingabe oder Appkompatibilitätsabnahme. Die verbleibende
+Racegrenze nach letzter Fokus-/Generationsprüfung und Crash zwischen Down/Up
+wird nicht als absolut gelöst ausgegeben. Clipboard-/Terminalwege unverändert.

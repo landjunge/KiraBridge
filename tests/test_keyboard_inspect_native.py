@@ -7,8 +7,11 @@ import shutil
 import subprocess
 import sys
 from pathlib import Path
+from typing import get_args
 
 import pytest
+
+from kirabridge.keyboard_models import NamedKey
 
 
 @pytest.mark.skipif(
@@ -57,6 +60,8 @@ def test_keyboard_snapshot_guards_and_utf16_without_ui(tmp_path):
     assert result.returncode == 0, result.stdout + result.stderr
     observed = json.loads(result.stdout)
     assert observed["checks"] == 15
+    assert observed["key_checks"] == 22
+    assert set(observed["named_key_codes"]) == set(get_args(NamedKey))
     assert observed["field"]["value_sha256"] == hashlib.sha256("A😀e\u0301".encode()).hexdigest()
     assert (
         observed["native_ui_calls"]

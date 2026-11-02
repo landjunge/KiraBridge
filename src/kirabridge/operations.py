@@ -74,6 +74,7 @@ for _name in (
     "files.prepare",
     "files.transfer",
     "session.open",
+    "keyboard.key",
     "session.input",
     "session.focus",
     "session.close",
@@ -99,6 +100,8 @@ for _name in (
     OPERATIONS[_name] = Operation(
         capability="process.inspect"
         if _name == "process.output"
+        else "keyboard.execute"
+        if _name == "keyboard.key"
         else "bridge.health"
         if _name == "platform.status"
         else "threaddesk.manage"

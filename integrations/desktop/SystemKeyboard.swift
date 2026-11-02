@@ -4,7 +4,7 @@ import Carbon
 import CoreGraphics
 import CryptoKit
 
-/// Read-only keyboard targets share SystemControl's principal/worker-bound AX store.
+/// Keyboard targets share SystemControl's principal/worker-bound AX store.
 @MainActor
 enum SystemKeyboard {
     static let maxValueBytes = 4 * 1024 * 1024
@@ -152,8 +152,105 @@ enum SystemKeyboard {
             "supported": true, "input_attempted": false, "permission_requested": false, "effect": "none",
         ])
     }
+    static let namedKeys: [String: CGKeyCode] = [
+        "enter": CGKeyCode(kVK_Return), "keypad_enter": CGKeyCode(kVK_ANSI_KeypadEnter),
+        "escape": CGKeyCode(kVK_Escape), "tab": CGKeyCode(kVK_Tab), "space": CGKeyCode(kVK_Space),
+        "backspace": CGKeyCode(kVK_Delete), "delete": CGKeyCode(kVK_ForwardDelete),
+        "left": CGKeyCode(kVK_LeftArrow), "right": CGKeyCode(kVK_RightArrow),
+        "up": CGKeyCode(kVK_UpArrow), "down": CGKeyCode(kVK_DownArrow),
+        "home": CGKeyCode(kVK_Home), "end": CGKeyCode(kVK_End),
+        "page_up": CGKeyCode(kVK_PageUp), "page_down": CGKeyCode(kVK_PageDown),
+        "f1": CGKeyCode(kVK_F1), "f2": CGKeyCode(kVK_F2), "f3": CGKeyCode(kVK_F3),
+        "f4": CGKeyCode(kVK_F4), "f5": CGKeyCode(kVK_F5), "f6": CGKeyCode(kVK_F6),
+        "f7": CGKeyCode(kVK_F7), "f8": CGKeyCode(kVK_F8), "f9": CGKeyCode(kVK_F9),
+        "f10": CGKeyCode(kVK_F10), "f11": CGKeyCode(kVK_F11), "f12": CGKeyCode(kVK_F12),
+    ]
+    static func namedKey(_ key: [String: Any]) throws -> (String, CGKeyCode) {
+        guard let name = key["named"] as? String, let code = namedKeys[name],
+              key.allSatisfy({ $0.key == "named" ||
+                  (["character", "key_code"].contains($0.key) && $0.value is NSNull) }) else {
+            throw SystemControl.failure("keyboard_unsupported", "Only one supported named key is available")
+        }
+        return (name, code)
+    }
+    static func matchingBinding(_ expected: [String: Any], _ current: [String: Any]) throws {
+        for key in ["pid", "expected_started_at", "target_token", "helper_pid", "worker_generation", "expected_revision"] {
+            guard let old = expected[key] as? NSObject, let fresh = current[key] as? NSObject,
+                  old.isEqual(fresh) else {
+                throw SystemControl.failure("macos_element_changed", "Keyboard target or revision changed")
+            }
+        }
+    }
+    static func boundSnapshot(_ target: [String: Any]) throws -> Snapshot {
+        let app = try SystemControl.target(target, mutating: true)
+        try SystemControl.axGranted()
+        var reference = target
+        reference["element_token"] = target["target_token"]
+        // Authenticate expiry/principal/worker BEFORE snapshot.remember can refresh an entry.
+        let original = try SystemControl.element(reference, app: app)
+        let current = try snapshot(target)
+        try matchingBinding(target, current.response["target"] as? [String: Any] ?? [:])
+        try require(CFEqual(original, current.element), "Keyboard focused element changed")
+        return current
+    }
+    static func inputAllowed(postAccess: Bool, flags: CGEventFlags, keyHeld: Bool) throws {
+        guard postAccess else {
+            throw SystemControl.failure("macos_permission_denied", "Native event post access is absent; no request was made")
+        }
+        try require(flags.intersection([.maskCommand, .maskControl, .maskAlternate, .maskShift, .maskSecondaryFn]).isEmpty
+                    && !keyHeld, "Held user keys or modifiers conflict with this key pair")
+    }
+    /// The callback is an attempted native post, not a processing acknowledgement.
+    static func postPair(validate: () throws -> Void, sameGeneration: () -> Bool,
+                         post: (Bool) throws -> Void) throws -> [String: Any] {
+        try validate()
+        try require(sameGeneration(), "Keyboard application generation changed before input")
+        do {
+            try post(true)
+            try require(sameGeneration(), "Keyboard application generation changed after key down")
+            try post(false)
+            return ["scope": "native_post_calls", "post_calls_returned": 2,
+                    "input_attempted": true, "app_processing_confirmed": false,
+                    "permission_requested": false, "effect": "keyboard_events_dispatched"]
+        } catch {
+            // Only our own nonmodifier key is released, and never into a reused PID.
+            if sameGeneration() { try? post(false) }
+            throw SystemControl.failure("keyboard_input_unknown",
+                "Keyboard post attempt is uncertain; no replay is permitted", unknown: true)
+        }
+    }
+    static func key(_ args: [String: Any]) throws -> [String: Any] {
+        guard let target = args["target"] as? [String: Any], let spec = args["key"] as? [String: Any] else {
+            throw SystemControl.failure("invalid_arguments", "Keyboard key requires an exact target and named key")
+        }
+        let (name, code) = try namedKey(spec)
+        guard let source = CGEventSource(stateID: .privateState),
+              let down = CGEvent(keyboardEventSource: source, virtualKey: code, keyDown: true),
+              let up = CGEvent(keyboardEventSource: source, virtualKey: code, keyDown: false) else {
+            throw SystemControl.failure("keyboard_unsupported", "Native key pair could not be created")
+        }
+        for event in [down, up] {
+            event.flags = []
+            event.setIntegerValueField(.keyboardEventAutorepeat, value: 0)
+        }
+        var result = try postPair(validate: {
+            _ = try boundSnapshot(target)
+            try inputAllowed(postAccess: CGPreflightPostEventAccess(),
+                flags: CGEventSource.flagsState(.combinedSessionState),
+                keyHeld: CGEventSource.keyState(.hidSystemState, key: code))
+        }, sameGeneration: { (try? SystemControl.target(target)) != nil }, post: { isDown in
+            // Last generation check immediately before every post, including cleanup.
+            let app = try SystemControl.target(target)
+            (isDown ? down : up).postToPid(app.processIdentifier)
+        })
+        result["requested"] = ["named": name]
+        return result
+    }
     static func handle(_ operation: String, arguments: [String: Any]) throws -> [String: Any]? {
-        guard operation == "keyboard.inspect" else { return nil }
-        return try snapshot(arguments).response
+        switch operation {
+        case "keyboard.inspect": return try snapshot(arguments).response
+        case "keyboard.key": return try key(arguments)
+        default: return nil
+        }
     }
 }

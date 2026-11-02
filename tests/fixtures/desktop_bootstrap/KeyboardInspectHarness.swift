@@ -70,7 +70,71 @@ struct KeyboardInspectHarness {
             precondition(first != next, "Snapshot revision ignored \(change)")
             checks += 1
         }
+        var keyChecks = 0
+        precondition(SystemKeyboard.namedKeys.count == 27 && Set(SystemKeyboard.namedKeys.values).count == 27)
+        precondition(SystemKeyboard.namedKeys["enter"] == 36 && SystemKeyboard.namedKeys["keypad_enter"] == 76)
+        precondition(SystemKeyboard.namedKeys["backspace"] == 51 && SystemKeyboard.namedKeys["delete"] == 117)
+        _ = try SystemKeyboard.namedKey(["named": "enter", "character": NSNull(), "key_code": NSNull()])
+        keyChecks += 1
+        let unsupportedKeys: [[String: Any]] = [["character": "a"], ["key_code": 0], ["named": "unknown"],
+            ["named": "enter", "character": "a"], ["named": "enter", "key_code": 0]]
+        for spec in unsupportedKeys {
+            do { _ = try SystemKeyboard.namedKey(spec); fatalError("Unsupported key accepted") }
+            catch let error as SystemBridgeFailure { precondition(!error.effectUnknown); keyChecks += 1 }
+        }
+        let binding: [String: Any] = ["pid": 123, "expected_started_at": 100.5, "target_token": "field",
+            "helper_pid": 456, "worker_generation": "worker", "expected_revision": first]
+        try SystemKeyboard.matchingBinding(binding, binding)
+        for key in binding.keys {
+            var stale = binding; stale[key] = "stale"
+            do { try SystemKeyboard.matchingBinding(stale, binding); fatalError("Stale binding accepted") }
+            catch let error as SystemBridgeFailure { precondition(!error.effectUnknown); keyChecks += 1 }
+        }
+        for scenario in ["permission", "modifier", "held_key"] {
+            var posts = 0
+            do {
+                _ = try SystemKeyboard.postPair(validate: {
+                    try SystemKeyboard.inputAllowed(postAccess: scenario != "permission",
+                        flags: scenario == "modifier" ? .maskShift : [], keyHeld: scenario == "held_key")
+                }, sameGeneration: { true }, post: { _ in posts += 1 })
+                fatalError("Input conflict accepted")
+            } catch let error as SystemBridgeFailure {
+                precondition(!error.effectUnknown && posts == 0); keyChecks += 1
+            }
+        }
+        var order: [String] = []
+        let posted = try SystemKeyboard.postPair(validate: {
+            order.append("validate")
+            try SystemKeyboard.inputAllowed(postAccess: true, flags: [], keyHeld: false)
+        }, sameGeneration: { order.append("generation"); return true }, post: { order.append($0 ? "down" : "up") })
+        precondition(order == ["validate", "generation", "down", "generation", "up"])
+        precondition(posted["post_calls_returned"] as? Int == 2 && posted["app_processing_confirmed"] as? Bool == false)
+        keyChecks += 1
+        for scenario in ["target_before", "generation_before", "generation_after", "down_error", "up_error", "cleanup_error"] {
+            var posts: [String] = []
+            do {
+                _ = try SystemKeyboard.postPair(validate: {
+                    if scenario == "target_before" { throw SystemControl.failure("changed", "fixture") }
+                }, sameGeneration: {
+                    scenario != "generation_before" && !(scenario == "generation_after" && !posts.isEmpty)
+                }, post: { down in
+                    posts.append(down ? "down" : "up")
+                    if (scenario == "down_error" && down) || (scenario == "up_error" && posts.count == 2)
+                        || scenario == "cleanup_error" { throw SystemControl.failure("post_lost", "fixture") }
+                })
+                fatalError("Expected key pair failure")
+            } catch let error as SystemBridgeFailure {
+                let before = ["target_before", "generation_before"].contains(scenario)
+                precondition(error.effectUnknown == !before)
+                if before { precondition(posts.isEmpty) }
+                else if scenario == "generation_after" { precondition(posts == ["down"]) }
+                else if scenario == "up_error" { precondition(posts == ["down", "up", "up"]) }
+                else { precondition(posts == ["down", "up"]) }
+                keyChecks += 1
+            }
+        }
         let result: [String: Any] = ["checks": checks, "field": observed.metadata,
+                                   "key_checks": keyChecks, "named_key_codes": SystemKeyboard.namedKeys,
                                    "native_ui_calls": 0, "event_posts": 0, "permission_requests": 0]
         print(String(data: try JSONSerialization.data(withJSONObject: result, options: [.sortedKeys]), encoding: .utf8)!)
     }

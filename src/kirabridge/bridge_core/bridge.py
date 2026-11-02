@@ -43,6 +43,7 @@ from kirabridge.directory_ranges import DirectoryInput
 from kirabridge.file_transfer.models import InventoryInput, PrepareInput, TransferInput
 from kirabridge.filesystem_manager import FilesystemManager, PathScope
 from kirabridge.image_manager import ImageManager
+from kirabridge.keyboard_manager import KEYBOARD_INPUTS, KeyboardManager
 from kirabridge.message_manager import MessageManager
 from kirabridge.message_manager.receiver import MessageReceiver
 from kirabridge.permissions import (
@@ -76,6 +77,7 @@ from kirabridge.visible_terminal import VisibleTerminal, VisibleTerminalInput
 
 INPUTS = {
     **SYSTEM_INPUTS,
+    **KEYBOARD_INPUTS,
     "process.output": OutputRangeInput,
     "system.report": SystemReportInput,
     "platform.status": PlatformStatusInput,
@@ -236,6 +238,11 @@ class Bridge:
 
         self.desktop_input = DesktopInput(
             self.sessions.lock, timeout=self.system_modules.transport.timeout
+        )
+        self.keyboard = KeyboardManager(
+            transport=self.system_modules.transport,
+            desktop_input=self.desktop_input,
+            authorize=self.security.authorize,
         )
         self.sessions.terminal_app.system_transport = self.system_modules.transport
         self.macos = MacOSProvider(
@@ -550,6 +557,8 @@ class Bridge:
                     "remain separately pageable"
                 ),
             }
+        if operation in KEYBOARD_INPUTS:
+            return await self.keyboard.execute(task, args, running)
         if operation in SYSTEM_LEAVES:
             if operation == "apps.launch":
                 # Launching a bundle does not bypass the caller's filesystem roots.
