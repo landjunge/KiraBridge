@@ -984,6 +984,19 @@ def require_queue_compatibility(config, release):
         ) from None
 
 
+def desktop_module(args):
+    path = Path(__file__).with_name("desktop.py")
+    if path.is_symlink():
+        raise RuntimeError("Desktop installer symlink refused")
+    manifest = json.loads((args.bundle / "release.json").read_text())
+    data = path.read_bytes()
+    if hashlib.sha256(data).hexdigest() != manifest.get("files", {}).get("installer/desktop.py"):
+        raise RuntimeError("Desktop installer checksum mismatch")
+    module = types.ModuleType("_kirabridge_desktop_installer")
+    exec(compile(data, str(path), "exec"), module.__dict__)
+    return module
+
+
 def activate(args, release):
     require_visible_terminal(args)
     validate_service_owner(args)
@@ -997,7 +1010,7 @@ def activate(args, release):
     current = args.prefix / "current.json"
     old = json.loads(current.read_text()) if current.exists() else None
     manifest = json.loads((release / "release.json").read_text())
-    if old and old["release"] == str(release):
+    if old and old["release"] == str(release) and not getattr(args, "desktop", False):
         if args.service != "none":
             if not loaded(args):
                 start_service(args)
@@ -1040,6 +1053,11 @@ def activate(args, release):
         **manifest,
     }
     jwrite(backup / "transaction.json", before)
+    if getattr(args, "desktop", False):
+        before["desktop"] = desktop_module(args).snapshot(
+            types.SimpleNamespace(**globals()), args, release, old, backup
+        )
+        jwrite(backup / "transaction.json", before)
     say(f"Rückweg gesichert: {backup}. Konfiguration und Zugangsdaten bleiben erhalten.")
     try:
         with idle_guard(args.config):
@@ -1107,6 +1125,10 @@ def activate(args, release):
         if args.service != "none":
             health = wait_health(args, release, manifest["version"])
             say(f"Dienst gestartet: Version {health['version']}, PID {health['runtime']['pid']}.")
+        if before.get("desktop"):
+            desktop_module(args).activate(
+                types.SimpleNamespace(**globals()), args, release, before, current
+            )
     except Exception:
         if current.exists() and json.loads(current.read_text()).get("backup") == str(backup):
             say("Umschaltung fehlgeschlagen. Rückweg wird unter erneuter Leerlaufprüfung versucht.")
@@ -1129,6 +1151,7 @@ def rollback(args, *, _compensating=False):
     if not current.exists():
         raise RuntimeError("No activated version/recovery record")
     active = json.loads(current.read_text())
+    core_already_restored = active.get("rollback_core_restored", False)
     for key in ("config", "launcher", "plist", "service"):
         if str(getattr(args, key)) != active[key]:
             raise RuntimeError("Rollback arguments differ from activation; no switch")
@@ -1138,7 +1161,10 @@ def rollback(args, *, _compensating=False):
         (args.launcher, "installed_wrapper_sha256"),
         (args.plist, "installed_plist_sha256"),
     ]:
-        if active.get(key) and (not path.exists() or sha(path) != active[key]):
+        expected_key = "restored_" + key if active.get("rollback_core_restored") else key
+        if expected_key in active and (
+            (sha(path) if path.exists() else None) != active[expected_key]
+        ):
             raise RuntimeError(
                 "Installed definition changed since activation; preserve and review first"
             )
@@ -1149,26 +1175,41 @@ def rollback(args, *, _compensating=False):
         )
         if not _compensating:
             require_visible_terminal(args)
-        stop_service(args)
-        for path, flag, name in [
-            (args.launcher, "had_wrapper", "launcher.before"),
-            (args.plist, "had_plist", "service.before.plist"),
-        ]:
-            if path == args.plist and args.service == "none":
-                continue
-            if active[flag]:
-                saved = backup / name
-                atomic(path, saved.read_bytes(), saved.stat().st_mode & 0o777)
-            else:
-                path.unlink(missing_ok=True)
-        if active["previous"]:
-            jwrite(current, active["previous"])
-        else:
-            current.unlink()
-    if active["was_loaded"]:
+        if not active.get("rollback_core_restored"):
+            stop_service(args)
+            for path, flag, name in [
+                (args.launcher, "had_wrapper", "launcher.before"),
+                (args.plist, "had_plist", "service.before.plist"),
+            ]:
+                if path == args.plist and args.service == "none":
+                    continue
+                if active[flag]:
+                    saved = backup / name
+                    atomic(path, saved.read_bytes(), saved.stat().st_mode & 0o777)
+                else:
+                    path.unlink(missing_ok=True)
+            if active.get("desktop"):
+                active["rollback_core_restored"] = True
+                active["restored_installed_wrapper_sha256"] = (
+                    sha(args.launcher) if args.launcher.exists() else None
+                )
+                active["restored_installed_plist_sha256"] = (
+                    sha(args.plist) if args.plist.exists() else None
+                )
+                jwrite(backup / "transaction.json", active)
+                jwrite(current, active)
+    if active["was_loaded"] and (not core_already_restored or not loaded(args)):
         start_service(args)
+    if active.get("desktop"):
+        desktop_module(args).restore(types.SimpleNamespace(**globals()), active, current)
     if active["was_loaded"] and active.get("previous_version"):
         wait_health(args, Path(active["release"]), active["previous_version"])
+    # Keep the complete active recovery record until every affected component
+    # is restored. Desktop failure must not erase its transaction checkpoint.
+    if active["previous"]:
+        jwrite(current, active["previous"])
+    else:
+        current.unlink()
     say(
         "ZURÜCKGEROLLT: vorheriger Launcher/Dienst wiederhergestellt. "
         "Konfiguration, Zugangsdaten und neue Ergebnisdaten bleiben erhalten."
@@ -1230,7 +1271,16 @@ def _main():
         action="store_true",
         help="Require a fresh confirmed visible macOS Terminal window before activation",
     )
+    parser.add_argument(
+        "--desktop",
+        action="store_true",
+        help="Upgrade the matched desktop app, console and linked ChatGPT service transactionally",
+    )
     args = parser.parse_args()
+    if args.desktop and (sys.platform != "darwin" or not args.bundle or args.test_label):
+        parser.error("--desktop requires a native macOS bundle and the standard user service")
+    if args.desktop and args.action == "install" and not args.require_visible_terminal:
+        parser.error("--desktop installation requires --require-visible-terminal")
     if args.test_label:
         if not re.fullmatch(r"com\.kirabridge\.test\.[a-z0-9-]{8,64}", args.test_label):
             parser.error("Invalid isolated test label")

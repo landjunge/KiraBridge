@@ -157,10 +157,7 @@ class KeyboardControl:
             if (
                 target.get("pid") != app["pid"]
                 or target.get("expected_started_at") != app["started_at"]
-                or any(
-                    observed.get(key) != app.get(key)
-                    for key in _APPLICATION_IDENTITY_FIELDS
-                )
+                or any(observed.get(key) != app.get(key) for key in _APPLICATION_IDENTITY_FIELDS)
             ):
                 raise BridgeError(
                     "keyboard_application_changed", "Resolved program identity changed"

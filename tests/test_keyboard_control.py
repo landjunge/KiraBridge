@@ -142,7 +142,12 @@ async def test_focus_observation_waits_for_activation_without_replay(bridge, con
     bridge.keyboard.transport.request.side_effect = delayed
     result = await execute(bridge, {"app": "Editor", "key": {"named": "escape"}})
     assert [op for op, _ in calls] == [
-        "apps.list", "app.focus", "apps.list", "apps.list", "keyboard.inspect", "keyboard.key"
+        "apps.list",
+        "app.focus",
+        "apps.list",
+        "apps.list",
+        "keyboard.inspect",
+        "keyboard.key",
     ]
     assert authorized.count("apps.list") == 2 * observed_reads
     assert result["resolved_application"]["active"] is True
@@ -153,8 +158,14 @@ async def test_focus_observation_waits_for_activation_without_replay(bridge, con
 @pytest.mark.parametrize(
     "change",
     [
-        "pid", "started_at", "bundle_id", "app_path", "executable",
-        "duplicate", "missing", "incomplete",
+        "pid",
+        "started_at",
+        "bundle_id",
+        "app_path",
+        "executable",
+        "duplicate",
+        "missing",
+        "incomplete",
     ],
 )
 async def test_focus_observation_refuses_changed_identity(bridge, config, monkeypatch, change):

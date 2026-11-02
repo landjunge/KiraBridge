@@ -142,6 +142,7 @@ def build(output):
             files[member] = subprocess.check_output(["git", "show", f"{commit}:{name}"])
     for name in (
         "installer/install.py",
+        "installer/desktop.py",
         "installer/presentation.py",
         "installer/visible_terminal.py",
     ):

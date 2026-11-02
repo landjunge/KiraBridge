@@ -28,12 +28,27 @@ def test_generic_keyboard_context_without_ui(tmp_path):
         )
     ]
     command = [
-        "xcrun", "swiftc", "-swift-version", "5", "-parse-as-library", "-target",
-        f"{platform.machine()}-apple-macosx12.0", *map(str, sources), "-o", str(binary),
+        "xcrun",
+        "swiftc",
+        "-swift-version",
+        "5",
+        "-parse-as-library",
+        "-target",
+        f"{platform.machine()}-apple-macosx12.0",
+        *map(str, sources),
+        "-o",
+        str(binary),
     ]
     for framework in (
-        "Cocoa", "ApplicationServices", "CryptoKit", "ScreenCaptureKit", "UserNotifications",
-        "ImageIO", "UniformTypeIdentifiers", "SystemConfiguration", "Security",
+        "Cocoa",
+        "ApplicationServices",
+        "CryptoKit",
+        "ScreenCaptureKit",
+        "UserNotifications",
+        "ImageIO",
+        "UniformTypeIdentifiers",
+        "SystemConfiguration",
+        "Security",
     ):
         command += ["-framework", framework]
     compiled = subprocess.run(command, capture_output=True, text=True, timeout=90)
@@ -42,6 +57,10 @@ def test_generic_keyboard_context_without_ui(tmp_path):
     assert result.returncode == 0, result.stdout + result.stderr
     observed = json.loads(result.stdout)
     assert observed == {
-        "checks": 54, "value_reads": 2, "simulated_key_posts": 12,
-        "native_ui_calls": 0, "event_posts": 0, "permission_requests": 0,
+        "checks": 54,
+        "value_reads": 2,
+        "simulated_key_posts": 12,
+        "native_ui_calls": 0,
+        "event_posts": 0,
+        "permission_requests": 0,
     }

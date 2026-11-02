@@ -9,12 +9,10 @@ import plistlib
 import re
 import secrets
 import shlex
-import shutil
 import time
 from pathlib import Path
 
 from kirabridge.bridge_core.models import BridgeError
-from kirabridge.local_runtime import write_private
 from kirabridge.operator_actions import action_identity
 from kirabridge.permissions import LEVELS, level_for, permission_summary
 
@@ -341,7 +339,7 @@ class OperatorControl:
             or action not in {"start", "restart"}
         ):
             raise BridgeError("invalid_request", "Unbekannter Prozess oder unbekannte Aktion")
-        if name in {"chatgpt", "grok_app"} and action == "restart":
+        if name == "grok_app" and action == "restart":
             health = await self.reload_bridge()
             return {
                 "state": "reconnected",
@@ -454,38 +452,88 @@ class OperatorControl:
         path = Path.home() / "Library/LaunchAgents" / (label + ".plist")
         code, output, _ = await self.command("/bin/launchctl", "print", target)
         loaded = code == 0
-        if name == "chatgpt" and not loaded:
-            current = next(
-                row for row in (await self.snapshot(fresh=True))["services"] if row["id"] == name
+        if name == "chatgpt":
+            from kirabridge.chatgpt_service import (
+                ensure_chatgpt_service,
+                restore_chatgpt_service,
             )
-            if current["active"]:
-                return {
-                    "state": "active",
-                    "existing_runtime_preserved": True,
-                    "message": "Die vorhandene ChatGPT-Verbindung ist aktiv.",
-                }
-            binary = shutil.which("tunnel-client")
+            from kirabridge.setup_dependencies import local_client
+
+            unmanaged_active = False
+            if not loaded:
+                current = next(
+                    row
+                    for row in (await self.snapshot(fresh=True))["services"]
+                    if row["id"] == name
+                )
+                unmanaged_active = bool(current["active"])
+            binary = local_client(Path(config._source_path))
             profile = Path(config._source_path).parent / "tunnel/kirabridge.yaml"
             if not binary or not profile.is_file():
                 raise BridgeError(
                     "connection_missing", "Die ChatGPT-Verbindung muss einmal verknüpft werden"
                 )
-            definition = {
-                "Label": label,
-                "RunAtLoad": True,
-                "KeepAlive": {"SuccessfulExit": False},
-                "Umask": 63,
-                "ProgramArguments": [
-                    binary,
-                    "run",
-                    "--profile-dir",
-                    str(profile.parent),
-                    "--profile",
-                    "kirabridge",
-                ],
-            }
-            if not path.exists():
-                write_private(path, plistlib.dumps(definition))
+            update = ensure_chatgpt_service(
+                Path(config._source_path),
+                binary,
+                create=True,
+                loaded_output=output if loaded else None,
+            )
+            if unmanaged_active:
+                return {
+                    "state": "active",
+                    "existing_runtime_preserved": True,
+                    "autostart_updated": update["changed"],
+                    "message": "Die vorhandene ChatGPT-Verbindung ist aktiv.",
+                }
+            if (update["changed"] or update["reload_required"]) and loaded:
+                code, _, _ = await self.command("/bin/launchctl", "bootout", target)
+                if code:
+                    restore_chatgpt_service(update)
+                    raise BridgeError(
+                        "service_start", "ChatGPT-Dienst konnte nicht neu geladen werden"
+                    )
+
+                async def bootstrap():
+                    deadline = time.monotonic() + 30
+                    for attempt in range(30):
+                        remaining = deadline - time.monotonic()
+                        if remaining <= 0:
+                            return 5
+                        try:
+                            code, _, _ = await self.command(
+                                "/bin/launchctl",
+                                "bootstrap",
+                                f"gui/{os.getuid()}",
+                                str(path),
+                                timeout=min(8, remaining),
+                            )
+                        except TimeoutError as exc:
+                            # A timed-out launchctl command may have succeeded.
+                            # Preserve the receipt/definition; never replay it.
+                            raise BridgeError(
+                                "service_start_unknown",
+                                "ChatGPT-Dienststart unklar; Zustand lokal prüfen.",
+                            ) from exc
+                        if code != 5 or attempt == 29:
+                            return code
+                        await asyncio.sleep(min(1, max(0, deadline - time.monotonic())))
+                    return 5
+
+                code = await bootstrap()
+                if code:
+                    restore_chatgpt_service(update)
+                    restored = await bootstrap()
+                    raise BridgeError(
+                        "service_start",
+                        "ChatGPT-Start fehlgeschlagen; vorheriger Dienst "
+                        + ("wiederhergestellt" if restored == 0 else "muss lokal gestartet werden"),
+                    )
+                return {
+                    "state": "starting",
+                    "autostart_updated": True,
+                    "message": "ChatGPT-Verbindung mit automatischem Wiederanlauf gestartet.",
+                }
         if name == "bridge" and action == "restart" and loaded:
             return await self.reload_bridge()
         if not path.is_file():

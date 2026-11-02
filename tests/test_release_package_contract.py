@@ -117,6 +117,7 @@ def test_builder_emits_license_asset_and_matching_manifest_for_both_bundles(tmp_
         "pyproject.toml": f'[project]\nversion = "{VERSION}"\nlicense = "{EXPRESSION}"\n'.encode(),
         "uv.lock": b"version = 1\n",
         "installer/install.py": b"# fixture\n",
+        "installer/desktop.py": b"# isolated desktop transaction fixture\n",
         "installer/presentation.py": b"# isolated presentation fixture\n",
         "installer/visible_terminal.py": b"# isolated visibility fixture\n",
         "src/kirabridge/terminal_design.py": b"# isolated renderer fixture\n",
