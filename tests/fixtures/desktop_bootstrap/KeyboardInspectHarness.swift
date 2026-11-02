@@ -68,11 +68,16 @@ struct KeyboardInspectHarness {
                     case kAXSubroleAttribute: return scenario == "secure" ? "AXSecureTextField" as CFString : nil
                     case kAXEnabledAttribute: return scenario == "disabled" ? NSNumber(value: false) : nil
                     case kAXFocusedAttribute: return NSNumber(value: scenario != "unfocused")
-                    case kAXNumberOfCharactersAttribute: return NSNumber(value: 0)
+                    case kAXNumberOfCharactersAttribute: return NSNumber(value: scenario == "nonempty_no_value" ? 1 : 0)
                     case kAXSelectedTextRangeAttribute:
-                        var range = CFRange(location: 0, length: 0)
+                        var range = CFRange(location: scenario == "nonempty_no_value" ? 1 : 0, length: 0)
                         return AXValueCreate(.cfRange, &range)
-                    case kAXValueAttribute: valueRead = true; return "" as CFString
+                    case kAXValueAttribute:
+                        valueRead = true
+                        if ["empty_no_value", "nonempty_no_value", "empty_other_error", "empty_without_proof", "wrong_value_type"].contains(scenario) {
+                            return scenario == "wrong_value_type" ? NSNumber(value: 0) : nil
+                        }
+                        return "" as CFString
                     default: return nil
                     }
                 }, notesEvidence: {
@@ -94,11 +99,16 @@ struct KeyboardInspectHarness {
                         subroleUnsupported: scenario != "subrole_error",
                         enabledUnsupported: scenario != "enabled_error",
                         selectedTextWritable: !["locked", "writability_error"].contains(scenario))
+                }, notesEmptyValue: scenario == "empty_without_proof" ? nil : {
+                    precondition(valueRead, "Empty-value proof must follow the guarded value read")
+                    return scenario != "empty_other_error"
                 })
                 precondition(valueRead)
                 return result
             } catch {
-                precondition(!valueRead, "Unverified Notes field value was read")
+                if !["nonempty_no_value", "empty_other_error", "empty_without_proof", "wrong_value_type"].contains(scenario) {
+                    precondition(!valueRead, "Unverified Notes field value was read")
+                }
                 throw error
             }
         }
@@ -109,11 +119,17 @@ struct KeyboardInspectHarness {
         notesChecks += 1
         try SystemKeyboard.textFieldAllowed(notesBody, text: "\n\n\t")
         notesChecks += 1
+        let emptyNotesBody = try notesField("empty_no_value")
+        precondition(emptyNotesBody.value.isEmpty && emptyNotesBody.selection.location == 0)
+        precondition(emptyNotesBody.metadata["value_source"] as? String == "system_notes_empty_no_value")
+        precondition(emptyNotesBody.metadata["value_utf8_bytes"] as? Int == 0)
+        notesChecks += 1
         for scenario in ["fake_bundle", "fake_path", "fake_executable", "wrong_identifier",
                          "listed_subrole", "listed_enabled", "names_failed", "too_many_names",
                          "duplicate_names", "invalid_name", "subrole_error", "enabled_error",
                          "locked", "writability_error", "secure", "disabled", "unknown_role",
-                         "unfocused", "evidence_failed"] {
+                         "unfocused", "evidence_failed", "nonempty_no_value", "empty_other_error",
+                         "empty_without_proof", "wrong_value_type"] {
             do { _ = try notesField(scenario); fatalError("Unsafe Notes fallback accepted: \(scenario)") }
             catch let error as SystemBridgeFailure {
                 precondition(!error.effectUnknown)

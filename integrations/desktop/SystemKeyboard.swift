@@ -99,7 +99,8 @@ enum SystemKeyboard {
     }
     static func observeField(prepare: () throws -> Void,
                              read: (String) -> CFTypeRef?,
-                             notesEvidence: (() throws -> NotesBodyEvidence)? = nil) throws -> Field {
+                             notesEvidence: (() throws -> NotesBodyEvidence)? = nil,
+                             notesEmptyValue: (() -> Bool)? = nil) throws -> Field {
         try prepare()
         let classification = try classifyField(read: read, notesEvidence: notesEvidence)
         guard let count = read(kAXNumberOfCharactersAttribute) as? NSNumber,
@@ -118,7 +119,18 @@ enum SystemKeyboard {
                     && selection.location <= count.intValue
                     && selection.length <= count.intValue - selection.location,
                     "Keyboard UTF-16 selection is invalid")
-        guard let value = read(kAXValueAttribute) as? String else {
+        let rawValue = read(kAXValueAttribute)
+        let value: String, valueSource: String
+        if let observed = rawValue as? String {
+            value = observed; valueSource = "ax_value"
+        } else if rawValue == nil,
+                  classification["classification_source"] as? String == "system_notes_writable_body",
+                  count.intValue == 0, selection.location == 0, selection.length == 0,
+                  notesEmptyValue?() == true {
+            // Notes exposes an empty writable body as AXError.noValue. Only the
+            // independently observed zero-length metadata permits this derivation.
+            value = ""; valueSource = "system_notes_empty_no_value"
+        } else {
             throw SystemControl.failure("keyboard_unsupported", "Readable keyboard field value is unavailable")
         }
         try require(value.utf8.count <= maxValueBytes,
@@ -132,11 +144,16 @@ enum SystemKeyboard {
                         "Keyboard selection splits a UTF-16 surrogate pair")
         }
         return Field(value: value, selection: selection, metadata: classification.merging([
-            "value_utf8_bytes": value.utf8.count,
+            "value_utf8_bytes": value.utf8.count, "value_source": valueSource,
             "value_utf16_units": units.count, "value_sha256_encoding": "utf-8",
             "value_sha256": SHA256.hash(data: Data(value.utf8)).map { String(format: "%02x", $0) }.joined(),
             "selection_utf16": ["location": selection.location, "length": selection.length],
         ]) { _, value in value })
+    }
+    static func notesEmptyValue(_ element: AXUIElement) -> Bool {
+        var value: CFTypeRef?
+        return AXUIElementCopyAttributeValue(element, kAXValueAttribute as CFString, &value) == .noValue
+            && value == nil
     }
     struct Layout {
         let metadata: [String: Any]
@@ -223,7 +240,8 @@ enum SystemKeyboard {
         }
         let field = try observeField(prepare: { try timeout(element) },
                                      read: { SystemControl.attribute(element, $0) },
-                                     notesEvidence: { try notesBodyEvidence(element, app: app) })
+                                     notesEvidence: { try notesBodyEvidence(element, app: app) },
+                                     notesEmptyValue: { notesEmptyValue(element) })
         let layout = try inputSource(), application = try SystemControl.appIdentity(app)
         let windowToken = try SystemControl.remember(window, app: app)
         let token = try SystemControl.remember(element, app: app)
@@ -233,7 +251,8 @@ enum SystemKeyboard {
         let (finalWindow, finalElement) = try focused()
         let finalField = try observeField(prepare: { try timeout(element) },
                                           read: { SystemControl.attribute(element, $0) },
-                                          notesEvidence: { try notesBodyEvidence(element, app: app) })
+                                          notesEvidence: { try notesBodyEvidence(element, app: app) },
+                                          notesEmptyValue: { notesEmptyValue(element) })
         try require(CFEqual(finalWindow, window) && CFEqual(finalElement, element)
                     && before == revision(application: SystemControl.appIdentity(app), window: windowToken,
                                           element: token, field: finalField, layout: inputSource()),

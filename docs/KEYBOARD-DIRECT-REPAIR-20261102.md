@@ -40,6 +40,13 @@ Beobachtung ersetzt keine spätere eigene Post-Event-Prüfung.
   diese Kombination. Explizit secure/disabled, fremde Pfade, fehlgeschlagene oder
   übergroße Inventare und Read-only bleiben vor Value-Zugriff verweigert.
   Fehlende Metadaten bleiben null, Herkunft system_notes_writable_body.
+- Die private Live-Prüfung zeigte zusätzlich: Notizen meldet im nachgewiesen
+  leeren Body AXValue.noValue bei Zeichenanzahl0 und Auswahl0. Ausschließlich
+  unter derselben Notes-Klassifikation und erneutem ausdrücklichem noValue/nil
+  darf der leere Wert hergeleitet werden; Fehler, unbekannte/nichtleere Werte
+  bleiben verweigert. Die Herkunft system_notes_empty_no_value bleibt sichtbar.
+  Der gezielte Swift-Harness bestand nach diesem Delta erneut mit26 Noteschecks
+  (fünf neu); die ersten privaten Versuche hatten keine Eingabe ausgeführt.
 - Konsole: einfache Eingabe und frischer ChatGPT-Katalogstatus; bisheriger
   Profil-Editor geschlossen unter Erweitert erhalten. Verschwundene ausdrückliche
   Ziele verlangen Neuwahl statt stiller Umleitung zum aktiven Programm.
