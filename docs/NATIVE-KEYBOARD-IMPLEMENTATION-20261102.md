@@ -620,3 +620,79 @@ für eine erfolgreiche Profilaktion exakt zwei zurückgekehrte native Postcalls
 neben dem gebundenen Profilbeleg. Ruff, Node-Syntax und Diffprüfung sind grün;
 Rootreview und gegenseitiger Spezialistenreview sind abgeschlossen. Die drei
 produktiven Prozessgenerationen 78414/78630/78865 waren unverändert.
+
+## Schritt 13 – Intel-Paket geprüft, sichtbare Installation noch offen
+
+Aus dem sauberen abgetrennten Commit
+`73d4ea0dc09979367400574b9163d5263ba151bf` wurde mit dem offiziellen Builder
+der Intel-Snapshot gebaut. Das Versionslabel bleibt `0.8.0rc24`; die neue Quelle
+wird ausdrücklich durch Commit und Hashes unterschieden. Es wurde kein neues
+GitHub-Release und kein Tag erzeugt. Der unabhängige Paketreview bestätigte alle
+475 Manifestdateien und 167 Wheel-Package-Dateien gegen Payload/Snapshot sowie
+die vier Consoleassets. Native: Mach-O x86_64, SystemProtocol1, KeyboardProtocol1,
+sechs offizielle Swiftquellen und CompanionSource-SHA
+`4a2a99f8798216c9366019c6e4bd90adc546ec9e4ca0241683f2e50e0d8be887`.
+
+| Artefakt | SHA256 |
+| --- | --- |
+| Runtime-Bundle | `ca7cd73ac0049124e771903b95b8bb8b934509226c0b343f3f59288c5ef17636` |
+| Wheel | `164fe295b00aa42db26be9a5bc2dfcf4d1b2ccf90df3384782b514efb94b24bf` |
+| Native Binärdatei | `e13b84b90bdc07c98719fbf5aae42a440e9d7fcf20b65868f4bb5d51f85ca4a8` |
+| Pythonbaum, 155 Dateien | `801ba911c186be211436b30df70643688f09e815ebcd9585babe35d1203884e7` |
+
+Der unveränderte offizielle Intel-Smoke bestand isoliertes Prepare,
+authentifizierten Dispatcher mit geladenem Quellvergleich,
+Korruptpaketverweigerung und Config-/Credentialerhalt. Eine separat geprüfte
+kleine Hülle behielt ausschließlich das sonst temporäre private Verzeichnis
+unter0700, damit dieselbe vorbereitete Laufzeit weiterverwendet werden kann.
+Keine Testassertion und kein Dienstablauf wurde dafür verändert.
+
+Genau ein finales `profile-action`-MCP-Szenario bestand aus dieser tatsächlich
+installierten privaten Paketlaufzeit mit genau dieser nativen Binärdatei.
+`passed`, `tests_passed`, `cleanup_complete` und `private_endpoint_absent` sind
+jeweils true. Der Profilbeleg und unabhängige Receiver sind erhalten unter
+`step13-profile-live-01/evidence.json`. Kein erneuter Großtext-/Codex-Agentlauf.
+29 Dateien unveränderter Terminal-/Clipboard-/Task-/Nachrichten-/MCP-/Installer-
+Komponenten wurden bytegenau gegen die echte RC24-Abnahmequelle `023f70f` geprüft.
+Der originale Codex-E2E bleibt ein historischer Komponentenbeleg und wird nicht
+als neuer Lauf dieses Snapshots bezeichnet. Der explizite Delta-Beleg liegt
+unter `step13-delta-acceptance.json` im bestehenden Backuproot.
+
+Neue private Kopien der bereits geprüften Installationshelfer pinnen den neuen
+Commit, Source-/Bundle-/Nativehash, KeyboardProtocol und alle sechs Swiftquellen.
+Sie ergänzen Sicherung/Unchanged-Prüfung einer vorhandenen Profilablage und
+separate Consoleasset-Prüfung. Die Aktivierung verlangt den echten neuen
+Paket-/Keyboardbeleg, die getrennten Originalbelege und eine frische Baseline.
+Der unabhängige Review hat diese begrenzten Anpassungen freigegeben.
+
+### Noch offene Sichtbarkeitsbedingung
+
+Der erste Auftrag zum getrennten Installationsfenster endete vor Erzeugung mit
+`session_window_inventory_pending`. Das erhaltene Unknown wurde nicht wiederholt
+oder zurückgesetzt. Der gespeicherte ungekapselte Phasencode stammt aus
+`TerminalWindowProof.prepare().snapshot()`, vor `native_open_source()` und dessen
+mutierendem Dispatch. Damit ist für diesen konkreten Auftrag der Vorwirkungsausgang
+belegt; fehlende Creationreceipt allein wäre dafür nicht ausreichend.
+
+Die anschließende rein lesende Inventur fand fünf vorhandene logische Ansichten
+231/327/590/1567/1584, drei AX-Fenster und nur ein sichtbares CG-Fenster. Genau zwei
+AX-Fenster melden `minimized=true`. Eine einzige getrennte, frisch an Terminal-PID
+und volle Prozessidentität gebundene App-Aktivierung lieferte `frontmost=true`,
+änderte jedoch den Minimisierungszustand nicht. Drei begrenzte Nachbeobachtungen
+bestätigten denselben Mismatch. Alle logischen IDs/TTYs und die Appgeneration
+blieben unverändert; es wurde weder ein neues Fenster erzeugt noch eingegeben.
+
+Die bestehende strikte Fensterprüfung wurde nicht umgangen. Der Nutzer wurde
+gebeten, die beiden minimierten Fenster wieder einzublenden. Erst nach gesunder
+frischer Inventur folgen ein neuer eigener Installationsintent und die einzeln
+bestätigten Schritte Core→Console→App→Verify. RC24-Quelle `023f70f` mit
+Core78414/Console78630/App78865 bleibt bis dahin installiert. Neue Tastaturgrants
+werden nicht automatisch vergeben; nach Installation kann der Nutzer sie über
+**Rechte → Voll erlaubt → Übernehmen** ausdrücklich aktivieren.
+
+Das geprüfte lokale ZIP liegt separat unter
+`~/Downloads/KiraBridge-Keyboard-Intel-73d4ea0/`, mit eigener Akzeptanzdatei,
+Snapshotbeschreibung und Prüfsummen. Die frühere RC24-Lieferung und deren
+GitHub-Release bleiben erhalten. Der Paketnachweis ersetzt nicht die noch offene
+produktive Installation und Prüfung der tatsächlichen laufenden Quelle.
+ZIP-SHA256: `3629db3c8b9b574b1e80e6d7975e24637c5c26da72bb5269554f5133b4107fe9`.
