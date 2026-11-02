@@ -10,6 +10,7 @@ import uuid
 from pydantic import ValidationError
 
 from kirabridge.bridge_core.models import BridgeError, TaskRequest
+from kirabridge.keyboard_control import KeyboardControlInput
 from kirabridge.keyboard_profile_manager import PROFILE_INPUTS, ActionName
 from kirabridge.keyboard_profiles import KeyboardProfile, Revision, Slug
 from kirabridge.permissions import decision
@@ -19,6 +20,7 @@ from kirabridge.security_manager import request_hash
 
 ALLOWED = {
     "apps.list": SYSTEM_INPUTS["apps.list"],
+    "keyboard.control": KeyboardControlInput,
     **PROFILE_INPUTS,
     "keyboard.shortcuts.discover": SYSTEM_INPUTS["keyboard.shortcuts.discover"],
 }

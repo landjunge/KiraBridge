@@ -12,13 +12,32 @@
 <div class="view" id="doctor" hidden><div class="section-heading"><h2>Reparatur-Doktor</h2><button id="doctor-check">Prüfen</button></div><p class="description">Prüft Verbindungen, Prozesse, Rechte und Terminals.</p><div id="doctor-checks" class="doctor-checks"><p>Noch keine Prüfung durchgeführt.</p></div><div class="doctor-footer"><span id="doctor-summary" class="small">Laufende Arbeit bleibt erhalten.</span><button id="doctor-repair" class="primary">Probleme beheben</button></div></div>
 <div class="view" id="permissions" hidden><div class="section-heading"><h2>Rechte</h2><span class="small">Gilt für alle Zugänge</span></div><fieldset class="permission-options"><legend class="sr-only">Rechtestufe</legend><label><input type="radio" name="permission" value="full"><span><strong>Voll erlaubt</strong><small>Alle Aktionen mit deinen erteilten Freigaben. Ohne zusätzliche Nachfrage.</small></span></label><label><input type="radio" name="permission" value="medium"><span><strong>Mittel</strong><small>Lesen automatisch. Änderungen und Ausführung nach deiner Freigabe.</small></span></label><label><input type="radio" name="permission" value="ask"><span><strong>Nur mit Erlaubnis</strong><small>Aufträge warten auf Freigabe; dauerhafte Ausnahmen stehen unten.</small></span></label></fieldset><div class="permission-footer"><p class="small" id="permission-detail">Vorhandene Freigaben werden gelesen.</p><button id="permissions-save" class="primary">Übernehmen</button></div><div id="permission-exceptions" class="small"></div><div id="approvals" class="approvals"></div></div>
 <div class="view" id="keyboard" hidden>
-<div class="section-heading"><h2>Tastaturprofile</h2><button type="button" id="keyboard-refresh">Profile und Programme laden</button></div>
-<p class="small">Profile speichern Belegungen. Eine Vorschau bestätigt keine native Ausführung. Menübeobachtungen bleiben unbestätigte Kandidaten.</p>
+<div class="section-heading"><h2>Tastatur</h2><button type="button" id="keyboard-apps-refresh">Programme aktualisieren</button></div>
+<p class="small">Laufende Programme werden automatisch erkannt. Wähle dein Ziel und sende Text oder eine Tastenkombination.</p>
+<form id="keyboard-direct-form" class="keyboard-direct">
+<label for="keyboard-apps">An dieses Programm senden</label><select id="keyboard-apps" aria-describedby="keyboard-app-help"><option value="">Programm wählen</option></select>
+<p class="small" id="keyboard-app-help">Programme werden beim Öffnen geladen. Das gewählte Programm wird vor dem Senden aktiviert.</p>
+<label for="keyboard-kind">Was möchtest du senden?</label><select id="keyboard-kind"><option value="text">Text</option><option value="key">Taste oder Tastenkombination</option></select>
+<div id="keyboard-text-fields" class="keyboard-column">
+<label for="keyboard-text">Text</label><textarea id="keyboard-text" class="keyboard-text" autocomplete="off" placeholder="Text eingeben …" aria-describedby="keyboard-text-help"></textarea>
+<label class="keyboard-check"><input type="checkbox" id="keyboard-submit"> Anschließend Return senden</label>
+<p class="small" id="keyboard-text-help">Zeilenumbrüche bleiben erhalten. Gesendet wird erst mit „Senden“. Die lokale Konsole nimmt bis zu 32 KiB pro Auftrag an.</p>
+</div>
+<div id="keyboard-key-fields" class="keyboard-column" hidden>
+<label for="keyboard-key">Taste</label><select id="keyboard-key"><option value="enter">Return ↵</option><option value="keypad_enter">Enter (Ziffernblock)</option><option value="tab">Tab ⇥</option><option value="escape">Escape</option><option value="space">Leertaste</option><option value="backspace">Rückschritt ⌫</option><option value="delete">Vorwärts löschen ⌦</option><option value="left">Pfeil links ←</option><option value="right">Pfeil rechts →</option><option value="up">Pfeil hoch ↑</option><option value="down">Pfeil runter ↓</option><option value="home">Home</option><option value="end">Ende</option><option value="page_up">Bild hoch</option><option value="page_down">Bild runter</option><option value="f1">F1</option><option value="f2">F2</option><option value="f3">F3</option><option value="f4">F4</option><option value="f5">F5</option><option value="f6">F6</option><option value="f7">F7</option><option value="f8">F8</option><option value="f9">F9</option><option value="f10">F10</option><option value="f11">F11</option><option value="f12">F12</option><option value="character">Eigenes Zeichen …</option></select>
+<label for="keyboard-character" id="keyboard-character-label" hidden>Ein Zeichen (zum Beispiel a für ⌘A)</label><input id="keyboard-character" type="text" hidden autocomplete="off" spellcheck="false" aria-describedby="keyboard-key-help">
+<fieldset class="keyboard-modifiers"><legend>Zusätzliche Tasten</legend><label class="keyboard-check"><input type="checkbox" value="command"> ⌘ Command</label><label class="keyboard-check"><input type="checkbox" value="option"> ⌥ Option</label><label class="keyboard-check"><input type="checkbox" value="control"> ⌃ Control</label><label class="keyboard-check"><input type="checkbox" value="shift"> ⇧ Shift</label></fieldset>
+<p class="small" id="keyboard-key-help">Für ⌘A: „Eigenes Zeichen“, a und Command wählen. Großbuchstaben schalten Shift nicht automatisch ein.</p>
+</div>
+<div class="keyboard-buttons"><button type="button" id="keyboard-send" class="primary">Senden</button><span class="small" id="keyboard-destination">Wähle ein Zielprogramm.</span></div>
+</form>
+<details id="keyboard-advanced" class="keyboard-advanced"><summary>Erweitert: Profile und Menübelegungen</summary>
+<div class="section-heading"><h3>Gespeicherte Tastaturprofile</h3><button type="button" id="keyboard-refresh">Profile und Programme laden</button></div>
+<p class="small">Profile speichern eigene Belegungen. Menübeobachtungen zeigen unbestätigte Kandidaten.</p>
 <form id="keyboard-form" class="keyboard-grid">
 <div class="keyboard-column">
 <label for="keyboard-profiles">Gespeicherte Profile</label><select id="keyboard-profiles"><option value="">Profil wählen</option></select>
 <div class="keyboard-buttons"><button type="button" id="keyboard-load">Laden</button><button type="button" id="keyboard-new">Neu</button></div>
-<label for="keyboard-apps">Zielprogramm</label><select id="keyboard-apps"><option value="">Programm wählen</option></select>
 <label for="keyboard-actions">Gespeicherte Aktion</label><select id="keyboard-actions"><option value="">Aktion wählen</option></select>
 <p class="small" id="keyboard-binding">Noch kein gespeichertes Profil geladen.</p>
 <button type="button" id="keyboard-run" class="primary">Programm aktivieren und Aktion ausführen</button>
@@ -33,7 +52,7 @@
 <label for="keyboard-context">Kontextangaben für die Vorschau · JSON</label><textarea id="keyboard-context" class="keyboard-context" spellcheck="false">{}</textarea>
 <button type="button" id="keyboard-preview">Caller-Vorschau prüfen</button>
 <pre id="keyboard-preview-result" class="keyboard-output">Noch keine Vorschau. Angaben sind kein nativer Kontextbeleg.</pre>
-</div></form>
+</div></form></details>
 <div class="keyboard-buttons"><button type="button" id="keyboard-status">Auftragsstatus prüfen</button><button type="button" id="keyboard-rights" data-go="permissions">Rechte öffnen</button></div>
 <p id="keyboard-task" class="small" role="status" aria-live="polite">Noch kein Auftrag. Schreibaufrufe werden nicht automatisch wiederholt.</p>
 </div>

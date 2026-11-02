@@ -111,7 +111,40 @@ wurden nicht wiederholt. Eine kleine ergänzte App-Metadatenangabe kennzeichnet
 normale GUI-Programme; die Konsole kann damit Hintergrundhelfer ausblenden,
 während die allgemeine App-API diese unverändert zugänglich hält.
 
-## Schritt 3 – Einfache Oberfläche und reale Abnahme
+## Schritt 3 – Einfache Oberfläche, vorhandene Funktionen erhalten
 
-Die einfache Konsole und die gezielte reale ChatGPT-Abnahme folgen als getrennte
-Schritte. Bis zur Paket-/Laufzeitabnahme bleibt der installierte Stand unverändert.
+Der Tastaturbereich lädt beim Öffnen automatisch die laufenden Programme.
+Normale GUI-Programme erscheinen namentlich, explizite Hintergrundhelfer nicht;
+alte Server ohne dieses Metadatum bleiben kompatibel. Es wird kein Browser oder
+anderes Ziel geraten. Der Nutzer wählt ein Programm, Text oder Taste/Kombination
+und „Senden“. Return ist bei Text ein ausdrückliches Häkchen. Der Backendweg ist
+derselbe einzelne `keyboard.control`-Auftrag wie beim MCP-Werkzeug.
+
+Profilverwaltung mit CAS, Vorschau, Profilaktionen und Menübeobachtung bleibt
+vollständig unter „Erweitert“ verfügbar. Die bisherige Intent-/Unknown-/GET-only-
+Behandlung wird wiederverwendet. IME-Komposition, Enter im Textfeld und Doppelklick
+senden nicht versehentlich mehrfach. UTF8-/Unicode- und32-KiB-HTTP-Grenzen werden
+vor Persistierung/POST geprüft; die Core-Textgrenze bleibt1MiB.
+
+Ein neuer Backendfall bestand in0,35s, fünf neue isolierte Browserfälle bestanden
+im ersten Lauf. Nur der anschließende GUI-Programmfilter erhielt einen weiteren
+gezielten Browserfall. Alte Browsermatrizen wurden nicht wiederholt. Geprüft sind
+direkter Text/Return, Taste/Modifier, Antwortverlust/Neuladen/GET-only, fehlende
+Belege, Draft-/Größenschutz und weiterhin vorhandene erweiterte Funktionen.
+Screenshot visuell geprüft; keine personenbezogenen Browserprofile verwendet.
+
+Für die reale Prüfung erhält die vorhandene eigene Fixture zusätzlich einen
+fokussierbaren Button mit unabhängigen Down-/Up-Zählern. Die TextArea benutzt
+nun ihre normale Framework-Subrole; der alte erzwungene Leerstring ist optional.
+Ein kleiner separater Sessionhelfer verwaltet ausschließlich eine neue UUID-App,
+ihre Prozessgeneration und Receiverdateien; er sendet keine Tastatureingaben und
+startet keinen alternativen MCP-Server. Code-/Offlineprüfungen und ein einzelner
+Fixturecompile sind belegt. Erst Root sendet die tatsächlichen Eingaben über den
+vorhandenen authentifizierten ChatGPT-Connector. Die vorbereitete Fixture ist
+noch kein Liveeingabenachweis.
+
+## Paket, Installation und tatsächliche ChatGPT-Prüfung
+
+Noch ausstehend. Die bisherigen isolierten Belege werden wiederverwendet;
+keine wiederholte Vollsuite, kein neuer Codex-Agentlauf und keine großen CI-Läufe.
+Bis zur Paket-/Laufzeitabnahme bleibt der installierte Stand unverändert.

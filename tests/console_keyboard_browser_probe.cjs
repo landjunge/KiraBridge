@@ -22,9 +22,130 @@ const status = {
   permission_details: { chatgpt: { label: "Voll erlaubt", exceptions: [] } },
   pending: [], peers_connected: true, maintenance: null
 };
-const cases = ["profiles_and_discovery", "one_run", "lost_response", "lost_response_preparation", "completed_preparation", "failed_intent", "failed_main", "missing_post_proof", "candidate"];
+const automaticCases = ["automatic_text_return", "automatic_key_combination", "automatic_lost_response", "automatic_limit_and_draft", "automatic_advanced", "automatic_app_visibility"];
+const cases = ["profiles_and_discovery", "one_run", "lost_response", "lost_response_preparation", "completed_preparation", "failed_intent", "failed_main", "missing_post_proof", "candidate", ...automaticCases];
+
+async function checkAutomatic(page, name, posts, gets) {
+  const controls = () => posts.filter(p => p.operation === "keyboard.control");
+  const target = { pid: 12345, expected_started_at: 123.5 };
+  await page.waitForFunction(() => document.querySelector("#keyboard-apps").options.length === 3 && !document.querySelector("#keyboard-apps").disabled);
+  assert.deepEqual(posts.map(p => p.operation), ["apps.list"], "Opening the tab only discovers programs");
+  assert.equal(await page.locator("#keyboard-apps").inputValue(), "", "The console browser must not become an implicit target");
+  assert.ok(await page.locator("#keyboard-send").isDisabled());
+  assert.equal(await page.locator("#keyboard-advanced").getAttribute("open"), null);
+  assert.match(await page.locator("#keyboard-apps").innerText(), /Notizen/);
+  assert.doesNotMatch(await page.locator("#keyboard-apps").innerText(), /PID|com\.example/);
+  await page.locator('[data-view="overview"]').click();
+  await page.locator('[data-view="keyboard"]').click();
+  assert.equal(posts.length, 1, "The discovery has no recurring polling loop");
+  await page.locator("#keyboard-apps").selectOption("12345:123.5");
+
+  if (name === "automatic_app_visibility") {
+    assert.deepEqual(await page.locator("#keyboard-apps option").evaluateAll(options => options.map(option => option.value)), ["", "12345:123.5", "23456:234.5"], "Keep normal apps and older-server entries; omit explicit background helpers");
+    assert.doesNotMatch(await page.locator("#keyboard-apps").innerText(), /Hintergrundhelfer/);
+    assert.equal(controls().length, 0);
+  } else if (name === "automatic_text_return") {
+    const text = "Hallo 👋\nzweite Zeile";
+    await page.locator("#keyboard-text").fill(text);
+    await page.locator("#keyboard-text").press("Enter");
+    assert.equal(controls().length, 0, "Enter in the text field must not send");
+    await page.locator("#keyboard-text").fill(text);
+    await page.locator("#keyboard-text").dispatchEvent("compositionstart");
+    assert.ok(await page.locator("#keyboard-send").isDisabled(), "IME composition must not send a partial input");
+    await page.locator("#keyboard-text").dispatchEvent("compositionend");
+    await page.locator("#keyboard-send").click();
+    await page.waitForFunction(() => document.querySelector("#notice").textContent.includes("Text im Zielprogramm bestätigt"));
+    assert.deepEqual(controls()[0].args, { ...target, text, submit: false });
+    await page.locator("#keyboard-submit").check();
+    await page.locator("#keyboard-send").click();
+    await page.waitForFunction(() => document.querySelector("#notice").textContent.includes("Return wurde gesendet"));
+    assert.deepEqual(controls()[1].args, { ...target, text, submit: true });
+    assert.equal(await page.locator("#keyboard-text").inputValue(), text);
+    const screenshot = process.argv[2].replace(/\.json$/, "") + "-text.png";
+    await page.screenshot({ path: screenshot, fullPage: true });
+  } else if (name === "automatic_key_combination") {
+    await page.locator("#keyboard-kind").selectOption("key");
+    assert.ok(await page.locator("#keyboard-text-fields").isHidden());
+    await page.locator("#keyboard-key").selectOption("character");
+    await page.locator("#keyboard-character").fill("a");
+    await page.locator('.keyboard-modifiers input[value="command"]').check();
+    await page.locator("#keyboard-character").press("Enter");
+    assert.equal(controls().length, 0, "A key field's Enter must not submit its form");
+    await page.locator("#keyboard-send").evaluate(button => { button.click(); button.click(); });
+    await page.waitForFunction(() => document.querySelector("#notice").textContent.includes("Native Tastendruck-Aufrufe bestätigt"));
+    assert.equal(controls().length, 1, "Double-click may create only one native input intent");
+    assert.deepEqual(controls()[0].args, { ...target, key: { character: "a" }, modifiers: ["command"] });
+    assert.equal(gets.length, 1, "An open task is resolved by the existing GET status path");
+    await page.locator("#keyboard-key").selectOption("escape");
+    await page.locator("#keyboard-send").click();
+    await page.waitForFunction(() => document.querySelector("#notice").textContent.includes("nicht vollständig bestätigt"));
+    assert.ok(await page.locator("#keyboard-send").isDisabled(), "Missing native receipt must retain the input intent");
+    await page.locator("#keyboard-status").click();
+    await page.waitForFunction(() => !document.querySelector("#keyboard-status").disabled);
+    assert.equal(controls().length, 2, "Status does not replay a missing receipt");
+  } else if (name === "automatic_lost_response") {
+    const draft = "Diese Eingabe genau einmal senden.";
+    await page.locator("#keyboard-text").fill(draft);
+    await page.locator("#keyboard-send").evaluate(button => { button.click(); button.click(); });
+    await page.waitForFunction(() => document.querySelector("#keyboard-task").textContent.includes("ungewiss"));
+    assert.equal(await page.locator("#keyboard-text").inputValue(), draft, "A lost response must keep the current draft");
+    const sent = controls()[0].id, count = posts.length;
+    await page.reload();
+    await page.locator('[data-view="keyboard"]').click();
+    assert.ok(await page.locator("#keyboard-send").isDisabled());
+    assert.equal(posts.length, count, "A restored unknown intent must suppress automatic discovery and sends");
+    await page.locator("#keyboard-status").click();
+    await page.waitForFunction(() => document.querySelector("#keyboard-task").textContent.includes("unknown"));
+    assert.equal(controls().length, 1);
+    assert.equal(posts.length, count);
+    assert.deepEqual(gets, ["/api/control/keyboard/task/ui-keyboard-" + sent.replaceAll("-", "") + "-main"]);
+    assert.ok(await page.locator("#keyboard-send").isDisabled());
+    assert.equal(await page.evaluate(() => JSON.parse(sessionStorage.getItem("kirabridge.keyboard.intent")).id), sent);
+  } else if (name === "automatic_limit_and_draft") {
+    // The literal is under 32 KiB; JSON escaping makes the actual body exceed it.
+    const large = '"'.repeat(17000);
+    await page.locator("#keyboard-text").fill(large);
+    await page.locator("#keyboard-send").click();
+    await page.waitForFunction(() => document.querySelector("#notice").textContent.includes("32 KiB"));
+    assert.equal(controls().length, 0, "Oversized JSON must be rejected before transport");
+    assert.equal(await page.locator("#keyboard-text").inputValue(), large);
+    assert.ok(await page.locator("#keyboard-send").isEnabled(), "A local size error must not create an unknown lock");
+    assert.equal(await page.evaluate(() => JSON.parse(sessionStorage.getItem("kirabridge.keyboard.intent")).operation), "apps.list");
+    await page.locator("#keyboard-text").fill("Kleiner Entwurf bleibt erhalten.");
+    await page.locator("#keyboard-apps-refresh").click();
+    await page.waitForFunction(() => !document.querySelector("#keyboard-apps-refresh").disabled);
+    assert.equal(await page.locator("#keyboard-text").inputValue(), "Kleiner Entwurf bleibt erhalten.");
+    await page.locator("#keyboard-send").click();
+    await page.waitForFunction(() => document.querySelector("#notice").textContent.includes("Text im Zielprogramm bestätigt"));
+    assert.equal(controls().length, 1);
+  } else if (name === "automatic_advanced") {
+    await page.locator("#keyboard-advanced summary").click();
+    for (const id of ["profiles", "load", "new", "actions", "run", "discover", "menu-next", "editor", "save", "delete", "context", "preview", "preview-result"]) {
+      assert.equal(await page.locator("#keyboard-" + id).count(), 1, "Existing advanced control remains: " + id);
+    }
+    await page.locator("#keyboard-refresh").click();
+    await page.waitForFunction(() => document.querySelector("#keyboard-profiles").options.length === 2 && !document.querySelector("#keyboard-refresh").disabled);
+    await page.locator("#keyboard-profiles").selectOption("fixture");
+    await page.locator("#keyboard-load").click();
+    await page.waitForFunction(() => document.querySelector("#keyboard-editor").value.includes('"select_all"'));
+    await page.locator("#keyboard-actions").selectOption("select_all");
+    const draft = JSON.stringify({ ...profile, id: "edited_fixture" });
+    await page.locator("#keyboard-editor").fill(draft);
+    assert.ok(await page.locator("#keyboard-run").isDisabled(), "Dirty profiles remain blocked");
+    await page.locator("#keyboard-apps-refresh").click();
+    await page.waitForFunction(() => !document.querySelector("#keyboard-apps-refresh").disabled);
+    assert.equal(await page.locator("#keyboard-editor").inputValue(), draft);
+    await page.locator("#keyboard-discover").click();
+    await page.waitForFunction(() => document.querySelector("#keyboard-menu").textContent.includes("onerror"));
+    assert.equal(await page.locator("#keyboard img").count(), 0);
+    assert.equal(await page.evaluate(() => window.injected), undefined);
+    assert.equal(controls().length, 0);
+  }
+  if (name !== "automatic_advanced") assert.ok(posts.every(p => ["apps.list", "keyboard.control"].includes(p.operation)), "Direct input does not require any profile operation");
+}
 
 async function check(browser, name) {
+  const automatic = automaticCases.includes(name);
   const context = await browser.newContext({ viewport: { width: 1180, height: 900 } });
   const posts = [], gets = [], errors = [], tasks = new Map();
   let networkLost = false;
@@ -50,11 +171,20 @@ async function check(browser, name) {
       let result = {}, state = "completed", primary = true;
       switch (body.operation) {
         case "keyboard.profiles.list": result = { profiles: [{ profile_id: "fixture", revision, app: document.app }] }; break;
-        case "apps.list": result = { applications: [{ pid: 12345, started_at: 123.5, bundle_id: document.app.bundle_id, name: '<img src=x onerror="window.injected=1">' }] }; break;
+        case "apps.list":
+          result = { applications: automatic ? [{ pid: 12345, started_at: 123.5, bundle_id: document.app.bundle_id, name: "Notizen", active: false }, { pid: 23456, started_at: 234.5, bundle_id: "org.example.Browser", name: "Webbrowser", active: true, user_application: true }] : [{ pid: 12345, started_at: 123.5, bundle_id: document.app.bundle_id, name: '<img src=x onerror="window.injected=1">' }] };
+          if (name === "automatic_app_visibility") result.applications.push({ pid: 34567, started_at: 345.5, bundle_id: document.app.bundle_id, name: "Hintergrundhelfer", user_application: false });
+          break;
         case "keyboard.profiles.get": result = snapshot(); break;
         case "keyboard.profiles.put": result = { ...snapshot(), profile: body.args.profile }; break;
         case "keyboard.profiles.resolve": result = { context_verified: false, execution_authorized: false, effect: "none", status: "resolved" }; break;
         case "keyboard.shortcuts.discover": result = { revision, entries: [{ name: '<img src=x onerror="window.injected=1">', candidate_only: true }], coverage: "partial", reasons: ["menu_identity_attribute_unavailable"], cached: false }; break;
+        case "keyboard.control":
+          result = { automatic_target: true, resolved_application: { pid: 12345, started_at: 123.5, name: "Notizen" }, app_processing_confirmed: false };
+          if (body.args.text !== undefined) Object.assign(result, { text_verified: true, selection_verified: true, return_posted: body.args.submit === true });
+          else if (body.args.key.named !== "escape") result.post_calls_returned = 2;
+          if (name === "automatic_key_combination" && body.args.key.character) state = "running";
+          break;
         case "run_profile":
           state = name.startsWith("failed_") ? "failed" : ["completed_preparation", "missing_post_proof"].includes(name) ? "completed" : "running";
           primary = !["completed_preparation", "failed_intent"].includes(name);
@@ -66,6 +196,7 @@ async function check(browser, name) {
       const task = { id, state, result, error: state === "failed" ? { code: "keyboard_profile_conflict" } : null, ui_primary: primary, ui_incomplete: !primary, ui_stage: primary ? "main" : "profile", ui_workflow_status: primary ? "primary" : "halted", ui_halted: !primary || state === "failed" };
       tasks.set(id, { request_id: body.id, task, status_url: "/api/control/keyboard/task/" + id });
       if (name.startsWith("lost_response") && body.operation === "run_profile") { networkLost = true; return route.abort("failed"); }
+      if (name === "automatic_lost_response" && body.operation === "keyboard.control") { networkLost = true; return route.abort("failed"); }
       return json(tasks.get(id));
     }
     if (url.pathname.startsWith("/api/control/keyboard/task/")) {
@@ -84,7 +215,14 @@ async function check(browser, name) {
   try {
     await page.goto(origin);
     await page.locator('[data-view="keyboard"]').click();
-    assert.equal(posts.length, 0, "Opening the tab must not dispatch anything");
+    if (automatic) {
+      await checkAutomatic(page, name, posts, gets);
+      assert.deepEqual(errors, []);
+      return { name, passed: true, keyboard_posts: posts.length, status_gets: gets.length };
+    }
+    await page.waitForFunction(() => document.querySelector("#keyboard-apps").options.length === 2 && !document.querySelector("#keyboard-apps").disabled);
+    assert.deepEqual(posts.map(p => p.operation), ["apps.list"], "Opening the tab only discovers programs");
+    await page.locator("#keyboard-advanced summary").click();
     await page.locator("#keyboard-refresh").click();
     await page.waitForFunction(() => document.querySelector("#keyboard-apps").options.length === 2);
     await page.locator("#keyboard-profiles").selectOption("fixture");

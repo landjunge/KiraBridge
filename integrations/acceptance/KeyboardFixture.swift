@@ -26,6 +26,16 @@ final class KeyboardTextView: NSTextView {
     override func keyUp(with event: NSEvent) { upCount += 1 }
 }
 
+/// A separate non-text focus target records pairs without invoking an action.
+@MainActor
+final class KeyboardButton: NSButton {
+    var downCount = 0
+    var upCount = 0
+    override var acceptsFirstResponder: Bool { true }
+    override func keyDown(with event: NSEvent) { downCount += 1 }
+    override func keyUp(with event: NSEvent) { upCount += 1 }
+}
+
 @main
 @MainActor
 struct KeyboardFixture {
@@ -42,7 +52,9 @@ struct KeyboardFixture {
                               styleMask: [.titled, .closable, .resizable], backing: .buffered, defer: false)
         window.title = "KiraBridge native keyboard acceptance – \(nonce)"
         window.collectionBehavior = [.moveToActiveSpace]
-        let scroll = NSScrollView(frame: window.contentView!.bounds)
+        let content = NSView(frame: window.contentView!.bounds)
+        let scroll = NSScrollView(frame: NSRect(x: 0, y: 48, width: content.bounds.width,
+                                               height: content.bounds.height - 48))
         scroll.autoresizingMask = [.width, .height]
         scroll.hasVerticalScroller = true
         let editor = KeyboardTextView(frame: scroll.bounds)
@@ -54,8 +66,15 @@ struct KeyboardFixture {
         editor.isAutomaticDashSubstitutionEnabled = false
         editor.isAutomaticSpellingCorrectionEnabled = false
         editor.isAutomaticTextReplacementEnabled = false
-        editor.setAccessibilitySubrole(NSAccessibility.Subrole(rawValue: ""))
+        if info["FixtureLegacyEmptySubrole"] as? Bool == true {
+            editor.setAccessibilitySubrole(NSAccessibility.Subrole(rawValue: ""))
+        }
         scroll.documentView = editor
+        let button = KeyboardButton(frame: NSRect(x: 12, y: 8, width: 280, height: 32))
+        button.title = "Keyboard receiver (no action)"
+        button.action = nil
+        content.addSubview(scroll)
+        content.addSubview(button)
         // Standard Cocoa key-equivalent routing, also visible to menu discovery.
         let menu = NSMenu(title: "Keyboard Fixture")
         let applicationItem = NSMenuItem()
@@ -70,7 +89,7 @@ struct KeyboardFixture {
         editItem.submenu = editMenu
         menu.addItem(editItem)
         app.mainMenu = menu
-        window.contentView = scroll
+        window.contentView = content
         window.makeKeyAndOrderFront(nil)
         window.makeFirstResponder(editor)
         app.activate(ignoringOtherApps: true)
@@ -88,9 +107,12 @@ struct KeyboardFixture {
                 "down_count": editor.downCount, "up_count": editor.upCount,
                 "return_count": editor.returnCount, "clipboard_generation": NSPasteboard.general.changeCount,
                 "window_key": window.isKeyWindow, "editor_first_responder": window.firstResponder === editor,
+                "button_first_responder": window.firstResponder === button,
+                "button_down_count": button.downCount, "button_up_count": button.upCount,
                 "accessibility_enabled": editor.isAccessibilityEnabled(),
                 "accessibility_focused": editor.isAccessibilityFocused(),
                 "accessibility_role": editor.accessibilityRole()?.rawValue ?? "missing",
+                "accessibility_subrole": editor.accessibilitySubrole()?.rawValue as Any? ?? NSNull(),
             ]
             value.merge(extra) { _, new in new }
             let temporary = root.appendingPathComponent(".receipt-\(UUID().uuidString).json")
@@ -117,6 +139,10 @@ struct KeyboardFixture {
                     editor.string = ""
                     editor.setSelectedRange(NSRange(location: 0, length: 0))
                     editor.downCount = 0; editor.upCount = 0; editor.returnCount = 0
+                    button.downCount = 0; button.upCount = 0
+                } else if operation == "focus_button" {
+                    window.makeKeyAndOrderFront(nil)
+                    window.makeFirstResponder(button)
                 }
                 try? receipt("receipt-\(id).json")
                 if operation == "close" { app.terminate(nil) }

@@ -212,6 +212,32 @@ async def test_duplicate_posts_approve_exact_own_task_once_and_get_never_dispatc
     assert all(not n for n in rpc.notices.values())
 
 
+async def test_profile_free_control_is_one_exact_main_task_without_replay(
+    bridge, config, monkeypatch
+):
+    _, backend, rpc, _ = console(bridge, config, monkeypatch)
+    request = value(
+        "keyboard.control",
+        {
+            "pid": 123,
+            "expected_started_at": 1700000000.125,
+            "key": {"character": "a"},
+            "modifiers": ["command"],
+        },
+    )
+    first = await backend.request(request)
+    assert first["task"]["state"] == "completed" and first["task"]["ui_primary"]
+    assert first["task"]["operation"] == "keyboard.control"
+    assert await backend.request(request) == first
+    assert (await backend.status(first["task"]["id"]))["state"] == "completed"
+    tasks = [call[1]["request"] for call in rpc.calls if call[0] == "task_request"]
+    assert len(tasks) == 1
+    assert tasks[0]["operation"] == "keyboard.control"
+    assert tasks[0]["arguments"] == {**request["args"], "submit": False}
+    assert rpc.approvals == [first["task"]["id"]]
+    assert all(not notices for notices in rpc.notices.values())
+
+
 async def test_missing_capability_and_foreign_approval_are_not_bypassed(
     bridge, config, monkeypatch
 ):
