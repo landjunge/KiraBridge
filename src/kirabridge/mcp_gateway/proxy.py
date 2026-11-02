@@ -2,6 +2,7 @@
 
 import asyncio
 import json
+import time
 
 from mcp.server.lowlevel import NotificationOptions, Server
 from mcp.server.stdio import stdio_server
@@ -20,6 +21,17 @@ class DaemonConnection:
         self.lock = asyncio.Lock()
         self.revision = None
         self.change_generation = 0
+        self.catalog_lock = asyncio.Lock()
+        self._catalog = None
+        self._catalog_generation = None
+        self._catalog_read_at = 0.0
+        self._catalog_epoch = None
+
+    def connection_generation(self):
+        return (
+            self.pool.sessions.get(self.endpoint.id),
+            self.pool.connection_ids.get(self.endpoint.id),
+        )
 
     async def ensure_connection(self):
         try:
@@ -44,20 +56,70 @@ class DaemonConnection:
             raise failure from None
 
     async def call_tool(self, name, arguments, *, routine_health=False):
-        tools = await self.list_tools()
+        tools = await self.tools_for_call()
         if name not in {tool.name for tool in tools}:
-            raise BridgeError("tool_unavailable", "Tool absent from the current daemon catalog")
+            # Newly advertised tools need not wait for the short metadata TTL.
+            tools = await self.list_tools()
+            if name not in {tool.name for tool in tools}:
+                raise BridgeError("tool_unavailable", "Tool absent from the current daemon catalog")
         if routine_health:
-            return await self.pool.call(self.endpoint.id, name, arguments, routine_health=True)
-        return await self.pool.call(self.endpoint.id, name, arguments)
+            result = await self.pool.call(self.endpoint.id, name, arguments, routine_health=True)
+        else:
+            result = await self.pool.call(self.endpoint.id, name, arguments)
+        data = result.structuredContent
+        discovery = data.get("discovery") if isinstance(data, dict) else None
+        if isinstance(discovery, dict) and self._catalog_epoch is not None:
+            if any(
+                key in discovery and discovery[key] != value
+                for key, value in self._catalog_epoch.items()
+            ):
+                self._catalog = None
+        return result
+
+    async def tools_for_call(self):
+        """Cache schemas for at most one second, never execution or authorization.
+
+        The daemon still validates current permissions for every call. Explicit
+        discovery stays fresh; notifications, epochs and connection changes expire
+        this local metadata immediately. Failed refreshes never serve old schemas.
+        """
+        await self.ensure_connection()
+        async with asyncio.timeout(self.pool.call_timeout), self.catalog_lock:
+            if (
+                self._catalog is not None
+                and self._catalog_generation == self.connection_generation()
+                and self.endpoint.id not in self.pool.catalog_dirty
+                and self.pool.catalogs.get(self.endpoint.id) is self._catalog
+                and time.monotonic() - self._catalog_read_at < 1.0
+            ):
+                return self._catalog
+            return await self.refresh_tools()
 
     async def list_tools(self):
         await self.ensure_connection()
+        async with asyncio.timeout(self.pool.call_timeout), self.catalog_lock:
+            return await self.refresh_tools()
+
+    async def refresh_tools(self):
+        self._catalog = None
         tools = await self.pool.list_tools(self.endpoint.id)
         revision = digest([tool.model_dump(mode="json", by_alias=True) for tool in tools])
         if self.revision is not None and self.revision != revision:
             self.change_generation += 1
         self.revision = revision
+        self._catalog = tools
+        self._catalog_generation = self.connection_generation()
+        self._catalog_read_at = time.monotonic()
+        metadata = (tools[0].meta or {}).get("kirabridge") if tools else None
+        self._catalog_epoch = (
+            {
+                key: metadata[key]
+                for key in ("version", "instance_id", "revision", "principal")
+                if key in metadata
+            }
+            if isinstance(metadata, dict)
+            else None
+        )
         return tools
 
 
@@ -100,6 +162,8 @@ async def connect_stdio(config, principal):
             "no busy/unconfirmed window and no invisible fallback. Internal Codex/Grok execution "
             "and ThreadDesk are separate. Refresh tools/list on list_changed and compare "
             "discovery.revision after connection/version/session changes. "
+            "Send each paragraph in one keyboard_control text request, including line breaks; "
+            "never one tool call per character. No clipboard is used. "
             "Check per-operation permission_decision; approval_mode is legacy policy metadata. "
             "Use task_request; automatic mode queues permitted work without a browser click. "
             "Only when approval_required is true, give the operator local_approval_url. "

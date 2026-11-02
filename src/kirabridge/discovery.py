@@ -54,7 +54,10 @@ def snapshot(bridge, principal):
                 "terminal_session",
                 "platform",
             ],
-            "tools_list": "fresh per request; stdio proxy forwards list-change notifications",
+            "tools_list": (
+                "explicit tools/list is fresh; stdio call schemas cached <=1s "
+                "with epoch/notification invalidation"
+            ),
             "client_action": (
                 "Refresh tools/list and operation_catalog when revision changes; "
                 "never replay writes"

@@ -28,12 +28,16 @@ from kirabridge.team_manager.models import (
 
 
 def inline_task_timeout(operation: str) -> float | None:
-    """Seconds task_request may wait so the tool result contains the finished read.
+    """Seconds task_request may wait so its response contains the finished result.
 
     session.read used to return only a queued receipt. Its text lived in a snapshot,
     and the default completion inbox does not deliver that text. Clipboard and
     ThreadDesk keep the existing two-second wait.
     """
+    # Short keyboard operations normally finish inside this response. A slow or
+    # queued operation remains the same durable task; the wait never cancels it.
+    if operation == "keyboard.control":
+        return 2
     if operation in {"threaddesk.read", "threaddesk.manage", "clipboard.read", "clipboard.write"}:
         return 2
     if operation in {"session.catalog", "session.read"}:
@@ -57,7 +61,8 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
         "connection, version or session changes; compare discovery.revision. API v1. "
         "Check per-operation permission_decision; approval_mode is legacy policy metadata. "
         "Use task_request: automatic mode admits permitted work without a browser click. "
-        "Use keyboard_control for direct text, keys and chords without keyboard profiles. "
+        "Use one keyboard_control text request per paragraph, including line breaks; "
+        "never one tool call per character. No clipboard is used. "
         "Choose an application by name or an exact PID/start pair, or omit the selector "
         "for the fresh foreground application. Target inspection is automatic. "
         "No Events subscription is needed. Read task_get for execution evidence; "
@@ -593,11 +598,14 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
         No profile or Events subscription is needed. Scope auto recognizes configured
         macOS shortcuts, app forces program input, system selects system keys/actions.
         Use action names from keyboard_system_inventory for volume, brightness, media,
-        Mission Control and Spaces. Repeat keys 1–20 times in the same task; text once.
+        Mission Control and Spaces. Send a whole paragraph or poem in ONE text request,
+        including its line breaks; never issue one tool call per character. Text uses
+        no clipboard. Repeat keys 1–20 times in one task. Keep dependent calls serial.
         Select an app by name, an exact PID/start pair, or the current foreground app.
         Text is literal and submit defaults to false. Chords require explicit modifiers.
         Existing identity permissions apply. Reuse the same task_id and idempotency_key
         for this same request; inspect task_get for completion and native evidence.
+        Fast operations return completion inline; inspect the same task if still pending.
         A native posting receipt does not confirm application processing.
         """
         return await task_request(

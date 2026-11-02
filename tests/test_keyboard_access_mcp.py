@@ -1,5 +1,6 @@
 """Existing full grants and direct typed MCP input, without native keyboard effects."""
 
+import asyncio
 import hashlib
 
 import pytest
@@ -186,6 +187,8 @@ async def test_direct_keyboard_mcp_uses_old_full_grant_and_exactly_once_task_rou
             assert catalog["operations"][operation]["approval_required"] is False
         accepted = (await clients.call("local", "keyboard_control", value)).structuredContent
         assert accepted["id"] == value["task_id"] and not accepted["approval_required"]
+        assert accepted["state"] == "completed"
+        assert accepted["result"]["post_calls_returned"] == 2
         assert accepted["completion_channel"]["target"] == "keyboard-http-test"
         completed = await bridge.tasks.wait("local", value["task_id"], timeout=3)
         assert completed["state"] == "completed", completed
@@ -197,3 +200,58 @@ async def test_direct_keyboard_mcp_uses_old_full_grant_and_exactly_once_task_rou
     assert len(calls) == 1
     assert path.read_bytes() == original
     assert not (config.state_path / "keyboard").exists()
+
+
+async def test_keyboard_inline_timeout_preserves_one_running_task_without_cancel_or_replay(
+    http_bridge,  # noqa: F811 -- imported real HTTP fixture
+    config,
+    monkeypatch,
+):
+    from kirabridge.mcp_gateway.server import inline_task_timeout
+
+    assert inline_task_timeout("keyboard.control") == 2
+    bridge, endpoint = http_bridge
+    policy = config.principals["local"]
+    policy.approval_mode = "automatic"
+    policy.capabilities += sorted(KEYBOARD_CAPABILITIES)
+    entered, release = asyncio.Event(), asyncio.Event()
+    calls, cancelled = [], []
+
+    async def executor(task, running, progress):
+        calls.append(task["id"])
+        await running({"native_input_attempted": False})
+        entered.set()
+        try:
+            await release.wait()
+        except asyncio.CancelledError:
+            cancelled.append(task["id"])
+            raise
+        return {"post_calls_returned": 2, "app_processing_confirmed": False}
+
+    monkeypatch.setattr(bridge.tasks, "executor", executor)
+    monkeypatch.setattr(bridge.tasks, "preflight", None)
+    value = {
+        "request": {"app": "Owned Test Editor", "text": "one write"},
+        "task_id": "keyboard-inline-timeout",
+        "idempotency_key": "keyboard-inline-timeout",
+    }
+    try:
+        async with MCPClientPool() as pool:
+            await pool.connect(Peer("caller", url=endpoint, token="local-test-" + "a" * 40))
+            pending = (await pool.call("caller", "keyboard_control", value)).structuredContent
+            assert entered.is_set() and not cancelled
+            assert pending["id"] == value["task_id"] and pending["state"] == "running"
+            assert calls == [value["task_id"]]
+            release.set()
+            duplicate = (await pool.call("caller", "keyboard_control", value)).structuredContent
+            assert duplicate["id"] == value["task_id"]
+            assert duplicate["state"] == "completed"
+            observed = (
+                await pool.call("caller", "task_get", {"task_id": value["task_id"]})
+            ).structuredContent
+            assert observed["state"] == "completed"
+            assert observed["result"]["post_calls_returned"] == 2
+            assert calls == [value["task_id"]] and not cancelled
+            assert bridge.store.db.execute("SELECT count(*) FROM tasks").fetchone()[0] == 1
+    finally:
+        release.set()

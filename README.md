@@ -43,6 +43,13 @@ funktioniert unabhängig von ThreadDesk und anderen Integrationen.
   Optionale ThreadDesk-Datei-/Wissensfunktionen, TollGate-Stopbelege und neutrale
   Agent-Authority-Beobachtungen benötigen jeweils ihre tatsächliche Konfiguration.
 
+Zusammenhängenden Text wie ein Gedicht mit **einem** `keyboard_control`-Aufruf
+übergeben: `request={"app":"Notes","text":"Der Mond…\nDie Nacht…","submit":false}`.
+Zeilenumbrüche bleiben Teil des Texts; der Pfad benötigt keine Zwischenablage.
+Einzelzeichen als einzelne Werkzeugaufrufe vervielfachen Übergaben und können
+Plattformlimits erreichen. Nach unklarem Ausgang denselben Task lesen, nicht
+unter neuer ID erneut tippen. [RC26-Messbericht](docs/RC26-KEYBOARD-LATENCY-20261102.md).
+
 Direkte Terminaleingaben wie `/resume` verwenden `task_request` mit
 `operation="session.input"` und den aktuellen `pane_id`-/`expected_pid`-Werten.
 `text` wird unverändert eingefügt; `submit=true` sendet anschließend einmal Enter,
