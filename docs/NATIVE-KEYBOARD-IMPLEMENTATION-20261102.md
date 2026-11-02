@@ -330,3 +330,50 @@ Setterfehlern, fehlendem Beleg, Abbruch oder Returnguardfehler. Kein Replay oder
 Eventfallback nach Setterversuch. Native Deltareview freigegeben; Core unverändert,
 dessen vorhandene Nachweise werden wiederverwendet. Echte größere Texte und
 Geschwindigkeit bleiben bis zur Abnahme des exakten Commitbuilds offen.
+
+## Schritt 9b – Tatsächliche native Eingabe und öffentlicher MCP-Weg
+
+Privater, sauberer Build aus gepushtem Commit
+`ce6360a9177ddf6ead0138b5779e478071e87905`: drei reale KeyboardManager-Aufträge
+erfolgreich.31 Unicode-/BOM-Bytes in0,254s,100.019 Bytes in0,723s, exakt1 MiB
+UTF-8 in2,711s mit anschließend genau einem Return. Jeweils ein nativer
+AXSelectedText-Aufruf, keine Textevents,0/0/2 Return-Postcalls. Die unabhängige
+Receiver-App bestätigte Inhaltshash, UTF-16-Cursor und Returnzählung; die
+Clipboard-Generation blieb gleich. Jede eigene App wurde geschlossen und ihre
+Abwesenheit bestätigt. Das sind belegte Werte für diese kontrollierte Textfläche,
+keine universelle Leistungszusage für Fremdprogramme. Beleg im Backuproot:
+`step09a-live-01/result.private.json`.
+
+Zusätzlich bestand eine reale Folge mit frischem Ziel vor jeder Aktion:
+Text einfügen, benannte Linkstaste, Command+A, markierte Auswahl nativ ersetzen.
+Inhalt und Auswahl wurden nach jeder Aktion unabhängig geprüft, ohne Return
+oder Clipboardänderung. Ein erster Fixturelauf besaß kein Editmenü und bestätigte
+deshalb keine SelectAll-Wirkung; daraus wurde kein Produktfehler abgeleitet.
+Die Test-App besitzt jetzt ein reguläres Cocoa-Menü Edit→Select All mit Command+A.
+Native Implementierung blieb unverändert; der zweite Lauf bestand alle vier
+Aufträge. Keine Wiederholung derselben Task-ID. Fixture-Menüdifferenz unabhängig
+geprüft, expliziter Edit-Titel für spätere AX-Menüpfade ergänzt. Beleg:
+`step09b-keys-live-02/result.private.json`.
+
+Auch der vollständige öffentliche HTTP-/MCP-/Task-Workerweg ist jetzt belegt.
+Das Abnahmeskript `scripts/accept_native_keyboard_macos.py` verwendet das vorhandene
+MCP-Testmuster, privaten Datenordner, minimale Testberechtigungen, frischen
+Zufallstoken und zufälligen Loopback-Port. Die gepinnte Native-App wird nur im
+privaten Testprozess verdrahtet. Der erfolgreiche Lauf
+`step09b-mcp-live-04/evidence.json` bestätigt einen lesenden Inspecttask und genau
+einen `task_submit` für langen Unicode-/BOM-Text mit Return, vollständiges Staging,
+Text-/Caretbeleg und unabhängigen Receiverhash mit Returnzählung1. Test-App,
+Nativeworker und Loopback-Endpunkt wurden geschlossen und unabhängig abwesend
+geprüft. Vorläufe01–03 enthielten keinen schreibenden Tastaturauftrag: korrigiert
+wurden Fixture-Belegdateien (0600 vor atomarer Veröffentlichung), der Aufrufweg
+für Inspect (Readonlytask statt begrenztem `read_query`) und die Behandlung des
+normalen Taskfeldes `error:null`. Keine Produkt-/Rechteänderung für diese
+Korrekturen und keine Eingabewiederholung. Die großen nativen Texte und die
+Tastenfolge wurden nicht nochmals getestet. Die Fixture- und Skriptdifferenzen
+sind unabhängig geprüft; Ruff/Syntax/Diffprüfung grün.
+
+Vor Shortcut-Discovery bleibt die bereits dokumentierte Workerepochen-Grenze von
+256 Textcommits zu behandeln: derzeit sichere Verweigerung statt automatischer
+Erneuerung. Produktive RC24 und vorhandene Sitzungen bleiben währenddessen
+unverändert. Keine allgemeine Fremdprogrammkompatibilität oder Installation dieses
+Entwicklungsstands behauptet.

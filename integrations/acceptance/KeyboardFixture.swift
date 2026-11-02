@@ -56,6 +56,20 @@ struct KeyboardFixture {
         editor.isAutomaticTextReplacementEnabled = false
         editor.setAccessibilitySubrole(NSAccessibility.Subrole(rawValue: ""))
         scroll.documentView = editor
+        // Standard Cocoa key-equivalent routing, also visible to menu discovery.
+        let menu = NSMenu(title: "Keyboard Fixture")
+        let applicationItem = NSMenuItem()
+        applicationItem.submenu = NSMenu(title: "Keyboard Fixture")
+        menu.addItem(applicationItem)
+        let editItem = NSMenuItem(title: "Edit", action: nil, keyEquivalent: "")
+        let editMenu = NSMenu(title: "Edit")
+        let selectAll = NSMenuItem(title: "Select All", action: #selector(NSTextView.selectAll(_:)), keyEquivalent: "a")
+        selectAll.keyEquivalentModifierMask = [.command]
+        selectAll.target = editor
+        editMenu.addItem(selectAll)
+        editItem.submenu = editMenu
+        menu.addItem(editItem)
+        app.mainMenu = menu
         window.contentView = scroll
         window.makeKeyAndOrderFront(nil)
         window.makeFirstResponder(editor)
@@ -79,8 +93,11 @@ struct KeyboardFixture {
                 "accessibility_role": editor.accessibilityRole()?.rawValue ?? "missing",
             ]
             value.merge(extra) { _, new in new }
+            let temporary = root.appendingPathComponent(".receipt-\(UUID().uuidString).json")
             try JSONSerialization.data(withJSONObject: value, options: [.sortedKeys]).write(
-                to: root.appendingPathComponent(name), options: [.atomic])
+                to: temporary, options: [.withoutOverwriting])
+            try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: temporary.path)
+            try FileManager.default.moveItem(at: temporary, to: root.appendingPathComponent(name))
         }
         try receipt("ready.json")
         let deadline = Date().addingTimeInterval(600)
