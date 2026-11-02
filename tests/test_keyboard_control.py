@@ -1,11 +1,13 @@
 """Automatic target resolution through the real Core; only native transport is fake."""
 
+import asyncio
 import base64
 from unittest.mock import AsyncMock
 
 import pytest
 from pydantic import ValidationError
 
+from kirabridge import keyboard_control as control_module
 from kirabridge.bridge_core.models import BridgeError, TaskRequest, UncertainExecution
 from kirabridge.keyboard_control import KeyboardControlInput
 
@@ -112,6 +114,109 @@ async def test_named_inactive_program_gets_exactly_one_focus(bridge, config):
         "keyboard.chord",
     ]
     assert calls[1][1] == {"expected_pid": 321, "expected_start": "1700000000.125000"}
+
+
+async def test_focus_observation_waits_for_activation_without_replay(bridge, config, monkeypatch):
+    calls, app, native = setup(bridge, config, active=False)
+    monkeypatch.setattr(control_module, "_FOCUS_OBSERVATION_INTERVAL", 0.001)
+    observed_reads, authorized = 0, []
+    original_authorize = bridge.keyboard.authorize
+
+    def authorize(principal, operation):
+        authorized.append(operation)
+        return original_authorize(principal, operation)
+
+    bridge.keyboard.authorize = authorize
+
+    async def delayed(op, args, **kwargs):
+        nonlocal observed_reads
+        result = await native(op, args, **kwargs)
+        if op == "app.focus":
+            return {"active_observed": False}
+        if op == "apps.list":
+            observed_reads += 1
+            if observed_reads == 3:
+                app["active"] = True
+        return result
+
+    bridge.keyboard.transport.request.side_effect = delayed
+    result = await execute(bridge, {"app": "Editor", "key": {"named": "escape"}})
+    assert [op for op, _ in calls] == [
+        "apps.list", "app.focus", "apps.list", "apps.list", "keyboard.inspect", "keyboard.key"
+    ]
+    assert authorized.count("apps.list") == 2 * observed_reads
+    assert result["resolved_application"]["active"] is True
+    assert result["automatic_retry"] is False
+    assert not bridge.sessions.lock.locked()
+
+
+@pytest.mark.parametrize(
+    "change",
+    [
+        "pid", "started_at", "bundle_id", "app_path", "executable",
+        "duplicate", "missing", "incomplete",
+    ],
+)
+async def test_focus_observation_refuses_changed_identity(bridge, config, monkeypatch, change):
+    calls, app, native = setup(bridge, config, active=False)
+    monkeypatch.setattr(control_module, "_FOCUS_OBSERVATION_INTERVAL", 0.001)
+    observed_reads = 0
+
+    async def changed(op, args, **kwargs):
+        nonlocal observed_reads
+        result = await native(op, args, **kwargs)
+        if op == "app.focus":
+            return {"active_observed": False}
+        if op == "apps.list":
+            observed_reads += 1
+            if observed_reads > 1:
+                current = {**app, "active": True}
+                if change in {"pid", "started_at"}:
+                    current[change] += 1
+                elif change in {"bundle_id", "app_path", "executable"}:
+                    current[change] += ".changed"
+                result = {"applications": [current], "eof": True}
+                if change == "duplicate":
+                    result["applications"].append(dict(current))
+                elif change == "missing":
+                    result["applications"] = []
+                elif change == "incomplete":
+                    result["eof"] = False
+        return result
+
+    bridge.keyboard.transport.request.side_effect = changed
+    with pytest.raises(BridgeError) as error:
+        await execute(bridge, {"app": "Editor", "key": {"named": "escape"}})
+    assert error.value.code == (
+        "keyboard_catalog_incomplete" if change == "incomplete" else "keyboard_application_changed"
+    )
+    assert [op for op, _ in calls] == ["apps.list", "app.focus", "apps.list"]
+    assert not bridge.sessions.lock.locked()
+
+
+async def test_focus_observation_timeout_bounds_stalled_read(bridge, config, monkeypatch):
+    calls, _, native = setup(bridge, config, active=False)
+    monkeypatch.setattr(control_module, "_FOCUS_OBSERVATION_TIMEOUT", 0.02)
+    monkeypatch.setattr(control_module, "_FOCUS_OBSERVATION_INTERVAL", 0.001)
+    observed_reads = 0
+
+    async def stalled(op, args, **kwargs):
+        nonlocal observed_reads
+        result = await native(op, args, **kwargs)
+        if op == "app.focus":
+            return {"active_observed": False}
+        if op == "apps.list":
+            observed_reads += 1
+            if observed_reads > 1:
+                await asyncio.Event().wait()
+        return result
+
+    bridge.keyboard.transport.request.side_effect = stalled
+    with pytest.raises(BridgeError) as error:
+        await execute(bridge, {"app": "Editor", "text": "never sent", "submit": True})
+    assert error.value.code == "keyboard_focus_unconfirmed"
+    assert [op for op, _ in calls] == ["apps.list", "app.focus", "apps.list"]
+    assert not bridge.sessions.lock.locked()
 
 
 @pytest.mark.parametrize("submit", [False, True])

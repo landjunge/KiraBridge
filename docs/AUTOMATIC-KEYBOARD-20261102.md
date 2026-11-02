@@ -177,3 +177,35 @@ Fortschrittszeilen mit Zustandsübergängen; nur die Zählung nach Evidence-Typ
 wurde korrigiert, der Beleg bleibt erhalten. Unabhängiger Deltareview grün.
 Nur wegen dieses tatsächlichen Corefixes ist ein neues exaktes Paket nötig;
 Native-, Rechte- und Browsermatrizen werden nicht erneut ausgeführt.
+
+
+### Hintergrundaktivierung: zweiter realer Fehler vor Installation
+
+Das korrigierte exakte Paket `65c85b4` bestand Build, offiziellen Smoke,
+unabhängigen Paketvergleich und die reale profilfreie MCP-Texteingabe mit Return
+(`direct-control-live-fixed-01`, alle Abnahme-/Bereinigungsflags wahr). Ein
+zusätzlicher, gezielt begründeter Hintergrundtest deckte danach eine noch offene
+Synchronitätsannahme auf: Die eigene Fixture wurde nachweislich inaktiv; die
+anschließende automatische Eingabe stoppte mit `keyboard_focus_unconfirmed`.
+MacOS bestätigt `activate()` als Anfrage und aktualisiert `isActive` über die
+Main-Runloop. Der sofortige Statuscheck war deshalb kein ausreichender Wartevertrag.
+
+Der erste Hintergrundtest fand keinen laufenden Finder und stoppte bereits im
+Testaufbau; er wird nicht als Produktfehler gezählt. Der korrigierte Aufbau
+aktivierte ausschließlich das vorhandene Terminal ohne Eingabe und belegte den
+Fehler (`background-control-live-02`). Beide Originalbelege und Logs bleiben
+erhalten. Fixture, eigener Worker und privater Endpunkt sind jeweils bereinigt;
+kein produktiver Dienst wurde umgeschaltet und keine Texteingabe wiederholt.
+
+Die kleine Corekorrektur wartet nach höchstens einer Aktivierungsanfrage lesend
+auf das exakt gleiche Programm. Sie verwendet die ohnehin autorisierte App-Liste,
+eine kurze feste Deadline und unveränderte Prozess-/Bundle-/Pfadidentität. Erst
+danach folgt frischer Inspect. Kein Aktivierungsretry, keine Texteingabewiederholung
+und kein zusätzlicher Zugriff oder Clipboard-Fallback. Nur das betroffene Delta
+wird geprüft; die vorhandenen Native-, Rechte- und Browserbelege bleiben gültig.
+
+Zehn neue gezielte Fokusbeobachtungsfälle bestanden in0,80s;17 bestehende Fälle
+wurden ausgelassen. Darunter verzögerte Aktivierung, alle festen Identitätswechsel,
+unvollständiger Katalog, Berechtigungswiderruf und ein hängender Leseaufruf mit
+strikter Gesamtdeadline vor jeglicher Texteingabe. Ruff-/Diffprüfung und
+unabhängiger enger Core-Review sind grün.

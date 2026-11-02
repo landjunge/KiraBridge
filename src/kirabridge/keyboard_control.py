@@ -1,5 +1,7 @@
 """Profile-free keyboard intents; discover once, bind freshly, never replay."""
 
+import asyncio
+
 from pydantic import Field, model_validator
 
 from kirabridge.bridge_core.models import BridgeError, Input, UncertainExecution
@@ -43,6 +45,9 @@ class KeyboardControlInput(Input):
 
 
 CONTROL_INPUTS = {"keyboard.control": KeyboardControlInput}
+_FOCUS_OBSERVATION_TIMEOUT = 1.0
+_FOCUS_OBSERVATION_INTERVAL = 0.05
+_APPLICATION_IDENTITY_FIELDS = ("pid", "started_at", "bundle_id", "app_path", "executable")
 
 
 class KeyboardControl:
@@ -119,9 +124,33 @@ class KeyboardControl:
                     before_send=focus_send,
                 )
                 if focused.get("active_observed") is not True:
-                    raise BridgeError(
-                        "keyboard_focus_unconfirmed", "Program activation was not confirmed"
-                    )
+                    try:
+                        async with asyncio.timeout(_FOCUS_OBSERVATION_TIMEOUT):
+                            while True:
+                                await asyncio.sleep(_FOCUS_OBSERVATION_INTERVAL)
+                                page = await read("apps.list", {"limit": 1000})
+                                if page.get("eof") is not True:
+                                    raise BridgeError(
+                                        "keyboard_catalog_incomplete",
+                                        "Running program list is incomplete",
+                                    )
+                                current = [
+                                    a for a in page["applications"] if a.get("pid") == app["pid"]
+                                ]
+                                if len(current) != 1 or any(
+                                    current[0].get(key) != app.get(key)
+                                    for key in _APPLICATION_IDENTITY_FIELDS
+                                ):
+                                    raise BridgeError(
+                                        "keyboard_application_changed",
+                                        "Program identity changed during activation",
+                                    )
+                                if current[0].get("active") is True:
+                                    break
+                    except TimeoutError as error:
+                        raise BridgeError(
+                            "keyboard_focus_unconfirmed", "Program activation was not confirmed"
+                        ) from error
             inspected = await read("keyboard.inspect", selected)
             target = inspected["target"]
             observed = inspected["application"]
@@ -130,7 +159,7 @@ class KeyboardControl:
                 or target.get("expected_started_at") != app["started_at"]
                 or any(
                     observed.get(key) != app.get(key)
-                    for key in ("pid", "started_at", "bundle_id", "app_path", "executable")
+                    for key in _APPLICATION_IDENTITY_FIELDS
                 )
             ):
                 raise BridgeError(
