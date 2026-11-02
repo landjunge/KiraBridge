@@ -551,3 +551,72 @@ unabhängig abwesend geprüft. Beleg:
 denselben Setup-/Status-/Cleanup-Pfad wie bisher; das alte Textszenario bleibt
 Default und wurde nicht wiederholt. Source-Deltareview und Ruff/Syntax grün.
 Console-Bedienung und Paketierung/Installation bleiben die nächsten Schritte.
+
+## Schritt 12b – Tastaturprofile in der bestehenden Konsole
+
+Der neue Bereich **Tastatur** verwaltet lokale Profile mit Versionsprüfung,
+zeigt eine ausdrücklich unverifizierte Kontextvorschau und liest Menübelegungen
+nur auf Knopfdruck. Ungespeicherte Entwürfe bleiben beim Aktualisieren erhalten
+und können nicht ausgeführt werden. Menübeobachtungen bleiben Kandidaten;
+unbeobachtbare Versions-/Build-/Signierungs-/Sprachbedingungen sperren den Run.
+Programm- und Menünamen werden als Text angezeigt, niemals als HTML.
+
+Eine ausdrückliche Run-Aktion nimmt nur gespeicherte Profil-ID/Revision/Aktion
+und die gewählte PID/Startzeit. Der bestehende Aufgabenweg prüft Grants und
+Profilrevision vor Fokus, aktiviert genau einmal, holt danach ein neues natives
+Ziel und sendet die revisionsgebundene Aktion. Jede unvollständige oder fehlerhafte
+Vorstufe beendet diesen Ablauf; Statusabfragen setzen ihn niemals fort.
+Im manuellen Freigabemodus bestätigt ausschließlich der authentifizierte lokale
+POST seinen eigenen exakten Taskhash über die vorhandene Freigabestelle.
+Fehlende Capabilities werden nicht ergänzt. Der vorhandene Bereich **Rechte**
+bleibt der ausdrückliche Weg zur Änderung von Freigaben.
+
+Persistente Intent-UUID und deterministische Taskkennungen verhindern Wiederholung
+auch bei Doppelklick, verlorener Antwort und Neuladen. Ein unbekannter Ausgang
+bleibt gesperrt; anschließend erfolgen nur GET-Statusabfragen. Der primäre
+Statusresolver liest gegebenenfalls vorhandene Vorstufen, dispatcht aber nichts.
+Eine abgeschlossene Vorstufe ist kein Ausführungsbeleg. Nur der persistierte
+Inline-Abschluss beweist, dass die Ablaufkette tatsächlich angehalten hat;
+während eines noch laufenden POST bleibt dies unbestätigt. Erfolg verlangt den
+primären Task mit exakt bestätigter Profil-/Revisions-/Aktionsbindung. Auch das
+bestätigt weiterhin keine Verarbeitung durch das Zielprogramm.
+
+Die neue POST-Route hat einen eigenen 32-KiB-Bodyrahmen; der vorhandene globale
+4096-Byte-Rahmen bleibt bestehen. Authentifizierung, Originprüfung, Aufgabenspeicher,
+Freigaben und Completion-ACKs werden wiederverwendet. Clipboard-/Terminalcode,
+Nativequellen und produktive Prozesse wurden in diesem Schritt nicht geändert.
+Die Bedienabnahme verwendet einen separaten Headlessbrowser mit ausschließlich
+synthetischem HTTP; sie ist kein weiterer nativer Eingabenachweis. Die tatsächliche
+native Profilaktion ist separat unter Schritt 12a belegt. Paketierung und
+Installation folgen erst nach Abschluss und verifiziertem Push dieses Schritts.
+
+Gezielte Browserbelege liegen unter `step12b-browser-*.json` im bestehenden
+Backuproot. Geprüft sind List/Get/Put, Dirty-/CAS-Schutz, Caller-Vorschau,
+lesende Discovery und HTML-Injektion, Doppelklick, Antwortverlust/Neuladen,
+Vorstufe-zu-Primary-Reconciliation, Kandidatensperre sowie Freigabe nach sicherem
+Fehler. New/Delete sind in diesem Browserharness nicht separat ausgeführt;
+ihre schmalen UI-Aufrufe wurden im Source geprüft, der Profilstore-Deletepfad
+ist bereits unter Schritt 11 abgesichert. Zwei ursprüngliche fehlgeschlagene
+Browserbelege bleiben erhalten: Das Testskript wartete irrtümlich auf das Wort
+„Auftrag“ auch im abweichenden Antwortverlusttext. Nur dieses Testorakel wurde
+korrigiert; betroffene Fälle wurden gezielt erneut geprüft. Spätere kleine
+Änderungen an Halt-/Erfolgsbelegen wurden ausschließlich in betroffenen Fällen
+nachgeprüft, ohne Wiederholung der nativen oder bisherigen Browsergesamtsuiten.
+
+Die gezielte Backendrunde bestand zwölf Fälle in 0,86 s einschließlich genau
+einer bestehenden Console-Authregression. Eine echte Store-/TaskManager-Integration
+prüft TaskRequest-Hash, lokale Freigabe, Fokus→Inspect→Aktion und vier passende
+Completion-ACKs; nur der native Request ist dabei synthetisch. Der abschließende
+Review fand einen weiteren Unsicherheitspfad: Eine falsche Antwort nach bereits
+eingereihtem Mainauftrag beweist keine Verweigerung. Nur eigene lokale
+`keyboard_ui_*`-Vorwirkungsfehler dürfen daher einen sicheren Halt behaupten;
+generische RPC-/Identitätsfehler bleiben unconfirmed. Genau zwei betroffene
+Gegenfälle bestanden anschließend in 0,45 s, keine Gesamtrunde wurde wiederholt.
+
+Neun unterschiedliche Headlessbrowserfälle sind über die archivierten Läufe und
+gezielten Deltaläufe grün. Zusätzlich zu den genannten Pfaden sind ein tatsächlich
+fehlgeschlagener Mainauftrag und fehlende Postcall-Belege geprüft. Die UI verlangt
+für eine erfolgreiche Profilaktion exakt zwei zurückgekehrte native Postcalls
+neben dem gebundenen Profilbeleg. Ruff, Node-Syntax und Diffprüfung sind grün;
+Rootreview und gegenseitiger Spezialistenreview sind abgeschlossen. Die drei
+produktiven Prozessgenerationen 78414/78630/78865 waren unverändert.

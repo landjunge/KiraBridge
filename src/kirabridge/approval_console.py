@@ -72,6 +72,7 @@ class ApprovalConsole:
                 Route("/style.css", self.asset),
                 Route("/networkpunkt.css", self.asset),
                 Route("/center.js", self.asset),
+                Route("/keyboard.js", self.asset),
                 Route("/center.css", self.asset),
                 Route("/protocol.js", self.asset),
                 Route("/api/tasks", self.tasks),
@@ -93,6 +94,12 @@ class ApprovalConsole:
 
         self.control_center = ControlCenter(application.control, self.authenticate)
         self.app.routes.extend(self.control_center.routes)
+        from kirabridge.keyboard_console import KeyboardConsole
+
+        self.keyboard_console = KeyboardConsole(
+            application.control, application.task_decisions, self.authenticate
+        )
+        self.app.routes.extend(self.keyboard_console.routes)
 
     async def __call__(self, scope, receive, send):
         if scope["type"] != "http":
