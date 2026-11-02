@@ -150,6 +150,8 @@ async def run(args):
     )
     if args.scenario == "profile-action":
         policy.capabilities += ["keyboard.profiles.read", "keyboard.profiles.manage"]
+    if args.scenario == "direct-control":
+        policy.capabilities += ["apps.list", "app.focus"]
     config = Config(
         data_dir=str(root / "state"), concurrency=1, principals={"acceptance": policy}, agents={}
     )
@@ -310,12 +312,17 @@ async def run(args):
                 text = (
                     "Profiltest ä e\u0301 😀"
                     if args.scenario == "profile-action"
+                    else "\ufeffDirekttest ä e\u0301 👩‍💻"
+                    if args.scenario == "direct-control"
                     else "\ufeff" + "x" * 100000 + " ä e\u0301 👩‍💻\r\n"
                 )
                 operation, arguments = (
                     "keyboard.text",
                     {"target": target, "text": text, "submit": True},
                 )
+                if args.scenario == "direct-control":
+                    operation = "keyboard.control"
+                    arguments = {"app": info["CFBundleIdentifier"], "text": text, "submit": True}
                 if args.scenario == "profile-action":
 
                     async def noop(_):
@@ -418,6 +425,17 @@ async def run(args):
                             )
                         ),
                         "Public staging/text/Return receipt incomplete",
+                    )
+                if args.scenario == "direct-control":
+                    resolved = result.get("resolved_application") or {}
+                    require(
+                        result.get("automatic_target") is True
+                        and result.get("native_operation") == "keyboard.text"
+                        and resolved.get("pid") == launched["pid"]
+                        and resolved.get("started_at") == launched["started_at"]
+                        and resolved.get("bundle_id") == info["CFBundleIdentifier"]
+                        and resolved.get("app_path") == str(owned),
+                        "Automatic keyboard target receipt differs from the owned fixture",
                     )
                 async with asyncio.timeout(5):
                     while True:  # noqa: ASYNC110 -- only independent receiver readback
@@ -576,7 +594,9 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--execute", action="store_true")
     parser.add_argument(
-        "--scenario", choices=["keyboard-text", "profile-action"], default="keyboard-text"
+        "--scenario",
+        choices=["keyboard-text", "profile-action", "direct-control"],
+        default="keyboard-text",
     )
     parser.add_argument("--native-app", type=Path, required=True)
     parser.add_argument("--expected-commit", required=True)

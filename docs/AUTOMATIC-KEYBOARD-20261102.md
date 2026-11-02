@@ -148,3 +148,11 @@ noch kein Liveeingabenachweis.
 Noch ausstehend. Die bisherigen isolierten Belege werden wiederverwendet;
 keine wiederholte Vollsuite, kein neuer Codex-Agentlauf und keine großen CI-Läufe.
 Bis zur Paket-/Laufzeitabnahme bleibt der installierte Stand unverändert.
+
+Die vorhandene öffentliche MCP-Abnahme erhielt dafür ausschließlich das neue
+Szenario `direct-control`: kurzer BOM-/Unicode-Text, Appauswahl nur durch UUID-
+Bundle-ID, kein übergebenes natives Target, exakt bestätigter Text/Return und
+automatisch ermittelte Appgeneration. Die bisherigen Default-/Profilfälle werden
+nicht erneut ausgeführt. Syntax-/Ruff-/Deltareview sind grün; ein Lauf wurde bis
+zu diesem Sourcecheckpoint noch nicht behauptet. Danach folgt getrennt der
+tatsächliche Apps-Connector mit authentifiziertem Principal `chatgpt`.
