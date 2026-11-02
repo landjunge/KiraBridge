@@ -98,6 +98,10 @@ nur der gemeinsame lokale Proxy. [Rohdaten](evidence/rc26-cross-domain-latency-2
 | macOS-Fähigkeiten | 136,35 | 75,62 |
 | Plattform-Leseabfrage | 106,53 | 41,68 |
 
+Bei den historischen Abständen von etwa fünf bis zehn Sekunden läuft der
+Ein-Sekunden-Schemacache zwischen Aufrufen aus. Er hilft schnellen Aufruffolgen;
+die beobachteten 62 Sekunden werden damit nicht als behoben dargestellt.
+
 Der Cache ist werkzeugübergreifend, sitzt jedoch im Stdio→HTTP-Proxy. Die
 hier eingerichtete ChatGPT-Tunnelroute benutzt `kirabridge --principal chatgpt
 connect` und durchläuft diesen Proxy. Ein alternativer direkter HTTP-Client
@@ -204,3 +208,27 @@ ursprüngliche Task-ID abfragen, Ziel unabhängig lesen, niemals unter neuer ID
 blind erneut tippen. Code, Messdaten und Untersuchungsbericht sind auf dem
 Branch `fix/rc26-keyboard-latency-20261102` gesichert; abschließende Paketprüfung
 und veröffentlichter Commit werden unten ergänzt.
+
+## Abschließender Quell-, Paket- und Betriebsstand
+
+Implementierung gepusht: `08209f1` (Cache/Inline/Textweg) und
+`38223b16ed286aacf951f91890a6eafae6ea88f0` (gemeinsame Serverpfade und
+bedarfsgesteuerte Terminalbeobachtung). Die letzten 27 betroffenen Regressionen
+bestanden in 13,63 s; Ruff/Format und Lockdateiprüfung bestanden.
+
+[RC27 für Intel veröffentlicht](https://github.com/landjunge/KiraBridge/releases/tag/v0.8.0rc27):
+finales Installationspaket lokal aus `38223b1` gebaut, Signatur/Architektur/
+Checksummen und echte isolierte Paketinstallation geprüft. Der veröffentlichte
+Installer wurde erneut heruntergeladen und bytegenau per SHA-256 verglichen.
+[Veröffentlichungsbeleg](evidence/rc27-latency-publication-20261103.json).
+Das frühere Paket aus `08209f1` bleibt unveröffentlicht erhalten; nach Erweiterung
+auf alle Werkzeugbereiche wurde nur der vollständige neue Stand freigegeben.
+Der erste GitHub-Upload scheiterte mit HTTP 408; nach Zustandsabgleich gelang die
+verifizierte Übertragung über HTTP/1.1. Dies ist kein KiraBridge-Latenzbefund.
+
+Produktiv bleibt ausdrücklich **RC26**, PID 21419, unveränderte Runtimeinstanz;
+die Optimierungen sind im veröffentlichten RC27 verfügbar und noch nicht in
+die laufende Installation übernommen. Andere Sitzungen und OS-Rechte wurden
+erhalten. Im kanonischen ThreadDesk-Whiteboard `188ce4729a62` wurde auf Basis
+der beobachteten Threadrevision 487 Ergebnis 127 angehängt und separat vollständig
+zurückgelesen. Das ausgeschlossene Codex-„working“-Thema wurde nicht bearbeitet.

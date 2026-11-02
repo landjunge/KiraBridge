@@ -1,0 +1,53 @@
+{
+  "release_url": "https://github.com/landjunge/KiraBridge/releases/tag/v0.8.0rc27",
+  "release_id": 432070531,
+  "source_commit": "38223b16ed286aacf951f91890a6eafae6ea88f0",
+  "platform": "Darwin-x86_64",
+  "downloaded_installer_sha256": "0d62aa0d265f3fe3aeef7bcafdabf011053e6f7c491ac66b2427551a5b87e180",
+  "downloaded_installer_bytes": 3176024,
+  "github_download_verified": true,
+  "all_seven_assets_server_digest_verified": true,
+  "smoke": {
+    "platform": "Darwin-x86_64",
+    "version": "0.8.0rc27",
+    "source_commit": "38223b16ed286aacf951f91890a6eafae6ea88f0",
+    "archive_sha256": "0e7b07c55c4b8ac5d0dec10ac3588f381b65ef7bbbe2f543db0674554645f7f6",
+    "packaged_start_command": "passed isolated bundled installer preparation",
+    "installed_authenticated_dispatcher": true,
+    "concrete_preflight_and_loaded_source_match": true,
+    "corrupt_package_rejected_before_install": true,
+    "config_and_credentials_preserved": true,
+    "license_in_bundle_payload_wheel_and_separate_asset": true,
+    "license_sha256": "3316d5eda60ac1fea355aa43d196feea3567384179b55ca88c8636c0322021ec",
+    "license_expression": "LicenseRef-Netzwerkpunkt-Personal-Use-1.0",
+    "real_user_setup_service_tunnel_changed": false,
+    "new_chatgpt_account_call": "not performed",
+    "real_user_service_manager": "not exercised"
+  },
+  "production_installation_performed": false,
+  "first_release_attempt": {
+    "outcome": "HTTP408 upload failed; original release id404 confirmed before recreation",
+    "successful_recovery": "HTTP1.1 streaming; each asset size and server SHA256 verified"
+  },
+  "production_runtime": {
+    "observed_at_utc": "2026-11-02T23:09:14.669Z",
+    "version": "0.8.0rc26",
+    "runtime_pid": 21419,
+    "runtime_instance_id": "7cccdce67d774b7ba574c4bad9eb3720",
+    "dispatcher_active": true,
+    "accepting_new_work": true,
+    "installation_changed_by_this_investigation": false
+  },
+  "whiteboard": {
+    "id": "682d5e619a32",
+    "thread_id": "188ce4729a62",
+    "ordinal": 127,
+    "entry_type": "result",
+    "created_at": "2026-11-02T23:17:48.212854+00:00",
+    "content_hash": "966f0dddd4f5ef0a88ee7b0c8ad119d5f040ed69603bea3bb670a1e058ca3136",
+    "duplicate": false,
+    "appended": true,
+    "readback_verified": true,
+    "observed_thread_revision": 487
+  }
+}
