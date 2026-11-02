@@ -44,6 +44,7 @@ from kirabridge.file_transfer.models import InventoryInput, PrepareInput, Transf
 from kirabridge.filesystem_manager import FilesystemManager, PathScope
 from kirabridge.image_manager import ImageManager
 from kirabridge.keyboard_action_manager import ACTION_INPUTS, KeyboardActionManager
+from kirabridge.keyboard_control import CONTROL_INPUTS, KeyboardControl
 from kirabridge.keyboard_manager import KEYBOARD_INPUTS, KeyboardManager
 from kirabridge.keyboard_profile_manager import PROFILE_INPUTS, KeyboardProfileManager
 from kirabridge.message_manager import MessageManager
@@ -80,6 +81,7 @@ from kirabridge.visible_terminal import VisibleTerminal, VisibleTerminalInput
 INPUTS = {
     **SYSTEM_INPUTS,
     **KEYBOARD_INPUTS,
+    **CONTROL_INPUTS,
     **ACTION_INPUTS,
     **PROFILE_INPUTS,
     "process.output": OutputRangeInput,
@@ -251,6 +253,7 @@ class Bridge:
             desktop_input=self.desktop_input,
             authorize=self.security.authorize,
         )
+        self.keyboard_control = KeyboardControl(self.keyboard)
         self.keyboard_actions = KeyboardActionManager(
             keyboard=self.keyboard,
             profiles=self.keyboard_profiles,
@@ -570,6 +573,8 @@ class Bridge:
                     "remain separately pageable"
                 ),
             }
+        if operation in CONTROL_INPUTS:
+            return await self.keyboard_control.execute(task, args, running, progress)
         if operation in ACTION_INPUTS:
             return await self.keyboard_actions.execute(task, args, running, progress)
         if operation in PROFILE_INPUTS:

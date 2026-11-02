@@ -12,6 +12,18 @@ from pydantic import BaseModel, ConfigDict, Field, PrivateAttr, model_validator
 
 from kirabridge.bridge_core.models import BridgeError
 
+_FULL_KEYBOARD_CAPABILITIES = frozenset(
+    {
+        "keyboard.inspect",
+        "keyboard.shortcuts.read",
+        "keyboard.execute",
+        "keyboard.profiles.read",
+        "keyboard.profiles.manage",
+        "apps.list",
+        "app.focus",
+    }
+)
+
 
 class PrincipalConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -29,6 +41,13 @@ class PrincipalConfig(BaseModel):
     team_only_execution: bool = False
     permission_level: Literal["full", "medium", "ask"] | None = None
     automatic_operations: list[Literal["session.input"]] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def full_keyboard_access(self):
+        """Extend an explicit unrestricted full grant without rewriting its source file."""
+        if self.permission_level == "full" and self.allow_any_executable and "/" in self.roots:
+            self.capabilities = sorted(set(self.capabilities) | _FULL_KEYBOARD_CAPABILITIES)
+        return self
 
 
 class ReceiverConfig(BaseModel):

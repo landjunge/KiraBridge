@@ -19,6 +19,11 @@ class KeyboardManager:
         self.transport, self.desktop_input, self.authorize = transport, desktop_input, authorize
 
     async def execute(self, task, args, running, progress=None):
+        async with self.desktop_input.transaction() as turn:
+            return await self.execute_in_turn(task, args, running, turn, progress)
+
+    async def execute_in_turn(self, task, args, running, turn, progress=None, *, before_send=None):
+        """Reuse a caller-owned transaction without taking the session lock twice."""
         principal, operation = task["principal"], task["operation"]
         arguments = args.model_dump(exclude_none=True)
         if operation == "keyboard.text":
@@ -31,19 +36,26 @@ class KeyboardManager:
                 ),
             }
             native_frame_bytes("keyboard.text.begin", begin, principal=principal)
-        async with self.desktop_input.transaction() as turn:
+        self.authorize(principal, operation)
+        await running(
+            {
+                "evidence_type": "native_keyboard_attempt",
+                "operation": operation,
+                "automatic_retry": False,
+                "scope": "native request; no application acknowledgement",
+            }
+        )
+        if operation == "keyboard.text":
+            return await self._text(task, plan, begin, turn, progress, before_send=before_send)
+
+        def authorize_pair():
             self.authorize(principal, operation)
-            await running(
-                {
-                    "evidence_type": "native_keyboard_attempt",
-                    "operation": operation,
-                    "automatic_retry": False,
-                    "scope": "native request; no application acknowledgement",
-                }
-            )
-            if operation == "keyboard.text":
-                return await self._text(task, plan, begin, turn, progress)
-            return await self.send_pair_in_turn(principal, operation, arguments, turn)
+            if before_send is not None:
+                before_send()
+
+        return await self.send_pair_in_turn(
+            principal, operation, arguments, turn, before_send=authorize_pair
+        )
 
     async def send_pair_in_turn(self, principal, operation, arguments, turn, *, before_send=None):
         """Caller owns the desktop lease; authorize and mark only at transport send."""
@@ -59,16 +71,18 @@ class KeyboardManager:
             operation, arguments, principal=principal, before_send=prepare
         )
 
-    async def _text(self, task, plan, begin, turn, progress):
+    async def _text(self, task, plan, begin, turn, progress, *, before_send=None):
         principal = task["principal"]
         manifest = plan.manifest
         identifier = manifest["transfer_id"]
         began, committed = False, False
 
         async def send(operation, arguments, *, commit=False):
-            def before_send():
+            def prepare_send():
                 nonlocal committed
                 self.authorize(principal, "keyboard.text")
+                if before_send is not None:
+                    before_send()
                 if commit:
                     turn.mark_attempted()
                     committed = True
@@ -77,7 +91,7 @@ class KeyboardManager:
                 operation,
                 arguments,
                 principal=principal,
-                before_send=before_send,
+                before_send=prepare_send,
             )
 
         def acknowledgement(reply, state):

@@ -80,6 +80,17 @@ def snapshot(bridge, principal):
                 "transferred bytes alone are not import success"
             ),
         },
+        "keyboard": {
+            "tool": "keyboard_control",
+            "operation": "keyboard.control",
+            "profile_required": False,
+            "event_subscription_required": False,
+            "target_selection": "application name, exact PID/start pair, or fresh foreground app",
+            "target_inspection": "automatic before native input",
+            "permission": decision(bridge.config, principal, "keyboard.control"),
+            "os_permission_requested_automatically": False,
+            "success_scope": "native posting evidence; application processing is not confirmed",
+        },
         "direct_terminal": {
             "tool": "terminal_control",
             "operation": "terminal.visible",

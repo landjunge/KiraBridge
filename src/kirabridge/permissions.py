@@ -83,6 +83,8 @@ def decision(config, principal, operation, *, text=None):
     """
     policy = config.principals.get(principal)
     required = {capability_for(operation)}
+    if operation == "keyboard.control":
+        required.update({"keyboard.inspect", "apps.list", "app.focus"})
     if operation == "keyboard.action":
         required.add("keyboard.profiles.read")
     if operation in {"session.input", "terminal.visible"} or (

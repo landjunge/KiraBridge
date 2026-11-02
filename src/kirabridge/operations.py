@@ -78,6 +78,7 @@ for _name in (
     "files.transfer",
     "session.open",
     "keyboard.key",
+    "keyboard.control",
     "keyboard.chord",
     "keyboard.text",
     "keyboard.action",
@@ -115,7 +116,14 @@ for _name in (
         else "keyboard.shortcuts.read"
         if _name == "keyboard.shortcuts.discover"
         else "keyboard.execute"
-        if _name in {"keyboard.key", "keyboard.chord", "keyboard.text", "keyboard.action"}
+        if _name
+        in {
+            "keyboard.key",
+            "keyboard.chord",
+            "keyboard.text",
+            "keyboard.action",
+            "keyboard.control",
+        }
         else "bridge.health"
         if _name == "platform.status"
         else "threaddesk.manage"

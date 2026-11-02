@@ -12,6 +12,7 @@ from kirabridge import LOCAL_APPROVAL_URL, __version__
 from kirabridge.bridge_core.bridge import INPUTS, Bridge
 from kirabridge.bridge_core.models import BridgeError, TaskRequest
 from kirabridge.image_manager import image_task_result
+from kirabridge.keyboard_control import KeyboardControlInput
 from kirabridge.message_manager import MessageSend
 from kirabridge.readiness import ReadinessInput, readiness
 from kirabridge.team_manager.models import (
@@ -55,6 +56,11 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
         "connection, version or session changes; compare discovery.revision. API v1. "
         "Check per-operation permission_decision; approval_mode is legacy policy metadata. "
         "Use task_request: automatic mode admits permitted work without a browser click. "
+        "Use keyboard_control for direct text, keys and chords without keyboard profiles. "
+        "Choose an application by name or an exact PID/start pair, or omit the selector "
+        "for the fresh foreground application. Target inspection is automatic. "
+        "No Events subscription is needed. Read task_get for execution evidence; "
+        "posting keys does not prove that the application processed them. "
         "New visible delivery has one immediate attempt; a blocked target returns a clear error. "
         "Only when approval_required is true, send the operator to local_approval_url. "
         "Do not ask for approval when approval_required is false. "
@@ -572,6 +578,34 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
         from kirabridge.grok_connector.conversation import result_for_conversation
 
         return await result_for_conversation(bridge, identity(ctx), task)
+
+    @server.tool(annotations=write)
+    async def keyboard_control(
+        request: KeyboardControlInput,
+        task_id: str,
+        idempotency_key: str,
+        ctx: Context,
+        completion_target: str | None = None,
+    ) -> dict[str, Any]:
+        """Type text, press a key or send a chord directly, with automatic target inspection.
+
+        Use this for ordinary keyboard input; no profile or Events subscription is needed.
+        Select an app by name, an exact PID/start pair, or the current foreground app.
+        Text is literal and submit defaults to false. Chords require explicit modifiers.
+        Existing identity permissions apply. Reuse the same task_id and idempotency_key
+        for this same request; inspect task_get for completion and native evidence.
+        A native posting receipt does not confirm application processing.
+        """
+        return await task_request(
+            TaskRequest(
+                task_id=task_id,
+                idempotency_key=idempotency_key,
+                operation="keyboard.control",
+                arguments=request.model_dump(),
+            ),
+            ctx,
+            completion_target,
+        )
 
     @server.tool(annotations=write)
     async def session_enter(
