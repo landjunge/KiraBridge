@@ -1,5 +1,10 @@
 # RC26: Ende-zu-Ende-Latenz aller Werkzeugbereiche
 
+**Aktueller Betriebsstand:** Auf anschließenden ausdrücklichen Nutzerauftrag
+ist RC27 (`38223b1`) produktiv installiert und geprüft.
+[Installationsbeleg und Erhaltungsgrenzen](RC27-INSTALL-20261103.md).
+Die unten dokumentierte RC26-Erhaltung beschreibt den Zustand vor diesem Upgrade.
+
 Auftrag vom 2. November 2026, ergänzt am 3. November: Der Nutzer meldet riesige
 Latenz in **allen Werkzeugbereichen**; Tastatur/Notizen dient als konkrete Reproduktion.
 Untersucht werden gemeinsame Übergabe-/Orchestrierungskosten und bereichsspezifische
