@@ -125,6 +125,81 @@ async def test_persistent_worker_serializes_and_binds_authenticated_owner(monkey
     assert child.killed and child.stdin.closed
 
 
+async def test_keyboard_inspection_renews_only_exhausted_owned_worker(monkeypatch):
+    worker, old, _ = transport(monkeypatch)
+    renewed_generation = "ffffffff-ffff-ffff-ffff-ffffffffffff"
+    renewed = Child(
+        lambda request, child: response(
+            request,
+            child,
+            result={"target": {"target_token": "c" * 32}},
+            helper_delta={"generation": renewed_generation},
+        )
+    )
+    renewed.pid = old.pid + 1
+    spawns = []
+
+    async def spawn(*args, **kwargs):
+        assert old.killed and old.stdin.closed
+        spawns.append(args)
+        return renewed
+
+    worker.factory = spawn
+    worker.process = old
+    worker.active_contract = dict(CONTRACT)
+    worker.generation = GENERATION
+    worker._keyboard_commit_attempts = 255
+    try:
+        await worker.request("keyboard.text.commit", {}, principal="alice")
+        assert worker._keyboard_commit_attempts == 256 and not old.killed and spawns == []
+        inspected = await worker.request("keyboard.inspect", {}, principal="alice")
+        assert inspected["native_helper"]["pid"] == renewed.pid
+        assert inspected["native_helper"]["generation"] == renewed_generation
+        assert inspected["target"]["target_token"] == "c" * 32
+        assert worker.process is renewed and worker._keyboard_commit_attempts == 0
+        assert len(spawns) == 1
+        assert [request["operation"] for request in old.requests] == ["keyboard.text.commit"]
+        assert [request["operation"] for request in renewed.requests] == ["keyboard.inspect"]
+    finally:
+        await worker.close()
+    assert renewed.killed and worker._keyboard_commit_attempts == 0
+
+
+async def test_other_operations_do_not_renew_exhausted_keyboard_worker(monkeypatch):
+    worker, child, calls = transport(monkeypatch)
+    try:
+        await worker.request("system.info", {}, principal="alice")
+        worker._keyboard_commit_attempts = 256
+        await worker.request("system.info", {}, principal="alice")
+        await worker.request("app.focus", {}, principal="alice")
+        assert len(calls) == 1 and worker.process is child and not child.killed
+        assert worker._keyboard_commit_attempts == 256
+        assert [request["operation"] for request in child.requests] == [
+            "system.info",
+            "system.info",
+            "app.focus",
+        ]
+    finally:
+        await worker.close()
+    assert worker._keyboard_commit_attempts == 0
+
+
+async def test_denied_keyboard_commit_does_not_consume_worker_budget(monkeypatch):
+    worker, child, calls = transport(monkeypatch)
+
+    def denied():
+        raise BridgeError("permission_denied", "Commit denied before send")
+
+    try:
+        with pytest.raises(BridgeError) as error:
+            await worker.request("keyboard.text.commit", {}, principal="alice", before_send=denied)
+        assert error.value.code == "permission_denied"
+        assert worker._keyboard_commit_attempts == 0
+        assert child.requests == [] and not child.killed and len(calls) == 1
+    finally:
+        await worker.close()
+
+
 async def test_acl_revalidated_after_waiting_for_serial_worker_lock(monkeypatch):
     worker, child, calls = transport(monkeypatch)
     policy = {"alice": True}

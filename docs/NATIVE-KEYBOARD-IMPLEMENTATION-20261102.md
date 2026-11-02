@@ -377,3 +377,21 @@ Vor Shortcut-Discovery bleibt die bereits dokumentierte Workerepochen-Grenze von
 Erneuerung. Produktive RC24 und vorhandene Sitzungen bleiben währenddessen
 unverändert. Keine allgemeine Fremdprogrammkompatibilität oder Installation dieses
 Entwicklungsstands behauptet.
+
+## Schritt 9c – Begrenzte Workerepochen ohne manuelles Neustarten
+
+Der Transport zählt versandte Textcommits pro eigenem Hilfsprozess direkt nach
+abschließender Autorisierung, vor dem Write. Bei256 Versuchen erneuert erst die
+nächste frische `keyboard.inspect`-Abfrage diesen eigenen Hilfsprozess unter
+bestehender Transportsperre und Gesamtfrist. Die native Replayhistorie bleibt
+innerhalb jeder Epoche vollständig; keine Mutation wird wiederholt oder auf ein
+anderes Ziel umgebogen. Andere Operationen lösen keinen Wechsel aus.
+
+Neue Inspektion liefert neue Worker-/AX-Handles. Alte Referenzen werden danach
+wie bei jedem Epochenwechsel verweigert; Clients müssen das frisch beobachtete
+Ziel verwenden. App, Core-Daemon, Terminal und Clipboard werden nicht neu gestartet.
+Genau drei zusätzliche simulierte Transportfälle bestanden in0,33s (67 nicht
+ausgeführt):255→256→neue Inspektion, andere Operationen ohne Rotation sowie
+Autorisierungsverweigerung ohne Zählerverbrauch. Native Swiftdateien unverändert;
+die174 bisherigen Nativechecks und tatsächlichen Eingaben wurden wiederverwendet.
+Unabhängige Deltareview und Ruff/Diffprüfung grün.

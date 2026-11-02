@@ -27,6 +27,7 @@ PROTOCOL = 1
 BUNDLE_ID = "de.netzwerkpunkt.kirabridge"
 MAX_REQUEST_BYTES = 65536
 MAX_RESPONSE_BYTES = 12 * 1024 * 1024
+KEYBOARD_COMMIT_LIMIT = 256  # Matches the native worker's consumed-transfer budget.
 
 
 def _private_file(path, limit):
@@ -83,6 +84,7 @@ class NativeSystemTransport:
         self.active_contract = None
         self.closed = False
         self.active_request = None
+        self._keyboard_commit_attempts = 0
 
     def snapshot_metadata(self):
         """No app launch, framework/API call, permission probe or user-content read."""
@@ -135,6 +137,7 @@ class NativeSystemTransport:
     async def _discard(self):
         child, self.process = self.process, None
         self.generation = self.active_contract = None
+        self._keyboard_commit_attempts = 0
         if child is not None:
             await reap_process(child, process_group=False)
 
@@ -196,6 +199,12 @@ class NativeSystemTransport:
             self.active_request = asyncio.current_task()
             try:
                 async with asyncio.timeout(self.timeout):
+                    if (
+                        operation == "keyboard.inspect"
+                        and self._keyboard_commit_attempts >= KEYBOARD_COMMIT_LIMIT
+                    ):
+                        # Only a new inspection may renew handles; never replay a mutation.
+                        await self._discard()
                     if self.process is None:
                         creation = asyncio.create_task(
                             self.factory(
@@ -229,6 +238,8 @@ class NativeSystemTransport:
                     if before_send is not None:
                         before_send()
                     attempted = True
+                    if operation == "keyboard.text.commit":
+                        self._keyboard_commit_attempts += 1
                     child.stdin.write(payload)
                     await child.stdin.drain()
                     raw = await child.stdout.readline()
