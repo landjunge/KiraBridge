@@ -423,5 +423,21 @@ Der separate neue Nativeharness bestand40 Fallgruppen in16,00s:22 Decoder-,
 bestand ebenfalls. Ein Swift-Closure-Compilefix und die konkrete Identitäts-
 Ergänzung wurden ausschließlich im betroffenen Harness nachgeprüft; keine
 Wiederholung der174 alten Tastaturfälle. Gegenseitige Deltareviews freigegeben.
-Die reale lesende Menüabnahme des exakten Commitbuilds steht noch aus. Profile
-und deren Ausführung wurden noch nicht begonnen.
+Reale lesende Abnahme des sauberen, privaten Commitbuilds
+`bdb2797c00ebc63eda4016da2ecb87fc3871e0e9`:85 beobachtete Menüeinträge inklusive
+Edit→Select All, `cmd_char=A`, Modifier0 und damit ausschließlich Command.
+Eine Folgeseite verwendete dieselbe Revision mit `cached=true`. Coverage ist
+ausdrücklich partial wegen nicht exportierter Identitätsattribute; keine Zusage
+über sämtliche Programmshortcuts. Receiver bestätigte null Down/Up/Return,
+unveränderten leeren Text und gleiche Clipboard-Generation. Eigene App geschlossen
+und abwesend bestätigt.
+Launch und Aktivierung der eigenen Fixture waren separate Setupaufrufe;
+die Aussage `effect=none` gilt für die beiden Discovery-Aufrufe.
+
+Die erste Assertion nahm Kleinbuchstabe a an. Der bestehende Basistastenvertrag
+behandelt A/a gleich und fügt kein Shift hinzu. Daher wurden ausschließlich die
+bereits vollständig erfassten Wire-/Receiverbelege unabhängig offline abgeglichen,
+ohne weiteren OS-Aufruf oder Livewiederholung. Originales fehlgeschlagenes
+Testergebnis bleibt erhalten; `step10-readonly-live-01/reconciled-acceptance.json`
+enthält Abgleich, Originalhashes und den genauen Abweichungsgrund. Kein
+Produktcodefix dafür. Profile und deren Ausführung wurden noch nicht begonnen.
