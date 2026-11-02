@@ -114,6 +114,7 @@ from kirabridge.platform_adapters.macos.system_services_models import SERVICE_IN
 SYSTEM_INPUTS.update(CONTROL_INPUTS)
 SYSTEM_INPUTS.update(SERVICE_INPUTS)
 
-from kirabridge.keyboard_models import KeyboardInspectInput  # noqa: E402
+from kirabridge.keyboard_models import KeyboardInspectInput, KeyboardShortcutsInput  # noqa: E402
 
 SYSTEM_INPUTS["keyboard.inspect"] = KeyboardInspectInput
+SYSTEM_INPUTS["keyboard.shortcuts.discover"] = KeyboardShortcutsInput

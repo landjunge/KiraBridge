@@ -395,3 +395,33 @@ ausgeführt):255→256→neue Inspektion, andere Operationen ohne Rotation sowie
 Autorisierungsverweigerung ohne Zählerverbrauch. Native Swiftdateien unverändert;
 die174 bisherigen Nativechecks und tatsächlichen Eingaben wurden wiederverwendet.
 Unabhängige Deltareview und Ruff/Diffprüfung grün.
+
+
+## Schritt 10 – Lesende Menü-Shortcut-Erkennung
+
+Eigene Capability `keyboard.shortcuts.read`, kein automatischer Grant durch
+`keyboard.execute` oder Vollberechtigung. Der öffentliche Vertrag bindet PID und
+Startzeit, begrenzt Seiten auf250 Einträge und verlangt für Folgeseiten eine
+beobachtete Snapshotrevision. Kein Desktop-Lease und keine Eingabe-/Fokuswirkung.
+Sieben gezielte Schema-/Dispatchfälle bestanden in0,32s; ein zusätzlicher enger
+Negativfall bestätigt echte Capabilityverweigerung vor jedem Nativeversand.
+Core-Deltareview unabhängig freigegeben. Der native Scanner ist auf2000 besuchte
+und vorgemerkte Knoten zusammen, Tiefe12 und ein weiches3s-Budget begrenzt.
+AX-Nachrichten sind begrenzt. Er öffnet keine Menüs und probiert keine Kürzel aus.
+Leere/Nullattribute erzeugen keinen erfundenen Shortcut; unbekannte Modifierbits
+oder nicht ausführbare virtuelle Tasten bleiben unaufgelöste Rohbeobachtungen.
+Command ist gemäß AX-Modifiervertrag implizit, solange NoCommand nicht gesetzt ist.
+
+Maximal vier15s-Snapshots sind an Principal, Worker, Layout und stabile
+Appidentität gebunden. Folgeseiten lesen nur diesen Snapshot. Bundle-/Pfadwechsel
+verwerfen ihn auch bei gleicher PID/Startzeit; Aktiv-/Hiddenänderungen allein
+verwerfen ihn nicht. Coverage beschreibt nur den exportierten AX-Menüsnapshot,
+niemals sämtliche Appshortcuts; Sprache bleibt ohne Beleg unknown.
+
+Der separate neue Nativeharness bestand40 Fallgruppen in16,00s:22 Decoder-,
+6 Scanbegrenzungs- und12 Cache-/Pagingfälle. Ein betroffener Builder-Mockfall
+bestand ebenfalls. Ein Swift-Closure-Compilefix und die konkrete Identitäts-
+Ergänzung wurden ausschließlich im betroffenen Harness nachgeprüft; keine
+Wiederholung der174 alten Tastaturfälle. Gegenseitige Deltareviews freigegeben.
+Die reale lesende Menüabnahme des exakten Commitbuilds steht noch aus. Profile
+und deren Ausführung wurden noch nicht begonnen.

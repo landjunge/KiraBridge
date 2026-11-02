@@ -25,6 +25,7 @@ def framing_harness(tmp_path_factory):
             "SystemControl.swift",
             "SystemServices.swift",
             "SystemKeyboard.swift",
+            "SystemShortcuts.swift",
         )
     ]
     command = [

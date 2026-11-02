@@ -102,6 +102,8 @@ for _name in (
     OPERATIONS[_name] = Operation(
         capability="process.inspect"
         if _name == "process.output"
+        else "keyboard.shortcuts.read"
+        if _name == "keyboard.shortcuts.discover"
         else "keyboard.execute"
         if _name in {"keyboard.key", "keyboard.chord", "keyboard.text"}
         else "bridge.health"

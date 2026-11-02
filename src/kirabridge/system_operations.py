@@ -2,6 +2,7 @@
 
 SYSTEM_LEAVES = {
     "keyboard.inspect": "keyboard",
+    "keyboard.shortcuts.discover": "keyboard",
     "system.info": "system",
     "system.processes": "system",
     "system.process": "system",
@@ -55,6 +56,7 @@ SYSTEM_PERMISSIONS = {
     if operation
     in {
         "keyboard.inspect",
+        "keyboard.shortcuts.discover",
         "windows.focus",
         "accessibility.inspect",
         "accessibility.action",

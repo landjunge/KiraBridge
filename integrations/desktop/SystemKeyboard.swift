@@ -729,7 +729,7 @@ enum SystemKeyboard {
         case "keyboard.text.chunk": return try chunkTransfer(arguments)
         case "keyboard.text.commit": return try await commitTransfer(arguments, writer: { try await text($0) })
         case "keyboard.text.abort": return try abortTransfer(arguments)
-        default: return nil
+        default: return try SystemShortcuts.handle(operation, arguments: arguments)
         }
     }
 }

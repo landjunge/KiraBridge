@@ -34,6 +34,7 @@ def build(destination=None):
         root / "integrations/desktop/SystemControl.swift",
         root / "integrations/desktop/SystemServices.swift",
         root / "integrations/desktop/SystemKeyboard.swift",
+        root / "integrations/desktop/SystemShortcuts.swift",
     ]
     binary = bundle / "Contents/MacOS/KiraBridge"
     binary.parent.mkdir(parents=True, exist_ok=True)

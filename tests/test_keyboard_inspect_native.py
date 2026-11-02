@@ -28,6 +28,7 @@ def test_keyboard_snapshot_guards_and_utf16_without_ui(tmp_path):
         root / "integrations/desktop" / name
         for name in (
             "SystemKeyboard.swift",
+            "SystemShortcuts.swift",
             "SystemControl.swift",
             "SystemBridge.swift",
             "SystemServices.swift",

@@ -24,6 +24,7 @@ def accessibility_harness(tmp_path_factory):
             "SystemBridge.swift",
             "SystemServices.swift",
             "SystemKeyboard.swift",
+            "SystemShortcuts.swift",
         )
     ]
     command = [

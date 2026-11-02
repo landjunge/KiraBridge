@@ -80,6 +80,7 @@ def test_native_process_primitive_guards_without_signals(tmp_path):
         root / "integrations/desktop/SystemBridge.swift",
         root / "integrations/desktop/SystemControl.swift",
         root / "integrations/desktop/SystemKeyboard.swift",
+        root / "integrations/desktop/SystemShortcuts.swift",
     ]
     command = [
         "xcrun",

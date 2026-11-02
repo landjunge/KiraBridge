@@ -57,6 +57,7 @@ def test_companion_metadata_binds_release_and_source(tmp_path, builder, monkeypa
             "SystemControl.swift",
             "SystemServices.swift",
             "SystemKeyboard.swift",
+            "SystemShortcuts.swift",
         )
     ]
     for source in sources:

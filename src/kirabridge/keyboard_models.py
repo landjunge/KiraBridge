@@ -57,6 +57,20 @@ class KeyboardInspectInput(ApplicationTargetInput):
     """Inspect an exact existing app; never activate it implicitly."""
 
 
+class KeyboardShortcutsInput(ApplicationTargetInput):
+    """Read a bounded menu snapshot; continuation never starts a new scan."""
+
+    limit: int = Field(default=100, ge=1, le=250)
+    offset: int = Field(default=0, ge=0, le=2000)
+    expected_revision: str | None = Field(default=None, pattern=r"^[a-f0-9]{64}$")
+
+    @model_validator(mode="after")
+    def bound_page(self):
+        if self.offset and self.expected_revision is None:
+            raise ValueError("Shortcut continuation requires its observed snapshot revision")
+        return self
+
+
 class KeyboardTarget(ApplicationTargetInput):
     target_token: str = Field(pattern=r"^[a-f0-9]{32}$")
     helper_pid: int = Field(gt=0, le=2**31 - 1)
