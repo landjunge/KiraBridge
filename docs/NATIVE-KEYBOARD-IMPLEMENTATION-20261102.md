@@ -441,3 +441,31 @@ ohne weiteren OS-Aufruf oder Livewiederholung. Originales fehlgeschlagenes
 Testergebnis bleibt erhalten; `step10-readonly-live-01/reconciled-acceptance.json`
 enthält Abgleich, Originalhashes und den genauen Abweichungsgrund. Kein
 Produktcodefix dafür. Profile und deren Ausführung wurden noch nicht begonnen.
+
+## Schritt 11a – Private Profilmodelle und atomarer CAS-Store
+
+Noch keine öffentliche Schnittstelle, Auflösung oder Ausführung. Strikte Modelle
+speichern App-Bundle, optionale genaue Versions-/Build-/Signierungs-/Sprach-/
+Layout-/Feldkontexte sowie benannte Tastenaktionen mit höchstens vier eindeutigen
+Modifiern und expliziter Herkunft. Beobachtete Menübindungen bleiben Kandidaten.
+Texte, Skripte, PID-/AX-Tokens und zusätzliche unbekannte Felder sind unzulässig.
+
+Eine private JSONdatei je Profil hält aktuellen Stand und unmittelbaren Vorgänger
+gemeinsam. Maximal64 Profile,24 KiB je normalisierter Definition und64 KiB je
+Envelope. SHA256-Revisionen sichern CAS-Änderungen; ein inhaltsgleicher Put erhält
+den Vorgänger. Fsync der temporären Datei, atomarer Austausch und Directoryfsync
+sichern den Commitpfad. Unklarheit nach Renameversuch bleibt Unknown ohne Retry.
+Snapshots enthalten immutable Bytes; ausgegebene Dokumente sind defensive Kopien.
+
+Verzeichnisse0700 und Dateien0600 werden geprüft. Directory-FDs, NoFollow,
+Nonblock und Fstat verhindern Pfadausbruch, Links und blockierende FIFO-Reads.
+Gemeinsame Leser-/exklusive Schreibsperre schützt CAS auch zwischen Storeinstanzen.
+Eine belegte Sperre verweigert sofort mit Busy; kein unbegrenztes Warten.
+Plattformen ohne POSIX-Sperren können die Modelle importieren, verweigern den
+Store vor Dateisystemänderung. Bestehende private IO-/Clipboardpfade unverändert.
+
+17 gezielte Tmpfilefälle bestanden in0,34s: Persistenz, CAS, genau ein Gewinner
+konkurrierender Writer, Vorgänger, unveränderliche Snapshots, Grenzen, manipulierte
+Dateien, Modus-/Link-/FIFO-/Lockprüfung und Fehler vor Commit. Keine Native-/GUI-
+oder Prozessläufe. Unabhängige Deltareview, Ruff und Diffprüfung grün. Tests werden
+auf nicht unterstützten Storeplattformen ausdrücklich übersprungen.
