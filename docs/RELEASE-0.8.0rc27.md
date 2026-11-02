@@ -1,4 +1,4 @@
-# KiraBridge 0.8.0rc27 — weniger Tastatur-Werkzeugübergaben
+# KiraBridge 0.8.0rc27 — schnellere gemeinsame Werkzeugpfade
 
 Kurze `keyboard.control`-Tasks liefern ihren Abschluss jetzt bis zu zwei Sekunden
 im ursprünglichen Aufruf. Längere Tasks bleiben unter derselben ID abfragbar;
@@ -7,6 +7,16 @@ Werkzeugschemas höchstens eine Sekunde wieder, mit Invalidierung bei Änderunge
 und Verbindungswechsel. Ausführung, Antworten, Berechtigungen und Tastaturziele
 werden weiterhin frisch geprüft. Werkzeughinweise empfehlen ganzen Text mit
 Zeilenumbrüchen in einem Aufruf ohne Zwischenablage.
+
+Der Schemacache wirkt über alle Werkzeuge im Stdio-Proxy. Sechs lesende
+Werkzeugbereiche wurden zusätzlich vermessen; das ersetzt keine Beobachtung
+der ChatGPT-internen Cloud-/Modellwartezeit.
+
+Der gemeinsame Serverpfad entfernt außerdem wiederholtes natives Binary-Hashing
+im Operationskatalog (50 → 2 Metadatenaufrufe im Benchmark) und die doppelte
+normale Health-Discovery. `operation_catalog` beobachtet Terminal-Sitzungen nun
+nur explizit mit `observe_terminals=true`; Standardbeobachtungen sind als
+`not_probed`/`cached` gekennzeichnet und gewähren keine Inputfreigabe.
 
 Historisch lagen 96,361 % der beobachteten Gedichtzeit außerhalb der internen
 Taskausführung. Die genaue ChatGPT-Callquote und Cloud-Teillatenzen sind nicht

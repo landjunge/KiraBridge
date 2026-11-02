@@ -172,12 +172,14 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
         Routine polling must not consume the foreground terminal-read lane.
         Never claims ChatGPT integration.
         """
-        from kirabridge.discovery import live, snapshot
+        from kirabridge.discovery import live
 
         name = identity(ctx)
         try:
-            discovery = await live(bridge, name) if observe_terminals else snapshot(bridge, name)
-            return {**bridge.health(name), "discovery": discovery}
+            if observe_terminals:
+                discovery = await live(bridge, name)
+                return {**bridge.health(name), "discovery": discovery}
+            return bridge.health(name)
         except BridgeError as exc:
             return {"error": {"code": exc.code, "message": str(exc)}}
 
@@ -386,8 +388,14 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
             return {"error": {"code": exc.code, "message": str(exc)}}
 
     @server.tool(annotations=read)
-    async def operation_catalog(ctx: Context) -> dict[str, Any]:
-        """Permitted version-1 operations and exact argument JSON schemas."""
+    async def operation_catalog(ctx: Context, observe_terminals: bool = False) -> dict[str, Any]:
+        """Permitted version-1 operations and exact argument JSON schemas.
+
+        Schema discovery does not inspect terminal sessions by default. Set
+        observe_terminals=true for an explicit fresh terminal catalogue. The
+        default discovery labels prior terminal observations as cached/not_probed;
+        observations never authorize input or replace fresh target validation.
+        """
 
         def action():
             from kirabridge.operations import OPERATIONS
@@ -402,6 +410,9 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
                     lambda op: decision(bridge.config, identity(ctx), op)
                 )
             }
+            # Host platform is a process-lifetime fact. Do not reconstruct the
+            # full native capability snapshot for every operation in this request.
+            native_host = bridge.macos.host_platform == "darwin"
             return {
                 "api_version": "1",
                 "approval_mode": policy.approval_mode,
@@ -451,17 +462,21 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
                             "session.close",
                             "clipboard.info",
                         }
-                        or bridge.macos.snapshot()["host"]["platform"] != "darwin"
+                        or not native_host
                         or platform_rows[name]["eligible_for_submission"]
                     )
                 },
             }
 
-        from kirabridge.discovery import live
+        from kirabridge.discovery import live, snapshot
 
         result = safe(action)
         if "error" not in result:
-            result["discovery"] = await live(bridge, identity(ctx))
+            result["discovery"] = (
+                await live(bridge, identity(ctx))
+                if observe_terminals
+                else snapshot(bridge, identity(ctx))
+            )
         return result
 
     @server.tool(annotations=write)

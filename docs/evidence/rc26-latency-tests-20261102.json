@@ -22,5 +22,16 @@
     "evidence": "rc26-native-keyboard-latency-20261102.json",
     "failed_prior_runs_preserved": true
   },
-  "review": "two independent native subagents reviewed metadata cache and inline wait; no blocking source defect"
+  "review": "two independent native subagents reviewed metadata cache and inline wait; no blocking source defect",
+  "cross_domain_server_changes": {
+    "new_snapshot_tests": 3,
+    "final_focused_http_tests": 7,
+    "seconds": 3.4,
+    "purpose": "Request-local native snapshot counts, current rights, no implicit terminal catalog; explicit fresh/cached/failure observations preserved"
+  },
+  "final_common_path_regressions": {
+    "passed": 27,
+    "seconds": 13.63,
+    "command": "PYTHONPATH=src python -m pytest -q tests/test_mcp_request_snapshots.py tests/test_mcp.py tests/test_keyboard_access_mcp.py tests/test_discovery_visible.py::test_real_http_initialization_and_fresh_catalog_agree_with_grants"
+  }
 }

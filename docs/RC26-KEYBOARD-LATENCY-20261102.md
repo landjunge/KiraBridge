@@ -1,6 +1,9 @@
-# RC26: Ende-zu-Ende-Untersuchung der Tastatureingabe
+# RC26: Ende-zu-Ende-Latenz aller Werkzeugbereiche
 
-Auftrag vom 2. November 2026; Intel-macOS 15.7.4, produktiv RC26, Quellstand
+Auftrag vom 2. November 2026, ergänzt am 3. November: Der Nutzer meldet riesige
+Latenz in **allen Werkzeugbereichen**; Tastatur/Notizen dient als konkrete Reproduktion.
+Untersucht werden gemeinsame Übergabe-/Orchestrierungskosten und bereichsspezifische
+Ausführung getrennt. Intel-macOS 15.7.4, produktiv RC26, Quellstand
 `34f5e6d` mit Dokumentationsbaseline `78b182b`. Das separate alte
 Codex-Terminal-Statusproblem ist ausdrücklich kein Gegenstand dieses Berichts.
 
@@ -78,6 +81,56 @@ historischer ChatGPT-Handshake unbekannt. Quellen und Interpretation stehen in
 [MCP-/Orchestrierungsrecherche](RC26-MCP-RESEARCH-20261102.md). Neuere
 Protokollversionen wurden nicht rückwirkend als beobachtetes Verhalten behandelt.
 
+## Bereichsübergreifende Messungen
+
+36 zusätzliche, tatsächlich ausgeführte Leseaufrufe prüfen sechs Bereiche ohne
+UI-Eingabe, Clipboardinhalt oder Benutzerdateien. Je Bereich drei Aufrufe vorher
+und nachher: Discovery sinkt von drei auf einen Request; jeder Toolcall wird
+weiterhin separat ausgeführt. Backend bleibt produktives RC26, variiert wird
+nur der gemeinsame lokale Proxy. [Rohdaten](evidence/rc26-cross-domain-latency-20261103.json).
+
+| Bereich | Median vorher ms | Median mit Proxycache ms |
+| --- | ---: | ---: |
+| Health | 89,41 | 47,40 |
+| Clipboard-Fähigkeitsinfo, kein Inhalt | 105,17 | 5,79 |
+| Berechtigungskontext | 102,61 | 66,44 |
+| Taskübersicht, begrenzt auf eine Zusammenfassung | 102,96 | 6,86 |
+| macOS-Fähigkeiten | 136,35 | 75,62 |
+| Plattform-Leseabfrage | 106,53 | 41,68 |
+
+Der Cache ist werkzeugübergreifend, sitzt jedoch im Stdio→HTTP-Proxy. Die
+hier eingerichtete ChatGPT-Tunnelroute benutzt `kirabridge --principal chatgpt
+connect` und durchläuft diesen Proxy. Ein alternativer direkter HTTP-Client
+bekommt diese Optimierung nicht automatisch. Die Verbesserungen liegen lokal
+im Bereich einiger Dutzend Millisekunden; sie erklären keine riesige allgemeine
+Cloud-/Modellwartezeit. Keine Hochrechnung auf unbeobachtete Werkzeuge.
+
+Der siebte Bereich, `operation_catalog`, brauchte am unveränderten produktiven
+Backend median 1363 ms ohne und 1263 ms mit Proxycache. Beide Varianten holten
+drei Kataloge für drei Dispatches, weil ein Call länger als die Ein-Sekunden-TTL
+brauchte. Der Proxycache allein löst diesen Backendengpass also nicht.
+[Separater Beleg](evidence/rc26-catalog-domain-latency-20261103.json).
+
+Im gemeinsamen Serverpfad sind deshalb zusätzlich zwei Ursachen behoben:
+Der Operationskatalog verwendete pro passender Operation eine vollständige
+native Momentaufnahme und las/hashte dabei das App-Binary wiederholt.
+76 Operationen verursachten in der Messung **50 statt benötigter zwei** solcher
+Metadatenaufrufe. Jetzt wird die unveränderliche Hostplattform direkt verwendet.
+Health berechnet seine normale Discovery nur einmal statt zweimal. Drei
+alternierende direkte FastMCP-Paare mit echtem installiertem Binary ergaben
+median **250,03 → 65,96 ms** für den Operationskatalog und **9,28 → 4,82 ms**
+für Health. Dies ist ein direkter Funktionsbenchmark mit temporärem Zustand,
+kein gemessener Cloud-/HTTP-Geschwindigkeitsfaktor.
+[Messdaten](evidence/mcp-request-snapshots-20261103.json).
+
+Außerdem liest `operation_catalog` Terminal-Sitzungen nur noch auf ausdrücklichen
+Wunsch `observe_terminals=true`. Der normale Schemaabruf benötigt keine fremde
+Terminalabfrage. Seine Beobachtungen sind explizit `not_probed` oder `cached`,
+niemals als aktuelle Inputfreigabe verwendbar. Die tatsächlichen Zielprüfungen
+bei Eingabe und die aktuelle Berechtigung je Request bleiben erhalten.
+Sieben gezielte HTTP-/Rechte-/Fehlerprüfungen dieses letzten Schritts bestanden.
+Diese generischen Serververbesserungen wirken auch für direkte HTTP-Clients.
+
 ## Implementierte Änderungen und kontrollierter Vergleich
 
 1. `DaemonConnection` verwendet Schemas höchstens eine Sekunde wieder. Explizite
@@ -138,8 +191,16 @@ Backspace, mit `unknown / macos_target_changed`. Ursache nicht aufgeklärt;
 keine Wiederholung der unsicheren Eingabe. Alle drei Läufe wurden vollständig
 bereinigt; eigener Empfänger und Worker unabhängig zweimal abwesend geprüft.
 
+Weitere aktuelle Kosten bleiben sichtbar: `connection_check` liest ausdrücklich
+Terminalmetadaten; dynamische `td_*`-Aufrufe prüfen nachgelagerte ThreadDesk-Kataloge
+mehrfach und seriell. Diese fachlichen Prüfungen sind keine reine Transportlatenz
+und werden nicht durch den Core-Schemacache aufgehoben. Es wurde weder ein
+Rechte-/Zielcache noch ein Cache für Seiteneffekte eingeführt.
+
 Produktive RC26-Installation und andere Sitzungen wurden nicht geändert.
 Kein neuer kompletter ChatGPT-Cloudlauf, keine garantierte Ende-zu-Ende-Zeitzusage
 und keine vollständige Fehlerfreiheit beansprucht. Nach unsicherem Ausgang:
 ursprüngliche Task-ID abfragen, Ziel unabhängig lesen, niemals unter neuer ID
-blind erneut tippen. Commit-, Push- und Freigabestand wird nach Abschluss ergänzt.
+blind erneut tippen. Code, Messdaten und Untersuchungsbericht sind auf dem
+Branch `fix/rc26-keyboard-latency-20261102` gesichert; abschließende Paketprüfung
+und veröffentlichter Commit werden unten ergänzt.

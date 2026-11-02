@@ -50,7 +50,9 @@ async def test_real_http_initialization_and_fresh_catalog_agree_with_grants(
         health = (
             await pool.call("local", "bridge_health", {"observe_terminals": True})
         ).structuredContent
-        catalog_result = (await pool.call("local", "operation_catalog", {})).structuredContent
+        catalog_result = (
+            await pool.call("local", "operation_catalog", {"observe_terminals": True})
+        ).structuredContent
         inventory = (await pool.call("local", "agent_inventory", {})).structuredContent
         assert not health["approval_required"]
         assert not catalog_result["operations"]["session.open"]["approval_required"]

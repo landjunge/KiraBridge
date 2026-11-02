@@ -1,0 +1,154 @@
+{
+  "observed_at_utc": "2026-11-02T23:03:51.828797+00:00",
+  "scope": "own authenticated loopback MCP; before/after changes proxy only, same running daemon; no ChatGPT cloud/model/stdio/native input timing",
+  "response_contents_saved": false,
+  "order": "each domain before then after, cold catalog each variant",
+  "baseline_commit": "78b182b",
+  "protocolVersion": "2025-11-25",
+  "sdk_version": "1.30.0",
+  "tools": 72,
+  "catalog_json_bytes": 88143,
+  "samples": [
+    {
+      "variant": "before",
+      "domain": "operation_catalog",
+      "operation": "operation_catalog",
+      "call_ms": [
+        1315.9990670028492,
+        1391.2442399996507,
+        1363.3190229993488
+      ],
+      "summary": {
+        "count": 3,
+        "p50_ms": 1363.3190229993488,
+        "min_ms": 1315.9990670028492,
+        "max_ms": 1391.2442399996507,
+        "sum_ms": 4070.5623300018487
+      },
+      "metadata_list_requests": 3,
+      "metadata_list_ms": [
+        50.649931999942055,
+        48.249749997921754,
+        47.008293000544654
+      ],
+      "metadata_summary": {
+        "count": 3,
+        "p50_ms": 48.249749997921754,
+        "min_ms": 47.008293000544654,
+        "max_ms": 50.649931999942055,
+        "sum_ms": 145.90797499840846
+      },
+      "actual_tool_dispatches": 3,
+      "dispatch_ms": [
+        1262.2215019982832,
+        1340.1172589983616,
+        1313.1762730008631
+      ],
+      "dispatch_summary": {
+        "count": 3,
+        "p50_ms": 1313.1762730008631,
+        "min_ms": 1262.2215019982832,
+        "max_ms": 1340.1172589983616,
+        "sum_ms": 3915.515033997508
+      },
+      "client_result_encoding_ms": [
+        3.746485999727156,
+        4.165643997112056,
+        3.1451490031031426
+      ],
+      "response_json_bytes": [
+        511925,
+        511923,
+        511923
+      ],
+      "errors": [
+        {
+          "isError": false,
+          "error_code": null
+        },
+        {
+          "isError": false,
+          "error_code": null
+        },
+        {
+          "isError": false,
+          "error_code": null
+        }
+      ]
+    },
+    {
+      "variant": "after",
+      "domain": "operation_catalog",
+      "operation": "operation_catalog",
+      "call_ms": [
+        1263.1243249998079,
+        1292.8767730008985,
+        1220.4705359981745
+      ],
+      "summary": {
+        "count": 3,
+        "p50_ms": 1263.1243249998079,
+        "min_ms": 1220.4705359981745,
+        "max_ms": 1292.8767730008985,
+        "sum_ms": 3776.471633998881
+      },
+      "metadata_list_requests": 3,
+      "metadata_list_ms": [
+        48.166936001507565,
+        48.48827000023448,
+        48.169007000979036
+      ],
+      "metadata_summary": {
+        "count": 3,
+        "p50_ms": 48.169007000979036,
+        "min_ms": 48.166936001507565,
+        "max_ms": 48.48827000023448,
+        "sum_ms": 144.82421300272108
+      },
+      "actual_tool_dispatches": 3,
+      "dispatch_ms": [
+        1211.9353220004996,
+        1241.5980949990626,
+        1168.708365999919
+      ],
+      "dispatch_summary": {
+        "count": 3,
+        "p50_ms": 1211.9353220004996,
+        "min_ms": 1168.708365999919,
+        "max_ms": 1241.5980949990626,
+        "sum_ms": 3622.241782999481
+      },
+      "client_result_encoding_ms": [
+        3.4862560023611877,
+        3.1296739980462007,
+        3.232301998650655
+      ],
+      "response_json_bytes": [
+        511925,
+        511923,
+        511923
+      ],
+      "errors": [
+        {
+          "isError": false,
+          "error_code": null
+        },
+        {
+          "isError": false,
+          "error_code": null
+        },
+        {
+          "isError": false,
+          "error_code": null
+        }
+      ]
+    }
+  ],
+  "skipped": [],
+  "not_measured": [
+    "model orchestration",
+    "ChatGPT ingress",
+    "remote tunnel",
+    "stdio"
+  ]
+}

@@ -43,6 +43,11 @@ funktioniert unabhängig von ThreadDesk und anderen Integrationen.
   Optionale ThreadDesk-Datei-/Wissensfunktionen, TollGate-Stopbelege und neutrale
   Agent-Authority-Beobachtungen benötigen jeweils ihre tatsächliche Konfiguration.
 
+Der Operationskatalog prüft aktuelle Rechte und Schemas, ohne standardmäßig
+Terminal-Sitzungen zu lesen. Frische Terminalmetadaten bei Bedarf mit
+`operation_catalog(observe_terminals=true)` anfordern; Eingabeziele werden
+weiterhin bei jeder Aktion geprüft.
+
 Zusammenhängenden Text wie ein Gedicht mit **einem** `keyboard_control`-Aufruf
 übergeben: `request={"app":"Notes","text":"Der Mond…\nDie Nacht…","submit":false}`.
 Zeilenumbrüche bleiben Teil des Texts; der Pfad benötigt keine Zwischenablage.
