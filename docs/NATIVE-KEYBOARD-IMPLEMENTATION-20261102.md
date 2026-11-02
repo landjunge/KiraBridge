@@ -469,3 +469,32 @@ konkurrierender Writer, Vorgänger, unveränderliche Snapshots, Grenzen, manipul
 Dateien, Modus-/Link-/FIFO-/Lockprüfung und Fehler vor Commit. Keine Native-/GUI-
 oder Prozessläufe. Unabhängige Deltareview, Ruff und Diffprüfung grün. Tests werden
 auf nicht unterstützten Storeplattformen ausdrücklich übersprungen.
+
+## Schritt 11b – Öffentliche Profilverwaltung und Auflösungsvorschau
+
+Corelokale Operationen `keyboard.profiles.list/get/put/delete/resolve` sind
+registriert. List/Get/Resolve benötigen `keyboard.profiles.read`, Änderungen
+`keyboard.profiles.manage`; bestehende Principals erhalten keine neuen Grants.
+Der Store wird erst nach Autorisierung erzeugt. Änderungen verwenden die
+bestehende Desktoptransaktion und prüfen nach Wartezeit/Running erneut die
+Berechtigung vor dem synchronen Storezugriff. Kein Native-Dispatch dafür.
+
+List liefert nur ID, Revision, Appbedingungen und Aktionszahl; Get/Put enthalten
+die einzelne Definition. Put nimmt `profile, expected_revision?`, Delete
+`profile_id, expected_revision`, Get `profile_id, previous?`. Resolve erhält
+`action, context, profile_id?, expected_revision?`. Die Kontextfelder sind
+`bundle_id` sowie optionale Version, Build, Signingteam, Sprache, Layout,
+Keyboardtyp und Feldrolle. Eine Revision setzt eine explizite Profil-ID voraus.
+
+Der Kontext ist ausdrücklich Caller-Vorschau, niemals native Beobachtung:
+`context_verified=false`, `execution_authorized=false`, `effect=none` und kein
+Eingabeversuch. Benutzerzuordnung schlägt bestätigte Appzuordnung, diese schlägt
+Menükandidat. Gleichrangige Mehrfachtreffer bleiben auch bei gleichen Tasten
+mehrdeutig. Fehlende notwendige Kontexte gleich- oder höherrangiger Profile
+verhindern einen stillen Fallback. Menübeobachtungen bleiben candidate_only.
+
+22 gezielte Manager-/Bridge-/Resolverfälle bestanden in0,43s. Getrennte Grants,
+CAS, alte Revision, unbekannter/geänderter Versions-/Layoutkontext, Ambiguität,
+Vorschauherkunft und Null-Native-Dispatch sind geprüft. Keine Wiederholung der
+17 Store-, Native- oder MCP-Läufe. Gegenseitige Deltareview sowie Ruff/Diffprüfung
+grün. Profilaktionen und Bedienoberfläche folgen als eigene Schritte.

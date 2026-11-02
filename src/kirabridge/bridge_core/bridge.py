@@ -44,6 +44,7 @@ from kirabridge.file_transfer.models import InventoryInput, PrepareInput, Transf
 from kirabridge.filesystem_manager import FilesystemManager, PathScope
 from kirabridge.image_manager import ImageManager
 from kirabridge.keyboard_manager import KEYBOARD_INPUTS, KeyboardManager
+from kirabridge.keyboard_profile_manager import PROFILE_INPUTS, KeyboardProfileManager
 from kirabridge.message_manager import MessageManager
 from kirabridge.message_manager.receiver import MessageReceiver
 from kirabridge.permissions import (
@@ -78,6 +79,7 @@ from kirabridge.visible_terminal import VisibleTerminal, VisibleTerminalInput
 INPUTS = {
     **SYSTEM_INPUTS,
     **KEYBOARD_INPUTS,
+    **PROFILE_INPUTS,
     "process.output": OutputRangeInput,
     "system.report": SystemReportInput,
     "platform.status": PlatformStatusInput,
@@ -238,6 +240,9 @@ class Bridge:
 
         self.desktop_input = DesktopInput(
             self.sessions.lock, timeout=self.system_modules.transport.timeout
+        )
+        self.keyboard_profiles = KeyboardProfileManager(
+            config.state_path, self.security.authorize, self.desktop_input
         )
         self.keyboard = KeyboardManager(
             transport=self.system_modules.transport,
@@ -557,6 +562,8 @@ class Bridge:
                     "remain separately pageable"
                 ),
             }
+        if operation in PROFILE_INPUTS:
+            return await self.keyboard_profiles.execute(task, args, running)
         if operation in KEYBOARD_INPUTS:
             return await self.keyboard.execute(task, args, running, progress)
         if operation in SYSTEM_LEAVES:

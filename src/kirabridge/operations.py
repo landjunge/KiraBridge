@@ -12,6 +12,9 @@ from kirabridge.system_operations import SYSTEM_LEAVES, SYSTEM_READ_OPERATIONS
 READ_OPERATIONS = frozenset(
     {
         *SYSTEM_READ_OPERATIONS,
+        "keyboard.profiles.list",
+        "keyboard.profiles.get",
+        "keyboard.profiles.resolve",
         "process.output",
         "system.report",
         "platform.status",
@@ -77,6 +80,8 @@ for _name in (
     "keyboard.key",
     "keyboard.chord",
     "keyboard.text",
+    "keyboard.profiles.put",
+    "keyboard.profiles.delete",
     "session.input",
     "session.focus",
     "session.close",
@@ -102,6 +107,10 @@ for _name in (
     OPERATIONS[_name] = Operation(
         capability="process.inspect"
         if _name == "process.output"
+        else "keyboard.profiles.read"
+        if _name in {"keyboard.profiles.list", "keyboard.profiles.get", "keyboard.profiles.resolve"}
+        else "keyboard.profiles.manage"
+        if _name in {"keyboard.profiles.put", "keyboard.profiles.delete"}
         else "keyboard.shortcuts.read"
         if _name == "keyboard.shortcuts.discover"
         else "keyboard.execute"
