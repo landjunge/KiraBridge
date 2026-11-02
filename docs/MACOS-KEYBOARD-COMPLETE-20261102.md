@@ -88,6 +88,12 @@ Eingaben wurden anhand vorhandener Quittungen untersucht und nicht erneut gesend
 | Stummschaltung | Tatsächliches Mute false → true → false. |
 | Caps Lock | Kandidat d3cb270: false → true; physisches A erzeugt `A`; true → false, jeweils gelesen und am Empfänger geprüft. |
 | Command+Tab | Kandidat d3cb270: eigener Empfänger → Brave; drei wirkliche Posts einschließlich Modifierfreigabe. |
+| App-Wechsel in beide Richtungen | Kandidat e8f7cc4: tatsächlicher Vordergrundwechsel mit drei beziehungsweise vier Posts; Umschalter anschließend geschlossen. |
+| Wechsel unabhängiger Fenster | Eigene Fenster 1198 → 1191; Tabbing ausdrücklich deaktiviert, keine gemeinsame Tabgruppe. |
+| Control+Pfeil rechts/links | Automatischer Systempfad nach rechts und expliziter Systempfad nach links; unterschiedliche tatsächliche Desktopansichten, anschließend zurück. |
+| Mission Control, Programmfenster-Übersicht und Spotlight | Geöffnet und geschlossen; Spotlight auch per systemweitem Escape geschlossen. |
+| Alle fünf Modifier zusammen | Command/Control/Option/Shift/Fn mit F20 zweimal: vier empfangene Ereignisse mit exakt passendem Modifierbitfeld. |
+| Caps mit Shift und literalem Text | Literaltext bleibt exakt. Caps+Shift erzeugt auf der aktiven deutschen Mac-Belegung `A`, wie die unabhängig gelesene UCKeyTranslate-Belegung vorgibt. |
 
 Die praktischen Tests fanden zusätzliche Fehler, die reine Ereignisbau-Tests
 nicht erkennen konnten: Caps war zunächst nicht in Folgeereignissen enthalten;
@@ -97,10 +103,20 @@ Race Condition: öffentliche HID-Zustandsabfragen enthalten auch unsere eigenen
 synthetischen Modifier. Die Korrektur verfolgt deren Besitz während der gesamten
 Ereignisfolge und wartet anschließend begrenzt und nur lesend auf gelöste
 HID-Zustände. Post-Aufrufe werden dadurch nicht als Verarbeitungsquittung ausgelegt.
+Eine weitere F11-Abnahme öffnete den Schreibtisch tatsächlich, endete aber wegen
+eines verbleibenden Fn-Klassifikationsbits unklar. Nur dieses Metadatenbit wird
+beim normalen Loslassereignis entfernt; explizites Benutzer-Fn bleibt erhalten.
+Der praktische Gegenversuch bestätigte gelöste HID-Flags ohne ein zusätzliches
+Globe/Fn-Ereignis. Die finale Paketabnahme folgt diesem Stand.
 
 Der erste Fensterwechsel-Test war durch automatisch gruppierte macOS-Fenstertabs
 nicht aussagekräftig. Der eigene Testempfänger erhält ausdrücklich unabhängige
 Fenster. Das ändert keine Benutzereinstellung und kein fremdes Programm.
+
+Ein nach einem früheren fehlgeschlagenen Kandidaten noch gesetzter eigener
+Tab-Tastenzustand wurde separat erkannt und ausschließlich per KeyUp freigegeben.
+Die anschließende unabhängige Fenster-/App-/Space-Abnahme startete mit gelösten
+Tasten; alte unbekannte Aufgaben wurden nicht erneut eingereicht.
 
 Mission Control wurde sichtbar geöffnet und zeigte vier bereits bestehende
 Spaces, darunter den vorhandenen Brave-Vollbildbereich. Der öffentliche

@@ -121,3 +121,14 @@ def test_system_modifier_ownership_delta_without_os_input(tmp_path):
     assert receipt["cmd_shift_tab_fixture_total_posts"] == 4
     assert receipt["delayed_hid_clear_polls"] == 3
     assert receipt["timeout_release_batches"] == 1
+
+
+@pytest.mark.skipif(
+    sys.platform != "darwin" or not shutil.which("xcrun"), reason="Darwin SDK required"
+)
+def test_fn_classification_keyup_delta_without_os_input(tmp_path):
+    receipt = run_native_harness(tmp_path, "FnClassificationKeyUpHarness.swift")
+    assert receipt["checks"] >= 1539
+    assert receipt["classification_key_up_clears_fn"] is True
+    assert receipt["explicit_fn_preserved"] is True
+    assert receipt["real_event_posts"] == receipt["additional_event_posts"] == 0

@@ -243,7 +243,12 @@ enum SystemSpecialKeys {
         return rawKeyPlan(code: Int(resolved.code), flags: resolved.flags,
                           explicitFn: modifiers.contains("fn"), preferences: preferences)
     }
-    static func events(_ plan: Plan, observedCapsLock: Bool? = nil) throws -> (CGEvent, CGEvent) {
+    static func classificationKeyUpFlags(_ flags: CGEventFlags, code: Int, explicitFn: Bool) -> CGEventFlags {
+        guard !explicitFn, flags.contains(.maskSecondaryFn), comparableFlags(flags, code: code) != flags else { return flags }
+        return flags.subtracting(.maskSecondaryFn)
+    }
+    static func events(_ plan: Plan, observedCapsLock: Bool? = nil,
+                       explicitFn: Bool = false) throws -> (CGEvent, CGEvent) {
         if plan.route == "system_defined_hid" {
             func event(_ down: Bool) throws -> CGEvent {
                 let state = Int(down ? NX_KEYDOWN : NX_KEYUP)
@@ -261,8 +266,12 @@ enum SystemSpecialKeys {
         guard plan.route == "quartz_hid" else {
             throw failure("System keyboard event could not be constructed")
         }
-        return try SystemKeyboard.events(["keyboard_type": Int(LMGetKbdType())],
+        let pair = try SystemKeyboard.events(["keyboard_type": Int(LMGetKbdType())],
             code: CGKeyCode(plan.code), flags: plan.flags, observedCapsLock: observedCapsLock)
+        // Fn on an arrow/F-key can be classification metadata. Clearing only
+        // that bit on the ordinary key-up avoids synthesizing a Globe/Fn-up.
+        pair.1.flags = classificationKeyUpFlags(pair.1.flags, code: plan.code, explicitFn: explicitFn)
+        return pair
     }
     /// Pure orchestration also used by the injected native harness. Key-up is
     /// always attempted after our key-down; system navigation may change focus.
@@ -462,6 +471,7 @@ enum SystemSpecialKeys {
         let initial = try plan(args, preferences: preferences())
         let before = observations()
         var appliedEventFlags: CGEventFlags?
+        var appliedKeyUpFlags: CGEventFlags?
         let validate: () throws -> Void = {
             let current = try plan(args, preferences: preferences())
             guard current == initial else { throw failure("System shortcut changed before input") }
@@ -493,8 +503,11 @@ enum SystemSpecialKeys {
                 })
             }
         } else {
-            let pair = try events(initial)
-            if initial.route == "quartz_hid" { appliedEventFlags = pair.0.flags }
+            let pair = try events(initial, explicitFn: (args["modifiers"] as? [String] ?? []).contains("fn"))
+            if initial.route == "quartz_hid" {
+                appliedEventFlags = pair.0.flags
+                appliedKeyUpFlags = pair.1.flags
+            }
             var introducedFlags = CGEventFlags()
             let releaseGuard: () throws -> Void = {
                 try SystemControl.axGranted()
@@ -538,6 +551,10 @@ enum SystemSpecialKeys {
             var metadata = initial.metadata
             metadata["requested_flags"] = initial.flags.rawValue
             metadata["applied_flags"] = applied.rawValue
+            metadata["applied_key_down_flags"] = applied.rawValue
+            metadata["applied_key_up_flags"] = appliedKeyUpFlags?.rawValue as Any? ?? NSNull()
+            metadata["function_classification_cleared_on_key_up"] = applied.contains(.maskSecondaryFn)
+                && appliedKeyUpFlags?.contains(.maskSecondaryFn) == false
             metadata["caps_lock_applied"] = applied.contains(.maskAlphaShift)
             result["resolved"] = metadata
         }
