@@ -41,7 +41,8 @@ enum SystemControl {
         return ["pid": Int(app.processIdentifier), "started_at": started.timeIntervalSince1970,
                 "bundle_id": app.bundleIdentifier ?? "", "name": app.localizedName ?? "",
                 "app_path": app.bundleURL?.path ?? "", "executable": app.executableURL?.path ?? "",
-                "active": app.isActive, "hidden": app.isHidden]
+                "active": app.isActive, "hidden": app.isHidden,
+                "user_application": app.activationPolicy == .regular]
     }
     static func target(_ args: [String: Any], mutating: Bool = false) throws -> NSRunningApplication {
         guard let number = args["pid"] as? NSNumber, number.int64Value > 0, number.int64Value <= Int64(Int32.max),

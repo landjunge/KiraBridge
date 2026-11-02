@@ -90,8 +90,28 @@ bestanden in3,43s. Eine unabhängige Review fand und schloss einen rekursiv bena
 Autorisierungscallback; die Textintegration prüft ausdrücklich den korrigierten
 Pfad. Native-Transport dieser Fälle ist synthetisch, keine Liveeingabe behauptet.
 
-## Schritte 2 und 3
+## Schritt 2 – Allgemeine native Tasten ohne Textfeldpflicht
 
-Native allgemeine Fokuskontexte, optionale TextArea-Subrole, einfache Konsole und
-gezielte reale ChatGPT-Abnahme werden als weitere getrennte Schritte dokumentiert.
-Bis zur Paket-/Laufzeitabnahme bleibt der installierte Stand unverändert.
+Der native Snapshot bindet nun einen allgemeinen fokussierten AX-Kontext. Für
+Tasten und Kombinationen werden keine Textwerte gelesen. Fehlende optionale
+Fokus-/Enabled-/Subroleattribute bleiben ausdrücklich unbekannt; widersprüchliche
+Werte, sichere/protected Elemente, App-/Fenster-/Fokus-/Layoutänderungen verweigern.
+App-, Prozess-, Principal-, Worker- und Zielrevision bleiben gebunden.
+
+Text und optionales Return verlangen weiterhin den vollständigen strengen
+Textvertrag. Für echte AXTextAreas darf die Subrole fehlen, wenn der AX-Status
+dies belegt; bei TextFields wird daraus keine Freigabe abgeleitet. Kommunikations-
+fehler werden nicht als optional fehlender Wert umgedeutet. Nach wie vor kein
+blindes Unicode-/Clipboard-Fallback und keine behauptete Programmbestätigung.
+
+Der neue isolierte Nativeharness bestand zunächst40, nach dem gezielten
+TextArea-Delta54 Fallgruppen (letzter Lauf17,70s). Ausschließlich injizierte
+AX-Daten/Closures, keine UI-, TCC- oder echten Postaufrufe. Alte174 Nativefälle
+wurden nicht wiederholt. Eine kleine ergänzte App-Metadatenangabe kennzeichnet
+normale GUI-Programme; die Konsole kann damit Hintergrundhelfer ausblenden,
+während die allgemeine App-API diese unverändert zugänglich hält.
+
+## Schritt 3 – Einfache Oberfläche und reale Abnahme
+
+Die einfache Konsole und die gezielte reale ChatGPT-Abnahme folgen als getrennte
+Schritte. Bis zur Paket-/Laufzeitabnahme bleibt der installierte Stand unverändert.

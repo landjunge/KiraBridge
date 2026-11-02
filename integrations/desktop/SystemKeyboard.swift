@@ -13,11 +13,15 @@ enum SystemKeyboard {
         let selection: CFRange
         let metadata: [String: Any]
     }
+    struct Context {
+        let field: Field?
+        let metadata: [String: Any]
+    }
     struct Snapshot {
         let application: NSRunningApplication
         let window: AXUIElement
         let element: AXUIElement
-        let field: Field
+        let field: Field?
         let response: [String: Any]
     }
     static func require(_ condition: Bool, _ message: String) throws {
@@ -27,14 +31,91 @@ enum SystemKeyboard {
         try require(AXUIElementSetMessagingTimeout(element, 1.0) == .success,
                     "Keyboard AX timeout could not be configured")
     }
+    static func optionalSubrole(status: AXError, value: CFTypeRef?) throws -> CFTypeRef? {
+        switch status {
+        case .success:
+            try require(value == nil || value is String, "Keyboard subrole has an invalid value")
+            return value
+        case .attributeUnsupported, .noValue: return nil
+        default: throw SystemControl.failure("keyboard_unsupported", "Keyboard subrole observation failed")
+        }
+    }
+    static func subrole(_ element: AXUIElement) throws -> CFTypeRef? {
+        try timeout(element)
+        var value: CFTypeRef?
+        let status = AXUIElementCopyAttributeValue(element, kAXSubroleAttribute as CFString, &value)
+        return try optionalSubrole(status: status, value: value)
+    }
+    static func textClassification(role: String?, subrole: String?) -> Bool {
+        ["AXTextField", "AXTextArea"].contains(role ?? "")
+            && (subrole == "" || subrole == "AXSearchField" || (role == "AXTextArea" && subrole == nil))
+    }
+    /// A key pair needs an exact focused element, not a readable editable value.
+    static func observeContext(prepare: () throws -> Void,
+                               read: (String) -> CFTypeRef?) throws -> Context {
+        try prepare()
+        guard let role = read(kAXRoleAttribute) as? String,
+              role.range(of: "\\AAX[A-Za-z0-9]{1,126}\\z", options: .regularExpression) != nil else {
+            throw SystemControl.failure("keyboard_unsupported", "Reliable keyboard focus role is unavailable")
+        }
+        let rawSubrole = read(kAXSubroleAttribute)
+        let subrole = rawSubrole as? String
+        try require(rawSubrole == nil || (subrole != nil && subrole!.utf8.count <= 128),
+                    "Keyboard focus subrole is invalid")
+        try require(!role.contains("Secure") && !(subrole?.contains("Secure") ?? false)
+                    && (read("AXProtectedContent") as? NSNumber)?.boolValue != true,
+                    "Protected keyboard focus is unsupported")
+        let rawFocused = read(kAXFocusedAttribute)
+        let focused = rawFocused as? NSNumber
+        try require(rawFocused == nil || focused != nil, "Keyboard focused state is invalid")
+        // The surrounding snapshot proves focus using AXFocusedUIElement identity.
+        // Some non-text elements omit their own optional focused attribute.
+        try require(focused?.boolValue != false, "Keyboard element is not focused")
+        let rawEnabled = read(kAXEnabledAttribute)
+        let enabled = rawEnabled as? NSNumber
+        try require(rawEnabled == nil || enabled != nil, "Keyboard enabled state is invalid")
+        try require(enabled?.boolValue != false, "Keyboard element is disabled")
+        var metadata: [String: Any] = ["role": role, "subrole": subrole as Any? ?? NSNull(),
+            "focused": focused.map { $0.boolValue } as Any? ?? NSNull(),
+            "enabled": enabled.map { $0.boolValue } as Any? ?? NSNull(),
+            "secure": NSNull(), "text_supported": false]
+        // Missing/unsupported text metadata must not prevent a non-text key command.
+        // Only the established strict observer may read an eligible field's value.
+        if textClassification(role: role, subrole: subrole) {
+            do {
+                let field = try observeField(prepare: {}, read: read)
+                metadata = field.metadata
+                metadata["text_supported"] = true
+                return Context(field: field, metadata: metadata)
+            } catch let error as SystemBridgeFailure where error.code == "keyboard_unsupported" && !error.effectUnknown {
+                // Text remains unavailable; no input has been attempted.
+                let currentFocused = read(kAXFocusedAttribute)
+                try require(read(kAXRoleAttribute) as? String == role
+                            && read(kAXSubroleAttribute) as? String == subrole
+                            && (currentFocused == nil || currentFocused is NSNumber)
+                            && (currentFocused as? NSNumber)?.boolValue != false
+                            && (read(kAXEnabledAttribute) as? NSNumber)?.boolValue != false
+                            && (read("AXProtectedContent") as? NSNumber)?.boolValue != true,
+                            "Keyboard classification changed during text capability observation")
+            }
+        }
+        return Context(field: nil, metadata: metadata)
+    }
+    static func requireField(_ field: Field?) throws -> Field {
+        guard let field = field else {
+            throw SystemControl.failure("keyboard_unsupported", "Exact readable text field metadata is unavailable")
+        }
+        return field
+    }
     static func observeField(prepare: () throws -> Void,
                              read: (String) -> CFTypeRef?) throws -> Field {
         try prepare()
         let role = read(kAXRoleAttribute) as? String
-        let subrole = read(kAXSubroleAttribute) as? String
-        try require(["AXTextField", "AXTextArea"].contains(role ?? "")
-                    && ["", "AXSearchField"].contains(subrole ?? "unknown"),
+        let rawSubrole = read(kAXSubroleAttribute), subrole = rawSubrole as? String
+        try require((rawSubrole == nil || subrole != nil) && textClassification(role: role, subrole: subrole),
                     "Secure or unknown keyboard field is unsupported")
+        try require((read("AXProtectedContent") as? NSNumber)?.boolValue != true,
+                    "Protected keyboard field is unsupported")
         try require((read(kAXEnabledAttribute) as? NSNumber)?.boolValue == true
                     && (read(kAXFocusedAttribute) as? NSNumber)?.boolValue == true,
                     "Keyboard field is not enabled and focused")
@@ -68,7 +149,7 @@ enum SystemKeyboard {
                         "Keyboard selection splits a UTF-16 surrogate pair")
         }
         return Field(value: value, selection: selection, metadata: [
-            "role": role!, "subrole": subrole!, "focused": true, "enabled": true,
+            "role": role!, "subrole": subrole as Any? ?? NSNull(), "focused": true, "enabled": true,
             "secure": false, "value_utf8_bytes": value.utf8.count,
             "value_utf16_units": units.count, "value_sha256_encoding": "utf-8",
             "value_sha256": SHA256.hash(data: Data(value.utf8)).map { String(format: "%02x", $0) }.joined(),
@@ -124,8 +205,13 @@ enum SystemKeyboard {
     static func inputSource() throws -> [String: Any] { try currentLayout().metadata }
     static func revision(application: [String: Any], window: String, element: String,
                          field: Field, layout: [String: Any]) throws -> String {
+        try revision(application: application, window: window, element: element,
+                     metadata: field.metadata, layout: layout)
+    }
+    static func revision(application: [String: Any], window: String, element: String,
+                         metadata: [String: Any], layout: [String: Any]) throws -> String {
         try SystemControl.hash(["application": application, "window_token": window,
-                                "field_token": element, "field": field.metadata, "layout": layout])
+                                "field_token": element, "field": metadata, "layout": layout])
     }
     static func snapshot(_ args: [String: Any]) throws -> Snapshot {
         // Reuse protection checks without performing a mutation or changing focus.
@@ -158,28 +244,33 @@ enum SystemKeyboard {
               CFEqual(ownerWindow, window) else {
             throw SystemControl.failure("keyboard_unsupported", "Focused field/window ownership is unavailable")
         }
-        let field = try observeField(prepare: { try timeout(element) },
-                                     read: { SystemControl.attribute(element, $0) })
+        func context() throws -> Context {
+            let observedSubrole = try subrole(element)
+            return try observeContext(prepare: {
+                try timeout(element)
+                try require(!SystemControl.secure(element), "Secure keyboard focus is unsupported")
+            }, read: { $0 == kAXSubroleAttribute ? observedSubrole : SystemControl.attribute(element, $0) })
+        }
+        let observed = try context()
         let layout = try inputSource(), application = try SystemControl.appIdentity(app)
         let windowToken = try SystemControl.remember(window, app: app)
         let token = try SystemControl.remember(element, app: app)
         let before = try revision(application: application, window: windowToken,
-                                  element: token, field: field, layout: layout)
+                                  element: token, metadata: observed.metadata, layout: layout)
         _ = try SystemControl.target(args, mutating: true)
         let (finalWindow, finalElement) = try focused()
-        let finalField = try observeField(prepare: { try timeout(element) },
-                                          read: { SystemControl.attribute(element, $0) })
+        let finalContext = try context()
         try require(CFEqual(finalWindow, window) && CFEqual(finalElement, element)
                     && before == revision(application: SystemControl.appIdentity(app), window: windowToken,
-                                          element: token, field: finalField, layout: inputSource()),
+                                          element: token, metadata: finalContext.metadata, layout: inputSource()),
                     "Keyboard focus, field, selection or layout changed during inspection")
         let target: [String: Any] = ["pid": Int(app.processIdentifier),
             "expected_started_at": application["started_at"]!, "target_token": token,
             "helper_pid": Int(getpid()), "worker_generation": SystemBridgeRuntime.generation,
             "expected_revision": before]
-        return Snapshot(application: app, window: window, element: element, field: field, response: [
+        return Snapshot(application: app, window: window, element: element, field: observed.field, response: [
             "target": target, "application": application, "window_token": windowToken,
-            "field": field.metadata, "layout": layout,
+            "field": observed.metadata, "layout": layout,
             "permissions": ["accessibility": true, "post_events": CGPreflightPostEventAccess()],
             "supported": true, "input_attempted": false, "permission_requested": false, "effect": "none",
         ])
@@ -417,7 +508,8 @@ enum SystemKeyboard {
             let current = try boundSnapshot(target)
             if profile {
                 binding = try profileContext(args["profile_context"], application: current.response["application"] as? [String: Any] ?? [:],
-                    layout: current.response["layout"] as? [String: Any] ?? [:], field: current.field.metadata)
+                    layout: current.response["layout"] as? [String: Any] ?? [:],
+                    field: current.response["field"] as? [String: Any] ?? [:])
                 expectedIdentity = try SystemShortcuts.stableAppIdentity(current.response["application"] as? [String: Any] ?? [:])
             }
             try matchingLayout(layout.metadata, current.response["layout"] as? [String: Any] ?? [:])
@@ -491,7 +583,8 @@ enum SystemKeyboard {
     }
     static func textFieldAllowed(_ field: Field, text: String) throws {
         if text.unicodeScalars.contains(where: { [9, 10, 13].contains($0.value) }) {
-            try require(field.metadata["role"] as? String == "AXTextArea" && field.metadata["subrole"] as? String == "",
+            let subrole = field.metadata["subrole"] as? String
+            try require(field.metadata["role"] as? String == "AXTextArea" && (subrole == nil || subrole == ""),
                         "Tab and line breaks require a supported multiline text area")
         }
     }
@@ -517,6 +610,7 @@ enum SystemKeyboard {
     }
     /// No field value is read here: own insertion changes it. Identity/layout/security remain mandatory.
     static func textRoute(_ target: [String: Any], initial: Snapshot, keyCode: CGKeyCode = 0) throws {
+        let field = try requireField(initial.field)
         let app = try SystemControl.target(target, mutating: true)
         try SystemControl.axGranted()
         var reference = target; reference["element_token"] = target["target_token"]
@@ -532,8 +626,10 @@ enum SystemKeyboard {
             throw SystemControl.failure("macos_element_changed", "Text window or field identity changed")
         }
         try require((SystemControl.attribute(initial.window, kAXMinimizedAttribute) as? NSNumber)?.boolValue == false
-                    && SystemControl.attribute(initial.element, kAXRoleAttribute) as? String == initial.field.metadata["role"] as? String
-                    && SystemControl.attribute(initial.element, kAXSubroleAttribute) as? String == initial.field.metadata["subrole"] as? String
+                    && SystemControl.attribute(initial.element, kAXRoleAttribute) as? String == field.metadata["role"] as? String
+                    && (try subrole(initial.element)) as? String == field.metadata["subrole"] as? String
+                    && !SystemControl.secure(initial.element)
+                    && (SystemControl.attribute(initial.element, "AXProtectedContent") as? NSNumber)?.boolValue != true
                     && (SystemControl.attribute(initial.element, kAXEnabledAttribute) as? NSNumber)?.boolValue == true
                     && (SystemControl.attribute(initial.element, kAXFocusedAttribute) as? NSNumber)?.boolValue == true,
                     "Text field classification or focus changed")
@@ -627,15 +723,16 @@ enum SystemKeyboard {
         let submit = try submitIntent(args)
         try validateText(text)
         let initial = try boundSnapshot(target)
-        try textFieldAllowed(initial.field, text: text)
-        let expected = try expectedText(initial.field, inserting: Array(text.utf16))
+        let initialField = try requireField(initial.field)
+        try textFieldAllowed(initialField, text: text)
+        let expected = try expectedText(initialField, inserting: Array(text.utf16))
         let layout = initial.response["layout"] as? [String: Any] ?? [:]
         let verify: () async throws -> Bool = {
             for attempt in 0..<5 {
                 let current = try boundSnapshot(target, revision: false)
                 try require(CFEqual(current.window, initial.window) && CFEqual(current.element, initial.element), "Text verification target changed")
                 try matchingLayout(layout, current.response["layout"] as? [String: Any] ?? [:])
-                if expected.matches(current.field) { return true }
+                if expected.matches(try requireField(current.field)) { return true }
                 if attempt < 4 { try await Task.sleep(nanoseconds: 20_000_000) }
             }
             return false
@@ -645,7 +742,7 @@ enum SystemKeyboard {
             _ = try postPair(validate: {
                 let current = try boundSnapshot(target, revision: false)
                 try require(CFEqual(current.window, initial.window) && CFEqual(current.element, initial.element)
-                            && expected.matches(current.field), "Text or selection changed before optional Return")
+                            && expected.matches(try requireField(current.field)), "Text or selection changed before optional Return")
                 try textRoute(target, initial: initial, keyCode: CGKeyCode(kVK_Return))
                 try Task.checkCancellation()
             }, sameGeneration: { (try? SystemControl.target(target)) != nil }, post: { isDown in
