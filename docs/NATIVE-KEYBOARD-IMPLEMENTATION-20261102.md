@@ -621,7 +621,7 @@ neben dem gebundenen Profilbeleg. Ruff, Node-Syntax und Diffprüfung sind grün;
 Rootreview und gegenseitiger Spezialistenreview sind abgeschlossen. Die drei
 produktiven Prozessgenerationen 78414/78630/78865 waren unverändert.
 
-## Schritt 13 – Intel-Paket geprüft, sichtbare Installation noch offen
+## Schritt 13 – Intel-Paket geprüft und sichtbar installiert
 
 Aus dem sauberen abgetrennten Commit
 `73d4ea0dc09979367400574b9163d5263ba151bf` wurde mit dem offiziellen Builder
@@ -665,7 +665,7 @@ separate Consoleasset-Prüfung. Die Aktivierung verlangt den echten neuen
 Paket-/Keyboardbeleg, die getrennten Originalbelege und eine frische Baseline.
 Der unabhängige Review hat diese begrenzten Anpassungen freigegeben.
 
-### Noch offene Sichtbarkeitsbedingung
+### Erster Versuch: zunächst blockierte Sichtbarkeitsbedingung
 
 Der erste Auftrag zum getrennten Installationsfenster endete vor Erzeugung mit
 `session_window_inventory_pending`. Das erhaltene Unknown wurde nicht wiederholt
@@ -683,16 +683,93 @@ bestätigten denselben Mismatch. Alle logischen IDs/TTYs und die Appgeneration
 blieben unverändert; es wurde weder ein neues Fenster erzeugt noch eingegeben.
 
 Die bestehende strikte Fensterprüfung wurde nicht umgangen. Der Nutzer wurde
-gebeten, die beiden minimierten Fenster wieder einzublenden. Erst nach gesunder
-frischer Inventur folgen ein neuer eigener Installationsintent und die einzeln
-bestätigten Schritte Core→Console→App→Verify. RC24-Quelle `023f70f` mit
-Core78414/Console78630/App78865 bleibt bis dahin installiert. Neue Tastaturgrants
+gebeten, die beiden minimierten Fenster wieder einzublenden. Zu diesem früheren
+Checkpoint blieb RC24-Quelle `023f70f` mit Core78414/Console78630/App78865
+installiert. Die nachfolgende Fortsetzung ist unten gesondert belegt. Neue Tastaturgrants
 werden nicht automatisch vergeben; nach Installation kann der Nutzer sie über
 **Rechte → Voll erlaubt → Übernehmen** ausdrücklich aktivieren.
 
 Das geprüfte lokale ZIP liegt separat unter
 `~/Downloads/KiraBridge-Keyboard-Intel-73d4ea0/`, mit eigener Akzeptanzdatei,
 Snapshotbeschreibung und Prüfsummen. Die frühere RC24-Lieferung und deren
-GitHub-Release bleiben erhalten. Der Paketnachweis ersetzt nicht die noch offene
-produktive Installation und Prüfung der tatsächlichen laufenden Quelle.
+GitHub-Release bleiben erhalten. Der Paketnachweis ist vom nachfolgenden
+produktiven Installationsnachweis getrennt.
 ZIP-SHA256: `3629db3c8b9b574b1e80e6d7975e24637c5c26da72bb5269554f5133b4107fe9`.
+
+### Fortsetzung nach Nutzerbestätigung: Installation bestanden
+
+Nach „fertig“ bestätigte eine neue rein lesende Inventur CG2/AX2 und alle fünf
+ursprünglichen logischen Ansichten. Ein neuer Intent erzeugte genau einen eigenen
+Tab2451/ttys006. Die vorhandene Trennungsprüfung verweigerte anschließend wegen
+`Pre-open host native layout changed`; ein Installationsbefehl lief noch nicht.
+Dieser zweite Openauftrag bleibt ebenfalls unverändert Unknown. Sein eigener
+dauerhafter Erzeugungsbeleg wurde für eine getrennte Recovery verwendet; kein
+weiteres Fenster wurde erzeugt und kein Openauftrag wiederholt.
+
+Die unabhängig geprüfte private Recovery band Originalreceipt, Nonce, TTY,
+Appgeneration, Shell-PID25609 samt Geburt innerhalb des ursprünglichen
+Erzeugungsintervalls, exakten CWD, leere kontrollierte Eingabe und kinderlosen
+Idleprozess. Eine einmalige gezielte Fokusakquisition machte den bekannten
+eigenen Tab physisch beobachtbar. Genau ein vorhandenes `move_created_tab`
+trennte ihn. Danach bestanden dieselben produktiven Post-Move-Prüfungen:
+gleicher Own-AX-Anker, ein zusätzlicher CG-/AX-Bereich mit exakt altem und neuem
+CG-Teil, erhaltene Hostgeometrie gegenüber der **frischen Recoverybaseline**,
+unverwandte Flächen, Originalradiofolge, logische Ansichten und Prozessgenerationen.
+Das beweist die Recovery, nicht nachträglich die alte Vor-Open-Geometrie.
+Eine separat bezeichnete reale Post-Recovery-Bindung wurde erneut verifiziert;
+kein fehlgeschlagener Task wurde dafür als completed ausgegeben.
+
+Zwei vorangehende private Recoveryaufrufe erreichten den Move nicht: ein
+Pfadtypfehler beim Laden wurde korrigiert, ein weiterer rein lesender Versuch
+konnte den Hintergrundtab nicht physisch binden. Belege bleiben erhalten.
+Produktiver Terminal-/Clipboardcode wurde für die Recovery nicht verändert.
+Der erfolgreiche Controllerlauf liegt unter `step13-visible-install-recovery-03`.
+
+Über dasselbe positiv bestätigte eigene physische Fenster liefen anschließend
+die unterstützten Schritte Prepare→Baseline→Core→Console→App→Verify. Jeder Schritt
+wurde erst nach seinem bestätigten Ergebnis fortgesetzt. Die frische Baseline
+war beim Coreaufruf etwa18 Sekunden alt und enthielt null aktive Aufgaben.
+Konfiguration, Credentials samt Modi, vorheriger Release, App und konsistente
+SQLite-Sicherung sind erhalten. Alle185 geschützten Datenbankzeilen wurden nachher
+unabhängig exakt verglichen:94 Unknown-Tasks,10 Handoffs,23 Jobs,30 Holds und28
+Withdrawals. Alle14 geschützten Prozessgenerationen blieben erhalten.
+
+| Tatsächlich laufender Bestandteil | Bestätigter Zustand |
+| --- | --- |
+| Installierte Quelle | `73d4ea0dc09979367400574b9163d5263ba151bf` |
+| Core | PID26933, Start `2026-11-02T09:20:19.200130+00:00` |
+| Coreinstanz | `107df7ccc0a04db0a39686779aeb609c` |
+| Konsole | PID27104, Start `2026-11-02 10:20:54 CET` |
+| Companion-App | PID27279, Start `2026-11-02 10:21:32 CET` |
+| Geladener Pythonbaum |155 Dateien, SHA256 `801ba911c186be211436b30df70643688f09e815ebcd9585babe35d1203884e7` |
+| UI- und Managed-Nativebinärdatei | jeweils SHA256 `e13b84b90bdc07c98719fbf5aae42a440e9d7fcf20b65868f4bb5d51f85ca4a8` |
+| Tatsächlich ausgelieferte Konsole | HTML unter `/`, CSS, `center.js`, `keyboard.js` gegen Planhashes bestätigt |
+
+Der tatsächliche MCP-Anschluss bestätigte den neuen Core und seine geladene
+Quelle. Ein einzelner zusätzlicher rein lesender öffentlicher `apps.list`-Auftrag
+beendete sich mit `effect=none` und identifizierte den tatsächlich ausgeführten
+Managed-Nativeworker PID28296/Generation911BA7F9-7A11-4A57-AE1D-1BDA0FEDA917,
+Quelle73d4ea0 und erwarteten eingebetteten Executablepfad. Die Binärbytes stimmen
+ebenfalls; seine eigene Completion wurde nach Verarbeitung bestätigt.
+Dies ist eine Laufzeitprüfung und keine erneute native Texteingabeabnahme.
+
+Der unabhängige Abschlussreview bestätigte Dateihashes, reale Prozessgenerationen,
+LaunchAgents, HTTP-Assets und den vollständigen geschützten Datenerhalt lesend.
+Kein Rollback war erforderlich. `current.previous`, vorheriger Release und
+Installerbackup, zurückbehaltene App, alte Consoleplist und die frische geprüfte
+SQLite-Baseline bilden den Rückrollpunkt. Die Datenbank wird bei einem späteren
+Rollback nicht unbesehen über neuere Zustände zurückkopiert.
+
+Das eigene Installationsfenster wurde einmal geschlossen. Controllerprüfungen
+und ein unabhängiger Katalog über den tatsächlichen neuen MCP-Anschluss bestätigten
+seine Abwesenheit; PID25609 ist ebenfalls abwesend. Alle fünf Originalansichten
+231/327/590/1567/1584 sind vorhanden. Die alten Unknown-Belege bleiben bestehen.
+
+Neue Tastaturrechte sind wie freigegeben **nicht automatisch erteilt**. Zum Nutzen
+der neuen Operationen einmal **Rechte → Voll erlaubt → Übernehmen** wählen.
+Der bisherige sichere Fensterpfad kann weiterhin bei minimierten Fenstern oder
+einer Größenänderung des bisherigen Tabverbunds verweigern. Die erfolgreiche
+Installation über den gebundenen Recoveryweg ist kein allgemeiner Fix dieser
+unveränderten Fensterpfade. Native Tastatur, optionale separate Clipboardnutzung,
+Profile und Konsole sind im geprüften Intel-Snapshot installiert; die beschriebenen
+Feld-/Discovery-/Profilgrenzen bleiben ausdrücklich bestehen.
