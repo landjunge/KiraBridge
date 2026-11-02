@@ -147,7 +147,12 @@ class NativeSystemTransport:
         await self._discard()
 
     async def request(self, operation, arguments, *, principal, before_send=None):
-        if not isinstance(principal, str) or not principal or len(principal.encode()) > 256:
+        if (
+            not isinstance(principal, str)
+            or not principal
+            or principal.startswith("\ufeff")
+            or len(principal.encode()) > 256
+        ):
             raise BridgeError(
                 "system_context_required", "Native operation requires its authenticated owner"
             )

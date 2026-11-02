@@ -188,3 +188,52 @@ Noch keine echte App-/Performanceabnahme: TextArea-Klassifikation allein beweist
 keine universelle Submit-freie Semantik von Fremdprogrammen. Das Ergebnis meldet
 `text_verified/selection_verified`, aber keine bestätigte Programmaktion.
 Lange Texte und optionales Return sind weiterhin die nächsten getrennten Schritte.
+
+## Schritt 7 – Verlustfreies, begrenztes Textstaging
+
+Alle öffentlichen `keyboard.text`-Aufträge verwenden jetzt dieselbe interne
+Begin/Chunk/Commit-Übertragung. Darwin Foundation verlor im nachgewiesenen
+JSON-String-Fall ein führendes U+FEFF. Deshalb gibt es keinen direkten nativen
+JSON-Textpfad mehr: UTF-16LE ohne BOM mit Base64 erhält auch dieses Zeichen.
+Authentifizierte Principal-Namen mit führendem U+FEFF werden vor Workerstart
+verweigert, damit die Parserabweichung keine Besitzeridentitäten zusammenführt.
+
+Das Manifest bindet Task, Besitzer, exaktes Ziel samt Worker, Submitabsicht,
+UTF-8-Hash, beide Längen und Chunkzahl. Der originale kanonische Binding-String
+vermeidet Unterschiede der Python-/Foundation-Floatserialisierung. ACKs müssen
+Transfer-ID, Zustand, explizit `input_attempted=false` und exakte Integerzähler
+bestätigen. Core behält während der Übertragung dieselbe Desktoptransaktion
+und prüft die Berechtigung vor jedem Versand erneut. Abbruch vor Commit räumt
+nur den eigenen Speicherpuffer auf, auch bei entzogener Eingabeberechtigung.
+Commit entfernt den Puffer und verbraucht die ID vor Validierung und Eingabe;
+ein verlorener oder widersprüchlicher Commitbeleg wird niemals wiederholt.
+Die internen Stagingoperationen sind keine öffentlichen Tools.
+
+Grenzen: ein Speicherpuffer, 1 MiB UTF-8, höchstens 65 Chunks à 16.384 UTF-16-
+Einheiten, monotone Ablaufzeit 60 Sekunden. 256 verbrauchte IDs je Workerepoche
+werden ohne Eviction gespeichert; danach erfolgt eine sichere Verweigerung.
+Automatische Epochenrotation ist noch nicht implementiert. Keine Nutzdaten auf
+Disk, kein Clipboardzugriff, keine neuen Services. Return bleibt bis Schritt8
+gesperrt. Die vorhandene 12-Sekunden-Desktopfrist wurde nicht erhöht.
+
+Gezielte Nachweise: Python24 Fälle grün,60 nicht ausgeführt; darunter große
+Unicode-/BOM-Texte über Framegröße, fehlerhafte ACKs/Zähler, Berechtigungsentzug,
+Pufferabort und unbekannter Commit ohne Replay. Der bereits verifizierte native
+Harness wurde wiederverwendet:26 neue Stagingchecks plus117 bisherige in14,69s.
+Er belegt tatsächliche Codec-/Manifestprüfung und injizierten Writer; keine
+GUI-Ereignisse. Ruff und Diffprüfung grün. Reale lange Texte und Geschwindigkeit
+sind damit noch nicht abgenommen. Die eigene kontrollierte GUI-Testfläche ist
+im Repository enthalten. Vorabproben mit privatem Schritt6-Build verweigerten
+zunächst wegen Vordergrund/Feldzustand. Mit ausdrücklich aktiviertem AX-Testfeld
+bestätigte Inspect anschließend AX- und Postingberechtigung; der Eingabeversuch
+stoppte vor jedem Post wegen gleichzeitig gehaltener Hardwaretasten/Modifier.
+Der unabhängige Receiver meldete null Down-/Returnereignisse. Alle eigenen
+Fixtureinstanzen wurden geschlossen und ihre Abwesenheit bestätigt.
+Die installierte RC24 und vorhandene Terminal-/Clipboardwege bleiben unverändert.
+
+Die unabhängige Coreprüfung fand einen zu frühen Commitmarker: Ein Widerruf
+unmittelbar vor dem tatsächlichen Versand ließ den Puffer unnötig bis zur
+Ablaufzeit bestehen. Der Marker wird jetzt nach erfolgreicher abschließender
+Autorisierung direkt vor dem Transportwrite gesetzt. Der neue Widerruffall und
+die beiden betroffenen Unknown-/Receiptfälle bestanden zusammen (3/3,15 nicht
+ausgeführt); übrige bereits grüne Nachweise wurden nicht wiederholt.

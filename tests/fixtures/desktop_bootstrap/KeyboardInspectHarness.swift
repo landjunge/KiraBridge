@@ -1,6 +1,7 @@
 import Foundation
 import ApplicationServices
 import Carbon
+import CryptoKit
 
 @main
 struct KeyboardInspectHarness {
@@ -304,10 +305,149 @@ struct KeyboardInspectHarness {
             _ = try await SystemKeyboard.text(["target": [:], "text": "x", "submit": true])
             fatalError("Unexpected text submit")
         } catch let error as SystemBridgeFailure { precondition(!error.effectUnknown); textChecks += 1 }
+        let fixture = try JSONSerialization.jsonObject(with: FileHandle.standardInput.readDataToEndOfFile()) as! [String: Any]
+        var manifest = fixture["begin"] as! [String: Any]
+        var stageTarget = manifest["target"] as! [String: Any]
+        stageTarget["helper_pid"] = Int(getpid()); stageTarget["worker_generation"] = SystemBridgeRuntime.generation
+        manifest["target"] = stageTarget
+        // Preserve Python canonical bytes, including 123.0. Only substitute this private process identity.
+        let canonical = (manifest["binding_json"] as! String)
+            .replacingOccurrences(of: "\"helper_pid\":11111111", with: "\"helper_pid\":\(getpid())")
+            .replacingOccurrences(of: "00000000-0000-0000-0000-000000000000", with: SystemBridgeRuntime.generation)
+        func sha(_ data: Data) -> String { SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined() }
+        manifest["binding_json"] = canonical; manifest["transfer_id"] = sha(Data(canonical.utf8))
+        let expectedBytes = Data(base64Encoded: fixture["expected_utf8_b64"] as! String)!
+        let expectedLarge = String(decoding: expectedBytes, as: UTF8.self)
+        precondition(expectedLarge.unicodeScalars.first?.value == 0xFEFF && expectedLarge.utf8.count > 65536)
+        let basePackets = fixture["chunks"] as! [[String: Any]]
+        SystemBridgeRuntime.principal = "fixture_owner"
+        SystemKeyboard.transfer = nil; SystemKeyboard.consumedTransfers = []
+        var stageChecks = 0, writes = 0, caseNumber = 0
+        let rawText = try await SystemKeyboard.handle("keyboard.text", arguments: [:])
+        precondition(rawText == nil); stageChecks += 1 // Only the staged binary codec reaches the text writer.
+        func signed(_ candidate: [String: Any]) throws -> [String: Any] {
+            var result = candidate.filter { !["transfer_id", "binding_json"].contains($0.key) }
+            let data = try JSONSerialization.data(withJSONObject: result, options: [.sortedKeys])
+            result["binding_json"] = String(data: data, encoding: .utf8)!; result["transfer_id"] = sha(data)
+            return result
+        }
+        func fresh() throws -> [String: Any] {
+            caseNumber += 1
+            var result = manifest; result["task_id"] = "stage_case_\(caseNumber)"
+            return try signed(result)
+        }
+        func packets(_ value: [String: Any]) -> [[String: Any]] {
+            basePackets.map { var packet = $0; packet["transfer_id"] = value["transfer_id"]; return packet }
+        }
+        func fill(_ value: [String: Any], now: Double = 10) throws {
+            SystemKeyboard.transfer = nil
+            let accepted = try SystemKeyboard.beginTransfer(value, now: now)
+            precondition(accepted["state"] as? String == "accepted" && accepted["input_attempted"] as? Bool == false)
+            var count = 0
+            for packet in packets(value) {
+                let receipt = try SystemKeyboard.chunkTransfer(packet, now: now)
+                count += 1
+                precondition(receipt["state"] as? String == "received" && receipt["received_chunks"] as? Int == count)
+                precondition(receipt["input_attempted"] as? Bool == false)
+            }
+        }
+        func refusedStage(_ body: () async throws -> Void) async throws {
+            let before = writes
+            do { try await body(); fatalError("Unsafe staging accepted") }
+            catch let error as SystemBridgeFailure { precondition(!error.effectUnknown && writes == before); stageChecks += 1 }
+        }
+        let writer: ([String: Any]) async throws -> [String: Any] = { payload in
+            writes += 1
+            precondition((payload["text"] as! String).utf8.elementsEqual(expectedLarge.utf8))
+            let targetHash = try SystemControl.hash(payload["target"]!)
+            let expectedTargetHash = try SystemControl.hash(stageTarget)
+            precondition(targetHash == expectedTargetHash)
+            precondition(payload["submit"] as? Bool == false)
+            return ["text_verified": true]
+        }
+        try fill(manifest)
+        let reference = ["transfer_id": manifest["transfer_id"]!]
+        let committed = try await SystemKeyboard.commitTransfer(reference, now: 10, writer: writer)
+        precondition(writes == 1 && committed["staging_verified"] as? Bool == true && SystemKeyboard.transfer == nil)
+        stageChecks += 1
+        try await refusedStage { _ = try await SystemKeyboard.commitTransfer(reference, now: 10, writer: writer) }
+        try await refusedStage { _ = try SystemKeyboard.beginTransfer(manifest, now: 10) }
+        var tampered = try fresh(); tampered["utf8_bytes"] = 100
+        try await refusedStage { _ = try SystemKeyboard.beginTransfer(tampered, now: 10) }
+        var missing = try fresh(); missing.removeValue(forKey: "binding_json")
+        try await refusedStage { _ = try SystemKeyboard.beginTransfer(missing, now: 10) }
+        var malformed = try fresh(); malformed["binding_json"] = "{"; malformed["transfer_id"] = sha(Data("{".utf8))
+        try await refusedStage { _ = try SystemKeyboard.beginTransfer(malformed, now: 10) }
+        var oldWorker = try fresh(), oldTarget = stageTarget
+        oldTarget["worker_generation"] = "00000000-0000-0000-0000-000000000000"; oldWorker["target"] = oldTarget
+        oldWorker = try signed(oldWorker)
+        try await refusedStage { _ = try SystemKeyboard.beginTransfer(oldWorker, now: 10) }
+        let invalidManifestFields: [(String, Any)] = [("principal", "foreign"), ("submit", true), ("encoding", "utf-16-be"), ("utf8_bytes", 1048577)]
+        for (key, value) in invalidManifestFields {
+            var invalid = try fresh(); invalid[key] = value; invalid = try signed(invalid)
+            try await refusedStage { _ = try SystemKeyboard.beginTransfer(invalid, now: 10) }
+        }
+        let pending = try fresh(), other = try fresh()
+        _ = try SystemKeyboard.beginTransfer(pending, now: 10)
+        try await refusedStage { _ = try SystemKeyboard.beginTransfer(other, now: 10) }
+        let aborted = try SystemKeyboard.abortTransfer(["transfer_id": pending["transfer_id"]!], now: 10)
+        precondition(aborted["state"] as? String == "aborted" && SystemKeyboard.transfer == nil)
+        let ordered = try fresh(); _ = try SystemKeyboard.beginTransfer(ordered, now: 10)
+        let firstPacket = packets(ordered)[0]
+        var outOfOrder = firstPacket; outOfOrder["index"] = 1
+        try await refusedStage { _ = try SystemKeyboard.chunkTransfer(outOfOrder, now: 10) }
+        var wrongID = firstPacket; wrongID["transfer_id"] = String(repeating: "f", count: 64)
+        try await refusedStage { _ = try SystemKeyboard.chunkTransfer(wrongID, now: 10) }
+        _ = try SystemKeyboard.chunkTransfer(firstPacket, now: 10)
+        try await refusedStage { _ = try SystemKeyboard.chunkTransfer(firstPacket, now: 10) }
+        try await refusedStage {
+            SystemBridgeRuntime.principal = "foreign"; defer { SystemBridgeRuntime.principal = "fixture_owner" }
+            _ = try SystemKeyboard.chunkTransfer(packets(ordered)[1], now: 10)
+        }
+        try await refusedStage {
+            SystemBridgeRuntime.principal = "foreign"; defer { SystemBridgeRuntime.principal = "fixture_owner" }
+            _ = try await SystemKeyboard.commitTransfer(["transfer_id": ordered["transfer_id"]!], now: 10, writer: writer)
+        }
+        SystemKeyboard.transfer = nil
+        let invalidBytes = try fresh(); _ = try SystemKeyboard.beginTransfer(invalidBytes, now: 10)
+        for bytes in [Data([0, 216]), Data([65]), Data(repeating: 65, count: 32770)] {
+            var packet = packets(invalidBytes)[0]; packet["data_b64"] = bytes.base64EncodedString()
+            try await refusedStage { _ = try SystemKeyboard.chunkTransfer(packet, now: 10) }
+        }
+        SystemKeyboard.transfer = nil
+        var quota = try fresh(); quota["utf8_bytes"] = 1; quota["utf16_units"] = 1; quota["chunk_count"] = 1
+        quota = try signed(quota); _ = try SystemKeyboard.beginTransfer(quota, now: 10)
+        let overQuota: [String: Any] = ["transfer_id": quota["transfer_id"]!, "index": 0, "data_b64": Data([65, 0, 66, 0]).base64EncodedString()]
+        try await refusedStage { _ = try SystemKeyboard.chunkTransfer(overQuota, now: 10) }
+        SystemKeyboard.transfer = nil
+        let incomplete = try fresh(); _ = try SystemKeyboard.beginTransfer(incomplete, now: 10)
+        try await refusedStage { _ = try await SystemKeyboard.commitTransfer(["transfer_id": incomplete["transfer_id"]!], now: 10, writer: writer) }
+        var wrongHash = try fresh(); wrongHash["sha256"] = String(repeating: "c", count: 64); wrongHash = try signed(wrongHash)
+        try fill(wrongHash)
+        try await refusedStage { _ = try await SystemKeyboard.commitTransfer(["transfer_id": wrongHash["transfer_id"]!], now: 10, writer: writer) }
+        let expired = try fresh(); _ = try SystemKeyboard.beginTransfer(expired, now: 10)
+        try await refusedStage { _ = try SystemKeyboard.chunkTransfer(packets(expired)[0], now: 70) }
+        precondition(SystemKeyboard.transfer == nil)
+        let uncertain = try fresh(); try fill(uncertain)
+        do {
+            _ = try await SystemKeyboard.commitTransfer(["transfer_id": uncertain["transfer_id"]!], now: 10, writer: { _ in
+                writes += 1; throw SystemControl.failure("lost", "fixture", unknown: true)
+            })
+            fatalError("Expected uncertain text writer")
+        } catch let error as SystemBridgeFailure { precondition(error.effectUnknown && writes == 2) }
+        do {
+            _ = try await SystemKeyboard.commitTransfer(["transfer_id": uncertain["transfer_id"]!], now: 10, writer: writer)
+            fatalError("Uncertain commit replayed")
+        } catch let error as SystemBridgeFailure { precondition(!error.effectUnknown && writes == 2) }
+        do { _ = try SystemKeyboard.beginTransfer(uncertain, now: 10); fatalError("Uncertain stage replayed") }
+        catch let error as SystemBridgeFailure { precondition(!error.effectUnknown && writes == 2) }
+        stageChecks += 1
+        SystemKeyboard.transfer = nil; SystemKeyboard.consumedTransfers = []; SystemBridgeRuntime.principal = ""
         let result: [String: Any] = ["checks": checks, "field": observed.metadata,
                                    "key_checks": keyChecks, "named_key_codes": SystemKeyboard.namedKeys,
                                    "layout_checks": layoutChecks, "layout_positions": layoutPositions,
                                    "text_checks": textChecks,
+                                   "stage_checks": stageChecks,
                                    "native_ui_calls": 0, "event_posts": 0, "permission_requests": 0]
         print(String(data: try JSONSerialization.data(withJSONObject: result, options: [.sortedKeys]), encoding: .utf8)!)
     }

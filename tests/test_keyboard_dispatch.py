@@ -1,6 +1,9 @@
 """Keyboard uses existing dispatch/permission/lease paths; no events or worker starts."""
 
 import asyncio
+import base64
+import hashlib
+from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
 import pytest
@@ -137,12 +140,15 @@ async def test_chord_failure_never_falls_back_to_a_key_operation(bridge):
     assert bridge.keyboard.transport.request.await_args.args[0] == "keyboard.chord"
 
 
-async def test_native_text_is_literal_and_does_not_touch_clipboard(bridge):
+@pytest.mark.parametrize(
+    "literal", [" /resume go-go-go \r\n e\u0301 👩‍💻 ", "\ufeff" + "ä😀x" * 20000]
+)
+async def test_native_text_is_literal_and_does_not_touch_clipboard(bridge, literal):
     task = setup_keyboard(bridge)
     task["operation"] = "keyboard.text"
     task["args"] = {
         "target": TARGET,
-        "text": " /resume go-go-go \r\n e\u0301 👩‍💻 ",
+        "text": literal,
         "submit": False,
     }
     bridge.clipboard.read = AsyncMock(
@@ -151,31 +157,148 @@ async def test_native_text_is_literal_and_does_not_touch_clipboard(bridge):
     bridge.clipboard.write = AsyncMock(
         side_effect=AssertionError("Native text must not write clipboard")
     )
-    bridge.keyboard.transport.request = AsyncMock(return_value={"text_insertion_confirmed": True})
-    await bridge.execute(task, AsyncMock(), AsyncMock())
-    call = bridge.keyboard.transport.request.await_args
-    assert call.args == ("keyboard.text", task["args"])
+    receiver = staged_receiver(bridge, task)
+    bridge.keyboard.transport.request = AsyncMock(side_effect=receiver)
+    result = await bridge.execute(task, AsyncMock(), AsyncMock())
+    assert result["text_verified"] is True
+    assert receiver.raw.decode("utf-16-le") == literal
+    operations = [call.args[0] for call in bridge.keyboard.transport.request.await_args_list]
+    assert operations[0] == "keyboard.text.begin" and operations[-1] == "keyboard.text.commit"
+    assert operations.count("keyboard.text.commit") == 1
     assert "keyboard.text" not in SYSTEM_LEAVES
     assert not bridge.sessions.lock.locked()
     bridge.clipboard.read.assert_not_awaited()
     bridge.clipboard.write.assert_not_awaited()
 
 
-@pytest.mark.parametrize(
-    "change,code",
-    [
-        ({"submit": True}, "keyboard_submit_pending"),
-        ({"text": "x" * 100000}, "keyboard_staging_pending"),
-    ],
-)
-async def test_unfinished_text_modes_refuse_before_running_or_native_send(bridge, change, code):
+async def test_unfinished_submit_refuses_before_running_or_native_send(bridge):
     task = setup_keyboard(bridge)
     task["operation"] = "keyboard.text"
-    task["args"] = {"target": TARGET, "text": "literal", **change}
+    task["args"] = {"target": TARGET, "text": "literal", "submit": True}
     running = AsyncMock()
     bridge.keyboard.transport.request = AsyncMock()
     with pytest.raises(BridgeError) as caught:
         await bridge.execute(task, running, running)
-    assert caught.value.code == code
+    assert caught.value.code == "keyboard_submit_pending"
     running.assert_not_awaited()
     bridge.keyboard.transport.request.assert_not_awaited()
+
+
+def staged_receiver(bridge, task):
+    from kirabridge.bridge_core.models import canonical
+    from kirabridge.keyboard_text import native_frame_bytes
+
+    async def receive(operation, arguments, *, principal, before_send=None):
+        assert bridge.sessions.lock.locked() and principal == task["principal"]
+        assert len(native_frame_bytes(operation, arguments, principal=principal)) <= 65536
+        if before_send:
+            before_send()
+        identifier = arguments["transfer_id"]
+        if operation == "keyboard.text.begin":
+            binding = {
+                k: v for k, v in arguments.items() if k not in {"transfer_id", "binding_json"}
+            }
+            assert arguments["binding_json"] == canonical(binding)
+            assert hashlib.sha256(arguments["binding_json"].encode()).hexdigest() == identifier
+            assert binding["target"] == TARGET and binding["task_id"] == task["id"]
+            receive.manifest = arguments
+            return {"transfer_id": identifier, "state": "accepted", "input_attempted": False}
+        if operation == "keyboard.text.chunk":
+            assert arguments["index"] == receive.chunks
+            receive.raw += base64.b64decode(arguments["data_b64"], validate=True)
+            receive.chunks += 1
+            return {
+                "transfer_id": identifier,
+                "state": "received",
+                "received_chunks": receive.chunks,
+                "received_utf16_units": len(receive.raw) // 2,
+                "input_attempted": False,
+            }
+        assert arguments == {"transfer_id": receive.manifest["transfer_id"]}
+        if operation == "keyboard.text.abort":
+            return {"transfer_id": identifier, "state": "aborted", "input_attempted": False}
+        assert operation == "keyboard.text.commit"
+        assert (
+            hashlib.sha256(receive.raw.decode("utf-16-le").encode()).hexdigest()
+            == receive.manifest["sha256"]
+        )
+        return {
+            "transfer_id": identifier,
+            "task_id": task["id"],
+            "staging_verified": True,
+            "text_verified": True,
+            "selection_verified": True,
+            "return_posted": False,
+            "text_sha256": receive.manifest["sha256"],
+        }
+
+    receive.raw, receive.chunks = b"", 0
+    return receive
+
+
+@pytest.mark.parametrize(
+    "failure", ["bad_ack", "bad_counts", "chunk_error", "revoke", "commit_revoke"]
+)
+async def test_text_stage_failure_aborts_owned_buffer_without_commit(bridge, failure):
+    task = setup_keyboard(bridge)
+    task.update(operation="keyboard.text", args={"target": TARGET, "text": "literal"})
+    receiver = staged_receiver(bridge, task)
+    bridge.keyboard.transport.process = SimpleNamespace(returncode=None)
+
+    async def send(operation, arguments, **context):
+        if operation == "keyboard.text.commit" and failure == "commit_revoke":
+            bridge.config.principals["local"].capabilities.remove("keyboard.execute")
+            context["before_send"]()
+            pytest.fail("Revoked commit cannot reach the native writer")
+        if operation == "keyboard.text.chunk" and failure in {"chunk_error", "revoke"}:
+            if failure == "revoke":
+                bridge.config.principals["local"].capabilities.remove("keyboard.execute")
+                context["before_send"]()
+            raise BridgeError("test_stage_failure", "failed before commit")
+        reply = await receiver(operation, arguments, **context)
+        if operation == "keyboard.text.chunk":
+            if failure == "bad_ack":
+                reply["input_attempted"] = 0
+            if failure == "bad_counts":
+                reply["received_chunks"] = True
+        return reply
+
+    bridge.keyboard.transport.request = AsyncMock(side_effect=send)
+    with pytest.raises(BridgeError):
+        await bridge.execute(task, AsyncMock(), AsyncMock())
+    operations = [call.args[0] for call in bridge.keyboard.transport.request.await_args_list]
+    expected = ["keyboard.text.begin", "keyboard.text.chunk"]
+    if failure == "commit_revoke":
+        expected.append("keyboard.text.commit")
+    assert operations == [*expected, "keyboard.text.abort"]
+    assert not bridge.sessions.lock.locked()
+    bridge.keyboard.transport.process = None
+
+
+@pytest.mark.parametrize("failure", ["lost", "invalid_receipt"])
+async def test_text_commit_uncertainty_is_never_replayed_or_aborted(bridge, failure):
+    task = setup_keyboard(bridge)
+    task.update(operation="keyboard.text", args={"target": TARGET, "text": "literal"})
+    receiver = staged_receiver(bridge, task)
+
+    async def send(operation, arguments, **context):
+        reply = await receiver(operation, arguments, **context)
+        if operation == "keyboard.text.commit":
+            if failure == "lost":
+                raise UncertainExecution("lost", "unknown after commit")
+            reply["text_sha256"] = "0" * 64
+        return reply
+
+    bridge.keyboard.transport.request = AsyncMock(side_effect=send)
+    with pytest.raises(UncertainExecution):
+        await bridge.execute(task, AsyncMock(), AsyncMock())
+    operations = [call.args[0] for call in bridge.keyboard.transport.request.await_args_list]
+    assert operations == ["keyboard.text.begin", "keyboard.text.chunk", "keyboard.text.commit"]
+
+
+def test_private_staging_operations_are_not_public_inputs():
+    from kirabridge.bridge_core.bridge import INPUTS
+
+    for suffix in ("begin", "chunk", "commit", "abort"):
+        assert "keyboard.text." + suffix not in INPUTS
+        assert "keyboard.text." + suffix not in OPERATIONS

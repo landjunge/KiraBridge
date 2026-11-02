@@ -522,12 +522,130 @@ enum SystemKeyboard {
         result["selection_utf16"] = ["location": expected.selection.location, "length": 0]
         return result
     }
+    @MainActor final class TextTransfer {
+        let id: String, principal: String, taskID: String, digest: String, epoch: String
+        let target: [String: Any]
+        let byteCount: Int, unitCount: Int, chunkCount: Int, expires: Double
+        var units: [UniChar] = []
+        var nextIndex = 0
+        init(id: String, principal: String, task: String, digest: String, target: [String: Any],
+             bytes: Int, units: Int, chunks: Int, now: Double) {
+            self.id = id; self.principal = principal; taskID = task; self.digest = digest; self.target = target
+            byteCount = bytes; unitCount = units; chunkCount = chunks; expires = now + 60
+            epoch = SystemBridgeRuntime.generation
+            self.units.reserveCapacity(units)
+        }
+    }
+    static var transfer: TextTransfer?
+    // Never evict committed IDs within an epoch: exhaust the small budget instead of allowing replay.
+    static var consumedTransfers: Set<String> = []
+    static func stageInteger(_ args: [String: Any], _ key: String, max: Int) throws -> Int {
+        guard let value = args[key] as? NSNumber, CFGetTypeID(value) != CFBooleanGetTypeID(),
+              value.doubleValue.isFinite, value.doubleValue >= 0, value.doubleValue <= Double(max),
+              value.doubleValue.rounded(.towardZero) == value.doubleValue else {
+            throw SystemControl.failure("keyboard_staging_invalid", "Text staging integer is invalid")
+        }
+        return value.intValue
+    }
+    static func stageHex(_ value: Any?, length: Int) -> Bool {
+        guard let text = value as? String, text.utf8.count == length else { return false }
+        return text.utf8.allSatisfy { (48...57).contains($0) || (97...102).contains($0) }
+    }
+    static func purgeTransfer(_ now: Double) {
+        if let current = transfer, now >= current.expires { transfer = nil }
+    }
+    static func beginTransfer(_ args: [String: Any], now: Double = ProcessInfo.processInfo.systemUptime) throws -> [String: Any] {
+        purgeTransfer(now)
+        let fields: Set<String> = ["task_id", "principal", "target", "submit", "utf8_bytes", "utf16_units", "sha256", "chunk_count", "encoding"]
+        try require(Set(args.keys) == fields.union(["transfer_id", "binding_json"]), "Text staging manifest fields differ")
+        guard let id = args["transfer_id"] as? String, stageHex(id, length: 64),
+              let raw = args["binding_json"] as? String, raw.utf8.count <= 8192,
+              let binding = (try? JSONSerialization.jsonObject(with: Data(raw.utf8))) as? [String: Any],
+              SHA256.hash(data: Data(raw.utf8)).map({ String(format: "%02x", $0) }).joined() == id,
+              try SystemControl.hash(binding) == SystemControl.hash(args.filter { fields.contains($0.key) }),
+              let principal = args["principal"] as? String, !principal.isEmpty, principal.utf8.count <= 256,
+              principal.utf8.elementsEqual(SystemBridgeRuntime.principal.utf8),
+              let task = args["task_id"] as? String, !task.isEmpty, task.utf8.count <= 128,
+              task.utf8.allSatisfy({ (48...57).contains($0) || (65...90).contains($0) || (97...122).contains($0) || $0 == 45 || $0 == 95 }),
+              let target = args["target"] as? [String: Any],
+              Set(target.keys) == Set(["pid", "expected_started_at", "target_token", "helper_pid", "worker_generation", "expected_revision"]),
+              let started = target["expected_started_at"] as? NSNumber, CFGetTypeID(started) != CFBooleanGetTypeID(),
+              started.doubleValue.isFinite, started.doubleValue > 0,
+              try stageInteger(target, "pid", max: Int(Int32.max)) > 0,
+              try stageInteger(target, "helper_pid", max: Int(Int32.max)) == Int(getpid()),
+              target["worker_generation"] as? String == SystemBridgeRuntime.generation,
+              stageHex(target["target_token"], length: 32), stageHex(target["expected_revision"], length: 64),
+              let submit = args["submit"] as? NSNumber, CFGetTypeID(submit) == CFBooleanGetTypeID(), !submit.boolValue,
+              args["encoding"] as? String == "utf-16-le", stageHex(args["sha256"], length: 64),
+              let digest = args["sha256"] as? String else {
+            throw SystemControl.failure("keyboard_staging_invalid", "Text staging binding, owner or encoding is invalid")
+        }
+        let bytes = try stageInteger(args, "utf8_bytes", max: 1024 * 1024)
+        let units = try stageInteger(args, "utf16_units", max: 1024 * 1024)
+        let count = try stageInteger(args, "chunk_count", max: 65)
+        try require(bytes > 0 && units > 0 && units <= bytes && count > 0 && count <= units && units <= count * 16384,
+                    "Text staging manifest exceeds the bounded quota")
+        try require(transfer == nil && !consumedTransfers.contains(id) && consumedTransfers.count < 256,
+                    "Text staging is occupied, consumed or its epoch budget is exhausted")
+        transfer = TextTransfer(id: id, principal: principal, task: task, digest: digest, target: target,
+                                bytes: bytes, units: units, chunks: count, now: now)
+        return ["transfer_id": id, "state": "accepted", "input_attempted": false]
+    }
+    static func ownedTransfer(_ args: [String: Any], now: Double) throws -> TextTransfer {
+        purgeTransfer(now)
+        guard let current = transfer, args["transfer_id"] as? String == current.id,
+              current.principal.utf8.elementsEqual(SystemBridgeRuntime.principal.utf8),
+              current.epoch == SystemBridgeRuntime.generation else {
+            throw SystemControl.failure("keyboard_staging_invalid", "Text staging is absent, expired, consumed or foreign")
+        }
+        return current
+    }
+    static func chunkTransfer(_ args: [String: Any], now: Double = ProcessInfo.processInfo.systemUptime) throws -> [String: Any] {
+        try require(Set(args.keys) == Set(["transfer_id", "index", "data_b64"]), "Text staging chunk fields differ")
+        let current = try ownedTransfer(args, now: now)
+        let index = try stageInteger(args, "index", max: current.chunkCount - 1)
+        guard index == current.nextIndex, let encoded = args["data_b64"] as? String, encoded.utf8.count <= 43692,
+              let data = Data(base64Encoded: encoded), data.base64EncodedString() == encoded,
+              !data.isEmpty, data.count <= 32768, data.count % 2 == 0 else {
+            throw SystemControl.failure("keyboard_staging_invalid", "Text staging chunk order or base64 is invalid")
+        }
+        let bytes = Array(data)
+        let units = stride(from: 0, to: bytes.count, by: 2).map { UniChar(bytes[$0]) | (UniChar(bytes[$0 + 1]) << 8) }
+        try require(String(decoding: units, as: UTF16.self).utf16.elementsEqual(units)
+                    && current.units.count + units.count <= current.unitCount, "Text staging UTF-16 or cumulative quota is invalid")
+        current.units.append(contentsOf: units); current.nextIndex += 1
+        return ["transfer_id": current.id, "state": "received", "received_chunks": current.nextIndex,
+                "received_utf16_units": current.units.count, "input_attempted": false]
+    }
+    static func commitTransfer(_ args: [String: Any], now: Double = ProcessInfo.processInfo.systemUptime,
+                               writer: ([String: Any]) async throws -> [String: Any]) async throws -> [String: Any] {
+        try require(Set(args.keys) == Set(["transfer_id"]), "Text commit fields differ")
+        let current = try ownedTransfer(args, now: now)
+        transfer = nil; consumedTransfers.insert(current.id) // Before validation/writer/any possible input.
+        let text = String(decoding: current.units, as: UTF16.self)
+        try require(current.nextIndex == current.chunkCount && current.units.count == current.unitCount
+                    && text.utf16.elementsEqual(current.units) && text.utf8.count == current.byteCount
+                    && SHA256.hash(data: Data(text.utf8)).map({ String(format: "%02x", $0) }).joined() == current.digest,
+                    "Staged text is incomplete or its length/digest differs")
+        var result = try await writer(["target": current.target, "text": text, "submit": false])
+        result["transfer_id"] = current.id; result["task_id"] = current.taskID; result["staging_verified"] = true
+        return result
+    }
+    static func abortTransfer(_ args: [String: Any], now: Double = ProcessInfo.processInfo.systemUptime) throws -> [String: Any] {
+        try require(Set(args.keys) == Set(["transfer_id"]), "Text abort fields differ")
+        let current = try ownedTransfer(args, now: now)
+        transfer = nil
+        return ["transfer_id": current.id, "state": "aborted", "input_attempted": false]
+    }
     static func handle(_ operation: String, arguments: [String: Any]) async throws -> [String: Any]? {
         switch operation {
         case "keyboard.inspect": return try snapshot(arguments).response
         case "keyboard.key": return try key(arguments)
         case "keyboard.chord": return try key(arguments, chord: true)
-        case "keyboard.text": return try await text(arguments)
+        case "keyboard.text.begin": return try beginTransfer(arguments)
+        case "keyboard.text.chunk": return try chunkTransfer(arguments)
+        case "keyboard.text.commit": return try await commitTransfer(arguments, writer: { try await text($0) })
+        case "keyboard.text.abort": return try abortTransfer(arguments)
         default: return nil
         }
     }

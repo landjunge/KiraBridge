@@ -558,7 +558,7 @@ class Bridge:
                 ),
             }
         if operation in KEYBOARD_INPUTS:
-            return await self.keyboard.execute(task, args, running)
+            return await self.keyboard.execute(task, args, running, progress)
         if operation in SYSTEM_LEAVES:
             if operation == "apps.launch":
                 # Launching a bundle does not bypass the caller's filesystem roots.

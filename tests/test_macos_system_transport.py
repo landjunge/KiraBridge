@@ -388,7 +388,7 @@ async def test_worker_generation_change_invalidates_handles(monkeypatch):
     assert child.killed
 
 
-@pytest.mark.parametrize("principal", ["", None, "x" * 257])
+@pytest.mark.parametrize("principal", ["", None, "x" * 257, "\ufeffalice"])
 async def test_principal_required_before_launch(monkeypatch, principal):
     worker, _, calls = transport(monkeypatch)
     with pytest.raises(BridgeError):
