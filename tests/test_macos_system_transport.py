@@ -426,6 +426,24 @@ def make_app(tmp_path):
     return app
 
 
+@pytest.mark.parametrize("protocol,expected", [(None, 0), (True, 0), (1, 1)])
+def test_keyboard_metadata_preserves_old_worker_compatibility(
+    tmp_path, monkeypatch, protocol, expected
+):
+    monkeypatch.setattr(native.sys, "platform", "darwin")
+    app = make_app(tmp_path)
+    info = app / "Contents/Info.plist"
+    metadata = plistlib.loads(info.read_bytes())
+    if protocol is not None:
+        metadata["KiraBridgeKeyboardProtocol"] = protocol
+        info.write_bytes(plistlib.dumps(metadata))
+    worker = native.NativeSystemTransport(app, expected_commit=COMMIT)
+    observed = worker.snapshot_metadata()
+    assert observed["available"] is True
+    assert observed["keyboard_protocol"] == expected
+    assert worker.process is None
+
+
 def test_metadata_is_passive_and_pins_binary_commit(tmp_path, monkeypatch):
     monkeypatch.setattr(native.sys, "platform", "darwin")
     app = make_app(tmp_path)

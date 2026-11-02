@@ -33,6 +33,7 @@ def build(destination=None):
         root / "integrations/desktop/SystemBridge.swift",
         root / "integrations/desktop/SystemControl.swift",
         root / "integrations/desktop/SystemServices.swift",
+        root / "integrations/desktop/SystemKeyboard.swift",
     ]
     binary = bundle / "Contents/MacOS/KiraBridge"
     binary.parent.mkdir(parents=True, exist_ok=True)
@@ -91,6 +92,7 @@ def build(destination=None):
                     )
                 ).hexdigest(),
                 "KiraBridgeSystemProtocol": 1,
+                "KiraBridgeKeyboardProtocol": 1,
                 "CFBundlePackageType": "APPL",
                 "NSHighResolutionCapable": True,
                 "LSMinimumSystemVersion": "12.0",

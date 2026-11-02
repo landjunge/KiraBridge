@@ -47,4 +47,31 @@ reproduzierten beide Befunde. Nach tiefer Neuvalidierung und unveränderlicher
 JSON-Ablage mit defensiven Wire-Dicts sind nur die zwölf betroffenen Fälle erneut
 grün (12 passed, 19 deselected). Der enge unabhängige Abschlussreview ist freigegeben.
 
-Der Remote-SHA wird vor Beginn von Schritt 2 unabhängig abgeglichen.
+Schritt1-Commit/Remote: `6a926cf6e1ca4ca43c18372c2bc14b3c6ea55073`, unabhängig abgeglichen.
+
+
+## Schritt 2 – Native Ziel- und Feldbeobachtung
+
+`keyboard.inspect` ist als rein lesende Operation an den vorhandenen Dispatcher
+und Swift-Worker angebunden. Der Snapshot prüft Appgeneration, aktives Fenster,
+fokussiertes Element und Besitzer sowie UTF-16-Auswahl, Wertdigest und Layout.
+Der native AX-Tokenstore wird weiterverwendet. Es werden keine Rohtextwerte
+zurückgegeben, keine Tasten gesendet und keine Berechtigungen angefordert.
+Sichere oder unzureichend klassifizierbare Felder werden vor dem Value-Read
+verweigert. Die 4-MiB-Wertgrenze wird vor einer zusätzlichen UTF-16-Kopie geprüft.
+
+Der passive Protokollmarker `KiraBridgeKeyboardProtocol=1` kennzeichnet neue
+Worker. Ohne diesen exakten Integer meldet der Katalog nur Keyboard unverfügbar;
+andere Fähigkeiten alter Worker bleiben erhalten. Neue Swiftquellen sind in
+Build-/Quellhashlisten und bestehenden expliziten Harness-Compilelisten enthalten.
+
+Nachweise: 9 direkt betroffene Pythonfälle bestanden,159 übrige deselected.
+Ein echter gemeinsamer Swiftcompile mit 15 Metadaten-/Revisionschecks und ein
+Builder-Mockfall bestanden als2 pytest-Fälle in8,77s. Native Autor-/Rootreview
+und unabhängiger Check der Pythonverdrahtung sind grün. Keine erneute Vollsuite.
+
+Grenzen: Der Native-Harness injiziert AX-Metadaten und ruft keine UI-/TCC-APIs
+auf. Fehlende Subrole/Zeichenanzahl werden strikt verweigert; echte TextEdit-/
+NSTextView-Kompatibilität und Eingabeeffekte sind noch nicht abgenommen.
+Clipboard-/Terminalimplementierungen und laufende Benutzersitzungen unverändert.
+Schritt3 beginnt erst nach geprüftem Push dieses Schritts.

@@ -124,6 +124,10 @@ class NativeSystemTransport:
                 "executable": str(executable.absolute()),
                 "bundle_id": BUNDLE_ID,
                 "binary_sha256": binary_sha256,
+                "keyboard_protocol": 1
+                if type(metadata.get("KiraBridgeKeyboardProtocol")) is int
+                and metadata["KiraBridgeKeyboardProtocol"] == 1
+                else 0,
             }
         except (OSError, ValueError, TypeError, RecursionError, plistlib.InvalidFileException):
             return {"available": False, "reason": "native_app_protocol_unavailable"}

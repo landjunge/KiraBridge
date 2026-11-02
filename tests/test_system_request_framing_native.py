@@ -20,7 +20,12 @@ def framing_harness(tmp_path_factory):
     sources = [root / "tests/fixtures/desktop_bootstrap/FramingHarness.swift"]
     sources += [
         root / "integrations/desktop" / name
-        for name in ("SystemBridge.swift", "SystemControl.swift", "SystemServices.swift")
+        for name in (
+            "SystemBridge.swift",
+            "SystemControl.swift",
+            "SystemServices.swift",
+            "SystemKeyboard.swift",
+        )
     ]
     command = [
         "xcrun",

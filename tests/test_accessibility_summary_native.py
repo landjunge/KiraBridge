@@ -19,7 +19,12 @@ def accessibility_harness(tmp_path_factory):
     sources = [root / "tests/fixtures/desktop_bootstrap/AccessibilityHarness.swift"]
     sources += [
         root / "integrations/desktop" / name
-        for name in ("SystemControl.swift", "SystemBridge.swift", "SystemServices.swift")
+        for name in (
+            "SystemControl.swift",
+            "SystemBridge.swift",
+            "SystemServices.swift",
+            "SystemKeyboard.swift",
+        )
     ]
     command = [
         "xcrun",

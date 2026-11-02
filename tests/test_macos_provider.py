@@ -54,6 +54,23 @@ def test_missing_osascript_only_disables_its_leaf():
     assert snapshot["capabilities"]["files"]["available"]
 
 
+@pytest.mark.parametrize(
+    "protocol,available", [(None, False), (True, False), (2, False), (1, True)]
+)
+def test_keyboard_requires_its_own_advertised_native_contract(protocol, available):
+    current = probe()
+    current.native_metadata = lambda: {
+        "available": True,
+        "reason": "available",
+        "keyboard_protocol": protocol,
+    }
+    leaves = current.snapshot()["capabilities"]
+    assert leaves["keyboard"]["available"] is available
+    assert leaves["apps"]["available"] is True
+    if not available:
+        assert leaves["keyboard"]["reason"] == "keyboard_protocol_unavailable"
+
+
 def test_internal_native_guard_is_available_but_not_advertised_as_public_execution():
     native = provider()
     assert native.require("terminal.native").leaf == "terminal_app"

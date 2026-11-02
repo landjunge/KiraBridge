@@ -56,6 +56,7 @@ def test_companion_metadata_binds_release_and_source(tmp_path, builder, monkeypa
             "SystemBridge.swift",
             "SystemControl.swift",
             "SystemServices.swift",
+            "SystemKeyboard.swift",
         )
     ]
     for source in sources:
@@ -89,7 +90,8 @@ def test_companion_metadata_binds_release_and_source(tmp_path, builder, monkeypa
         ).hexdigest()
     )
     assert info["KiraBridgeSystemProtocol"] == 1
-    assert calls[0][-6:] == [
+    assert info["KiraBridgeKeyboardProtocol"] == 1
+    assert calls[0][-(len(sources) + 2) :] == [
         *map(str, sources),
         "-o",
         str(destination / "Contents/MacOS/KiraBridge"),

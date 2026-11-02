@@ -32,6 +32,7 @@ ELEMENT = {
     "expected_revision": REV,
 }
 SAMPLES = {
+    "keyboard.inspect": APP,
     "system.info": {},
     "system.processes": {},
     "system.process": {"pid": 222, "expected_start": "123.000000"},
@@ -69,7 +70,11 @@ SAMPLES = {
 def native(bridge):
     probe = bridge.macos.capability_probe
     probe.facts.update(platform="darwin", os_version="15.7.4")
-    probe.native_metadata = lambda: {"available": True, "revision": "fixture-v1"}
+    probe.native_metadata = lambda: {
+        "available": True,
+        "revision": "fixture-v1",
+        "keyboard_protocol": 1,
+    }
     bridge.system_modules.execute = AsyncMock(return_value={"effect": "fixture_only"})
 
 

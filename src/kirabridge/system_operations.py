@@ -1,6 +1,7 @@
 """Passive operation contracts for the native macOS system application worker."""
 
 SYSTEM_LEAVES = {
+    "keyboard.inspect": "keyboard",
     "system.info": "system",
     "system.processes": "system",
     "system.process": "system",
@@ -52,7 +53,13 @@ SYSTEM_PERMISSIONS = {
     if operation.startswith("capture.")
     else "accessibility"
     if operation
-    in {"windows.focus", "accessibility.inspect", "accessibility.action", "accessibility.set"}
+    in {
+        "keyboard.inspect",
+        "windows.focus",
+        "accessibility.inspect",
+        "accessibility.action",
+        "accessibility.set",
+    }
     else "notifications"
     if operation == "notifications.post"
     else "per_selected_operation"
