@@ -35,6 +35,8 @@
 </div>
 <div id="keyboard-system-fields" class="keyboard-column" hidden>
 <label for="keyboard-system-action">Mac-Funktion</label><select id="keyboard-system-action" aria-describedby="keyboard-system-help"><option value="">Funktionen zuerst prüfen</option></select>
+<fieldset id="keyboard-system-modifiers" class="keyboard-column" hidden aria-describedby="keyboard-system-modifier-help"><legend>Zusätzliche Tasten (optional)</legend><label class="keyboard-check"><input type="checkbox" value="command"> ⌘ Command</label><label class="keyboard-check"><input type="checkbox" value="option"> ⌥ Option</label><label class="keyboard-check"><input type="checkbox" value="control"> ⌃ Control</label><label class="keyboard-check"><input type="checkbox" value="shift"> ⇧ Shift</label><label class="keyboard-check"><input type="checkbox" value="fn"> fn / Globus</label></fieldset>
+<p class="small" id="keyboard-system-modifier-help" hidden>Zusätzliche Tasten werden nur bei dafür geeigneten Mac-Tastensignalen mitgesendet.</p>
 <p class="small" id="keyboard-system-help">Verfügbare Mac-Funktionen werden frisch ermittelt. Ein Zielprogramm ist dafür nicht erforderlich. Die Wirkung hängt auch von deiner Hardware und deinen macOS-Einstellungen ab.</p>
 </div>
 <div id="keyboard-repeat-fields" class="keyboard-column" hidden><label for="keyboard-repeat">Anzahl der Tastendrücke</label><input id="keyboard-repeat" type="number" min="1" max="20" step="1" value="1" inputmode="numeric" aria-describedby="keyboard-repeat-help"><p class="small" id="keyboard-repeat-help">1 bis 20. Jeder Tastendruck wird einmal gesendet; bei einer unklaren Rückmeldung wird gestoppt.</p></div>

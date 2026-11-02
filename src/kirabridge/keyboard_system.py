@@ -8,6 +8,30 @@ from kirabridge.bridge_core.models import Input
 from kirabridge.keyboard_models import KeyboardKey, Modifier
 from kirabridge.platform_adapters.macos.control_models import ApplicationTargetInput
 
+HARDWARE_SYSTEM_ACTIONS = frozenset(
+    {
+        "volume_up",
+        "volume_down",
+        "mute",
+        "brightness_up",
+        "brightness_down",
+        "keyboard_brightness_up",
+        "keyboard_brightness_down",
+        "keyboard_brightness_toggle",
+        "play_pause",
+        "next_track",
+        "previous_track",
+        "fast_forward",
+        "rewind",
+        "eject",
+        "display_mirror",
+        "contrast_up",
+        "contrast_down",
+        "launch_panel",
+        "menu",
+    }
+)
+
 
 class KeyboardSystemKeyInput(Input):
     scope: Literal["system"]
@@ -21,7 +45,11 @@ class KeyboardSystemKeyInput(Input):
     def coherent(self):
         if (self.action is None) == (self.key is None):
             raise ValueError("Choose a system action or one key")
-        if self.action is not None and self.modifiers:
+        if (
+            self.action is not None
+            and self.modifiers
+            and self.action not in HARDWARE_SYSTEM_ACTIONS
+        ):
             raise ValueError("System actions use their observed configured modifiers")
         if len(self.modifiers) != len(set(self.modifiers)):
             raise ValueError("Modifiers must be unique")

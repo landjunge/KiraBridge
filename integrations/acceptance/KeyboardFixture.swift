@@ -96,7 +96,13 @@ struct KeyboardFixture {
         guard let path, let nonce = identifier,
               nonce.range(of: "^[a-f0-9]{32}$", options: .regularExpression) != nil else { exit(2) }
         let root = URL(fileURLWithPath: path, isDirectory: true)
-        let app = KeyboardFixtureApplication()
+        // AppKit windows retrieve NSApplication.shared. Constructing a separate
+        // instance here aborts on the first window: "Creating more than one Application".
+        guard let app = KeyboardFixtureApplication.shared as? KeyboardFixtureApplication,
+              NSApplication.shared === app else {
+            fputs("Keyboard fixture application singleton has an unexpected type\n", stderr)
+            exit(3)
+        }
         app.setActivationPolicy(.regular)
         let window = NSWindow(contentRect: NSRect(x: 120, y: 120, width: 760, height: 420),
                               styleMask: [.titled, .closable, .resizable], backing: .buffered, defer: false)

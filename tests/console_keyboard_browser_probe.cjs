@@ -23,7 +23,7 @@ const status = {
   pending: [], peers_connected: true, maintenance: null
 };
 const automaticCases = ["automatic_text_return", "automatic_key_combination", "automatic_lost_response", "automatic_limit_and_draft", "automatic_advanced", "automatic_app_visibility"];
-const modernCases = ["system_inventory_rights", "system_action_repeat", "system_missing_receipt", "system_lost_response", "system_inventory_changed", "app_extended_key_repeat", "system_caps_lock_repeat", "system_caps_lock_unconfirmed"];
+const modernCases = ["system_inventory_rights", "system_action_repeat", "system_missing_receipt", "system_lost_response", "system_inventory_changed", "app_extended_key_repeat", "system_caps_lock_repeat", "system_caps_lock_unconfirmed", "system_hardware_modifiers", "system_hardware_modifier_receipt"];
 const cases = ["profiles_and_discovery", "one_run", "lost_response", "lost_response_preparation", "completed_preparation", "failed_intent", "failed_main", "missing_post_proof", "candidate", ...automaticCases, ...modernCases];
 
 async function checkModern(page, name, posts, gets) {
@@ -62,6 +62,44 @@ async function checkModern(page, name, posts, gets) {
   await page.locator("#keyboard-system-action").selectOption(caps ? "caps_lock" : "volume_up");
   assert.match(await page.locator("#keyboard-system-help").innerText(), /erkannt/);
   assert.doesNotMatch(await page.locator("#keyboard-system-help").innerText(), /Mac-Funktionen verfügbar/);
+  if (name.startsWith("system_hardware_modifier")) {
+    assert.ok(await page.locator("#keyboard-system-modifiers").isVisible());
+    assert.match(await page.locator("#keyboard-system-modifier-help").innerText(), /Option \+ Shift.*kleinere Schritte/);
+    await page.locator('#keyboard-system-modifiers input[value="option"]').check();
+    await page.locator('#keyboard-system-modifiers input[value="shift"]').check();
+    await page.locator("#keyboard-send").evaluate(button => { button.click(); button.click(); });
+    await page.waitForFunction(() => /Mac-Funktion wurde gesendet|nicht vollständig bestätigt/.test(document.querySelector("#notice").textContent));
+    assert.deepEqual(inputs()[0].args, { scope: "system", action: "volume_up", modifiers: ["option", "shift"] });
+    if (name === "system_hardware_modifier_receipt") {
+      await page.waitForFunction(() => document.querySelector("#notice").textContent.includes("nicht vollständig bestätigt"));
+      assert.ok(await page.locator("#keyboard-send").isDisabled(), "A lost modifier receipt must not confirm fine-step input");
+      await page.locator("#keyboard-status").click();
+      await page.waitForFunction(() => !document.querySelector("#keyboard-status").disabled);
+      assert.equal(inputs().length, 1, "Status never resends a hardware key to recover its modifier proof");
+      return;
+    }
+    await page.waitForFunction(() => document.querySelector("#notice").textContent.includes("Mac-Funktion wurde gesendet"));
+    await page.locator("#keyboard-system-action").selectOption("brightness_up");
+    assert.ok(await page.locator("#keyboard-system-modifiers").isVisible());
+    assert.match(await page.locator("#keyboard-system-modifier-help").innerText(), /Helligkeit/);
+    await page.locator("#keyboard-system-action").selectOption("caps_lock");
+    assert.ok(await page.locator("#keyboard-system-modifiers").isHidden());
+    assert.equal(await page.locator("#keyboard-system-modifiers input:checked").count(), 0, "Changing to Caps Lock clears hidden modifier drafts");
+    await page.locator("#keyboard-repeat").fill("2");
+    await page.locator("#keyboard-send").click();
+    await page.waitForFunction(() => document.querySelector("#notice").textContent.includes("Feststelltaste bestätigt"));
+    assert.deepEqual(inputs()[1].args, { scope: "system", action: "caps_lock", repeat: 2 });
+    await page.locator("#keyboard-system-action").selectOption("volume_up");
+    assert.ok(await page.locator("#keyboard-system-modifiers").isVisible());
+    assert.equal(await page.locator("#keyboard-system-modifiers input:checked").count(), 0);
+    await page.locator('#keyboard-system-modifiers input[value="option"]').check();
+    await page.locator("#keyboard-capabilities").click();
+    await page.waitForFunction(() => !document.querySelector("#keyboard-capabilities").disabled);
+    assert.ok(await page.locator("#keyboard-system-modifiers").isHidden(), "A fresh inventory without modifier support hides the controls");
+    assert.equal(await page.locator("#keyboard-system-modifiers input:checked").count(), 0);
+    assert.equal(inputs().length, 2);
+    return;
+  }
   if (caps) {
     assert.match(await page.locator("#keyboard-system-action").innerText(), /Feststelltaste/);
     await page.locator("#keyboard-repeat").fill("2");
@@ -289,6 +327,10 @@ async function check(browser, name) {
           result = { permission_guidance };
           if (body.operation === "keyboard.system_inventory") result.actions = [{ action: "volume_up", available: !(name === "system_inventory_changed" && posts.filter(p => p.operation === body.operation).length > 1) }, { action: "mission_control", available: false }, { action: "other", label: '<img src=x onerror="window.injected=1">', available: false }];
           if (body.operation === "keyboard.system_inventory" && name.startsWith("system_caps_lock_")) result.actions.push({ action: "caps_lock", available: true });
+          if (body.operation === "keyboard.system_inventory" && name.startsWith("system_hardware_modifier")) {
+            result.actions[0].accepts_modifiers = posts.filter(p => p.operation === body.operation).length === 1;
+            result.actions.push({ action: "brightness_up", available: true, accepts_modifiers: true }, { action: "caps_lock", available: true, accepts_modifiers: true });
+          }
           break;
         }
         case "keyboard.control":
@@ -296,6 +338,7 @@ async function check(browser, name) {
           if (body.args.text !== undefined) Object.assign(result, { text_verified: true, selection_verified: true, return_posted: body.args.submit === true });
           else if (body.args.key?.named !== "escape") Object.assign(result, { post_calls_returned: 2 * (body.args.repeat || 1), requested_repeat: body.args.repeat || 1, completed_repeat: body.args.repeat || 1 });
           if (body.args.scope === "system") Object.assign(result, { event_scope: "system", native_operation: "keyboard.system_key", resolved: { action: body.args.action || "explicit_key" } });
+          if (body.args.action && Array.isArray(body.args.modifiers)) result.resolved.modifiers = name === "system_hardware_modifier_receipt" ? [] : body.args.modifiers;
           if (body.args.action === "caps_lock") Object.assign(result, { scope: "native_state_readback", modifier: "caps_lock", resolved: { action: "caps_lock", route: "modifier_lock_state" }, effect_verified: true, system_processing_confirmed: true, post_calls_returned: 0, state_set_calls_returned: body.args.repeat, state_before: false, state_after: name === "system_caps_lock_unconfirmed" });
           if (name === "system_missing_receipt") result.post_calls_returned = 2;
           if (name === "automatic_key_combination" && body.args.key?.character) state = "running";

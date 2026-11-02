@@ -6,6 +6,8 @@
  const systemMode=()=>$("keyboard-kind").value==="system"||($("keyboard-kind").value==="key"&&$("keyboard-scope").value==="system");
  const repeatCount=()=>Number($("keyboard-repeat").value),validRepeat=()=>$("keyboard-repeat").value.trim()!==""&&Number.isInteger(repeatCount())&&repeatCount()>=1&&repeatCount()<=20;
  const systemAction=()=>state.systemActions.find(a=>a.action===$("keyboard-system-action").value&&a.available===true);
+ const hardwareModifierActions=new Set(["volume_up","volume_down","mute","brightness_up","brightness_down","keyboard_brightness_up","keyboard_brightness_down","keyboard_brightness_toggle","play_pause","next_track","previous_track","fast_forward","rewind","eject","display_mirror","contrast_up","contrast_down","launch_panel","menu"]);
+ const systemModifiersAllowed=action=>action?.accepts_modifiers===true&&hardwareModifierActions.has(action.action);
  const systemLabels={volume_up:"Lauter",volume_down:"Leiser",mute:"Ton stummschalten",brightness_up:"Bildschirm heller",brightness_down:"Bildschirm dunkler",keyboard_brightness_up:"Tastaturbeleuchtung heller",keyboard_brightness_down:"Tastaturbeleuchtung dunkler",keyboard_brightness_toggle:"Tastaturbeleuchtung umschalten",play_pause:"Wiedergabe / Pause",next_track:"Nächster Titel",previous_track:"Vorheriger Titel",fast_forward:"Vorspulen",rewind:"Zurückspulen",eject:"Medium auswerfen",display_mirror:"Bildschirmsynchronisierung umschalten",contrast_up:"Kontrast erhöhen",contrast_down:"Kontrast verringern",launch_panel:"Launchpad öffnen",menu:"Medienmenü",mission_control:"Mission Control",application_windows:"Fenster des aktuellen Programms",show_desktop:"Schreibtisch anzeigen",space_left:"Zum linken Schreibtisch wechseln",space_right:"Zum rechten Schreibtisch wechseln",spotlight:"Spotlight öffnen",spotlight_finder:"Im Finder suchen",window_next:"Nächstes Fenster",app_next:"Zum nächsten Programm wechseln",app_previous:"Zum vorherigen Programm wechseln"};
  systemLabels.caps_lock="Feststelltaste umschalten";
  const actionLabel=action=>Object.hasOwn(systemLabels,action.action)?systemLabels[action.action]:typeof action.label==="string"&&action.label.length<=240?action.label:null;
@@ -19,6 +21,10 @@
   $("keyboard-direct-form").querySelectorAll("input,textarea").forEach(input=>input.disabled=locked);
   const textMode=$("keyboard-kind").value==="text",validKey=$("keyboard-key").value!=="character"||Array.from($("keyboard-character").value).length===1;
   const system=systemMode(),actionMode=$("keyboard-kind").value==="system";
+  const action=actionMode?systemAction():null,acceptsModifiers=systemModifiersAllowed(action);
+  $("keyboard-system-modifiers").hidden=!acceptsModifiers;$("keyboard-system-modifier-help").hidden=!acceptsModifiers;
+  $("keyboard-system-modifiers").querySelectorAll("input").forEach(input=>{input.disabled=locked||!acceptsModifiers;if(!acceptsModifiers)input.checked=false;});
+  $("keyboard-system-modifier-help").textContent=["volume_up","volume_down","brightness_up","brightness_down"].includes(action?.action)?"Option + Shift ermöglicht bei Lautstärke und Helligkeit kleinere Schritte, sofern der Mac diese unterstützt. Andere Kombinationen können macOS-Einstellungen öffnen.":"Zusätzliche Tasten werden mit diesem Mac-Tastensignal gesendet. Ihre Wirkung hängt von Hardware, Medien-App und macOS-Einstellungen ab.";
   $("keyboard-send").disabled=locked||state.permissionReady===false||(!system&&!app())||state.composing||(textMode?!$("keyboard-text").value:!validRepeat()||(actionMode?!systemAction():!validKey));
   $("keyboard-destination").textContent=system?"Ziel: macOS · systemweit":app()?"Ziel: "+(app().name||app().bundle_id||"Programm"):"Wähle ein Zielprogramm.";
   $("keyboard-direct-form").setAttribute("aria-busy",String(locked));
@@ -96,8 +102,9 @@
     const r=task.result||{},resolved=r.resolved_application,repeat=intent.repeat||1,system=intent.scope==="system",nativeSystem=r.native_operation==="keyboard.system_key"&&r.event_scope==="system";
     const targetConfirmed=system?Number.isInteger(resolved?.pid)&&Number.isFinite(resolved?.started_at):resolved?.pid===intent.pid&&resolved.started_at===intent.expected_started_at;
     const repeatConfirmed=r.post_calls_returned===2*repeat&&(repeat===1||(r.requested_repeat===repeat&&r.completed_repeat===repeat));
+    const actionModifiersConfirmed=!Array.isArray(intent.action_modifiers)||(Array.isArray(r.resolved?.modifiers)&&r.resolved.modifiers.length===intent.action_modifiers.length&&new Set(r.resolved.modifiers).size===r.resolved.modifiers.length&&intent.action_modifiers.every(value=>r.resolved.modifiers.includes(value)));
     const capsRequested=system&&intent.action==="caps_lock",capsVerified=capsRequested&&nativeSystem&&r.scope==="native_state_readback"&&r.modifier==="caps_lock"&&r.resolved?.route==="modifier_lock_state"&&r.resolved?.action==="caps_lock"&&r.effect_verified===true&&r.system_processing_confirmed===true&&r.requested_repeat===repeat&&r.completed_repeat===repeat&&r.state_set_calls_returned===repeat&&r.post_calls_returned===0&&typeof r.state_before==="boolean"&&typeof r.state_after==="boolean"&&r.state_after===(r.state_before!==Boolean(repeat%2));
-    const receiptConfirmed=intent.kind==="text"?r.text_verified===true&&r.selection_verified===true&&r.return_posted===intent.submit:capsRequested?capsVerified:repeatConfirmed&&(!system||nativeSystem)&&(!intent.action||r.resolved?.action===intent.action)&&(intent.scope!=="app"||!nativeSystem);
+    const receiptConfirmed=intent.kind==="text"?r.text_verified===true&&r.selection_verified===true&&r.return_posted===intent.submit:capsRequested?capsVerified:repeatConfirmed&&actionModifiersConfirmed&&(!system||nativeSystem)&&(!intent.action||r.resolved?.action===intent.action)&&(intent.scope!=="app"||!nativeSystem);
     actionConfirmed=task.ui_workflow_status==="primary"&&intent.primary===true&&task.id===intent.task_id&&r.automatic_target===true&&targetConfirmed&&receiptConfirmed;
     notice(actionConfirmed?(intent.kind==="text"?"Text im Zielprogramm bestätigt."+(intent.submit?" Return wurde gesendet; die Verarbeitung im Programm ist nicht bestätigt.":""):capsVerified?"Feststelltaste bestätigt: "+(r.state_after?"eingeschaltet.":"ausgeschaltet."):nativeSystem?"Mac-Funktion wurde gesendet. Die Wirkung auf dem Mac ist damit noch nicht bestätigt.":"Native Tastendruck-Aufrufe bestätigt. Die Verarbeitung im Programm ist nicht bestätigt."):"Die Eingabe ist nicht vollständig bestätigt. Auftrag bleibt erhalten; nicht erneut senden.",!actionConfirmed);
    }else{resultView(task.result||{},intent);notice("Auftrag abgeschlossen.");}
@@ -124,7 +131,7 @@
   const intent={id:crypto.randomUUID(),operation,editor_version:state.version,polls:0,pid:args.pid,expected_started_at:args.expected_started_at};
   intent.task_id="ui-keyboard-"+intent.id.replaceAll("-","")+"-main";
   if(operation==="run_profile")intent.binding={id:args.profile_id,revision:args.expected_revision,action:args.action};
-  if(operation==="keyboard.control"){intent.kind=args.text!==undefined?"text":"key";intent.submit=args.submit===true;intent.scope=args.scope||"auto";intent.action=args.action;intent.repeat=args.repeat||1;}
+  if(operation==="keyboard.control"){intent.kind=args.text!==undefined?"text":"key";intent.submit=args.submit===true;intent.scope=args.scope||"auto";intent.action=args.action;intent.repeat=args.repeat||1;if(args.action&&Array.isArray(args.modifiers))intent.action_modifiers=args.modifiers.slice();}
   const body=JSON.stringify({id:intent.id,operation,args});
   if(bytes(body)>32768)throw Error("Dieser Auftrag überschreitet 32 KiB. Bitte den Text oder das Profil kürzen. Es wurde nichts gesendet.");
   persist(intent);state.intent=intent;state.last=intent;state.busy=true;controls();
@@ -154,6 +161,7 @@
    if(repeatCount()!==1)args.repeat=repeatCount();
    if($("keyboard-kind").value==="system"){
     const action=systemAction();if(!action)throw Error("Bitte eine verfügbare Mac-Funktion wählen.");args.action=action.action;
+    if(systemModifiersAllowed(action))args.modifiers=Array.from($("keyboard-system-modifiers").querySelectorAll("input:checked"),input=>input.value);
     return request("keyboard.control",args);
    }
    if(!system&&$("keyboard-scope").value==="app")args.scope="app";

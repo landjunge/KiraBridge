@@ -31,7 +31,7 @@ struct SpecialKeysHarness {
             ["79": ["enabled": true, "value": ["type": "button", "parameters": [65535, 123, 8650752]]]]
         ] { refuse { _ = try SystemSpecialKeys.symbolicPlan("space_left", preferences: invalid) } }
         refuse { _ = try SystemSpecialKeys.actionPlan("power", modifiers: [], preferences: prefs) }
-        refuse { _ = try SystemSpecialKeys.actionPlan("volume_up", modifiers: ["command"], preferences: prefs) }
+        refuse { _ = try SystemSpecialKeys.actionPlan("space_left", modifiers: ["command"], preferences: prefs) }
         refuse { _ = try SystemSpecialKeys.plan(["action": "volume_up"], preferences: prefs) }
         refuse { _ = try SystemSpecialKeys.plan(["scope": "system", "action": "mute", "key": [:]], preferences: prefs) }
         precondition(SystemSpecialKeys.registeredMatch(code: 123, flags: .maskControl, preferences: prefs)?.action == "space_left")

@@ -16,6 +16,7 @@ from kirabridge.keyboard_models import (
     literal_text,
 )
 from kirabridge.keyboard_system import (
+    HARDWARE_SYSTEM_ACTIONS,
     KeyboardSystemKeyInput,
     possible_system_shortcut,
     registered_system_action,
@@ -39,7 +40,10 @@ class KeyboardControlInput(Input):
     def coherent(self):
         if sum(v is not None for v in (self.text, self.key, self.action)) != 1:
             raise ValueError("Choose text, one key or a system action")
-        if self.action is not None and (self.scope != "system" or self.modifiers):
+        if self.action is not None and (
+            self.scope != "system"
+            or (self.modifiers and self.action not in HARDWARE_SYSTEM_ACTIONS)
+        ):
             raise ValueError("System actions require scope=system and their configured modifiers")
         if self.scope == "system" and self.text is not None:
             raise ValueError("System scope cannot type text")
@@ -181,7 +185,9 @@ class KeyboardControl:
                     target=selected,
                     action=system_action,
                     key=None if system_action is not None else args.key,
-                    modifiers=[] if system_action is not None else args.modifiers,
+                    modifiers=[]
+                    if system_action is not None and args.action is None
+                    else args.modifiers,
                     repeat=args.repeat,
                 )
                 result = await k.execute_in_turn(

@@ -87,3 +87,14 @@ def test_system_key_observation_delta_without_os_input(tmp_path):
     receipt = run_native_harness(tmp_path, "SpecialKeysDeltaHarness.swift")
     assert receipt["checks"] >= 12
     assert receipt["real_event_posts"] == receipt["permission_requests"] == 0
+
+
+@pytest.mark.skipif(
+    sys.platform != "darwin" or not shutil.which("xcrun"), reason="Darwin SDK required"
+)
+def test_system_hardware_modifier_combinations_without_os_input(tmp_path):
+    receipt = run_native_harness(tmp_path, "SpecialKeysModifiersHarness.swift")
+    assert receipt["checks"] >= 140
+    assert receipt["nx_action_count"] == 19
+    assert receipt["combinations_per_action"] == 7
+    assert receipt["real_event_posts"] == receipt["hardware_writes"] == 0

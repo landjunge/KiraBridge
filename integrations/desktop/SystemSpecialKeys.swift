@@ -165,6 +165,19 @@ enum SystemSpecialKeys {
                     registered: true, preferenceID: identifier)
     }
     static func actionPlan(_ action: String, modifiers: [String], preferences: [String: Any]) throws -> Plan {
+        if let type = special[action] {
+            guard modifiers.count <= 5, Set(modifiers).count == modifiers.count else {
+                throw failure("System hardware modifiers must be unique and bounded")
+            }
+            let lookup = Dictionary(uniqueKeysWithValues: SystemKeyboard.modifierFlags)
+            var flags = CGEventFlags()
+            for name in modifiers {
+                guard let flag = lookup[name] else { throw failure("Unknown system hardware modifier") }
+                flags.insert(flag)
+            }
+            return Plan(action: action, route: "system_defined_hid", code: Int(type), flags: flags,
+                        registered: true, preferenceID: nil)
+        }
         guard modifiers.isEmpty else { throw failure("Named system actions use their own exact modifiers") }
         if action.hasPrefix("registered_shortcut_") {
             guard let plan = publicPlans(preferences).first(where: { $0.action == action }) else {
@@ -174,10 +187,6 @@ enum SystemSpecialKeys {
         }
         if action == "caps_lock" {
             return Plan(action: action, route: "modifier_lock_state", code: 57, flags: [],
-                        registered: true, preferenceID: nil)
-        }
-        if let type = special[action] {
-            return Plan(action: action, route: "system_defined_hid", code: Int(type), flags: [],
                         registered: true, preferenceID: nil)
         }
         if let chord = fixed[action] {
@@ -239,7 +248,7 @@ enum SystemSpecialKeys {
             func event(_ down: Bool) throws -> CGEvent {
                 let state = Int(down ? NX_KEYDOWN : NX_KEYUP)
                 guard let event = NSEvent.otherEvent(with: .systemDefined, location: .zero,
-                    modifierFlags: NSEvent.ModifierFlags(rawValue: UInt(state << 8)),
+                    modifierFlags: NSEvent.ModifierFlags(rawValue: UInt(plan.flags.rawValue) | UInt(state << 8)),
                     timestamp: 0, windowNumber: 0, context: nil,
                     subtype: Int16(NX_SUBTYPE_AUX_CONTROL_BUTTONS),
                     data1: (plan.code << 16) | (state << 8), data2: -1)?.cgEvent else {
@@ -459,17 +468,19 @@ enum SystemSpecialKeys {
             if let value = try? actionPlan(action, modifiers: [], preferences: prefs) {
                 let lockAvailable = (observed["caps_lock"] as? [String: Any])?["available"] as? Bool ?? false
                 rows.append(value.metadata.merging(["available": action == "caps_lock" ? lockAvailable : true,
+                    "accepts_modifiers": special[action] != nil,
                     "effect_support": action == "caps_lock" ? "modifier_lock_readback; setter_access_not_probed"
                         : special[action] != nil ? "hardware_or_media_handler_dependent" : "configured_system_shortcut",
                     "execution_requires": "explicit_system_scope; fresh_frontmost; Accessibility; post_access; idle_user_keys"
                 ]) { _, next in next })
             } else {
-                rows.append(["action": action, "available": false,
+                rows.append(["action": action, "available": false, "accepts_modifiers": false,
                              "reason": "shortcut_absent_disabled_or_unsupported"])
             }
         }
         rows += publicPlans(prefs).map { plan in
-            plan.metadata.merging(["available": true, "effect_support": "public_registered_system_shortcut",
+            plan.metadata.merging(["available": true, "accepts_modifiers": false,
+                "effect_support": "public_registered_system_shortcut",
                 "semantic_action": "unknown; public Carbon API does not expose action IDs",
                 "execution_requires": "explicit_system_scope; fresh_frontmost; Accessibility; post_access; idle_user_keys"
             ]) { _, next in next }

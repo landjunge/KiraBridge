@@ -129,9 +129,21 @@ def test_system_scope_does_not_accept_text_or_ambiguous_intents():
         KeyboardSystemKeyInput(
             scope="system",
             target={"pid": 1, "expected_started_at": 1},
-            action="volume_up",
+            action="space_left",
             modifiers=["shift"],
         )
+
+
+@pytest.mark.parametrize("action", ["volume_up", "brightness_down", "play_pause"])
+async def test_hardware_action_preserves_explicit_fine_step_modifiers(bridge, config, action):
+    calls = setup_system(bridge, config)
+    await execute(
+        bridge,
+        {"scope": "system", "action": action, "modifiers": ["option", "shift"]},
+    )
+    assert calls[-1][1]["modifiers"] == ["option", "shift"]
+    assert calls[-1][1]["action"] == action
+    assert [op for op, _ in calls] == ["apps.list", "keyboard.system_key"]
 
 
 def test_caps_lock_needs_state_readback_parity_not_invented_event_posts():
