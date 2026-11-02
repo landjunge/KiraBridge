@@ -353,6 +353,8 @@ enum SystemControl {
             let settings = await UNUserNotificationCenter.current().notificationSettings()
             return ["actor_pid": Int(ProcessInfo.processInfo.processIdentifier),
                 "accessibility_granted": AXIsProcessTrusted(),
+                "post_events_granted": CGPreflightPostEventAccess(),
+                "input_monitoring_granted": CGPreflightListenEventAccess(),
                 "screen_capture_granted": CGPreflightScreenCaptureAccess(),
                 "notification_authorization_status": settings.authorizationStatus.rawValue,
                 "permission_requested": false, "effect": "none",

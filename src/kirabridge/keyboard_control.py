@@ -1,6 +1,7 @@
 """Profile-free keyboard intents; discover once, bind freshly, never replay."""
 
 import asyncio
+from typing import Literal
 
 from pydantic import Field, model_validator
 
@@ -14,6 +15,12 @@ from kirabridge.keyboard_models import (
     Modifier,
     literal_text,
 )
+from kirabridge.keyboard_system import (
+    KeyboardSystemKeyInput,
+    possible_system_shortcut,
+    registered_system_action,
+    system_receipt_verified,
+)
 
 
 class KeyboardControlInput(Input):
@@ -22,17 +29,26 @@ class KeyboardControlInput(Input):
     expected_started_at: float | None = Field(default=None, gt=0, allow_inf_nan=False)
     text: str | None = Field(default=None, min_length=1, max_length=MAX_TEXT_UTF8_BYTES)
     key: KeyboardKey | None = None
-    modifiers: list[Modifier] = Field(default_factory=list, max_length=4)
+    modifiers: list[Modifier] = Field(default_factory=list, max_length=5)
     submit: bool = False
+    scope: Literal["auto", "app", "system"] = "auto"
+    action: str | None = Field(default=None, pattern=r"^[a-z][a-z0-9_]{0,63}$")
+    repeat: int = Field(default=1, ge=1, le=20, strict=True)
 
     @model_validator(mode="after")
     def coherent(self):
-        if (self.text is None) == (self.key is None):
-            raise ValueError("Choose text or one key")
+        if sum(v is not None for v in (self.text, self.key, self.action)) != 1:
+            raise ValueError("Choose text, one key or a system action")
+        if self.action is not None and (self.scope != "system" or self.modifiers):
+            raise ValueError("System actions require scope=system and their configured modifiers")
+        if self.scope == "system" and self.text is not None:
+            raise ValueError("System scope cannot type text")
         if self.text is not None:
             literal_text(self.text)
             if self.modifiers:
                 raise ValueError("Modifiers belong to a key, not literal text")
+            if self.repeat != 1:
+                raise ValueError("Text is one literal write; repetition belongs to keys")
         elif self.submit:
             raise ValueError("submit belongs to text; use the enter key otherwise")
         if len(self.modifiers) != len(set(self.modifiers)):
@@ -151,6 +167,42 @@ class KeyboardControl:
                         raise BridgeError(
                             "keyboard_focus_unconfirmed", "Program activation was not confirmed"
                         ) from error
+            system_action = args.action
+            if args.scope == "auto" and possible_system_shortcut(args.key, args.modifiers):
+                inventory = await read(
+                    "keyboard.system_inventory",
+                    {"key": args.key.model_dump(exclude_none=True), "modifiers": args.modifiers},
+                )
+                system_action = registered_system_action(inventory, args.key, args.modifiers)
+            if args.scope == "system" or system_action is not None:
+                operation = "keyboard.system_key"
+                request = KeyboardSystemKeyInput(
+                    scope="system",
+                    target=selected,
+                    action=system_action,
+                    key=None if system_action is not None else args.key,
+                    modifiers=[] if system_action is not None else args.modifiers,
+                    repeat=args.repeat,
+                )
+                result = await k.execute_in_turn(
+                    {**task, "operation": operation},
+                    request,
+                    observe,
+                    turn,
+                    progress,
+                    before_send=authorize,
+                )
+                if not system_receipt_verified(result, action=system_action, repeat=args.repeat):
+                    raise UncertainExecution(
+                        "keyboard_control_unknown", "System key receipt is incomplete; no replay"
+                    )
+                return {
+                    **result,
+                    "automatic_target": True,
+                    "resolved_application": app,
+                    "native_operation": operation,
+                    "automatic_retry": False,
+                }
             inspected = await read("keyboard.inspect", selected)
             target = inspected["target"]
             observed = inspected["application"]
@@ -167,10 +219,12 @@ class KeyboardControl:
                 request = KeyboardTextInput(target=target, text=args.text, submit=args.submit)
             elif args.modifiers:
                 operation = "keyboard.chord"
-                request = KeyboardChordInput(target=target, key=args.key, modifiers=args.modifiers)
+                request = KeyboardChordInput(
+                    target=target, key=args.key, modifiers=args.modifiers, repeat=args.repeat
+                )
             else:
                 operation = "keyboard.key"
-                request = KeyboardKeyInput(target=target, key=args.key)
+                request = KeyboardKeyInput(target=target, key=args.key, repeat=args.repeat)
             await observe(
                 {
                     "evidence_type": "automatic_keyboard_target_bound",
@@ -188,7 +242,10 @@ class KeyboardControl:
                 progress,
                 before_send=authorize,
             )
-            if operation != "keyboard.text" and result.get("post_calls_returned") != 2:
+            if (
+                operation != "keyboard.text"
+                and result.get("post_calls_returned") != 2 * args.repeat
+            ):
                 raise UncertainExecution(
                     "keyboard_control_unknown", "Native key receipt is incomplete; no replay"
                 )

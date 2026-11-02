@@ -13,6 +13,7 @@ from kirabridge.bridge_core.bridge import INPUTS, Bridge
 from kirabridge.bridge_core.models import BridgeError, TaskRequest
 from kirabridge.image_manager import image_task_result
 from kirabridge.keyboard_control import KeyboardControlInput
+from kirabridge.keyboard_system import KeyboardSystemKeyInput
 from kirabridge.message_manager import MessageSend
 from kirabridge.readiness import ReadinessInput, readiness
 from kirabridge.team_manager.models import (
@@ -589,7 +590,10 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
     ) -> dict[str, Any]:
         """Type text, press a key or send a chord directly, with automatic target inspection.
 
-        Use this for ordinary keyboard input; no profile or Events subscription is needed.
+        No profile or Events subscription is needed. Scope auto recognizes configured
+        macOS shortcuts, app forces program input, system selects system keys/actions.
+        Use action names from keyboard_system_inventory for volume, brightness, media,
+        Mission Control and Spaces. Repeat keys 1–20 times in the same task; text once.
         Select an app by name, an exact PID/start pair, or the current foreground app.
         Text is literal and submit defaults to false. Chords require explicit modifiers.
         Existing identity permissions apply. Reuse the same task_id and idempotency_key
@@ -601,6 +605,53 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
                 task_id=task_id,
                 idempotency_key=idempotency_key,
                 operation="keyboard.control",
+                arguments=request.model_dump(),
+            ),
+            ctx,
+            completion_target,
+        )
+
+    @server.tool(annotations=read)
+    async def keyboard_system_inventory(
+        task_id: str,
+        idempotency_key: str,
+        ctx: Context,
+        completion_target: str | None = None,
+    ) -> dict[str, Any]:
+        """Inspect macOS special keys, configured shortcuts and native worker permissions.
+
+        Reads current device observations without posting keys or requesting OS consent.
+        An available event route is not proof of an installed device or an executed effect.
+        """
+        return await task_request(
+            TaskRequest(
+                task_id=task_id,
+                idempotency_key=idempotency_key,
+                operation="keyboard.system_inventory",
+                arguments={},
+            ),
+            ctx,
+            completion_target,
+        )
+
+    @server.tool(annotations=write)
+    async def keyboard_system_key(
+        request: KeyboardSystemKeyInput,
+        task_id: str,
+        idempotency_key: str,
+        ctx: Context,
+        completion_target: str | None = None,
+    ) -> dict[str, Any]:
+        """Send one explicit system-scope keyboard action to a fresh foreground generation.
+
+        Use keyboard_control with scope=system for automatic foreground resolution.
+        Reuse the same task and idempotency key after a lost response; never resend effects.
+        """
+        return await task_request(
+            TaskRequest(
+                task_id=task_id,
+                idempotency_key=idempotency_key,
+                operation="keyboard.system_key",
                 arguments=request.model_dump(),
             ),
             ctx,

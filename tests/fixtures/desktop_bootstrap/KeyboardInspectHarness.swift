@@ -73,7 +73,7 @@ struct KeyboardInspectHarness {
             checks += 1
         }
         var keyChecks = 0
-        precondition(SystemKeyboard.namedKeys.count == 27 && Set(SystemKeyboard.namedKeys.values).count == 27)
+        precondition(SystemKeyboard.namedKeys.count == 54 && Set(SystemKeyboard.namedKeys.values).count == 54)
         precondition(SystemKeyboard.namedKeys["enter"] == 36 && SystemKeyboard.namedKeys["keypad_enter"] == 76)
         precondition(SystemKeyboard.namedKeys["backspace"] == 51 && SystemKeyboard.namedKeys["delete"] == 117)
         _ = try SystemKeyboard.namedKey(["named": "enter", "character": NSNull(), "key_code": NSNull()])
@@ -202,7 +202,9 @@ struct KeyboardInspectHarness {
         var changedData = layouts[0].metadata; changedData["layout_sha256"] = "changed"
         refuses { try SystemKeyboard.matchingLayout(layouts[0].metadata, changedData) }
         refuses { _ = try SystemKeyboard.resolve(["named": "enter"], modifiers: ["shift", "shift"], layout: symbols) }
-        refuses { _ = try SystemKeyboard.resolve(["named": "enter"], modifiers: ["fn"], layout: symbols) }
+        let fn = try SystemKeyboard.resolve(["named": "enter"], modifiers: ["fn"], layout: symbols)
+        precondition(fn.code == CGKeyCode(kVK_Return) && fn.flags == .maskSecondaryFn)
+        layoutChecks += 1
         for type in [40, 41] {
             let (down, up) = try SystemKeyboard.events(["keyboard_type": type], code: 6, flags: [.maskCommand, .maskShift])
             precondition(down.type == .keyDown && up.type == .keyUp)
@@ -215,6 +217,60 @@ struct KeyboardInspectHarness {
         let invalidTypes: [Any] = [true, -1, 40.5, Double(UInt32.max) + 1]
         for invalid in invalidTypes {
             refuses { _ = try SystemKeyboard.events(["keyboard_type": invalid], code: 6, flags: []) }
+        }
+        var extendedKeyChecks = 0
+        let unavailable = try SystemKeyboard.observedLayout(sourceID: nil, layoutID: nil,
+            keyboardType: 40, data: nil)
+        precondition(unavailable.metadata["input_source_id"] is NSNull
+                     && unavailable.metadata["layout_id"] is NSNull
+                     && unavailable.metadata["logical_keys_available"] as? Bool == false)
+        for (name, expectedCode) in SystemKeyboard.namedKeys {
+            let key = try SystemKeyboard.resolve(["named": name], modifiers: ["fn"], layout: unavailable)
+            let physical = try SystemKeyboard.resolve(["key_code": Int(expectedCode)],
+                modifiers: ["command", "control", "option", "shift", "fn"], layout: unavailable)
+            let fnCode = SystemKeyboard.fnNavigation[expectedCode]?.0 ?? expectedCode
+            precondition(key.code == fnCode && key.flags == (fnCode == expectedCode ? .maskSecondaryFn : []))
+            precondition(physical.code == expectedCode
+                && physical.flags == [.maskCommand, .maskControl, .maskAlternate, .maskShift, .maskSecondaryFn])
+            extendedKeyChecks += 1
+        }
+        for failure: () throws -> Void in [
+            { _ = try SystemKeyboard.resolve(["character": "a"], modifiers: [], layout: unavailable) },
+            { _ = try SystemKeyboard.resolve(["named": "left"], modifiers: ["fn", "fn"], layout: unavailable) },
+            { _ = try SystemKeyboard.resolve(["named": "left"], modifiers: ["hyper"], layout: unavailable) },
+            { try SystemKeyboard.inputAllowed(postAccess: true, flags: .maskSecondaryFn, keyHeld: false) },
+            { _ = try SystemKeyboard.observedLayout(sourceID: "", layoutID: nil, keyboardType: 40, data: nil) },
+        ] {
+            do { try failure(); fatalError("Invalid extended keyboard state accepted") }
+            catch let error as SystemBridgeFailure { precondition(!error.effectUnknown); extendedKeyChecks += 1 }
+        }
+        let ime = try SystemKeyboard.observedLayout(sourceID: "fixture.ime", layoutID: "fixture.layout",
+            keyboardType: 40, data: Data() as CFData)
+        precondition(ime.metadata["logical_keys_available"] as? Bool == false
+                     && ime.translate(0, []) == nil)
+        extendedKeyChecks += 1
+        var fnNavigationChecks = 0
+        for (name, originalCode, transformedCode): (String, CGKeyCode, CGKeyCode) in [
+            ("backspace", 51, 117), ("left", 123, 115), ("right", 124, 119),
+            ("up", 126, 116), ("down", 125, 121),
+        ] {
+            for modifiers in [["fn"], ["fn", "shift"], ["fn", "control"],
+                              ["fn", "command"], ["fn", "option"], ["fn", "control", "shift"]] {
+                let shouldTransform = !modifiers.contains(where: { ["control", "command", "option"].contains($0) })
+                for spec: [String: Any] in [["named": name], ["key_code": Int(originalCode)]] {
+                    let result = try SystemKeyboard.resolve(spec, modifiers: modifiers, layout: unavailable)
+                    if shouldTransform {
+                        precondition(result.code == transformedCode && result.originalCode == originalCode)
+                        precondition(result.flags == (modifiers.contains("shift") ? .maskShift : []))
+                        precondition(result.originalFlags?.contains(.maskSecondaryFn) == true)
+                        precondition(result.transformation != nil)
+                    } else {
+                        precondition(result.code == originalCode && result.flags.contains(.maskSecondaryFn))
+                        precondition(result.originalCode == nil && result.transformation == nil)
+                    }
+                    fnNavigationChecks += 1
+                }
+            }
         }
         var textChecks = 0
         let textLayout: [String: Any] = ["keyboard_type": 40]
@@ -587,6 +643,8 @@ struct KeyboardInspectHarness {
         SystemKeyboard.transfer = nil; SystemKeyboard.consumedTransfers = []; SystemBridgeRuntime.principal = ""
         let result: [String: Any] = ["checks": checks, "field": observed.metadata,
                                    "key_checks": keyChecks, "named_key_codes": SystemKeyboard.namedKeys,
+                                   "extended_key_checks": extendedKeyChecks,
+                                   "fn_navigation_checks": fnNavigationChecks,
                                    "layout_checks": layoutChecks, "layout_positions": layoutPositions,
                                    "text_checks": textChecks,
                                    "stage_checks": stageChecks,

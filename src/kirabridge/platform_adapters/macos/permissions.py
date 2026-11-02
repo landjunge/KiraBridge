@@ -29,6 +29,13 @@ def core_permission(resource):
     elif resource == "screen_capture":
         library = "/System/Library/Frameworks/CoreGraphics.framework/CoreGraphics"
         name = "CGPreflightScreenCaptureAccess"
+    elif resource in {"post_events", "input_monitoring"}:
+        library = "/System/Library/Frameworks/CoreGraphics.framework/CoreGraphics"
+        name = (
+            "CGPreflightPostEventAccess"
+            if resource == "post_events"
+            else "CGPreflightListenEventAccess"
+        )
     else:
         return {"state": "unknown", "method": "no_public_generic_preflight"}
     import ctypes
@@ -53,7 +60,9 @@ class PermissionProbe:
         self._observations = {}
         self.identity = {"pid": os.getpid(), "executable": sys.executable}
 
-    def refresh_core(self, resources=("accessibility", "screen_capture")):
+    def refresh_core(
+        self, resources=("accessibility", "screen_capture", "post_events", "input_monitoring")
+    ):
         """Explicit status action only; never call this from tools/list."""
         for resource in resources:
             observed = dict(self.reader(resource))

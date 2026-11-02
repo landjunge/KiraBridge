@@ -45,7 +45,7 @@ async def test_keyboard_dispatch_uses_exact_target_owner_and_same_session_lock(b
     async def send(operation, arguments, *, principal, before_send):
         assert bridge.sessions.lock.locked()
         assert operation == "keyboard.key" and principal == "local"
-        assert arguments == task["args"]
+        assert arguments == {**task["args"], "repeat": 1}
         before_send()
         trace.append("native")
         return {"post_calls_returned": 2, "app_processing_confirmed": False}
@@ -114,7 +114,7 @@ async def test_chord_uses_same_lease_and_passes_exact_requested_modifiers(bridge
 
     async def send(operation, arguments, *, principal, before_send):
         assert bridge.sessions.lock.locked()
-        assert operation == "keyboard.chord" and arguments == task["args"]
+        assert operation == "keyboard.chord" and arguments == {**task["args"], "repeat": 1}
         assert principal == "local"
         before_send()
         return {"app_processing_confirmed": False, "post_calls_returned": 2}

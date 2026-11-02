@@ -22,6 +22,7 @@ def test_native_private_profile_context_without_ui(tmp_path):
         for name in (
             "SystemKeyboard.swift",
             "SystemShortcuts.swift",
+            "SystemSpecialKeys.swift",
             "SystemControl.swift",
             "SystemBridge.swift",
             "SystemServices.swift",
@@ -49,6 +50,8 @@ def test_native_private_profile_context_without_ui(tmp_path):
         "UniformTypeIdentifiers",
         "SystemConfiguration",
         "Security",
+        "CoreAudio",
+        "IOKit",
     ):
         command += ["-framework", framework]
     compiled = subprocess.run(command, capture_output=True, text=True, timeout=90)

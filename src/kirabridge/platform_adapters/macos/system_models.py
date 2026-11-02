@@ -114,7 +114,25 @@ from kirabridge.platform_adapters.macos.system_services_models import SERVICE_IN
 SYSTEM_INPUTS.update(CONTROL_INPUTS)
 SYSTEM_INPUTS.update(SERVICE_INPUTS)
 
-from kirabridge.keyboard_models import KeyboardInspectInput, KeyboardShortcutsInput  # noqa: E402
+from kirabridge.keyboard_models import (  # noqa: E402
+    KeyboardInspectInput,
+    KeyboardKey,
+    KeyboardShortcutsInput,
+    Modifier,
+)
+
+
+class KeyboardInventoryInput(Input):
+    key: KeyboardKey | None = None
+    modifiers: list[Modifier] = Field(default_factory=list, max_length=5)
+
+    @model_validator(mode="after")
+    def coherent_shortcut(self):
+        if (self.modifiers and self.key is None) or len(set(self.modifiers)) != len(self.modifiers):
+            raise ValueError("Shortcut observation needs one key and unique modifiers")
+        return self
+
 
 SYSTEM_INPUTS["keyboard.inspect"] = KeyboardInspectInput
+SYSTEM_INPUTS["keyboard.system_inventory"] = KeyboardInventoryInput
 SYSTEM_INPUTS["keyboard.shortcuts.discover"] = KeyboardShortcutsInput

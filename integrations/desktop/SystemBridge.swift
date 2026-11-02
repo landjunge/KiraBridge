@@ -427,6 +427,7 @@ enum SystemBridge {
         case "preferences.read": return ["preference": try preference(text(args, "key"))]
         case "preferences.write", "preferences.reset": return try changePreference(operation, args)
         default:
+            if let result = try await SystemSpecialKeys.handle(operation, arguments: args) { return result }
             if let result = try await SystemKeyboard.handle(operation, arguments: args) { return result }
             if let result = try await SystemControl.handle(operation, arguments: args) { return result }
             throw fail("unknown_operation", "Unknown native system operation")

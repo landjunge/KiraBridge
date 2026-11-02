@@ -41,6 +41,8 @@ def setup(bridge, config, *, active=True):
         calls.append((operation, arguments))
         if operation == "apps.list":
             return {"applications": [app], "eof": True}
+        if operation == "keyboard.system_inventory":
+            return {"actions": [], "shortcut_match": None}
         if operation == "app.focus":
             return {"active_observed": True}
         if operation == "keyboard.inspect":
@@ -110,6 +112,7 @@ async def test_named_inactive_program_gets_exactly_one_focus(bridge, config):
     assert [op for op, _ in calls] == [
         "apps.list",
         "app.focus",
+        "keyboard.system_inventory",
         "keyboard.inspect",
         "keyboard.chord",
     ]

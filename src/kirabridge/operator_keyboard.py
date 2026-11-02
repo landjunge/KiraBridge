@@ -20,6 +20,8 @@ from kirabridge.security_manager import request_hash
 
 ALLOWED = {
     "apps.list": SYSTEM_INPUTS["apps.list"],
+    "keyboard.system_inventory": SYSTEM_INPUTS["keyboard.system_inventory"],
+    "system.permissions": SYSTEM_INPUTS["system.permissions"],
     "keyboard.control": KeyboardControlInput,
     **PROFILE_INPUTS,
     "keyboard.shortcuts.discover": SYSTEM_INPUTS["keyboard.shortcuts.discover"],

@@ -65,6 +65,36 @@ def navigation_harness(tmp_path_factory):
         ("https://example.invalid/", "automatic", "deny"),
         ("https://example.invalid/", "activated", "external"),
         ("javascript:alert(1)", "activated", "deny"),
+        (
+            "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility",
+            "activated",
+            "external",
+        ),
+        (
+            "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility",
+            "automatic",
+            "deny",
+        ),
+        (
+            "x-apple.systempreferences:com.apple.preference.security?Privacy_ListenEvent",
+            "activated",
+            "external",
+        ),
+        (
+            "x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture",
+            "activated",
+            "external",
+        ),
+        (
+            "x-apple.systempreferences:com.apple.preference.security?Privacy_Automation",
+            "activated",
+            "external",
+        ),
+        (
+            "x-apple.systempreferences:com.apple.preference.security?Privacy_AllFiles",
+            "activated",
+            "deny",
+        ),
         ("data:text/html,private-fixture", "automatic", "deny"),
         ("about:blank", "automatic", "deny"),
         ("http://127.0.0.1:8766/protocol", "popup", "true"),

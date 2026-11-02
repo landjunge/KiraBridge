@@ -234,9 +234,9 @@ async def session_action(options):
         }
     if options.action == "close":
         save(root / "close-attempt.json", {"nonce": state["nonce"], "automatic_retry": False})
-    operation = "focus_button" if options.action == "focus-button" else options.action
+    operation = options.action.replace("-", "_")
     observed = await command(root, state, ready, operation, options.timeout)
-    if options.action in {"snapshot", "focus-button"}:
+    if options.action != "close":
         require(
             await live_identity(transport, state, ready) == identity, "Snapshot generation changed"
         )
@@ -254,7 +254,20 @@ async def session_action(options):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     actions = parser.add_subparsers(dest="action", required=True)
-    for name in ("prepare", "start", "status", "snapshot", "focus-button", "close"):
+    for name in (
+        "prepare",
+        "start",
+        "status",
+        "snapshot",
+        "focus-button",
+        "focus-editor",
+        "clear-events",
+        "open-second-window",
+        "focus-main",
+        "focus-second",
+        "reset",
+        "close",
+    ):
         action = actions.add_parser(name)
         action.add_argument("--session-dir", type=Path, required=True)
         action.add_argument("--timeout", type=float, default=15)

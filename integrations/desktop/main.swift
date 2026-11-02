@@ -148,6 +148,12 @@ struct DesktopNavigationPolicy {
                 ? .allow : .deny
         }
         if isConsoleOrigin(url) { return .allow }
+        if activated, [
+            "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility",
+            "x-apple.systempreferences:com.apple.preference.security?Privacy_ListenEvent",
+            "x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture",
+            "x-apple.systempreferences:com.apple.preference.security?Privacy_Automation"
+        ].contains(url.absoluteString) { return .external }
         if activated, ["http", "https"].contains(url.scheme?.lowercased() ?? ""),
            let host = url.host, !host.isEmpty { return .external }
         return .deny

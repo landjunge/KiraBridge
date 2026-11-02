@@ -21,6 +21,7 @@ def test_generic_keyboard_context_without_ui(tmp_path):
         root / "integrations/desktop" / name
         for name in (
             "SystemKeyboard.swift",
+            "SystemSpecialKeys.swift",
             "SystemShortcuts.swift",
             "SystemControl.swift",
             "SystemBridge.swift",
@@ -49,6 +50,8 @@ def test_generic_keyboard_context_without_ui(tmp_path):
         "UniformTypeIdentifiers",
         "SystemConfiguration",
         "Security",
+        "CoreAudio",
+        "IOKit",
     ):
         command += ["-framework", framework]
     compiled = subprocess.run(command, capture_output=True, text=True, timeout=90)
@@ -60,6 +63,8 @@ def test_generic_keyboard_context_without_ui(tmp_path):
         "checks": 54,
         "value_reads": 2,
         "simulated_key_posts": 12,
+        "notes_checks": 28,
+        "repeat_checks": 12,
         "native_ui_calls": 0,
         "event_posts": 0,
         "permission_requests": 0,

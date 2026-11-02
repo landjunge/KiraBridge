@@ -68,6 +68,7 @@ DESCRIPTORS += tuple(
     OperationDescriptor(op, "keyboard")
     for op in (
         "keyboard.key",
+        "keyboard.system_key",
         "keyboard.chord",
         "keyboard.text",
         "keyboard.action",

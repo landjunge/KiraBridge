@@ -22,6 +22,8 @@ KEYBOARD_CAPABILITIES = {
     "app.focus",
 }
 KEYBOARD_OPERATIONS = {
+    "keyboard.system_inventory",
+    "keyboard.system_key",
     "keyboard.inspect",
     "keyboard.shortcuts.discover",
     "keyboard.key",

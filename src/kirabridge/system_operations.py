@@ -2,6 +2,7 @@
 
 SYSTEM_LEAVES = {
     "keyboard.inspect": "keyboard",
+    "keyboard.system_inventory": "keyboard",
     "keyboard.shortcuts.discover": "keyboard",
     "system.info": "system",
     "system.processes": "system",

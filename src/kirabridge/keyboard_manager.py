@@ -5,12 +5,14 @@ import base64
 
 from kirabridge.bridge_core.models import BridgeError, UncertainExecution, canonical
 from kirabridge.keyboard_models import KeyboardChordInput, KeyboardKeyInput, KeyboardTextInput
+from kirabridge.keyboard_system import KeyboardSystemKeyInput
 from kirabridge.keyboard_text import native_frame_bytes, plan_text
 
 KEYBOARD_INPUTS = {
     "keyboard.key": KeyboardKeyInput,
     "keyboard.chord": KeyboardChordInput,
     "keyboard.text": KeyboardTextInput,
+    "keyboard.system_key": KeyboardSystemKeyInput,
 }
 
 

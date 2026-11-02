@@ -81,6 +81,7 @@ def test_native_process_primitive_guards_without_signals(tmp_path):
         root / "integrations/desktop/SystemControl.swift",
         root / "integrations/desktop/SystemKeyboard.swift",
         root / "integrations/desktop/SystemShortcuts.swift",
+        root / "integrations/desktop/SystemSpecialKeys.swift",
     ]
     command = [
         "xcrun",
@@ -103,6 +104,8 @@ def test_native_process_primitive_guards_without_signals(tmp_path):
         "UniformTypeIdentifiers",
         "SystemConfiguration",
         "Security",
+        "CoreAudio",
+        "IOKit",
     ):
         command.extend(["-framework", framework])
     compiled = subprocess.run(command, capture_output=True, text=True, timeout=120)

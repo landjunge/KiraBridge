@@ -36,8 +36,35 @@ NamedKey = Literal[
     "f10",
     "f11",
     "f12",
+    "f13",
+    "f14",
+    "f15",
+    "f16",
+    "f17",
+    "f18",
+    "f19",
+    "f20",
+    "help",
+    "keypad_clear",
+    "keypad_0",
+    "keypad_1",
+    "keypad_2",
+    "keypad_3",
+    "keypad_4",
+    "keypad_5",
+    "keypad_6",
+    "keypad_7",
+    "keypad_8",
+    "keypad_9",
+    "keypad_decimal",
+    "keypad_multiply",
+    "keypad_plus",
+    "keypad_divide",
+    "keypad_minus",
+    "keypad_equals",
+    "keypad_comma",
 ]
-Modifier = Literal["command", "control", "option", "shift"]
+Modifier = Literal["command", "control", "option", "shift", "fn"]
 
 
 def literal_text(value: str) -> bytes:
@@ -104,6 +131,7 @@ class KeyboardKey(Input):
 class KeyboardKeyInput(Input):
     target: KeyboardTarget
     key: KeyboardKey
+    repeat: int = Field(default=1, ge=1, le=20, strict=True)
 
 
 class KeyboardActionInput(Input):
@@ -114,7 +142,7 @@ class KeyboardActionInput(Input):
 
 
 class KeyboardChordInput(KeyboardKeyInput):
-    modifiers: list[Modifier] = Field(min_length=1, max_length=4)
+    modifiers: list[Modifier] = Field(min_length=1, max_length=5)
 
     @model_validator(mode="after")
     def unique_modifiers(self):

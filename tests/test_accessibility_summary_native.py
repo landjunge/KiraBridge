@@ -25,6 +25,7 @@ def accessibility_harness(tmp_path_factory):
             "SystemServices.swift",
             "SystemKeyboard.swift",
             "SystemShortcuts.swift",
+            "SystemSpecialKeys.swift",
         )
     ]
     command = [
@@ -49,6 +50,8 @@ def accessibility_harness(tmp_path_factory):
         "UniformTypeIdentifiers",
         "SystemConfiguration",
         "Security",
+        "CoreAudio",
+        "IOKit",
     ):
         command += ["-framework", framework]
     result = subprocess.run(command, capture_output=True, text=True, timeout=90)

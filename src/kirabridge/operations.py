@@ -78,6 +78,7 @@ for _name in (
     "files.transfer",
     "session.open",
     "keyboard.key",
+    "keyboard.system_key",
     "keyboard.control",
     "keyboard.chord",
     "keyboard.text",
@@ -123,7 +124,10 @@ for _name in (
             "keyboard.text",
             "keyboard.action",
             "keyboard.control",
+            "keyboard.system_key",
         }
+        else "keyboard.inspect"
+        if _name == "keyboard.system_inventory"
         else "bridge.health"
         if _name == "platform.status"
         else "threaddesk.manage"

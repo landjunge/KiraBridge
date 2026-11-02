@@ -21,6 +21,7 @@ def test_native_menu_observation_decoder_and_cache_without_ui(tmp_path):
         root / "integrations/desktop" / name
         for name in (
             "SystemShortcuts.swift",
+            "SystemSpecialKeys.swift",
             "SystemKeyboard.swift",
             "SystemControl.swift",
             "SystemBridge.swift",
@@ -49,6 +50,8 @@ def test_native_menu_observation_decoder_and_cache_without_ui(tmp_path):
         "UniformTypeIdentifiers",
         "SystemConfiguration",
         "Security",
+        "CoreAudio",
+        "IOKit",
     ):
         command += ["-framework", framework]
     compiled = subprocess.run(command, capture_output=True, text=True, timeout=90)

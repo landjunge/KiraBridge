@@ -357,6 +357,18 @@ class SystemModules:
         if self.authorize is not None:
             options["before_send"] = lambda: self.authorize(principal, operation)
         result = await self.transport.request(operation, native, **options)
+        if operation in {"system.permissions", "keyboard.system_inventory"}:
+            from kirabridge.platform_adapters.macos.keyboard_permissions import permission_guidance
+
+            observation = (
+                result
+                if operation == "system.permissions"
+                else {
+                    **result.get("permissions", {}),
+                    "native_helper": result.get("native_helper", {}),
+                }
+            )
+            result["permission_guidance"] = permission_guidance(observation)
         if operation.startswith("capture."):
             encoded = result.get("image_data")
             if not isinstance(encoded, str) or len(encoded) > (MAX_IMAGE_BYTES + 2) // 3 * 4:

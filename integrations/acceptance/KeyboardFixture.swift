@@ -1,6 +1,56 @@
 import AppKit
 import CryptoKit
 
+/// Captures only this owned application's event stream, before Cocoa consumes
+/// key equivalents such as Cmd+A. No global tap or event monitor is installed.
+@MainActor
+final class KeyboardFixtureApplication: NSApplication {
+    static let maxRecords = 4096
+    var eventRecords: [[String: Any]] = []
+    var eventCounts: [String: Int] = [:]
+    var eventSequence: UInt64 = 0
+    var droppedRecords = 0
+
+    func clearEvents() {
+        eventRecords.removeAll(keepingCapacity: true)
+        eventCounts.removeAll(keepingCapacity: true)
+        droppedRecords = 0
+    }
+
+    override func sendEvent(_ event: NSEvent) {
+        let type: String
+        switch event.type {
+        case .keyDown: type = "key_down"
+        case .keyUp: type = "key_up"
+        case .flagsChanged: type = "flags_changed"
+        case .systemDefined: type = "system_defined"
+        default: super.sendEvent(event); return
+        }
+        eventSequence += 1
+        eventCounts[type, default: 0] += 1
+        var record: [String: Any] = [
+            "sequence": eventSequence, "type": type, "raw_type": event.type.rawValue,
+            "flags": UInt64(event.modifierFlags.rawValue), "window_number": event.windowNumber,
+            "timestamp": event.timestamp,
+        ]
+        if event.type == .systemDefined {
+            record["code"] = (event.data1 >> 16) & 0xffff
+            record["subtype"] = event.subtype.rawValue
+            record["data1"] = event.data1
+            record["data2"] = event.data2
+        } else {
+            record["code"] = Int(event.keyCode)
+            if event.type != .flagsChanged { record["is_repeat"] = event.isARepeat }
+        }
+        if eventRecords.count == Self.maxRecords {
+            eventRecords.removeFirst()
+            droppedRecords += 1
+        }
+        eventRecords.append(record)
+        super.sendEvent(event)
+    }
+}
+
 /// Own controlled receiver for real native events; never opens user documents.
 @MainActor
 final class KeyboardTextView: NSTextView {
@@ -46,11 +96,13 @@ struct KeyboardFixture {
         guard let path, let nonce = identifier,
               nonce.range(of: "^[a-f0-9]{32}$", options: .regularExpression) != nil else { exit(2) }
         let root = URL(fileURLWithPath: path, isDirectory: true)
-        let app = NSApplication.shared
+        let app = KeyboardFixtureApplication()
         app.setActivationPolicy(.regular)
         let window = NSWindow(contentRect: NSRect(x: 120, y: 120, width: 760, height: 420),
                               styleMask: [.titled, .closable, .resizable], backing: .buffered, defer: false)
         window.title = "KiraBridge native keyboard acceptance – \(nonce)"
+        window.isReleasedWhenClosed = false
+        var secondWindow: NSWindow?
         window.collectionBehavior = [.moveToActiveSpace]
         let content = NSView(frame: window.contentView!.bounds)
         let scroll = NSScrollView(frame: NSRect(x: 0, y: 48, width: content.bounds.width,
@@ -107,12 +159,22 @@ struct KeyboardFixture {
                 "down_count": editor.downCount, "up_count": editor.upCount,
                 "return_count": editor.returnCount, "clipboard_generation": NSPasteboard.general.changeCount,
                 "window_key": window.isKeyWindow, "editor_first_responder": window.firstResponder === editor,
+                "main_window_number": window.windowNumber, "main_window_visible": window.isVisible,
+                "second_window_number": secondWindow?.windowNumber as Any? ?? NSNull(),
+                "second_window_visible": secondWindow?.isVisible ?? false,
+                "second_window_key": secondWindow?.isKeyWindow ?? false,
+                "active_window_number": app.keyWindow?.windowNumber as Any? ?? NSNull(),
+                "ordered_window_numbers": app.orderedWindows.map { $0.windowNumber },
                 "button_first_responder": window.firstResponder === button,
                 "button_down_count": button.downCount, "button_up_count": button.upCount,
                 "accessibility_enabled": editor.isAccessibilityEnabled(),
                 "accessibility_focused": editor.isAccessibilityFocused(),
                 "accessibility_role": editor.accessibilityRole()?.rawValue ?? "missing",
                 "accessibility_subrole": editor.accessibilitySubrole()?.rawValue as Any? ?? NSNull(),
+                "event_records": app.eventRecords, "event_counts": app.eventCounts,
+                "event_record_limit": KeyboardFixtureApplication.maxRecords,
+                "event_sequence": app.eventSequence, "event_records_dropped": app.droppedRecords,
+                "event_record_scope": "own application sendEvent before Cocoa key equivalents; no global tap",
             ]
             value.merge(extra) { _, new in new }
             let temporary = root.appendingPathComponent(".receipt-\(UUID().uuidString).json")
@@ -140,9 +202,30 @@ struct KeyboardFixture {
                     editor.setSelectedRange(NSRange(location: 0, length: 0))
                     editor.downCount = 0; editor.upCount = 0; editor.returnCount = 0
                     button.downCount = 0; button.upCount = 0
+                    app.clearEvents()
                 } else if operation == "focus_button" {
                     window.makeKeyAndOrderFront(nil)
                     window.makeFirstResponder(button)
+                } else if operation == "focus_editor" || operation == "focus_main" {
+                    window.makeKeyAndOrderFront(nil)
+                    if operation == "focus_editor" { window.makeFirstResponder(editor) }
+                } else if operation == "clear_events" {
+                    app.clearEvents()
+                } else if operation == "open_second_window" {
+                    if secondWindow == nil {
+                        let owned = NSWindow(contentRect: NSRect(x: 180, y: 180, width: 500, height: 220),
+                            styleMask: [.titled, .closable, .resizable], backing: .buffered, defer: false)
+                        owned.title = "KiraBridge keyboard second owned window – \(nonce)"
+                        owned.isReleasedWhenClosed = false
+                        owned.collectionBehavior = [.moveToActiveSpace]
+                        let label = NSTextField(labelWithString: "Owned window-cycle receiver; no user documents")
+                        label.frame = NSRect(x: 16, y: 80, width: 460, height: 30)
+                        owned.contentView?.addSubview(label)
+                        secondWindow = owned
+                    }
+                    secondWindow?.makeKeyAndOrderFront(nil)
+                } else if operation == "focus_second" {
+                    secondWindow?.makeKeyAndOrderFront(nil)
                 }
                 try? receipt("receipt-\(id).json")
                 if operation == "close" { app.terminate(nil) }

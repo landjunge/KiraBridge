@@ -23,7 +23,109 @@ const status = {
   pending: [], peers_connected: true, maintenance: null
 };
 const automaticCases = ["automatic_text_return", "automatic_key_combination", "automatic_lost_response", "automatic_limit_and_draft", "automatic_advanced", "automatic_app_visibility"];
-const cases = ["profiles_and_discovery", "one_run", "lost_response", "lost_response_preparation", "completed_preparation", "failed_intent", "failed_main", "missing_post_proof", "candidate", ...automaticCases];
+const modernCases = ["system_inventory_rights", "system_action_repeat", "system_missing_receipt", "system_lost_response", "system_inventory_changed", "app_extended_key_repeat", "system_caps_lock_repeat", "system_caps_lock_unconfirmed"];
+const cases = ["profiles_and_discovery", "one_run", "lost_response", "lost_response_preparation", "completed_preparation", "failed_intent", "failed_main", "missing_post_proof", "candidate", ...automaticCases, ...modernCases];
+
+async function checkModern(page, name, posts, gets) {
+  const inputs = () => posts.filter(p => p.operation === "keyboard.control");
+  await page.waitForFunction(() => document.querySelector("#keyboard-apps").options.length === 3 && !document.querySelector("#keyboard-apps").disabled);
+  assert.equal(await page.locator("#keyboard-apps").inputValue(), "");
+  if (name === "app_extended_key_repeat") {
+    await page.locator("#keyboard-apps").selectOption("12345:123.5");
+    await page.locator("#keyboard-kind").selectOption("key");
+    await page.locator("#keyboard-key").selectOption("f20");
+    assert.equal(await page.locator('#keyboard-key option[value^="keypad_"]').count(), 19);
+    await page.locator('.keyboard-modifiers input[value="fn"]').check();
+    await page.locator("#keyboard-repeat").fill("21");
+    assert.ok(await page.locator("#keyboard-send").isDisabled());
+    await page.locator("#keyboard-repeat").fill("20");
+    await page.locator("#keyboard-send").evaluate(button => { button.click(); button.click(); });
+    await page.waitForFunction(() => document.querySelector("#notice").textContent.includes("Native Tastendruck-Aufrufe bestätigt"));
+    assert.equal(inputs().length, 1);
+    assert.deepEqual(inputs()[0].args, { pid: 12345, expected_started_at: 123.5, repeat: 20, key: { named: "f20" }, modifiers: ["fn"] });
+    await page.locator("#keyboard-scope").selectOption("system");
+    assert.ok(await page.locator("#keyboard-app-target").isHidden());
+    assert.match(await page.locator("#keyboard-destination").innerText(), /systemweit/);
+    return;
+  }
+  await page.locator("#keyboard-capabilities").click();
+  await page.waitForFunction(() => !document.querySelector("#keyboard-capabilities").disabled);
+  assert.deepEqual(posts.map(p => p.operation), ["apps.list", "keyboard.system_inventory", "system.permissions"]);
+  assert.equal(inputs().length, 0, "Checking functions and rights never sends a key");
+  await page.locator("#keyboard-kind").selectOption("system");
+  assert.ok(await page.locator("#keyboard-app-target").isHidden());
+  assert.ok(await page.locator("#keyboard-text-fields").isHidden());
+  assert.ok(await page.locator('#keyboard-system-action option[value="mission_control"]').isDisabled());
+  assert.match(await page.locator("#keyboard-system-action").innerText(), /Lauter/);
+  assert.equal(await page.locator("#keyboard img").count(), 0, "Untrusted action labels remain text");
+  const caps = name.startsWith("system_caps_lock_");
+  await page.locator("#keyboard-system-action").selectOption(caps ? "caps_lock" : "volume_up");
+  assert.match(await page.locator("#keyboard-system-help").innerText(), /erkannt/);
+  assert.doesNotMatch(await page.locator("#keyboard-system-help").innerText(), /Mac-Funktionen verfügbar/);
+  if (caps) {
+    assert.match(await page.locator("#keyboard-system-action").innerText(), /Feststelltaste/);
+    await page.locator("#keyboard-repeat").fill("2");
+    await page.locator("#keyboard-send").evaluate(button => { button.click(); button.click(); });
+    if (name === "system_caps_lock_repeat") {
+      await page.waitForFunction(() => document.querySelector("#notice").textContent.includes("Feststelltaste bestätigt: ausgeschaltet"));
+      assert.ok(await page.locator("#keyboard-send").isEnabled(), "Two verified state changes need no fake key posts");
+    } else {
+      await page.waitForFunction(() => document.querySelector("#notice").textContent.includes("nicht vollständig bestätigt"));
+      assert.ok(await page.locator("#keyboard-send").isDisabled(), "Wrong Caps Lock parity must retain the intent");
+      await page.locator("#keyboard-status").click();
+      await page.waitForFunction(() => !document.querySelector("#keyboard-status").disabled);
+      assert.ok(await page.locator("#keyboard-send").isDisabled(), "Missing state readback must still retain the intent");
+      assert.equal(gets.length, 1);
+    }
+    assert.equal(inputs().length, 1, "A state-only operation is never sent again to invent event receipts");
+    assert.deepEqual(inputs()[0].args, { scope: "system", repeat: 2, action: "caps_lock" });
+    return;
+  }
+  if (name === "system_inventory_rights") {
+    assert.ok(await page.locator("#keyboard-send").isDisabled());
+    assert.match(await page.locator("#keyboard-permission-help").innerText(), /Freigabe fehlt/);
+    await page.locator("#keyboard-rights").click();
+    assert.match(await page.locator("#macos-keyboard-permissions").innerText(), /Bedienungshilfen: Freigabe fehlt/);
+    assert.equal(await page.locator('#macos-keyboard-permissions a').first().getAttribute("href"), "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility");
+    assert.equal(inputs().length, 0);
+    return;
+  }
+  if (name === "system_inventory_changed") {
+    await page.locator("#keyboard-capabilities").click();
+    await page.waitForFunction(() => !document.querySelector("#keyboard-capabilities").disabled);
+    assert.equal(await page.locator("#keyboard-system-action").inputValue(), "", "A vanished selection must not choose another system function");
+    assert.ok(await page.locator("#keyboard-send").isDisabled());
+    assert.equal(inputs().length, 0);
+    return;
+  }
+  await page.locator("#keyboard-repeat").fill("3");
+  await page.locator("#keyboard-send").evaluate(button => { button.click(); button.click(); });
+  if (name === "system_lost_response") {
+    await page.waitForFunction(() => document.querySelector("#keyboard-task").textContent.includes("ungewiss"));
+    const count = posts.length;
+    await page.reload();
+    await page.locator('[data-view="keyboard"]').click();
+    assert.equal(posts.length, count, "Reload must not replace an unknown system input with discovery");
+    await page.locator("#keyboard-status").click();
+    await page.waitForFunction(() => document.querySelector("#keyboard-task").textContent.includes("unknown"));
+    assert.ok(await page.locator("#keyboard-send").isDisabled());
+    assert.equal(inputs().length, 1);
+  } else if (name === "system_missing_receipt") {
+    await page.waitForFunction(() => document.querySelector("#notice").textContent.includes("nicht vollständig bestätigt"));
+    assert.ok(await page.locator("#keyboard-send").isDisabled());
+    await page.locator("#keyboard-status").click();
+    await page.waitForFunction(() => !document.querySelector("#keyboard-status").disabled);
+    assert.equal(inputs().length, 1, "Incomplete repeated-key receipts never replay input");
+  } else {
+    await page.waitForFunction(() => document.querySelector("#notice").textContent.includes("Mac-Funktion wurde gesendet"));
+    assert.ok(await page.locator("#keyboard-send").isEnabled());
+    assert.equal(await page.locator("#keyboard-apps").inputValue(), "", "System input needs no manually chosen app");
+    assert.equal(inputs().length, 1);
+    await page.screenshot({ path: process.argv[2].replace(/\.json$/, "") + "-system.png", fullPage: true });
+  }
+  assert.deepEqual(inputs()[0].args, { scope: "system", repeat: 3, action: "volume_up" });
+  assert.ok(posts.every(p => ["apps.list", "keyboard.system_inventory", "system.permissions", "keyboard.control"].includes(p.operation)), "No profile or permission request is required");
+}
 
 async function checkAutomatic(page, name, posts, gets) {
   const controls = () => posts.filter(p => p.operation === "keyboard.control");
@@ -145,7 +247,7 @@ async function checkAutomatic(page, name, posts, gets) {
 }
 
 async function check(browser, name) {
-  const automatic = automaticCases.includes(name);
+  const automatic = automaticCases.includes(name), modern = modernCases.includes(name);
   const context = await browser.newContext({ viewport: { width: 1180, height: 900 } });
   const posts = [], gets = [], errors = [], tasks = new Map();
   let networkLost = false;
@@ -163,6 +265,7 @@ async function check(browser, name) {
     if (asset) return route.fulfill({ body: await fs.readFile(path.join(assets, asset)), contentType: asset.endsWith(".js") ? "application/javascript" : asset.endsWith(".css") ? "text/css" : "text/html" });
     const json = value => route.fulfill({ json: value });
     if (url.pathname === "/api/control/status") return json(status);
+    if (url.pathname === "/api/tasks") return json({ tasks: [] });
     if (url.pathname === "/api/control/connections") return json({ chatgpt_url: "https://chatgpt.invalid", grok_url: "https://grok.invalid", checks: [], grok: { url: "", pending: [] } });
     if (url.pathname === "/api/control/keyboard/request") {
       assert.equal(request.method(), "POST");
@@ -172,18 +275,30 @@ async function check(browser, name) {
       switch (body.operation) {
         case "keyboard.profiles.list": result = { profiles: [{ profile_id: "fixture", revision, app: document.app }] }; break;
         case "apps.list":
-          result = { applications: automatic ? [{ pid: 12345, started_at: 123.5, bundle_id: document.app.bundle_id, name: "Notizen", active: false }, { pid: 23456, started_at: 234.5, bundle_id: "org.example.Browser", name: "Webbrowser", active: true, user_application: true }] : [{ pid: 12345, started_at: 123.5, bundle_id: document.app.bundle_id, name: '<img src=x onerror="window.injected=1">' }] };
+          result = { applications: automatic || modern ? [{ pid: 12345, started_at: 123.5, bundle_id: document.app.bundle_id, name: "Notizen", active: false }, { pid: 23456, started_at: 234.5, bundle_id: "org.example.Browser", name: "Webbrowser", active: true, user_application: true }] : [{ pid: 12345, started_at: 123.5, bundle_id: document.app.bundle_id, name: '<img src=x onerror="window.injected=1">' }] };
           if (name === "automatic_app_visibility") result.applications.push({ pid: 34567, started_at: 345.5, bundle_id: document.app.bundle_id, name: "Hintergrundhelfer", user_application: false });
           break;
         case "keyboard.profiles.get": result = snapshot(); break;
         case "keyboard.profiles.put": result = { ...snapshot(), profile: body.args.profile }; break;
         case "keyboard.profiles.resolve": result = { context_verified: false, execution_authorized: false, effect: "none", status: "resolved" }; break;
         case "keyboard.shortcuts.discover": result = { revision, entries: [{ name: '<img src=x onerror="window.injected=1">', candidate_only: true }], coverage: "partial", reasons: ["menu_identity_attribute_unavailable"], cached: false }; break;
+        case "keyboard.system_inventory":
+        case "system.permissions": {
+          const missing = name === "system_inventory_rights";
+          const permission_guidance = { keyboard_ready: !missing, summary: missing ? "Freigabe fehlt für Tastatureingaben." : "Benötigte macOS-Freigaben vorhanden.", checks: [{ resource: "accessibility", label: "Bedienungshilfen", required_for_keyboard: true, state: missing ? "not_granted" : "granted", manual_steps: "Datenschutz & Sicherheit → Bedienungshilfen" }] };
+          result = { permission_guidance };
+          if (body.operation === "keyboard.system_inventory") result.actions = [{ action: "volume_up", available: !(name === "system_inventory_changed" && posts.filter(p => p.operation === body.operation).length > 1) }, { action: "mission_control", available: false }, { action: "other", label: '<img src=x onerror="window.injected=1">', available: false }];
+          if (body.operation === "keyboard.system_inventory" && name.startsWith("system_caps_lock_")) result.actions.push({ action: "caps_lock", available: true });
+          break;
+        }
         case "keyboard.control":
           result = { automatic_target: true, resolved_application: { pid: 12345, started_at: 123.5, name: "Notizen" }, app_processing_confirmed: false };
           if (body.args.text !== undefined) Object.assign(result, { text_verified: true, selection_verified: true, return_posted: body.args.submit === true });
-          else if (body.args.key.named !== "escape") result.post_calls_returned = 2;
-          if (name === "automatic_key_combination" && body.args.key.character) state = "running";
+          else if (body.args.key?.named !== "escape") Object.assign(result, { post_calls_returned: 2 * (body.args.repeat || 1), requested_repeat: body.args.repeat || 1, completed_repeat: body.args.repeat || 1 });
+          if (body.args.scope === "system") Object.assign(result, { event_scope: "system", native_operation: "keyboard.system_key", resolved: { action: body.args.action || "explicit_key" } });
+          if (body.args.action === "caps_lock") Object.assign(result, { scope: "native_state_readback", modifier: "caps_lock", resolved: { action: "caps_lock", route: "modifier_lock_state" }, effect_verified: true, system_processing_confirmed: true, post_calls_returned: 0, state_set_calls_returned: body.args.repeat, state_before: false, state_after: name === "system_caps_lock_unconfirmed" });
+          if (name === "system_missing_receipt") result.post_calls_returned = 2;
+          if (name === "automatic_key_combination" && body.args.key?.character) state = "running";
           break;
         case "run_profile":
           state = name.startsWith("failed_") ? "failed" : ["completed_preparation", "missing_post_proof"].includes(name) ? "completed" : "running";
@@ -197,6 +312,7 @@ async function check(browser, name) {
       tasks.set(id, { request_id: body.id, task, status_url: "/api/control/keyboard/task/" + id });
       if (name.startsWith("lost_response") && body.operation === "run_profile") { networkLost = true; return route.abort("failed"); }
       if (name === "automatic_lost_response" && body.operation === "keyboard.control") { networkLost = true; return route.abort("failed"); }
+      if (name === "system_lost_response" && body.operation === "keyboard.control") { networkLost = true; return route.abort("failed"); }
       return json(tasks.get(id));
     }
     if (url.pathname.startsWith("/api/control/keyboard/task/")) {
@@ -204,6 +320,7 @@ async function check(browser, name) {
       const value = structuredClone(tasks.get(url.pathname.split("/").pop()));
       assert.ok(value, "Lost response must retain a deterministic task identity");
       value.task.state = networkLost && name !== "lost_response_preparation" ? "unknown" : "completed";
+      if (name === "system_caps_lock_unconfirmed") { value.task.result.state_after = false; delete value.task.result.effect_verified; }
       if (name === "lost_response_preparation" && gets.length === 1) {
         value.task.id = value.task.id.replace(/-main$/, "-focus");
         Object.assign(value.task, { ui_primary: false, ui_incomplete: true, ui_halted: false, ui_workflow_status: "unconfirmed", result: {} });
@@ -215,6 +332,11 @@ async function check(browser, name) {
   try {
     await page.goto(origin);
     await page.locator('[data-view="keyboard"]').click();
+    if (modern) {
+      await checkModern(page, name, posts, gets);
+      assert.deepEqual(errors, []);
+      return { name, passed: true, keyboard_posts: posts.length, status_gets: gets.length };
+    }
     if (automatic) {
       await checkAutomatic(page, name, posts, gets);
       assert.deepEqual(errors, []);

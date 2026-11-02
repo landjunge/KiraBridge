@@ -56,7 +56,7 @@ class ProfileApp(Input):
 
 class ProfileAction(Input):
     key: KeyboardKey
-    modifiers: list[Modifier] = Field(default_factory=list, max_length=4)
+    modifiers: list[Modifier] = Field(default_factory=list, max_length=5)
     provenance: Literal["user", "confirmed_app", "observed_menu"]
 
     @model_validator(mode="after")

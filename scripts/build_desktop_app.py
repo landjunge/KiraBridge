@@ -35,6 +35,7 @@ def build(destination=None):
         root / "integrations/desktop/SystemServices.swift",
         root / "integrations/desktop/SystemKeyboard.swift",
         root / "integrations/desktop/SystemShortcuts.swift",
+        root / "integrations/desktop/SystemSpecialKeys.swift",
     ]
     binary = bundle / "Contents/MacOS/KiraBridge"
     binary.parent.mkdir(parents=True, exist_ok=True)
@@ -67,6 +68,10 @@ def build(destination=None):
             "SystemConfiguration",
             "-framework",
             "Security",
+            "-framework",
+            "CoreAudio",
+            "-framework",
+            "IOKit",
             *map(str, native_sources),
             "-o",
             str(binary),

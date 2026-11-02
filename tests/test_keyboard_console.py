@@ -233,7 +233,12 @@ async def test_profile_free_control_is_one_exact_main_task_without_replay(
     tasks = [call[1]["request"] for call in rpc.calls if call[0] == "task_request"]
     assert len(tasks) == 1
     assert tasks[0]["operation"] == "keyboard.control"
-    assert tasks[0]["arguments"] == {**request["args"], "submit": False}
+    assert tasks[0]["arguments"] == {
+        **request["args"],
+        "submit": False,
+        "repeat": 1,
+        "scope": "auto",
+    }
     assert rpc.approvals == [first["task"]["id"]]
     assert all(not notices for notices in rpc.notices.values())
 

@@ -28,6 +28,7 @@ def test_keyboard_snapshot_guards_and_utf16_without_ui(tmp_path):
         root / "integrations/desktop" / name
         for name in (
             "SystemKeyboard.swift",
+            "SystemSpecialKeys.swift",
             "SystemShortcuts.swift",
             "SystemControl.swift",
             "SystemBridge.swift",
@@ -56,6 +57,8 @@ def test_keyboard_snapshot_guards_and_utf16_without_ui(tmp_path):
         "UniformTypeIdentifiers",
         "SystemConfiguration",
         "Security",
+        "CoreAudio",
+        "IOKit",
     ):
         command += ["-framework", framework]
     compiled = subprocess.run(command, capture_output=True, text=True, timeout=90)
@@ -101,6 +104,8 @@ def test_keyboard_snapshot_guards_and_utf16_without_ui(tmp_path):
     assert observed["checks"] == 15
     assert observed["key_checks"] == 22
     assert observed["layout_checks"] == 53
+    assert observed["extended_key_checks"] == 60
+    assert observed["fn_navigation_checks"] == 60
     assert observed["text_checks"] == 27
     assert observed["stage_checks"] == 27
     assert observed["return_checks"] == 14
