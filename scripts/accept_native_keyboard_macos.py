@@ -1,4 +1,4 @@
-"""Opt-in, one-task public MCP keyboard acceptance using a UUID-owned receiver.
+"""Opt-in, one-primary-task MCP keyboard acceptance using a UUID-owned receiver.
 
 Run with the reviewed checkout's Python. No production configuration, services,
 clipboard operation, permission request or task retry. Root supplies both apps;
@@ -29,6 +29,7 @@ import kirabridge
 from kirabridge.bridge_core.bridge import Bridge
 from kirabridge.bridge_core.config import Config, PrincipalConfig
 from kirabridge.bridge_core.models import BridgeError, TaskRequest
+from kirabridge.keyboard_models import KeyboardTextInput
 from kirabridge.mcp_gateway.client import MCPClientPool, Peer
 from kirabridge.mcp_gateway.http import create_http_app
 from kirabridge.operations_service import installed_source_sha
@@ -123,6 +124,7 @@ async def run(args):
         "passed": False,
         "cleanup_complete": False,
         "nonce": nonce,
+        "scenario": args.scenario,
         "records": [],
         "package": str(Path(kirabridge.__file__).parent),
         "python": sys.executable,
@@ -146,6 +148,8 @@ async def run(args):
         capabilities=["keyboard.inspect", "keyboard.execute", "task.read", "bridge.health"],
         roots=[str(root)],
     )
+    if args.scenario == "profile-action":
+        policy.capabilities += ["keyboard.profiles.read", "keyboard.profiles.manage"]
     config = Config(
         data_dir=str(root / "state"), concurrency=1, principals={"acceptance": policy}, agents={}
     )
@@ -269,25 +273,33 @@ async def run(args):
                     return result
 
                 await call("bridge_health", {})
-                inspection_id = "keyboard-inspect-" + nonce
-                inspection = TaskRequest(
-                    task_id=inspection_id,
-                    idempotency_key=inspection_id,
-                    operation="keyboard.inspect",
-                    arguments={
-                        "pid": launched["pid"],
-                        "expected_started_at": launched["started_at"],
-                    },
-                )
-                await call("task_request", {"request": inspection.model_dump()})
-                async with asyncio.timeout(15):
-                    while True:  # noqa: ASYNC110 -- read-only inspection task, same ID
-                        observed = await call("task_get", {"task_id": inspection_id})
-                        if observed["state"] in FINAL_STATES:
-                            break
-                        await asyncio.sleep(0.1)
-                require(observed["state"] == "completed", "Public keyboard inspection failed")
-                inspected = observed["result"]
+
+                async def setup_task(label, operation, arguments):
+                    identifier = f"keyboard-{label}-{nonce}"
+                    request = TaskRequest(
+                        task_id=identifier,
+                        idempotency_key=identifier,
+                        operation=operation,
+                        arguments=arguments,
+                    )
+                    await call("task_request", {"request": request.model_dump()})
+                    async with asyncio.timeout(15):
+                        while True:  # noqa: ASYNC110 -- one setup task, same ID
+                            observed = await call("task_get", {"task_id": identifier})
+                            if observed["state"] in FINAL_STATES:
+                                break
+                            await asyncio.sleep(0.1)
+                    require(observed["state"] == "completed", "Public setup task failed")
+                    return observed["result"]
+
+                async def inspect(label):
+                    return await setup_task(
+                        label,
+                        "keyboard.inspect",
+                        {"pid": launched["pid"], "expected_started_at": launched["started_at"]},
+                    )
+
+                inspected = await inspect("inspect")
                 target = inspected["target"]
                 require(
                     target["pid"] == launched["pid"]
@@ -295,13 +307,74 @@ async def run(args):
                     "Wrong MCP keyboard target",
                 )
                 worker_pids.add(target["helper_pid"])
-                text = "\ufeff" + "x" * 100000 + " ä e\u0301 👩‍💻\r\n"
+                text = (
+                    "Profiltest ä e\u0301 😀"
+                    if args.scenario == "profile-action"
+                    else "\ufeff" + "x" * 100000 + " ä e\u0301 👩‍💻\r\n"
+                )
+                operation, arguments = (
+                    "keyboard.text",
+                    {"target": target, "text": text, "submit": True},
+                )
+                if args.scenario == "profile-action":
+
+                    async def noop(_):
+                        pass
+
+                    seed = await bridge.keyboard.execute(
+                        {
+                            "principal": "acceptance",
+                            "operation": "keyboard.text",
+                            "id": "seed-" + nonce,
+                        },
+                        KeyboardTextInput(target=target, text=text, submit=False),
+                        noop,
+                    )
+                    record("owned_receiver_seed", seed)
+                    inspected = await inspect("inspect-seeded")
+                    target = inspected["target"]
+                    require(
+                        target["pid"] == launched["pid"]
+                        and target["expected_started_at"] == launched["started_at"],
+                        "Seeded target changed",
+                    )
+                    require(
+                        inspected["field"]["role"] == "AXTextArea", "Owned receiver role changed"
+                    )
+                    worker_pids.add(target["helper_pid"])
+                    action = dict(key={"character": "a"}, modifiers=["command"], provenance="user")
+                    profile = {
+                        "id": "accept-" + nonce,
+                        "app": {
+                            "bundle_id": info["CFBundleIdentifier"],
+                            "layout_id": inspected["layout"]["layout_id"],
+                            "keyboard_type": inspected["layout"]["keyboard_type"],
+                            "field_roles": ["AXTextArea"],
+                        },
+                        "actions": {"select_all": action},
+                    }
+                    stored = await setup_task(
+                        "profile-put", "keyboard.profiles.put", {"profile": profile}
+                    )
+                    binding = dict(
+                        id=profile["id"], revision=stored["revision"], action="select_all"
+                    )
+                    operation = "keyboard.action"
+                    arguments = {
+                        "target": target,
+                        "profile_id": binding["id"],
+                        "expected_revision": binding["revision"],
+                        "action": binding["action"],
+                    }
                 expected_hash, units = digest(text.encode()), len(text.encode("utf-16-le")) // 2
+                location, length = (0, units) if args.scenario == "profile-action" else (units, 0)
+                expected_selection = dict(location=location, length=length)
+                expected_returns = 0 if args.scenario == "profile-action" else 1
                 request = TaskRequest(
                     task_id=task_id,
                     idempotency_key=task_id,
-                    operation="keyboard.text",
-                    arguments={"target": target, "text": text, "submit": True},
+                    operation=operation,
+                    arguments=arguments,
                 )
                 record(
                     "single_task_reserved",
@@ -313,7 +386,7 @@ async def run(args):
                         "text_sha256": expected_hash,
                     },
                 )
-                submitted = True  # Reserved before the only mutating public MCP request.
+                submitted = True  # Reserved before the single primary keyboard task_submit.
                 await call("task_submit", {"request": request.model_dump()})
                 async with asyncio.timeout(25):
                     while True:  # noqa: ASYNC110 -- same task ID; no mutation retry
@@ -323,20 +396,29 @@ async def run(args):
                         await asyncio.sleep(0.1)
                 require(final["state"] == "completed", "Public keyboard task did not complete")
                 result = final["result"]
-                require(
-                    result.get("task_id") == task_id
-                    and result.get("text_sha256") == expected_hash
-                    and all(
-                        result.get(k) is True
-                        for k in (
-                            "staging_verified",
-                            "text_verified",
-                            "selection_verified",
-                            "return_posted",
-                        )
-                    ),
-                    "Public staging/text/Return receipt incomplete",
-                )
+                if args.scenario == "profile-action":
+                    require(
+                        result.get("profile_binding_verified") is True
+                        and result.get("profile_binding") == binding
+                        and type(result.get("post_calls_returned")) is int
+                        and result["post_calls_returned"] == 2,
+                        "Public profile binding/key-pair receipt incomplete",
+                    )
+                else:
+                    require(
+                        result.get("task_id") == task_id
+                        and result.get("text_sha256") == expected_hash
+                        and all(
+                            result.get(k) is True
+                            for k in (
+                                "staging_verified",
+                                "text_verified",
+                                "selection_verified",
+                                "return_posted",
+                            )
+                        ),
+                        "Public staging/text/Return receipt incomplete",
+                    )
                 async with asyncio.timeout(5):
                     while True:  # noqa: ASYNC110 -- only independent receiver readback
                         after = await fixture_command("snapshot")
@@ -345,8 +427,8 @@ async def run(args):
                             after["text_sha256"] == expected_hash
                             and after["utf8_bytes"] == len(text.encode())
                             and after["utf16_units"] == units
-                            and after["selection_utf16"] == {"location": units, "length": 0}
-                            and after["return_count"] == 1
+                            and after["selection_utf16"] == expected_selection
+                            and after["return_count"] == expected_returns
                         ):
                             break
                         await asyncio.sleep(0.05)
@@ -354,7 +436,21 @@ async def run(args):
                     after["clipboard_generation"] == before["clipboard_generation"],
                     "Independent receiver text/caret/Return/clipboard differs",
                 )
-                record("durable_events", bridge.events("acceptance", task_id))
+                events = bridge.events("acceptance", task_id)
+                record("durable_events", events)
+                if args.scenario == "profile-action":
+                    snapshots = [
+                        event["evidence"]
+                        for event in events["events"]
+                        if event["evidence"].get("evidence_type")
+                        == "keyboard_profile_snapshot_bound"
+                    ]
+                    require(
+                        len(snapshots) == 1
+                        and snapshots[0]["profile_binding"] == binding
+                        and snapshots[0]["profile_snapshot"] == stored["profile"],
+                        "Durable full profile snapshot differs",
+                    )
                 evidence["tests_passed"] = True
             except BaseException as error:
                 record(
@@ -479,6 +575,9 @@ async def run(args):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--execute", action="store_true")
+    parser.add_argument(
+        "--scenario", choices=["keyboard-text", "profile-action"], default="keyboard-text"
+    )
     parser.add_argument("--native-app", type=Path, required=True)
     parser.add_argument("--expected-commit", required=True)
     parser.add_argument("--expected-binary-sha256", required=True)

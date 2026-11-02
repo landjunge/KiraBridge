@@ -531,3 +531,23 @@ Autorisierung/CAS, parallele Profiländerung, eine Lease, Kandidatenverweigerung
 dauerhafter Snapshot und Kontextfehler mit null Posts. Keine Wiederholung der
 alten Store-/Resolver-/Tastatur-/Shortcut-/MCP-Suiten. Gegenseitige Deltareviews,
 Ruff und Diffprüfung grün. Reale Profilaktion und Console-Bedienung bleiben offen.
+
+### Reale Profilaktion über MCP
+
+Der private, sauber gebaute Native-Commit
+`584895a459a07aaa2b3e3e9da8a8737d5feaea21` bestand das neue Szenario
+`accept_native_keyboard_macos.py --scenario profile-action` in genau einem Lauf.
+Eine kleine synthetische Texteingabe diente ausschließlich als Fixture-Setup;
+keine erneute Großtextabnahme. Öffentliche MCP-Aufträge speicherten das explizite
+Profil und holten ein frisches Ziel. Genau ein primärer `keyboard.action`-Auftrag
+führte Command+A aus und meldete die exakte Profil-/Revisions-/Aktionsbindung mit
+zwei Postcalls. Der unabhängige Receiver bestätigte unveränderten Text mit22
+UTF-8-Bytes/18 UTF-16-Einheiten, Auswahl0/18 und null Return. Clipboard-Generation
+vor/nachher gleich. Der vollständige Snapshot ist im dauerhaften Taskevent belegt.
+
+Fixture, eigener Nativeworker und privater MCP-Endpunkt wurden geschlossen und
+unabhängig abwesend geprüft. Beleg:
+`step12a-profile-live-01/evidence.json` im bestehenden Backuproot. Das Skript nutzt
+denselben Setup-/Status-/Cleanup-Pfad wie bisher; das alte Textszenario bleibt
+Default und wurde nicht wiederholt. Source-Deltareview und Ruff/Syntax grün.
+Console-Bedienung und Paketierung/Installation bleiben die nächsten Schritte.
