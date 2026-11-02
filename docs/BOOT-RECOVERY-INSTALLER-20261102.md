@@ -58,3 +58,10 @@ continuation after the core is already restored. Visibility/release-builder
 checks also passed. Repository-wide Ruff lint and formatting passed. The native
 installer source compiled on Intel. Existing keyboard behavior was retained;
 its complete previous native matrix was not repeated for this boot-policy change.
+
+During the build gate the operator updated the Kira skill to require local Intel
+builds/tests only. The automatic workflow triggered by the first push was
+cancelled; it is not counted as successful validation. Subsequent commits skip
+CI. The existing builder also emitted a Linux archive on a Mac; the final builder
+now emits only its host platform. The earlier candidate is preserved privately
+and is not the released installer.

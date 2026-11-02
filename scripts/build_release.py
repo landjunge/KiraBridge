@@ -240,8 +240,18 @@ exec python3.11 "$bundle/installer/install.py" install --bundle "$bundle" "$@"
         (output / (wheel.name + ".sha256")).write_text(
             hashlib.sha256(wheel.read_bytes()).hexdigest() + "  " + wheel.name + "\n"
         )
-    # Preserve main's Linux source-install route. macOS uses the guarded updater
-    # above; there is no second macOS installer implementation in this build.
+    # Build only the host platform. A local macOS release must not manufacture
+    # untested Linux assets as a side effect.
+    if sys.platform == "darwin":
+        (output / "SHA256SUMS").write_text(
+            "".join(
+                hashlib.sha256(p.read_bytes()).hexdigest() + "  " + p.name + "\n"
+                for p in [bundle, wheel, bootstrap, output / "LICENSE"]
+            )
+        )
+        print(json.dumps({"version": version, "commit": commit, "bundle": str(bundle)}, indent=2))
+        return
+    # Preserve the existing Linux route for builds performed on Linux.
     linux_name = f"KiraBridge-{version}-Linux-x86_64"
     linux_files = {
         "payload/" + name: subprocess.check_output(["git", "show", f"{commit}:{name}"])

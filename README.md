@@ -1,16 +1,17 @@
 # KiraBridge
 
-**Lokal auf Intel installiert: `0.8.0rc20` aus Return-Reparaturcommit `ecb76cb`.**
-Der laufende Dienst, Paketquellhash, Neustart, Datenerhalt und die tatsächliche
-Terminalabnahme sind [im Return-Reparaturbericht dokumentiert](docs/RC20-RETURN-20261031.md).
-Das geprüfte Paket liegt lokal; für diese Reparatur gab es keinen Push und keine
-öffentliche Veröffentlichung. Der Bericht nennt den exakten Installer und Rückweg.
+**RC25: dauerhafter ChatGPT-Wiederanlauf und native Installations-App für Intel.**
+Die App aktualisiert Dienst, Bedienoberfläche und die vorhandene ChatGPT-Anbindung
+über den geprüften Installer mit Sicherung und Rückweg. Einstellungen und Zugänge
+bleiben erhalten. Lokale Prüfungen, Paketidentität und der tatsächliche
+Installationsstand stehen im [aktuellen Bericht](docs/BOOT-RECOVERY-INSTALLER-20261102.md).
 
-[Erhaltene veröffentlichte Versionen](https://github.com/landjunge/KiraBridge/releases)
-und der [frühere RC18-Download-/Installationsbeleg](docs/RC18-PUBLISH-INSTALL-20261029.md)
-bleiben als historische Quellen verfügbar. Deren Downloadstarter installieren
-den jeweiligen veröffentlichten Quellstand. Für die lokale Reparatur wird das
-im aktuellen Bericht verifizierte Bundle verwendet.
+[Intel-Installationspaket und Releasehinweise](https://github.com/landjunge/KiraBridge/releases/tag/v0.8.0rc25) ·
+[ältere Veröffentlichungen](https://github.com/landjunge/KiraBridge/releases)
+
+Letzter vor dem RC25-Upgrade verifizierter Stand: RC24, Build `34f768b`.
+Die bisherigen [Terminal-/Return-Belege](docs/RC20-RETURN-20261031.md) und
+[RC18-Installationsbelege](docs/RC18-PUBLISH-INSTALL-20261029.md) bleiben erhalten.
 
 
 ## Funktionen
