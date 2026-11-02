@@ -1,8 +1,8 @@
 """Keyboard orchestration through existing tasks, desktop transaction and worker."""
 
-from kirabridge.keyboard_models import KeyboardKeyInput
+from kirabridge.keyboard_models import KeyboardChordInput, KeyboardKeyInput
 
-KEYBOARD_INPUTS = {"keyboard.key": KeyboardKeyInput}
+KEYBOARD_INPUTS = {"keyboard.key": KeyboardKeyInput, "keyboard.chord": KeyboardChordInput}
 
 
 class KeyboardManager:

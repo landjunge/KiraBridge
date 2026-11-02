@@ -1,5 +1,6 @@
 import Foundation
 import ApplicationServices
+import Carbon
 
 @main
 struct KeyboardInspectHarness {
@@ -133,8 +134,90 @@ struct KeyboardInspectHarness {
                 keyChecks += 1
             }
         }
+        var layoutChecks = 0
+        var layoutPositions: [String: [String: Int]] = [:]
+        var layouts: [SystemKeyboard.Layout] = []
+        // Read installed layout DATA, never select an input source or post an event.
+        for id in ["com.apple.keylayout.US", "com.apple.keylayout.German"] {
+            let filter = [kTISPropertyInputSourceID as String: id] as CFDictionary
+            let sources = TISCreateInputSourceList(filter, true)!.takeRetainedValue()
+            precondition(CFArrayGetCount(sources) == 1)
+            let source = unsafeBitCast(CFArrayGetValueAtIndex(sources, 0), to: TISInputSource.self)
+            let raw = TISGetInputSourceProperty(source, kTISPropertyUnicodeKeyLayoutData)!
+            let data = Unmanaged<CFData>.fromOpaque(raw).takeUnretainedValue()
+            let layout = SystemKeyboard.Layout(metadata: ["layout_id": id, "layout_sha256": id], translate: {
+                SystemKeyboard.translate(data, code: $0, flags: $1, keyboardType: 40)
+            })
+            layouts.append(layout)
+            for character in ["z", "Z", "y", "Y"] {
+                let expected: UInt16 = (character.lowercased() == "z") == id.hasSuffix("US") ? 6 : 16
+                for modifiers in [["command"], ["command", "shift"]] {
+                    let resolved = try SystemKeyboard.resolve(["character": character], modifiers: modifiers, layout: layout)
+                    precondition(resolved.code == expected)
+                    precondition(resolved.flags == (modifiers.count == 1 ? .maskCommand : [.maskCommand, .maskShift]))
+                    layoutChecks += 1
+                }
+                layoutPositions[id, default: [:]][character] = Int(expected)
+            }
+            if id.hasSuffix("US") {
+                precondition(SystemKeyboard.translate(data, code: UInt16(kVK_ANSI_E), flags: .maskAlternate,
+                                                     keyboardType: 40) == nil)
+                layoutChecks += 1
+            }
+        }
+        func refuses(_ validation: () throws -> Void) {
+            var posts = 0
+            do {
+                _ = try SystemKeyboard.postPair(validate: validation, sameGeneration: { true }, post: { _ in posts += 1 })
+                fatalError("Unsafe layout resolution accepted")
+            } catch let error as SystemBridgeFailure {
+                precondition(!error.effectUnknown && posts == 0); layoutChecks += 1
+            } catch { fatalError("Unexpected fixture error: \(error)") }
+        }
+        for code in [54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 72, 73, 74, 102, 104, 127] {
+            refuses { _ = try SystemKeyboard.resolve(["key_code": code], modifiers: [], layout: layouts[0]) }
+        }
+        for code in [0, 6, 16, 82, 123] {
+            let resolved = try SystemKeyboard.resolve(["key_code": code], modifiers: ["control"], layout: layouts[0])
+            precondition(Int(resolved.code) == code && resolved.flags == .maskControl); layoutChecks += 1
+        }
+        let symbols = SystemKeyboard.Layout(metadata: [:], translate: { code, flags in
+            guard code == 0 else { return nil }
+            if flags.contains(.maskAlternate) { return flags.contains(.maskShift) ? "#" : "@" }
+            return nil
+        })
+        let option = try SystemKeyboard.resolve(["character": "@"], modifiers: ["command"], layout: symbols)
+        precondition(option.code == 0 && option.flags == [.maskCommand, .maskAlternate]); layoutChecks += 1
+        let shiftOption = try SystemKeyboard.resolve(["character": "#"], modifiers: ["option"], layout: symbols)
+        precondition(shiftOption.code == 0 && shiftOption.flags == [.maskShift, .maskAlternate]); layoutChecks += 1
+        let positionsAmbiguous = SystemKeyboard.Layout(metadata: [:], translate: { code, _ in code < 2 ? "@" : nil })
+        refuses { _ = try SystemKeyboard.resolve(["character": "@"], modifiers: [], layout: positionsAmbiguous) }
+        let flagsAmbiguous = SystemKeyboard.Layout(metadata: [:], translate: { code, flags in
+            code == 0 && (flags == .maskShift || flags == .maskAlternate) ? "@" : nil
+        })
+        refuses { _ = try SystemKeyboard.resolve(["character": "@"], modifiers: [], layout: flagsAmbiguous) }
+        refuses { _ = try SystemKeyboard.resolve(["character": "😀"], modifiers: [], layout: symbols) }
+        refuses { try SystemKeyboard.matchingLayout(layouts[0].metadata, layouts[1].metadata) }
+        var changedData = layouts[0].metadata; changedData["layout_sha256"] = "changed"
+        refuses { try SystemKeyboard.matchingLayout(layouts[0].metadata, changedData) }
+        refuses { _ = try SystemKeyboard.resolve(["named": "enter"], modifiers: ["shift", "shift"], layout: symbols) }
+        refuses { _ = try SystemKeyboard.resolve(["named": "enter"], modifiers: ["fn"], layout: symbols) }
+        for type in [40, 41] {
+            let (down, up) = try SystemKeyboard.events(["keyboard_type": type], code: 6, flags: [.maskCommand, .maskShift])
+            precondition(down.type == .keyDown && up.type == .keyUp)
+            for event in [down, up] {
+                precondition(event.getIntegerValueField(.keyboardEventKeyboardType) == Int64(type))
+                precondition(event.flags == [.maskCommand, .maskShift])
+            }
+            layoutChecks += 1
+        }
+        let invalidTypes: [Any] = [true, -1, 40.5, Double(UInt32.max) + 1]
+        for invalid in invalidTypes {
+            refuses { _ = try SystemKeyboard.events(["keyboard_type": invalid], code: 6, flags: []) }
+        }
         let result: [String: Any] = ["checks": checks, "field": observed.metadata,
                                    "key_checks": keyChecks, "named_key_codes": SystemKeyboard.namedKeys,
+                                   "layout_checks": layoutChecks, "layout_positions": layoutPositions,
                                    "native_ui_calls": 0, "event_posts": 0, "permission_requests": 0]
         print(String(data: try JSONSerialization.data(withJSONObject: result, options: [.sortedKeys]), encoding: .utf8)!)
     }

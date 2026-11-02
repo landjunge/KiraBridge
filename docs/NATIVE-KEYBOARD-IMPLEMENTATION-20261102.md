@@ -127,3 +127,35 @@ keine zweite Reviewrunde oder Gesamtsuite.
 Noch keine echte OS-Eingabe oder Appkompatibilitätsabnahme. Die verbleibende
 Racegrenze nach letzter Fokus-/Generationsprüfung und Crash zwischen Down/Up
 wird nicht als absolut gelöst ausgegeben. Clipboard-/Terminalwege unverändert.
+
+
+Schritt4-Commit/Remote: `5b20d0ee1220f1f45d51c19b518bb95caa5d4299`, unabhängig abgeglichen.
+
+## Schritt 5 – Kombinationen und Layoutauflösung
+
+`keyboard.chord` nutzt unverändert denselben Manager, Write-Capability,
+Transaktionslock, Autorisierungscheck und nativen Pairpfad. Benannte, freigegebene
+physische und logische Tasten werden nativ aufgelöst. Physische Modifier-/Caps-/
+Fn-/Medien-/Systempositionen bleiben gesperrt. Command/Control/Option/Shift werden
+explizit als Flags übertragen, ohne Hardwaremodifier global zu drücken/lösen.
+
+Logische Buchstaben sind Basis-Tastenbezeichnungen: Großschreibung fügt niemals
+Shift hinzu. Cmd+Z bleibt damit von Cmd+Shift+Z getrennt. Für Symbolglyphen wird
+nur minimal fehlendes Shift/Option ergänzt; mehrdeutige Positionen oder Modifier
+werden vor Eingabe verweigert. Deadkeyfolgen werden nicht als eine Taste geraten.
+Die Übersetzung verwendet aktuelle TIS-/UCKeyTranslate-Daten und Tastaturtyp;
+Layout-ID und Datenhash werden gegen den frischen Zielsnapshot geprüft.
+
+Nachweise: zwei neue gezielte Core-Chordfälle grün (fünf bestehende deselected).
+Ein gemeinsamer Swift-Harness prüfte zunächst47 neue Layoutfälle, einschließlich
+rein lesender echter installierter DE-/US-Daten für z/Z/y/Y unter Cmd und CmdShift
+sowie US-Option-E-Deadkey-Verweigerung. Ein enger Abschlusscheck verwarf die lokal
+nicht bestätigte CGEventSource-Set/Get-Annahme. Die tatsächlichen Down/Up-Events
+setzen und verifizieren stattdessen explizit ihr keyboardEventKeyboardType-Feld.
+Der direkt betroffene Harness bestand danach mit53 Layout-/Factorychecks sowie
+wiederverwendeten15 Snapshot-/22 Pairchecks in11,47s; keine weitere Suite.
+Unabhängige Reviews beider Implementierungsteile freigegeben, Ruff grün.
+
+Keine Layoutumschaltung, keine OS-Posts, kein Clipboardzugriff. Ergebnis weiterhin
+Versandbeleg mit unverändert requested und ausdrücklich resolved, kein Beleg
+für Appverarbeitung. Step6 beginnt erst nach unabhängig geprüftem Push.

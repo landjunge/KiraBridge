@@ -61,6 +61,11 @@ def test_keyboard_snapshot_guards_and_utf16_without_ui(tmp_path):
     observed = json.loads(result.stdout)
     assert observed["checks"] == 15
     assert observed["key_checks"] == 22
+    assert observed["layout_checks"] == 53
+    assert observed["layout_positions"] == {
+        "com.apple.keylayout.US": {"z": 6, "Z": 6, "y": 16, "Y": 16},
+        "com.apple.keylayout.German": {"z": 16, "Z": 16, "y": 6, "Y": 6},
+    }
     assert set(observed["named_key_codes"]) == set(get_args(NamedKey))
     assert observed["field"]["value_sha256"] == hashlib.sha256("A😀e\u0301".encode()).hexdigest()
     assert (

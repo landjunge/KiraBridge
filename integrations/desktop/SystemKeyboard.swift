@@ -75,7 +75,28 @@ enum SystemKeyboard {
             "selection_utf16": ["location": selection.location, "length": selection.length],
         ])
     }
-    static func inputSource() throws -> [String: Any] {
+    struct Layout {
+        let metadata: [String: Any]
+        let translate: (CGKeyCode, CGEventFlags) -> String?
+    }
+    static func translate(_ data: CFData, code: CGKeyCode, flags: CGEventFlags,
+                          keyboardType: UInt32) -> String? {
+        guard CFDataGetLength(data) >= MemoryLayout<UCKeyboardLayout>.size,
+              let bytes = CFDataGetBytePtr(data) else { return nil }
+        var modifiers: UInt32 = 0, dead: UInt32 = 0, count = 0
+        // Control changes the command, not the logical key label.
+        for (flag, carbon) in [(CGEventFlags.maskCommand, cmdKey), (.maskShift, shiftKey), (.maskAlternate, optionKey)] {
+            if flags.contains(flag) { modifiers |= UInt32(carbon) }
+        }
+        var units = [UniChar](repeating: 0, count: 8)
+        let status = UCKeyTranslate(UnsafeRawPointer(bytes).assumingMemoryBound(to: UCKeyboardLayout.self),
+            code, UInt16(kUCKeyActionDown), modifiers >> 8, keyboardType, 0, &dead, units.count, &count, &units)
+        // A dead key is not a directly generated character; never resolve a sequence as one pair.
+        guard status == noErr, dead == 0, count > 0, count <= units.count else { return nil }
+        let text = String(decoding: units.prefix(count), as: UTF16.self)
+        return Array(text.utf16) == Array(units.prefix(count)) ? text : nil
+    }
+    static func currentLayout() throws -> Layout {
         guard let source = TISCopyCurrentKeyboardInputSource()?.takeRetainedValue(),
               let layout = TISCopyCurrentKeyboardLayoutInputSource()?.takeRetainedValue(),
               let sourceID = TISGetInputSourceProperty(source, kTISPropertyInputSourceID),
@@ -87,9 +108,20 @@ enum SystemKeyboard {
         try require(!sourceText.isEmpty && !layoutText.isEmpty
                     && sourceText.utf8.count <= 1024 && layoutText.utf8.count <= 1024,
                     "Current input source/layout identity is invalid")
-        return ["input_source_id": sourceText, "layout_id": layoutText,
-                "keyboard_type": Int(LMGetKbdType())]
+        let keyboardType = UInt32(LMGetKbdType())
+        var data: CFData?
+        if let raw = TISGetInputSourceProperty(layout, kTISPropertyUnicodeKeyLayoutData) {
+            let value = Unmanaged<CFData>.fromOpaque(raw).takeUnretainedValue()
+            if CFDataGetLength(value) <= maxValueBytes { data = value }
+        }
+        let digest = data.map { SHA256.hash(data: $0 as Data).map { String(format: "%02x", $0) }.joined() } ?? ""
+        return Layout(metadata: ["input_source_id": sourceText, "layout_id": layoutText,
+            "keyboard_type": Int(keyboardType), "layout_sha256": digest], translate: { code, flags in
+                guard sourceText == layoutText, let data = data else { return nil }
+                return translate(data, code: code, flags: flags, keyboardType: keyboardType)
+            })
     }
+    static func inputSource() throws -> [String: Any] { try currentLayout().metadata }
     static func revision(application: [String: Any], window: String, element: String,
                          field: Field, layout: [String: Any]) throws -> String {
         try SystemControl.hash(["application": application, "window_token": window,
@@ -173,6 +205,73 @@ enum SystemKeyboard {
         }
         return (name, code)
     }
+    static let modifierFlags: [(String, CGEventFlags)] = [
+        ("command", .maskCommand), ("control", .maskControl), ("option", .maskAlternate), ("shift", .maskShift),
+    ]
+    // Ordinary ANSI/ISO positions (0...50), named keys, printable keypad and JIS positions only.
+    // Modifier/CapsLock/Fn/media/language-switch/power positions are deliberately absent.
+    static let physicalKeys = Set((0...50).map { CGKeyCode($0) }).union(namedKeys.values).union([
+        kVK_ANSI_KeypadDecimal, kVK_ANSI_KeypadMultiply, kVK_ANSI_KeypadPlus, kVK_ANSI_KeypadDivide,
+        kVK_ANSI_KeypadMinus, kVK_ANSI_KeypadEquals, kVK_ANSI_Keypad0, kVK_ANSI_Keypad1,
+        kVK_ANSI_Keypad2, kVK_ANSI_Keypad3, kVK_ANSI_Keypad4, kVK_ANSI_Keypad5, kVK_ANSI_Keypad6,
+        kVK_ANSI_Keypad7, kVK_ANSI_Keypad8, kVK_ANSI_Keypad9, kVK_JIS_Yen, kVK_JIS_Underscore,
+        kVK_JIS_KeypadComma,
+    ].map { CGKeyCode($0) })
+    struct ResolvedKey {
+        let code: CGKeyCode
+        let flags: CGEventFlags
+        let representation: String
+    }
+    static func resolve(_ spec: [String: Any], modifiers: [String], layout: Layout) throws -> ResolvedKey {
+        try require(modifiers.count <= 4 && Set(modifiers).count == modifiers.count
+                    && modifiers.allSatisfy { name in modifierFlags.contains { $0.0 == name } },
+                    "Keyboard modifiers are unsupported or duplicated")
+        let flags = modifierFlags.reduce(CGEventFlags()) { modifiers.contains($1.0) ? $0.union($1.1) : $0 }
+        let values = spec.filter { !($0.value is NSNull) }
+        try require(values.count == 1, "Choose exactly one keyboard key representation")
+        if values["named"] != nil {
+            let (_, code) = try namedKey(spec)
+            return ResolvedKey(code: code, flags: flags, representation: "named")
+        }
+        if let number = values["key_code"] as? NSNumber,
+           CFGetTypeID(number) != CFBooleanGetTypeID(), number.doubleValue.isFinite,
+           number.doubleValue == Double(number.intValue), number.intValue >= 0, number.intValue <= 127 {
+            let code = CGKeyCode(number.intValue)
+            try require(physicalKeys.contains(code), "Physical modifier/system key is unsupported")
+            return ResolvedKey(code: code, flags: flags, representation: "physical")
+        }
+        guard let character = values["character"] as? String, character.unicodeScalars.count == 1,
+              let scalar = character.unicodeScalars.first, !CharacterSet.controlCharacters.contains(scalar) else {
+            throw SystemControl.failure("keyboard_unsupported", "Logical key must be one supported Unicode scalar")
+        }
+        let letter = CharacterSet.letters.contains(scalar)
+        // Letters name a BASE KEY: case-insensitive, never an implicit Shift (Cmd+Z is not Redo).
+        // Explicit Shift/Option/Control remain on the posted chord, outside this base-label lookup.
+        let base = letter ? flags.intersection(.maskCommand) : flags.subtracting(.maskControl)
+        let additions: [CGEventFlags] = letter ? [[]] : [[], .maskShift, .maskAlternate, [.maskShift, .maskAlternate]]
+        var matches: [(CGKeyCode, CGEventFlags, Int)] = []
+        var seen: Set<UInt64> = []
+        for addition in additions {
+            let lookup = base.union(addition)
+            guard seen.insert(lookup.rawValue).inserted else { continue }
+            let extra = addition.subtracting(base).rawValue.nonzeroBitCount
+            // Logical glyphs use ordinary positions; keypad ambiguity requires an explicit physical code.
+            for code in (0...50).map({ CGKeyCode($0) }) {
+                guard let text = layout.translate(code, lookup) else { continue }
+                if letter ? text.lowercased() == character.lowercased() : text == character {
+                    matches.append((code, flags.union(addition), extra))
+                }
+            }
+        }
+        guard let least = matches.map({ $0.2 }).min(), matches.filter({ $0.2 == least }).count == 1,
+              let match = matches.first(where: { $0.2 == least }) else {
+            throw SystemControl.failure("keyboard_unsupported", "Logical key is absent or ambiguous in the current layout")
+        }
+        return ResolvedKey(code: match.0, flags: match.1, representation: "logical")
+    }
+    static func matchingLayout(_ expected: [String: Any], _ current: [String: Any]) throws {
+        try require(SystemControl.hash(expected) == SystemControl.hash(current), "Keyboard layout changed before input")
+    }
     static func matchingBinding(_ expected: [String: Any], _ current: [String: Any]) throws {
         for key in ["pid", "expected_started_at", "target_token", "helper_pid", "worker_generation", "expected_revision"] {
             guard let old = expected[key] as? NSObject, let fresh = current[key] as? NSObject,
@@ -219,22 +318,38 @@ enum SystemKeyboard {
                 "Keyboard post attempt is uncertain; no replay is permitted", unknown: true)
         }
     }
-    static func key(_ args: [String: Any]) throws -> [String: Any] {
-        guard let target = args["target"] as? [String: Any], let spec = args["key"] as? [String: Any] else {
-            throw SystemControl.failure("invalid_arguments", "Keyboard key requires an exact target and named key")
-        }
-        let (name, code) = try namedKey(spec)
-        guard let source = CGEventSource(stateID: .privateState),
+    static func events(_ layout: [String: Any], code: CGKeyCode,
+                       flags: CGEventFlags) throws -> (CGEvent, CGEvent) {
+        guard let type = layout["keyboard_type"] as? NSNumber,
+              CFGetTypeID(type) != CFBooleanGetTypeID(), type.doubleValue.isFinite,
+              type.doubleValue >= 0, type.doubleValue <= Double(UInt32.max),
+              type.doubleValue.rounded(.towardZero) == type.doubleValue,
+              let source = CGEventSource(stateID: .privateState),
               let down = CGEvent(keyboardEventSource: source, virtualKey: code, keyDown: true),
               let up = CGEvent(keyboardEventSource: source, virtualKey: code, keyDown: false) else {
-            throw SystemControl.failure("keyboard_unsupported", "Native key pair could not be created")
+            throw SystemControl.failure("keyboard_unsupported", "Bounded native keyboard type or event source is unavailable")
         }
         for event in [down, up] {
-            event.flags = []
+            event.flags = flags
             event.setIntegerValueField(.keyboardEventAutorepeat, value: 0)
+            event.setIntegerValueField(.keyboardEventKeyboardType, value: Int64(type.doubleValue))
+            try require(event.getIntegerValueField(.keyboardEventKeyboardType) == Int64(type.doubleValue),
+                        "Native key event did not retain its bound keyboard type")
         }
+        return (down, up)
+    }
+    static func key(_ args: [String: Any], chord: Bool = false) throws -> [String: Any] {
+        guard let target = args["target"] as? [String: Any], let spec = args["key"] as? [String: Any] else {
+            throw SystemControl.failure("invalid_arguments", "Keyboard key requires an exact target and key")
+        }
+        let modifiers = args["modifiers"] as? [String] ?? []
+        try require(chord ? !modifiers.isEmpty : args["modifiers"] == nil, "Keyboard chord requires explicit modifiers")
+        let layout = try currentLayout(), resolved = try resolve(spec, modifiers: modifiers, layout: layout)
+        let code = resolved.code
+        let (down, up) = try events(layout.metadata, code: code, flags: resolved.flags)
         var result = try postPair(validate: {
-            _ = try boundSnapshot(target)
+            let current = try boundSnapshot(target)
+            try matchingLayout(layout.metadata, current.response["layout"] as? [String: Any] ?? [:])
             try inputAllowed(postAccess: CGPreflightPostEventAccess(),
                 flags: CGEventSource.flagsState(.combinedSessionState),
                 keyHeld: CGEventSource.keyState(.hidSystemState, key: code))
@@ -243,13 +358,17 @@ enum SystemKeyboard {
             let app = try SystemControl.target(target)
             (isDown ? down : up).postToPid(app.processIdentifier)
         })
-        result["requested"] = ["named": name]
+        result["requested"] = ["key": spec, "modifiers": modifiers]
+        result["resolved"] = ["key_code": Int(code), "flags": resolved.flags.rawValue,
+            "modifiers": modifierFlags.filter { resolved.flags.contains($0.1) }.map { $0.0 },
+            "representation": resolved.representation, "layout": layout.metadata]
         return result
     }
     static func handle(_ operation: String, arguments: [String: Any]) throws -> [String: Any]? {
         switch operation {
         case "keyboard.inspect": return try snapshot(arguments).response
         case "keyboard.key": return try key(arguments)
+        case "keyboard.chord": return try key(arguments, chord: true)
         default: return nil
         }
     }

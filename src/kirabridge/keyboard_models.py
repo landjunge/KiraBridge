@@ -65,10 +65,15 @@ class KeyboardTarget(ApplicationTargetInput):
 
 
 class KeyboardKey(Input):
-    """A named key, logical character or physical macOS position; exactly one."""
+    """A named key, logical base-key label or physical macOS position; exactly one."""
 
     named: NamedKey | None = None
-    character: str | None = Field(default=None, min_length=1, max_length=1)
+    character: str | None = Field(
+        default=None,
+        min_length=1,
+        max_length=1,
+        description="Base-key label; letter case never adds Shift. Use explicit modifiers.",
+    )
     key_code: int | None = Field(default=None, ge=0, le=127)
 
     @model_validator(mode="after")

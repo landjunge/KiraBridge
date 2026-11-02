@@ -102,3 +102,36 @@ async def test_keyboard_waits_for_existing_session_before_marking_running(bridge
 def test_keyboard_key_intent_does_not_silently_add_a_submit():
     request = KeyboardKeyInput(target=TARGET, key={"named": "enter"})
     assert "submit" not in request.model_dump()
+
+
+async def test_chord_uses_same_lease_and_passes_exact_requested_modifiers(bridge):
+    task = setup_keyboard(bridge)
+    task["operation"] = "keyboard.chord"
+    task["args"] = {"target": TARGET, "key": {"character": "z"}, "modifiers": ["command", "shift"]}
+
+    async def send(operation, arguments, *, principal, before_send):
+        assert bridge.sessions.lock.locked()
+        assert operation == "keyboard.chord" and arguments == task["args"]
+        assert principal == "local"
+        before_send()
+        return {"app_processing_confirmed": False, "post_calls_returned": 2}
+
+    bridge.keyboard.transport.request = AsyncMock(side_effect=send)
+    result = await bridge.execute(task, AsyncMock(), AsyncMock())
+    assert result["app_processing_confirmed"] is False
+    assert bridge.keyboard.transport.request.await_count == 1
+    assert OPERATIONS["keyboard.chord"].capability == "keyboard.execute"
+    assert "keyboard.chord" not in SYSTEM_LEAVES
+
+
+async def test_chord_failure_never_falls_back_to_a_key_operation(bridge):
+    task = setup_keyboard(bridge)
+    task["operation"] = "keyboard.chord"
+    task["args"]["modifiers"] = ["command"]
+    bridge.keyboard.transport.request = AsyncMock(
+        side_effect=UncertainExecution("chord_unknown", "lost")
+    )
+    with pytest.raises(UncertainExecution):
+        await bridge.execute(task, AsyncMock(), AsyncMock())
+    bridge.keyboard.transport.request.assert_awaited_once()
+    assert bridge.keyboard.transport.request.await_args.args[0] == "keyboard.chord"

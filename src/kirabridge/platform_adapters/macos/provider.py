@@ -64,7 +64,9 @@ DESCRIPTORS = tuple(
 
 
 DESCRIPTORS += tuple(OperationDescriptor(op, leaf) for op, leaf in SYSTEM_LEAVES.items())
-DESCRIPTORS += (OperationDescriptor("keyboard.key", "keyboard"),)
+DESCRIPTORS += tuple(
+    OperationDescriptor(op, "keyboard") for op in ("keyboard.key", "keyboard.chord")
+)
 DESCRIPTORS += (OperationDescriptor("system.report", "system_reports"),)
 
 
