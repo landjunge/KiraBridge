@@ -9,7 +9,8 @@ Installationsstand stehen im [aktuellen Bericht](docs/BOOT-RECOVERY-INSTALLER-20
 [Intel-Installationspaket und Releasehinweise](https://github.com/landjunge/KiraBridge/releases/tag/v0.8.0rc25) ·
 [ältere Veröffentlichungen](https://github.com/landjunge/KiraBridge/releases)
 
-Letzter vor dem RC25-Upgrade verifizierter Stand: RC24, Build `34f768b`.
+Lokal auf Intel installiert und über den echten ChatGPT-Connector geprüft:
+**RC25, Build `7d862e5`**, einschließlich automatischem Tunnel-Wiederanlauf.
 Die bisherigen [Terminal-/Return-Belege](docs/RC20-RETURN-20261031.md) und
 [RC18-Installationsbelege](docs/RC18-PUBLISH-INSTALL-20261029.md) bleiben erhalten.
 
