@@ -284,10 +284,54 @@ enum SystemSpecialKeys {
         }
         return result
     }
+    static let leftModifierKeys: [(CGKeyCode, CGEventFlags)] = [
+        (55, .maskCommand), (56, .maskShift), (58, .maskAlternate), (59, .maskControl), (63, .maskSecondaryFn)
+    ]
+    static func modifierStateCompatible(ownedFlags: CGEventFlags, read: (CGKeyCode) -> Bool) -> Bool {
+        // HID queries include our synthetic chord. Only left-key states
+        // introduced by this input are allowed between transitions; no right
+        // modifier is generated here. A simultaneous physical press of the
+        // same owned modifier cannot be distinguished by this public API.
+        let owned = Set(leftModifierKeys.filter { ownedFlags.contains($0.1) }.map { $0.0 })
+        return ![54, 55, 56, 58, 59, 60, 61, 62, 63].contains {
+            read(CGKeyCode($0)) && !owned.contains(CGKeyCode($0))
+        }
+    }
     static func physicalModifiersIdle(read: (CGKeyCode) -> Bool) -> Bool {
-        // Left/right physical keys only. Caps Lock is persistent state, not a
-        // held user modifier, and event flags can include our synthetic chord.
-        ![54, 55, 56, 58, 59, 60, 61, 62, 63].contains { read(CGKeyCode($0)) }
+        // Strict pre-input query: no synthetic modifier is owned yet.
+        modifierStateCompatible(ownedFlags: [], read: read)
+    }
+    static func settleModifierState(ownedFlags: CGEventFlags,
+                                    now: () -> Double, pause: (Double) -> Void,
+                                    validate: () throws -> Void,
+                                    read: () -> (Set<CGKeyCode>, CGEventFlags)) throws -> Int {
+        let flags = ownedFlags.intersection([.maskCommand, .maskControl, .maskAlternate, .maskShift, .maskSecondaryFn])
+        guard !flags.isEmpty else { return 0 }
+        let keys = Set(leftModifierKeys.filter { flags.contains($0.1) }.map { $0.0 })
+        let started = now(), limit = 0.2
+        guard started.isFinite else { throw failure("Modifier state clock is unavailable", unknown: true) }
+        for poll in 1...256 {
+            let before = now()
+            guard before.isFinite, before >= started, before - started <= limit else {
+                throw failure("Own modifier state did not settle within 200 ms; no replay is permitted", unknown: true)
+            }
+            try validate()
+            let (held, currentFlags) = read()
+            guard modifierStateCompatible(ownedFlags: flags, read: { held.contains($0) }) else {
+                throw failure("Unowned modifier state changed during release observation", unknown: true)
+            }
+            let after = now()
+            guard after.isFinite, after >= before, after - started <= limit else {
+                throw failure("Own modifier state observation exceeded 200 ms", unknown: true)
+            }
+            if held.intersection(keys).isEmpty && currentFlags.intersection(flags).isEmpty { return poll }
+            let remaining = limit - (after - started)
+            guard remaining > 0 else {
+                throw failure("Own modifier state did not clear; no replay is permitted", unknown: true)
+            }
+            pause(min(0.001, remaining))
+        }
+        throw failure("Own modifier state observation limit reached; no replay is permitted", unknown: true)
     }
     static func releaseModifiers(_ plan: Plan, explicitFn: Bool,
                                  capsLock: () -> Bool, validate: () throws -> Void,
@@ -326,7 +370,7 @@ enum SystemSpecialKeys {
                     releases += try release()
                 } catch {
                     // Release only our own key/modifiers, once, through the
-                    // same fresh-rights/physical-idle callback. Never replay a
+                    // same fresh-rights/ownership-aware modifier callback. Never replay a
                     // partially attempted modifier-release batch.
                     if !keyUpReturned { try? post(false) }
                     if !releaseAttempted { _ = try? release() }
@@ -451,23 +495,42 @@ enum SystemSpecialKeys {
         } else {
             let pair = try events(initial)
             if initial.route == "quartz_hid" { appliedEventFlags = pair.0.flags }
+            var introducedFlags = CGEventFlags()
             let releaseGuard: () throws -> Void = {
                 try SystemControl.axGranted()
-                guard CGPreflightPostEventAccess(), physicalModifiersIdle(read: {
+                guard CGPreflightPostEventAccess(), modifierStateCompatible(ownedFlags: introducedFlags, read: {
                     CGEventSource.keyState(.hidSystemState, key: $0)
                 }) else {
-                    throw failure("Current post access or idle physical modifier proof is absent")
+                    throw failure("Current post access or compatible unowned modifier state is absent")
                 }
             }
             result = try pairs(count, validate: validate,
                 post: { down in
                     try releaseGuard()
                     (down ? pair.0 : pair.1).post(tap: .cghidEventTap)
+                    if down && initial.route == "quartz_hid" { introducedFlags = initial.flags }
                 }, release: {
-                    try releaseModifiers(initial,
+                    let returned = try releaseModifiers(initial,
                         explicitFn: (args["modifiers"] as? [String] ?? []).contains("fn"),
                         capsLock: { SystemKeyboard.observedCapsLock() }, validate: releaseGuard,
-                        post: { $0.post(tap: .cghidEventTap) })
+                        post: { event in
+                            event.post(tap: .cghidEventTap)
+                        })
+                    // Post return is not a processing acknowledgement: retain
+                    // the complete owned mask through every release and the
+                    // bounded read-only settling phase. This proves HID state
+                    // clearing only, never an application's action processing.
+                    _ = try settleModifierState(ownedFlags: introducedFlags,
+                        now: { ProcessInfo.processInfo.systemUptime },
+                        pause: { Thread.sleep(forTimeInterval: $0) }, validate: releaseGuard,
+                        read: {
+                            let held = Set([54, 55, 56, 58, 59, 60, 61, 62, 63].compactMap { code -> CGKeyCode? in
+                                CGEventSource.keyState(.hidSystemState, key: CGKeyCode(code)) ? CGKeyCode(code) : nil
+                            })
+                            return (held, CGEventSource.flagsState(.hidSystemState))
+                        })
+                    introducedFlags = []
+                    return returned
                 })
         }
         result["resolved"] = initial.metadata

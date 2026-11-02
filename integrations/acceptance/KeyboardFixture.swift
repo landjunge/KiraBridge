@@ -104,8 +104,13 @@ struct KeyboardFixture {
             exit(3)
         }
         app.setActivationPolicy(.regular)
+        // This controlled two-window receiver must stay independent even when
+        // the user's macOS preference is to open all ordinary windows as tabs.
+        // This property affects only this fixture process, not system settings.
+        NSWindow.allowsAutomaticWindowTabbing = false
         let window = NSWindow(contentRect: NSRect(x: 120, y: 120, width: 760, height: 420),
                               styleMask: [.titled, .closable, .resizable], backing: .buffered, defer: false)
+        window.tabbingMode = .disallowed
         window.title = "KiraBridge native keyboard acceptance – \(nonce)"
         window.isReleasedWhenClosed = false
         var secondWindow: NSWindow?
@@ -169,6 +174,17 @@ struct KeyboardFixture {
                 "second_window_number": secondWindow?.windowNumber as Any? ?? NSNull(),
                 "second_window_visible": secondWindow?.isVisible ?? false,
                 "second_window_key": secondWindow?.isKeyWindow ?? false,
+                "automatic_window_tabbing": NSWindow.allowsAutomaticWindowTabbing,
+                "main_window_tabbing_mode": Int(window.tabbingMode.rawValue),
+                "second_window_tabbing_mode": secondWindow.map { Int($0.tabbingMode.rawValue) } as Any? ?? NSNull(),
+                "main_tabbed_window_numbers": window.tabbedWindows?.map { $0.windowNumber } ?? [],
+                "second_tabbed_window_numbers": secondWindow?.tabbedWindows?.map { $0.windowNumber } ?? [],
+                "main_tab_group_window_numbers": window.tabGroup?.windows.map { $0.windowNumber } ?? [],
+                "second_tab_group_window_numbers": secondWindow?.tabGroup?.windows.map { $0.windowNumber } ?? [],
+                "windows_share_tab_group": secondWindow.map { second in
+                    guard let mainGroup = window.tabGroup, let otherGroup = second.tabGroup else { return false }
+                    return mainGroup === otherGroup
+                } as Any? ?? NSNull(),
                 "active_window_number": app.keyWindow?.windowNumber as Any? ?? NSNull(),
                 "ordered_window_numbers": app.orderedWindows.map { $0.windowNumber },
                 "button_first_responder": window.firstResponder === button,
@@ -221,6 +237,7 @@ struct KeyboardFixture {
                     if secondWindow == nil {
                         let owned = NSWindow(contentRect: NSRect(x: 180, y: 180, width: 500, height: 220),
                             styleMask: [.titled, .closable, .resizable], backing: .buffered, defer: false)
+                        owned.tabbingMode = .disallowed
                         owned.title = "KiraBridge keyboard second owned window – \(nonce)"
                         owned.isReleasedWhenClosed = false
                         owned.collectionBehavior = [.moveToActiveSpace]

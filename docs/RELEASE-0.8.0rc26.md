@@ -18,6 +18,7 @@ RC25 boot-recovery/transactional installer remain included.
 
 Local Intel checks and practical results are recorded in
 [the keyboard investigation report](MACOS-KEYBOARD-COMPLETE-20261102.md). This
-candidate's live matrix is completed before the final package is published.
+release includes the practical matrix and exact build/installation evidence;
+publication follows the relevant local acceptance checks.
 The installer requires Intel macOS 15/26, Python 3.11 and uv 0.11.6 and is ad-hoc
 signed. Apple notarization is not claimed.

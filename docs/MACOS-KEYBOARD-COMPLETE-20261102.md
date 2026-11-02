@@ -69,3 +69,49 @@ cases together. All tests and builds are local Intel; GitHub Actions is skipped.
 
 Practical test matrix, exact candidate/release pins, preserved state, installation
 and remaining limitations follow after actual receiver/hardware tests.
+
+## Praktische Zwischenbefunde auf diesem Mac
+
+Die Prüfung verwendete eine eigene, eindeutig bezeichnete Notiz und eine eigene
+signierte Empfangs-App. Je Auftrag gibt es eine einmalige Kennung; unbekannte
+Eingaben wurden anhand vorhandener Quittungen untersucht und nicht erneut gesendet.
+
+| Funktion | Tatsächlich beobachteter Beleg |
+| --- | --- |
+| Notizen: Unicode und zweimal Return | Exakter eigener Notizinhalt; UTF-16-Länge und Cursorposition stiegen bei Return um zwei. |
+| 54 benannte Tasten einschließlich F1–F20 und Ziffernblock | Jeweils genau erwartetes Down/Up am eigenen Empfänger, keine verlorenen Protokolleinträge. |
+| Unicode einschließlich Umlauten, Japanisch, Emoji, Tab und Zeilenwechsel | SHA256 des tatsächlich empfangenen eigenen Textes. |
+| Command+A, Shift+A, Fn+Backspace | Tatsächliche Auswahl, Großbuchstabe und Vorwärtslöschen aus `abcd` zu `abd`. |
+| 20 Wiederholungen | Empfänger registrierte genau 20 Down- und 20 Up-Ereignisse. |
+| Lautstärke normal und Option+Shift | Öffentlich gelesene Werte 0.2543667 → 0.3097164 beziehungsweise 0.2632136 → ursprünglicher Wert. |
+| Helligkeit normal und Option+Shift | Internes Display 0.3750057 → 0.4375067 beziehungsweise 0.3906310 → ursprünglicher Wert. |
+| Stummschaltung | Tatsächliches Mute false → true → false. |
+| Caps Lock | Kandidat d3cb270: false → true; physisches A erzeugt `A`; true → false, jeweils gelesen und am Empfänger geprüft. |
+| Command+Tab | Kandidat d3cb270: eigener Empfänger → Brave; drei wirkliche Posts einschließlich Modifierfreigabe. |
+
+Die praktischen Tests fanden zusätzliche Fehler, die reine Ereignisbau-Tests
+nicht erkennen konnten: Caps war zunächst nicht in Folgeereignissen enthalten;
+der verriegelte Caps-Zustand wurde als gehaltene Taste gewertet; Command-Tab
+ließ den Umschalter offen. Nach deren Korrektur zeigte Command+Shift+Tab noch eine
+Race Condition: öffentliche HID-Zustandsabfragen enthalten auch unsere eigenen
+synthetischen Modifier. Die Korrektur verfolgt deren Besitz während der gesamten
+Ereignisfolge und wartet anschließend begrenzt und nur lesend auf gelöste
+HID-Zustände. Post-Aufrufe werden dadurch nicht als Verarbeitungsquittung ausgelegt.
+
+Der erste Fensterwechsel-Test war durch automatisch gruppierte macOS-Fenstertabs
+nicht aussagekräftig. Der eigene Testempfänger erhält ausdrücklich unabhängige
+Fenster. Das ändert keine Benutzereinstellung und kein fremdes Programm.
+
+Mission Control wurde sichtbar geöffnet und zeigte vier bereits bestehende
+Spaces, darunter den vorhandenen Brave-Vollbildbereich. Der öffentliche
+Space-Notificationzähler blieb in dieser Umgebung bei null; er wird daher nicht
+als erfolgreicher Wechselbeleg verwendet. Eine zusätzliche Vergleichsprobe blieb
+unentscheidbar (CLI-Beobachter ohne Benachrichtigung; AppKit-Probe ohne bestätigten
+Start). Es gibt daraus keine abgeleitete Änderung an macOS oder dessen Spaces.
+
+Die öffentliche CoreAudio-Prozessabfrage zeigte aktive Audioausgabe eines Brave-
+Helferprozesses. Der vorbereitete eigene Medienempfänger wurde deshalb nicht als
+Now-Playing-Anbieter aktiviert. Play/Pause, Titel- und Suchlaufsignale sind lokal
+konstruktiv geprüft; eine tatsächliche Änderung fremder Wiedergabe ist nicht
+behauptet. Tastaturbeleuchtung, Auswurf, Spiegelung und Kontrast bleiben von
+angeschlossener Hardware und aktivierten macOS-Funktionen abhängig.

@@ -109,3 +109,15 @@ def test_system_modifier_release_delta_without_os_input(tmp_path):
     assert receipt["real_event_posts"] == receipt["permission_requests"] == 0
     assert receipt["fixture_keyboard_posts"] == 6
     assert receipt["fixture_modifier_releases"] == 3
+
+
+@pytest.mark.skipif(
+    sys.platform != "darwin" or not shutil.which("xcrun"), reason="Darwin SDK required"
+)
+def test_system_modifier_ownership_delta_without_os_input(tmp_path):
+    receipt = run_native_harness(tmp_path, "ModifierOwnershipHarness.swift")
+    assert receipt["checks"] >= 1159
+    assert receipt["real_event_posts"] == receipt["permission_requests"] == 0
+    assert receipt["cmd_shift_tab_fixture_total_posts"] == 4
+    assert receipt["delayed_hid_clear_polls"] == 3
+    assert receipt["timeout_release_batches"] == 1
