@@ -272,15 +272,16 @@ enum SystemKeyboard {
     static func matchingLayout(_ expected: [String: Any], _ current: [String: Any]) throws {
         try require(SystemControl.hash(expected) == SystemControl.hash(current), "Keyboard layout changed before input")
     }
-    static func matchingBinding(_ expected: [String: Any], _ current: [String: Any]) throws {
+    static func matchingBinding(_ expected: [String: Any], _ current: [String: Any], revision: Bool = true) throws {
         for key in ["pid", "expected_started_at", "target_token", "helper_pid", "worker_generation", "expected_revision"] {
+            if key == "expected_revision" && !revision { continue }
             guard let old = expected[key] as? NSObject, let fresh = current[key] as? NSObject,
                   old.isEqual(fresh) else {
                 throw SystemControl.failure("macos_element_changed", "Keyboard target or revision changed")
             }
         }
     }
-    static func boundSnapshot(_ target: [String: Any]) throws -> Snapshot {
+    static func boundSnapshot(_ target: [String: Any], revision: Bool = true) throws -> Snapshot {
         let app = try SystemControl.target(target, mutating: true)
         try SystemControl.axGranted()
         var reference = target
@@ -288,7 +289,7 @@ enum SystemKeyboard {
         // Authenticate expiry/principal/worker BEFORE snapshot.remember can refresh an entry.
         let original = try SystemControl.element(reference, app: app)
         let current = try snapshot(target)
-        try matchingBinding(target, current.response["target"] as? [String: Any] ?? [:])
+        try matchingBinding(target, current.response["target"] as? [String: Any] ?? [:], revision: revision)
         try require(CFEqual(original, current.element), "Keyboard focused element changed")
         return current
     }
@@ -364,11 +365,169 @@ enum SystemKeyboard {
             "representation": resolved.representation, "layout": layout.metadata]
         return result
     }
-    static func handle(_ operation: String, arguments: [String: Any]) throws -> [String: Any]? {
+    struct TextState {
+        let value: String
+        let units: [UniChar]
+        let selection: CFRange
+        func matches(_ field: Field) -> Bool {
+            // Swift String == allows canonical equivalence; literal insertion does not.
+            value.utf8.elementsEqual(field.value.utf8) && units.elementsEqual(field.value.utf16)
+                && selection.location == field.selection.location && selection.length == field.selection.length
+        }
+    }
+    static func textChunks(_ text: String, capacity: Int = 16) throws -> [[UniChar]] {
+        try require(!text.isEmpty && text.utf8.count <= 1024 * 1024 && capacity >= 2 && capacity <= 16,
+                    "Text or native Unicode unit capacity is unsupported")
+        try require(text.unicodeScalars.allSatisfy { !($0.value < 32 && ![9, 10, 13].contains($0.value)) && $0.value != 127 },
+                    "Text contains unsupported control characters")
+        var chunks: [[UniChar]] = [], current: [UniChar] = []
+        for character in text {
+            let units = Array(String(character).utf16)
+            try require(units.count <= capacity, "One grapheme exceeds the bounded native Unicode unit")
+            if current.count + units.count > capacity { chunks.append(current); current = [] }
+            current += units
+        }
+        if !current.isEmpty { chunks.append(current) }
+        try require(chunks.flatMap { $0 }.elementsEqual(text.utf16), "Unicode chunking changed literal text")
+        return chunks
+    }
+    static func expectedText(_ field: Field, inserting units: [UniChar]) throws -> TextState {
+        let original = Array(field.value.utf16), start = field.selection.location, length = field.selection.length
+        try require(start >= 0 && length >= 0 && start <= original.count && length <= original.count - start,
+                    "Text insertion selection is invalid")
+        for offset in [start, start + length] where offset > 0 && offset < original.count {
+            try require(!(0xD800...0xDBFF).contains(original[offset - 1]) || !(0xDC00...0xDFFF).contains(original[offset]),
+                        "Text insertion selection splits a surrogate pair")
+        }
+        var result = Array(original.prefix(start))
+        result.append(contentsOf: units)
+        result.append(contentsOf: original.dropFirst(start + length))
+        let value = String(decoding: result, as: UTF16.self)
+        try require(result.elementsEqual(value.utf16) && value.utf8.count <= maxValueBytes
+                    && result.count <= maxValueBytes / 2, "Expected text field exceeds its bounded value limit")
+        return TextState(value: value, units: result, selection: CFRange(location: start + units.count, length: 0))
+    }
+    static func textFieldAllowed(_ field: Field, text: String) throws {
+        if text.unicodeScalars.contains(where: { [9, 10, 13].contains($0.value) }) {
+            try require(field.metadata["role"] as? String == "AXTextArea" && field.metadata["subrole"] as? String == "",
+                        "Tab and line breaks require a supported multiline text area")
+        }
+    }
+    static func checkedUnicode(_ expected: [UniChar], actualCount: Int, actual: [UniChar]) throws {
+        try require(actualCount == expected.count && actual == expected,
+                    "Native event Unicode capacity or contents differ from the literal text")
+    }
+    static func unicodeEvents(_ layout: [String: Any], units: [UniChar]) throws -> (CGEvent, CGEvent) {
+        try require(!units.isEmpty && units.count <= 16, "Native Unicode unit is unbounded")
+        let (down, up) = try events(layout, code: 0, flags: [])
+        for event in [down, up] {
+            units.withUnsafeBufferPointer { event.keyboardSetUnicodeString(stringLength: $0.count, unicodeString: $0.baseAddress) }
+            var count = 0
+            event.keyboardGetUnicodeString(maxStringLength: 0, actualStringLength: &count, unicodeString: nil)
+            try require(count == units.count, "Native event Unicode capacity differs from the literal text")
+            var actual = [UniChar](repeating: 0, count: count)
+            actual.withUnsafeMutableBufferPointer {
+                event.keyboardGetUnicodeString(maxStringLength: $0.count, actualStringLength: &count, unicodeString: $0.baseAddress)
+            }
+            try checkedUnicode(units, actualCount: count, actual: actual)
+        }
+        return (down, up)
+    }
+    /// No field value is read here: own insertion changes it. Identity/layout/security remain mandatory.
+    static func textRoute(_ target: [String: Any], initial: Snapshot) throws {
+        let app = try SystemControl.target(target, mutating: true)
+        try SystemControl.axGranted()
+        var reference = target; reference["element_token"] = target["target_token"]
+        let cached = try SystemControl.element(reference, app: app)
+        let root = AXUIElementCreateApplication(app.processIdentifier)
+        for element in [root, initial.window, initial.element] { try timeout(element) }
+        try require(app.isActive && (SystemControl.attribute(root, kAXFrontmostAttribute) as? NSNumber)?.boolValue == true,
+                    "Text target is no longer frontmost")
+        guard let window = SystemControl.attribute(root, kAXFocusedWindowAttribute),
+              let element = SystemControl.attribute(root, kAXFocusedUIElementAttribute),
+              CFGetTypeID(window) == AXUIElementGetTypeID(), CFGetTypeID(element) == AXUIElementGetTypeID(),
+              CFEqual(window, initial.window), CFEqual(element, initial.element), CFEqual(cached, initial.element) else {
+            throw SystemControl.failure("macos_element_changed", "Text window or field identity changed")
+        }
+        try require((SystemControl.attribute(initial.window, kAXMinimizedAttribute) as? NSNumber)?.boolValue == false
+                    && SystemControl.attribute(initial.element, kAXRoleAttribute) as? String == initial.field.metadata["role"] as? String
+                    && SystemControl.attribute(initial.element, kAXSubroleAttribute) as? String == initial.field.metadata["subrole"] as? String
+                    && (SystemControl.attribute(initial.element, kAXEnabledAttribute) as? NSNumber)?.boolValue == true
+                    && (SystemControl.attribute(initial.element, kAXFocusedAttribute) as? NSNumber)?.boolValue == true,
+                    "Text field classification or focus changed")
+        guard let owner = SystemControl.attribute(initial.element, kAXWindowAttribute),
+              CFGetTypeID(owner) == AXUIElementGetTypeID(), CFEqual(owner, initial.window) else {
+            throw SystemControl.failure("macos_element_changed", "Text field moved to a different window")
+        }
+        try matchingLayout(initial.response["layout"] as? [String: Any] ?? [:], inputSource())
+        try inputAllowed(postAccess: CGPreflightPostEventAccess(), flags: CGEventSource.flagsState(.combinedSessionState),
+                         keyHeld: CGEventSource.keyState(.hidSystemState, key: 0))
+    }
+    static func writeText(_ chunks: [[UniChar]], prepare: ([UniChar]) throws -> Void,
+                          validate: (Int) throws -> Void, sameGeneration: () -> Bool,
+                          post: (Bool) throws -> Void, verify: () async throws -> Bool) async throws -> [String: Any] {
+        var attempted = false
+        try require(!chunks.isEmpty, "Literal text has no native units")
+        do {
+            for (index, units) in chunks.enumerated() {
+                try Task.checkCancellation()
+                try prepare(units)
+                _ = try postPair(validate: { try validate(index) }, sameGeneration: sameGeneration, post: {
+                    attempted = true
+                    try post($0)
+                })
+            }
+            let verified = try await verify()
+            try require(verified, "Literal text or final selection could not be verified")
+            return ["scope": "literal_text_and_selection_observed", "post_calls_returned": chunks.count * 2,
+                    "input_attempted": attempted, "text_verified": true, "selection_verified": true,
+                    "submitted": false, "return_posted": false, "permission_requested": false,
+                    "app_processing_confirmed": false, "effect": "text_insertion_observed"]
+        } catch {
+            if attempted { throw SystemControl.failure("keyboard_input_unknown", "Literal text attempt is uncertain; no replay or Return is permitted", unknown: true) }
+            throw error
+        }
+    }
+    static func text(_ args: [String: Any]) async throws -> [String: Any] {
+        guard let target = args["target"] as? [String: Any], let text = args["text"] as? String else {
+            throw SystemControl.failure("invalid_arguments", "Literal text requires an exact target and text")
+        }
+        try require(args["submit"] == nil || (args["submit"] as? NSNumber)?.boolValue == false,
+                    "Text submission is not supported in this step")
+        let chunks = try textChunks(text), initial = try boundSnapshot(target)
+        try textFieldAllowed(initial.field, text: text)
+        let expected = try expectedText(initial.field, inserting: Array(text.utf16))
+        let layout = initial.response["layout"] as? [String: Any] ?? [:]
+        var pair: (CGEvent, CGEvent)?
+        var result = try await writeText(chunks, prepare: { pair = try unicodeEvents(layout, units: $0) }, validate: { index in
+            if index == 0 { _ = try boundSnapshot(target) }
+            try textRoute(target, initial: initial)
+        }, sameGeneration: { (try? SystemControl.target(target)) != nil }, post: { down in
+            let app = try SystemControl.target(target)
+            guard let pair = pair else { throw SystemControl.failure("keyboard_unsupported", "Unicode pair is unavailable") }
+            (down ? pair.0 : pair.1).postToPid(app.processIdentifier)
+        }, verify: {
+            for attempt in 0..<5 {
+                let current = try boundSnapshot(target, revision: false)
+                try require(CFEqual(current.window, initial.window) && CFEqual(current.element, initial.element), "Text verification target changed")
+                try matchingLayout(layout, current.response["layout"] as? [String: Any] ?? [:])
+                if expected.matches(current.field) { return true }
+                if attempt < 4 { try await Task.sleep(nanoseconds: 20_000_000) }
+            }
+            return false
+        })
+        result["utf8_bytes"] = text.utf8.count
+        result["utf16_units"] = text.utf16.count
+        result["text_sha256"] = SHA256.hash(data: Data(text.utf8)).map { String(format: "%02x", $0) }.joined()
+        result["selection_utf16"] = ["location": expected.selection.location, "length": 0]
+        return result
+    }
+    static func handle(_ operation: String, arguments: [String: Any]) async throws -> [String: Any]? {
         switch operation {
         case "keyboard.inspect": return try snapshot(arguments).response
         case "keyboard.key": return try key(arguments)
         case "keyboard.chord": return try key(arguments, chord: true)
+        case "keyboard.text": return try await text(arguments)
         default: return nil
         }
     }

@@ -158,4 +158,33 @@ Unabhängige Reviews beider Implementierungsteile freigegeben, Ruff grün.
 
 Keine Layoutumschaltung, keine OS-Posts, kein Clipboardzugriff. Ergebnis weiterhin
 Versandbeleg mit unverändert requested und ausdrücklich resolved, kein Beleg
-für Appverarbeitung. Step6 beginnt erst nach unabhängig geprüftem Push.
+für Appverarbeitung. Schritt5-Commit/Remote: `acc096e9ab97f0d5e3b26c122364bbe845758be3`, unabhängig abgeglichen.
+
+
+## Schritt 6 – Kurzer nativer Literaltext
+
+`keyboard.text` ist über denselben Manager/Lock/Transport angebunden. Kein
+Clipboardaufruf, kein AXSetValue und kein Return. Vorläufig werden Submit und
+Payloads oberhalb eines vollständigen nativen Frames vor Running/Versand
+verweigert; der folgende Stagingschritt erweitert dies ohne Clipboardalternative.
+
+Native Unicodeeinheiten sind graphem- und surrogatsicher begrenzt. Jede tatsächliche
+Down/Up-Unicodepayload wird über CGEvent Set/Get exakt zurückgelesen. Erwarteter
+Gesamtfeldwert und UTF-16-Auswahl werden vor dem ersten Ereignis berechnet und
+begrenzt. Nachfolgende Einheiten prüfen frische Zielroute/Sicherheit/Layout/
+Hardwaremodifier. Der abschließende Beleg vergleicht UTF-8, UTF-16 und Caret exakt;
+kanonisch ähnliche, aber unterschiedliche Zeichenfolgen gelten nicht als gleich.
+Fehlender Beleg oder Teilfehler nach einem Post bleiben Unknown ohne Replay.
+LF/CR/Tab werden in einzeiligen Text-/Suchfeldern vorab verweigert.
+
+Nachweise: drei neue gezielte Corefälle grün (sieben unbetroffene deselected).
+Der betroffene Swift-Harness bestand nach einem konkreten ArraySlice-Compilefix
+mit27 neuen Textchecks plus den wiederverwendeten90 bisherigen Checks in12,73s.
+Enthalten: echte ungepostete Unicodeevent-Set/Get-Roundtrips, Whitespace/CRLF/Tab/
+Case/Emoji/Combining, ExpectedField/Selection, Grenzen sowie Teilfehler/noReturn.
+Keine weitere Suite. Unabhängige Reviewteile freigegeben, Ruff grün.
+
+Noch keine echte App-/Performanceabnahme: TextArea-Klassifikation allein beweist
+keine universelle Submit-freie Semantik von Fremdprogrammen. Das Ergebnis meldet
+`text_verified/selection_verified`, aber keine bestätigte Programmaktion.
+Lange Texte und optionales Return sind weiterhin die nächsten getrennten Schritte.

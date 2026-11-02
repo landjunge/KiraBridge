@@ -76,6 +76,7 @@ for _name in (
     "session.open",
     "keyboard.key",
     "keyboard.chord",
+    "keyboard.text",
     "session.input",
     "session.focus",
     "session.close",
@@ -102,7 +103,7 @@ for _name in (
         capability="process.inspect"
         if _name == "process.output"
         else "keyboard.execute"
-        if _name in {"keyboard.key", "keyboard.chord"}
+        if _name in {"keyboard.key", "keyboard.chord", "keyboard.text"}
         else "bridge.health"
         if _name == "platform.status"
         else "threaddesk.manage"

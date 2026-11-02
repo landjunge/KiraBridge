@@ -4,7 +4,7 @@ import Carbon
 
 @main
 struct KeyboardInspectHarness {
-    @MainActor static func main() throws {
+    @MainActor static func main() async throws {
         var checks = 0
         func field(_ scenario: String = "ordinary", selection: CFRange = CFRange(location: 1, length: 2),
                    value: String = "A😀e\u{301}") throws -> SystemKeyboard.Field {
@@ -215,9 +215,99 @@ struct KeyboardInspectHarness {
         for invalid in invalidTypes {
             refuses { _ = try SystemKeyboard.events(["keyboard_type": invalid], code: 6, flags: []) }
         }
+        var textChecks = 0
+        let textLayout: [String: Any] = ["keyboard_type": 40]
+        for sample in [" aA \t\r\n", "A😀e\u{301}中", "0123456789abcdef😀e\u{301}", "é", "e\u{301}"] {
+            let chunks = try SystemKeyboard.textChunks(sample)
+            precondition(chunks.flatMap { $0 }.elementsEqual(sample.utf16))
+            for units in chunks {
+                let pair = try SystemKeyboard.unicodeEvents(textLayout, units: units)
+                for event in [pair.0, pair.1] {
+                    precondition(event.getIntegerValueField(.keyboardEventKeycode) == 0) // Never Return.
+                    var count = 0
+                    event.keyboardGetUnicodeString(maxStringLength: 0, actualStringLength: &count, unicodeString: nil)
+                    precondition(count == units.count)
+                }
+            }
+            textChecks += 1
+        }
+        for tail in ["😀", "e\u{301}", "👨‍👩‍👧‍👦"] {
+            let chunks = try SystemKeyboard.textChunks(String(repeating: "a", count: 15) + tail)
+            precondition(chunks.count == 2 && chunks[0].count == 15 && chunks[1].elementsEqual(tail.utf16))
+            textChecks += 1
+        }
+        let area = SystemKeyboard.Field(value: "prefix😀suffix", selection: CFRange(location: 6, length: 2),
+                                        metadata: ["role": "AXTextArea", "subrole": ""])
+        let insertion = "A😀e\u{301}"
+        let expected = try SystemKeyboard.expectedText(area, inserting: Array(insertion.utf16))
+        precondition(expected.value.utf8.elementsEqual(("prefix" + insertion + "suffix").utf8))
+        precondition(expected.selection.location == 11 && expected.selection.length == 0)
+        precondition(expected.matches(SystemKeyboard.Field(value: expected.value, selection: expected.selection, metadata: [:])))
+        precondition(!expected.matches(SystemKeyboard.Field(value: expected.value, selection: CFRange(location: 0, length: 0), metadata: [:])))
+        textChecks += 1
+        let composed = SystemKeyboard.Field(value: "é", selection: CFRange(location: 2, length: 0), metadata: [:])
+        let decomposed = SystemKeyboard.TextState(value: "e\u{301}", units: Array("e\u{301}".utf16), selection: composed.selection)
+        precondition(decomposed.value == composed.value && !decomposed.matches(composed))
+        textChecks += 1
+        try SystemKeyboard.textFieldAllowed(area, text: "\r\n\t"); textChecks += 1
+        let textFailures: [() throws -> Void] = [
+            { _ = try SystemKeyboard.textChunks("e" + String(repeating: "\u{301}", count: 16)) },
+            { _ = try SystemKeyboard.textChunks("a", capacity: 1) },
+            { _ = try SystemKeyboard.textChunks("a\u{1b}") },
+            { try SystemKeyboard.checkedUnicode([65], actualCount: 0, actual: []) },
+            { try SystemKeyboard.checkedUnicode([65], actualCount: 1, actual: [66]) },
+            { _ = try SystemKeyboard.expectedText(SystemKeyboard.Field(value: "😀", selection: CFRange(location: 1, length: 0), metadata: [:]), inserting: [65]) },
+            { _ = try SystemKeyboard.expectedText(SystemKeyboard.Field(value: String(repeating: "😀", count: SystemKeyboard.maxValueBytes / 4), selection: CFRange(location: 0, length: 0), metadata: [:]), inserting: [65]) },
+        ]
+        for check in textFailures {
+            do { try check(); fatalError("Unsafe Unicode text accepted") }
+            catch let error as SystemBridgeFailure { precondition(!error.effectUnknown); textChecks += 1 }
+        }
+        for subrole in ["", "AXSearchField"] {
+            let field = SystemKeyboard.Field(value: "", selection: CFRange(location: 0, length: 0), metadata: ["role": "AXTextField", "subrole": subrole])
+            do { try SystemKeyboard.textFieldAllowed(field, text: "\n"); fatalError("Single-line control accepted") }
+            catch let error as SystemBridgeFailure { precondition(!error.effectUnknown); textChecks += 1 }
+        }
+        let pieces = try SystemKeyboard.textChunks("0123456789abcdef😀x")
+        var unit: [UniChar] = [], received: [UniChar] = [], posts: [Bool] = [], validated: [Int] = []
+        let textReceipt = try await SystemKeyboard.writeText(pieces, prepare: { unit = $0 }, validate: {
+            validated.append($0)
+            if $0 > 0 { precondition(!received.isEmpty) } // Own insertion does not require the old value revision.
+        }, sameGeneration: { true }, post: { down in
+            posts.append(down); if down { received += unit }
+        }, verify: { received.elementsEqual("0123456789abcdef😀x".utf16) })
+        precondition(posts == [true, false, true, false] && validated == [0, 1])
+        precondition(textReceipt["text_verified"] as? Bool == true && textReceipt["return_posted"] as? Bool == false)
+        textChecks += 1
+        for scenario in ["target_before", "target_after", "capacity_before", "capacity_after", "verification"] {
+            var prepared = 0, postCount = 0
+            do {
+                _ = try await SystemKeyboard.writeText(pieces, prepare: { _ in
+                    let index = prepared; prepared += 1
+                    if scenario == "capacity_\(index == 0 ? "before" : "after")" {
+                        throw SystemControl.failure("capacity", "fixture")
+                    }
+                }, validate: { index in
+                    if scenario == "target_\(index == 0 ? "before" : "after")" {
+                        throw SystemControl.failure("target", "fixture")
+                    }
+                }, sameGeneration: { true }, post: { _ in postCount += 1 }, verify: { false })
+                fatalError("Unsafe text write completed")
+            } catch let error as SystemBridgeFailure {
+                let before = scenario.hasSuffix("before")
+                precondition(error.effectUnknown == !before)
+                precondition(postCount == (before ? 0 : scenario == "verification" ? 4 : 2))
+                textChecks += 1
+            }
+        }
+        do {
+            _ = try await SystemKeyboard.text(["target": [:], "text": "x", "submit": true])
+            fatalError("Unexpected text submit")
+        } catch let error as SystemBridgeFailure { precondition(!error.effectUnknown); textChecks += 1 }
         let result: [String: Any] = ["checks": checks, "field": observed.metadata,
                                    "key_checks": keyChecks, "named_key_codes": SystemKeyboard.namedKeys,
                                    "layout_checks": layoutChecks, "layout_positions": layoutPositions,
+                                   "text_checks": textChecks,
                                    "native_ui_calls": 0, "event_posts": 0, "permission_requests": 0]
         print(String(data: try JSONSerialization.data(withJSONObject: result, options: [.sortedKeys]), encoding: .utf8)!)
     }
