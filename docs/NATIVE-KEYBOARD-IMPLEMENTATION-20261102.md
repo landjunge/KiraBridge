@@ -74,4 +74,27 @@ Grenzen: Der Native-Harness injiziert AX-Metadaten und ruft keine UI-/TCC-APIs
 auf. Fehlende Subrole/Zeichenanzahl werden strikt verweigert; echte TextEdit-/
 NSTextView-Kompatibilität und Eingabeeffekte sind noch nicht abgenommen.
 Clipboard-/Terminalimplementierungen und laufende Benutzersitzungen unverändert.
-Schritt3 beginnt erst nach geprüftem Push dieses Schritts.
+Schritt2-Commit/Remote: `fb532628e4fde3445224a9a772df2b72b7adb63a`, unabhängig abgeglichen.
+
+
+## Schritt 3 – Gemeinsame Eingabetransaktion
+
+`DesktopInput` verwendet exakt die bestehende `SessionManager.lock`. Damit
+nehmen native App-/Fensterfokus-, AX-Schreib- und App-Lebenszyklusaktionen an
+derselben Serialisierung wie bestehende Terminaleingaben teil. Ein zusätzlicher
+verschachtelter Sessionlock entfällt. Die zugrunde liegenden Clipboard-/
+Terminalimplementierungen sind unverändert. Read-only und Stop-/Signalpfade
+werden nicht an die neue Desktoptransaktion gebunden.
+
+Die gemeinsame Gesamtfrist beginnt vor dem Warten auf die Sperre. Ein Ablauf
+vor dem nativen Versuch meldet `desktop_input_busy` ohne Running/Dispatch;
+nach Beginn des nativen Aufrufs konservativ `desktop_input_unknown`, ohne Replay.
+Der Marker beweist keine OS-Verarbeitung. Innere Beobachtungstimeouts behalten
+ihren Ursprung; Cancellation gibt nur selbst erworbene Locks frei.
+
+Nachweise: sechs direkt notwendige Konkurrenz-/Deadline-/Cancellation-/
+Dispatcherfälle bestanden (76 unbetroffene deselected), dazu der bestehende
+konkrete app.focus-Dispatcherfall separat bestanden. Unabhängiger enger Review
+freigegeben; Ruff grün. Der Trace einer simulierten Text+Return-Transaktion
+schließt konkurrierende vorhandene Sessioneingabe zwischen beiden aus; dies ist
+noch kein nativer Text-/Return-UI-Nachweis. Schritt4 erst nach Remote-SHA-Abgleich.

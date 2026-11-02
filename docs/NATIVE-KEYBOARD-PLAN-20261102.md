@@ -69,7 +69,7 @@ Vorgeschlagene neue Zuständigkeiten, keine schon vorhandenen Module:
 - `keyboard_models.py`: strikte öffentliche Intents, Zielreferenzen und Ergebnisse.
 - `keyboard_manager.py`: Freigabe, Profilrevision, Koordination und Belege; nutzt
   vorhandenen TaskManager und SystemModules statt einen zweiten Dispatcher.
-- `input_coordination.py`: eine gemeinsame Desktop-Eingabeleihenfolge pro Core.
+- `desktop_input.py`: gemeinsame Eingabetransaktion auf der bereits vorhandenen Session-Sperre.
 - `keyboard_profiles.py`: deklaratives Schema, Resolver und private revisionsgebundene Ablage.
 - `integrations/desktop/SystemKeyboard.swift`: nativer Zielcheck, Tastenpaare,
   Layoutauflösung, Unicode und begrenzte eigene Key-up-Bereinigung.
@@ -124,8 +124,9 @@ alle JXA-, Fokus-, Clipboard- und Terminalpfade. Deshalb braucht der Core eine
 kurze gemeinsame Eingabetransaktion auch für seine vorhandenen konkurrierenden
 Fokus-/Fenster-/AX-Eingabeeffekte.
 
-Festzulegende Sperrreihenfolge:
-**DesktopInputLease → SessionLock → ClipboardLock → NativeTransportLock**.
+Umsetzungsentscheidung in Schritt3: Die vorhandene `SessionManager.lock` ist
+zugleich die DesktopInputLease; kein zweiter äußerer Lock ist nötig. Reihenfolge:
+**gemeinsame Desktop-/SessionLock → ClipboardLock → NativeTransportLock**.
 Nur benötigte Sperren nehmen; kein nativer Callback erwirbt eine äußere Sperre.
 Interne Delegation erhält dieselbe Lease, statt sie nochmals zu erwerben.
 Keine Sperre während Agentenantworten oder unbegrenzter Menüscans halten. Auch

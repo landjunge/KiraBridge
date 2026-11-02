@@ -1,5 +1,6 @@
 """System operations share typed schemas, central policy, provider and task results."""
 
+import asyncio
 import base64
 import hashlib
 import json
@@ -76,6 +77,54 @@ def native(bridge):
         "keyboard_protocol": 1,
     }
     bridge.system_modules.execute = AsyncMock(return_value={"effect": "fixture_only"})
+
+
+async def test_desktop_focus_waits_for_session_transaction_but_inspect_stays_readonly(bridge):
+    native(bridge)
+    observed = []
+
+    async def running(evidence):
+        observed.append(evidence["operation"])
+
+    def task(operation):
+        return {
+            "id": "owned-system-test",
+            "principal": "local",
+            "operation": operation,
+            "args": SAMPLES[operation],
+        }
+
+    assert bridge.desktop_input.lock is bridge.sessions.lock
+    async with bridge.sessions.lock:
+        focus = asyncio.create_task(bridge.execute(task("app.focus"), running, running))
+        await asyncio.sleep(0)
+        assert not focus.done() and not observed
+        await asyncio.wait_for(bridge.execute(task("keyboard.inspect"), running, running), 1)
+        assert observed == ["keyboard.inspect"]
+    await focus
+    assert observed == ["keyboard.inspect", "app.focus"]
+    assert bridge.system_modules.execute.await_count == 2
+
+
+async def test_desktop_lock_timeout_does_not_dispatch_or_mark_running(bridge):
+    native(bridge)
+    bridge.desktop_input.timeout = 0.01
+    running = AsyncMock()
+    async with bridge.sessions.lock:
+        with pytest.raises(BridgeError) as caught:
+            await bridge.execute(
+                {
+                    "id": "owned-system-test",
+                    "principal": "local",
+                    "operation": "app.focus",
+                    "args": SAMPLES["app.focus"],
+                },
+                running,
+                running,
+            )
+    assert caught.value.code == "desktop_input_busy"
+    running.assert_not_awaited()
+    bridge.system_modules.execute.assert_not_awaited()
 
 
 @pytest.mark.parametrize("operation", sorted(SYSTEM_LEAVES))

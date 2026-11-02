@@ -232,6 +232,11 @@ class Bridge:
         self.system_modules = SystemModules(
             authorize=self.security.authorize, **installed_native_contract(Path(__file__))
         )
+        from kirabridge.desktop_input import DesktopInput
+
+        self.desktop_input = DesktopInput(
+            self.sessions.lock, timeout=self.system_modules.transport.timeout
+        )
         self.sessions.terminal_app.system_transport = self.system_modules.transport
         self.macos = MacOSProvider(
             terminal_app=self.sessions.terminal_app,
@@ -550,20 +555,30 @@ class Bridge:
                 # Launching a bundle does not bypass the caller's filesystem roots.
                 with scope.directory(args.app_path):
                     pass
-            await running(
-                {
-                    "evidence_type": "native_system_operation",
-                    "operation": operation,
-                    "effect_attempted": operation not in SYSTEM_READ_OPERATIONS,
-                    "automatic_retry": False,
-                }
-            )
-            return await self.system_modules.execute(
-                operation,
-                args.model_dump(exclude_none=True),
-                principal=principal,
-                task_id=task["id"],
-            )
+            from kirabridge.desktop_input import DESKTOP_EFFECT_OPERATIONS
+
+            async def execute_native(turn=None):
+                await running(
+                    {
+                        "evidence_type": "native_system_operation",
+                        "operation": operation,
+                        "effect_attempted": operation not in SYSTEM_READ_OPERATIONS,
+                        "automatic_retry": False,
+                    }
+                )
+                if turn is not None:
+                    turn.mark_attempted()
+                return await self.system_modules.execute(
+                    operation,
+                    args.model_dump(exclude_none=True),
+                    principal=principal,
+                    task_id=task["id"],
+                )
+
+            if operation in DESKTOP_EFFECT_OPERATIONS:
+                async with self.desktop_input.transaction() as turn:
+                    return await execute_native(turn)
+            return await execute_native()
         if operation == "process.output":
             self.store.get(args.task_id, principal)
             await running({"evidence_type": "owned_process_output_read"})
