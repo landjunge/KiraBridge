@@ -372,6 +372,72 @@ struct KeyboardInspectHarness {
                 sameGeneration: { true }, post: { _ in }, verify: { true }, submit: true)
             fatalError("Missing Return callback accepted")
         } catch let error as SystemBridgeFailure { precondition(error.effectUnknown); returnChecks += 1 }
+        var axChecks = 0
+        for (status, flag, expected) in [(AXError.success, true, true), (.success, false, false),
+                                       (.attributeUnsupported, false, false), (.notImplemented, false, false)] {
+            let writable = try SystemKeyboard.selectedTextWritable(status: status, settable: flag)
+            precondition(writable == expected); axChecks += 1
+        }
+        for status in [AXError.cannotComplete, .invalidUIElement, .apiDisabled, .noValue] {
+            do { _ = try SystemKeyboard.selectedTextWritable(status: status, settable: false); fatalError("Uncertain capability accepted") }
+            catch let error as SystemBridgeFailure { precondition(!error.effectUnknown); axChecks += 1 }
+        }
+        let axLiteral = "\u{FEFF}e" + String(repeating: "\u{301}", count: 17) + "😀"
+        try SystemKeyboard.validateText(axLiteral)
+        let axExpected = try SystemKeyboard.expectedText(area, inserting: Array(axLiteral.utf16))
+        let cfLiteral = axLiteral as CFString
+        var cfUnits = [UniChar](repeating: 0, count: CFStringGetLength(cfLiteral))
+        CFStringGetCharacters(cfLiteral, CFRange(location: 0, length: cfUnits.count), &cfUnits)
+        precondition(cfUnits.elementsEqual(axLiteral.utf16))
+        var axField = area, axSets = 0, axReturns = 0
+        let axReceipt = try await SystemKeyboard.writeSelectedText(validate: {}, setter: {
+            axSets += 1
+            axField = SystemKeyboard.Field(value: axExpected.value, selection: axExpected.selection, metadata: area.metadata)
+            return .success
+        }, verify: { axExpected.matches(axField) }, returnPair: { axReturns += 1 })
+        precondition(axSets == 1 && axReturns == 0 && axReceipt["insertion_method"] as? String == "ax_selected_text")
+        precondition(axReceipt["text_event_count"] as? Int == 0 && axReceipt["post_calls_returned"] as? Int == 0)
+        precondition(axReceipt["ax_set_calls_returned"] as? Int == 1 && axReceipt["text_verified"] as? Bool == true)
+        axChecks += 1
+        var axReturnOrder: [Bool] = []
+        let axSubmitted = try await SystemKeyboard.writeSelectedText(validate: {}, setter: { .success }, verify: { true },
+            submit: true, returnPair: {
+                _ = try SystemKeyboard.postPair(validate: {}, sameGeneration: { true }, post: { axReturnOrder.append($0) })
+            })
+        precondition(axReturnOrder == [true, false] && axSubmitted["text_event_count"] as? Int == 0)
+        precondition(axSubmitted["post_calls_returned"] as? Int == 2 && axSubmitted["return_posted"] as? Bool == true)
+        precondition(axSubmitted["submitted"] as? Bool == false && axSubmitted["app_processing_confirmed"] as? Bool == false)
+        axChecks += 1
+        for scenario in ["guard", "setter_status", "setter_throw", "verify", "return_guard"] {
+            var sets = 0, observed = 0, returns = 0
+            do {
+                _ = try await SystemKeyboard.writeSelectedText(validate: {
+                    if scenario == "guard" { throw SystemControl.failure("changed", "fixture") }
+                }, setter: {
+                    sets += 1 // A failed setter may already have changed the target.
+                    if scenario == "setter_throw" { throw SystemControl.failure("lost", "fixture") }
+                    return scenario == "setter_status" ? .cannotComplete : .success
+                }, verify: { observed += 1; return scenario != "verify" }, submit: true, returnPair: {
+                    _ = try SystemKeyboard.postPair(validate: { throw SystemControl.failure("changed", "fixture") },
+                        sameGeneration: { true }, post: { _ in returns += 1 })
+                })
+                fatalError("Unsafe AX insertion completed")
+            } catch let error as SystemBridgeFailure {
+                precondition(error.effectUnknown == (scenario != "guard") && sets == (scenario == "guard" ? 0 : 1))
+                precondition(returns == 0 && observed == (["verify", "return_guard"].contains(scenario) ? 1 : 0))
+                axChecks += 1
+            }
+        }
+        var cancelledSets = 0, cancelledReturns = 0
+        let cancelledAX = Task { @MainActor in
+            try await SystemKeyboard.writeSelectedText(validate: {}, setter: { cancelledSets += 1; return .success },
+                verify: { withUnsafeCurrentTask { $0?.cancel() }; return true }, submit: true,
+                returnPair: { cancelledReturns += 1 })
+        }
+        do { _ = try await cancelledAX.value; fatalError("Return after AX cancellation") }
+        catch let error as SystemBridgeFailure {
+            precondition(error.effectUnknown && cancelledSets == 1 && cancelledReturns == 0); axChecks += 1
+        }
         let fixture = try JSONSerialization.jsonObject(with: FileHandle.standardInput.readDataToEndOfFile()) as! [String: Any]
         var manifest = fixture["begin"] as! [String: Any]
         var stageTarget = manifest["target"] as! [String: Any]
@@ -525,6 +591,7 @@ struct KeyboardInspectHarness {
                                    "text_checks": textChecks,
                                    "stage_checks": stageChecks,
                                    "return_checks": returnChecks,
+                                   "ax_checks": axChecks,
                                    "native_ui_calls": 0, "event_posts": 0, "permission_requests": 0]
         print(String(data: try JSONSerialization.data(withJSONObject: result, options: [.sortedKeys]), encoding: .utf8)!)
     }

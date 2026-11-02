@@ -265,3 +265,68 @@ Enthalten sind wirkungsfreie CGEvent-Returnfactory, Text-vor-Return-Reihenfolge,
 Teiltext, Verifikations-/Guardfehler, Abbruch und Teilpost-Unknown ohne Replay.
 Gegenseitige Review freigegeben, Ruff/Diffprüfung grün. Noch keine Liveabnahme
 des Returnpfads. Die produktive RC24 bleibt während dieser Entwicklung unverändert.
+
+## Schritt 9 – Reale Abnahme und gemessener Optimierungsbedarf
+
+Privater Build aus sauberem, separatem Checkout von
+`901f558d9d417bef7a53cb244bf32a09149b7253`, nicht installiert. Derselbe tatsächliche
+KeyboardManager mit Desktoptransaktion, Staging und gebundenem nativen Worker
+wurde gegen ausschließlich die eigene UUID-Receiver-App ausgeführt. Kein
+öffentlicher HTTP-/MCP-Daemon war Teil dieser Vorabprobe.
+
+Zwei reale Aufträge erfolgreich:31 UTF-8-Bytes mit führendem U+FEFF, Umlaut,
+Combiningzeichen, Emoji, LF und Tab in0,308s;1.024 ASCIIzeichen mit anschließendem
+Return in2,335s. Unabhängiger Receiver bestätigte beide exakten Text-Hashes und
+UTF-16-Cursor, im zweiten Fall genau einen Return. Er beobachtete2/2 bzw65/65
+Down-/Up-Ereignisse. Clipboard-Generation blieb jeweils gleich. Keine
+Eingabewiederholung; eigene Fixture geschlossen und Prozessabwesenheit geprüft.
+Der frühere Hardwareguard-Stop trat in diesen Aufträgen nicht auf; das ist
+kein Beleg für einen vorherigen Guardfehler oder dessen Reparatur.
+
+Beleg: Backuproot `native-keyboard-implementation-20261101T235356Z`, dort
+`step08-live-01/result.private.json` und private Wire-/Receiverbelege. Die
+Produktionsprozesse78414/78630/78865 liefen anschließend mit ihren bisherigen
+Startzeiten weiter. Die Testfläche deklariert AXEnabled und leeren Subrole
+ausdrücklich; universelle TextEdit-/Browserkompatibilität ist nicht abgenommen.
+
+Die gemessenen2,335s für1.024 Zeichen machen die vielen synchronen Zielprüfungen
+je16 UTF-16-Einheiten zu einem relevanten Langtextrisiko. Keine große Eingabe
+wurde blind in den12s-Timeout gefahren. Nächster kleiner Schritt9a ist daher ein
+nativer Insert über nachweislich schreibbares AXSelectedText, mit denselben
+Vorbedingungen, exaktem Endbeleg und Returnguard. Kein AXValueersatz und kein
+Clipboard. Größere Nutzlasten/Geschwindigkeit bleiben bis zu diesen Messungen
+offen; Shortcut-Discovery und Profile beginnen erst nach stabiler Tastaturabnahme.
+
+## Schritt 9a – Bedingter nativer Auswahl-Insert
+
+Eine zusätzliche, eng begrenzte Wirkungsfrei-Prüfung zeigte CGEvent-Set/Get-
+Roundtrips bis1.024 UTF-16-Einheiten. Das beweist keine OS-Zustellung größerer
+Ereignisse; die produktive Eventgrenze wird daraus nicht verändert. Ein eigener
+Swifthelper aus dem gepushten Schritt8-Systemcode prüfte anschließend die
+kontrollierte Textfläche: `AXUIElementIsAttributeSettable(AXSelectedText)` ergab
+success/true. Dieser reine Fähigkeitsbefund löste keine Eingabe aus; Receiver
+meldete0 Down/Return und die eigene App wurde geschlossen/abwesend bestätigt.
+Entscheidungsbeleg `step09a-decision.json` im bestehenden Backuproot.
+
+Die API ist bedingt: der generische SDK-Attributkommentar bezeichnet SelectedText
+als readonly, AppKit bietet einen SelectedText-Setter. Deshalb entscheidet allein
+die konkrete native Settableabfrage. Nur success/true verwendet den Setter;
+belegt fehlende Unterstützung bleibt beim vorhandenen Ereignisweg, sonstige
+Abfragefehler verweigern vor Wirkung. Kein Setterversuch fällt auf Ereignisse
+zurück. Die vorhandene16-Unit-Graphemgrenze gilt weiterhin für CGEvents und wird
+dem nativen Auswahl-Insert nicht auferlegt.
+
+Textvalidierung, erwarteter Gesamtinhalt und gemeinsame Verifikation/Returnroute
+bleiben erhalten. Der Setter erhält eine letzte vollständige Ziel-/Fokus-/
+Revisions-/Hardware-/Settableprüfung. Sein tatsächlicher Aufruf ist der einzige
+Textwirkungspunkt; Fehlerstatus danach sind Unknown. Die Rückgabe benennt
+`insertion_method`, echte AX-Aufrufzahl und tatsächliche Eventzahlen getrennt.
+Keine Änderung an öffentlichen Eingaben, Textstaging, Berechtigungen, Clipboard
+oder Terminal. Ein betroffener nativer Compile-/Harnesslauf bestand in17,91s:
+16 neue AX-Fallgruppen plus die unveränderten158 bisherigen. Geprüft sind
+Settablezustände, unklare Abfragefehler, Literal-CFString mit BOM und langem
+Graphem, genau ein Setter/keine Textevents, optionales Return sowie Unknown bei
+Setterfehlern, fehlendem Beleg, Abbruch oder Returnguardfehler. Kein Replay oder
+Eventfallback nach Setterversuch. Native Deltareview freigegeben; Core unverändert,
+dessen vorhandene Nachweise werden wiederverwendet. Echte größere Texte und
+Geschwindigkeit bleiben bis zur Abnahme des exakten Commitbuilds offen.

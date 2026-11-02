@@ -376,11 +376,14 @@ enum SystemKeyboard {
                 && selection.location == field.selection.location && selection.length == field.selection.length
         }
     }
-    static func textChunks(_ text: String, capacity: Int = 16) throws -> [[UniChar]] {
-        try require(!text.isEmpty && text.utf8.count <= 1024 * 1024 && capacity >= 2 && capacity <= 16,
-                    "Text or native Unicode unit capacity is unsupported")
+    static func validateText(_ text: String) throws {
+        try require(!text.isEmpty && text.utf8.count <= 1024 * 1024, "Text exceeds its bounded UTF-8 limit")
         try require(text.unicodeScalars.allSatisfy { !($0.value < 32 && ![9, 10, 13].contains($0.value)) && $0.value != 127 },
                     "Text contains unsupported control characters")
+    }
+    static func textChunks(_ text: String, capacity: Int = 16) throws -> [[UniChar]] {
+        try validateText(text)
+        try require(capacity >= 2 && capacity <= 16, "Native Unicode unit capacity is unsupported")
         var chunks: [[UniChar]] = [], current: [UniChar] = []
         for character in text {
             let units = Array(String(character).utf16)
@@ -464,6 +467,52 @@ enum SystemKeyboard {
         try inputAllowed(postAccess: CGPreflightPostEventAccess(), flags: CGEventSource.flagsState(.combinedSessionState),
                          keyHeld: CGEventSource.keyState(.hidSystemState, key: keyCode))
     }
+    static func finishText(method: String, textEvents: Int, verify: () async throws -> Bool,
+                           submit: Bool, returnPair: (() throws -> Void)?) async throws -> [String: Any] {
+        let verified = try await verify()
+        try require(verified, "Literal text or final selection could not be verified")
+        if submit {
+            try Task.checkCancellation()
+            guard let returnPair = returnPair else { throw SystemControl.failure("keyboard_unsupported", "Guarded Return pair is unavailable") }
+            try returnPair()
+        }
+        return ["scope": "literal_text_and_selection_observed", "insertion_method": method,
+                "text_event_count": textEvents, "ax_set_calls_returned": method == "ax_selected_text" ? 1 : 0,
+                "post_calls_returned": textEvents + (submit ? 2 : 0),
+                "text_post_calls_returned": textEvents, "return_post_calls_returned": submit ? 2 : 0,
+                "input_attempted": true, "text_verified": true, "selection_verified": true,
+                "verification_scope": "before_optional_return", "return_scope": submit ? "native_post_calls" : "none",
+                "submitted": false, "return_posted": submit, "permission_requested": false,
+                "app_processing_confirmed": false, "effect": "text_insertion_observed"]
+    }
+    static func textUnknown() -> SystemBridgeFailure {
+        SystemControl.failure("keyboard_input_unknown", "Literal text/Return attempt is uncertain; no replay is permitted", unknown: true)
+    }
+    static func selectedTextWritable(status: AXError, settable: Bool) throws -> Bool {
+        switch status {
+        case .success: return settable
+        case .attributeUnsupported, .notImplemented: return false
+        default: throw SystemControl.failure("keyboard_unsupported", "Selected-text capability could not be observed")
+        }
+    }
+    static func selectedTextWritable(_ element: AXUIElement) throws -> Bool {
+        try timeout(element)
+        var settable = DarwinBoolean(false)
+        let status = AXUIElementIsAttributeSettable(element, kAXSelectedTextAttribute as CFString, &settable)
+        return try selectedTextWritable(status: status, settable: settable.boolValue)
+    }
+    static func writeSelectedText(validate: () throws -> Void, setter: () throws -> AXError,
+                                  verify: () async throws -> Bool, submit: Bool = false,
+                                  returnPair: (() throws -> Void)? = nil) async throws -> [String: Any] {
+        try validate()
+        try Task.checkCancellation()
+        do {
+            // From this call onward an effect is possible, even if the AX status reports failure.
+            try require(setter() == .success, "Selected-text setter outcome is uncertain")
+            return try await finishText(method: "ax_selected_text", textEvents: 0,
+                                        verify: verify, submit: submit, returnPair: returnPair)
+        } catch { throw textUnknown() }
+    }
     static func writeText(_ chunks: [[UniChar]], prepare: ([UniChar]) throws -> Void,
                           validate: (Int) throws -> Void, sameGeneration: () -> Bool,
                           post: (Bool) throws -> Void, verify: () async throws -> Bool,
@@ -479,21 +528,10 @@ enum SystemKeyboard {
                     try post($0)
                 })
             }
-            let verified = try await verify()
-            try require(verified, "Literal text or final selection could not be verified")
-            if submit {
-                try Task.checkCancellation()
-                guard let returnPair = returnPair else { throw SystemControl.failure("keyboard_unsupported", "Guarded Return pair is unavailable") }
-                try returnPair()
-            }
-            return ["scope": "literal_text_and_selection_observed", "post_calls_returned": chunks.count * 2 + (submit ? 2 : 0),
-                    "text_post_calls_returned": chunks.count * 2, "return_post_calls_returned": submit ? 2 : 0,
-                    "input_attempted": attempted, "text_verified": true, "selection_verified": true,
-                    "verification_scope": "before_optional_return", "return_scope": submit ? "native_post_calls" : "none",
-                    "submitted": false, "return_posted": submit, "permission_requested": false,
-                    "app_processing_confirmed": false, "effect": "text_insertion_observed"]
+            return try await finishText(method: "cgevent_unicode", textEvents: chunks.count * 2,
+                                        verify: verify, submit: submit, returnPair: returnPair)
         } catch {
-            if attempted { throw SystemControl.failure("keyboard_input_unknown", "Literal text/Return attempt is uncertain; no replay is permitted", unknown: true) }
+            if attempted { throw textUnknown() }
             throw error
         }
     }
@@ -509,19 +547,12 @@ enum SystemKeyboard {
             throw SystemControl.failure("invalid_arguments", "Literal text requires an exact target and text")
         }
         let submit = try submitIntent(args)
-        let chunks = try textChunks(text), initial = try boundSnapshot(target)
+        try validateText(text)
+        let initial = try boundSnapshot(target)
         try textFieldAllowed(initial.field, text: text)
         let expected = try expectedText(initial.field, inserting: Array(text.utf16))
         let layout = initial.response["layout"] as? [String: Any] ?? [:]
-        var pair: (CGEvent, CGEvent)?
-        var result = try await writeText(chunks, prepare: { pair = try unicodeEvents(layout, units: $0) }, validate: { index in
-            if index == 0 { _ = try boundSnapshot(target) }
-            try textRoute(target, initial: initial)
-        }, sameGeneration: { (try? SystemControl.target(target)) != nil }, post: { down in
-            let app = try SystemControl.target(target)
-            guard let pair = pair else { throw SystemControl.failure("keyboard_unsupported", "Unicode pair is unavailable") }
-            (down ? pair.0 : pair.1).postToPid(app.processIdentifier)
-        }, verify: {
+        let verify: () async throws -> Bool = {
             for attempt in 0..<5 {
                 let current = try boundSnapshot(target, revision: false)
                 try require(CFEqual(current.window, initial.window) && CFEqual(current.element, initial.element), "Text verification target changed")
@@ -530,7 +561,8 @@ enum SystemKeyboard {
                 if attempt < 4 { try await Task.sleep(nanoseconds: 20_000_000) }
             }
             return false
-        }, submit: submit, returnPair: {
+        }
+        let returnPair: () throws -> Void = {
             let (down, up) = try events(layout, code: CGKeyCode(kVK_Return), flags: [])
             _ = try postPair(validate: {
                 let current = try boundSnapshot(target, revision: false)
@@ -542,7 +574,29 @@ enum SystemKeyboard {
                 let app = try SystemControl.target(target)
                 (isDown ? down : up).postToPid(app.processIdentifier)
             })
-        })
+        }
+        var result: [String: Any]
+        if try selectedTextWritable(initial.element) {
+            result = try await writeSelectedText(validate: {
+                _ = try boundSnapshot(target)
+                try textRoute(target, initial: initial)
+                try require(selectedTextWritable(initial.element), "Selected text is no longer writable")
+                _ = try SystemControl.target(target)
+            }, setter: {
+                AXUIElementSetAttributeValue(initial.element, kAXSelectedTextAttribute as CFString, text as CFString)
+            }, verify: verify, submit: submit, returnPair: returnPair)
+        } else {
+            let chunks = try textChunks(text)
+            var pair: (CGEvent, CGEvent)?
+            result = try await writeText(chunks, prepare: { pair = try unicodeEvents(layout, units: $0) }, validate: { index in
+                if index == 0 { _ = try boundSnapshot(target) }
+                try textRoute(target, initial: initial)
+            }, sameGeneration: { (try? SystemControl.target(target)) != nil }, post: { down in
+                let app = try SystemControl.target(target)
+                guard let pair = pair else { throw SystemControl.failure("keyboard_unsupported", "Unicode pair is unavailable") }
+                (down ? pair.0 : pair.1).postToPid(app.processIdentifier)
+            }, verify: verify, submit: submit, returnPair: returnPair)
+        }
         result["utf8_bytes"] = text.utf8.count
         result["utf16_units"] = text.utf16.count
         result["text_sha256"] = SHA256.hash(data: Data(text.utf8)).map { String(format: "%02x", $0) }.joined()

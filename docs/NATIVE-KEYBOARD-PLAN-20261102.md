@@ -196,6 +196,21 @@ Voraussetzung oder automatischer Ersatz für lange native Texte. Ein späterer
 expliziter Clipboardauftrag behält seine vorhandene Generation-/Restore-Semantik.
 `AXSet(value)` ersetzt Werte und ist kein gleichwertiger nativer Insert-Fallback.
 
+Messbedingte Präzisierung nach Schritt8: Der echte CGEvent-Pfad funktionierte auf
+Intel-macOS für Unicode/BOM und 1.024 Zeichen mit Return, benötigte aber2,34s
+für letztere. Lineare Hochrechnung ist keine Messung größerer Texte; sie zeigt
+jedoch ein relevantes Risiko für die bestehende12s-Transaktionsfrist. Für
+nachweislich schreibbares `AXSelectedText` wird deshalb ein nativer Insertweg
+ergänzt: nur die aktuelle Auswahl ersetzen/einfügen, niemals `AXValue` ersetzen.
+Exaktes Ziel und Auswahl bleiben gebunden, Feld-/Caretbeleg und optionales Return
+bleiben obligatorisch. Nach einem Setterversuch kein Eventfallback/Replay.
+Fehlende Setzbarkeit wird vor jedem Effekt erkannt; der bestehende Unicode-
+Eventweg bleibt für solche Felder erhalten. Clipboard wird nicht verwendet.
+Apple dokumentiert den [SelectedText-Setter](https://developer.apple.com/documentation/appkit/nsaccessibilityprotocol/setaccessibilityselectedtext(_:))
+und die [native Attributsetzung](https://developer.apple.com/documentation/applicationservices/1460434-axuielementsetattributevalue).
+Tatsächliche Unterstützung und Leistung müssen im eigenen Receiver belegt werden;
+aus der APIexistenz folgt keine allgemeine Unterstützung aller Fremdprogramme.
+
 Vorläufige Grenzen: bis zu 1 MiB UTF-8-Text, zusätzlich das vorhandene
 serialisierte Tasklimit, begrenztes Staging und native Frames unter 64 KiB.
 Chunkzahlen sind interne Transportgrenzen, keine Grenze, die einen Wechsel zur
