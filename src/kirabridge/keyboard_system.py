@@ -158,4 +158,52 @@ def system_receipt_verified(result, *, action, repeat):
             and type(after) is bool
             and after == (before ^ bool(repeat % 2))
         )
-    return result.get("post_calls_returned") == 2 * repeat
+    release_fields = {"key_pair_post_calls_returned", "modifier_release_post_calls_returned"}
+    resolved = result.get("resolved") or {}
+    releases = resolved.get("modifier_release_key_codes")
+    if (
+        resolved.get("route") == "quartz_hid"
+        or releases is not None
+        or release_fields.intersection(result)
+    ):
+        if (
+            result.get("scope") != "native_post_calls"
+            or result.get("event_scope") != "system"
+            or resolved.get("route") not in {"quartz_hid", "system_defined_hid"}
+            or not isinstance(releases, list)
+            or len(releases) > 5
+            or any(type(code) is not int or code not in {55, 59, 58, 56, 63} for code in releases)
+            or len(set(releases)) != len(releases)
+            or (resolved.get("route") == "system_defined_hid" and releases)
+            or any(
+                type(result.get(key)) is not int
+                for key in (
+                    *release_fields,
+                    "post_calls_returned",
+                    "requested_repeat",
+                    "completed_repeat",
+                )
+            )
+        ):
+            return False
+        if resolved["route"] == "quartz_hid":
+            modifiers = resolved.get("modifiers")
+            codes = {"command": 55, "control": 59, "option": 58, "shift": 56, "fn": 63}
+            if (
+                not isinstance(modifiers, list)
+                or any(name not in codes for name in modifiers)
+                or len(set(modifiers)) != len(modifiers)
+                or set(releases) - {63} != {codes[name] for name in modifiers if name != "fn"}
+                or (63 in releases and "fn" not in modifiers)
+            ):
+                return False
+        return (
+            result["requested_repeat"] == result["completed_repeat"] == repeat
+            and result["key_pair_post_calls_returned"] == 2 * repeat
+            and result["modifier_release_post_calls_returned"] == len(releases) * repeat
+            and result["post_calls_returned"] == (2 + len(releases)) * repeat
+        )
+    return (
+        type(result.get("post_calls_returned")) is int
+        and result["post_calls_returned"] == 2 * repeat
+    )

@@ -98,3 +98,14 @@ def test_system_hardware_modifier_combinations_without_os_input(tmp_path):
     assert receipt["nx_action_count"] == 19
     assert receipt["combinations_per_action"] == 7
     assert receipt["real_event_posts"] == receipt["hardware_writes"] == 0
+
+
+@pytest.mark.skipif(
+    sys.platform != "darwin" or not shutil.which("xcrun"), reason="Darwin SDK required"
+)
+def test_system_modifier_release_delta_without_os_input(tmp_path):
+    receipt = run_native_harness(tmp_path, "ModifierReleaseHarness.swift")
+    assert receipt["checks"] >= 138
+    assert receipt["real_event_posts"] == receipt["permission_requests"] == 0
+    assert receipt["fixture_keyboard_posts"] == 6
+    assert receipt["fixture_modifier_releases"] == 3

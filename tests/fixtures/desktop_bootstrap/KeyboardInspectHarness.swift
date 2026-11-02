@@ -206,7 +206,7 @@ struct KeyboardInspectHarness {
         precondition(fn.code == CGKeyCode(kVK_Return) && fn.flags == .maskSecondaryFn)
         layoutChecks += 1
         for type in [40, 41] {
-            let (down, up) = try SystemKeyboard.events(["keyboard_type": type], code: 6, flags: [.maskCommand, .maskShift])
+            let (down, up) = try SystemKeyboard.events(["keyboard_type": type], code: 6, flags: [.maskCommand, .maskShift], observedCapsLock: false)
             precondition(down.type == .keyDown && up.type == .keyUp)
             for event in [down, up] {
                 precondition(event.getIntegerValueField(.keyboardEventKeyboardType) == Int64(type))

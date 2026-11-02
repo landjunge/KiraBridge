@@ -1,12 +1,17 @@
 # KiraBridge
 
-**RC25: dauerhafter ChatGPT-Wiederanlauf und native Installations-App für Intel.**
+**RC26: native macOS-Tastatur einschließlich Systemtasten und Berechtigungsprüfung.**
+Apple Notizen, F1–F20, Ziffernblock, Fn, Caps Lock und konfigurierte macOS-Kombinationen
+nutzen passende native Eingabewege. Die Oberfläche bietet Systemaktionen und direkte
+Links zu erforderlichen macOS-Freigaben. Tatsächliche Gerätewirkungen, Testergebnisse
+und Grenzen stehen im [Tastaturbericht](docs/MACOS-KEYBOARD-COMPLETE-20261102.md).
+
 Die App aktualisiert Dienst, Bedienoberfläche und die vorhandene ChatGPT-Anbindung
 über den geprüften Installer mit Sicherung und Rückweg. Einstellungen und Zugänge
 bleiben erhalten. Lokale Prüfungen, Paketidentität und der tatsächliche
 Installationsstand stehen im [aktuellen Bericht](docs/BOOT-RECOVERY-INSTALLER-20261102.md).
 
-[Intel-Installationspaket und Releasehinweise](https://github.com/landjunge/KiraBridge/releases/tag/v0.8.0rc25) ·
+[Intel-Installationspaket und Releasehinweise](https://github.com/landjunge/KiraBridge/releases/tag/v0.8.0rc26) ·
 [ältere Veröffentlichungen](https://github.com/landjunge/KiraBridge/releases)
 
 Lokal auf Intel installiert und über den echten ChatGPT-Connector geprüft:

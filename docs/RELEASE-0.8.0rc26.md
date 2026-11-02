@@ -5,6 +5,10 @@ The native keyboard path supports Apple Notes' actual accessibility metadata,
 key repetitions. A separate explicit system path sends configured macOS shortcuts
 and special-key signals through the HID event stream. Caps Lock uses a typed,
 verified modifier-state transaction instead of invented event-post receipts.
+Ordinary keys preserve Caps Lock while literal Unicode stays exact. Global
+shortcuts include real modifier-release events, counted separately from key pairs.
+Hardware keys accept explicit modifiers, including Option+Shift for finer volume
+and brightness steps.
 
 The native inventory distinguishes configured shortcuts, event routes, observed
 audio/display/Space state and hardware-dependent effects. Permission guidance

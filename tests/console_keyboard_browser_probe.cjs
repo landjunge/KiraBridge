@@ -23,7 +23,7 @@ const status = {
   pending: [], peers_connected: true, maintenance: null
 };
 const automaticCases = ["automatic_text_return", "automatic_key_combination", "automatic_lost_response", "automatic_limit_and_draft", "automatic_advanced", "automatic_app_visibility"];
-const modernCases = ["system_inventory_rights", "system_action_repeat", "system_missing_receipt", "system_lost_response", "system_inventory_changed", "app_extended_key_repeat", "system_caps_lock_repeat", "system_caps_lock_unconfirmed", "system_hardware_modifiers", "system_hardware_modifier_receipt"];
+const modernCases = ["system_inventory_rights", "system_action_repeat", "system_missing_receipt", "system_lost_response", "system_inventory_changed", "app_extended_key_repeat", "system_caps_lock_repeat", "system_caps_lock_unconfirmed", "system_hardware_modifiers", "system_hardware_modifier_receipt", "system_quartz_release", "system_quartz_bad_release", "system_quartz_fn_classification"];
 const cases = ["profiles_and_discovery", "one_run", "lost_response", "lost_response_preparation", "completed_preparation", "failed_intent", "failed_main", "missing_post_proof", "candidate", ...automaticCases, ...modernCases];
 
 async function checkModern(page, name, posts, gets) {
@@ -58,6 +58,25 @@ async function checkModern(page, name, posts, gets) {
   assert.ok(await page.locator('#keyboard-system-action option[value="mission_control"]').isDisabled());
   assert.match(await page.locator("#keyboard-system-action").innerText(), /Lauter/);
   assert.equal(await page.locator("#keyboard img").count(), 0, "Untrusted action labels remain text");
+  if(name.startsWith("system_quartz_")){
+    const action=name==="system_quartz_fn_classification"?"space_left":"app_next";
+    await page.locator("#keyboard-system-action").selectOption(action);
+    await page.locator("#keyboard-send").evaluate(button => { button.click(); button.click(); });
+    if(name!=="system_quartz_bad_release"){
+      await page.waitForFunction(() => document.querySelector("#notice").textContent.includes("Mac-Funktion wurde gesendet"));
+      assert.ok(await page.locator("#keyboard-send").isEnabled(), "A complete Cmd-Tab receipt includes its actual modifier release post");
+    }else{
+      await page.waitForFunction(() => document.querySelector("#notice").textContent.includes("nicht vollständig bestätigt"));
+      assert.ok(await page.locator("#keyboard-send").isDisabled(), "Wrong release counter must retain the original intent");
+      await page.locator("#keyboard-status").click();
+      await page.waitForFunction(() => !document.querySelector("#keyboard-status").disabled);
+      assert.ok(await page.locator("#keyboard-send").isDisabled(), "A missing release list after status must remain unknown");
+      assert.equal(gets.length,1);
+    }
+    assert.equal(inputs().length,1,"Neither double-click nor status may replay a global key");
+    assert.deepEqual(inputs()[0].args,{scope:"system",action});
+    return;
+  }
   const caps = name.startsWith("system_caps_lock_");
   await page.locator("#keyboard-system-action").selectOption(caps ? "caps_lock" : "volume_up");
   assert.match(await page.locator("#keyboard-system-help").innerText(), /erkannt/);
@@ -327,6 +346,7 @@ async function check(browser, name) {
           result = { permission_guidance };
           if (body.operation === "keyboard.system_inventory") result.actions = [{ action: "volume_up", available: !(name === "system_inventory_changed" && posts.filter(p => p.operation === body.operation).length > 1) }, { action: "mission_control", available: false }, { action: "other", label: '<img src=x onerror="window.injected=1">', available: false }];
           if (body.operation === "keyboard.system_inventory" && name.startsWith("system_caps_lock_")) result.actions.push({ action: "caps_lock", available: true });
+          if (body.operation === "keyboard.system_inventory" && name.startsWith("system_quartz_")) result.actions.push({ action: "app_next", available: true, accepts_modifiers: false },{action:"space_left",available:true,accepts_modifiers:false});
           if (body.operation === "keyboard.system_inventory" && name.startsWith("system_hardware_modifier")) {
             result.actions[0].accepts_modifiers = posts.filter(p => p.operation === body.operation).length === 1;
             result.actions.push({ action: "brightness_up", available: true, accepts_modifiers: true }, { action: "caps_lock", available: true, accepts_modifiers: true });
@@ -338,6 +358,8 @@ async function check(browser, name) {
           if (body.args.text !== undefined) Object.assign(result, { text_verified: true, selection_verified: true, return_posted: body.args.submit === true });
           else if (body.args.key?.named !== "escape") Object.assign(result, { post_calls_returned: 2 * (body.args.repeat || 1), requested_repeat: body.args.repeat || 1, completed_repeat: body.args.repeat || 1 });
           if (body.args.scope === "system") Object.assign(result, { event_scope: "system", native_operation: "keyboard.system_key", resolved: { action: body.args.action || "explicit_key" } });
+          if(name.startsWith("system_quartz_")&&body.args.action==="app_next")Object.assign(result,{scope:"native_post_calls",resolved:{action:"app_next",route:"quartz_hid",modifiers:["command"],modifier_release_key_codes:[55]},key_pair_post_calls_returned:2,modifier_release_post_calls_returned:name==="system_quartz_bad_release"?0:1,post_calls_returned:name==="system_quartz_bad_release"?2:3});
+          if(name==="system_quartz_fn_classification"&&body.args.action==="space_left")Object.assign(result,{scope:"native_post_calls",resolved:{action:"space_left",route:"quartz_hid",modifiers:["control","fn"],modifier_release_key_codes:[59]},key_pair_post_calls_returned:2,modifier_release_post_calls_returned:1,post_calls_returned:3});
           if (body.args.action && Array.isArray(body.args.modifiers)) result.resolved.modifiers = name === "system_hardware_modifier_receipt" ? [] : body.args.modifiers;
           if (body.args.action === "caps_lock") Object.assign(result, { scope: "native_state_readback", modifier: "caps_lock", resolved: { action: "caps_lock", route: "modifier_lock_state" }, effect_verified: true, system_processing_confirmed: true, post_calls_returned: 0, state_set_calls_returned: body.args.repeat, state_before: false, state_after: name === "system_caps_lock_unconfirmed" });
           if (name === "system_missing_receipt") result.post_calls_returned = 2;
@@ -363,6 +385,7 @@ async function check(browser, name) {
       const value = structuredClone(tasks.get(url.pathname.split("/").pop()));
       assert.ok(value, "Lost response must retain a deterministic task identity");
       value.task.state = networkLost && name !== "lost_response_preparation" ? "unknown" : "completed";
+      if(name==="system_quartz_bad_release"){value.task.result.modifier_release_post_calls_returned=1;value.task.result.post_calls_returned=3;delete value.task.result.resolved.modifier_release_key_codes;}
       if (name === "system_caps_lock_unconfirmed") { value.task.result.state_after = false; delete value.task.result.effect_verified; }
       if (name === "lost_response_preparation" && gets.length === 1) {
         value.task.id = value.task.id.replace(/-main$/, "-focus");

@@ -171,3 +171,37 @@ def test_caps_lock_needs_state_readback_parity_not_invented_event_posts():
         {"state_before": 0},
     ]:
         assert not system_receipt_verified({**receipt, **changed}, action="caps_lock", repeat=2)
+
+
+def test_system_modifier_releases_require_exact_typed_post_counters():
+    receipt = {
+        "scope": "native_post_calls",
+        "event_scope": "system",
+        "resolved": {
+            "route": "quartz_hid",
+            "modifiers": ["command"],
+            "modifier_release_key_codes": [55],
+        },
+        "requested_repeat": 2,
+        "completed_repeat": 2,
+        "key_pair_post_calls_returned": 4,
+        "modifier_release_post_calls_returned": 2,
+        "post_calls_returned": 6,
+    }
+    assert system_receipt_verified(receipt, action="app_next", repeat=2)
+    assert not system_receipt_verified(
+        {"resolved": {"route": "quartz_hid"}, "post_calls_returned": 4},
+        action="app_next",
+        repeat=2,
+    )
+    for changed in [
+        {"post_calls_returned": 4},
+        {"modifier_release_post_calls_returned": 0},
+        {"key_pair_post_calls_returned": 6},
+        {"requested_repeat": 1},
+        {"completed_repeat": True},
+        {"resolved": {"route": "quartz_hid", "modifier_release_key_codes": [55, 55]}},
+        {"resolved": {"route": "quartz_hid", "modifier_release_key_codes": [54]}},
+        {"resolved": {"route": "system_defined_hid", "modifier_release_key_codes": [55]}},
+    ]:
+        assert not system_receipt_verified({**receipt, **changed}, action="app_next", repeat=2)

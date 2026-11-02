@@ -544,8 +544,17 @@ enum SystemKeyboard {
                 "Keyboard post attempt is uncertain; no replay is permitted", unknown: true)
         }
     }
+    static func mergedEventFlags(_ requested: CGEventFlags, observedCapsLock: Bool) -> CGEventFlags {
+        var applied = requested.subtracting(.maskAlphaShift)
+        if observedCapsLock { applied.insert(.maskAlphaShift) }
+        return applied
+    }
+    static func observedCapsLock() -> Bool {
+        CGEventSource.flagsState(.hidSystemState).contains(.maskAlphaShift)
+    }
     static func events(_ layout: [String: Any], code: CGKeyCode,
-                       flags: CGEventFlags) throws -> (CGEvent, CGEvent) {
+                       flags: CGEventFlags, preserveCapsLock: Bool = true,
+                       observedCapsLock injectedCapsLock: Bool? = nil) throws -> (CGEvent, CGEvent) {
         guard let type = layout["keyboard_type"] as? NSNumber,
               CFGetTypeID(type) != CFBooleanGetTypeID(), type.doubleValue.isFinite,
               type.doubleValue >= 0, type.doubleValue <= Double(UInt32.max),
@@ -555,8 +564,10 @@ enum SystemKeyboard {
               let up = CGEvent(keyboardEventSource: source, virtualKey: code, keyDown: false) else {
             throw SystemControl.failure("keyboard_unsupported", "Bounded native keyboard type or event source is unavailable")
         }
+        let applied = mergedEventFlags(flags,
+            observedCapsLock: preserveCapsLock ? (injectedCapsLock ?? observedCapsLock()) : false)
         for event in [down, up] {
-            event.flags = flags
+            event.flags = applied
             event.setIntegerValueField(.keyboardEventAutorepeat, value: 0)
             event.setIntegerValueField(.keyboardEventKeyboardType, value: Int64(type.doubleValue))
             try require(event.getIntegerValueField(.keyboardEventKeyboardType) == Int64(type.doubleValue),
@@ -671,8 +682,12 @@ enum SystemKeyboard {
         let code = resolved.code
         var binding: [String: Any]?, expectedIdentity: String?
         var firstWindow: AXUIElement?, firstElement: AXUIElement?
+        var appliedEventFlags: CGEventFlags?
         var result = try repeatedPairs(repetitions) { index in
             let (down, up) = try events(layout.metadata, code: code, flags: resolved.flags)
+            if let previous = appliedEventFlags {
+                try require(previous == down.flags, "Caps Lock changed during keyboard repetition")
+            } else { appliedEventFlags = down.flags }
             return try postPair(validate: {
                 let current = try boundSnapshot(target, revision: index == 0)
                 if index == 0 {
@@ -692,6 +707,8 @@ enum SystemKeyboard {
                     } else { expectedIdentity = identity }
                 }
                 try matchingLayout(layout.metadata, current.response["layout"] as? [String: Any] ?? [:])
+                try require(observedCapsLock() == down.flags.contains(.maskAlphaShift),
+                            "Caps Lock changed before keyboard input")
                 try inputAllowed(postAccess: CGPreflightPostEventAccess(),
                     flags: CGEventSource.flagsState(.combinedSessionState),
                     keyHeld: CGEventSource.keyState(.hidSystemState, key: code)
@@ -712,6 +729,9 @@ enum SystemKeyboard {
         }
         result["requested"] = ["key": spec, "modifiers": modifiers, "repeat": repetitions]
         result["resolved"] = ["key_code": Int(code), "flags": resolved.flags.rawValue,
+            "requested_flags": resolved.flags.rawValue,
+            "applied_flags": (appliedEventFlags ?? resolved.flags).rawValue,
+            "caps_lock_applied": appliedEventFlags?.contains(.maskAlphaShift) ?? false,
             "modifiers": modifierFlags.filter { resolved.flags.contains($0.1) }.map { $0.0 },
             "original_key_code": Int(resolved.originalCode ?? code),
             "original_flags": (resolved.originalFlags ?? resolved.flags).rawValue,
@@ -778,7 +798,8 @@ enum SystemKeyboard {
     }
     static func unicodeEvents(_ layout: [String: Any], units: [UniChar]) throws -> (CGEvent, CGEvent) {
         try require(!units.isEmpty && units.count <= 16, "Native Unicode unit is unbounded")
-        let (down, up) = try events(layout, code: 0, flags: [])
+        // Literal Unicode insertion does not inherit keyboard case modifiers.
+        let (down, up) = try events(layout, code: 0, flags: [], preserveCapsLock: false)
         for event in [down, up] {
             units.withUnsafeBufferPointer { event.keyboardSetUnicodeString(stringLength: $0.count, unicodeString: $0.baseAddress) }
             var count = 0

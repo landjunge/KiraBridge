@@ -55,6 +55,20 @@
   $("keyboard-system-help").textContent=available+(available===1?" Tastensignal/Systemaktion erkannt.":" Tastensignale/Systemaktionen erkannt.")+" Kein Zielprogramm erforderlich. Eine Gerätewirkung ist nur bei einem entsprechenden Zustandsbeleg bestätigt; sie hängt auch von Hardware, laufender Medien-App und macOS-Einstellungen ab.";
   guidanceView(result.permission_guidance);
  }
+ function systemKeyReceipt(result,repeat){
+  const route=result.resolved?.route,codes=result.resolved?.modifier_release_key_codes;
+  const typed=codes!==undefined||result.key_pair_post_calls_returned!==undefined||result.modifier_release_post_calls_returned!==undefined;
+  const repeated=result.requested_repeat===repeat&&result.completed_repeat===repeat;
+  if(!typed)return route!=="quartz_hid"&&(route===undefined||route==="system_defined_hid")&&result.post_calls_returned===2*repeat&&(repeat===1||repeated);
+  if(result.scope!=="native_post_calls"||!repeated||!["quartz_hid","system_defined_hid"].includes(route)||!Array.isArray(codes)||codes.length>5||new Set(codes).size!==codes.length||!codes.every(code=>Number.isInteger(code)&&[55,59,58,56,63].includes(code)))return false;
+  if(route==="system_defined_hid"&&codes.length!==0)return false;
+  if(route==="quartz_hid"&&Array.isArray(result.resolved.modifiers)){
+   const keys={command:55,control:59,option:58,shift:56},modifiers=result.resolved.modifiers,ordinary=modifiers.filter(name=>name!=="fn");
+   if(new Set(modifiers).size!==modifiers.length||!modifiers.every(name=>name==="fn"||Object.hasOwn(keys,name))||ordinary.length!==codes.filter(code=>code!==63).length||!ordinary.every(name=>codes.includes(keys[name]))||(codes.includes(63)&&!modifiers.includes("fn")))return false;
+  }
+  const pairs=2*repeat,releases=codes.length*repeat;
+  return result.key_pair_post_calls_returned===pairs&&result.modifier_release_post_calls_returned===releases&&result.post_calls_returned===pairs+releases;
+ }
  function renderActions(){const select=$("keyboard-actions"),previous=select.value;select.replaceChildren(node("option","Aktion wählen"));select.firstChild.value="";for(const [name,action] of Object.entries(state.saved?.profile.actions||{})){const option=node("option",name+(action.provenance==="observed_menu"?" · unbestätigter Kandidat":""));option.value=name;select.append(option);}if(Object.hasOwn(state.saved?.profile.actions||{},previous))select.value=previous;}
  function acceptProfile(result,intent){
   state.saved={profile_id:result.profile_id,revision:result.revision,profile:result.profile};
@@ -101,7 +115,7 @@
    }else if(intent.operation==="keyboard.control"){
     const r=task.result||{},resolved=r.resolved_application,repeat=intent.repeat||1,system=intent.scope==="system",nativeSystem=r.native_operation==="keyboard.system_key"&&r.event_scope==="system";
     const targetConfirmed=system?Number.isInteger(resolved?.pid)&&Number.isFinite(resolved?.started_at):resolved?.pid===intent.pid&&resolved.started_at===intent.expected_started_at;
-    const repeatConfirmed=r.post_calls_returned===2*repeat&&(repeat===1||(r.requested_repeat===repeat&&r.completed_repeat===repeat));
+    const repeatConfirmed=nativeSystem?systemKeyReceipt(r,repeat):r.post_calls_returned===2*repeat&&(repeat===1||(r.requested_repeat===repeat&&r.completed_repeat===repeat));
     const actionModifiersConfirmed=!Array.isArray(intent.action_modifiers)||(Array.isArray(r.resolved?.modifiers)&&r.resolved.modifiers.length===intent.action_modifiers.length&&new Set(r.resolved.modifiers).size===r.resolved.modifiers.length&&intent.action_modifiers.every(value=>r.resolved.modifiers.includes(value)));
     const capsRequested=system&&intent.action==="caps_lock",capsVerified=capsRequested&&nativeSystem&&r.scope==="native_state_readback"&&r.modifier==="caps_lock"&&r.resolved?.route==="modifier_lock_state"&&r.resolved?.action==="caps_lock"&&r.effect_verified===true&&r.system_processing_confirmed===true&&r.requested_repeat===repeat&&r.completed_repeat===repeat&&r.state_set_calls_returned===repeat&&r.post_calls_returned===0&&typeof r.state_before==="boolean"&&typeof r.state_after==="boolean"&&r.state_after===(r.state_before!==Boolean(repeat%2));
     const receiptConfirmed=intent.kind==="text"?r.text_verified===true&&r.selection_verified===true&&r.return_posted===intent.submit:capsRequested?capsVerified:repeatConfirmed&&actionModifiersConfirmed&&(!system||nativeSystem)&&(!intent.action||r.resolved?.action===intent.action)&&(intent.scope!=="app"||!nativeSystem);

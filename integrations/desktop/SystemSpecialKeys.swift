@@ -243,7 +243,7 @@ enum SystemSpecialKeys {
         return rawKeyPlan(code: Int(resolved.code), flags: resolved.flags,
                           explicitFn: modifiers.contains("fn"), preferences: preferences)
     }
-    static func events(_ plan: Plan) throws -> (CGEvent, CGEvent) {
+    static func events(_ plan: Plan, observedCapsLock: Bool? = nil) throws -> (CGEvent, CGEvent) {
         if plan.route == "system_defined_hid" {
             func event(_ down: Bool) throws -> CGEvent {
                 let state = Int(down ? NX_KEYDOWN : NX_KEYUP)
@@ -258,29 +258,80 @@ enum SystemSpecialKeys {
             }
             return try (event(true), event(false))
         }
-        guard plan.route == "quartz_hid", let source = CGEventSource(stateID: .privateState),
-              let down = CGEvent(keyboardEventSource: source, virtualKey: CGKeyCode(plan.code), keyDown: true),
-              let up = CGEvent(keyboardEventSource: source, virtualKey: CGKeyCode(plan.code), keyDown: false) else {
+        guard plan.route == "quartz_hid" else {
             throw failure("System keyboard event could not be constructed")
         }
-        for event in [down, up] {
-            event.flags = plan.flags
-            event.setIntegerValueField(.keyboardEventAutorepeat, value: 0)
-        }
-        return (down, up)
+        return try SystemKeyboard.events(["keyboard_type": Int(LMGetKbdType())],
+            code: CGKeyCode(plan.code), flags: plan.flags, observedCapsLock: observedCapsLock)
     }
     /// Pure orchestration also used by the injected native harness. Key-up is
     /// always attempted after our key-down; system navigation may change focus.
+    struct ModifierRelease {
+        let code: CGKeyCode
+        let flags: CGEventFlags
+    }
+    static func modifierReleasePlan(_ plan: Plan, explicitFn: Bool, capsLock: Bool) -> [ModifierRelease] {
+        guard plan.route == "quartz_hid" else { return [] }
+        var owned = plan.flags.intersection([.maskCommand, .maskControl, .maskAlternate, .maskShift])
+        if explicitFn && plan.flags.contains(.maskSecondaryFn) { owned.insert(.maskSecondaryFn) }
+        let order: [(CGKeyCode, CGEventFlags)] = [(55, .maskCommand), (59, .maskControl),
+            (58, .maskAlternate), (56, .maskShift), (63, .maskSecondaryFn)]
+        var result: [ModifierRelease] = []
+        for (code, flag) in order where owned.contains(flag) {
+            owned.remove(flag)
+            result.append(ModifierRelease(code: code,
+                flags: capsLock ? owned.union(.maskAlphaShift) : owned))
+        }
+        return result
+    }
+    static func physicalModifiersIdle(read: (CGKeyCode) -> Bool) -> Bool {
+        // Left/right physical keys only. Caps Lock is persistent state, not a
+        // held user modifier, and event flags can include our synthetic chord.
+        ![54, 55, 56, 58, 59, 60, 61, 62, 63].contains { read(CGKeyCode($0)) }
+    }
+    static func releaseModifiers(_ plan: Plan, explicitFn: Bool,
+                                 capsLock: () -> Bool, validate: () throws -> Void,
+                                 post: (CGEvent) throws -> Void) throws -> Int {
+        // Build no events for non-Quartz routes or classification-only Fn.
+        let releases = modifierReleasePlan(plan, explicitFn: explicitFn, capsLock: false)
+        var returned = 0
+        for release in releases {
+            try validate()
+            guard let source = CGEventSource(stateID: .privateState),
+                  let event = CGEvent(keyboardEventSource: source, virtualKey: release.code, keyDown: false) else {
+                throw failure("System modifier release event could not be constructed")
+            }
+            event.type = .flagsChanged
+            event.flags = capsLock() ? release.flags.union(.maskAlphaShift) : release.flags
+            try post(event)
+            returned += 1
+        }
+        return returned
+    }
     static func pairs(_ count: Int, validate: () throws -> Void,
-                      post: (Bool) throws -> Void) throws -> [String: Any] {
+                      post: (Bool) throws -> Void,
+                      release: () throws -> Int = { 0 }) throws -> [String: Any] {
         guard count >= 1, count <= 20 else { throw failure("System repeat must be between 1 and 20") }
-        var attempted = 0, completed = 0
+        var attempted = 0, completed = 0, releases = 0
         do {
             for _ in 0..<count {
                 try validate()
                 attempted += 1
-                do { try post(true); try post(false) }
-                catch { try? post(false); throw error }
+                var keyUpReturned = false, releaseAttempted = false
+                do {
+                    try post(true)
+                    try post(false)
+                    keyUpReturned = true
+                    releaseAttempted = true
+                    releases += try release()
+                } catch {
+                    // Release only our own key/modifiers, once, through the
+                    // same fresh-rights/physical-idle callback. Never replay a
+                    // partially attempted modifier-release batch.
+                    if !keyUpReturned { try? post(false) }
+                    if !releaseAttempted { _ = try? release() }
+                    throw error
+                }
                 completed += 1
             }
         } catch {
@@ -292,7 +343,8 @@ enum SystemSpecialKeys {
         return ["scope": "native_post_calls", "event_scope": "system",
                 "attempted_pairs": attempted, "posted_pairs": completed,
                 "requested_repeat": count, "completed_repeat": completed,
-                "post_calls_returned": completed * 2, "input_attempted": true,
+                "key_pair_post_calls_returned": completed * 2, "modifier_release_post_calls_returned": releases,
+                "post_calls_returned": completed * 2 + releases, "input_attempted": true,
                 "system_processing_confirmed": false, "permission_requested": false]
     }
     static func withCapsLock<T>(_ operation: (io_connect_t) throws -> T) throws -> T {
@@ -354,6 +406,9 @@ enum SystemSpecialKeys {
                 "state_set_calls_returned": completed, "post_calls_returned": 0,
                 "input_attempted": true, "system_processing_confirmed": true, "permission_requested": false]
     }
+    static func heldKeyConflict(route: String, read: () -> Bool) -> Bool {
+        route == "quartz_hid" && read()
+    }
     static func key(_ args: [String: Any]) throws -> [String: Any] {
         guard let target = args["target"] as? [String: Any] else {
             throw failure("System input requires a freshly bound frontmost PID and start time")
@@ -362,6 +417,7 @@ enum SystemSpecialKeys {
         guard count >= 1 else { throw failure("System repeat must be between 1 and 20") }
         let initial = try plan(args, preferences: preferences())
         let before = observations()
+        var appliedEventFlags: CGEventFlags?
         let validate: () throws -> Void = {
             let current = try plan(args, preferences: preferences())
             guard current == initial else { throw failure("System shortcut changed before input") }
@@ -371,9 +427,17 @@ enum SystemSpecialKeys {
             }
             try SystemControl.axGranted()
             if !initial.registered { _ = try SystemKeyboard.snapshot(target) }
+            if initial.route == "quartz_hid", let applied = appliedEventFlags {
+                guard SystemKeyboard.observedCapsLock() == applied.contains(.maskAlphaShift) else {
+                    throw failure("Caps Lock changed before system keyboard input")
+                }
+            }
             let heldFlags = CGEventSource.flagsState(.hidSystemState)
-            let heldKey = (initial.route == "quartz_hid" || initial.route == "modifier_lock_state")
-                && CGEventSource.keyState(.hidSystemState, key: CGKeyCode(initial.code))
+            // keyState(57) reports the latched lock state, not physical pressure.
+            // Keep the held-key guard for ordinary Quartz keys only.
+            let heldKey = heldKeyConflict(route: initial.route) {
+                CGEventSource.keyState(.hidSystemState, key: CGKeyCode(initial.code))
+            }
             try SystemKeyboard.inputAllowed(postAccess: CGPreflightPostEventAccess(), flags: heldFlags, keyHeld: heldKey)
         }
         var result: [String: Any]
@@ -386,10 +450,38 @@ enum SystemSpecialKeys {
             }
         } else {
             let pair = try events(initial)
+            if initial.route == "quartz_hid" { appliedEventFlags = pair.0.flags }
+            let releaseGuard: () throws -> Void = {
+                try SystemControl.axGranted()
+                guard CGPreflightPostEventAccess(), physicalModifiersIdle(read: {
+                    CGEventSource.keyState(.hidSystemState, key: $0)
+                }) else {
+                    throw failure("Current post access or idle physical modifier proof is absent")
+                }
+            }
             result = try pairs(count, validate: validate,
-                post: { down in (down ? pair.0 : pair.1).post(tap: .cghidEventTap) })
+                post: { down in
+                    try releaseGuard()
+                    (down ? pair.0 : pair.1).post(tap: .cghidEventTap)
+                }, release: {
+                    try releaseModifiers(initial,
+                        explicitFn: (args["modifiers"] as? [String] ?? []).contains("fn"),
+                        capsLock: { SystemKeyboard.observedCapsLock() }, validate: releaseGuard,
+                        post: { $0.post(tap: .cghidEventTap) })
+                })
         }
         result["resolved"] = initial.metadata
+        if let applied = appliedEventFlags {
+            var metadata = initial.metadata
+            metadata["requested_flags"] = initial.flags.rawValue
+            metadata["applied_flags"] = applied.rawValue
+            metadata["caps_lock_applied"] = applied.contains(.maskAlphaShift)
+            result["resolved"] = metadata
+        }
+        var resolved = result["resolved"] as? [String: Any] ?? initial.metadata
+        resolved["modifier_release_key_codes"] = modifierReleasePlan(initial,
+            explicitFn: (args["modifiers"] as? [String] ?? []).contains("fn"), capsLock: false).map { Int($0.code) }
+        result["resolved"] = resolved
         result["observed_before"] = before
         result["observed_after"] = observations()
         result["effect"] = initial.route == "modifier_lock_state" ? "modifier_lock_verified" : "system_events_dispatched"
