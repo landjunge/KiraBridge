@@ -106,6 +106,13 @@ class KeyboardKeyInput(Input):
     key: KeyboardKey
 
 
+class KeyboardActionInput(Input):
+    target: KeyboardTarget
+    profile_id: str = Field(pattern=r"^[a-z][a-z0-9_-]{0,63}$")
+    expected_revision: str = Field(pattern=r"^[a-f0-9]{64}$")
+    action: str = Field(pattern=r"^[a-z][a-z0-9_.-]{0,79}$")
+
+
 class KeyboardChordInput(KeyboardKeyInput):
     modifiers: list[Modifier] = Field(min_length=1, max_length=4)
 

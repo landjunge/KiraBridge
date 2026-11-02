@@ -80,6 +80,7 @@ for _name in (
     "keyboard.key",
     "keyboard.chord",
     "keyboard.text",
+    "keyboard.action",
     "keyboard.profiles.put",
     "keyboard.profiles.delete",
     "session.input",
@@ -114,7 +115,7 @@ for _name in (
         else "keyboard.shortcuts.read"
         if _name == "keyboard.shortcuts.discover"
         else "keyboard.execute"
-        if _name in {"keyboard.key", "keyboard.chord", "keyboard.text"}
+        if _name in {"keyboard.key", "keyboard.chord", "keyboard.text", "keyboard.action"}
         else "bridge.health"
         if _name == "platform.status"
         else "threaddesk.manage"

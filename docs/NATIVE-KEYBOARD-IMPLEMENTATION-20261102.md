@@ -498,3 +498,36 @@ CAS, alte Revision, unbekannter/geänderter Versions-/Layoutkontext, Ambiguität
 Vorschauherkunft und Null-Native-Dispatch sind geprüft. Keine Wiederholung der
 17 Store-, Native- oder MCP-Läufe. Gegenseitige Deltareview sowie Ruff/Diffprüfung
 grün. Profilaktionen und Bedienoberfläche folgen als eigene Schritte.
+
+## Schritt 12a – Revisionsgebundene Profilaktionen
+
+`keyboard.action` nimmt ausschließlich Ziel, Profil-ID, erwartete Revision und
+Aktionsnamen. Capability `keyboard.execute` plus `keyboard.profiles.read` sind
+bereits in Admission/Discovery erforderlich und werden vor Versand erneut geprüft.
+Genau eine vorhandene Desktoptransaktion umfasst gespeicherten Snapshot, CAS und
+Versand. Menü-Kandidaten, fehlende Aktionen und alte Revisionen verweigern vor
+Nativeversand. Der vollständige unveränderliche Profilsnapshot wird vor Wirkung
+als Dauerbeleg erfasst und bleibt nach einer späteren Profillöschung nachvollziehbar.
+
+Die privaten nativen Opcodes `keyboard.profile.key/chord` verlangen die gespeicherten
+Profilbedingungen; sie sind keine öffentlichen Tools. Alte Worker kennen diese
+Opcodes nicht und verweigern vor Wirkung, statt Bedingungen zu ignorieren. Native
+Kontextprüfung folgt erst nach der bestehenden Token-/Expiry-/Ownerprüfung.
+Es gibt keinen vorgeschalteten Inspectaufruf, der abgelaufene Handles auffrischt.
+
+Bundle, Layout, Keyboardtyp und Feldrolle werden mit tatsächlich beobachteten
+Werten verglichen. Geforderte Version, Build, Signingteam oder Sprache werden
+mangels belegter nativer Beobachtung vor Wirkung als nicht verfügbar verweigert.
+Caller-Vorschau ist niemals Ausführungsautorität. Nach KeyDown wird nur die stabile
+Appidentität für KeyUp/Cleanup geprüft; eine Aktion darf Auswahl oder Fenster
+verändern. Der Beleg enthält exakte Profil-/Revisions-/Aktionsbindung, aber weiterhin
+keine behauptete Bestätigung der Programmaktion. Abweichender Beleg bleibt Unknown
+ohne Replay oder Fallback.
+
+Eine fokussierte Core-Runde bestand17 neue Fälle plus einen bestehenden Key-
+Regressionstest in0,95s. Der separate neue Nativeharness bestand31 Fallgruppen
+in11,04s, ohne OS-Eingaben. Geprüft sind unter anderem beide Grants, erneute
+Autorisierung/CAS, parallele Profiländerung, eine Lease, Kandidatenverweigerung,
+dauerhafter Snapshot und Kontextfehler mit null Posts. Keine Wiederholung der
+alten Store-/Resolver-/Tastatur-/Shortcut-/MCP-Suiten. Gegenseitige Deltareviews,
+Ruff und Diffprüfung grün. Reale Profilaktion und Console-Bedienung bleiben offen.

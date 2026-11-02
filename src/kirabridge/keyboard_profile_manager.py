@@ -162,6 +162,16 @@ class KeyboardProfileManager:
         self.data_dir, self.authorize, self.desktop_input = data_dir, authorize, desktop_input
         self._store = None  # No startup IO; even directory creation requires authorization.
 
+    def authorized_snapshot(self, principal, profile_id, expected_revision):
+        """Internal action binding; always recheck read authorization and exact CAS."""
+        self.authorize(principal, "keyboard.profiles.get")
+        if self._store is None:
+            self._store = KeyboardProfileStore(self.data_dir)
+        snapshot = self._store.get(profile_id)
+        if snapshot.revision != expected_revision:
+            raise BridgeError("keyboard_profile_conflict", "Profile revision changed")
+        return snapshot
+
     async def execute(self, task, args, running):
         operation, principal = task["operation"], task["principal"]
         self.authorize(principal, operation)

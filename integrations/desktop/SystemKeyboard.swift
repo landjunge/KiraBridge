@@ -340,30 +340,108 @@ enum SystemKeyboard {
         }
         return (down, up)
     }
-    static func key(_ args: [String: Any], chord: Bool = false) throws -> [String: Any] {
+    static func profileString(_ value: Any?, pattern: String, maxBytes: Int) -> Bool {
+        guard let text = value as? String, text.utf8.count <= maxBytes else { return false }
+        return text.range(of: "\\A(?:" + pattern + ")\\z", options: .regularExpression) != nil
+    }
+    static func profileContext(_ value: Any?, application: [String: Any], layout: [String: Any],
+                               field: [String: Any]) throws -> [String: Any] {
+        let invalid = SystemControl.failure("keyboard_profile_context_invalid", "Private profile context is invalid")
+        guard let context = value as? [String: Any], Set(context.keys) == Set(["id", "revision", "action", "app"]),
+              profileString(context["id"], pattern: "[a-z][a-z0-9_-]{0,63}", maxBytes: 64),
+              stageHex(context["revision"], length: 64),
+              profileString(context["action"], pattern: "[a-z][a-z0-9_.-]{0,79}", maxBytes: 80),
+              let raw = context["app"] as? [String: Any],
+              Set(raw.keys).isSubset(of: Set(["bundle_id", "version", "build", "signing_team_id", "language", "layout_id", "keyboard_type", "field_roles"])) else { throw invalid }
+        // ProfileApp's optional null values are unconstrained; no unknown keys are accepted.
+        let constraints = raw.filter { !($0.value is NSNull) }
+        guard profileString(constraints["bundle_id"], pattern: "[A-Za-z0-9-]+(?:\\.[A-Za-z0-9-]+)+", maxBytes: 255) else { throw invalid }
+        for key in ["version", "build", "language", "layout_id"] where constraints[key] != nil {
+            guard profileString(constraints[key], pattern: "[A-Za-z0-9_.+-]+", maxBytes: 128) else { throw invalid }
+        }
+        if let team = constraints["signing_team_id"], !profileString(team, pattern: "[A-Z0-9]{10}", maxBytes: 10) { throw invalid }
+        if let type = constraints["keyboard_type"] {
+            guard let number = type as? NSNumber, CFGetTypeID(number) != CFBooleanGetTypeID(), number.doubleValue.isFinite,
+                  number.doubleValue >= 0, number.doubleValue <= Double(UInt32.max), number.doubleValue.rounded(.towardZero) == number.doubleValue else { throw invalid }
+        }
+        if let value = constraints["field_roles"] {
+            guard let roles = value as? [String], !roles.isEmpty, roles.count <= 16, Set(roles).count == roles.count,
+                  roles.allSatisfy({ profileString($0, pattern: "AX[A-Za-z0-9]{1,62}", maxBytes: 64) }) else { throw invalid }
+        }
+        guard !["version", "build", "signing_team_id", "language"].contains(where: { constraints[$0] != nil }) else {
+            throw SystemControl.failure("keyboard_profile_context_unavailable", "Required profile context is not natively observed")
+        }
+        for (key, observed) in [("bundle_id", application["bundle_id"]), ("layout_id", layout["layout_id"])] where constraints[key] != nil {
+            guard let actual = observed as? String, !actual.isEmpty else {
+                throw SystemControl.failure("keyboard_profile_context_unavailable", "Required profile context is unavailable")
+            }
+            guard actual.utf8.elementsEqual((constraints[key] as! String).utf8) else {
+                throw SystemControl.failure("keyboard_profile_context_mismatch", "Profile app or layout no longer matches")
+            }
+        }
+        if let expected = constraints["keyboard_type"] as? NSNumber {
+            guard let actual = layout["keyboard_type"] as? NSNumber, CFGetTypeID(actual) != CFBooleanGetTypeID() else {
+                throw SystemControl.failure("keyboard_profile_context_unavailable", "Keyboard type is unavailable")
+            }
+            guard expected == actual else { throw SystemControl.failure("keyboard_profile_context_mismatch", "Profile keyboard type changed") }
+        }
+        if let roles = constraints["field_roles"] as? [String] {
+            guard let actual = field["role"] as? String, !actual.isEmpty else {
+                throw SystemControl.failure("keyboard_profile_context_unavailable", "Field role is unavailable")
+            }
+            guard roles.contains(actual) else { throw SystemControl.failure("keyboard_profile_context_mismatch", "Profile field role changed") }
+        }
+        return ["id": context["id"]!, "revision": context["revision"]!, "action": context["action"]!]
+    }
+    static func profileGeneration(_ target: [String: Any], expectedIdentity: String?) -> Bool {
+        do {
+            let app = try SystemControl.target(target)
+            guard let expected = expectedIdentity else { return false }
+            return try SystemShortcuts.stableAppIdentity(SystemControl.appIdentity(app)) == expected
+        } catch { return false }
+    }
+    static func key(_ args: [String: Any], chord: Bool = false, profile: Bool = false) throws -> [String: Any] {
         guard let target = args["target"] as? [String: Any], let spec = args["key"] as? [String: Any] else {
             throw SystemControl.failure("invalid_arguments", "Keyboard key requires an exact target and key")
+        }
+        if !profile && args["profile_context"] != nil {
+            throw SystemControl.failure("keyboard_profile_context_invalid", "Profile context requires a private profile operation")
         }
         let modifiers = args["modifiers"] as? [String] ?? []
         try require(chord ? !modifiers.isEmpty : args["modifiers"] == nil, "Keyboard chord requires explicit modifiers")
         let layout = try currentLayout(), resolved = try resolve(spec, modifiers: modifiers, layout: layout)
         let code = resolved.code
         let (down, up) = try events(layout.metadata, code: code, flags: resolved.flags)
+        var binding: [String: Any]?, expectedIdentity: String?
         var result = try postPair(validate: {
             let current = try boundSnapshot(target)
+            if profile {
+                binding = try profileContext(args["profile_context"], application: current.response["application"] as? [String: Any] ?? [:],
+                    layout: current.response["layout"] as? [String: Any] ?? [:], field: current.field.metadata)
+                expectedIdentity = try SystemShortcuts.stableAppIdentity(current.response["application"] as? [String: Any] ?? [:])
+            }
             try matchingLayout(layout.metadata, current.response["layout"] as? [String: Any] ?? [:])
             try inputAllowed(postAccess: CGPreflightPostEventAccess(),
                 flags: CGEventSource.flagsState(.combinedSessionState),
                 keyHeld: CGEventSource.keyState(.hidSystemState, key: code))
-        }, sameGeneration: { (try? SystemControl.target(target)) != nil }, post: { isDown in
+        }, sameGeneration: {
+            profile ? profileGeneration(target, expectedIdentity: expectedIdentity) : (try? SystemControl.target(target)) != nil
+        }, post: { isDown in
             // Last generation check immediately before every post, including cleanup.
             let app = try SystemControl.target(target)
+            if profile {
+                guard let expected = expectedIdentity,
+                      try SystemShortcuts.stableAppIdentity(SystemControl.appIdentity(app)) == expected else {
+                    throw SystemControl.failure("macos_target_changed", "Profile application identity changed before post")
+                }
+            }
             (isDown ? down : up).postToPid(app.processIdentifier)
         })
         result["requested"] = ["key": spec, "modifiers": modifiers]
         result["resolved"] = ["key_code": Int(code), "flags": resolved.flags.rawValue,
             "modifiers": modifierFlags.filter { resolved.flags.contains($0.1) }.map { $0.0 },
             "representation": resolved.representation, "layout": layout.metadata]
+        if let binding = binding { result["profile_binding"] = binding; result["profile_binding_verified"] = true }
         return result
     }
     struct TextState {
@@ -725,6 +803,8 @@ enum SystemKeyboard {
         case "keyboard.inspect": return try snapshot(arguments).response
         case "keyboard.key": return try key(arguments)
         case "keyboard.chord": return try key(arguments, chord: true)
+        case "keyboard.profile.key": return try key(arguments, profile: true)
+        case "keyboard.profile.chord": return try key(arguments, chord: true, profile: true)
         case "keyboard.text.begin": return try beginTransfer(arguments)
         case "keyboard.text.chunk": return try chunkTransfer(arguments)
         case "keyboard.text.commit": return try await commitTransfer(arguments, writer: { try await text($0) })

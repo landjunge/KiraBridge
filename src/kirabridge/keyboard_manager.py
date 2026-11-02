@@ -43,13 +43,21 @@ class KeyboardManager:
             )
             if operation == "keyboard.text":
                 return await self._text(task, plan, begin, turn, progress)
+            return await self.send_pair_in_turn(principal, operation, arguments, turn)
+
+    async def send_pair_in_turn(self, principal, operation, arguments, turn, *, before_send=None):
+        """Caller owns the desktop lease; authorize and mark only at transport send."""
+
+        def prepare():
+            if before_send is not None:
+                before_send()
+            else:
+                self.authorize(principal, operation)
             turn.mark_attempted()
-            return await self.transport.request(
-                operation,
-                arguments,
-                principal=principal,
-                before_send=lambda: self.authorize(principal, operation),
-            )
+
+        return await self.transport.request(
+            operation, arguments, principal=principal, before_send=prepare
+        )
 
     async def _text(self, task, plan, begin, turn, progress):
         principal = task["principal"]
