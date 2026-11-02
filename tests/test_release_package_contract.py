@@ -106,11 +106,13 @@ def test_smoke_reaches_correct_isolated_preparation_for_actual_bundle_layout(
         module.smoke(artifacts)
 
 
-def test_builder_emits_license_asset_and_matching_manifest_for_both_bundles(tmp_path, monkeypatch):
+@pytest.mark.parametrize("host", ["linux", "darwin"])
+def test_builder_emits_license_asset_and_matching_manifest_for_host(tmp_path, monkeypatch, host):
     module = script("build_release")
     # This fixture exercises source/license packaging; native Darwin packaging
     # has its own signed-app fixture and must never invoke Swift here.
-    monkeypatch.setattr(module.sys, "platform", "linux")
+    monkeypatch.setattr(module.sys, "platform", host)
+    monkeypatch.setattr(module, "native_payload", lambda *a: ({}, {}, {}))
     monkeypatch.chdir(tmp_path)
     inputs = {
         "LICENSE": LICENSE,
@@ -152,6 +154,10 @@ def test_builder_emits_license_asset_and_matching_manifest_for_both_bundles(tmp_
     )
     output = tmp_path / "output"
     module.build(output)
+    if host == "darwin":
+        assert [p.name for p in output.glob("*.tar.gz")] == ["KiraBridge-macos.tar.gz"]
+    else:
+        assert not (output / "KiraBridge-macos.tar.gz").exists()
     assert (output / "LICENSE").read_bytes() == LICENSE
     assert "  LICENSE\n" in (output / "SHA256SUMS").read_text()
     for path in output.glob("*.tar.gz"):
