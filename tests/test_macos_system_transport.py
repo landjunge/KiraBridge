@@ -108,6 +108,70 @@ def transport(monkeypatch, respond=response, *, timeout=0.1):
     return worker, child, calls
 
 
+@pytest.mark.parametrize(
+    ("operation", "code", "message", "unknown", "expected"),
+    [
+        (
+            "keyboard.inspect",
+            "keyboard_unsupported",
+            "Keyboard app is not frontmost",
+            False,
+            "keyboard_not_frontmost",
+        ),
+        (
+            "keyboard.inspect",
+            "keyboard_unsupported",
+            "Secure or unknown keyboard field is unsupported",
+            False,
+            "keyboard_unsupported",
+        ),
+        (
+            "keyboard.inspect",
+            "keyboard_unsupported",
+            "private field secret",
+            False,
+            "keyboard_unsupported",
+        ),
+        (
+            "keyboard.key",
+            "keyboard_unsupported",
+            "Keyboard app is not frontmost",
+            False,
+            "keyboard_unsupported",
+        ),
+        (
+            "keyboard.inspect",
+            "keyboard_unsupported",
+            "Keyboard app is not frontmost",
+            True,
+            "keyboard_unsupported",
+        ),
+    ],
+)
+async def test_only_verified_readonly_frontmost_refusal_gets_typed_code(
+    monkeypatch, operation, code, message, unknown, expected
+):
+    worker, _, _ = transport(
+        monkeypatch,
+        lambda request, child: response(
+            request,
+            child,
+            error={
+                "code": code,
+                "message": message,
+                "effect_unknown": unknown,
+            },
+        ),
+    )
+    try:
+        with pytest.raises(UncertainExecution if unknown else BridgeError) as caught:
+            await worker.request(operation, {}, principal="alice")
+        assert caught.value.code == expected
+        assert str(caught.value) == "Native system operation refused or failed"
+    finally:
+        await worker.close()
+
+
 async def test_persistent_worker_serializes_and_binds_authenticated_owner(monkeypatch):
     worker, child, calls = transport(monkeypatch)
     try:

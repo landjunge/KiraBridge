@@ -10,6 +10,7 @@ import uuid
 from pydantic import ValidationError
 
 from kirabridge.bridge_core.models import BridgeError, TaskRequest
+from kirabridge.keyboard_models import KeyboardInput
 from kirabridge.keyboard_profile_manager import PROFILE_INPUTS, ActionName
 from kirabridge.keyboard_profiles import KeyboardProfile, Revision, Slug
 from kirabridge.permissions import decision
@@ -18,6 +19,7 @@ from kirabridge.platform_adapters.macos.system_models import SYSTEM_INPUTS
 from kirabridge.security_manager import request_hash
 
 ALLOWED = {
+    "keyboard.input": KeyboardInput,
     "apps.list": SYSTEM_INPUTS["apps.list"],
     **PROFILE_INPUTS,
     "keyboard.shortcuts.discover": SYSTEM_INPUTS["keyboard.shortcuts.discover"],
@@ -46,6 +48,26 @@ class RunProfileInput(ApplicationTargetInput):
 class OperatorKeyboard:
     def __init__(self, control, decisions):
         self.control, self.decisions = control, decisions
+
+    async def availability(self):
+        """Read ChatGPT's actual catalogue; never grant rights or send input."""
+        catalog = await self.control.rpc("operation_catalog", {}, principal="chatgpt")
+        operations = catalog.get("operations", {})
+        entry = operations.get("keyboard.input", {})
+        permission = entry.get("permission_decision", {})
+        discovery = catalog.get("discovery", {})
+        return {
+            "available": bool(entry and permission.get("authorized") is True),
+            "registered": bool(entry),
+            "authorized": permission.get("authorized") is True,
+            "approval_required": permission.get("approval_required"),
+            "operation_count": len(operations),
+            "revision": discovery.get("revision"),
+            "version": discovery.get("version"),
+            "instance_id": discovery.get("instance_id"),
+            "profile_required": False,
+            "os_permissions_checked": False,
+        }
 
     def _require(self, operations):
         config = self.control.config()

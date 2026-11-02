@@ -280,7 +280,18 @@ class NativeSystemTransport:
                         ):
                             raise ValueError("Invalid native failure")
                         cls = UncertainExecution if error["effect_unknown"] else BridgeError
-                        raise cls(error["code"], "Native system operation refused or failed")
+                        code = error["code"]
+                        # One public, non-sensitive classification from an already
+                        # authenticated read response. Never expose native messages
+                        # or infer this condition from other unsupported fields.
+                        if (
+                            operation == "keyboard.inspect"
+                            and code == "keyboard_unsupported"
+                            and error["effect_unknown"] is False
+                            and error.get("message") == "Keyboard app is not frontmost"
+                        ):
+                            code = "keyboard_not_frontmost"
+                        raise cls(code, "Native system operation refused or failed")
                     result = response.get("result")
                     if not isinstance(result, dict):
                         raise ValueError("Invalid native result")

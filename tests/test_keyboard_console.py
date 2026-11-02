@@ -114,6 +114,16 @@ class RPC:
 
     async def __call__(self, name, args, **kwargs):
         self.calls.append((name, copy.deepcopy(args)))
+        if name == "operation_catalog":
+            assert kwargs.get("principal") == "chatgpt"
+            return {
+                "operations": {
+                    "keyboard.input": {
+                        "permission_decision": {"authorized": True, "approval_required": False}
+                    }
+                },
+                "discovery": {"revision": "fresh", "version": "0.8.0rc24"},
+            }
         if name == "task_request":
             request = TaskRequest.model_validate(args["request"])
             self.requests[request.task_id] = request
@@ -210,6 +220,69 @@ async def test_duplicate_posts_approve_exact_own_task_once_and_get_never_dispatc
     assert len([c for c in rpc.calls if c[0] == "task_request"]) == count
     assert len([c for c in rpc.calls if c[0] == "completion_ack"]) == 1
     assert all(not n for n in rpc.notices.values())
+
+
+async def test_direct_keyboard_without_profile_forwards_one_bounded_intent(
+    bridge, config, monkeypatch
+):
+    app, backend, rpc, headers = console(bridge, config, monkeypatch)
+    config.principals["local"].capabilities.remove("keyboard.profiles.read")
+    args = {"app": "Notizen", "key": {"named": "enter"}, "repeat": 2}
+    request = value("keyboard.input", args)
+    first = await backend.request(request)
+    assert first["task"]["state"] == "completed"
+    assert first["task"]["ui_primary"] is True
+    sent = [call[1]["request"] for call in rpc.calls if call[0] == "task_request"]
+    assert len(sent) == 1 and sent[0]["operation"] == "keyboard.input"
+    assert sent[0]["arguments"]["repeat"] == 2
+    assert sent[0]["arguments"]["key"]["named"] == "enter"
+    assert not any("profile" in key for key in sent[0]["arguments"])
+    assert await backend.request(request) == first
+    assert len([call for call in rpc.calls if call[0] == "task_request"]) == 1
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url=ORIGIN) as client:
+        path = "/api/control/keyboard/availability"
+        assert (await client.get(path)).status_code == 401
+        availability = (await client.get(path, headers=headers)).json()
+    assert availability["available"] is True and availability["revision"] == "fresh"
+    assert availability["profile_required"] is False
+    assert availability["os_permissions_checked"] is False
+    assert len([call for call in rpc.calls if call[0] == "task_request"]) == 1
+
+
+async def test_direct_keyboard_denied_or_invalid_never_submits(bridge, config, monkeypatch):
+    _, backend, rpc, _ = console(bridge, config, monkeypatch)
+    with pytest.raises(BridgeError, match="Invalid keyboard UI request"):
+        await backend.request(value("keyboard.input", {"key": {"named": "enter"}, "repeat": 21}))
+    assert rpc.calls == []
+    config.principals["local"].capabilities.remove("keyboard.execute")
+    response = await backend.request(value("keyboard.input", {"key": {"named": "enter"}}))
+    assert response["task"]["error"]["code"] == "keyboard_ui_permission_denied"
+    assert rpc.calls == []
+
+
+@pytest.mark.parametrize("entry", [None, {"authorized": False}, {"authorized": True}])
+async def test_keyboard_availability_reports_live_catalog_not_a_permission_grant(
+    bridge, config, monkeypatch, entry
+):
+    _, backend, rpc, _ = console(bridge, config, monkeypatch)
+    original = copy.deepcopy(config.principals["local"].capabilities)
+
+    async def catalog(name, args, **kwargs):
+        assert name == "operation_catalog" and args == {} and kwargs["principal"] == "chatgpt"
+        return {
+            "operations": {"keyboard.input": {"permission_decision": entry}} if entry else {},
+            "discovery": {"revision": "changed-generation", "instance_id": "fresh-instance"},
+        }
+
+    monkeypatch.setattr(backend.control, "rpc", catalog)
+    result = await backend.availability()
+    assert result["available"] is bool(entry and entry["authorized"])
+    assert result["registered"] is bool(entry)
+    assert result["revision"] == "changed-generation"
+    assert result["instance_id"] == "fresh-instance"
+    assert result["os_permissions_checked"] is False
+    assert config.principals["local"].capabilities == original
+    assert rpc.calls == []
 
 
 async def test_missing_capability_and_foreign_approval_are_not_bypassed(

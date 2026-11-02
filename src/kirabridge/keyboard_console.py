@@ -14,9 +14,14 @@ class KeyboardConsole:
     def __init__(self, control, decisions, authenticate):
         self.service, self.authenticate = OperatorKeyboard(control, decisions), authenticate
         self.routes = [
+            Route("/api/control/keyboard/availability", self.availability, methods=["GET"]),
             Route("/api/control/keyboard/request", self.request, methods=["POST"]),
             Route("/api/control/keyboard/task/{task_id}", self.task, methods=["GET"]),
         ]
+
+    async def availability(self, request):
+        self.authenticate(request)
+        return JSONResponse(await self.service.availability())
 
     async def request(self, request):
         self.authenticate(request)

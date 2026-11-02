@@ -132,3 +132,38 @@ class KeyboardTextInput(Input):
     def valid_text(self):
         literal_text(self.text)
         return self
+
+
+class KeyboardInput(Input):
+    """Profile-free input into one freshly observed existing application/field.
+
+    Omit app for the currently active application. An explicit app is its exact
+    bundle identifier or display name, never a partial-name search. Repeat is
+    intentional input, not retry; text copies are inserted before one optional
+    final Return. No profile or previously copied native token is required.
+    """
+
+    app: str | None = Field(default=None, min_length=1, max_length=255)
+    text: str | None = Field(default=None, min_length=1, max_length=MAX_TEXT_UTF8_BYTES)
+    key: KeyboardKey | None = None
+    modifiers: list[Modifier] = Field(default_factory=list, max_length=4)
+    repeat: int = Field(default=1, ge=1, le=20)
+    submit: bool = False
+
+    @model_validator(mode="after")
+    def one_intent(self):
+        if (self.text is None) == (self.key is None):
+            raise ValueError("Choose exactly one literal text or key")
+        if len(set(self.modifiers)) != len(self.modifiers):
+            raise ValueError("Modifier names must be unique")
+        if self.app is not None and (
+            self.app != self.app.strip() or any(ord(c) < 32 for c in self.app)
+        ):
+            raise ValueError("Use an exact application name or bundle identifier")
+        if self.text is not None:
+            if self.modifiers:
+                raise ValueError("Literal text does not accept key modifiers")
+            literal_text(self.text * self.repeat)
+        elif self.submit:
+            raise ValueError("Submit is only available with literal text")
+        return self

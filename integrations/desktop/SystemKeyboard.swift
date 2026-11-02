@@ -27,17 +27,81 @@ enum SystemKeyboard {
         try require(AXUIElementSetMessagingTimeout(element, 1.0) == .success,
                     "Keyboard AX timeout could not be configured")
     }
-    static func observeField(prepare: () throws -> Void,
-                             read: (String) -> CFTypeRef?) throws -> Field {
-        try prepare()
+    struct NotesBodyEvidence {
+        let bundleID: String?
+        let bundlePath: String?
+        let executablePath: String?
+        let identifier: String?
+        let attributeNames: [String]?
+        let subroleUnsupported: Bool
+        let enabledUnsupported: Bool
+        let selectedTextWritable: Bool
+    }
+    static func notesBodyEligible(_ evidence: NotesBodyEvidence) -> Bool {
+        guard evidence.bundleID == "com.apple.Notes",
+              evidence.bundlePath == "/System/Applications/Notes.app",
+              evidence.executablePath == "/System/Applications/Notes.app/Contents/MacOS/Notes",
+              evidence.identifier == "Note Body Text View",
+              evidence.subroleUnsupported, evidence.enabledUnsupported,
+              evidence.selectedTextWritable, let names = evidence.attributeNames,
+              !names.isEmpty, names.count <= 256, Set(names).count == names.count,
+              names.allSatisfy({ !$0.isEmpty && $0.utf8.count <= 256 }),
+              !names.contains(kAXSubroleAttribute), !names.contains(kAXEnabledAttribute) else { return false }
+        return true
+    }
+    /// Compatibility is limited to the actual system Notes body. A missing AX
+    /// value is never treated as permission; unsupported status, the complete
+    /// bounded attribute inventory and actual public writability must agree.
+    static func notesBodyEvidence(_ element: AXUIElement, app: NSRunningApplication) throws -> NotesBodyEvidence {
+        try timeout(element)
+        let bundle = app.bundleURL
+        let canonicalBundle = bundle?.resolvingSymlinksInPath()
+        let bundlePath = bundle == canonicalBundle ? canonicalBundle?.path : nil
+        let actualExecutable = SystemServices.codeExecutablePath(app.processIdentifier)
+        func unsupported(_ name: String) -> Bool {
+            var value: CFTypeRef?
+            return AXUIElementCopyAttributeValue(element, name as CFString, &value) == .attributeUnsupported
+                && value == nil
+        }
+        var rawNames: CFArray?
+        let namesStatus = AXUIElementCopyAttributeNames(element, &rawNames)
+        let names = namesStatus == .success && (rawNames.map { CFArrayGetCount($0) <= 256 } ?? false)
+            ? rawNames as? [String] : nil
+        var writable = DarwinBoolean(false)
+        let writeStatus = AXUIElementIsAttributeSettable(element, kAXSelectedTextAttribute as CFString, &writable)
+        return NotesBodyEvidence(bundleID: app.bundleIdentifier, bundlePath: bundlePath,
+            executablePath: actualExecutable,
+            identifier: SystemControl.attribute(element, kAXIdentifierAttribute) as? String,
+            attributeNames: names, subroleUnsupported: unsupported(kAXSubroleAttribute),
+            enabledUnsupported: unsupported(kAXEnabledAttribute),
+            selectedTextWritable: writeStatus == .success && writable.boolValue)
+    }
+    static func classifyField(read: (String) -> CFTypeRef?,
+                              notesEvidence: (() throws -> NotesBodyEvidence)? = nil) throws -> [String: Any] {
         let role = read(kAXRoleAttribute) as? String
         let subrole = read(kAXSubroleAttribute) as? String
-        try require(["AXTextField", "AXTextArea"].contains(role ?? "")
-                    && ["", "AXSearchField"].contains(subrole ?? "unknown"),
+        try require(["AXTextField", "AXTextArea"].contains(role ?? ""),
                     "Secure or unknown keyboard field is unsupported")
-        try require((read(kAXEnabledAttribute) as? NSNumber)?.boolValue == true
-                    && (read(kAXFocusedAttribute) as? NSNumber)?.boolValue == true,
+        let enabled = read(kAXEnabledAttribute) as? NSNumber
+        try require((read(kAXFocusedAttribute) as? NSNumber)?.boolValue == true,
                     "Keyboard field is not enabled and focused")
+        if ["", "AXSearchField"].contains(subrole ?? "unknown"), enabled?.boolValue == true {
+            return ["role": role!, "subrole": subrole!, "focused": true, "enabled": true,
+                "secure": false, "classification_source": "explicit_ax_attributes"]
+        }
+        guard role == "AXTextArea", subrole == nil, enabled == nil,
+              let notesEvidence, try notesBodyEligible(notesEvidence()) else {
+            throw SystemControl.failure("keyboard_unsupported", "Secure or unknown keyboard field is unsupported")
+        }
+        return ["role": role!, "subrole": NSNull(), "focused": true, "enabled": NSNull(),
+            "secure": false, "classification_source": "system_notes_writable_body",
+            "selected_text_settable": true, "optional_attributes_absent": [kAXSubroleAttribute, kAXEnabledAttribute]]
+    }
+    static func observeField(prepare: () throws -> Void,
+                             read: (String) -> CFTypeRef?,
+                             notesEvidence: (() throws -> NotesBodyEvidence)? = nil) throws -> Field {
+        try prepare()
+        let classification = try classifyField(read: read, notesEvidence: notesEvidence)
         guard let count = read(kAXNumberOfCharactersAttribute) as? NSNumber,
               CFGetTypeID(count) != CFBooleanGetTypeID(), count.doubleValue.isFinite,
               count.doubleValue == Double(count.intValue), count.intValue >= 0,
@@ -67,13 +131,12 @@ enum SystemKeyboard {
                         || !(0xDC00...0xDFFF).contains(units[offset]),
                         "Keyboard selection splits a UTF-16 surrogate pair")
         }
-        return Field(value: value, selection: selection, metadata: [
-            "role": role!, "subrole": subrole!, "focused": true, "enabled": true,
-            "secure": false, "value_utf8_bytes": value.utf8.count,
+        return Field(value: value, selection: selection, metadata: classification.merging([
+            "value_utf8_bytes": value.utf8.count,
             "value_utf16_units": units.count, "value_sha256_encoding": "utf-8",
             "value_sha256": SHA256.hash(data: Data(value.utf8)).map { String(format: "%02x", $0) }.joined(),
             "selection_utf16": ["location": selection.location, "length": selection.length],
-        ])
+        ]) { _, value in value })
     }
     struct Layout {
         let metadata: [String: Any]
@@ -159,7 +222,8 @@ enum SystemKeyboard {
             throw SystemControl.failure("keyboard_unsupported", "Focused field/window ownership is unavailable")
         }
         let field = try observeField(prepare: { try timeout(element) },
-                                     read: { SystemControl.attribute(element, $0) })
+                                     read: { SystemControl.attribute(element, $0) },
+                                     notesEvidence: { try notesBodyEvidence(element, app: app) })
         let layout = try inputSource(), application = try SystemControl.appIdentity(app)
         let windowToken = try SystemControl.remember(window, app: app)
         let token = try SystemControl.remember(element, app: app)
@@ -168,7 +232,8 @@ enum SystemKeyboard {
         _ = try SystemControl.target(args, mutating: true)
         let (finalWindow, finalElement) = try focused()
         let finalField = try observeField(prepare: { try timeout(element) },
-                                          read: { SystemControl.attribute(element, $0) })
+                                          read: { SystemControl.attribute(element, $0) },
+                                          notesEvidence: { try notesBodyEvidence(element, app: app) })
         try require(CFEqual(finalWindow, window) && CFEqual(finalElement, element)
                     && before == revision(application: SystemControl.appIdentity(app), window: windowToken,
                                           element: token, field: finalField, layout: inputSource()),
@@ -491,7 +556,11 @@ enum SystemKeyboard {
     }
     static func textFieldAllowed(_ field: Field, text: String) throws {
         if text.unicodeScalars.contains(where: { [9, 10, 13].contains($0.value) }) {
-            try require(field.metadata["role"] as? String == "AXTextArea" && field.metadata["subrole"] as? String == "",
+            let notesBody = field.metadata["classification_source"] as? String == "system_notes_writable_body"
+                && field.metadata["subrole"] is NSNull && field.metadata["enabled"] is NSNull
+                && field.metadata["selected_text_settable"] as? Bool == true
+            try require(field.metadata["role"] as? String == "AXTextArea"
+                        && (field.metadata["subrole"] as? String == "" || notesBody),
                         "Tab and line breaks require a supported multiline text area")
         }
     }
@@ -531,11 +600,11 @@ enum SystemKeyboard {
               CFEqual(window, initial.window), CFEqual(element, initial.element), CFEqual(cached, initial.element) else {
             throw SystemControl.failure("macos_element_changed", "Text window or field identity changed")
         }
+        let classification = try classifyField(read: { SystemControl.attribute(initial.element, $0) },
+            notesEvidence: { try notesBodyEvidence(initial.element, app: app) })
+        let expectedClassification = initial.field.metadata.filter { classification.keys.contains($0.key) }
         try require((SystemControl.attribute(initial.window, kAXMinimizedAttribute) as? NSNumber)?.boolValue == false
-                    && SystemControl.attribute(initial.element, kAXRoleAttribute) as? String == initial.field.metadata["role"] as? String
-                    && SystemControl.attribute(initial.element, kAXSubroleAttribute) as? String == initial.field.metadata["subrole"] as? String
-                    && (SystemControl.attribute(initial.element, kAXEnabledAttribute) as? NSNumber)?.boolValue == true
-                    && (SystemControl.attribute(initial.element, kAXFocusedAttribute) as? NSNumber)?.boolValue == true,
+                    && SystemControl.hash(classification) == SystemControl.hash(expectedClassification),
                     "Text field classification or focus changed")
         guard let owner = SystemControl.attribute(initial.element, kAXWindowAttribute),
               CFGetTypeID(owner) == AXUIElementGetTypeID(), CFEqual(owner, initial.window) else {

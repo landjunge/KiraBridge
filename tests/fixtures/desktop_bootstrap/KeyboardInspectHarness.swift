@@ -58,6 +58,68 @@ struct KeyboardInspectHarness {
                 checks += 1
             }
         }
+        var notesChecks = 0
+        func notesField(_ scenario: String = "allowed") throws -> SystemKeyboard.Field {
+            var valueRead = false
+            do {
+                let result = try SystemKeyboard.observeField(prepare: {}, read: { name in
+                    switch name {
+                    case kAXRoleAttribute: return (scenario == "unknown_role" ? "AXButton" : "AXTextArea") as CFString
+                    case kAXSubroleAttribute: return scenario == "secure" ? "AXSecureTextField" as CFString : nil
+                    case kAXEnabledAttribute: return scenario == "disabled" ? NSNumber(value: false) : nil
+                    case kAXFocusedAttribute: return NSNumber(value: scenario != "unfocused")
+                    case kAXNumberOfCharactersAttribute: return NSNumber(value: 0)
+                    case kAXSelectedTextRangeAttribute:
+                        var range = CFRange(location: 0, length: 0)
+                        return AXValueCreate(.cfRange, &range)
+                    case kAXValueAttribute: valueRead = true; return "" as CFString
+                    default: return nil
+                    }
+                }, notesEvidence: {
+                    if scenario == "evidence_failed" { throw SystemControl.failure("mock_notes_error", "fixture") }
+                    var names = [kAXRoleAttribute, kAXFocusedAttribute, kAXIdentifierAttribute,
+                                 kAXValueAttribute, kAXSelectedTextAttribute, kAXSelectedTextRangeAttribute,
+                                 kAXNumberOfCharactersAttribute]
+                    if scenario == "listed_subrole" { names.append(kAXSubroleAttribute) }
+                    if scenario == "listed_enabled" { names.append(kAXEnabledAttribute) }
+                    if scenario == "duplicate_names" { names.append(kAXRoleAttribute) }
+                    if scenario == "too_many_names" { names = (0...256).map { "AXField\($0)" } }
+                    if scenario == "invalid_name" { names.append("") }
+                    return SystemKeyboard.NotesBodyEvidence(
+                        bundleID: scenario == "fake_bundle" ? "com.example.Notes" : "com.apple.Notes",
+                        bundlePath: scenario == "fake_path" ? "/Applications/Notes.app" : "/System/Applications/Notes.app",
+                        executablePath: scenario == "fake_executable" ? "/tmp/Notes" : "/System/Applications/Notes.app/Contents/MacOS/Notes",
+                        identifier: scenario == "wrong_identifier" ? "Other text view" : "Note Body Text View",
+                        attributeNames: scenario == "names_failed" ? nil : names,
+                        subroleUnsupported: scenario != "subrole_error",
+                        enabledUnsupported: scenario != "enabled_error",
+                        selectedTextWritable: !["locked", "writability_error"].contains(scenario))
+                })
+                precondition(valueRead)
+                return result
+            } catch {
+                precondition(!valueRead, "Unverified Notes field value was read")
+                throw error
+            }
+        }
+        let notesBody = try notesField()
+        precondition(notesBody.metadata["subrole"] is NSNull && notesBody.metadata["enabled"] is NSNull)
+        precondition(notesBody.metadata["classification_source"] as? String == "system_notes_writable_body")
+        precondition(notesBody.metadata["selected_text_settable"] as? Bool == true)
+        notesChecks += 1
+        try SystemKeyboard.textFieldAllowed(notesBody, text: "\n\n\t")
+        notesChecks += 1
+        for scenario in ["fake_bundle", "fake_path", "fake_executable", "wrong_identifier",
+                         "listed_subrole", "listed_enabled", "names_failed", "too_many_names",
+                         "duplicate_names", "invalid_name", "subrole_error", "enabled_error",
+                         "locked", "writability_error", "secure", "disabled", "unknown_role",
+                         "unfocused", "evidence_failed"] {
+            do { _ = try notesField(scenario); fatalError("Unsafe Notes fallback accepted: \(scenario)") }
+            catch let error as SystemBridgeFailure {
+                precondition(!error.effectUnknown)
+                notesChecks += 1
+            }
+        }
         let app: [String: Any] = ["pid": 123, "started_at": 100.5, "active": true]
         let layout: [String: Any] = ["input_source_id": "fixture.de", "layout_id": "fixture.de", "keyboard_type": 40]
         let first = try SystemKeyboard.revision(application: app, window: "window", element: "field", field: observed, layout: layout)
@@ -586,6 +648,7 @@ struct KeyboardInspectHarness {
         precondition(sawSubmit && SystemKeyboard.transfer == nil); stageChecks += 1
         SystemKeyboard.transfer = nil; SystemKeyboard.consumedTransfers = []; SystemBridgeRuntime.principal = ""
         let result: [String: Any] = ["checks": checks, "field": observed.metadata,
+                                   "notes_checks": notesChecks,
                                    "key_checks": keyChecks, "named_key_codes": SystemKeyboard.namedKeys,
                                    "layout_checks": layoutChecks, "layout_positions": layoutPositions,
                                    "text_checks": textChecks,

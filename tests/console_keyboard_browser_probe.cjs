@@ -22,12 +22,15 @@ const status = {
   permission_details: { chatgpt: { label: "Voll erlaubt", exceptions: [] } },
   pending: [], peers_connected: true, maintenance: null
 };
-const cases = ["profiles_and_discovery", "one_run", "lost_response", "lost_response_preparation", "completed_preparation", "failed_intent", "failed_main", "missing_post_proof", "candidate"];
+const cases = ["profiles_and_discovery", "one_run", "lost_response", "lost_response_preparation", "completed_preparation", "failed_intent", "failed_main", "missing_post_proof", "candidate", "direct_return", "direct_lost_response", "direct_missing_proof", "direct_denied", "direct_catalog_refresh", "direct_missing_target", "direct_errors"];
 
 async function check(browser, name) {
   const context = await browser.newContext({ viewport: { width: 1180, height: 900 } });
   const posts = [], gets = [], errors = [], tasks = new Map();
   let networkLost = false;
+  let catalogReads = 0;
+  let appLists = 0;
+  let directError = null;
   const document = structuredClone(profile);
   if (name === "candidate") document.actions.select_all.provenance = "observed_menu";
   const snapshot = () => ({ profile_id: "fixture", revision, profile: document });
@@ -42,6 +45,8 @@ async function check(browser, name) {
     if (asset) return route.fulfill({ body: await fs.readFile(path.join(assets, asset)), contentType: asset.endsWith(".js") ? "application/javascript" : asset.endsWith(".css") ? "text/css" : "text/html" });
     const json = value => route.fulfill({ json: value });
     if (url.pathname === "/api/control/status") return json(status);
+    if (url.pathname === "/api/tasks") return json({ tasks: [] });
+    if (url.pathname === "/api/control/keyboard/availability") return json({ available: name !== "direct_denied", registered: true, authorized: name !== "direct_denied", approval_required: false, operation_count: 88, version: "0.8.0rc24", revision: "fixture-" + ++catalogReads });
     if (url.pathname === "/api/control/connections") return json({ chatgpt_url: "https://chatgpt.invalid", grok_url: "https://grok.invalid", checks: [], grok: { url: "", pending: [] } });
     if (url.pathname === "/api/control/keyboard/request") {
       assert.equal(request.method(), "POST");
@@ -50,11 +55,16 @@ async function check(browser, name) {
       let result = {}, state = "completed", primary = true;
       switch (body.operation) {
         case "keyboard.profiles.list": result = { profiles: [{ profile_id: "fixture", revision, app: document.app }] }; break;
-        case "apps.list": result = { applications: [{ pid: 12345, started_at: 123.5, bundle_id: document.app.bundle_id, name: '<img src=x onerror="window.injected=1">' }] }; break;
+        case "apps.list": result = { applications: name === "direct_missing_target" && ++appLists > 1 ? [] : [{ pid: 12345, started_at: 123.5, bundle_id: document.app.bundle_id, name: '<img src=x onerror="window.injected=1">' }] }; break;
         case "keyboard.profiles.get": result = snapshot(); break;
         case "keyboard.profiles.put": result = { ...snapshot(), profile: body.args.profile }; break;
         case "keyboard.profiles.resolve": result = { context_verified: false, execution_authorized: false, effect: "none", status: "resolved" }; break;
         case "keyboard.shortcuts.discover": result = { revision, entries: [{ name: '<img src=x onerror="window.injected=1">', candidate_only: true }], coverage: "partial", reasons: ["menu_identity_attribute_unavailable"], cached: false }; break;
+        case "keyboard.input":
+          result = { requested_count: body.args.repeat, completed_count: body.args.repeat, post_calls_returned: 2 * body.args.repeat, input_attempted: true, automatic_retry: false, app_processing_confirmed: false, field_change_observed: true, application: { name: "Testprogramm" } };
+          if (name === "direct_missing_proof") delete result.completed_count;
+          if (name === "direct_errors") { result = null; state = directError.endsWith("_unknown") ? "unknown" : "failed"; }
+          break;
         case "run_profile":
           state = name.startsWith("failed_") ? "failed" : ["completed_preparation", "missing_post_proof"].includes(name) ? "completed" : "running";
           primary = !["completed_preparation", "failed_intent"].includes(name);
@@ -64,8 +74,9 @@ async function check(browser, name) {
         default: throw Error("Unexpected operation " + body.operation);
       }
       const task = { id, state, result, error: state === "failed" ? { code: "keyboard_profile_conflict" } : null, ui_primary: primary, ui_incomplete: !primary, ui_stage: primary ? "main" : "profile", ui_workflow_status: primary ? "primary" : "halted", ui_halted: !primary || state === "failed" };
+      if (name === "direct_errors" && body.operation === "keyboard.input") task.error = { code: directError, message: "NATIVE_PRIVATE_DIAGNOSTIC must never be shown" };
       tasks.set(id, { request_id: body.id, task, status_url: "/api/control/keyboard/task/" + id });
-      if (name.startsWith("lost_response") && body.operation === "run_profile") { networkLost = true; return route.abort("failed"); }
+      if ((name.startsWith("lost_response") && body.operation === "run_profile") || (name === "direct_lost_response" && body.operation === "keyboard.input")) { networkLost = true; return route.abort("failed"); }
       return json(tasks.get(id));
     }
     if (url.pathname.startsWith("/api/control/keyboard/task/")) {
@@ -85,6 +96,87 @@ async function check(browser, name) {
     await page.goto(origin);
     await page.locator('[data-view="keyboard"]').click();
     assert.equal(posts.length, 0, "Opening the tab must not dispatch anything");
+    if (name === "direct_errors") {
+      const samples = [["keyboard_unsupported", "Eingabefeld"], ["keyboard_application_missing", "nicht gefunden"], ["keyboard_application_ambiguous", "nicht eindeutig"], ["macos_permission_denied", "macOS-Freigabe"], ["keyboard_target_changed", "hat sich geändert"], ["desktop_input_busy", "anderen Auftrag"], ["some_new_error_code", "konnte nicht bestätigt werden"], ["keyboard_input_partial_unknown", "Ein Teil der Eingabe"]];
+      for (const [code, expected] of samples) {
+        directError = code;
+        await page.locator('[data-view="keyboard"]').click();
+        await page.waitForFunction(() => !document.querySelector("#keyboard-direct-return").disabled);
+        await page.locator("#keyboard-direct-return").click();
+        await page.waitForFunction(text => document.querySelector("#keyboard-direct-result").textContent.includes(text), expected);
+        const shown = await page.locator("#keyboard-direct-result").innerText() + await page.locator("#notice").innerText();
+        assert.ok(!shown.includes("NATIVE_PRIVATE_DIAGNOSTIC") && !shown.includes(code), "Normal status must use fixed human wording, never native messages or codes");
+      }
+      assert.equal(posts.filter(p => p.operation === "keyboard.input").length, samples.length);
+      assert.ok(await page.locator("#keyboard-direct-return").isDisabled(), "Partial unknown retains the one-shot intent");
+      assert.match(await page.locator("#keyboard-direct-result").innerText(), /nicht erneut senden/);
+      assert.deepEqual(errors, []);
+      return { name, passed: true, keyboard_posts: posts.length, status_gets: gets.length };
+    }
+    if (name === "direct_denied") {
+      await page.waitForFunction(() => document.querySelector("#keyboard-availability").textContent.includes("wirksame Tastaturfreigabe"));
+      assert.ok(await page.locator("#keyboard-direct-send").isDisabled());
+      assert.ok(await page.locator("#keyboard-direct-return").isDisabled());
+      assert.equal(posts.length, 0);
+      return { name, passed: true, keyboard_posts: 0, status_gets: 0 };
+    }
+    if (name === "direct_catalog_refresh") {
+      await page.waitForFunction(() => document.querySelector("#keyboard-availability").textContent.includes("frisch geprüft"));
+      await page.locator("#keyboard-direct-refresh").click();
+      await page.waitForFunction(() => document.querySelector("#keyboard-availability").textContent.includes("Katalog wurde aktualisiert"));
+      await page.waitForFunction(() => document.querySelector("#keyboard-direct-app").options.length === 2);
+      assert.equal(posts.filter(p => p.operation === "keyboard.input").length, 0);
+      assert.equal(posts.filter(p => p.operation.includes("profiles")).length, 0);
+      return { name, passed: true, keyboard_posts: posts.length, status_gets: 0 };
+    }
+    if (name === "direct_missing_target") {
+      await page.waitForFunction(() => !document.querySelector("#keyboard-direct-return").disabled);
+      await page.locator("#keyboard-direct-refresh").click();
+      await page.waitForFunction(() => document.querySelector("#keyboard-direct-app").options.length === 2);
+      await page.locator("#keyboard-direct-app").selectOption("12345:123.5");
+      await page.locator("#keyboard-direct-refresh").click();
+      await page.waitForFunction(() => document.querySelector("#keyboard-target-status").textContent.includes("nicht mehr verfügbar"));
+      assert.equal(await page.locator("#keyboard-direct-app").inputValue(), "12345:123.5", "Refresh must never replace an explicit vanished target with active-app routing");
+      await page.locator("#keyboard-direct-return").click();
+      await page.waitForFunction(() => document.querySelector("#notice").textContent.includes("das Ziel erneut wählen"));
+      assert.equal(posts.filter(p => p.operation === "keyboard.input").length, 0);
+      await page.locator("#keyboard-direct-send").click();
+      assert.equal(posts.filter(p => p.operation === "keyboard.input").length, 0);
+      await page.locator("#keyboard-direct-app").selectOption("");
+      await page.locator("#keyboard-direct-return").click();
+      await page.waitForFunction(() => document.querySelector("#keyboard-direct-result").textContent.includes("1 von 1"));
+      assert.equal(posts.filter(p => p.operation === "keyboard.input").length, 1, "Only an explicit new target selection permits a new input");
+      assert.deepEqual(errors, []);
+      return { name, passed: true, keyboard_posts: posts.length, status_gets: gets.length };
+    }
+    if (name.startsWith("direct_")) {
+      assert.equal(await page.locator("#keyboard-advanced").getAttribute("open"), null, "Profile editor stays optional and closed");
+      await page.waitForFunction(() => !document.querySelector("#keyboard-direct-return").disabled);
+      await page.locator("#keyboard-direct-repeat").fill("2");
+      await page.locator("#keyboard-direct-return").evaluate(button => { button.click(); button.click(); });
+      await page.waitForFunction(() => !document.querySelector("#keyboard-direct-result").textContent.includes("wird einmalig gesendet"));
+      assert.equal(posts.filter(p => p.operation === "keyboard.input").length, 1);
+      assert.deepEqual(posts[0].args, { repeat: 2, key: { named: "enter" } });
+      assert.equal(posts.filter(p => p.operation.includes("profiles")).length, 0);
+      if (name === "direct_lost_response") {
+        await page.waitForFunction(() => document.querySelector("#keyboard-direct-result").textContent.includes("ungewiss"));
+        await page.reload();
+        await page.locator('[data-view="keyboard"]').click();
+        await page.locator("#keyboard-status").click();
+        await page.waitForFunction(() => document.querySelector("#keyboard-task").textContent.includes("unknown"));
+        assert.ok(await page.locator("#keyboard-direct-return").isDisabled());
+      } else if (name === "direct_missing_proof") {
+        await page.waitForFunction(() => document.querySelector("#keyboard-direct-result").textContent.includes("nicht vollständig bestätigt"));
+        assert.ok(await page.locator("#keyboard-direct-return").isDisabled());
+      } else {
+        await page.waitForFunction(() => document.querySelector("#keyboard-direct-result").textContent.includes("2 von 2"));
+        assert.match(await page.locator("#keyboard-direct-result").innerText(), /Programmaktion ist nicht bestätigt/);
+        assert.ok(await page.locator("#keyboard-direct-return").isEnabled());
+      }
+      assert.deepEqual(errors, []);
+      return { name, passed: true, keyboard_posts: posts.length, status_gets: gets.length };
+    }
+    await page.locator("#keyboard-advanced summary").click();
     await page.locator("#keyboard-refresh").click();
     await page.waitForFunction(() => document.querySelector("#keyboard-apps").options.length === 2);
     await page.locator("#keyboard-profiles").selectOption("fixture");

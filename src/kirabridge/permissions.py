@@ -85,6 +85,8 @@ def decision(config, principal, operation, *, text=None):
     required = {capability_for(operation)}
     if operation == "keyboard.action":
         required.add("keyboard.profiles.read")
+    if operation == "keyboard.input":
+        required.update({"apps.list", "keyboard.inspect"})
     if operation in {"session.input", "terminal.visible"} or (
         operation in {"terminal.execute", "admin.execute"}
         and direct_terminal_required(config, principal)

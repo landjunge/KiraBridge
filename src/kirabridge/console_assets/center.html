@@ -12,8 +12,24 @@
 <div class="view" id="doctor" hidden><div class="section-heading"><h2>Reparatur-Doktor</h2><button id="doctor-check">Prüfen</button></div><p class="description">Prüft Verbindungen, Prozesse, Rechte und Terminals.</p><div id="doctor-checks" class="doctor-checks"><p>Noch keine Prüfung durchgeführt.</p></div><div class="doctor-footer"><span id="doctor-summary" class="small">Laufende Arbeit bleibt erhalten.</span><button id="doctor-repair" class="primary">Probleme beheben</button></div></div>
 <div class="view" id="permissions" hidden><div class="section-heading"><h2>Rechte</h2><span class="small">Gilt für alle Zugänge</span></div><fieldset class="permission-options"><legend class="sr-only">Rechtestufe</legend><label><input type="radio" name="permission" value="full"><span><strong>Voll erlaubt</strong><small>Alle Aktionen mit deinen erteilten Freigaben. Ohne zusätzliche Nachfrage.</small></span></label><label><input type="radio" name="permission" value="medium"><span><strong>Mittel</strong><small>Lesen automatisch. Änderungen und Ausführung nach deiner Freigabe.</small></span></label><label><input type="radio" name="permission" value="ask"><span><strong>Nur mit Erlaubnis</strong><small>Aufträge warten auf Freigabe; dauerhafte Ausnahmen stehen unten.</small></span></label></fieldset><div class="permission-footer"><p class="small" id="permission-detail">Vorhandene Freigaben werden gelesen.</p><button id="permissions-save" class="primary">Übernehmen</button></div><div id="permission-exceptions" class="small"></div><div id="approvals" class="approvals"></div></div>
 <div class="view" id="keyboard" hidden>
-<div class="section-heading"><h2>Tastaturprofile</h2><button type="button" id="keyboard-refresh">Profile und Programme laden</button></div>
-<p class="small">Profile speichern Belegungen. Eine Vorschau bestätigt keine native Ausführung. Menübeobachtungen bleiben unbestätigte Kandidaten.</p>
+<div class="section-heading"><h2>Tastatur</h2><button type="button" id="keyboard-direct-refresh">Verfügbarkeit und Programme prüfen</button></div>
+<p class="description">Text, Return und Tastenkombinationen funktionieren ohne Profil. Das Zielprogramm und sein Eingabefeld werden vor dem Senden geprüft.</p>
+<p id="keyboard-availability" class="small" role="status" aria-live="polite">ChatGPT-Zugang noch nicht geprüft. macOS-Rechte und das Eingabefeld werden beim Senden geprüft.</p>
+<form id="keyboard-direct-form" class="keyboard-direct">
+<label for="keyboard-direct-app">Zielprogramm</label><select id="keyboard-direct-app"><option value="">Beim Senden aktives Programm</option></select>
+<p id="keyboard-target-status" class="small">Das aktive Programm wird erst beim Senden bestimmt. Für eine Eingabe aus dieser Konsole wähle das gewünschte Programm ausdrücklich aus.</p>
+<label for="keyboard-direct-mode">Was möchtest du senden?</label><select id="keyboard-direct-mode"><option value="text">Text</option><option value="key">Einzelne Taste</option><option value="chord">Tastenkombination</option></select>
+<div id="keyboard-text-controls"><label for="keyboard-direct-text">Text</label><textarea id="keyboard-direct-text" rows="4" maxlength="4096" autocomplete="off" placeholder="Text unverändert eingeben …"></textarea><label class="keyboard-check"><input type="checkbox" id="keyboard-direct-submit">Nach dem vollständigen Text einmal Return senden</label></div>
+<div id="keyboard-key-controls" hidden><label for="keyboard-direct-key">Taste</label><select id="keyboard-direct-key"><option value="enter">Return</option><option value="tab">Tab</option><option value="escape">Escape</option><option value="space">Leertaste</option><option value="backspace">Rücktaste</option><option value="delete">Vorwärts löschen</option><option value="left">Pfeil links</option><option value="right">Pfeil rechts</option><option value="up">Pfeil oben</option><option value="down">Pfeil unten</option><option value="home">Anfang</option><option value="end">Ende</option><option value="page_up">Seite auf</option><option value="page_down">Seite ab</option><option value="character">Buchstabe oder Zeichen …</option></select><label id="keyboard-character-label" for="keyboard-direct-character" hidden>Zeichen<input id="keyboard-direct-character" autocomplete="off" placeholder="z. B. a"></label></div>
+<fieldset id="keyboard-modifier-controls" hidden><legend>Zusätzliche Tasten</legend><label><input type="checkbox" value="command">⌘ Befehl</label><label><input type="checkbox" value="shift">⇧ Umschalt</label><label><input type="checkbox" value="option">⌥ Wahl</label><label><input type="checkbox" value="control">⌃ Steuerung</label></fieldset>
+<label for="keyboard-direct-repeat">Wie oft?</label><input id="keyboard-direct-repeat" type="number" min="1" max="20" step="1" value="1" inputmode="numeric">
+<p class="small">Die Anzahl gilt für den Text oder Tastendruck. Ein zusätzliches Return nach Text wird nur einmal am Ende gesendet. Eine unklare Rückmeldung wird niemals automatisch wiederholt.</p>
+<div class="keyboard-buttons"><button id="keyboard-direct-send" type="submit" class="primary">Einmaligen Auftrag senden</button><button type="button" id="keyboard-direct-return">Return senden</button></div>
+<p id="keyboard-direct-result" class="small" role="status" aria-live="polite">Noch keine Eingabe gesendet.</p>
+</form>
+<details id="keyboard-advanced"><summary>Erweitert: optionale Profile und Menübelegungen</summary>
+<p class="small">Nur für eigene gespeicherte Belegungen. Für Text und Tasten oben wird kein Profil benötigt.</p>
+<button type="button" id="keyboard-refresh">Profile und Programme laden</button>
 <form id="keyboard-form" class="keyboard-grid">
 <div class="keyboard-column">
 <label for="keyboard-profiles">Gespeicherte Profile</label><select id="keyboard-profiles"><option value="">Profil wählen</option></select>
@@ -33,8 +49,8 @@
 <label for="keyboard-context">Kontextangaben für die Vorschau · JSON</label><textarea id="keyboard-context" class="keyboard-context" spellcheck="false">{}</textarea>
 <button type="button" id="keyboard-preview">Caller-Vorschau prüfen</button>
 <pre id="keyboard-preview-result" class="keyboard-output">Noch keine Vorschau. Angaben sind kein nativer Kontextbeleg.</pre>
-</div></form>
+</div></form></details>
 <div class="keyboard-buttons"><button type="button" id="keyboard-status">Auftragsstatus prüfen</button><button type="button" id="keyboard-rights" data-go="permissions">Rechte öffnen</button></div>
-<p id="keyboard-task" class="small" role="status" aria-live="polite">Noch kein Auftrag. Schreibaufrufe werden nicht automatisch wiederholt.</p>
+<details><summary>Auftragsdetails</summary><p id="keyboard-task" class="small" role="status" aria-live="polite">Noch kein Auftrag. Schreibaufrufe werden nicht automatisch wiederholt.</p></details>
 </div>
 </section></div><footer class="app-footer"><span id="footer-state">Zustände werden live geprüft.</span><span>Nur das Protokoll öffnet ein eigenes Fenster.</span></footer></main></body></html>

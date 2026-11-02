@@ -99,6 +99,7 @@ def test_keyboard_snapshot_guards_and_utf16_without_ui(tmp_path):
     assert result.returncode == 0, result.stdout + result.stderr
     observed = json.loads(result.stdout)
     assert observed["checks"] == 15
+    assert observed["notes_checks"] == 21
     assert observed["key_checks"] == 22
     assert observed["layout_checks"] == 53
     assert observed["text_checks"] == 27
