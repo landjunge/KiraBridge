@@ -1,0 +1,155 @@
+{
+  "schema": "kirabridge.rc32.independent-review.v1",
+  "observed_at_utc": "2026-11-03T21:14:27.667174+00:00",
+  "scope": "Independent static code/SDK review and existing raw-evidence recomputation. No additional tests, AX/UI execution, process/window operations, rebuild or installation by reviewer.",
+  "branch": "perf/rc32-native-ipc-20261103",
+  "source_base": "0f554bc64ba7d0cecfa5898990f1df67fc6c0591",
+  "production_swift_sha256": "3b578d5ae885bd833c3f338b7b1c1c04e938308258df069386c9d37479721ace",
+  "source_hash_checks": {
+    "real": {
+      "tests/fixtures/desktop_bootstrap/AccessibilityTimingHarness.swift": true,
+      "integrations/desktop/SystemControl.swift": true,
+      "integrations/desktop/SystemBridge.swift": true,
+      "integrations/desktop/SystemServices.swift": true,
+      "integrations/desktop/SystemKeyboard.swift": true,
+      "integrations/desktop/SystemShortcuts.swift": true,
+      "integrations/desktop/SystemSpecialKeys.swift": true
+    },
+    "synthetic": {
+      "tests/fixtures/desktop_bootstrap/AccessibilityBatchHarness.swift": true,
+      "integrations/desktop/SystemControl.swift": true,
+      "integrations/desktop/SystemBridge.swift": true,
+      "integrations/desktop/SystemServices.swift": true,
+      "integrations/desktop/SystemKeyboard.swift": true,
+      "integrations/desktop/SystemShortcuts.swift": true,
+      "integrations/desktop/SystemSpecialKeys.swift": true,
+      "tests/test_accessibility_batch_native.py": true
+    }
+  },
+  "product_review": {
+    "retained_scalar_tree_summary_exactly_matches_rc31": true,
+    "legacy_default_summary_unchanged": true,
+    "strict_positional_array_cfnull_axerror_and_geometry_decode": true,
+    "role_subrole_classified_before_requesting_value": true,
+    "secure_value_omitted_from_metadata_batch": true,
+    "only_whole_api_notimplemented_restarts_fresh_scalar_read": true,
+    "per_attribute_action_deadline_errors_do_not_fallback": true,
+    "fallback_preserves_original_deadline_and_fresh_classification": true,
+    "existing_owner_revision_children_token_and_size_guards_retained": true,
+    "no_value_or_permission_cache": true,
+    "open_blockers": []
+  },
+  "public_api_invocations": {
+    "ordinary_summary_before": 14,
+    "ordinary_summary_after": 3,
+    "secure_summary_before": 13,
+    "secure_summary_after": 3,
+    "ordinary_full_tree_node_derived_before": 30,
+    "ordinary_full_tree_node_derived_after": 8,
+    "secure_full_tree_node_derived_before": 28,
+    "secure_full_tree_node_derived_after": 8,
+    "scope": "Public API/callback counts; underlying physical IPCs not instrumented"
+  },
+  "owned_ax_timing": {
+    "statistics": {
+      "individual": {
+        "p50_ms": 16.855711000971496,
+        "p95_ms": 18.447597001795657,
+        "n": 20,
+        "cpu_p50_ms": 5.5879999999999885,
+        "total_ms": 335.0785740185529
+      },
+      "batched": {
+        "p50_ms": 8.138045996020082,
+        "p95_ms": 8.626676994026639,
+        "n": 20,
+        "cpu_p50_ms": 3.3984999999999985,
+        "total_ms": 164.01044501981232
+      }
+    },
+    "median_reduction_percent": 51.719354967873876,
+    "rounds": 20,
+    "summaries_per_arm_per_round": 12,
+    "alternating_order_verified": true,
+    "all_recorded_samples_retained": true,
+    "identical_full_json_and_revisions_every_round": true,
+    "distinct_result_hashes": 1,
+    "same_provider_pid_start_identity": true,
+    "provider_inactive": true,
+    "observed_foreground_pid": 852,
+    "all_targets_preflighted_for_both_attribute_batches": true,
+    "setup_preflight_warms_data_before_timing": true,
+    "timed_fallback_count_not_separately_instrumented": true,
+    "full_tree_children_and_target_checks_not_in_timing": true,
+    "cloud_voice_mcp_not_measured": true,
+    "recorded_owned_sigterm_and_independent_empty_family": true,
+    "no_permission_requests_or_input_posts": true
+  },
+  "metadata_profile_recomputed": [
+    {
+      "fixture_binary_bytes": 32768,
+      "n": 30,
+      "wall_p50_ms": 2.4431469999999997,
+      "metadata_sum_p50_ms": 1.1847945000000002,
+      "fresh_snapshots_per_read": 3,
+      "private_file_reads_per_read": 6,
+      "binary_hashes_per_read": 3,
+      "source_hashes_match": true
+    },
+    {
+      "fixture_binary_bytes": 1048576,
+      "n": 30,
+      "wall_p50_ms": 13.915979,
+      "metadata_sum_p50_ms": 12.28609,
+      "fresh_snapshots_per_read": 3,
+      "private_file_reads_per_read": 6,
+      "binary_hashes_per_read": 3,
+      "source_hashes_match": true
+    },
+    {
+      "fixture_binary_bytes": 4194304,
+      "n": 30,
+      "wall_p50_ms": 50.422981500000006,
+      "metadata_sum_p50_ms": 48.692511499999995,
+      "fresh_snapshots_per_read": 3,
+      "private_file_reads_per_read": 6,
+      "binary_hashes_per_read": 3,
+      "source_hashes_match": true
+    }
+  ],
+  "metadata_reproduction": {
+    "captured_script_hash_matches_historical_script": true,
+    "current_script_hash_matches_recorded_reproduction": true,
+    "captured_and_current_python_ast_equal_ignoring_locations": true,
+    "difference": "Formatting and adjacent string-literal wrapping only; capture hashes remain historical."
+  },
+  "final_tests_recorded_by_parent": {
+    "passed": 74,
+    "new_batch_cases": 26,
+    "existing_tree_cases": 39,
+    "existing_summary_cases": 9,
+    "duration_seconds": 72.96,
+    "rerun_by_reviewer": false
+  },
+  "previous_setup_failures_retained_separately": [
+    "docs/evidence/rc32-owned-ax-timing-20261103.json",
+    "docs/evidence/rc32-owned-ax-launchservices-20261103.json"
+  ],
+  "reviewed_document": "docs/RC32-NATIVE-ATTRIBUTE-BATCHING-20261103.md",
+  "document_numerical_and_method_scope_consistent": true,
+  "evidence_sha256": {
+    "docs/evidence/rc32-owned-ax-launchservices-fixed-20261103.json": "c3ad7672913add45e21eea261ec04f217914bd446e02142cfd35847308c894a4",
+    "docs/evidence/rc32-accessibility-batches-20261103.json": "6936a8469d64a9c00654fff461e0f523e187b38d5863ceb0117c963f8099acde",
+    "docs/evidence/rc32-native-metadata-profile-20261103.json": "6ffc963d02c87e60bd137f31ace9cba1105ac858368762128ba652875d3e5a8a"
+  },
+  "passed": true,
+  "official_local_sdk": {
+    "version": "15.0",
+    "header_sha256": {
+      "AXUIElement.h": "e4c7b5521a48ace58127ef8e696370b265a26fe935f0bf63b8fa6876d072fddd",
+      "AXValue.h": "6fa359daa94e09169bda8d613afee6235d7d53dd4089b56e4822706b41a3c970",
+      "AXError.h": "6d1018a32092ee776aceebc253c8d0afb6e16e94fad1a5b5c5410a272455a9f1"
+    },
+    "contract": "AXUIElement.h226-244: ordered slots, options0 permits CFNull/AXValue.axError.387-402: timeout applies to the exact reference. No documented atomicity or physical IPC count."
+  }
+}

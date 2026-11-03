@@ -83,6 +83,10 @@ and bounded Accessibility subtrees with `max_depth>0`, reducing repeated UI read
 and persisted task traffic. Task-event reads also avoid loading large outputs.
 See [RC31 implementation, measurements and delivery status](docs/RC31-NATIVE-READS-20261103.md).
 
+RC32 also batches attributes inside optional UI subtree reads. In a controlled
+native test, the same twelve owned AppKit buttons took 8.14 instead of 16.86 ms
+median over twenty alternating rounds. See [RC32 measurements and limits](docs/RC32-NATIVE-ATTRIBUTE-BATCHING-20261103.md).
+
 ## License
 
 Private, non-business use is free under the

@@ -86,6 +86,10 @@ und begrenzte Accessibility-Unterbäume mit `max_depth>0`. Dadurch sinken wieder
 UI-Leseaufrufe und persistente Taskdaten. Ereignisabrufe laden große Ausgaben nicht
 mehr mit. Siehe [RC31-Umsetzung, Messungen und Auslieferungsstand](docs/RC31-NATIVE-READS-20261103.md).
 
+RC32 bündelt zusätzlich Attribute innerhalb optionaler UI-Unterbäume. Dieselben
+zwölf eigenen AppKit-Buttons benötigten im kontrollierten nativen Test 8,14 statt
+16,86 ms Median bei zwanzig abwechselnden Runden. Siehe [RC32-Messungen und Grenzen](docs/RC32-NATIVE-ATTRIBUTE-BATCHING-20261103.md).
+
 ## Lizenz
 
 Private, nicht geschäftliche Nutzung ist unter der

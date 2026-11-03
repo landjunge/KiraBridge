@@ -304,7 +304,10 @@ enum SystemControl {
         }
         return names
     }
-    static func treeSummary(_ element: AXUIElement, deadline: Double) throws -> [String: Any] {
+    // Retained as the compatibility path when the application does not implement
+    // the whole multiple-attribute API. Values are freshly observed again; no
+    // partial fields from an unsupported batch are reused.
+    static func individualTreeSummary(_ element: AXUIElement, deadline: Double) throws -> [String: Any] {
         var readError: Error?
         do {
             let result = try observedSummary(prepare: { try prepareTreeElement(element, deadline: deadline) },
@@ -340,6 +343,97 @@ enum SystemControl {
             // a value/hash from a field whose secure classification is unknown.
             throw readError ?? error
         }
+    }
+    enum TreeBatchFailure: Error { case notImplemented }
+    static let treeClassificationAttributes = [kAXRoleAttribute, kAXSubroleAttribute]
+    static let treeMetadataAttributes = [kAXTitleAttribute, kAXDescriptionAttribute, kAXIdentifierAttribute,
+        kAXEnabledAttribute, kAXFocusedAttribute, kAXSelectedAttribute, kAXExpandedAttribute,
+        kAXMinimizedAttribute, kAXPositionAttribute, kAXSizeAttribute]
+
+    /// CopyMultiple(options:0) reports missing attributes as CFNull or an
+    /// AXValue(.axError) in their original position. Only supported absence is
+    /// omitted, matching strict scalar tree reads. Transport/unknown errors
+    /// never become empty fields or compatibility fallbacks.
+    static func treeBatchAttributes(_ names: [String], status: AXError, raw: CFArray?) throws -> [String: CFTypeRef] {
+        guard !names.isEmpty, names.count <= 32, Set(names).count == names.count else {
+            throw failure("invalid_arguments", "Invalid Accessibility attribute batch")
+        }
+        if status == .notImplemented { throw TreeBatchFailure.notImplemented }
+        guard status == .success, let values = raw,
+              CFGetTypeID(values) == CFArrayGetTypeID(),
+              CFArrayGetCount(values) == names.count,
+              let items = values as? [AnyObject] else {
+            throw failure("macos_accessibility_unavailable", "Accessibility attribute batch is not a complete positional array")
+        }
+        var result: [String: CFTypeRef] = [:]
+        for (name, item) in zip(names, items) {
+            if CFGetTypeID(item) == CFNullGetTypeID() { continue }
+            if CFGetTypeID(item) == AXValueGetTypeID() {
+                let value = unsafeBitCast(item, to: AXValue.self)
+                if AXValueGetType(value) == .axError {
+                    var error = AXError.failure
+                    guard AXValueGetValue(value, .axError, &error), error != .success else {
+                        throw failure("macos_accessibility_unavailable", "Accessibility batch contains an invalid error value")
+                    }
+                    if error == .attributeUnsupported || error == .noValue { continue }
+                    throw failure("macos_accessibility_unavailable", "Accessibility batch attribute could not be observed")
+                }
+            }
+            result[name] = item
+        }
+        return result
+    }
+    /// Pure public-API call planner, injected by the synthetic harness. This
+    /// reduces API invocations, without asserting the framework's IPC internals.
+    static func observedBatchedTreeSummary(prepare: () throws -> Void,
+        copy: ([String]) throws -> (AXError, CFArray?),
+        actionNames: () throws -> [String]?,
+        individual: () throws -> [String: Any]) throws -> [String: Any] {
+        do {
+            try prepare()
+            let classification = try copy(treeClassificationAttributes)
+            var values = try treeBatchAttributes(treeClassificationAttributes,
+                status: classification.0, raw: classification.1)
+            guard let role = values[kAXRoleAttribute] as? String, !role.isEmpty,
+                  values[kAXSubroleAttribute] == nil || values[kAXSubroleAttribute] is String else {
+                throw failure("macos_accessibility_unavailable", "Accessibility secure classification is not observable")
+            }
+            let subrole = values[kAXSubroleAttribute] as? String ?? ""
+            let secure = role.contains("Secure") || subrole.contains("Secure")
+            // A secure value is never requested, rather than fetched and then
+            // redacted. Role/subrole are always observed before this list exists.
+            let names = Array(treeMetadataAttributes.prefix(3))
+                + (secure ? [] : [kAXValueAttribute]) + Array(treeMetadataAttributes.dropFirst(3))
+            let metadata = try copy(names)
+            values.merge(try treeBatchAttributes(names, status: metadata.0, raw: metadata.1)) { _, new in new }
+            let actions = try actionNames()
+            return try observedSummary(prepare: {}, read: { values[$0] }, actionNames: { actions })
+        } catch TreeBatchFailure.notImplemented {
+            return try individual()
+        }
+    }
+    static func treeSummary(_ element: AXUIElement, deadline: Double) throws -> [String: Any] {
+        let result = try observedBatchedTreeSummary(
+            prepare: { try prepareTreeElement(element, deadline: deadline) },
+            copy: { names in
+                try checkTreeDeadline(deadline)
+                var values: CFArray?
+                let status = AXUIElementCopyMultipleAttributeValues(element, names as CFArray, [], &values)
+                try checkTreeDeadline(deadline)
+                return (status, values)
+            }, actionNames: {
+                try checkTreeDeadline(deadline)
+                var actions: CFArray?
+                let status = AXUIElementCopyActionNames(element, &actions)
+                try checkTreeDeadline(deadline)
+                if status == .notImplemented { return nil }
+                guard status == .success else {
+                    throw failure("macos_accessibility_unavailable", "Accessibility actions could not be observed during subtree read")
+                }
+                return try treeActionNames(actions)
+            }, individual: { try individualTreeSummary(element, deadline: deadline) })
+        try checkTreeDeadline(deadline)
+        return result
     }
     /// Pure bounded BFS, also exercised by the no-desktop synthetic harness.
     /// Each observation is locally stable; the whole remote AX graph is not an
