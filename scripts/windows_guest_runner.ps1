@@ -227,6 +227,13 @@ try {
     Run-Once 'mcp' @('scripts/accept_windows_mcp.py','--output',$mcpOut) 180 $mcpOut
     $previewOut=Join-Path $Work ('preview-'+$RunId+'.json')
     Run-Once 'preview' @('scripts/accept_windows_preview.py','--output',$previewOut) 180 $previewOut
+    $launcher=Join-Path ([Environment]::GetFolderPath('Desktop')) 'KiraBridge Windows Test.cmd'
+    $launcherSource=Join-Path $Source 'scripts\start_windows_preview.cmd'
+    if (-not (Test-Path -LiteralPath $launcher)) {
+        Copy-Item -LiteralPath $launcherSource -Destination $launcher -ErrorAction Stop
+    } elseif ((Digest $launcher) -ne (Digest $launcherSource)) {
+        Event 'existing_desktop_launcher_preserved'
+    }
     Event 'guest_checks_finished'
 } catch {
     Event ('guest_runner_stopped_'+$_.Exception.GetType().Name)

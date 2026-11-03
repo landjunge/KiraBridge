@@ -102,7 +102,14 @@ exact manifest and phase. An uncertain or failed test blocks subsequent input.
 - Native guest acceptance is **pending**. Its scripts reserve evidence before any
   effect and must run in the actual interactive guest:
   `tests/test_windows_core_native.py`, `scripts/accept_windows_keyboard.py` and
-  `scripts/accept_windows_mcp.py`.
+  `scripts/accept_windows_mcp.py` and `scripts/accept_windows_preview.py`.
+
+The preview also has a persistent user-run entrypoint documented in
+[WINDOWS-PREVIEW.md](WINDOWS-PREVIEW.md). After all guest checks succeed, setup
+places `KiraBridge Windows Test.cmd` on the owned guest desktop. It starts the
+loopback authenticated MCP in an ordinary visible console, using the exact
+prepared Python installation; no Windows service or host process is installed.
+An existing modified desktop launcher is preserved.
 
 No Windows boot, native keyboard pass, downloadable Windows release or complete
 Windows port is claimed by these preparatory results. The running Mac remains
