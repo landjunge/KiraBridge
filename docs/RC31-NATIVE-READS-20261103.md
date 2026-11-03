@@ -106,8 +106,8 @@ kooperative Deadlineende um seine auf höchstens 100 ms gesetzte IPC-Frist
 | Nativer JSON-Read über echten lokalen HTTP-/MCP-SDK-Pfad, P50/P95 | 14,23 / 34,00 ms | 7,58 / 10,07 ms |
 | Persistente Tasks / Events / Notices bei 30 solchen Reads | 30 / 150 / 30 | 0 / 0 / 0 |
 | Vollständiger synthetischer Baum mit 121 Knoten | 40 Einzelinspektionen innerer Knoten | 1 Baumoperation |
-| Ereignisse eines Tasks mit 4-MiB-Ausgabe bei 100.005 Events, P50/P95 | 36,40 / 45,83 ms | 0,050 / 0,110 ms |
-| Derselbe Ereignispfad bei 40.005 Events, P50/P95 | 30,75 / 75,20 ms | 0,047 / 0,058 ms |
+| Ereignisse eines Tasks mit 4-MiB-Ausgabe bei 100.005 Events, P50/P95 | 36,40 / 45,83 ms | 0,049 / 0,110 ms |
+| Derselbe Ereignispfad bei 40.005 Events, P50/P95 | 30,75 / 75,19 ms | 0,047 / 0,058 ms |
 
 Beim nativen HTTP-Vergleich: je 30 Samples, gleiche Grants, identische normalisierte
 native Argumente und exakt gleiches JSON-Ergebnis; jeweils **ein** HTTP-Aufruf
@@ -165,3 +165,9 @@ Ruff, Format-, Lock- und Diffprüfungen sind Teil der Abnahme. Alle Builds und
 Tests laufen lokal auf diesem Intel-Mac. Keine GitHub Actions, keine fremde
 Sitzungssteuerung und keine produktive Installation in diesem Parallelauftrag.
 Release-/Assetprüfung folgt nach dem exakten sauberen Sourcecommit.
+
+Der erste Paketbau auf `0ea050b` stoppte nach Wheel-/Nativekompilierung, weil die
+versionsgebundene `RELEASE-0.8.0rc31.md` noch fehlte. Es entstand kein vollständiges
+Paket und keine Veröffentlichung. Die fehlende Freigabenotiz wurde ergänzt;
+der folgende saubere Build bekommt einen eigenen Sourcepin. Die Implementierung
+und ihre 380 bestandenen Prüfungen bleiben unverändert.
