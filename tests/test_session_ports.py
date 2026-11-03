@@ -1,5 +1,7 @@
 import asyncio
+import os
 from types import SimpleNamespace
+from unittest.mock import AsyncMock, Mock
 
 import pytest
 
@@ -133,3 +135,50 @@ async def test_recognized_agent_cannot_bypass_central_handoff_with_direct_send(s
             ),
         )
     assert error.value.code == "visible_handoff_required" and native.calls == tmux.calls == []
+
+
+@pytest.mark.parametrize("sender", ["chatgpt", "grok_app", "codex", "grok"])
+@pytest.mark.parametrize("busy", [False, True], ids=["idle-tab", "busy-tab"])
+async def test_unbound_agent_cannot_bypass_selection_policy_or_input_intent(sender, busy):
+    manager, native, tmux, _ = manager_without_core(bound_pid=457)
+    native.rows[0]["busy"] = busy
+    native.rows[0]["processes"] = [
+        {"pid": 345, "ppid": 344, "name": "zsh", "image": "/bin/zsh"},
+        {"pid": 456, "ppid": 345, "name": "grok", "image": "/bin/grok"},
+    ]
+    text = "Never send through an unbound agent shortcut"
+    # These fully functional mock transports make the old shortcut submit without
+    # checking readiness, policy or the caller's durable input-intent callback.
+    native.process_identity = AsyncMock(
+        side_effect=lambda pid, **kwargs: (
+            f"{os.getuid()} ttys004 Sat Oct 24 12:00:00 2026 "
+            + ("344 /bin/zsh" if pid == 345 else "345 /bin/grok")
+        )
+    )
+    native.read = AsyncMock(return_value=text)
+    native.insert = AsyncMock()
+    native.press_return = AsyncMock()
+    manager.input_release = SimpleNamespace(dispatch=Mock(), sent=Mock())
+    intent = AsyncMock()
+    with pytest.raises(BridgeError) as error:
+        await manager.send(
+            sender,
+            SessionInput(
+                pane_id="terminal:123:ttys004",
+                expected_pid=345,
+                text=text,
+                submit=True,
+                require_idle=True,
+            ),
+            task_id="unbound-agent",
+            before_transport=intent,
+        )
+    assert error.value.code == "visible_target_changed"
+    intent.assert_not_awaited()
+    manager.input_release.dispatch.assert_not_called()
+    manager.input_release.sent.assert_not_called()
+    native.process_identity.assert_not_awaited()
+    native.read.assert_not_awaited()
+    native.insert.assert_not_awaited()
+    native.press_return.assert_not_awaited()
+    assert native.calls == tmux.calls == []

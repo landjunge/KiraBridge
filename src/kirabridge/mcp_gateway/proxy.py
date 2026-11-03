@@ -46,6 +46,33 @@ class DaemonConnection:
         return tools
 
 
+def dynamic_input_schema(item):
+    """Mutation envelopes keep the peer schema intact and cannot collide with its fields."""
+    if not item.get("requires_operation_id", False):
+        return item["inputSchema"]
+    return {
+        "type": "object",
+        "additionalProperties": False,
+        "properties": {
+            "operation_id": {"type": "string", "pattern": "^[A-Za-z0-9_-]{1,128}$"},
+            "arguments": item["inputSchema"],
+        },
+        "required": ["operation_id", "arguments"],
+    }
+
+
+def dynamic_call_arguments(item, arguments):
+    if not item.get("requires_operation_id", False):
+        return {"name": item["name"], "arguments": arguments}
+    if (
+        not isinstance(arguments, dict)
+        or set(arguments) != {"operation_id", "arguments"}
+        or not isinstance(arguments.get("arguments"), dict)
+    ):
+        raise BridgeError("invalid_arguments", "Use the advertised mutation envelope")
+    return {"name": item["name"], **arguments}
+
+
 async def connect_stdio(config, principal):
     async with MCPClientPool(observer=connection_observer(config, principal)) as pool:
         await pool.connect(peer(config, principal))
@@ -103,7 +130,7 @@ async def connect_stdio(config, principal):
                 if result.isError or not isinstance(data, dict):
                     return {}
                 entries = data.get("tools")
-                if not isinstance(entries, list) or len(entries) > 64:
+                if not isinstance(entries, list) or len(entries) > 256:
                     return {}
                 names = {}
                 for item in entries:
@@ -138,10 +165,17 @@ async def connect_stdio(config, principal):
                 baseline.append(
                     Tool(
                         name=name,
-                        description="ThreadDesk read-only: " + (item.get("description") or ""),
-                        inputSchema=item["inputSchema"],
+                        description="ThreadDesk: " + (item.get("description") or ""),
+                        inputSchema=dynamic_input_schema(item),
                         annotations=ToolAnnotations(
-                            readOnlyHint=True, destructiveHint=False, openWorldHint=False
+                            **item.get(
+                                "annotations",
+                                {
+                                    "readOnlyHint": True,
+                                    "destructiveHint": False,
+                                    "openWorldHint": False,
+                                },
+                            )
                         ),
                     )
                 )
@@ -160,7 +194,7 @@ async def connect_stdio(config, principal):
                         raise BridgeError("threaddesk_tool_denied", "Dynamic tool is unavailable")
                     result = await connection.call_tool(
                         "threaddesk_dynamic_call",
-                        {"name": item["name"], "arguments": arguments or {}},
+                        dynamic_call_arguments(item, arguments or {}),
                     )
                     data = result.structuredContent
                     if isinstance(data, dict) and "error" in data:

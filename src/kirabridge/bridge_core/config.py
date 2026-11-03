@@ -207,7 +207,8 @@ class ThreadDeskConfig(BaseModel):
     storage: Literal["json", "sqlite"] = "json"
     timeout: float = Field(default=15, gt=0, le=60)
     max_result_bytes: int = Field(default=524288, ge=1024, le=1048576)
-    dynamic_read_proxy: bool = False  # Explicit opt-in; requires threaddesk.read permission.
+    dynamic_read_proxy: bool = False  # Legacy read-only opt-in remains supported.
+    dynamic_tool_proxy: bool = False  # Explicit all-tools opt-in; mutations use durable tasks.
 
 
 class WorkflowControlConfig(BaseModel):

@@ -83,12 +83,15 @@ for _name in (
     "handoff.answer",
     "handoff.reconcile",
     "handoff.decide",
+    "threaddesk.dynamic",
     "threaddesk.manage",
     "threaddesk.knowledge",
     "admin.execute",
 ):
     OPERATIONS[_name] = Operation(
-        capability="task.cancel"
+        capability="threaddesk.manage"
+        if _name == "threaddesk.dynamic"
+        else "task.cancel"
         if _name == "queue.control"
         else "files.inspect"
         if _name in {"files.inventory", "files.status"}

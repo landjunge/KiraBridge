@@ -22,7 +22,10 @@ def input_view(target, text):
     if target == "grok" and "╭" in text:
         return text[text.rfind("╭") :]
     if target == "codex":
-        prompts = list(re.finditer(r"(?m)^[ \t]*›[^\n]*", text))
+        # The busy Codex composer uses U+00BB; submitted history retains
+        # U+203A. Ignoring the busy marker selects a previous submitted prompt
+        # and misreports that old text as current pending input.
+        prompts = list(re.finditer(r"(?m)^[ \t]*[›»][^\n]*", text))
         return text[prompts[-1].start() :] if prompts else ""
     return text if target not in {"grok", "codex"} else ""
 
@@ -47,13 +50,24 @@ def assess(target, raw, binding, protocol=None):
     first = view.splitlines()[0].strip()
     if target == "codex":
         # The final input row, not any previous user prompt in visible output.
-        empty = bool(re.fullmatch(binding.ready_pattern, first))
+        queue_composer = first.startswith("»")
+        candidate = "›" + first[1:] if queue_composer else first
+        empty = bool(re.fullmatch(binding.ready_pattern, candidate))
         base["input_empty"] = empty
         prelude = text[: text.rfind(view)].rstrip()
         current_block = re.split(r"\n[ \t]*\n", prelude)[-1] if prelude else ""
         current = current_block + "\n" + view
         if not empty:
             return result("input_not_empty", "existing_input_must_not_be_overwritten")
+        if queue_composer:
+            # Recognize the empty field without authorizing queued input into
+            # a running turn. An idle protocol that disagrees also fails closed.
+            return result(
+                "unknown" if protocol and protocol.get("state") == "idle" else "working",
+                "protocol_display_disagree"
+                if protocol and protocol.get("state") == "idle"
+                else "current_queue_composer",
+            )
         if protocol and protocol.get("state") == "working":
             return result("working", "bound_codex_turn_active")
         if "tab to queue message" in view:
