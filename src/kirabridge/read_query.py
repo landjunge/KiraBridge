@@ -19,6 +19,7 @@ class ReadQuery(Input):
         "session.catalog",
         "session.read",
         "platform.status",
+        "task.observe",
     ]
     path: str | None = Field(default=None, max_length=4096)
     task_id: str | None = Field(default=None, max_length=128)
@@ -34,9 +35,13 @@ class ReadQuery(Input):
     limit: int = Field(default=100, ge=1, le=1000, strict=True)
     cursor: str = Field(default="", max_length=4096)
     stream: Literal["stdout", "stderr"] | None = None
+    wait_seconds: float = Field(default=0.0, ge=0, le=18, allow_inf_nan=False)
+    events_after: int = Field(default=0, ge=0, le=2**63 - 1, strict=True)
 
     @model_validator(mode="after")
     def selector(self):
+        if (self.wait_seconds or self.events_after) and self.operation != "task.observe":
+            raise ValueError("task observation selectors require task.observe")
         if self.check_helpers and self.operation != "platform.status":
             raise ValueError("helper permission diagnostics require platform.status")
         if self.encoding != "utf-8" and self.operation not in {"file.read", "process.output"}:
@@ -68,6 +73,9 @@ class ReadQuery(Input):
         elif self.operation == "platform.status":
             if self.path or self.task_id or self.offset or self.tail:
                 raise ValueError("platform.status does not accept file/task selectors")
+        elif self.operation == "task.observe":
+            if not self.task_id or self.path is not None or self.offset or self.tail:
+                raise ValueError("task.observe requires only an existing task_id and wait/cursor")
         elif self.operation == "terminal.output":
             if not self.task_id or self.path is not None or self.offset or self.tail:
                 raise ValueError("terminal.output requires only task_id and max_bytes")
@@ -87,6 +95,12 @@ class ReadQuery(Input):
 
 async def read_query_async(bridge, principal: str, query: ReadQuery) -> dict:
     """Existing dictionary-shaped tool also works with cached client tool lists."""
+    if query.operation == "task.observe":
+        from kirabridge.task_observation import observe_task
+
+        return await observe_task(
+            bridge, principal, query.task_id, query.wait_seconds, query.events_after
+        )
     if query.operation == "platform.status":
         return await bridge.platform_status(principal, check_helpers=query.check_helpers)
     if query.operation == "session.catalog":

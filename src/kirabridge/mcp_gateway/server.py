@@ -28,26 +28,28 @@ from kirabridge.team_manager.models import (
 )
 
 
-def inline_task_timeout(operation: str) -> float | None:
-    """Seconds task_request may wait so its response contains the finished result.
+def inline_task_timeout(operation: str) -> float:
+    """Bound result observation without changing the durable execution deadline."""
+    from kirabridge.desktop_input import DESKTOP_EFFECT_OPERATIONS
 
-    session.read used to return only a queued receipt. Its text lived in a snapshot,
-    and the default completion inbox does not deliver that text. Clipboard and
-    ThreadDesk keep the existing two-second wait.
-    """
-    # Short keyboard operations normally finish inside this response. A slow or
-    # queued operation remains the same durable task; the wait never cancels it.
-    if operation == "keyboard.sequence":
-        return 13
-    if operation == "keyboard.control":
-        return 2
-    if operation in {"threaddesk.read", "threaddesk.manage", "clipboard.read", "clipboard.write"}:
-        return 2
+    if operation in DESKTOP_EFFECT_OPERATIONS or operation.startswith("keyboard."):
+        return 13  # The existing desktop transaction has a twelve-second deadline.
     if operation in {"session.catalog", "session.read"}:
         from kirabridge.terminal_queries import TERMINAL_QUERY_SECONDS
 
         return TERMINAL_QUERY_SECONDS + 1
-    return None
+    if operation in {
+        "agent.execute",
+        "terminal.execute",
+        "terminal.visible",
+        "admin.execute",
+        "system.report",
+        "session.input",
+        "files.transfer",
+        "handoff.start",
+    }:
+        return 1
+    return 2
 
 
 def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = "local") -> FastMCP:
@@ -67,6 +69,12 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
         "Use keyboard_sequence for requested genuine individual keystrokes; "
         "use keyboard_control text for literal text. Keep adaptive steps separate. "
         "Use read_queries to combine independent reads in one roundtrip. "
+        "Use read_tools or read_query operation=tool.batch for mixed read-only tools. "
+        "For known arguments submit directly; do not prefetch health or the full catalog "
+        "before every action. Request operation_catalog operations=[...] for needed schemas. "
+        "A completed inline result needs no task_get/events/completion poll. "
+        "For pending work use read_query operation=task.observe with the same task_id, "
+        "wait_seconds<=18 and events_after to receive status and evidence together. "
         "Choose an application by name or an exact PID/start pair, or omit the selector "
         "for the fresh foreground application. Target inspection is automatic. "
         "No Events subscription is needed. Read task_get for execution evidence; "
@@ -261,8 +269,11 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
     async def read_query(query: dict[str, Any], ctx: Context) -> dict[str, Any]:
         """Direct authorized read without tasks or Events subscriptions.
 
-        Cached clients may use operation=read.batch with queries=[...] for the
-        same bounded read_queries batch; nested batches and writes are rejected.
+        Cached clients may use operation=read.batch with queries=[...] or
+        operation=tool.batch with calls=[{tool,arguments},...] for mixed existing
+        read-only tools. Both accept 1–8 reads; nested batches and writes rejected.
+        task.observe accepts existing task_id, wait_seconds<=18 and events_after:
+        waits without execution/retry and returns task plus events in one response.
 
         query.operation: file.read (path, max_bytes<=65536, offset or tail,
         encoding=utf-8|base64, expected_identity). For complete/binary logs use
@@ -283,6 +294,12 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
         from kirabridge.read_query import ReadQuery, read_query_async
 
         try:
+            if query.get("operation") == "tool.batch":
+                from kirabridge.read_tool_batch import read_tool_batch
+
+                if set(query) != {"operation", "calls"}:
+                    return {"error": {"code": "invalid_arguments"}}
+                return await read_tool_batch(server, bridge, identity(ctx), query["calls"])
             if query.get("operation") == "read.batch":
                 from kirabridge.read_queries import ReadQueries
                 from kirabridge.read_queries import read_queries as execute_reads
@@ -297,6 +314,28 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
             return {"error": {"code": exc.code, "message": str(exc)}}
         except ValidationError:
             return {"error": {"code": "invalid_arguments", "message": "Invalid read query"}}
+
+    @server.tool(annotations=read)
+    async def read_tools(calls: list[dict[str, Any]], ctx: Context) -> dict[str, Any]:
+        """Combine 1–8 independent existing read-only tools in one cloud roundtrip.
+
+        Each call is {tool,arguments}. Exact allowed names and all argument schemas
+        are validated before the first read. Normal tool authorization remains
+        fresh per call. No writes, nested batches, retries or atomic snapshots.
+        Allowed: bridge_health, clipboard_info, operation_catalog, task_get,
+        task_events, task_diagnose, task_list, policy_inspect, bridge_readiness,
+        agent_inventory, macos_status, session_catalog, session_read,
+        whiteboard_read, read_query (one non-batch query).
+        JSON text results only: use the original tool for images. The cooperative
+        deadline is 12s and the result budget 2 MiB; partial results are explicit.
+        Cached clients can use read_query operation=tool.batch with these calls.
+        """
+        from kirabridge.read_tool_batch import read_tool_batch
+
+        try:
+            return await read_tool_batch(server, bridge, identity(ctx), calls)
+        except BridgeError as exc:
+            return {"error": {"code": exc.code, "message": str(exc)}}
 
     @server.tool(annotations=read)
     async def read_queries(queries: list[dict[str, Any]], ctx: Context) -> dict[str, Any]:
@@ -424,13 +463,19 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
             return {"error": {"code": exc.code, "message": str(exc)}}
 
     @server.tool(annotations=read)
-    async def operation_catalog(ctx: Context, observe_terminals: bool = False) -> dict[str, Any]:
+    async def operation_catalog(
+        ctx: Context,
+        observe_terminals: bool = False,
+        operations: list[str] | None = None,
+    ) -> dict[str, Any]:
         """Permitted version-1 operations and exact argument JSON schemas.
 
         Schema discovery does not inspect terminal sessions by default. Set
         observe_terminals=true for an explicit fresh terminal catalogue. The
         default discovery labels prior terminal observations as cached/not_probed;
         observations never authorize input or replace fresh target validation.
+        Set operations to 1–32 exact operation names to obtain only the argument
+        schemas needed for this action; omit it for the complete permitted catalog.
         """
 
         def action():
@@ -440,6 +485,12 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
             from kirabridge.terminal_queries import TERMINAL_QUERY_SECONDS
 
             policy = bridge.security.principal(identity(ctx))
+            if operations is not None and (
+                not 1 <= len(operations) <= 32
+                or len(set(operations)) != len(operations)
+                or any(name not in INPUTS for name in operations)
+            ):
+                raise BridgeError("invalid_arguments", "Select 1–32 distinct known operations")
             platform_rows = {
                 row["operation"]: row
                 for row in bridge.macos.operation_catalog(
@@ -486,7 +537,8 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
                         **({"platform": platform_rows[name]} if name in platform_rows else {}),
                     }
                     for name, model in INPUTS.items()
-                    if decision(bridge.config, identity(ctx), name)["authorized"]
+                    if (operations is None or name in operations)
+                    and decision(bridge.config, identity(ctx), name)["authorized"]
                     and (
                         name not in platform_rows
                         or name
@@ -508,6 +560,15 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
 
         result = safe(action)
         if "error" not in result:
+            if operations is not None:
+                result["selection"] = {
+                    "requested": operations,
+                    "returned": list(result["operations"]),
+                    "scope": (
+                        "requested permitted eligible operations; omitted entries may be "
+                        "unauthorized or unavailable"
+                    ),
+                }
             result["discovery"] = (
                 await live(bridge, identity(ctx))
                 if observe_terminals
@@ -525,31 +586,54 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
         admitted once; a busy or changed target fails without a waiting backlog.
         session.input follows the principal's automatic_operations and optional buffer policy.
         A standing session.input grant needs no marker or manual approval.
+        Short work returns its finished result when available within the bounded
+        response budget. Pending work keeps the same ID; never resubmit it.
+        task.read is required and checked before admission, so the owned result
+        can be returned without leaking internal task fields.
         For the Grok app, waits briefly and returns conversation_return with the
         actual result. If continue_required is true, call task_get with this same ID.
         """
-        result = safe(
-            lambda: bridge.submit(
-                identity(ctx), request, approval, completion_target=completion_target
-            )
-        )
-        if result.get("id"):
-            observed = await bridge.tasks.wait_delivery(result["id"])
-            if observed.get("delivery"):
-                result = safe(lambda: bridge.task(identity(ctx), result["id"]))
-                if result.get("id"):
-                    result["delivery"] = observed["delivery"]
-                    if observed.get("error"):
-                        result["error"] = observed["error"]
-        from kirabridge.grok_connector.conversation import result_for_conversation
+        import asyncio
 
-        return await result_for_conversation(bridge, identity(ctx), result)
+        from kirabridge.grok_connector.conversation import enabled_for, result_for_conversation
+        from kirabridge.task_observation import MAX_WAIT_SECONDS, observe_submitted_task
+
+        loop = asyncio.get_running_loop()
+        deadline = loop.time() + MAX_WAIT_SECONDS
+        name = identity(ctx)
+
+        def submit_readable():
+            bridge.security.principal(name, "task.read")
+            return bridge.submit(name, request, approval, completion_target=completion_target)
+
+        result = safe(submit_readable)
+        try:
+            result = await observe_submitted_task(
+                bridge,
+                name,
+                result,
+                wait_seconds=0
+                if enabled_for(bridge, name)
+                else inline_task_timeout(request.operation),
+                deadline=deadline,
+            )
+            return await result_for_conversation(
+                bridge, name, result, wait_seconds=max(0, deadline - loop.time())
+            )
+        except BridgeError as exc:
+            return {
+                "id": result.get("id"),
+                "error": {"code": exc.code, "message": str(exc)},
+                "observation_failed": True,
+                "automatic_retry": False,
+            }
 
     @server.tool(annotations=read)
     async def task_get(task_id: str, ctx: Context) -> dict[str, Any]:
         """Read own task and evidence; completed image/capture tasks include MCP images.
 
         The PNG is a saved snapshot, not a fresh read. Other tasks retain their JSON format.
+        ChatGPT briefly waits for this same task; it never starts or retries work.
         For the Grok app, waits for ongoing work and returns conversation_return.
         Keep waiting on this same task when continue_required is true; never resubmit it.
         """
@@ -559,6 +643,15 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
         result = safe(lambda: bridge.task(name, task_id))
         if enabled_for(bridge, name):
             result = await result_for_conversation(bridge, name, result)
+        elif (name == "chatgpt" or config.principals[name].client_type == "chatgpt") and result.get(
+            "id"
+        ):
+            from kirabridge.task_observation import observe_task
+
+            try:
+                result = (await observe_task(bridge, name, task_id, wait_seconds=2))["task"]
+            except BridgeError as exc:
+                return {"error": {"code": exc.code, "message": str(exc)}}
         return safe(lambda: image_task_result(result))
 
     @server.tool(annotations=read)
@@ -586,32 +679,45 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
         Only when true, give the operator local_approval_url to approve in their Mac browser.
         Do not ask them to copy task IDs between chats. A queued receipt is not proof of execution.
         New native work is attempted once; blocked targets fail clearly without a waiting backlog.
+        Short work returns its finished result in this response when available.
+        An observation timeout never cancels work; inspect the same task ID.
+        task.read is checked before admission, so a result can be read safely.
         For the Grok app, waits briefly and includes conversation_return. Speak its
         actual result when final is true. If continue_required, call task_get with
         this same task ID before finishing the conversation. This does not attest audio playback.
         """
 
+        import asyncio
+
+        from kirabridge.grok_connector.conversation import enabled_for, result_for_conversation
+        from kirabridge.task_observation import MAX_WAIT_SECONDS, observe_submitted_task
+
+        loop = asyncio.get_running_loop()
+        deadline = loop.time() + MAX_WAIT_SECONDS
         principal = identity(ctx)
-        task = safe(lambda: bridge.prepare(principal, request, completion_target=completion_target))
-        if task.get("id"):
-            observed = await bridge.tasks.wait_delivery(task["id"])
-            if observed.get("delivery"):
-                task = safe(lambda: bridge.task(principal, task["id"]))
-                if task.get("id"):
-                    task["delivery"] = observed["delivery"]
-                    if observed.get("error"):
-                        task["error"] = observed["error"]
-        timeout = inline_task_timeout(task.get("operation")) if isinstance(task, dict) else None
-        if (
-            isinstance(task, dict)
-            and timeout
-            and task.get("state") in {"queued", "accepted", "running"}
-            and bridge.tasks.workers
-        ):
-            try:
-                task = await bridge.tasks.wait(principal, task["id"], timeout=timeout)
-            except TimeoutError:
-                task = safe(lambda: bridge.task(principal, task["id"]))
+
+        def prepare_readable():
+            bridge.security.principal(principal, "task.read")
+            return bridge.prepare(principal, request, completion_target=completion_target)
+
+        task = safe(prepare_readable)
+        try:
+            task = await observe_submitted_task(
+                bridge,
+                principal,
+                task,
+                wait_seconds=0
+                if enabled_for(bridge, principal)
+                else inline_task_timeout(request.operation),
+                deadline=deadline,
+            )
+        except BridgeError as exc:
+            return {
+                "id": task.get("id"),
+                "error": {"code": exc.code, "message": str(exc)},
+                "observation_failed": True,
+                "automatic_retry": False,
+            }
         if isinstance(task, dict) and task.get("id") and task.get("state"):
             task = {
                 **task,
@@ -632,9 +738,17 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
                 },
             }
 
-        from kirabridge.grok_connector.conversation import result_for_conversation
-
-        return await result_for_conversation(bridge, identity(ctx), task)
+        try:
+            return await result_for_conversation(
+                bridge, principal, task, wait_seconds=max(0, deadline - loop.time())
+            )
+        except BridgeError as exc:
+            return {
+                "id": task.get("id"),
+                "error": {"code": exc.code, "message": str(exc)},
+                "observation_failed": True,
+                "automatic_retry": False,
+            }
 
     @server.tool(annotations=write)
     async def keyboard_control(
@@ -896,40 +1010,42 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
             return {"error": {"code": exc.code, "message": str(exc)}}
 
     @server.tool(annotations=write)
-    def clipboard_read(
+    async def clipboard_read(
         task_id: str, idempotency_key: str, ctx: Context, approval: str = "", max_bytes: int = 65536
     ) -> dict[str, Any]:
-        """Queue one clipboard read under the configured approval mode; fetch with task_get."""
-        return safe(
-            lambda: bridge.submit(
-                identity(ctx),
-                TaskRequest(
-                    task_id=task_id,
-                    idempotency_key=idempotency_key,
-                    operation="clipboard.read",
-                    arguments={"max_bytes": max_bytes},
-                ),
-                approval,
+        """Read the clipboard under normal approval, returning short work inline.
+
+        Pending work retains the same task ID; never repeat an uncertain request.
+        """
+        try:
+            request = TaskRequest(
+                task_id=task_id,
+                idempotency_key=idempotency_key,
+                operation="clipboard.read",
+                arguments={"max_bytes": max_bytes},
             )
-        )
+        except ValidationError:
+            return {"error": {"code": "invalid_arguments", "message": "Invalid tool arguments"}}
+        return await task_submit(request, ctx, approval)
 
     @server.tool(annotations=write)
-    def clipboard_write(
+    async def clipboard_write(
         task_id: str, idempotency_key: str, text: str, ctx: Context, approval: str = ""
     ) -> dict[str, Any]:
-        """Queue a text write under the configured approval mode, with immediate readback proof."""
-        return safe(
-            lambda: bridge.submit(
-                identity(ctx),
-                TaskRequest(
-                    task_id=task_id,
-                    idempotency_key=idempotency_key,
-                    operation="clipboard.write",
-                    arguments={"text": text},
-                ),
-                approval,
+        """Write clipboard text under normal approval, returning short work inline.
+
+        The executor retains its readback proof; an observation timeout never retries.
+        """
+        try:
+            request = TaskRequest(
+                task_id=task_id,
+                idempotency_key=idempotency_key,
+                operation="clipboard.write",
+                arguments={"text": text},
             )
-        )
+        except ValidationError:
+            return {"error": {"code": "invalid_arguments", "message": "Invalid tool arguments"}}
+        return await task_submit(request, ctx, approval)
 
     @server.tool(annotations=read)
     def clipboard_info(ctx: Context) -> dict[str, Any]:

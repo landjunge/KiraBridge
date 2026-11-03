@@ -36,8 +36,8 @@ def test_session_read_waits_longer_than_the_query_budget_and_other_work_does_not
     assert inline_task_timeout("session.catalog") == 9
     assert inline_task_timeout("clipboard.read") == 2
     assert inline_task_timeout("threaddesk.read") == 2
-    assert inline_task_timeout("session.input") is None
-    assert inline_task_timeout("terminal.execute") is None
+    assert inline_task_timeout("session.input") == 1
+    assert inline_task_timeout("terminal.execute") == 1
 
 
 def test_since_is_only_a_session_read_cursor():

@@ -47,6 +47,9 @@ Der Operationskatalog prüft aktuelle Rechte und Schemas, ohne standardmäßig
 Terminal-Sitzungen zu lesen. Frische Terminalmetadaten bei Bedarf mit
 `operation_catalog(observe_terminals=true)` anfordern; Eingabeziele werden
 weiterhin bei jeder Aktion geprüft.
+Für bekannte Argumente ist kein zusätzlicher Health-/Katalogaufruf nötig.
+Mit `operation_catalog(operations=["file.read","keyboard.sequence"])` lassen sich
+gezielt nur benötigte Schemas anfordern.
 
 Explizit verlangte **einzelne Tastenereignisse** nutzt `keyboard_sequence` mit
 `request={"app":"Notes","steps":[{"key":{"character":"s"},"modifiers":["shift"]},
@@ -56,6 +59,23 @@ Blocktextinsertion. Entscheidungen anhand der Rückmeldung nach jeder Taste
 benötigen weiterhin separate Aufrufe. Unabhängige Leseabfragen können über
 `read_queries(queries=[...])` dieselbe Werkzeugübergabe teilen.
 [RC28-Ursache und Vergleichsmessungen](docs/RC28-E2E-LATENCY-20261103.md).
+
+Gemischte reine Lesezugriffe teilen ebenfalls einen Cloudaufruf:
+`read_query(query={"operation":"tool.batch","calls":[
+{"tool":"bridge_health","arguments":{}},
+{"tool":"clipboard_info","arguments":{}}]})`.
+`read_tools(calls=[...])` bietet denselben begrenzten Pfad für 1–8 bekannte
+Lesewerkzeuge. Rechte und Argumente werden weiterhin geprüft; verschachtelte
+Batches, Schreibzugriffe und Bilder sind ausgeschlossen. Teilresultate bei
+Zeit-/Mengenlimits bleiben ausdrücklich sichtbar.
+Kurze Aufgaben geben ihren Abschluss möglichst direkt zurück. Bei `completed`
+ist keine pauschale zusätzliche Statusabfrage nötig. Wartende Aufgaben über
+`read_query(query={"operation":"task.observe","task_id":"vorhandene-ID",
+"wait_seconds":18,"events_after":0})` beobachten: Status und Ereignisse kommen
+gemeinsam zurück, ohne neue Ausführung oder Wiederholung.
+Submit-Endpunkte prüfen `task.read` vor der Aufnahme, damit sie ein sicheres
+eigenes Ergebnis zurückgeben können; ohne dieses Leserecht startet kein Auftrag.
+[RC29-Aufrufreduktion und Vergleichsmessungen](docs/RC29-CLOUD-CALL-REDUCTION-20261103.md).
 
 Zusammenhängenden Text wie ein Gedicht mit **einem** `keyboard_control`-Aufruf
 übergeben: `request={"app":"Notes","text":"Der Mond…\nDie Nacht…","submit":false}`.

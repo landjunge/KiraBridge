@@ -210,7 +210,10 @@ async def test_keyboard_inline_timeout_preserves_one_running_task_without_cancel
 ):
     from kirabridge.mcp_gateway.server import inline_task_timeout
 
-    assert inline_task_timeout("keyboard.control") == 2
+    assert inline_task_timeout("keyboard.control") == 13
+    monkeypatch.setattr(
+        "kirabridge.mcp_gateway.server.inline_task_timeout", lambda _operation: 0.03
+    )
     bridge, endpoint = http_bridge
     policy = config.principals["local"]
     policy.approval_mode = "automatic"
