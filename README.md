@@ -78,6 +78,11 @@ The same eight large read results needed one instead of two Apps calls in the
 measured RC30 comparison; median 22.72 → 13.02 seconds over three groups per version.
 Cloud latency remains; this is not a new physical keyboard or Voice benchmark.
 
+RC31 adds direct native JSON reads through `read_query` with `operation="native.read"`
+and bounded Accessibility subtrees with `max_depth>0`, reducing repeated UI reads
+and persisted task traffic. Task-event reads also avoid loading large outputs.
+See [RC31 implementation, measurements and delivery status](docs/RC31-NATIVE-READS-20261103.md).
+
 ## License
 
 Private, non-business use is free under the

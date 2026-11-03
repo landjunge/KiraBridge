@@ -342,7 +342,11 @@ class SystemModules:
     async def close(self):
         await self.transport.close()
 
-    async def execute(self, operation, arguments, *, principal="", task_id=""):
+    async def execute(
+        self, operation, arguments, *, principal="", task_id="", automatic_only=False
+    ):
+        if automatic_only and (operation not in READ_OPERATIONS or self.authorize is None):
+            raise BridgeError("forbidden", "Automatic read requires a current authorization check")
         model = SYSTEM_INPUTS.get(operation)
         if model is None:
             raise BridgeError("unknown_operation", "Unknown native system operation")
@@ -357,7 +361,16 @@ class SystemModules:
             native["identifier"] = hashlib.sha256((principal + "\0" + task_id).encode()).hexdigest()
         options = {"principal": principal}
         if self.authorize is not None:
-            options["before_send"] = lambda: self.authorize(principal, operation)
+
+            def authorize_send():
+                decision = self.authorize(principal, operation)
+                if automatic_only and decision["approval_required"]:
+                    raise BridgeError(
+                        "approval_required",
+                        "Native read requires approval; submit the operation using task_request",
+                    )
+
+            options["before_send"] = authorize_send
         result = await self.transport.request(operation, native, **options)
         if operation in {"system.permissions", "keyboard.system_inventory"}:
             from kirabridge.platform_adapters.macos.keyboard_permissions import permission_guidance

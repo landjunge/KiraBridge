@@ -34,6 +34,8 @@ ELEMENT = {
 }
 SAMPLES = {
     "keyboard.inspect": APP,
+    "keyboard.system_inventory": {},
+    "keyboard.shortcuts.discover": APP,
     "system.info": {},
     "system.processes": {},
     "system.process": {"pid": 222, "expected_start": "123.000000"},
@@ -69,6 +71,8 @@ SAMPLES = {
 
 
 def native(bridge):
+    # These read operations were added after this fixture's original catalog.
+    bridge.config.principals["local"].capabilities.append("keyboard.shortcuts.read")
     probe = bridge.macos.capability_probe
     probe.facts.update(platform="darwin", os_version="15.7.4")
     probe.native_metadata = lambda: {

@@ -70,6 +70,8 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
         "use keyboard_control text for literal text. Keep adaptive steps separate. "
         "Use read_queries to combine independent reads in one roundtrip. "
         "Use read_tools or read_query operation=tool.batch for mixed read-only tools. "
+        "Use read_query native.read for automatic apps/windows/accessibility reads without "
+        "tasks; accessibility.inspect max_depth>0 returns a bounded descendant tree in one read. "
         "Prefer result_format=structured for batches: all structured values and errors "
         "remain, only duplicate JSON text is omitted. Full remains available. "
         "For known arguments submit directly; do not prefetch health or the full catalog "
@@ -270,6 +272,19 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
     @server.tool(annotations=read)
     async def read_query(query: dict[str, Any], ctx: Context) -> dict[str, Any]:
         """Direct authorized read without tasks or Events subscriptions.
+
+        Native JSON reads use {operation:"native.read", native_operation, arguments,
+        max_bytes<=524288}. Exact supported operations: apps.list, apps.inspect,
+        windows.list, windows.inspect, accessibility.status, accessibility.inspect.
+        Uses the same typed arguments and fresh native guards; automatic rights
+        required, otherwise submit the native operation through task_request.
+        No tasks/notices, input, capture or permission requests. Result is in result.
+        accessibility.inspect with max_depth>0 reads a bounded descendant tree:
+        max_nodes<=512, tree_budget_ms<=5000, max_tree_bytes capped by max_bytes.
+        Set max_bytes=262144 for a larger tree (default is 32768); read.batch
+        still limits the combined requested budgets to 256 KiB.
+        Tree completeness is explicit; snapshots are not atomic. Retain returned
+        node tokens, worker identity and revisions for later guarded actions.
 
         Cached clients may use operation=read.batch with queries=[...] or
         operation=tool.batch with calls=[{tool,arguments},...] for mixed existing

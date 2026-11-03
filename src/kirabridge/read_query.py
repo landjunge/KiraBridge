@@ -20,10 +20,11 @@ class ReadQuery(Input):
         "session.read",
         "platform.status",
         "task.observe",
+        "native.read",
     ]
     path: str | None = Field(default=None, max_length=4096)
     task_id: str | None = Field(default=None, max_length=128)
-    max_bytes: int = Field(default=32768, ge=1, le=65536)
+    max_bytes: int = Field(default=32768, ge=1, le=524288)
     offset: int = Field(default=0, ge=0, le=2**63 - 1, strict=True)
     tail: bool = False
     encoding: Literal["utf-8", "base64"] = "utf-8"
@@ -37,9 +38,28 @@ class ReadQuery(Input):
     stream: Literal["stdout", "stderr"] | None = None
     wait_seconds: float = Field(default=0.0, ge=0, le=18, allow_inf_nan=False)
     events_after: int = Field(default=0, ge=0, le=2**63 - 1, strict=True)
+    native_operation: str | None = Field(default=None, max_length=64)
+    arguments: dict | None = None
 
     @model_validator(mode="after")
     def selector(self):
+        if self.operation == "native.read":
+            from kirabridge.native_queries import native_arguments
+
+            # Reject unrelated selectors rather than ignoring them. Use the
+            # existing operation's typed schema for the inner arguments.
+            allowed = {"operation", "native_operation", "arguments", "max_bytes"}
+            if any(
+                getattr(self, field) != type(self).model_fields[field].get_default()
+                for field in self.model_fields_set - allowed
+            ):
+                raise ValueError("Native reads accept only their operation, arguments and budget")
+            native_arguments(self.native_operation, self.arguments, self.max_bytes)
+            return self
+        if self.native_operation is not None or self.arguments is not None:
+            raise ValueError("Native selectors require native.read")
+        if self.max_bytes > 65536:
+            raise ValueError("Non-native reads are limited to 65536 bytes")
         if (self.wait_seconds or self.events_after) and self.operation != "task.observe":
             raise ValueError("task observation selectors require task.observe")
         if self.check_helpers and self.operation != "platform.status":
@@ -95,6 +115,10 @@ class ReadQuery(Input):
 
 async def read_query_async(bridge, principal: str, query: ReadQuery) -> dict:
     """Existing dictionary-shaped tool also works with cached client tool lists."""
+    if query.operation == "native.read":
+        return await bridge.native_queries.execute(
+            principal, query.native_operation, query.arguments, max_bytes=query.max_bytes
+        )
     if query.operation == "task.observe":
         from kirabridge.task_observation import observe_task
 

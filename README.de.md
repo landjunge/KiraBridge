@@ -81,6 +81,11 @@ Dieselben acht großen Leseergebnisse benötigten im gemessenen RC30-Vergleich e
 statt zwei Apps-Aufrufe; Median 22,72 → 13,02 Sekunden bei je drei Gruppen.
 Cloudlatenz bleibt; das ist kein neuer physischer Tasten- oder Voicevergleich.
 
+RC31 ergänzt direkte native JSON-Reads über `read_query` mit `operation="native.read"`
+und begrenzte Accessibility-Unterbäume mit `max_depth>0`. Dadurch sinken wiederholte
+UI-Leseaufrufe und persistente Taskdaten. Ereignisabrufe laden große Ausgaben nicht
+mehr mit. Siehe [RC31-Umsetzung, Messungen und Auslieferungsstand](docs/RC31-NATIVE-READS-20261103.md).
+
 ## Lizenz
 
 Private, nicht geschäftliche Nutzung ist unter der
