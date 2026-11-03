@@ -165,7 +165,36 @@ erfolgreichen Prüfungen aller Zielknoten belegt.
 Die Produktänderung ist ausschließlich die gebündelte optionale Baumbeobachtung
 in `SystemControl.swift`; der Versionsstand ist 0.8.0rc32. Alle übrigen
 RC31-Python-/Guardpfade bleiben unverändert. Die 74 gezielten Tests sowie
-unabhängige Produkt- und Messreviews sind die Entwicklungsabnahme. Der lokale
-Intel-Build, isolierter Installer-/Starttest und Release-Download werden auf dem
-anschließenden exakten sauberen Quellcommit geprüft. Die produktive RC30 wird
-während des parallelen Windows-Auftrags nicht aktualisiert.
+unabhängige Produkt- und Messreviews sind die Entwicklungsabnahme.
+[Validierung](evidence/rc32-validation-20261103.json),
+[unabhängiger Review](evidence/rc32-independent-review-20261103.json).
+
+Der lokale Intel-Build auf **`300df69ec55d236ef1059d1b146a0ff89c2f003c`** bestand.
+Der isolierte Installer-/Starttest bestätigt authentifizierten Dispatcher,
+konkrete Lesevoraussetzungen, Ablehnung eines beschädigten Pakets und unveränderte
+eigene Testkonfiguration/Credentials. Der unabhängige Paketreview bestätigt
+578 sichere Tar-Member, 166 Pythondateien bytegleich zwischen Git/Tar/Wheel,
+native x86_64-Architektur, gültige Signaturen und Versions-/Sourcepin,
+579 Installer-Manifestdateien sowie alle 583 ZIP-Dateien einschließlich Modi.
+[Paketreview](evidence/rc32-package-review-20261103.json).
+
+[Prerelease v0.8.0rc32](https://github.com/landjunge/KiraBridge/releases/tag/v0.8.0rc32)
+ist veröffentlicht. Alle sieben hochgeladenen Assets wurden unabhängig in Größe
+und GitHub-SHA256 gegen die lokalen Dateien geprüft. Nach Veröffentlichung wurde
+der Intel-Installer erneut heruntergeladen: **3.459.081 Bytes**, SHA-256
+`9dc2d582f3a8075a06d8a84ae36e6fbf1da2075a0fa308a7ebb84e04acbf72c3`.
+Der Release-Tag zeigt exakt auf `300df69`; keine GitHub Actions.
+[Auslieferungsbeleg](evidence/rc32-release-20261103.json).
+
+[Draft-PR #57](https://github.com/landjunge/KiraBridge/pull/57) ist auf RC31/PR56
+gestapelt. `main` bleibt `21a6abd`, RC31-Abschluss bleibt `0f554bc`.
+Spätere Abschlussdokumentation ändert den geprüften Paketpin nicht.
+Die produktive RC30 läuft weiterhin mit **PID 66439**, Start **03:30:12 UTC**,
+Instanz `777222cce58e4b38b503c2f3d20900e1`, Dispatcher aktiv. Es gab keinen
+Produktiv-/Tunnel-/Agentneustart während der parallelen Windows-/VM-Arbeit.
+
+Der Abschluss wurde im vorhandenen ThreadDesk-Whiteboard `188ce4729a62` nach
+beobachteter Revision 500 angehängt, stabile Operation
+`rc32-native-batching-released-300df69-20261103`. Eintrag `21e2d94c3b2a`, Ordinal 140,
+wurde danach unabhängig vollständig und zeichengenau zurückgelesen. Bestehende
+Beiträge bleiben erhalten.

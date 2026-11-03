@@ -13,15 +13,15 @@ KiraBridge verbindet ChatGPT mit **Grok Build und Codex, die in Terminalfenstern
 auf deinem Computer laufen**. Besprich im Chat, was du erledigen möchtest, gib die
 Arbeit an diese Terminalagenten weiter und verfolge ihre Antworten — mit den von dir erlaubten Zugriffen.
 
-**macOS · Intel — [0.8.0rc31](https://github.com/landjunge/KiraBridge/releases/tag/v0.8.0rc31) · 3. November 2026 · Vorabversion**
+**macOS · Intel — [0.8.0rc32](https://github.com/landjunge/KiraBridge/releases/tag/v0.8.0rc32) · 3. November 2026 · Vorabversion**
 
-### [KiraBridge herunterladen — App und Installer](https://github.com/landjunge/KiraBridge/releases/download/v0.8.0rc31/KiraBridge-0.8.0rc31-Intel-Installer.zip)
+### [KiraBridge herunterladen — App und Installer](https://github.com/landjunge/KiraBridge/releases/download/v0.8.0rc32/KiraBridge-0.8.0rc32-Intel-Installer.zip)
 
-[Prüfsummen](https://github.com/landjunge/KiraBridge/releases/download/v0.8.0rc31/SHA256SUMS)
+[Prüfsummen](https://github.com/landjunge/KiraBridge/releases/download/v0.8.0rc32/SHA256SUMS)
 · [Alle Versionen](https://github.com/landjunge/KiraBridge/releases)
 
 Für die Downloads brauchst du ein GitHub-Konto mit Zugriff auf dieses private Repository.
-Dies ist eine Vorabversion; eine stabile Version gibt es noch nicht. RC31 ist für Intel-Macs verfügbar.
+Dies ist eine Vorabversion; eine stabile Version gibt es noch nicht. RC32 ist für Intel-Macs verfügbar.
 
 ## Wobei KiraBridge dir hilft
 
@@ -56,7 +56,7 @@ Für Terminalaufträge müssen Grok Build oder Codex installiert und angemeldet 
 Richte ihre Terminalsitzung in KiraBridge als Ziel ein.
 
 Diese Vorabversion hat bekannte Einschränkungen bei der Terminalbedienung; die App
-ist nicht von Apple notarisiert. Der [RC31-Paketnachweis](docs/RC31-NATIVE-READS-20261103.md)
+ist nicht von Apple notarisiert. Der [RC32-Paketnachweis](docs/RC32-NATIVE-ATTRIBUTE-BATCHING-20261103.md)
 beschreibt das aktuelle Paket; [frühere Installation und Hilfe](docs/INSTALL-DE.md)
 dokumentiert weiterhin RC20.
 

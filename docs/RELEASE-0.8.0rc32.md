@@ -19,8 +19,10 @@ Die Verringerung der API-Aufrufzahl ist keine Aussage über dieselbe prozentuale
 Beschleunigung von macOS, Cloud oder Voice. Im echten kontrollierten AppKit-Test
 mit zwölf eigenen Buttons sank die native Medianzeit bei identischen Ergebnissen
 von 16,856 auf 8,138 ms (rund 51,7 % weniger Zeit, 20 abwechselnde Runden).
-74 gezielte Tests bestanden. Paketabnahme und genaue Grenzen werden im RC32-Bericht
-gesondert ausgewiesen.
+74 gezielte Tests bestanden. Intel-Build, isolierter Installer-/Starttest,
+unabhängiger Quellen-/Paketvergleich und erneuter Installerdownload bestanden.
+Alle sieben Assets sind verfügbar; Paketpin `300df69ec55d236ef1059d1b146a0ff89c2f003c`.
+Genaue Grenzen und Einzelbelege sind im RC32-Bericht ausgewiesen.
 
 RC32 enthält auch die RC31-Optimierungen. Die produktive RC30 läuft während der
 parallelen Windows-/VM-Arbeit weiter; dieses Paket wird dabei nicht automatisch
