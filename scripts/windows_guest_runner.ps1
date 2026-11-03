@@ -24,7 +24,11 @@ function Digest([string]$Path) {
 }
 function New-PrivateReceipt([string]$Path, [string]$Text) {
     $stream = [IO.File]::Open($Path, [IO.FileMode]::CreateNew, [IO.FileAccess]::Write)
-    try { $bytes=$Utf8.GetBytes($Text); $stream.Write($bytes,0,$bytes.Length) }
+    try {
+        $bytes=$Utf8.GetBytes($Text)
+        $stream.Write($bytes,0,$bytes.Length)
+        $stream.Flush($true) # Persist the attempt before any native command starts.
+    }
     finally { $stream.Dispose() }
 }
 function Download-Verified($Entry, [string]$Root) {
@@ -83,11 +87,18 @@ function Run-Once([string]$Name, [string[]]$Arguments, [int]$Seconds, [string]$A
     $report=Join-Path $Work ($Name+'-report.json')
     if (Test-Path -LiteralPath $receipt) {
         Event ($Name+'_already_attempted_no_retry')
+        $attempt=Get-Content -LiteralPath $receipt -Raw | ConvertFrom-Json
+        if ($attempt.manifest_sha256 -cne $ManifestHash -or $attempt.phase -cne $Name) {
+            throw 'Earlier attempt belongs to another payload; explicit reconciliation required'
+        }
         if (-not (Test-Path -LiteralPath $report)) {
             throw 'Earlier attempt has no final report; explicit reconciliation required'
         }
-        Publish ($RunId+'-'+$Name) $report
         $earlier=Get-Content -LiteralPath $report -Raw | ConvertFrom-Json
+        if ($earlier.manifest_sha256 -cne $ManifestHash -or $earlier.phase -cne $Name) {
+            throw 'Earlier report belongs to another payload; explicit reconciliation required'
+        }
+        Publish ($RunId+'-'+$Name) $report
         if ($null -eq $earlier.exit_code -or $earlier.exit_code -ne 0) {
             throw 'Earlier failed or uncertain acceptance blocks subsequent native checks'
         }
@@ -107,7 +118,7 @@ function Run-Once([string]$Name, [string[]]$Arguments, [int]$Seconds, [string]$A
             $result.artifact_sha256=Digest $Artifact
         }
         $json=$result|ConvertTo-Json -Depth 80 -Compress
-        [IO.File]::WriteAllText($report,$json,$Utf8)
+        New-PrivateReceipt $report $json
         Publish ($RunId+'-'+$Name) $report
         if ($run.exit_code -ne 0) {
             Event ($Name+'_failed_no_retry')
@@ -120,7 +131,7 @@ function Run-Once([string]$Name, [string[]]$Arguments, [int]$Seconds, [string]$A
                 stdout=(Log-Tail (Join-Path $Work ($Name+'-stdout.txt')));
                 stderr=(Log-Tail (Join-Path $Work ($Name+'-stderr.txt')))}
             $json=$failure|ConvertTo-Json -Compress
-            [IO.File]::WriteAllText($report,$json,$Utf8)
+            New-PrivateReceipt $report $json
             try { Publish ($RunId+'-'+$Name) $report } catch { }
         }
         throw

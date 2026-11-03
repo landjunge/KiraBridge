@@ -1,0 +1,39 @@
+{
+  "scope": "Independent local provisioning/bootstrap review; no VM launch or Windows native acceptance",
+  "base_commit": "d8404f7668fe68f09e6bfe8259da995ad5c82d72",
+  "receipt_fixes": {
+    "prior_attempt_and_report_must_match_current_manifest_and_phase": true,
+    "attempts_and_reports_flushed_to_disk_before_next_phase": true,
+    "reports_use_exclusive_create_without_overwrite": true,
+    "unknown_native_attempt_never_replayed": true
+  },
+  "powershell_control_flow": {
+    "host": "Intel macOS",
+    "version": "7.4.0",
+    "native_windows_powershell_tested": false,
+    "parser_passed": true,
+    "executed_scenarios": 7,
+    "pytest_tests_passed": 1,
+    "real_native_commands": 0
+  },
+  "qcow2_validation": {
+    "implementation": "Installed UTM 5.0.8 bundled qemu-img library main entrypoint in isolated child",
+    "operation": "check -f qcow2 --output=json",
+    "own_temporary_image": true,
+    "virtual_size_bytes": 85899345920,
+    "image_end_offset": 262144,
+    "total_clusters": 1310720,
+    "check_errors": 0,
+    "exit_code": 0,
+    "stderr_empty": true,
+    "vm_started": false,
+    "framework_search_override_scope": "Own child process only; no host settings modified"
+  },
+  "reviewed_contracts": {
+    "utm_config_keys": "Matched QEMU, Network and Drive Codable keys in UTM v5.0.8 source",
+    "network": "Emulated NAT plus e1000 follows UTM q35 defaults; 10.0.2.2 host alias matches QEMU user networking",
+    "unattend": "Only blank disk0/partition3 targeted; English Administrators is recognized and localized by Windows Shell Setup",
+    "source_and_wheels": "Manifest pins file SHA256/length and exact package versions; pip uses offline wheelhouse only",
+    "sharing": "No host folder, clipboard or USB device sharing in generated config"
+  }
+}
