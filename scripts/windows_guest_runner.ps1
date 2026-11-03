@@ -64,12 +64,29 @@ function Invoke-Bounded([string]$Program, [string[]]$Arguments, [string]$Name, [
     })
     $process = Start-Process -FilePath $Program -ArgumentList $quoted -PassThru -WindowStyle Normal `
         -RedirectStandardOutput $stdout -RedirectStandardError $stderr
+    # Windows PowerShell 5.1 can return null ExitCode for redirected Start-Process
+    # children unless the original process handle is retained before waiting.
+    # See PowerShell/PowerShell#5421. Never turn a missing exit code into zero.
+    $retainedHandle = $process.Handle
+    $script:LastProcessInfo = @{step=$Name; pid=$process.Id; state='started';
+        handle_retained=($retainedHandle -ne [IntPtr]::Zero)}
+    if ($retainedHandle -eq [IntPtr]::Zero) { throw 'Original child process handle unavailable' }
     if (-not $process.WaitForExit($Seconds*1000)) {
+        $script:LastProcessInfo.state = 'timeout_unknown_no_retry'
         Event ($Name+'_timeout_unknown_no_retry')
         throw 'Process timeout; original process may remain active, never replay automatically'
     }
     $process.WaitForExit()
-    return @{exit_code=$process.ExitCode; pid=$process.Id; stdout=$stdout; stderr=$stderr}
+    # Reflection propagates a CLR getter exception; PowerShell's normal member
+    # adapter can silently return null for an inaccessible property getter.
+    $exitCode = [Diagnostics.Process].GetProperty('ExitCode').GetValue($process,$null)
+    if ($null -eq $exitCode -or $exitCode -isnot [int]) {
+        $script:LastProcessInfo.state = 'exit_code_unavailable_no_retry'
+        throw 'Original child exited without a verifiable Int32 exit code'
+    }
+    $script:LastProcessInfo.state = 'exited'
+    $script:LastProcessInfo.exit_code = $exitCode
+    return @{exit_code=$exitCode; pid=$process.Id; stdout=$stdout; stderr=$stderr}
 }
 function Log-Tail([string]$Path) {
     if (Test-Path $Path) {
@@ -237,6 +254,13 @@ try {
     Event 'guest_checks_finished'
 } catch {
     Event ('guest_runner_stopped_'+$_.Exception.GetType().Name)
+    # Only types, source line and numeric process evidence: never error messages,
+    # command arguments, credentials or URLs in the remotely readable event log.
+    $diagnostic=@{phase='guest_runner_failure_detail';
+        exception_type=$_.Exception.GetType().FullName;
+        script_line=$_.InvocationInfo.ScriptLineNumber;
+        process=$script:LastProcessInfo; powershell_version=$PSVersionTable.PSVersion.ToString()}
+    try { Post-Json 'events' ($diagnostic|ConvertTo-Json -Depth 8 -Compress) } catch { }
     [IO.File]::WriteAllText((Join-Path $Work 'runner-status.txt'),
         ('failed_or_unknown_no_retry: '+$_.Exception.GetType().FullName),$Utf8)
     exit 1
