@@ -225,6 +225,8 @@ try {
     Run-Once 'keyboard' @('scripts/accept_windows_keyboard.py','--output',$keyboardOut) 180 $keyboardOut
     $mcpOut=Join-Path $Work ('mcp-'+$RunId+'.json')
     Run-Once 'mcp' @('scripts/accept_windows_mcp.py','--output',$mcpOut) 180 $mcpOut
+    $previewOut=Join-Path $Work ('preview-'+$RunId+'.json')
+    Run-Once 'preview' @('scripts/accept_windows_preview.py','--output',$previewOut) 180 $previewOut
     Event 'guest_checks_finished'
 } catch {
     Event ('guest_runner_stopped_'+$_.Exception.GetType().Name)
