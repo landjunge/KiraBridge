@@ -130,7 +130,16 @@ async def test_stdio_proxy_reaches_existing_daemon_without_second_dispatcher(
         )
         assert pending.structuredContent["local_approval_url"] == "http://127.0.0.1:8766/"
         assert pending.structuredContent["approval_required"] is (mode == "manual")
-        assert pending.structuredContent["state"] == ("created" if mode == "manual" else "queued")
+        if mode == "manual":
+            assert pending.structuredContent["state"] == "created"
+        else:
+            # RC29+ may finish a permitted short read inside the submit handoff.
+            assert pending.structuredContent["state"] in {
+                "queued",
+                "accepted",
+                "running",
+                "completed",
+            }
         if mode == "automatic":
             assert (await bridge.tasks.wait("local", "proxy-console-link"))["state"] == "completed"
         else:

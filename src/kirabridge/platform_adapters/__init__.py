@@ -446,8 +446,16 @@ class RuntimeLock:
 
     def __init__(self, path: Path):
         self.path, self.fd = path, None
+        self._windows = None
 
     def acquire(self) -> None:
+        if os.name == "nt":
+            from kirabridge.platform_adapters.windows.locking import WindowsRuntimeLock
+
+            if self._windows is None:
+                self._windows = WindowsRuntimeLock(self.path)
+            self._windows.acquire()
+            return
         if os.name != "posix":
             raise BridgeError("unsupported_platform", "Runtime locking needs a Windows adapter")
         import fcntl
@@ -463,6 +471,8 @@ class RuntimeLock:
         self.fd = fd
 
     def release(self) -> None:
+        if self._windows is not None:
+            self._windows.release()
         if self.fd is not None:
             os.close(self.fd)
             self.fd = None

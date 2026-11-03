@@ -53,6 +53,12 @@ class ProcessOutputStore:
         self.max_total_bytes = max_total_bytes
         self.max_streams = max_streams
         self._writers = {}
+        self._unsupported = os.name != "posix"
+        if self._unsupported:
+            # Windows keyboard/MCP startup does not grant POSIX file or process access.
+            # Keep every capture/read entrypoint closed until its native adapter exists.
+            self.scope = self._directory_identity = None
+            return
         if self.root.is_symlink():
             raise BridgeError("unsafe_state", "Process output directory cannot be a symlink")
         self.root.mkdir(mode=0o700, exist_ok=True)
@@ -74,6 +80,7 @@ class ProcessOutputStore:
 
     @contextmanager
     def _directory(self):
+        self._require_available()
         with self.scope.directory(str(self.root)) as fd:
             info = os.fstat(fd)
             if (info.st_dev, info.st_ino) != self._directory_identity:
@@ -81,6 +88,7 @@ class ProcessOutputStore:
             yield fd
 
     def _row(self, principal, task_id, stream):
+        self._require_available()
         if stream not in {"stdout", "stderr"}:
             raise BridgeError("invalid_arguments", "Select stdout or stderr")
         row = self.store.db.execute(
@@ -93,6 +101,7 @@ class ProcessOutputStore:
 
     def start(self, principal, task_id):
         """Reserve both streams before starting the child. Never overwrite an old run."""
+        self._require_available()
         created, started_keys = [], []
         try:
             with self.store.transaction(), self._directory() as parent:
@@ -161,6 +170,7 @@ class ProcessOutputStore:
             raise
 
     def append(self, principal, task_id, stream, chunk):
+        self._require_available()
         if not isinstance(chunk, bytes):
             raise TypeError("Process output must be bytes")
         key = (principal, task_id, stream)
@@ -227,6 +237,7 @@ class ProcessOutputStore:
 
     def finish(self, principal, task_id, *, complete, error=None):
         """Finalize captured bytes; an interrupted/limited prefix is never complete."""
+        self._require_available()
         keys = [(principal, task_id, stream) for stream in ("stdout", "stderr")]
         try:
             with self.store.transaction():
@@ -244,6 +255,7 @@ class ProcessOutputStore:
         return self.status(principal, task_id)
 
     def status(self, principal, task_id):
+        self._require_available()
         result = {}
         for stream in ("stdout", "stderr"):
             row = self._row(principal, task_id, stream)
@@ -265,6 +277,12 @@ class ProcessOutputStore:
             "max_streams": self.max_streams,
             "automatic_deletion": False,
         }
+
+    def _require_available(self):
+        if self._unsupported:
+            raise BridgeError(
+                "unsupported_platform", "A secure Windows process-output adapter is required"
+            )
 
     @staticmethod
     def _matches_file(info, row):
