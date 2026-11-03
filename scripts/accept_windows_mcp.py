@@ -53,7 +53,7 @@ def task_summary(task):
     }
 
 
-async def run_mcp(receiver, report):
+async def run_mcp(receiver, report, *, persist=None):
     import httpx
     import uvicorn
 
@@ -98,6 +98,9 @@ async def run_mcp(receiver, report):
     started = time.monotonic_ns()
     try:
         bridge = Bridge(configuration)
+        receiver.instrument_keyboard(
+            bridge.windows_keyboard.require(), report, persist=persist or (lambda: None)
+        )
         application = create_http_app(bridge)
 
         class CountingHTTP:
@@ -381,11 +384,24 @@ def worker(receiver, output):
         "external_chatgpt_cloud_measured": False,
         "tool_samples": [],
         "automatic_input_retry": False,
+        "input_attempted": False,
+        "input_attempt_hooks": 0,
+        "case_attempts": [],
     }
+
+    def persist():
+        receiver.save_report(output, report)
+
+    def foreground(observation):
+        report["foreground_readiness"] = observation
+        persist()
+
     try:
+        persist()
         if not receiver.ready.wait(5):
             raise RuntimeError("Own Windows receiver was not ready")
-        asyncio.run(run_mcp(receiver, report))
+        receiver.wait_for_foreground(on_status=foreground)
+        asyncio.run(run_mcp(receiver, report, persist=persist))
         report["passed"] = True
     except Exception as error:
         report["error"] = f"{type(error).__name__}: {error}"
@@ -393,11 +409,7 @@ def worker(receiver, output):
             report["provider_error"] = error.provider_error
     finally:
         try:
-            output.seek(0)
-            output.write(json.dumps(report, indent=2, ensure_ascii=True) + "\n")
-            output.truncate()
-            output.flush()
-            os.fsync(output.fileno())
+            persist()
         finally:
             if receiver.hwnd:
                 receiver.user.PostMessageW(receiver.hwnd, 0x8002, 0, 0)
@@ -414,7 +426,10 @@ def main():
     except FileExistsError:
         parser.error("Output already exists; reconcile that original run instead of replaying")
     with output:
-        output.write('{"state":"started","passed":false,"automatic_input_retry":false}\n')
+        output.write(
+            '{"state":"started","passed":false,"automatic_input_retry":false,'
+            '"input_attempted":false,"input_attempt_hooks":0}\n'
+        )
         output.flush()
         os.fsync(output.fileno())
         receiver = load_receiver()

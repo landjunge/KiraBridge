@@ -11,6 +11,7 @@ from __future__ import annotations
 import argparse
 import ctypes
 import json
+import math
 import os
 import queue
 import threading
@@ -30,6 +31,7 @@ class Receiver:
         self.lock, self.ready = threading.Lock(), threading.Event()
         self.hwnd, self.original_layout = None, None
         self.error = None
+        self.input_case_name = "windows.keyboard.sequence"
         P, U, INT, S = ctypes.c_void_p, ctypes.c_uint32, ctypes.c_int32, ctypes.c_size_t
         self.proc_type = ctypes.WINFUNCTYPE(ctypes.c_ssize_t, P, U, S, ctypes.c_ssize_t)
 
@@ -73,6 +75,9 @@ class Receiver:
             "DefWindowProcW": ([P, U, S, ctypes.c_ssize_t], ctypes.c_ssize_t),
             "ShowWindow": ([P, INT], INT),
             "SetForegroundWindow": ([P], INT),
+            "GetForegroundWindow": ([], P),
+            "IsWindow": ([P], INT),
+            "GetWindowThreadProcessId": ([P, ctypes.POINTER(U)], U),
             "SetWindowTextW": ([P, ctypes.c_wchar_p], INT),
             "GetMessageW": ([ctypes.POINTER(MSG), P, U, U], INT),
             "TranslateMessage": ([ctypes.POINTER(MSG)], INT),
@@ -91,6 +96,141 @@ class Receiver:
         self.kernel.GetModuleHandleW.argtypes = [ctypes.c_wchar_p]
         self.kernel.GetModuleHandleW.restype = P
         self.callback = self.proc_type(self._window_proc)
+
+    @staticmethod
+    def save_report(output, report):
+        output.seek(0)
+        output.write(json.dumps(report, indent=2, ensure_ascii=True) + "\n")
+        output.truncate()
+        output.flush()
+        os.fsync(output.fileno())
+
+    def foreground_status(self):
+        own_pid = ctypes.c_uint32()
+        own_window = bool(self.hwnd and self.user.IsWindow(self.hwnd))
+        if own_window:
+            self.user.GetWindowThreadProcessId(self.hwnd, ctypes.byref(own_pid))
+            own_window = own_pid.value == os.getpid()
+        current = self.user.GetForegroundWindow()
+        pid = ctypes.c_uint32()
+        if current:
+            self.user.GetWindowThreadProcessId(current, ctypes.byref(pid))
+        return {
+            "window_created": own_window,
+            "hwnd": str(self.hwnd) if self.hwnd else None,
+            "pid": os.getpid(),
+            "window_owner_pid": own_pid.value or None,
+            "foreground_hwnd": str(current) if current else None,
+            "foreground_pid": pid.value or None,
+            "foreground_ready": own_window and current == self.hwnd and pid.value == os.getpid(),
+        }
+
+    def wait_for_foreground(self, *, timeout=120, on_status=None, clock=time.monotonic, wait=None):
+        """Wait for ordinary activation of our own window; never steal focus in a loop."""
+        if (
+            type(timeout) not in (int, float)
+            or not math.isfinite(timeout)
+            or not 0 < timeout <= 300
+        ):
+            raise ValueError("Fixture foreground wait must be finite and at most 300 seconds")
+        pause = wait or threading.Event().wait
+        started, previous = clock(), None
+        if self.foreground_status()["window_created"]:
+            self.user.SetWindowTextW(self.hwnd, f"KiraBridge CLICK THIS WINDOW PID {os.getpid()}")
+        while True:
+            status = self.foreground_status()
+            elapsed = clock() - started
+            phase = "ready" if status["foreground_ready"] else "waiting_for_foreground"
+            if elapsed >= timeout and not status["foreground_ready"]:
+                phase = "foreground_timeout"
+            if not status["window_created"] or self.error:
+                phase = "window_unavailable"
+            if phase != previous:
+                observation = {
+                    **status,
+                    "phase": phase,
+                    "elapsed_ms": round(elapsed * 1000, 3),
+                    "input_attempted": False,
+                    "timeout_seconds": timeout,
+                }
+                print(
+                    json.dumps({"event": "windows_fixture_foreground", **observation}), flush=True
+                )
+                if on_status is not None:
+                    on_status(observation)
+                previous = phase
+            if phase == "ready":
+                self.user.SetWindowTextW(self.hwnd, f"KiraBridge READY PID {os.getpid()}")
+                return observation
+            if phase != "waiting_for_foreground":
+                raise RuntimeError(f"Owned fixture {phase}; no input attempted")
+            pause(min(0.05, max(0, timeout - elapsed)))
+
+    def instrument_keyboard(self, keyboard, report, *, persist):
+        """Test-only observations around the unchanged guarded backend and native hook.
+
+        Persist null before entering a potentially effectful call. If the process
+        stops before return, that receipt stays uncertain. A normal pre-hook error
+        proves zero attempted input; never infer zero from an empty cases list.
+        """
+        original = keyboard.send
+        report.setdefault("input_attempted", False)
+        report.setdefault("input_attempt_hooks", 0)
+        report.setdefault("case_attempts", [])
+        report["input_attempt_scope"] = "Before-send hook; conservatively before last target check"
+
+        def reconcile():
+            states = [item["input_attempted"] for item in report["case_attempts"]]
+            report["input_attempted"] = (
+                True if True in states else None if None in states else False
+            )
+
+        def observed_send(target, strokes, *, before_send=None):
+            item = {
+                "name": self.input_case_name,
+                "input_attempted": None,
+                "input_attempt_hooks": 0,
+                "native_calls_acknowledged": None,
+                "inserted_events": None,
+                "state": "dispatching",
+            }
+            report["case_attempts"].append(item)
+            reconcile()
+            persist()
+
+            def mark():
+                if before_send is not None:
+                    before_send()
+                item["input_attempted"] = True
+                item["input_attempt_hooks"] += 1
+                report["input_attempt_hooks"] += 1
+                reconcile()
+
+            try:
+                result = original(target, strokes, before_send=mark)
+                item.update(
+                    {
+                        "state": "inserted",
+                        "native_calls_acknowledged": result["native_calls"],
+                        "inserted_events": result["inserted_events"],
+                    }
+                )
+                if item["input_attempt_hooks"] != result["native_calls"]:
+                    raise RuntimeError(
+                        "Native-call receipt differs from observed before-send hooks"
+                    )
+                return result
+            except BaseException as error:
+                if item["input_attempt_hooks"] == 0:
+                    item["input_attempted"] = False
+                item["state"], item["error_type"] = "failed", type(error).__name__
+                item["inserted_events"] = None
+                raise
+            finally:
+                reconcile()
+                persist()
+
+        keyboard.send = observed_send
 
     def text(self):
         with self.lock:
@@ -175,12 +315,15 @@ class Receiver:
         window_class.cbSize = ctypes.sizeof(window_class)
         window_class.lpfnWndProc = self.callback
         window_class.hInstance, window_class.lpszClassName = instance, name
+        window_class.hbrBackground = (
+            6  # System COLOR_WINDOW brush; owned fixture surface stays visible.
+        )
         if not self.user.RegisterClassExW(ctypes.byref(window_class)):
             raise RuntimeError("Cannot register owned fixture window")
         self.hwnd = self.user.CreateWindowExW(
             0,
             name,
-            "KiraBridge Windows keyboard fixture",
+            f"KiraBridge CLICK THIS WINDOW PID {os.getpid()}",
             0x00CF0000,
             100,
             100,
@@ -216,11 +359,25 @@ def run_acceptance(receiver, output):
         "host_mac_input": False,
         "cases": [],
         "passed": False,
+        "input_attempted": False,
+        "input_attempt_hooks": 0,
+        "case_attempts": [],
     }
+
+    def persist():
+        receiver.save_report(output, report)
+
+    def foreground(observation):
+        report["foreground_readiness"] = observation
+        persist()
+
     try:
+        persist()
         if not receiver.ready.wait(5):
             raise RuntimeError("Fixture window did not become ready")
+        receiver.wait_for_foreground(on_status=foreground)
         keyboard = WindowsKeyboard()
+        receiver.instrument_keyboard(keyboard, report, persist=persist)
 
         def pairs(*keys):
             return [(kind, key) for key in keys for kind in ("down", "up")]
@@ -228,6 +385,7 @@ def run_acceptance(receiver, output):
         def send_case(
             name, strokes, text_suffix, expected_events, physical=True, require_extended=False
         ):
+            receiver.input_case_name = name
             target = keyboard.inspect_foreground()
             if target.hwnd != receiver.hwnd or target.pid != os.getpid():
                 raise RuntimeError("Owned fixture is not foreground; no input attempted")
@@ -262,6 +420,8 @@ def run_acceptance(receiver, output):
                     "key_order_exact": True,
                     "physical_key_events": physical,
                     "completed_keys": result["completed_keys"],
+                    "input_attempted": True,
+                    "input_attempt_hooks": report["case_attempts"][-1]["input_attempt_hooks"],
                 }
             )
 
@@ -317,13 +477,11 @@ def run_acceptance(receiver, output):
         if hasattr(error, "provider_error"):
             report["provider_error"] = error.provider_error
     finally:
-        output.seek(0)
-        output.write(json.dumps(report, indent=2, ensure_ascii=True) + "\n")
-        output.truncate()
-        output.flush()
-        os.fsync(output.fileno())
-        if receiver.hwnd:
-            receiver.user.PostMessageW(receiver.hwnd, 0x8002, 0, 0)
+        try:
+            persist()
+        finally:
+            if receiver.hwnd:
+                receiver.user.PostMessageW(receiver.hwnd, 0x8002, 0, 0)
 
 
 def main():
@@ -337,7 +495,10 @@ def main():
     except FileExistsError:
         parser.error("Use a new evidence filename; never overwrite an uncertain previous run")
     with output:
-        output.write('{"state":"started","passed":false,"automatic_retry":false}\n')
+        output.write(
+            '{"state":"started","passed":false,"automatic_retry":false,'
+            '"input_attempted":false,"input_attempt_hooks":0}\n'
+        )
         output.flush()
         os.fsync(output.fileno())
         receiver = Receiver()
