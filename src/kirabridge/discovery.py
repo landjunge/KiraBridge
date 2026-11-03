@@ -55,7 +55,7 @@ def snapshot(bridge, principal):
                 "platform",
             ],
             "tools_list": (
-                "explicit tools/list is fresh; stdio call schemas cached <=1s "
+                "explicit tools/list is fresh; stdio call schemas cached <=30s "
                 "with epoch/notification invalidation"
             ),
             "client_action": (

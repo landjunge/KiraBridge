@@ -48,6 +48,15 @@ Terminal-Sitzungen zu lesen. Frische Terminalmetadaten bei Bedarf mit
 `operation_catalog(observe_terminals=true)` anfordern; Eingabeziele werden
 weiterhin bei jeder Aktion geprüft.
 
+Explizit verlangte **einzelne Tastenereignisse** nutzt `keyboard_sequence` mit
+`request={"app":"Notes","steps":[{"key":{"character":"s"},"modifiers":["shift"]},
+{"key":{"character":"t"}}]}`. Bis zu 32 echte Key-down/Key-up-Paare laufen seriell
+in einem idempotenten Task; jede Zielprüfung bleibt frisch. Das ist keine
+Blocktextinsertion. Entscheidungen anhand der Rückmeldung nach jeder Taste
+benötigen weiterhin separate Aufrufe. Unabhängige Leseabfragen können über
+`read_queries(queries=[...])` dieselbe Werkzeugübergabe teilen.
+[RC28-Ursache und Vergleichsmessungen](docs/RC28-E2E-LATENCY-20261103.md).
+
 Zusammenhängenden Text wie ein Gedicht mit **einem** `keyboard_control`-Aufruf
 übergeben: `request={"app":"Notes","text":"Der Mond…\nDie Nacht…","submit":false}`.
 Zeilenumbrüche bleiben Teil des Texts; der Pfad benötigt keine Zwischenablage.

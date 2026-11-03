@@ -31,6 +31,7 @@ KEYBOARD_OPERATIONS = {
     "keyboard.chord",
     "keyboard.text",
     "keyboard.control",
+    "keyboard.sequence",
     "keyboard.action",
     "keyboard.profiles.list",
     "keyboard.profiles.get",

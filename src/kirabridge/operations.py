@@ -80,6 +80,7 @@ for _name in (
     "keyboard.key",
     "keyboard.system_key",
     "keyboard.control",
+    "keyboard.sequence",
     "keyboard.chord",
     "keyboard.text",
     "keyboard.action",
@@ -124,6 +125,7 @@ for _name in (
             "keyboard.text",
             "keyboard.action",
             "keyboard.control",
+            "keyboard.sequence",
             "keyboard.system_key",
         }
         else "keyboard.inspect"

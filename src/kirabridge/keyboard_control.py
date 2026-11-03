@@ -75,12 +75,29 @@ class KeyboardControl:
         self.keyboard = keyboard
 
     async def execute(self, task, args, running, progress=None):
+        async with self.keyboard.desktop_input.transaction() as turn:
+            return await self.execute_in_turn(task, args, running, turn, progress)
+
+    async def execute_in_turn(
+        self,
+        task,
+        args,
+        running,
+        turn,
+        progress=None,
+        *,
+        expected_application=None,
+        authorization_operation=None,
+    ):
+        """Reuse one caller-owned desktop transaction; never reuse a native target."""
         # Validate again; callers cannot mutate a previously validated intent.
         args = KeyboardControlInput.model_validate(args.model_dump(exclude_none=True))
         k, principal = self.keyboard, task["principal"]
 
         def authorize(operation="keyboard.control"):
             k.authorize(principal, "keyboard.control")
+            if authorization_operation is not None:
+                k.authorize(principal, authorization_operation)
             k.authorize(principal, operation)
 
         async def read(operation, arguments):
@@ -93,152 +110,106 @@ class KeyboardControl:
             if progress is not None:
                 await progress(evidence)
 
-        async with k.desktop_input.transaction() as turn:
-            authorize()
-            await running(
-                {"evidence_type": "automatic_keyboard_resolution", "automatic_retry": False}
+        authorize()
+        await running({"evidence_type": "automatic_keyboard_resolution", "automatic_retry": False})
+        page = await read("apps.list", {"limit": 1000})
+        if page.get("eof") is not True:
+            raise BridgeError("keyboard_catalog_incomplete", "Running program list is incomplete")
+        applications = page["applications"]
+        if args.pid is not None:
+            matches = [
+                a
+                for a in applications
+                if a.get("pid") == args.pid and a.get("started_at") == args.expected_started_at
+            ]
+        elif args.app is not None:
+            label = args.app.strip().casefold()
+            matches = [
+                a
+                for a in applications
+                if label
+                in {str(a.get("bundle_id", "")).casefold(), str(a.get("name", "")).casefold()}
+            ]
+        else:
+            matches = [a for a in applications if a.get("active") is True]
+        if len(matches) != 1:
+            raise BridgeError(
+                "keyboard_application_ambiguous" if matches else "keyboard_application_unavailable",
+                "Choose one running program by exact name, bundle ID or PID generation",
             )
-            page = await read("apps.list", {"limit": 1000})
-            if page.get("eof") is not True:
-                raise BridgeError(
-                    "keyboard_catalog_incomplete", "Running program list is incomplete"
-                )
-            applications = page["applications"]
-            if args.pid is not None:
-                matches = [
-                    a
-                    for a in applications
-                    if a.get("pid") == args.pid and a.get("started_at") == args.expected_started_at
-                ]
-            elif args.app is not None:
-                label = args.app.strip().casefold()
-                matches = [
-                    a
-                    for a in applications
-                    if label
-                    in {str(a.get("bundle_id", "")).casefold(), str(a.get("name", "")).casefold()}
-                ]
-            else:
-                matches = [a for a in applications if a.get("active") is True]
-            if len(matches) != 1:
-                raise BridgeError(
-                    "keyboard_application_ambiguous"
-                    if matches
-                    else "keyboard_application_unavailable",
-                    "Choose one running program by exact name, bundle ID or PID generation",
-                )
-            app = dict(matches[0])
-            selected = {"pid": app["pid"], "expected_started_at": app["started_at"]}
-            if app.get("active") is not True:
-                if args.app is None and args.pid is None:
-                    raise BridgeError("keyboard_application_changed", "Foreground program changed")
+        app = dict(matches[0])
+        if expected_application is not None and (
+            any(
+                app.get(key) != expected_application.get(key)
+                for key in _APPLICATION_IDENTITY_FIELDS
+            )
+            or app.get("active") is not True
+        ):
+            raise BridgeError(
+                "keyboard_application_changed",
+                "Sequence program generation or foreground changed; no further keys",
+            )
+        selected = {"pid": app["pid"], "expected_started_at": app["started_at"]}
+        if app.get("active") is not True:
+            if args.app is None and args.pid is None:
+                raise BridgeError("keyboard_application_changed", "Foreground program changed")
 
-                def focus_send():
-                    authorize("app.focus")
-                    turn.mark_attempted()
+            def focus_send():
+                authorize("app.focus")
+                turn.mark_attempted()
 
-                focused = await k.transport.request(
-                    "app.focus",
-                    {"expected_pid": app["pid"], "expected_start": f"{app['started_at']:.6f}"},
-                    principal=principal,
-                    before_send=focus_send,
-                )
-                if focused.get("active_observed") is not True:
-                    try:
-                        async with asyncio.timeout(_FOCUS_OBSERVATION_TIMEOUT):
-                            while True:
-                                await asyncio.sleep(_FOCUS_OBSERVATION_INTERVAL)
-                                page = await read("apps.list", {"limit": 1000})
-                                if page.get("eof") is not True:
-                                    raise BridgeError(
-                                        "keyboard_catalog_incomplete",
-                                        "Running program list is incomplete",
-                                    )
-                                current = [
-                                    a for a in page["applications"] if a.get("pid") == app["pid"]
-                                ]
-                                if len(current) != 1 or any(
-                                    current[0].get(key) != app.get(key)
-                                    for key in _APPLICATION_IDENTITY_FIELDS
-                                ):
-                                    raise BridgeError(
-                                        "keyboard_application_changed",
-                                        "Program identity changed during activation",
-                                    )
-                                if current[0].get("active") is True:
-                                    break
-                    except TimeoutError as error:
-                        raise BridgeError(
-                            "keyboard_focus_unconfirmed", "Program activation was not confirmed"
-                        ) from error
-            system_action = args.action
-            if args.scope == "auto" and possible_system_shortcut(args.key, args.modifiers):
-                inventory = await read(
-                    "keyboard.system_inventory",
-                    {"key": args.key.model_dump(exclude_none=True), "modifiers": args.modifiers},
-                )
-                system_action = registered_system_action(inventory, args.key, args.modifiers)
-            if args.scope == "system" or system_action is not None:
-                operation = "keyboard.system_key"
-                request = KeyboardSystemKeyInput(
-                    scope="system",
-                    target=selected,
-                    action=system_action,
-                    key=None if system_action is not None else args.key,
-                    modifiers=[]
-                    if system_action is not None and args.action is None
-                    else args.modifiers,
-                    repeat=args.repeat,
-                )
-                result = await k.execute_in_turn(
-                    {**task, "operation": operation},
-                    request,
-                    observe,
-                    turn,
-                    progress,
-                    before_send=authorize,
-                )
-                if not system_receipt_verified(result, action=system_action, repeat=args.repeat):
-                    raise UncertainExecution(
-                        "keyboard_control_unknown", "System key receipt is incomplete; no replay"
-                    )
-                return {
-                    **result,
-                    "automatic_target": True,
-                    "resolved_application": app,
-                    "native_operation": operation,
-                    "automatic_retry": False,
-                }
-            inspected = await read("keyboard.inspect", selected)
-            target = inspected["target"]
-            observed = inspected["application"]
-            if (
-                target.get("pid") != app["pid"]
-                or target.get("expected_started_at") != app["started_at"]
-                or any(observed.get(key) != app.get(key) for key in _APPLICATION_IDENTITY_FIELDS)
-            ):
-                raise BridgeError(
-                    "keyboard_application_changed", "Resolved program identity changed"
-                )
-            if args.text is not None:
-                operation = "keyboard.text"
-                request = KeyboardTextInput(target=target, text=args.text, submit=args.submit)
-            elif args.modifiers:
-                operation = "keyboard.chord"
-                request = KeyboardChordInput(
-                    target=target, key=args.key, modifiers=args.modifiers, repeat=args.repeat
-                )
-            else:
-                operation = "keyboard.key"
-                request = KeyboardKeyInput(target=target, key=args.key, repeat=args.repeat)
-            await observe(
-                {
-                    "evidence_type": "automatic_keyboard_target_bound",
-                    "resolved_application": observed,
-                    "native_operation": operation,
-                    "input_attempted": False,
-                    "automatic_retry": False,
-                }
+            focused = await k.transport.request(
+                "app.focus",
+                {"expected_pid": app["pid"], "expected_start": f"{app['started_at']:.6f}"},
+                principal=principal,
+                before_send=focus_send,
+            )
+            if focused.get("active_observed") is not True:
+                try:
+                    async with asyncio.timeout(_FOCUS_OBSERVATION_TIMEOUT):
+                        while True:
+                            await asyncio.sleep(_FOCUS_OBSERVATION_INTERVAL)
+                            page = await read("apps.list", {"limit": 1000})
+                            if page.get("eof") is not True:
+                                raise BridgeError(
+                                    "keyboard_catalog_incomplete",
+                                    "Running program list is incomplete",
+                                )
+                            current = [
+                                a for a in page["applications"] if a.get("pid") == app["pid"]
+                            ]
+                            if len(current) != 1 or any(
+                                current[0].get(key) != app.get(key)
+                                for key in _APPLICATION_IDENTITY_FIELDS
+                            ):
+                                raise BridgeError(
+                                    "keyboard_application_changed",
+                                    "Program identity changed during activation",
+                                )
+                            if current[0].get("active") is True:
+                                break
+                except TimeoutError as error:
+                    raise BridgeError(
+                        "keyboard_focus_unconfirmed", "Program activation was not confirmed"
+                    ) from error
+        system_action = args.action
+        if args.scope == "auto" and possible_system_shortcut(args.key, args.modifiers):
+            inventory = await read(
+                "keyboard.system_inventory",
+                {"key": args.key.model_dump(exclude_none=True), "modifiers": args.modifiers},
+            )
+            system_action = registered_system_action(inventory, args.key, args.modifiers)
+        if args.scope == "system" or system_action is not None:
+            operation = "keyboard.system_key"
+            request = KeyboardSystemKeyInput(
+                scope="system",
+                target=selected,
+                action=system_action,
+                key=None if system_action is not None else args.key,
+                modifiers=[]
+                if system_action is not None and args.action is None
+                else args.modifiers,
+                repeat=args.repeat,
             )
             result = await k.execute_in_turn(
                 {**task, "operation": operation},
@@ -248,17 +219,62 @@ class KeyboardControl:
                 progress,
                 before_send=authorize,
             )
-            if (
-                operation != "keyboard.text"
-                and result.get("post_calls_returned") != 2 * args.repeat
-            ):
+            if not system_receipt_verified(result, action=system_action, repeat=args.repeat):
                 raise UncertainExecution(
-                    "keyboard_control_unknown", "Native key receipt is incomplete; no replay"
+                    "keyboard_control_unknown", "System key receipt is incomplete; no replay"
                 )
             return {
                 **result,
                 "automatic_target": True,
-                "resolved_application": observed,
+                "resolved_application": app,
                 "native_operation": operation,
                 "automatic_retry": False,
             }
+        inspected = await read("keyboard.inspect", selected)
+        target = inspected["target"]
+        observed = inspected["application"]
+        if (
+            target.get("pid") != app["pid"]
+            or target.get("expected_started_at") != app["started_at"]
+            or any(observed.get(key) != app.get(key) for key in _APPLICATION_IDENTITY_FIELDS)
+        ):
+            raise BridgeError("keyboard_application_changed", "Resolved program identity changed")
+        if args.text is not None:
+            operation = "keyboard.text"
+            request = KeyboardTextInput(target=target, text=args.text, submit=args.submit)
+        elif args.modifiers:
+            operation = "keyboard.chord"
+            request = KeyboardChordInput(
+                target=target, key=args.key, modifiers=args.modifiers, repeat=args.repeat
+            )
+        else:
+            operation = "keyboard.key"
+            request = KeyboardKeyInput(target=target, key=args.key, repeat=args.repeat)
+        await observe(
+            {
+                "evidence_type": "automatic_keyboard_target_bound",
+                "resolved_application": observed,
+                "native_operation": operation,
+                "input_attempted": False,
+                "automatic_retry": False,
+            }
+        )
+        result = await k.execute_in_turn(
+            {**task, "operation": operation},
+            request,
+            observe,
+            turn,
+            progress,
+            before_send=authorize,
+        )
+        if operation != "keyboard.text" and result.get("post_calls_returned") != 2 * args.repeat:
+            raise UncertainExecution(
+                "keyboard_control_unknown", "Native key receipt is incomplete; no replay"
+            )
+        return {
+            **result,
+            "automatic_target": True,
+            "resolved_application": observed,
+            "native_operation": operation,
+            "automatic_retry": False,
+        }

@@ -1,0 +1,796 @@
+{
+  "captured_at_utc": "2026-11-02T23:59:09.917979+00:00",
+  "scope": "Tunnel process-lifetime cumulative histograms; not per-Voice or per-model timings",
+  "quantiles": "Histogram bucket upper bounds, not exact sample percentiles",
+  "privacy": "Only selected metric labels; tunnel identifiers and payloads omitted",
+  "command_latency": [
+    {
+      "labels": {
+        "channel": "main",
+        "latency_type": "enqueue_to_response",
+        "request_kind": "call",
+        "request_method": "initialize",
+        "tunnel_service_status": "200"
+      },
+      "buckets": [
+        {
+          "upper_ms": 0.0,
+          "cumulative_count": 0
+        },
+        {
+          "upper_ms": 5.0,
+          "cumulative_count": 0
+        },
+        {
+          "upper_ms": 10.0,
+          "cumulative_count": 0
+        },
+        {
+          "upper_ms": 25.0,
+          "cumulative_count": 0
+        },
+        {
+          "upper_ms": 50.0,
+          "cumulative_count": 0
+        },
+        {
+          "upper_ms": 75.0,
+          "cumulative_count": 0
+        },
+        {
+          "upper_ms": 100.0,
+          "cumulative_count": 0
+        },
+        {
+          "upper_ms": 250.0,
+          "cumulative_count": 7
+        },
+        {
+          "upper_ms": 500.0,
+          "cumulative_count": 31
+        },
+        {
+          "upper_ms": 750.0,
+          "cumulative_count": 39
+        },
+        {
+          "upper_ms": 1000.0,
+          "cumulative_count": 56
+        },
+        {
+          "upper_ms": 2500.0,
+          "cumulative_count": 81
+        },
+        {
+          "upper_ms": 5000.0,
+          "cumulative_count": 82
+        },
+        {
+          "upper_ms": 7500.0,
+          "cumulative_count": 82
+        },
+        {
+          "upper_ms": 10000.0,
+          "cumulative_count": 82
+        },
+        {
+          "upper_ms": null,
+          "cumulative_count": 82
+        }
+      ],
+      "sum_ms": 67723.0,
+      "count": 82,
+      "mean_ms": 825.890243902439,
+      "p50_histogram_upper_ms": 1000.0,
+      "p95_histogram_upper_ms": 2500.0
+    },
+    {
+      "labels": {
+        "channel": "main",
+        "latency_type": "enqueue_to_response",
+        "request_kind": "call",
+        "request_method": "tools/call",
+        "tunnel_service_status": "200"
+      },
+      "buckets": [
+        {
+          "upper_ms": 0.0,
+          "cumulative_count": 0
+        },
+        {
+          "upper_ms": 5.0,
+          "cumulative_count": 0
+        },
+        {
+          "upper_ms": 10.0,
+          "cumulative_count": 0
+        },
+        {
+          "upper_ms": 25.0,
+          "cumulative_count": 0
+        },
+        {
+          "upper_ms": 50.0,
+          "cumulative_count": 0
+        },
+        {
+          "upper_ms": 75.0,
+          "cumulative_count": 0
+        },
+        {
+          "upper_ms": 100.0,
+          "cumulative_count": 0
+        },
+        {
+          "upper_ms": 250.0,
+          "cumulative_count": 0
+        },
+        {
+          "upper_ms": 500.0,
+          "cumulative_count": 11
+        },
+        {
+          "upper_ms": 750.0,
+          "cumulative_count": 24
+        },
+        {
+          "upper_ms": 1000.0,
+          "cumulative_count": 36
+        },
+        {
+          "upper_ms": 2500.0,
+          "cumulative_count": 64
+        },
+        {
+          "upper_ms": 5000.0,
+          "cumulative_count": 81
+        },
+        {
+          "upper_ms": 7500.0,
+          "cumulative_count": 82
+        },
+        {
+          "upper_ms": 10000.0,
+          "cumulative_count": 82
+        },
+        {
+          "upper_ms": null,
+          "cumulative_count": 82
+        }
+      ],
+      "sum_ms": 131688.0,
+      "count": 82,
+      "mean_ms": 1605.9512195121952,
+      "p50_histogram_upper_ms": 2500.0,
+      "p95_histogram_upper_ms": 5000.0
+    },
+    {
+      "labels": {
+        "channel": "main",
+        "latency_type": "enqueue_to_response",
+        "request_kind": "notification",
+        "request_method": "notifications/initialized",
+        "tunnel_service_status": "200"
+      },
+      "buckets": [
+        {
+          "upper_ms": 0.0,
+          "cumulative_count": 0
+        },
+        {
+          "upper_ms": 5.0,
+          "cumulative_count": 0
+        },
+        {
+          "upper_ms": 10.0,
+          "cumulative_count": 0
+        },
+        {
+          "upper_ms": 25.0,
+          "cumulative_count": 0
+        },
+        {
+          "upper_ms": 50.0,
+          "cumulative_count": 0
+        },
+        {
+          "upper_ms": 75.0,
+          "cumulative_count": 0
+        },
+        {
+          "upper_ms": 100.0,
+          "cumulative_count": 0
+        },
+        {
+          "upper_ms": 250.0,
+          "cumulative_count": 16
+        },
+        {
+          "upper_ms": 500.0,
+          "cumulative_count": 37
+        },
+        {
+          "upper_ms": 750.0,
+          "cumulative_count": 53
+        },
+        {
+          "upper_ms": 1000.0,
+          "cumulative_count": 64
+        },
+        {
+          "upper_ms": 2500.0,
+          "cumulative_count": 82
+        },
+        {
+          "upper_ms": 5000.0,
+          "cumulative_count": 82
+        },
+        {
+          "upper_ms": 7500.0,
+          "cumulative_count": 82
+        },
+        {
+          "upper_ms": 10000.0,
+          "cumulative_count": 82
+        },
+        {
+          "upper_ms": null,
+          "cumulative_count": 82
+        }
+      ],
+      "sum_ms": 56968.0,
+      "count": 82,
+      "mean_ms": 694.7317073170732,
+      "p50_histogram_upper_ms": 750.0,
+      "p95_histogram_upper_ms": 2500.0
+    },
+    {
+      "labels": {
+        "channel": "main",
+        "latency_type": "poll_to_response",
+        "request_kind": "call",
+        "request_method": "initialize",
+        "tunnel_service_status": "200"
+      },
+      "buckets": [
+        {
+          "upper_ms": 0.0,
+          "cumulative_count": 0
+        },
+        {
+          "upper_ms": 5.0,
+          "cumulative_count": 0
+        },
+        {
+          "upper_ms": 10.0,
+          "cumulative_count": 0
+        },
+        {
+          "upper_ms": 25.0,
+          "cumulative_count": 0
+        },
+        {
+          "upper_ms": 50.0,
+          "cumulative_count": 0
+        },
+        {
+          "upper_ms": 75.0,
+          "cumulative_count": 0
+        },
+        {
+          "upper_ms": 100.0,
+          "cumulative_count": 0
+        },
+        {
+          "upper_ms": 250.0,
+          "cumulative_count": 15
+        },
+        {
+          "upper_ms": 500.0,
+          "cumulative_count": 47
+        },
+        {
+          "upper_ms": 750.0,
+          "cumulative_count": 57
+        },
+        {
+          "upper_ms": 1000.0,
+          "cumulative_count": 70
+        },
+        {
+          "upper_ms": 2500.0,
+          "cumulative_count": 81
+        },
+        {
+          "upper_ms": 5000.0,
+          "cumulative_count": 82
+        },
+        {
+          "upper_ms": 7500.0,
+          "cumulative_count": 82
+        },
+        {
+          "upper_ms": 10000.0,
+          "cumulative_count": 82
+        },
+        {
+          "upper_ms": null,
+          "cumulative_count": 82
+        }
+      ],
+      "sum_ms": 47694.0,
+      "count": 82,
+      "mean_ms": 581.6341463414634,
+      "p50_histogram_upper_ms": 500.0,
+      "p95_histogram_upper_ms": 2500.0
+    },
+    {
+      "labels": {
+        "channel": "main",
+        "latency_type": "poll_to_response",
+        "request_kind": "call",
+        "request_method": "tools/call",
+        "tunnel_service_status": "200"
+      },
+      "buckets": [
+        {
+          "upper_ms": 0.0,
+          "cumulative_count": 0
+        },
+        {
+          "upper_ms": 5.0,
+          "cumulative_count": 0
+        },
+        {
+          "upper_ms": 10.0,
+          "cumulative_count": 0
+        },
+        {
+          "upper_ms": 25.0,
+          "cumulative_count": 0
+        },
+        {
+          "upper_ms": 50.0,
+          "cumulative_count": 0
+        },
+        {
+          "upper_ms": 75.0,
+          "cumulative_count": 0
+        },
+        {
+          "upper_ms": 100.0,
+          "cumulative_count": 0
+        },
+        {
+          "upper_ms": 250.0,
+          "cumulative_count": 0
+        },
+        {
+          "upper_ms": 500.0,
+          "cumulative_count": 17
+        },
+        {
+          "upper_ms": 750.0,
+          "cumulative_count": 32
+        },
+        {
+          "upper_ms": 1000.0,
+          "cumulative_count": 46
+        },
+        {
+          "upper_ms": 2500.0,
+          "cumulative_count": 66
+        },
+        {
+          "upper_ms": 5000.0,
+          "cumulative_count": 81
+        },
+        {
+          "upper_ms": 7500.0,
+          "cumulative_count": 82
+        },
+        {
+          "upper_ms": 10000.0,
+          "cumulative_count": 82
+        },
+        {
+          "upper_ms": null,
+          "cumulative_count": 82
+        }
+      ],
+      "sum_ms": 112127.0,
+      "count": 82,
+      "mean_ms": 1367.4024390243903,
+      "p50_histogram_upper_ms": 1000.0,
+      "p95_histogram_upper_ms": 5000.0
+    },
+    {
+      "labels": {
+        "channel": "main",
+        "latency_type": "poll_to_response",
+        "request_kind": "notification",
+        "request_method": "notifications/initialized",
+        "tunnel_service_status": "200"
+      },
+      "buckets": [
+        {
+          "upper_ms": 0.0,
+          "cumulative_count": 0
+        },
+        {
+          "upper_ms": 5.0,
+          "cumulative_count": 0
+        },
+        {
+          "upper_ms": 10.0,
+          "cumulative_count": 0
+        },
+        {
+          "upper_ms": 25.0,
+          "cumulative_count": 0
+        },
+        {
+          "upper_ms": 50.0,
+          "cumulative_count": 0
+        },
+        {
+          "upper_ms": 75.0,
+          "cumulative_count": 0
+        },
+        {
+          "upper_ms": 100.0,
+          "cumulative_count": 0
+        },
+        {
+          "upper_ms": 250.0,
+          "cumulative_count": 30
+        },
+        {
+          "upper_ms": 500.0,
+          "cumulative_count": 56
+        },
+        {
+          "upper_ms": 750.0,
+          "cumulative_count": 66
+        },
+        {
+          "upper_ms": 1000.0,
+          "cumulative_count": 79
+        },
+        {
+          "upper_ms": 2500.0,
+          "cumulative_count": 82
+        },
+        {
+          "upper_ms": 5000.0,
+          "cumulative_count": 82
+        },
+        {
+          "upper_ms": 7500.0,
+          "cumulative_count": 82
+        },
+        {
+          "upper_ms": 10000.0,
+          "cumulative_count": 82
+        },
+        {
+          "upper_ms": null,
+          "cumulative_count": 82
+        }
+      ],
+      "sum_ms": 36858.0,
+      "count": 82,
+      "mean_ms": 449.4878048780488,
+      "p50_histogram_upper_ms": 500.0,
+      "p95_histogram_upper_ms": 1000.0
+    }
+  ],
+  "controlplane_http_latency": [
+    {
+      "labels": {
+        "http_request_method": "GET",
+        "http_response_status_code": "200",
+        "http_route": "/v1/tunnels/{tunnel_id}",
+        "network_protocol_version": "1.1"
+      },
+      "buckets": [
+        {
+          "upper_ms": 5.0,
+          "cumulative_count": 0
+        },
+        {
+          "upper_ms": 10.0,
+          "cumulative_count": 0
+        },
+        {
+          "upper_ms": 25.0,
+          "cumulative_count": 0
+        },
+        {
+          "upper_ms": 50.0,
+          "cumulative_count": 0
+        },
+        {
+          "upper_ms": 75.0,
+          "cumulative_count": 0
+        },
+        {
+          "upper_ms": 100.0,
+          "cumulative_count": 0
+        },
+        {
+          "upper_ms": 250.0,
+          "cumulative_count": 0
+        },
+        {
+          "upper_ms": 500.0,
+          "cumulative_count": 0
+        },
+        {
+          "upper_ms": 750.0,
+          "cumulative_count": 0
+        },
+        {
+          "upper_ms": 1000.0,
+          "cumulative_count": 0
+        },
+        {
+          "upper_ms": 2500.0,
+          "cumulative_count": 1
+        },
+        {
+          "upper_ms": 5000.0,
+          "cumulative_count": 1
+        },
+        {
+          "upper_ms": 7500.0,
+          "cumulative_count": 1
+        },
+        {
+          "upper_ms": 10000.0,
+          "cumulative_count": 1
+        },
+        {
+          "upper_ms": null,
+          "cumulative_count": 1
+        }
+      ],
+      "sum_ms": 1331.44993,
+      "count": 1,
+      "mean_ms": 1331.44993,
+      "p50_histogram_upper_ms": 2500.0,
+      "p95_histogram_upper_ms": 2500.0
+    },
+    {
+      "labels": {
+        "http_request_method": "GET",
+        "http_response_status_code": "200",
+        "http_route": "/v1/tunnels/{tunnel_id}/poll",
+        "network_protocol_version": "1.1"
+      },
+      "buckets": [
+        {
+          "upper_ms": 5.0,
+          "cumulative_count": 0
+        },
+        {
+          "upper_ms": 10.0,
+          "cumulative_count": 0
+        },
+        {
+          "upper_ms": 25.0,
+          "cumulative_count": 0
+        },
+        {
+          "upper_ms": 50.0,
+          "cumulative_count": 0
+        },
+        {
+          "upper_ms": 75.0,
+          "cumulative_count": 0
+        },
+        {
+          "upper_ms": 100.0,
+          "cumulative_count": 0
+        },
+        {
+          "upper_ms": 250.0,
+          "cumulative_count": 5
+        },
+        {
+          "upper_ms": 500.0,
+          "cumulative_count": 43
+        },
+        {
+          "upper_ms": 750.0,
+          "cumulative_count": 101
+        },
+        {
+          "upper_ms": 1000.0,
+          "cumulative_count": 137
+        },
+        {
+          "upper_ms": 2500.0,
+          "cumulative_count": 202
+        },
+        {
+          "upper_ms": 5000.0,
+          "cumulative_count": 220
+        },
+        {
+          "upper_ms": 7500.0,
+          "cumulative_count": 224
+        },
+        {
+          "upper_ms": 10000.0,
+          "cumulative_count": 230
+        },
+        {
+          "upper_ms": null,
+          "cumulative_count": 245
+        }
+      ],
+      "sum_ms": 624392.8135749999,
+      "count": 245,
+      "mean_ms": 2548.5420962244893,
+      "p50_histogram_upper_ms": 1000.0,
+      "p95_histogram_upper_ms": null
+    },
+    {
+      "labels": {
+        "http_request_method": "GET",
+        "http_response_status_code": "204",
+        "http_route": "/v1/tunnels/{tunnel_id}/poll",
+        "network_protocol_version": "1.1"
+      },
+      "buckets": [
+        {
+          "upper_ms": 5.0,
+          "cumulative_count": 0
+        },
+        {
+          "upper_ms": 10.0,
+          "cumulative_count": 0
+        },
+        {
+          "upper_ms": 25.0,
+          "cumulative_count": 0
+        },
+        {
+          "upper_ms": 50.0,
+          "cumulative_count": 0
+        },
+        {
+          "upper_ms": 75.0,
+          "cumulative_count": 0
+        },
+        {
+          "upper_ms": 100.0,
+          "cumulative_count": 0
+        },
+        {
+          "upper_ms": 250.0,
+          "cumulative_count": 0
+        },
+        {
+          "upper_ms": 500.0,
+          "cumulative_count": 0
+        },
+        {
+          "upper_ms": 750.0,
+          "cumulative_count": 0
+        },
+        {
+          "upper_ms": 1000.0,
+          "cumulative_count": 0
+        },
+        {
+          "upper_ms": 2500.0,
+          "cumulative_count": 0
+        },
+        {
+          "upper_ms": 5000.0,
+          "cumulative_count": 0
+        },
+        {
+          "upper_ms": 7500.0,
+          "cumulative_count": 0
+        },
+        {
+          "upper_ms": 10000.0,
+          "cumulative_count": 0
+        },
+        {
+          "upper_ms": null,
+          "cumulative_count": 12
+        }
+      ],
+      "sum_ms": 368018.20455,
+      "count": 12,
+      "mean_ms": 30668.183712500002,
+      "p50_histogram_upper_ms": null,
+      "p95_histogram_upper_ms": null
+    },
+    {
+      "labels": {
+        "http_request_method": "POST",
+        "http_response_status_code": "200",
+        "http_route": "/v1/tunnels/{tunnel_id}/response",
+        "network_protocol_version": "1.1"
+      },
+      "buckets": [
+        {
+          "upper_ms": 5.0,
+          "cumulative_count": 0
+        },
+        {
+          "upper_ms": 10.0,
+          "cumulative_count": 0
+        },
+        {
+          "upper_ms": 25.0,
+          "cumulative_count": 0
+        },
+        {
+          "upper_ms": 50.0,
+          "cumulative_count": 0
+        },
+        {
+          "upper_ms": 75.0,
+          "cumulative_count": 0
+        },
+        {
+          "upper_ms": 100.0,
+          "cumulative_count": 0
+        },
+        {
+          "upper_ms": 250.0,
+          "cumulative_count": 52
+        },
+        {
+          "upper_ms": 500.0,
+          "cumulative_count": 139
+        },
+        {
+          "upper_ms": 750.0,
+          "cumulative_count": 175
+        },
+        {
+          "upper_ms": 1000.0,
+          "cumulative_count": 212
+        },
+        {
+          "upper_ms": 2500.0,
+          "cumulative_count": 234
+        },
+        {
+          "upper_ms": 5000.0,
+          "cumulative_count": 246
+        },
+        {
+          "upper_ms": 7500.0,
+          "cumulative_count": 246
+        },
+        {
+          "upper_ms": 10000.0,
+          "cumulative_count": 246
+        },
+        {
+          "upper_ms": null,
+          "cumulative_count": 246
+        }
+      ],
+      "sum_ms": 165721.16999499997,
+      "count": 246,
+      "mean_ms": 673.6632926626015,
+      "p50_histogram_upper_ms": 500.0,
+      "p95_histogram_upper_ms": 2500.0
+    }
+  ],
+  "limits": [
+    "enqueue_to_response uses control-plane enqueue wall clock and host clock",
+    "poll_to_response includes local execution and response POST",
+    "HTTP poll durations include idle long-poll waiting and are not request delivery delay",
+    "Process totals include all callers since tunnel startup"
+  ]
+}

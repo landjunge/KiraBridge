@@ -1,0 +1,138 @@
+{
+  "scope": "Private loopback/own grants and payload; no production/UI/clipboard content/native worker",
+  "baseline_domains": {
+    "bridge_health": {
+      "count": 10,
+      "total_ms": 124.863069,
+      "p50_ms": 12.476651,
+      "p95_ms": 13.574279,
+      "min_ms": 11.74692,
+      "max_ms": 13.574279,
+      "p95_method": "nearest rank ceil(0.95*n); small n is not a population guarantee"
+    },
+    "clipboard_info": {
+      "count": 10,
+      "total_ms": 62.445953999999986,
+      "p50_ms": 6.254347,
+      "p95_ms": 6.747383,
+      "min_ms": 5.8244,
+      "max_ms": 6.747383,
+      "p95_method": "nearest rank ceil(0.95*n); small n is not a population guarantee"
+    },
+    "policy_inspect": {
+      "count": 10,
+      "total_ms": 259.999747,
+      "p50_ms": 25.795202500000002,
+      "p95_ms": 27.079648,
+      "min_ms": 25.310613,
+      "max_ms": 27.079648,
+      "p95_method": "nearest rank ceil(0.95*n); small n is not a population guarantee"
+    },
+    "operation_catalog": {
+      "count": 10,
+      "total_ms": 265.44333700000004,
+      "p50_ms": 26.488456499999998,
+      "p95_ms": 27.884171,
+      "min_ms": 25.370649,
+      "max_ms": 27.884171,
+      "p95_method": "nearest rank ceil(0.95*n); small n is not a population guarantee"
+    }
+  },
+  "candidate_domains": {
+    "bridge_health": {
+      "count": 10,
+      "total_ms": 131.13811499999997,
+      "p50_ms": 12.9330385,
+      "p95_ms": 14.477165,
+      "min_ms": 12.505613,
+      "max_ms": 14.477165,
+      "p95_method": "nearest rank ceil(0.95*n); small n is not a population guarantee"
+    },
+    "clipboard_info": {
+      "count": 10,
+      "total_ms": 65.492423,
+      "p50_ms": 6.519575,
+      "p95_ms": 7.472719,
+      "min_ms": 5.763531,
+      "max_ms": 7.472719,
+      "p95_method": "nearest rank ceil(0.95*n); small n is not a population guarantee"
+    },
+    "policy_inspect": {
+      "count": 10,
+      "total_ms": 241.04033399999997,
+      "p50_ms": 24.0211455,
+      "p95_ms": 25.147901,
+      "min_ms": 23.107092,
+      "max_ms": 25.147901,
+      "p95_method": "nearest rank ceil(0.95*n); small n is not a population guarantee"
+    },
+    "operation_catalog": {
+      "count": 10,
+      "total_ms": 266.29303100000004,
+      "p50_ms": 26.481707,
+      "p95_ms": 27.604623,
+      "min_ms": 25.830159,
+      "max_ms": 27.604623,
+      "p95_method": "nearest rank ceil(0.95*n); small n is not a population guarantee"
+    }
+  },
+  "baseline_three_single_reads": {
+    "count": 10,
+    "total_ms": 771.6883349999999,
+    "p50_ms": 69.46830349999999,
+    "p95_ms": 103.496957,
+    "min_ms": 66.678299,
+    "max_ms": 103.496957,
+    "p95_method": "nearest rank ceil(0.95*n); small n is not a population guarantee"
+  },
+  "candidate_matched_reads": {
+    "single": {
+      "count": 10,
+      "total_ms": 733.895238,
+      "p50_ms": 67.4635845,
+      "p95_ms": 128.420923,
+      "min_ms": 65.966653,
+      "max_ms": 128.420923,
+      "p95_method": "nearest rank ceil(0.95*n); small n is not a population guarantee"
+    },
+    "batch": {
+      "count": 10,
+      "total_ms": 558.3085490000001,
+      "p50_ms": 55.985969999999995,
+      "p95_ms": 57.63495,
+      "min_ms": 53.392674,
+      "max_ms": 57.63495,
+      "p95_method": "nearest rank ceil(0.95*n); small n is not a population guarantee"
+    }
+  },
+  "candidate_matched_semantics": "File read/list exact; platform OS observed_at alone excluded. Rights/revision/availability retained in comparisons.",
+  "sources": {
+    "baseline_domains_and_groups": "rc28-baseline-read-tools-20261103.json",
+    "candidate_domains": "rc28-candidate-read-tools-final-20261103.json",
+    "candidate_matched_groups": "rc28-candidate-read-tools-final-20261103.json"
+  },
+  "preserved_harness_failures": [
+    "Baseline native harness later readonly grant refusal, after successful keys.",
+    "Initial candidate read harness rejected differing permission observed_at values; corrected semantic comparison.",
+    "Groups-only CLI printed KeyError after complete successful measurement and cleanup; formatter corrected; saved successful evidence revalidated without reposting reads."
+  ],
+  "response_bytes": {
+    "bridge_health": {
+      "before": 37540.0,
+      "after": 32889.0
+    },
+    "clipboard_info": {
+      "before": 482.0,
+      "after": 804.0
+    },
+    "policy_inspect": {
+      "before": 15391.0,
+      "after": 14010.0
+    },
+    "operation_catalog": {
+      "before": 51477.0,
+      "after": 43598.0
+    }
+  },
+  "final_complete_read_harness_passed": true
+}

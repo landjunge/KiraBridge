@@ -47,6 +47,7 @@ from kirabridge.keyboard_action_manager import ACTION_INPUTS, KeyboardActionMana
 from kirabridge.keyboard_control import CONTROL_INPUTS, KeyboardControl
 from kirabridge.keyboard_manager import KEYBOARD_INPUTS, KeyboardManager
 from kirabridge.keyboard_profile_manager import PROFILE_INPUTS, KeyboardProfileManager
+from kirabridge.keyboard_sequence import SEQUENCE_INPUTS, KeyboardSequence
 from kirabridge.message_manager import MessageManager
 from kirabridge.message_manager.receiver import MessageReceiver
 from kirabridge.permissions import (
@@ -82,6 +83,7 @@ INPUTS = {
     **SYSTEM_INPUTS,
     **KEYBOARD_INPUTS,
     **CONTROL_INPUTS,
+    **SEQUENCE_INPUTS,
     **ACTION_INPUTS,
     **PROFILE_INPUTS,
     "process.output": OutputRangeInput,
@@ -254,6 +256,7 @@ class Bridge:
             authorize=self.security.authorize,
         )
         self.keyboard_control = KeyboardControl(self.keyboard)
+        self.keyboard_sequence = KeyboardSequence(self.keyboard_control)
         self.keyboard_actions = KeyboardActionManager(
             keyboard=self.keyboard,
             profiles=self.keyboard_profiles,
@@ -573,6 +576,8 @@ class Bridge:
                     "remain separately pageable"
                 ),
             }
+        if operation in SEQUENCE_INPUTS:
+            return await self.keyboard_sequence.execute(task, args, running, progress)
         if operation in CONTROL_INPUTS:
             return await self.keyboard_control.execute(task, args, running, progress)
         if operation in ACTION_INPUTS:

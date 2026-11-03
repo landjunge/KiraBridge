@@ -24,6 +24,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 import uvicorn
+from keyboard_sequence_benchmark import run_key_rounds, run_read_rounds
 
 import kirabridge
 from kirabridge.bridge_core.bridge import Bridge
@@ -146,12 +147,18 @@ async def run(args):
         approval_mode="automatic",
         permission_level="full",
         token_env=token_env,
-        capabilities=["keyboard.inspect", "keyboard.execute", "task.read", "bridge.health"],
+        capabilities=[
+            "keyboard.inspect",
+            "keyboard.execute",
+            "task.read",
+            "bridge.health",
+            "clipboard.info",
+        ],
         roots=[str(root)],
     )
     if args.scenario == "profile-action":
         policy.capabilities += ["keyboard.profiles.read", "keyboard.profiles.manage"]
-    if args.scenario in {"direct-control", "latency"}:
+    if args.scenario in {"direct-control", "latency", "sequence-latency"}:
         policy.capabilities += ["apps.list", "app.focus"]
     config = Config(
         data_dir=str(root / "state"), concurrency=1, principals={"acceptance": policy}, agents={}
@@ -164,7 +171,7 @@ async def run(args):
     with patch("kirabridge.bridge_core.bridge.installed_native_contract", return_value=contract):
         bridge = Bridge(config)
     transport, worker_pids = bridge.system_modules.transport, set()
-    if args.scenario == "latency":
+    if args.scenario in {"latency", "sequence-latency"}:
         original_native = transport.request
         original_metadata = transport.snapshot_metadata
 
@@ -286,7 +293,10 @@ async def run(args):
                     try:
                         return await http_app(scope, receive, send)
                     finally:
-                        if scope["type"] == "http" and args.scenario == "latency":
+                        if scope["type"] == "http" and args.scenario in {
+                            "latency",
+                            "sequence-latency",
+                        }:
                             record(
                                 "http_timing",
                                 {
@@ -306,7 +316,7 @@ async def run(args):
                         await asyncio.sleep(0.01)
                 clients = MCPClientPool(
                     observer=(lambda _kind, value, **_kwargs: record("client_phase", value))
-                    if args.scenario == "latency"
+                    if args.scenario in {"latency", "sequence-latency"}
                     else None
                 )
                 await clients.__aenter__()
@@ -314,12 +324,27 @@ async def run(args):
                     Peer("owned", url=f"http://127.0.0.1:{config.port}/mcp", token=token)
                 )
 
+                benchmark_proxy = DaemonConnection(clients, Peer("owned"))
+                rpc_metadata = {}
+
                 async def call(tool, arguments):
                     nonlocal submit_response_received
                     started = time.perf_counter_ns()
-                    response = await clients.call("owned", tool, arguments)
+                    response = (
+                        await benchmark_proxy.call_tool(tool, arguments)
+                        if args.scenario == "sequence-latency"
+                        else await clients.call("owned", tool, arguments)
+                    )
                     result = response.structuredContent
-                    if args.scenario == "latency":
+                    if args.scenario == "sequence-latency":
+                        meta = json.loads(response.model_dump_json(by_alias=True)).get("_meta")
+                        if arguments.get("task_id"):
+                            rpc_metadata[arguments["task_id"]] = meta
+                        record(
+                            "mcp_response_meta",
+                            {"tool": tool, "task_id": arguments.get("task_id"), "meta": meta},
+                        )
+                    if args.scenario in {"latency", "sequence-latency"}:
                         record(
                             "mcp_call_timing",
                             {"tool": tool, "duration_ms": (time.perf_counter_ns() - started) / 1e6},
@@ -501,7 +526,28 @@ async def run(args):
                     )
                     evidence["tests_passed"] = True
 
-                if args.scenario != "latency":
+                if args.scenario == "sequence-latency":
+                    result = await run_key_rounds(
+                        call=call,
+                        fixture_command=fixture_command,
+                        bridge=bridge,
+                        app=info["CFBundleIdentifier"],
+                        nonce=nonce,
+                        rounds=args.rounds,
+                        mode=args.sequence_mode,
+                        record=record,
+                        task_ids=latency_task_ids,
+                        responses=latency_responses,
+                        metadata=rpc_metadata,
+                    )
+                    evidence["key_benchmark"] = result
+                    if args.include_read_tools:
+                        evidence["read_benchmark"] = await run_read_rounds(
+                            call=call, repeat=10, record=record
+                        )
+                    evidence["tests_passed"] = True
+
+                if args.scenario not in {"latency", "sequence-latency"}:
 
                     async def setup_task(label, operation, arguments):
                         identifier = f"keyboard-{label}-{nonce}"
@@ -547,7 +593,7 @@ async def run(args):
                         "keyboard.text",
                         {"target": target, "text": text, "submit": True},
                     )
-                    if args.scenario in {"direct-control", "latency"}:
+                    if args.scenario in {"direct-control", "latency", "sequence-latency"}:
                         operation = "keyboard.control"
                         arguments = {
                             "app": info["CFBundleIdentifier"],
@@ -662,7 +708,7 @@ async def run(args):
                             ),
                             "Public staging/text/Return receipt incomplete",
                         )
-                    if args.scenario in {"direct-control", "latency"}:
+                    if args.scenario in {"direct-control", "latency", "sequence-latency"}:
                         resolved = result.get("resolved_application") or {}
                         require(
                             result.get("automatic_target") is True
@@ -853,9 +899,18 @@ if __name__ == "__main__":
     parser.add_argument("--execute", action="store_true")
     parser.add_argument(
         "--scenario",
-        choices=["keyboard-text", "profile-action", "direct-control", "latency"],
+        choices=[
+            "keyboard-text",
+            "profile-action",
+            "direct-control",
+            "latency",
+            "sequence-latency",
+        ],
         default="keyboard-text",
     )
+    parser.add_argument("--include-read-tools", action="store_true")
+    parser.add_argument("--rounds", type=int, default=5)
+    parser.add_argument("--sequence-mode", choices=["single", "sequence", "both"], default="both")
     parser.add_argument("--native-app", type=Path, required=True)
     parser.add_argument("--expected-commit", required=True)
     parser.add_argument("--expected-binary-sha256", required=True)

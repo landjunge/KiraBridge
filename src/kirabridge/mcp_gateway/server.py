@@ -13,6 +13,7 @@ from kirabridge.bridge_core.bridge import INPUTS, Bridge
 from kirabridge.bridge_core.models import BridgeError, TaskRequest
 from kirabridge.image_manager import image_task_result
 from kirabridge.keyboard_control import KeyboardControlInput
+from kirabridge.keyboard_sequence import KeyboardSequenceInput
 from kirabridge.keyboard_system import KeyboardSystemKeyInput
 from kirabridge.message_manager import MessageSend
 from kirabridge.readiness import ReadinessInput, readiness
@@ -36,6 +37,8 @@ def inline_task_timeout(operation: str) -> float | None:
     """
     # Short keyboard operations normally finish inside this response. A slow or
     # queued operation remains the same durable task; the wait never cancels it.
+    if operation == "keyboard.sequence":
+        return 13
     if operation == "keyboard.control":
         return 2
     if operation in {"threaddesk.read", "threaddesk.manage", "clipboard.read", "clipboard.write"}:
@@ -61,8 +64,9 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
         "connection, version or session changes; compare discovery.revision. API v1. "
         "Check per-operation permission_decision; approval_mode is legacy policy metadata. "
         "Use task_request: automatic mode admits permitted work without a browser click. "
-        "Use one keyboard_control text request per paragraph, including line breaks; "
-        "never one tool call per character. No clipboard is used. "
+        "Use keyboard_sequence for requested genuine individual keystrokes; "
+        "use keyboard_control text for literal text. Keep adaptive steps separate. "
+        "Use read_queries to combine independent reads in one roundtrip. "
         "Choose an application by name or an exact PID/start pair, or omit the selector "
         "for the fresh foreground application. Target inspection is automatic. "
         "No Events subscription is needed. Read task_get for execution evidence; "
@@ -257,6 +261,9 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
     async def read_query(query: dict[str, Any], ctx: Context) -> dict[str, Any]:
         """Direct authorized read without tasks or Events subscriptions.
 
+        Cached clients may use operation=read.batch with queries=[...] for the
+        same bounded read_queries batch; nested batches and writes are rejected.
+
         query.operation: file.read (path, max_bytes<=65536, offset or tail,
         encoding=utf-8|base64, expected_identity). For complete/binary logs use
         data_base64, verify content_sha256, then follow next_offset until eof.
@@ -276,11 +283,40 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
         from kirabridge.read_query import ReadQuery, read_query_async
 
         try:
+            if query.get("operation") == "read.batch":
+                from kirabridge.read_queries import ReadQueries
+                from kirabridge.read_queries import read_queries as execute_reads
+
+                if set(query) != {"operation", "queries"}:
+                    return {"error": {"code": "invalid_arguments"}}
+                return await execute_reads(
+                    bridge, identity(ctx), ReadQueries(queries=query["queries"])
+                )
             return await read_query_async(bridge, identity(ctx), ReadQuery.model_validate(query))
         except BridgeError as exc:
             return {"error": {"code": exc.code, "message": str(exc)}}
         except ValidationError:
             return {"error": {"code": "invalid_arguments", "message": "Invalid read query"}}
+
+    @server.tool(annotations=read)
+    async def read_queries(queries: list[dict[str, Any]], ctx: Context) -> dict[str, Any]:
+        """Perform 1–8 independent authorized reads in one roundtrip.
+
+        Same query objects, permissions and ranges as read_query. Reads execute
+        serially and independently; results are not an atomic snapshot. No writes,
+        input, clipboard use, tasks or automatic retries. Combined byte budget
+        <=256 KiB, directory pages <=100. The batch has a 12 second cooperative
+        deadline; a synchronous file read may overrun it, but no further read
+        starts after expiry.
+        """
+        from kirabridge.read_queries import ReadQueries
+        from kirabridge.read_queries import read_queries as execute_reads
+
+        try:
+            request = ReadQueries(queries=queries)
+            return await execute_reads(bridge, identity(ctx), request)
+        except ValidationError:
+            return {"error": {"code": "invalid_arguments", "message": "Invalid read batch"}}
 
     @server.tool(annotations=read)
     async def session_catalog(ctx: Context) -> dict[str, Any]:
@@ -613,9 +649,11 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
         No profile or Events subscription is needed. Scope auto recognizes configured
         macOS shortcuts, app forces program input, system selects system keys/actions.
         Use action names from keyboard_system_inventory for volume, brightness, media,
-        Mission Control and Spaces. Send a whole paragraph or poem in ONE text request,
-        including its line breaks; never issue one tool call per character. Text uses
-        no clipboard. Repeat keys 1–20 times in one task. Keep dependent calls serial.
+        Mission Control and Spaces. For literal text send the whole paragraph including
+        line breaks in one text request without clipboard. For explicitly requested
+        individual key events use keyboard_sequence, never substitute text insertion.
+        Keep separate requests when the next key depends on the previous result.
+        Repeat identical keys 1–20 times in one task. Keep dependent calls serial.
         Select an app by name, an exact PID/start pair, or the current foreground app.
         Text is literal and submit defaults to false. Chords require explicit modifiers.
         Existing identity permissions apply. Reuse the same task_id and idempotency_key
@@ -628,6 +666,35 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
                 task_id=task_id,
                 idempotency_key=idempotency_key,
                 operation="keyboard.control",
+                arguments=request.model_dump(),
+            ),
+            ctx,
+            completion_target,
+        )
+
+    @server.tool(annotations=write)
+    async def keyboard_sequence(
+        request: KeyboardSequenceInput,
+        task_id: str,
+        idempotency_key: str,
+        ctx: Context,
+        completion_target: str | None = None,
+    ) -> dict[str, Any]:
+        """Post ordered real key-down/key-up events in ONE request, without text insertion.
+
+        Each step is one key/chord (optional repeat). Maximum 32 physical key pairs;
+        one application, one desktop transaction, fresh native target per step.
+        No clipboard, Unicode text insertion, parallel posts or automatic retry.
+        Stops on changed foreground/generation, denied permissions or uncertain output.
+        Inspect this SAME task after pending/partial/unknown; never replay with a new ID.
+        Native receipts confirm posting, not application processing. For decisions that
+        depend on each result, keep separate requests instead of predeclaring a sequence.
+        """
+        return await task_request(
+            TaskRequest(
+                task_id=task_id,
+                idempotency_key=idempotency_key,
+                operation="keyboard.sequence",
                 arguments=request.model_dump(),
             ),
             ctx,
@@ -1213,4 +1280,7 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
             or rows[tool.name]["eligible_for_submission"]
         ]
 
+    from kirabridge.mcp_gateway.timing import instrument_server
+
+    instrument_server(server._mcp_server, "daemon")
     return server

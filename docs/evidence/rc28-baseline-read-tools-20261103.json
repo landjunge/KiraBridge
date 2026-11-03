@@ -1,0 +1,1041 @@
+{
+  "source_label": "installed-rc27",
+  "package": "/Users/landjunge/.local/share/kirabridge/install/releases/0.8.0rc27-38223b16ed28/source/.venv/lib/python3.11/site-packages/kirabridge",
+  "source_sha256": "3f1bc01f0452a03b56a2f5906eb063fce31a544686b70252f35998b72ce87f6c",
+  "version": "0.8.0rc27",
+  "scope": "private loopback MCP, same bounded grants and payload; excludes cloud/model/voice",
+  "response_contents_saved": false,
+  "passed": true,
+  "protocol_version": "2025-11-25",
+  "read_queries_advertised": false,
+  "domains": {
+    "scope": "private loopback backend with same grants; no voice/cloud model timing",
+    "samples": [
+      {
+        "tool": "bridge_health",
+        "index": 0,
+        "elapsed_ms": 13.574279
+      },
+      {
+        "tool": "clipboard_info",
+        "index": 0,
+        "elapsed_ms": 6.348384
+      },
+      {
+        "tool": "policy_inspect",
+        "index": 0,
+        "elapsed_ms": 25.623533
+      },
+      {
+        "tool": "operation_catalog",
+        "index": 0,
+        "elapsed_ms": 27.884171
+      },
+      {
+        "tool": "clipboard_info",
+        "index": 1,
+        "elapsed_ms": 6.285249
+      },
+      {
+        "tool": "policy_inspect",
+        "index": 1,
+        "elapsed_ms": 25.310613
+      },
+      {
+        "tool": "operation_catalog",
+        "index": 1,
+        "elapsed_ms": 27.120167
+      },
+      {
+        "tool": "bridge_health",
+        "index": 1,
+        "elapsed_ms": 12.108569
+      },
+      {
+        "tool": "policy_inspect",
+        "index": 2,
+        "elapsed_ms": 26.046379
+      },
+      {
+        "tool": "operation_catalog",
+        "index": 2,
+        "elapsed_ms": 26.436173
+      },
+      {
+        "tool": "bridge_health",
+        "index": 2,
+        "elapsed_ms": 13.010023
+      },
+      {
+        "tool": "clipboard_info",
+        "index": 2,
+        "elapsed_ms": 6.747383
+      },
+      {
+        "tool": "operation_catalog",
+        "index": 3,
+        "elapsed_ms": 27.847405
+      },
+      {
+        "tool": "bridge_health",
+        "index": 3,
+        "elapsed_ms": 12.746615
+      },
+      {
+        "tool": "clipboard_info",
+        "index": 3,
+        "elapsed_ms": 6.12081
+      },
+      {
+        "tool": "policy_inspect",
+        "index": 3,
+        "elapsed_ms": 26.7542
+      },
+      {
+        "tool": "bridge_health",
+        "index": 4,
+        "elapsed_ms": 12.283095
+      },
+      {
+        "tool": "clipboard_info",
+        "index": 4,
+        "elapsed_ms": 6.319735
+      },
+      {
+        "tool": "policy_inspect",
+        "index": 4,
+        "elapsed_ms": 25.784807
+      },
+      {
+        "tool": "operation_catalog",
+        "index": 4,
+        "elapsed_ms": 27.073606
+      },
+      {
+        "tool": "clipboard_info",
+        "index": 5,
+        "elapsed_ms": 6.040754
+      },
+      {
+        "tool": "policy_inspect",
+        "index": 5,
+        "elapsed_ms": 25.805598
+      },
+      {
+        "tool": "operation_catalog",
+        "index": 5,
+        "elapsed_ms": 25.765439
+      },
+      {
+        "tool": "bridge_health",
+        "index": 5,
+        "elapsed_ms": 11.892724
+      },
+      {
+        "tool": "policy_inspect",
+        "index": 6,
+        "elapsed_ms": 25.691859
+      },
+      {
+        "tool": "operation_catalog",
+        "index": 6,
+        "elapsed_ms": 26.54074
+      },
+      {
+        "tool": "bridge_health",
+        "index": 6,
+        "elapsed_ms": 12.039546
+      },
+      {
+        "tool": "clipboard_info",
+        "index": 6,
+        "elapsed_ms": 5.8244
+      },
+      {
+        "tool": "operation_catalog",
+        "index": 7,
+        "elapsed_ms": 25.665916
+      },
+      {
+        "tool": "bridge_health",
+        "index": 7,
+        "elapsed_ms": 11.74692
+      },
+      {
+        "tool": "clipboard_info",
+        "index": 7,
+        "elapsed_ms": 6.446098
+      },
+      {
+        "tool": "policy_inspect",
+        "index": 7,
+        "elapsed_ms": 26.374761
+      },
+      {
+        "tool": "bridge_health",
+        "index": 8,
+        "elapsed_ms": 12.670207
+      },
+      {
+        "tool": "clipboard_info",
+        "index": 8,
+        "elapsed_ms": 6.089696
+      },
+      {
+        "tool": "policy_inspect",
+        "index": 8,
+        "elapsed_ms": 25.528349
+      },
+      {
+        "tool": "operation_catalog",
+        "index": 8,
+        "elapsed_ms": 25.370649
+      },
+      {
+        "tool": "clipboard_info",
+        "index": 9,
+        "elapsed_ms": 6.223445
+      },
+      {
+        "tool": "policy_inspect",
+        "index": 9,
+        "elapsed_ms": 27.079648
+      },
+      {
+        "tool": "operation_catalog",
+        "index": 9,
+        "elapsed_ms": 25.739071
+      },
+      {
+        "tool": "bridge_health",
+        "index": 9,
+        "elapsed_ms": 12.791091
+      }
+    ],
+    "summary": {
+      "bridge_health": {
+        "count": 10,
+        "total_ms": 124.863069,
+        "p50_ms": 12.476651,
+        "p95_ms": 13.574279,
+        "min_ms": 11.74692,
+        "max_ms": 13.574279,
+        "p95_method": "nearest rank ceil(0.95*n); small n is not a population guarantee"
+      },
+      "clipboard_info": {
+        "count": 10,
+        "total_ms": 62.445953999999986,
+        "p50_ms": 6.254347,
+        "p95_ms": 6.747383,
+        "min_ms": 5.8244,
+        "max_ms": 6.747383,
+        "p95_method": "nearest rank ceil(0.95*n); small n is not a population guarantee"
+      },
+      "policy_inspect": {
+        "count": 10,
+        "total_ms": 259.999747,
+        "p50_ms": 25.795202500000002,
+        "p95_ms": 27.079648,
+        "min_ms": 25.310613,
+        "max_ms": 27.079648,
+        "p95_method": "nearest rank ceil(0.95*n); small n is not a population guarantee"
+      },
+      "operation_catalog": {
+        "count": 10,
+        "total_ms": 265.44333700000004,
+        "p50_ms": 26.488456499999998,
+        "p95_ms": 27.884171,
+        "min_ms": 25.370649,
+        "max_ms": 27.884171,
+        "p95_method": "nearest rank ceil(0.95*n); small n is not a population guarantee"
+      }
+    }
+  },
+  "read_groups": {
+    "samples": [
+      {
+        "index": 0,
+        "mode": "single",
+        "elapsed_ms": 103.496957,
+        "tool_calls": 3,
+        "read_operations": 3,
+        "result_sha256": [
+          "92f08e8f175713b8e0fa7875f416a337144f7023b5b0b5f9e42e2aa1074d467e",
+          "354641fcad1161b5ea3d6e5922b5e8d63a7375f96cc80a03fabbd2853b02244a",
+          "4525f78e055145e94286bd1fe8d5cb95a4c77dae309d5604bbad7d7009db184e"
+        ]
+      },
+      {
+        "index": 1,
+        "mode": "single",
+        "elapsed_ms": 69.441785,
+        "tool_calls": 3,
+        "read_operations": 3,
+        "result_sha256": [
+          "92f08e8f175713b8e0fa7875f416a337144f7023b5b0b5f9e42e2aa1074d467e",
+          "354641fcad1161b5ea3d6e5922b5e8d63a7375f96cc80a03fabbd2853b02244a",
+          "17ddb6f8b0ea6ab3664d244d1178512eca573f010f17ee701ee38948c23e3e6b"
+        ]
+      },
+      {
+        "index": 2,
+        "mode": "single",
+        "elapsed_ms": 95.300425,
+        "tool_calls": 3,
+        "read_operations": 3,
+        "result_sha256": [
+          "92f08e8f175713b8e0fa7875f416a337144f7023b5b0b5f9e42e2aa1074d467e",
+          "354641fcad1161b5ea3d6e5922b5e8d63a7375f96cc80a03fabbd2853b02244a",
+          "1bad824dd40bf11e846a8fb22e6adbc1799e0ef6e6a196fbdbaedf357db3503c"
+        ]
+      },
+      {
+        "index": 3,
+        "mode": "single",
+        "elapsed_ms": 94.259212,
+        "tool_calls": 3,
+        "read_operations": 3,
+        "result_sha256": [
+          "92f08e8f175713b8e0fa7875f416a337144f7023b5b0b5f9e42e2aa1074d467e",
+          "354641fcad1161b5ea3d6e5922b5e8d63a7375f96cc80a03fabbd2853b02244a",
+          "593506c011acc3f0aa893ef374ffbc39d41133b6d9b40ec44b56d53579f29cba"
+        ]
+      },
+      {
+        "index": 4,
+        "mode": "single",
+        "elapsed_ms": 66.678299,
+        "tool_calls": 3,
+        "read_operations": 3,
+        "result_sha256": [
+          "92f08e8f175713b8e0fa7875f416a337144f7023b5b0b5f9e42e2aa1074d467e",
+          "354641fcad1161b5ea3d6e5922b5e8d63a7375f96cc80a03fabbd2853b02244a",
+          "7734da83316fd7b5e863f38427472ac68df94e575bd261b9795b53e41e4f0728"
+        ]
+      },
+      {
+        "index": 5,
+        "mode": "single",
+        "elapsed_ms": 68.076934,
+        "tool_calls": 3,
+        "read_operations": 3,
+        "result_sha256": [
+          "92f08e8f175713b8e0fa7875f416a337144f7023b5b0b5f9e42e2aa1074d467e",
+          "354641fcad1161b5ea3d6e5922b5e8d63a7375f96cc80a03fabbd2853b02244a",
+          "48c64828a8f25d135ea203f6aa2561a187398f1a1433034abf08bd960cd029cf"
+        ]
+      },
+      {
+        "index": 6,
+        "mode": "single",
+        "elapsed_ms": 66.903329,
+        "tool_calls": 3,
+        "read_operations": 3,
+        "result_sha256": [
+          "92f08e8f175713b8e0fa7875f416a337144f7023b5b0b5f9e42e2aa1074d467e",
+          "354641fcad1161b5ea3d6e5922b5e8d63a7375f96cc80a03fabbd2853b02244a",
+          "889b3226f0c8b3eca9fc9f99dc18887ca9987b09a954defc4366b9050054f4c1"
+        ]
+      },
+      {
+        "index": 7,
+        "mode": "single",
+        "elapsed_ms": 68.479255,
+        "tool_calls": 3,
+        "read_operations": 3,
+        "result_sha256": [
+          "92f08e8f175713b8e0fa7875f416a337144f7023b5b0b5f9e42e2aa1074d467e",
+          "354641fcad1161b5ea3d6e5922b5e8d63a7375f96cc80a03fabbd2853b02244a",
+          "f6e4fc4d1d7562051a72ab997b7b9c8f0302e0fa860b54f27a3577a540321ced"
+        ]
+      },
+      {
+        "index": 8,
+        "mode": "single",
+        "elapsed_ms": 69.557317,
+        "tool_calls": 3,
+        "read_operations": 3,
+        "result_sha256": [
+          "92f08e8f175713b8e0fa7875f416a337144f7023b5b0b5f9e42e2aa1074d467e",
+          "354641fcad1161b5ea3d6e5922b5e8d63a7375f96cc80a03fabbd2853b02244a",
+          "71a3799db991c813ce973fd3dc6e9a36819aa5220f0c2d47d5b364aad217748c"
+        ]
+      },
+      {
+        "index": 9,
+        "mode": "single",
+        "elapsed_ms": 69.494822,
+        "tool_calls": 3,
+        "read_operations": 3,
+        "result_sha256": [
+          "92f08e8f175713b8e0fa7875f416a337144f7023b5b0b5f9e42e2aa1074d467e",
+          "354641fcad1161b5ea3d6e5922b5e8d63a7375f96cc80a03fabbd2853b02244a",
+          "d13d1405406bcb89c8390b56d105136e8d61f1a682e7b19693af36fce817eb17"
+        ]
+      }
+    ],
+    "summary": {
+      "single": {
+        "count": 10,
+        "total_ms": 771.6883349999999,
+        "p50_ms": 69.46830349999999,
+        "p95_ms": 103.496957,
+        "min_ms": 66.678299,
+        "max_ms": 103.496957,
+        "p95_method": "nearest rank ceil(0.95*n); small n is not a population guarantee"
+      },
+      "batch": {
+        "count": 0,
+        "total_ms": 0
+      }
+    }
+  },
+  "rpc_samples": [
+    {
+      "tool": "bridge_health",
+      "elapsed_ms": 13.041022,
+      "response_bytes": 37540,
+      "meta": null
+    },
+    {
+      "tool": "clipboard_info",
+      "elapsed_ms": 6.277679,
+      "response_bytes": 482,
+      "meta": null
+    },
+    {
+      "tool": "policy_inspect",
+      "elapsed_ms": 25.328418,
+      "response_bytes": 15393,
+      "meta": null
+    },
+    {
+      "tool": "operation_catalog",
+      "elapsed_ms": 27.244359,
+      "response_bytes": 51477,
+      "meta": null
+    },
+    {
+      "tool": "clipboard_info",
+      "elapsed_ms": 6.213253,
+      "response_bytes": 482,
+      "meta": null
+    },
+    {
+      "tool": "policy_inspect",
+      "elapsed_ms": 25.081655,
+      "response_bytes": 15391,
+      "meta": null
+    },
+    {
+      "tool": "operation_catalog",
+      "elapsed_ms": 26.482092,
+      "response_bytes": 51477,
+      "meta": null
+    },
+    {
+      "tool": "bridge_health",
+      "elapsed_ms": 11.613932,
+      "response_bytes": 37540,
+      "meta": null
+    },
+    {
+      "tool": "policy_inspect",
+      "elapsed_ms": 25.769165,
+      "response_bytes": 15391,
+      "meta": null
+    },
+    {
+      "tool": "operation_catalog",
+      "elapsed_ms": 25.749418,
+      "response_bytes": 51477,
+      "meta": null
+    },
+    {
+      "tool": "bridge_health",
+      "elapsed_ms": 12.465849,
+      "response_bytes": 37540,
+      "meta": null
+    },
+    {
+      "tool": "clipboard_info",
+      "elapsed_ms": 6.673336,
+      "response_bytes": 482,
+      "meta": null
+    },
+    {
+      "tool": "operation_catalog",
+      "elapsed_ms": 27.059727,
+      "response_bytes": 51477,
+      "meta": null
+    },
+    {
+      "tool": "bridge_health",
+      "elapsed_ms": 12.227881,
+      "response_bytes": 37540,
+      "meta": null
+    },
+    {
+      "tool": "clipboard_info",
+      "elapsed_ms": 6.034851,
+      "response_bytes": 482,
+      "meta": null
+    },
+    {
+      "tool": "policy_inspect",
+      "elapsed_ms": 26.495424,
+      "response_bytes": 15393,
+      "meta": null
+    },
+    {
+      "tool": "bridge_health",
+      "elapsed_ms": 11.780628,
+      "response_bytes": 37540,
+      "meta": null
+    },
+    {
+      "tool": "clipboard_info",
+      "elapsed_ms": 6.162264,
+      "response_bytes": 482,
+      "meta": null
+    },
+    {
+      "tool": "policy_inspect",
+      "elapsed_ms": 25.51737,
+      "response_bytes": 15391,
+      "meta": null
+    },
+    {
+      "tool": "operation_catalog",
+      "elapsed_ms": 26.432456,
+      "response_bytes": 51477,
+      "meta": null
+    },
+    {
+      "tool": "clipboard_info",
+      "elapsed_ms": 5.958625,
+      "response_bytes": 482,
+      "meta": null
+    },
+    {
+      "tool": "policy_inspect",
+      "elapsed_ms": 25.570091,
+      "response_bytes": 15391,
+      "meta": null
+    },
+    {
+      "tool": "operation_catalog",
+      "elapsed_ms": 25.134976,
+      "response_bytes": 51477,
+      "meta": null
+    },
+    {
+      "tool": "bridge_health",
+      "elapsed_ms": 11.378493,
+      "response_bytes": 37540,
+      "meta": null
+    },
+    {
+      "tool": "policy_inspect",
+      "elapsed_ms": 25.416981,
+      "response_bytes": 15393,
+      "meta": null
+    },
+    {
+      "tool": "operation_catalog",
+      "elapsed_ms": 25.860692,
+      "response_bytes": 51477,
+      "meta": null
+    },
+    {
+      "tool": "bridge_health",
+      "elapsed_ms": 11.479278,
+      "response_bytes": 37540,
+      "meta": null
+    },
+    {
+      "tool": "clipboard_info",
+      "elapsed_ms": 5.764542,
+      "response_bytes": 482,
+      "meta": null
+    },
+    {
+      "tool": "operation_catalog",
+      "elapsed_ms": 24.994655,
+      "response_bytes": 51477,
+      "meta": null
+    },
+    {
+      "tool": "bridge_health",
+      "elapsed_ms": 11.24739,
+      "response_bytes": 37540,
+      "meta": null
+    },
+    {
+      "tool": "clipboard_info",
+      "elapsed_ms": 6.366292,
+      "response_bytes": 482,
+      "meta": null
+    },
+    {
+      "tool": "policy_inspect",
+      "elapsed_ms": 25.9535,
+      "response_bytes": 15391,
+      "meta": null
+    },
+    {
+      "tool": "bridge_health",
+      "elapsed_ms": 12.16484,
+      "response_bytes": 37540,
+      "meta": null
+    },
+    {
+      "tool": "clipboard_info",
+      "elapsed_ms": 5.958805,
+      "response_bytes": 482,
+      "meta": null
+    },
+    {
+      "tool": "policy_inspect",
+      "elapsed_ms": 25.285915,
+      "response_bytes": 15391,
+      "meta": null
+    },
+    {
+      "tool": "operation_catalog",
+      "elapsed_ms": 24.640421,
+      "response_bytes": 51477,
+      "meta": null
+    },
+    {
+      "tool": "clipboard_info",
+      "elapsed_ms": 6.024228,
+      "response_bytes": 482,
+      "meta": null
+    },
+    {
+      "tool": "policy_inspect",
+      "elapsed_ms": 26.844994,
+      "response_bytes": 15393,
+      "meta": null
+    },
+    {
+      "tool": "operation_catalog",
+      "elapsed_ms": 25.039418,
+      "response_bytes": 51477,
+      "meta": null
+    },
+    {
+      "tool": "bridge_health",
+      "elapsed_ms": 12.229674,
+      "response_bytes": 37540,
+      "meta": null
+    },
+    {
+      "tool": "read_query",
+      "elapsed_ms": 15.914484,
+      "response_bytes": 1654,
+      "meta": null
+    },
+    {
+      "tool": "read_query",
+      "elapsed_ms": 10.323646,
+      "response_bytes": 1161,
+      "meta": null
+    },
+    {
+      "tool": "read_query",
+      "elapsed_ms": 76.942579,
+      "response_bytes": 17018,
+      "meta": null
+    },
+    {
+      "tool": "read_query",
+      "elapsed_ms": 11.900356,
+      "response_bytes": 1654,
+      "meta": null
+    },
+    {
+      "tool": "read_query",
+      "elapsed_ms": 11.467737,
+      "response_bytes": 1161,
+      "meta": null
+    },
+    {
+      "tool": "read_query",
+      "elapsed_ms": 45.717201,
+      "response_bytes": 17016,
+      "meta": null
+    },
+    {
+      "tool": "read_query",
+      "elapsed_ms": 10.379448,
+      "response_bytes": 1654,
+      "meta": null
+    },
+    {
+      "tool": "read_query",
+      "elapsed_ms": 10.402916,
+      "response_bytes": 1161,
+      "meta": null
+    },
+    {
+      "tool": "read_query",
+      "elapsed_ms": 74.180217,
+      "response_bytes": 17018,
+      "meta": null
+    },
+    {
+      "tool": "read_query",
+      "elapsed_ms": 10.805182,
+      "response_bytes": 1654,
+      "meta": null
+    },
+    {
+      "tool": "read_query",
+      "elapsed_ms": 10.613204,
+      "response_bytes": 1161,
+      "meta": null
+    },
+    {
+      "tool": "read_query",
+      "elapsed_ms": 72.507231,
+      "response_bytes": 17018,
+      "meta": null
+    },
+    {
+      "tool": "read_query",
+      "elapsed_ms": 10.447196,
+      "response_bytes": 1654,
+      "meta": null
+    },
+    {
+      "tool": "read_query",
+      "elapsed_ms": 10.612686,
+      "response_bytes": 1161,
+      "meta": null
+    },
+    {
+      "tool": "read_query",
+      "elapsed_ms": 45.251882,
+      "response_bytes": 17018,
+      "meta": null
+    },
+    {
+      "tool": "read_query",
+      "elapsed_ms": 10.707948,
+      "response_bytes": 1654,
+      "meta": null
+    },
+    {
+      "tool": "read_query",
+      "elapsed_ms": 10.847186,
+      "response_bytes": 1161,
+      "meta": null
+    },
+    {
+      "tool": "read_query",
+      "elapsed_ms": 46.191521,
+      "response_bytes": 17018,
+      "meta": null
+    },
+    {
+      "tool": "read_query",
+      "elapsed_ms": 10.193873,
+      "response_bytes": 1654,
+      "meta": null
+    },
+    {
+      "tool": "read_query",
+      "elapsed_ms": 10.337221,
+      "response_bytes": 1161,
+      "meta": null
+    },
+    {
+      "tool": "read_query",
+      "elapsed_ms": 46.000649,
+      "response_bytes": 17018,
+      "meta": null
+    },
+    {
+      "tool": "read_query",
+      "elapsed_ms": 10.516174,
+      "response_bytes": 1654,
+      "meta": null
+    },
+    {
+      "tool": "read_query",
+      "elapsed_ms": 10.460033,
+      "response_bytes": 1161,
+      "meta": null
+    },
+    {
+      "tool": "read_query",
+      "elapsed_ms": 47.140753,
+      "response_bytes": 17014,
+      "meta": null
+    },
+    {
+      "tool": "read_query",
+      "elapsed_ms": 11.647289,
+      "response_bytes": 1654,
+      "meta": null
+    },
+    {
+      "tool": "read_query",
+      "elapsed_ms": 10.475353,
+      "response_bytes": 1161,
+      "meta": null
+    },
+    {
+      "tool": "read_query",
+      "elapsed_ms": 47.082351,
+      "response_bytes": 17018,
+      "meta": null
+    },
+    {
+      "tool": "read_query",
+      "elapsed_ms": 11.160451,
+      "response_bytes": 1654,
+      "meta": null
+    },
+    {
+      "tool": "read_query",
+      "elapsed_ms": 10.803783,
+      "response_bytes": 1161,
+      "meta": null
+    },
+    {
+      "tool": "read_query",
+      "elapsed_ms": 47.182783,
+      "response_bytes": 17016,
+      "meta": null
+    }
+  ],
+  "http_post_samples": [
+    {
+      "duration_ms": 1.638843
+    },
+    {
+      "duration_ms": 0.769898
+    },
+    {
+      "duration_ms": 16.220647
+    },
+    {
+      "duration_ms": 8.295339
+    },
+    {
+      "duration_ms": 2.643199
+    },
+    {
+      "duration_ms": 21.43003
+    },
+    {
+      "duration_ms": 22.013286
+    },
+    {
+      "duration_ms": 2.230518
+    },
+    {
+      "duration_ms": 21.058575
+    },
+    {
+      "duration_ms": 21.804745
+    },
+    {
+      "duration_ms": 7.342831
+    },
+    {
+      "duration_ms": 21.53853
+    },
+    {
+      "duration_ms": 20.668197
+    },
+    {
+      "duration_ms": 7.484247
+    },
+    {
+      "duration_ms": 2.418666
+    },
+    {
+      "duration_ms": 21.975875
+    },
+    {
+      "duration_ms": 7.352563
+    },
+    {
+      "duration_ms": 2.117355
+    },
+    {
+      "duration_ms": 22.150889
+    },
+    {
+      "duration_ms": 7.167511
+    },
+    {
+      "duration_ms": 2.287875
+    },
+    {
+      "duration_ms": 21.356527
+    },
+    {
+      "duration_ms": 21.21974
+    },
+    {
+      "duration_ms": 2.20224
+    },
+    {
+      "duration_ms": 21.533018
+    },
+    {
+      "duration_ms": 20.46098
+    },
+    {
+      "duration_ms": 7.03748
+    },
+    {
+      "duration_ms": 21.008068
+    },
+    {
+      "duration_ms": 20.571347
+    },
+    {
+      "duration_ms": 7.068693
+    },
+    {
+      "duration_ms": 2.003362
+    },
+    {
+      "duration_ms": 20.472552
+    },
+    {
+      "duration_ms": 6.94095
+    },
+    {
+      "duration_ms": 2.3099
+    },
+    {
+      "duration_ms": 21.906904
+    },
+    {
+      "duration_ms": 7.560318
+    },
+    {
+      "duration_ms": 2.24729
+    },
+    {
+      "duration_ms": 20.949558
+    },
+    {
+      "duration_ms": 19.917366
+    },
+    {
+      "duration_ms": 2.11297
+    },
+    {
+      "duration_ms": 22.221543
+    },
+    {
+      "duration_ms": 20.193559
+    },
+    {
+      "duration_ms": 7.276875
+    },
+    {
+      "duration_ms": 11.741137
+    },
+    {
+      "duration_ms": 6.359259
+    },
+    {
+      "duration_ms": 73.070383
+    },
+    {
+      "duration_ms": 7.583507
+    },
+    {
+      "duration_ms": 6.949357
+    },
+    {
+      "duration_ms": 41.59061
+    },
+    {
+      "duration_ms": 6.516823
+    },
+    {
+      "duration_ms": 6.561606
+    },
+    {
+      "duration_ms": 70.236405
+    },
+    {
+      "duration_ms": 6.769514
+    },
+    {
+      "duration_ms": 6.733688
+    },
+    {
+      "duration_ms": 14.26446
+    },
+    {
+      "duration_ms": 42.324137
+    },
+    {
+      "duration_ms": 6.624235
+    },
+    {
+      "duration_ms": 6.650568
+    },
+    {
+      "duration_ms": 40.917091
+    },
+    {
+      "duration_ms": 6.613412
+    },
+    {
+      "duration_ms": 6.945427
+    },
+    {
+      "duration_ms": 42.12357
+    },
+    {
+      "duration_ms": 6.230789
+    },
+    {
+      "duration_ms": 6.482155
+    },
+    {
+      "duration_ms": 42.131414
+    },
+    {
+      "duration_ms": 6.591864
+    },
+    {
+      "duration_ms": 6.642215
+    },
+    {
+      "duration_ms": 42.988579
+    },
+    {
+      "duration_ms": 7.375024
+    },
+    {
+      "duration_ms": 6.626385
+    },
+    {
+      "duration_ms": 42.856307
+    },
+    {
+      "duration_ms": 6.753312
+    },
+    {
+      "duration_ms": 6.91786
+    },
+    {
+      "duration_ms": 43.115827
+    }
+  ],
+  "tasks_created": 0,
+  "private_endpoint_absent": true
+}

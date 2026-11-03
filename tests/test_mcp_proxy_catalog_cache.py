@@ -38,14 +38,14 @@ def proxy(monkeypatch):
 async def test_warm_calls_reuse_only_schemas_and_explicit_discovery_is_fresh(monkeypatch):
     connection, session, now = proxy(monkeypatch)
     await connection.call_tool("write_once", {"text": "A"})
-    now[0] += 0.9
+    now[0] += 5.3
     await connection.call_tool("write_once", {"text": "B"})
     assert session.list_tools.await_count == 1
     assert session.call_tool.await_args_list[0].args == ("write_once", {"text": "A"})
     assert session.call_tool.await_args_list[1].args == ("write_once", {"text": "B"})
     await connection.list_tools()
     assert session.list_tools.await_count == 2
-    now[0] += 1.0
+    now[0] += 30.1
     await connection.call_tool("write_once", {"text": "C"})
     assert session.list_tools.await_count == 3
 

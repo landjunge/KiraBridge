@@ -1,0 +1,1291 @@
+{
+  "source_label": "rc28-candidate",
+  "package": "/Users/landjunge/KiraBridge-worktrees/rc28-e2e-20261103/src/kirabridge",
+  "source_sha256": "f303535cedb79fe149a467ca53b2beacebc455cebe79cd47635c3059ed55985e",
+  "version": "0.8.0rc27",
+  "scope": "private loopback MCP, same bounded grants and payload; excludes cloud/model/voice",
+  "response_contents_saved": false,
+  "passed": true,
+  "protocol_version": "2025-11-25",
+  "read_queries_advertised": true,
+  "semantic_comparison_exclusion": "platform.status OS-permission observed_at only",
+  "read_groups": {
+    "samples": [
+      {
+        "index": 0,
+        "mode": "single",
+        "elapsed_ms": 104.93343,
+        "tool_calls": 3,
+        "read_operations": 3,
+        "result_sha256": [
+          "df8ecb955cadb1de7c37364492b0c93e0008ca4a31313a3fdd7b6d2334a9318f",
+          "922643ea4eda525d275f006cfa39369981c0f4fbc2d069a32f686fbd88cbff9e",
+          "b0317bd784ac0ebbb7a522a9d524363f564a0bc1e3b76778ab24abffc5e9fb97"
+        ]
+      },
+      {
+        "index": 0,
+        "mode": "batch",
+        "elapsed_ms": 57.031506,
+        "tool_calls": 1,
+        "read_operations": 3,
+        "result_sha256": [
+          "df8ecb955cadb1de7c37364492b0c93e0008ca4a31313a3fdd7b6d2334a9318f",
+          "922643ea4eda525d275f006cfa39369981c0f4fbc2d069a32f686fbd88cbff9e",
+          "b0317bd784ac0ebbb7a522a9d524363f564a0bc1e3b76778ab24abffc5e9fb97"
+        ]
+      },
+      {
+        "index": 1,
+        "mode": "batch",
+        "elapsed_ms": 56.592696,
+        "tool_calls": 1,
+        "read_operations": 3,
+        "result_sha256": [
+          "df8ecb955cadb1de7c37364492b0c93e0008ca4a31313a3fdd7b6d2334a9318f",
+          "922643ea4eda525d275f006cfa39369981c0f4fbc2d069a32f686fbd88cbff9e",
+          "b0317bd784ac0ebbb7a522a9d524363f564a0bc1e3b76778ab24abffc5e9fb97"
+        ]
+      },
+      {
+        "index": 1,
+        "mode": "single",
+        "elapsed_ms": 70.62922,
+        "tool_calls": 3,
+        "read_operations": 3,
+        "result_sha256": [
+          "df8ecb955cadb1de7c37364492b0c93e0008ca4a31313a3fdd7b6d2334a9318f",
+          "922643ea4eda525d275f006cfa39369981c0f4fbc2d069a32f686fbd88cbff9e",
+          "b0317bd784ac0ebbb7a522a9d524363f564a0bc1e3b76778ab24abffc5e9fb97"
+        ]
+      },
+      {
+        "index": 2,
+        "mode": "single",
+        "elapsed_ms": 70.080306,
+        "tool_calls": 3,
+        "read_operations": 3,
+        "result_sha256": [
+          "df8ecb955cadb1de7c37364492b0c93e0008ca4a31313a3fdd7b6d2334a9318f",
+          "922643ea4eda525d275f006cfa39369981c0f4fbc2d069a32f686fbd88cbff9e",
+          "b0317bd784ac0ebbb7a522a9d524363f564a0bc1e3b76778ab24abffc5e9fb97"
+        ]
+      },
+      {
+        "index": 2,
+        "mode": "batch",
+        "elapsed_ms": 57.844676,
+        "tool_calls": 1,
+        "read_operations": 3,
+        "result_sha256": [
+          "df8ecb955cadb1de7c37364492b0c93e0008ca4a31313a3fdd7b6d2334a9318f",
+          "922643ea4eda525d275f006cfa39369981c0f4fbc2d069a32f686fbd88cbff9e",
+          "b0317bd784ac0ebbb7a522a9d524363f564a0bc1e3b76778ab24abffc5e9fb97"
+        ]
+      },
+      {
+        "index": 3,
+        "mode": "batch",
+        "elapsed_ms": 57.318713,
+        "tool_calls": 1,
+        "read_operations": 3,
+        "result_sha256": [
+          "df8ecb955cadb1de7c37364492b0c93e0008ca4a31313a3fdd7b6d2334a9318f",
+          "922643ea4eda525d275f006cfa39369981c0f4fbc2d069a32f686fbd88cbff9e",
+          "b0317bd784ac0ebbb7a522a9d524363f564a0bc1e3b76778ab24abffc5e9fb97"
+        ]
+      },
+      {
+        "index": 3,
+        "mode": "single",
+        "elapsed_ms": 67.868949,
+        "tool_calls": 3,
+        "read_operations": 3,
+        "result_sha256": [
+          "df8ecb955cadb1de7c37364492b0c93e0008ca4a31313a3fdd7b6d2334a9318f",
+          "922643ea4eda525d275f006cfa39369981c0f4fbc2d069a32f686fbd88cbff9e",
+          "b0317bd784ac0ebbb7a522a9d524363f564a0bc1e3b76778ab24abffc5e9fb97"
+        ]
+      },
+      {
+        "index": 4,
+        "mode": "single",
+        "elapsed_ms": 67.753966,
+        "tool_calls": 3,
+        "read_operations": 3,
+        "result_sha256": [
+          "df8ecb955cadb1de7c37364492b0c93e0008ca4a31313a3fdd7b6d2334a9318f",
+          "922643ea4eda525d275f006cfa39369981c0f4fbc2d069a32f686fbd88cbff9e",
+          "b0317bd784ac0ebbb7a522a9d524363f564a0bc1e3b76778ab24abffc5e9fb97"
+        ]
+      },
+      {
+        "index": 4,
+        "mode": "batch",
+        "elapsed_ms": 55.28474,
+        "tool_calls": 1,
+        "read_operations": 3,
+        "result_sha256": [
+          "df8ecb955cadb1de7c37364492b0c93e0008ca4a31313a3fdd7b6d2334a9318f",
+          "922643ea4eda525d275f006cfa39369981c0f4fbc2d069a32f686fbd88cbff9e",
+          "b0317bd784ac0ebbb7a522a9d524363f564a0bc1e3b76778ab24abffc5e9fb97"
+        ]
+      },
+      {
+        "index": 5,
+        "mode": "batch",
+        "elapsed_ms": 54.954652,
+        "tool_calls": 1,
+        "read_operations": 3,
+        "result_sha256": [
+          "df8ecb955cadb1de7c37364492b0c93e0008ca4a31313a3fdd7b6d2334a9318f",
+          "922643ea4eda525d275f006cfa39369981c0f4fbc2d069a32f686fbd88cbff9e",
+          "b0317bd784ac0ebbb7a522a9d524363f564a0bc1e3b76778ab24abffc5e9fb97"
+        ]
+      },
+      {
+        "index": 5,
+        "mode": "single",
+        "elapsed_ms": 94.44064,
+        "tool_calls": 3,
+        "read_operations": 3,
+        "result_sha256": [
+          "df8ecb955cadb1de7c37364492b0c93e0008ca4a31313a3fdd7b6d2334a9318f",
+          "922643ea4eda525d275f006cfa39369981c0f4fbc2d069a32f686fbd88cbff9e",
+          "b0317bd784ac0ebbb7a522a9d524363f564a0bc1e3b76778ab24abffc5e9fb97"
+        ]
+      },
+      {
+        "index": 6,
+        "mode": "single",
+        "elapsed_ms": 97.005429,
+        "tool_calls": 3,
+        "read_operations": 3,
+        "result_sha256": [
+          "df8ecb955cadb1de7c37364492b0c93e0008ca4a31313a3fdd7b6d2334a9318f",
+          "922643ea4eda525d275f006cfa39369981c0f4fbc2d069a32f686fbd88cbff9e",
+          "b0317bd784ac0ebbb7a522a9d524363f564a0bc1e3b76778ab24abffc5e9fb97"
+        ]
+      },
+      {
+        "index": 6,
+        "mode": "batch",
+        "elapsed_ms": 56.028953,
+        "tool_calls": 1,
+        "read_operations": 3,
+        "result_sha256": [
+          "df8ecb955cadb1de7c37364492b0c93e0008ca4a31313a3fdd7b6d2334a9318f",
+          "922643ea4eda525d275f006cfa39369981c0f4fbc2d069a32f686fbd88cbff9e",
+          "b0317bd784ac0ebbb7a522a9d524363f564a0bc1e3b76778ab24abffc5e9fb97"
+        ]
+      },
+      {
+        "index": 7,
+        "mode": "batch",
+        "elapsed_ms": 54.571813,
+        "tool_calls": 1,
+        "read_operations": 3,
+        "result_sha256": [
+          "df8ecb955cadb1de7c37364492b0c93e0008ca4a31313a3fdd7b6d2334a9318f",
+          "922643ea4eda525d275f006cfa39369981c0f4fbc2d069a32f686fbd88cbff9e",
+          "b0317bd784ac0ebbb7a522a9d524363f564a0bc1e3b76778ab24abffc5e9fb97"
+        ]
+      },
+      {
+        "index": 7,
+        "mode": "single",
+        "elapsed_ms": 105.980906,
+        "tool_calls": 3,
+        "read_operations": 3,
+        "result_sha256": [
+          "df8ecb955cadb1de7c37364492b0c93e0008ca4a31313a3fdd7b6d2334a9318f",
+          "922643ea4eda525d275f006cfa39369981c0f4fbc2d069a32f686fbd88cbff9e",
+          "b0317bd784ac0ebbb7a522a9d524363f564a0bc1e3b76778ab24abffc5e9fb97"
+        ]
+      },
+      {
+        "index": 8,
+        "mode": "single",
+        "elapsed_ms": 137.147661,
+        "tool_calls": 3,
+        "read_operations": 3,
+        "result_sha256": [
+          "df8ecb955cadb1de7c37364492b0c93e0008ca4a31313a3fdd7b6d2334a9318f",
+          "922643ea4eda525d275f006cfa39369981c0f4fbc2d069a32f686fbd88cbff9e",
+          "b0317bd784ac0ebbb7a522a9d524363f564a0bc1e3b76778ab24abffc5e9fb97"
+        ]
+      },
+      {
+        "index": 8,
+        "mode": "batch",
+        "elapsed_ms": 61.685871,
+        "tool_calls": 1,
+        "read_operations": 3,
+        "result_sha256": [
+          "df8ecb955cadb1de7c37364492b0c93e0008ca4a31313a3fdd7b6d2334a9318f",
+          "922643ea4eda525d275f006cfa39369981c0f4fbc2d069a32f686fbd88cbff9e",
+          "b0317bd784ac0ebbb7a522a9d524363f564a0bc1e3b76778ab24abffc5e9fb97"
+        ]
+      },
+      {
+        "index": 9,
+        "mode": "batch",
+        "elapsed_ms": 56.616585,
+        "tool_calls": 1,
+        "read_operations": 3,
+        "result_sha256": [
+          "df8ecb955cadb1de7c37364492b0c93e0008ca4a31313a3fdd7b6d2334a9318f",
+          "922643ea4eda525d275f006cfa39369981c0f4fbc2d069a32f686fbd88cbff9e",
+          "b0317bd784ac0ebbb7a522a9d524363f564a0bc1e3b76778ab24abffc5e9fb97"
+        ]
+      },
+      {
+        "index": 9,
+        "mode": "single",
+        "elapsed_ms": 68.028755,
+        "tool_calls": 3,
+        "read_operations": 3,
+        "result_sha256": [
+          "df8ecb955cadb1de7c37364492b0c93e0008ca4a31313a3fdd7b6d2334a9318f",
+          "922643ea4eda525d275f006cfa39369981c0f4fbc2d069a32f686fbd88cbff9e",
+          "b0317bd784ac0ebbb7a522a9d524363f564a0bc1e3b76778ab24abffc5e9fb97"
+        ]
+      }
+    ],
+    "summary": {
+      "single": {
+        "count": 10,
+        "total_ms": 883.869262,
+        "p50_ms": 82.53493,
+        "p95_ms": 137.147661,
+        "min_ms": 67.753966,
+        "max_ms": 137.147661,
+        "p95_method": "nearest rank ceil(0.95*n); small n is not a population guarantee"
+      },
+      "batch": {
+        "count": 10,
+        "total_ms": 567.930205,
+        "p50_ms": 56.6046405,
+        "p95_ms": 61.685871,
+        "min_ms": 54.571813,
+        "max_ms": 61.685871,
+        "p95_method": "nearest rank ceil(0.95*n); small n is not a population guarantee"
+      }
+    }
+  },
+  "rpc_samples": [
+    {
+      "tool": "read_query",
+      "elapsed_ms": 15.081851,
+      "response_bytes": 1936,
+      "meta": {
+        "de.netzwerkpunkt.kirabridge/timing": {
+          "trace_id": "83539ed7326245a2af6de0eb97764daa",
+          "schema": 1,
+          "daemon": {
+            "handler_started_unix_ns": 1793663861851801000,
+            "result_ready_unix_ns": 1793663861860363000,
+            "duration_ms": 8.562833
+          },
+          "proxy_dispatch": {
+            "handler_started_unix_ns": 1793663861848970000,
+            "result_ready_unix_ns": 1793663861864033000,
+            "duration_ms": 15.063573,
+            "catalog_ms": 0.047756
+          }
+        }
+      }
+    },
+    {
+      "tool": "read_query",
+      "elapsed_ms": 11.181085,
+      "response_bytes": 1445,
+      "meta": {
+        "de.netzwerkpunkt.kirabridge/timing": {
+          "trace_id": "643f229dc6434450a888a914b29d47e8",
+          "schema": 1,
+          "daemon": {
+            "handler_started_unix_ns": 1793663861867052000,
+            "result_ready_unix_ns": 1793663861872477000,
+            "duration_ms": 5.425183
+          },
+          "proxy_dispatch": {
+            "handler_started_unix_ns": 1793663861864142000,
+            "result_ready_unix_ns": 1793663861875309000,
+            "duration_ms": 11.166891,
+            "catalog_ms": 0.038984
+          }
+        }
+      }
+    },
+    {
+      "tool": "read_query",
+      "elapsed_ms": 78.306769,
+      "response_bytes": 15148,
+      "meta": {
+        "de.netzwerkpunkt.kirabridge/timing": {
+          "trace_id": "7bdfe2fb12224c3fa357d4dc30b2c9b7",
+          "schema": 1,
+          "daemon": {
+            "handler_started_unix_ns": 1793663861877782000,
+            "result_ready_unix_ns": 1793663861950334000,
+            "duration_ms": 72.552678
+          },
+          "proxy_dispatch": {
+            "handler_started_unix_ns": 1793663861875385000,
+            "result_ready_unix_ns": 1793663861953677000,
+            "duration_ms": 78.291836,
+            "catalog_ms": 0.037407
+          }
+        }
+      }
+    },
+    {
+      "tool": "read_queries",
+      "elapsed_ms": 56.777919,
+      "response_bytes": 17957,
+      "meta": {
+        "de.netzwerkpunkt.kirabridge/timing": {
+          "trace_id": "6ff71f434c0a45aa8bef0afd7bd37abc",
+          "schema": 1,
+          "daemon": {
+            "handler_started_unix_ns": 1793663861956651000,
+            "result_ready_unix_ns": 1793663862007371000,
+            "duration_ms": 50.720317
+          },
+          "proxy_dispatch": {
+            "handler_started_unix_ns": 1793663861954149000,
+            "result_ready_unix_ns": 1793663862010912000,
+            "duration_ms": 56.762928,
+            "catalog_ms": 0.035752
+          }
+        }
+      }
+    },
+    {
+      "tool": "read_queries",
+      "elapsed_ms": 56.327208,
+      "response_bytes": 17955,
+      "meta": {
+        "de.netzwerkpunkt.kirabridge/timing": {
+          "trace_id": "cd9ef93eaee54369a7941b39418541be",
+          "schema": 1,
+          "daemon": {
+            "handler_started_unix_ns": 1793663862014117000,
+            "result_ready_unix_ns": 1793663862064341000,
+            "duration_ms": 50.224696
+          },
+          "proxy_dispatch": {
+            "handler_started_unix_ns": 1793663862011427000,
+            "result_ready_unix_ns": 1793663862067737000,
+            "duration_ms": 56.311034,
+            "catalog_ms": 0.035148
+          }
+        }
+      }
+    },
+    {
+      "tool": "read_query",
+      "elapsed_ms": 11.048838,
+      "response_bytes": 1936,
+      "meta": {
+        "de.netzwerkpunkt.kirabridge/timing": {
+          "trace_id": "76791894accc410e8371b1a8c6f4ebef",
+          "schema": 1,
+          "daemon": {
+            "handler_started_unix_ns": 1793663862071006000,
+            "result_ready_unix_ns": 1793663862076387000,
+            "duration_ms": 5.382015
+          },
+          "proxy_dispatch": {
+            "handler_started_unix_ns": 1793663862068270000,
+            "result_ready_unix_ns": 1793663862079305000,
+            "duration_ms": 11.035752,
+            "catalog_ms": 0.040265
+          }
+        }
+      }
+    },
+    {
+      "tool": "read_query",
+      "elapsed_ms": 11.571247,
+      "response_bytes": 1445,
+      "meta": {
+        "de.netzwerkpunkt.kirabridge/timing": {
+          "trace_id": "7d91308c4dd04d3bbcbf544db1c86f21",
+          "schema": 1,
+          "daemon": {
+            "handler_started_unix_ns": 1793663862082364000,
+            "result_ready_unix_ns": 1793663862087897000,
+            "duration_ms": 5.532684
+          },
+          "proxy_dispatch": {
+            "handler_started_unix_ns": 1793663862079386000,
+            "result_ready_unix_ns": 1793663862090939000,
+            "duration_ms": 11.555009,
+            "catalog_ms": 0.037415
+          }
+        }
+      }
+    },
+    {
+      "tool": "read_query",
+      "elapsed_ms": 47.637486,
+      "response_bytes": 15146,
+      "meta": {
+        "de.netzwerkpunkt.kirabridge/timing": {
+          "trace_id": "0185363076064f7d8969086d3a213fb2",
+          "schema": 1,
+          "daemon": {
+            "handler_started_unix_ns": 1793663862093641000,
+            "result_ready_unix_ns": 1793663862135048000,
+            "duration_ms": 41.406966
+          },
+          "proxy_dispatch": {
+            "handler_started_unix_ns": 1793663862091031000,
+            "result_ready_unix_ns": 1793663862138650000,
+            "duration_ms": 47.619227,
+            "catalog_ms": 0.041637
+          }
+        }
+      }
+    },
+    {
+      "tool": "read_query",
+      "elapsed_ms": 10.869877,
+      "response_bytes": 1936,
+      "meta": {
+        "de.netzwerkpunkt.kirabridge/timing": {
+          "trace_id": "26f74cecfa644a099639be0800959c10",
+          "schema": 1,
+          "daemon": {
+            "handler_started_unix_ns": 1793663862141669000,
+            "result_ready_unix_ns": 1793663862146876000,
+            "duration_ms": 5.207551
+          },
+          "proxy_dispatch": {
+            "handler_started_unix_ns": 1793663862139153000,
+            "result_ready_unix_ns": 1793663862150003000,
+            "duration_ms": 10.850409,
+            "catalog_ms": 0.038567
+          }
+        }
+      }
+    },
+    {
+      "tool": "read_query",
+      "elapsed_ms": 11.727856,
+      "response_bytes": 1445,
+      "meta": {
+        "de.netzwerkpunkt.kirabridge/timing": {
+          "trace_id": "8393c42c7cfb4375a3572470c3f9ffd2",
+          "schema": 1,
+          "daemon": {
+            "handler_started_unix_ns": 1793663862153161000,
+            "result_ready_unix_ns": 1793663862158742000,
+            "duration_ms": 5.581985
+          },
+          "proxy_dispatch": {
+            "handler_started_unix_ns": 1793663862150126000,
+            "result_ready_unix_ns": 1793663862161837000,
+            "duration_ms": 11.711562,
+            "catalog_ms": 0.037486
+          }
+        }
+      }
+    },
+    {
+      "tool": "read_query",
+      "elapsed_ms": 47.057619,
+      "response_bytes": 15145,
+      "meta": {
+        "de.netzwerkpunkt.kirabridge/timing": {
+          "trace_id": "8d7a8c1b743e494cbe9ba32b36926121",
+          "schema": 1,
+          "daemon": {
+            "handler_started_unix_ns": 1793663862164422000,
+            "result_ready_unix_ns": 1793663862205300000,
+            "duration_ms": 40.878918
+          },
+          "proxy_dispatch": {
+            "handler_started_unix_ns": 1793663862161928000,
+            "result_ready_unix_ns": 1793663862208967000,
+            "duration_ms": 47.040131,
+            "catalog_ms": 0.03257
+          }
+        }
+      }
+    },
+    {
+      "tool": "read_queries",
+      "elapsed_ms": 57.539148,
+      "response_bytes": 17957,
+      "meta": {
+        "de.netzwerkpunkt.kirabridge/timing": {
+          "trace_id": "d9491783b0874f0c86cdc158dca71dba",
+          "schema": 1,
+          "daemon": {
+            "handler_started_unix_ns": 1793663862213090000,
+            "result_ready_unix_ns": 1793663862263698000,
+            "duration_ms": 50.608952
+          },
+          "proxy_dispatch": {
+            "handler_started_unix_ns": 1793663862209601000,
+            "result_ready_unix_ns": 1793663862267122000,
+            "duration_ms": 57.521807,
+            "catalog_ms": 0.044552
+          }
+        }
+      }
+    },
+    {
+      "tool": "read_queries",
+      "elapsed_ms": 57.083328,
+      "response_bytes": 17957,
+      "meta": {
+        "de.netzwerkpunkt.kirabridge/timing": {
+          "trace_id": "88326a8e46f74849bb27ce136507d823",
+          "schema": 1,
+          "daemon": {
+            "handler_started_unix_ns": 1793663862270358000,
+            "result_ready_unix_ns": 1793663862321357000,
+            "duration_ms": 51.000036
+          },
+          "proxy_dispatch": {
+            "handler_started_unix_ns": 1793663862267694000,
+            "result_ready_unix_ns": 1793663862324763000,
+            "duration_ms": 57.069475,
+            "catalog_ms": 0.035648
+          }
+        }
+      }
+    },
+    {
+      "tool": "read_query",
+      "elapsed_ms": 10.960989,
+      "response_bytes": 1936,
+      "meta": {
+        "de.netzwerkpunkt.kirabridge/timing": {
+          "trace_id": "5ebda706aa0642d0ae622ea3ec859b61",
+          "schema": 1,
+          "daemon": {
+            "handler_started_unix_ns": 1793663862327755000,
+            "result_ready_unix_ns": 1793663862333257000,
+            "duration_ms": 5.502147
+          },
+          "proxy_dispatch": {
+            "handler_started_unix_ns": 1793663862325255000,
+            "result_ready_unix_ns": 1793663862336202000,
+            "duration_ms": 10.947446,
+            "catalog_ms": 0.030986
+          }
+        }
+      }
+    },
+    {
+      "tool": "read_query",
+      "elapsed_ms": 10.931317,
+      "response_bytes": 1444,
+      "meta": {
+        "de.netzwerkpunkt.kirabridge/timing": {
+          "trace_id": "4cbc9d9a57b44df6ae76c7abc0d0b856",
+          "schema": 1,
+          "daemon": {
+            "handler_started_unix_ns": 1793663862338537000,
+            "result_ready_unix_ns": 1793663862343907000,
+            "duration_ms": 5.370439
+          },
+          "proxy_dispatch": {
+            "handler_started_unix_ns": 1793663862336280000,
+            "result_ready_unix_ns": 1793663862347144000,
+            "duration_ms": 10.865624,
+            "catalog_ms": 0.02889
+          }
+        }
+      }
+    },
+    {
+      "tool": "read_query",
+      "elapsed_ms": 45.508394,
+      "response_bytes": 15147,
+      "meta": {
+        "de.netzwerkpunkt.kirabridge/timing": {
+          "trace_id": "71f0ba152703435ab3c50c4d700e1a85",
+          "schema": 1,
+          "daemon": {
+            "handler_started_unix_ns": 1793663862350078000,
+            "result_ready_unix_ns": 1793663862389554000,
+            "duration_ms": 39.476842
+          },
+          "proxy_dispatch": {
+            "handler_started_unix_ns": 1793663862347425000,
+            "result_ready_unix_ns": 1793663862392919000,
+            "duration_ms": 45.49447,
+            "catalog_ms": 0.040986
+          }
+        }
+      }
+    },
+    {
+      "tool": "read_query",
+      "elapsed_ms": 10.391732,
+      "response_bytes": 1935,
+      "meta": {
+        "de.netzwerkpunkt.kirabridge/timing": {
+          "trace_id": "20650e0e55c340a18c94c40d8a041eab",
+          "schema": 1,
+          "daemon": {
+            "handler_started_unix_ns": 1793663862395684000,
+            "result_ready_unix_ns": 1793663862400823000,
+            "duration_ms": 5.140306
+          },
+          "proxy_dispatch": {
+            "handler_started_unix_ns": 1793663862393362000,
+            "result_ready_unix_ns": 1793663862403740000,
+            "duration_ms": 10.378426,
+            "catalog_ms": 0.02941
+          }
+        }
+      }
+    },
+    {
+      "tool": "read_query",
+      "elapsed_ms": 10.665082,
+      "response_bytes": 1444,
+      "meta": {
+        "de.netzwerkpunkt.kirabridge/timing": {
+          "trace_id": "5acf3fceda87455e8563fc0f4b00b071",
+          "schema": 1,
+          "daemon": {
+            "handler_started_unix_ns": 1793663862406155000,
+            "result_ready_unix_ns": 1793663862411514000,
+            "duration_ms": 5.359639
+          },
+          "proxy_dispatch": {
+            "handler_started_unix_ns": 1793663862403821000,
+            "result_ready_unix_ns": 1793663862414470000,
+            "duration_ms": 10.650057,
+            "catalog_ms": 0.02939
+          }
+        }
+      }
+    },
+    {
+      "tool": "read_query",
+      "elapsed_ms": 46.353017,
+      "response_bytes": 15148,
+      "meta": {
+        "de.netzwerkpunkt.kirabridge/timing": {
+          "trace_id": "362450e99f784a96b2d93df08e0f97b4",
+          "schema": 1,
+          "daemon": {
+            "handler_started_unix_ns": 1793663862417132000,
+            "result_ready_unix_ns": 1793663862457559000,
+            "duration_ms": 40.427437
+          },
+          "proxy_dispatch": {
+            "handler_started_unix_ns": 1793663862414555000,
+            "result_ready_unix_ns": 1793663862460895000,
+            "duration_ms": 46.339773,
+            "catalog_ms": 0.032645
+          }
+        }
+      }
+    },
+    {
+      "tool": "read_queries",
+      "elapsed_ms": 55.031587,
+      "response_bytes": 17957,
+      "meta": {
+        "de.netzwerkpunkt.kirabridge/timing": {
+          "trace_id": "854cfe1899304fa58a3c83a10e044d29",
+          "schema": 1,
+          "daemon": {
+            "handler_started_unix_ns": 1793663862463592000,
+            "result_ready_unix_ns": 1793663862513012000,
+            "duration_ms": 49.420633
+          },
+          "proxy_dispatch": {
+            "handler_started_unix_ns": 1793663862461356000,
+            "result_ready_unix_ns": 1793663862516373000,
+            "duration_ms": 55.017783,
+            "catalog_ms": 0.029291
+          }
+        }
+      }
+    },
+    {
+      "tool": "read_queries",
+      "elapsed_ms": 54.714203,
+      "response_bytes": 17955,
+      "meta": {
+        "de.netzwerkpunkt.kirabridge/timing": {
+          "trace_id": "8df85ff59f6d4b37ace3204e3bb24da7",
+          "schema": 1,
+          "daemon": {
+            "handler_started_unix_ns": 1793663862519482000,
+            "result_ready_unix_ns": 1793663862568269000,
+            "duration_ms": 48.787534
+          },
+          "proxy_dispatch": {
+            "handler_started_unix_ns": 1793663862516883000,
+            "result_ready_unix_ns": 1793663862571584000,
+            "duration_ms": 54.701156,
+            "catalog_ms": 0.031407
+          }
+        }
+      }
+    },
+    {
+      "tool": "read_query",
+      "elapsed_ms": 35.634309,
+      "response_bytes": 1936,
+      "meta": {
+        "de.netzwerkpunkt.kirabridge/timing": {
+          "trace_id": "38fb05b5aba4426cb0b80cc79179396d",
+          "schema": 1,
+          "daemon": {
+            "handler_started_unix_ns": 1793663862574773000,
+            "result_ready_unix_ns": 1793663862579952000,
+            "duration_ms": 5.179899
+          },
+          "proxy_dispatch": {
+            "handler_started_unix_ns": 1793663862572085000,
+            "result_ready_unix_ns": 1793663862607698000,
+            "duration_ms": 35.614333,
+            "catalog_ms": 0.031688
+          }
+        }
+      }
+    },
+    {
+      "tool": "read_query",
+      "elapsed_ms": 11.440145,
+      "response_bytes": 1444,
+      "meta": {
+        "de.netzwerkpunkt.kirabridge/timing": {
+          "trace_id": "fcc5eb0168a94bc4bd03158994dc8ae8",
+          "schema": 1,
+          "daemon": {
+            "handler_started_unix_ns": 1793663862610515000,
+            "result_ready_unix_ns": 1793663862616352000,
+            "duration_ms": 5.838053
+          },
+          "proxy_dispatch": {
+            "handler_started_unix_ns": 1793663862607813000,
+            "result_ready_unix_ns": 1793663862619239000,
+            "duration_ms": 11.42704,
+            "catalog_ms": 0.059565
+          }
+        }
+      }
+    },
+    {
+      "tool": "read_query",
+      "elapsed_ms": 47.015204,
+      "response_bytes": 15148,
+      "meta": {
+        "de.netzwerkpunkt.kirabridge/timing": {
+          "trace_id": "f883f580351d4269b9b77f11d38dbd90",
+          "schema": 1,
+          "daemon": {
+            "handler_started_unix_ns": 1793663862621632000,
+            "result_ready_unix_ns": 1793663862662356000,
+            "duration_ms": 40.724227
+          },
+          "proxy_dispatch": {
+            "handler_started_unix_ns": 1793663862619310000,
+            "result_ready_unix_ns": 1793663862666309000,
+            "duration_ms": 46.999873,
+            "catalog_ms": 0.027926
+          }
+        }
+      }
+    },
+    {
+      "tool": "read_query",
+      "elapsed_ms": 11.462084,
+      "response_bytes": 1936,
+      "meta": {
+        "de.netzwerkpunkt.kirabridge/timing": {
+          "trace_id": "7d4776cd0d144d6ca23676cfe0ed8f5b",
+          "schema": 1,
+          "daemon": {
+            "handler_started_unix_ns": 1793663862669754000,
+            "result_ready_unix_ns": 1793663862674890000,
+            "duration_ms": 5.136646
+          },
+          "proxy_dispatch": {
+            "handler_started_unix_ns": 1793663862666765000,
+            "result_ready_unix_ns": 1793663862678195000,
+            "duration_ms": 11.430732,
+            "catalog_ms": 0.030879
+          }
+        }
+      }
+    },
+    {
+      "tool": "read_query",
+      "elapsed_ms": 10.984049,
+      "response_bytes": 1445,
+      "meta": {
+        "de.netzwerkpunkt.kirabridge/timing": {
+          "trace_id": "896c131519b645a49d65bfbe9300c40b",
+          "schema": 1,
+          "daemon": {
+            "handler_started_unix_ns": 1793663862681058000,
+            "result_ready_unix_ns": 1793663862686295000,
+            "duration_ms": 5.236873
+          },
+          "proxy_dispatch": {
+            "handler_started_unix_ns": 1793663862678334000,
+            "result_ready_unix_ns": 1793663862689304000,
+            "duration_ms": 10.970719,
+            "catalog_ms": 0.035258
+          }
+        }
+      }
+    },
+    {
+      "tool": "read_query",
+      "elapsed_ms": 74.186198,
+      "response_bytes": 15148,
+      "meta": {
+        "de.netzwerkpunkt.kirabridge/timing": {
+          "trace_id": "56d5f9835b3c42cbb6d2483508861bef",
+          "schema": 1,
+          "daemon": {
+            "handler_started_unix_ns": 1793663862691702000,
+            "result_ready_unix_ns": 1793663862760170000,
+            "duration_ms": 68.468533
+          },
+          "proxy_dispatch": {
+            "handler_started_unix_ns": 1793663862689379000,
+            "result_ready_unix_ns": 1793663862763551000,
+            "duration_ms": 74.173354,
+            "catalog_ms": 0.028511
+          }
+        }
+      }
+    },
+    {
+      "tool": "read_queries",
+      "elapsed_ms": 55.752171,
+      "response_bytes": 17954,
+      "meta": {
+        "de.netzwerkpunkt.kirabridge/timing": {
+          "trace_id": "e87bfa33871c4502b01e887a5bae9938",
+          "schema": 1,
+          "daemon": {
+            "handler_started_unix_ns": 1793663862766393000,
+            "result_ready_unix_ns": 1793663862816302000,
+            "duration_ms": 49.910099
+          },
+          "proxy_dispatch": {
+            "handler_started_unix_ns": 1793663862764010000,
+            "result_ready_unix_ns": 1793663862819747000,
+            "duration_ms": 55.73755,
+            "catalog_ms": 0.031141
+          }
+        }
+      }
+    },
+    {
+      "tool": "read_queries",
+      "elapsed_ms": 54.336635,
+      "response_bytes": 17957,
+      "meta": {
+        "de.netzwerkpunkt.kirabridge/timing": {
+          "trace_id": "5291d235627c4bd29ef7ee94aece0855",
+          "schema": 1,
+          "daemon": {
+            "handler_started_unix_ns": 1793663862822815000,
+            "result_ready_unix_ns": 1793663862871390000,
+            "duration_ms": 48.575997
+          },
+          "proxy_dispatch": {
+            "handler_started_unix_ns": 1793663862820288000,
+            "result_ready_unix_ns": 1793663862874611000,
+            "duration_ms": 54.323508,
+            "catalog_ms": 0.030441
+          }
+        }
+      }
+    },
+    {
+      "tool": "read_query",
+      "elapsed_ms": 10.84408,
+      "response_bytes": 1936,
+      "meta": {
+        "de.netzwerkpunkt.kirabridge/timing": {
+          "trace_id": "d302b8f56eb348cc970c03b5df85835f",
+          "schema": 1,
+          "daemon": {
+            "handler_started_unix_ns": 1793663862877788000,
+            "result_ready_unix_ns": 1793663862883070000,
+            "duration_ms": 5.282167
+          },
+          "proxy_dispatch": {
+            "handler_started_unix_ns": 1793663862875094000,
+            "result_ready_unix_ns": 1793663862885925000,
+            "duration_ms": 10.831496,
+            "catalog_ms": 0.030397
+          }
+        }
+      }
+    },
+    {
+      "tool": "read_query",
+      "elapsed_ms": 13.760572,
+      "response_bytes": 1445,
+      "meta": {
+        "de.netzwerkpunkt.kirabridge/timing": {
+          "trace_id": "2ad5583bb7334266be2c86cc2b394507",
+          "schema": 1,
+          "daemon": {
+            "handler_started_unix_ns": 1793663862888740000,
+            "result_ready_unix_ns": 1793663862895344000,
+            "duration_ms": 6.604571
+          },
+          "proxy_dispatch": {
+            "handler_started_unix_ns": 1793663862886001000,
+            "result_ready_unix_ns": 1793663862899690000,
+            "duration_ms": 13.689718,
+            "catalog_ms": 0.029284
+          }
+        }
+      }
+    },
+    {
+      "tool": "read_query",
+      "elapsed_ms": 80.658264,
+      "response_bytes": 15146,
+      "meta": {
+        "de.netzwerkpunkt.kirabridge/timing": {
+          "trace_id": "5a7aa12d17044cae86c981e0547d9a19",
+          "schema": 1,
+          "daemon": {
+            "handler_started_unix_ns": 1793663862903134000,
+            "result_ready_unix_ns": 1793663862974945000,
+            "duration_ms": 71.811745
+          },
+          "proxy_dispatch": {
+            "handler_started_unix_ns": 1793663862899895000,
+            "result_ready_unix_ns": 1793663862980533000,
+            "duration_ms": 80.639354,
+            "catalog_ms": 0.069986
+          }
+        }
+      }
+    },
+    {
+      "tool": "read_query",
+      "elapsed_ms": 19.437799,
+      "response_bytes": 1935,
+      "meta": {
+        "de.netzwerkpunkt.kirabridge/timing": {
+          "trace_id": "ed2a6684558e4c7a9fd653f339603bd9",
+          "schema": 1,
+          "daemon": {
+            "handler_started_unix_ns": 1793663862986697000,
+            "result_ready_unix_ns": 1793663862995727000,
+            "duration_ms": 9.03032
+          },
+          "proxy_dispatch": {
+            "handler_started_unix_ns": 1793663862981692000,
+            "result_ready_unix_ns": 1793663863001108000,
+            "duration_ms": 19.416934,
+            "catalog_ms": 0.083904
+          }
+        }
+      }
+    },
+    {
+      "tool": "read_query",
+      "elapsed_ms": 20.285357,
+      "response_bytes": 1444,
+      "meta": {
+        "de.netzwerkpunkt.kirabridge/timing": {
+          "trace_id": "08874351a1d24e51986a0e8c38d0e64d",
+          "schema": 1,
+          "daemon": {
+            "handler_started_unix_ns": 1793663863008236000,
+            "result_ready_unix_ns": 1793663863016091000,
+            "duration_ms": 7.854894
+          },
+          "proxy_dispatch": {
+            "handler_started_unix_ns": 1793663863001219000,
+            "result_ready_unix_ns": 1793663863021485000,
+            "duration_ms": 20.266724,
+            "catalog_ms": 0.03955
+          }
+        }
+      }
+    },
+    {
+      "tool": "read_query",
+      "elapsed_ms": 96.582793,
+      "response_bytes": 15146,
+      "meta": {
+        "de.netzwerkpunkt.kirabridge/timing": {
+          "trace_id": "550ed1fe783a49259b7f3091288f51ef",
+          "schema": 1,
+          "daemon": {
+            "handler_started_unix_ns": 1793663863026136000,
+            "result_ready_unix_ns": 1793663863105074000,
+            "duration_ms": 78.938677
+          },
+          "proxy_dispatch": {
+            "handler_started_unix_ns": 1793663863021703000,
+            "result_ready_unix_ns": 1793663863118265000,
+            "duration_ms": 96.563441,
+            "catalog_ms": 0.041476
+          }
+        }
+      }
+    },
+    {
+      "tool": "read_queries",
+      "elapsed_ms": 61.42095,
+      "response_bytes": 17955,
+      "meta": {
+        "de.netzwerkpunkt.kirabridge/timing": {
+          "trace_id": "2826afcc68514c07a137f55f155f20fd",
+          "schema": 1,
+          "daemon": {
+            "handler_started_unix_ns": 1793663863124024000,
+            "result_ready_unix_ns": 1793663863176661000,
+            "duration_ms": 52.637802
+          },
+          "proxy_dispatch": {
+            "handler_started_unix_ns": 1793663863119148000,
+            "result_ready_unix_ns": 1793663863180552000,
+            "duration_ms": 61.405147,
+            "catalog_ms": 0.046282
+          }
+        }
+      }
+    },
+    {
+      "tool": "read_queries",
+      "elapsed_ms": 56.308887,
+      "response_bytes": 17957,
+      "meta": {
+        "de.netzwerkpunkt.kirabridge/timing": {
+          "trace_id": "a667044f2f0c4dd380e0dc5d7cacf1b4",
+          "schema": 1,
+          "daemon": {
+            "handler_started_unix_ns": 1793663863183440000,
+            "result_ready_unix_ns": 1793663863234159000,
+            "duration_ms": 50.719673
+          },
+          "proxy_dispatch": {
+            "handler_started_unix_ns": 1793663863181071000,
+            "result_ready_unix_ns": 1793663863237366000,
+            "duration_ms": 56.295723,
+            "catalog_ms": 0.030332
+          }
+        }
+      }
+    },
+    {
+      "tool": "read_query",
+      "elapsed_ms": 11.019603,
+      "response_bytes": 1936,
+      "meta": {
+        "de.netzwerkpunkt.kirabridge/timing": {
+          "trace_id": "dd5a4f1754ca475e98f467e81625592d",
+          "schema": 1,
+          "daemon": {
+            "handler_started_unix_ns": 1793663863240420000,
+            "result_ready_unix_ns": 1793663863245469000,
+            "duration_ms": 5.049512
+          },
+          "proxy_dispatch": {
+            "handler_started_unix_ns": 1793663863237921000,
+            "result_ready_unix_ns": 1793663863248925000,
+            "duration_ms": 11.004785,
+            "catalog_ms": 0.030571
+          }
+        }
+      }
+    },
+    {
+      "tool": "read_query",
+      "elapsed_ms": 10.627984,
+      "response_bytes": 1445,
+      "meta": {
+        "de.netzwerkpunkt.kirabridge/timing": {
+          "trace_id": "d8e06aacc435415186ec3f91f5e3cc60",
+          "schema": 1,
+          "daemon": {
+            "handler_started_unix_ns": 1793663863251471000,
+            "result_ready_unix_ns": 1793663863256712000,
+            "duration_ms": 5.241299
+          },
+          "proxy_dispatch": {
+            "handler_started_unix_ns": 1793663863249015000,
+            "result_ready_unix_ns": 1793663863259629000,
+            "duration_ms": 10.614505,
+            "catalog_ms": 0.029735
+          }
+        }
+      }
+    },
+    {
+      "tool": "read_query",
+      "elapsed_ms": 46.037741,
+      "response_bytes": 15148,
+      "meta": {
+        "de.netzwerkpunkt.kirabridge/timing": {
+          "trace_id": "3ba150312a914561ac88230bb0ad6edc",
+          "schema": 1,
+          "daemon": {
+            "handler_started_unix_ns": 1793663863262148000,
+            "result_ready_unix_ns": 1793663863302110000,
+            "duration_ms": 39.962575
+          },
+          "proxy_dispatch": {
+            "handler_started_unix_ns": 1793663863259703000,
+            "result_ready_unix_ns": 1793663863305725000,
+            "duration_ms": 46.022533,
+            "catalog_ms": 0.028828
+          }
+        }
+      }
+    }
+  ],
+  "http_post_samples": [
+    {
+      "duration_ms": 1.644423
+    },
+    {
+      "duration_ms": 1.023712
+    },
+    {
+      "duration_ms": 16.369013
+    },
+    {
+      "duration_ms": 10.484908
+    },
+    {
+      "duration_ms": 6.908212
+    },
+    {
+      "duration_ms": 74.111233
+    },
+    {
+      "duration_ms": 52.356424
+    },
+    {
+      "duration_ms": 51.95742
+    },
+    {
+      "duration_ms": 6.89379
+    },
+    {
+      "duration_ms": 7.114145
+    },
+    {
+      "duration_ms": 43.002256
+    },
+    {
+      "duration_ms": 6.56834
+    },
+    {
+      "duration_ms": 7.189409
+    },
+    {
+      "duration_ms": 42.411561
+    },
+    {
+      "duration_ms": 53.066597
+    },
+    {
+      "duration_ms": 52.756939
+    },
+    {
+      "duration_ms": 6.935893
+    },
+    {
+      "duration_ms": 6.691076
+    },
+    {
+      "duration_ms": 41.061494
+    },
+    {
+      "duration_ms": 6.460885
+    },
+    {
+      "duration_ms": 6.803889
+    },
+    {
+      "duration_ms": 41.974902
+    },
+    {
+      "duration_ms": 50.965396
+    },
+    {
+      "duration_ms": 50.414034
+    },
+    {
+      "duration_ms": 6.493859
+    },
+    {
+      "duration_ms": 7.212398
+    },
+    {
+      "duration_ms": 42.359262
+    },
+    {
+      "duration_ms": 6.841195
+    },
+    {
+      "duration_ms": 6.589523
+    },
+    {
+      "duration_ms": 69.945652
+    },
+    {
+      "duration_ms": 51.534375
+    },
+    {
+      "duration_ms": 50.086079
+    },
+    {
+      "duration_ms": 6.652307
+    },
+    {
+      "duration_ms": 8.275612
+    },
+    {
+      "duration_ms": 74.254833
+    },
+    {
+      "duration_ms": 11.236552
+    },
+    {
+      "duration_ms": 11.792266
+    },
+    {
+      "duration_ms": 86.624728
+    },
+    {
+      "duration_ms": 55.156508
+    },
+    {
+      "duration_ms": 52.204999
+    },
+    {
+      "duration_ms": 6.564461
+    },
+    {
+      "duration_ms": 6.585841
+    },
+    {
+      "duration_ms": 41.490985
+    }
+  ],
+  "tasks_created": 0,
+  "private_endpoint_absent": true
+}

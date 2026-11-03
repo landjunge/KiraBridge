@@ -73,6 +73,7 @@ DESCRIPTORS += tuple(
         "keyboard.text",
         "keyboard.action",
         "keyboard.control",
+        "keyboard.sequence",
     )
 )
 DESCRIPTORS += (OperationDescriptor("system.report", "system_reports"),)

@@ -11,6 +11,9 @@ from mcp.types import CallToolResult, TextContent, Tool, ToolAnnotations
 from kirabridge.bridge_core.models import BridgeError, digest
 from kirabridge.local_runtime import connection_observer, peer
 from kirabridge.mcp_gateway.client import MCPClientPool
+from kirabridge.mcp_gateway.timing import ToolSpan, instrument_server
+
+SCHEMA_CACHE_SECONDS = 30.0
 
 
 class DaemonConnection:
@@ -56,12 +59,14 @@ class DaemonConnection:
             raise failure from None
 
     async def call_tool(self, name, arguments, *, routine_health=False):
+        span = ToolSpan()
         tools = await self.tools_for_call()
         if name not in {tool.name for tool in tools}:
             # Newly advertised tools need not wait for the short metadata TTL.
             tools = await self.list_tools()
             if name not in {tool.name for tool in tools}:
                 raise BridgeError("tool_unavailable", "Tool absent from the current daemon catalog")
+        catalog_ms = span.elapsed_ms
         if routine_health:
             result = await self.pool.call(self.endpoint.id, name, arguments, routine_health=True)
         else:
@@ -74,10 +79,10 @@ class DaemonConnection:
                 for key, value in self._catalog_epoch.items()
             ):
                 self._catalog = None
-        return result
+        return span.result(result, "proxy_dispatch", catalog_ms=catalog_ms)
 
     async def tools_for_call(self):
-        """Cache schemas for at most one second, never execution or authorization.
+        """Cache schemas for at most thirty seconds, never execution or authorization.
 
         The daemon still validates current permissions for every call. Explicit
         discovery stays fresh; notifications, epochs and connection changes expire
@@ -90,7 +95,7 @@ class DaemonConnection:
                 and self._catalog_generation == self.connection_generation()
                 and self.endpoint.id not in self.pool.catalog_dirty
                 and self.pool.catalogs.get(self.endpoint.id) is self._catalog
-                and time.monotonic() - self._catalog_read_at < 1.0
+                and time.monotonic() - self._catalog_read_at < SCHEMA_CACHE_SECONDS
             ):
                 return self._catalog
             return await self.refresh_tools()
@@ -162,8 +167,8 @@ async def connect_stdio(config, principal):
             "no busy/unconfirmed window and no invisible fallback. Internal Codex/Grok execution "
             "and ThreadDesk are separate. Refresh tools/list on list_changed and compare "
             "discovery.revision after connection/version/session changes. "
-            "Send each paragraph in one keyboard_control text request, including line breaks; "
-            "never one tool call per character. No clipboard is used. "
+            "Use keyboard_sequence for ordered genuine individual keystrokes in one call; "
+            "use keyboard_control text only for literal text requests. No clipboard is used. "
             "Check per-operation permission_decision; approval_mode is legacy policy metadata. "
             "Use task_request; automatic mode queues permitted work without a browser click. "
             "Only when approval_required is true, give the operator local_approval_url. "
@@ -299,6 +304,8 @@ async def connect_stdio(config, principal):
                     content=[TextContent(type="text", text=json.dumps(data))],
                     structuredContent=data,
                 )
+
+        instrument_server(server, "stdio_proxy")
 
         async def monitor():
             while True:
