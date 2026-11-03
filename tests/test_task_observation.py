@@ -125,8 +125,8 @@ async def test_wait_resolves_output_once_at_return_instead_of_every_state_poll(
     monkeypatch.setattr(bridge.store, "get", counted)
     result = await observe_task(bridge, "local", value.task_id, wait_seconds=0.16)
     assert result["pending"]
-    # Initial authorization, final task and events authorization; no full-output poll.
-    assert reads == [value.task_id] * 3
+    # Rights/owner/state polling never resolves full output; the final snapshot does once.
+    assert reads == [value.task_id]
 
 
 async def test_wait_returns_completion_and_events_with_page_cursor(bridge, config):
@@ -209,6 +209,7 @@ async def test_submit_observation_shares_native_and_inline_budget_without_cancel
         return bridge.store.get(value.task_id)
 
     monkeypatch.setattr(bridge.tasks, "wait_delivery", wait_delivery)
+    monkeypatch.setattr(bridge.tasks.native, "native", lambda _task: True)
     deadline = asyncio.get_running_loop().time() + 0.02
     result = await observe_submitted_task(
         bridge, "local", bridge.store.get(value.task_id), wait_seconds=13, deadline=deadline
@@ -389,6 +390,7 @@ async def test_grok_submit_native_and_conversation_wait_share_one_response_budge
 
     bridge.tasks.executor = executor
     monkeypatch.setattr(bridge.tasks, "wait_delivery", native_wait)
+    monkeypatch.setattr(bridge.tasks.native, "native", lambda _task: True)
     value = request(
         "file.write",
         {"path": config.principals["local"].roots[0] + "/result", "text": "test"},

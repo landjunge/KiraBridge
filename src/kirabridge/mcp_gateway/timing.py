@@ -7,6 +7,7 @@ The span ends before the final JSON-RPC serialization/transport write.
 import json
 import time
 import uuid
+from decimal import Decimal, DecimalException
 
 from mcp import types
 
@@ -40,25 +41,75 @@ class ToolSpan:
         return result.model_copy(update={"meta": meta})
 
 
-def compact_structured_text(result):
-    """Keep the complete JSON fallback but remove its redundant whitespace.
+def _unique_pairs(pairs):
+    value = {}
+    for key, item in pairs:
+        if key in value:
+            raise ValueError("Duplicate JSON object key")
+        value[key] = item
+    return value
 
-    Images, custom prose and deliberately different text fallbacks are preserved.
-    Both the structured result and a complete backwards-compatible text result remain.
-    """
+
+def _json_integer(token):
+    if token == "-0":
+        raise ValueError("Preserve a signed integer zero text fallback")
+    return int(token)
+
+
+def _json_constant(token):
+    raise ValueError("Non-JSON numeric constant")
+
+
+def _typed_equal(left, right):
+    if type(left) is not type(right):
+        return False
+    if isinstance(left, dict):
+        return left.keys() == right.keys() and all(
+            _typed_equal(left[key], right[key]) for key in left
+        )
+    if isinstance(left, list):
+        return len(left) == len(right) and all(
+            _typed_equal(a, b) for a, b in zip(left, right, strict=True)
+        )
+    if isinstance(left, Decimal) and left.is_zero() and right.is_zero():
+        return left.is_signed() == right.is_signed()
+    return left == right
+
+
+def equivalent_structured_text(result):
+    """True only for a single JSON text block identical in value and JSON types."""
     if not (
         isinstance(result, types.CallToolResult)
         and result.structuredContent is not None
         and len(result.content) == 1
         and isinstance(result.content[0], types.TextContent)
     ):
+        return False
+    try:
+        parse = dict(
+            parse_float=Decimal,
+            parse_int=_json_integer,
+            parse_constant=_json_constant,
+            object_pairs_hook=_unique_pairs,
+        )
+        decoded = json.loads(result.content[0].text, **parse)
+        structured = json.loads(
+            json.dumps(
+                result.structuredContent, ensure_ascii=False, allow_nan=False, sort_keys=True
+            ),
+            **parse,
+        )
+        # Keep exact decimal values and JSON types; never round custom text to float.
+        return _typed_equal(decoded, structured)
+    except (ValueError, TypeError, UnicodeError, RecursionError, DecimalException):
+        return False
+
+
+def compact_structured_text(result):
+    """Keep complete JSON fallback; preserve custom prose, images and JSON types."""
+    if not equivalent_structured_text(result):
         return result
     try:
-        decoded = json.loads(result.content[0].text)
-        canonical = dict(ensure_ascii=False, allow_nan=False, sort_keys=True, separators=(",", ":"))
-        # JSON types matter: Python equality equates True/1 and 1/1.0.
-        if json.dumps(decoded, **canonical) != json.dumps(result.structuredContent, **canonical):
-            return result
         compact = json.dumps(
             result.structuredContent, ensure_ascii=False, allow_nan=False, separators=(",", ":")
         )

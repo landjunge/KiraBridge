@@ -44,9 +44,11 @@ def _private_file(path, limit):
         if info.st_size > limit:
             raise ValueError("Native app metadata exceeds limit")
         with os.fdopen(fd, "rb", closefd=False) as stream:
-            data = stream.read(limit + 1)
+            # Reserve the observed file size, not the maximum allowed binary size.
+            # The extra byte detects growth; a short read is never a valid snapshot.
+            data = stream.read(info.st_size + 1)
         after = os.fstat(fd)
-        if len(data) > limit or (info.st_ino, info.st_size, info.st_mtime_ns) != (
+        if len(data) != info.st_size or (info.st_ino, info.st_size, info.st_mtime_ns) != (
             after.st_ino,
             after.st_size,
             after.st_mtime_ns,

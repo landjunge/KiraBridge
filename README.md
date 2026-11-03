@@ -68,6 +68,12 @@ Gemischte reine Lesezugriffe teilen ebenfalls einen Cloudaufruf:
 Lesewerkzeuge. Rechte und Argumente werden weiterhin geprüft; verschachtelte
 Batches, Schreibzugriffe und Bilder sind ausgeschlossen. Teilresultate bei
 Zeit-/Mengenlimits bleiben ausdrücklich sichtbar.
+Mit `"result_format":"structured"` im `tool.batch`-Query entfallen ausschließlich
+nachweislich doppelte JSON-Textkopien. Alle strukturierten Werte, Fehler und
+Metadaten bleiben erhalten; eigene Prosa und annotierte Textblöcke bleiben voll
+vorhanden. Ohne Auswahl gilt weiterhin das vollständige bisherige Format.
+Bei Mengenabbruch bezeichnet `resume_index` den ersten noch benötigten Read;
+eine bereits gelesene, aber nicht zurückgegebene Seite wird ausdrücklich markiert.
 Kurze Aufgaben geben ihren Abschluss möglichst direkt zurück. Bei `completed`
 ist keine pauschale zusätzliche Statusabfrage nötig. Wartende Aufgaben über
 `read_query(query={"operation":"task.observe","task_id":"vorhandene-ID",
@@ -76,6 +82,7 @@ gemeinsam zurück, ohne neue Ausführung oder Wiederholung.
 Submit-Endpunkte prüfen `task.read` vor der Aufnahme, damit sie ein sicheres
 eigenes Ergebnis zurückgeben können; ohne dieses Leserecht startet kein Auftrag.
 [RC29-Aufrufreduktion und Vergleichsmessungen](docs/RC29-CLOUD-CALL-REDUCTION-20261103.md).
+[RC30: weitere lokale Engpässe und kompakte Sammelantworten](docs/RC30-HOTPATHS-20261103.md).
 
 Zusammenhängenden Text wie ein Gedicht mit **einem** `keyboard_control`-Aufruf
 übergeben: `request={"app":"Notes","text":"Der Mond…\nDie Nacht…","submit":false}`.

@@ -9,7 +9,7 @@ from kirabridge.bridge_core.models import BridgeError, digest
 from kirabridge.permissions import decision, direct_terminal_required, permission_revision
 
 
-def snapshot(bridge, principal):
+def _snapshot_facts(bridge, principal):
     policy = bridge.security.principal(principal)
     observed = getattr(bridge, "discovery_observations", {}).get(principal)
     current_permissions = permission_revision(bridge.config)
@@ -27,7 +27,7 @@ def snapshot(bridge, principal):
         {
             "version": __version__,
             "instance": bridge.runtime["instance_id"],
-            "permissions": permission_revision(bridge.config),
+            "permissions": current_permissions,
             "platform": platform["revision"],
             "agents": {
                 name: value.model_dump()
@@ -37,12 +37,30 @@ def snapshot(bridge, principal):
             "sessions": observed.get("revision") if observed else None,
         }
     )
+    return policy, observed, current_permissions, platform, revision
+
+
+def epoch(bridge, principal):
+    """Fresh lightweight schema epoch, without the full presentation payload."""
+    _, _, permissions, platform, revision = _snapshot_facts(bridge, principal)
     return {
         "version": __version__,
         "instance_id": bridge.runtime["instance_id"],
         "principal": principal,
         "revision": revision,
-        "permission_revision": permission_revision(bridge.config),
+        "permission_revision": permissions,
+        "platform_revision": platform["revision"],
+    }
+
+
+def snapshot(bridge, principal):
+    policy, observed, current_permissions, platform, revision = _snapshot_facts(bridge, principal)
+    return {
+        "version": __version__,
+        "instance_id": bridge.runtime["instance_id"],
+        "principal": principal,
+        "revision": revision,
+        "permission_revision": current_permissions,
         "platform": platform,
         "capabilities": sorted(policy.capabilities),
         "refresh": {

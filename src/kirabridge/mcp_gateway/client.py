@@ -16,12 +16,37 @@ from mcp.client.streamable_http import streamable_http_client
 from mcp.shared.exceptions import McpError
 
 from kirabridge.bridge_core.models import BridgeError, digest
+from kirabridge.mcp_gateway.schema_validation import SchemaValidatorCache
 
 
 class ObservedClientSession(ClientSession):
     def __init__(self, *args, notice, **kwargs):
         self.notice = notice
+        self.output_validators = SchemaValidatorCache()
         super().__init__(*args, **kwargs)
+
+    async def _validate_tool_result(self, name, result):
+        """SDK 1.x validation with bounded content-bound schema compilation reuse."""
+        from jsonschema import SchemaError, ValidationError
+        from referencing.exceptions import Unresolvable
+
+        if name not in self._tool_output_schemas:
+            await self.list_tools()
+        schema = self._tool_output_schemas.get(name)
+        if schema is None:
+            return
+        if result.structuredContent is None:
+            raise RuntimeError(
+                f"Tool {name} has an output schema but did not return structured content"
+            )
+        try:
+            self.output_validators.validate(result.structuredContent, schema)
+        except ValidationError as error:
+            raise RuntimeError(
+                f"Invalid structured content returned by tool {name}: {error}"
+            ) from error
+        except (SchemaError, Unresolvable) as error:
+            raise RuntimeError(f"Invalid schema for tool {name}: {error}") from error
 
     async def send_request(self, request, *args, **kwargs):
         initializing = isinstance(request.root, types.InitializeRequest)
@@ -367,7 +392,8 @@ class MCPClientPool:
             )
         # Only the internal passive poll may defer successful diagnostics. Explicit
         # reads and all execution/receipt tools retain the existing observation path.
-        quiet = routine_health and tool == "bridge_health" and arguments == {} and task_id is None
+        health_tool = tool in {"bridge_health", "bridge_epoch"}
+        quiet = routine_health and health_tool and arguments == {} and task_id is None
         started = False
         call_phase = self.phases.get(peer_id, "unknown")
 
@@ -453,14 +479,10 @@ class MCPClientPool:
                     raise predispatch_failure
                 dispatched = True
                 result = await session.call_tool(tool, arguments)
-                if (
-                    current_generation()
-                    and tool == "bridge_health"
-                    and self.health_epoch(peer_id, result) is None
-                ):
+                epoch = self.health_epoch(peer_id, result) if health_tool else None
+                if current_generation() and health_tool and epoch is None:
                     self.health_epochs.pop(peer_id, None)
                 if quiet and current_generation():
-                    epoch = self.health_epoch(peer_id, result)
                     if epoch is not None and self.health_epochs.get(peer_id) == epoch:
                         self.phases[peer_id] = "call.returned"
                         return result
@@ -483,7 +505,7 @@ class MCPClientPool:
                 raise not_dispatched(
                     "peer_timeout", "MCP request deadline elapsed before dispatch"
                 ) from None
-            if tool == "bridge_health" and current_generation():
+            if health_tool and current_generation():
                 self.health_epochs.pop(peer_id, None)
             observe_start()
             notice_call(
@@ -496,7 +518,7 @@ class MCPClientPool:
         except Exception as exc:
             if exc is predispatch_failure:
                 raise
-            if tool == "bridge_health" and current_generation():
+            if health_tool and current_generation():
                 self.health_epochs.pop(peer_id, None)
             observe_start()
             notice_call(
@@ -516,7 +538,7 @@ class MCPClientPool:
                 await self.disconnect(peer_id)
             raise failure from None
         except asyncio.CancelledError:
-            if tool == "bridge_health" and current_generation():
+            if health_tool and current_generation():
                 self.health_epochs.pop(peer_id, None)
             observe_start()
             notice_call("call.interrupted", tool=tool, task_id=task_id, error_code="peer_unknown")

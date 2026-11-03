@@ -4,6 +4,7 @@ import asyncio
 import json
 import time
 
+from jsonschema import ValidationError
 from mcp.server.lowlevel import NotificationOptions, Server
 from mcp.server.stdio import stdio_server
 from mcp.types import CallToolResult, TextContent, Tool, ToolAnnotations
@@ -11,6 +12,7 @@ from mcp.types import CallToolResult, TextContent, Tool, ToolAnnotations
 from kirabridge.bridge_core.models import BridgeError, digest
 from kirabridge.local_runtime import connection_observer, peer
 from kirabridge.mcp_gateway.client import MCPClientPool
+from kirabridge.mcp_gateway.schema_validation import SchemaValidatorCache
 from kirabridge.mcp_gateway.timing import ToolSpan, instrument_server
 
 SCHEMA_CACHE_SECONDS = 30.0
@@ -105,6 +107,16 @@ class DaemonConnection:
         async with asyncio.timeout(self.pool.call_timeout), self.catalog_lock:
             return await self.refresh_tools()
 
+    async def poll_health(self):
+        """Use the fresh minimal epoch when advertised; retain older-daemon support."""
+        tools = await self.tools_for_call()
+        name = (
+            "bridge_epoch"
+            if any(tool.name == "bridge_epoch" for tool in tools)
+            else "bridge_health"
+        )
+        return await self.call_tool(name, {}, routine_health=True)
+
     async def refresh_tools(self):
         self._catalog = None
         tools = await self.pool.list_tools(self.endpoint.id)
@@ -171,6 +183,8 @@ async def connect_stdio(config, principal):
             "use keyboard_control text only for literal text requests. No clipboard is used. "
             "Reduce cloud roundtrips: read_query operation=tool.batch combines 1–8 existing "
             "read-only calls [{tool,arguments}]; read.batch combines query objects. "
+            "Prefer result_format=structured for lossless structured values without duplicate "
+            "child JSON text; full preserves envelopes. "
             "Read_query operation=task.observe returns an existing task and events together "
             "with wait_seconds<=18 and events_after; never resubmit uncertain work. "
             "For known schemas submit directly, without routine health/catalog prefetches. "
@@ -205,6 +219,7 @@ async def connect_stdio(config, principal):
 
         downstream = set()
         last_generation = 0
+        input_validators = SchemaValidatorCache()
 
         async def changed():
             nonlocal last_generation
@@ -276,10 +291,23 @@ async def connect_stdio(config, principal):
             await changed()
             return baseline
 
-        @server.call_tool()
+        @server.call_tool(validate_input=False)
         async def call_tool(name, arguments):
             try:
                 downstream.add(server.request_context.session)
+                definition = await server._get_cached_tool_definition(name)
+                if definition is not None:
+                    try:
+                        input_validators.validate(arguments or {}, definition.inputSchema)
+                    except ValidationError as error:
+                        return CallToolResult(
+                            isError=True,
+                            content=[
+                                TextContent(
+                                    type="text", text=f"Input validation error: {error.message}"
+                                )
+                            ],
+                        )
                 if name.startswith("td_"):
                     # Re-list to reject stale tool names and changes after discovery.
                     discovered = await dynamic_catalog()
@@ -321,7 +349,7 @@ async def connect_stdio(config, principal):
                     try:
                         # Reads only; a failed/uncertain mutation is never retried.
                         # call_tool already refreshes the catalog and revision.
-                        await connection.call_tool("bridge_health", {}, routine_health=True)
+                        await connection.poll_health()
                         await changed()
                     except Exception:
                         pass  # The next explicit call reports its connection error.

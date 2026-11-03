@@ -12,8 +12,10 @@ import math
 
 from mcp import types
 from pydantic import ValidationError
+from pydantic_core import to_json
 
 from kirabridge.bridge_core.models import BridgeError
+from kirabridge.mcp_gateway.timing import equivalent_structured_text
 from kirabridge.read_query import ReadQuery
 
 MAX_CALLS = 8
@@ -110,7 +112,15 @@ def _wire_size(value):
     return len(result.model_dump_json(by_alias=True).encode("utf-8")) + 2048
 
 
-async def read_tool_batch(server, bridge, principal, calls, *, deadline_seconds=12.0) -> dict:
+def _row_wire_bytes(row):
+    # The outer MCP object carries a structured copy and one JSON-text copy.
+    # Measure one new row in both encodings, instead of serializing every prefix.
+    return len(to_json(row)) + len(to_json(_json(row))) - 2
+
+
+async def read_tool_batch(
+    server, bridge, principal, calls, *, deadline_seconds=12.0, result_format="full"
+) -> dict:
     """Run serial existing tools within one request's auth/context and global budget.
 
     Validate the complete whitelist/argument contract before any read. Each child
@@ -118,7 +128,11 @@ async def read_tool_batch(server, bridge, principal, calls, *, deadline_seconds=
     identity/capabilities, output normalization and timing metadata. MCP images,
     audio and resource blocks require the original tool and stop this JSON batch
     explicitly. Twelve seconds is cooperative; synchronous reads may overrun it.
+    Structured format omits only proven redundant child JSON text, retaining the
+    complete structured value, error flag and metadata. Full is the RC29 contract.
     """
+    if type(result_format) is not str or result_format not in {"full", "structured"}:
+        raise BridgeError("invalid_arguments", "Choose full or structured batch results")
     if (
         isinstance(deadline_seconds, bool)
         or not isinstance(deadline_seconds, (int, float))
@@ -131,9 +145,16 @@ async def read_tool_batch(server, bridge, principal, calls, *, deadline_seconds=
     checked = _validated_calls(server, calls)
     bridge.security.principal(principal)
     results = []
+    row_bytes = 0
+
+    def response(rows, *, complete, **extra):
+        if result_format == "structured":
+            extra["result_format"] = "structured"
+        return _response(rows, complete=complete, **extra)
+
     for index, (name, arguments) in enumerate(checked):
         if loop.time() >= deadline:
-            return _response(
+            return response(
                 results,
                 complete=False,
                 next_index=index,
@@ -150,7 +171,9 @@ async def read_tool_batch(server, bridge, principal, calls, *, deadline_seconds=
                 request = types.CallToolRequest(
                     params=types.CallToolRequestParams(name=name, arguments=arguments)
                 )
-                response = await server._mcp_server.request_handlers[types.CallToolRequest](request)
+                wire_response = await server._mcp_server.request_handlers[types.CallToolRequest](
+                    request
+                )
         except TimeoutError:
             results.append(
                 {
@@ -161,13 +184,13 @@ async def read_tool_batch(server, bridge, principal, calls, *, deadline_seconds=
                     "error": {"code": "read_timeout"},
                 }
             )
-            return _response(
+            return response(
                 results,
                 complete=False,
                 next_index=index + 1,
                 error={"code": "read_timeout"},
             )
-        result = response.root
+        result = wire_response.root
         if not isinstance(result, types.CallToolResult) or any(
             not isinstance(block, types.TextContent) for block in result.content
         ):
@@ -183,7 +206,7 @@ async def read_tool_batch(server, bridge, principal, calls, *, deadline_seconds=
                     },
                 }
             )
-            return _response(
+            return response(
                 results,
                 complete=False,
                 next_index=index + 1,
@@ -195,23 +218,37 @@ async def read_tool_batch(server, bridge, principal, calls, *, deadline_seconds=
             "read_executed": True,
             "result": result.model_dump(mode="json", by_alias=True),
         }
-        candidate = _response([*results, row], complete=True)
-        if _wire_size(candidate) > MAX_RESULT_BYTES:
-            return _response(
+        plain_text = (
+            len(result.content) == 1
+            and not result.content[0].model_extra
+            and not set(result.content[0].model_dump(mode="json", by_alias=True, exclude_none=True))
+            - {"type", "text"}
+        )
+        if result_format == "structured" and plain_text and equivalent_structured_text(result):
+            row["result"]["content"] = []
+            row["content_omitted"] = "equivalent_structured_json"
+        added_bytes = _row_wire_bytes(row) + (2 if results else 0)
+        candidate = response([*results, row], complete=True)
+        base = response([], complete=True)
+        base.update(errors=candidate["errors"], all_succeeded=candidate["all_succeeded"])
+        if _wire_size(base) + row_bytes + added_bytes > MAX_RESULT_BYTES:
+            return response(
                 results,
                 complete=False,
                 omitted_index=index,
                 omitted_read_executed=True,
                 next_index=index + 1,
+                resume_index=index,
                 error={"code": "read_result_limit"},
             )
         results.append(row)
+        row_bytes += added_bytes
         if loop.time() >= deadline:
-            return _response(
+            return response(
                 results,
                 complete=False,
                 next_index=index + 1,
                 read_executed=True,
                 error={"code": "read_timeout"},
             )
-    return _response(results, complete=True)
+    return response(results, complete=True)

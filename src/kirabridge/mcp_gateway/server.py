@@ -70,6 +70,8 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
         "use keyboard_control text for literal text. Keep adaptive steps separate. "
         "Use read_queries to combine independent reads in one roundtrip. "
         "Use read_tools or read_query operation=tool.batch for mixed read-only tools. "
+        "Prefer result_format=structured for batches: all structured values and errors "
+        "remain, only duplicate JSON text is omitted. Full remains available. "
         "For known arguments submit directly; do not prefetch health or the full catalog "
         "before every action. Request operation_catalog operations=[...] for needed schemas. "
         "A completed inline result needs no task_get/events/completion poll. "
@@ -272,6 +274,8 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
         Cached clients may use operation=read.batch with queries=[...] or
         operation=tool.batch with calls=[{tool,arguments},...] for mixed existing
         read-only tools. Both accept 1–8 reads; nested batches and writes rejected.
+        For tool.batch, result_format=structured avoids redundant child JSON text;
+        full (default) preserves original MCP envelopes. Neither removes data fields.
         task.observe accepts existing task_id, wait_seconds<=18 and events_after:
         waits without execution/retry and returns task plus events in one response.
 
@@ -297,9 +301,19 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
             if query.get("operation") == "tool.batch":
                 from kirabridge.read_tool_batch import read_tool_batch
 
-                if set(query) != {"operation", "calls"}:
+                if not {"operation", "calls"} <= set(query) or set(query) - {
+                    "operation",
+                    "calls",
+                    "result_format",
+                }:
                     return {"error": {"code": "invalid_arguments"}}
-                return await read_tool_batch(server, bridge, identity(ctx), query["calls"])
+                return await read_tool_batch(
+                    server,
+                    bridge,
+                    identity(ctx),
+                    query["calls"],
+                    result_format=query.get("result_format", "full"),
+                )
             if query.get("operation") == "read.batch":
                 from kirabridge.read_queries import ReadQueries
                 from kirabridge.read_queries import read_queries as execute_reads
@@ -316,7 +330,11 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
             return {"error": {"code": "invalid_arguments", "message": "Invalid read query"}}
 
     @server.tool(annotations=read)
-    async def read_tools(calls: list[dict[str, Any]], ctx: Context) -> dict[str, Any]:
+    async def read_tools(
+        calls: list[dict[str, Any]],
+        ctx: Context,
+        result_format: Literal["full", "structured"] = "full",
+    ) -> dict[str, Any]:
         """Combine 1–8 independent existing read-only tools in one cloud roundtrip.
 
         Each call is {tool,arguments}. Exact allowed names and all argument schemas
@@ -329,11 +347,15 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
         JSON text results only: use the original tool for images. The cooperative
         deadline is 12s and the result budget 2 MiB; partial results are explicit.
         Cached clients can use read_query operation=tool.batch with these calls.
+        Prefer result_format=structured to omit only equivalent child JSON text;
+        all structured fields, errors and metadata remain. Full is backwards compatible.
         """
         from kirabridge.read_tool_batch import read_tool_batch
 
         try:
-            return await read_tool_batch(server, bridge, identity(ctx), calls)
+            return await read_tool_batch(
+                server, bridge, identity(ctx), calls, result_format=result_format
+            )
         except BridgeError as exc:
             return {"error": {"code": exc.code, "message": str(exc)}}
 
@@ -640,18 +662,24 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
         from kirabridge.grok_connector.conversation import enabled_for, result_for_conversation
 
         name = identity(ctx)
-        result = safe(lambda: bridge.task(name, task_id))
         if enabled_for(bridge, name):
+            result = safe(lambda: bridge.task(name, task_id))
             result = await result_for_conversation(bridge, name, result)
-        elif (name == "chatgpt" or config.principals[name].client_type == "chatgpt") and result.get(
-            "id"
-        ):
-            from kirabridge.task_observation import observe_task
+        elif name == "chatgpt" or config.principals[name].client_type == "chatgpt":
+            from kirabridge.task_observation import observe_task_result
 
             try:
-                result = (await observe_task(bridge, name, task_id, wait_seconds=2))["task"]
+                result = await observe_task_result(bridge, name, task_id, wait_seconds=2)
             except BridgeError as exc:
                 return {"error": {"code": exc.code, "message": str(exc)}}
+            except ValidationError:
+                return {"error": {"code": "invalid_arguments", "message": "Invalid tool arguments"}}
+            except Exception:
+                return {
+                    "error": {"code": "internal_error", "message": "Request could not be completed"}
+                }
+        else:
+            result = safe(lambda: bridge.task(name, task_id))
         return safe(lambda: image_task_result(result))
 
     @server.tool(annotations=read)
@@ -1363,20 +1391,37 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
         """Read ordered team role/delegation/delivery events, without secret/raw error logs."""
         return safe(lambda: bridge.teams.events(identity(ctx), team_id, after, limit))
 
+    @server.tool(annotations=read)
+    def bridge_epoch(ctx: Context) -> dict[str, Any]:
+        """Fresh passive schema epoch; explicit bridge_health retains full status."""
+        from kirabridge.discovery import epoch
+
+        def action():
+            name = identity(ctx)
+            bridge.security.principal(name, "bridge.health")
+            return {
+                "version": __version__,
+                "dispatcher_active": bool(bridge.tasks.workers)
+                and all(not worker.done() for worker in bridge.tasks.workers),
+                "discovery": epoch(bridge, name),
+            }
+
+        return safe(action)
+
     @server._mcp_server.list_tools()
     async def current_tools():
-        from kirabridge.discovery import snapshot
+        from kirabridge.discovery import epoch as discovery_epoch
 
         # Listing schemas is side-effect free: invalid/buffered calls must not
         # cause terminal probes merely because the SDK fetches its tool schemas.
         name = identity(server.get_context())
-        epoch = snapshot(bridge, name)
+        epoch = discovery_epoch(bridge, name)
         metadata = {
             "version": epoch["version"],
             "instance_id": epoch["instance_id"],
             "revision": epoch["revision"],
             "principal": name,
-            "platform_revision": epoch["platform"]["revision"],
+            "platform_revision": epoch["platform_revision"],
         }
         from kirabridge.permissions import decision
 
@@ -1386,7 +1431,7 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
         }
         if "session_input" in rows:
             rows["session_enter"] = rows["session_input"]
-        native_host = epoch["platform"]["host"]["platform"] == "darwin"
+        native_host = bridge.macos.host_platform == "darwin"
         return [
             tool.model_copy(update={"meta": {**(tool.meta or {}), "kirabridge": metadata}})
             for tool in await server.list_tools()
