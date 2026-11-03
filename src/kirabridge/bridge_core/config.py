@@ -439,6 +439,11 @@ def load_config(path: str | None = None) -> Config:
 
 
 def private_directory(path: Path) -> None:
+    if sys.platform == "win32":
+        from kirabridge.platform_adapters.windows.filesystem_security import private_directory
+
+        private_directory(path)
+        return
     if path.is_symlink():
         raise BridgeError("unsafe_state", "State directory must not be a symlink")
     path.mkdir(parents=True, exist_ok=True, mode=0o700)

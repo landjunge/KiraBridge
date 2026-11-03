@@ -8,7 +8,12 @@ from kirabridge.bridge_core.models import BridgeError
 
 
 def private_json(path: Path) -> dict:
-    fd = os.open(path, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0))
+    if os.name == "nt":
+        from kirabridge.platform_adapters.windows.filesystem_security import private_open
+
+        fd = private_open(path)
+    else:
+        fd = os.open(path, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0))
     with os.fdopen(fd, "r", encoding="utf-8") as source:
         info = os.fstat(source.fileno())
         if os.name == "posix" and (info.st_uid != os.getuid() or info.st_mode & 0o077):
@@ -20,7 +25,12 @@ def private_json(path: Path) -> dict:
 
 
 def write_private(path: Path, text: str | bytes, *, mode: int = 0o600) -> None:
-    fd = os.open(path, os.O_CREAT | os.O_EXCL | os.O_WRONLY, mode)
+    if os.name == "nt":
+        from kirabridge.platform_adapters.windows.filesystem_security import private_open
+
+        fd = private_open(path, write=True, create_new=True)
+    else:
+        fd = os.open(path, os.O_CREAT | os.O_EXCL | os.O_WRONLY, mode)
     with os.fdopen(fd, "wb") as output:
         output.write(text.encode() if isinstance(text, str) else text)
         output.flush()

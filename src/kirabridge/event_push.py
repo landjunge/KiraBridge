@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import asyncio
 import base64
-import fcntl
 import hashlib
 import hmac
 import ipaddress
@@ -27,6 +26,11 @@ from urllib.parse import urlsplit
 
 import httpx
 from httpcore._backends.auto import AutoBackend
+
+if os.name == "posix":
+    import fcntl
+else:
+    fcntl = None
 
 EVENT_NAME = "kirabridge.task.completed"
 
@@ -187,6 +191,29 @@ CREATE TABLE IF NOT EXISTS observations(
 @contextmanager
 def initialization_lock(directory):
     """Serialize first WAL/schema setup across sender and independent frontends."""
+    if os.name == "nt":
+        from kirabridge.bridge_core.models import BridgeError
+        from kirabridge.platform_adapters.windows.locking import WindowsRuntimeLock
+
+        lock = WindowsRuntimeLock(directory / "initialize.lock")
+        try:
+            deadline = time.monotonic() + 5
+            while True:
+                try:
+                    lock.acquire()
+                    break
+                except BridgeError as error:
+                    if error.code != "already_running":
+                        raise
+                    if time.monotonic() >= deadline:
+                        raise EventError("event_journal_initialization_busy") from None
+                    time.sleep(0.01)
+            yield
+        finally:
+            lock.release()
+        return
+    if fcntl is None:
+        raise EventError("event_journal_platform_unsupported")
     fd = os.open(directory / "initialize.lock", os.O_CREAT | os.O_RDWR | os.O_NOFOLLOW, 0o600)
     try:
         deadline = time.monotonic() + 5
@@ -208,14 +235,30 @@ class EventJournal:
         directory = Path(directory)
         if directory.is_symlink():
             raise EventError("unsafe_event_state")
-        directory.mkdir(parents=True, exist_ok=True, mode=0o700)
-        if directory.stat().st_uid != os.getuid() or directory.stat().st_mode & 0o077:
-            raise EventError("private_event_state_required")
         path = directory / "events.sqlite3"
-        fd = os.open(path, os.O_CREAT | os.O_RDWR | os.O_NOFOLLOW, 0o600)
-        os.close(fd)
-        if path.stat().st_uid != os.getuid() or path.stat().st_mode & 0o077:
-            raise EventError("private_event_database_required")
+        if os.name == "nt":
+            from kirabridge.platform_adapters.windows.filesystem_security import (
+                WindowsFiles,
+                ensure_private_file,
+                private_directory,
+            )
+
+            private_directory(directory)
+            ensure_private_file(path)
+            files = WindowsFiles()
+            for suffix in ("-wal", "-shm"):
+                sidecar = Path(str(path) + suffix)
+                if sidecar.exists():
+                    handle = files.open(sidecar)
+                    files.close(handle)
+        else:
+            directory.mkdir(parents=True, exist_ok=True, mode=0o700)
+            if directory.stat().st_uid != os.getuid() or directory.stat().st_mode & 0o077:
+                raise EventError("private_event_state_required")
+            fd = os.open(path, os.O_CREAT | os.O_RDWR | os.O_NOFOLLOW, 0o600)
+            os.close(fd)
+            if path.stat().st_uid != os.getuid() or path.stat().st_mode & 0o077:
+                raise EventError("private_event_database_required")
         with initialization_lock(directory):
             self.db = sqlite3.connect(path, isolation_level=None, timeout=5)
             self.db.row_factory = sqlite3.Row
