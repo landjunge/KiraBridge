@@ -60,7 +60,15 @@ function Invoke-Bounded([string]$Program, [string[]]$Arguments, [string]$Name, [
     if ((Test-Path $stdout) -or (Test-Path $stderr)) { throw 'Process evidence already exists' }
     $quoted = @($Arguments | ForEach-Object {
         if ($_ -match '["\r\n]') { throw 'Unsupported process argument' }
-        '"'+$_+'"'
+        # Start-Process joins this array as one native command line. In
+        # particular cmd.exe must see /d /c, not quoted switch tokens.
+        if ($_ -eq '') { '""' }
+        elseif ($_ -notmatch '\s') { $_ }
+        else {
+            # A trailing backslash must not escape the closing quote in the
+            # Windows C runtime argument parser (Python/installer path values).
+            '"'+[regex]::Replace($_,'(\\+)$','$1$1')+'"'
+        }
     })
     $process = Start-Process -FilePath $Program -ArgumentList $quoted -PassThru -WindowStyle Normal `
         -RedirectStandardOutput $stdout -RedirectStandardError $stderr
