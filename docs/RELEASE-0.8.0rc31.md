@@ -21,8 +21,9 @@ Ereignisabfragen prüfen Eigentümer und Rechte, ohne große Taskausgaben mitzul
 Ein additiver Datenbankindex beschleunigt den gezielten Zugriff. Im kontrollierten
 lokalen 4-MiB-/100k-Ereignistest sank der Median von 36,40 auf 0,049 ms.
 
-380 relevante Tests und unabhängige Teamreviews bestanden. Intel-Build und
-isolierte Paketabnahme werden für diesen exakten Quellstand separat dokumentiert.
+380 relevante Tests und unabhängige Teamreviews bestanden. Intel-Build,
+isolierte Paketabnahme, unabhängiger Paketvergleich und echter Installerdownload
+bestanden. Alle sieben Assets des Prereleases sind verfügbar.
 Die produktive RC30-Installation bleibt während des parallelen Windows-Auftrags
 aktiv; RC31 wird hier nicht automatisch installiert. Bestehende Sitzungen,
 Konfiguration und Zugriffsrechte bleiben erhalten.

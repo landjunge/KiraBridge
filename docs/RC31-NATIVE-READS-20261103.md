@@ -164,10 +164,44 @@ Arrays; beide wurden vor der abschließenden Runde korrigiert.
 Ruff, Format-, Lock- und Diffprüfungen sind Teil der Abnahme. Alle Builds und
 Tests laufen lokal auf diesem Intel-Mac. Keine GitHub Actions, keine fremde
 Sitzungssteuerung und keine produktive Installation in diesem Parallelauftrag.
-Release-/Assetprüfung folgt nach dem exakten sauberen Sourcecommit.
+Der abschließende [Validierungsbeleg](evidence/rc31-validation-20261103.json)
+enthält die tatsächlich ausgeführten Testdateien und Runtimehashes.
 
 Der erste Paketbau auf `0ea050b` stoppte nach Wheel-/Nativekompilierung, weil die
 versionsgebundene `RELEASE-0.8.0rc31.md` noch fehlte. Es entstand kein vollständiges
 Paket und keine Veröffentlichung. Die fehlende Freigabenotiz wurde ergänzt;
 der folgende saubere Build bekommt einen eigenen Sourcepin. Die Implementierung
 und ihre 380 bestandenen Prüfungen bleiben unverändert.
+
+Der vollständige lokale Intel-Build auf
+**`fc4063fef33c273fe5b33aadea3f99dddf88b757`** bestand anschließend. Die isolierte
+Paketinstallation, ein authentifizierter Dispatcherstart, konkrete Lesevoraussetzungen,
+Ablehnung eines beschädigten Pakets sowie Erhalt der eigenen Testkonfiguration und
+Credentials wurden erfolgreich geprüft. Produktiver Dienst/Tunnel wurden nicht
+angesprochen. Die unabhängige Paketprüfung bestätigt 166 Pythondateien bytegenau
+gegen Git, Tar und Wheel, native x86_64-Architektur, Signaturen/Sourcepin,
+568 Installer-Manifestdateien und die vollständigen ZIP-Bytes.
+[Paketreview](evidence/rc31-package-review-20261103.json).
+
+[Prerelease v0.8.0rc31](https://github.com/landjunge/KiraBridge/releases/tag/v0.8.0rc31)
+ist veröffentlicht. Alle sieben Assets sind vollständig hochgeladen; ihre Größen
+und GitHub-SHA256-Digests stimmen unabhängig mit den lokalen Dateien überein.
+Der Intel-Installer wurde nach Veröffentlichung erneut heruntergeladen und geprüft:
+**3.411.769 Bytes**, SHA-256
+`9f9cb87ec910faa197f26c12a221f81f62c2a9961b11352a22cb935d4ca0f2ec`.
+Der Release-Tag zeigt exakt auf `fc4063f`; es gab keinen GitHub-Actions-Lauf.
+[Auslieferungsbeleg](evidence/rc31-release-20261103.json).
+
+Der Branch ist als [Draft-PR #56](https://github.com/landjunge/KiraBridge/pull/56)
+gegen `main` reviewbar; `main` bleibt `21a6abd`. Spätere Abschlussdokumentation
+ändert den geprüften Paketpin nicht. Auf dem Mac läuft weiterhin die ursprüngliche
+RC30-Instanz **PID 66439**, Start **03:30:12 UTC**, Instanz
+`777222cce58e4b38b503c2f3d20900e1`. Diese aktuelle Beobachtung bestätigt den
+erhaltenen Dienst; eine RC31-Produktivinstallation oder Cloud-/Voiceabnahme wird
+in diesem Parallelauftrag ausdrücklich nicht behauptet.
+
+Der Abschluss wurde im vorhandenen ThreadDesk-Whiteboard `188ce4729a62` nach
+beobachteter Revision 496 angehängt, stabile Operation
+`rc31-released-isolated-fc4063f-20261103`. Eintrag `d146e3c19060`, Ordinal 136,
+wurde anschließend unabhängig vollständig und zeichengenau zurückgelesen.
+Bestehende Beiträge bleiben erhalten.
