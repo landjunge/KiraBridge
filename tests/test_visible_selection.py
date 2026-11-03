@@ -223,6 +223,11 @@ async def new_native_selection(bridge, monkeypatch, row):
 
     monkeypatch.setattr(bridge.sessions.terminal_app, "process_identity", identity)
 
+    async def no_geometry(*args, **kwargs):
+        return None
+
+    monkeypatch.setattr(bridge.sessions.terminal_app, "input_columns", no_geometry)
+
 
 async def test_explicit_current_agent_handle_enters_current_window_without_mutating_default(
     visible,  # noqa: F811
@@ -232,7 +237,7 @@ async def test_explicit_current_agent_handle_enters_current_window_without_mutat
     bridge, transport = visible
     transport.update(target="codex", text="› ")
     row = new_row()
-    await new_selection(bridge, monkeypatch, row)
+    await new_native_selection(bridge, monkeypatch, row)
     before = config.visible_handoffs.bindings["codex"].model_dump()
     result = await bridge.execute(
         {
@@ -248,10 +253,10 @@ async def test_explicit_current_agent_handle_enters_current_window_without_mutat
         callback,
         callback,
     )
-    assert result["success"] and transport["calls"] == ["insert", "return"]
-    stored = bridge.visible_handoffs.status("chatgpt", "fresh-explicit")
-    assert stored["binding"]["pane_id"] == row["pane_id"]
-    assert stored["binding"]["agent_pid"] == 901
+    assert result["submitted"] and transport["calls"] == ["insert", "return"]
+    assert result["agent_confirmed"] is False
+    assert not bridge.store.db.execute("SELECT 1 FROM visible_handoffs").fetchone()
+    assert not bridge.store.db.execute("SELECT 1 FROM messages").fetchone()
     assert config.visible_handoffs.bindings["codex"].model_dump() == before
     assert bridge.sessions._selection.get() is None
     # Automatic/default delivery still uses the old assignment; it never silently follows.
@@ -438,12 +443,12 @@ async def test_exec_change_during_identity_capture_cannot_be_pinned(visible, mon
             pytest.fail("A changed executable must not acquire the selection context")
 
 
-def test_native_screen_guard_uses_unicode_codepoints_for_long_emoji_viewport(tmp_path):
+def test_native_screen_guard_uses_unicode_codepoints_for_long_emoji_buffer(tmp_path):
     from kirabridge.platform_adapters.terminal_app import TerminalAppTransport
 
     text = "🧠" * 9000 + "› "
     guard = TerminalAppTransport.native_screen_guard(text)
-    assert "Array.from(tab.contents()).slice(-8192).join('')" in guard
+    assert "Array.from(tab.history().slice(-16384)).slice(-8192).join('')" in guard
     import json
 
     literal = guard.split("!==", 1)[1].split(") throw Error", 1)[0]
@@ -454,7 +459,7 @@ def test_native_screen_guard_uses_unicode_codepoints_for_long_emoji_viewport(tmp
     if sys.platform == "darwin":
         script = tmp_path / "unicode-guard.js"
         script.write_text(
-            "const tab={contents:()=>"
+            "const tab={history:()=>"
             + json.dumps(text)
             + "};"
             + guard

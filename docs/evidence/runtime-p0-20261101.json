@@ -1,0 +1,305 @@
+{
+  "revision": 4,
+  "recorded_at": "2026-11-01T09:21:26.161142+00:00",
+  "version": "0.8.0rc23",
+  "phase": "P0 repaired and released; productive UI gate failed before input; supported rollback to RC22 verified",
+  "source_files": 144,
+  "source_manifest_sha256": "a8f8f3915531ed5e6464f5ccb613a163523a526e2a3ee199bea9b0bf0d2b807c",
+  "baseline_code_commit": "f97ab1cdeebe1d06648febe685f7ebb738ca93a9",
+  "baseline_docs_commit": "0107d154e472710e3f65f077ddee871eac70a220",
+  "original_tasks_replayed": false,
+  "production_modified": true,
+  "scope": [
+    "background native admission lifecycle",
+    "pinned own-session process group cleanup"
+  ],
+  "admission": {
+    "implemented": true,
+    "owner_tests": 51,
+    "independent_tests": 7,
+    "independently_reviewed": true,
+    "actual_http_tests": 2,
+    "status": "process_started is admission only; task completes independently"
+  },
+  "cleanup": {
+    "implemented": true,
+    "original_owner_tests_before_census_review_fix": 52,
+    "final_census_owner_cases": 21,
+    "independent_final_cases": 11,
+    "exact_pid_worker_path_changed": false,
+    "terminal_manager_changed": false,
+    "cleanup_budget_seconds": 5,
+    "term_grace_seconds": 2,
+    "escaped_session_or_incomplete_census": "unknown, never success"
+  },
+  "combined_regression": {
+    "passed": 310,
+    "scope": "before caller completeness anchor refinement; final21 owner/11 independent and2 HTTP separately passed after refinement",
+    "overlapping_counts_not_summed": true
+  },
+  "lint_format_lock": "passed",
+  "packaged_runtime_acceptance": {
+    "commit": "a9b55f3dc644851ed46bcfd08a8cb1e03caed5c9",
+    "passed": true,
+    "source_unchanged_for_final_candidate": true,
+    "background35": {
+      "admission_seconds": 0.195245739,
+      "execution_seconds": 35.739996744,
+      "crossed30s": true,
+      "spawn_count_after_id_reuse": 1
+    },
+    "applications60": {
+      "state": "completed",
+      "seconds": 24.695211852,
+      "bytes": 578524,
+      "records": 1407,
+      "live_owned_members": []
+    },
+    "applications1": {
+      "state": "failed",
+      "seconds": 2.084845012,
+      "live_owned_members": []
+    },
+    "first_private_policy_fixture": "forbidden before any task; preserved; session.input dependency added only to private policy"
+  },
+  "release": {
+    "published": true,
+    "installed": false,
+    "installation_attempted": true,
+    "url": "https://github.com/landjunge/KiraBridge/releases/tag/v0.8.0rc23",
+    "current_status": "operator restored to RC22 after failed physical UI acceptance",
+    "assets": 15,
+    "public_download_all_digests_verified": true,
+    "operator_install_command_version": "0.8.0rc22"
+  },
+  "private_evidence_directory": "~/.local/share/kirabridge/backups/runtime-p0-20261101T080015Z/",
+  "private_evidence_sha256": {
+    "native-admission-p0a-checkpoint.json": "eae247253a146607a86549378ab17756decbe20c7bf4b252b38df6b6c091ae1f",
+    "native-p0a-independent-review.json": "e8cd31f48c72e77f3fadbdd0c1158783ac7edcb575461a7027f3a0195416755c",
+    "p0b-implementation-checkpoint-v2.json": "72735182722ef1855cf8ac7bbc564f24eeec6286f15f0887c7417ceb1342d845",
+    "p0b-v2-independent-review.json": "3f36baaef59f30c77828b957291f5f6d6eed92f900cfd7d68b5a9764590373e5",
+    "runtime-p0-harness-independent-review.json": "80f37772135d7d206793bdeb1b505c9a1313dc5d7bd14a145181b43e8dad044b",
+    "combined-runtime-regressions.log": "5fe69aa72a8fc89ce6365466f716721e92b6197bec60d73f90651ef5ff1094dc",
+    "managed-admission-real-http-census-v2.log": "8ce35df22afa0df0231b1b950a9959987e910f49bc3e7de0e5414e122e1fd5d5",
+    "p0b-applications-timeout1/diagnosis.json": "35023388e9347095315d45e7a42815bfbb2b38bff3becc59e715e6b62d8bf899",
+    "ci-fixture-hermetic-v2-independent-review.json": "442dfff0c89aac1f081be32e8072289567d86ec7bcdf9b0db5c92e3cefdf78f9",
+    "runtime-p0-harness-policy-independent-review.json": "d9ab0f1dd41fc359e6f1766840d209f72e2793fd67919d298f38f063095e6dc0",
+    "actual-p0-acceptance-a9b55f3-02/evidence.json": "2ba8fb50c223969c7ad4964e3a1d028a28ecf7bfa3004edf48a0465bc03e8c52",
+    "ci-04faa3b-independent/checkpoint.json": "6d052be87949756e3aad18506d0a97b582df866be865bba4211af2cf7d475d84",
+    "independent-artifact-04faa3b.json": "746e46c9471df866d6e4548628af7817c6b3fff5613b2cd78161d33e3f147333",
+    "actual-p0-acceptance-04faa3b/evidence.json": "66fb243c452c9b9aef9f5de1746ed941b59992aa9d5b3b105899be9b16af2c89",
+    "release-local-04faa3b/evidence.json": "be54e7cf651516ad8c1dd4e97dbaa34af30520f084be21a3b533f164a2f68ac8",
+    "release-draft-download-04faa3b/evidence.json": "e217b589678d34e3fb955e63c3d2307c7c1105c99ef2e604f2f99ee0aae4f74d",
+    "public-download-verified.json": "e01bf9b594978e19c62ccc53d890027e0394eeac5e1acdacd76cb4d388493b99",
+    "productive-rc23/installed-independent.json": "e703773094983e37f411760f379055da4cd594b0fecdad9f893a5446ef8614ad",
+    "live-p0-04faa3b-01/evidence.json": "04e0e031f7a9acb498a8c3682e973ec33488a8ee2d4b79a69e2577080098d2a8",
+    "live-ui/raw-prepaste-timeout-source-review.json": "61fbe434e15ecf57f867f5fe8262623f3d52b6ac81066dc8c6b630b22e39070d",
+    "productive-rc23/rollback-independent.json": "a070b5f1b777d48653b18857de0523a83f5fb592852b81431665f9f5cee43c46",
+    "owned-window-cleanup-result.json": "2c6aab409cff6d42e032ec30d30fa6a8a765f760e59a4e8d67dfb2371b133f0b"
+  },
+  "limits": [
+    "P1 calculator focus/pagination/Brave unchanged",
+    "No historical task outcome rewritten",
+    "POSIX preflight and signal are not atomic",
+    "No new OS permission requests; notifications already authorized",
+    "Productive UI pre-paste TimeoutError unresolved; no regression cause established",
+    "Current operator remains RC22 and its known P0 behavior",
+    "Earlier idle9199 absence unattributed; no all-historical-panes claim"
+  ],
+  "ci_initial": {
+    "run": 41288752537,
+    "commit": "a9b55f3dc644851ed46bcfd08a8cb1e03caed5c9",
+    "linux_jobs": "both2776passed40skipped",
+    "macos_jobs": "both2806passed4skipped6fixturefailures",
+    "final_fixture_review": "passed; product source unchanged; exact new CI required"
+  },
+  "release_code_commit": "04faa3b40e972cf155704dc5cb10a1784f8c10cb",
+  "ci_final": {
+    "run": 41289857422,
+    "conclusion": "success",
+    "jobs": 4,
+    "linux_each": {
+      "passed": 2776,
+      "skipped": 40
+    },
+    "macos_intel_and_arm_each": {
+      "passed": 2812,
+      "skipped": 4
+    }
+  },
+  "runtime_productive_p0": {
+    "passed": true,
+    "runtime": {
+      "instance_id": "aaedae38f9714b1a8171dd21a2634d38",
+      "version": "0.8.0rc23",
+      "pid": 29390,
+      "started_at": "2026-11-01T09:04:59.752656+00:00",
+      "config_path": "/Users/landjunge/.config/kirabridge/config.toml",
+      "config_sha256": "7f6eb92a5e199d9039568fd0756b986f64812a7b501d8a06bf5d8ebfae6d48e3",
+      "effective_config_sha256": "55ecca933142d5ce52d003c38dbb5288bb1bffb049376aa46186994116434474",
+      "source_tree_sha256": "a8f8f3915531ed5e6464f5ccb613a163523a526e2a3ee199bea9b0bf0d2b807c",
+      "source_file_count": 144,
+      "source_package_path": "/Users/landjunge/.local/share/kirabridge/install/releases/0.8.0rc23-04faa3b40e97/source/.venv/lib/python3.11/site-packages/kirabridge",
+      "source_scope": "package Python files observed at startup; no remote attestation"
+    },
+    "checks": [
+      {
+        "name": "sleep35",
+        "passed": true,
+        "admission_seconds": 0.37025440495926887,
+        "seconds": 36.31880496797385,
+        "running_seen_after_30_5_seconds": true,
+        "spawn_count_after_completed_ID_reuse": 1,
+        "pid": 29750,
+        "live_session_members": []
+      },
+      {
+        "name": "applications60",
+        "state": "completed",
+        "pid": 29864,
+        "seconds": 41.342267423984595,
+        "stdout": {
+          "bytes": 578524,
+          "sha256": "9d71f8f4abc93f040fe50d5d0d50a3946b34673fe36a8748f5cdf7ab86ad1e3f",
+          "complete": true,
+          "error": null
+        },
+        "applications": 1407,
+        "stderr": {
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "complete": true,
+          "error": null
+        },
+        "passed": true,
+        "live_session_members": []
+      },
+      {
+        "name": "applications1",
+        "state": "failed",
+        "pid": 29989,
+        "seconds": 2.8326294790022075,
+        "stdout": {
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "complete": false,
+          "error": "timeout"
+        },
+        "stderr": {
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "complete": false,
+          "error": "timeout"
+        },
+        "passed": true,
+        "live_session_members": []
+      }
+    ],
+    "scope": "historical RC23 Core29390 before supported rollback"
+  },
+  "ui_productive": {
+    "passed": false,
+    "busy_refusal": "passed/session_busy/no input",
+    "codex_start": "passed owned30095",
+    "raw_task": "rc23-ui-raw-return-20261101-01",
+    "state": "failed",
+    "exception": "TimeoutError",
+    "terminal_input_attempted": false,
+    "widget_after": "ready and empty",
+    "paste_return_or_agent_ack_claimed": false,
+    "failure_replayed": false,
+    "cause": "not determined; PS/Tmux preflight candidates only; investigated UI source identical to F97"
+  },
+  "rollback": {
+    "passed": true,
+    "current_runtime": {
+      "config_path": "/Users/landjunge/.config/kirabridge/config.toml",
+      "config_sha256": "7f6eb92a5e199d9039568fd0756b986f64812a7b501d8a06bf5d8ebfae6d48e3",
+      "effective_config_sha256": "55ecca933142d5ce52d003c38dbb5288bb1bffb049376aa46186994116434474",
+      "instance_id": "435d85c4547848388fa26d51279b8bca",
+      "pid": 31355,
+      "source_file_count": 144,
+      "source_package_path": "/Users/landjunge/.local/share/kirabridge/install/releases/0.8.0rc22-f97ab1cdeebe/source/.venv/lib/python3.11/site-packages/kirabridge",
+      "source_scope": "package Python files observed at startup; no remote attestation",
+      "source_tree_sha256": "03bae2fd8715d4a7581e007096bf03633f7d978d6c590aec044a026512ab3986",
+      "started_at": "2026-11-01T09:17:11.257626+00:00",
+      "version": "0.8.0rc22"
+    },
+    "current_code_commit": "f97ab1cdeebe1d06648febe685f7ebb738ca93a9",
+    "console_pid": 31167,
+    "app_pid": 30906,
+    "database_restored": false,
+    "development_and_release_preserved": true,
+    "protected_original_counts": {
+      "unknown_tasks": 87,
+      "holds": 30,
+      "withdrawals": 28,
+      "message_jobs": 23,
+      "handoffs": 10
+    }
+  },
+  "owned_cleanup": {
+    "passed": true,
+    "close": {
+      "closed": true,
+      "owned_window_id": 10377,
+      "others_retained": 3
+    },
+    "owned_pane_absent": true,
+    "owned_shell_absent": true,
+    "owned_codex_children_already_exited": true,
+    "original_codex_pids_unchanged": [
+      36878,
+      65258
+    ],
+    "other_current_panes_preserved": [
+      "terminal:8193:ttys000",
+      "terminal:8818:ttys003",
+      "terminal:10343:ttys002"
+    ],
+    "clipboard_text_sha256": "ac3d4ec296ece8ad665932acfb6fd4ae7a6804eb0363b35d4e10776a6304fed2",
+    "clipboard_text_equals_initial": true,
+    "no_clipboard_overwrite_performed": true,
+    "prior_idle9199_gap": "unattributed absence observed beforeCore03, not claimed preserved"
+  },
+  "release_artifacts": {
+    "full_zip_sha256": "d6bc6233dcdbc1d1ce0406704055d89a4a09a9220c81fc70e6b068d2761329ae",
+    "runtime_tar_sha256": "e1f93fc068ba6ffd853df71ba0fe89da3bd59152a0af61cc39eff4896da26b97",
+    "wheel_sha256": "15a76e3ae40e072618a900a83ef6a11b6fcfa332496050f83ab3a87084bca240"
+  },
+  "final_packaged_runtime_acceptance": {
+    "source_commit": "04faa3b40e972cf155704dc5cb10a1784f8c10cb",
+    "source_sha256": "a8f8f3915531ed5e6464f5ccb613a163523a526e2a3ee199bea9b0bf0d2b807c",
+    "passed": true,
+    "checks": [
+      {
+        "name": "background35s_with45s_runtime_and30s_admission",
+        "passed": true,
+        "admission_seconds": 0.22459878999507055,
+        "seconds": 35.95379202498589,
+        "pid": 26664,
+        "crossed_admission_budget_while_running": true,
+        "spawn_count_after_id_reuse": 1
+      },
+      {
+        "name": "applications_60s",
+        "state": "completed",
+        "seconds": 22.525826429016888,
+        "pid": 26737,
+        "bytes": 578524,
+        "applications": 1407,
+        "passed": true,
+        "live_session_members_after_cleanup": []
+      },
+      {
+        "name": "applications_1s",
+        "state": "failed",
+        "seconds": 2.1156485300161876,
+        "pid": 26805,
+        "passed": true,
+        "live_session_members_after_cleanup": []
+      }
+    ],
+    "owned_core_shutdown": true
+  }
+}

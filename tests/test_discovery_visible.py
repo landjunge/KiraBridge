@@ -36,7 +36,7 @@ async def test_real_http_initialization_and_fresh_catalog_agree_with_grants(
         }
     ]
 
-    async def catalog(principal):
+    async def catalog(principal, *, transport=None):
         bridge.security.principal(principal, "session.inspect")
         return {"status": "available", "sessions": copy.deepcopy(rows)}
 
@@ -50,7 +50,9 @@ async def test_real_http_initialization_and_fresh_catalog_agree_with_grants(
         health = (
             await pool.call("local", "bridge_health", {"observe_terminals": True})
         ).structuredContent
-        catalog_result = (await pool.call("local", "operation_catalog", {})).structuredContent
+        catalog_result = (
+            await pool.call("local", "operation_catalog", {"observe_terminals": True})
+        ).structuredContent
         inventory = (await pool.call("local", "agent_inventory", {})).structuredContent
         assert not health["approval_required"]
         assert not catalog_result["operations"]["session.open"]["approval_required"]
@@ -190,7 +192,7 @@ async def test_stale_explicit_window_cannot_receive_input(bridge, config, monkey
     config.principals["local"].capabilities.append("session.inspect")
     config.principals["local"].executables.append("/bin/echo")
 
-    async def catalog(principal):
+    async def catalog(principal, *, transport=None):
         return {"sessions": [{"pane_id": "terminal:123:ttys004", "expected_pid": 346}]}
 
     async def never(*args, **kwargs):
@@ -308,7 +310,7 @@ async def test_health_monitors_leave_terminal_read_capacity_available(
     policy.permission_level = "full"
     catalog_calls = []
 
-    async def catalog(principal):
+    async def catalog(principal, *, transport=None):
         catalog_calls.append(principal)
         await asyncio.sleep(0.05)
         return {"status": "available", "sessions": []}

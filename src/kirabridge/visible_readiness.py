@@ -7,6 +7,29 @@ No input, process operations or identity inference takes place here.
 import re
 
 
+def _codex_transcript_navigation(line):
+    """Known transcript controls coexist with Codex's live input widget."""
+    return bool(
+        re.fullmatch(
+            r"New activity · (?:"
+            r"(?:↓ )?Back to bottom · esc|"
+            r"enter/esc latest(?:[ \t]+⚠ \d+ warnings? · f2 to view)?"
+            r")",
+            line.strip(),
+        )
+    )
+
+
+def codex_input_footer(line):
+    """Recognize only supported rows below the Codex composer."""
+    line = line.strip()
+    return bool(
+        re.match(r"^GPT-\S+.*", line)
+        or ("for agents" in line and "? for shortcuts" in line)
+        or _codex_transcript_navigation(line)
+    )
+
+
 def display_text(text):
     text = text.replace("\r\n", "\n")
     text = re.sub(r"\x1b\[[0-9;:]*m", "", text)
@@ -22,7 +45,10 @@ def input_view(target, text):
     if target == "grok" and "╭" in text:
         return text[text.rfind("╭") :]
     if target == "codex":
-        prompts = list(re.finditer(r"(?m)^[ \t]*›[^\n]*", text))
+        # The busy Codex composer uses U+00BB; submitted history retains
+        # U+203A. Ignoring the busy marker selects a previous submitted prompt
+        # and misreports that old text as current pending input.
+        prompts = list(re.finditer(r"(?m)^[ \t]*[›»][^\n]*", text))
         return text[prompts[-1].start() :] if prompts else ""
     return text if target not in {"grok", "codex"} else ""
 
@@ -47,33 +73,38 @@ def assess(target, raw, binding, protocol=None):
     first = view.splitlines()[0].strip()
     if target == "codex":
         # The final input row, not any previous user prompt in visible output.
-        empty = bool(re.fullmatch(binding.ready_pattern, first))
+        queue_composer = first.startswith("»")
+        candidate = "›" + first[1:] if queue_composer else first
+        empty = bool(re.fullmatch(binding.ready_pattern, candidate))
         base["input_empty"] = empty
         prelude = text[: text.rfind(view)].rstrip()
         current_block = re.split(r"\n[ \t]*\n", prelude)[-1] if prelude else ""
         current = current_block + "\n" + view
         if not empty:
             return result("input_not_empty", "existing_input_must_not_be_overwritten")
+        if queue_composer:
+            # Recognize the empty field without authorizing queued input into
+            # a running turn. An idle protocol that disagrees also fails closed.
+            return result(
+                "unknown" if protocol and protocol.get("state") == "idle" else "working",
+                "protocol_display_disagree"
+                if protocol and protocol.get("state") == "idle"
+                else "current_queue_composer",
+            )
         if protocol and protocol.get("state") == "working":
             return result("working", "bound_codex_turn_active")
         if "tab to queue message" in view:
             return result("working", "current_queue_hint")
-        # The TUI can leave a scroll hint visible while its live prompt is empty.
-        # A bound idle event stream makes that viewport hint irrelevant to input.
-        scroll_controls = re.search(r"Back to bottom|enter/esc latest", current, re.I)
+        # These exact controls navigate the transcript above the live composer;
+        # they do not prove the input is hidden. Unknown scroll views still block.
+        activity_text = "\n".join(
+            line for line in current.splitlines() if not _codex_transcript_navigation(line)
+        )
+        scroll_controls = re.search(r"Back to bottom|enter/esc latest", activity_text, re.I)
         if scroll_controls and not (protocol and protocol.get("state") == "idle"):
             return result("scrolled", "current_scroll_controls")
         footer = [line.strip() for line in view.splitlines()[1:] if line.strip()]
-        known_footer = all(
-            re.match(r"^GPT-\S+.*", line)
-            or ("for agents" in line and "? for shortcuts" in line)
-            or (
-                line.startswith("New activity")
-                and "enter/esc latest" in line
-                and re.search(r"⚠ \d+ warnings · f2 to view$", line)
-            )
-            for line in footer
-        )
+        known_footer = all(codex_input_footer(line) for line in footer)
         if not known_footer:
             return result("unknown", "unrecognized_footer_or_dialog")
         # Real progress is above the prompt. An idle protocol observation cannot
@@ -97,7 +128,10 @@ def assess(target, raw, binding, protocol=None):
                 else "bound_codex_state_unavailable",
             )
         # Without a bound protocol, ambiguous work words are not an idle proof.
-        if binding.busy_pattern and re.search(binding.busy_pattern, text, re.I):
+        activity_text = "\n".join(
+            line for line in text.splitlines() if not _codex_transcript_navigation(line)
+        )
+        if binding.busy_pattern and re.search(binding.busy_pattern, activity_text, re.I):
             return result("unknown", "unbound_ambiguous_activity_text")
         return result("ready", "current_empty_widget")
 

@@ -1,5 +1,9 @@
 [Deutsch](DEVELOPERS.de.md) · [README](../README.md)
 
+Current status: [RC30, published and installed](RC30-HOTPATHS-20261103.md),
+source pin `2d540ee05f945efdd2330b46a1a65a4b94bcb482`. Dated release claims
+in the retained guide below describe RC20.
+
 # KiraBridge: development and operations
 
 ## Source and release

@@ -1,0 +1,128 @@
+{
+  "scope": "Temporal same-host match of task interval within one complete initialize/notification/tools-call tunnel log group; no direct task_id in tunnel log, so not authenticated request-ID matching",
+  "source_commit": "5f99daabd4aa4a77049e6d81d54a0d8c18335397",
+  "event_semantics": "processor.go emits forwarded-command log after forwardResponses returns (including response posting); notification log follows acknowledgment POST",
+  "complete_groups": 82,
+  "matched": [
+    {
+      "task_id": "rc27_realkeys_20261103_0042_0",
+      "candidate_count": 1,
+      "request_ref": "8f1eb3cad948",
+      "initialize_response_posted_at": 1793662717.782846,
+      "notification_ack_posted_at": 1793662718.553889,
+      "tool_response_posted_at": 1793662719.365964,
+      "created": 1793662718.6066382,
+      "finished": 1793662719.017725,
+      "initialize_posted_to_core_created_ms": 823.7922191619873,
+      "core_finished_to_response_posted_ms": 348.2389450073242
+    },
+    {
+      "task_id": "rc27_realkeys_20261103_0042_1",
+      "candidate_count": 1,
+      "request_ref": "1711ff9fe182",
+      "initialize_response_posted_at": 1793662722.342016,
+      "notification_ack_posted_at": 1793662723.533368,
+      "tool_response_posted_at": 1793662725.147072,
+      "created": 1793662724.426964,
+      "finished": 1793662724.7386649,
+      "initialize_posted_to_core_created_ms": 2084.9480628967285,
+      "core_finished_to_response_posted_ms": 408.40721130371094
+    },
+    {
+      "task_id": "rc27_realkeys_20261103_0042_2",
+      "candidate_count": 1,
+      "request_ref": "8d5447897088",
+      "initialize_response_posted_at": 1793662727.882939,
+      "notification_ack_posted_at": 1793662728.498327,
+      "tool_response_posted_at": 1793662729.550045,
+      "created": 1793662728.607488,
+      "finished": 1793662728.857603,
+      "initialize_posted_to_core_created_ms": 724.5488166809082,
+      "core_finished_to_response_posted_ms": 692.4419403076172
+    },
+    {
+      "task_id": "rc27_realkeys_20261103_0042_3",
+      "candidate_count": 1,
+      "request_ref": "1a0e3c94c4c2",
+      "initialize_response_posted_at": 1793662730.953539,
+      "notification_ack_posted_at": 1793662733.555908,
+      "tool_response_posted_at": 1793662734.552536,
+      "created": 1793662733.5852768,
+      "finished": 1793662733.835732,
+      "initialize_posted_to_core_created_ms": 2631.7379474639893,
+      "core_finished_to_response_posted_ms": 716.804027557373
+    },
+    {
+      "task_id": "rc27_realkeys_20261103_0042_4",
+      "candidate_count": 1,
+      "request_ref": "0c459ba8bf6a",
+      "initialize_response_posted_at": 1793662735.882657,
+      "notification_ack_posted_at": 1793662736.487281,
+      "tool_response_posted_at": 1793662737.40458,
+      "created": 1793662736.818291,
+      "finished": 1793662737.071757,
+      "initialize_posted_to_core_created_ms": 935.6338977813721,
+      "core_finished_to_response_posted_ms": 332.8230381011963
+    },
+    {
+      "task_id": "rc27_realkeys_20261103_0042_5",
+      "candidate_count": 1,
+      "request_ref": "a7b037850239",
+      "initialize_response_posted_at": 1793662738.839009,
+      "notification_ack_posted_at": 1793662739.197427,
+      "tool_response_posted_at": 1793662740.183259,
+      "created": 1793662739.59863,
+      "finished": 1793662739.870686,
+      "initialize_posted_to_core_created_ms": 759.6209049224854,
+      "core_finished_to_response_posted_ms": 312.5729560852051
+    },
+    {
+      "task_id": "rc27_realkeys_20261103_0042_6",
+      "candidate_count": 1,
+      "request_ref": "0c94a7a69b90",
+      "initialize_response_posted_at": 1793662744.722373,
+      "notification_ack_posted_at": 1793662745.562823,
+      "tool_response_posted_at": 1793662746.584175,
+      "created": 1793662745.667188,
+      "finished": 1793662745.9332428,
+      "initialize_posted_to_core_created_ms": 944.814920425415,
+      "core_finished_to_response_posted_ms": 650.9323120117188
+    },
+    {
+      "task_id": "rc27_realkeys_20261103_0042_7",
+      "candidate_count": 1,
+      "request_ref": "0dac71786dde",
+      "initialize_response_posted_at": 1793662750.560145,
+      "notification_ack_posted_at": 1793662751.815201,
+      "tool_response_posted_at": 1793662752.691741,
+      "created": 1793662751.846091,
+      "finished": 1793662752.369846,
+      "initialize_posted_to_core_created_ms": 1285.9461307525635,
+      "core_finished_to_response_posted_ms": 321.89488410949707
+    },
+    {
+      "task_id": "rc27_long_poem_20261103_0040",
+      "candidate_count": 1,
+      "request_ref": "e197afe0bfcd",
+      "initialize_response_posted_at": 1793662686.926515,
+      "notification_ack_posted_at": 1793662687.333634,
+      "tool_response_posted_at": 1793662688.561789,
+      "created": 1793662687.634409,
+      "finished": 1793662688.238189,
+      "initialize_posted_to_core_created_ms": 707.8938484191895,
+      "core_finished_to_response_posted_ms": 323.60005378723145
+    },
+    {
+      "task_id": "rc27_poem_20261103_0037",
+      "candidate_count": 1,
+      "request_ref": "b4947ef85b4f",
+      "initialize_response_posted_at": 1793662645.503057,
+      "notification_ack_posted_at": 1793662645.772453,
+      "tool_response_posted_at": 1793662647.49166,
+      "created": 1793662646.5955222,
+      "finished": 1793662646.9368598,
+      "initialize_posted_to_core_created_ms": 1092.4651622772217,
+      "core_finished_to_response_posted_ms": 554.800271987915
+    }
+  ]
+}

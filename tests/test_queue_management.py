@@ -169,8 +169,11 @@ async def test_manual_grants_require_exact_approval_and_control_lane(queues, bri
     assert pending["state"] == "created"
     # The old queued message is not delivered by this isolated test.
     approved = bridge.security.grant("local", task)
-    bridge.submit("local", task, approved)
-    bridge.tasks.approve(task.task_id)
+    submitted = bridge.submit("local", task, approved)
+    assert submitted["state"] == "queued"
+    with pytest.raises(BridgeError) as repeated:
+        bridge.tasks.approve(task.task_id)
+    assert repeated.value.code == "state_conflict"
     assert bridge.store.claim("control-worker", 20, "stop")["id"] == task.task_id
 
 

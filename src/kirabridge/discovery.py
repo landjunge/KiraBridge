@@ -9,10 +9,11 @@ from kirabridge.bridge_core.models import BridgeError, digest
 from kirabridge.permissions import decision, direct_terminal_required, permission_revision
 
 
-def snapshot(bridge, principal):
+def _snapshot_facts(bridge, principal):
     policy = bridge.security.principal(principal)
     observed = getattr(bridge, "discovery_observations", {}).get(principal)
     current_permissions = permission_revision(bridge.config)
+    platform = bridge.macos.snapshot()
     access = decision(bridge.config, principal, "session.catalog")
     if observed and observed.get("permission_revision") != current_permissions:
         observed = None
@@ -26,7 +27,8 @@ def snapshot(bridge, principal):
         {
             "version": __version__,
             "instance": bridge.runtime["instance_id"],
-            "permissions": permission_revision(bridge.config),
+            "permissions": current_permissions,
+            "platform": platform["revision"],
             "agents": {
                 name: value.model_dump()
                 for name, value in bridge.config.agents.items()
@@ -35,16 +37,45 @@ def snapshot(bridge, principal):
             "sessions": observed.get("revision") if observed else None,
         }
     )
+    return policy, observed, current_permissions, platform, revision
+
+
+def epoch(bridge, principal):
+    """Fresh lightweight schema epoch, without the full presentation payload."""
+    _, _, permissions, platform, revision = _snapshot_facts(bridge, principal)
     return {
         "version": __version__,
         "instance_id": bridge.runtime["instance_id"],
         "principal": principal,
         "revision": revision,
-        "permission_revision": permission_revision(bridge.config),
+        "permission_revision": permissions,
+        "platform_revision": platform["revision"],
+    }
+
+
+def snapshot(bridge, principal):
+    policy, observed, current_permissions, platform, revision = _snapshot_facts(bridge, principal)
+    return {
+        "version": __version__,
+        "instance_id": bridge.runtime["instance_id"],
+        "principal": principal,
+        "revision": revision,
+        "permission_revision": current_permissions,
+        "platform": platform,
         "capabilities": sorted(policy.capabilities),
         "refresh": {
-            "on": ["connection", "version", "instance", "permissions", "terminal_session"],
-            "tools_list": "fresh per request; stdio proxy forwards list-change notifications",
+            "on": [
+                "connection",
+                "version",
+                "instance",
+                "permissions",
+                "terminal_session",
+                "platform",
+            ],
+            "tools_list": (
+                "explicit tools/list is fresh; stdio call schemas cached <=30s "
+                "with epoch/notification invalidation"
+            ),
             "client_action": (
                 "Refresh tools/list and operation_catalog when revision changes; "
                 "never replay writes"
@@ -69,6 +100,17 @@ def snapshot(bridge, principal):
                 "stored plus validated durable receipt; "
                 "transferred bytes alone are not import success"
             ),
+        },
+        "keyboard": {
+            "tool": "keyboard_control",
+            "operation": "keyboard.control",
+            "profile_required": False,
+            "event_subscription_required": False,
+            "target_selection": "application name, exact PID/start pair, or fresh foreground app",
+            "target_inspection": "automatic before native input",
+            "permission": decision(bridge.config, principal, "keyboard.control"),
+            "os_permission_requested_automatically": False,
+            "success_scope": "native posting evidence; application processing is not confirmed",
         },
         "direct_terminal": {
             "tool": "terminal_control",

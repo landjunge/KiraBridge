@@ -1,0 +1,34 @@
+{
+  "scope": "One actual read-only App clipboard_info call bracketed by local tunnel metric reads; no Voice/model turn between reads",
+  "elapsed_ms": 2598,
+  "error": false,
+  "before": {
+    "methods": {
+      "initialize": 82,
+      "tools/call": 82,
+      "notifications/initialized": 82
+    },
+    "post": {
+      "sum_seconds": 165.72116999499997,
+      "count": 246
+    }
+  },
+  "after": {
+    "methods": {
+      "initialize": 83,
+      "tools/call": 83,
+      "notifications/initialized": 83
+    },
+    "post": {
+      "sum_seconds": 166.52068704999996,
+      "count": 249
+    }
+  },
+  "delta_methods": {
+    "initialize": 1,
+    "tools/call": 1,
+    "notifications/initialized": 1
+  },
+  "delta_post_count": 3,
+  "delta_post_sum_ms": 799.5170549999955
+}

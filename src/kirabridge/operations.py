@@ -7,8 +7,17 @@ manager, platform adapter or configuration and cannot start work.
 from dataclasses import asdict, dataclass
 from typing import Literal
 
+from kirabridge.system_operations import SYSTEM_LEAVES, SYSTEM_READ_OPERATIONS
+
 READ_OPERATIONS = frozenset(
     {
+        *SYSTEM_READ_OPERATIONS,
+        "keyboard.profiles.list",
+        "keyboard.profiles.get",
+        "keyboard.profiles.resolve",
+        "process.output",
+        "system.report",
+        "platform.status",
         "files.inventory",
         "files.status",
         "connection.check",
@@ -33,6 +42,7 @@ STOP_OPERATIONS = frozenset(
 )
 RESERVED_READ_OPERATIONS = frozenset(
     {
+        "platform.status",
         "session.catalog",
         "session.read",
         "files.inventory",
@@ -63,9 +73,19 @@ OPERATIONS = {}
 for _name in (
     *READ_OPERATIONS,
     *STOP_OPERATIONS,
+    *SYSTEM_LEAVES,
     "files.prepare",
     "files.transfer",
     "session.open",
+    "keyboard.key",
+    "keyboard.system_key",
+    "keyboard.control",
+    "keyboard.sequence",
+    "keyboard.chord",
+    "keyboard.text",
+    "keyboard.action",
+    "keyboard.profiles.put",
+    "keyboard.profiles.delete",
     "session.input",
     "session.focus",
     "session.close",
@@ -83,12 +103,38 @@ for _name in (
     "handoff.answer",
     "handoff.reconcile",
     "handoff.decide",
+    "threaddesk.dynamic",
     "threaddesk.manage",
     "threaddesk.knowledge",
     "admin.execute",
 ):
     OPERATIONS[_name] = Operation(
-        capability="task.cancel"
+        capability="process.inspect"
+        if _name == "process.output"
+        else "keyboard.profiles.read"
+        if _name in {"keyboard.profiles.list", "keyboard.profiles.get", "keyboard.profiles.resolve"}
+        else "keyboard.profiles.manage"
+        if _name in {"keyboard.profiles.put", "keyboard.profiles.delete"}
+        else "keyboard.shortcuts.read"
+        if _name == "keyboard.shortcuts.discover"
+        else "keyboard.execute"
+        if _name
+        in {
+            "keyboard.key",
+            "keyboard.chord",
+            "keyboard.text",
+            "keyboard.action",
+            "keyboard.control",
+            "keyboard.sequence",
+            "keyboard.system_key",
+        }
+        else "keyboard.inspect"
+        if _name == "keyboard.system_inventory"
+        else "bridge.health"
+        if _name == "platform.status"
+        else "threaddesk.manage"
+        if _name == "threaddesk.dynamic"
+        else "task.cancel"
         if _name == "queue.control"
         else "files.inspect"
         if _name in {"files.inventory", "files.status"}

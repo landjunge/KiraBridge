@@ -10,6 +10,7 @@ import hashlib
 import io
 import json
 import os
+import platform
 import plistlib
 import re
 import selectors
@@ -262,13 +263,16 @@ def private_dir(path):
         raise RuntimeError(f"owner-only directory required, permissions not changed: {path}")
 
 
-def atomic(path, data, mode=0o600):
+def atomic(path, data, mode=0o600, *, exact_mode=False):
     path.parent.mkdir(parents=True, exist_ok=True)
     if path.is_symlink():
         raise RuntimeError(f"symlink destination refused: {path}")
     temporary = path.with_name("." + path.name + "-" + uuid.uuid4().hex)
     fd = os.open(temporary, os.O_CREAT | os.O_EXCL | os.O_WRONLY | os.O_NOFOLLOW, mode)
     try:
+        if exact_mode:
+            # Bootstrap uses umask 077; native archive modes are explicit and pinned.
+            os.fchmod(fd, mode)
         with os.fdopen(fd, "wb") as stream:
             stream.write(data.encode() if isinstance(data, str) else data)
             stream.flush()
@@ -283,7 +287,11 @@ def jwrite(path, value):
 
 
 def sha(path):
-    return hashlib.sha256(path.read_bytes()).hexdigest()
+    digest = hashlib.sha256()
+    with path.open("rb") as stream:
+        while chunk := stream.read(1024 * 1024):
+            digest.update(chunk)
+    return digest.hexdigest()
 
 
 def settings(config):
@@ -359,6 +367,171 @@ def cli(release, config, *args, timeout=30):
     )
 
 
+def bundle_member(root, name):
+    if not isinstance(name, str):
+        raise RuntimeError("Unsafe bundle member")
+    relative = Path(name)
+    if (
+        not relative.parts
+        or relative.is_absolute()
+        or ".." in relative.parts
+        or relative.as_posix() != name
+    ):
+        raise RuntimeError("Unsafe bundle member")
+    current = root
+    for component in relative.parts:
+        current = current / component
+        if current.is_symlink():
+            raise RuntimeError("Unsafe bundle member symlink")
+    if not current.is_file() or not stat.S_ISREG(current.stat().st_mode):
+        raise RuntimeError("Unsafe bundle member type")
+    return current
+
+
+def native_contract(root, manifest, commit, version):
+    """Manifest-verified regular files only; old release bundles remain rollback inputs."""
+    prefix = "native/KiraBridge.app/"
+    entries = {
+        name: value for name, value in manifest["files"].items() if name.startswith("native/")
+    }
+    descriptor = manifest.get("native_app")
+    if descriptor is None:
+        if (
+            manifest.get("native_app_required")
+            or entries
+            or manifest.get("file_modes")
+            or "payload/src/kirabridge/platform_adapters/macos/system_transport.py"
+            in manifest["files"]
+        ):
+            raise RuntimeError("Required native app descriptor is missing")
+        return None
+    if (
+        not isinstance(descriptor, dict)
+        or descriptor.get("schema") != "kirabridge.native-app.v1"
+        or descriptor.get("path") != "native/KiraBridge.app"
+        or type(descriptor.get("protocol")) is not int
+        or descriptor.get("protocol") != 1
+        or descriptor.get("source_commit") != commit
+        or descriptor.get("signing") != "ad-hoc"
+        or descriptor.get("architecture") not in {"x86_64", "arm64"}
+        or not isinstance(descriptor.get("binary_sha256"), str)
+        or not re.fullmatch(r"[a-f0-9]{64}", descriptor["binary_sha256"])
+        or manifest.get("native_app_required") is not True
+        or not entries
+        or len(entries) > 1000
+        or any(not name.startswith(prefix) for name in entries)
+    ):
+        raise RuntimeError("Native app descriptor identity is invalid")
+    if (
+        manifest.get("platforms", ["Darwin-" + descriptor["architecture"]])
+        != ["Darwin-" + descriptor["architecture"]]
+        or sys.platform == "darwin"
+        and descriptor["architecture"] != platform.machine()
+    ):
+        raise RuntimeError("Native app architecture does not match this host")
+    modes = manifest.get("file_modes")
+    if not isinstance(modes, dict) or set(modes) != set(entries):
+        raise RuntimeError("Native app file modes are incomplete")
+    required = {
+        prefix + "Contents/Info.plist",
+        prefix + "Contents/MacOS/KiraBridge",
+        prefix + "Contents/_CodeSignature/CodeResources",
+    }
+    if not required.issubset(entries):
+        raise RuntimeError("Native app files are incomplete")
+    actual, total = set(), 0
+    native = root / "native"
+    if native.is_symlink() or not native.is_dir():
+        raise RuntimeError("Unsafe native app directory")
+    for path in native.rglob("*"):
+        if path.is_symlink():
+            raise RuntimeError("Unsafe native app symlink")
+        if path.is_dir():
+            continue
+        actual.add(path.relative_to(root).as_posix())
+    if actual != set(entries):
+        raise RuntimeError("Native app has unlisted or missing members")
+    for name in entries:
+        path = bundle_member(root, name)
+        mode = modes[name]
+        if (
+            type(mode) is not int
+            or mode not in {0o644, 0o755}
+            or stat.S_IMODE(path.stat().st_mode) != mode
+        ):
+            raise RuntimeError("Native app file mode mismatch")
+        size = path.stat().st_size
+        total += size
+        if size > 32 * 1024 * 1024 or total > 64 * 1024 * 1024:
+            raise RuntimeError("Native app exceeds package limits")
+        if sha(path) != entries[name]:
+            raise RuntimeError("Native app checksum mismatch")
+    binary = prefix + "Contents/MacOS/KiraBridge"
+    if modes[binary] != 0o755 or entries[binary] != descriptor["binary_sha256"]:
+        raise RuntimeError("Native app binary pin mismatch")
+    with bundle_member(root, binary).open("rb") as stream:
+        header = stream.read(32)
+    # The companion builder emits a thin, 64-bit MH_EXECUTE, never a universal
+    # wrapper or an archive/script. CPU declarations alone cannot prove that.
+    architecture = {0x01000007: "x86_64", 0x0100000C: "arm64"}.get(
+        int.from_bytes(header[4:8], "little")
+    )
+    if (
+        len(header) != 32
+        or header[:4] != b"\xcf\xfa\xed\xfe"
+        or int.from_bytes(header[12:16], "little") != 2
+        or architecture != descriptor["architecture"]
+    ):
+        raise RuntimeError("Native app Mach-O architecture differs from descriptor")
+    info = plistlib.loads(bundle_member(root, prefix + "Contents/Info.plist").read_bytes())
+    if (
+        info.get("CFBundleIdentifier") != "de.netzwerkpunkt.kirabridge"
+        or info.get("CFBundleExecutable") != "KiraBridge"
+        or info.get("KiraBridgeSourceCommit") != commit
+        or info.get("KiraBridgeVersion") != version
+        or type(info.get("KiraBridgeSystemProtocol")) is not int
+        or info.get("KiraBridgeSystemProtocol") != 1
+    ):
+        raise RuntimeError("Native app plist identity mismatch")
+    return {
+        "native_app_required": True,
+        "native_app": descriptor,
+        "files": entries,
+        "file_modes": modes,
+    }
+
+
+def copy_native(root, destination, contract):
+    """Copy verified bytes once; never execute the app or modify user Applications."""
+    for name, expected in contract["files"].items():
+        source = bundle_member(root, name)
+        fd = os.open(source, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+        try:
+            before = os.fstat(fd)
+            if not stat.S_ISREG(before.st_mode) or before.st_size > 32 * 1024 * 1024:
+                raise RuntimeError("Unsafe native app source")
+            with os.fdopen(fd, "rb", closefd=False) as stream:
+                data = stream.read(32 * 1024 * 1024 + 1)
+            after = os.fstat(fd)
+            if (
+                before.st_dev,
+                before.st_ino,
+                before.st_size,
+                before.st_mtime_ns,
+                before.st_ctime_ns,
+            ) != (
+                after.st_dev,
+                after.st_ino,
+                after.st_size,
+                after.st_mtime_ns,
+                after.st_ctime_ns,
+            ) or hashlib.sha256(data).hexdigest() != expected:
+                raise RuntimeError("Native app changed during verified copy")
+        finally:
+            os.close(fd)
+        atomic(destination / name, data, contract["file_modes"][name], exact_mode=True)
+
+
 def prepare_bundle(args):
     bundle = args.bundle.resolve()
     manifest = json.loads((bundle / "release.json").read_text())
@@ -367,19 +540,36 @@ def prepare_bundle(args):
         raise RuntimeError("Invalid bundle commit")
     if not re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+(?:(?:a|b|rc)[0-9]+)?", version):
         raise RuntimeError("Invalid bundle version")
+    if not isinstance(manifest.get("files"), dict):
+        raise RuntimeError("Invalid bundle checksum declaration")
     for name, expected in manifest["files"].items():
-        path = Path(name)
-        if path.is_absolute() or ".." in path.parts or (bundle / path).is_symlink():
-            raise RuntimeError("Unsafe bundle member")
-        if sha(bundle / path) != expected:
+        path = bundle_member(bundle, name)
+        if not isinstance(expected, str) or not re.fullmatch(r"[a-f0-9]{64}", expected):
+            raise RuntimeError("Invalid bundle checksum declaration")
+        if sha(path) != expected:
             raise RuntimeError(f"Bundle checksum mismatch: {name}")
+    wheel_name = manifest.get("wheel")
+    if (
+        not isinstance(wheel_name, str)
+        or wheel_name not in manifest["files"]
+        or not wheel_name.endswith(".whl")
+    ):
+        raise RuntimeError("Bundle wheel must be a checksum-pinned member")
+    wheel = bundle_member(bundle, wheel_name)
+    native = native_contract(bundle, manifest, ref, version)
     releases = args.prefix / "releases"
     private_dir(releases)
     destination = releases / (version + "-" + ref[:12])
+    if destination.is_symlink():
+        raise RuntimeError("Existing release symlink refused; preserved")
     if destination.exists():
         saved = json.loads((destination / "release.json").read_text())
         if saved["commit"] != ref or cli_version(destination) != version:
             raise RuntimeError("Existing release identity differs; preserved")
+        if native is not None:
+            if any(saved.get(key) != value for key, value in native.items()):
+                raise RuntimeError("Existing native release identity differs; preserved")
+            native_contract(destination, saved, ref, version)
         return destination
     uv = shutil.which("uv")
     if not uv or run([uv, "--version"], capture=True).decode().split()[:2] != ["uv", "0.11.6"]:
@@ -387,8 +577,10 @@ def prepare_bundle(args):
     private_dir(destination)
     try:
         shutil.copytree(bundle / "payload", destination / "source")
+        if native is not None:
+            copy_native(bundle, destination, native)
+            native_contract(destination, {**manifest, **native}, ref, version)
         source = destination / "source"
-        wheel = bundle / manifest["wheel"]
         run(
             [
                 uv,
@@ -422,7 +614,13 @@ def prepare_bundle(args):
             raise RuntimeError("Installed wheel version mismatch")
         jwrite(
             destination / "release.json",
-            {"version": version, "commit": ref, "lock_sha256": sha(source / "uv.lock")},
+            {
+                "version": version,
+                "commit": ref,
+                "source_commit": ref,
+                "lock_sha256": sha(source / "uv.lock"),
+                **(native or {}),
+            },
         )
     except BaseException:
         shutil.rmtree(destination)
@@ -447,6 +645,25 @@ def prepare(args):
     version = project["project"]["version"]
     if not re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+(?:(?:a|b|rc)[0-9]+)?", version):
         raise RuntimeError("Unsupported release version")
+    if (
+        sys.platform == "darwin"
+        and run(
+            [
+                "git",
+                "-C",
+                args.repo,
+                "ls-tree",
+                "--name-only",
+                ref,
+                "src/kirabridge/platform_adapters/macos/system_transport.py",
+            ],
+            capture=True,
+        ).strip()
+    ):
+        raise RuntimeError(
+            "This macOS revision requires its signed native runtime; "
+            "use the release --bundle package"
+        )
     releases = args.prefix / "releases"
     private_dir(releases)
     destination = releases / (version + "-" + ref[:12])
@@ -767,6 +984,19 @@ def require_queue_compatibility(config, release):
         ) from None
 
 
+def desktop_module(args):
+    path = Path(__file__).with_name("desktop.py")
+    if path.is_symlink():
+        raise RuntimeError("Desktop installer symlink refused")
+    manifest = json.loads((args.bundle / "release.json").read_text())
+    data = path.read_bytes()
+    if hashlib.sha256(data).hexdigest() != manifest.get("files", {}).get("installer/desktop.py"):
+        raise RuntimeError("Desktop installer checksum mismatch")
+    module = types.ModuleType("_kirabridge_desktop_installer")
+    exec(compile(data, str(path), "exec"), module.__dict__)
+    return module
+
+
 def activate(args, release):
     require_visible_terminal(args)
     validate_service_owner(args)
@@ -780,7 +1010,7 @@ def activate(args, release):
     current = args.prefix / "current.json"
     old = json.loads(current.read_text()) if current.exists() else None
     manifest = json.loads((release / "release.json").read_text())
-    if old and old["release"] == str(release):
+    if old and old["release"] == str(release) and not getattr(args, "desktop", False):
         if args.service != "none":
             if not loaded(args):
                 start_service(args)
@@ -823,6 +1053,11 @@ def activate(args, release):
         **manifest,
     }
     jwrite(backup / "transaction.json", before)
+    if getattr(args, "desktop", False):
+        before["desktop"] = desktop_module(args).snapshot(
+            types.SimpleNamespace(**globals()), args, release, old, backup
+        )
+        jwrite(backup / "transaction.json", before)
     say(f"Rückweg gesichert: {backup}. Konfiguration und Zugangsdaten bleiben erhalten.")
     try:
         with idle_guard(args.config):
@@ -890,6 +1125,10 @@ def activate(args, release):
         if args.service != "none":
             health = wait_health(args, release, manifest["version"])
             say(f"Dienst gestartet: Version {health['version']}, PID {health['runtime']['pid']}.")
+        if before.get("desktop"):
+            desktop_module(args).activate(
+                types.SimpleNamespace(**globals()), args, release, before, current
+            )
     except Exception:
         if current.exists() and json.loads(current.read_text()).get("backup") == str(backup):
             say("Umschaltung fehlgeschlagen. Rückweg wird unter erneuter Leerlaufprüfung versucht.")
@@ -912,6 +1151,7 @@ def rollback(args, *, _compensating=False):
     if not current.exists():
         raise RuntimeError("No activated version/recovery record")
     active = json.loads(current.read_text())
+    core_already_restored = active.get("rollback_core_restored", False)
     for key in ("config", "launcher", "plist", "service"):
         if str(getattr(args, key)) != active[key]:
             raise RuntimeError("Rollback arguments differ from activation; no switch")
@@ -921,7 +1161,10 @@ def rollback(args, *, _compensating=False):
         (args.launcher, "installed_wrapper_sha256"),
         (args.plist, "installed_plist_sha256"),
     ]:
-        if active.get(key) and (not path.exists() or sha(path) != active[key]):
+        expected_key = "restored_" + key if active.get("rollback_core_restored") else key
+        if expected_key in active and (
+            (sha(path) if path.exists() else None) != active[expected_key]
+        ):
             raise RuntimeError(
                 "Installed definition changed since activation; preserve and review first"
             )
@@ -932,26 +1175,41 @@ def rollback(args, *, _compensating=False):
         )
         if not _compensating:
             require_visible_terminal(args)
-        stop_service(args)
-        for path, flag, name in [
-            (args.launcher, "had_wrapper", "launcher.before"),
-            (args.plist, "had_plist", "service.before.plist"),
-        ]:
-            if path == args.plist and args.service == "none":
-                continue
-            if active[flag]:
-                saved = backup / name
-                atomic(path, saved.read_bytes(), saved.stat().st_mode & 0o777)
-            else:
-                path.unlink(missing_ok=True)
-        if active["previous"]:
-            jwrite(current, active["previous"])
-        else:
-            current.unlink()
-    if active["was_loaded"]:
+        if not active.get("rollback_core_restored"):
+            stop_service(args)
+            for path, flag, name in [
+                (args.launcher, "had_wrapper", "launcher.before"),
+                (args.plist, "had_plist", "service.before.plist"),
+            ]:
+                if path == args.plist and args.service == "none":
+                    continue
+                if active[flag]:
+                    saved = backup / name
+                    atomic(path, saved.read_bytes(), saved.stat().st_mode & 0o777)
+                else:
+                    path.unlink(missing_ok=True)
+            if active.get("desktop"):
+                active["rollback_core_restored"] = True
+                active["restored_installed_wrapper_sha256"] = (
+                    sha(args.launcher) if args.launcher.exists() else None
+                )
+                active["restored_installed_plist_sha256"] = (
+                    sha(args.plist) if args.plist.exists() else None
+                )
+                jwrite(backup / "transaction.json", active)
+                jwrite(current, active)
+    if active["was_loaded"] and (not core_already_restored or not loaded(args)):
         start_service(args)
+    if active.get("desktop"):
+        desktop_module(args).restore(types.SimpleNamespace(**globals()), active, current)
     if active["was_loaded"] and active.get("previous_version"):
         wait_health(args, Path(active["release"]), active["previous_version"])
+    # Keep the complete active recovery record until every affected component
+    # is restored. Desktop failure must not erase its transaction checkpoint.
+    if active["previous"]:
+        jwrite(current, active["previous"])
+    else:
+        current.unlink()
     say(
         "ZURÜCKGEROLLT: vorheriger Launcher/Dienst wiederhergestellt. "
         "Konfiguration, Zugangsdaten und neue Ergebnisdaten bleiben erhalten."
@@ -1013,7 +1271,16 @@ def _main():
         action="store_true",
         help="Require a fresh confirmed visible macOS Terminal window before activation",
     )
+    parser.add_argument(
+        "--desktop",
+        action="store_true",
+        help="Upgrade the matched desktop app, console and linked ChatGPT service transactionally",
+    )
     args = parser.parse_args()
+    if args.desktop and (sys.platform != "darwin" or not args.bundle or args.test_label):
+        parser.error("--desktop requires a native macOS bundle and the standard user service")
+    if args.desktop and args.action == "install" and not args.require_visible_terminal:
+        parser.error("--desktop installation requires --require-visible-terminal")
     if args.test_label:
         if not re.fullmatch(r"com\.kirabridge\.test\.[a-z0-9-]{8,64}", args.test_label):
             parser.error("Invalid isolated test label")

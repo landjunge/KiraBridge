@@ -1,6 +1,7 @@
 """Durable handoffs to exact existing visible terminals; never spawn a fallback."""
 
 import asyncio
+import hashlib
 import re
 import time
 
@@ -10,13 +11,18 @@ from kirabridge.session_manager import SessionInput
 from kirabridge.visible_binding import (
     binding_still_present,
     catalog_can_replace,
-    identities_disjoint,
+    distinct_window_processes,
     load_refresh,
     replacement_binding,
     save_refresh,
 )
 from kirabridge.visible_readiness import assess, input_view
-from kirabridge.voice_channel import IDENTITIES
+
+RETURN_OBSERVATION_TIMEOUT = 8.0
+
+
+def _text_sha256(value):
+    return hashlib.sha256(value.encode("utf-8")).hexdigest()
 
 
 class VisibleReadinessError(BridgeError):
@@ -30,9 +36,11 @@ class VisibleReadinessError(BridgeError):
             "target_changed": "visible_target_changed",
         }[observation["state"]]
         message = {
-            "working": "Der Agent arbeitet noch; die Nachricht wartet ohne Eingabe.",
+            "working": (
+                "Der Agent arbeitet noch; keine Eingabe und keine automatische Wiederholung."
+            ),
             "input_not_empty": "Im Eingabefeld steht bereits Text; er wird nicht überschrieben.",
-            "scrolled": "Die aktuelle Eingabeansicht ist nicht erreichbar; Nachricht wartet.",
+            "scrolled": "Die aktuelle Eingabeansicht ist nicht erreichbar; keine Eingabe.",
             "unknown": "Die aktuelle Eingabebereitschaft ist nicht eindeutig; keine Eingabe.",
             "target_changed": "Die zugeordnete CLI-Sitzung hat sich geändert; keine Eingabe.",
         }[observation["state"]]
@@ -65,53 +73,100 @@ class VisibleHandoffs:
 
     @staticmethod
     def prompt(principal, target, identifier, body, message_id=None, conversation_id=None):
-        message_id = message_id or "visible-" + digest(identifier)[:48]
-        conversation_id = conversation_id or message_id
-        name = IDENTITIES.get(principal, {}).get("name", principal)
+        """Only the authorized body is terminal input; routing stays internal."""
+        return body
+
+    @staticmethod
+    def insertion_observed(target, text, prompt, identifier, *, before=None, **options):
+        """Reuse the strict literal verifier with the real empty pre-paste frame."""
+        from kirabridge.literal_session_input import insertion_observed
+
+        if before is None:
+            return None
         return (
-            f"[KiraBridge Auftrag {identifier}] Von {name} ({principal}) an {target}. "
-            "Diese KiraBridge-Übergabe verwendet die bestehende sichtbare Sitzung. "
-            "Codex/Grok bestimmen ihre internen Arbeitsweisen nach ihren eigenen Regeln. "
-            f"Zuerst über KiraBridge message_receive die Konversation {conversation_id} lesen und "
-            f"Nachricht {message_id} mit deren receipt per message_ack bestätigen. "
-            "Danach den folgenden Auftrag bearbeiten. Antworte am Ende sichtbar hier UND mit "
-            f"message_send an {principal}, conversation_id={conversation_id}, "
-            f"reply_to={message_id}, "
-            "kind=result, request_reply=false, dispatch=false, eigener stabiler idempotency_key. "
-            f"Die Auftrags-ID immer angeben. Auftrag:\n{body}\nKB-END-{digest(identifier)[:12]}"
+            "literal_widget_exact_payload"
+            if insertion_observed(target, text, prompt, before, **options)
+            else None
         )
 
     @staticmethod
-    def insertion_observed(target, text, prompt, identifier):
-        raw_text = text
-        text = VisibleHandoffs.input_view(target, text)
-        if target == "grok":
-            collapsed = re.search(r"\[Pasted: (\d+) lines\]", text)
-            preceding = raw_text[: raw_text.rfind("╭")]
-            preview = preceding[preceding.rfind("╭") :]
-            if (
-                collapsed
-                and int(collapsed[1]) == prompt.count("\n") + 1
-                and "KB-END-" + digest(identifier)[:12] in preview
-                and "paste again or double-cli" in preview
-            ):
-                return "grok_collapsed_paste_lines_and_unique_preview_marker"
-        if "KB-END-" + digest(identifier)[:12] in text:
-            return "visible_end_marker"
-        # Real Codex collapses multiline pastes; the empty pre-state and exact
-        # length bind this observable representation to the just-authorized paste.
-        if target == "codex":
-            match = re.search(r"(?m)^\s*› \[Pasted Content (\d+) chars\]\s*$", text)
-            if match and int(match[1]) == len(prompt):
-                return "codex_collapsed_paste_exact_character_count"
-        return None
+    def body_only_delivery(status):
+        return any(
+            event["state"] == "sent"
+            and event["evidence"].get("prompt_format") == "body_only_v1"
+            and event["evidence"].get("return_sent") is True
+            and event["evidence"].get("input_field_cleared") is True
+            for event in status["events"]
+        )
+
+    @classmethod
+    def body_only_transport_delivery(cls, status):
+        return cls.body_only_delivery(status) and any(
+            event["state"] == "sent"
+            and event["evidence"].get("prompt_format") == "body_only_v1"
+            and event["evidence"].get("return_sent") is True
+            and event["evidence"].get("input_field_cleared") is True
+            and event["evidence"].get("wait_for_reply") is False
+            for event in status["events"]
+        )
+
+    @classmethod
+    def body_only_input_released(cls, status):
+        evidence = status["evidence"]
+        return (
+            status["state"] == "unknown"
+            and evidence.get("prompt_format") == "body_only_v1"
+            and evidence.get("reason") == "body_only_target_ready"
+            and evidence.get("input_reservation_released") is True
+            and evidence.get("return_sent") is True
+            and evidence.get("target_readiness") == "verified_ready_before_new_input"
+            and cls.body_only_delivery(status)
+        )
+
+    async def verify_inserted_body(self, principal, target, binding, prompt, before, after, cwd):
+        from kirabridge.literal_session_input import _task_cwd
+
+        options = {}
+        observed = self.insertion_observed(
+            target, after["text"], prompt, None, before=before["text"]
+        )
+        if not observed and target == "codex":
+            selection = self.sessions.current_selection()
+            if selection and len(prompt) <= 1000:
+                try:
+                    columns = await self.sessions.terminal_app.input_columns(
+                        binding.pane_id,
+                        identity_guard=selection[2],
+                        expected_screen=after["text"],
+                    )
+                except BridgeError:
+                    columns = None
+                if columns is not None:
+                    options["columns"] = columns
+                    observed = self.insertion_observed(
+                        target, after["text"], prompt, None, before=before["text"], **options
+                    )
+            if not observed and cwd is not None:
+                if await _task_cwd(self.sessions, binding) == cwd:
+                    observed = self.insertion_observed(
+                        target,
+                        after["text"],
+                        prompt,
+                        None,
+                        before=before["text"],
+                        cwd=cwd,
+                        **options,
+                    )
+        return observed
 
     def __init__(self, config, store, security, sessions, messages):
         self.config, self.store, self.security = config, store, security
         self.sessions, self.messages = sessions, messages
+        from kirabridge.platform_adapters.codex_reply import CodexReplyObserver
         from kirabridge.platform_adapters.codex_state import CodexTurnState
 
         self.codex_state = CodexTurnState()
+        self.codex_reply = CodexReplyObserver()
         load_refresh(config)
         with store.transaction():
             store.db.execute(
@@ -166,7 +221,7 @@ class VisibleHandoffs:
         idle_reply_pending = (
             status["state"] == "unknown"
             and status["evidence"].get("reason") == "target_idle_reply_unconfirmed"
-        )
+        ) or self.body_only_input_released(status)
         if message["acknowledged"] and status["state"] not in {"completed", "interrupted"}:
             evidence = {
                 "authenticated_principal": status["target"],
@@ -318,6 +373,8 @@ class VisibleHandoffs:
         *,
         busy_message="Existing handoff must finish or reconcile",
         explicit_paste_task_id=None,
+        explicit_handoff_task_id=None,
+        explicit_return_task_id=None,
         observed_sessions=None,
     ):
         """Keep the input lock until authenticated receipt and verified target readiness."""
@@ -337,6 +394,23 @@ class VisibleHandoffs:
                     "Literal paste requires task-owned native identities",
                 )
             await self.check_target(principal, target, binding, ready=True)
+        if explicit_return_task_id is not None:
+            # The key owner has already validated its scoped observation and
+            # current Return frame. This is a resource check, never Paste-ready
+            # permission for a menu or a nonempty composer.
+            selection = self.sessions.current_selection()
+            if (
+                not explicit_return_task_id
+                or not selection
+                or selection[0] != target
+                or selection[1] != binding
+                or binding.expected_pid == binding.agent_pid
+                or not isinstance(selection[2], dict)
+                or not {binding.expected_pid, binding.agent_pid}.issubset(selection[2])
+            ):
+                raise BridgeError(
+                    "visible_selection_required", "Return requires task-owned native identities"
+                )
         active = self.store.db.execute(
             "SELECT id,principal,state,binding FROM visible_handoffs WHERE target=? "
             "AND NOT EXISTS (SELECT 1 FROM queue_holds h WHERE "
@@ -347,16 +421,82 @@ class VisibleHandoffs:
             (target,),
         ).fetchall()
         for row in active:
+            if explicit_return_task_id is not None and self.independent_unknown_paste(
+                row, binding, explicit_return_task_id
+            ):
+                continue  # Another proven-independent resource retains its complete uncertainty.
             if explicit_paste_task_id is not None and self.independent_unknown_paste(
                 row, binding, explicit_paste_task_id
             ):
                 continue  # Original state, binding, events and receipt remain untouched.
+            if explicit_handoff_task_id is not None and self.independent_unknown_paste(
+                row, binding, explicit_handoff_task_id
+            ):
+                # An explicitly addressed, independently identified native pane
+                # is a different resource, not a retry/rebind of the old input.
+                # Default agent delivery must never borrow this exception.
+                selection = self.sessions.current_selection()
+                if (
+                    not selection
+                    or selection[0] != target
+                    or selection[1] != binding
+                    or binding.expected_pid == binding.agent_pid
+                    or not isinstance(selection[2], dict)
+                    or not {binding.expected_pid, binding.agent_pid}.issubset(selection[2])
+                ):
+                    raise BridgeError(
+                        "visible_selection_required",
+                        "Explicit handoff requires task-owned native identities",
+                    )
+                await self.check_target(principal, target, binding, ready=True)
+                continue  # Old uncertainty and its own terminal reservation stay intact.
             if await self._foreign_dead_reservation(
                 principal, target, row, binding, observed_sessions
             ):
                 continue  # Dead pane stays recorded. It does not lock the replacement.
             status = self.reconcile(row["principal"], row["id"])
             if status["state"] in {"completed", "interrupted"}:
+                continue
+            if (
+                self.body_only_delivery(status)
+                and status["binding"] == binding.model_dump()
+                and (
+                    self.body_only_transport_delivery(status)
+                    or self.body_only_input_released(status)
+                )
+                and (
+                    status["state"] in {"sent", "confirmed"}
+                    or (
+                        status["state"] == "unknown"
+                        and status["evidence"].get("reason") == "body_only_target_ready"
+                    )
+                )
+            ):
+                if self.body_only_input_released(status):
+                    # The old input slot was already released. The current
+                    # operation owns its fresh input/menu/key checks; an old
+                    # empty-composer requirement must not override those guards.
+                    continue
+                # Delivery does not claim an answer. A later *fresh* empty/idle
+                # observation of this same exact target releases its input slot.
+                await self.check_target(principal, target, binding, ready=True)
+                if status["evidence"].get("reason") != "body_only_target_ready":
+                    self.transition(
+                        row["id"],
+                        "unknown",
+                        {
+                            **status["evidence"],
+                            "reason": "body_only_target_ready",
+                            "input_reservation_released": True,
+                            "prompt_format": "body_only_v1",
+                            "wait_for_reply": False,
+                            "return_sent": True,
+                            "previous_state": status["state"],
+                            "agent_confirmed": False,
+                            "automatic_retry": False,
+                            "target_readiness": "verified_ready_before_new_input",
+                        },
+                    )
                 continue
             message = self.messages.get(row["principal"], status["message_id"])
             reply = self.store.db.execute(
@@ -500,12 +640,13 @@ class VisibleHandoffs:
             original = VisibleTerminalBinding.model_validate_json(row["binding"])
         except (ValueError, TypeError):
             return False
-        if not identities_disjoint(original, binding):
+        if not distinct_window_processes(original, binding):
             return False
         if observed_sessions is not None and binding_still_present(original, observed_sessions):
             return False
-        # Session input has no overlay yet. Only a full OS inventory may release
-        # the lock; a missing catalog row is not absence.
+        # A tty can be reused as soon as its old window closes. That name is not
+        # the session identity. Only a full native window inventory plus absence
+        # of both original PIDs may release the lock, never a missing catalog row.
         try:
             await self.sessions.prove_original_target_gone(principal, original.model_dump())
         except BridgeError:
@@ -586,30 +727,37 @@ class VisibleHandoffs:
                     )
             return output
 
-    async def submit_inserted(self, identifier, principal, target, binding, running):
+    async def submit_inserted(
+        self,
+        identifier,
+        principal,
+        target,
+        binding,
+        running,
+        *,
+        expected_input_view=None,
+        wait_for_reply=True,
+    ):
         """Exactly one separately recorded Return; never call after an uncertain submit."""
         self.transition(identifier, "submitting", {"agent_confirmed": False})
         view = await self.check_target(principal, target, binding)
-        status = self.status(principal, identifier)
-        message = self.messages.get(principal, status["message_id"])
-        expected_prompt = self.prompt(
-            principal,
-            target,
-            identifier,
-            message["body"],
-            message["id"],
-            message["conversation_id"],
-        )
-        if not self.insertion_observed(target, view["text"], expected_prompt, identifier):
+        if (
+            expected_input_view is not None
+            and self.input_view(target, view["text"]) != expected_input_view
+        ):
             raise UncertainExecution(
                 "visible_insert_unknown", "Inserted input changed; no Return sent"
+            )
+        if expected_input_view is None:
+            raise UncertainExecution(
+                "visible_insert_unknown", "No previously verified input frame; no Return sent"
             )
         await self.sessions.press_return(
             principal, binding.pane_id, binding.expected_pid, expected_screen=view["text"]
         )
         self.transition(identifier, "return_sent", {"return_sent": True, "agent_confirmed": False})
         # Return transport is separate from observable CLI acceptance.
-        deadline = time.monotonic() + 8
+        deadline = time.monotonic() + RETURN_OBSERVATION_TIMEOUT
         while time.monotonic() < deadline:
             view = await self.check_target(principal, target, binding)
             if re.search(binding.ready_pattern, self.input_view(target, view["text"])):
@@ -623,7 +771,14 @@ class VisibleHandoffs:
         self.transition(
             identifier,
             "sent",
-            {"return_sent": True, "input_field_cleared": True, "agent_confirmed": False},
+            {
+                "return_sent": True,
+                "input_field_cleared": True,
+                "agent_confirmed": False,
+                "request_reply_satisfied": False,
+                "prompt_format": "body_only_v1",
+                "wait_for_reply": wait_for_reply,
+            },
         )
         await running({"handoff_id": identifier, "state": "sent", "agent_confirmed": False})
 
@@ -659,17 +814,37 @@ class VisibleHandoffs:
         if self.config.visible_handoffs.bindings.get(status["target"]) != binding:
             raise BridgeError("handoff_conflict", "Original binding changed")
         view = await self.check_target(principal, status["target"], binding)
-        prompt = self.prompt(
-            principal,
-            status["target"],
-            identifier,
-            message["body"],
-            message["id"],
-            message["conversation_id"],
+        verified = next(
+            (
+                event["evidence"]
+                for event in reversed(status["events"])
+                if event["state"] == "inserted"
+                and event["evidence"].get("prompt_format") == "body_only_v1"
+                and event["evidence"].get("prompt_observed") is True
+            ),
+            None,
         )
-        observed = self.insertion_observed(status["target"], view["text"], prompt, identifier)
-        if not observed:
-            raise BridgeError("visible_insert_unknown", "Original unsubmitted paste is not visible")
+        current_view = self.input_view(status["target"], view["text"])
+        if (
+            verified is None
+            or verified.get("expected_payload_sha256") != _text_sha256(message["body"])
+            or verified.get("verified_input_view_sha256") != _text_sha256(current_view)
+        ):
+            raise BridgeError(
+                "return_reconciliation_required",
+                "Original literal input was not verified; inspect it and use an explicit Return",
+            )
+        wait_for_reply = verified.get("wait_for_reply", True)
+        if type(wait_for_reply) is not bool or wait_for_reply != bool(message["request_reply"]):
+            raise BridgeError(
+                "return_reconciliation_required", "Original reply preference is not consistent"
+            )
+        observed = "same_previously_verified_literal_widget"
+        local_reply = verified.get("local_reply_observer")
+        if isinstance(local_reply, dict) and local_reply.get("state") == "ready":
+            local_reply = await self.codex_reply.before_submit(
+                local_reply["cursor"], binding, body=message["body"]
+            )
         self.transition(
             identifier,
             "inserted",
@@ -678,10 +853,19 @@ class VisibleHandoffs:
                 "reconciled_without_paste": True,
                 "return_sent": False,
                 "agent_confirmed": False,
+                **({"local_reply_observer": local_reply} if isinstance(local_reply, dict) else {}),
             },
         )
         try:
-            await self.submit_inserted(identifier, principal, status["target"], binding, running)
+            await self.submit_inserted(
+                identifier,
+                principal,
+                status["target"],
+                binding,
+                running,
+                expected_input_view=current_view,
+                wait_for_reply=wait_for_reply,
+            )
         except BaseException as exc:
             self.transition(
                 identifier,
@@ -692,6 +876,59 @@ class VisibleHandoffs:
         return self.status(principal, identifier)
 
     async def execute(self, task, args, running, progress, *, binding_override=None):
+        started = time.monotonic()
+        error = None
+        cause_error = None
+        try:
+            return await self._execute_selected(
+                task, args, running, progress, binding_override=binding_override
+            )
+        except BaseException as exc:
+            code = getattr(exc, "code", None)
+            error = (
+                code
+                if isinstance(code, str) and re.fullmatch(r"[a-z][a-z0-9_]{0,79}", code)
+                else "cancelled"
+                if isinstance(exc, asyncio.CancelledError)
+                else "timeout"
+                if isinstance(exc, TimeoutError)
+                else "unexpected_error"
+            )
+            cause = exc.__cause__
+            cause_code = getattr(cause, "code", None)
+            if isinstance(cause_code, str) and re.fullmatch(r"[a-z][a-z0-9_]{0,79}", cause_code):
+                cause_error = cause_code
+            elif isinstance(cause, TimeoutError):
+                cause_error = "timeout"
+            raise
+        finally:
+            # One bounded diagnostic per invocation. No screen, prompt, payload,
+            # exception message or credentials enter this diagnostic event.
+            row = self.store.db.execute(
+                "SELECT state FROM visible_handoffs WHERE id=?", (task["id"],)
+            ).fetchone()
+            last = self.store.db.execute(
+                "SELECT state FROM visible_handoff_events WHERE id=? "
+                "AND state NOT IN ('unknown','interrupted') ORDER BY seq DESC LIMIT 1",
+                (task["id"],),
+            ).fetchone()
+            self.store.audit(
+                "control.handoff.diagnostic",
+                task["principal"],
+                None,
+                {
+                    "handoff_id": task["id"],
+                    "at": time.time(),
+                    "duration_ms": round((time.monotonic() - started) * 1000, 3),
+                    "state": row[0] if row else "not_started",
+                    "phase": last[0] if last else "preflight",
+                    "error": error,
+                    "cause_error": cause_error,
+                    "automatic_retry": False,
+                },
+            )
+
+    async def _execute_selected(self, task, args, running, progress, *, binding_override=None):
         policy = self.security.principal(task["principal"], "agent.execute")
         if args.agent not in policy.agents:
             raise BridgeError("agent_denied", "Selected agent is not granted to this identity")
@@ -717,13 +954,28 @@ class VisibleHandoffs:
                 binding = VisibleTerminalBinding.model_validate_json(stored["binding"])
         async with self.sessions.agent_selection(task["principal"], args.agent, binding):
             return await self._execute(
-                task, args, running, progress, binding_override=binding, observed_sessions=observed
+                task,
+                args,
+                running,
+                progress,
+                binding_override=binding,
+                observed_sessions=observed,
+                explicit_selection=binding_override is not None,
             )
 
     async def _execute(
-        self, task, args, running, progress, *, binding_override=None, observed_sessions=None
+        self,
+        task,
+        args,
+        running,
+        progress,
+        *,
+        binding_override=None,
+        observed_sessions=None,
+        explicit_selection=False,
     ):
         principal, target, identifier = task["principal"], args.agent, task["id"]
+        local_reply = {"state": "unavailable", "reason": "independent_thread_binding_unavailable"}
         # All senders use this path. Eve is grok_app; only target selects the CLI window.
         for capability in ("agent.execute", "session.inspect", "session.input", "terminal.execute"):
             self.security.principal(principal, capability)
@@ -742,7 +994,12 @@ class VisibleHandoffs:
                     "The requesting CLI needs its assigned visible window",
                 )
             await self.check_target(principal, principal, reply_binding)
-        hashed = digest({"principal": principal, "args": args.model_dump()})
+        hash_args = args.model_dump()
+        if args.wait_for_reply:
+            # Preserve historical handoff hashes for the unchanged reply-wait
+            # default. Explicit transport-only mode remains part of identity.
+            hash_args.pop("wait_for_reply")
+        hashed = digest({"principal": principal, "args": hash_args})
         existing = self.store.db.execute(
             "SELECT * FROM visible_handoffs WHERE id=?", (identifier,)
         ).fetchone()
@@ -754,8 +1011,20 @@ class VisibleHandoffs:
                     "handoff_conflict", "Original visible handoff and target are immutable"
                 )
             reconciled = self.reconcile(principal, identifier)
+            local_reply = next(
+                (
+                    event["evidence"]["local_reply_observer"]
+                    for event in reversed(reconciled["events"])
+                    if event["state"] == "inserted"
+                    and isinstance(event["evidence"].get("local_reply_observer"), dict)
+                ),
+                local_reply,
+            )
             existing = {**dict(existing), "state": reconciled["state"]}
-            if existing["state"] not in {"sent", "confirmed", "completed"}:
+            if existing["state"] not in {"sent", "confirmed", "completed"} and not (
+                self.body_only_delivery(reconciled)
+                and reconciled["evidence"].get("reason") == "body_only_target_ready"
+            ):
                 raise UncertainExecution(
                     "visible_handoff_unknown",
                     "Prior input must be reconciled; never repeat automatically",
@@ -768,18 +1037,19 @@ class VisibleHandoffs:
                 target,
                 binding,
                 busy_message="Another handoff owns this terminal; reconcile it first",
+                explicit_handoff_task_id=identifier if explicit_selection else None,
                 observed_sessions=observed_sessions,
             )
-            if "KB-END-" + digest(identifier)[:12] in before["text"]:
-                raise BridgeError(
-                    "visible_marker_collision", "This handoff marker was already visible"
-                )
             addressed = task.get("visible_message_id")
             if addressed:
                 original = self.messages.get(principal, addressed)
                 if original["sender"] != principal or original["recipient"] != target:
                     raise BridgeError(
                         "handoff_conflict", "Original addressed message does not match"
+                    )
+                if original["body"] != args.prompt:
+                    raise BridgeError(
+                        "handoff_conflict", "Visible input must match the original addressed body"
                     )
                 message_id, conversation = addressed, original["conversation_id"]
             else:
@@ -789,6 +1059,9 @@ class VisibleHandoffs:
             )
             if len(prompt) > 16384 or "\x00" in prompt:
                 raise BridgeError("payload_limit", "Visible prompt exceeds terminal input limit")
+            from kirabridge.literal_session_input import check_codex_paste_geometry
+
+            await check_codex_paste_geometry(self.sessions, target, binding, prompt, before)
             # The partial unique index still owns sent/confirmed rows. Parking a
             # proven-dead row as unknown releases that slot and does not resend it.
             await self._park_proven_dead(principal, target, binding, observed_sessions)
@@ -828,7 +1101,7 @@ class VisibleHandoffs:
                             idempotency_key=message_id,
                             kind="work",
                             body=args.prompt,
-                            request_reply=True,
+                            request_reply=args.wait_for_reply,
                             dispatch=False,
                         ),
                         visible_internal=True,
@@ -849,19 +1122,63 @@ class VisibleHandoffs:
                     ),
                 )
             input_attempted = False
-            try:
-                await self.check_target(principal, target, binding, ready=True)
+
+            async def before_paste():
+                nonlocal input_attempted, local_reply
+                if target == "codex" and args.wait_for_reply:
+                    selection = self.sessions.current_selection()
+                    expected_identity = (
+                        selection[2].get(binding.agent_pid)
+                        if selection
+                        and selection[0] == target
+                        and selection[1] == binding
+                        and isinstance(selection[2], dict)
+                        else None
+                    )
+                    local_reply = await self.codex_reply.prepare(
+                        binding,
+                        process_identity=self.sessions.terminal_app.process_identity,
+                        expected_identity=expected_identity,
+                        body=prompt,
+                        cwd=args.cwd,
+                    )
+                # SessionManager invokes this only after its final native
+                # identity/readiness checks, immediately before transport.
+                # Refusal before this boundary sent no input, while any later
+                # failure stays uncertain and must never be automatically retried.
+                input_attempted = True
                 self.transition(
                     identifier,
                     "inserting",
                     {
                         "agent_confirmed": False,
-                        "marker_preexisting": False,
+                        "prompt_format": "body_only_v1",
+                        "wait_for_reply": args.wait_for_reply,
                         "empty_input_observed": True,
                         "terminal_input_attempted": True,
+                        "local_reply_observer": local_reply,
                     },
                 )
-                input_attempted = True
+                await running(
+                    {
+                        "handoff_id": identifier,
+                        "state": "inserting",
+                        "terminal_input_attempted": True,
+                        "return_sent": False,
+                        "agent_confirmed": False,
+                        "automatic_retry": False,
+                    }
+                )
+
+            try:
+                before = await self.check_target(principal, target, binding, ready=True)
+                from kirabridge.literal_session_input import _needs_cwd_proof, _task_cwd
+
+                before_cwd = (
+                    await _task_cwd(self.sessions, binding)
+                    if target == "codex" and _needs_cwd_proof(before["text"])
+                    else None
+                )
                 await self.sessions.insert(
                     principal,
                     SessionInput(
@@ -870,29 +1187,51 @@ class VisibleHandoffs:
                         text=prompt,
                         submit=False,
                     ),
+                    before_transport=before_paste,
                 )
                 inserted = await self.check_target(principal, target, binding)
-                observed = self.insertion_observed(target, inserted["text"], prompt, identifier)
+                observed = await self.verify_inserted_body(
+                    principal, target, binding, prompt, before, inserted, before_cwd
+                )
                 if not observed:
                     raise UncertainExecution(
                         "visible_insert_unknown", "Prompt insertion not observed; no Return sent"
+                    )
+                if local_reply.get("state") == "ready":
+                    local_reply = await self.codex_reply.before_submit(
+                        local_reply["cursor"], binding, body=prompt
                     )
                 self.transition(
                     identifier,
                     "inserted",
                     {
                         "prompt_observed": True,
+                        "prompt_format": "body_only_v1",
+                        "wait_for_reply": args.wait_for_reply,
+                        "expected_payload_sha256": _text_sha256(prompt),
+                        "verified_input_view_sha256": _text_sha256(
+                            self.input_view(target, inserted["text"])
+                        ),
                         "insertion_representation": observed,
                         "return_sent": False,
                         "agent_confirmed": False,
+                        "local_reply_observer": local_reply,
                     },
                 )
                 await progress(
                     {"handoff_id": identifier, "state": "inserted", "agent_confirmed": False}
                 )
-                await self.submit_inserted(identifier, principal, target, binding, running)
+                await self.submit_inserted(
+                    identifier,
+                    principal,
+                    target,
+                    binding,
+                    progress,
+                    expected_input_view=self.input_view(target, inserted["text"]),
+                    wait_for_reply=args.wait_for_reply,
+                )
             except BaseException as exc:
-                if not input_attempted:
+                if not input_attempted and not isinstance(exc, UncertainExecution):
                     self.transition(
                         identifier,
                         "interrupted",
@@ -917,6 +1256,51 @@ class VisibleHandoffs:
                     "visible_handoff_unknown",
                     "Input outcome requires reconciliation; no automatic resend",
                 ) from exc
+        current = self.reconcile(principal, identifier)
+        cached_local = current["evidence"].get("local_reply_result")
+        original = self.messages.get(principal, message_id)
+        replied = self.store.db.execute(
+            "SELECT 1 FROM messages WHERE reply_to=? AND sender=? AND recipient=? "
+            "AND kind IN ('answer','result') LIMIT 1",
+            (message_id, target, principal),
+        ).fetchone()
+        if (
+            current["state"] == "completed"
+            and isinstance(cached_local, dict)
+            and not (original["acknowledged"] and replied)
+        ):
+            return cached_local  # Same immutable task/body/binding; never another input.
+        if (
+            not args.wait_for_reply
+            and self.body_only_delivery(current)
+            and not (original["acknowledged"] and replied)
+        ):
+            # This is a delivery receipt, never a fabricated agent answer. Real
+            # later mailbox ACK/replies retain their own reconciliation path.
+            return {
+                "success": True,
+                "submitted": True,
+                "return_sent": True,
+                "agent_confirmed": False,
+                "request_reply_satisfied": False,
+                "message_id": message_id,
+                "scope": "visible_input_delivery",
+                "work_completion_verified": False,
+                "project_completion_verified": False,
+                "evidence": {
+                    "handoff_id": identifier,
+                    "message_id": message_id,
+                    "route": "existing_visible_terminal",
+                    "prompt_format": "body_only_v1",
+                    "agent_confirmed": False,
+                    "request_reply_satisfied": False,
+                    "return_sent": True,
+                    "input_field_cleared": True,
+                    "binding": binding.model_dump(),
+                    "automatic_retry": False,
+                    "expected_payload_sha256": _text_sha256(args.prompt),
+                },
+            }
         try:
             async with asyncio.timeout(args.timeout):
                 confirmed = False
@@ -931,6 +1315,7 @@ class VisibleHandoffs:
                         message["acknowledged"]
                         and not confirmed
                         and current["state"] != "completed"
+                        and not self.body_only_input_released(current)
                     ):
                         confirmed = True
                         self.transition(
@@ -982,6 +1367,65 @@ class VisibleHandoffs:
                             "scope": "agent_turn",
                             "project_completion_verified": False,
                         }
+                    if local_reply.get("state") == "ready":
+                        observed = await self.codex_reply.observe(
+                            local_reply["cursor"],
+                            binding,
+                            body=args.prompt,
+                            process_identity=self.sessions.terminal_app.process_identity,
+                        )
+                        if observed["state"] == "completed":
+                            await self.check_target(principal, target, binding)
+                            if reply_binding:
+                                await self.check_target(principal, principal, reply_binding)
+                            # A genuine mailbox return can arrive while the local
+                            # descriptor is checked. It retains its existing priority.
+                            original = self.messages.get(principal, message_id)
+                            authenticated_reply = self.store.db.execute(
+                                "SELECT 1 FROM messages WHERE reply_to=? AND sender=? "
+                                "AND recipient=? AND kind IN ('answer','result') LIMIT 1",
+                                (message_id, target, principal),
+                            ).fetchone()
+                            if original["acknowledged"] and authenticated_reply:
+                                continue
+                            evidence = {
+                                **observed["evidence"],
+                                "handoff_id": identifier,
+                                "message_id": message_id,
+                                "route": "existing_visible_terminal",
+                                "reply_route": "active_request_and_durable_processing_result",
+                                "reply_visible_rendering": "client_not_attested",
+                                "completion_scope": "local_agent_turn",
+                                "agent_confirmed": False,
+                                "request_reply_satisfied": True,
+                                "automatic_retry": False,
+                            }
+                            result = {
+                                "success": True,
+                                "text": observed["text"],
+                                "scope": "local_agent_turn",
+                                "reply_source": "bound_local_codex_rollout",
+                                "agent_confirmed": False,
+                                "request_reply_satisfied": True,
+                                "work_completion_verified": False,
+                                "project_completion_verified": False,
+                                "evidence": evidence,
+                            }
+                            self.transition(
+                                identifier,
+                                "completed",
+                                {**evidence, "local_reply_result": result},
+                            )
+                            return result
+                        if observed["state"] == "unavailable":
+                            local_reply = observed
+                            await progress(
+                                {
+                                    "handoff_id": identifier,
+                                    "local_reply_observer": observed,
+                                    "agent_confirmed": False,
+                                }
+                            )
                     await asyncio.sleep(0.25)
         except asyncio.CancelledError:
             # Only the reply observer is gone: paste and Return were already
@@ -989,9 +1433,23 @@ class VisibleHandoffs:
             # Cancellation during input is still handled as uncertain input.
             raise
         except BaseException as exc:
-            self.transition(
-                identifier, "unknown", {"reason": "reply_unconfirmed", "automatic_retry": False}
+            current = self.status(principal, identifier)
+            evidence = (
+                {
+                    **current["evidence"],
+                    "reply_observer_error": "reply_unconfirmed",
+                    "automatic_retry": False,
+                }
+                if self.body_only_input_released(current)
+                else {
+                    "reason": "reply_unconfirmed",
+                    "automatic_retry": False,
+                    "local_reply_observer": {
+                        key: local_reply[key] for key in ("state", "reason") if key in local_reply
+                    },
+                }
             )
+            self.transition(identifier, "unknown", evidence)
             raise UncertainExecution(
                 "visible_reply_unknown", "No confirmed final reply; do not resubmit"
             ) from exc

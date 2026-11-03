@@ -9,12 +9,10 @@ import plistlib
 import re
 import secrets
 import shlex
-import shutil
 import time
 from pathlib import Path
 
 from kirabridge.bridge_core.models import BridgeError
-from kirabridge.local_runtime import write_private
 from kirabridge.operator_actions import action_identity
 from kirabridge.permissions import LEVELS, level_for, permission_summary
 
@@ -37,6 +35,7 @@ NAMES = {
     "copilot": "Copilot",
     "console": "Steuerfenster",
 }
+INPUT_TERMINAL_STATES = {"completed", "failed", "cancelled", "unknown", "blocked", "rejected"}
 
 
 class OperatorControl:
@@ -234,6 +233,15 @@ class OperatorControl:
 
     async def terminal_input(self, value):
         identity = action_identity(value)
+        arguments = {
+            "pane_id": value.get("pane_id"),
+            "expected_pid": value.get("expected_pid"),
+            "text": value.get("text", ""),
+            "submit": True,
+        }
+        for name in ("key", "expected_cursor", "expected_agent_pid"):
+            if name in value:
+                arguments[name] = value[name]
         result = await self.rpc(
             "action_request",
             {
@@ -242,35 +250,78 @@ class OperatorControl:
                     "task_id": "input-" + identity,
                     "idempotency_key": "input-" + identity,
                     "operation": "session.input",
-                    "arguments": {
-                        "pane_id": value.get("pane_id"),
-                        "expected_pid": value.get("expected_pid"),
-                        "text": value.get("text"),
-                        "submit": True,
-                    },
+                    "arguments": arguments,
                 },
             },
         )
-        if result.get("state") == "queued":
+        return await self.terminal_input_status(
+            identity, wait_seconds=5 if result.get("state") == "queued" else 0
+        )
+
+    async def terminal_input_status(self, identity, *, wait_seconds=0):
+        """Read this UI intent and acknowledge only its processed completion.
+
+        Status requests never enqueue or repeat input. Outcome and completion
+        notice commit atomically; an absent notice after a terminal task can
+        also mean it was already acknowledged or explicitly retired.
+        """
+        identity = action_identity({"action_id": identity})
+        task_id, target = "input-" + identity, "ui-input:" + identity
+
+        async def current():
+            task = await self.rpc("task_get", {"task_id": task_id})
+            if task.get("id") != task_id or task.get("operation") != "session.input":
+                raise BridgeError("terminal_task_mismatch", "Terminalauftrag nicht zugeordnet")
+            return task
+
+        task = await current()
+        processed = 0
+        try:
             delivery = await self.rpc(
                 "completion_receive",
                 {
-                    "target": "ui-input:" + identity,
-                    "limit": 1,
-                    "wait_seconds": 5,
+                    "target": target,
+                    "source_id": task_id,
+                    "limit": 20,
+                    "wait_seconds": 0 if task["state"] in INPUT_TERMINAL_STATES else wait_seconds,
                 },
             )
-            for notice in delivery.get("notices", []):
-                if notice["payload"].get("task_id") == "input-" + identity:
-                    result = await self.rpc("task_get", {"task_id": "input-" + identity})
-                    await self.rpc(
-                        "completion_ack",
-                        {
-                            "notice_id": notice["id"],
-                            "receipt": notice["receipt"],
-                        },
+            notices = delivery.get("notices", [])
+            for notice in notices:
+                payload = notice.get("payload", {})
+                if (
+                    notice.get("target") != target
+                    or payload.get("task_id") != task_id
+                    or payload.get("source") != "task"
+                ):
+                    raise BridgeError(
+                        "completion_scope_mismatch", "Rückmeldung gehört nicht zu dieser Eingabe"
                     )
-        return result
+                # A late notice may supersede an older unknown result. Read the
+                # actual task immediately before acknowledging the observation.
+                task = await current()
+                if task["state"] not in INPUT_TERMINAL_STATES:
+                    return {**task, "ui_completion": {"pending": True, "processed": processed}}
+                await self.rpc(
+                    "completion_ack",
+                    {"notice_id": notice["id"], "receipt": notice["receipt"]},
+                )
+                processed += 1
+            return {
+                **task,
+                "ui_completion": {"pending": len(notices) == 20, "processed": processed},
+            }
+        except BridgeError as exc:
+            # Keep the original task identity/result. The next scoped status
+            # read can reconcile a missing ACK reply; it never resends input.
+            return {
+                **task,
+                "ui_completion": {
+                    "pending": True,
+                    "processed": processed,
+                    "error": {"code": exc.code},
+                },
+            }
 
     async def reload_bridge(self):
         health = await self.operations.activate()
@@ -288,7 +339,7 @@ class OperatorControl:
             or action not in {"start", "restart"}
         ):
             raise BridgeError("invalid_request", "Unbekannter Prozess oder unbekannte Aktion")
-        if name in {"chatgpt", "grok_app"} and action == "restart":
+        if name == "grok_app" and action == "restart":
             health = await self.reload_bridge()
             return {
                 "state": "reconnected",
@@ -401,38 +452,88 @@ class OperatorControl:
         path = Path.home() / "Library/LaunchAgents" / (label + ".plist")
         code, output, _ = await self.command("/bin/launchctl", "print", target)
         loaded = code == 0
-        if name == "chatgpt" and not loaded:
-            current = next(
-                row for row in (await self.snapshot(fresh=True))["services"] if row["id"] == name
+        if name == "chatgpt":
+            from kirabridge.chatgpt_service import (
+                ensure_chatgpt_service,
+                restore_chatgpt_service,
             )
-            if current["active"]:
-                return {
-                    "state": "active",
-                    "existing_runtime_preserved": True,
-                    "message": "Die vorhandene ChatGPT-Verbindung ist aktiv.",
-                }
-            binary = shutil.which("tunnel-client")
+            from kirabridge.setup_dependencies import local_client
+
+            unmanaged_active = False
+            if not loaded:
+                current = next(
+                    row
+                    for row in (await self.snapshot(fresh=True))["services"]
+                    if row["id"] == name
+                )
+                unmanaged_active = bool(current["active"])
+            binary = local_client(Path(config._source_path))
             profile = Path(config._source_path).parent / "tunnel/kirabridge.yaml"
             if not binary or not profile.is_file():
                 raise BridgeError(
                     "connection_missing", "Die ChatGPT-Verbindung muss einmal verknüpft werden"
                 )
-            definition = {
-                "Label": label,
-                "RunAtLoad": True,
-                "KeepAlive": {"SuccessfulExit": False},
-                "Umask": 63,
-                "ProgramArguments": [
-                    binary,
-                    "run",
-                    "--profile-dir",
-                    str(profile.parent),
-                    "--profile",
-                    "kirabridge",
-                ],
-            }
-            if not path.exists():
-                write_private(path, plistlib.dumps(definition))
+            update = ensure_chatgpt_service(
+                Path(config._source_path),
+                binary,
+                create=True,
+                loaded_output=output if loaded else None,
+            )
+            if unmanaged_active:
+                return {
+                    "state": "active",
+                    "existing_runtime_preserved": True,
+                    "autostart_updated": update["changed"],
+                    "message": "Die vorhandene ChatGPT-Verbindung ist aktiv.",
+                }
+            if (update["changed"] or update["reload_required"]) and loaded:
+                code, _, _ = await self.command("/bin/launchctl", "bootout", target)
+                if code:
+                    restore_chatgpt_service(update)
+                    raise BridgeError(
+                        "service_start", "ChatGPT-Dienst konnte nicht neu geladen werden"
+                    )
+
+                async def bootstrap():
+                    deadline = time.monotonic() + 30
+                    for attempt in range(30):
+                        remaining = deadline - time.monotonic()
+                        if remaining <= 0:
+                            return 5
+                        try:
+                            code, _, _ = await self.command(
+                                "/bin/launchctl",
+                                "bootstrap",
+                                f"gui/{os.getuid()}",
+                                str(path),
+                                timeout=min(8, remaining),
+                            )
+                        except TimeoutError as exc:
+                            # A timed-out launchctl command may have succeeded.
+                            # Preserve the receipt/definition; never replay it.
+                            raise BridgeError(
+                                "service_start_unknown",
+                                "ChatGPT-Dienststart unklar; Zustand lokal prüfen.",
+                            ) from exc
+                        if code != 5 or attempt == 29:
+                            return code
+                        await asyncio.sleep(min(1, max(0, deadline - time.monotonic())))
+                    return 5
+
+                code = await bootstrap()
+                if code:
+                    restore_chatgpt_service(update)
+                    restored = await bootstrap()
+                    raise BridgeError(
+                        "service_start",
+                        "ChatGPT-Start fehlgeschlagen; vorheriger Dienst "
+                        + ("wiederhergestellt" if restored == 0 else "muss lokal gestartet werden"),
+                    )
+                return {
+                    "state": "starting",
+                    "autostart_updated": True,
+                    "message": "ChatGPT-Verbindung mit automatischem Wiederanlauf gestartet.",
+                }
         if name == "bridge" and action == "restart" and loaded:
             return await self.reload_bridge()
         if not path.is_file():

@@ -1,0 +1,829 @@
+{
+  "scope": "Owned temporary regular files only; no app, process, bridge or network calls",
+  "limit_bytes": 33554432,
+  "fresh_reads_and_sha256_per_sample": 2,
+  "rounds_per_size_and_version": 20,
+  "before_function_sha256": "112f8d7cebcbaac8802f650be7a3c00d1788d5c6d4b03f885ec230acb44613f9",
+  "after_function_sha256": "aa7dd7181479c0a68b98e2f534801734dd39f165ff4f95ccbae74910c43a834d",
+  "cache": "Warm OS file cache; no application/integrity/result cache",
+  "method": "Alternating before/after order; P50 median, P95 nearest rank; tracemalloc active during timing",
+  "limitations": "Synthetic integrity-read microbenchmark, not Cloud or end-to-end latency; traced memory is Python allocation, not RSS",
+  "records": [
+    {
+      "label": "before",
+      "fixture_bytes": 1024,
+      "two_fresh_read_and_hash_ms": {
+        "n": 20,
+        "p50": 0.457963,
+        "p95": 0.568649,
+        "min": 0.444784,
+        "max": 0.575333,
+        "total": 9.570885999999998
+      },
+      "peak_traced_bytes": {
+        "n": 20,
+        "p50": 33560278.0,
+        "p95": 33560278,
+        "min": 33560278,
+        "max": 33560278,
+        "total": 671205560
+      },
+      "samples": [
+        {
+          "two_fresh_read_and_hash_ms": 0.482725,
+          "peak_traced_bytes": 33560278
+        },
+        {
+          "two_fresh_read_and_hash_ms": 0.459533,
+          "peak_traced_bytes": 33560278
+        },
+        {
+          "two_fresh_read_and_hash_ms": 0.453442,
+          "peak_traced_bytes": 33560278
+        },
+        {
+          "two_fresh_read_and_hash_ms": 0.447615,
+          "peak_traced_bytes": 33560278
+        },
+        {
+          "two_fresh_read_and_hash_ms": 0.447301,
+          "peak_traced_bytes": 33560278
+        },
+        {
+          "two_fresh_read_and_hash_ms": 0.444784,
+          "peak_traced_bytes": 33560278
+        },
+        {
+          "two_fresh_read_and_hash_ms": 0.446744,
+          "peak_traced_bytes": 33560278
+        },
+        {
+          "two_fresh_read_and_hash_ms": 0.484815,
+          "peak_traced_bytes": 33560278
+        },
+        {
+          "two_fresh_read_and_hash_ms": 0.500889,
+          "peak_traced_bytes": 33560278
+        },
+        {
+          "two_fresh_read_and_hash_ms": 0.452905,
+          "peak_traced_bytes": 33560278
+        },
+        {
+          "two_fresh_read_and_hash_ms": 0.456393,
+          "peak_traced_bytes": 33560278
+        },
+        {
+          "two_fresh_read_and_hash_ms": 0.535176,
+          "peak_traced_bytes": 33560278
+        },
+        {
+          "two_fresh_read_and_hash_ms": 0.470751,
+          "peak_traced_bytes": 33560278
+        },
+        {
+          "two_fresh_read_and_hash_ms": 0.475829,
+          "peak_traced_bytes": 33560278
+        },
+        {
+          "two_fresh_read_and_hash_ms": 0.575333,
+          "peak_traced_bytes": 33560278
+        },
+        {
+          "two_fresh_read_and_hash_ms": 0.568649,
+          "peak_traced_bytes": 33560278
+        },
+        {
+          "two_fresh_read_and_hash_ms": 0.517976,
+          "peak_traced_bytes": 33560278
+        },
+        {
+          "two_fresh_read_and_hash_ms": 0.451965,
+          "peak_traced_bytes": 33560278
+        },
+        {
+          "two_fresh_read_and_hash_ms": 0.449469,
+          "peak_traced_bytes": 33560278
+        },
+        {
+          "two_fresh_read_and_hash_ms": 0.448592,
+          "peak_traced_bytes": 33560278
+        }
+      ]
+    },
+    {
+      "label": "after",
+      "fixture_bytes": 1024,
+      "two_fresh_read_and_hash_ms": {
+        "n": 20,
+        "p50": 0.231403,
+        "p95": 0.260368,
+        "min": 0.217925,
+        "max": 0.29114,
+        "total": 4.714392999999999
+      },
+      "peak_traced_bytes": {
+        "n": 20,
+        "p50": 6870.0,
+        "p95": 6870,
+        "min": 6870,
+        "max": 6870,
+        "total": 137400
+      },
+      "samples": [
+        {
+          "two_fresh_read_and_hash_ms": 0.24062,
+          "peak_traced_bytes": 6870
+        },
+        {
+          "two_fresh_read_and_hash_ms": 0.230476,
+          "peak_traced_bytes": 6870
+        },
+        {
+          "two_fresh_read_and_hash_ms": 0.230243,
+          "peak_traced_bytes": 6870
+        },
+        {
+          "two_fresh_read_and_hash_ms": 0.228332,
+          "peak_traced_bytes": 6870
+        },
+        {
+          "two_fresh_read_and_hash_ms": 0.22464,
+          "peak_traced_bytes": 6870
+        },
+        {
+          "two_fresh_read_and_hash_ms": 0.22562,
+          "peak_traced_bytes": 6870
+        },
+        {
+          "two_fresh_read_and_hash_ms": 0.222251,
+          "peak_traced_bytes": 6870
+        },
+        {
+          "two_fresh_read_and_hash_ms": 0.217925,
+          "peak_traced_bytes": 6870
+        },
+        {
+          "two_fresh_read_and_hash_ms": 0.239312,
+          "peak_traced_bytes": 6870
+        },
+        {
+          "two_fresh_read_and_hash_ms": 0.230548,
+          "peak_traced_bytes": 6870
+        },
+        {
+          "two_fresh_read_and_hash_ms": 0.233886,
+          "peak_traced_bytes": 6870
+        },
+        {
+          "two_fresh_read_and_hash_ms": 0.224384,
+          "peak_traced_bytes": 6870
+        },
+        {
+          "two_fresh_read_and_hash_ms": 0.239951,
+          "peak_traced_bytes": 6870
+        },
+        {
+          "two_fresh_read_and_hash_ms": 0.239198,
+          "peak_traced_bytes": 6870
+        },
+        {
+          "two_fresh_read_and_hash_ms": 0.29114,
+          "peak_traced_bytes": 6870
+        },
+        {
+          "two_fresh_read_and_hash_ms": 0.232258,
+          "peak_traced_bytes": 6870
+        },
+        {
+          "two_fresh_read_and_hash_ms": 0.239318,
+          "peak_traced_bytes": 6870
+        },
+        {
+          "two_fresh_read_and_hash_ms": 0.236151,
+          "peak_traced_bytes": 6870
+        },
+        {
+          "two_fresh_read_and_hash_ms": 0.227772,
+          "peak_traced_bytes": 6870
+        },
+        {
+          "two_fresh_read_and_hash_ms": 0.260368,
+          "peak_traced_bytes": 6870
+        }
+      ]
+    },
+    {
+      "label": "before",
+      "fixture_bytes": 262144,
+      "two_fresh_read_and_hash_ms": {
+        "n": 20,
+        "p50": 3.0443905,
+        "p95": 3.368503,
+        "min": 2.177846,
+        "max": 4.00658,
+        "total": 59.402828
+      },
+      "peak_traced_bytes": {
+        "n": 20,
+        "p50": 33560334.0,
+        "p95": 33560398,
+        "min": 33560310,
+        "max": 33560398,
+        "total": 671207104
+      },
+      "samples": [
+        {
+          "two_fresh_read_and_hash_ms": 2.542815,
+          "peak_traced_bytes": 33560310
+        },
+        {
+          "two_fresh_read_and_hash_ms": 2.84273,
+          "peak_traced_bytes": 33560334
+        },
+        {
+          "two_fresh_read_and_hash_ms": 3.107068,
+          "peak_traced_bytes": 33560334
+        },
+        {
+          "two_fresh_read_and_hash_ms": 4.00658,
+          "peak_traced_bytes": 33560334
+        },
+        {
+          "two_fresh_read_and_hash_ms": 2.995696,
+          "peak_traced_bytes": 33560334
+        },
+        {
+          "two_fresh_read_and_hash_ms": 2.712947,
+          "peak_traced_bytes": 33560334
+        },
+        {
+          "two_fresh_read_and_hash_ms": 2.955162,
+          "peak_traced_bytes": 33560334
+        },
+        {
+          "two_fresh_read_and_hash_ms": 2.726794,
+          "peak_traced_bytes": 33560334
+        },
+        {
+          "two_fresh_read_and_hash_ms": 2.177846,
+          "peak_traced_bytes": 33560334
+        },
+        {
+          "two_fresh_read_and_hash_ms": 3.051911,
+          "peak_traced_bytes": 33560334
+        },
+        {
+          "two_fresh_read_and_hash_ms": 2.305194,
+          "peak_traced_bytes": 33560334
+        },
+        {
+          "two_fresh_read_and_hash_ms": 3.03687,
+          "peak_traced_bytes": 33560334
+        },
+        {
+          "two_fresh_read_and_hash_ms": 3.064363,
+          "peak_traced_bytes": 33560334
+        },
+        {
+          "two_fresh_read_and_hash_ms": 3.094154,
+          "peak_traced_bytes": 33560398
+        },
+        {
+          "two_fresh_read_and_hash_ms": 2.704539,
+          "peak_traced_bytes": 33560398
+        },
+        {
+          "two_fresh_read_and_hash_ms": 3.157562,
+          "peak_traced_bytes": 33560398
+        },
+        {
+          "two_fresh_read_and_hash_ms": 3.189002,
+          "peak_traced_bytes": 33560398
+        },
+        {
+          "two_fresh_read_and_hash_ms": 3.298236,
+          "peak_traced_bytes": 33560398
+        },
+        {
+          "two_fresh_read_and_hash_ms": 3.064856,
+          "peak_traced_bytes": 33560398
+        },
+        {
+          "two_fresh_read_and_hash_ms": 3.368503,
+          "peak_traced_bytes": 33560398
+        }
+      ]
+    },
+    {
+      "label": "after",
+      "fixture_bytes": 262144,
+      "two_fresh_read_and_hash_ms": {
+        "n": 20,
+        "p50": 1.5248979999999999,
+        "p95": 1.946632,
+        "min": 1.479088,
+        "max": 2.957739,
+        "total": 32.85596100000001
+      },
+      "peak_traced_bytes": {
+        "n": 20,
+        "p50": 268046.0,
+        "p95": 268110,
+        "min": 268046,
+        "max": 268110,
+        "total": 5361304
+      },
+      "samples": [
+        {
+          "two_fresh_read_and_hash_ms": 1.726767,
+          "peak_traced_bytes": 268046
+        },
+        {
+          "two_fresh_read_and_hash_ms": 1.500398,
+          "peak_traced_bytes": 268046
+        },
+        {
+          "two_fresh_read_and_hash_ms": 1.52752,
+          "peak_traced_bytes": 268046
+        },
+        {
+          "two_fresh_read_and_hash_ms": 2.957739,
+          "peak_traced_bytes": 268046
+        },
+        {
+          "two_fresh_read_and_hash_ms": 1.502382,
+          "peak_traced_bytes": 268046
+        },
+        {
+          "two_fresh_read_and_hash_ms": 1.493309,
+          "peak_traced_bytes": 268046
+        },
+        {
+          "two_fresh_read_and_hash_ms": 1.51702,
+          "peak_traced_bytes": 268046
+        },
+        {
+          "two_fresh_read_and_hash_ms": 1.518577,
+          "peak_traced_bytes": 268046
+        },
+        {
+          "two_fresh_read_and_hash_ms": 1.491046,
+          "peak_traced_bytes": 268046
+        },
+        {
+          "two_fresh_read_and_hash_ms": 1.479088,
+          "peak_traced_bytes": 268046
+        },
+        {
+          "two_fresh_read_and_hash_ms": 1.946632,
+          "peak_traced_bytes": 268046
+        },
+        {
+          "two_fresh_read_and_hash_ms": 1.625906,
+          "peak_traced_bytes": 268046
+        },
+        {
+          "two_fresh_read_and_hash_ms": 1.669859,
+          "peak_traced_bytes": 268046
+        },
+        {
+          "two_fresh_read_and_hash_ms": 1.629481,
+          "peak_traced_bytes": 268046
+        },
+        {
+          "two_fresh_read_and_hash_ms": 1.561322,
+          "peak_traced_bytes": 268110
+        },
+        {
+          "two_fresh_read_and_hash_ms": 1.490895,
+          "peak_traced_bytes": 268110
+        },
+        {
+          "two_fresh_read_and_hash_ms": 1.619931,
+          "peak_traced_bytes": 268110
+        },
+        {
+          "two_fresh_read_and_hash_ms": 1.591365,
+          "peak_traced_bytes": 268110
+        },
+        {
+          "two_fresh_read_and_hash_ms": 1.522276,
+          "peak_traced_bytes": 268110
+        },
+        {
+          "two_fresh_read_and_hash_ms": 1.484448,
+          "peak_traced_bytes": 268110
+        }
+      ]
+    },
+    {
+      "label": "before",
+      "fixture_bytes": 2097152,
+      "two_fresh_read_and_hash_ms": {
+        "n": 20,
+        "p50": 15.825828,
+        "p95": 18.386693,
+        "min": 15.079728,
+        "max": 19.557155,
+        "total": 330.5884429999999
+      },
+      "peak_traced_bytes": {
+        "n": 20,
+        "p50": 33560398.0,
+        "p95": 33560398,
+        "min": 33560310,
+        "max": 33560398,
+        "total": 671207872
+      },
+      "samples": [
+        {
+          "two_fresh_read_and_hash_ms": 17.969489,
+          "peak_traced_bytes": 33560310
+        },
+        {
+          "two_fresh_read_and_hash_ms": 15.68591,
+          "peak_traced_bytes": 33560398
+        },
+        {
+          "two_fresh_read_and_hash_ms": 16.107504,
+          "peak_traced_bytes": 33560398
+        },
+        {
+          "two_fresh_read_and_hash_ms": 15.635771,
+          "peak_traced_bytes": 33560398
+        },
+        {
+          "two_fresh_read_and_hash_ms": 15.773064,
+          "peak_traced_bytes": 33560398
+        },
+        {
+          "two_fresh_read_and_hash_ms": 17.810557,
+          "peak_traced_bytes": 33560398
+        },
+        {
+          "two_fresh_read_and_hash_ms": 15.710245,
+          "peak_traced_bytes": 33560398
+        },
+        {
+          "two_fresh_read_and_hash_ms": 15.643159,
+          "peak_traced_bytes": 33560398
+        },
+        {
+          "two_fresh_read_and_hash_ms": 17.870246,
+          "peak_traced_bytes": 33560398
+        },
+        {
+          "two_fresh_read_and_hash_ms": 15.436663,
+          "peak_traced_bytes": 33560398
+        },
+        {
+          "two_fresh_read_and_hash_ms": 15.647334,
+          "peak_traced_bytes": 33560398
+        },
+        {
+          "two_fresh_read_and_hash_ms": 15.255116,
+          "peak_traced_bytes": 33560398
+        },
+        {
+          "two_fresh_read_and_hash_ms": 17.366704,
+          "peak_traced_bytes": 33560398
+        },
+        {
+          "two_fresh_read_and_hash_ms": 15.079728,
+          "peak_traced_bytes": 33560398
+        },
+        {
+          "two_fresh_read_and_hash_ms": 19.557155,
+          "peak_traced_bytes": 33560398
+        },
+        {
+          "two_fresh_read_and_hash_ms": 15.878592,
+          "peak_traced_bytes": 33560398
+        },
+        {
+          "two_fresh_read_and_hash_ms": 16.038546,
+          "peak_traced_bytes": 33560398
+        },
+        {
+          "two_fresh_read_and_hash_ms": 15.463762,
+          "peak_traced_bytes": 33560398
+        },
+        {
+          "two_fresh_read_and_hash_ms": 18.386693,
+          "peak_traced_bytes": 33560398
+        },
+        {
+          "two_fresh_read_and_hash_ms": 18.272205,
+          "peak_traced_bytes": 33560398
+        }
+      ]
+    },
+    {
+      "label": "after",
+      "fixture_bytes": 2097152,
+      "two_fresh_read_and_hash_ms": {
+        "n": 20,
+        "p50": 11.6448595,
+        "p95": 14.448701,
+        "min": 11.362435,
+        "max": 15.103075,
+        "total": 242.39522899999997
+      },
+      "peak_traced_bytes": {
+        "n": 20,
+        "p50": 2103118.0,
+        "p95": 2103118,
+        "min": 2103118,
+        "max": 2103118,
+        "total": 42062360
+      },
+      "samples": [
+        {
+          "two_fresh_read_and_hash_ms": 12.367151,
+          "peak_traced_bytes": 2103118
+        },
+        {
+          "two_fresh_read_and_hash_ms": 11.46281,
+          "peak_traced_bytes": 2103118
+        },
+        {
+          "two_fresh_read_and_hash_ms": 11.514181,
+          "peak_traced_bytes": 2103118
+        },
+        {
+          "two_fresh_read_and_hash_ms": 11.433464,
+          "peak_traced_bytes": 2103118
+        },
+        {
+          "two_fresh_read_and_hash_ms": 11.362435,
+          "peak_traced_bytes": 2103118
+        },
+        {
+          "two_fresh_read_and_hash_ms": 12.57584,
+          "peak_traced_bytes": 2103118
+        },
+        {
+          "two_fresh_read_and_hash_ms": 14.448701,
+          "peak_traced_bytes": 2103118
+        },
+        {
+          "two_fresh_read_and_hash_ms": 11.665774,
+          "peak_traced_bytes": 2103118
+        },
+        {
+          "two_fresh_read_and_hash_ms": 11.581358,
+          "peak_traced_bytes": 2103118
+        },
+        {
+          "two_fresh_read_and_hash_ms": 12.121239,
+          "peak_traced_bytes": 2103118
+        },
+        {
+          "two_fresh_read_and_hash_ms": 11.508132,
+          "peak_traced_bytes": 2103118
+        },
+        {
+          "two_fresh_read_and_hash_ms": 15.103075,
+          "peak_traced_bytes": 2103118
+        },
+        {
+          "two_fresh_read_and_hash_ms": 11.623945,
+          "peak_traced_bytes": 2103118
+        },
+        {
+          "two_fresh_read_and_hash_ms": 11.578846,
+          "peak_traced_bytes": 2103118
+        },
+        {
+          "two_fresh_read_and_hash_ms": 11.801078,
+          "peak_traced_bytes": 2103118
+        },
+        {
+          "two_fresh_read_and_hash_ms": 11.485756,
+          "peak_traced_bytes": 2103118
+        },
+        {
+          "two_fresh_read_and_hash_ms": 12.777676,
+          "peak_traced_bytes": 2103118
+        },
+        {
+          "two_fresh_read_and_hash_ms": 12.41704,
+          "peak_traced_bytes": 2103118
+        },
+        {
+          "two_fresh_read_and_hash_ms": 11.98193,
+          "peak_traced_bytes": 2103118
+        },
+        {
+          "two_fresh_read_and_hash_ms": 11.584798,
+          "peak_traced_bytes": 2103118
+        }
+      ]
+    },
+    {
+      "label": "before",
+      "fixture_bytes": 33554432,
+      "two_fresh_read_and_hash_ms": {
+        "n": 20,
+        "p50": 189.50668000000002,
+        "p95": 215.503956,
+        "min": 179.358262,
+        "max": 236.650123,
+        "total": 3839.542825999999
+      },
+      "peak_traced_bytes": {
+        "n": 20,
+        "p50": 33560398.0,
+        "p95": 33560398,
+        "min": 33560310,
+        "max": 33560398,
+        "total": 671207872
+      },
+      "samples": [
+        {
+          "two_fresh_read_and_hash_ms": 186.970495,
+          "peak_traced_bytes": 33560310
+        },
+        {
+          "two_fresh_read_and_hash_ms": 187.423993,
+          "peak_traced_bytes": 33560398
+        },
+        {
+          "two_fresh_read_and_hash_ms": 183.274581,
+          "peak_traced_bytes": 33560398
+        },
+        {
+          "two_fresh_read_and_hash_ms": 191.251022,
+          "peak_traced_bytes": 33560398
+        },
+        {
+          "two_fresh_read_and_hash_ms": 190.179551,
+          "peak_traced_bytes": 33560398
+        },
+        {
+          "two_fresh_read_and_hash_ms": 190.511245,
+          "peak_traced_bytes": 33560398
+        },
+        {
+          "two_fresh_read_and_hash_ms": 183.426481,
+          "peak_traced_bytes": 33560398
+        },
+        {
+          "two_fresh_read_and_hash_ms": 188.408862,
+          "peak_traced_bytes": 33560398
+        },
+        {
+          "two_fresh_read_and_hash_ms": 179.358262,
+          "peak_traced_bytes": 33560398
+        },
+        {
+          "two_fresh_read_and_hash_ms": 196.301922,
+          "peak_traced_bytes": 33560398
+        },
+        {
+          "two_fresh_read_and_hash_ms": 236.650123,
+          "peak_traced_bytes": 33560398
+        },
+        {
+          "two_fresh_read_and_hash_ms": 187.68137,
+          "peak_traced_bytes": 33560398
+        },
+        {
+          "two_fresh_read_and_hash_ms": 191.058274,
+          "peak_traced_bytes": 33560398
+        },
+        {
+          "two_fresh_read_and_hash_ms": 190.878311,
+          "peak_traced_bytes": 33560398
+        },
+        {
+          "two_fresh_read_and_hash_ms": 192.795589,
+          "peak_traced_bytes": 33560398
+        },
+        {
+          "two_fresh_read_and_hash_ms": 189.173764,
+          "peak_traced_bytes": 33560398
+        },
+        {
+          "two_fresh_read_and_hash_ms": 189.839596,
+          "peak_traced_bytes": 33560398
+        },
+        {
+          "two_fresh_read_and_hash_ms": 215.503956,
+          "peak_traced_bytes": 33560398
+        },
+        {
+          "two_fresh_read_and_hash_ms": 183.200732,
+          "peak_traced_bytes": 33560398
+        },
+        {
+          "two_fresh_read_and_hash_ms": 185.654697,
+          "peak_traced_bytes": 33560398
+        }
+      ]
+    },
+    {
+      "label": "after",
+      "fixture_bytes": 33554432,
+      "two_fresh_read_and_hash_ms": {
+        "n": 20,
+        "p50": 187.151576,
+        "p95": 195.474091,
+        "min": 179.267193,
+        "max": 205.463663,
+        "total": 3770.780774
+      },
+      "peak_traced_bytes": {
+        "n": 20,
+        "p50": 33560398.0,
+        "p95": 33560398,
+        "min": 33560398,
+        "max": 33560398,
+        "total": 671207960
+      },
+      "samples": [
+        {
+          "two_fresh_read_and_hash_ms": 187.339039,
+          "peak_traced_bytes": 33560398
+        },
+        {
+          "two_fresh_read_and_hash_ms": 186.200856,
+          "peak_traced_bytes": 33560398
+        },
+        {
+          "two_fresh_read_and_hash_ms": 186.032664,
+          "peak_traced_bytes": 33560398
+        },
+        {
+          "two_fresh_read_and_hash_ms": 194.707235,
+          "peak_traced_bytes": 33560398
+        },
+        {
+          "two_fresh_read_and_hash_ms": 183.193833,
+          "peak_traced_bytes": 33560398
+        },
+        {
+          "two_fresh_read_and_hash_ms": 188.63725,
+          "peak_traced_bytes": 33560398
+        },
+        {
+          "two_fresh_read_and_hash_ms": 186.964113,
+          "peak_traced_bytes": 33560398
+        },
+        {
+          "two_fresh_read_and_hash_ms": 205.463663,
+          "peak_traced_bytes": 33560398
+        },
+        {
+          "two_fresh_read_and_hash_ms": 195.474091,
+          "peak_traced_bytes": 33560398
+        },
+        {
+          "two_fresh_read_and_hash_ms": 185.833136,
+          "peak_traced_bytes": 33560398
+        },
+        {
+          "two_fresh_read_and_hash_ms": 190.818999,
+          "peak_traced_bytes": 33560398
+        },
+        {
+          "two_fresh_read_and_hash_ms": 184.071972,
+          "peak_traced_bytes": 33560398
+        },
+        {
+          "two_fresh_read_and_hash_ms": 179.267193,
+          "peak_traced_bytes": 33560398
+        },
+        {
+          "two_fresh_read_and_hash_ms": 185.129122,
+          "peak_traced_bytes": 33560398
+        },
+        {
+          "two_fresh_read_and_hash_ms": 182.700068,
+          "peak_traced_bytes": 33560398
+        },
+        {
+          "two_fresh_read_and_hash_ms": 185.267407,
+          "peak_traced_bytes": 33560398
+        },
+        {
+          "two_fresh_read_and_hash_ms": 189.933615,
+          "peak_traced_bytes": 33560398
+        },
+        {
+          "two_fresh_read_and_hash_ms": 192.881096,
+          "peak_traced_bytes": 33560398
+        },
+        {
+          "two_fresh_read_and_hash_ms": 189.92557,
+          "peak_traced_bytes": 33560398
+        },
+        {
+          "two_fresh_read_and_hash_ms": 190.939852,
+          "peak_traced_bytes": 33560398
+        }
+      ]
+    }
+  ]
+}

@@ -47,11 +47,17 @@ class TmuxTransport:
                         "session_transport_unavailable", "No accessible tmux server or pane"
                     )
                 return raw.decode("utf-8", "replace")
-        except (TimeoutError, BridgeError):
+        except (TimeoutError, BridgeError) as exc:
             if mutation:
                 raise UncertainExecution(
                     "session_input_unknown", "Input outcome unknown; do not resend automatically"
                 ) from None
+            if isinstance(exc, TimeoutError):
+                error = BridgeError(
+                    "session_observation_timeout", "Read-only tmux observation timed out"
+                )
+                error.provider_error = {"phase": "tmux_read", "reason": "timeout"}
+                raise error from None
             raise
         finally:
             was_cancelled = isinstance(sys.exc_info()[1], asyncio.CancelledError)

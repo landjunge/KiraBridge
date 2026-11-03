@@ -1,0 +1,30 @@
+{
+  "checks": {
+    "exit0_observed_by_launchd": true,
+    "exit1_observed_by_launchd": true,
+    "four_unique_processes": true,
+    "independent_job_absence": true,
+    "independent_process_absence": true,
+    "late_readiness_attempt_failed": true,
+    "late_readiness_recovered_automatically": true,
+    "no_repeated_fixture_execution": true,
+    "original_cleanup_passed": true,
+    "ready_pid_stable": true,
+    "thirty_second_restart_intervals": true
+  },
+  "harness_correction": "Recorded monotonic values are process-local in this environment; compare already recorded epoch timestamps across processes. Original failed assertion preserved. No launchd test or input repeated.",
+  "original_harness_error": {
+    "message": "[0.004732966999999998, -0.0030085809999999963, -0.0022468620000000022]",
+    "type": "AssertionError"
+  },
+  "original_result_sha256": "a90c826f46e5293eba41aeb393e4bacdfb0e49acb821b55a7667a181bb6a3389",
+  "passed": true,
+  "restart_intervals_epoch_seconds": [
+    30.253537893295288,
+    30.252538919448853,
+    30.252947330474854
+  ],
+  "schema": "kirabridge.launchd-fixture-independent-verification.v1",
+  "scope": "KeepAlive true with ThrottleInterval30, actual isolated launchd; local readiness only",
+  "verified_at": 1793638082.700375
+}

@@ -523,6 +523,7 @@ async def run_request(bridge, principal, request, wait, approve, original=None):
     finally:
         if owns_dispatcher:
             await bridge.tasks.stop()
+        await bridge.system_modules.close()
     if final["state"] != State.COMPLETED:
         raise SystemExit(3 if final["state"] == State.UNKNOWN else 2)
 

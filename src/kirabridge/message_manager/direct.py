@@ -9,6 +9,7 @@ from __future__ import annotations
 import asyncio
 import json
 import re
+import sqlite3
 
 from kirabridge.bridge_core.models import BridgeError, UncertainExecution
 from kirabridge.local_runtime import peer
@@ -28,6 +29,7 @@ class DirectDelivery:
         "visible_target_working",
         "visible_target_unknown",
         "visible_input_not_empty",
+        "visible_input_geometry_ambiguous",
         "visible_target_scrolled",
         "visible_selection_required",
         "desktop_locked",
@@ -85,9 +87,22 @@ class DirectDelivery:
             event.set()
             if not result.cancelled():
                 result.exception()  # Consume a persistence fault; never retry it.
+            self._forget_recorded(message_id)
 
         task.add_done_callback(finished)
         return True
+
+    def _forget_recorded(self, message_id):
+        # A durable claim/outcome still rejects submit via _pristine after the
+        # local tombstone is dropped. Keep unrecorded attempts on storage faults.
+        try:
+            row = self.receiver.bridge.store.db.execute(
+                "SELECT state FROM message_jobs WHERE message_id=?", (message_id,)
+            ).fetchone()
+            if row is not None and row["state"] != "queued":
+                self._submitted.discard(message_id)
+        except sqlite3.Error:
+            pass
 
     @staticmethod
     def _consume(task):
@@ -371,4 +386,5 @@ class DirectDelivery:
                 uncertain=False,
                 preserve_delivered=event.is_set(),
             )
+            self._forget_recorded(identifier)
             event.set()

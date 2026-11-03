@@ -61,7 +61,7 @@ async def test_idle_only_input_rejects_busy_target_before_transport(bridge, conf
     config.principals["local"].capabilities += ["session.inspect"]
     target = {"pane_id": "terminal:123:ttys004", "expected_pid": 345, "busy": True}
 
-    async def catalog(principal):
+    async def catalog(principal, *, transport=None):
         return {"sessions": [target]}
 
     async def no_transport(*args, **kwargs):
@@ -140,7 +140,7 @@ async def test_native_session_selection_read_and_input(bridge, config, monkeypat
     }
     calls = []
 
-    async def catalog(principal):
+    async def catalog(principal, *, transport=None):
         bridge.security.principal(principal, "session.inspect")
         return {"sessions": [selected]}
 
@@ -150,6 +150,13 @@ async def test_native_session_selection_read_and_input(bridge, config, monkeypat
 
     monkeypatch.setattr(manager, "catalog", catalog)
     monkeypatch.setattr(manager.terminal_app, "native", native)
+    monkeypatch.setattr(
+        manager.terminal_app,
+        "process_identity",
+        AsyncMock(
+            return_value=f"{__import__('os').getuid()} ttys004 Sun Nov 1 12:00:00 2026 1 /bin/zsh"
+        ),
+    )
     with pytest.raises(BridgeError, match="exact current"):
         await manager.read("local", selected["pane_id"], 346)
     assert not calls

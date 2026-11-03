@@ -47,7 +47,7 @@ def install_catalog(monkeypatch, bridge, sessions):
                 return dict(row)
         raise BridgeError("session_selection_changed", "stale target")
 
-    async def catalog(principal):
+    async def catalog(principal, *, transport=None):
         return {"status": "available", "sessions": [dict(row) for row in sessions]}
 
     async def prove(principal, original):
@@ -455,7 +455,7 @@ async def test_incomplete_catalog_does_not_replace_or_release(visible, monkeypat
     async def selected(principal, pane, pid):
         raise BridgeError("session_selection_changed", "stale target")
 
-    async def catalog(principal):
+    async def catalog(principal, *, transport=None):
         return {"status": "available", "incomplete": True, "sessions": [new_session()]}
 
     async def prove(principal, original):

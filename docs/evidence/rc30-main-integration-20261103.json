@@ -1,0 +1,36 @@
+{
+  "source_commit": "ce1372fa9596d6b0798d7fcc82dd790c35aec4ec",
+  "runtime_source_commit": "2d540ee05f945efdd2330b46a1a65a4b94bcb482",
+  "previous_main_commit": "984ada6b378e1dc1fa1787faaba7e291236f20a1",
+  "merge_strategy": "Two-parent merge in isolated worktree, no history rewrite or force-push",
+  "non_documentation_tree_matches_tested_rc30": true,
+  "changed_paths_relative_to_rc30_before_this_evidence": [
+    "README.de.md",
+    "README.md",
+    "docs/CHATGPT.md",
+    "docs/DEVELOPERS.de.md",
+    "docs/DEVELOPERS.md",
+    "docs/INSTALL-DE.md",
+    "docs/INSTALL-EN.md",
+    "docs/README-REVIEW-20261031.md",
+    "docs/evidence/readme-release-check-20261031.json"
+  ],
+  "main_only_guides_preserved_byte_for_byte": [
+    "docs/CHATGPT.md",
+    "docs/INSTALL-DE.md",
+    "docs/INSTALL-EN.md",
+    "docs/README-REVIEW-20261031.md",
+    "docs/evidence/readme-release-check-20261031.json"
+  ],
+  "readme_conflict_resolution": "Preserve main bilingual structure and terminal-agent clarification; update verified RC30 release/installer links and sequence/batch documentation",
+  "local_document_links_valid": true,
+  "unresolved_conflicts": 0,
+  "diff_check_passed": true,
+  "new_tests_builds_or_installs": 0,
+  "reused_tests": "204 relevant RC30 integration tests plus completed independent reviews; code tree unchanged",
+  "release_url": "https://github.com/landjunge/KiraBridge/releases/tag/v0.8.0rc30",
+  "rollback_ref": "backup/main-before-rc30-20261103",
+  "whiteboard_thread_id": "188ce4729a62",
+  "observed_thread_revision": 492,
+  "push_intent": "Normal fast-forward update of refs/heads/main; independently verify remote after push"
+}

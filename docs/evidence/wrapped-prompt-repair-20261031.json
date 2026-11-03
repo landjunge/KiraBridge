@@ -1,0 +1,184 @@
+{
+  "date": "2026-10-31",
+  "whiteboard_id": "0ab8b95a7369",
+  "verified_whiteboard_milestones": [
+    14,
+    15,
+    16
+  ],
+  "code_commit": "acc1c850ba3d2ff384e02da78e489b48ebbbf27a",
+  "source_tree_sha256": "aef9319b72cce81a4b5d8702a7eccb69984bba43077c21bca881cd879a87c848",
+  "original_failure": {
+    "task_id": "readme_kirabridge_codex_1031",
+    "payload_chars": 886,
+    "logical_lines": 1,
+    "error": "visible_paste_unconfirmed",
+    "return_sent": false,
+    "historical_capture_old_verifier": false,
+    "historical_capture_new_verifier_columns129": true,
+    "separate_return_task": "readme_enter_only_1031",
+    "separate_error": "visible_target_unknown",
+    "historical_tasks_not_replayed": true
+  },
+  "package": {
+    "private_path": "/Users/landjunge/.local/share/kirabridge/backups/wrapped-singleline-repair-20261031/productive/package-verification.json",
+    "sha256": "4c44ea9cef5dbcedc3767eb15db6046cd96020a550ace97f167a8b9a22d22f99",
+    "value": {
+      "commit": "acc1c850ba3d2ff384e02da78e489b48ebbbf27a",
+      "bundle_sha256": "551fd4118c700795e960838507684321db26a4c3048db7c00fd0fb7adf36f502",
+      "wheel_sha256": "fa850b0f22ac9f9e43343045144c3531036b4a39f614c6deddd5fe05089db54b",
+      "manifest_files_verified": 420,
+      "python_files": 132,
+      "source_tree_sha256": "aef9319b72cce81a4b5d8702a7eccb69984bba43077c21bca881cd879a87c848",
+      "source_wheel_payload_byte_equal": true,
+      "build_offline": true
+    }
+  },
+  "isolated_release_smoke": {
+    "private_path": "/Users/landjunge/.local/share/kirabridge/backups/wrapped-singleline-repair-20261031/build-acc1c85/smoke-Darwin-x86_64.json",
+    "sha256": "7777a350bc9923cedb31f570a018e6a646eeb1d16dedb0236ef6977a1e2f13bf",
+    "value": {
+      "platform": "Darwin-x86_64",
+      "version": "0.8.0rc20",
+      "source_commit": "acc1c850ba3d2ff384e02da78e489b48ebbbf27a",
+      "archive_sha256": "551fd4118c700795e960838507684321db26a4c3048db7c00fd0fb7adf36f502",
+      "packaged_start_command": "passed isolated bundled installer preparation",
+      "installed_authenticated_dispatcher": true,
+      "concrete_preflight_and_loaded_source_match": true,
+      "corrupt_package_rejected_before_install": true,
+      "config_and_credentials_preserved": true,
+      "license_in_bundle_payload_wheel_and_separate_asset": true,
+      "license_sha256": "3316d5eda60ac1fea355aa43d196feea3567384179b55ca88c8636c0322021ec",
+      "license_expression": "LicenseRef-Netzwerkpunkt-Personal-Use-1.0",
+      "real_user_setup_service_tunnel_changed": false,
+      "new_chatgpt_account_call": "not performed",
+      "real_user_service_manager": "not exercised"
+    }
+  },
+  "independent_runtime_verification": {
+    "private_path": "/Users/landjunge/.local/share/kirabridge/backups/wrapped-singleline-repair-20261031/productive/independent-running-verification.json",
+    "sha256": "464e5877189fcb5d0b1694cf19152746be228f03d9580a882582810051702e8b",
+    "value": {
+      "passed": true,
+      "commit": "acc1c850ba3d2ff384e02da78e489b48ebbbf27a",
+      "runtime": {
+        "instance_id": "a7da137f455f408bb26b95b875b99006",
+        "version": "0.8.0rc20",
+        "pid": 35746,
+        "started_at": "2026-10-31T14:30:28.259044+00:00",
+        "config_path": "/Users/landjunge/.config/kirabridge/config.toml",
+        "config_sha256": "0dc8eb5952fe4d986c152d38e1658e06de711d6b1f91ccc9745b184d1adb6370",
+        "effective_config_sha256": "d5de7e63e70636a03ae54ead9990224da6e38137e23c8ba1b74aa233cfe5c012",
+        "source_tree_sha256": "aef9319b72cce81a4b5d8702a7eccb69984bba43077c21bca881cd879a87c848",
+        "source_file_count": 132,
+        "source_package_path": "/Users/landjunge/.local/share/kirabridge/install/releases/0.8.0rc20-acc1c850ba3d/source/.venv/lib/python3.11/site-packages/kirabridge",
+        "source_scope": "package Python files observed at startup; no remote attestation"
+      },
+      "launchd_pid_path_match": true,
+      "previous_core_pid_29698_absent": true,
+      "wheel_files_byte_equal": 143,
+      "installed_python_files": 132,
+      "configuration_credentials_hashes_modes_preserved": true,
+      "permission_revision_preserved": true,
+      "plist_options_preserved": true,
+      "queue_holds_byte_unchanged": 28,
+      "original_held_message_and_job_byte_unchanged": true,
+      "previously_acked_live_note_seq374_byte_unchanged": true,
+      "protected_task_rows_byte_unchanged": [
+        "kb_macos_implementation_20261031",
+        "kb_macos_continue_return_20261031",
+        "readme_kirabridge_codex_1031",
+        "readme_enter_only_1031"
+      ],
+      "historical_record_baseline_source": "preinstall/bridge.before.sqlite3; filtered protected JSON does not contain every historical record",
+      "parent_57091_readme_30638_tunnel_25909_console_15308_preserved": true,
+      "observed_by": "independent install_verify agent",
+      "scope": "actual install identity/data preservation only; no native input or message delivery triggered"
+    }
+  },
+  "actual_productive_e2e": {
+    "private_path": "/Users/landjunge/.local/share/kirabridge/backups/wrapped-singleline-repair-20261031/productive/acceptance/actual-productive-e2e-proof.json",
+    "sha256": "dc01afccb099855e3d6fec5ab695b1ee7215cf6334044f9f8628f4d9dc5496e0",
+    "value": {
+      "passed": true,
+      "installed_commit": "acc1c850ba3d2ff384e02da78e489b48ebbbf27a",
+      "source_tree_sha256": "aef9319b72cce81a4b5d8702a7eccb69984bba43077c21bca881cd879a87c848",
+      "actual_productive_core": true,
+      "actual_external_chatgpt_connector": true,
+      "first_prompt_chars": 886,
+      "second_prompt_chars": 125,
+      "first": {
+        "thread_id": "01a1925f-f626-7f82-b7dd-0eeebcfbadfb",
+        "turn_id": "01a19260-77b3-7c41-b4f4-6c1b2dc818e2",
+        "event_family": "item_completed",
+        "user_item_id": "01a19260-7cd6-75c2-8899-384aa93fc219",
+        "answer_item_id": "msg_0d3bde0c4bc494fb016ae5fc0919308191985807a32b960a79",
+        "user_prompt_count": 1,
+        "assistant_answer_count": 1,
+        "task_complete_observed": true,
+        "response_item_mirrors_counted": false,
+        "rollout": "/Users/landjunge/.codex/sessions/2026/10/31/rollout-2026-10-31T15-32-04-01a1925f-f626-7f82-b7dd-0eeebcfbadfb.jsonl"
+      },
+      "second": {
+        "thread_id": "01a1925f-f626-7f82-b7dd-0eeebcfbadfb",
+        "turn_id": "01a19261-4852-7080-b9af-4c7189ab81d0",
+        "event_family": "item_completed",
+        "user_item_id": "01a19261-487e-7243-8789-65a63794b3db",
+        "answer_item_id": "msg_0d3bde0c4bc494fb016ae5fc3d57e08191b1d486a7cf698a51",
+        "user_prompt_count": 1,
+        "assistant_answer_count": 1,
+        "task_complete_observed": true,
+        "response_item_mirrors_counted": false
+      },
+      "each_task_completed_attempt1_return_true": true,
+      "both_completions_received_and_acknowledged": true,
+      "first_task": "wrapped-installed-singleline-20261031",
+      "second_task": "wrapped-installed-blankline-20261031",
+      "final_screen_sha256": "dcab618ef98507eea54ae65e5aec284ebd82bb5adc41c08cc877bc94226d5071",
+      "cleanup": {
+        "own_test_agent_absent": true,
+        "reused_existing_shell_and_window_preserved": true,
+        "all_original_window_ids_preserved": true,
+        "other_codex_process_identities_preserved": true,
+        "no_new_window_opened": true
+      }
+    }
+  },
+  "source_native_continuation": {
+    "path": "/Users/landjunge/.local/share/kirabridge/backups/wrapped-singleline-repair-20261031/native-final/final-continuation-summary.json",
+    "sha256": "f365f7961e86a595861519fd4b3587dd709423bb935ad9bf46da0a07b0107a3f",
+    "acceptance": "passed",
+    "source_hash_at_continuation": "6fdd355b8235e147e58ed07c324c9651d0f34fdba369f94c00a5d2e7c2996fba",
+    "slash_completed_attempt1_return_true": true,
+    "menu": {
+      "return_sent": true,
+      "paste_event_sent": false,
+      "attempt": 1,
+      "native_mutations": 1,
+      "thread_id": "01a19253-2245-7de3-806d-c77482d3ad37",
+      "title_sha256": "f81f4abea808bee40acd43b2aa216d13019be86bd61d71d2e9e9ea55315163e1"
+    },
+    "cleanup": {
+      "reused_existing_window_and_shell_preserved": true,
+      "owned_test_agent_absent": true,
+      "other_windows_and_current_process_identities_preserved": true
+    },
+    "earlier_failed_attempts_preserved": true
+  },
+  "tests": {
+    "nine_relevant_suites_before_last_narrow_hardenings": "277 passed in 10.65s",
+    "literal_return_clipboard_after_blank_padding_fix": "152 passed in 6.33s",
+    "final_return_guard_run": "89 passed; one queue-hint failure identified and corrected",
+    "only_affected_final_guard_cases_rerun": "9 passed,26 deselected in0.43s",
+    "ruff_format_diffcheck": "passed",
+    "independent_source_review": "concrete findings corrected; no unresolved reported code finding",
+    "counts_overlap": true
+  },
+  "limitations": [
+    "Complex Unicode/whitespace/softwrap forms need their own positive evidence and may still stop before Return.",
+    "An initial isolated dispatcher start exited before readiness without preserved child stdout/stderr; diagnostic retry and productive start passed without package/source changes; initial cause unproven.",
+    "No general exactly-once guarantee or automatic busy-session steering is claimed."
+  ],
+  "rollback": "/Users/landjunge/.local/share/kirabridge/install/backups/20261031-153021-014baa7c",
+  "rollback_executed": false
+}

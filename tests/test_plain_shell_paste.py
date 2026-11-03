@@ -139,6 +139,14 @@ async def test_callback_failure_prevents_all_transport(plain):
     native.assert_not_awaited()
 
 
+async def test_theme_prompt_plain_paste_uses_shared_empty_prompt_check(plain):
+    sessions, _, _, native = plain
+    sessions.terminal_app.read.return_value = "➜  ~ \n\n"
+    result = await sessions.send("local", arguments())
+    assert result["paste_event_sent"] and not result["return_sent"]
+    native.assert_awaited_once()
+
+
 async def test_input_policy_refusal_prevents_intent_and_transport(plain, monkeypatch):
     sessions, _, _, native = plain
 
@@ -239,10 +247,11 @@ async def test_submitted_direct_shell_checks_input_before_intent(plain, monkeypa
     )
     sessions.terminal_app.read.return_value = "KiraBridge fixture % unfinished user text"
     intent = AsyncMock()
-    with pytest.raises(BridgeError, match="existing input"):
+    with pytest.raises(BridgeError) as failure:
         await sessions.send(
             "local", arguments().model_copy(update={"submit": True}), before_transport=intent
         )
+    assert failure.value.code == "visible_input_not_empty"
     intent.assert_not_awaited()
     native.assert_not_awaited()
 

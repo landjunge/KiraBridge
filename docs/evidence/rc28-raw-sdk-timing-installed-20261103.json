@@ -1,0 +1,32 @@
+{
+  "scope": "One post-benchmark read-only raw SDK clipboard_info call through a fresh local stdio proxy using configured chatgpt identity. No clipboard contents. Includes proxy/daemon _meta unavailable in normalized attached wrappers. Fresh connection initialization timed separately; excludes cloud and Voice.",
+  "version": "0.8.0rc28",
+  "source_commit": "6b70116ba06da69c2e3f1552471c1842e983d8f7",
+  "fresh_connect_ms": 1279.694531,
+  "tool_elapsed_ms": 484.277501,
+  "error": false,
+  "meta": {
+    "de.netzwerkpunkt.kirabridge/timing": {
+      "trace_id": "545f2fe2f0fc4541991c4b50031127a0",
+      "schema": 1,
+      "daemon": {
+        "handler_started_unix_ns": 1793666705931736000,
+        "result_ready_unix_ns": 1793666705933024000,
+        "duration_ms": 1.288736
+      },
+      "proxy_dispatch": {
+        "handler_started_unix_ns": 1793666705921540000,
+        "result_ready_unix_ns": 1793666705939179000,
+        "duration_ms": 17.639364,
+        "catalog_ms": 0.054722
+      },
+      "stdio_proxy": {
+        "handler_started_unix_ns": 1793666705692234000,
+        "result_ready_unix_ns": 1793666705939313000,
+        "duration_ms": 247.078539
+      }
+    }
+  },
+  "response_bytes": 935,
+  "response_contents_saved": false
+}

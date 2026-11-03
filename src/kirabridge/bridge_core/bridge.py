@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+from pathlib import Path
 from typing import Any
 
 from pydantic import ValidationError
@@ -30,6 +31,7 @@ from kirabridge.bridge_core.models import (
     State,
     TaskRequest,
     TerminalInput,
+    ThreadDeskDynamicInput,
     ThreadDeskKnowledgeInput,
     ThreadDeskManageInput,
     ThreadDeskReadInput,
@@ -37,9 +39,15 @@ from kirabridge.bridge_core.models import (
     WriteInput,
 )
 from kirabridge.clipboard_manager import ClipboardManager
+from kirabridge.directory_ranges import DirectoryInput
 from kirabridge.file_transfer.models import InventoryInput, PrepareInput, TransferInput
 from kirabridge.filesystem_manager import FilesystemManager, PathScope
 from kirabridge.image_manager import ImageManager
+from kirabridge.keyboard_action_manager import ACTION_INPUTS, KeyboardActionManager
+from kirabridge.keyboard_control import CONTROL_INPUTS, KeyboardControl
+from kirabridge.keyboard_manager import KEYBOARD_INPUTS, KeyboardManager
+from kirabridge.keyboard_profile_manager import PROFILE_INPUTS, KeyboardProfileManager
+from kirabridge.keyboard_sequence import SEQUENCE_INPUTS, KeyboardSequence
 from kirabridge.message_manager import MessageManager
 from kirabridge.message_manager.receiver import MessageReceiver
 from kirabridge.permissions import (
@@ -49,7 +57,12 @@ from kirabridge.permissions import (
     state_exclusions,
     visible_execution,
 )
+from kirabridge.platform_adapters.macos.status import PlatformStatusInput
+from kirabridge.platform_adapters.macos.system_identity import installed_native_contract
+from kirabridge.platform_adapters.macos.system_models import SYSTEM_INPUTS
+from kirabridge.platform_adapters.macos.system_transport import SystemModules
 from kirabridge.process_manager import ProcessManager
+from kirabridge.process_output_store import OutputRangeInput, ProcessOutputStore
 from kirabridge.queue_management.models import QueueControl
 from kirabridge.security_manager import SecurityManager
 from kirabridge.session_manager import (
@@ -59,12 +72,23 @@ from kirabridge.session_manager import (
     SessionRead,
     SessionSelect,
 )
+from kirabridge.system_operations import SYSTEM_LEAVES, SYSTEM_READ_OPERATIONS
+from kirabridge.system_reports import REPORT_TYPES, SystemReportInput
 from kirabridge.task_manager.manager import TaskManager
 from kirabridge.task_manager.store import Store
 from kirabridge.terminal_manager import TerminalManager
 from kirabridge.visible_terminal import VisibleTerminal, VisibleTerminalInput
 
 INPUTS = {
+    **SYSTEM_INPUTS,
+    **KEYBOARD_INPUTS,
+    **CONTROL_INPUTS,
+    **SEQUENCE_INPUTS,
+    **ACTION_INPUTS,
+    **PROFILE_INPUTS,
+    "process.output": OutputRangeInput,
+    "system.report": SystemReportInput,
+    "platform.status": PlatformStatusInput,
     "queue.control": QueueControl,
     "files.prepare": PrepareInput,
     "files.transfer": TransferInput,
@@ -83,7 +107,7 @@ INPUTS = {
     "terminal.visible": VisibleTerminalInput,
     "file.read": ReadInput,
     "file.image": ImageInput,
-    "file.list": PathInput,
+    "file.list": DirectoryInput,
     "file.write": WriteInput,
     "file.mkdir": PathInput,
     "file.move": MoveInput,
@@ -102,6 +126,7 @@ INPUTS = {
     "handoff.inbox": HandoffInboxInput,
     "handoff.reconcile": HandoffReference,
     "handoff.decide": HandoffDecisionInput,
+    "threaddesk.dynamic": ThreadDeskDynamicInput,
     "threaddesk.read": ThreadDeskReadInput,
     "threaddesk.manage": ThreadDeskManageInput,
     "threaddesk.knowledge": ThreadDeskKnowledgeInput,
@@ -162,7 +187,8 @@ class Bridge:
         )
         self.outputs = OutputHistory(config.output_history, self.store)
         self.store.result_codec = self.outputs
-        self.terminal = TerminalManager(config.terminal)
+        self.process_outputs = ProcessOutputStore(config.state_path / "process-output", self.store)
+        self.terminal = TerminalManager(config.terminal, output_store=self.process_outputs)
         self.filesystem = FilesystemManager()
         self.images = ImageManager()
         self.clipboard = ClipboardManager()
@@ -211,6 +237,42 @@ class Bridge:
         self.visible_handoffs = VisibleHandoffs(
             config, self.store, self.security, self.sessions, self.messages
         )
+        from kirabridge.platform_adapters.macos import MacOSProvider
+
+        self.system_modules = SystemModules(
+            authorize=self.security.authorize, **installed_native_contract(Path(__file__))
+        )
+        from kirabridge.desktop_input import DesktopInput
+
+        self.desktop_input = DesktopInput(
+            self.sessions.lock, timeout=self.system_modules.transport.timeout
+        )
+        self.keyboard_profiles = KeyboardProfileManager(
+            config.state_path, self.security.authorize, self.desktop_input
+        )
+        self.keyboard = KeyboardManager(
+            transport=self.system_modules.transport,
+            desktop_input=self.desktop_input,
+            authorize=self.security.authorize,
+        )
+        self.keyboard_control = KeyboardControl(self.keyboard)
+        self.keyboard_sequence = KeyboardSequence(self.keyboard_control)
+        self.keyboard_actions = KeyboardActionManager(
+            keyboard=self.keyboard,
+            profiles=self.keyboard_profiles,
+            desktop_input=self.desktop_input,
+            authorize=self.security.authorize,
+        )
+        self.sessions.terminal_app.system_transport = self.system_modules.transport
+        self.macos = MacOSProvider(
+            terminal_app=self.sessions.terminal_app,
+            clipboard=self.clipboard,
+            files=self.filesystem,
+            processes=self.processes,
+            system_modules=self.system_modules,
+            system_reports=self.terminal,
+        )
+        self.sessions.terminal_app.platform_guard = lambda: self.macos.require("terminal.native")
         self.agents.visible_handoffs = self.visible_handoffs
 
         def maintain():
@@ -239,7 +301,10 @@ class Bridge:
             model.model_validate(request.arguments)
         except ValidationError:
             raise BridgeError(
-                "invalid_arguments", "Arguments do not match the operation schema"
+                "invalid_arguments",
+                "For Return without text use session_enter with the observed cursor and agent PID"
+                if request.operation == "session.input" and not request.arguments.get("text")
+                else "Arguments do not match the operation schema",
             ) from None
 
     def submit(
@@ -395,6 +460,67 @@ class Bridge:
         }
 
     async def execute(self, task: dict, running, progress) -> dict[str, Any]:
+        operation = self.platform_operation(task["operation"], task["args"], task["principal"])
+        if operation is not None:
+            return await self.macos.execute(
+                operation,
+                lambda: self._execute_operation(task, running, progress),
+                revalidate=lambda: self.security.authorize(
+                    task["principal"], task["operation"], text=task["args"].get("text")
+                ),
+            )
+        return await self._execute_operation(task, running, progress)
+
+    def platform_operation(self, operation, arguments=None, principal=None):
+        """Select the existing native provider without changing tmux/portable routes."""
+        if self.macos.host_platform != "darwin":
+            return None
+        if operation in {"session.catalog", "platform.status", "clipboard.info"}:
+            return None  # The terminal catalogue can contain tmux as well.
+        if operation in {"terminal.execute", "admin.execute"}:
+            if visible_execution(
+                self.config,
+                principal,
+                operation,
+                background=bool((arguments or {}).get("background", False)),
+            ) or (
+                operation == "admin.execute" and direct_terminal_required(self.config, principal)
+            ):
+                return "terminal.visible"
+            return None
+        if operation.startswith("session.") and operation != "session.open":
+            if not str((arguments or {}).get("pane_id", "")).startswith("terminal:"):
+                return None
+        return operation if operation in self.macos.descriptors else None
+
+    async def platform_status(self, principal, *, check_helpers=False):
+        from kirabridge.permissions import decision
+
+        self.security.authorize(principal, "platform.status")
+        # Explicit no-prompt checks run only for status, never tools/list.
+        await asyncio.to_thread(self.macos.permission_probe.refresh_core)
+        result = {
+            **self.macos.snapshot(),
+            "operations": [
+                row
+                for row in self.macos.operation_catalog(
+                    lambda op: decision(self.config, principal, op)
+                )
+                if row["operation"] in INPUTS and row["policy"]["authorized"]
+            ],
+            "scope": "technical availability and OS observations; no execution grant",
+        }
+        if check_helpers:
+            from kirabridge.platform_adapters.macos.helper_permissions import (
+                inspect_helper_permissions,
+            )
+
+            # A transient diagnostic process cannot authorize another worker.
+            # Keep its identity out of PermissionProbe and discovery revisions.
+            result["helper_diagnostics"] = await inspect_helper_permissions()
+        return result
+
+    async def _execute_operation(self, task: dict, running, progress) -> dict[str, Any]:
         operation, arguments, principal = task["operation"], task["args"], task["principal"]
         args = INPUTS[operation].model_validate(arguments)
         self.security.authorize(principal, operation, text=arguments.get("text"))
@@ -403,6 +529,96 @@ class Bridge:
             policy.read_roots if operation in {"file.read", "file.image", "file.list"} else []
         )
         scope = PathScope(roots, excluded=state_exclusions(self.config, policy))
+        if operation == "platform.status":
+            await running({"evidence_type": "platform_status_query"})
+            return await self.platform_status(principal, check_helpers=args.check_helpers)
+        if operation == "system.report":
+            self.macos.require(operation)
+            roots = policy.terminal_roots or policy.roots
+            if not roots:
+                raise BridgeError("path_denied", "A permitted working directory is required")
+            report = TerminalInput(
+                argv=[
+                    "/usr/sbin/system_profiler",
+                    "-json",
+                    "-detailLevel",
+                    args.detail,
+                    REPORT_TYPES[args.report],
+                ],
+                cwd=roots[0],
+                timeout=args.timeout,
+                max_output=args.max_output,
+                background=True,
+            )
+            result = await self.terminal.execute(
+                task["id"],
+                principal,
+                report,
+                roots,
+                ["/usr/sbin/system_profiler"],
+                running,
+                allow_any_executable=False,
+            )
+            return {
+                **result,
+                "report": args.report,
+                "format": "json",
+                "success": result["exit_code"] == 0
+                and not result["timed_out"]
+                and not result["terminated"],
+                "full_output": {
+                    "operation": "process.output",
+                    "task_id": task["id"],
+                    "streams": ["stdout", "stderr"],
+                },
+                "scope": (
+                    "Fixed public system_profiler report; complete owned byte streams "
+                    "remain separately pageable"
+                ),
+            }
+        if operation in SEQUENCE_INPUTS:
+            return await self.keyboard_sequence.execute(task, args, running, progress)
+        if operation in CONTROL_INPUTS:
+            return await self.keyboard_control.execute(task, args, running, progress)
+        if operation in ACTION_INPUTS:
+            return await self.keyboard_actions.execute(task, args, running, progress)
+        if operation in PROFILE_INPUTS:
+            return await self.keyboard_profiles.execute(task, args, running)
+        if operation in KEYBOARD_INPUTS:
+            return await self.keyboard.execute(task, args, running, progress)
+        if operation in SYSTEM_LEAVES:
+            if operation == "apps.launch":
+                # Launching a bundle does not bypass the caller's filesystem roots.
+                with scope.directory(args.app_path):
+                    pass
+            from kirabridge.desktop_input import DESKTOP_EFFECT_OPERATIONS
+
+            async def execute_native(turn=None):
+                await running(
+                    {
+                        "evidence_type": "native_system_operation",
+                        "operation": operation,
+                        "effect_attempted": operation not in SYSTEM_READ_OPERATIONS,
+                        "automatic_retry": False,
+                    }
+                )
+                if turn is not None:
+                    turn.mark_attempted()
+                return await self.system_modules.execute(
+                    operation,
+                    args.model_dump(exclude_none=True),
+                    principal=principal,
+                    task_id=task["id"],
+                )
+
+            if operation in DESKTOP_EFFECT_OPERATIONS:
+                async with self.desktop_input.transaction() as turn:
+                    return await execute_native(turn)
+            return await execute_native()
+        if operation == "process.output":
+            self.store.get(args.task_id, principal)
+            await running({"evidence_type": "owned_process_output_read"})
+            return self.terminal.read_output(principal, **args.model_dump())
         if operation == "queue.control":
             # Rejections before any mutation remain definite failures, not unknown effects.
             result = await self.queues.control(
@@ -458,7 +674,9 @@ class Bridge:
             background=bool(getattr(args, "background", False)),
         ):
             visible_args = VisibleTerminalInput.model_validate(arguments)
-            return await self.visible_terminal.execute(task, visible_args, running)
+            return await self.visible_terminal.execute(
+                task, visible_args, running, progress=progress
+            )
         if operation == "terminal.execute":
             result = await self.terminal.execute(
                 task["id"],
@@ -482,66 +700,16 @@ class Bridge:
                 },
             }
         if operation == "session.input":
+            if args.key == "enter":
+                from kirabridge.session_return import execute
+
+                return await execute(self, task, args, running, progress)
             selected = await self.sessions.selected(principal, args.pane_id, args.expected_pid)
             target, selected_binding = self.sessions.explicit_agent_binding(selected)
             if target:
-                if not args.submit:
-                    # Paste-only is an explicit task, never a submitted agent handoff.
-                    # Retain agent access control even though no Return is sent.
-                    agent_policy = self.security.principal(principal, "agent.execute")
-                    if target not in agent_policy.agents:
-                        raise BridgeError("agent_denied", "Selected agent is not granted")
-                    self.security.principal(principal, "terminal.execute")
-                    async with self.sessions.agent_selection(principal, target, selected_binding):
-                        await self.visible_handoffs.reconcile_target_reservations(
-                            principal,
-                            target,
-                            selected_binding,
-                            explicit_paste_task_id=task["id"],
-                        )
+                from kirabridge.session_input_router import execute
 
-                        async def paste_attempted():
-                            await running(
-                                {
-                                    "evidence_type": "visible_paste_dispatch",
-                                    "terminal_input_attempted": True,
-                                    "pane_id": args.pane_id,
-                                    "expected_pid": args.expected_pid,
-                                    "agent_pid": selected_binding.agent_pid,
-                                    "return_sent": False,
-                                    "agent_confirmed": False,
-                                    "automatic_retry": False,
-                                }
-                            )
-
-                        approved = self.tasks.input_policy.dispatch(principal, args, task["id"])
-                        result = await self.sessions.insert(
-                            principal, approved, before_transport=paste_attempted
-                        )
-                    self.tasks.input_policy.sent(principal, task["id"])
-                    return {
-                        **result,
-                        "pane_id": args.pane_id,
-                        "expected_pid": args.expected_pid,
-                        "submitted": False,
-                        "execution_confirmed": False,
-                        "scope": "literal paste event only; no Return or agent acknowledgement",
-                    }
-                approved = self.tasks.input_policy.dispatch(principal, args, task["id"])
-                result = await self.visible_handoffs.execute(
-                    task,
-                    AgentInput(
-                        agent=target,
-                        prompt=approved.text,
-                        cwd=str(self.config.state_path),
-                        timeout=300,
-                    ),
-                    running,
-                    progress,
-                    binding_override=selected_binding,
-                )
-                self.tasks.input_policy.sent(principal, task["id"])
-                return result
+                return await execute(self, task, args, target, selected_binding, running, progress)
 
             async def session_input_attempted():
                 await running(
@@ -559,7 +727,19 @@ class Bridge:
             )
         if operation == "session.open":
             await running({"evidence_type": "session_open_dispatch"})
-            return await self.sessions.open(principal, args, task_id=task["id"])
+
+            async def session_window_created(receipt):
+                await progress(
+                    {
+                        "evidence_type": "session_window_created",
+                        "creation_receipt": receipt,
+                        "automatic_retry": False,
+                    }
+                )
+
+            return await self.sessions.open(
+                principal, args, task_id=task["id"], on_created=session_window_created
+            )
         if operation == "agent.execute":
             self.teams.authorize_execution(task)
             return await self.agents.execute(task, args, policy, running, progress)
@@ -587,6 +767,10 @@ class Bridge:
             return await self.workflow_control.stop(
                 principal, args.handoff_id, args.revision, args.stop_id, task_id=task["id"]
             )
+        if operation == "threaddesk.dynamic":
+            from kirabridge.threaddesk_dynamic import execute as dynamic_execute
+
+            return await dynamic_execute(self, task, args, running)
         if operation.startswith("threaddesk."):
             return await self.threaddesk.execute(task, args, running)
         if operation == "observations.read":
@@ -600,7 +784,11 @@ class Bridge:
         if operation == "admin.execute":
             if direct_terminal_required(self.config, principal):
                 return await self.visible_terminal.execute(
-                    task, VisibleTerminalInput.model_validate(arguments), running, privileged=True
+                    task,
+                    VisibleTerminalInput.model_validate(arguments),
+                    running,
+                    progress=progress,
+                    privileged=True,
                 )
             from kirabridge.admin_manager import execute_admin
 
@@ -719,5 +907,6 @@ class Bridge:
                 await self.message_receiver.stop()
         finally:
             await self.tasks.stop()
+            await self.system_modules.close()
             await self.threaddesk.close()
             self.store.close()

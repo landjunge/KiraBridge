@@ -112,7 +112,7 @@ async def test_existing_terminal_handles_are_visible_without_reading_or_claiming
         "busy": True,
     }
 
-    async def catalog(principal):
+    async def catalog(principal, *, transport=None):
         assert principal == "local"
         return {"status": "available", "sessions": [target]}
 

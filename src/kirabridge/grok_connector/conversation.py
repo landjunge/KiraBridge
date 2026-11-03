@@ -48,7 +48,7 @@ def confirmed_input_reply(bridge, principal, task, result):
     )
 
 
-async def result_for_conversation(bridge, principal, task):
+async def result_for_conversation(bridge, principal, task, *, wait_seconds=None):
     """An authenticated tool response is not evidence of audio playback."""
     if not enabled_for(bridge, principal) or "id" not in task:
         return task
@@ -66,9 +66,10 @@ async def result_for_conversation(bridge, principal, task):
         }
     # Re-read through the normal owner/permission check, including on reconnect.
     task = bridge.task(principal, task["id"])
-    if task["state"] in ACTIVE:
+    timeout = WAIT_SECONDS if wait_seconds is None else min(WAIT_SECONDS, max(0, wait_seconds))
+    if task["state"] in ACTIVE and timeout > 0:
         try:
-            await bridge.tasks.wait(principal, task["id"], timeout=WAIT_SECONDS)
+            await bridge.tasks.wait(principal, task["id"], timeout=timeout)
         except TimeoutError:
             pass
         task = bridge.task(principal, task["id"])

@@ -1,0 +1,198 @@
+{
+  "version": "0.8.0rc30",
+  "source_commit": "2d540ee05f945efdd2330b46a1a65a4b94bcb482",
+  "release": {
+    "id": 432239689,
+    "url": "https://github.com/landjunge/KiraBridge/releases/tag/v0.8.0rc30",
+    "published": true,
+    "source_commit": "2d540ee05f945efdd2330b46a1a65a4b94bcb482",
+    "version": "0.8.0rc30",
+    "download_verified": true,
+    "downloaded_zip_sha256": "a84e76edec09be23bbb9a7c2f65656db93ac3f9a72660afab4f4d3f03b239630",
+    "downloaded_zip_bytes": 3326833,
+    "assets": [
+      {
+        "name": "install-macos.sh",
+        "size": 586,
+        "digest": "sha256:bcda2189325f77f6249ee993ed92811b3f08e0c0180545372e6617fe69488222"
+      },
+      {
+        "name": "KiraBridge-0.8.0rc30-Intel-Installer.zip",
+        "size": 3326833,
+        "digest": "sha256:a84e76edec09be23bbb9a7c2f65656db93ac3f9a72660afab4f4d3f03b239630"
+      },
+      {
+        "name": "kirabridge-0.8.0rc30-py3-none-any.whl",
+        "size": 576349,
+        "digest": "sha256:efcdb861fd52ef4f76c9c7d7b9157741fac18c47f11d89b84fec65982304379c"
+      },
+      {
+        "name": "KiraBridge-macos.tar.gz",
+        "size": 2808887,
+        "digest": "sha256:164ec6659d84c79001f2f940da158e9bf831b1fd80adbb2a019d7b1788db8ab6"
+      },
+      {
+        "name": "LICENSE",
+        "size": 6373,
+        "digest": "sha256:3316d5eda60ac1fea355aa43d196feea3567384179b55ca88c8636c0322021ec"
+      },
+      {
+        "name": "SHA256SUMS",
+        "size": 458,
+        "digest": "sha256:9a8b7e0ed51869a719b10037fc102ec99cd723c50068ea773e020c94083daabd"
+      },
+      {
+        "name": "smoke-Darwin-x86_64.json",
+        "size": 848,
+        "digest": "sha256:7ea2327b373d74e106177024f8e4788f5925e76e69fae1fc57f890dbb9f1daf3"
+      }
+    ]
+  },
+  "installation": {
+    "started": {
+      "phase": "started",
+      "at_utc": "2026-11-03T03:29:59.937748+00:00",
+      "tty": "/dev/ttys000",
+      "window_id": 2142,
+      "cg_window_id": 2142,
+      "source_commit": "2d540ee05f945efdd2330b46a1a65a4b94bcb482",
+      "target_version": "0.8.0rc30",
+      "root_confirmed_own_physical_tabs": 1
+    },
+    "finished": {
+      "phase": "finished",
+      "at_utc": "2026-11-03T03:30:21.216711+00:00",
+      "tty": "/dev/ttys000",
+      "window_id": 2142,
+      "cg_window_id": 2142,
+      "source_commit": "2d540ee05f945efdd2330b46a1a65a4b94bcb482",
+      "target_version": "0.8.0rc30",
+      "root_confirmed_own_physical_tabs": 1,
+      "exit_code": 0
+    },
+    "window_cleanup": {
+      "owned_window_closed": true,
+      "absence_verified_twice": true,
+      "original_logical_inventory_preserved": true,
+      "original_native_cg_ids_preserved": [
+        1548,
+        1604
+      ]
+    },
+    "runtime": {
+      "pid": 66439,
+      "instance_id": "777222cce58e4b38b503c2f3d20900e1",
+      "started_at": "2026-11-03T03:30:12.398324+00:00",
+      "source_tree_sha256": "ba30666046103b32c129394374b7ce92304bedb7920fc5b7b3fa8743756f2f8c",
+      "source_file_count": 165,
+      "source_scope": "Package Python files observed at startup; verified against installed wheel and packaged source, no remote attestation"
+    },
+    "connector_status": {
+      "connected": true,
+      "healthy": true,
+      "process_running": true,
+      "ready": true,
+      "process_evidence_source": "launchd",
+      "actual_apps_calls_verified_separately_in": "rc30-cloud-after-20261103.json"
+    },
+    "rollback_version": "0.8.0rc29",
+    "rollback_backup": "20261103-043004-2c1cf0e1"
+  },
+  "independent_preservation_verification": {
+    "captured_at_utc": "2026-11-03T03:35:42.590280+00:00",
+    "source_commit": "2d540ee05f945efdd2330b46a1a65a4b94bcb482",
+    "version": "0.8.0rc30",
+    "protected_config_files": 7,
+    "all_config_hash_size_modes_preserved": true,
+    "database_schema_preserved": true,
+    "inventory_tables": 11,
+    "all_old_inventory_rows_preserved": true,
+    "old_rows_preserved": 15560,
+    "added_row_counts": {
+      "completion_notices": 4,
+      "tasks": 4
+    },
+    "added_tasks": {
+      "rc30_read_fixture_36dc164015_0": "completed",
+      "rc30_read_fixture_36dc164015_1": "completed",
+      "rc30_read_fixture_36dc164015_2": "completed",
+      "rc30_read_fixture_36dc164015_3": "completed"
+    },
+    "only_expected_four_completed_read_tasks_added": true,
+    "nonconnector_agent_and_shell_identities_preserved": true,
+    "preserved_agent_ids": [
+      1728,
+      1749,
+      1825,
+      35046
+    ],
+    "preserved_shell_pid": 34884,
+    "expected_service_replacements": {
+      "old_backend_pid": 56714,
+      "new_backend": {
+        "pid": 66439,
+        "ppid": 1,
+        "tty": "??",
+        "started_local": "Tue Nov 3 04:30:11 2026",
+        "executable_name": "Python"
+      },
+      "old_tunnel_pid": 56742,
+      "new_tunnel": {
+        "pid": 66465,
+        "ppid": 1,
+        "tty": "??",
+        "started_local": "Tue Nov 3 04:30:17 2026",
+        "executable_name": "tunnel-client"
+      },
+      "old_connector_pid": 56745,
+      "new_connector": {
+        "pid": 66468,
+        "ppid": 66465,
+        "started_local": "Tue Nov 3 04:30:17 2026",
+        "executable_name": "codex"
+      }
+    },
+    "old_native_app_pid": 56756,
+    "new_native_app": {
+      "pid": 66478,
+      "ppid": 1,
+      "tty": "??",
+      "started_local": "Tue Nov 3 04:30:20 2026",
+      "executable_name": "KiraBridge"
+    },
+    "installed_python_module_count": 165,
+    "all_165_python_modules_match_wheel_and_packaged_source": true,
+    "all_three_native_files_hash_and_mode_match_release_and_desktop": true,
+    "native_source_pin_matches": true,
+    "native_binary_sha256": "aa073d32fb4fd68101cc39935b7b1ac2a147951f6e2e26a82921ea2e854b5372",
+    "architecture": "x86_64",
+    "scope": "Independent local file bytes, metadata, consistent SQLite snapshot, process identities; no UI, Cloud, MCP, builds or tests"
+  },
+  "fixture_cleanup": {
+    "at_utc": "2026-11-03T03:51:22.233818+00:00",
+    "own_immutable_fixture_files_removed": 4,
+    "owner_mode_contents_and_sha_verified_before_removal": true,
+    "fixture_directory_removed": true,
+    "completed_read_tasks_retained_as_evidence": true
+  },
+  "build": {
+    "architecture": "x86_64",
+    "local_intel_builds": 1,
+    "github_actions_used": false,
+    "arm_builds": 0,
+    "installer_files_verified": 550,
+    "isolated_release_smoke_passed": true,
+    "corrupt_package_rejected": true
+  },
+  "whiteboard": {
+    "thread_id": "188ce4729a62",
+    "observed_thread_revision": 491,
+    "external_key": "rc30-hotpaths-installed-20261103-2d540ee",
+    "entry_id": "7d5ae806a8d1",
+    "ordinal": 131,
+    "content_hash": "5af225598a3b0106d9d66d13609bb4c23871456b78ee707d646b674cc99a94b9",
+    "independent_readback_exact": true,
+    "readback_truncated": false,
+    "characters_verified": 3702
+  }
+}

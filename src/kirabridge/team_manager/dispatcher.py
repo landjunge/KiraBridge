@@ -142,6 +142,9 @@ class TeamDispatcher:
 
     def _next(self):
         now = time.monotonic()
+        for identifier, until in list(self._defer.items()):
+            if until <= now:
+                del self._defer[identifier]
         for existing, rows in (
             (True, self.teams.inflight(limit=32)),
             (False, self.teams.pending(limit=16)),

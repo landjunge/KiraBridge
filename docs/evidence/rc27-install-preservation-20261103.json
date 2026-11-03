@@ -1,0 +1,114 @@
+{
+  "package_integrity": {
+    "version": "0.8.0rc27",
+    "commit": "38223b16ed286aacf951f91890a6eafae6ea88f0",
+    "installed_python_files_equal_wheel": 159,
+    "desktop_binary_sha256": "d0d762bb11ad8c31951d63ff5d55ad50c97323db7922c94752cfdc328d0d9502",
+    "desktop_matches_release_manifest": true,
+    "rollback_backup": "/Users/landjunge/.local/share/kirabridge/install/backups/20261103-003445-6a660b8f"
+  },
+  "chatgpt_tunnel": {
+    "connected": true,
+    "runtime_evidence": {
+      "healthy": true,
+      "process_running": true,
+      "ready": true
+    },
+    "process_evidence_source": "launchd",
+    "chatgpt_tool_call": "unverified"
+  },
+  "installer_terminal": {
+    "pane_id": "terminal:1695:ttys000",
+    "logical_window_id": 1695,
+    "tty": "/dev/ttys000",
+    "cg_window_id": 1695,
+    "own_physical_tabs": 2,
+    "physical_window_count": 2,
+    "installer_success_text": true,
+    "process_completed": true
+  },
+  "installer_window_cleanup": {
+    "owned_window_id": 1695,
+    "closed": true,
+    "absence_verified_twice": true,
+    "other_window_ids_before": [
+      1548,
+      1604
+    ],
+    "other_window_ids_after": [
+      1548,
+      1604
+    ]
+  },
+  "preservation": {
+    "at_utc": "2026-11-02T23:38:19.808878+00:00",
+    "protected_files_checked": 7,
+    "protected_files_unchanged": true,
+    "schema_unchanged": true,
+    "inventories_checked": 11,
+    "old_inventory_rows_retained_unchanged": true,
+    "processes": {
+      "preserved": [
+        {
+          "pid": 1728,
+          "started_local": "Mon Nov 2 17:22:55 2026",
+          "executable_name": "codex",
+          "current_ppid": 1,
+          "baseline_ppid": 1722
+        },
+        {
+          "pid": 1749,
+          "started_local": "Mon Nov 2 17:22:57 2026",
+          "executable_name": "codex",
+          "current_ppid": 1,
+          "baseline_ppid": 1722
+        },
+        {
+          "pid": 1825,
+          "started_local": "Mon Nov 2 17:23:42 2026",
+          "executable_name": "codex-code-mode-host",
+          "current_ppid": 1728,
+          "baseline_ppid": 1728
+        },
+        {
+          "pid": 35046,
+          "started_local": "Mon Nov 2 23:43:58 2026",
+          "executable_name": "codex",
+          "current_ppid": 34884,
+          "baseline_ppid": 34884
+        }
+      ],
+      "absent": [
+        {
+          "pid": 21486,
+          "ppid": 21483,
+          "started_local": "Mon Nov 2 20:10:13 2026",
+          "executable_name": "codex"
+        },
+        {
+          "pid": 1722,
+          "ppid": 857,
+          "started_local": "Mon Nov 2 17:22:50 2026",
+          "executable_name": "codex"
+        }
+      ],
+      "new": [
+        {
+          "pid": 43325,
+          "ppid": 43322,
+          "started_local": "Tue Nov 3 00:34:58 2026",
+          "executable_name": "codex"
+        }
+      ]
+    },
+    "limits": [
+      "Shell857 and parent1722 were absent at the interim/final observations after terminal reconciliation; exact termination time and cause are not established.",
+      "Connector21486 replacement43325 has tunnel-client parent43322; expected during service installation.",
+      "Current session35046 and app-server1728/1749/1825 must be assessed separately from the missing old parent."
+    ],
+    "existing_inventory_rows_deleted": 0,
+    "existing_inventory_rows_changed": 0
+  },
+  "separate_physical_installer_window_verified": false,
+  "visibility_limit": "Official installer completed visibly, but subsequent native inventory showed its tab in a physical group with two tabs. The desired separate-window constraint was not verified. No repeat installation."
+}

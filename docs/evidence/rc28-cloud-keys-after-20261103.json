@@ -1,0 +1,459 @@
+{
+  "scope": "actual ChatGPT Apps connector; no Voice/model turns between key events simulated; wall-clock tool responses",
+  "version": "0.8.0rc28",
+  "source_commit": "6b70116ba06da69c2e3f1552471c1842e983d8f7",
+  "word": "Stern am",
+  "clipboard_initial_generation": 17,
+  "sequence_rounds": [
+    {
+      "round": 0,
+      "sample": {
+        "id": "rc28_cloud_after_seq_r0_20261103",
+        "wall_start_ms": 1793666273501,
+        "elapsed_ms": 4480,
+        "state": "completed",
+        "created": 1793666276.049029,
+        "accepted": 1793666276.051436,
+        "started": 1793666276.062238,
+        "finished": 1793666277.379945,
+        "post_calls_returned": 16,
+        "completed_steps": 8
+      },
+      "receiver": {
+        "text_sha256": "51eee786a11585b19c9f7a1e12c07afb9e78fc00727d47edb60d0498da02ebf2",
+        "utf8_bytes": 8,
+        "down_count": 8,
+        "up_count": 8,
+        "selection_utf16": {
+          "length": 0,
+          "location": 8
+        },
+        "clipboard_generation": 17,
+        "event_sequence": 16,
+        "event_records_dropped": 0
+      }
+    },
+    {
+      "round": 1,
+      "sample": {
+        "id": "rc28_cloud_after_seq_r1_20261103",
+        "wall_start_ms": 1793666327520,
+        "elapsed_ms": 3171,
+        "state": "completed",
+        "created": 1793666329.200156,
+        "accepted": 1793666329.202285,
+        "started": 1793666329.212908,
+        "finished": 1793666330.333026,
+        "post_calls_returned": 16,
+        "completed_steps": 8
+      },
+      "receiver": {
+        "text_sha256": "51eee786a11585b19c9f7a1e12c07afb9e78fc00727d47edb60d0498da02ebf2",
+        "utf8_bytes": 8,
+        "down_count": 8,
+        "up_count": 8,
+        "selection_utf16": {
+          "length": 0,
+          "location": 8
+        },
+        "clipboard_generation": 17,
+        "event_sequence": 48,
+        "event_records_dropped": 0
+      }
+    },
+    {
+      "round": 2,
+      "sample": {
+        "id": "rc28_cloud_after_seq_r2_20261103",
+        "wall_start_ms": 1793666358283,
+        "elapsed_ms": 4861,
+        "state": "completed",
+        "created": 1793666361.531004,
+        "accepted": 1793666361.5355258,
+        "started": 1793666361.545831,
+        "finished": 1793666362.656364,
+        "post_calls_returned": 16,
+        "completed_steps": 8
+      },
+      "receiver": {
+        "text_sha256": "51eee786a11585b19c9f7a1e12c07afb9e78fc00727d47edb60d0498da02ebf2",
+        "utf8_bytes": 8,
+        "down_count": 8,
+        "up_count": 8,
+        "selection_utf16": {
+          "length": 0,
+          "location": 8
+        },
+        "clipboard_generation": 17,
+        "event_sequence": 80,
+        "event_records_dropped": 0
+      }
+    }
+  ],
+  "separate_rounds": [
+    {
+      "round": 0,
+      "response_total_ms": 24002,
+      "samples": [
+        {
+          "id": "rc28_cloud_after_single_r0_0_20261103",
+          "wall_start_ms": 1793666292020,
+          "elapsed_ms": 3816,
+          "state": "completed",
+          "created": 1793666295.110288,
+          "accepted": 1793666295.127049,
+          "started": 1793666295.1533802,
+          "finished": 1793666295.304672,
+          "post_calls_returned": 2
+        },
+        {
+          "id": "rc28_cloud_after_single_r0_1_20261103",
+          "wall_start_ms": 1793666295837,
+          "elapsed_ms": 3542,
+          "state": "completed",
+          "created": 1793666298.5109692,
+          "accepted": 1793666298.513257,
+          "started": 1793666298.5244641,
+          "finished": 1793666298.7069771,
+          "post_calls_returned": 2
+        },
+        {
+          "id": "rc28_cloud_after_single_r0_2_20261103",
+          "wall_start_ms": 1793666299379,
+          "elapsed_ms": 2204,
+          "state": "completed",
+          "created": 1793666301.1364312,
+          "accepted": 1793666301.138554,
+          "started": 1793666301.149473,
+          "finished": 1793666301.272598,
+          "post_calls_returned": 2
+        },
+        {
+          "id": "rc28_cloud_after_single_r0_3_20261103",
+          "wall_start_ms": 1793666301583,
+          "elapsed_ms": 2913,
+          "state": "completed",
+          "created": 1793666303.585524,
+          "accepted": 1793666303.588193,
+          "started": 1793666303.599339,
+          "finished": 1793666303.7255309,
+          "post_calls_returned": 2
+        },
+        {
+          "id": "rc28_cloud_after_single_r0_4_20261103",
+          "wall_start_ms": 1793666304496,
+          "elapsed_ms": 2255,
+          "state": "completed",
+          "created": 1793666306.102218,
+          "accepted": 1793666306.1082711,
+          "started": 1793666306.118895,
+          "finished": 1793666306.241855,
+          "post_calls_returned": 2
+        },
+        {
+          "id": "rc28_cloud_after_single_r0_5_20261103",
+          "wall_start_ms": 1793666306751,
+          "elapsed_ms": 2033,
+          "state": "completed",
+          "created": 1793666308.2891111,
+          "accepted": 1793666308.291188,
+          "started": 1793666308.3019981,
+          "finished": 1793666308.428271,
+          "post_calls_returned": 2
+        },
+        {
+          "id": "rc28_cloud_after_single_r0_6_20261103",
+          "wall_start_ms": 1793666308784,
+          "elapsed_ms": 3494,
+          "state": "completed",
+          "created": 1793666311.522006,
+          "accepted": 1793666311.539837,
+          "started": 1793666311.582444,
+          "finished": 1793666311.731402,
+          "post_calls_returned": 2
+        },
+        {
+          "id": "rc28_cloud_after_single_r0_7_20261103",
+          "wall_start_ms": 1793666312279,
+          "elapsed_ms": 3742,
+          "state": "completed",
+          "created": 1793666315.514188,
+          "accepted": 1793666315.5163488,
+          "started": 1793666315.527702,
+          "finished": 1793666315.651048,
+          "post_calls_returned": 2
+        }
+      ],
+      "receiver": {
+        "text_sha256": "51eee786a11585b19c9f7a1e12c07afb9e78fc00727d47edb60d0498da02ebf2",
+        "utf8_bytes": 8,
+        "down_count": 8,
+        "up_count": 8,
+        "selection_utf16": {
+          "length": 0,
+          "location": 8
+        },
+        "clipboard_generation": 17,
+        "event_sequence": 32,
+        "event_records_dropped": 0
+      }
+    },
+    {
+      "round": 1,
+      "response_total_ms": 24530,
+      "samples": [
+        {
+          "id": "rc28_cloud_after_single_r1_0_20261103",
+          "wall_start_ms": 1793666332208,
+          "elapsed_ms": 4357,
+          "state": "completed",
+          "created": 1793666335.833581,
+          "accepted": 1793666335.834995,
+          "started": 1793666335.846164,
+          "finished": 1793666335.969128,
+          "post_calls_returned": 2
+        },
+        {
+          "id": "rc28_cloud_after_single_r1_1_20261103",
+          "wall_start_ms": 1793666336565,
+          "elapsed_ms": 2475,
+          "state": "completed",
+          "created": 1793666338.6239831,
+          "accepted": 1793666338.6276429,
+          "started": 1793666338.64006,
+          "finished": 1793666338.7682822,
+          "post_calls_returned": 2
+        },
+        {
+          "id": "rc28_cloud_after_single_r1_2_20261103",
+          "wall_start_ms": 1793666339040,
+          "elapsed_ms": 4266,
+          "state": "completed",
+          "created": 1793666342.553328,
+          "accepted": 1793666342.559305,
+          "started": 1793666342.571146,
+          "finished": 1793666342.700691,
+          "post_calls_returned": 2
+        },
+        {
+          "id": "rc28_cloud_after_single_r1_3_20261103",
+          "wall_start_ms": 1793666343307,
+          "elapsed_ms": 3037,
+          "state": "completed",
+          "created": 1793666344.92518,
+          "accepted": 1793666344.9273028,
+          "started": 1793666344.93775,
+          "finished": 1793666345.062,
+          "post_calls_returned": 2
+        },
+        {
+          "id": "rc28_cloud_after_single_r1_4_20261103",
+          "wall_start_ms": 1793666346344,
+          "elapsed_ms": 3166,
+          "state": "completed",
+          "created": 1793666348.8636951,
+          "accepted": 1793666348.868248,
+          "started": 1793666348.878809,
+          "finished": 1793666349.0043578,
+          "post_calls_returned": 2
+        },
+        {
+          "id": "rc28_cloud_after_single_r1_5_20261103",
+          "wall_start_ms": 1793666349510,
+          "elapsed_ms": 2095,
+          "state": "completed",
+          "created": 1793666351.118284,
+          "accepted": 1793666351.120598,
+          "started": 1793666351.131237,
+          "finished": 1793666351.2541409,
+          "post_calls_returned": 2
+        },
+        {
+          "id": "rc28_cloud_after_single_r1_6_20261103",
+          "wall_start_ms": 1793666351606,
+          "elapsed_ms": 2769,
+          "state": "completed",
+          "created": 1793666353.594334,
+          "accepted": 1793666353.598922,
+          "started": 1793666353.60978,
+          "finished": 1793666353.7341719,
+          "post_calls_returned": 2
+        },
+        {
+          "id": "rc28_cloud_after_single_r1_7_20261103",
+          "wall_start_ms": 1793666354375,
+          "elapsed_ms": 2362,
+          "state": "completed",
+          "created": 1793666356.1006908,
+          "accepted": 1793666356.119081,
+          "started": 1793666356.158976,
+          "finished": 1793666356.2885919,
+          "post_calls_returned": 2
+        }
+      ],
+      "receiver": {
+        "text_sha256": "51eee786a11585b19c9f7a1e12c07afb9e78fc00727d47edb60d0498da02ebf2",
+        "utf8_bytes": 8,
+        "down_count": 8,
+        "up_count": 8,
+        "selection_utf16": {
+          "length": 0,
+          "location": 8
+        },
+        "clipboard_generation": 17,
+        "event_sequence": 64,
+        "event_records_dropped": 0
+      }
+    },
+    {
+      "round": 2,
+      "response_total_ms": 28626,
+      "samples": [
+        {
+          "id": "rc28_cloud_after_single_r2_0_20261103",
+          "wall_start_ms": 1793666364622,
+          "elapsed_ms": 3263,
+          "state": "completed",
+          "created": 1793666367.2933178,
+          "accepted": 1793666367.297844,
+          "started": 1793666367.308633,
+          "finished": 1793666367.435782,
+          "post_calls_returned": 2
+        },
+        {
+          "id": "rc28_cloud_after_single_r2_1_20261103",
+          "wall_start_ms": 1793666367885,
+          "elapsed_ms": 2677,
+          "state": "completed",
+          "created": 1793666370.0859368,
+          "accepted": 1793666370.087997,
+          "started": 1793666370.0995672,
+          "finished": 1793666370.226927,
+          "post_calls_returned": 2
+        },
+        {
+          "id": "rc28_cloud_after_single_r2_2_20261103",
+          "wall_start_ms": 1793666370562,
+          "elapsed_ms": 3390,
+          "state": "completed",
+          "created": 1793666373.3242428,
+          "accepted": 1793666373.341732,
+          "started": 1793666373.38308,
+          "finished": 1793666373.555755,
+          "post_calls_returned": 2
+        },
+        {
+          "id": "rc28_cloud_after_single_r2_3_20261103",
+          "wall_start_ms": 1793666373952,
+          "elapsed_ms": 2232,
+          "state": "completed",
+          "created": 1793666375.577524,
+          "accepted": 1793666375.579701,
+          "started": 1793666375.590625,
+          "finished": 1793666375.718305,
+          "post_calls_returned": 2
+        },
+        {
+          "id": "rc28_cloud_after_single_r2_4_20261103",
+          "wall_start_ms": 1793666376185,
+          "elapsed_ms": 3938,
+          "state": "completed",
+          "created": 1793666379.542551,
+          "accepted": 1793666379.5486689,
+          "started": 1793666379.5595489,
+          "finished": 1793666379.712564,
+          "post_calls_returned": 2
+        },
+        {
+          "id": "rc28_cloud_after_single_r2_5_20261103",
+          "wall_start_ms": 1793666380123,
+          "elapsed_ms": 3031,
+          "state": "completed",
+          "created": 1793666382.5712,
+          "accepted": 1793666382.573219,
+          "started": 1793666382.584616,
+          "finished": 1793666382.716151,
+          "post_calls_returned": 2
+        },
+        {
+          "id": "rc28_cloud_after_single_r2_6_20261103",
+          "wall_start_ms": 1793666383154,
+          "elapsed_ms": 2647,
+          "state": "completed",
+          "created": 1793666385.2346392,
+          "accepted": 1793666385.237112,
+          "started": 1793666385.248462,
+          "finished": 1793666385.407491,
+          "post_calls_returned": 2
+        },
+        {
+          "id": "rc28_cloud_after_single_r2_7_20261103",
+          "wall_start_ms": 1793666385802,
+          "elapsed_ms": 7448,
+          "state": "running",
+          "created": 1793666389.86163,
+          "accepted": 1793666390.064126,
+          "started": 1793666390.189536,
+          "finished": null
+        }
+      ],
+      "receiver": {
+        "text_sha256": "51eee786a11585b19c9f7a1e12c07afb9e78fc00727d47edb60d0498da02ebf2",
+        "utf8_bytes": 8,
+        "down_count": 8,
+        "up_count": 8,
+        "selection_utf16": {
+          "length": 0,
+          "location": 8
+        },
+        "clipboard_generation": 17,
+        "event_sequence": 96,
+        "event_records_dropped": 0
+      },
+      "settlement": {
+        "id": "rc28_cloud_after_single_r2_7_20261103",
+        "wall_start_ms": 1793666408167,
+        "elapsed_ms": 4877,
+        "state": "completed",
+        "created": 1793666389.86163,
+        "accepted": 1793666390.064126,
+        "started": 1793666390.189536,
+        "finished": 1793666395.887923,
+        "post_calls_returned": 2,
+        "known_completed_round_wall_ms": 48422,
+        "note": "Manual audit/poll scheduling delay included; initial submission response was running. One task_get; no resubmission."
+      }
+    }
+  ],
+  "idempotence_probe": {
+    "task_id": "rc28_cloud_after_seq_r0_20261103",
+    "state": "completed",
+    "before": {
+      "text_sha256": "51eee786a11585b19c9f7a1e12c07afb9e78fc00727d47edb60d0498da02ebf2",
+      "utf8_bytes": 8,
+      "down_count": 8,
+      "up_count": 8,
+      "selection_utf16": {
+        "length": 0,
+        "location": 8
+      },
+      "clipboard_generation": 17,
+      "event_sequence": 16,
+      "event_records_dropped": 0
+    },
+    "after": {
+      "text_sha256": "51eee786a11585b19c9f7a1e12c07afb9e78fc00727d47edb60d0498da02ebf2",
+      "utf8_bytes": 8,
+      "down_count": 8,
+      "up_count": 8,
+      "selection_utf16": {
+        "length": 0,
+        "location": 8
+      },
+      "clipboard_generation": 17,
+      "event_sequence": 16,
+      "event_records_dropped": 0
+    }
+  },
+  "fixture_absence_verified_twice": true
+}

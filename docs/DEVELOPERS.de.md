@@ -1,5 +1,9 @@
 [English](DEVELOPERS.md) · [README](../README.de.md)
 
+Aktueller Stand: [RC30, veröffentlicht und installiert](RC30-HOTPATHS-20261103.md),
+Quellpin `2d540ee05f945efdd2330b46a1a65a4b94bcb482`. Die datierten
+Releaseangaben im folgenden bisherigen Leitfaden beschreiben RC20.
+
 # KiraBridge: Entwicklung und Betrieb
 
 ## Quellstand und Release

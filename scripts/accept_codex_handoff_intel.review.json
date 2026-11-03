@@ -1,0 +1,155 @@
+{
+  "schema": 1,
+  "status": "product_window_code_and_simplified_harness_independently_reviewed_live_acceptance_pending",
+  "harness": "scripts/accept_codex_handoff_intel.py",
+  "offline_tests": "tests/test_codex_acceptance_harness.py",
+  "runner": "Root only, after review and candidate source freeze",
+  "purpose": "Actual Intel Terminal.app/Codex acceptance of literal input, one Return, body_only_v1 handoff, authoritative local answer and pre-effect refusals",
+  "reuse": {
+    "scheduler": "Unchanged Bridge action_request/task_get routes; no second scheduler",
+    "proof_helpers": "scripts/accept_macos_adapter_intel.py::owned_turn_messages and local_reply_protocol_proof",
+    "native_and_cleanup_patterns": [
+      "scripts/accept_shell_input_intel.py",
+      "scripts/accept_closed_terminal_intel.py"
+    ],
+    "renderer_evidence": "Private cursor-design-01/FINAL-CURSOR-REVIEW.json and official 0.166.0 renderer matrix",
+    "previous_ui_evidence": "Private actual-ui-candidate-01 is reference only; no task, pane or uncertain input is resumed"
+  },
+  "candidate_gates": [
+    "Default invocation prints the review plan and creates no resource",
+    "Execution requires explicit --execute and --allow-one-owned-visible-window",
+    "Exact Python executable path, imported package directory, package version, Python tree hash, Git commit and Codex binary hash/version",
+    "Harness must be tracked; src and scripts must match HEAD; installed release commit must match if present",
+    "Intel macOS only; assertions enabled; pinned codex-cli 0.166.0; required flags verified against actual local --help",
+    "Fresh nonsymlink private root, private workspace and random run nonce; existing CODEX_HOME refused without changing it",
+    "Read/hash local Codex config inputs without saving credentials; selected profiles and final config symlinks refused",
+    "Known local requirements/legacy managed TOML and Codex preference-domain files must be absent before UI and immediately before model start; their observed presence causes refusal, not repair",
+    "Invocation-only scalar overrides disable hooks, plugins, remote plugins, apps, MCP apps, skill MCP dependency installation and shell tools",
+    "Disable every locally discovered MCP server by name; do not assume mcp_servers={} clears recursively merged tables",
+    "Effective features list must confirm disabled flags; effective mcp list must match expected names with enabled=false; unexpected managed entries stop before UI",
+    "No --strict-config for the mcp management subcommand: pinned source explicitly rejects it; interactive TUI still requires it",
+    "CLI management listing is read-only but may inspect auth status; it is not claimed to be offline or a no-network command",
+    "Config input hashes and binary hash rechecked immediately before startup; no config/auth/HOME/CODEX_HOME rewrite or repair",
+    "Separate --commit for the installed package manifest and --harness-commit for clean tracked verification sources; both are exact40hex pins",
+    "Live physical proof requires the packaged matching native worker contract; no global UI-app fallback",
+    "Both main harness and physical helper must be tracked and clean at the pinned harness commit"
+  ],
+  "ownership_gates": [
+    "Private in-process Core, fresh DB, random private bearer token, dynamically bound loopback socket; endpoint cannot be supplied by operator",
+    "Unauthenticated HTTP request must return 401; private health must match expected candidate source hash",
+    "Record complete initial native window catalog and process identities as private evidence",
+    "One session.open action with fresh nonce/task ID is the only permitted new-window attempt",
+    "Adopt only that action's successful receipt: root PID, TTY and pane; never adopt a window inferred from inventory differences",
+    "New window ID and TTY must not exist in baseline; unique single-tab visual window required; root generation and private workspace CWD verified",
+    "The existing own busy fixture records only HOME, CODEX_HOME, four XDG root fields and two profile-context fields; every field must equal the Python/preflight environment and effective default Codex reader root",
+    "Repeat actual effective features/MCP listings after that shell-context check and immediately before Codex start; recheck local config hashes and known managed-file absence",
+    "Later native mutations must explicitly address the exact owned window ID; open, raw send, managed terminal execution and tmux fallback disabled",
+    "Start only the locally pinned CLI binary directly from the same verified controlled shell with --no-alt-screen --no-daemon --strict-config -s read-only -a never -C privateWorkspace; no extra launch shell can reload user startup files",
+    "Bind one fresh Codex PID, exact process image and generation inside the owned TTY; never rebind a replacement generation",
+    "Persist creation receipt before any startup trust; first PID birth and parent must match the original OpenTask interval/process receipt",
+    "Read-only startup allows login-to-exec comm transition only within the exact PID/UID/TTY/birth/parent generation, then requires two consistent controlled empty prompt/CWD/idle/child-free samples",
+    "A shell-ready receipt does not grant input; use existing native AX/CG APIs to bind a private nonce title to physical topology before geometry or Codex",
+    "No equality assumption between Terminal scripting IDs, AX tokens and Window Server numbers",
+    "Normal product session.open must itself return separate_window=true with positive native physical binding; the harness never tags or moves a tab",
+    "Wrap on_created only to forward the product durable callback first and observe exact fresh TTY/window receipt; subsequent traced native mutations must name that exact logical window",
+    "Use product verify_opened with stable native IDs after initial binding, allowing legitimate own geometry and CLI title changes; preserve other native partitions",
+    "Only cleanup may accept ASCII spaces/percent repaint residue before exactly one complete owned controlled prompt; input/startup parsing remains unchanged"
+  ],
+  "acceptance_matrix": [
+    {
+      "case": "real busy shell before Codex",
+      "expect": "Typed session_busy and zero additional native mutation; own bounded fixture released through its own private release file"
+    },
+    {
+      "case": "stale PID",
+      "expect": "Typed session_selection_changed and zero additional native mutation"
+    },
+    {
+      "case": "131-column supported full-row cursor ambiguity",
+      "expect": "Fresh literal and handoff actions both fail visible_input_geometry_ambiguous before paste, with zero native mutation and unchanged screen"
+    },
+    {
+      "case": "130-column long literal",
+      "expect": "One unchanged >1000-character literal paste and exactly one confirmed Return; unique exact own user prompt and final answer in the bound rollout plus answer on screen"
+    },
+    {
+      "case": "130-column body_only_v1 handoff",
+      "expect": "One unchanged short-word body paste and one Return through ordinary agent.execute; completed handoff, exact local reply proof and independent screen/rollout match in the same fresh thread"
+    }
+  ],
+  "evidence": [
+    "Nonce, candidate runtime identity, CLI/help hashes and private endpoint",
+    "Initial catalog, own action receipts and detailed owned identities",
+    "All native mutation source hashes and receipts; input frames labeled by own task only",
+    "Fresh persisted task results, attempt=1, no retry on admission/call/turn uncertainty",
+    "Rollout discovered through exact owned process writer and CWD, anchored no-follow descriptor, regular file/UID/device/inode/prefix checks and 8MiB bound",
+    "Authoritative typed Codex event family with exactly one own prompt, exact final answer and task_complete; mirrors never counted",
+    "Independent local handoff protocol prefix/hash proof, unchanged body and body_only_v1 event",
+    "Private cleanup screen, SIGTERM target if any, exact close receipt, independent own PID/window absence and private endpoint absence",
+    "Foreign process/window deltas recorded read-only; natural foreign activity neither authorizes mutation nor blocks owned cleanup",
+    "Full private native read records and physical baseline/nonce/owner/generation/topology receipts; no raw UI/config/auth data in public assets"
+  ],
+  "failure_and_cleanup": [
+    "No previously unknown task is replayed; each fresh ID is reserved before HTTP dispatch and cannot be submitted again",
+    "Any unknown result stops dependent acceptance; no automatic retry, keyboard reset, prompt editing or substitute target",
+    "Stop only the private Core and its private scheduler",
+    "Signal only the fresh pinned owned Codex PID after immediate generation recheck; no process group or SIGKILL",
+    "Release own bounded busy fixture by file; never signal a discovered foreign child",
+    "Close only the exact owned generation-bound single-tab idle shell with matching last observed screen and a fresh identity-bound private workspace CWD check immediately before close",
+    "Verify own IDs absent independently; do not require foreign window/process inventory to remain static",
+    "If an open effect cannot be bound to a successful owned receipt or ownership changes, preserve it and report incomplete cleanup for manual reconciliation",
+    "Retain private evidence and workspace; do not publish captures or credentials as release assets",
+    "If physical proof fails after shell readiness, cleanup may close only the confirmed original logical receipt under final CWD/identity/idle/single-tab/screen guards; unconfirmed startup remains preserved"
+  ],
+  "review_focus": [
+    "Review all CLI isolation gates against pinned upstream source and current local help; no missing feature/server may be ignored",
+    "Confirm the observed local managed/legacy absence, exact shell config context and repeated effective disabled listings; reject an observed override or drift. Do not claim external cloud configuration is immutable or that the known file list is exhaustive",
+    "Confirm native mutation receipts really cover one paste and one Return, and refusals cover zero attempted native mutation",
+    "Check failure paths before/after session.open and Codex readiness, including lost receipts and missing identities",
+    "Check independent helper assertions, own rollout descriptor binding and output proof scope",
+    "Run only the offline harness test file before source freeze; actual acceptance remains a separate Root-controlled step"
+  ],
+  "official_sources": [
+    "https://developers.openai.com/codex/cli/reference",
+    "https://developers.openai.com/codex/config-reference",
+    "https://github.com/openai/codex/blob/6ff1e1ca3b30fc8b914720681fcf5fe62e95f856/codex-rs/cli/src/main.rs",
+    "https://github.com/openai/codex/blob/6ff1e1ca3b30fc8b914720681fcf5fe62e95f856/codex-rs/config/src/merge.rs",
+    "https://github.com/openai/codex/blob/6ff1e1ca3b30fc8b914720681fcf5fe62e95f856/codex-rs/features/src/lib.rs",
+    "https://github.com/openai/codex/blob/6ff1e1ca3b30fc8b914720681fcf5fe62e95f856/codex-rs/cli/src/mcp_cmd.rs",
+    "https://github.com/openai/codex/blob/6ff1e1ca3b30fc8b914720681fcf5fe62e95f856/codex-rs/codex-mcp/src/mcp/auth.rs",
+    "https://developer.apple.com/documentation/appkit/nswindow/movetabtonewwindow(_:)",
+    "https://developer.apple.com/documentation/coregraphics/kcgwindownumber"
+  ],
+  "offline_checkpoint": {
+    "author_tests": "98 repository cases plus 7 private actual03 membership cases passed in 6.84s; historical run03 does not pass the new baseline coherence gate retroactively",
+    "independent_counterexamples": "13 passed in0.16s against d41b79; same topology AST in final2bc78; final restrictive metadata delta read independently",
+    "startup_and_cleanup_review": "review_macos final59790300",
+    "physical_helper_review": "review_mcp final2bc78cce",
+    "actual_read_only_baseline": "passed with UI mutations hard-disabled: one CG/AX physical window, three radio tabs, three logical views",
+    "product_source_commit": "4064755e12b5524ad5d07ea4a4305bf0530057ac",
+    "product_source_sha256": "9b3c03ccf40e13e2cfcbdeb8f89b359141455026a8620a2c3b8d8dd0a3881f36",
+    "activation_delta_review": "review_mcp independently read final c3950b57/a1014262; no open findings",
+    "radio_membership_delta": "review_mcp Go for helper6d623ff3; 10 independent pure predicate checks passed in0.21s; actual post-detach remains unproven",
+    "actual_run03": "Stopped before detach, test input and Codex because selected virtual tab changed parent AX/CG IDs; exact original radio tokens/order retained; own shell closed once, private endpoint absent, originals preserved",
+    "ax_read_delta": "Helper07633820 independently approved by review_mcp and Root; at most3 identical AX requests for exactly macos_tree_changed only before baseline after one activation;3 direct cases passed in0.59s; no product delta",
+    "hidden_tabbar_delta": "Helpere083a277 independently read and approved by Root, design approved by review_mcp;3 narrow author cases passed in0.46s including private original actual05; no product delta",
+    "tooltip_count_delta": "Helperab01eab7: compare AXWindow roles consistently in both native inventories; one regression red then green0.25s; Root independent diff approved; no product delta",
+    "final_product_window_fix": {
+      "source_sha256": "c0af2bb8c428c137e0f87c68354cfa43225eb8ff73887f09bf1d2809f3d65c15",
+      "files": 146,
+      "author_local_cases": 14,
+      "review": "review_macos final code Go; two native partition/geometry findings closed",
+      "root_dispatcher_cases": 2,
+      "root_cleanup_string_cases": 4,
+      "harness_sha256": "eccca80bddb4215ec2a99e54a92dd64e6808357e7b5b34176db42a6adadc5753",
+      "actions_started": 0,
+      "repeated_full_suites": 0
+    },
+    "active_space_delta": {
+      "product": "one full-generation-bound activation only if logical views exist and both CG/AX are zero; maximum3 fresh reads",
+      "author": "one direct test with recovery, unavailable and JS-generation negative paths passed1.52s",
+      "review": "review_macos exact product and harness Go",
+      "harness_sha256": "dd6933e06837712ee3b054ed5bc82189c098a68d0b3b100149a06686bd2b6d45"
+    }
+  }
+}

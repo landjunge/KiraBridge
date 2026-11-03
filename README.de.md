@@ -13,16 +13,15 @@ KiraBridge verbindet ChatGPT mit **Grok Build und Codex, die in Terminalfenstern
 auf deinem Computer laufen**. Besprich im Chat, was du erledigen möchtest, gib die
 Arbeit an diese Terminalagenten weiter und verfolge ihre Antworten — mit den von dir erlaubten Zugriffen.
 
-**macOS · Intel — [0.8.0rc20](https://github.com/landjunge/KiraBridge/releases/tag/v0.8.0rc20) · 30. Oktober 2026 · Vorabversion**
+**macOS · Intel — [0.8.0rc30](https://github.com/landjunge/KiraBridge/releases/tag/v0.8.0rc30) · 3. November 2026 · Vorabversion**
 
-### [KiraBridge herunterladen — App und Installer](https://github.com/landjunge/KiraBridge/releases/download/v0.8.0rc20/KiraBridge-0.8.0rc20-Intel-macOS.zip)
+### [KiraBridge herunterladen — App und Installer](https://github.com/landjunge/KiraBridge/releases/download/v0.8.0rc30/KiraBridge-0.8.0rc30-Intel-Installer.zip)
 
-[Nur die App, wenn der Dienst bereits installiert ist](https://github.com/landjunge/KiraBridge/releases/download/v0.8.0rc20/KiraBridge-App-0.8.0rc20-Intel.zip)
-· [Prüfsummen](https://github.com/landjunge/KiraBridge/releases/download/v0.8.0rc20/SHA256SUMS-INTEL)
+[Prüfsummen](https://github.com/landjunge/KiraBridge/releases/download/v0.8.0rc30/SHA256SUMS)
 · [Alle Versionen](https://github.com/landjunge/KiraBridge/releases)
 
 Für die Downloads brauchst du ein GitHub-Konto mit Zugriff auf dieses private Repository.
-Dies ist eine Vorabversion; eine stabile Version gibt es noch nicht. RC20 ist für Intel-Macs verfügbar.
+Dies ist eine Vorabversion; eine stabile Version gibt es noch nicht. RC30 ist für Intel-Macs verfügbar.
 
 ## Wobei KiraBridge dir hilft
 
@@ -38,11 +37,13 @@ ThreadDesk und andere Integrationen sind optional. Der Kern von KiraBridge funkt
 
 ## Loslegen
 
-1. **Dienst installieren.** Lade das ZIP mit App und Installer herunter und
-   entpacke es vollständig. Öffne `KiraBridge-Installieren.command` und folge dem Installer im Terminal.
-2. **App öffnen.** Kopiere `KiraBridge.app` in den Ordner `Applications` in deinem
-   Benutzerordner (`~/Applications`; bei Bedarf anlegen) und öffne sie. Die App
-   verwendet den Dienst aus Schritt 1.
+1. **Installieren oder aktualisieren.** Lade das Intel-Installer-ZIP herunter und
+   entpacke es vollständig. Öffne `KiraBridge-Installer.app` und folge der Bestätigung
+   und sichtbaren Terminalinstallation. Verwende ein separates Terminalfenster;
+   laufende Agentensitzungen erhalten.
+2. **App öffnen.** Der Installer aktualisiert Dienst und Desktop-App gemeinsam.
+   Öffne `KiraBridge.app` in `~/Applications`. Vorhandene Einstellungen und Zugänge
+   bleiben erhalten; der Installer erstellt eine Rückfallsicherung.
 3. **Chat verbinden.** Folge der [ChatGPT-Verbindungsanleitung](docs/CHATGPT.md).
    Bitte ihn zum Einstieg, eine kleine Datei aus einem erlaubten Ordner zu lesen.
    Gib die Anfrage bei Bedarf frei und prüfe das Ergebnis in deinem Chat.
@@ -55,8 +56,30 @@ Für Terminalaufträge müssen Grok Build oder Codex installiert und angemeldet 
 Richte ihre Terminalsitzung in KiraBridge als Ziel ein.
 
 Diese Vorabversion hat bekannte Einschränkungen bei der Terminalbedienung; die App
-ist nicht von Apple notarisiert. Unter [Installation und Hilfe](docs/INSTALL-DE.md)
-findest du Einrichtung, Updates und bekannte Probleme.
+ist nicht von Apple notarisiert. Der [RC30-Installationsnachweis](docs/RC30-HOTPATHS-20261103.md)
+beschreibt das aktuelle Paket; [frühere Installation und Hilfe](docs/INSTALL-DE.md)
+dokumentiert weiterhin RC20.
+
+## Tastenfolgen und weniger Cloudaufrufe
+
+`keyboard_sequence` führt bis zu 32 echte Key-down/Key-up-Paare ohne Zwischenablage
+seriell in einem idempotenten Task aus. Wenn die nächste Taste von der Rückmeldung
+der vorigen abhängt, bleiben einzelne Aufrufe erforderlich. Blocktext ist ein
+eigener Vorgang und ersetzt keine verlangten einzelnen Tastenereignisse.
+
+Bekannte Lesewerkzeuge teilen eine Übergabe über
+`read_query(query={"operation":"tool.batch","calls":[...],"result_format":"structured"})`.
+Das optionale strukturierte Format entfernt ausschließlich bewiesene äquivalente
+JSON-Textkopien; alle strukturierten Werte, Fehler und Metadaten bleiben.
+Der Default ist `full`. Rechte werden frisch geprüft. Bei ungewissem Ausgang
+denselben Task lesen, statt die Eingabe erneut auszuführen.
+
+[RC28-Tastenfolgen](docs/RC28-E2E-LATENCY-20261103.md) ·
+[RC29-Aufrufreduktion](docs/RC29-CLOUD-CALL-REDUCTION-20261103.md) ·
+[RC30-Messungen, Installation und Grenzen](docs/RC30-HOTPATHS-20261103.md).
+Dieselben acht großen Leseergebnisse benötigten im gemessenen RC30-Vergleich einen
+statt zwei Apps-Aufrufe; Median 22,72 → 13,02 Sekunden bei je drei Gruppen.
+Cloudlatenz bleibt; das ist kein neuer physischer Tasten- oder Voicevergleich.
 
 ## Lizenz
 

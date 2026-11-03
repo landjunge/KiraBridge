@@ -1,0 +1,176 @@
+{
+  "scope": "Actual ChatGPT Apps connector on installed RC28. No Voice/model turns inside timed groups. P50 median; P95 nearest rank; n=3 P95=max. No warmup omitted. Own tmp file writes only; no UI or clipboard contents.",
+  "runtime_version": "0.8.0rc28",
+  "source_commit": "6b70116ba06da69c2e3f1552471c1842e983d8f7",
+  "mixed": {
+    "statistics": {
+      "n": 3,
+      "total_ms": 26965,
+      "p50_ms": 8753,
+      "p95_ms": 9469
+    },
+    "rounds": [
+      {
+        "round": 0,
+        "total_ms": 9469,
+        "samples": [
+          {
+            "tool": "bridge_health",
+            "elapsed_ms": 2632,
+            "task_id": null,
+            "state": null
+          },
+          {
+            "tool": "clipboard_info",
+            "elapsed_ms": 4416,
+            "task_id": null,
+            "state": null
+          },
+          {
+            "tool": "task_get",
+            "elapsed_ms": 2421,
+            "task_id": "rc28_cloud_after_seq_r1_20261103",
+            "state": "completed"
+          }
+        ]
+      },
+      {
+        "round": 1,
+        "total_ms": 8753,
+        "samples": [
+          {
+            "tool": "bridge_health",
+            "elapsed_ms": 2633,
+            "task_id": null,
+            "state": null
+          },
+          {
+            "tool": "clipboard_info",
+            "elapsed_ms": 2844,
+            "task_id": null,
+            "state": null
+          },
+          {
+            "tool": "task_get",
+            "elapsed_ms": 3275,
+            "task_id": "rc28_cloud_after_seq_r1_20261103",
+            "state": "completed"
+          }
+        ]
+      },
+      {
+        "round": 2,
+        "total_ms": 8743,
+        "samples": [
+          {
+            "tool": "bridge_health",
+            "elapsed_ms": 2934,
+            "task_id": null,
+            "state": null
+          },
+          {
+            "tool": "clipboard_info",
+            "elapsed_ms": 2906,
+            "task_id": null,
+            "state": null
+          },
+          {
+            "tool": "task_get",
+            "elapsed_ms": 2901,
+            "task_id": "rc28_cloud_after_seq_r1_20261103",
+            "state": "completed"
+          }
+        ]
+      }
+    ]
+  },
+  "task_evidence": {
+    "statistics": {
+      "n": 3,
+      "total_ms": 16901,
+      "p50_ms": 6210,
+      "p95_ms": 6503
+    },
+    "rounds": [
+      {
+        "round": 0,
+        "total_ms": 4188,
+        "get_ms": 1971,
+        "events_ms": 2217,
+        "task_id": "rc28_cloud_after_seq_r1_20261103",
+        "state": "completed",
+        "event_count": 37,
+        "events_sha256": "105ae9a847515b0c25d33cec84553d57127337318f824ed50008c376bccbf51e"
+      },
+      {
+        "round": 1,
+        "total_ms": 6210,
+        "get_ms": 3146,
+        "events_ms": 3064,
+        "task_id": "rc28_cloud_after_seq_r1_20261103",
+        "state": "completed",
+        "event_count": 37,
+        "events_sha256": "105ae9a847515b0c25d33cec84553d57127337318f824ed50008c376bccbf51e"
+      },
+      {
+        "round": 2,
+        "total_ms": 6503,
+        "get_ms": 3270,
+        "events_ms": 3233,
+        "task_id": "rc28_cloud_after_seq_r1_20261103",
+        "state": "completed",
+        "event_count": 37,
+        "events_sha256": "105ae9a847515b0c25d33cec84553d57127337318f824ed50008c376bccbf51e"
+      }
+    ]
+  },
+  "writes": {
+    "statistics": {
+      "n": 3,
+      "total_ms": 16976,
+      "p50_ms": 5607,
+      "p95_ms": 5900
+    },
+    "rounds": [
+      {
+        "round": 0,
+        "task_id": "rc29_before_file_write_r0_20261103",
+        "submit_tool": "action_request",
+        "submit_ms": 2889,
+        "submit_state": "queued",
+        "status_ms": 2718,
+        "final_state": "completed",
+        "total_ms": 5607,
+        "cloud_calls": 2,
+        "observed_file_bytes": 26,
+        "observed_file_sha256": "8b33df66d47d99fcd3024c60c27f56f8d47b3d7944b209ca7d0f5e8097f08147"
+      },
+      {
+        "round": 1,
+        "task_id": "rc29_before_file_write_r1_20261103",
+        "submit_tool": "action_request",
+        "submit_ms": 2405,
+        "submit_state": "queued",
+        "status_ms": 3495,
+        "final_state": "completed",
+        "total_ms": 5900,
+        "cloud_calls": 2,
+        "observed_file_bytes": 26,
+        "observed_file_sha256": "8b33df66d47d99fcd3024c60c27f56f8d47b3d7944b209ca7d0f5e8097f08147"
+      },
+      {
+        "round": 2,
+        "task_id": "rc29_before_file_write_r2_20261103",
+        "submit_tool": "action_submit",
+        "submit_ms": 3476,
+        "submit_state": "queued",
+        "status_ms": 1993,
+        "final_state": "completed",
+        "total_ms": 5469,
+        "cloud_calls": 2,
+        "observed_file_bytes": 26,
+        "observed_file_sha256": "8b33df66d47d99fcd3024c60c27f56f8d47b3d7944b209ca7d0f5e8097f08147"
+      }
+    ]
+  }
+}

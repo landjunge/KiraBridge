@@ -1,0 +1,24 @@
+{
+  "scope": "One diagnostic actual Apps call via the previously cached operation_catalog tool. JS JSON.stringify UTF-16 units, not network bytes. Excluded from nine benchmark RPCs.",
+  "elapsed_ms": 4175,
+  "requested": [
+    "file.read",
+    "file.write"
+  ],
+  "returned": [
+    "file.read",
+    "file.write"
+  ],
+  "selection": {
+    "requested": [
+      "file.read",
+      "file.write"
+    ],
+    "returned": [
+      "file.read",
+      "file.write"
+    ],
+    "scope": "requested permitted eligible operations; omitted entries may be unauthorized or unavailable"
+  },
+  "serialized_result_utf16_units": 43788
+}

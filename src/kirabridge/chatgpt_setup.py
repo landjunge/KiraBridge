@@ -51,7 +51,46 @@ def persist_stdio_notification(config_path: Path) -> None:
     replace_private(profile, json.dumps(settings, indent=2) + "\n")
 
 
-def runtime_status(binary: str) -> dict:
+def _managed_tunnel_running(binary: str, config_path: Path) -> bool:
+    """Validate the current launchd process, not a historical runtime alias PID."""
+    from kirabridge.chatgpt_service import LABEL as TUNNEL_LABEL
+    from kirabridge.chatgpt_service import loaded_service_matches, service_definition
+
+    if sys.platform != "darwin":
+        return False
+    try:
+        job = subprocess.run(
+            ["/bin/launchctl", "print", f"gui/{os.getuid()}/{TUNNEL_LABEL}"],
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+        if job.returncode or not loaded_service_matches(
+            job.stdout, service_definition(config_path.absolute(), binary)
+        ):
+            return False
+        match = re.search(r"(?m)^\s*pid = (\d+)\s*$", job.stdout)
+        if not match:
+            return False
+        process = subprocess.run(
+            ["/bin/ps", "-p", match[1], "-o", "uid=,args="],
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+        observed = process.stdout.strip().split(None, 1)
+        return bool(
+            process.returncode == 0
+            and len(observed) == 2
+            and observed[0] == str(os.getuid())
+            and shlex.split(observed[1])
+            == service_definition(config_path.absolute(), binary)["ProgramArguments"]
+        )
+    except (OSError, ValueError, subprocess.TimeoutExpired, BridgeError):
+        return False
+
+
+def runtime_status(binary: str, config_path: Path | None = None) -> dict:
     result = subprocess.run(
         [binary, "runtimes", "status", "kirabridge", "--json"],
         capture_output=True,
@@ -75,9 +114,17 @@ def runtime_status(binary: str) -> dict:
                 collect(item)
 
     collect(payload)
+    # The runtime alias metadata can retain a PID from an older manual launch.
+    # Live health still has to be ready; a validated current launchd process only
+    # replaces that historical PID observation, never a failed health check.
+    evidence.setdefault("process_running", False)
+    managed = config_path is not None and _managed_tunnel_running(binary, config_path)
+    if managed:
+        evidence["process_running"] = True
     return {
         "connected": all(evidence.get(key) for key in ("process_running", "healthy", "ready")),
         "runtime_evidence": evidence,
+        "process_evidence_source": "launchd" if managed else "runtime_metadata",
         "chatgpt_tool_call": "unverified",
     }
 
@@ -209,7 +256,13 @@ def configure_tunnel(
             "tunnel_access", "Tunnel setup failed; check account, workspace and Tunnels Read + Use"
         )
     persist_stdio_notification(config_path)
-    return runtime_status(binary)
+    if sys.platform == "darwin":
+        from kirabridge.chatgpt_service import ensure_chatgpt_service
+
+        # runtimes connect already owns a live process. Register only the next
+        # login's supervised job; do not bootstrap a duplicate tunnel now.
+        ensure_chatgpt_service(config_path.absolute(), binary, create=True)
+    return runtime_status(binary, config_path)
 
 
 def verification_steps(ui, result):
@@ -257,7 +310,7 @@ def wizard(config: Config, config_path: Path, action: str, *, language="de") -> 
                 "next": CLIENT_RELEASE,
                 "chatgpt_tool_call": "unverified",
             }
-        return {"tunnel_client_installed": True, **runtime_status(binary)}
+        return {"tunnel_client_installed": True, **runtime_status(binary, config_path)}
     if not sys.stdin.isatty():
         raise BridgeError(
             "interactive_setup", "Run kirabridge chatgpt setup in your local Terminal"
@@ -285,7 +338,7 @@ def wizard(config: Config, config_path: Path, action: str, *, language="de") -> 
     profile = config_path.parent / "tunnel/kirabridge.yaml"
     key = config_path.parent / "openai-tunnel-runtime.key"
     if profile.exists() or key.exists() or "chatgpt" in config.principals:
-        state = runtime_status(binary)
+        state = runtime_status(binary, config_path)
         if (
             state["connected"]
             and profile.exists()

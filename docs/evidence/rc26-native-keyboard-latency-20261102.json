@@ -1,0 +1,501 @@
+{
+  "cleanup_complete": true,
+  "fixture_absent_twice": true,
+  "native_binary_sha256": "5ef3c6a1fcba528af1f0d0a28c371f7e347e9c2d8eadcf9e553cb5a53db4ace4",
+  "native_commit": "34f5e6da7d7232407c20ca98afd168021e7804ce",
+  "native_worker_absent_twice": true,
+  "nonce": "d863e1a75a3c4ccd841835c9e1f3939c",
+  "package": "/Users/landjunge/KiraBridge-worktrees/rc26-keyboard-latency-20261102/src/kirabridge",
+  "passed": true,
+  "private_endpoint_absent": true,
+  "python": "/Users/landjunge/KiraBridge-worktrees/macos-keyboard-complete-20261102/.venv/bin/python",
+  "scenario": "latency",
+  "source_sha256": "a35220b8966293b370070d0572cfe29d595983ec1c941c0117f3d9a7881f3bce",
+  "template_binary_sha256": "d54d0ce793550cbb01e08b71611ed35a023fff89cf13c1ef8bd90a70a69a4f26",
+  "tests_passed": true,
+  "measurement_scope": "One sequential before-cache / after-cache owned receiver demonstration, inline completion enabled in both; excludes ChatGPT model/cloud and stdio framing. Instrumented timings include synchronous evidence writes.",
+  "samples": [
+    {
+      "version": "2025-11-25"
+    },
+    {
+      "cached": false,
+      "duration_ms": 400.688935,
+      "label": "before-0",
+      "state": "completed",
+      "task_id": "latency-before-0-d863e1a75a3c4ccd841835c9e1f3939c"
+    },
+    {
+      "accepted": 1793660064.488312,
+      "created": 1793660064.486201,
+      "finished": 1793660064.749414,
+      "id": "latency-before-0-d863e1a75a3c4ccd841835c9e1f3939c",
+      "started": 1793660064.499071,
+      "state": "completed"
+    },
+    {
+      "cached": false,
+      "duration_ms": 265.635067,
+      "label": "before-1",
+      "state": "completed",
+      "task_id": "latency-before-1-d863e1a75a3c4ccd841835c9e1f3939c"
+    },
+    {
+      "accepted": 1793660064.8544588,
+      "created": 1793660064.8520708,
+      "finished": 1793660065.031028,
+      "id": "latency-before-1-d863e1a75a3c4ccd841835c9e1f3939c",
+      "started": 1793660064.865133,
+      "state": "completed"
+    },
+    {
+      "cached": false,
+      "duration_ms": 247.294903,
+      "label": "before-2",
+      "state": "completed",
+      "task_id": "latency-before-2-d863e1a75a3c4ccd841835c9e1f3939c"
+    },
+    {
+      "accepted": 1793660065.106275,
+      "created": 1793660065.104654,
+      "finished": 1793660065.272607,
+      "id": "latency-before-2-d863e1a75a3c4ccd841835c9e1f3939c",
+      "started": 1793660065.1165109,
+      "state": "completed"
+    },
+    {
+      "cached": false,
+      "duration_ms": 261.635721,
+      "label": "before-3",
+      "state": "completed",
+      "task_id": "latency-before-3-d863e1a75a3c4ccd841835c9e1f3939c"
+    },
+    {
+      "accepted": 1793660065.368105,
+      "created": 1793660065.366513,
+      "finished": 1793660065.540997,
+      "id": "latency-before-3-d863e1a75a3c4ccd841835c9e1f3939c",
+      "started": 1793660065.380783,
+      "state": "completed"
+    },
+    {
+      "cached": false,
+      "duration_ms": 245.207544,
+      "label": "before-4",
+      "state": "completed",
+      "task_id": "latency-before-4-d863e1a75a3c4ccd841835c9e1f3939c"
+    },
+    {
+      "accepted": 1793660065.6157482,
+      "created": 1793660065.613939,
+      "finished": 1793660065.779281,
+      "id": "latency-before-4-d863e1a75a3c4ccd841835c9e1f3939c",
+      "started": 1793660065.625816,
+      "state": "completed"
+    },
+    {
+      "cached": false,
+      "duration_ms": 244.429658,
+      "label": "before-5",
+      "state": "completed",
+      "task_id": "latency-before-5-d863e1a75a3c4ccd841835c9e1f3939c"
+    },
+    {
+      "accepted": 1793660065.8635268,
+      "created": 1793660065.8619368,
+      "finished": 1793660066.032765,
+      "id": "latency-before-5-d863e1a75a3c4ccd841835c9e1f3939c",
+      "started": 1793660065.873616,
+      "state": "completed"
+    },
+    {
+      "cached": false,
+      "duration_ms": 245.142857,
+      "label": "before-6",
+      "state": "completed",
+      "task_id": "latency-before-6-d863e1a75a3c4ccd841835c9e1f3939c"
+    },
+    {
+      "accepted": 1793660066.1083462,
+      "created": 1793660066.106839,
+      "finished": 1793660066.273879,
+      "id": "latency-before-6-d863e1a75a3c4ccd841835c9e1f3939c",
+      "started": 1793660066.1188328,
+      "state": "completed"
+    },
+    {
+      "cached": false,
+      "duration_ms": 243.276204,
+      "label": "before-7",
+      "state": "completed",
+      "task_id": "latency-before-7-d863e1a75a3c4ccd841835c9e1f3939c"
+    },
+    {
+      "accepted": 1793660066.353845,
+      "created": 1793660066.3523479,
+      "finished": 1793660066.5172648,
+      "id": "latency-before-7-d863e1a75a3c4ccd841835c9e1f3939c",
+      "started": 1793660066.3639,
+      "state": "completed"
+    },
+    {
+      "cached": false,
+      "duration_ms": 245.0678,
+      "label": "before-select",
+      "state": "completed",
+      "task_id": "latency-before-select-d863e1a75a3c4ccd841835c9e1f3939c"
+    },
+    {
+      "accepted": 1793660066.653287,
+      "created": 1793660066.6515388,
+      "finished": 1793660066.824845,
+      "id": "latency-before-select-d863e1a75a3c4ccd841835c9e1f3939c",
+      "started": 1793660066.663533,
+      "state": "completed"
+    },
+    {
+      "cached": false,
+      "duration_ms": 244.720995,
+      "label": "before-clear",
+      "state": "completed",
+      "task_id": "latency-before-clear-d863e1a75a3c4ccd841835c9e1f3939c"
+    },
+    {
+      "accepted": 1793660066.950216,
+      "created": 1793660066.948711,
+      "finished": 1793660067.114285,
+      "id": "latency-before-clear-d863e1a75a3c4ccd841835c9e1f3939c",
+      "started": 1793660066.960316,
+      "state": "completed"
+    },
+    {
+      "cached": true,
+      "duration_ms": 213.144323,
+      "label": "after-0",
+      "state": "completed",
+      "task_id": "latency-after-0-d863e1a75a3c4ccd841835c9e1f3939c"
+    },
+    {
+      "accepted": 1793660067.214945,
+      "created": 1793660067.212878,
+      "finished": 1793660067.3894641,
+      "id": "latency-after-0-d863e1a75a3c4ccd841835c9e1f3939c",
+      "started": 1793660067.224847,
+      "state": "completed"
+    },
+    {
+      "cached": true,
+      "duration_ms": 213.997484,
+      "label": "after-1",
+      "state": "completed",
+      "task_id": "latency-after-1-d863e1a75a3c4ccd841835c9e1f3939c"
+    },
+    {
+      "accepted": 1793660067.429431,
+      "created": 1793660067.4278479,
+      "finished": 1793660067.603195,
+      "id": "latency-after-1-d863e1a75a3c4ccd841835c9e1f3939c",
+      "started": 1793660067.439853,
+      "state": "completed"
+    },
+    {
+      "cached": true,
+      "duration_ms": 211.656138,
+      "label": "after-2",
+      "state": "completed",
+      "task_id": "latency-after-2-d863e1a75a3c4ccd841835c9e1f3939c"
+    },
+    {
+      "accepted": 1793660067.644279,
+      "created": 1793660067.642766,
+      "finished": 1793660067.80656,
+      "id": "latency-after-2-d863e1a75a3c4ccd841835c9e1f3939c",
+      "started": 1793660067.654486,
+      "state": "completed"
+    },
+    {
+      "cached": true,
+      "duration_ms": 211.423149,
+      "label": "after-3",
+      "state": "completed",
+      "task_id": "latency-after-3-d863e1a75a3c4ccd841835c9e1f3939c"
+    },
+    {
+      "accepted": 1793660067.857559,
+      "created": 1793660067.855621,
+      "finished": 1793660068.0271292,
+      "id": "latency-after-3-d863e1a75a3c4ccd841835c9e1f3939c",
+      "started": 1793660067.867405,
+      "state": "completed"
+    },
+    {
+      "cached": true,
+      "duration_ms": 251.998858,
+      "label": "after-4",
+      "state": "completed",
+      "task_id": "latency-after-4-d863e1a75a3c4ccd841835c9e1f3939c"
+    },
+    {
+      "accepted": 1793660068.1051679,
+      "created": 1793660068.103456,
+      "finished": 1793660068.286301,
+      "id": "latency-after-4-d863e1a75a3c4ccd841835c9e1f3939c",
+      "started": 1793660068.116031,
+      "state": "completed"
+    },
+    {
+      "cached": true,
+      "duration_ms": 210.936298,
+      "label": "after-5",
+      "state": "completed",
+      "task_id": "latency-after-5-d863e1a75a3c4ccd841835c9e1f3939c"
+    },
+    {
+      "accepted": 1793660068.323646,
+      "created": 1793660068.321653,
+      "finished": 1793660068.4871879,
+      "id": "latency-after-5-d863e1a75a3c4ccd841835c9e1f3939c",
+      "started": 1793660068.33367,
+      "state": "completed"
+    },
+    {
+      "cached": true,
+      "duration_ms": 213.830929,
+      "label": "after-6",
+      "state": "completed",
+      "task_id": "latency-after-6-d863e1a75a3c4ccd841835c9e1f3939c"
+    },
+    {
+      "accepted": 1793660068.536008,
+      "created": 1793660068.534358,
+      "finished": 1793660068.7199948,
+      "id": "latency-after-6-d863e1a75a3c4ccd841835c9e1f3939c",
+      "started": 1793660068.546674,
+      "state": "completed"
+    },
+    {
+      "cached": true,
+      "duration_ms": 212.260805,
+      "label": "after-7",
+      "state": "completed",
+      "task_id": "latency-after-7-d863e1a75a3c4ccd841835c9e1f3939c"
+    },
+    {
+      "accepted": 1793660068.75173,
+      "created": 1793660068.749611,
+      "finished": 1793660068.927831,
+      "id": "latency-after-7-d863e1a75a3c4ccd841835c9e1f3939c",
+      "started": 1793660068.762114,
+      "state": "completed"
+    },
+    {
+      "cached": true,
+      "duration_ms": 212.139176,
+      "label": "after-select",
+      "state": "completed",
+      "task_id": "latency-after-select-d863e1a75a3c4ccd841835c9e1f3939c"
+    },
+    {
+      "accepted": 1793660069.017417,
+      "created": 1793660069.015838,
+      "finished": 1793660069.182712,
+      "id": "latency-after-select-d863e1a75a3c4ccd841835c9e1f3939c",
+      "started": 1793660069.0273762,
+      "state": "completed"
+    },
+    {
+      "cached": true,
+      "duration_ms": 294.701279,
+      "label": "after-clear",
+      "state": "completed",
+      "task_id": "latency-after-clear-d863e1a75a3c4ccd841835c9e1f3939c"
+    },
+    {
+      "accepted": 1793660069.3551202,
+      "created": 1793660069.3514829,
+      "finished": 1793660069.531914,
+      "id": "latency-after-clear-d863e1a75a3c4ccd841835c9e1f3939c",
+      "started": 1793660069.3650692,
+      "state": "completed"
+    },
+    {
+      "cached": true,
+      "duration_ms": 370.056973,
+      "label": "batched-poem",
+      "state": "completed",
+      "task_id": "latency-batched-poem-d863e1a75a3c4ccd841835c9e1f3939c"
+    },
+    {
+      "accepted": 1793660069.6317508,
+      "created": 1793660069.629144,
+      "finished": 1793660069.9399009,
+      "id": "latency-batched-poem-d863e1a75a3c4ccd841835c9e1f3939c",
+      "started": 1793660069.642517,
+      "state": "completed"
+    }
+  ],
+  "rounds": [
+    {
+      "duration_ms": 2163.704596,
+      "label": "before",
+      "tool_calls": 8,
+      "receiver": {
+        "text_sha256": "d95c700529cc53e9e540705d03623e3e671da26af15467a1f3a080216c8e86c6",
+        "utf8_bytes": 8,
+        "utf16_units": 8,
+        "return_count": 0,
+        "clipboard_generation": 13,
+        "selection_utf16": {
+          "length": 0,
+          "location": 8
+        },
+        "event_counts": {
+          "key_down": 8,
+          "key_up": 8
+        },
+        "event_records_dropped": 0
+      }
+    },
+    {
+      "duration_ms": 1749.83812,
+      "label": "after",
+      "tool_calls": 8,
+      "receiver": {
+        "text_sha256": "d95c700529cc53e9e540705d03623e3e671da26af15467a1f3a080216c8e86c6",
+        "utf8_bytes": 8,
+        "utf16_units": 8,
+        "return_count": 0,
+        "clipboard_generation": 13,
+        "selection_utf16": {
+          "length": 0,
+          "location": 8
+        },
+        "event_counts": {
+          "key_down": 18,
+          "key_up": 18
+        },
+        "event_records_dropped": 0
+      }
+    },
+    {
+      "characters": 41,
+      "duration_including_readback_ms": 422.736823,
+      "result": {
+        "text_verified": true,
+        "selection_verified": true,
+        "staging_verified": true,
+        "return_posted": false,
+        "automatic_retry": false,
+        "method": null,
+        "text_sha256": "6d07bc3e0e104454f93a62e2149e40aa5fed760bd8b517ea4de006e4332b3379"
+      },
+      "tool_calls": 1,
+      "receiver": {
+        "text_sha256": "6d07bc3e0e104454f93a62e2149e40aa5fed760bd8b517ea4de006e4332b3379",
+        "utf8_bytes": 41,
+        "utf16_units": 41,
+        "return_count": 0,
+        "clipboard_generation": 13,
+        "selection_utf16": {
+          "length": 0,
+          "location": 41
+        },
+        "event_counts": {
+          "key_down": 20,
+          "key_up": 20
+        },
+        "event_records_dropped": 0
+      }
+    }
+  ],
+  "native_timing": {
+    "apps.launch": {
+      "count": 1,
+      "min_ms": 376.89385,
+      "median_ms": 376.89385,
+      "max_ms": 376.89385
+    },
+    "app.focus": {
+      "count": 1,
+      "min_ms": 41.596735,
+      "median_ms": 41.596735,
+      "max_ms": 41.596735
+    },
+    "apps.list": {
+      "count": 21,
+      "min_ms": 20.828392,
+      "median_ms": 22.488148,
+      "max_ms": 26.613075
+    },
+    "keyboard.inspect": {
+      "count": 21,
+      "min_ms": 53.940147,
+      "median_ms": 58.203301,
+      "max_ms": 118.87723
+    },
+    "keyboard.chord": {
+      "count": 6,
+      "min_ms": 72.329979,
+      "median_ms": 79.019928,
+      "max_ms": 104.417739
+    },
+    "keyboard.key": {
+      "count": 14,
+      "min_ms": 73.028638,
+      "median_ms": 74.0705725,
+      "max_ms": 86.226035
+    },
+    "keyboard.text.begin": {
+      "count": 1,
+      "min_ms": 5.720218,
+      "median_ms": 5.720218,
+      "max_ms": 5.720218
+    },
+    "keyboard.text.chunk": {
+      "count": 1,
+      "min_ms": 4.885206,
+      "median_ms": 4.885206,
+      "max_ms": 4.885206
+    },
+    "keyboard.text.commit": {
+      "count": 1,
+      "min_ms": 198.012739,
+      "median_ms": 198.012739,
+      "max_ms": 198.012739
+    },
+    "apps.inspect": {
+      "count": 1,
+      "min_ms": 5.146504,
+      "median_ms": 5.146504,
+      "max_ms": 5.146504
+    }
+  },
+  "native_metadata_timing": {
+    "metadata": {
+      "count": 143,
+      "min_ms": 3.486452,
+      "median_ms": 3.666324,
+      "max_ms": 6.07641
+    }
+  },
+  "http_timing": {
+    "POST": {
+      "count": 38,
+      "min_ms": 1.543026,
+      "median_ms": 205.7451265,
+      "max_ms": 363.389657
+    }
+  },
+  "failed_runs": [
+    {
+      "run": "01",
+      "outcome": "harness expected completed but RC26 returned queued; task settled before cleanup",
+      "cleanup_complete": true
+    },
+    {
+      "run": "02",
+      "outcome": "16 input characters correct; later cleanup backspace unknown macos_target_changed; no replay",
+      "cleanup_complete": true
+    }
+  ]
+}

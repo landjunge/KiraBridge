@@ -109,6 +109,67 @@ def test_idle_protocol_allows_empty_prompt_with_current_new_activity_footer(bind
     assert result["state"] == "ready" and result["input_empty"]
 
 
+@pytest.mark.parametrize(
+    "navigation",
+    [
+        "New activity · ↓ Back to bottom · esc",
+        "New activity · enter/esc latest",
+        "New activity · enter/esc latest    ⚠ 1 warning · f2 to view",
+        "New activity · enter/esc latest    ⚠ 3 warnings · f2 to view",
+    ],
+)
+def test_transcript_navigation_does_not_hide_a_current_empty_composer(binding, navigation):
+    text = navigation + "\n\n" + EMPTY + FOOTER
+    result = checked(text, binding)
+    assert result["state"] == "ready" and result["input_empty"]
+
+
+@pytest.mark.parametrize(
+    "warnings", ["", "    ⚠ 1 warning · f2 to view", "    ⚠ 3 warnings · f2 to view"]
+)
+def test_current_new_activity_footer_does_not_require_a_rollout_binding(binding, warnings):
+    text = (
+        "New activity · ↓ Back to bottom · esc\n\n"
+        + EMPTY
+        + FOOTER
+        + "New activity · enter/esc latest"
+        + warnings
+        + "\n"
+    )
+    assert checked(text, binding)["state"] == "ready"
+
+
+@pytest.mark.parametrize("protocol", [None, {"state": "idle"}, {"state": "working"}])
+def test_transcript_navigation_cannot_override_current_activity_or_a_dialog(binding, protocol):
+    navigation = "New activity · ↓ Back to bottom · esc\n"
+    for text in (
+        WORKING + "\n" + navigation + "\n" + EMPTY + FOOTER,
+        navigation + "\n» Ask Codex to do anything" + FOOTER,
+        navigation + "\n› existing draft" + FOOTER,
+        navigation + "\n" + EMPTY + "\nApproval required\n" + FOOTER,
+        navigation + "\n" + EMPTY + "\n  tab to queue message\n",
+    ):
+        assert not checked(text, binding, protocol)["ready"]
+
+
+def test_old_transcript_navigation_is_not_current_activity(binding):
+    text = "New activity · enter/esc latest\n\n• Finished reply.\n\n" + EMPTY + FOOTER
+    assert checked(text, binding)["state"] == "ready"
+
+
+@pytest.mark.parametrize(
+    "navigation",
+    [
+        "Back to bottom",
+        "enter/esc latest",
+        "New activity · Back to bottom · unknown dialog",
+        "New activity · enter/esc latest    Approval required",
+    ],
+)
+def test_unrecognized_navigation_is_not_an_idle_proof(binding, navigation):
+    assert not checked(navigation + "\n\n" + EMPTY + FOOTER, binding)["ready"]
+
+
 def test_old_scroll_quotation_does_not_poison_current_idle_widget(binding):
     text = '• Früher stand hier "Back to bottom".\n\n• Fertige Antwort.\n\n' + EMPTY + FOOTER
     assert checked(text, binding, {"state": "idle"})["state"] == "ready"
@@ -155,3 +216,36 @@ def test_an_old_empty_prompt_does_not_override_the_last_nonempty_widget(binding)
 def test_completed_subagent_is_not_a_completed_main_turn(binding):
     text = "• Completed `/root/readiness_audit`\n\n" + WORKING + "\n\n" + EMPTY + FOOTER
     assert checked(text, binding, {"state": "working"})["state"] == "working"
+
+
+@pytest.mark.parametrize("protocol", [None, {"state": "working"}])
+def test_current_empty_queue_composer_does_not_reuse_submitted_prompt(binding, protocol):
+    # The live working TUI uses U+00BB, while submitted history uses U+203A.
+    text = (
+        "› earlier submitted request\n\n• Completed part of the answer.\n\n"
+        + WORKING
+        + "\n  └ Tip: Press control-t to open the full transcript.\n\n"
+        + "» Ask Codex to do anything"
+        + FOOTER
+    )
+    result = checked(text, binding, protocol)
+    assert result["state"] == "working" and result["input_empty"]
+    assert result["reason"] == "current_queue_composer"
+
+
+def test_bound_idle_cannot_promote_current_queue_composer(binding):
+    result = checked("» Ask Codex to do anything" + FOOTER, binding, {"state": "idle"})
+    assert result["state"] == "unknown" and result["input_empty"]
+    assert result["reason"] == "protocol_display_disagree"
+
+
+@pytest.mark.parametrize("protocol", [None, {"state": "working"}, {"state": "idle"}])
+def test_existing_queued_text_remains_nonempty(binding, protocol):
+    result = checked("› old submitted request\n\n» do not overwrite me" + FOOTER, binding, protocol)
+    assert result["state"] == "input_not_empty" and not result["input_empty"]
+
+
+def test_old_queue_composer_does_not_override_later_idle_widget(binding):
+    text = "» old queued text\n\n• Completed reply.\n\n" + EMPTY + FOOTER
+    result = checked(text, binding, {"state": "idle"})
+    assert result["state"] == "ready" and result["input_empty"]

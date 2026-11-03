@@ -138,9 +138,18 @@ async def test_explicit_health_and_evidence_calls_keep_every_observation(tool, a
 
 async def test_proxy_forwards_only_explicit_background_poll_context(monkeypatch):
     pool, _, records = observed_pool()
+    listings = []
+    schema_revision = "one"
 
     async def tools(_):
-        return [Tool(name="bridge_health", inputSchema={"type": "object"})]
+        listings.append(schema_revision)
+        return [
+            Tool(
+                name="bridge_health",
+                description=schema_revision,
+                inputSchema={"type": "object"},
+            )
+        ]
 
     monkeypatch.setattr(pool, "list_tools", tools)
     connection = DaemonConnection(pool, Peer("daemon"))
@@ -149,6 +158,12 @@ async def test_proxy_forwards_only_explicit_background_poll_context(monkeypatch)
     assert len(records) == 2
     await connection.call_tool("bridge_health", {})
     assert len(records) == 4
+    assert listings == ["one"] * 3
+    assert connection.change_generation == 0
+    schema_revision = "two"
+    await connection.call_tool("bridge_health", {}, routine_health=True)
+    assert listings == ["one"] * 3 + ["two"]
+    assert connection.change_generation == 1
 
 
 async def test_explicit_health_failure_does_not_hide_background_recovery():

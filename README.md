@@ -13,16 +13,15 @@ KiraBridge connects ChatGPT to **Grok Build and Codex running in terminal window
 on your computer**. Discuss what you need in chat, pass the work to those terminal
 agents and follow their replies while choosing what they may access.
 
-**macOS · Intel — [0.8.0rc20](https://github.com/landjunge/KiraBridge/releases/tag/v0.8.0rc20) · October 30, 2026 · Preview**
+**macOS · Intel — [0.8.0rc30](https://github.com/landjunge/KiraBridge/releases/tag/v0.8.0rc30) · November 3, 2026 · Preview**
 
-### [Download KiraBridge — app and installer](https://github.com/landjunge/KiraBridge/releases/download/v0.8.0rc20/KiraBridge-0.8.0rc20-Intel-macOS.zip)
+### [Download KiraBridge — app and installer](https://github.com/landjunge/KiraBridge/releases/download/v0.8.0rc30/KiraBridge-0.8.0rc30-Intel-Installer.zip)
 
-[App only, if the service is already installed](https://github.com/landjunge/KiraBridge/releases/download/v0.8.0rc20/KiraBridge-App-0.8.0rc20-Intel.zip)
-· [Checksums](https://github.com/landjunge/KiraBridge/releases/download/v0.8.0rc20/SHA256SUMS-INTEL)
+[Checksums](https://github.com/landjunge/KiraBridge/releases/download/v0.8.0rc30/SHA256SUMS)
 · [All releases](https://github.com/landjunge/KiraBridge/releases)
 
 Downloads require a GitHub account with access to this private repository.
-This is a preview; there is no stable release yet. RC20 is available for Intel Macs.
+This is a preview; there is no stable release yet. RC30 is available for Intel Macs.
 
 ## What KiraBridge helps you do
 
@@ -38,11 +37,12 @@ ThreadDesk and other integrations are optional. KiraBridge's core works independ
 
 ## Get started
 
-1. **Install the service.** Download and fully extract the app-and-installer ZIP.
-   Open `KiraBridge-Installieren.command` and follow the installer in Terminal.
-2. **Open the app.** Copy `KiraBridge.app` to the `Applications` folder in your
-   home folder (`~/Applications`; create it if needed), then open it. The app
-   uses the service installed in step 1.
+1. **Install or update.** Download and fully extract the Intel installer ZIP.
+   Open `KiraBridge-Installer.app` and follow its confirmation and visible Terminal
+   installation. Use a separate Terminal window; preserve running agent sessions.
+2. **Open the app.** The installer updates the service and desktop app together.
+   Open `KiraBridge.app` in `~/Applications`. Existing settings and credentials
+   remain; the installer creates a rollback backup.
 3. **Connect your chat.** Follow the [ChatGPT connection guide](docs/CHATGPT.md#english-connect-then-confirm-the-actual-task).
    Start by asking it to read a small file from an allowed folder. Approve the
    request if asked, then check the result in your chat.
@@ -55,7 +55,28 @@ For terminal-agent tasks, install and sign in to Grok Build or Codex, then
 configure its terminal session as a target in KiraBridge.
 
 This preview has known terminal limitations, and the app is not Apple-notarized.
-Read [installation and help](docs/INSTALL-EN.md) for setup, updates and known issues.
+See [RC30 installation evidence](docs/RC30-HOTPATHS-20261103.md) for the current
+package and [earlier installation and help](docs/INSTALL-EN.md) for the RC20 guide.
+
+## Keyboard sequences and fewer cloud calls
+
+`keyboard_sequence` executes up to 32 genuine key-down/key-up pairs in order,
+without the clipboard, under one idempotent task. Use separate calls when the
+next key depends on feedback from the preceding one. Block text is a separate
+operation and does not replace requested key events.
+
+Known read tools can share one handoff through
+`read_query(query={"operation":"tool.batch","calls":[...],"result_format":"structured"})`.
+The optional structured format removes only proven equivalent JSON text copies;
+all structured values, errors and metadata remain. The default is `full`.
+Permissions stay current. Read an uncertain task's status instead of replaying it.
+
+[RC28 sequences](docs/RC28-E2E-LATENCY-20261103.md) ·
+[RC29 call reduction](docs/RC29-CLOUD-CALL-REDUCTION-20261103.md) ·
+[RC30 measurements, installation and limits](docs/RC30-HOTPATHS-20261103.md).
+The same eight large read results needed one instead of two Apps calls in the
+measured RC30 comparison; median 22.72 → 13.02 seconds over three groups per version.
+Cloud latency remains; this is not a new physical keyboard or Voice benchmark.
 
 ## License
 

@@ -1,4 +1,5 @@
-import inspect
+import asyncio
+import re
 
 import pytest
 from pydantic import ValidationError
@@ -35,8 +36,8 @@ def test_session_read_waits_longer_than_the_query_budget_and_other_work_does_not
     assert inline_task_timeout("session.catalog") == 9
     assert inline_task_timeout("clipboard.read") == 2
     assert inline_task_timeout("threaddesk.read") == 2
-    assert inline_task_timeout("session.input") is None
-    assert inline_task_timeout("terminal.execute") is None
+    assert inline_task_timeout("session.input") == 1
+    assert inline_task_timeout("terminal.execute") == 1
 
 
 def test_since_is_only_a_session_read_cursor():
@@ -47,13 +48,23 @@ def test_since_is_only_a_session_read_cursor():
         ReadQuery(operation="file.read", path="/tmp/example", since="ab" * 32)
 
 
-def test_terminal_read_source_does_not_focus_or_type():
-    source = inspect.getsource(TerminalAppTransport.read)
-    assert "contents()" in source
-    assert "frontmost" not in source
-    assert "selected" not in source
-    assert "keyCode" not in source
-    assert "doScript" not in source
+async def test_terminal_read_source_does_not_focus_or_type(monkeypatch):
+    transport = TerminalAppTransport(asyncio.Lock())
+    calls = []
+
+    async def native(source, *, mutation=False):
+        calls.append((source, mutation))
+        return "observed buffer tail"
+
+    monkeypatch.setattr(transport, "native", native)
+    assert await transport.read("terminal:9:ttys009") == "observed buffer tail"
+    assert len(calls) == 1
+    source, mutation = calls[0]
+    assert mutation is False
+    assert "tab.history()" in source and ".slice(-65536)" in source
+    assert not re.search(r"\.selected\s*=", source)
+    for action in ("frontmost", "activate()", "keyCode", "keystroke", "doScript", ".click()"):
+        assert action not in source
 
 
 async def test_cursor_follows_one_pane_and_does_not_reveal_another(bridge):

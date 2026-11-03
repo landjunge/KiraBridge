@@ -1,0 +1,180 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-31",
+  "scope": "local implementation and incrementally verified real Intel macOS integration; no productive deployment",
+  "host": {
+    "macos": "15.7.4",
+    "build": "24G517",
+    "model": "iMac17,1",
+    "arch": "x86_64"
+  },
+  "source": {
+    "tree_sha256": "e790665737fa910d99730f6f2a0a7ca5dec9511beebb3e1832d5a7e6e19077db",
+    "python_files": 132,
+    "same_as_menu_continuation": true
+  },
+  "tests": [
+    {
+      "stage": "before final slash/menu renderer extensions",
+      "suites": 21,
+      "passed": 426,
+      "seconds": 25.22
+    },
+    {
+      "stage": "after slash/title binding extension",
+      "suites": 9,
+      "passed": 230,
+      "seconds": 8.58
+    },
+    {
+      "stage": "after wide archive menu extension",
+      "suites": 3,
+      "passed": 84,
+      "seconds": 2.9
+    }
+  ],
+  "review": {
+    "native_agent": "macos_provider",
+    "final_material_findings": 0
+  },
+  "historical_tasks_preserved": [
+    {
+      "id": "kb_macos_continue_return_20261031",
+      "state": "unknown",
+      "error": "{\"code\":\"visible_insert_unknown\"}",
+      "attempt": 1
+    },
+    {
+      "id": "kb_macos_implementation_20261031",
+      "state": "unknown",
+      "error": "{\"code\":\"visible_insert_unknown\"}",
+      "attempt": 1
+    }
+  ],
+  "historical_hint_replay": {
+    "expected_payload_chars": [
+      1388,
+      1022
+    ],
+    "old_verifier": [
+      false,
+      false
+    ],
+    "new_verifier": [
+      true,
+      true
+    ],
+    "inside_original_task_before_frame_available": false
+  },
+  "real_acceptance": {
+    "status": "passed_incrementally",
+    "initial_full_harness_run": "native-e2e-07",
+    "initial_run_overall": "failed_at_unrecognized_wide_archive_menu",
+    "prompt_and_slash_runtime": {
+      "instance_id": "e10adb7e63ad475a9c201804f2ecfc4d",
+      "version": "0.8.0rc20",
+      "pid": 23012,
+      "started_at": "2026-10-31T12:42:53.870352+00:00",
+      "config_path": null,
+      "config_sha256": null,
+      "effective_config_sha256": "6b9688d99d5d55a3102cea7fb6f4f3c79a89db2fe850a05fc38e782e9d31d55f",
+      "source_tree_sha256": "5ab502c80ad401b81f9e76e9accdf90c23576e98a6be4662fc2d4c07e206569e",
+      "source_file_count": 132,
+      "source_package_path": "/Users/landjunge/KiraBridge-worktrees/macos-adapter-phases1-3-20261031/src/kirabridge",
+      "source_scope": "package Python files observed at startup; no remote attestation"
+    },
+    "checks_before_menu": [
+      "private endpoint rejects unauthenticated request",
+      "new status tool and generic operation discovered through authenticated HTTP",
+      "platform.status executed through the existing task/policy path",
+      "manual approval waits without effect; exact grant executes once; reuse denied",
+      "real busy shell rejected before native mutation",
+      "own Codex reached two identical ready frames",
+      "stale PID rejected; invalid_arguments rejected before persisted task/native input",
+      "empty literal without key and Return without cursor both rejected before effects; these are concrete schema cases, not a replay of unavailable historical arguments",
+      "exactly once paste/Return completed and completion consumed",
+      "real Codex response independently confirmed in current screen and own rollout",
+      "explicit session_enter sends one Return without paste at own empty Codex prompt"
+    ],
+    "prompt_chars": 1694,
+    "prompt_sha256": "6c88dea89c7ec845b2fa74e389cf0acd97324974a3688f9ccefa769428464820",
+    "literal_replay": {
+      "before_sha256": "bea6cce2b1ea96a94ad4d01539be2ffef3f600442dcbf4eff3fdb2fd6148c8eb",
+      "after_sha256": "7f92c378694332e8dd14d5a796a29c36e1817ab6e16423e0281000705fbde1af",
+      "old_verifier": true,
+      "new_verifier": true,
+      "collapsed_marker_observed": true,
+      "regression_reproduced_in_real_task": false
+    },
+    "answer": {
+      "rollout": "/Users/landjunge/.codex/sessions/2026/10/31/rollout-2026-10-31T13-43-05-01a191fc-2c70-7300-b47b-b20003c79e69.jsonl",
+      "screen_sha256": "a9025de895d0f740a4299fa9c4fa413f0dc592f3589664c14da3a75320bd49c6",
+      "thread_id": "01a191fc-2c70-7300-b47b-b20003c79e69",
+      "turn_id": "01a191fc-608a-74a1-a09b-a08e8dc2f638",
+      "event_family": "item_completed",
+      "user_item_id": "01a191fc-6431-7213-b710-fa5e81fa1d27",
+      "answer_item_id": "msg_00670772bdc3c048016ae5e269402481918064105a6aa5af93",
+      "user_prompt_count": 1,
+      "assistant_answer_count": 1,
+      "task_complete_observed": true,
+      "response_item_mirrors_counted": false
+    },
+    "slash": {
+      "task_id": "macos-native-e2e-07-own-resume-menu",
+      "state": "completed",
+      "attempt": 1,
+      "input_kind": "slash_command",
+      "return_sent": true
+    },
+    "menu_continuation": {
+      "continuation_of": "native-e2e-07",
+      "source_runtime": {
+        "instance_id": "610373e6592e49e48611eff7d0307318",
+        "version": "0.8.0rc20",
+        "pid": 23636,
+        "started_at": "2026-10-31T12:47:17.990215+00:00",
+        "config_path": null,
+        "config_sha256": null,
+        "effective_config_sha256": "8c1cb7a3051cb8d251852fadde80ce6c5abfb6d7209c0657a1f7488bbbe10a75",
+        "source_tree_sha256": "e790665737fa910d99730f6f2a0a7ca5dec9511beebb3e1832d5a7e6e19077db",
+        "source_file_count": 132,
+        "source_package_path": "/Users/landjunge/KiraBridge-worktrees/macos-adapter-phases1-3-20261031/src/kirabridge",
+        "source_scope": "package Python files observed at startup; no remote attestation"
+      },
+      "fresh_http_instance": true,
+      "new_window_opened": false,
+      "prompt_replayed": false,
+      "menu_confirmation": {
+        "return_sent": true,
+        "paste_event_sent": false,
+        "attempt": 1,
+        "native_mutations": 1,
+        "thread_id": "01a191fc-2c70-7300-b47b-b20003c79e69",
+        "title_sha256": "9a3eae7354db41433134cc56425f78596845700e5e92d1de23fe16da5a994467"
+      },
+      "cleanup": {
+        "owned_window_absent": true,
+        "owned_shell_agent_absent": true,
+        "other_windows_and_current_process_identities_preserved": true
+      },
+      "acceptance": "passed"
+    },
+    "private_evidence_root": "/Users/landjunge/.local/share/kirabridge/backups/macos-implementation-20261031T121031Z",
+    "continued_same_owned_window": true,
+    "prompt_replayed_for_menu": false
+  },
+  "remaining_limits": [
+    "Short noncollapsed visually wrapped multiline drafts may stop with visible_paste_unconfirmed before Return (Run04)",
+    "Exact agents-hint display was not recreated live after closed diagnostic child (Run05); historical real-frame replay and regression tests cover it",
+    "Library source gap from architecture report remains",
+    "No ARM/12/26/27 native acceptance",
+    "Core/helper TCC grants are separate; no generic permission request or unknown-dialog confirmation"
+  ],
+  "production": {
+    "installed_commit": "ecb76cb2082a863d5dfdcba3aef848a0ee0c9f33",
+    "core_pid": 15207,
+    "installed": false,
+    "restarted": false,
+    "pushed": false
+  }
+}

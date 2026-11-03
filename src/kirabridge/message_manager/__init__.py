@@ -127,9 +127,32 @@ class MessageManager:
         )
         if job:
             result["processing"]["evidence"] = json.loads(job["evidence"])
+            if result["processing"]["evidence"].get("completion_scope") == "visible_input_delivery":
+                result["processing"].update(
+                    completion_scope="visible_input_delivery",
+                    agent_confirmed=False,
+                    agent_work_completion_verified=False,
+                    request_reply_satisfied=False,
+                )
+            if result["processing"]["evidence"].get("completion_scope") == "local_agent_turn":
+                local = result["processing"]["evidence"].pop("local_reply_result", None)
+                result["processing"].update(
+                    completion_scope="local_agent_turn",
+                    reply_source="bound_local_codex_rollout",
+                    agent_confirmed=False,
+                    request_reply_satisfied=True,
+                    agent_work_completion_verified=False,
+                    result=local,
+                )
             scope = result["processing"]["evidence"].get("session_scope")
             if scope == "existing_visible_terminal":
                 result["processing_route"] = scope
+            elif (
+                not visible
+                and job["state"] in {"failed", "blocked"}
+                and result["processing"]["evidence"].get("phase") == "direct_admission"
+            ):
+                result["processing_route"] = "failed_visible_admission"
             elif job["state"] == "queued":
                 result["processing_route"] = (
                     "pending_visible_terminal"

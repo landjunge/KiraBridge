@@ -28,7 +28,7 @@ def terminal_reads(bridge, config, monkeypatch):
     policy.permission_level = "medium"
     calls = []
 
-    async def catalog(principal):
+    async def catalog(principal, *, transport=None):
         bridge.security.principal(principal, "session.inspect")
         calls.append("catalog")
         return {"status": "available", "sessions": [TARGET]}
@@ -129,7 +129,7 @@ async def test_read_flood_does_not_take_stop_capacity(bridge, config, terminal_r
     all_read_slots = asyncio.Event()
     release = asyncio.Event()
 
-    async def held_catalog(principal):
+    async def held_catalog(principal, *, transport=None):
         nonlocal started
         started += 1
         if started == config.read_concurrency:
@@ -214,7 +214,7 @@ async def test_stale_target_and_read_timeout_have_same_code_on_both_routes(
         monkeypatch.setattr("kirabridge.terminal_queries.TERMINAL_QUERY_SECONDS", 0.03)
         cancelled = []
 
-        async def blocked(principal):
+        async def blocked(principal, *, transport=None):
             try:
                 await asyncio.Event().wait()
             finally:

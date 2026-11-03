@@ -1,0 +1,44 @@
+{
+  "version": "0.8.0rc28",
+  "source_commit": "6b70116ba06da69c2e3f1552471c1842e983d8f7",
+  "release_url": "https://github.com/landjunge/KiraBridge/releases/tag/v0.8.0rc28",
+  "intel_only": true,
+  "github_actions_used": false,
+  "assets_verified_uploaded": 7,
+  "installer_zip_bytes": 3251102,
+  "installer_zip_sha256": "61a0be5eaaa02bb03e1b596563653ae803fb0c6b251a4d1f828cc7b452f983fe",
+  "downloaded_again_digest_matched": true,
+  "installer_finished_utc": "2026-11-03T00:16:15.724282+00:00",
+  "installer_exit_code": 0,
+  "daemon": {
+    "version": "0.8.0rc28",
+    "pid": 47232,
+    "instance_id": "db5f442a3cad48208120250f737ce2e2",
+    "started_at": "2026-11-03T00:16:06.451809+00:00"
+  },
+  "installed_wheel_python_files_byte_verified": 162,
+  "installed_native_binary_sha256": "f2d7f4b29605b4aba6d6aef0557316f95ead226d824d69533e9693cec1339c39",
+  "rollback_version": "0.8.0rc27",
+  "rollback_backup": "~/.local/share/kirabridge/install/backups/20261103-011558-832b1a0d",
+  "preservation": {
+    "independent_snapshot_utc": "2026-11-03T00:36:12.448679+00:00",
+    "protected_files_hash_mode_size_equal": 7,
+    "db_schema_equal": true,
+    "old_inventory_tables_checked": 11,
+    "old_inventory_rows_changed": 0,
+    "old_inventory_rows_deleted": 0,
+    "original_agents_pid_start_parent_equal": [
+      1728,
+      1749,
+      1825,
+      35046
+    ],
+    "expected_connector_process_replaced": true,
+    "separate_owned_install_window_verified": true,
+    "owned_install_window_absent_twice": true,
+    "other_terminal_window_ids_preserved": [
+      1548,
+      1604
+    ]
+  }
+}

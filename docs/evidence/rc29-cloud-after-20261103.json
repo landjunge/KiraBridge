@@ -1,0 +1,221 @@
+{
+  "version": "0.8.0rc29",
+  "source_commit": "279afccc693e2b8d3d7d1787828ad44679d1bba2",
+  "scope": "Actual Apps connector. Three groups per workload, no warmup omitted. Outer cloud RPCs counted; internal reads remain separate. Voice/model planning not simulated. P50 median, P95 nearest rank (n3=max). Extra completed-idempotence probe excluded and explicitly recorded.",
+  "mixed": {
+    "cloud_calls_per_group": 1,
+    "statistics": {
+      "n": 3,
+      "total_ms": 17175,
+      "p50_ms": 4787,
+      "p95_ms": 9106
+    },
+    "rounds": [
+      {
+        "round": 0,
+        "total_ms": 9106,
+        "children": [
+          {
+            "tool": "bridge_health",
+            "is_error": false,
+            "daemon_ms": 75.692609
+          },
+          {
+            "tool": "clipboard_info",
+            "is_error": false,
+            "daemon_ms": 1.332792
+          },
+          {
+            "tool": "task_get",
+            "is_error": false,
+            "daemon_ms": 75.989458
+          }
+        ],
+        "clipboard_info_equal": true,
+        "historical_task_equal": true,
+        "running_version": "0.8.0rc29"
+      },
+      {
+        "round": 1,
+        "total_ms": 3282,
+        "children": [
+          {
+            "tool": "bridge_health",
+            "is_error": false,
+            "daemon_ms": 18.269878
+          },
+          {
+            "tool": "clipboard_info",
+            "is_error": false,
+            "daemon_ms": 1.091894
+          },
+          {
+            "tool": "task_get",
+            "is_error": false,
+            "daemon_ms": 7.455223
+          }
+        ],
+        "clipboard_info_equal": true,
+        "historical_task_equal": true,
+        "running_version": "0.8.0rc29"
+      },
+      {
+        "round": 2,
+        "total_ms": 4787,
+        "children": [
+          {
+            "tool": "bridge_health",
+            "is_error": false,
+            "daemon_ms": 25.01912
+          },
+          {
+            "tool": "clipboard_info",
+            "is_error": false,
+            "daemon_ms": 1.342779
+          },
+          {
+            "tool": "task_get",
+            "is_error": false,
+            "daemon_ms": 8.838916
+          }
+        ],
+        "clipboard_info_equal": true,
+        "historical_task_equal": true,
+        "running_version": "0.8.0rc29"
+      }
+    ]
+  },
+  "task_evidence": {
+    "cloud_calls_per_group": 1,
+    "statistics": {
+      "n": 3,
+      "total_ms": 9554,
+      "p50_ms": 3210,
+      "p95_ms": 3899
+    },
+    "rounds": [
+      {
+        "round": 0,
+        "total_ms": 2445,
+        "task_id": "rc28_cloud_after_seq_r1_20261103",
+        "state": "completed",
+        "task_equal": true,
+        "events_equal": true,
+        "events_sha256": "105ae9a847515b0c25d33cec84553d57127337318f824ed50008c376bccbf51e",
+        "event_count": 37,
+        "has_more_events": false,
+        "next_after": 37768
+      },
+      {
+        "round": 1,
+        "total_ms": 3899,
+        "task_id": "rc28_cloud_after_seq_r1_20261103",
+        "state": "completed",
+        "task_equal": true,
+        "events_equal": true,
+        "events_sha256": "105ae9a847515b0c25d33cec84553d57127337318f824ed50008c376bccbf51e",
+        "event_count": 37,
+        "has_more_events": false,
+        "next_after": 37768
+      },
+      {
+        "round": 2,
+        "total_ms": 3210,
+        "task_id": "rc28_cloud_after_seq_r1_20261103",
+        "state": "completed",
+        "task_equal": true,
+        "events_equal": true,
+        "events_sha256": "105ae9a847515b0c25d33cec84553d57127337318f824ed50008c376bccbf51e",
+        "event_count": 37,
+        "has_more_events": false,
+        "next_after": 37768
+      }
+    ]
+  },
+  "writes": {
+    "cloud_calls_per_group": 1,
+    "statistics": {
+      "n": 3,
+      "total_ms": 6186,
+      "p50_ms": 1990,
+      "p95_ms": 2285
+    },
+    "rounds": [
+      {
+        "round": 0,
+        "tool": "action_request",
+        "task_id": "rc29_after_file_write_r0_20261103",
+        "elapsed_ms": 1911,
+        "state": "completed",
+        "created": 1793669349.2741702,
+        "finished": 1793669349.2906828,
+        "cloud_calls": 1
+      },
+      {
+        "round": 1,
+        "tool": "action_request",
+        "task_id": "rc29_after_file_write_r1_20261103",
+        "elapsed_ms": 1990,
+        "state": "completed",
+        "created": 1793669351.293597,
+        "finished": 1793669351.311,
+        "cloud_calls": 1
+      },
+      {
+        "round": 2,
+        "tool": "action_submit",
+        "task_id": "rc29_after_file_write_r2_20261103",
+        "elapsed_ms": 2285,
+        "state": "completed",
+        "created": 1793669353.581077,
+        "finished": 1793669353.6261592,
+        "cloud_calls": 1
+      }
+    ]
+  },
+  "file_proofs": [
+    {
+      "name": "after-0.txt",
+      "bytes": 26,
+      "sha256": "8b33df66d47d99fcd3024c60c27f56f8d47b3d7944b209ca7d0f5e8097f08147"
+    },
+    {
+      "name": "after-1.txt",
+      "bytes": 26,
+      "sha256": "8b33df66d47d99fcd3024c60c27f56f8d47b3d7944b209ca7d0f5e8097f08147"
+    },
+    {
+      "name": "after-2.txt",
+      "bytes": 26,
+      "sha256": "8b33df66d47d99fcd3024c60c27f56f8d47b3d7944b209ca7d0f5e8097f08147"
+    },
+    {
+      "name": "before-0.txt",
+      "bytes": 26,
+      "sha256": "8b33df66d47d99fcd3024c60c27f56f8d47b3d7944b209ca7d0f5e8097f08147"
+    },
+    {
+      "name": "before-1.txt",
+      "bytes": 26,
+      "sha256": "8b33df66d47d99fcd3024c60c27f56f8d47b3d7944b209ca7d0f5e8097f08147"
+    },
+    {
+      "name": "before-2.txt",
+      "bytes": 26,
+      "sha256": "8b33df66d47d99fcd3024c60c27f56f8d47b3d7944b209ca7d0f5e8097f08147"
+    }
+  ],
+  "completed_idempotence_probe": {
+    "additional_diagnostic_cloud_calls": 1,
+    "elapsed_ms": 2039,
+    "same_task_id": true,
+    "same_created_finished": true,
+    "state": "completed",
+    "overwrite": false
+  },
+  "total_workload_cloud_calls": {
+    "before": 21,
+    "after": 9,
+    "excluded_additional_diagnostic_probe": 1
+  }
+}

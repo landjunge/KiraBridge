@@ -10,12 +10,12 @@ from contextlib import asynccontextmanager, contextmanager
 from contextvars import ContextVar
 from copy import deepcopy
 from pathlib import Path
+from typing import Literal
 
-from pydantic import Field
+from pydantic import Field, model_validator
 
-from kirabridge.bridge_core.models import BridgeError, Input, digest
+from kirabridge.bridge_core.models import BridgeError, Input, UncertainExecution, digest
 from kirabridge.filesystem_manager import PathScope
-from kirabridge.platform_adapters.desktop import DESKTOP_MESSAGES
 from kirabridge.platform_adapters.terminal_app import TerminalAppTransport
 from kirabridge.platform_adapters.tmux import TmuxTransport
 from kirabridge.session_ports import SessionPorts, SessionTransport, TerminalAppPort
@@ -62,9 +62,23 @@ class SessionSelect(SessionReference):
 
 
 class SessionInput(SessionReference):
-    text: str = Field(min_length=1, max_length=16384)
+    """Literal text, or key='enter' bound to an observed cursor and current agent PID."""
+
+    text: str = Field(default="", max_length=16384)
     submit: bool = True
     require_idle: bool = False
+    key: Literal["enter"] | None = None
+    expected_cursor: str = Field(default="", pattern=r"^$|^[0-9a-f]{64}$")
+    expected_agent_pid: int | None = Field(default=None, gt=0)
+
+    @model_validator(mode="after")
+    def explicit_input_mode(self):
+        if self.key == "enter":
+            if self.text or not self.submit or not self.expected_cursor:
+                raise ValueError("Return requires empty text, submit=true and an observed cursor")
+        elif not self.text or self.expected_cursor or self.expected_agent_pid is not None:
+            raise ValueError("Literal text must be nonempty and cannot include Return-only guards")
+        return self
 
 
 class SessionOpen(Input):
@@ -112,14 +126,38 @@ class SessionManager:
     def transport(self, pane_id):
         return self.terminal_app if pane_id.startswith("terminal:") else self.tmux
 
-    async def catalog(self, principal):
+    async def catalog(self, principal, *, transport=None):
+        """Discover both transports, or observe only an explicitly selected one."""
         self.authorization.principal(principal, "session.inspect")
+        if transport not in {None, "terminal_app", "tmux"}:
+            raise BridgeError("invalid_arguments", "Unknown session catalog transport")
         native_rows, errors = [], {}
-        if self.terminal_app.available and self.socket_name is None:
+        if transport != "tmux" and self.terminal_app.available and self.socket_name is None:
             try:
                 native_rows = await self.terminal_app.catalog()
             except BridgeError as exc:
-                errors["terminal_app"] = {"code": exc.code, "message": str(exc)}
+                errors["terminal_app"] = {
+                    "code": exc.code,
+                    "message": str(exc),
+                    **(
+                        {"provider_error": exc.provider_error}
+                        if getattr(exc, "provider_error", None) is not None
+                        else {}
+                    ),
+                }
+        elif transport == "terminal_app":
+            errors["terminal_app"] = {
+                "code": "session_transport_unavailable",
+                "message": "Native Terminal.app catalog is unavailable",
+            }
+        if transport == "terminal_app":
+            return self._catalog_result(
+                native_rows,
+                transport="terminal_app",
+                status=errors.get("terminal_app", {}).get("code", "available"),
+                errors=errors,
+                truncated=getattr(self.terminal_app, "last_catalog_incomplete", False),
+            )
         try:
             rows = await self.tmux.catalog()
         except BridgeError as exc:
@@ -129,8 +167,19 @@ class SessionManager:
                 status="available"
                 if native_rows
                 else errors.get("terminal_app", {}).get("code", exc.code),
-                errors={**errors, "tmux": {"code": exc.code}},
-                truncated=getattr(self.terminal_app, "last_catalog_incomplete", False),
+                errors={
+                    **errors,
+                    "tmux": {
+                        "code": exc.code,
+                        **(
+                            {"provider_error": exc.provider_error}
+                            if getattr(exc, "provider_error", None) is not None
+                            else {}
+                        ),
+                    },
+                },
+                truncated=transport != "tmux"
+                and getattr(self.terminal_app, "last_catalog_incomplete", False),
             )
         return self._catalog_result(
             native_rows + rows,
@@ -138,7 +187,8 @@ class SessionManager:
             status="available",
             errors=errors,
             truncated=getattr(self.tmux, "last_catalog_truncated", False)
-            or getattr(self.terminal_app, "last_catalog_incomplete", False),
+            or transport != "tmux"
+            and getattr(self.terminal_app, "last_catalog_incomplete", False),
         )
 
     def _catalog_result(self, rows, *, transport, status, errors, truncated=False):
@@ -411,7 +461,7 @@ class SessionManager:
             raise BridgeError("invalid_arguments", "Insertion must not submit a line")
         async with self.lock:
             selected = await self.selected(principal, args.pane_id, args.expected_pid)
-            self.assigned_agent(selected)
+            target = self.assigned_agent(selected)
             identities = self.selected_identities(selected)
             # Native agent process presence is not turn activity. A task-owned
             # identity requires the fresh widget/readiness check below instead.
@@ -439,7 +489,11 @@ class SessionManager:
                 if before_transport is not None:
                     await before_transport()
                 await self.terminal_app.insert(
-                    args.pane_id, args.text, identity_guard=identities, expected_screen=text
+                    args.pane_id,
+                    args.text,
+                    identity_guard=identities,
+                    expected_screen=text,
+                    agent_target=target,
                 )
             else:
                 if before_transport is not None:
@@ -471,58 +525,46 @@ class SessionManager:
                 await self.transport(pane_id).press_return(pane_id)
         return {"return_sent": True, "agent_confirmed": False}
 
-    def unbound_agent(self, selected):
-        """A grok or codex process that is not the configured production pane."""
-        agents, bindings = self.agent_registry()
-        matches = [item for item in selected.get("processes", []) if item["name"] in agents]
-        if len(matches) != 1:
-            return None
-        process = matches[0]
-        binding = bindings.get(process["name"])
-        if binding and self.binding_matches(selected, binding, process["name"]):
-            return None
-        return process
-
-    async def paste_and_return(self, args, selected, process):
-        """Paste into one explicit test pane, then send Return. Not the production binding."""
-        identities = {}
-        for pid in {selected["expected_pid"], process["pid"]}:
-            identity = await self.terminal_app.process_identity(pid, detailed=True)
-            fields = identity.split(None, 8)
-            owner = next((item for item in selected["processes"] if item["pid"] == pid), None)
-            if (
-                len(fields) != 9
-                or not fields[0].isdigit()
-                or not fields[7].isdigit()
-                or fields[1] != Path(selected["tty"]).name
-                or owner is None
-                or int(fields[7]) != owner.get("ppid")
-                or fields[8] != owner.get("image")
-            ):
+    async def return_key(self, principal, args, *, expected_screen, before_transport):
+        """One key for the separately authorized, observed view; never paste text."""
+        self.authorization.principal(principal, "session.input")
+        self.authorization.principal(principal, "terminal.execute")
+        if args.key != "enter" or args.text or not args.submit:
+            raise BridgeError("invalid_arguments", "A standalone Return requires explicit key mode")
+        async with self.lock:
+            selected = await self.selected(principal, args.pane_id, args.expected_pid)
+            if selected.get("transport") != "terminal_app":
                 raise BridgeError(
-                    "visible_target_changed", "Selected process image/parent/TTY changed"
+                    "visible_terminal_required", "Return requires a visible native tab"
                 )
-            identities[pid] = identity
-        before = await self.terminal_app.read(args.pane_id)
-        await self.terminal_app.insert(
-            args.pane_id, args.text, identity_guard=identities, expected_screen=before
-        )
-        inserted = await self.terminal_app.read(args.pane_id)
-        if args.text not in inserted:
-            raise BridgeError(
-                "visible_insert_unknown", "Pasted text was not observed; no Return sent"
+            target = self.assigned_agent(selected)
+            snapshot = None
+            if target:
+                identities = self.selected_identities(selected)
+                selection = self.current_selection()
+                if (
+                    identities is None
+                    or not selection
+                    or args.expected_agent_pid != selection[1].agent_pid
+                ):
+                    raise BridgeError("visible_target_changed", "Observed agent identity changed")
+            else:
+                if args.expected_agent_pid is not None:
+                    raise BridgeError(
+                        "visible_target_changed", "Observed agent is no longer present"
+                    )
+                context = await self.terminal_app.prepare_shell_paste(selected)
+                if context["screen"] != expected_screen:
+                    raise BridgeError("visible_input_changed", "Observed terminal view changed")
+                identities, snapshot = context["identities"], context["snapshot"]
+            await before_transport()
+            await self.terminal_app.press_return(
+                args.pane_id,
+                identity_guard=identities,
+                expected_screen=expected_screen,
+                **({"shell_snapshot": snapshot} if snapshot is not None else {}),
             )
-        await self.terminal_app.press_return(
-            args.pane_id, identity_guard=identities, expected_screen=inserted
-        )
-        return {
-            "pane_id": args.pane_id,
-            "expected_pid": args.expected_pid,
-            "paste_event_sent": True,
-            "return_sent": True,
-            "agent_confirmed": False,
-            "production_binding": False,
-        }
+        return {"paste_event_sent": False, "return_sent": True, "agent_confirmed": False}
 
     async def send(self, principal, args, *, task_id=None, before_transport=None):
         self.authorization.principal(principal, "session.input")
@@ -531,9 +573,9 @@ class SessionManager:
             raise BridgeError("invalid_arguments", "NUL in input")
         async with self.lock:
             selected = await self.selected(principal, args.pane_id, args.expected_pid)
-            foreign = self.unbound_agent(selected)
-            if foreign and args.submit and args.pane_id.startswith("terminal:"):
-                return await self.paste_and_return(args, selected, foreign)
+            # Recognition, exact assignment and central handoff are mandatory for
+            # every CLI tab, including an unbound idle-looking tab. A raw shortcut
+            # cannot establish readiness or the task's durable input intent.
             if self.assigned_agent(selected):
                 raise BridgeError(
                     "visible_handoff_required", "CLI handoffs require the central route"
@@ -565,10 +607,25 @@ class SessionManager:
                     selected, args.text, identity, before_transport=before_transport
                 )
             else:
+                identities = None
+                if args.pane_id.startswith("terminal:"):
+                    identity = await self.terminal_app.process_identity(
+                        selected["expected_pid"], detailed=True
+                    )
+                    fields = identity.split(None, 8)
+                    if len(fields) != 9 or fields[1] != args.pane_id.rsplit(":", 1)[1]:
+                        raise BridgeError(
+                            "visible_target_changed", "Selected process TTY identity changed"
+                        )
+                    identities = {selected["expected_pid"]: identity}
                 if before_transport is not None:
                     await before_transport()
                 await self.transport(args.pane_id).send(
-                    args.pane_id, args.text, submit=args.submit, require_idle=args.require_idle
+                    args.pane_id,
+                    args.text,
+                    submit=args.submit,
+                    require_idle=args.require_idle,
+                    **({"identity_guard": identities} if identities is not None else {}),
                 )
             self.input_release.sent(principal, task_id)
         return {
@@ -590,10 +647,16 @@ class SessionManager:
         }
 
     async def selected(self, principal, pane_id, expected_pid):
-        catalog = await self.catalog(principal)
-        native_error = catalog.get("transport_errors", {}).get("terminal_app", {})
-        if pane_id.startswith("terminal:") and native_error.get("code") in DESKTOP_MESSAGES:
-            raise BridgeError(native_error["code"], native_error["message"])
+        transport = "terminal_app" if pane_id.startswith("terminal:") else "tmux"
+        catalog = await self.catalog(principal, transport=transport)
+        error = catalog.get("transport_errors", {}).get(transport, {})
+        if error:
+            failure = BridgeError(
+                error["code"], error.get("message", "Selected session observation failed")
+            )
+            if error.get("provider_error") is not None:
+                failure.provider_error = error["provider_error"]
+            raise failure
         matches = [
             row
             for row in catalog["sessions"]
@@ -700,7 +763,7 @@ class SessionManager:
                 result["next_cursor"] = reference["sha256"]
             return result
 
-    async def open(self, principal, args, *, task_id=None):
+    async def open(self, principal, args, *, task_id=None, on_created=None):
         policy = self.authorization.principal(principal, "session.open")
         self.authorization.principal(principal, "terminal.execute")
         self.authorization.validate_window(principal, task_id, args)
@@ -728,36 +791,79 @@ class SessionManager:
                 + shlex.quote("KiraBridge visible %% ")
                 + " /bin/zsh -f"
             )
-        if argv and not self.direct(principal):
-            command += " && " + shlex.join(argv)
         async with self.lock:
             self.authorization.check_window(principal, task_id, args)
             try:
-                result = await self.terminal_app.open(command)
+                result = await self.terminal_app.open(
+                    command, on_created=on_created, principal=principal
+                )
             except BaseException:
                 self.authorization.window_outcome(principal, task_id, "unknown")
                 raise
             self.authorization.window_outcome(principal, task_id, "opened")
-            for _ in range(20):
-                sessions = await self.terminal_app.catalog()
-                selected = next((s for s in sessions if s["tty"] == result["tty"]), None)
-                if selected:
-                    if self.direct(principal) and argv:
-                        from kirabridge.platform_adapters.shell_prompt import empty_shell_prompt
+            try:
+                for _ in range(20):
+                    sessions = await self.terminal_app.catalog()
+                    matches = [s for s in sessions if s["tty"] == result["tty"]]
+                    if len(matches) > 1 or any(s.get("identity_ambiguous") for s in matches):
+                        raise BridgeError(
+                            "visible_target_ambiguous",
+                            "New terminal TTY has several live views; select an unambiguous view",
+                        )
+                    selected = matches[0] if matches else None
+                    if selected:
+                        if argv:
+                            from kirabridge.platform_adapters.shell_prompt import empty_shell_prompt
 
-                        if selected.get("busy", True):
-                            await asyncio.sleep(0.1)
-                            continue
-                        view = await self.read(
-                            principal, selected["pane_id"], selected["expected_pid"]
-                        )
-                        if not empty_shell_prompt(view["text"]):
-                            await asyncio.sleep(0.1)
-                            continue
-                        identity = await self.terminal_app.process_identity(
-                            selected["expected_pid"]
-                        )
-                        await self.terminal_app.send_confirmed(selected, shlex.join(argv), identity)
-                    return {**selected, "opened": True, "agent_processed": False}
-                await asyncio.sleep(0.05)
-        return {**result, "session_handle_pending": True, "agent_processed": False}
+                            if selected.get("busy", True):
+                                await asyncio.sleep(0.1)
+                                continue
+                            view = await self.read(
+                                principal, selected["pane_id"], selected["expected_pid"]
+                            )
+                            if not empty_shell_prompt(view["text"]):
+                                await asyncio.sleep(0.1)
+                                continue
+                            identity = await self.terminal_app.process_identity(
+                                selected["expected_pid"], detailed=True
+                            )
+                            actual_cwd = await self.terminal_app.process_working_directory(
+                                selected["expected_pid"], expected_identity=identity
+                            )
+                            if actual_cwd != cwd:
+                                await asyncio.sleep(0.1)
+                                continue
+                            await self.terminal_app.send_confirmed(
+                                selected,
+                                shlex.join(argv),
+                                identity,
+                                expected_cwd=cwd,
+                                before_transport=lambda: self.terminal_app.verify_opened(
+                                    result, principal=principal
+                                ),
+                            )
+                        return {
+                            **selected,
+                            "opened": True,
+                            "agent_processed": False,
+                            "creation_receipt": result,
+                            "separate_window": result.get("separate_window", False),
+                        }
+                    await asyncio.sleep(0.05)
+                if argv:
+                    raise UncertainExecution(
+                        "session_open_pending", "Window opened; argv was not dispatched"
+                    )
+                return {**result, "session_handle_pending": True, "agent_processed": False}
+            except Exception as cause:
+                error = UncertainExecution(
+                    getattr(cause, "code", "session_open_unknown"),
+                    "Window opened; later outcome unconfirmed; never reopen or resend",
+                )
+                error.provider_error = {
+                    "creation_receipt": result,
+                    "automatic_retry": False,
+                    "cause_code": getattr(cause, "code", type(cause).__name__),
+                    "cause_message": str(cause)[:512],
+                }
+                raise error from cause

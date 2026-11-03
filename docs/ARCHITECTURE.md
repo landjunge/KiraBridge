@@ -1,6 +1,22 @@
 # Architektur
 
-Aktueller Quellstand: unveröffentlichter RC17-Konsolidierungskandidat; [Zusammenführung](CONSOLIDATION-20261024.md). Produktive RC14 unverändert.
+Produktiver Planabschluss vom 31.10.2026, Code `831150a9b973`: [prozessgebundene Helperdiagnostik
+und gemeinsame native Abnahme](MACOS-PLAN-COMPLETION-20261031.md).
+Die explizite Diagnose ergänzt den vorhandenen Statusweg; sie überträgt keine
+Rechte auf spätere Worker. Paket- und Installationsstand stehen im Bericht.
+
+Vorheriger produktiver Stand vom 31.10.2026: [modularer macOS-Provider und getrennte Eingabewege](MACOS-ADAPTER-IMPLEMENTATION-20261031.md)
+als `acc1c850ba3d` (RC20) installiert; kurze umbrochene Prompts und
+echte Leerzeilen wurden über den produktiven Connector mit Return geprüft:
+[Prompt-Reparatur](WRAPPED-PROMPT-REPAIR-20261031.md). Der aktuelle Core ist der oben verlinkte Planabschluss.
+Frühere Eingabe-/Adapterabnahmen:
+[Installationsbelege](MACOS-ADAPTER-INSTALLATION-20261031.md).
+Laufende Anweisungen verwenden den vereinbarten kooperativen
+[Postfachweg](WORKING-SESSION-MESSAGING-20261031.md); eine abgewiesene
+sichtbare Übergabe wird nicht automatisch nachgeliefert.
+
+Historischer Konsolidierungsstand vom 24.10.2026: unveröffentlichter RC17-Kandidat;
+[Zusammenführung](CONSOLIDATION-20261024.md), damals produktive RC14 unverändert.
 
 Historischer Nachweis vom 20. Oktober 2026: damals produktiv `0.8.0rc11`; gesicherter Ausgangspunkt `0.8.0rc3`, Quellpin
 `4188f001d405a9f04ee63f6bbe1b088c6f39d26e`, Dokumentation `d9727ac1`,

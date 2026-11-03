@@ -129,10 +129,17 @@ class ProcessInput(Input):
 
 class AgentInput(Input):
     local_tools: bool = False
+    wait_for_reply: bool = True
     agent: str = Field(pattern=r"^[a-z][a-z0-9_-]{0,40}$")
     prompt: str = Field(min_length=1, max_length=262144)
     cwd: str
     timeout: float = Field(default=300.0, gt=0, le=3600)
+
+
+class ThreadDeskDynamicInput(Input):
+    name: str = Field(pattern=r"^[A-Za-z][A-Za-z0-9_-]{0,63}$")
+    arguments: dict[str, Any] = Field(default_factory=dict)
+    contract_sha256: str = Field(pattern=r"^[a-f0-9]{64}$")
 
 
 class ThreadDeskReadInput(Input):

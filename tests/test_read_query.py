@@ -78,7 +78,7 @@ async def test_cached_read_tool_discovers_reads_and_rejects_stale_pid(bridge, co
     selected = {"pane_id": "terminal:123:ttys004", "expected_pid": 345}
     reads = []
 
-    async def catalog(principal):
+    async def catalog(principal, *, transport=None):
         bridge.security.principal(principal, "session.inspect")
         return {"sessions": [selected], "status": "available"}
 

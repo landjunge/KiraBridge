@@ -12,6 +12,18 @@ from pydantic import BaseModel, ConfigDict, Field, PrivateAttr, model_validator
 
 from kirabridge.bridge_core.models import BridgeError
 
+_FULL_KEYBOARD_CAPABILITIES = frozenset(
+    {
+        "keyboard.inspect",
+        "keyboard.shortcuts.read",
+        "keyboard.execute",
+        "keyboard.profiles.read",
+        "keyboard.profiles.manage",
+        "apps.list",
+        "app.focus",
+    }
+)
+
 
 class PrincipalConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -29,6 +41,13 @@ class PrincipalConfig(BaseModel):
     team_only_execution: bool = False
     permission_level: Literal["full", "medium", "ask"] | None = None
     automatic_operations: list[Literal["session.input"]] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def full_keyboard_access(self):
+        """Extend an explicit unrestricted full grant without rewriting its source file."""
+        if self.permission_level == "full" and self.allow_any_executable and "/" in self.roots:
+            self.capabilities = sorted(set(self.capabilities) | _FULL_KEYBOARD_CAPABILITIES)
+        return self
 
 
 class ReceiverConfig(BaseModel):
@@ -207,7 +226,8 @@ class ThreadDeskConfig(BaseModel):
     storage: Literal["json", "sqlite"] = "json"
     timeout: float = Field(default=15, gt=0, le=60)
     max_result_bytes: int = Field(default=524288, ge=1024, le=1048576)
-    dynamic_read_proxy: bool = False  # Explicit opt-in; requires threaddesk.read permission.
+    dynamic_read_proxy: bool = False  # Legacy read-only opt-in remains supported.
+    dynamic_tool_proxy: bool = False  # Explicit all-tools opt-in; mutations use durable tasks.
 
 
 class WorkflowControlConfig(BaseModel):
@@ -394,9 +414,9 @@ class Config(BaseModel):
         if not any(p.token_env for p in self.principals.values()):
             raise BridgeError("auth_config", "HTTP requires a configured bearer token environment")
         tokens = [os.environ.get(p.token_env, "") for p in self.principals.values() if p.token_env]
-        if any(len(t) < 32 for t in tokens) or len(set(tokens)) != len(tokens):
+        if any(len(t) < 32 or not t.isascii() for t in tokens) or len(set(tokens)) != len(tokens):
             raise BridgeError(
-                "auth_config", "HTTP tokens must be unique and at least 32 characters"
+                "auth_config", "HTTP tokens must be unique ASCII strings of at least 32 characters"
             )
 
 

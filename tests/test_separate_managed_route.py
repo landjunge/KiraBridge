@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import sys
+
 import pytest
 from pydantic import ValidationError
 
@@ -296,8 +298,7 @@ async def test_new_message_roundtrip_leaves_old_jobs_untouched(bridge, config, m
         is None
     )
     assert seen["separate"] is True and seen["visible_id"] is None
-    assert "Neue isolierte Frage" in seen["prompt"]
-    assert "KiraBridge addressed communication" in seen["prompt"]
+    assert seen["prompt"] == completed["body"] == "Neue isolierte Frage"
     assert _states(bridge, held_id, unknown_id) == ("queued", "unknown")
     assert bridge.message_receiver._claim(held_id) is None
     assert bridge.message_receiver._claim(unknown_id) is None
@@ -379,7 +380,7 @@ async def test_local_process_replies_without_touching_old_jobs(bridge, config, m
     workspace = Path(config.principals["local"].roots[0])
     program = workspace / "fake-codex"
     program.write_text(
-        "#!/usr/bin/env python3\n"
+        f"#!{sys.executable}\n"
         "import json, sys\n"
         "sys.stdin.read()\n"
         "for event in (\n"
@@ -393,12 +394,14 @@ async def test_local_process_replies_without_touching_old_jobs(bridge, config, m
     )
     program.chmod(0o755)
     config.agents["probe"].executable = str(program)
+    # This owned fixture must not depend on the host's system/Xcode Python.
+    monkeypatch.setitem(bridge.terminal.environment, "PATH", str(workspace / "no-host-python"))
     _arm(monkeypatch, bridge, None, use_process=True)
     sent = _send_new(bridge, "fresh-process")
     assert await bridge.message_receiver._dispatch_next("probe") is True
     completed = bridge.messages.get("chatgpt", sent["id"])
-    assert completed["acknowledged"] is not None
-    assert completed["processing"]["state"] == "completed"
+    assert completed["acknowledged"] is not None, completed["processing"]
+    assert completed["processing"]["state"] == "completed", completed["processing"]
     assert completed["processing"]["evidence"]["session_scope"] == "separate_managed_session"
     assert completed["processing"]["evidence"]["pid"] > 0
     reply = bridge.messages.get("probe", completed["processing"]["reply_id"])
@@ -412,7 +415,7 @@ def _local_program(config, name, events, *, exit_code=0):
     program = Path(config.principals["local"].roots[0]) / name
     lines = ",\n".join(repr(event) for event in events)
     program.write_text(
-        "#!/usr/bin/env python3\n"
+        f"#!{sys.executable}\n"
         "import json, sys\n"
         "sys.stdin.read()\n"
         f"for event in ({lines}):\n"
@@ -464,7 +467,6 @@ async def test_unconfirmed_local_process_stays_unknown(bridge, config, monkeypat
 async def test_cancelling_the_turn_reaps_only_its_process(bridge, config, monkeypatch):
     import asyncio
     import os
-    import sys
     from pathlib import Path
 
     from kirabridge.bridge_core.bridge import Bridge
@@ -474,7 +476,7 @@ async def test_cancelling_the_turn_reaps_only_its_process(bridge, config, monkey
     workspace = Path(config.principals["local"].roots[0])
     program = workspace / "sleeping-codex"
     program.write_text(
-        "#!/usr/bin/env python3\n"
+        f"#!{sys.executable}\n"
         "import os, sys, time\n"
         "open('owned.pid','w').write(str(os.getpid()))\n"
         "sys.stdin.read()\n"

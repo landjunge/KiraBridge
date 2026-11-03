@@ -30,6 +30,11 @@ class ControlCenter:
             Route("/api/control/terminals", self.terminals),
             Route("/api/control/terminal/read", self.terminal_read, methods=["POST"]),
             Route("/api/control/terminal/input", self.terminal_input, methods=["POST"]),
+            Route(
+                "/api/control/terminal/input/{action_id}",
+                self.terminal_input_status,
+                methods=["GET"],
+            ),
             Route("/api/control/consent/{request_id}", self.consent, methods=["POST"]),
         ]
 
@@ -88,6 +93,11 @@ class ControlCenter:
     async def terminal_input(self, request):
         self.authenticate(request)
         return JSONResponse(await self.service.terminal_input(await self.body(request)))
+
+    async def terminal_input_status(self, request):
+        self.authenticate(request)
+        task = await self.service.terminal_input_status(request.path_params["action_id"])
+        return JSONResponse({"task": task})
 
     async def action(self, request):
         self.authenticate(request)

@@ -1,0 +1,37 @@
+{
+  "actual_chatgpt_connector_after_restart": true,
+  "actual_tunnel_automatic_restart": {
+    "after_pid": 7114,
+    "before_pid": 6825,
+    "manual_kickstart": false,
+    "single_signal": "SIGTERM"
+  },
+  "build": "7d862e5f63694e92a89afa68f0bed3671d791033",
+  "complete_machine_reboot_repeated": false,
+  "evidence_sha256": {
+    "final-connector-evidence.json": "15ef87a94b6d21c4c95638c59510f4aee995a9a76f418cbcdfe790dc3573162c",
+    "final-isolated-acceptance.json": "6adf3be9f2ae95dd1598e45d707d8fc243d90a75db6bf1a5af8072a18ebb7e21",
+    "installed-independent-final.json": "8587e411dcbea417ff071d9f0bfabbb32a6ba1d214ce8858166fabb4c12f24b2",
+    "installed-verification.json": "4f7a1b9882093c3fb1a9dcd6f834330fcc34f4995a279dd0eeee5c568dbbb243",
+    "release-download-verified.json": "73df6c026d61f70b834954f8984ffcbde9cd9ed24d40b69b8dd6ec7c509b6fbe"
+  },
+  "independent_actual_chatgpt_connector": true,
+  "independent_package_check": true,
+  "independent_running_package_match": true,
+  "installer_zip_sha256": "c354a6f9968892a26423b2784433c3f7434c80316dd7aa23b167ee4fb761f92c",
+  "interactive_agent_sessions_preserved": true,
+  "isolated_macos_upgrade_rollback": true,
+  "native_installer_actual_visible_installation": true,
+  "native_sha256": "8366f05228a1cb7c394f539a4f01e8bdb0bba2eb3e4d30eda7d223d9169b63c4",
+  "owned_install_window_closed": true,
+  "package_smoke": true,
+  "platform": "Darwin-x86_64",
+  "protected_config_and_credentials_unchanged": true,
+  "release": "https://github.com/landjunge/KiraBridge/releases/tag/v0.8.0rc25",
+  "release_download_verified": true,
+  "running_source_sha256": "9937d9f6ec7147527e915f6e8f3eb3d0dbf61eae40582576fccf320e9b35a1ed",
+  "runtime_sha256": "e4782c70c00c952d6a51f6d54ca41b2e8cffa31f7e5dedbf8835509489ed5282",
+  "schema": "kirabridge.rc25.final-acceptance.v1",
+  "signing": "ad-hoc; not notarized",
+  "version": "0.8.0rc25"
+}

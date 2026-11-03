@@ -1,0 +1,548 @@
+{
+  "schema_version": 1,
+  "task_id": "channel-8580791dce2b430abed13201ade41a9d",
+  "conversation_id": "rc20_install_restart_20261030",
+  "reply_to": "da402005-1e66-49aa-b207-3d1280639aca",
+  "local_date": "2026-10-31",
+  "timezone": "Europe/Berlin",
+  "skill": {
+    "name": "kira",
+    "path": "/Users/landjunge/.codex/skills/kira/SKILL.md",
+    "applied": true,
+    "explicit_limits_override_push_step": true
+  },
+  "authorization": {
+    "build_backup_install_restart_acceptance_and_failure_rollback": true,
+    "push_performed": false,
+    "public_release_performed": false,
+    "productive_permissions_or_credentials_changed": false
+  },
+  "source": {
+    "installed_commit": "881a53f7107c4c60e2a86e747e8e5ad7eab9111d",
+    "version": "0.8.0rc20",
+    "built_from_clean_tree": true,
+    "documentation_branch": "docs/rc20-881a53f-install-20261031",
+    "remote_state": "No push or release requested; remote not changed or claimed synchronized"
+  },
+  "platform": {
+    "system": "Darwin",
+    "version": "15.7.4",
+    "machine": "x86_64",
+    "python": "3.11.15",
+    "uv": "0.11.6",
+    "codex_cli": "0.166.0"
+  },
+  "baseline": {
+    "previous_commit": "da1bdaed019c31aa11bb28a39ef8bead7e73c1d4",
+    "old_runtime": {
+      "instance_id": "9a44e4428ffc42ba86855677f5881b14",
+      "version": "0.8.0rc20",
+      "pid": 47085,
+      "started_at": "2026-10-30T19:56:13.821393+00:00",
+      "config_path": "/Users/landjunge/.config/kirabridge/config.toml",
+      "config_sha256": "0dc8eb5952fe4d986c152d38e1658e06de711d6b1f91ccc9745b184d1adb6370",
+      "effective_config_sha256": "d5de7e63e70636a03ae54ead9990224da6e38137e23c8ba1b74aa233cfe5c012",
+      "source_tree_sha256": "4ddc9c375532fcdaa1e77c9b55f05d3f28eaf5e943ad29ba0a9eca39f55dbbe6",
+      "source_file_count": 122,
+      "source_package_path": "/Users/landjunge/.local/share/kirabridge/install/releases/0.8.0rc20-da1bdaed019c/source/.venv/lib/python3.11/site-packages/kirabridge",
+      "source_scope": "package Python files observed at startup; no remote attestation"
+    },
+    "dispatcher_active": true,
+    "permission_revision": "14a406b04ed5730fdb5644ec4f28824a4f3bd8ec0dbb38f51de6ee4f1a8f9a40",
+    "backup": "/Users/landjunge/.local/share/kirabridge/backups/rc20-881a53f-install-20261030-01/preinstall-20261030T230026Z",
+    "previous_release": "/Users/landjunge/.local/share/kirabridge/install/releases/0.8.0rc20-da1bdaed019c",
+    "previous_runtime_entries_verified": 1328,
+    "active_configuration_entries_verified": 8,
+    "sqlite_integrity": "ok",
+    "sqlite_sha256": "024313fc22b7ad5522ffaff283b2665a1f61423086080ce485f45840aa3a1d35",
+    "active_counts_at_snapshot": {
+      "tasks": 0,
+      "message_jobs": 0
+    },
+    "protected_record_counts": {
+      "queue_holds": 27,
+      "visible_handoffs": 10,
+      "message_jobs": 22,
+      "tasks": 59,
+      "messages": 25
+    },
+    "summary_sha256": "8366f9cea4cd5013b36f8ab2173f90f48ecef27c7916cd20cd883b71519b2578"
+  },
+  "package": {
+    "private_root": "/Users/landjunge/.local/share/kirabridge/backups/rc20-881a53f-install-20261030-01",
+    "artifact": "build-a/KiraBridge-macos.tar.gz",
+    "artifact_sha256": "ac202d91418fa541eb5f1bf700f60b47bb48ef5f4314aaffa7118274c876374a",
+    "wheel": "build-a/kirabridge-0.8.0rc20-py3-none-any.whl",
+    "wheel_sha256": "ae0dcbcbcd81350fa07fca0394181e76de795cd1705f16c7858e981b51059dc3",
+    "deterministic_two_builds_identical": true,
+    "manifest_hashes_verified": 397,
+    "archive_regular_files": 398,
+    "git_source_files_matched": 393,
+    "wheel_package_files_matched": 134,
+    "wheel_record_entries_verified": 139,
+    "python_files": 123,
+    "installed_expected_source_sha256": "50849fc2c65abcf2f27591cd2a2f85a61a8c34e251a2b01d3893946743cfbdf1",
+    "intel_cryptography_version": "48.0.1",
+    "local_bundle": "/Users/landjunge/.local/share/kirabridge/backups/rc20-881a53f-install-20261030-01/verified-local-bundle/KiraBridge",
+    "actual_installer": "/Users/landjunge/.local/share/kirabridge/backups/rc20-881a53f-install-20261030-01/verified-local-bundle/KiraBridge/installer/install.py",
+    "generated_network_bootstrap_used": false,
+    "bootstrap_reason": "Published v0.8.0rc20 still contains da1bdae; exact local bundle used for 881a53f."
+  },
+  "isolated_upgrade_and_rollback": {
+    "result": {
+      "download_command": "not exercised",
+      "os": "macOS-15.7.4-x86_64-i386-64bit",
+      "architecture": "x86_64",
+      "version": "0.8.0rc20",
+      "scope": "isolated real launchd label, config, port, runtime and data; no production paths",
+      "tested_command": "sh KiraBridge/install.sh --prefix /Users/landjunge/.local/share/kirabridge/backups/rc20-881a53f-install-20261030-01/isolated-upgrade/install --config /Users/landjunge/.local/share/kirabridge/backups/rc20-881a53f-install-20261030-01/isolated-upgrade/config/config.toml --launcher /Users/landjunge/.local/share/kirabridge/backups/rc20-881a53f-install-20261030-01/isolated-upgrade/bin/kirabridge --plist /Users/landjunge/.local/share/kirabridge/backups/rc20-881a53f-install-20261030-01/isolated-upgrade/service.plist --cache-dir /Users/landjunge/.local/share/kirabridge/backups/rc20-881a53f-install-20261030-01/isolated-upgrade/cache --workspace /Users/landjunge/.local/share/kirabridge/backups/rc20-881a53f-install-20261030-01/isolated-upgrade/workspace --test-label com.kirabridge.test.isolated-upgrade",
+      "cwd": "/Users/landjunge/.local/share/kirabridge/backups/rc20-881a53f-install-20261030-01/isolated-upgrade/extracted",
+      "checks": [
+        "pinned previous 0.8.0rc20 wheel starts under isolated launchd",
+        "built package upgrades 0.8.0rc20; authenticated version/status/start",
+        "config/credentials hashes, database row and user file preserved",
+        "real rollback restarts previous 0.8.0rc20 wheel and preserves secrets"
+      ],
+      "upgrade_only": true,
+      "hold_completion": false,
+      "previous_version": "0.8.0rc20",
+      "previous_commit": "da1bdaed019c31aa11bb28a39ef8bead7e73c1d4",
+      "previous_wheel_sha256": "259bb1adb5ef5e702c4a71a785193b4f583dacb06a9f64d4c7e6b419b3817371",
+      "remote_release_command": "not exercised in this run",
+      "passed": true,
+      "service_cleanup_bootout_returncode": 0,
+      "service_cleanup_absence_verified": true
+    },
+    "live_identity_evidence": "isolated-upgrade-live-code-identity.json",
+    "verified_live_source_sequence": [
+      "da1bdae / 4ddc9c375532fcdaa1e77c9b55f05d3f28eaf5e943ad29ba0a9eca39f55dbbe6 / 122 Python files",
+      "881a53f / 50849fc2c65abcf2f27591cd2a2f85a61a8c34e251a2b01d3893946743cfbdf1 / 123 Python files",
+      "da1bdae / 4ddc9c375532fcdaa1e77c9b55f05d3f28eaf5e943ad29ba0a9eca39f55dbbe6 / 122 Python files"
+    ],
+    "source_identity_observer": "Read-only Python return profiling; unchanged supported acceptance script and guards.",
+    "cleanup": {
+      "private_service": "gui/501/com.kirabridge.test.isolated-upgrade",
+      "launchctl_print_returncode": 113,
+      "service_absence_independently_verified": true,
+      "observed_runtime_pids": [
+        65860,
+        65895,
+        65910
+      ],
+      "pid_output": {
+        "65860": "",
+        "65895": "",
+        "65910": ""
+      },
+      "all_observed_runtime_pids_absent": true,
+      "private_port_connection_refused": true,
+      "observation_phases": [
+        "before_upgrade",
+        "after_upgrade",
+        "after_rollback"
+      ]
+    },
+    "runs": 1
+  },
+  "installation": {
+    "preflight": {
+      "supported_idle_guard_passed": true,
+      "active_tasks": 0,
+      "receiver_jobs": 0,
+      "team_jobs": 0,
+      "critical_file_hashes_modes_unchanged": true,
+      "old_service_unchanged_before_switch": true
+    },
+    "owned_pane_id": "terminal:6417:ttys002",
+    "owned_shell_pid": 65922,
+    "receipt": {
+      "task_id": "channel-8580791dce2b430abed13201ade41a9d",
+      "action": "install",
+      "command": [
+        "/usr/local/bin/python3.11",
+        "/Users/landjunge/.local/share/kirabridge/backups/rc20-881a53f-install-20261030-01/verified-local-bundle/KiraBridge/installer/install.py",
+        "install",
+        "--bundle",
+        "/Users/landjunge/.local/share/kirabridge/backups/rc20-881a53f-install-20261030-01/verified-local-bundle/KiraBridge",
+        "--prefix",
+        "/Users/landjunge/.local/share/kirabridge/install",
+        "--config",
+        "/Users/landjunge/.config/kirabridge/config.toml",
+        "--launcher",
+        "/Users/landjunge/.local/bin/kirabridge",
+        "--plist",
+        "/Users/landjunge/Library/LaunchAgents/com.kirabridge.bridge.plist",
+        "--service",
+        "launchd",
+        "--require-visible-terminal",
+        "--language",
+        "de",
+        "--motion",
+        "reduced"
+      ],
+      "started_at": "2026-10-30T23:07:38.528217+00:00",
+      "driver_pid": 66154,
+      "tty": "/dev/ttys002",
+      "stdin_tty": "/dev/ttys002",
+      "state": "finished",
+      "no_background_install": true,
+      "exit_code": 0,
+      "finished_at": "2026-10-30T23:07:49.825567+00:00"
+    },
+    "live_verification": {
+      "task_id": "channel-8580791dce2b430abed13201ade41a9d",
+      "passed": true,
+      "commit": "881a53f7107c4c60e2a86e747e8e5ad7eab9111d",
+      "release": "/Users/landjunge/.local/share/kirabridge/install/releases/0.8.0rc20-881a53f7107c",
+      "runtime": {
+        "instance_id": "9770676db7ef4c4ab32de84ba19d9d93",
+        "version": "0.8.0rc20",
+        "pid": 66208,
+        "started_at": "2026-10-30T23:07:47.918723+00:00",
+        "config_path": "/Users/landjunge/.config/kirabridge/config.toml",
+        "config_sha256": "0dc8eb5952fe4d986c152d38e1658e06de711d6b1f91ccc9745b184d1adb6370",
+        "effective_config_sha256": "d5de7e63e70636a03ae54ead9990224da6e38137e23c8ba1b74aa233cfe5c012",
+        "source_tree_sha256": "50849fc2c65abcf2f27591cd2a2f85a61a8c34e251a2b01d3893946743cfbdf1",
+        "source_file_count": 123,
+        "source_package_path": "/Users/landjunge/.local/share/kirabridge/install/releases/0.8.0rc20-881a53f7107c/source/.venv/lib/python3.11/site-packages/kirabridge",
+        "source_scope": "package Python files observed at startup; no remote attestation"
+      },
+      "dispatcher_active": true,
+      "launchd_pid_matches_runtime": true,
+      "old_pid_absent": true,
+      "new_instance_and_start_time": true,
+      "wheel_package_files_equal": 134,
+      "python_files_equal": 123,
+      "config_credentials_hashes_modes_preserved": true,
+      "permission_revision_preserved": true,
+      "plist_options_preserved": true,
+      "protected_records_unchanged": {
+        "queue_holds": 27,
+        "visible_handoffs": 10,
+        "message_jobs": 22,
+        "tasks": 59,
+        "messages": 25
+      },
+      "database_integrity": "ok",
+      "parent_codex_57091_preserved": true,
+      "transaction_backup": "/Users/landjunge/.local/share/kirabridge/install/backups/20261031-000741-f220d856",
+      "discovery_revision": "b53ba66dce056061a7079245bbac6f7d92d0db3ee9ad062c363278391e59957c"
+    },
+    "installer_stopped_old_service_and_started_new": true,
+    "root_actual_mcp_reconnect": {
+      "new_instance_id": "9770676db7ef4c4ab32de84ba19d9d93",
+      "health_and_operation_catalog_refreshed": true,
+      "active_codex_client_not_restarted": true
+    },
+    "historical_inbound_wait": {
+      "state_before_switch": "unknown",
+      "reason": "visible_reply_unknown",
+      "regular_bounded_timeout": true,
+      "premature_installation_result_sent": false,
+      "replayed": false,
+      "final_authenticated_result": "Not yet sent at this evidence snapshot; required after final documentation and readback."
+    }
+  },
+  "recovery": {
+    "passed": true,
+    "transaction_backup": "/Users/landjunge/.local/share/kirabridge/install/backups/20261031-000741-f220d856",
+    "previous_commit": "da1bdaed019c31aa11bb28a39ef8bead7e73c1d4",
+    "previous_release": "/Users/landjunge/.local/share/kirabridge/install/releases/0.8.0rc20-da1bdaed019c",
+    "saved_definitions_match_verified_baseline": {
+      "config.before.toml": "0dc8eb5952fe4d986c152d38e1658e06de711d6b1f91ccc9745b184d1adb6370",
+      "credentials.before.json": "04953c427cb7bf558c78469c8da50f4f433a54558836a36486922f7f621b71e4",
+      "launcher.before": "84f90ad704dd35dc11b0af33920841fd9fecc9c094b7ef51e9c79185d3af677b",
+      "service.before.plist": "db32a2e6e3ea496bce020d82015a4c2e902b50675e8c531667e8e7a629c817db"
+    },
+    "previous_runtime_entries_unchanged": 1328,
+    "transaction_sqlite_integrity": "ok",
+    "rollback_command": [
+      "/usr/local/bin/python3.11",
+      "/Users/landjunge/.local/share/kirabridge/backups/rc20-881a53f-install-20261030-01/run_visible_install.py",
+      "rollback"
+    ],
+    "rollback_was_exercised_in_isolated_package_acceptance": true,
+    "productive_rollback_performed": false,
+    "no_database_restore": true,
+    "instructions": "/Users/landjunge/.local/share/kirabridge/backups/rc20-881a53f-install-20261030-01/RECOVERY.md"
+  },
+  "acceptance": {
+    "live_public_mcp": true,
+    "expected_commit": "881a53f7107c4c60e2a86e747e8e5ad7eab9111d",
+    "tasks": {
+      "sleep": {
+        "id": "kb-881a53f-accept-sleep-20261031-01",
+        "state": "completed",
+        "attempt": 1,
+        "error": null,
+        "result": {
+          "agent_processed": false,
+          "expected_pid": 65922,
+          "input_handed_to_transport": true,
+          "pane_id": "terminal:6417:ttys002",
+          "submitted": true
+        },
+        "completion_id": "completion-task-32967",
+        "completion_ack_scope": "consumer_processed",
+        "evidence_path": "/Users/landjunge/.local/share/kirabridge/backups/rc20-881a53f-install-20261030-01/deployed-acceptance/sleep-task-evidence.json"
+      },
+      "busy_refusal": {
+        "id": "kb-881a53f-accept-busy-refusal-20261031-01",
+        "state": "failed",
+        "attempt": 1,
+        "error": {
+          "code": "session_busy"
+        },
+        "result": null,
+        "completion_id": "completion-task-32971",
+        "completion_ack_scope": "consumer_processed",
+        "evidence_path": "/Users/landjunge/.local/share/kirabridge/backups/rc20-881a53f-install-20261030-01/deployed-acceptance/busy-refusal-task-evidence.json"
+      },
+      "codex_start": {
+        "id": "kb-881a53f-accept-start-codex-20261031-01",
+        "state": "completed",
+        "attempt": 1,
+        "error": null,
+        "result": {
+          "agent_processed": false,
+          "expected_pid": 65922,
+          "input_handed_to_transport": true,
+          "pane_id": "terminal:6417:ttys002",
+          "submitted": true
+        },
+        "completion_id": "completion-task-32976",
+        "completion_ack_scope": "consumer_processed",
+        "evidence_path": "/Users/landjunge/.local/share/kirabridge/backups/rc20-881a53f-install-20261030-01/deployed-acceptance/codex-start-task-evidence.json"
+      },
+      "resume": {
+        "id": "kb-881a53f-accept-resume-20261031-01",
+        "state": "completed",
+        "attempt": 1,
+        "error": null,
+        "result": {
+          "agent_confirmed": false,
+          "execution_confirmed": false,
+          "expected_pid": 65922,
+          "input_handed_to_transport": true,
+          "pane_id": "terminal:6417:ttys002",
+          "paste_event_sent": true,
+          "return_sent": true,
+          "scope": "literal terminal input; no agent work message or acknowledgement",
+          "submitted": true
+        },
+        "completion_id": "completion-task-32983",
+        "completion_ack_scope": "consumer_processed",
+        "evidence_path": "/Users/landjunge/.local/share/kirabridge/backups/rc20-881a53f-install-20261030-01/deployed-acceptance/live-resume-task-evidence.json"
+      },
+      "menu_refusal": {
+        "id": "kb-881a53f-accept-menu-refusal-20261031-01",
+        "state": "failed",
+        "attempt": 1,
+        "error": {
+          "code": "visible_target_unknown"
+        },
+        "result": null,
+        "completion_id": "completion-task-32987",
+        "completion_ack_scope": "consumer_processed",
+        "evidence_path": "/Users/landjunge/.local/share/kirabridge/backups/rc20-881a53f-install-20261030-01/deployed-acceptance/live-menu-refusal-evidence.json"
+      },
+      "quit": {
+        "id": "kb-881a53f-accept-quit-20261031-01",
+        "state": "completed",
+        "attempt": 1,
+        "error": null,
+        "result": {
+          "agent_confirmed": false,
+          "execution_confirmed": false,
+          "expected_pid": 65922,
+          "input_handed_to_transport": true,
+          "pane_id": "terminal:6417:ttys002",
+          "paste_event_sent": true,
+          "return_sent": true,
+          "scope": "literal terminal input; no agent work message or acknowledgement",
+          "submitted": true
+        },
+        "completion_id": "completion-task-32994",
+        "completion_ack_scope": "consumer_processed",
+        "evidence_path": "/Users/landjunge/.local/share/kirabridge/backups/rc20-881a53f-install-20261030-01/deployed-acceptance/live-quit-task-evidence.json"
+      }
+    },
+    "resume_args_exactly_literal": true,
+    "resume_recorded_phases": {
+      "inserting": 1,
+      "submitting": 1,
+      "sent": 1
+    },
+    "live_picker_title_observed": true,
+    "live_picker_exit_footer_observed": true,
+    "busy_refusal_before_input": true,
+    "menu_refusal_before_input": true,
+    "busy_negative_marker_absent": true,
+    "menu_negative_visible_text_unchanged": true,
+    "completion": {
+      "dedicated_target": "accept-881a53f-native-20261031",
+      "processed_and_acked": 6,
+      "scope": "consumer_processed",
+      "remaining_unacked": 0,
+      "automatic_chat_wakeup_claimed": false
+    },
+    "installed_handoff_fixture": {
+      "imported_package": "/Users/landjunge/.local/share/kirabridge/install/releases/0.8.0rc20-881a53f7107c/source/.venv/lib/python3.11/site-packages/kirabridge",
+      "expected_installed_package": "/Users/landjunge/.local/share/kirabridge/install/releases/0.8.0rc20-881a53f7107c/source/.venv/lib/python3.11/site-packages/kirabridge",
+      "module_path_asserted": true,
+      "test_scope": "one isolated installed-package test: actual temporary authenticated HTTP MCP, simulated native UI, private store; not a live production agent handoff",
+      "result": "1 passed in 0.68s",
+      "exit_code": 0,
+      "log_path": "/private/tmp/kb-rc20-deployed-881a53f-20261031/installed-http-fixture.log"
+    },
+    "installed_parser_smoke": {
+      "passed": true,
+      "scope": "Installed real parser and unchanged production ready/busy patterns with synthetic terminal frames; no terminal input",
+      "module_path": "/Users/landjunge/.local/share/kirabridge/install/releases/0.8.0rc20-881a53f7107c/source/.venv/lib/python3.11/site-packages/kirabridge/visible_readiness.py",
+      "checks": 5,
+      "results": {
+        "live_composer_with_navigation": {
+          "target": "codex",
+          "ready": true,
+          "state": "ready",
+          "reason": "current_empty_widget",
+          "input_empty": true,
+          "protocol_state": "not_bound"
+        },
+        "singular_warning_navigation": {
+          "target": "codex",
+          "ready": true,
+          "state": "ready",
+          "reason": "current_empty_widget",
+          "input_empty": true,
+          "protocol_state": "not_bound"
+        },
+        "busy_queue_composer": {
+          "target": "codex",
+          "ready": false,
+          "state": "working",
+          "reason": "current_queue_composer",
+          "input_empty": true,
+          "protocol_state": "not_bound"
+        },
+        "existing_draft": {
+          "target": "codex",
+          "ready": false,
+          "state": "input_not_empty",
+          "reason": "existing_input_must_not_be_overwritten",
+          "input_empty": false,
+          "protocol_state": "not_bound"
+        },
+        "unknown_dialog": {
+          "target": "codex",
+          "ready": false,
+          "state": "unknown",
+          "reason": "unrecognized_footer_or_dialog",
+          "input_empty": true,
+          "protocol_state": "not_bound"
+        }
+      }
+    },
+    "cleanup": {
+      "owned_window_absent": true,
+      "other_original_windows_preserved": true,
+      "owned_shell_absent": true,
+      "owned_agent_absent": true
+    },
+    "all_checked_owned_pids_absent": true,
+    "owned_pids_checked": [
+      65922,
+      66577,
+      66475
+    ],
+    "root_independent_catalog": {
+      "owned6417_absent": true,
+      "user6368_6369_6401_preserved": true,
+      "parent_codex57091_preserved": true
+    },
+    "final_runtime": {
+      "instance_id": "9770676db7ef4c4ab32de84ba19d9d93",
+      "version": "0.8.0rc20",
+      "pid": 66208,
+      "started_at": "2026-10-30T23:07:47.918723+00:00",
+      "config_path": "/Users/landjunge/.config/kirabridge/config.toml",
+      "config_sha256": "0dc8eb5952fe4d986c152d38e1658e06de711d6b1f91ccc9745b184d1adb6370",
+      "effective_config_sha256": "d5de7e63e70636a03ae54ead9990224da6e38137e23c8ba1b74aa233cfe5c012",
+      "source_tree_sha256": "50849fc2c65abcf2f27591cd2a2f85a61a8c34e251a2b01d3893946743cfbdf1",
+      "source_file_count": 123,
+      "source_package_path": "/Users/landjunge/.local/share/kirabridge/install/releases/0.8.0rc20-881a53f7107c/source/.venv/lib/python3.11/site-packages/kirabridge",
+      "source_scope": "package Python files observed at startup; no remote attestation"
+    },
+    "daemon_survived_owned_window_close": true,
+    "default_parent_binding_unchanged": true,
+    "permission_revision_unchanged": true,
+    "summary_sha256": "06b2af560340e793c26bfc9857c12c1642f3582e8f72d9525cb4847937afcf61",
+    "archived_evidence": "/Users/landjunge/.local/share/kirabridge/backups/rc20-881a53f-install-20261030-01/deployed-acceptance",
+    "archive_files_verified": 36,
+    "limits": [
+      "No live positive agent work handoff to protected active default Codex; public work schema lacks an explicit window target. Positive protocol covered by installed-package isolated actual HTTP/fake-native fixture.",
+      "Existing diagnostic observer reports daily budget_exhausted; durable task events and completions verified, no historical data/retention settings changed.",
+      "No model work request, source/config/permission edit, push, release or second deployment by acceptance agent."
+    ]
+  },
+  "independent_review": {
+    "package_manifest_wheel_installer_and_exact_productive_command": "reviewed, no blocking findings",
+    "same_version_source_and_pid_gate": "required and passed",
+    "repair_source_was_not_edited_for_deployment": true
+  },
+  "final_state": {
+    "installed_commit": "881a53f7107c4c60e2a86e747e8e5ad7eab9111d",
+    "pid": 66208,
+    "instance_id": "9770676db7ef4c4ab32de84ba19d9d93",
+    "runtime_source_sha256": "50849fc2c65abcf2f27591cd2a2f85a61a8c34e251a2b01d3893946743cfbdf1",
+    "dispatcher_active": true,
+    "old_pid47085_absent": true,
+    "config_credentials_rights_preserved": true,
+    "protected_records_unchanged": {
+      "queue_holds": 27,
+      "visible_handoffs": 10,
+      "message_jobs": 22,
+      "tasks": 59,
+      "messages": 25
+    },
+    "database_integrity": "ok",
+    "productive_rollback_needed": false,
+    "user_codex_session_preserved": true
+  },
+  "deviations": [
+    "Initial own backup attempt included historical nested config archives, terminated only owned copy process. New incomplete duplicate removed; original history and all verified recovery artifacts retained. Scoped active files/runtime snapshot then fully verified.",
+    "Initial read-only preservation verifier used only first column of queue_holds composite primary key. Full-key query corrected; original failure log retained, all original records then matched. No productive data or source correction.",
+    "Existing diagnostic daily budget was already exhausted. Durable task events/completions and independent terminal receipts used; limits and data retained."
+  ],
+  "retained_evidence_file_sha256": {
+    "operation.json": "f16be2eca76ac48aa02103ee032d8052a77d6c931dff5950531f63253391e066",
+    "build-verification.json": "e25396ae33cceb699c41bbbb65dfb6542546b8eb81271b9a8f5cde51a1e87089",
+    "productive-preflight.json": "bbf6564ab5995ccb638e778e894473778058abee4b75956bc6c52b010f4b91c3",
+    "productive-install-started.json": "7db3f304c3bc6e1028354871d8815c0b6e560262760cdf7311b8d21952591974",
+    "productive-install-result.json": "14694fd29d8c3e19abcd62de42b86decf482b64ad559667f423343231abe695a",
+    "running-install-verification.before-native.json": "992df51072ad67abb152650b2adeab5042721e92971a41f596707ef77cbaa494",
+    "running-install-verification.json": "992df51072ad67abb152650b2adeab5042721e92971a41f596707ef77cbaa494",
+    "recovery-point-verification.json": "382823851d7cc28b827eaf92718bae5ce32e3b931b8ce8bfe8d35bd9e64872b8",
+    "isolated-upgrade/evidence.json": "507db4562548ab28f1ba9d2e57efc5deb0986c0d1598a747b2aa3d3c9b65bf14",
+    "isolated-upgrade-live-code-identity.json": "9117875fbfd1c3f1657d1e8a4b300b13e4ec5f0ca7844add9490029a4819a15a",
+    "isolated-upgrade-cleanup-independent.json": "a1a3b04593ea3a58eef6c6acabc8537eb9f2a5685dd23f8e486015c0937fd958",
+    "installed-parser-smoke.json": "477a03dad30f7e67fee68722416162b0de89b9936d16b2a6fde8e7d151afa3ee",
+    "deployed-acceptance/deployed-acceptance-summary.json": "06b2af560340e793c26bfc9857c12c1642f3582e8f72d9525cb4847937afcf61",
+    "deployed-acceptance-archive-verification.json": "2de405b22eab1b6a53feabc45a0659daeb2d746e9e7fb53b9307b1271757139c",
+    "baseline-capture.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "baseline-capture-v2.log": "8c5290ec319f8919b10ced90a3afa46ca4abcc94f709185d7f82edc342955f42",
+    "productive-preflight.log": "c592f21bae4b7cab7f76806ca17a76e1af288ceeb9a5135da67dbdb2d3b7e412",
+    "productive-install-terminal-capture.private.txt": "764090f5db4c6e32063afed85c2a9377688a0923014e479a5c7b19bc6bbf0179",
+    "running-install-verification.first.log": "fcf6553c0c8cfb87b848219e18dbc938da0888e8e2376bf5a5b4443de9ba3f6b",
+    "running-install-final-verification.log": "4021603b16318d970c4fca02d907549722bf1430026f725fa43581e85ea1cffe",
+    "acceptance-upgrade.log": "691ae2d543969c0d10de4fbe5c1bc9250f84d82b506be4acd6baed4556b1039d",
+    "deployed-acceptance/installed-http-fixture.log": "6d4f96a2d359afae8438220eb82d82928423fa04b66b76d31302046fe3ffa4bd",
+    "RECOVERY.md": "6812912332b44fa3e3a41b34aac94eb63b43189093770fc98d70edd9b08ce17b"
+  },
+  "limits": [
+    "Local Intel acceptance only; no hosted CI or ARM pass claimed.",
+    "No repeated full regression suite; prior 629-case source repair evidence retained separately.",
+    "A positive live work handoff was not sent to protected active parent Codex; one isolated actual-HTTP installed-package protocol fixture used simulated terminal UI.",
+    "Public message delivery result is reported separately from CLI work execution; historical unknown requests never replayed."
+  ]
+}

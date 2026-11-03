@@ -27,6 +27,7 @@ REASONS = frozenset(
         "visible_handoff_unknown",
         "target_idle_reply_unconfirmed",
         "reply_unconfirmed",
+        "body_only_target_ready",
         "interrupted",
         "preinput_error",
         "desktop_locked",
@@ -51,7 +52,7 @@ def _time(value):
     return value if type(value) in (int, float) and math.isfinite(value) else None
 
 
-def handoff_delivery_status(db, identifier, state, *, tables=None):
+def handoff_delivery_status(db, identifier, state, *, tables=None, evidence=None):
     """Stored delivery retirement is distinct from view-only queue withdrawal.
 
     Absence of the additive hold table never releases an unknown reservation.
@@ -82,13 +83,38 @@ def handoff_delivery_status(db, identifier, state, *, tables=None):
         "confirmed",
         "unknown",
     }
+    if evidence is None:
+        row = db.execute(
+            "SELECT substr(CAST(evidence AS BLOB),1,?) FROM visible_handoffs WHERE id=?",
+            (EVIDENCE_LIMIT + 1, identifier),
+        ).fetchone()
+        raw = row[0] if row else None
+        try:
+            evidence = (
+                json.loads(raw) if isinstance(raw, bytes) and len(raw) <= EVIDENCE_LIMIT else {}
+            )
+        except (ValueError, UnicodeError, RecursionError):
+            evidence = {}
+    released = (
+        state == "unknown"
+        and isinstance(evidence, dict)
+        and evidence.get("prompt_format") == "body_only_v1"
+        and evidence.get("reason") == "body_only_target_ready"
+        and evidence.get("input_reservation_released") is True
+        and evidence.get("return_sent") is True
+        and evidence.get("target_readiness") == "verified_ready_before_new_input"
+    )
     return {
         "delivery_retired": retired,
+        "input_reservation_released": released,
         "execution_reservation_active": isinstance(state, str)
         and state in reserving_states
-        and not retired,
+        and not retired
+        and not released,
         "next_step": "retired_history_do_not_resend"
         if retired
+        else "await_explicit_agent_reply_or_new_authorized_input"
+        if released
         else "inspect_original_handoff_without_repeating_input",
     }
 
@@ -166,5 +192,5 @@ def visible_message_evidence(
         ],
         "automatic_retry_permitted": False,
         "reconciliation_performed": False,
-        **handoff_delivery_status(db, row[0], row[1], tables=tables),
+        **handoff_delivery_status(db, row[0], row[1], tables=tables, evidence=evidence),
     }

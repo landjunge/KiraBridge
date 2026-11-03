@@ -1,0 +1,283 @@
+{
+  "date": "2026-10-31",
+  "whiteboard_id": "0ab8b95a7369",
+  "whiteboard_revisions": [
+    8,
+    9
+  ],
+  "install_source_commit": "7dff6f21d4bfe61da50b82092446b2e12eb50f59",
+  "bundle_sha256": "ac2f1d4575044516528373ba5bf2073660840a46e6097eb0162d98b9b2f55e7f",
+  "evidence": {
+    "runtime_verification": {
+      "path": "/Users/landjunge/.local/share/kirabridge/backups/macos-implementation-20261031T121031Z/productive-install-20261031T130351Z/independent-running-verification.json",
+      "sha256": "ed3b2643d028bf3909ef4ac88118376e677cf57f942b48435d730da198aee367",
+      "value": {
+        "passed": true,
+        "commit": "7dff6f21d4bfe61da50b82092446b2e12eb50f59",
+        "runtime": {
+          "instance_id": "39058371a48e4a3aa63f7eaa5994b548",
+          "version": "0.8.0rc20",
+          "pid": 25826,
+          "started_at": "2026-10-31T13:05:44.721811+00:00",
+          "config_path": "/Users/landjunge/.config/kirabridge/config.toml",
+          "config_sha256": "0dc8eb5952fe4d986c152d38e1658e06de711d6b1f91ccc9745b184d1adb6370",
+          "effective_config_sha256": "d5de7e63e70636a03ae54ead9990224da6e38137e23c8ba1b74aa233cfe5c012",
+          "source_tree_sha256": "e790665737fa910d99730f6f2a0a7ca5dec9511beebb3e1832d5a7e6e19077db",
+          "source_file_count": 132,
+          "source_package_path": "/Users/landjunge/.local/share/kirabridge/install/releases/0.8.0rc20-7dff6f21d4bf/source/.venv/lib/python3.11/site-packages/kirabridge",
+          "source_scope": "package Python files observed at startup; no remote attestation"
+        },
+        "launchd_pid_and_source_match": true,
+        "previous_core_pid_absent": true,
+        "wheel_files_byte_equal": 143,
+        "python_files": 132,
+        "configuration_credentials_hashes_modes_preserved": true,
+        "permission_revision_preserved": true,
+        "plist_options_preserved": true,
+        "queue_holds_unchanged": 27,
+        "original_unknown_tasks_byte_unchanged": 2,
+        "database_integrity": "ok",
+        "console_15308_and_parent_codex_57091_preserved": true,
+        "transaction_backup": "/Users/landjunge/.local/share/kirabridge/install/backups/20261031-140537-c7f850fc",
+        "observed_by": "independent install_verify agent",
+        "scope": "installation identity and data preservation; live UI acceptance remains parent task"
+      }
+    },
+    "prompt_e2e": {
+      "path": "/Users/landjunge/.local/share/kirabridge/backups/macos-implementation-20261031T121031Z/productive-install-20261031T130351Z/installed-acceptance/actual-installed-e2e-proof.json",
+      "sha256": "14c7ee5cf6923fc298a4c248c25f68880bba99c3910ccc468092d2b548370d26",
+      "value": {
+        "passed": true,
+        "actual_installed_source": "7dff6f21d4bfe61da50b82092446b2e12eb50f59",
+        "source_tree_sha256": "e790665737fa910d99730f6f2a0a7ca5dec9511beebb3e1832d5a7e6e19077db",
+        "prompt_chars": 1528,
+        "prompt_sha256": "0d354afbe3f39758c8c55dfa405a15901ec394ec03bf783ad71c044e4e895f88",
+        "exact_user_item_count": 1,
+        "exact_final_answer_item_count": 1,
+        "thread_id": "01a19213-97f8-72b1-9e2c-9eff39704c00",
+        "turn_id": "01a19215-0f61-7160-9898-b89ebe286532",
+        "rollout": "/Users/landjunge/.codex/sessions/2026/10/31/rollout-2026-10-31T14-08-40-01a19213-97f8-72b1-9e2c-9eff39704c00.jsonl",
+        "screen_sha256": "71768ffbb9496c440fa746bb7c9f77ea03f1baafb27b808525093b9310c24020",
+        "protocol_idle": true,
+        "owned_agent_pid": 26034,
+        "owned_agent_closed": true,
+        "eof": {
+          "owned_codex_eof": true,
+          "return_sent": false
+        },
+        "owned_install_shell_idle": true,
+        "pane_id": "terminal:7799:ttys000",
+        "shell_pid": 25674,
+        "task_id": "macos-installed-prompt-20261031",
+        "return_sent": true,
+        "attempt": 1,
+        "completion_received_and_acknowledged": true
+      }
+    },
+    "cleanup": {
+      "path": "/Users/landjunge/.local/share/kirabridge/backups/macos-implementation-20261031T121031Z/productive-install-20261031T130351Z/installed-acceptance/cleanup-proof.json",
+      "sha256": "fbcf170918a9748f9c110b6a29f64aec64df42a7209880050431b480b8c2abff",
+      "value": {
+        "own_install_window_absent": true,
+        "own_shell_absent": true,
+        "own_codex_absent": true,
+        "original_other_windows_preserved": true,
+        "parent_codex_57091_preserved": true,
+        "actual_require_idle_refusal_before_input": true,
+        "stale_pid_refusal": true,
+        "earlier_codex_raw_mode_without_require_idle_not_counted_as_refusal": true
+      }
+    },
+    "tunnel": {
+      "path": "/Users/landjunge/.local/share/kirabridge/backups/macos-implementation-20261031T121031Z/tunnel-repair-20261031T130658Z/verification.json",
+      "sha256": "c00c1803fb5c36395e74c4aa925c6592115506d4064c1887d94e11e5a4ff4faa",
+      "value": {
+        "status": "restored",
+        "tunnel_pid": 25909,
+        "health": {
+          "locator": {
+            "kind": "url_file",
+            "url_file": "/Users/landjunge/Library/Application Support/tunnel-client/health/kirabridge.url",
+            "resolved_base_url": "http://127.0.0.1:57196"
+          },
+          "process": {
+            "pid": 25909,
+            "running": true
+          },
+          "base_url": "http://127.0.0.1:57196",
+          "ui_url": "http://127.0.0.1:57196/ui",
+          "healthz": {
+            "url": "http://127.0.0.1:57196/healthz",
+            "ok": true,
+            "status": 200,
+            "body": "live"
+          },
+          "readyz": {
+            "url": "http://127.0.0.1:57196/readyz",
+            "ok": true,
+            "status": 200,
+            "body": "ready"
+          },
+          "control_plane_poll": {
+            "url": "http://127.0.0.1:57196/metrics",
+            "value": 1793452085,
+            "ok": true
+          },
+          "result": "ok"
+        },
+        "stable_proxy_command": "/Users/landjunge/.local/bin/kirabridge --config /Users/landjunge/.config/kirabridge/config.toml --principal chatgpt connect",
+        "only_changed_field": "mcp.commands[0].command",
+        "tunnel_plist_preserved": true,
+        "core_process_touched": false,
+        "core_config_changed": false,
+        "credentials_changed": false,
+        "backup": "/Users/landjunge/.local/share/kirabridge/backups/macos-implementation-20261031T121031Z/tunnel-repair-20261031T130658Z",
+        "root_cause": "Configured stdio child from old managed-message-route worktree exited1, tunnel deliberately shut down0; installed stable launcher passed initialize/list/bridge_health and now stays connected."
+      }
+    }
+  },
+  "subsequent_status_update": {
+    "installed_source_commit": "c573709df91544f4094265e61d351ad00827cfbf",
+    "native_input_implementation_same_as_tested_commit": "7dff6f21d4bfe61da50b82092446b2e12eb50f59",
+    "whiteboard_milestone_revision": 12,
+    "files": {
+      "package": {
+        "path": "/Users/landjunge/.local/share/kirabridge/backups/macos-implementation-20261031T121031Z/working-messaging-install-c573709/package-verification.json",
+        "sha256": "9f43ee10c66c0cac16767ffc41770ac48c3f76cb99c8de716fead2af17236f4f",
+        "value": {
+          "commit": "c573709df91544f4094265e61d351ad00827cfbf",
+          "bundle_sha256": "7c7d313f56ececdcdbc017ced1942e1c4e3d3f59dfbfef4bb81876fa78e30646",
+          "wheel_sha256": "566e096be35eb14ba8986cbc7e0c6fd97c78bb20a33310637ce66bcd968786ac",
+          "manifest_files_verified": 419,
+          "python_files": 132,
+          "source_tree_sha256": "c95246efe9d208bb0ec7141a35fa31e39aaad433e9965babd77b3987feb02fc4",
+          "source_wheel_payload_byte_equal": true,
+          "build_offline": true
+        }
+      },
+      "smoke": {
+        "path": "/Users/landjunge/.local/share/kirabridge/backups/macos-implementation-20261031T121031Z/working-messaging-build-c573709/smoke-Darwin-x86_64.json",
+        "sha256": "8a3aef0167d00517fbc4b6fe7d1b4de7994b455973e76a9afd28a58eb92552f0",
+        "value": {
+          "platform": "Darwin-x86_64",
+          "version": "0.8.0rc20",
+          "source_commit": "c573709df91544f4094265e61d351ad00827cfbf",
+          "archive_sha256": "7c7d313f56ececdcdbc017ced1942e1c4e3d3f59dfbfef4bb81876fa78e30646",
+          "packaged_start_command": "passed isolated bundled installer preparation",
+          "installed_authenticated_dispatcher": true,
+          "concrete_preflight_and_loaded_source_match": true,
+          "corrupt_package_rejected_before_install": true,
+          "config_and_credentials_preserved": true,
+          "license_in_bundle_payload_wheel_and_separate_asset": true,
+          "license_sha256": "3316d5eda60ac1fea355aa43d196feea3567384179b55ca88c8636c0322021ec",
+          "license_expression": "LicenseRef-Netzwerkpunkt-Personal-Use-1.0",
+          "real_user_setup_service_tunnel_changed": false,
+          "new_chatgpt_account_call": "not performed",
+          "real_user_service_manager": "not exercised"
+        }
+      },
+      "visible_install": {
+        "path": "/Users/landjunge/.local/share/kirabridge/backups/macos-implementation-20261031T121031Z/working-messaging-install-c573709/productive-install-result.json",
+        "sha256": "67c82b1f6275d3e2b78f6e827092b10e6fade616fc9f57f98b08d92386a628e5",
+        "value": {
+          "task_id": "working-messaging-install-20261031",
+          "action": "install",
+          "command": [
+            "/usr/local/bin/python3.11",
+            "/Users/landjunge/.local/share/kirabridge/backups/macos-implementation-20261031T121031Z/working-messaging-install-c573709/verified-local-bundle/KiraBridge/installer/install.py",
+            "install",
+            "--bundle",
+            "/Users/landjunge/.local/share/kirabridge/backups/macos-implementation-20261031T121031Z/working-messaging-install-c573709/verified-local-bundle/KiraBridge",
+            "--prefix",
+            "/Users/landjunge/.local/share/kirabridge/install",
+            "--config",
+            "/Users/landjunge/.config/kirabridge/config.toml",
+            "--launcher",
+            "/Users/landjunge/.local/bin/kirabridge",
+            "--plist",
+            "/Users/landjunge/Library/LaunchAgents/com.kirabridge.bridge.plist",
+            "--service",
+            "launchd",
+            "--require-visible-terminal",
+            "--language",
+            "de",
+            "--motion",
+            "reduced"
+          ],
+          "started_at": "2026-10-31T13:41:01.538873+00:00",
+          "driver_pid": 29648,
+          "tty": "/dev/ttys000",
+          "stdin_tty": "/dev/ttys000",
+          "state": "finished",
+          "no_background_install": true,
+          "exit_code": 0,
+          "finished_at": "2026-10-31T13:41:13.031874+00:00"
+        }
+      },
+      "independent_runtime": {
+        "path": "/Users/landjunge/.local/share/kirabridge/backups/macos-implementation-20261031T121031Z/working-messaging-install-c573709/independent-running-verification.json",
+        "sha256": "ff393cd7112dc79f276bd27e8cd85821baf8c969549b27c43991c62f90c3bfd3",
+        "value": {
+          "passed": true,
+          "commit": "c573709df91544f4094265e61d351ad00827cfbf",
+          "runtime": {
+            "instance_id": "ab78040027c846169d1e3d85dc25e4cb",
+            "version": "0.8.0rc20",
+            "pid": 29698,
+            "started_at": "2026-10-31T13:41:11.017772+00:00",
+            "config_path": "/Users/landjunge/.config/kirabridge/config.toml",
+            "config_sha256": "0dc8eb5952fe4d986c152d38e1658e06de711d6b1f91ccc9745b184d1adb6370",
+            "effective_config_sha256": "d5de7e63e70636a03ae54ead9990224da6e38137e23c8ba1b74aa233cfe5c012",
+            "source_tree_sha256": "c95246efe9d208bb0ec7141a35fa31e39aaad433e9965babd77b3987feb02fc4",
+            "source_file_count": 132,
+            "source_package_path": "/Users/landjunge/.local/share/kirabridge/install/releases/0.8.0rc20-c573709df915/source/.venv/lib/python3.11/site-packages/kirabridge",
+            "source_scope": "package Python files observed at startup; no remote attestation"
+          },
+          "launchd_pid_path_match": true,
+          "previous_core_pid_25826_absent": true,
+          "wheel_files_byte_equal": 143,
+          "installed_python_files": 132,
+          "configuration_credentials_hashes_modes_preserved": true,
+          "permission_revision_preserved": true,
+          "plist_options_preserved": true,
+          "queue_holds_byte_unchanged": 28,
+          "original_held_message_and_job_byte_unchanged": true,
+          "previously_acked_live_note_seq374_byte_unchanged": true,
+          "original_unknown_tasks_byte_unchanged": 2,
+          "parent_codex_57091_console_15308_tunnel_25909_preserved": true,
+          "transaction_backup": "/Users/landjunge/.local/share/kirabridge/install/backups/20261031-144104-82dfec47",
+          "observed_by": "independent install_verify agent",
+          "scope": "actual install identity/data preservation only; no native input or message delivery triggered"
+        }
+      },
+      "cleanup": {
+        "path": "/Users/landjunge/.local/share/kirabridge/backups/macos-implementation-20261031T121031Z/working-messaging-install-c573709/cleanup-proof.json",
+        "sha256": "760e43761fd970699a79c89107c3ae4308409b78bcacfc06ff4fac5c7a5a93de",
+        "value": {
+          "live_new_tool_guidance_verified": true,
+          "install_screen_sha256": "169b6b37266bbcc98f8145250162770252d3b3f117399afad7090663b7daa489",
+          "own_install_window_absent": true,
+          "own_shell_absent": true,
+          "other_windows_preserved": true,
+          "parent_codex_57091_preserved": true,
+          "close": {
+            "closed": true,
+            "closed_window_id": 7857,
+            "remaining": 2
+          }
+        }
+      },
+      "offline_smoke_failure": {
+        "path": "/Users/landjunge/.local/share/kirabridge/backups/macos-implementation-20261031T121031Z/working-messaging-install-c573709/package-smoke-offline-failure.json",
+        "sha256": "3392b34061685ec7fca0e6001a2a5e42b1177a2c6f853f779111628c6211b0ff",
+        "value": {
+          "passed": false,
+          "stage": "isolated installer prepare",
+          "reason": "UV_OFFLINE=true plus empty explicit temporary --cache-dir lacks pinned cryptography==48.0.1 wheel",
+          "productive_changes": false,
+          "next_step": "Rerun only isolated release smoke with network and unchanged lockfile."
+        }
+      }
+    }
+  }
+}

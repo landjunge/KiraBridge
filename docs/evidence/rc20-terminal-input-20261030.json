@@ -1,0 +1,323 @@
+{
+  "schema_version": 1,
+  "task": "KiraBridge RC20 literal terminal input and Codex transcript navigation",
+  "date": "2026-10-30",
+  "source": {
+    "base_commit": "da1bdaed019c31aa11bb28a39ef8bead7e73c1d4",
+    "branch": "fix/rc20-terminal-input-20261030",
+    "version": "0.8.0rc20",
+    "runtime_file_sha256": {
+      "src/kirabridge/bridge_core/bridge.py": "7fdee92c9996c9475bd502028aa6d4922771ab011e12d4562dc6d6c3cc96247d",
+      "src/kirabridge/literal_session_input.py": "043b281ee2e031218e5d32db3129f9741ffe2de9144634f53b33705a2c490136",
+      "src/kirabridge/visible_readiness.py": "a0abe1333b079a5d6d20e0decaed904753651a3f94b028d255d74a978fe6ac9a",
+      "src/kirabridge/session_manager.py": "d892ffeed34583da25324859fe3f49ca3b5bc0b68ced7c2aca90e71eaaa9a96f",
+      "src/kirabridge/mcp_gateway/server.py": "eb7733de25a049705f151163a799993eb1138167deee8b83d7c613b689153d56",
+      "src/kirabridge/mcp_gateway/proxy.py": "02e4bf87ec8b5184b61eec33fe9f9144a585b060ea2e8d3972e2789f05d3b006"
+    }
+  },
+  "environment": {
+    "platform": "macOS-15.7.4-x86_64-i386-64bit",
+    "python": "3.11.15",
+    "codex_cli": "0.166.0",
+    "dependencies": "Existing RC20 development virtualenv, PYTHONPATH=src; no installation"
+  },
+  "authorization": {
+    "local_commit_requested": true,
+    "push_performed": false,
+    "installation_performed": false,
+    "publication_performed": false
+  },
+  "root_causes": [
+    "Submitted session.input converted literal terminal text to AgentInput/VisibleHandoffs work envelope and waited for an agent ACK.",
+    "Known Codex transcript navigation controls were treated as unavailable input before validating the current empty composer; historical navigation also matched the global busy pattern."
+  ],
+  "reproductions": [
+    {
+      "area": "literal /resume wrapper",
+      "before": {
+        "failed": 1,
+        "deselected": 4,
+        "seconds": 5.47
+      },
+      "evidence": "Agent-observed command; original log was not saved",
+      "command": "PYTHONPATH=src <existing-rc20-venv>/bin/python -m pytest -q tests/test_literal_session_input.py -k resume_is_literal --maxfail=1"
+    },
+    {
+      "area": "known transcript navigation",
+      "before": {
+        "failed": 6,
+        "passed": 7,
+        "deselected": 52,
+        "seconds": 0.19
+      },
+      "log": "/tmp/kb-rc20-navigation-before.log"
+    },
+    {
+      "area": "native viewport padding",
+      "before": {
+        "failed": 1,
+        "seconds": 0.13
+      },
+      "log": "/tmp/kb-rc20-literal-padding-before.log"
+    },
+    {
+      "area": "native F2 badge hide/show",
+      "before": {
+        "failed": 4,
+        "deselected": 40,
+        "seconds": 0.16
+      },
+      "log": "/tmp/kb-rc20-literal-warning-before.log"
+    },
+    {
+      "area": "singular warning navigation",
+      "before": {
+        "failed": 2,
+        "passed": 6,
+        "deselected": 59,
+        "seconds": 0.13
+      },
+      "log": "/tmp/kb-rc20-navigation-singular-before.log"
+    }
+  ],
+  "regression": {
+    "broad": {
+      "modules": [
+        "tests/test_literal_session_input.py",
+        "tests/test_visible_readiness.py",
+        "tests/test_codex_transcript_navigation.py",
+        "tests/test_visible_handoff.py",
+        "tests/test_visible_selection.py",
+        "tests/test_visible_preinput.py",
+        "tests/test_visible_dispatch_wait.py",
+        "tests/test_visible_binding_refresh.py",
+        "tests/test_native_task_admission.py",
+        "tests/test_visible_handoff_reservation_scope.py",
+        "tests/test_visible_message_evidence.py",
+        "tests/test_codex_queue_widget.py",
+        "tests/test_sessions.py",
+        "tests/test_session_input_policy.py",
+        "tests/test_session_ports.py",
+        "tests/test_session_dispatch_evidence.py",
+        "tests/test_terminal_current_buffer.py",
+        "tests/test_codex_state.py",
+        "tests/test_codex_binding.py",
+        "tests/test_permissions.py",
+        "tests/test_security.py",
+        "tests/test_approval_modes.py",
+        "tests/test_messages.py",
+        "tests/test_receiver_resilience.py",
+        "tests/test_receiver_fault_boundaries.py",
+        "tests/test_message_failure_return.py",
+        "tests/test_grok_conversation.py",
+        "tests/test_mcp.py",
+        "tests/test_admission_mcp.py",
+        "tests/test_discovery_visible.py",
+        "tests/test_queue_reserves.py",
+        "tests/test_tasks.py",
+        "tests/test_crash_recovery.py",
+        "tests/test_control_center.py"
+      ],
+      "passed": 607,
+      "failed": 6,
+      "seconds": 52.02,
+      "command": "PYTHONPATH=src /Users/landjunge/KiraBridge-worktrees/rc20-release-da1bdae-20261030/.venv/bin/python -m pytest -q -W error::pytest.PytestUnraisableExceptionWarning --junitxml=/tmp/kb-rc20-regression.xml tests/test_literal_session_input.py tests/test_visible_readiness.py tests/test_codex_transcript_navigation.py tests/test_visible_handoff.py tests/test_visible_selection.py tests/test_visible_preinput.py tests/test_visible_dispatch_wait.py tests/test_visible_binding_refresh.py tests/test_native_task_admission.py tests/test_visible_handoff_reservation_scope.py tests/test_visible_message_evidence.py tests/test_codex_queue_widget.py tests/test_sessions.py tests/test_session_input_policy.py tests/test_session_ports.py tests/test_session_dispatch_evidence.py tests/test_terminal_current_buffer.py tests/test_codex_state.py tests/test_codex_binding.py tests/test_permissions.py tests/test_security.py tests/test_approval_modes.py tests/test_messages.py tests/test_receiver_resilience.py tests/test_receiver_fault_boundaries.py tests/test_message_failure_return.py tests/test_grok_conversation.py tests/test_mcp.py tests/test_admission_mcp.py tests/test_discovery_visible.py tests/test_queue_reserves.py tests/test_tasks.py tests/test_crash_recovery.py tests/test_control_center.py > /tmp/kb-rc20-regression.log 2>&1",
+      "log": "/tmp/kb-rc20-regression.log",
+      "junit": "/tmp/kb-rc20-regression.xml",
+      "failures_resolved_by": [
+        "Removed redundant new pre-state read for paste-only input, restoring existing dispatch evidence contract (4 cases).",
+        "Updated raw-input reservation contract to literal delivery and durable dispatcher idempotency (2 cases); old reservations, messages and bindings remain unchanged."
+      ]
+    },
+    "final_affected": {
+      "passed": 174,
+      "failed": 0,
+      "seconds": 12.54,
+      "command": "PYTHONPATH=src <existing-rc20-venv>/bin/python -m pytest -q -W error::pytest.PytestUnraisableExceptionWarning tests/test_literal_session_input.py tests/test_visible_handoff.py tests/test_visible_selection.py tests/test_visible_handoff_reservation_scope.py tests/test_session_dispatch_evidence.py",
+      "log": "/tmp/kb-rc20-final-affected.log",
+      "junit": "/tmp/kb-rc20-final-affected.xml"
+    },
+    "final_renderer": {
+      "passed": 44,
+      "failed": 0,
+      "seconds": 0.89,
+      "command": "PYTHONPATH=src <existing-rc20-venv>/bin/python -m pytest -q tests/test_literal_session_input.py",
+      "log": "/tmp/kb-rc20-literal-warning-after.log"
+    },
+    "final_readiness": {
+      "passed": 73,
+      "failed": 0,
+      "seconds": 0.37,
+      "command": "PYTHONPATH=src <existing-rc20-venv>/bin/python -m pytest -q tests/test_visible_readiness.py tests/test_codex_transcript_navigation.py",
+      "log": "/tmp/kb-rc20-navigation-final.log"
+    },
+    "distinct_cases_validated": 629,
+    "accounting": "Initial 613 cases; all 6 failures resolved and affected modules rerun. Final literal cases replace initial 30 with 44 (+14), final readiness replaces 65 with 67 (+2): 629. The 174 affected run predates the final renderer-badge change; 44 literal and 73 readiness/binding cases are the final checks for those later changes. No second full suite and no claim of a clean first broad run.",
+    "development_failures_preserved": "7 early fixture errors after closing the test database and 6 obsolete raw-to-handoff expectations were corrected. A new integration dialog test initially expected the wrong existing error name and was corrected with only that case rerun."
+  },
+  "static_checks": {
+    "ruff_check": "passed",
+    "ruff_format_check": "passed, 12 Python files",
+    "git_diff_check": "passed",
+    "files": [
+      "src/kirabridge/bridge_core/bridge.py",
+      "src/kirabridge/literal_session_input.py",
+      "src/kirabridge/visible_readiness.py",
+      "src/kirabridge/session_manager.py",
+      "src/kirabridge/mcp_gateway/server.py",
+      "src/kirabridge/mcp_gateway/proxy.py",
+      "tests/test_visible_handoff.py",
+      "tests/test_visible_selection.py",
+      "tests/test_literal_session_input.py",
+      "tests/test_visible_readiness.py",
+      "tests/test_codex_transcript_navigation.py",
+      "tests/test_visible_handoff_reservation_scope.py"
+    ]
+  },
+  "independent_review": {
+    "status": "no remaining blocking findings",
+    "found_and_fixed": "Footer-looking unauthorized continuation initially passed insertion verification. Final verifier consumes exact payload first and pins all footer rows/base text, with only trailing ASCII padding and an exact optional inline F2 badge on a GPT row normalized.",
+    "limits": "Supported UI grammar and OS process/window observations; no cryptographic identity or cursor-position claim."
+  },
+  "native": {
+    "scope": "Native Intel macOS acceptance of development source, isolated stores, no installation or model work request",
+    "successful_task": "native-resume-03",
+    "task_state": "completed",
+    "result": {
+      "agent_confirmed": false,
+      "execution_confirmed": false,
+      "expected_pid": 59817,
+      "input_handed_to_transport": true,
+      "pane_id": "terminal:6388:ttys002",
+      "paste_event_sent": true,
+      "return_sent": true,
+      "scope": "literal terminal input; no agent work message or acknowledgement",
+      "submitted": true
+    },
+    "native_calls": [
+      {
+        "action": "paste",
+        "pane_id": "terminal:6388:ttys002",
+        "text": "/resume"
+      },
+      {
+        "action": "return",
+        "pane_id": "terminal:6388:ttys002"
+      }
+    ],
+    "picker": {
+      "title_observed": true,
+      "exit_footer_observed": true,
+      "independent_read": true
+    },
+    "no_work_messages_or_handoffs": {
+      "messages": 0,
+      "visible_handoffs": 0
+    },
+    "private_task_states": {
+      "a": [
+        {
+          "id": "native-resume-01",
+          "state": "unknown",
+          "attempt": 1
+        }
+      ],
+      "b": [
+        {
+          "id": "native-resume-02",
+          "state": "unknown",
+          "attempt": 1
+        }
+      ],
+      "c": [
+        {
+          "id": "native-resume-03",
+          "state": "completed",
+          "attempt": 1
+        },
+        {
+          "id": "native-quit-03",
+          "state": "completed",
+          "attempt": 1
+        }
+      ]
+    },
+    "failed_trials_preserved": {
+      "a": "UNKNOWN visible_insert_unknown before Return; exact pre-paste frame not captured; renderer padding investigation",
+      "b": "UNKNOWN visible_insert_unknown before Return; exact pre/post proves inline warning badge disappearance"
+    },
+    "replay_performed": false,
+    "source_hashes_stable_across_success": true,
+    "cleanup": {
+      "owned_window_absent": true,
+      "other_windows_preserved": true,
+      "owned_agent_pid_absent": true,
+      "owned_shell_pid_absent": true
+    },
+    "quit_task_state": "completed",
+    "all_owned_test_pids_absent": true,
+    "owned_pids_checked": [
+      59817,
+      59838,
+      59839,
+      60814,
+      61394
+    ],
+    "root_independent_catalog_check": {
+      "owned_window_6388_absent": true,
+      "original_windows_6368_6369_preserved": true,
+      "unrelated_6401_left_untouched": true
+    },
+    "cleanup_harness_corrections": "First launcher nested zsh/PS1 encoding corrected after owned identity guarded child cleanup; close initially refused stale renderer, then guarded Ctrl-L redraw preserved input and normal empty predicate passed before actual close.",
+    "aggregation_correction": "Initial summary assertion used exact window-set equality and refused unrelated concurrent6401; preservation check correctly uses original-window subset plus owned-window absence. Runtime/native result and cleanup proof unchanged.",
+    "product_preservation": {
+      "runtime_unchanged": true,
+      "permission_revision_unchanged": true,
+      "dispatcher_active": true,
+      "version": "0.8.0rc20",
+      "pid": 47085,
+      "instance_id": "9a44e4428ffc42ba86855677f5881b14",
+      "source_tree_sha256": "4ddc9c375532fcdaa1e77c9b55f05d3f28eaf5e943ad29ba0a9eca39f55dbbe6",
+      "config_sha256": "0dc8eb5952fe4d986c152d38e1658e06de711d6b1f91ccc9745b184d1adb6370",
+      "config_mode": "0o600",
+      "config_unchanged_vs_after_first_test": true,
+      "scope": "Own read-only product snapshot after first trial/before second versus after final cleanup; not a pretended snapshot before the whole task."
+    },
+    "evidence_directory": "/private/tmp/kb-rc20-native-resume-20261030-c",
+    "summary_path": "/private/tmp/kb-rc20-native-resume-20261030-c/native-acceptance-summary.json",
+    "summary_sha256": "1b2ab7b68469baa772272b63fe9eb99ebd53f427fdd570ccd109a5e21707b46f",
+    "evidence_file_sha256": {
+      "native-resume-03-task.json": "dbf118ccfbb6a86f20195a0c0facb7297905fa57f5f242bc3876b9ccc1544550",
+      "native-resume-03-screen.json": "74e3e830e874438d3f930e0f2768a14276e605ff5f75bb92dbaa68872bbf3a79",
+      "native-resume-03-native-calls.json": "b53ef6df8bace9c5492b1d1670d6bde8ea147e87dd854bd3feea3cd2fbb65d02",
+      "native-resume-03-before-hashes.json": "f3f87d55ebaa6670405fe8a9fe6dfa8146bb5f5fdf4081366a9bffebe521fb70",
+      "native-resume-03-after-hashes.json": "f3f87d55ebaa6670405fe8a9fe6dfa8146bb5f5fdf4081366a9bffebe521fb70",
+      "cleanup-proof.json": "2a507a8db2f6b1a732acc9d50a65a97e618e914aa8fe1b22fedc6e0a5d74a847"
+    },
+    "harness_path": "/tmp/kb-rc20-native-resume-20261030.py",
+    "harness_sha256": "ac0a6c4c519bd3b3e610c2c9ed7f4c76c7ba263b14d2b00cd4c255da3c7342d9"
+  },
+  "raw_log_sha256": {
+    "/tmp/kb-rc20-navigation-before.log": "d671b506224668cf01861105a878505bf592977e0477d341c77b245e514fedf2",
+    "/tmp/kb-rc20-navigation-after.log": "ad25fe6069fd8e5a727fb7e9ea7de43ed911e3eab41a03e9717e4332c70bd2f7",
+    "/tmp/kb-rc20-navigation-integration.log": "b60c4dda6e4b5d9fd04f0767417a09529351473253b313f23bc84827b2c9563f",
+    "/tmp/kb-rc20-navigation-integration-correction.log": "922ea409d53ab9c03770356fcab57d95381e4114c64aad3f4df789e3a387a02f",
+    "/tmp/kb-rc20-regression.log": "e87bd884568071b290e11b6f289a54d4ff8173840d6f1ab14dfea61ce3ad32e2",
+    "/tmp/kb-rc20-regression.xml": "f87864967e387743c9f0032cb45b0cc9c914f51abe3c5836129ce83b9b2bf5dc",
+    "/tmp/kb-rc20-literal-padding-before.log": "314cae9e9124662093b60cb3f31223bc83ff1b1a257366ff6fd1a57a9f45a0b3",
+    "/tmp/kb-rc20-literal-padding-after.log": "8a04b61670049863ccf1b60294c947f6dd9f2724c4ac95d5a4d2547660813f43",
+    "/tmp/kb-rc20-literal-reservations-after.log": "b4178e276a7c286fa7a727a089d6774cc5ab65aa6b0f5e884d946663e9df5676",
+    "/tmp/kb-rc20-literal-padding-hardening.log": "26e6f74e2570a0e84f0eb472911c9c1cf1f381110fa4f4c0e86fe63b6f35c512",
+    "/tmp/kb-rc20-final-affected.log": "13e56683d1576a749742ebefac5efc7657a59ee2d9804efd75d145917cba446d",
+    "/tmp/kb-rc20-final-affected.xml": "a6b703b37dd14136624d736c6481e44b87224d9efad708cb18ca8c0f0032e509",
+    "/tmp/kb-rc20-navigation-singular-before.log": "8f72b693b98a40cc89a9c9cca1135f876b40ab2c450d2947aa718f465e5bc204",
+    "/tmp/kb-rc20-navigation-final.log": "6540140070273bb41710d4fa81ec33d31d64e237bfbe0ca917cec5b30892af8f",
+    "/tmp/kb-rc20-literal-warning-before.log": "67215269747ed897127a1d792a147de5657b5736d57d5623be4534ae20ea907e",
+    "/tmp/kb-rc20-literal-warning-after.log": "7210a4d6efff382e67224032e94c84f46fa4e546f25dcceca3198d450e27c8e2"
+  },
+  "limits": [
+    "Native acceptance is local Intel macOS with real Codex 0.166.0 using development source and isolated stores; no production installation.",
+    "Transcript-navigation regression cases use real Bridge preflight with simulated terminal frames; the fresh native /resume trial verifies actual literal command/menu behavior.",
+    "No GitHub CI, ARM, release/installer or publication acceptance was run for this source-only local task."
+  ]
+}

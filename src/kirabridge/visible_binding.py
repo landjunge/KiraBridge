@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 from pathlib import Path
 
 from kirabridge.bridge_core.config import VisibleTerminalBinding
@@ -77,6 +78,34 @@ def identities_disjoint(original, current) -> bool:
             {current.expected_pid, current.agent_pid}
         )
     )
+
+
+def distinct_window_processes(original, current) -> bool:
+    """Only a candidate for native absence proof; a tty name may have been reused.
+
+    Unlike identities_disjoint, this never permits bypassing an old reservation
+    on its own. The original window and both original PIDs must also be proved
+    absent with fresh native observations before the replacement can proceed.
+    """
+    try:
+        old, new = original.pane_id.split(":"), current.pane_id.split(":")
+        old_pids = {original.expected_pid, original.agent_pid}
+        new_pids = {current.expected_pid, current.agent_pid}
+        return (
+            len(old) == len(new) == 3
+            and old[0] == new[0] == "terminal"
+            and old[1].isdecimal()
+            and new[1].isdecimal()
+            and int(old[1]) > 0
+            and int(new[1]) > 0
+            and int(old[1]) != int(new[1])
+            and all(re.fullmatch(r"ttys[0-9]+", tty) for tty in (old[2], new[2]))
+            and len(old_pids) == len(new_pids) == 2
+            and all(type(pid) is int and pid > 0 for pid in old_pids | new_pids)
+            and old_pids.isdisjoint(new_pids)
+        )
+    except (AttributeError, TypeError, ValueError):
+        return False
 
 
 def overlay_replaced(config, target, original) -> bool:
@@ -178,10 +207,30 @@ def save_refresh(config, target, previous: VisibleTerminalBinding, updated: Visi
                 current = loaded
         except (OSError, ValueError):
             current = {}
+    # Keep the on-disk configuration as the anchor across A -> B -> C refreshes.
+    # Otherwise a restart with the original configured A would not restore C.
+    # A manual binding that does not match the saved B starts its own chain.
+    anchor = previous
+    saved = current.get(target)
+    if isinstance(saved, dict) and all(
+        saved.get(key) == getattr(previous, key) for key in ("pane_id", "expected_pid", "agent_pid")
+    ):
+        try:
+            anchor = VisibleTerminalBinding.model_validate(
+                {
+                    **previous.model_dump(),
+                    **{
+                        key: saved["replaced_" + key]
+                        for key in ("pane_id", "expected_pid", "agent_pid")
+                    },
+                }
+            )
+        except (KeyError, TypeError, ValueError):
+            anchor = previous
     current[target] = {
-        "replaced_pane_id": previous.pane_id,
-        "replaced_expected_pid": previous.expected_pid,
-        "replaced_agent_pid": previous.agent_pid,
+        "replaced_pane_id": anchor.pane_id,
+        "replaced_expected_pid": anchor.expected_pid,
+        "replaced_agent_pid": anchor.agent_pid,
         "pane_id": updated.pane_id,
         "expected_pid": updated.expected_pid,
         "agent_pid": updated.agent_pid,
