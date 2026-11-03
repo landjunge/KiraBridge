@@ -83,6 +83,8 @@ def decision(config, principal, operation, *, text=None):
     """
     policy = config.principals.get(principal)
     required = {capability_for(operation)}
+    if operation == "windows.keyboard.sequence":
+        required.add("windows.keyboard.inspect")
     if operation in {"keyboard.control", "keyboard.sequence"}:
         required.update({"keyboard.inspect", "apps.list", "app.focus"})
     if operation == "keyboard.action":

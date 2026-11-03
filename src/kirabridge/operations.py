@@ -11,6 +11,7 @@ from kirabridge.system_operations import SYSTEM_LEAVES, SYSTEM_READ_OPERATIONS
 
 READ_OPERATIONS = frozenset(
     {
+        "windows.keyboard.inspect",
         *SYSTEM_READ_OPERATIONS,
         "keyboard.profiles.list",
         "keyboard.profiles.get",
@@ -81,6 +82,7 @@ for _name in (
     "keyboard.system_key",
     "keyboard.control",
     "keyboard.sequence",
+    "windows.keyboard.sequence",
     "keyboard.chord",
     "keyboard.text",
     "keyboard.action",

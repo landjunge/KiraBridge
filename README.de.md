@@ -88,3 +88,7 @@ Private, nicht geschäftliche Nutzung ist unter der
 benötigt eine gesonderte schriftliche Erlaubnis. Der deutsche Lizenztext ist maßgeblich.
 
 [Entwicklerdokumentation](docs/DEVELOPERS.de.md)
+
+[Windows-Entwicklung](docs/WINDOWS-DEVELOPMENT-20261103.md): getrennte VM und
+native Tastatursteuerung in Vorbereitung; die echte Windows-Gastabnahme steht
+noch aus. Die veröffentlichte macOS-RC30-Installation bleibt getrennt erhalten.

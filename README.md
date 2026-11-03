@@ -85,3 +85,7 @@ Private, non-business use is free under the
 written permission. The German license text governs.
 
 [Developer documentation](docs/DEVELOPERS.md)
+
+[Windows development preview](docs/WINDOWS-DEVELOPMENT-20261103.md): separate VM
+and native keyboard backend under development; genuine Windows guest acceptance
+is pending. The published macOS RC30 installation remains separate.

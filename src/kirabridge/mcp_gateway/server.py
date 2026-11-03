@@ -519,6 +519,14 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
                     lambda op: decision(bridge.config, identity(ctx), op)
                 )
             }
+            platform_rows.update(
+                {
+                    row["operation"]: row
+                    for row in bridge.windows_keyboard.catalog(
+                        lambda op: decision(bridge.config, identity(ctx), op)
+                    )
+                }
+            )
             # Host platform is a process-lifetime fact. Do not reconstruct the
             # full native capability snapshot for every operation in this request.
             native_host = bridge.macos.host_platform == "darwin"
