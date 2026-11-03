@@ -1,6 +1,7 @@
 # RC29: weniger Cloud-Roundtrips statt zusätzlicher Statusketten
 
-Ausgangspunkt ist das installierte RC28 (`6b70116`), dessen belegte äußere
+RC29 ist als Sourcepin `279afcc` veröffentlicht, installiert und über den echten
+Apps-Anschluss geprüft. Ausgangspunkt war RC28 (`6b70116`), dessen belegte äußere
 Handshakekosten und Tastensequenzen weiterverwendet werden. Dieser Folgeauftrag
 reduziert weitere vermeidbare Aufrufe; keine Wiederholung der RC28-Untersuchung.
 Der Kira-Workflow und drei native Team-Agenten decken Implementierung,
@@ -46,6 +47,8 @@ Vorher-/Nachhergruppen sind keine kontrollierte Messung kleiner Cloudschwankunge
   Globale kooperative Deadline 12 s, Argumente zusammen 64 KiB, kompakte
   MCP-Antwortabschätzung maximal 2 MiB. Zeit-/Mengengrenzen geben Teilresultate
   und Fortsetzungscursor zurück, keinen erfundenen Gesamterfolg.
+  `complete`/`all_succeeded` beziehen sich auf die Leseaufrufe; für beobachtete
+  Arbeit bleibt `task.state` mit etwaigem Unknown-/Pending-Hinweis maßgeblich.
 - `read_query({operation:task.observe,task_id,wait_seconds:0..18,events_after})`
   liefert frischen eigenen Task und paginierte Ereignisse zusammen. Leichtes
   Zustandslesen statt wiederholter vollständiger Ergebnisauflösung; kurzer
@@ -85,10 +88,94 @@ Fakeausführung, keine echte Zwischenablage. Der betroffene Read-/Katalogsatz
 bestand danach nochmals 20 Prüfungen in 2,45 s. Unabhängige Reviews ohne Blocker.
 Ruff/Format für alle geänderten Pythondateien sowie Lock- und Diffprüfung.
 
-RC28 bleibt bis zur tatsächlichen Installation der produktive Stand. Ein lokales
-Intel-Release, verfügbarer GitHub-Download, Sicherungs-/Installationsnachweis,
-identische Apps-Nachmessungen und Abschluss-Whiteboard werden nach tatsächlicher
-Verifikation ergänzt. Keine GitHub Actions oder ARM-Builds.
+## Tatsächlicher Apps-Nachlauf und Anzahl
+
+Dieselben drei Workloads und unveränderten Datenparameter auf installiertem RC29,
+jeweils drei Gruppen. Die beiden bisherigen `action_request`- und
+`action_submit`-Namen wurden beibehalten; neue Lesewege nutzen das bereits
+gecachte `read_query`, benötigen also keine neuen Toolnamen in ChatGPT.
+
+| Gleicher Workload | Cloud-RPCs je Gruppe vorher → nachher | RC28 P50/P95 ms | RC29 P50/P95 ms |
+| --- | ---: | ---: | ---: |
+| Health + Clipboardinfo + ein Taskstatus | 3 → 1 | 8753 / 9469 | 4787 / 9106 |
+| Ein Taskstatus + seine Ereignisse | 2 → 1 | 6210 / 6503 | 3210 / 3899 |
+| Datei schreiben + Abschluss lesen | 2 → 1 | 5607 / 5900 | 1990 / 2285 |
+
+Für alle neun Vergleichsgruppen zusammen: **21 → 9 äußere Cloud-RPCs (−57,1 %)**,
+60842 → 32915 ms summierte Gruppenzeit. Die Mediane sanken um 45,3 %, 48,3 %
+und 64,5 %. Die inneren drei Reads bleiben im Daemon drei frisch autorisierte
+Toolausführungen, lösen aber nur einen äußeren Tunnel-/MCP-Aufruf aus.
+Ein zusätzlicher abgeschlossener Idempotenzprobeaufruf und eine gezielte
+Katalog-Diagnose sind außerhalb dieser neun Workload-RPCs ausdrücklich gezählt.
+
+Alle neun Gruppen waren vollständig erfolgreich. Clipboard-Fähigkeitsantwort
+und persistierter Vergleichstask stimmen vollständig mit RC28 überein.
+Alle 37 historischen Ereignisse wurden bytegleich in derselben JSON-Struktur
+zurückgeliefert. Alle drei RC29-Dateiaufträge lieferten direkt `completed`,
+keiner benötigte einen Statuspoll. Sämtliche sechs Vorher-/Nachherdateien enthielten
+exakt dieselben 26 Bytes samt SHA256. Der abgeschlossene Doppelaufruf verwendete
+dieselbe ID/Idempotenz mit `overwrite=false` und behielt Created/Finished bei;
+die Datei wurde nicht neu ausgeführt oder überschrieben. Die sechs eigenen
+temporären Dateien wurden anschließend gezielt geprüft und entfernt.
+[Einzelwerte, Teilzeiten und Gleichheitsbelege](evidence/rc29-cloud-after-20261103.json).
+
+Der erste vollständige RC29-Bündelcall dauerte **9106 ms** und wurde nicht als
+Warm-up weggelassen. Die drei lokalen Childhandler benötigten darin zusammen
+etwa 153 ms, in den zwei weiteren Gruppen etwa 27/35 ms. Der Rest liegt außerhalb
+dieser Childhandler einschließlich äußerer Serialisierung/Proxy/Transport/Host;
+er ist ohne zusätzliche Spans keine reine Cloud- oder Modellzeit. Die größere
+Streuung und kleine Stichprobe erlauben keine Garantie eines festen Speedups.
+P95 des Mischbündels bleibt bei rund neun Sekunden.
+
+Auch `operation_catalog(operations=["file.read","file.write"])` funktionierte
+über den bestehenden gecachten Apps-Toolnamen und gab genau diese Schemas zurück:
+ein Diagnosecall 4175 ms, Exportlänge 43788 UTF-16-Einheiten des in V8 erneut
+serialisierten Wrapperresultats. Das sind keine Netzwerkbytes und kein isolierter
+Kausalbeweis für eine Geschwindigkeitsverbesserung.
+[Selektorbeleg](evidence/rc29-selected-catalog-20261103.json).
+
+## Release, tatsächliche Installation und Schutz bestehender Arbeit
+
+Sourcecommit **279afccc693e2b8d3d7d1787828ad44679d1bba2** ist gepusht.
+Genau ein lokaler Intel-Build; der isolierte Installer-/Daemon-Smoke bestand
+einschließlich Korruptionsablehnung und Config-/Credentialerhalt. Installer-App
+prüft 537 gepackte Dateien, Intelarchitektur und Ad-hoc-Signatur.
+[GitHub-Prerelease v0.8.0rc29](https://github.com/landjunge/KiraBridge/releases/tag/v0.8.0rc29)
+enthält sieben verfügbare Assets mit geprüften Digests. Installer-Zip erneut
+heruntergeladen: 3286207 Bytes, SHA256
+`31870192887f1802e28b6512558fcb8403232d9fda80045c32fc84a13ff041c1`.
+Keine GitHub Actions oder ARM-Builds.
+
+Ein einziger Installationslauf im eigenen bestätigten physischen Terminalfenster
+1913, TTY `ttys000`: Beginn 03.11.2026 01:27:06 UTC, Ende 01:27:27 UTC, Exit 0.
+Die vorbereitende Layoutprüfung stoppte zunächst vor Installation; nach genau
+einem gezielten Detach des bereits identifizierten eigenen Tabs wurde dessen
+physische Trennung über CG/AX und das kanonische logische TTY-Inventar bestätigt.
+Ein roher Inventarvergleich meldete nach erfolgreichem Detach zunächst nur die
+geänderte Reihenfolge; unabhängige normalisierte Prüfung klärte dies ohne
+erneuten Detach oder neue Fensteröffnung. Vor dem Installationsstart war ein
+eigener physischer Tab bestätigt. Danach wurde ausschließlich Fenster 1913
+geschlossen und dessen Abwesenheit zweimal geprüft; 1548/1604 blieben erhalten.
+
+Laufender Daemon **56714**, Instanz `032377e6a8b043738187c88619ef084d`, Version
+`0.8.0rc29`; alle **164** installierten Pythondateien bytegleich mit Wheel und
+gepacktem Source. Alle drei nativen Release-/Desktopdateien stimmen in Hash und
+Modus mit dem Manifest überein, Desktop-Sourcepin korrekt. Tunnelruntime meldet
+process_running/healthy/ready true; die tatsächlichen Apps-Nachläufe bestätigen
+zusätzlich die aktuelle externe Verbindung.
+
+Unabhängiger Nachinstallationssnapshot: sieben geschützte Dateien in SHA/Modus/
+Größe unverändert, DB-Schema gleich, alle **15474** alten Zeilen in elf Inventaren
+unverändert. Die ursprünglichen Agenten 1728/1749/1825/35046 und Shell 34884
+behalten PID/Start/Parent. Nur Backend, Tunnel und Connector wurden erwartbar
+ersetzt. RC28-Rollback mit Installerbackup
+`~/.local/share/kirabridge/install/backups/20261103-022710-8909943e` vorhanden.
+[Minimierter Release-/Installations-/Erhaltbeleg](evidence/rc29-installed-release-20261103.json).
+
+Abschluss im bestehenden ThreadDesk-Whiteboard `188ce4729a62` nach gelesener
+Threadrevision 490: Beitrag `8e3877bcd0cf`, Ordinal 130, stabile Operation
+`rc29-cloud-reduction-installed-20261103-279afcc`. Separater Readback bestätigte
+den vollständigen Inhalt exakt; bestehende Beiträge wurden nicht ersetzt.
 
 ## Grenzen
 
