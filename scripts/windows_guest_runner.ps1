@@ -76,9 +76,14 @@ function Invoke-Bounded([string]$Program, [string[]]$Arguments, [string]$Name, [
     # children unless the original process handle is retained before waiting.
     # See PowerShell/PowerShell#5421. Never turn a missing exit code into zero.
     $retainedHandle = $process.Handle
+    $createdUtc = $process.StartTime.ToUniversalTime()
     $script:LastProcessInfo = @{step=$Name; pid=$process.Id; state='started';
-        handle_retained=($retainedHandle -ne [IntPtr]::Zero)}
+        handle_retained=($retainedHandle -ne [IntPtr]::Zero);
+        creation_utc=$createdUtc.ToString('o');
+        creation_filetime_100ns=$createdUtc.ToFileTimeUtc().ToString(
+            [Globalization.CultureInfo]::InvariantCulture)}
     if ($retainedHandle -eq [IntPtr]::Zero) { throw 'Original child process handle unavailable' }
+    Event ($Name+'_started')
     if (-not $process.WaitForExit($Seconds*1000)) {
         $script:LastProcessInfo.state = 'timeout_unknown_no_retry'
         Event ($Name+'_timeout_unknown_no_retry')
