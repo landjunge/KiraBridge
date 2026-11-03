@@ -283,8 +283,10 @@ class WindowsFiles:
                 flags,
                 None,
             )
+            error = ctypes.get_last_error()
         if handle == HANDLE(-1).value:
-            raise self._error()
+            # LocalFree in _attributes.__exit__ may change this thread's last error.
+            raise ctypes.WinError(error)
         try:
             self._inspect(handle, path, directory=directory)
             return handle

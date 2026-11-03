@@ -40,6 +40,8 @@ Windows APIs are loaded lazily; importing these modules on macOS has no OS effec
 `tests/test_windows_core.py`: **30 passed** on the Intel Mac. They check fixed
 Windows ABI widths, ACL/path policy, exact opened-handle metadata rejection,
 exclusive lock ownership, secure routing and unavailable output behavior.
+An additional focused regression passed for preserving CreateFileW error32
+before security-descriptor cleanup can change the native last-error value.
 
 A relevant run of Windows policy tests, event journal, process output and local
 credential/stdio integration initially reported **98 passed, 4 native skips,

@@ -296,3 +296,33 @@ def test_windows_event_journal_lock_contention_has_bounded_failure(monkeypatch, 
         with events.initialization_lock(tmp_path):
             pytest.fail("Busy journal must not enter its schema transaction")
     assert released == [True]
+
+
+def test_createfile_error_survives_security_descriptor_cleanup(monkeypatch):
+    from contextlib import contextmanager
+
+    import kirabridge.platform_adapters.windows.filesystem_security as security
+
+    last_error = [32]
+
+    @contextmanager
+    def attributes():
+        try:
+            yield security.SECURITY_ATTRIBUTES()
+        finally:
+            last_error[0] = 0  # A successful LocalFree can replace GetLastError.
+
+    def win_error(value):
+        error = OSError("native failure")
+        error.winerror = value
+        return error
+
+    api = object.__new__(security.WindowsFiles)
+    api._path = lambda value: value
+    api._attributes = attributes
+    api.kernel = SimpleNamespace(CreateFileW=lambda *_args: security.HANDLE(-1).value)
+    monkeypatch.setattr(security.ctypes, "get_last_error", lambda: last_error[0], raising=False)
+    monkeypatch.setattr(security.ctypes, "WinError", win_error, raising=False)
+    with pytest.raises(OSError) as caught:
+        api.open(r"C:\state\lock", exclusive=True)
+    assert caught.value.winerror == 32
