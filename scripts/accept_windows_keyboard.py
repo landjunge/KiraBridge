@@ -321,7 +321,7 @@ class Receiver:
         if not self.user.RegisterClassExW(ctypes.byref(window_class)):
             raise RuntimeError("Cannot register owned fixture window")
         self.hwnd = self.user.CreateWindowExW(
-            0,
+            0x00000008,  # WS_EX_TOPMOST: visible fixture; normal activation remains required.
             name,
             f"KiraBridge CLICK THIS WINDOW PID {os.getpid()}",
             0x00CF0000,
