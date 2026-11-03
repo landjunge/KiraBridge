@@ -161,3 +161,63 @@ eine Serversequenz ist dann eine andere Orchestrierungsform und muss so benannt
 werden. Entsprechend können unabhängige Leseabfragen in einer begrenzten
 Read-Bundle-Operation mehrere äußere Handshakes vermeiden. Zustände und Effekte
 werden dabei nicht als Erfolg gecacht; ungewisse Eingaben werden nicht wiederholt.
+
+## Identischer Nachherlauf am installierten RC28
+
+Nach Installation von RC28 `6b70116ba06da69c2e3f1552471c1842e983d8f7` dieselben
+drei Toolnamen, Argumente `{}`, Domänenreihenfolge und alternierende Wege wie
+oben wiederholt: je zehn Calls, **60/60 erfolgreich**. Beide angebundenen Wege
+meldeten Version `0.8.0rc28` und dieselbe neue Instanz
+`db5f442a3cad48208120250f737ce2e2`. Keine UI- oder Tastatureingaben und keine
+Clipboardinhalte. Die Calls liefen in fünf Zweier-Rundenblöcken; gemessen wird
+jeweils der Beginn des angehängten Toolaufrufs bis zur vollständigen
+Wrapperantwort. Voice und Modellplanung zwischen Blöcken sind ausgeschlossen.
+Es gab keinen verworfenen Warm-up-Call.
+
+| Werkzeug | lokal RC27 P50 / P95 ms | lokal RC28 P50 / P95 ms | Apps RC27 P50 / P95 ms | Apps RC28 P50 / P95 ms |
+| --- | ---: | ---: | ---: | ---: |
+| `bridge_health` | 43 / 1628 | 43,5 / 49 | 3495,5 / 4926 | 3304 / 4838 |
+| `clipboard_info` | 20,5 / 113 | 22,5 / 98 | 2668,5 / 5923 | 2511,5 / 3315 |
+| `operation_catalog` | 294,5 / 1198 | 300 / 323 | 6934,5 / 8533 | 7143,5 / 8892 |
+
+Gesamtzeit von 30 separaten Calls: lokal **6,477 → 3,889 s**, Apps
+**135,873 → 132,027 s** (Apps rund **2,83 %** kürzer). Der lokale Gesamtwert
+profitiert stark vom fehlenden kalten Health-Ausreißer; die lokalen Mediane
+liegen ungefähr auf vorherigem Niveau. Die Apps-Mediane von Health/Clipboardinfo
+liegen etwa 5,5/5,9 % niedriger, der Catalog etwa 3,0 % höher. Bei n=10 bleibt
+P95 der beobachtete Maximalwert. Zeitlich getrennte Serien, laufender
+Hintergrundverkehr und nicht identische dynamische Health-/Cataloginhalte erlauben
+keinen belastbaren kleinen kausalen Speedup. **Ein massiver allgemeiner Speedup
+separater MCP-Aufrufe wurde nicht nachgewiesen.** Der verbleibende Sekundenbereich
+ist auch beim winzigen Clipboard-Metadatentool sichtbar.
+
+Die Catalog-Wrapperlänge sank von lokal 504.750 auf 403.292 und über Apps von
+506.864 auf 405.228 UTF-16-Einheiten, also etwa 20 %. Dies ist die Länge des in
+V8 erneut serialisierten Ergebnisobjekts und kein Netzwerk-Bytezähler. Kleinere
+Antworten allein beseitigten in dieser Serie die Cloudlatenz nicht; aus diesen
+Samples folgt keine isolierte Kausalwirkung der Kompaktierung. Der neue
+30-Sekunden-Cache betrifft `tools/list`-Schemas. Er cached weder Toolergebnisse
+noch Ausführungen und kann die drei äußeren Tunnelkommandos pro App-RPC nicht
+zusammenlegen.
+[Minimierte Einzelmessungen](evidence/rc28-frontdoor-installed-20261103.json).
+
+Die normalisierten attached Toolresultate exponierten in allen 60 Calls kein
+Top-Level-`_meta`; daraus folgt **nicht**, dass der Server keine Timings liefert.
+Ein zusätzlicher einzelner lokaler Raw-SDK-Read von `clipboard_info` über einen
+frischen Stdio-Proxy bestätigte anschließend die tatsächlich ausgelieferten
+RC28-Metadaten: Daemon **1,289 ms**, Proxy-Dispatch **17,639 ms**, darin
+Catalogprüfung **0,055 ms**, gesamter Stdio-Handler **247,079 ms**. Der
+Clientaufruf dauerte **484,278 ms**, die separat gemessene frische
+Verbindungsinitialisierung **1279,695 ms**. Diese Spans sind verschachtelt und
+werden **nicht addiert**; n=1 an einer frischen lokalen Verbindung ist keine
+Cloudzerlegung und keine Perzentilschätzung. Standard-MCP-`_meta` erreicht den
+Raw-SDK-Client, wird jedoch durch den untersuchten angehängten Hostwrapper nicht
+an diese Messumgebung durchgereicht.
+[Raw-SDK-Beleg ohne Nutzinhalte](evidence/rc28-raw-sdk-timing-installed-20261103.json).
+
+Der für diese Teiluntersuchung isolierte Nachherbefund stützt deshalb die
+Architekturentscheidung, echte einzelne Down/Up-Ereignisse beziehungsweise
+unabhängige Reads in einem begrenzten Server-RPC zu bündeln. Er ersetzt keine
+separat ausgewiesenen Vorher/Nachher-Key- und Read-Bundle-Tests und macht aus
+acht einzelnen physischen Ereignissen keine Behauptung von acht schnellen
+einzelnen Cloud-RPCs.

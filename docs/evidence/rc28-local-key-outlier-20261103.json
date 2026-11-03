@@ -1,0 +1,106 @@
+{
+  "scope": "Independent read-only audit of one genuine post-installation key outlier; no request arguments or receiver text",
+  "task": {
+    "id": "rc28_cloud_after_single_r2_7_20261103",
+    "operation": "keyboard.control",
+    "state": "completed",
+    "created": 1793666389.86163,
+    "accepted": 1793666390.064126,
+    "started": 1793666390.189536,
+    "finished": 1793666395.887923,
+    "error": null
+  },
+  "utc_created": "2026-11-03T00:39:49.861630+00:00",
+  "stage_spans": {
+    "created_to_accepted_ms": 202.49605178833008,
+    "accepted_to_running_ms": 125.41007995605469,
+    "running_to_target_bound_ms": 2768.0890560150146,
+    "target_bound_to_native_attempt_ms": 2.193927764892578,
+    "native_attempt_to_finished_ms": 2928.1039237976074,
+    "running_to_finished_ms": 5698.386907577515,
+    "created_to_finished_ms": 6026.293039321899
+  },
+  "event_boundaries": [
+    {
+      "seq": 37911,
+      "at_unix": 1793666389.86163,
+      "state": "created",
+      "evidence_type": null
+    },
+    {
+      "seq": 37912,
+      "at_unix": 1793666389.86163,
+      "state": "queued",
+      "evidence_type": null
+    },
+    {
+      "seq": 37913,
+      "at_unix": 1793666390.064126,
+      "state": "accepted",
+      "evidence_type": null
+    },
+    {
+      "seq": 37914,
+      "at_unix": 1793666390.189536,
+      "state": "running",
+      "evidence_type": "automatic_keyboard_resolution"
+    },
+    {
+      "seq": 37915,
+      "at_unix": 1793666392.9576252,
+      "state": "running",
+      "evidence_type": "automatic_keyboard_target_bound"
+    },
+    {
+      "seq": 37916,
+      "at_unix": 1793666392.959819,
+      "state": "running",
+      "evidence_type": "native_keyboard_attempt"
+    },
+    {
+      "seq": 37917,
+      "at_unix": 1793666395.887923,
+      "state": "completed",
+      "evidence_type": null
+    }
+  ],
+  "native_identity": {
+    "pid": 48330,
+    "generation": "CEE55415-3F10-43E0-A262-5ED02E303411",
+    "source_commit": "6b70116ba06da69c2e3f1552471c1842e983d8f7"
+  },
+  "native_operation": "keyboard.key",
+  "post_calls_returned": 2,
+  "automatic_retry": false,
+  "app_processing_confirmed": false,
+  "other_recorded_task_execution_intervals_overlapping": 0,
+  "previous_three_same_round": [
+    {
+      "task_id": "rc28_cloud_after_single_r2_6_20261103",
+      "running_to_finished_ms": 159.0290069580078,
+      "same_native_pid_generation": true
+    },
+    {
+      "task_id": "rc28_cloud_after_single_r2_5_20261103",
+      "running_to_finished_ms": 131.53505325317383,
+      "same_native_pid_generation": true
+    },
+    {
+      "task_id": "rc28_cloud_after_single_r2_4_20261103",
+      "running_to_finished_ms": 153.01513671875,
+      "same_native_pid_generation": true
+    }
+  ],
+  "receiver_reference": {
+    "event_timestamp_uptime_seconds": 30712.156557,
+    "source": "Parent provided independent receiver record; not converted to UTC"
+  },
+  "conclusion": "A real local task outlier. Delay is present in both automatic target resolution and the native-key request/response interval. It must not be attributed wholly to cloud orchestration.",
+  "limits": [
+    "Events do not separate apps.list from keyboard.inspect, native transport-lock wait, OS inspection, event posting and final local reply.",
+    "No contemporaneous CPU or per-native-request timing record was found in the persisted task evidence; exact blocking cause remains unknown.",
+    "No overlapping TaskManager execution interval excludes neither direct read calls, background services nor other host processes.",
+    "The native helper PID/generation matches the previous three keys; no helper restart is indicated.",
+    "No cache rollback, network or OS-scan cause is inferred."
+  ]
+}

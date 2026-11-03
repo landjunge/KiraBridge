@@ -1,0 +1,151 @@
+{
+  "scope": "Actual Apps connector: same three heterogenous authorized reads, sequential calls vs one read.batch RPC. Only dynamic permission observed_at normalized for within-version equality.",
+  "queries": [
+    {
+      "operation": "file.read",
+      "path": "/Users/landjunge/KiraBridge-worktrees/rc28-e2e-20261103/LICENSE",
+      "max_bytes": 256
+    },
+    {
+      "operation": "file.list",
+      "path": "/Users/landjunge/KiraBridge-worktrees/rc28-e2e-20261103/src/kirabridge/mcp_gateway",
+      "limit": 3
+    },
+    {
+      "operation": "platform.status"
+    }
+  ],
+  "before": [
+    {
+      "round": 0,
+      "total_ms": 8310,
+      "samples": [
+        {
+          "operation": "file.read",
+          "elapsed_ms": 2174
+        },
+        {
+          "operation": "file.list",
+          "elapsed_ms": 2372
+        },
+        {
+          "operation": "platform.status",
+          "elapsed_ms": 3764
+        }
+      ]
+    },
+    {
+      "round": 1,
+      "total_ms": 11391,
+      "samples": [
+        {
+          "operation": "file.read",
+          "elapsed_ms": 3252
+        },
+        {
+          "operation": "file.list",
+          "elapsed_ms": 2815
+        },
+        {
+          "operation": "platform.status",
+          "elapsed_ms": 5322
+        }
+      ]
+    },
+    {
+      "round": 2,
+      "total_ms": 11352,
+      "samples": [
+        {
+          "operation": "file.read",
+          "elapsed_ms": 5285
+        },
+        {
+          "operation": "file.list",
+          "elapsed_ms": 2595
+        },
+        {
+          "operation": "platform.status",
+          "elapsed_ms": 3472
+        }
+      ]
+    }
+  ],
+  "after": [
+    {
+      "round": 0,
+      "separate_total_ms": 11410,
+      "separate_calls_ms": [
+        3162,
+        4160,
+        4088
+      ],
+      "batch_ms": 4303,
+      "batch_complete": true,
+      "batch_count": 3,
+      "comparison": [
+        [],
+        [],
+        [
+          "/permissions/0/observed_at",
+          "/permissions/1/observed_at",
+          "/permissions/2/observed_at",
+          "/permissions/3/observed_at"
+        ]
+      ],
+      "original_file_page_sha256": "e2ac54c201c38af897833a18d3deefe44ea9dac826cce15af5eaf12358765120",
+      "batch_file_page_sha256": "e2ac54c201c38af897833a18d3deefe44ea9dac826cce15af5eaf12358765120",
+      "file_list_equal": true
+    },
+    {
+      "round": 1,
+      "separate_total_ms": 14742,
+      "separate_calls_ms": [
+        3606,
+        5652,
+        5484
+      ],
+      "batch_ms": 4810,
+      "batch_complete": true,
+      "batch_count": 3,
+      "comparison": [
+        [],
+        [],
+        [
+          "/permissions/0/observed_at",
+          "/permissions/1/observed_at",
+          "/permissions/2/observed_at",
+          "/permissions/3/observed_at"
+        ]
+      ],
+      "original_file_page_sha256": "e2ac54c201c38af897833a18d3deefe44ea9dac826cce15af5eaf12358765120",
+      "batch_file_page_sha256": "e2ac54c201c38af897833a18d3deefe44ea9dac826cce15af5eaf12358765120",
+      "file_list_equal": true
+    },
+    {
+      "round": 2,
+      "separate_total_ms": 16166,
+      "separate_calls_ms": [
+        3530,
+        4827,
+        7809
+      ],
+      "batch_ms": 7153,
+      "batch_complete": true,
+      "batch_count": 3,
+      "comparison": [
+        [],
+        [],
+        [
+          "/permissions/0/observed_at",
+          "/permissions/1/observed_at",
+          "/permissions/2/observed_at",
+          "/permissions/3/observed_at"
+        ]
+      ],
+      "original_file_page_sha256": "e2ac54c201c38af897833a18d3deefe44ea9dac826cce15af5eaf12358765120",
+      "batch_file_page_sha256": "e2ac54c201c38af897833a18d3deefe44ea9dac826cce15af5eaf12358765120",
+      "file_list_equal": true
+    }
+  ]
+}
