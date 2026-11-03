@@ -4,6 +4,7 @@ import ctypes
 import json
 import os
 from dataclasses import replace
+from types import SimpleNamespace
 
 import pytest
 
@@ -16,6 +17,7 @@ from kirabridge.platform_adapters.windows.keyboard import (
     SCANCODE,
     UNICODE,
     KeyStroke,
+    Win32KeyboardAPI,
     WindowsKeyboard,
     WindowTarget,
 )
@@ -207,6 +209,91 @@ def test_extended_keys_keep_e0_flag_and_matching_release(stroke):
     down, up = api.calls[0]
     assert down.flags == SCANCODE | EXTENDED
     assert up.flags == SCANCODE | EXTENDED | KEYUP
+
+
+@pytest.mark.parametrize(
+    "name,scan",
+    [
+        ("left", 0x4B),
+        ("right", 0x4D),
+        ("up", 0x48),
+        ("down", 0x50),
+        ("home", 0x47),
+        ("end", 0x4F),
+        ("page_up", 0x49),
+        ("page_down", 0x51),
+        ("insert", 0x52),
+        ("delete", 0x53),
+        ("print_screen", 0x37),
+        ("keypad_divide", 0x35),
+        ("keypad_enter", 0x1C),
+    ],
+)
+def test_named_enhanced_keys_reach_native_input_encoder_with_e0_even_if_mapping_omits_it(
+    name, scan, monkeypatch
+):
+    captured = []
+
+    def native_send(count, records, size):
+        assert count == 2 and size == ctypes.sizeof(INPUT)
+        captured.extend((item.type, item.ki.wScan, item.ki.dwFlags) for item in records)
+        return count
+
+    encoder = Win32KeyboardAPI.__new__(Win32KeyboardAPI)
+    encoder.user = SimpleNamespace(SendInput=native_send)
+    monkeypatch.setattr(ctypes, "set_last_error", lambda value: None, raising=False)
+    monkeypatch.setattr(ctypes, "get_last_error", lambda: 0, raising=False)
+    api = FakeWin32()
+    api.map_scan = lambda vk, layout: (scan, False)
+    api.send_input = encoder.send_input
+    result = WindowsKeyboard(api).send(api.target, [KeyStroke(named=name)])
+    assert result["inserted_events"] == 2
+    assert captured == [(1, scan, SCANCODE | EXTENDED), (1, scan, SCANCODE | EXTENDED | KEYUP)]
+
+
+@pytest.mark.parametrize(
+    "name,scan",
+    [
+        ("enter", 0x1C),
+        ("keypad_0", 0x52),
+        ("keypad_1", 0x4F),
+        ("keypad_2", 0x50),
+        ("keypad_3", 0x51),
+        ("keypad_4", 0x4B),
+        ("keypad_6", 0x4D),
+        ("keypad_7", 0x47),
+        ("keypad_8", 0x48),
+        ("keypad_9", 0x49),
+        ("keypad_decimal", 0x53),
+        ("num_lock", 0x45),
+    ],
+)
+def test_main_enter_and_numeric_keypad_do_not_gain_navigation_e0_flag(name, scan):
+    api = FakeWin32()
+    api.map_scan = lambda vk, layout: (scan, False)
+    WindowsKeyboard(api).send(api.target, [KeyStroke(named=name)])
+    assert [(event.scan_code, event.flags) for event in api.calls[0]] == [
+        (scan, SCANCODE),
+        (scan, SCANCODE | KEYUP),
+    ]
+
+
+def test_explicit_unextended_raw_scan_is_not_reinterpreted_as_named_navigation():
+    api = FakeWin32()
+    WindowsKeyboard(api).send(api.target, [KeyStroke(scan_code=0x4D)])
+    assert [event.flags for event in api.calls[0]] == [SCANCODE, SCANCODE | KEYUP]
+
+
+def test_windows_modifier_keeps_e0_when_mapping_omits_prefix():
+    api = FakeWin32()
+    api.map_scan = lambda vk, layout: (0x5B if vk == 0x5B else 0x1E, False)
+    WindowsKeyboard(api).send(api.target, [KeyStroke(character="a", modifiers=("windows",))])
+    assert [(event.scan_code, event.flags) for event in api.calls[0]] == [
+        (0x5B, SCANCODE | EXTENDED),
+        (0x1E, SCANCODE),
+        (0x1E, SCANCODE | KEYUP),
+        (0x5B, SCANCODE | EXTENDED | KEYUP),
+    ]
 
 
 def test_pause_uses_virtual_key_not_invented_e1_scan_sequence():

@@ -60,6 +60,26 @@ NAMED_KEYS = {
     **{f"f{i}": 0x6F + i for i in range(1, 25)},
     **{f"keypad_{i}": 0x60 + i for i in range(10)},
 }
+# These dedicated enhanced-key identities differ from numeric-keypad keys with
+# the same low scan byte. Keep E0 even if a layout mapping reports only that byte.
+# NumLock/Pause and explicit raw scan codes keep their separate existing framing.
+EXTENDED_NAMED_KEYS = frozenset(
+    {
+        "left",
+        "right",
+        "up",
+        "down",
+        "home",
+        "end",
+        "page_up",
+        "page_down",
+        "insert",
+        "delete",
+        "print_screen",
+        "keypad_divide",
+        "keypad_enter",
+    }
+)
 
 
 @dataclass(frozen=True)
@@ -384,12 +404,12 @@ class WindowsKeyboard:
             key = (KeyEvent(vk, 0, 0, tag), KeyEvent(vk, 0, KEYUP, tag))
         else:
             scan, extended = self.api.map_scan(vk, target.keyboard_layout)
-            key = self._scan_pair(vk, scan, extended or stroke.named == "keypad_enter", tag)
+            key = self._scan_pair(vk, scan, extended or stroke.named in EXTENDED_NAMED_KEYS, tag)
         starts, ends = [], []
         for modifier in modifiers:
             code = MODIFIER_VKS[modifier]
             scan, extended = self.api.map_scan(code, target.keyboard_layout)
-            down, up = self._scan_pair(code, scan, extended, tag)
+            down, up = self._scan_pair(code, scan, extended or modifier == "windows", tag)
             starts.append(down)
             ends.insert(0, up)
         return tuple([*starts, *key, *ends]), vk

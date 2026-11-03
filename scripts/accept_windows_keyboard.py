@@ -401,11 +401,31 @@ def run_acceptance(receiver, output):
                 if receiver.text() == expected and len(events) >= event_count:
                     break
                 threading.Event().wait(0.01)
-            if receiver.text() != expected or len(events) != event_count:
+            observed_text = receiver.text()
+            # Retain actual receiver evidence before any assertion can reject it.
+            observation = {
+                "text_before": before,
+                "expected_text": expected,
+                "observed_text": observed_text,
+                "received_events": events,
+                "expected_events": expected_events,
+                "expected_event_count": event_count,
+                "event_count_exact": len(events) == event_count,
+                "text_exact": observed_text == expected,
+                "key_order_exact": [(e["kind"], e["vk"]) for e in events] == expected_events,
+                "require_extended": require_extended,
+                "extended_flags_exact": len(events) == event_count
+                and all(e["extended"] for e in events)
+                if require_extended
+                else None,
+            }
+            report["case_attempts"][-1]["receiver_observation"] = observation
+            persist()
+            if not observation["text_exact"] or len(events) != event_count:
                 raise RuntimeError(f"{name}: receiver text or exact event count mismatch")
-            if [(e["kind"], e["vk"]) for e in events] != expected_events:
+            if not observation["key_order_exact"]:
                 raise RuntimeError(f"{name}: receiver exact down/up key order mismatch")
-            if require_extended and not all(e["extended"] for e in events):
+            if require_extended and not observation["extended_flags_exact"]:
                 raise RuntimeError(f"{name}: expected extended scan-code flag missing")
             if result["physical_key_events"] != physical:
                 raise RuntimeError(f"{name}: physical/Unicode representation mismatch")
