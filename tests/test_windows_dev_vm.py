@@ -125,6 +125,7 @@ def test_creation_only_owns_new_disk_and_private_seed(plan):
     assert config["Network"][0]["PortForward"] == []
     assert config["QEMU"]["TPMDevice"] is True
     assert (plan.destination / "Data/efi_vars.fd").read_bytes() == b"secure-vars"
+    assert (plan.seed_dir / "first-logon.ps1").read_bytes().startswith(b"\xef\xbb\xbf")
     password = json.loads((plan.destination / "private-credentials.json").read_text())["password"]
     assert password not in json.dumps(result)
     for path in (
@@ -181,3 +182,27 @@ def test_copy_never_replaces_existing_target(tmp_path):
     with pytest.raises(OSError):
         vm.copy_exclusive(source, target)
     assert target.read_bytes() == b"keep"
+
+
+def test_first_logon_respects_native_windows_schema_and_delegates_to_seed():
+    import base64
+
+    root = ET.fromstring(vm.answer_file("Dummy-password-only", 1))
+    command = root.findtext(".//{*}FirstLogonCommands/{*}SynchronousCommand/{*}CommandLine")
+    assert command and len(command) <= 1024
+    payload = base64.b64decode(command.split()[-1]).decode("utf-16-le")
+    assert "KIRASEED" in payload and "first-logon.ps1" in payload
+    assert "Copy-Item" not in payload
+    script = vm.first_logon_script().decode("utf-8-sig")
+    assert "Copy-Item" in script and "Start-Process powershell.exe" in script
+    assert "-Wait" not in script and "Get-Process" not in script
+    with pytest.raises(ValueError, match="1024"):
+        vm.first_logon_command("x" * 1000)
+
+
+def test_explicit_vm_name_keeps_failed_and_replacement_targets_distinct(plan):
+    named = replace(plan, name="KiraBridge Windows Dev Fix1")
+    vm.validate(named)
+    assert vm.configuration(named, "own-test-uuid")["Information"]["Name"] == named.name
+    with pytest.raises(ValueError, match="VM name"):
+        vm.validate(replace(plan, name="bad\nname"))

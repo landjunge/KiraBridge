@@ -53,11 +53,13 @@ class Plan:
     guest_tools: Path | None = None
     disk_gib: int = 80
     image_index: int = 1
+    name: str = "KiraBridge Windows Dev"
 
     def public(self):
         return {
             "action": "plan",
             "destination": str(self.destination),
+            "name": self.name,
             "seed_dir": str(self.seed_dir),
             "seed_iso": str(self.seed_iso),
             "architecture": "x86_64",
@@ -108,6 +110,9 @@ def bootstrap_url(value: str) -> str:
 
 
 def validate(plan: Plan) -> Path:
+    first_logon_command()
+    if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9 ._-]{0,63}", plan.name):
+        raise ValueError("VM name needs a bounded plain label")
     checked_path(plan.app)
     info = plistlib.loads(checked_path(plan.app / "Contents/Info.plist", regular=True).read_bytes())
     if info.get("CFBundleIdentifier") != "com.utmapp.UTM":
@@ -240,7 +245,7 @@ def configuration(plan: Plan, identifier: str):
         "Backend": "QEMU",
         "ConfigurationVersion": 4,
         "Information": {
-            "Name": "KiraBridge Windows Dev",
+            "Name": plan.name,
             "UUID": identifier,
             "IconCustom": False,
             "Icon": "windows",
@@ -304,6 +309,39 @@ def element(parent, tag, text=None, **attributes):
     if text is not None:
         child.text = str(text)
     return child
+
+
+def first_logon_script() -> bytes:
+    # Start only a detached bootstrap; Explorer wait belongs to that child.
+    script = r"""$ErrorActionPreference='Stop'
+$seed=Get-Volume | Where-Object FileSystemLabel -eq 'KIRASEED' | Select-Object -First 1
+if(-not $seed){throw 'Seed unavailable'}
+$dest=Join-Path $env:LOCALAPPDATA 'KiraBridgeDev'
+New-Item -ItemType Directory -Force $dest | Out-Null
+$script=Join-Path $dest 'bootstrap.ps1'
+Copy-Item ($seed.DriveLetter+':\bootstrap.ps1') $script
+$arguments=@('-NoProfile','-ExecutionPolicy','Bypass','-File',('"'+$script+'"'))
+Start-Process powershell.exe -ArgumentList $arguments -WindowStyle Normal
+exit 0
+"""
+    return b"\xef\xbb\xbf" + script.encode("utf-8")
+
+
+def first_logon_command(script: str | None = None) -> str:
+    # Windows-Shell-Setup enforces a 1024-character CommandLine limit.
+    entry = (
+        script
+        if script is not None
+        else (
+            "$s=Get-Volume|Where-Object FileSystemLabel -eq 'KIRASEED'|"
+            "Select-Object -First 1;if(!$s){exit 2};&($s.DriveLetter+':\\first-logon.ps1')"
+        )
+    )
+    encoded = base64.b64encode(entry.encode("utf-16-le")).decode()
+    result = "powershell.exe -NoProfile -ExecutionPolicy Bypass -EncodedCommand " + encoded
+    if len(result) > 1024:
+        raise ValueError("Windows FirstLogon CommandLine exceeds 1024 characters")
+    return result
 
 
 def answer_file(password: str, image_index: int) -> bytes:
@@ -400,19 +438,7 @@ def answer_file(password: str, image_index: int) -> bytes:
     ):
         element(options, key, "true")
     element(options, "ProtectYourPC", 3)
-    # Return promptly: waiting for Explorer inside FirstLogonCommands can deadlock OOBE.
-    launcher = r"""$ErrorActionPreference='Stop'
-$seed=Get-Volume | Where-Object FileSystemLabel -eq 'KIRASEED' | Select-Object -First 1
-if(-not $seed){throw 'Seed unavailable'}
-$dest=Join-Path $env:LOCALAPPDATA 'KiraBridgeDev'
-New-Item -ItemType Directory -Force $dest | Out-Null
-$script=Join-Path $dest 'bootstrap.ps1'
-Copy-Item ($seed.DriveLetter+':\bootstrap.ps1') $script
-$arguments=@('-NoProfile','-ExecutionPolicy','Bypass','-File',('"'+$script+'"'))
-Start-Process powershell.exe -ArgumentList $arguments -WindowStyle Normal
-exit 0
-"""
-    encoded = base64.b64encode(launcher.encode("utf-16-le")).decode()
+    entry_command = first_logon_command()
     command = element(
         element(shell, "FirstLogonCommands"), "SynchronousCommand", **{f"{{{WCM}}}action": "add"}
     )
@@ -421,7 +447,7 @@ exit 0
     element(
         command,
         "CommandLine",
-        f"powershell.exe -NoProfile -ExecutionPolicy Bypass -EncodedCommand {encoded}",
+        entry_command,
     )
     ET.indent(root)
     return ET.tostring(root, encoding="utf-8", xml_declaration=True)
@@ -486,6 +512,7 @@ def create(plan: Plan, *, run=subprocess.run):
         password = "Kira!" + secrets.token_urlsafe(30)
         write_private(plan.seed_dir / "Autounattend.xml", answer_file(password, plan.image_index))
         write_private(plan.seed_dir / "bootstrap.ps1", bootstrap_script(plan.bootstrap_url))
+        write_private(plan.seed_dir / "first-logon.ps1", first_logon_script())
         write_private(
             plan.destination / "private-credentials.json",
             json.dumps({"username": "Kiradev", "password": password}).encode(),
@@ -539,6 +566,7 @@ def main(argv=None):
     parser.add_argument("--guest-tools", type=Path)
     parser.add_argument("--disk-gib", type=int, default=80)
     parser.add_argument("--image-index", type=int, default=1)
+    parser.add_argument("--name", default="KiraBridge Windows Dev")
     parser.add_argument("--create", action="store_true")
     args = parser.parse_args(argv)
     destination = checked_path(args.destination)
@@ -552,6 +580,7 @@ def main(argv=None):
         checked_path(args.guest_tools) if args.guest_tools else None,
         args.disk_gib,
         args.image_index,
+        args.name,
     )
     validate(plan)
     print(json.dumps(create(plan) if args.create else plan.public(), indent=2))

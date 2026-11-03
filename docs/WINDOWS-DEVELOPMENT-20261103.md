@@ -127,3 +127,27 @@ will be appended after the actual guest run.
 - [UTM scripting](https://docs.getutm.app/scripting/cheat-sheet/)
 - [Python3.14.10](https://www.python.org/downloads/release/python-31410/)
 - [Core details](WINDOWS-CORE-20261103.md) and [bootstrap review](WINDOWS-BOOTSTRAP-REVIEW-20261103.md)
+
+
+## First real Windows installation: failure and correction
+
+The first guest installed Windows but failed in `oobeSystem` before any KiraBridge
+acceptance or first logon. Read-only Panther logs prove error `0x80220005` at
+`Microsoft-Windows-Shell-Setup/FirstLogonCommands/SynchronousCommand/CommandLine`.
+The original automated launcher was1454 characters; Microsoft limits this field
+to1024. This was our provisioning error, not evidence against the Windows keyboard
+backend. The failed VM, disk clone and original logs were preserved; diagnosis
+mounted only an own converted disk image read-only. UTM HVF cannot save a RAM
+snapshot here; temporary CPU pause succeeded and the failed VM was later stopped.
+
+The fix moves the full detached launcher into UTF8-BOM `first-logon.ps1` on the
+installation seed. The short entry is426 characters and a hard guard rejects
+future oversize values before creating a VM. The moved script still returns
+without waiting; Explorer polling runs only in the detached bootstrap. Fifteen
+focused seeder tests passed. Independent PowerShell execution of the actual
+helpers confirmed one detached child, correct copy into a path with spaces and
+exit0. New VMs may use distinct bounded names, preserving the failed attempt.
+No uncertain Windows keyboard task was repeated: none had started.
+
+[Actual first-install failure proof](evidence/windows-first-install-failure-20261103.json)
+· [Microsoft CommandLine limit](https://learn.microsoft.com/en-us/windows-hardware/customize/desktop/unattend/microsoft-windows-shell-setup-firstlogoncommands-synchronouscommand-commandline).
