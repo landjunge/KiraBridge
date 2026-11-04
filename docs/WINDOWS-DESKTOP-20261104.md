@@ -159,10 +159,15 @@ never replayed.
 The new desktop starter **KiraBridge Windows Desktop Test.cmd** prefers the dev3
 venv and checks its installed version; SHA256
 `47eba8e2e586c0c365f05d3b5b7968e4919b6800b988435a31aace5df7428c2f`.
-Installation/startup used no keyboard/clipboard input, credential rotation,
-process stop, global OS-right change, Windows-service installation or autostart.
+The installer/verifier submitted no keyboard or window tasks and used no
+clipboard, credential rotation, process stop, global OS-right change, Windows
+service or autostart. Setup commands were entered separately through UTM in the
+existing owned PowerShell window.
 The owned console was left running at the recorded readback. macOS/main and
-the other ongoing session were outside this Windows deployment.
+the other ongoing session were outside this Windows deployment. All ten owned
+host HTTP staging/report helpers and the temporary OCR watcher were independently
+confirmed absent at final cleanup; UTM still reported the retained VM as started.
+Neither Windows preview nor UTM was signalled during that cleanup.
 
 External ChatGPT/Voice, full GUI automation, file/process/terminal operations,
 Windows 10 and native global Windows-key shortcuts remain outside this acceptance.
