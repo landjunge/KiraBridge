@@ -153,7 +153,8 @@
       ],
       "product_or_fixture_changes_during_acceptance": false,
       "production_installation_performed": false,
-      "host_ui_actions_performed": false
+      "host_ui_actions_performed": false,
+      "scope": "Historical isolated package acceptance before production installation"
     }
   },
   "windows_installation": {
@@ -189,89 +190,31 @@
     ]
   },
   "macos_production_installation": {
-    "installed_rc33": false,
-    "current_version": "0.8.0rc30",
-    "core_pid": 66439,
-    "instance_id": "777222cce58e4b38b503c2f3d20900e1",
-    "reason": "Product interactive-desktop guard reported locked session before detach or installation input",
-    "installer_from_verified_published_zip": true,
-    "owned_preparation_tab": {
-      "window_id": 2870,
-      "tty": "/dev/ttys005"
+    "installed": true,
+    "started_utc": "2026-11-04T12:27:06.080558+00:00",
+    "finished_utc": "2026-11-04T12:27:39.010329+00:00",
+    "exit_code": 0,
+    "live_core_pid": 21571,
+    "live_core_instance": "0c145048b0b34e3f81ad4b157515ec40",
+    "source_commit": "ce0687dd8831dae261bf285922a146bcf3aedc41",
+    "version": "0.8.0rc33",
+    "independent_preservation_and_byte_checks": {
+      "all_configuration_files_preserved": true,
+      "table_schema_preserved": true,
+      "all_inventory_old_rows_preserved": true,
+      "all_protected_processes_preserved": true,
+      "python_modules_match": true,
+      "no_extra_python_modules": true,
+      "native_files_match": true,
+      "desktop_source_pin_matches": true
     },
-    "needs_unlocked_existing_session_for_update_and_cleanup": true,
-    "deferred_lock_preservation": {
-      "observed_utc": "2026-11-04T09:08:14.414617+00:00",
-      "installation_started": false,
-      "detach_attempted": false,
-      "installed_version": "0.8.0rc30",
-      "reason": "Product require_interactive reported locked desktop before further UI mutation",
-      "all_seven_config_files_unchanged": true,
-      "all_eleven_inventory_old_rows_unchanged": true,
-      "protected_agent_shell_count": 11,
-      "all_protected_agent_shell_identities_unchanged": true,
-      "owned_preparation_tab": {
-        "window_id": 2870,
-        "tty": "/dev/ttys005",
-        "installation_input_sent": false,
-        "cleanup_requires_interactive_unlocked_session": true
-      },
-      "files": {
-        ".config/kirabridge/config.toml": true,
-        ".config/kirabridge/credentials.json": true,
-        ".config/kirabridge/console-credentials.json": true,
-        ".config/kirabridge/openai-tunnel-runtime.key": true,
-        ".config/kirabridge/tunnel/kirabridge.yaml": true,
-        ".codex/config.toml": true,
-        ".grok/config.toml": true
-      },
-      "inventories": {
-        "completion_notices": {
-          "missing": 0,
-          "changed": 0
-        },
-        "message_jobs": {
-          "missing": 0,
-          "changed": 0
-        },
-        "messages": {
-          "missing": 0,
-          "changed": 0
-        },
-        "queue_holds": {
-          "missing": 0,
-          "changed": 0
-        },
-        "queue_withdrawals": {
-          "missing": 0,
-          "changed": 0
-        },
-        "session_input_buffers": {
-          "missing": 0,
-          "changed": 0
-        },
-        "tasks": {
-          "missing": 0,
-          "changed": 0
-        },
-        "team_work": {
-          "missing": 0,
-          "changed": 0
-        },
-        "visible_handoffs": {
-          "missing": 0,
-          "changed": 0
-        },
-        "voice_message_buffers": {
-          "missing": 0,
-          "changed": 0
-        },
-        "window_dispatches": {
-          "missing": 0,
-          "changed": 0
-        }
-      }
-    }
+    "rollback_backup": "/Users/landjunge/.local/share/kirabridge/install/backups/20261104-132711-8d912eff",
+    "preserved_rc30_release": "/Users/landjunge/.local/share/kirabridge/install/releases/0.8.0rc30-2d540ee05f94",
+    "separate_rc30_backup": "/Users/landjunge/.local/share/kirabridge/backups/rc33-intel-install-20261104T122400Z",
+    "own_install_window_closed": true,
+    "installed_rc33": true,
+    "functional_acceptance": "unknown_keyboard_unsupported_stop",
+    "followup_report": "rc33-intel-install-090-gate-20261104.json"
   },
   "cloud_ci_started": false,
   "source_and_package_refs_sha256": {
@@ -293,5 +236,92 @@
     ],
     "captured_before_utc": "2026-11-04T07:03:22.443879+00:00",
     "captured_after_utc": "2026-11-04T09:10:13.158688+00:00"
-  }
+  },
+  "macos_production_installation_history": [
+    {
+      "installed_rc33": false,
+      "current_version": "0.8.0rc30",
+      "core_pid": 66439,
+      "instance_id": "777222cce58e4b38b503c2f3d20900e1",
+      "reason": "Product interactive-desktop guard reported locked session before detach or installation input",
+      "installer_from_verified_published_zip": true,
+      "owned_preparation_tab": {
+        "window_id": 2870,
+        "tty": "/dev/ttys005"
+      },
+      "needs_unlocked_existing_session_for_update_and_cleanup": true,
+      "deferred_lock_preservation": {
+        "observed_utc": "2026-11-04T09:08:14.414617+00:00",
+        "installation_started": false,
+        "detach_attempted": false,
+        "installed_version": "0.8.0rc30",
+        "reason": "Product require_interactive reported locked desktop before further UI mutation",
+        "all_seven_config_files_unchanged": true,
+        "all_eleven_inventory_old_rows_unchanged": true,
+        "protected_agent_shell_count": 11,
+        "all_protected_agent_shell_identities_unchanged": true,
+        "owned_preparation_tab": {
+          "window_id": 2870,
+          "tty": "/dev/ttys005",
+          "installation_input_sent": false,
+          "cleanup_requires_interactive_unlocked_session": true
+        },
+        "files": {
+          ".config/kirabridge/config.toml": true,
+          ".config/kirabridge/credentials.json": true,
+          ".config/kirabridge/console-credentials.json": true,
+          ".config/kirabridge/openai-tunnel-runtime.key": true,
+          ".config/kirabridge/tunnel/kirabridge.yaml": true,
+          ".codex/config.toml": true,
+          ".grok/config.toml": true
+        },
+        "inventories": {
+          "completion_notices": {
+            "missing": 0,
+            "changed": 0
+          },
+          "message_jobs": {
+            "missing": 0,
+            "changed": 0
+          },
+          "messages": {
+            "missing": 0,
+            "changed": 0
+          },
+          "queue_holds": {
+            "missing": 0,
+            "changed": 0
+          },
+          "queue_withdrawals": {
+            "missing": 0,
+            "changed": 0
+          },
+          "session_input_buffers": {
+            "missing": 0,
+            "changed": 0
+          },
+          "tasks": {
+            "missing": 0,
+            "changed": 0
+          },
+          "team_work": {
+            "missing": 0,
+            "changed": 0
+          },
+          "visible_handoffs": {
+            "missing": 0,
+            "changed": 0
+          },
+          "voice_message_buffers": {
+            "missing": 0,
+            "changed": 0
+          },
+          "window_dispatches": {
+            "missing": 0,
+            "changed": 0
+          }
+        }
+      }
+    }
+  ]
 }
