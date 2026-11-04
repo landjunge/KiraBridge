@@ -3,6 +3,7 @@
 import importlib.util
 import json
 import os
+from contextlib import nullcontext
 from pathlib import Path
 
 import pytest
@@ -43,7 +44,52 @@ def receiver():
     result = FIXTURE.Receiver.__new__(FIXTURE.Receiver)
     result.user, result.hwnd, result.error = User(), 100, None
     result.input_case_name = "case-one"
+    result.fixture_class_name = f"KiraBridgeKeyboardFixture_{os.getpid()}"
+    result.fixture_mouse_api = MouseAPI(result)
     return result
+
+
+class MouseAPI:
+    def __init__(self, receiver):
+        self.receiver, self.calls = receiver, []
+        self.covered, self.buttons, self.count, self.failure = False, (), 3, None
+        self.desktop_error, self.class_name = None, None
+
+    def physical(self):
+        return nullcontext()
+
+    def validate_desktop(self):
+        if self.desktop_error:
+            raise RuntimeError(self.desktop_error)
+
+    def target(self, hwnd):
+        return {
+            "hwnd": str(hwnd),
+            "pid": self.receiver.user.owner,
+            "thread_id": 401,
+            "class_name": self.class_name or self.receiver.fixture_class_name,
+            "visible": True,
+            "minimized": False,
+            "topmost": True,
+        }
+
+    def client_center(self, hwnd):
+        return 500, 200
+
+    def virtual_screen(self):
+        return 0, 0, 1920, 1080
+
+    def buttons_down(self):
+        return self.buttons
+
+    def window_from_point(self, point):
+        return 999 if self.covered else self.receiver.hwnd
+
+    def send_input(self, events):
+        self.calls.append(events)
+        if self.failure:
+            raise self.failure
+        return self.count, 0
 
 
 def test_waits_for_ordinary_own_window_activation_without_focus_stealing():
@@ -58,25 +104,34 @@ def test_waits_for_ordinary_own_window_activation_without_focus_stealing():
         timeout=1, on_status=observations.append, clock=lambda: now[0], wait=wait
     )
     assert result["foreground_ready"] and result["hwnd"] == "100"
-    assert [item["phase"] for item in observations] == ["waiting_for_foreground", "ready"]
+    assert [item["phase"] for item in observations] == [
+        "waiting_for_foreground",
+        "setup_mouse_dispatching",
+        "setup_mouse_inserted_foreground_pending",
+        "ready",
+    ]
+    assert len(window.fixture_mouse_api.calls) == 1
+    assert result["setup_mouse_attempted"] is True
     assert all(item["input_attempted"] is False for item in observations)
     assert f"CLICK THIS WINDOW PID {os.getpid()}" in window.user.captions[0]
     assert f"READY PID {os.getpid()}" in window.user.captions[-1]
 
 
-def test_foreground_timeout_is_bounded_and_proves_no_send_was_attempted():
+def test_foreground_timeout_distinguishes_mouse_setup_from_no_keyboard_attempt():
     window, observations, now = receiver(), [], [0.0]
 
     def wait(seconds):
         now[0] += seconds
 
-    with pytest.raises(RuntimeError, match="foreground_timeout; no input attempted"):
+    with pytest.raises(RuntimeError, match="foreground_timeout; no keyboard input attempted"):
         window.wait_for_foreground(
             timeout=0.1, on_status=observations.append, clock=lambda: now[0], wait=wait
         )
     assert now[0] == pytest.approx(0.1)
     assert observations[-1]["phase"] == "foreground_timeout"
     assert observations[-1]["input_attempted"] is False
+    assert observations[-1]["setup_mouse_attempted"] is True
+    assert observations[-1]["setup_mouse"]["native_calls"] == 1
 
 
 def test_reused_hwnd_with_another_pid_is_not_our_fixture_and_is_not_relabelled():

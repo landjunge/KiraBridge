@@ -304,6 +304,7 @@ def new_fixture():
 
         def run(self):
             self.class_name = f"KiraBridgeWindowFixture_{os.getpid()}"
+            self.fixture_class_name = self.class_name
             self.instance = self.kernel.GetModuleHandleW(None)
             kind = self.WNDCLASSEX()
             kind.cbSize = ctypes.sizeof(kind)
@@ -312,7 +313,7 @@ def new_fixture():
             if not self.user.RegisterClassExW(ctypes.byref(kind)):
                 raise RuntimeError("Cannot register owned window fixture")
             self.hwnd = self.user.CreateWindowExW(
-                0,
+                0x00000008,  # Own topmost fixture; setup click must prove its exact hit target.
                 self.class_name,
                 f"KiraBridge WINDOWS TEST PID {os.getpid()}",
                 0x00CF0000,

@@ -14,11 +14,177 @@ import json
 import math
 import os
 import queue
+import secrets
 import threading
 import time
+from contextlib import contextmanager
 from pathlib import Path
 
-from kirabridge.platform_adapters.windows.keyboard import KeyStroke, WindowsKeyboard
+from kirabridge.platform_adapters.windows.keyboard import (
+    INPUT,
+    MOUSEINPUT,
+    KeyStroke,
+    Win32KeyboardAPI,
+    WindowsKeyboard,
+)
+
+MOUSE_BUTTONS = (0x01, 0x02, 0x04, 0x05, 0x06)
+MOUSE_MOVE_ABSOLUTE_VIRTUAL, MOUSE_LEFT_DOWN, MOUSE_LEFT_UP = 0xC001, 0x0002, 0x0004
+
+
+class POINT(ctypes.Structure):
+    _fields_ = [(name, ctypes.c_int32) for name in ("x", "y")]
+
+
+class RECT(ctypes.Structure):
+    _fields_ = [(name, ctypes.c_int32) for name in ("left", "top", "right", "bottom")]
+
+
+def bind_fixture_mouse(user):
+    """Only the test fixture uses these calls; POINT crosses WindowFromPoint by value."""
+    pointer, integer, dword = ctypes.c_void_p, ctypes.c_int32, ctypes.c_uint32
+    signatures = {
+        "IsWindow": ([pointer], integer),
+        "IsWindowVisible": ([pointer], integer),
+        "IsIconic": ([pointer], integer),
+        "GetWindowThreadProcessId": ([pointer, ctypes.POINTER(dword)], dword),
+        "GetClassNameW": ([pointer, ctypes.c_wchar_p, integer], integer),
+        "GetWindowLongPtrW": ([pointer, integer], ctypes.c_ssize_t),
+        "GetClientRect": ([pointer, ctypes.POINTER(RECT)], integer),
+        "ClientToScreen": ([pointer, ctypes.POINTER(POINT)], integer),
+        "WindowFromPoint": ([POINT], pointer),
+        "GetSystemMetrics": ([integer], integer),
+        "GetAsyncKeyState": ([integer], ctypes.c_int16),
+        "SetThreadDpiAwarenessContext": ([pointer], pointer),
+        "SendInput": ([dword, ctypes.POINTER(INPUT), integer], dword),
+    }
+    for name, (arguments, result) in signatures.items():
+        function = getattr(user, name)
+        function.argtypes, function.restype = arguments, result
+
+
+class FixtureMouseAPI:
+    """One ordinary mouse click for fixture readiness; never a production input path."""
+
+    def __init__(self, receiver):
+        self.desktop = Win32KeyboardAPI()  # Native construction rejects the Mac first.
+        self.user = receiver.user
+        bind_fixture_mouse(self.user)
+
+    def validate_desktop(self):
+        self.desktop.validate_desktop()
+
+    @contextmanager
+    def physical(self):
+        previous = self.user.SetThreadDpiAwarenessContext(ctypes.c_void_p(-4).value)
+        if not previous:
+            raise RuntimeError("Cannot select physical fixture coordinates")
+        try:
+            yield
+        finally:
+            if not self.user.SetThreadDpiAwarenessContext(previous):
+                raise RuntimeError("Cannot restore fixture DPI context")
+
+    def target(self, hwnd):
+        if not self.user.IsWindow(hwnd):
+            raise RuntimeError("Own fixture window disappeared before mouse setup")
+        pid, name = ctypes.c_uint32(), ctypes.create_unicode_buffer(256)
+        thread = self.user.GetWindowThreadProcessId(hwnd, ctypes.byref(pid))
+        self.user.GetClassNameW(hwnd, name, len(name))
+        return {
+            "hwnd": str(hwnd),
+            "pid": pid.value,
+            "thread_id": thread,
+            "class_name": name.value,
+            "visible": bool(self.user.IsWindowVisible(hwnd)),
+            "minimized": bool(self.user.IsIconic(hwnd)),
+            "topmost": bool(self.user.GetWindowLongPtrW(hwnd, -20) & 8),
+        }
+
+    def client_center(self, hwnd):
+        rectangle = RECT()
+        if not self.user.GetClientRect(hwnd, ctypes.byref(rectangle)):
+            raise RuntimeError("Own fixture client rectangle unavailable")
+        if rectangle.right - rectangle.left < 16 or rectangle.bottom - rectangle.top < 16:
+            raise RuntimeError("Own fixture client area is too small for safe setup")
+        point = POINT(
+            (rectangle.left + rectangle.right) // 2, (rectangle.top + rectangle.bottom) // 2
+        )
+        if not self.user.ClientToScreen(hwnd, ctypes.byref(point)):
+            raise RuntimeError("Own fixture physical client center unavailable")
+        return point.x, point.y
+
+    def virtual_screen(self):
+        return tuple(self.user.GetSystemMetrics(index) for index in (76, 77, 78, 79))
+
+    def buttons_down(self):
+        return tuple(
+            button for button in MOUSE_BUTTONS if self.user.GetAsyncKeyState(button) & 0x8000
+        )
+
+    def window_from_point(self, point):
+        return self.user.WindowFromPoint(POINT(*point))
+
+    def send_input(self, inputs):
+        ctypes.set_last_error(0)
+        count = self.user.SendInput(len(inputs), inputs, ctypes.sizeof(INPUT))
+        return int(count), ctypes.get_last_error()
+
+
+def fixture_mouse_guard(receiver, api):
+    api.validate_desktop()
+    target = api.target(receiver.hwnd)
+    expected_class = getattr(receiver, "fixture_class_name", None)
+    if (
+        expected_class
+        not in {
+            f"KiraBridgeKeyboardFixture_{os.getpid()}",
+            f"KiraBridgeWindowFixture_{os.getpid()}",
+        }
+        or target["hwnd"] != str(receiver.hwnd)
+        or target["pid"] != os.getpid()
+        or target["thread_id"] <= 0
+        or target["class_name"] != expected_class
+        or not target["visible"]
+        or target["minimized"]
+        or not target["topmost"]
+    ):
+        raise RuntimeError("Mouse setup target is not the exact owned topmost fixture")
+    point, screen = api.client_center(receiver.hwnd), api.virtual_screen()
+    x, y, width, height = screen
+    if not 2 <= width <= 32768 or not 2 <= height <= 32768:
+        raise RuntimeError("Fixture virtual-screen dimensions are outside safe bounds")
+    if not x + 1 <= point[0] < x + width - 1 or not y + 1 <= point[1] < y + height - 1:
+        raise RuntimeError("Fixture center is not safely inside the virtual screen")
+    if api.buttons_down():
+        raise RuntimeError("Mouse button already held; no fixture click attempted")
+    api.validate_desktop()
+    # Absolute mouse mapping can round by one pixel. Refuse even an adjacent
+    # foreign overlay; no cursor movement is used as a preliminary probe.
+    for dx in (-1, 0, 1):
+        for dy in (-1, 0, 1):
+            if api.window_from_point((point[0] + dx, point[1] + dy)) != receiver.hwnd:
+                raise RuntimeError("Fixture click point is covered; no foreign window click")
+    if api.window_from_point(point) != receiver.hwnd or api.target(receiver.hwnd) != target:
+        raise RuntimeError("Fixture click point owner changed before mouse setup")
+    return {"target": target, "point": point, "virtual_screen": screen}
+
+
+def fixture_mouse_inputs(plan):
+    x, y, width, height = plan["virtual_screen"]
+    point = plan["point"]
+    normalized = (
+        round((point[0] - x) * 65535 / (width - 1)),
+        round((point[1] - y) * 65535 / (height - 1)),
+    )
+    tag = secrets.randbits(min(48, ctypes.sizeof(ctypes.c_size_t) * 8 - 1)) or 1
+    inputs = (INPUT * 3)()
+    for index, (dx, dy, flags) in enumerate(
+        [(*normalized, MOUSE_MOVE_ABSOLUTE_VIRTUAL), (0, 0, MOUSE_LEFT_DOWN), (0, 0, MOUSE_LEFT_UP)]
+    ):
+        inputs[index].type = 0
+        inputs[index].mi = MOUSEINPUT(dx, dy, 0, flags, 0, tag)
+    return inputs
 
 
 class Receiver:
@@ -99,6 +265,12 @@ class Receiver:
 
     @staticmethod
     def save_report(output, report):
+        readiness = report.get("foreground_readiness", {})
+        if "setup_mouse_attempted" in readiness:
+            # Preserve keyboard counters independently: mouse setup is not a
+            # keyboard or tested window-control operation.
+            report["setup_mouse_attempted"] = readiness["setup_mouse_attempted"]
+            report["setup_mouse"] = readiness["setup_mouse"]
         output.seek(0)
         output.write(json.dumps(report, indent=2, ensure_ascii=True) + "\n")
         output.truncate()
@@ -125,8 +297,89 @@ class Receiver:
             "foreground_ready": own_window and current == self.hwnd and pid.value == os.getpid(),
         }
 
-    def wait_for_foreground(self, *, timeout=120, on_status=None, clock=time.monotonic, wait=None):
-        """Wait for ordinary activation of our own window; never steal focus in a loop."""
+    def setup_foreground_click(self, *, on_status=None, api=None):
+        """At most one ordinary fixture click; never repeat or guess mouse cleanup."""
+        lock = self.__dict__.setdefault("_setup_mouse_lock", threading.Lock())
+        if not lock.acquire(blocking=False):
+            raise RuntimeError("Fixture mouse setup is already active; no repeated click")
+        if getattr(self, "_setup_mouse_reserved", False):
+            lock.release()
+            raise RuntimeError("Fixture mouse setup was already reserved; never retry")
+        entered = False
+        evidence = {
+            "setup_mouse_attempted": False,
+            "state": "preflight",
+            "native_calls": 0,
+            "inserted_events": None,
+            "automatic_retry": False,
+            "scope": "Fixture readiness only; not keyboard input or tested window activation",
+            "coordinate_space": "physical_screen_pixels",
+            "application_processing_confirmed": False,
+        }
+
+        def emit():
+            self.setup_mouse_evidence = evidence
+            if on_status is not None:
+                on_status(
+                    {
+                        "phase": "setup_mouse_" + evidence["state"],
+                        "input_attempted": False,
+                        "setup_mouse_attempted": evidence["setup_mouse_attempted"],
+                        "setup_mouse": json.loads(json.dumps(evidence)),
+                    }
+                )
+
+        try:
+            self._setup_mouse_reserved = True
+            if on_status is None:
+                raise RuntimeError("A durable status callback is required before a fixture click")
+            if api is None:
+                api = getattr(self, "fixture_mouse_api", None) or FixtureMouseAPI(self)
+            with api.physical():
+                plan = fixture_mouse_guard(self, api)
+                inputs = fixture_mouse_inputs(plan)
+                evidence.update(
+                    {
+                        **plan,
+                        "setup_mouse_attempted": None,
+                        "state": "dispatching",
+                        "planned_events": [
+                            {
+                                "dx": item.mi.dx,
+                                "dy": item.mi.dy,
+                                "flags": item.mi.dwFlags,
+                                "tag": item.mi.dwExtraInfo,
+                            }
+                            for item in inputs
+                        ],
+                    }
+                )
+                emit()  # Durable unknown before the possible native effect.
+                if fixture_mouse_guard(self, api) != plan:
+                    raise RuntimeError("Fixture mouse target or geometry changed before click")
+                entered = True
+                evidence["native_calls"] = 1
+                count, error = api.send_input(inputs)
+                evidence.update(
+                    {"setup_mouse_attempted": True, "inserted_events": count, "win32_error": error}
+                )
+                if type(count) is not int or count != 3:
+                    raise RuntimeError("Fixture mouse insertion incomplete; no retry or keys")
+                evidence["state"] = "inserted_foreground_pending"
+                emit()
+            return evidence
+        except BaseException:
+            evidence["setup_mouse_attempted"] = True if entered else False
+            evidence["state"] = "unknown_no_retry" if entered else "refused_before_effect"
+            emit()
+            raise
+        finally:
+            lock.release()
+
+    def wait_for_foreground(
+        self, *, timeout=120, on_status=None, clock=time.monotonic, wait=None, setup_mouse_api=None
+    ):
+        """Confirm normal foreground after at most one checked, owned fixture click."""
         if (
             type(timeout) not in (int, float)
             or not math.isfinite(timeout)
@@ -135,6 +388,14 @@ class Receiver:
             raise ValueError("Fixture foreground wait must be finite and at most 300 seconds")
         pause = wait or threading.Event().wait
         started, previous = clock(), None
+        setup = getattr(
+            self,
+            "setup_mouse_evidence",
+            {"setup_mouse_attempted": False, "state": "not_needed", "native_calls": 0},
+        )
+        if setup["state"] == "unknown_no_retry":
+            raise RuntimeError("Uncertain fixture mouse setup; no keyboard input or retry")
+        setup_tried = False
         if self.foreground_status()["window_created"]:
             self.user.SetWindowTextW(self.hwnd, f"KiraBridge CLICK THIS WINDOW PID {os.getpid()}")
         while True:
@@ -145,12 +406,16 @@ class Receiver:
                 phase = "foreground_timeout"
             if not status["window_created"] or self.error:
                 phase = "window_unavailable"
+            if phase == "ready":
+                setup["foreground_confirmed"] = True
             if phase != previous:
                 observation = {
                     **status,
                     "phase": phase,
                     "elapsed_ms": round(elapsed * 1000, 3),
                     "input_attempted": False,
+                    "setup_mouse_attempted": setup["setup_mouse_attempted"],
+                    "setup_mouse": json.loads(json.dumps(setup)),
                     "timeout_seconds": timeout,
                 }
                 print(
@@ -163,7 +428,11 @@ class Receiver:
                 self.user.SetWindowTextW(self.hwnd, f"KiraBridge READY PID {os.getpid()}")
                 return observation
             if phase != "waiting_for_foreground":
-                raise RuntimeError(f"Owned fixture {phase}; no input attempted")
+                raise RuntimeError(f"Owned fixture {phase}; no keyboard input attempted")
+            if not setup_tried:
+                setup_tried = True
+                setup = self.setup_foreground_click(on_status=on_status, api=setup_mouse_api)
+                continue
             pause(min(0.05, max(0, timeout - elapsed)))
 
     def instrument_keyboard(self, keyboard, report, *, persist):
@@ -310,6 +579,7 @@ class Receiver:
 
     def run(self):
         name = f"KiraBridgeKeyboardFixture_{os.getpid()}"
+        self.fixture_class_name = name
         instance = self.kernel.GetModuleHandleW(None)
         window_class = self.WNDCLASSEX()
         window_class.cbSize = ctypes.sizeof(window_class)
