@@ -20,12 +20,12 @@ import zipfile
 from email.parser import BytesParser
 from pathlib import Path
 
-VERSION = "0.8.0rc31.dev3"
+VERSION = "0.8.0rc33"
 ASSET = f"KiraBridge-{VERSION}-Windows-Dev-Kit.zip"
 PHASES = ("core", "keyboard", "mcp", "preview", "shortcuts", "windows")
 REUSED_PHASES = ("core", "keyboard", "mcp")
 FRESH_PHASES = ("preview", "shortcuts", "windows")
-RUNTIME_MODULE_COUNT = 173
+RUNTIME_MODULE_COUNT = 174
 REUSED_HARNESSES = (
     "tests/test_windows_core_native.py",
     "scripts/accept_windows_keyboard.py",
@@ -491,8 +491,8 @@ $python = "$env:LOCALAPPDATA\\Programs\\Python\\Python{compact}\\python.exe"
 & $python -m venv .venv
 $previewPython = ".\\.venv\\Scripts\\python.exe"
 & $previewPython -m pip install --no-index --find-links .\\wheels -r .\\requirements-win.txt
-$stateDir = "$env:LOCALAPPDATA\\KiraBridgeWindowsPreview"
-& $previewPython -m kirabridge.windows_preview --state-dir $stateDir --port 8765
+$stateDir = "$env:LOCALAPPDATA\\KiraBridgePreviewRC33"
+& $previewPython -m kirabridge.windows_preview --state-dir $stateDir --port 8767
 
 Das Fenster fuer die Laufzeit offen lassen. Token und eigene Zustandsdateien
 werden erst beim Start lokal angelegt; keine privaten Gast-/Mac-Zugaenge liegen bei.

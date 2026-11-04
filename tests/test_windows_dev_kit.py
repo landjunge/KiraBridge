@@ -188,7 +188,7 @@ def test_archive_is_deterministic_and_contains_only_allowed_payloads_and_public_
     (fixture[0] / "Windows.iso").write_bytes(b"not a payload")
     contents, package = kit.prepare(*fixture, PIN)
     assert package["offline_wheels"] == 38
-    assert package["version"] == "0.8.0rc31.dev3"
+    assert package["version"] == "0.8.0rc33"
     assert package["native_guest_phases"] == list(kit.PHASES)
     assert len(package["native_guest_phases"]) == 6
     first = kit.build(contents, package, tmp_path / "out1")
@@ -331,7 +331,7 @@ def test_component_reuse_records_each_original_source_manifest_and_run(reuse_fix
     assert proof["run_ids"] == ["a" * 32, "b" * 32]
     assert [phase["reused"] for phase in proof["phases"]] == [True] * 3 + [False] * 3
     assert [phase["source_commit"] for phase in proof["phases"]] == ["c" * 40] * 3 + [PIN] * 3
-    assert proof["reuse_basis"]["runtime_module_count"] == kit.RUNTIME_MODULE_COUNT == 173
+    assert proof["reuse_basis"]["runtime_module_count"] == kit.RUNTIME_MODULE_COUNT == 174
     ignored = proof["reuse_basis"]["ignored_previous_preview"]
     assert ignored["accepted_as_passing_phase"] is False
     assert len(ignored["raw_report_sha256"]) == 64
