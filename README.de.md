@@ -89,6 +89,6 @@ benötigt eine gesonderte schriftliche Erlaubnis. Der deutsche Lizenztext ist ma
 
 [Entwicklerdokumentation](docs/DEVELOPERS.de.md)
 
-[Windows-Entwicklung](docs/WINDOWS-DEVELOPMENT-20261103.md): getrennte VM und
-native Tastatursteuerung in Vorbereitung; die echte Windows-Gastabnahme steht
-noch aus. Die veröffentlichte macOS-RC30-Installation bleibt getrennt erhalten.
+[Windows-Vorschau dev2](https://github.com/landjunge/KiraBridge/releases/tag/windows-v0.8.0rc31.dev2):
+Native Tastatur und lokales MCP haben die Abnahme in einer eigenen Windows 11-VM bestanden.
+[Ergebnisse und Grenzen](docs/WINDOWS-DEVELOPMENT-20261103.md); macOS RC30 bleibt getrennt.

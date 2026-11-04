@@ -50,5 +50,7 @@ never resend under a new ID. Stop the owned preview console with Ctrl+C.
 
 On macOS, `--help` works, while actual execution fails before state or credential
 writes. Focused tests cover policy, credential persistence/refusal, protocol-only
-stdout, loopback binding and cleanup. Native Windows transport/startup acceptance
-must be recorded by the guest smoke; unit tests are not that acceptance.
+stdout, loopback binding and cleanup. The real Windows HTTP startup/stop smoke
+passed for dev2; [native results and installation status](WINDOWS-DEVELOPMENT-20261103.md)
+distinguish that stopped test child from a retained installed instance. Native
+stdio transport acceptance remains open.
