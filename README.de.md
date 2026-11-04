@@ -13,15 +13,20 @@ KiraBridge verbindet ChatGPT mit **Grok Build und Codex, die in Terminalfenstern
 auf deinem Computer laufen**. Besprich im Chat, was du erledigen möchtest, gib die
 Arbeit an diese Terminalagenten weiter und verfolge ihre Antworten — mit den von dir erlaubten Zugriffen.
 
-**macOS · Intel — [0.8.0rc30](https://github.com/landjunge/KiraBridge/releases/tag/v0.8.0rc30) · 3. November 2026 · Vorabversion**
+**macOS · Intel — [0.8.0rc32](https://github.com/landjunge/KiraBridge/releases/tag/v0.8.0rc32) · 3. November 2026 · Vorabversion**
 
-### [KiraBridge herunterladen — App und Installer](https://github.com/landjunge/KiraBridge/releases/download/v0.8.0rc30/KiraBridge-0.8.0rc30-Intel-Installer.zip)
+### [KiraBridge herunterladen — App und Installer](https://github.com/landjunge/KiraBridge/releases/download/v0.8.0rc32/KiraBridge-0.8.0rc32-Intel-Installer.zip)
 
-[Prüfsummen](https://github.com/landjunge/KiraBridge/releases/download/v0.8.0rc30/SHA256SUMS)
+[Prüfsummen](https://github.com/landjunge/KiraBridge/releases/download/v0.8.0rc32/SHA256SUMS)
 · [Alle Versionen](https://github.com/landjunge/KiraBridge/releases)
 
 Für die Downloads brauchst du ein GitHub-Konto mit Zugriff auf dieses private Repository.
-Dies ist eine Vorabversion; eine stabile Version gibt es noch nicht. RC30 ist für Intel-Macs verfügbar.
+Dies ist eine Vorabversion; eine stabile Version gibt es noch nicht. RC32 ist für Intel-Macs verfügbar.
+
+Dieser Branch vereint macOS RC31/RC32 und Windows dev3 als **0.8.0rc33.dev1**,
+einen unveröffentlichten Integrationsstand der Quellen. Die Downloads oben und
+Windows-Links unten bleiben die getrennt geprüften Releases. Vor Paketbau oder
+Installation gelten die [Integrationsbelege und Plattformgrenzen](docs/INTEGRATION-DEV3-RC32-20261104.md).
 
 ## Wobei KiraBridge dir hilft
 
@@ -56,7 +61,7 @@ Für Terminalaufträge müssen Grok Build oder Codex installiert und angemeldet 
 Richte ihre Terminalsitzung in KiraBridge als Ziel ein.
 
 Diese Vorabversion hat bekannte Einschränkungen bei der Terminalbedienung; die App
-ist nicht von Apple notarisiert. Der [RC30-Installationsnachweis](docs/RC30-HOTPATHS-20261103.md)
+ist nicht von Apple notarisiert. Der [RC32-Paketnachweis](docs/RC32-NATIVE-ATTRIBUTE-BATCHING-20261103.md)
 beschreibt das aktuelle Paket; [frühere Installation und Hilfe](docs/INSTALL-DE.md)
 dokumentiert weiterhin RC20.
 
@@ -81,6 +86,15 @@ Dieselben acht großen Leseergebnisse benötigten im gemessenen RC30-Vergleich e
 statt zwei Apps-Aufrufe; Median 22,72 → 13,02 Sekunden bei je drei Gruppen.
 Cloudlatenz bleibt; das ist kein neuer physischer Tasten- oder Voicevergleich.
 
+RC31 ergänzt direkte native JSON-Reads über `read_query` mit `operation="native.read"`
+und begrenzte Accessibility-Unterbäume mit `max_depth>0`. Dadurch sinken wiederholte
+UI-Leseaufrufe und persistente Taskdaten. Ereignisabrufe laden große Ausgaben nicht
+mehr mit. Siehe [RC31-Umsetzung, Messungen und Auslieferungsstand](docs/RC31-NATIVE-READS-20261103.md).
+
+RC32 bündelt zusätzlich Attribute innerhalb optionaler UI-Unterbäume. Dieselben
+zwölf eigenen AppKit-Buttons benötigten im kontrollierten nativen Test 8,14 statt
+16,86 ms Median bei zwanzig abwechselnden Runden. Siehe [RC32-Messungen und Grenzen](docs/RC32-NATIVE-ATTRIBUTE-BATCHING-20261103.md).
+
 ## Lizenz
 
 Private, nicht geschäftliche Nutzung ist unter der
@@ -88,3 +102,13 @@ Private, nicht geschäftliche Nutzung ist unter der
 benötigt eine gesonderte schriftliche Erlaubnis. Der deutsche Lizenztext ist maßgeblich.
 
 [Entwicklerdokumentation](docs/DEVELOPERS.de.md)
+
+[Windows-Vorschau dev2](https://github.com/landjunge/KiraBridge/releases/tag/windows-v0.8.0rc31.dev2):
+Native Tastatur und lokales MCP haben die Abnahme in einer eigenen Windows 11-VM bestanden.
+[Ergebnisse und Grenzen](docs/WINDOWS-DEVELOPMENT-20261103.md); macOS bleibt getrennt.
+
+[Windows-Desktop-Vorschau dev3](https://github.com/landjunge/KiraBridge/releases/tag/windows-v0.8.0rc31.dev3): Alle sechs nativen
+Gastprüfungen bestanden, einschließlich Ctrl-/Alt-/Shift-Kombinationen und
+abgesicherter Fenstersteuerung. Veröffentlichte Downloads und die getrennte
+Windows 11-Installation sind geprüft. [Belege und Grenzen](docs/WINDOWS-DESKTOP-20261104.md);
+dev2 bleibt als Rückfallmöglichkeit erhalten.

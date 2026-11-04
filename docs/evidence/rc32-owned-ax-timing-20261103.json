@@ -1,0 +1,35 @@
+{
+  "schema": "kirabridge.rc32.owned-ax-timing.v1",
+  "source_sha256": {
+    "tests/fixtures/desktop_bootstrap/AccessibilityTimingHarness.swift": "5d8256f3fcd85546f1809d3ed160024d9b09fd9276a01a19810fc0610386153c",
+    "integrations/desktop/SystemControl.swift": "3b578d5ae885bd833c3f338b7b1c1c04e938308258df069386c9d37479721ace",
+    "integrations/desktop/SystemBridge.swift": "b4893ce4f59ecc49c5b2fddc04843730292686aecd56d08483c8ed95204c72db",
+    "integrations/desktop/SystemServices.swift": "4908af5acfcb9059220116f7ea8fe666e69451966217d4d386743173de08ad89",
+    "integrations/desktop/SystemKeyboard.swift": "711bf4d674eb28da67a467d278adad4e18c9902ffa7bbf6bf51aa310c66a4db5",
+    "integrations/desktop/SystemShortcuts.swift": "8407fd5424ca2e124e23bc1f82189d376564c5d2b6e33c845c4525bb458dd3e1",
+    "integrations/desktop/SystemSpecialKeys.swift": "3d0e753085204270b13d45297b644492d8456dd9810f3ebe8f1aa62e92c489cd"
+  },
+  "scope": "real native AX reads of one owned background fixture; no Cloud/Voice/input",
+  "permission_requested": false,
+  "input_posts": 0,
+  "window_created": false,
+  "binary_sha256": "617114ecc92ddd18cdf0a785e3cef6ff8939e00d7a5a41b832be55afbf93e977",
+  "initial_probe": {
+    "foreground_pid": 852,
+    "permission_requested": false,
+    "trusted": true
+  },
+  "status": "failed",
+  "error_type": "RuntimeError",
+  "error": "Owned fixture exited before readiness",
+  "owned_process_terminated": true,
+  "cleanup_scope": "Popen wait only; readiness identity never available",
+  "source_unchanged": true,
+  "interpretation_correction": {
+    "window_creation": "unknown: original false flag preceded readiness after provider spawn; do not interpret as no window",
+    "failure_scope": "setup only; no timing samples obtained",
+    "likely_cause": "Direct binary launch does not guarantee NSRunningApplication.launchDate, which requires LaunchServices; provider nil guard exits before ready",
+    "historical_attribution": "inference supported by source/SDK, not conclusive because initial return code/stderr were not retained",
+    "cleanup_scope": "Only recorded own Popen wait is proven; no independent per-identity absence claim for this attempt"
+  }
+}

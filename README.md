@@ -13,15 +13,20 @@ KiraBridge connects ChatGPT to **Grok Build and Codex running in terminal window
 on your computer**. Discuss what you need in chat, pass the work to those terminal
 agents and follow their replies while choosing what they may access.
 
-**macOS · Intel — [0.8.0rc30](https://github.com/landjunge/KiraBridge/releases/tag/v0.8.0rc30) · November 3, 2026 · Preview**
+**macOS · Intel — [0.8.0rc32](https://github.com/landjunge/KiraBridge/releases/tag/v0.8.0rc32) · November 3, 2026 · Preview**
 
-### [Download KiraBridge — app and installer](https://github.com/landjunge/KiraBridge/releases/download/v0.8.0rc30/KiraBridge-0.8.0rc30-Intel-Installer.zip)
+### [Download KiraBridge — app and installer](https://github.com/landjunge/KiraBridge/releases/download/v0.8.0rc32/KiraBridge-0.8.0rc32-Intel-Installer.zip)
 
-[Checksums](https://github.com/landjunge/KiraBridge/releases/download/v0.8.0rc30/SHA256SUMS)
+[Checksums](https://github.com/landjunge/KiraBridge/releases/download/v0.8.0rc32/SHA256SUMS)
 · [All releases](https://github.com/landjunge/KiraBridge/releases)
 
 Downloads require a GitHub account with access to this private repository.
-This is a preview; there is no stable release yet. RC30 is available for Intel Macs.
+This is a preview; there is no stable release yet. RC32 is available for Intel Macs.
+
+This branch combines macOS RC31/RC32 and Windows dev3 as **0.8.0rc33.dev1**,
+an unpublished source integration. The downloads above and Windows links below
+remain their separately verified releases. See the [integration evidence and
+platform limits](docs/INTEGRATION-DEV3-RC32-20261104.md) before packaging or installation.
 
 ## What KiraBridge helps you do
 
@@ -55,7 +60,7 @@ For terminal-agent tasks, install and sign in to Grok Build or Codex, then
 configure its terminal session as a target in KiraBridge.
 
 This preview has known terminal limitations, and the app is not Apple-notarized.
-See [RC30 installation evidence](docs/RC30-HOTPATHS-20261103.md) for the current
+See [RC32 package checks and limits](docs/RC32-NATIVE-ATTRIBUTE-BATCHING-20261103.md) for the current
 package and [earlier installation and help](docs/INSTALL-EN.md) for the RC20 guide.
 
 ## Keyboard sequences and fewer cloud calls
@@ -78,6 +83,15 @@ The same eight large read results needed one instead of two Apps calls in the
 measured RC30 comparison; median 22.72 → 13.02 seconds over three groups per version.
 Cloud latency remains; this is not a new physical keyboard or Voice benchmark.
 
+RC31 adds direct native JSON reads through `read_query` with `operation="native.read"`
+and bounded Accessibility subtrees with `max_depth>0`, reducing repeated UI reads
+and persisted task traffic. Task-event reads also avoid loading large outputs.
+See [RC31 implementation, measurements and delivery status](docs/RC31-NATIVE-READS-20261103.md).
+
+RC32 also batches attributes inside optional UI subtree reads. In a controlled
+native test, the same twelve owned AppKit buttons took 8.14 instead of 16.86 ms
+median over twenty alternating rounds. See [RC32 measurements and limits](docs/RC32-NATIVE-ATTRIBUTE-BATCHING-20261103.md).
+
 ## License
 
 Private, non-business use is free under the
@@ -85,3 +99,12 @@ Private, non-business use is free under the
 written permission. The German license text governs.
 
 [Developer documentation](docs/DEVELOPERS.md)
+
+[Windows preview dev2](https://github.com/landjunge/KiraBridge/releases/tag/windows-v0.8.0rc31.dev2):
+native keyboard and local MCP acceptance passed in a dedicated Windows 11 VM.
+[Results and limits](docs/WINDOWS-DEVELOPMENT-20261103.md); macOS stays separate.
+
+[Windows desktop preview dev3](https://github.com/landjunge/KiraBridge/releases/tag/windows-v0.8.0rc31.dev3): all six native
+guest phases passed, including Ctrl/Alt/Shift shortcuts and guarded window control.
+Published downloads and the separate Windows 11 installation were verified.
+[Evidence and limits](docs/WINDOWS-DESKTOP-20261104.md); dev2 remains available for rollback.

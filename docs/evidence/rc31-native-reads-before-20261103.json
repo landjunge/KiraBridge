@@ -1,0 +1,630 @@
+{
+  "label": "rc30-21a6abd-task-backed",
+  "mode": "task",
+  "baseline_commit": "21a6abda85aadc8d0c361b4106d328953af9aa02",
+  "version": "0.8.0rc30",
+  "sdk_version": "1.30.0",
+  "scope": "private loopback HTTP with actual MCP SDK, fake native JSON transport; no production state, native worker/OS query, keyboard, clipboard, cloud or voice",
+  "native_execution_scope": "fixture return and before-send authorization only; real native target/OS permission guards are not exercised or certified by this timing comparison",
+  "schema_cache": "one explicit setup tools/list; no read warmup omitted",
+  "percentiles": "P50 median, P95 nearest rank",
+  "source_file_sha256": {
+    "bridge_core/bridge.py": "800f01f9263090a041d4d4777fc5537c49c020d10bb8c9f4e2ac8bd3ad7b1115",
+    "task_manager/store.py": "817488b80bb9afe8bcc96504b41aa4eaa770bd7bf3a388f79228f621ba198dc4",
+    "task_manager/manager.py": "51bc1362e666c039d8381370ee0be2c566422c674915f8a9498f2195392aef3c",
+    "task_observation.py": "4f44b6beff10af35f659a6429bed56308b7189d4e563f775924f1c282cd0fac7",
+    "read_query.py": "6c6204746a0397fb55884156afa958fc03cd156eae8dfc14beb22a8a5c0c3336",
+    "native_queries.py": null,
+    "mcp_gateway/client.py": "7954cf389b03187e81074d185f103efaee6f7f2a06a681ce9f4362bd773a6263",
+    "mcp_gateway/server.py": "85a6a57ed5e58cc78c873cae121e63b5868ff61aa90820e0d6936d262982f440",
+    "mcp_gateway/http.py": "191e8e079c6fb1785fdbfdf1f04ed923051bbf27d6c1e4d076c32e28094a167f",
+    "mcp_gateway/schema_validation.py": "64c5f1f8b3cb6d23ef347bd62c49917eaae1e0e66ce99fccfc2bd4355ba8cc67",
+    "platform_adapters/macos/system_models.py": "985088daf504c345d332699124b91583a848c02775c799e188baa115466b9a23",
+    "platform_adapters/macos/system_transport.py": "924de685200d56766a33518bddffb7af78c3a23da9e359f952197cdb08e94a02",
+    "platform_adapters/macos/provider.py": "c7f04dfba295dad7ec2dfa65fcb3d5a719f6c552187b55e68924bfc6bf7dd3d6"
+  },
+  "script_sha256": "439b58c8f9b24498a737adb6cda26fbc07714e255821833b798e616a02706092",
+  "expected_result_sha256": "3198596b4776f98e65c05f674cfa34332f9577a473cc40ae57630988c2382f0c",
+  "native_fixture_payload": {
+    "effect": "none",
+    "revision": "owned-synthetic-read-v1",
+    "offset": 0,
+    "eof": true,
+    "applications": [
+      {
+        "name": "Owned synthetic application 0",
+        "pid": 222,
+        "started_at": 123.0,
+        "bundle_id": "fixture.owned.application0",
+        "app_path": "/fixture/Application0.app",
+        "active": true
+      },
+      {
+        "name": "Owned synthetic application 1",
+        "pid": 223,
+        "started_at": 124.0,
+        "bundle_id": "fixture.owned.application1",
+        "app_path": "/fixture/Application1.app",
+        "active": false
+      },
+      {
+        "name": "Owned synthetic application 2",
+        "pid": 224,
+        "started_at": 125.0,
+        "bundle_id": "fixture.owned.application2",
+        "app_path": "/fixture/Application2.app",
+        "active": false
+      },
+      {
+        "name": "Owned synthetic application 3",
+        "pid": 225,
+        "started_at": 126.0,
+        "bundle_id": "fixture.owned.application3",
+        "app_path": "/fixture/Application3.app",
+        "active": false
+      },
+      {
+        "name": "Owned synthetic application 4",
+        "pid": 226,
+        "started_at": 127.0,
+        "bundle_id": "fixture.owned.application4",
+        "app_path": "/fixture/Application4.app",
+        "active": false
+      },
+      {
+        "name": "Owned synthetic application 5",
+        "pid": 227,
+        "started_at": 128.0,
+        "bundle_id": "fixture.owned.application5",
+        "app_path": "/fixture/Application5.app",
+        "active": false
+      },
+      {
+        "name": "Owned synthetic application 6",
+        "pid": 228,
+        "started_at": 129.0,
+        "bundle_id": "fixture.owned.application6",
+        "app_path": "/fixture/Application6.app",
+        "active": false
+      },
+      {
+        "name": "Owned synthetic application 7",
+        "pid": 229,
+        "started_at": 130.0,
+        "bundle_id": "fixture.owned.application7",
+        "app_path": "/fixture/Application7.app",
+        "active": false
+      },
+      {
+        "name": "Owned synthetic application 8",
+        "pid": 230,
+        "started_at": 131.0,
+        "bundle_id": "fixture.owned.application8",
+        "app_path": "/fixture/Application8.app",
+        "active": false
+      },
+      {
+        "name": "Owned synthetic application 9",
+        "pid": 231,
+        "started_at": 132.0,
+        "bundle_id": "fixture.owned.application9",
+        "app_path": "/fixture/Application9.app",
+        "active": false
+      },
+      {
+        "name": "Owned synthetic application 10",
+        "pid": 232,
+        "started_at": 133.0,
+        "bundle_id": "fixture.owned.application10",
+        "app_path": "/fixture/Application10.app",
+        "active": false
+      },
+      {
+        "name": "Owned synthetic application 11",
+        "pid": 233,
+        "started_at": 134.0,
+        "bundle_id": "fixture.owned.application11",
+        "app_path": "/fixture/Application11.app",
+        "active": false
+      }
+    ]
+  },
+  "native_fixture_metadata": {
+    "available": true,
+    "revision": "fixture-v1",
+    "keyboard_protocol": 1
+  },
+  "grants": {
+    "capabilities": [
+      "apps.list",
+      "task.read"
+    ],
+    "permission_level": "full",
+    "approval_mode": "automatic",
+    "root_scope": "owned private temporary directory only"
+  },
+  "samples": [
+    {
+      "index": 0,
+      "tool": "task_request",
+      "wall_ms": 33.995836,
+      "process_cpu_ms": 21.285,
+      "http_posts": 1,
+      "native_fixture_calls": 1,
+      "before_send_auth_calls": 1,
+      "result_sha256": "3198596b4776f98e65c05f674cfa34332f9577a473cc40ae57630988c2382f0c",
+      "mcp_result_reserialized_utf8_bytes": 6288
+    },
+    {
+      "index": 1,
+      "tool": "task_request",
+      "wall_ms": 65.290001,
+      "process_cpu_ms": 15.647,
+      "http_posts": 1,
+      "native_fixture_calls": 1,
+      "before_send_auth_calls": 1,
+      "result_sha256": "3198596b4776f98e65c05f674cfa34332f9577a473cc40ae57630988c2382f0c",
+      "mcp_result_reserialized_utf8_bytes": 6289
+    },
+    {
+      "index": 2,
+      "tool": "task_request",
+      "wall_ms": 20.349266,
+      "process_cpu_ms": 14.262,
+      "http_posts": 1,
+      "native_fixture_calls": 1,
+      "before_send_auth_calls": 1,
+      "result_sha256": "3198596b4776f98e65c05f674cfa34332f9577a473cc40ae57630988c2382f0c",
+      "mcp_result_reserialized_utf8_bytes": 6287
+    },
+    {
+      "index": 3,
+      "tool": "task_request",
+      "wall_ms": 17.212121,
+      "process_cpu_ms": 13.317,
+      "http_posts": 1,
+      "native_fixture_calls": 1,
+      "before_send_auth_calls": 1,
+      "result_sha256": "3198596b4776f98e65c05f674cfa34332f9577a473cc40ae57630988c2382f0c",
+      "mcp_result_reserialized_utf8_bytes": 6287
+    },
+    {
+      "index": 4,
+      "tool": "task_request",
+      "wall_ms": 16.833364,
+      "process_cpu_ms": 13.195,
+      "http_posts": 1,
+      "native_fixture_calls": 1,
+      "before_send_auth_calls": 1,
+      "result_sha256": "3198596b4776f98e65c05f674cfa34332f9577a473cc40ae57630988c2382f0c",
+      "mcp_result_reserialized_utf8_bytes": 6281
+    },
+    {
+      "index": 5,
+      "tool": "task_request",
+      "wall_ms": 15.902153,
+      "process_cpu_ms": 13.415,
+      "http_posts": 1,
+      "native_fixture_calls": 1,
+      "before_send_auth_calls": 1,
+      "result_sha256": "3198596b4776f98e65c05f674cfa34332f9577a473cc40ae57630988c2382f0c",
+      "mcp_result_reserialized_utf8_bytes": 6289
+    },
+    {
+      "index": 6,
+      "tool": "task_request",
+      "wall_ms": 17.464498,
+      "process_cpu_ms": 13.892,
+      "http_posts": 1,
+      "native_fixture_calls": 1,
+      "before_send_auth_calls": 1,
+      "result_sha256": "3198596b4776f98e65c05f674cfa34332f9577a473cc40ae57630988c2382f0c",
+      "mcp_result_reserialized_utf8_bytes": 6287
+    },
+    {
+      "index": 7,
+      "tool": "task_request",
+      "wall_ms": 14.444995,
+      "process_cpu_ms": 12.167,
+      "http_posts": 1,
+      "native_fixture_calls": 1,
+      "before_send_auth_calls": 1,
+      "result_sha256": "3198596b4776f98e65c05f674cfa34332f9577a473cc40ae57630988c2382f0c",
+      "mcp_result_reserialized_utf8_bytes": 6283
+    },
+    {
+      "index": 8,
+      "tool": "task_request",
+      "wall_ms": 16.178014,
+      "process_cpu_ms": 13.345,
+      "http_posts": 1,
+      "native_fixture_calls": 1,
+      "before_send_auth_calls": 1,
+      "result_sha256": "3198596b4776f98e65c05f674cfa34332f9577a473cc40ae57630988c2382f0c",
+      "mcp_result_reserialized_utf8_bytes": 6283
+    },
+    {
+      "index": 9,
+      "tool": "task_request",
+      "wall_ms": 14.957167,
+      "process_cpu_ms": 12.141,
+      "http_posts": 1,
+      "native_fixture_calls": 1,
+      "before_send_auth_calls": 1,
+      "result_sha256": "3198596b4776f98e65c05f674cfa34332f9577a473cc40ae57630988c2382f0c",
+      "mcp_result_reserialized_utf8_bytes": 6286
+    },
+    {
+      "index": 10,
+      "tool": "task_request",
+      "wall_ms": 15.152332,
+      "process_cpu_ms": 13.107,
+      "http_posts": 1,
+      "native_fixture_calls": 1,
+      "before_send_auth_calls": 1,
+      "result_sha256": "3198596b4776f98e65c05f674cfa34332f9577a473cc40ae57630988c2382f0c",
+      "mcp_result_reserialized_utf8_bytes": 6283
+    },
+    {
+      "index": 11,
+      "tool": "task_request",
+      "wall_ms": 14.935477,
+      "process_cpu_ms": 12.48,
+      "http_posts": 1,
+      "native_fixture_calls": 1,
+      "before_send_auth_calls": 1,
+      "result_sha256": "3198596b4776f98e65c05f674cfa34332f9577a473cc40ae57630988c2382f0c",
+      "mcp_result_reserialized_utf8_bytes": 6293
+    },
+    {
+      "index": 12,
+      "tool": "task_request",
+      "wall_ms": 15.400499,
+      "process_cpu_ms": 13.066,
+      "http_posts": 1,
+      "native_fixture_calls": 1,
+      "before_send_auth_calls": 1,
+      "result_sha256": "3198596b4776f98e65c05f674cfa34332f9577a473cc40ae57630988c2382f0c",
+      "mcp_result_reserialized_utf8_bytes": 6286
+    },
+    {
+      "index": 13,
+      "tool": "task_request",
+      "wall_ms": 14.231607,
+      "process_cpu_ms": 12.417,
+      "http_posts": 1,
+      "native_fixture_calls": 1,
+      "before_send_auth_calls": 1,
+      "result_sha256": "3198596b4776f98e65c05f674cfa34332f9577a473cc40ae57630988c2382f0c",
+      "mcp_result_reserialized_utf8_bytes": 6287
+    },
+    {
+      "index": 14,
+      "tool": "task_request",
+      "wall_ms": 13.019408,
+      "process_cpu_ms": 11.03,
+      "http_posts": 1,
+      "native_fixture_calls": 1,
+      "before_send_auth_calls": 1,
+      "result_sha256": "3198596b4776f98e65c05f674cfa34332f9577a473cc40ae57630988c2382f0c",
+      "mcp_result_reserialized_utf8_bytes": 6285
+    },
+    {
+      "index": 15,
+      "tool": "task_request",
+      "wall_ms": 13.911781,
+      "process_cpu_ms": 11.893,
+      "http_posts": 1,
+      "native_fixture_calls": 1,
+      "before_send_auth_calls": 1,
+      "result_sha256": "3198596b4776f98e65c05f674cfa34332f9577a473cc40ae57630988c2382f0c",
+      "mcp_result_reserialized_utf8_bytes": 6289
+    },
+    {
+      "index": 16,
+      "tool": "task_request",
+      "wall_ms": 12.893569,
+      "process_cpu_ms": 11.45,
+      "http_posts": 1,
+      "native_fixture_calls": 1,
+      "before_send_auth_calls": 1,
+      "result_sha256": "3198596b4776f98e65c05f674cfa34332f9577a473cc40ae57630988c2382f0c",
+      "mcp_result_reserialized_utf8_bytes": 6293
+    },
+    {
+      "index": 17,
+      "tool": "task_request",
+      "wall_ms": 13.405591,
+      "process_cpu_ms": 10.882,
+      "http_posts": 1,
+      "native_fixture_calls": 1,
+      "before_send_auth_calls": 1,
+      "result_sha256": "3198596b4776f98e65c05f674cfa34332f9577a473cc40ae57630988c2382f0c",
+      "mcp_result_reserialized_utf8_bytes": 6287
+    },
+    {
+      "index": 18,
+      "tool": "task_request",
+      "wall_ms": 13.367081,
+      "process_cpu_ms": 11.63,
+      "http_posts": 1,
+      "native_fixture_calls": 1,
+      "before_send_auth_calls": 1,
+      "result_sha256": "3198596b4776f98e65c05f674cfa34332f9577a473cc40ae57630988c2382f0c",
+      "mcp_result_reserialized_utf8_bytes": 6291
+    },
+    {
+      "index": 19,
+      "tool": "task_request",
+      "wall_ms": 13.564066,
+      "process_cpu_ms": 12.361,
+      "http_posts": 1,
+      "native_fixture_calls": 1,
+      "before_send_auth_calls": 1,
+      "result_sha256": "3198596b4776f98e65c05f674cfa34332f9577a473cc40ae57630988c2382f0c",
+      "mcp_result_reserialized_utf8_bytes": 6281
+    },
+    {
+      "index": 20,
+      "tool": "task_request",
+      "wall_ms": 14.234457,
+      "process_cpu_ms": 11.367,
+      "http_posts": 1,
+      "native_fixture_calls": 1,
+      "before_send_auth_calls": 1,
+      "result_sha256": "3198596b4776f98e65c05f674cfa34332f9577a473cc40ae57630988c2382f0c",
+      "mcp_result_reserialized_utf8_bytes": 6284
+    },
+    {
+      "index": 21,
+      "tool": "task_request",
+      "wall_ms": 13.556013,
+      "process_cpu_ms": 11.067,
+      "http_posts": 1,
+      "native_fixture_calls": 1,
+      "before_send_auth_calls": 1,
+      "result_sha256": "3198596b4776f98e65c05f674cfa34332f9577a473cc40ae57630988c2382f0c",
+      "mcp_result_reserialized_utf8_bytes": 6293
+    },
+    {
+      "index": 22,
+      "tool": "task_request",
+      "wall_ms": 13.72363,
+      "process_cpu_ms": 11.023,
+      "http_posts": 1,
+      "native_fixture_calls": 1,
+      "before_send_auth_calls": 1,
+      "result_sha256": "3198596b4776f98e65c05f674cfa34332f9577a473cc40ae57630988c2382f0c",
+      "mcp_result_reserialized_utf8_bytes": 6291
+    },
+    {
+      "index": 23,
+      "tool": "task_request",
+      "wall_ms": 13.80022,
+      "process_cpu_ms": 11.146,
+      "http_posts": 1,
+      "native_fixture_calls": 1,
+      "before_send_auth_calls": 1,
+      "result_sha256": "3198596b4776f98e65c05f674cfa34332f9577a473cc40ae57630988c2382f0c",
+      "mcp_result_reserialized_utf8_bytes": 6289
+    },
+    {
+      "index": 24,
+      "tool": "task_request",
+      "wall_ms": 12.91908,
+      "process_cpu_ms": 10.538,
+      "http_posts": 1,
+      "native_fixture_calls": 1,
+      "before_send_auth_calls": 1,
+      "result_sha256": "3198596b4776f98e65c05f674cfa34332f9577a473cc40ae57630988c2382f0c",
+      "mcp_result_reserialized_utf8_bytes": 6287
+    },
+    {
+      "index": 25,
+      "tool": "task_request",
+      "wall_ms": 13.410732,
+      "process_cpu_ms": 11.704,
+      "http_posts": 1,
+      "native_fixture_calls": 1,
+      "before_send_auth_calls": 1,
+      "result_sha256": "3198596b4776f98e65c05f674cfa34332f9577a473cc40ae57630988c2382f0c",
+      "mcp_result_reserialized_utf8_bytes": 6283
+    },
+    {
+      "index": 26,
+      "tool": "task_request",
+      "wall_ms": 13.933437,
+      "process_cpu_ms": 11.453,
+      "http_posts": 1,
+      "native_fixture_calls": 1,
+      "before_send_auth_calls": 1,
+      "result_sha256": "3198596b4776f98e65c05f674cfa34332f9577a473cc40ae57630988c2382f0c",
+      "mcp_result_reserialized_utf8_bytes": 6289
+    },
+    {
+      "index": 27,
+      "tool": "task_request",
+      "wall_ms": 13.004748,
+      "process_cpu_ms": 11.023,
+      "http_posts": 1,
+      "native_fixture_calls": 1,
+      "before_send_auth_calls": 1,
+      "result_sha256": "3198596b4776f98e65c05f674cfa34332f9577a473cc40ae57630988c2382f0c",
+      "mcp_result_reserialized_utf8_bytes": 6289
+    },
+    {
+      "index": 28,
+      "tool": "task_request",
+      "wall_ms": 14.769182,
+      "process_cpu_ms": 11.8,
+      "http_posts": 1,
+      "native_fixture_calls": 1,
+      "before_send_auth_calls": 1,
+      "result_sha256": "3198596b4776f98e65c05f674cfa34332f9577a473cc40ae57630988c2382f0c",
+      "mcp_result_reserialized_utf8_bytes": 6285
+    },
+    {
+      "index": 29,
+      "tool": "task_request",
+      "wall_ms": 13.779451,
+      "process_cpu_ms": 11.235,
+      "http_posts": 1,
+      "native_fixture_calls": 1,
+      "before_send_auth_calls": 1,
+      "result_sha256": "3198596b4776f98e65c05f674cfa34332f9577a473cc40ae57630988c2382f0c",
+      "mcp_result_reserialized_utf8_bytes": 6283
+    }
+  ],
+  "cleanup_mcp_calls": 0,
+  "completion_receive_calls": 0,
+  "completion_ack_calls": 0,
+  "passed": true,
+  "protocol_version": "2025-11-25",
+  "setup_http_posts": 3,
+  "setup_catalog_calls": 1,
+  "initial_inventory": {
+    "tasks": 0,
+    "events": 0,
+    "completion_routes": 0,
+    "completion_notices": 0
+  },
+  "final_inventory": {
+    "tasks": 30,
+    "events": 150,
+    "completion_routes": 30,
+    "completion_notices": 30
+  },
+  "task_states": {
+    "completed": 30
+  },
+  "completion_delivery": {
+    "delivered": 0,
+    "acknowledged": 0
+  },
+  "native_call_contract_sha256": "0ed51965dd93fed3485aa3e55ed868071e396aca074b64e3e202fa969265ea8b",
+  "native_fixture_calls_total": 30,
+  "before_send_auth_calls_total": 30,
+  "native_metadata_calls_total_including_setup": 64,
+  "native_worker_launch_attempts": 0,
+  "native_worker_running": false,
+  "private_endpoint_absent": true,
+  "fixture_closed": true,
+  "source_files_unchanged_during_run": true,
+  "all_http_posts": [
+    {
+      "duration_ms": 15.351314
+    },
+    {
+      "duration_ms": 34.090039
+    },
+    {
+      "duration_ms": 22.605358
+    },
+    {
+      "duration_ms": 20.279536
+    },
+    {
+      "duration_ms": 21.543765
+    },
+    {
+      "duration_ms": 13.608638
+    },
+    {
+      "duration_ms": 11.735182
+    },
+    {
+      "duration_ms": 11.124771
+    },
+    {
+      "duration_ms": 10.539487
+    },
+    {
+      "duration_ms": 12.447977
+    },
+    {
+      "duration_ms": 10.147678
+    },
+    {
+      "duration_ms": 10.674678
+    },
+    {
+      "duration_ms": 10.633297
+    },
+    {
+      "duration_ms": 10.987687
+    },
+    {
+      "duration_ms": 10.671323
+    },
+    {
+      "duration_ms": 10.662245
+    },
+    {
+      "duration_ms": 10.302538
+    },
+    {
+      "duration_ms": 9.318924
+    },
+    {
+      "duration_ms": 9.800396
+    },
+    {
+      "duration_ms": 9.398541
+    },
+    {
+      "duration_ms": 9.672906
+    },
+    {
+      "duration_ms": 9.608063
+    },
+    {
+      "duration_ms": 9.745362
+    },
+    {
+      "duration_ms": 10.384791
+    },
+    {
+      "duration_ms": 9.575673
+    },
+    {
+      "duration_ms": 9.631755
+    },
+    {
+      "duration_ms": 9.884656
+    },
+    {
+      "duration_ms": 9.328429
+    },
+    {
+      "duration_ms": 9.583851
+    },
+    {
+      "duration_ms": 10.236511
+    },
+    {
+      "duration_ms": 9.166788
+    },
+    {
+      "duration_ms": 10.095412
+    },
+    {
+      "duration_ms": 9.411351
+    }
+  ],
+  "wall": {
+    "n": 30,
+    "p50_ms": 14.233032000000001,
+    "p95_ms": 33.995836,
+    "total_ms": 509.63977600000015,
+    "min_ms": 12.893569,
+    "max_ms": 65.290001
+  },
+  "process_cpu": {
+    "n": 30,
+    "p50_ms": 12.017,
+    "p95_ms": 15.647,
+    "total_ms": 375.3380000000001,
+    "min_ms": 10.538,
+    "max_ms": 21.285
+  }
+}

@@ -1,0 +1,498 @@
+{
+  "schema": "kirabridge.rc32.owned-ax-timing.v1",
+  "source_sha256": {
+    "tests/fixtures/desktop_bootstrap/AccessibilityTimingHarness.swift": "4534777f535405a5d6d1e290fc8567e16ae0fc1db8d6c6c45ac68cb940898892",
+    "integrations/desktop/SystemControl.swift": "3b578d5ae885bd833c3f338b7b1c1c04e938308258df069386c9d37479721ace",
+    "integrations/desktop/SystemBridge.swift": "b4893ce4f59ecc49c5b2fddc04843730292686aecd56d08483c8ed95204c72db",
+    "integrations/desktop/SystemServices.swift": "4908af5acfcb9059220116f7ea8fe666e69451966217d4d386743173de08ad89",
+    "integrations/desktop/SystemKeyboard.swift": "711bf4d674eb28da67a467d278adad4e18c9902ffa7bbf6bf51aa310c66a4db5",
+    "integrations/desktop/SystemShortcuts.swift": "8407fd5424ca2e124e23bc1f82189d376564c5d2b6e33c845c4525bb458dd3e1",
+    "integrations/desktop/SystemSpecialKeys.swift": "3d0e753085204270b13d45297b644492d8456dd9810f3ebe8f1aa62e92c489cd"
+  },
+  "scope": "real native AX reads of one owned background fixture; no Cloud/Voice/input",
+  "permission_requested": false,
+  "input_posts": 0,
+  "window_created": true,
+  "binary_sha256": "35242e67d6b9a50aa9b47e55f6afca3aceb3862f6f7620edcfb6191d1b1b3424",
+  "initial_probe": {
+    "foreground_pid": 852,
+    "owned_other_pids": [],
+    "permission_requested": false,
+    "trusted": true
+  },
+  "window_creation_attempted": true,
+  "launch_stderr": "",
+  "launch_returncode": 0,
+  "launch_result": {
+    "activation_requested": false,
+    "active": false,
+    "foreground_pid": 852,
+    "launched": true,
+    "pid": 57565,
+    "started_at": 1793740120.9070992
+  },
+  "target": {
+    "active": false,
+    "foreground_pid": 852,
+    "pid": 57565,
+    "started_at": 1793740120.9070992,
+    "window_count": 1
+  },
+  "measurement": {
+    "batch_support_preflight": [
+      {
+        "classification_status": 0,
+        "metadata_status": 0
+      },
+      {
+        "classification_status": 0,
+        "metadata_status": 0
+      },
+      {
+        "classification_status": 0,
+        "metadata_status": 0
+      },
+      {
+        "classification_status": 0,
+        "metadata_status": 0
+      },
+      {
+        "classification_status": 0,
+        "metadata_status": 0
+      },
+      {
+        "classification_status": 0,
+        "metadata_status": 0
+      },
+      {
+        "classification_status": 0,
+        "metadata_status": 0
+      },
+      {
+        "classification_status": 0,
+        "metadata_status": 0
+      },
+      {
+        "classification_status": 0,
+        "metadata_status": 0
+      },
+      {
+        "classification_status": 0,
+        "metadata_status": 0
+      },
+      {
+        "classification_status": 0,
+        "metadata_status": 0
+      },
+      {
+        "classification_status": 0,
+        "metadata_status": 0
+      }
+    ],
+    "fixture_active": false,
+    "foreground_pid": 852,
+    "input_posts": 0,
+    "nodes_per_round": 12,
+    "passed": true,
+    "permission_requested": false,
+    "preflight_scope": "Both batches on every target before timing; timed fallback is not separately instrumented",
+    "result_hashes": [
+      "cfca00da338d8c8cdb4b8760565411c35ef15fd6f585a9ab30e2d08acddc015b"
+    ],
+    "rounds": 20,
+    "samples": [
+      {
+        "order": [
+          "individual",
+          "batched"
+        ],
+        "results_identical": true,
+        "round": 0,
+        "timings": {
+          "batched": {
+            "cpu_ms": 3.377999999999992,
+            "wall_ms": 8.073054006672464
+          },
+          "individual": {
+            "cpu_ms": 6.763999999999992,
+            "wall_ms": 17.601970001123846
+          }
+        }
+      },
+      {
+        "order": [
+          "batched",
+          "individual"
+        ],
+        "results_identical": true,
+        "round": 1,
+        "timings": {
+          "batched": {
+            "cpu_ms": 3.3499999999999917,
+            "wall_ms": 8.093217009445652
+          },
+          "individual": {
+            "cpu_ms": 4.859000000000002,
+            "wall_ms": 14.585850003641099
+          }
+        }
+      },
+      {
+        "order": [
+          "individual",
+          "batched"
+        ],
+        "results_identical": true,
+        "round": 2,
+        "timings": {
+          "batched": {
+            "cpu_ms": 3.3050000000000024,
+            "wall_ms": 8.036366998567246
+          },
+          "individual": {
+            "cpu_ms": 5.336999999999994,
+            "wall_ms": 16.94189599948004
+          }
+        }
+      },
+      {
+        "order": [
+          "batched",
+          "individual"
+        ],
+        "results_identical": true,
+        "round": 3,
+        "timings": {
+          "batched": {
+            "cpu_ms": 3.3009999999999984,
+            "wall_ms": 8.094799006357789
+          },
+          "individual": {
+            "cpu_ms": 5.589999999999998,
+            "wall_ms": 17.03048899071291
+          }
+        }
+      },
+      {
+        "order": [
+          "individual",
+          "batched"
+        ],
+        "results_identical": true,
+        "round": 4,
+        "timings": {
+          "batched": {
+            "cpu_ms": 3.3660000000000077,
+            "wall_ms": 8.13103499240242
+          },
+          "individual": {
+            "cpu_ms": 5.227000000000009,
+            "wall_ms": 16.642832008074038
+          }
+        }
+      },
+      {
+        "order": [
+          "batched",
+          "individual"
+        ],
+        "results_identical": true,
+        "round": 5,
+        "timings": {
+          "batched": {
+            "cpu_ms": 3.4190000000000054,
+            "wall_ms": 8.145056999637745
+          },
+          "individual": {
+            "cpu_ms": 5.591999999999986,
+            "wall_ms": 16.362523994757794
+          }
+        }
+      },
+      {
+        "order": [
+          "individual",
+          "batched"
+        ],
+        "results_identical": true,
+        "round": 6,
+        "timings": {
+          "batched": {
+            "cpu_ms": 3.4460000000000046,
+            "wall_ms": 8.091677009360865
+          },
+          "individual": {
+            "cpu_ms": 5.72700000000001,
+            "wall_ms": 17.243914000573568
+          }
+        }
+      },
+      {
+        "order": [
+          "batched",
+          "individual"
+        ],
+        "results_identical": true,
+        "round": 7,
+        "timings": {
+          "batched": {
+            "cpu_ms": 3.5560000000000036,
+            "wall_ms": 8.410778988036327
+          },
+          "individual": {
+            "cpu_ms": 5.647999999999986,
+            "wall_ms": 16.60463199368678
+          }
+        }
+      },
+      {
+        "order": [
+          "individual",
+          "batched"
+        ],
+        "results_identical": true,
+        "round": 8,
+        "timings": {
+          "batched": {
+            "cpu_ms": 3.371999999999986,
+            "wall_ms": 8.394500997383147
+          },
+          "individual": {
+            "cpu_ms": 5.393000000000009,
+            "wall_ms": 15.748482997878455
+          }
+        }
+      },
+      {
+        "order": [
+          "batched",
+          "individual"
+        ],
+        "results_identical": true,
+        "round": 9,
+        "timings": {
+          "batched": {
+            "cpu_ms": 3.4620000000000206,
+            "wall_ms": 8.258122004917823
+          },
+          "individual": {
+            "cpu_ms": 5.346000000000018,
+            "wall_ms": 15.690622007241473
+          }
+        }
+      },
+      {
+        "order": [
+          "individual",
+          "batched"
+        ],
+        "results_identical": true,
+        "round": 10,
+        "timings": {
+          "batched": {
+            "cpu_ms": 3.359000000000001,
+            "wall_ms": 7.898704003309831
+          },
+          "individual": {
+            "cpu_ms": 5.77999999999998,
+            "wall_ms": 18.447597001795657
+          }
+        }
+      },
+      {
+        "order": [
+          "batched",
+          "individual"
+        ],
+        "results_identical": true,
+        "round": 11,
+        "timings": {
+          "batched": {
+            "cpu_ms": 3.6390000000000033,
+            "wall_ms": 8.626676994026639
+          },
+          "individual": {
+            "cpu_ms": 5.547999999999997,
+            "wall_ms": 16.613801999483258
+          }
+        }
+      },
+      {
+        "order": [
+          "individual",
+          "batched"
+        ],
+        "results_identical": true,
+        "round": 12,
+        "timings": {
+          "batched": {
+            "cpu_ms": 3.4359999999999946,
+            "wall_ms": 8.500645009917207
+          },
+          "individual": {
+            "cpu_ms": 5.730999999999986,
+            "wall_ms": 16.850824002176523
+          }
+        }
+      },
+      {
+        "order": [
+          "batched",
+          "individual"
+        ],
+        "results_identical": true,
+        "round": 13,
+        "timings": {
+          "batched": {
+            "cpu_ms": 3.7289999999999823,
+            "wall_ms": 8.946321002440527
+          },
+          "individual": {
+            "cpu_ms": 5.974000000000007,
+            "wall_ms": 19.59289399383124
+          }
+        }
+      },
+      {
+        "order": [
+          "individual",
+          "batched"
+        ],
+        "results_identical": true,
+        "round": 14,
+        "timings": {
+          "batched": {
+            "cpu_ms": 3.469,
+            "wall_ms": 8.617189989308827
+          },
+          "individual": {
+            "cpu_ms": 5.959999999999993,
+            "wall_ms": 17.815975996199995
+          }
+        }
+      },
+      {
+        "order": [
+          "batched",
+          "individual"
+        ],
+        "results_identical": true,
+        "round": 15,
+        "timings": {
+          "batched": {
+            "cpu_ms": 3.460999999999992,
+            "wall_ms": 8.550073995138519
+          },
+          "individual": {
+            "cpu_ms": 5.071999999999993,
+            "wall_ms": 15.692083004978485
+          }
+        }
+      },
+      {
+        "order": [
+          "individual",
+          "batched"
+        ],
+        "results_identical": true,
+        "round": 16,
+        "timings": {
+          "batched": {
+            "cpu_ms": 2.960000000000018,
+            "wall_ms": 6.947900008526631
+          },
+          "individual": {
+            "cpu_ms": 4.610000000000003,
+            "wall_ms": 13.665033009601757
+          }
+        }
+      },
+      {
+        "order": [
+          "batched",
+          "individual"
+        ],
+        "results_identical": true,
+        "round": 17,
+        "timings": {
+          "batched": {
+            "cpu_ms": 3.2889999999999864,
+            "wall_ms": 8.028151001781225
+          },
+          "individual": {
+            "cpu_ms": 5.58599999999998,
+            "wall_ms": 17.526171999634244
+          }
+        }
+      },
+      {
+        "order": [
+          "individual",
+          "batched"
+        ],
+        "results_identical": true,
+        "round": 18,
+        "timings": {
+          "batched": {
+            "cpu_ms": 3.2039999999999846,
+            "wall_ms": 7.837784010916948
+          },
+          "individual": {
+            "cpu_ms": 5.69900000000001,
+            "wall_ms": 17.56038301391527
+          }
+        }
+      },
+      {
+        "order": [
+          "batched",
+          "individual"
+        ],
+        "results_identical": true,
+        "round": 19,
+        "timings": {
+          "batched": {
+            "cpu_ms": 3.4250000000000114,
+            "wall_ms": 8.328390991664492
+          },
+          "individual": {
+            "cpu_ms": 5.579999999999973,
+            "wall_ms": 16.86059799976647
+          }
+        }
+      }
+    ],
+    "scope": "real AX reads of the owned background fixture only"
+  },
+  "status": "passed",
+  "summary": {
+    "individual": {
+      "p50_ms": 16.855711000971496,
+      "p95_ms": 18.447597001795657
+    },
+    "batched": {
+      "p50_ms": 8.138045996020082,
+      "p95_ms": 8.626676994026639
+    }
+  },
+  "cleanup_inventory": {
+    "applications": [
+      {
+        "active": false,
+        "pid": 57565,
+        "started_at": 1793740120.9070992
+      }
+    ],
+    "foreground_pid": 852
+  },
+  "owned_stop": {
+    "errno": 0,
+    "signal_sent": true
+  },
+  "independent_absence": {
+    "applications": [],
+    "foreground_pid": 852
+  },
+  "owned_process_terminated": true,
+  "source_unchanged": true
+}

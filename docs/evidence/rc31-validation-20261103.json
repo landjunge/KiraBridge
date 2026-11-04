@@ -1,0 +1,66 @@
+{
+  "schema": "kirabridge.rc31.validation.v1",
+  "platform": "macOS-15.7.4-x86_64-i386-64bit",
+  "architecture": "x86_64",
+  "python": "3.11.15 (main, Mar  3 2026, 00:52:57) [Clang 17.0.0 (clang-1700.6.4.2)]",
+  "scope": "Final relevant local integration; no live deployment or native UI input",
+  "pytest": {
+    "files": [
+      "test_native_queries.py",
+      "test_native_read_transport_guards.py",
+      "test_accessibility_tree.py",
+      "test_accessibility_summary_native.py",
+      "test_macos_system_transport.py",
+      "test_system_modules_integration.py",
+      "test_task_event_hotpaths.py",
+      "test_task_observation_hotpaths.py",
+      "test_read_queries.py",
+      "test_read_tool_batch.py",
+      "test_read_query.py",
+      "test_read_query_ranges.py",
+      "test_security.py",
+      "test_permissions.py",
+      "test_tasks.py",
+      "test_mcp_schema_validation.py"
+    ],
+    "passed": 380,
+    "duration_seconds": 57.2,
+    "failed": 0
+  },
+  "independent_review": [
+    "Native reads/before-send approval checks",
+    "Swift tree and malformed native arrays",
+    "Task ownership/index migration",
+    "Benchmark workload and result equality"
+  ],
+  "historical_baseline_fixture_failures": {
+    "file": "tests/test_system_modules_integration.py",
+    "missing_samples": [
+      "keyboard.system_inventory",
+      "keyboard.shortcuts.discover"
+    ],
+    "missing_test_capability": "keyboard.shortcuts.read",
+    "rc30_archive_reproduction": true,
+    "fixed_in_test_fixture_only": true
+  },
+  "post_test_changes": "Only test_accessibility_tree.py whitespace formatting and documentation/evidence recording; no implementation/fixture semantic changes.",
+  "ruff_check": true,
+  "ruff_format_check": true,
+  "git_diff_check": true,
+  "changed_runtime_sha256": {
+    "integrations/desktop/SystemControl.swift": "635f239fa23ae005a6aedc5be4a62fa0453deef28b5e2afcc13476d719299246",
+    "src/kirabridge/__init__.py": "a007bd7a344bdc0890b02b4d9da8c3909e04333b9712ee0fae75c788711d6798",
+    "src/kirabridge/bridge_core/bridge.py": "da7352f5101b133975f05af5fb363b7b4861ee5e8de34246205ca3e127c7acc1",
+    "src/kirabridge/mcp_gateway/proxy.py": "736a4166c730fd12c972cdfd4405e6b62feab9aa92e010f35db47cd34847c51e",
+    "src/kirabridge/mcp_gateway/server.py": "bd8d41cd85b9e0c9d2bc18e17c81c8ef45ec77d8c3831b187c70794a263ca367",
+    "src/kirabridge/platform_adapters/macos/control_models.py": "2e83d504044a1cf84d56d2f6b513b8fcd6c97527c47a82aa2f3ab39e4f84bbba",
+    "src/kirabridge/platform_adapters/macos/system_transport.py": "e6b63b15d404142355eff100a2ba3c072e6c5d81c4867d76d0f8cea9b4a1f462",
+    "src/kirabridge/read_query.py": "25efb02116e393395bd7a500d8e70be910a3821eca0175a14fa31c7c2e1120db",
+    "src/kirabridge/task_manager/store.py": "92ccb02f9343a7316548778c1f82ae335a964ca7be69b9100e0f764269a0024b",
+    "src/kirabridge/native_queries.py": "f0d994ba0395db70e19fd2d7b7149a3aac60c1fdf2f85800b99c6f9265bb9507"
+  },
+  "source_base": "21a6abda85aadc8d0c361b4106d328953af9aa02",
+  "branch": "perf/rc31-latency-20261103",
+  "production_installation_changed": false,
+  "github_actions_used": false
+}

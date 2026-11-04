@@ -79,8 +79,22 @@ class Store:
         private_directory(path.parent)
         if path.is_symlink():
             raise BridgeError("unsafe_state", "Database must not be a symlink")
-        fd = os.open(path, os.O_CREAT | os.O_RDWR | getattr(os, "O_NOFOLLOW", 0), 0o600)
-        os.close(fd)
+        if os.name == "nt":
+            from kirabridge.platform_adapters.windows.filesystem_security import (
+                WindowsFiles,
+                ensure_private_file,
+            )
+
+            ensure_private_file(path)
+            files = WindowsFiles()
+            for suffix in ("-wal", "-shm"):
+                sidecar = Path(str(path) + suffix)
+                if sidecar.exists():
+                    handle = files.open(sidecar)
+                    files.close(handle)
+        else:
+            fd = os.open(path, os.O_CREAT | os.O_RDWR | getattr(os, "O_NOFOLLOW", 0), 0o600)
+            os.close(fd)
         if os.name != "nt" and path.stat().st_mode & 0o077:
             raise BridgeError("unsafe_state", "Database must be owner-only")
         self.db = sqlite3.connect(path, isolation_level=None, timeout=5)
@@ -104,6 +118,10 @@ class Store:
                     for statement in script.split(";"):
                         if statement.strip():
                             self.db.execute(statement)
+                # Event pages and existence checks are scoped to one task. The
+                # global sequence primary key alone scans unrelated task history.
+                # Install for existing databases too, in this same startup transaction.
+                self.db.execute("CREATE INDEX IF NOT EXISTS events_task_seq ON events(task_id,seq)")
                 from kirabridge.queue_management import install_schema
 
                 install_schema(self)
