@@ -720,6 +720,12 @@ def worker(fixture, output):
         persist()
         if not fixture.ready.wait(5):
             raise RuntimeError("Owned window fixture not ready")
+
+        def readiness(observation):
+            report["foreground_readiness"] = observation
+            persist()
+
+        fixture.wait_for_foreground(on_status=readiness)
         asyncio.run(run_mcp(fixture, NativeReadback(), report, persist))
         report["passed"] = True
     except Exception as error:

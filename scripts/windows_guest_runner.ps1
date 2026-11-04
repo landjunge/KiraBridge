@@ -1,9 +1,11 @@
 param(
     [Parameter(Mandatory=$true)][string]$BootstrapUrl,
     [ValidatePattern('^[A-Za-z][A-Za-z0-9-]{0,63}$')][string]$WorkName='KiraBridgeDev',
+    [ValidatePattern('^([a-f0-9]{64})?$')][string]$ExpectedManifestSha256='',
     [switch]$ReusePreparedPython
 )
 $ErrorActionPreference = 'Stop'
+$ProgressPreference = 'SilentlyContinue'
 if ($ReusePreparedPython -and $WorkName -eq 'KiraBridgeDev') {
     throw 'Prepared interpreter reuse requires a separate new work directory'
 }
@@ -187,6 +189,9 @@ try {
     }
     $ManifestHash=([BitConverter]::ToString(
         [Security.Cryptography.SHA256]::Create().ComputeHash($Utf8.GetBytes($manifestText)))).Replace('-','').ToLowerInvariant()
+    if ($ExpectedManifestSha256 -and $ManifestHash -cne $ExpectedManifestSha256) {
+        throw 'Manifest differs from the explicit expected payload pin'
+    }
     $Payload=Join-Path (Join-Path $Work 'payload') $ManifestHash
     New-Item -ItemType Directory -Force $Payload | Out-Null
     $entries=@{}
