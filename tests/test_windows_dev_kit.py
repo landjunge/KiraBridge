@@ -234,7 +234,7 @@ def test_filtered_guest_archive_reads_only_fixed_public_docs_at_exact_git_pin(mo
     monkeypatch.setattr(kit.subprocess, "run", run)
     with zipfile.ZipFile(io.BytesIO(data.getvalue())) as archive:
         result = kit.public_documentation(archive, PIN)
-    assert len(calls) == 2 and set(result) == {"LICENSE", *kit.DOCS}
+    assert len(calls) == 3 and set(result) == {"LICENSE", *kit.DOCS}
 
 
 def replace_source(stage, commit, changes):
