@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Package a frozen Windows preview only after six matching native reports.
+"""Package a frozen Windows preview only after seven matching native reports.
 
 Default is validation/plan only; --build writes one new output directory.
 No Windows tests, VM actions, downloads, publication or production installation
@@ -20,12 +20,12 @@ import zipfile
 from email.parser import BytesParser
 from pathlib import Path
 
-VERSION = "0.8.0rc33"
+VERSION = "0.8.0rc37.dev1"
 ASSET = f"KiraBridge-{VERSION}-Windows-Dev-Kit.zip"
-PHASES = ("core", "keyboard", "mcp", "preview", "shortcuts", "windows")
+PHASES = ("core", "keyboard", "mcp", "preview", "shortcuts", "windows", "setup")
 REUSED_PHASES = ("core", "keyboard", "mcp")
-FRESH_PHASES = ("preview", "shortcuts", "windows")
-RUNTIME_MODULE_COUNT = 174
+FRESH_PHASES = ("preview", "shortcuts", "windows", "setup")
+RUNTIME_MODULE_COUNT = 179
 REUSED_HARNESSES = (
     "tests/test_windows_core_native.py",
     "scripts/accept_windows_keyboard.py",
@@ -36,6 +36,7 @@ REQUIRED_HARNESSES = (
     "scripts/accept_windows_preview.py",
     "scripts/accept_windows_shortcuts.py",
     "scripts/accept_windows_windows.py",
+    "scripts/accept_windows_setup.py",
 )
 ALLOWED_FILE = re.compile(
     r"(?:source\.zip|python-installer\.exe|guest_runner\.ps1|"
@@ -46,7 +47,12 @@ DOCS = (
     "docs/WINDOWS-PREVIEW.md",
     "docs/WINDOWS-DEVELOPMENT-20261103.md",
     "docs/WINDOWS-DESKTOP-20261104.md",
+    "docs/WINDOWS-SETUP.md",
 )
+BOOTSTRAP_FILES = {
+    "Einrichtung-starten.cmd": "scripts/Einrichtung-starten.cmd",
+    "Einrichtung.ps1": "scripts/windows_setup_bootstrap.ps1",
+}
 # Python.org release reference supplied/verified during the frozen staging run.
 # The x64 installer has a bootstrapper, so its outer PE machine alone is not an
 # adequate architecture attestation. Anchor the complete vendor installer bytes.
@@ -186,13 +192,23 @@ def verified_reports(directory: Path, manifest_hash: str, phases=PHASES, *, igno
                 and artifact.get("independent_original_process_absent") is not True
             ):
                 raise ValueError("Preview child cleanup was not independently confirmed")
+            if phase == "setup" and (
+                artifact.get("platform") != "nt"
+                or artifact.get("gui_native_smoke") is not True
+                or artifact.get("authenticated_roundtrip_simulated") is not True
+                or artifact.get("cloud_attested") is not False
+                or artifact.get("keyboard_events_requested") != 0
+            ):
+                raise ValueError(
+                    "Setup requires native GUI and explicit local-only roundtrip proof"
+                )
             public["artifact"] = sanitize(artifact)
             public["raw_artifact_sha256"] = report.get("artifact_sha256")
         reports[phase] = public
         run_ids.add(run_id)
     if set(reports) != set(phases) or len(run_ids) != 1:
         raise ValueError(
-            "Exactly six phases of one native guest run are required"
+            "Exactly seven phases of one native guest run are required"
             if phases == PHASES
             else "Exactly the selected phases of one native guest run are required"
         )
@@ -414,7 +430,7 @@ def prepare(
             "component_provenance_reuse": True,
             "run_policy": (
                 "Three explicitly reused native phases; "
-                "preview, shortcuts and windows freshly executed"
+                "preview, shortcuts, windows and setup freshly executed"
             ),
             "reuse_basis": {
                 **basis,
@@ -427,6 +443,7 @@ def prepare(
         }
     with zipfile.ZipFile(io.BytesIO(payload["source.zip"])) as archive:
         documentation = public_documentation(archive, source_commit)
+        bootstrap = {name: archive.read(source) for name, source in BOOTSTRAP_FILES.items()}
     proof_bytes = json.dumps(proofs, sort_keys=True, indent=2, ensure_ascii=True).encode() + b"\n"
     package = {
         "name": "KiraBridge Windows Dev Kit",
@@ -448,6 +465,7 @@ def prepare(
             "Pinned native window listing, activation, geometry and window-state actions",
             "Regular pinned window close requests without force termination",
             "Fresh target identity and durable no-replay receipts",
+            "German graphical setup assistant with explicit desktop scope and response-code test",
         ],
         "unsupported_preview": [
             "Full Windows desktop GUI",
@@ -462,6 +480,7 @@ def prepare(
     contents = {
         **payload,
         **documentation,
+        **bootstrap,
         "manifest.json": raw_manifest,
         "requirements-win.txt": ("\n".join(manifest["requirements"]) + "\n").encode(),
         "native-acceptance.json": proof_bytes,
@@ -474,30 +493,29 @@ def prepare(
 
 
 def instructions(python_version: str, source_commit: str):
-    compact = "".join(python_version.split(".")[:2])
-    return f"""KiraBridge {VERSION} - Windows-Entwicklungspaket (Vorschau)
+    return f"""KiraBridge {VERSION} - Windows mit ChatGPT einrichten (Vorschau)
 
 Quellstand: {source_commit}
 Enthaelt Python {python_version} AMD64, alle exakt gepinnten Offline-Wheels,
 Quellarchiv, Lizenz und bereinigte native Testnachweise. Kein Windows-Betriebssystem.
 
 1. ZIP vollstaendig in einen eigenen lokalen Ordner entpacken.
-2. python-installer.exe oeffnen und nur fuer den eigenen Windows-Benutzer
-   installieren. pip einschliessen; PATH und systemweite Installation nicht aendern.
-3. PowerShell im entpackten Paketordner oeffnen. Falls Python an einen anderen
-   Ort installiert wurde, den ersten Pfad entsprechend anpassen:
+2. Einrichtung-starten.cmd doppelt anklicken. Die Vorbereitung prueft das Paket
+   und installiert Python und KiraBridge nur fuer deinen Windows-Benutzer.
+   Bestehende KiraBridge-Versionen, PATH und Systemrechte bleiben erhalten.
+3. Im Einrichtungsfenster den vier einfachen Schritten folgen. Der Assistent
+   oeffnet die passenden Kontoseiten und zeigt, was in ChatGPT zu tun ist.
+4. Den Antwortcode aus dem ChatGPT-Test im Assistenten eintragen.
 
-$python = "$env:LOCALAPPDATA\\Programs\\Python\\Python{compact}\\python.exe"
-& $python -m venv .venv
-$previewPython = ".\\.venv\\Scripts\\python.exe"
-& $previewPython -m pip install --no-index --find-links .\\wheels -r .\\requirements-win.txt
-$stateDir = "$env:LOCALAPPDATA\\KiraBridgePreviewRC33"
-& $previewPython -m kirabridge.windows_preview --state-dir $stateDir --port 8767
-
-Das Fenster fuer die Laufzeit offen lassen. Token und eigene Zustandsdateien
-werden erst beim Start lokal angelegt; keine privaten Gast-/Mac-Zugaenge liegen bei.
-Details zur Verbindung und Bedienung stehen in docs/WINDOWS-PREVIEW.md.
-Das Paket installiert keinen Windows-Dienst und keinen Hintergrund-Autostart.
+Die lokale Installation braucht keinen weiteren Download. Fuer die Verbindung
+werden Internet, der offizielle gepruefte OpenAI-Tunnelclient und passende
+Kontofunktionen benoetigt. Falls dein Konto den benoetigten Menuepunkt nicht
+zeigt, nennt der Assistent den naechsten Schritt; er umgeht keine Kontorechte.
+Den Runtime-Schluessel nur im verdeckten Feld des Assistenten eingeben, nie im
+Chat. Nach erfolgreichem Test beide KiraBridge-Verbindungsfenster offen lassen.
+Es gibt keinen Windows-Dienst und keinen Hintergrund-Autostart.
+Einfache Anleitung und Hilfe: docs/WINDOWS-SETUP.md.
+Technische Details: docs/WINDOWS-PREVIEW.md.
 
 Umfang: lokales authentifiziertes MCP, native Tastatur und Tastenfolgen,
 explizite Ctrl-/Alt-/Shift-/Windows-Tastenkombinationen sowie Fenster auflisten,

@@ -304,6 +304,8 @@ print('Prepared dependency versions verified without package writes')
     Run-Once 'shortcuts' @('scripts/accept_windows_shortcuts.py','--output',$shortcutOut) 180 $shortcutOut
     $windowOut=Join-Path $Work ('windows-'+$RunId+'.json')
     Run-Once 'windows' @('scripts/accept_windows_windows.py','--output',$windowOut) 180 $windowOut
+    $setupOut=Join-Path $Work ('setup-'+$RunId+'.json')
+    Run-Once 'setup' @('scripts/accept_windows_setup.py','--output',$setupOut) 420 $setupOut
     $launcher=Join-Path ([Environment]::GetFolderPath('Desktop')) 'KiraBridge RC33 Windows Preview.cmd'
     $launcherSource=Join-Path $Source 'scripts\start_windows_preview.cmd'
     if (-not (Test-Path -LiteralPath $launcher)) {
