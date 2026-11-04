@@ -27,6 +27,8 @@ Drei spezialisierte Codex-Unteragenten prüften Windows, macOS und weitere
 Branches/PRs/Releases. Windows- und macOS-Spezialisten prüften das vereinte
 Runtime-Ergebnis zusätzlich unabhängig. Audit, Rohlogs und Teamberichte:
 `/Users/landjunge/KiraBridge-integration-audit-20261104/`.
+Die [Windows-Review](reviews/integration-20261104/windows.md) und
+[macOS-Review](reviews/integration-20261104/macos.md) sind auch versioniert.
 
 ## Merge-Plan und tatsächliche Auflösung
 
@@ -34,7 +36,8 @@ Runtime-Ergebnis zusätzlich unabhängig. Audit, Rohlogs und Teamberichte:
    PRs, Releases, Workflow-Trigger und Abhängigkeiten lesend erfassen.
 2. Eigenen Branch von gepinntem main anlegen; RC32 einschließlich RC31 mit
    Merge-Commit `090fcaf66bf4a4ce840e4b3176317d7eb811b84e` übernehmen.
-3. Windows-HEAD als vollständigen zweiten Entwicklungsarm mergen. Die drei
+3. Windows-HEAD als vollständigen zweiten Entwicklungsarm mergen;
+   Ergebniscommit `d7a0b0a2d316c5b53ba6946f29eaac57f8cbaa23`. Die drei
    Textkonflikte betrafen ausschließlich Versionszeilen: pyproject, __init__,
    uv.lock. Alle drei nennen jetzt `0.8.0rc33.dev1`; damit wird zugleich die
    Windows-Ausgangsabweichung dev3 gegenüber dev2 im Lockfile korrigiert.
@@ -47,8 +50,10 @@ Runtime-Ergebnis zusätzlich unabhängig. Audit, Rohlogs und Teamberichte:
 5. Gemeinsame Pythonintegration gezielt neu prüfen. Vorhandenen Test zur
    verweigerten nativen macOS-Leseoperation zusätzlich mit `win32` ausführen;
    Windows-Operationen bleiben unter `windows.keyboard.*` / `windows.window.*`.
-6. Nach Ergebnissen und Review separaten Integrationsbranch synchronisieren.
-   main, bestehende PRs/Releases und produktive Installationen erhalten.
+6. Nach Ergebnissen und Review separaten Integrationsbranch synchronisiert;
+   [Draft-PR #58](https://github.com/landjunge/KiraBridge/pull/58) gegen main
+   angelegt und unabhängig zurückgelesen: offen, Draft, konfliktfrei mergeable,
+   nicht gemergt. main, bestehende PRs/Releases und Installationen erhalten.
 
 Zurückgestellte eigenständige Deltas sind ausdrücklich nicht als enthalten
 bewertet: `fix/output-completeness-20261026` ergänzt terminal.output-Metadaten,
@@ -142,3 +147,11 @@ Instanz `777222cce58e4b38b503c2f3d20900e1`. Keine Dienste, OS-Rechte,
 Credentials, Queues, historischen unknown-Tasks oder Terminal-/Agentensitzungen
 wurden umgestellt. Der Rückweg besteht im Erhalt der bisherigen Quellen und
 Installationen; es ist kein produktiver Rollback erforderlich.
+
+Die unabhängige Abschluss-Healthabfrage bestätigte dieselbe Core-Instanz/PID,
+Quellrevision und Permissionrevision. Der Vorher-/Nachhervergleich
+07:03:22 → 07:11:07 UTC bestätigt bei allen **89 ursprünglichen Worktrees**
+dieselben HEADs, Branches, Status-, Index-/Diff- und Inhaltsfingerprints; die
+fünf fehlenden blieben fehlend. Alle sechs fremden schmutzigen Worktrees sind
+unverändert. Neu ist ausschließlich der eigene Integrationsworktree. Lokaler
+Detailbeleg: `evidence/preservation-check.json` im Auditverzeichnis.

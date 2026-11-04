@@ -89,5 +89,41 @@
     "integrated macOS package and isolated native installer acceptance",
     "independent GitHub review/required check policy not positively verified",
     "controlled installation preserving active sessions"
-  ]
+  ],
+  "tested_runtime_merge": "d7a0b0a2d316c5b53ba6946f29eaac57f8cbaa23",
+  "preservation": {
+    "before_utc": "2026-11-04T07:03:22.443879+00:00",
+    "after_utc": "2026-11-04T07:11:07.542530+00:00",
+    "original_worktrees": 89,
+    "existing_originals": 84,
+    "unchanged_original_worktrees": 89,
+    "changed_original_worktrees": {},
+    "new_worktrees": [
+      "/Users/landjunge/KiraBridge-worktrees/integration-dev3-rc32-20261104"
+    ],
+    "fingerprints_checked": [
+      "HEAD",
+      "branch",
+      "status",
+      "index diff",
+      "HEAD diff",
+      "modified/untracked regular file SHA256"
+    ]
+  },
+  "remote_review": {
+    "pr": 58,
+    "url": "https://github.com/landjunge/KiraBridge/pull/58",
+    "draft": true,
+    "merged": false,
+    "mergeable": true,
+    "code_head": "d7a0b0a2d316c5b53ba6946f29eaac57f8cbaa23",
+    "main": "21a6abda85aadc8d0c361b4106d328953af9aa02"
+  },
+  "production_preserved": {
+    "version": "0.8.0rc30",
+    "pid": 66439,
+    "instance_id": "777222cce58e4b38b503c2f3d20900e1",
+    "permission_revision": "39bc6abce356e8b9643c10cdccad527acb8b78f8440779dff4da04640b7cfe86",
+    "same_core_source_and_permission_revision_after": true
+  }
 }
