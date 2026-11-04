@@ -484,6 +484,12 @@ async def run_mcp(fixture, probe, report, persist):
                             task = await call("task_get", {"task_id": task_id})
                         item["task_state"] = task.get("state")
                         item["error_code"] = (task.get("error") or {}).get("code")
+                        provider = (task.get("error") or {}).get("provider_error")
+                        if isinstance(provider, dict):
+                            item["provider_error"] = provider
+                            acknowledged = provider.get("native_request_accepted")
+                            if type(acknowledged) is bool:
+                                item["native_request_accepted"] = acknowledged
                         item["elapsed_ms"] = (time.monotonic_ns() - began) / 1e6
                         persist()
                         return task, item

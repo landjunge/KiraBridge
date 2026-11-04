@@ -22,6 +22,19 @@ INT_MIN, INT_MAX = -(2**31), 2**31 - 1
 MAX_DIMENSION = 32768
 COORDINATE_SPACE = "physical_screen_pixels"
 ACTIONS = frozenset({"activate", "minimize", "maximize", "restore", "move_resize", "close"})
+CAUSE_CODES = frozenset(
+    {
+        "windows_window_request_unconfirmed",
+        "windows_target_changed",
+        "windows_target_not_top_level",
+        "windows_target_unavailable",
+        "windows_desktop_unavailable",
+        "windows_desktop_changed",
+        "windows_dpi_restore_failed",
+        "windows_dpi_unavailable",
+        "windows_window_enumeration_failed",
+    }
+)
 SHOW_COMMANDS = {"minimize": 6, "maximize": 3, "restore": 9}
 SWP_NOZORDER, SWP_NOACTIVATE, SWP_ASYNCWINDOWPOS = 0x0004, 0x0010, 0x4000
 WM_CLOSE = 0x0010
@@ -188,28 +201,56 @@ class WindowsWindowAPI:
     def _identity(self, hwnd):
         if not self.user.IsWindow(hwnd):
             return None
-        if self.user.GetAncestor(hwnd, 2) != hwnd:
+        ancestor = self.user.GetAncestor(hwnd, 2)
+        if ancestor != hwnd:
+            if not ancestor and not self.user.IsWindow(hwnd):
+                return None
             raise BridgeError(
                 "windows_target_not_top_level", "Child windows are not control targets"
             )
-        self._on_current_desktop(hwnd)
+        try:
+            self._on_current_desktop(hwnd)
+        except BridgeError as error:
+            if error.code == "windows_target_changed" and not self.user.IsWindow(hwnd):
+                return None
+            raise
         pid = DWORD()
         thread = self.user.GetWindowThreadProcessId(hwnd, ctypes.byref(pid))
         if not thread or not pid.value:
+            if not self.user.IsWindow(hwnd):
+                return None
             raise BridgeError("windows_target_changed", "Window owner disappeared")
-        created = self._identity_api._created(pid.value)
+        try:
+            created = self._identity_api._created(pid.value)
+        except BridgeError as error:
+            if error.code == "windows_target_unavailable" and not self.user.IsWindow(hwnd):
+                return None
+            raise
         current_pid = DWORD()
         current_thread = self.user.GetWindowThreadProcessId(hwnd, ctypes.byref(current_pid))
+        if (not current_thread or not current_pid.value) and not self.user.IsWindow(hwnd):
+            return None
         if current_thread != thread or current_pid.value != pid.value:
             raise BridgeError("windows_target_changed", "Window owner changed during process query")
         return WindowIdentity(int(hwnd), pid.value, created, thread)
 
+    def _confirmed_absence(self, hwnd):
+        # A missing identity followed by a live handle is a contradiction, even
+        # if a replacement window happens to have the same process/thread token.
+        if self.user.IsWindow(hwnd):
+            raise BridgeError(
+                "windows_target_changed", "Window disappeared and reappeared during readback"
+            )
+        return None
+
     def snapshot(self, hwnd):
         target = self._identity(hwnd)
         if target is None:
-            return None
+            return self._confirmed_absence(hwnd)
         rectangle = RECT()
         if not self.user.GetWindowRect(hwnd, ctypes.byref(rectangle)):
+            if not self.user.IsWindow(hwnd):
+                return self._confirmed_absence(hwnd)
             raise BridgeError("windows_target_unavailable", "Cannot read window rectangle")
         title, kind = ctypes.create_unicode_buffer(513), ctypes.create_unicode_buffer(256)
         # GetWindowTextW does not wait for another process's hung window. For our
@@ -233,10 +274,15 @@ class WindowsWindowAPI:
             "maximized": bool(self.user.IsZoomed(hwnd)),
             "foreground": self.user.GetForegroundWindow() == hwnd,
         }
-        if self._identity(hwnd) != target:
+        current = self._identity(hwnd)
+        if current is None:
+            return self._confirmed_absence(hwnd)
+        if current != target:
             raise BridgeError(
                 "windows_target_changed", "Window generation changed during inspection"
             )
+        if not self.user.IsWindow(hwnd):
+            return self._confirmed_absence(hwnd)
         return state
 
     def request(self, target, action, bounds):
@@ -343,7 +389,7 @@ class WindowsWindows:
             bounds = WindowBounds.from_value(bounds)
         elif bounds is not None:
             raise ValueError("Bounds apply only to move_resize")
-        attempted = False
+        attempted, native_request_accepted = False, None
         with self._transaction():
             try:
                 with self.api.physical_coordinates():
@@ -353,6 +399,7 @@ class WindowsWindows:
                     self._guard(target)
                     attempted = True
                     accepted, native_error = self.api.request(target, action, bounds)
+                    native_request_accepted = accepted if type(accepted) is bool else None
                     if accepted is not True:
                         reason = (
                             "Windows may have denied foreground activation"
@@ -389,12 +436,32 @@ class WindowsWindows:
             except BaseException as error:
                 if not attempted:
                     raise
-                raise UncertainExecution(
+                failure = UncertainExecution(
                     "windows_window_effect_unknown",
                     f"Window {action} was attempted but cannot be confirmed; "
                     "reconcile the original task, never replay automatically"
                     + ("; Windows may deny foreground activation" if action == "activate" else ""),
-                ) from error
+                )
+                kind = "BridgeError" if isinstance(error, BridgeError) else "Exception"
+                if type(error) in {
+                    OSError,
+                    RuntimeError,
+                    TypeError,
+                    ValueError,
+                    TimeoutError,
+                    AttributeError,
+                    KeyError,
+                    KeyboardInterrupt,
+                    SystemExit,
+                }:
+                    kind = type(error).__name__
+                code = error.code if isinstance(error, BridgeError) else None
+                failure.provider_error = {
+                    "native_request_accepted": native_request_accepted,
+                    "cause_type": kind,
+                    "cause_code": code if type(code) is str and code in CAUSE_CODES else None,
+                }
+                raise failure from error
 
     @staticmethod
     def _observed(action, bounds, state):

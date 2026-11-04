@@ -452,6 +452,150 @@ def test_native_dpi_context_is_restored_even_after_read_failure(monkeypatch):
     assert api.user.SetThreadDpiAwarenessContext.calls == [(POINTER(-4).value,), (700,)]
 
 
+def test_snapshot_disappearance_at_final_identity_is_freshly_confirmed_absence(monkeypatch):
+    api = native_api_stub(monkeypatch)
+    identities = iter([FakeWindows().target, None])
+    api._identity = lambda hwnd: next(identities)
+    api.user.GetForegroundWindow = Function(0)
+    api.user.IsWindow = Function(0)
+    assert api.snapshot(FakeWindows().target.hwnd) is None
+
+
+def disappearing_native_api(monkeypatch, stage):
+    api = native_api_stub(monkeypatch)
+    state = {"present": True, "owner_queries": 0}
+    api.user.IsWindow = lambda hwnd: int(state["present"])
+
+    def ancestor(hwnd, flag):
+        if stage in {"ancestor", "real_child_then_gone"}:
+            state["present"] = False
+            return None if stage == "ancestor" else 999
+        return hwnd
+
+    def desktop(hwnd):
+        if stage in {"desktop", "unavailable_desktop"}:
+            state["present"] = False
+            raise BridgeError(
+                "windows_target_changed" if stage == "desktop" else "windows_desktop_unavailable",
+                "private exception text",
+            )
+
+    def owner(hwnd, pointer):
+        state["owner_queries"] += 1
+        if stage == "missing_owner" or (stage == "missing_recheck" and state["owner_queries"] == 2):
+            state["present"] = False
+            return 0
+        value = 400
+        if stage == "owner_mismatch_then_gone" and state["owner_queries"] == 2:
+            value, state["present"] = 999, False
+        ctypes.cast(pointer, ctypes.POINTER(DWORD))[0] = value
+        return 401
+
+    def created(pid):
+        if stage in {"creation", "live_creation_error"}:
+            state["present"] = stage == "live_creation_error"
+            raise BridgeError("windows_target_unavailable", "private exception text")
+        return 134000000000000003
+
+    def rectangle(hwnd, pointer):
+        if stage in {"rectangle", "live_rectangle_error"}:
+            state["present"] = stage == "live_rectangle_error"
+            return 0
+        return 1
+
+    api.user.GetAncestor = ancestor
+    api._on_current_desktop = desktop
+    api.user.GetWindowThreadProcessId = owner
+    api._identity_api = SimpleNamespace(_created=created)
+    api.user.GetWindowRect = rectangle
+    api.user.GetForegroundWindow = Function(100)
+    return api
+
+
+@pytest.mark.parametrize(
+    "stage", ["ancestor", "desktop", "missing_owner", "creation", "missing_recheck", "rectangle"]
+)
+def test_disappearance_during_native_read_returns_only_freshly_confirmed_absence(
+    monkeypatch, stage
+):
+    api = disappearing_native_api(monkeypatch, stage)
+    assert api.snapshot(100) is None
+
+
+@pytest.mark.parametrize(
+    "stage,code",
+    [
+        ("real_child_then_gone", "windows_target_not_top_level"),
+        ("owner_mismatch_then_gone", "windows_target_changed"),
+        ("live_rectangle_error", "windows_target_unavailable"),
+        ("live_creation_error", "windows_target_unavailable"),
+        ("unavailable_desktop", "windows_desktop_unavailable"),
+    ],
+)
+def test_observed_contradictions_or_unrelated_errors_are_not_downgraded_to_absence(
+    monkeypatch, stage, code
+):
+    api = disappearing_native_api(monkeypatch, stage)
+    error_code(code, lambda: api.snapshot(100))
+
+
+@pytest.mark.parametrize("first_missing", [True, False])
+def test_missing_identity_followed_by_present_same_token_handle_is_not_closed(
+    monkeypatch, first_missing
+):
+    api = native_api_stub(monkeypatch)
+    identities = iter([None] if first_missing else [FakeWindows().target, None])
+    api._identity = lambda hwnd: next(identities)
+    api.user.IsWindow = Function(1)
+    api.user.GetForegroundWindow = Function(0)
+    error_code("windows_target_changed", lambda: api.snapshot(100))
+
+
+@pytest.mark.parametrize(
+    "failure,acknowledged,cause",
+    [
+        ("false", False, "windows_window_request_unconfirmed"),
+        ("request_exception", None, None),
+        ("readback", True, "windows_target_changed"),
+    ],
+)
+def test_uncertain_provider_error_keeps_only_confirmed_ack_and_bounded_cause(
+    failure, acknowledged, cause
+):
+    api = FakeWindows()
+    if failure == "false":
+        api.accepted = False
+    elif failure == "request_exception":
+        api.failure = OSError("secret URL/password must not enter provider evidence")
+    else:
+
+        def readback(action, bounds):
+            api.target = replace(api.target, pid=999)
+
+        api.after_request = readback
+    error = error_code(
+        "windows_window_effect_unknown", lambda: WindowsWindows(api).control(api.target, "close")
+    )
+    assert error.provider_error["native_request_accepted"] is acknowledged
+    assert error.provider_error["cause_code"] == cause
+    assert "secret" not in json.dumps(error.provider_error)
+    assert len(api.calls) == 1
+
+
+def test_untrusted_exception_name_code_and_message_are_not_provider_diagnostics():
+    api = FakeWindows()
+    secret_error = type("PrivatePasswordToken", (Exception,), {})
+    api.failure = secret_error("https://secret.invalid/capability")
+    error = error_code(
+        "windows_window_effect_unknown", lambda: WindowsWindows(api).control(api.target, "close")
+    )
+    assert error.provider_error == {
+        "native_request_accepted": None,
+        "cause_type": "Exception",
+        "cause_code": None,
+    }
+
+
 @pytest.mark.skipif(os.name == "nt", reason="Native constructor is valid on Windows")
 def test_default_native_constructor_cannot_control_host_macos_windows():
     error_code("unsupported_platform", WindowsWindows)
