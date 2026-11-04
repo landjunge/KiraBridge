@@ -172,6 +172,21 @@ class KeyStroke:
                 value.encode("utf-16-le")  # Reject lone surrogates, never silently replace them.
 
 
+def shortcut_stroke(key: str, modifiers: tuple[str, ...]) -> KeyStroke:
+    """One explicit chord using a layout base label or a Windows named key.
+
+    ``("a", ("control",))`` describes Ctrl+A; a capital letter never adds
+    Shift. This helper parses no shortcut expression and inserts no Unicode
+    packets. The normal native planner owns mapping, modifiers, guards and the
+    single complete SendInput call; no cleanup or retry is added here.
+    """
+    if not isinstance(key, str) or not key or len(key) > 32:
+        raise ValueError("A shortcut needs one base character or a Windows named key")
+    if not isinstance(modifiers, tuple) or not 1 <= len(modifiers) <= 4:
+        raise ValueError("A shortcut needs one to four explicit Windows modifiers")
+    return KeyStroke(**{"named" if key in NAMED_KEYS else "character": key}, modifiers=modifiers)
+
+
 @dataclass(frozen=True)
 class KeyEvent:
     virtual_key: int = 0

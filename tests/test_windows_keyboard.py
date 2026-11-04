@@ -20,6 +20,7 @@ from kirabridge.platform_adapters.windows.keyboard import (
     Win32KeyboardAPI,
     WindowsKeyboard,
     WindowTarget,
+    shortcut_stroke,
 )
 
 
@@ -47,6 +48,8 @@ class FakeWin32:
         return vk in self.held
 
     def map_character(self, char, layout):
+        if char == " ":
+            return 0x20, 0
         if char == "@":
             return (0x51, 6) if layout == 0x04070407 else (0x32, 1)
         if char == "ä" and layout == 0x04070407:
@@ -75,6 +78,9 @@ class FakeWin32:
             0xA4: 0x38,
             0x5B: 0x5B,
             0x25: 0x4B,
+            0x09: 0x0F,
+            0x71: 0x3C,
+            0x5A: 0x15 if layout == 0x04070407 else 0x2C,
             0x59: 0x2C if layout == 0x04070407 else 0x15,
         }
         if vk not in scans:
@@ -437,3 +443,138 @@ def test_sequence_limit_counts_repeats():
             api.target, [KeyStroke(character="a", repeat=20), KeyStroke(character="b", repeat=13)]
         )
     assert not api.calls
+
+
+@pytest.mark.parametrize(
+    "key,modifiers,field",
+    [
+        ("a", ("control",), "character"),
+        ("A", ("control", "shift"), "character"),
+        (" ", ("control",), "character"),
+        ("space", ("control",), "named"),
+        ("tab", ("shift",), "named"),
+        ("f2", ("alt",), "named"),
+    ],
+)
+def test_explicit_shortcut_contract_maps_one_key_without_text_or_implicit_shift(
+    key, modifiers, field
+):
+    stroke = shortcut_stroke(key, modifiers)
+    assert getattr(stroke, field) == key
+    assert stroke.modifiers == modifiers and stroke.repeat == 1 and stroke.unicode is None
+
+
+@pytest.mark.parametrize(
+    "key,modifiers",
+    [
+        ("a", ()),
+        ("a", ["control"]),
+        ("a", ("control", "control")),
+        ("a", ("command",)),
+        ("a", ("control", "alt", "shift", "windows", "control")),
+        ("Ctrl+A", ("control",)),
+        ("", ("control",)),
+        ("text", ("control",)),
+        ("\n", ("control",)),
+    ],
+)
+def test_explicit_shortcut_rejects_ambiguous_or_unbounded_intent(key, modifiers):
+    with pytest.raises(ValueError):
+        shortcut_stroke(key, modifiers)
+
+
+@pytest.mark.parametrize(
+    "key,modifiers,expected",
+    [
+        (
+            " ",
+            ("control",),
+            [(0xA2, 0x1D, 0), (0x20, 0x39, 0), (0x20, 0x39, KEYUP), (0xA2, 0x1D, KEYUP)],
+        ),
+        (
+            "a",
+            ("control",),
+            [(0xA2, 0x1D, 0), (0x41, 0x1E, 0), (0x41, 0x1E, KEYUP), (0xA2, 0x1D, KEYUP)],
+        ),
+        (
+            "f2",
+            ("alt",),
+            [(0xA4, 0x38, 0), (0x71, 0x3C, 0), (0x71, 0x3C, KEYUP), (0xA4, 0x38, KEYUP)],
+        ),
+        (
+            "tab",
+            ("shift",),
+            [(0xA0, 0x2A, 0), (0x09, 0x0F, 0), (0x09, 0x0F, KEYUP), (0xA0, 0x2A, KEYUP)],
+        ),
+        (
+            "r",
+            ("windows",),
+            [
+                (0x5B, 0x5B, EXTENDED),
+                (0x52, 0x13, 0),
+                (0x52, 0x13, KEYUP),
+                (0x5B, 0x5B, EXTENDED | KEYUP),
+            ],
+        ),
+    ],
+)
+def test_shortcuts_encode_one_complete_native_call_with_modifier_ownership(
+    key, modifiers, expected, monkeypatch
+):
+    captured = []
+
+    def native_send(count, records, size):
+        assert size == ctypes.sizeof(INPUT)
+        captured.append([(item.ki.wVk, item.ki.wScan, item.ki.dwFlags) for item in records])
+        return count
+
+    encoder = Win32KeyboardAPI.__new__(Win32KeyboardAPI)
+    encoder.user = SimpleNamespace(SendInput=native_send)
+    monkeypatch.setattr(ctypes, "set_last_error", lambda value: None, raising=False)
+    monkeypatch.setattr(ctypes, "get_last_error", lambda: 0, raising=False)
+    api = FakeWin32()
+    api.send_input = encoder.send_input
+    result = WindowsKeyboard(api).send(api.target, [shortcut_stroke(key, modifiers)])
+    assert result["completed_keys"] == result["native_calls"] == 1
+    assert captured == [[(vk, scan, flags | SCANCODE) for vk, scan, flags in expected]]
+    assert not result["receiver_processing_confirmed"]
+
+
+def test_multimodifier_shortcut_releases_only_owned_modifiers_in_reverse_order():
+    api = FakeWin32()
+    WindowsKeyboard(api).send(
+        api.target, [shortcut_stroke("a", ("windows", "alt", "shift", "control"))]
+    )
+    assert [(e.virtual_key, bool(e.flags & KEYUP)) for e in api.calls[0]] == [
+        (0xA2, False),
+        (0xA4, False),
+        (0xA0, False),
+        (0x5B, False),
+        (0x41, False),
+        (0x41, True),
+        (0x5B, True),
+        (0xA0, True),
+        (0xA4, True),
+        (0xA2, True),
+    ]
+
+
+def test_partial_shortcut_does_not_guess_release_or_repeat_after_modifier_down():
+    api = FakeWin32()
+    api.ack = (1, 0)
+    with pytest.raises(UncertainExecution) as error:
+        WindowsKeyboard(api).send(api.target, [shortcut_stroke("a", ("control",))])
+    assert len(api.calls) == 1 and len(api.calls[0]) == 4
+    assert error.value.provider_error["modifiers_may_remain_pressed"] is True
+    assert error.value.provider_error["input_pair_may_be_incomplete"] is True
+    assert error.value.provider_error["automatic_retry"] is False
+
+
+def test_shortcut_refuses_preexisting_modifier_without_releasing_it():
+    api = FakeWin32()
+    api.modifiers = ("right_alt",)
+    expect_error(
+        "windows_modifiers_busy",
+        lambda: WindowsKeyboard(api).send(api.target, [shortcut_stroke("a", ("control",))]),
+    )
+    assert not api.calls and api.modifiers == ("right_alt",)
