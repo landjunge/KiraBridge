@@ -8,6 +8,7 @@ from pydantic import ValidationError
 
 from kirabridge import API_VERSION, LOCAL_APPROVAL_URL, __version__
 from kirabridge.agent_manager import AgentManager
+from kirabridge.autonext.models import AutoNextControl
 from kirabridge.bridge_core.config import Config
 from kirabridge.bridge_core.models import (
     AgentInput,
@@ -82,6 +83,7 @@ from kirabridge.windows_keyboard import WINDOWS_KEYBOARD_INPUTS, WindowsKeyboard
 from kirabridge.windows_windows import WINDOWS_WINDOW_INPUTS, WindowsWindowManager
 
 INPUTS = {
+    "autonext.control": AutoNextControl,
     **WINDOWS_KEYBOARD_INPUTS,
     **WINDOWS_WINDOW_INPUTS,
     **SYSTEM_INPUTS,
@@ -298,6 +300,12 @@ class Bridge:
         self.teams = TeamManager(self)
         self.messages.voice_policy.teams = self.teams
         self.team_dispatcher = TeamDispatcher(self)
+        from kirabridge.autonext.manager import AutoNextManager
+
+        self.autonext = AutoNextManager(self)
+        self.agents.worktree_guard = lambda task, args: self.autonext.authorize_execution(
+            {**task, "args": args.model_dump()}
+        )
         from kirabridge.queue_management import QueueManager
 
         self.queues = QueueManager(
@@ -430,6 +438,7 @@ class Bridge:
             "message_receiver_active": bool(
                 self.message_receiver.worker and not self.message_receiver.worker.done()
             ),
+            "autonext": self.autonext.inspect(),
             "message_receiver_scope": "bridge_dispatcher_for_configured_receivers",
         }
 
@@ -791,6 +800,10 @@ class Bridge:
         if operation == "agent.execute":
             self.teams.authorize_execution(task)
             return await self.agents.execute(task, args, policy, running, progress)
+        if operation == "autonext.control":
+            self.autonext.validate_control(principal, args)
+            await running({"evidence_type": "autonext_control", "action": args.action})
+            return self.autonext.control(principal, args)
         if operation.startswith("handoff."):
             return await self.handoffs.execute(task, args, policy, running, progress)
         if operation == "workflow.stop":
@@ -940,19 +953,27 @@ class Bridge:
             self.record_runtime_load()
             await self.message_receiver.start()
             await self.team_dispatcher.start()
+            await self.autonext.start()
         except BaseException:
-            await self.team_dispatcher.stop()
-            await self.message_receiver.stop()
-            await self.tasks.stop()
+            for stop in (
+                self.autonext.stop,
+                self.team_dispatcher.stop,
+                self.message_receiver.stop,
+                self.tasks.stop,
+            ):
+                await asyncio.gather(stop(), return_exceptions=True)
             raise
         return self
 
     async def __aexit__(self, *exc):
         try:
             try:
-                await self.team_dispatcher.stop()
+                await self.autonext.stop()
             finally:
-                await self.message_receiver.stop()
+                try:
+                    await self.team_dispatcher.stop()
+                finally:
+                    await self.message_receiver.stop()
         finally:
             await self.tasks.stop()
             await self.system_modules.close()

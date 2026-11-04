@@ -10,6 +10,7 @@ from urllib.parse import urlsplit
 
 from pydantic import BaseModel, ConfigDict, Field, PrivateAttr, model_validator
 
+from kirabridge.autonext.models import AutoNextConfig
 from kirabridge.bridge_core.models import BridgeError
 
 _FULL_KEYBOARD_CAPABILITIES = frozenset(
@@ -387,6 +388,7 @@ class Config(BaseModel):
     agents: dict[str, AgentConfig] = Field(default_factory=dict)
     messaging: MessagingConfig = Field(default_factory=MessagingConfig)
     team: TeamConfig = Field(default_factory=TeamConfig)
+    autonext: AutoNextConfig = Field(default_factory=AutoNextConfig)
     grok_connector: GrokConnectorConfig = Field(default_factory=GrokConnectorConfig)
     diagnostics: DiagnosticsConfig = Field(default_factory=DiagnosticsConfig)
     file_transfer: FileTransferConfig = Field(default_factory=FileTransferConfig)

@@ -610,9 +610,16 @@ class MessageReceiver:
                 else "separate_managed_session"
             )
             self.bridge.store.db.execute(
-                "UPDATE message_jobs SET state='running',run_id=?,claimed=?,evidence=? "
+                "UPDATE message_jobs SET state='running',run_id=?,claimed=?,evidence=?,"
+                "execution_cwd=? "
                 "WHERE message_id=?",
-                (run_id, time.time(), canonical({"session_scope": scope}), message_id),
+                (
+                    run_id,
+                    time.time(),
+                    canonical({"session_scope": scope}),
+                    config.receivers[row["recipient"]].cwd,
+                    message_id,
+                ),
             )
             self.messages._event(
                 message_id,
@@ -699,7 +706,7 @@ class MessageReceiver:
                 return False
             self.bridge.store.db.execute(
                 "UPDATE message_jobs SET state='queued',run_id=NULL,claimed=NULL,started=NULL,"
-                "finished=NULL,error=NULL,reply_id=NULL WHERE message_id=?",
+                "finished=NULL,error=NULL,reply_id=NULL,execution_cwd=NULL WHERE message_id=?",
                 (message_id,),
             )
             evidence = {
@@ -971,6 +978,11 @@ class MessageReceiver:
                 timeout=receiver.timeout,
                 wait_for_reply=bool(message["request_reply"]),
             )
+            pinned = self.bridge.store.db.execute(
+                "SELECT execution_cwd FROM message_jobs WHERE message_id=?", (message_id,)
+            ).fetchone()
+            if pinned is None or pinned[0] != receiver.cwd:
+                raise BridgeError("receiver_scope_changed", "Claimed receiver worktree changed")
             policy = self.bridge.security.principal(recipient, "message.read")
             result = await self.bridge.agents.execute(
                 {

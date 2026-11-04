@@ -150,6 +150,9 @@ class TeamDispatcher:
             (False, self.teams.pending(limit=16)),
         ):
             for work in rows:
+                continuation = getattr(self.bridge, "autonext", None)
+                if continuation is not None and not continuation.work_ready(work["id"]):
+                    continue
                 if not existing and not self.bridge.store.can_claim(work["created"]):
                     continue
                 if work["id"] not in self._active and self._defer.get(work["id"], 0) <= now:
@@ -307,6 +310,10 @@ class TeamDispatcher:
                 return
 
     async def _prompt(self, pool, work):
+        continuation = getattr(self.bridge, "autonext", None)
+        scoped = continuation.prompt_for(work) if continuation is not None else None
+        if scoped is not None:
+            return scoped
         snapshot = await self._call(pool, "team_context", {"team_id": work["team_id"]})
         team = snapshot["team"]
         context = []
@@ -419,6 +426,11 @@ class TeamDispatcher:
                 raise BridgeError("team_agent_no_text", "Agent returned no team result")
             if len(turn.actions) > limits.max_actions_per_turn:
                 raise BridgeError("team_action_limit", "Team action count exceeds policy")
+            continuation = getattr(self.bridge, "autonext", None)
+            if turn.actions and continuation is not None and continuation.owns(work["id"]):
+                raise BridgeError(
+                    "autonext_followups_denied", "This grant authorizes no delegated actions"
+                )
         except BridgeError as exc:
             self.teams.fail(
                 work["id"],

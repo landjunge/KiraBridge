@@ -158,6 +158,7 @@ class TeamManager:
         self.bridge = bridge
         self.config, self.store, self.security = bridge.config, bridge.store, bridge.security
         self.wake = asyncio.Event()
+        self.on_change = None
         with self.store.transaction():
             for statement in SCHEMA.split(";"):
                 if statement.strip():
@@ -250,6 +251,8 @@ class TeamManager:
         self.store.audit(
             kind, principal, None, {"team_id": team_id, "object_id": object_id, **metadata}
         )
+        if self.on_change is not None:
+            self.on_change()
 
     def _view_team(self, team_id):
         result = dict(
@@ -930,6 +933,9 @@ class TeamManager:
             if not self.store.can_claim(work["created"]):
                 return None
             if work["state"] != "queued" or work["core_task_id"] is not None:
+                return None
+            continuation = getattr(self.bridge, "autonext", None)
+            if continuation is not None and not continuation.work_ready(work_id):
                 return None
             try:
                 self._execution_allowed(work)

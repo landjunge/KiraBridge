@@ -33,7 +33,8 @@ CREATE INDEX message_inbox ON messages(recipient,acknowledged,seq);
 CREATE TABLE message_jobs (
  message_id TEXT PRIMARY KEY REFERENCES messages(id), state TEXT NOT NULL,
  run_id TEXT UNIQUE, claimed REAL, started REAL, finished REAL,
- reply_id TEXT REFERENCES messages(id), evidence TEXT NOT NULL DEFAULT '{}', error TEXT
+ reply_id TEXT REFERENCES messages(id), evidence TEXT NOT NULL DEFAULT '{}', error TEXT,
+ execution_cwd TEXT
 );
 CREATE INDEX message_queue ON message_jobs(state);
 CREATE TABLE message_events (
@@ -118,6 +119,12 @@ class Store:
                     for statement in script.split(";"):
                         if statement.strip():
                             self.db.execute(statement)
+                if "execution_cwd" not in {
+                    row[1] for row in self.db.execute("PRAGMA table_info(message_jobs)")
+                }:
+                    # Historical unknown jobs stay unknown with an unconfirmed
+                    # scope; a current receiver configuration cannot rewrite it.
+                    self.db.execute("ALTER TABLE message_jobs ADD COLUMN execution_cwd TEXT")
                 # Event pages and existence checks are scoped to one task. The
                 # global sequence primary key alone scans unrelated task history.
                 # Install for existing databases too, in this same startup transaction.

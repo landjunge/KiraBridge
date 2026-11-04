@@ -599,6 +599,8 @@ class AgentManager:
         config = self.config.agents.get(args.agent)
         if config is None or config.kind not in self.adapters:
             raise BridgeError("agent_unavailable", "Agent adapter is not configured")
+        if guard := getattr(self, "worktree_guard", None):
+            guard(task, args)
         if self.config.visible_handoffs.enabled and not separate_managed:
             if owned_resume_session is not None or handoff_reply:
                 raise BridgeError(

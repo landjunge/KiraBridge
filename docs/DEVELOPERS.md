@@ -29,6 +29,7 @@ permissions.
 - [Complete file/log reads](https://github.com/landjunge/KiraBridge/blob/307004e5b2e4285c19e8d7544bedf45b28297a0b/docs/READ-FULL-FILES.md) and [file transfer](https://github.com/landjunge/KiraBridge/blob/307004e5b2e4285c19e8d7544bedf45b28297a0b/docs/FILE-TRANSFER.md)
 - [Queue contract](https://github.com/landjunge/KiraBridge/blob/307004e5b2e4285c19e8d7544bedf45b28297a0b/docs/QUEUE-MANAGEMENT.md) and [direct admission](https://github.com/landjunge/KiraBridge/blob/307004e5b2e4285c19e8d7544bedf45b28297a0b/docs/QUEUE-DIRECT-ADMISSION-20261029.md)
 - [Optional ThreadDesk integration](https://github.com/landjunge/KiraBridge/blob/307004e5b2e4285c19e8d7544bedf45b28297a0b/docs/DYNAMIC-THREADDESK-PROXY.md)
+- [Bounded Whiteboard continuation](plans/BIGPLAN-AUTONEXT-20261104.md): operator-pinned READY tasks, acceptance receipts and activation gates; disabled by default.
 - [RC20 changes at the published source pin](https://github.com/landjunge/KiraBridge/blob/v0.8.0rc20/docs/RELEASE-0.8.0rc20.md)
 
 These detailed documents contain dated operational observations. Their old version
