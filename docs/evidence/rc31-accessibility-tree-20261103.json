@@ -1,0 +1,258 @@
+{
+  "schema": "kirabridge.rc31.accessibility-tree.synthetic.v1",
+  "captured_at": "2026-11-03T19:58:41.382120+00:00",
+  "scope": "Synthetic production Swift traversal and summary harness only; no actual browser or Cloud latency measurement.",
+  "platform": {
+    "system": "Darwin",
+    "machine": "x86_64"
+  },
+  "source_sha256": {
+    "tests/fixtures/desktop_bootstrap/AccessibilityTreeHarness.swift": "bcd30ec41fa8c1b1c35c32d757af0d48b5cfe7e84a2a5bc3fc42ebcfd05f2492",
+    "integrations/desktop/SystemControl.swift": "635f239fa23ae005a6aedc5be4a62fa0453deef28b5e2afcc13476d719299246",
+    "integrations/desktop/SystemBridge.swift": "b4893ce4f59ecc49c5b2fddc04843730292686aecd56d08483c8ed95204c72db",
+    "integrations/desktop/SystemServices.swift": "4908af5acfcb9059220116f7ea8fe666e69451966217d4d386743173de08ad89",
+    "integrations/desktop/SystemKeyboard.swift": "711bf4d674eb28da67a467d278adad4e18c9902ffa7bbf6bf51aa310c66a4db5",
+    "integrations/desktop/SystemShortcuts.swift": "8407fd5424ca2e124e23bc1f82189d376564c5d2b6e33c845c4525bb458dd3e1",
+    "integrations/desktop/SystemSpecialKeys.swift": "3d0e753085204270b13d45297b644492d8456dd9810f3ebe8f1aa62e92c489cd",
+    "src/kirabridge/platform_adapters/macos/control_models.py": "2e83d504044a1cf84d56d2f6b513b8fcd6c97527c47a82aa2f3ab39e4f84bbba",
+    "tests/test_accessibility_tree.py": "77b9d3ef289a5cfbe321e74d3eedf5c6b1cde8fa35e1b9e56b35c787971d3adf"
+  },
+  "source_and_binary_unchanged_during_capture": true,
+  "fixture_binary": {
+    "path": "/var/folders/v1/z7b9nf2s7879dvxxbzy7bqv00000gn/T/pytest-of-landjunge/pytest-124/synthetic-accessibility-tree0/tree-fixture",
+    "sha256": "350809cee3ce1943736b400046efbee3b5a73564159ebee5e5c7c01be8784230",
+    "compiled_source_match": true,
+    "compiled_source_match_basis": "Parent confirmed pytest-124 is the final 16-file integration invocation and sources stayed unchanged since freeze. It compiled this exact latest harness and production Swift sources, including the final success-with-nil guard; 380 tests passed in 57.20 s. No other compile/test invocation ran concurrently.",
+    "compiled_swift_sources": [
+      "tests/fixtures/desktop_bootstrap/AccessibilityTreeHarness.swift",
+      "integrations/desktop/SystemControl.swift",
+      "integrations/desktop/SystemBridge.swift",
+      "integrations/desktop/SystemServices.swift",
+      "integrations/desktop/SystemKeyboard.swift",
+      "integrations/desktop/SystemShortcuts.swift",
+      "integrations/desktop/SystemSpecialKeys.swift"
+    ],
+    "python_model_source_note": "The Python input model is independently fingerprinted and exercised by the same final integration tests; it is not part of the native binary compilation."
+  },
+  "reproduce": "PYTHONPATH=src python -m pytest -q tests/test_accessibility_tree.py; the module fixture compiles AccessibilityTreeHarness.swift against the listed production Swift sources. Execute its tree-fixture binary with each scenario name below.",
+  "methodology": {
+    "runs_per_scenario": 1,
+    "graph": "Full ternary tree of depth 4: 121 synthetic nodes, 40 internal nodes; Add people is node 120.",
+    "clock": "Injected deterministic monotonic clock; elapsed values are not native wall-clock timings.",
+    "legacy_operation_count": "One immediate-children inspect for each internal node; leaves need no additional inspect to reveal their summaries.",
+    "new_operation_count": "One opted-in bounded accessibility.inspect subtree operation for this fixture at a 262144-byte tree budget.",
+    "ax_ipc_calls_measured": false,
+    "cloud_calls_measured": false,
+    "native_ui_calls": 0,
+    "permission_requests": 0,
+    "input_posts": 0,
+    "native_read_byte_budgets": {
+      "default_max_bytes": 32768,
+      "maximum_max_bytes": 524288,
+      "non_native_query_maximum_max_bytes": 65536,
+      "explicit_example_max_bytes_for_full_fixture": 262144,
+      "scope": "Current read_query.py contract read from source after capture. The full 67574-byte synthetic tree exceeds the default; callers must request a larger budget. This harness capture does not execute native.read or measure an actual RPC."
+    }
+  },
+  "scenarios": {
+    "full": {
+      "reads": 121,
+      "native_ui_calls": 0,
+      "permission_requests": 0,
+      "input_posts": 0,
+      "individual_revisions_match": true,
+      "node_count": 121,
+      "complete": true,
+      "snapshot_atomic": false,
+      "truncated_reasons": [],
+      "bytes": 67574,
+      "max_depth": 32,
+      "max_nodes": 256,
+      "max_tree_bytes": 262144,
+      "tree_budget_ms": 1500,
+      "incomplete_frontier_nodes": 0,
+      "target_add_people_found": true,
+      "legacy_internal_node_inspect_operations": 40,
+      "bounded_tree_operations": 1
+    },
+    "cycle": {
+      "reads": 3,
+      "native_ui_calls": 0,
+      "permission_requests": 0,
+      "input_posts": 0,
+      "individual_revisions_match": true,
+      "node_count": 3,
+      "complete": true,
+      "snapshot_atomic": false,
+      "truncated_reasons": [],
+      "bytes": 1832,
+      "max_depth": 32,
+      "max_nodes": 256,
+      "max_tree_bytes": 262144,
+      "tree_budget_ms": 1500,
+      "incomplete_frontier_nodes": 0,
+      "target_add_people_found": false
+    },
+    "depth": {
+      "reads": 4,
+      "native_ui_calls": 0,
+      "permission_requests": 0,
+      "input_posts": 0,
+      "individual_revisions_match": true,
+      "node_count": 4,
+      "complete": false,
+      "snapshot_atomic": false,
+      "truncated_reasons": [
+        "max_depth"
+      ],
+      "bytes": 2396,
+      "max_depth": 1,
+      "max_nodes": 256,
+      "max_tree_bytes": 262144,
+      "tree_budget_ms": 1500,
+      "incomplete_frontier_nodes": 3,
+      "target_add_people_found": false
+    },
+    "nodes": {
+      "reads": 2,
+      "native_ui_calls": 0,
+      "permission_requests": 0,
+      "input_posts": 0,
+      "individual_revisions_match": true,
+      "node_count": 2,
+      "complete": false,
+      "snapshot_atomic": false,
+      "truncated_reasons": [
+        "max_nodes"
+      ],
+      "bytes": 1284,
+      "max_depth": 32,
+      "max_nodes": 2,
+      "max_tree_bytes": 262144,
+      "tree_budget_ms": 1500,
+      "incomplete_frontier_nodes": 2,
+      "target_add_people_found": false
+    },
+    "bytes": {
+      "reads": 2,
+      "native_ui_calls": 0,
+      "permission_requests": 0,
+      "input_posts": 0,
+      "individual_revisions_match": true,
+      "node_count": 1,
+      "complete": false,
+      "snapshot_atomic": false,
+      "truncated_reasons": [
+        "max_tree_bytes"
+      ],
+      "bytes": 8918,
+      "max_depth": 32,
+      "max_nodes": 256,
+      "max_tree_bytes": 16384,
+      "tree_budget_ms": 1500,
+      "incomplete_frontier_nodes": 1,
+      "target_add_people_found": false
+    },
+    "time": {
+      "reads": 3,
+      "native_ui_calls": 0,
+      "permission_requests": 0,
+      "input_posts": 0,
+      "individual_revisions_match": true,
+      "node_count": 2,
+      "complete": false,
+      "snapshot_atomic": false,
+      "truncated_reasons": [
+        "time_budget"
+      ],
+      "bytes": 1287,
+      "max_depth": 32,
+      "max_nodes": 256,
+      "max_tree_bytes": 262144,
+      "tree_budget_ms": 50,
+      "incomplete_frontier_nodes": 2,
+      "target_add_people_found": false
+    },
+    "root_time": {
+      "reads": 1,
+      "native_ui_calls": 0,
+      "permission_requests": 0,
+      "input_posts": 0,
+      "individual_revisions_match": true,
+      "error": "macos_tree_timeout"
+    },
+    "owner": {
+      "reads": 2,
+      "native_ui_calls": 0,
+      "permission_requests": 0,
+      "input_posts": 0,
+      "individual_revisions_match": true,
+      "error": "macos_target_changed"
+    },
+    "changed": {
+      "reads": 2,
+      "native_ui_calls": 0,
+      "permission_requests": 0,
+      "input_posts": 0,
+      "individual_revisions_match": true,
+      "error": "macos_tree_changed"
+    },
+    "unavailable": {
+      "reads": 2,
+      "native_ui_calls": 0,
+      "permission_requests": 0,
+      "input_posts": 0,
+      "individual_revisions_match": true,
+      "error": "macos_accessibility_unavailable"
+    },
+    "childlimit": {
+      "reads": 1,
+      "native_ui_calls": 0,
+      "permission_requests": 0,
+      "input_posts": 0,
+      "individual_revisions_match": true,
+      "error": "macos_resource_limit"
+    },
+    "heldlimit": {
+      "reads": 5,
+      "native_ui_calls": 0,
+      "permission_requests": 0,
+      "input_posts": 0,
+      "individual_revisions_match": true,
+      "error": "macos_resource_limit"
+    },
+    "rootbytes": {
+      "reads": 1,
+      "native_ui_calls": 0,
+      "permission_requests": 0,
+      "input_posts": 0,
+      "individual_revisions_match": true,
+      "error": "macos_resource_limit"
+    },
+    "secure": {
+      "reads": 121,
+      "native_ui_calls": 0,
+      "permission_requests": 0,
+      "input_posts": 0,
+      "individual_revisions_match": true,
+      "node_count": 121,
+      "complete": true,
+      "snapshot_atomic": false,
+      "truncated_reasons": [],
+      "bytes": 67486,
+      "max_depth": 32,
+      "max_nodes": 256,
+      "max_tree_bytes": 262144,
+      "tree_budget_ms": 1500,
+      "incomplete_frontier_nodes": 0,
+      "target_add_people_found": true,
+      "secure_nodes": 1,
+      "secure_values_or_hashes_exported": false
+    }
+  },
+  "limitations": [
+    "Operation counts concern this synthetic graph and a generous 262144-byte tree budget. Native reads default to 32768 bytes and allow an explicitly requested maximum of 524288 bytes. Smaller requested budgets and real UI churn may require several snapshots.",
+    "Snapshots are non-atomic. Each individual action must freshly revalidate its returned element revision.",
+    "Cooperative tree deadline is checked around AX calls; an already-started call can extend it by the configured messaging timeout. Synthetic runs do not measure actual AX deadline scheduling."
+  ]
+}

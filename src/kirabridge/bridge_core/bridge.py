@@ -272,6 +272,11 @@ class Bridge:
             system_modules=self.system_modules,
             system_reports=self.terminal,
         )
+        from kirabridge.native_queries import NativeQueries
+
+        self.native_queries = NativeQueries(
+            self.security, self.macos, self.system_modules, config.read_concurrency
+        )
         self.sessions.terminal_app.platform_guard = lambda: self.macos.require("terminal.native")
         self.agents.visible_handoffs = self.visible_handoffs
 
@@ -432,7 +437,14 @@ class Bridge:
     def events(self, principal: str, task_id: str, after: int = 0) -> dict:
         import json
 
-        self.task(principal, task_id)
+        self.security.principal(principal, "task.read")
+        if (
+            self.store.db.execute(
+                "SELECT 1 FROM tasks WHERE id=? AND principal=?", (task_id, principal)
+            ).fetchone()
+            is None
+        ):
+            raise BridgeError("not_found", "Task not found")
         rows = self.store.db.execute(
             "SELECT seq,at,state,evidence FROM events WHERE task_id=? AND seq>? "
             "ORDER BY seq LIMIT 1000",

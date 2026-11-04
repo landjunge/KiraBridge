@@ -60,6 +60,10 @@ class AccessibilityInspectInput(ApplicationTargetInput):
     value_offset: int = Field(default=0, ge=0, le=10000000)
     max_value_chars: int = Field(default=4096, ge=1, le=16384)
     expected_revision: str | None = Field(default=None, pattern=r"^[a-f0-9]{64}$")
+    max_depth: int = Field(default=0, ge=0, le=32)
+    max_nodes: int = Field(default=256, ge=1, le=512)
+    max_tree_bytes: int = Field(default=262144, ge=16384, le=524288)
+    tree_budget_ms: int = Field(default=1500, ge=50, le=5000)
 
     @model_validator(mode="after")
     def token_owner(self):
@@ -71,6 +75,8 @@ class AccessibilityInspectInput(ApplicationTargetInput):
             not self.element_token or not self.expected_revision
         ):
             raise ValueError("Continue using the returned token, worker and revision")
+        if self.max_depth and (self.offset or self.value_offset or self.expected_revision):
+            raise ValueError("A bounded subtree is a fresh snapshot, not a paginated continuation")
         return self
 
 

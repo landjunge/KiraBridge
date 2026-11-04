@@ -183,8 +183,9 @@ enum SystemControl {
         if offset + page.count < all.count { result["next_offset"] = offset + page.count }
         return result
     }
-    static func remember(_ element: AXUIElement, app: NSRunningApplication) throws -> String {
-        AXUIElementSetMessagingTimeout(element, 1.0)
+    static func remember(_ element: AXUIElement, app: NSRunningApplication,
+                         messagingTimeout: Float = 1.0) throws -> String {
+        AXUIElementSetMessagingTimeout(element, messagingTimeout)
         var actual: pid_t = 0
         guard AXUIElementGetPid(element, &actual) == .success, actual == app.processIdentifier else {
             throw failure("macos_target_changed", "Accessibility element belongs to a different application")
@@ -229,10 +230,343 @@ enum SystemControl {
     static func sameElements(_ left: [AXUIElement], _ right: [AXUIElement]) -> Bool {
         left.count == right.count && zip(left, right).allSatisfy { CFEqual($0.0, $0.1) }
     }
+    // A tree read amortizes native/cloud dispatches, not authorization. References
+    // still belong to this principal, PID/start identity and worker generation.
+    struct TreeReference: Hashable {
+        let element: AXUIElement
+        static func == (left: Self, right: Self) -> Bool { CFEqual(left.element, right.element) }
+        func hash(into hasher: inout Hasher) { hasher.combine(CFHash(element)) }
+    }
+    struct TreeObservation<Node: Hashable> {
+        let node: Node
+        let token: String
+        let metadata: [String: Any]
+        let children: [Node]
+    }
+    enum TreeReadLimit: Error { case deadline }
+    nonisolated static func treeNow() -> Double { ProcessInfo.processInfo.systemUptime }
+    static func checkTreeDeadline(_ deadline: Double) throws {
+        if treeNow() >= deadline { throw TreeReadLimit.deadline }
+    }
+    static func prepareTreeElement(_ element: AXUIElement, deadline: Double) throws {
+        try checkTreeDeadline(deadline)
+        // One already-started AX IPC can extend the cooperative deadline by at
+        // most this timeout. Every following attribute checks the deadline first.
+        let timeout = Float(max(0.001, min(0.1, deadline - treeNow())))
+        guard AXUIElementSetMessagingTimeout(element, timeout) == .success else {
+            throw failure("macos_accessibility_unavailable", "Accessibility timeout could not be configured")
+        }
+    }
+    static func treeAttribute(_ element: AXUIElement, _ name: String, deadline: Double) throws -> CFTypeRef? {
+        try checkTreeDeadline(deadline)
+        var value: CFTypeRef?
+        let status = AXUIElementCopyAttributeValue(element, name as CFString, &value)
+        try checkTreeDeadline(deadline)
+        if status == .success {
+            guard let observed = value else {
+                throw failure("macos_accessibility_unavailable", "Accessibility reported success without an observable attribute value")
+            }
+            return observed
+        }
+        if status == .attributeUnsupported || status == .noValue { return nil }
+        throw failure("macos_accessibility_unavailable", "Accessibility attribute could not be observed during subtree read")
+    }
+    static func treeChildren(_ raw: CFTypeRef?) throws -> [AXUIElement] {
+        guard let value = raw else { return [] }
+        guard CFGetTypeID(value) == CFArrayGetTypeID() else {
+            throw failure("macos_accessibility_unavailable", "Accessibility children are not an observable array")
+        }
+        guard CFArrayGetCount(unsafeBitCast(value, to: CFArray.self)) <= 5000 else {
+            throw failure("macos_resource_limit", "Accessibility subtree child reference budget exceeded")
+        }
+        guard let items = value as? [AnyObject] else {
+            throw failure("macos_accessibility_unavailable", "Accessibility children cannot be decoded")
+        }
+        return try items.map { item in
+            guard CFGetTypeID(item) == AXUIElementGetTypeID() else {
+                throw failure("macos_accessibility_unavailable", "Accessibility child is not an element reference")
+            }
+            return unsafeBitCast(item, to: AXUIElement.self)
+        }
+    }
+    static func treeActionNames(_ raw: CFArray?) throws -> [String] {
+        guard let value = raw else {
+            throw failure("macos_accessibility_unavailable", "Accessibility action names are not an observable array")
+        }
+        guard CFArrayGetCount(value) <= 128 else {
+            throw failure("macos_resource_limit", "Accessibility action name budget exceeded")
+        }
+        guard let names = value as? [String] else {
+            throw failure("macos_accessibility_unavailable", "Accessibility action names cannot be decoded")
+        }
+        guard names.allSatisfy({ $0.utf8.count <= 256 }) else {
+            throw failure("macos_resource_limit", "Accessibility action name length budget exceeded")
+        }
+        return names
+    }
+    // Retained as the compatibility path when the application does not implement
+    // the whole multiple-attribute API. Values are freshly observed again; no
+    // partial fields from an unsupported batch are reused.
+    static func individualTreeSummary(_ element: AXUIElement, deadline: Double) throws -> [String: Any] {
+        var readError: Error?
+        do {
+            let result = try observedSummary(prepare: { try prepareTreeElement(element, deadline: deadline) },
+                read: { name in
+                    guard readError == nil else { return nil }
+                    do {
+                        let value = try treeAttribute(element, name, deadline: deadline)
+                        if [kAXRoleAttribute, kAXSubroleAttribute].contains(name),
+                           let observed = value, !(observed is String) {
+                            throw failure("macos_accessibility_unavailable", "Accessibility secure classification is not observable")
+                        }
+                        return value
+                    }
+                    catch { readError = error; return nil }
+                }, actionNames: {
+                    guard readError == nil else { return nil }
+                    do {
+                        try checkTreeDeadline(deadline)
+                        var actions: CFArray?
+                        let status = AXUIElementCopyActionNames(element, &actions)
+                        try checkTreeDeadline(deadline)
+                        if status == .notImplemented { return nil }
+                        guard status == .success else {
+                            throw failure("macos_accessibility_unavailable", "Accessibility actions could not be observed during subtree read")
+                        }
+                        return try treeActionNames(actions)
+                    } catch { readError = error; return nil }
+                })
+            if let error = readError { throw error }
+            return result
+        } catch {
+            // In particular, a failed role/subrole read cannot lead to emitting
+            // a value/hash from a field whose secure classification is unknown.
+            throw readError ?? error
+        }
+    }
+    enum TreeBatchFailure: Error { case notImplemented }
+    static let treeClassificationAttributes = [kAXRoleAttribute, kAXSubroleAttribute]
+    static let treeMetadataAttributes = [kAXTitleAttribute, kAXDescriptionAttribute, kAXIdentifierAttribute,
+        kAXEnabledAttribute, kAXFocusedAttribute, kAXSelectedAttribute, kAXExpandedAttribute,
+        kAXMinimizedAttribute, kAXPositionAttribute, kAXSizeAttribute]
+
+    /// CopyMultiple(options:0) reports missing attributes as CFNull or an
+    /// AXValue(.axError) in their original position. Only supported absence is
+    /// omitted, matching strict scalar tree reads. Transport/unknown errors
+    /// never become empty fields or compatibility fallbacks.
+    static func treeBatchAttributes(_ names: [String], status: AXError, raw: CFArray?) throws -> [String: CFTypeRef] {
+        guard !names.isEmpty, names.count <= 32, Set(names).count == names.count else {
+            throw failure("invalid_arguments", "Invalid Accessibility attribute batch")
+        }
+        if status == .notImplemented { throw TreeBatchFailure.notImplemented }
+        guard status == .success, let values = raw,
+              CFGetTypeID(values) == CFArrayGetTypeID(),
+              CFArrayGetCount(values) == names.count,
+              let items = values as? [AnyObject] else {
+            throw failure("macos_accessibility_unavailable", "Accessibility attribute batch is not a complete positional array")
+        }
+        var result: [String: CFTypeRef] = [:]
+        for (name, item) in zip(names, items) {
+            if CFGetTypeID(item) == CFNullGetTypeID() { continue }
+            if CFGetTypeID(item) == AXValueGetTypeID() {
+                let value = unsafeBitCast(item, to: AXValue.self)
+                if AXValueGetType(value) == .axError {
+                    var error = AXError.failure
+                    guard AXValueGetValue(value, .axError, &error), error != .success else {
+                        throw failure("macos_accessibility_unavailable", "Accessibility batch contains an invalid error value")
+                    }
+                    if error == .attributeUnsupported || error == .noValue { continue }
+                    throw failure("macos_accessibility_unavailable", "Accessibility batch attribute could not be observed")
+                }
+            }
+            result[name] = item
+        }
+        return result
+    }
+    /// Pure public-API call planner, injected by the synthetic harness. This
+    /// reduces API invocations, without asserting the framework's IPC internals.
+    static func observedBatchedTreeSummary(prepare: () throws -> Void,
+        copy: ([String]) throws -> (AXError, CFArray?),
+        actionNames: () throws -> [String]?,
+        individual: () throws -> [String: Any]) throws -> [String: Any] {
+        do {
+            try prepare()
+            let classification = try copy(treeClassificationAttributes)
+            var values = try treeBatchAttributes(treeClassificationAttributes,
+                status: classification.0, raw: classification.1)
+            guard let role = values[kAXRoleAttribute] as? String, !role.isEmpty,
+                  values[kAXSubroleAttribute] == nil || values[kAXSubroleAttribute] is String else {
+                throw failure("macos_accessibility_unavailable", "Accessibility secure classification is not observable")
+            }
+            let subrole = values[kAXSubroleAttribute] as? String ?? ""
+            let secure = role.contains("Secure") || subrole.contains("Secure")
+            // A secure value is never requested, rather than fetched and then
+            // redacted. Role/subrole are always observed before this list exists.
+            let names = Array(treeMetadataAttributes.prefix(3))
+                + (secure ? [] : [kAXValueAttribute]) + Array(treeMetadataAttributes.dropFirst(3))
+            let metadata = try copy(names)
+            values.merge(try treeBatchAttributes(names, status: metadata.0, raw: metadata.1)) { _, new in new }
+            let actions = try actionNames()
+            return try observedSummary(prepare: {}, read: { values[$0] }, actionNames: { actions })
+        } catch TreeBatchFailure.notImplemented {
+            return try individual()
+        }
+    }
+    static func treeSummary(_ element: AXUIElement, deadline: Double) throws -> [String: Any] {
+        let result = try observedBatchedTreeSummary(
+            prepare: { try prepareTreeElement(element, deadline: deadline) },
+            copy: { names in
+                try checkTreeDeadline(deadline)
+                var values: CFArray?
+                let status = AXUIElementCopyMultipleAttributeValues(element, names as CFArray, [], &values)
+                try checkTreeDeadline(deadline)
+                return (status, values)
+            }, actionNames: {
+                try checkTreeDeadline(deadline)
+                var actions: CFArray?
+                let status = AXUIElementCopyActionNames(element, &actions)
+                try checkTreeDeadline(deadline)
+                if status == .notImplemented { return nil }
+                guard status == .success else {
+                    throw failure("macos_accessibility_unavailable", "Accessibility actions could not be observed during subtree read")
+                }
+                return try treeActionNames(actions)
+            }, individual: { try individualTreeSummary(element, deadline: deadline) })
+        try checkTreeDeadline(deadline)
+        return result
+    }
+    /// Pure bounded BFS, also exercised by the no-desktop synthetic harness.
+    /// Each observation is locally stable; the whole remote AX graph is not an
+    /// atomic snapshot. Mutations recheck the normal individual node revision.
+    static func observedTree<Node: Hashable>(root: Node, maxDepth: Int, maxNodes: Int,
+        maxBytes: Int, budgetMS: Int, now: () -> Double = treeNow,
+        observe: (Node, Double) throws -> TreeObservation<Node>) throws
+        -> (tree: [String: Any], root: TreeObservation<Node>) {
+        guard (1...32).contains(maxDepth), (1...512).contains(maxNodes),
+              (16384...524288).contains(maxBytes), (50...5000).contains(budgetMS) else {
+            throw failure("invalid_arguments", "Invalid bounded Accessibility subtree limits")
+        }
+        let started = now(), deadline = started + Double(budgetMS) / 1000
+        var queue: [(node: Node, parent: String?, depth: Int)] = [(root, nil, 0)]
+        var discovered: Set<Node> = [root], observations: [TreeObservation<Node>] = []
+        var paths: [(parent: String?, depth: Int)] = [], reasons: Set<String> = []
+        var cursor = 0, childReferences = 0, estimatedBytes = 2048
+        while cursor < queue.count {
+            if now() >= deadline { reasons.insert("time_budget"); break }
+            let item = queue[cursor]
+            let observation: TreeObservation<Node>
+            do { observation = try observe(item.node, deadline) }
+            catch TreeReadLimit.deadline { reasons.insert("time_budget"); break }
+            if now() >= deadline { reasons.insert("time_budget"); break }
+            guard observation.children.count <= 5000,
+                  childReferences + observation.children.count <= 16384 else {
+                throw failure("macos_resource_limit", "Accessibility subtree child reference budget exceeded")
+            }
+            childReferences += observation.children.count
+            var row = observation.metadata
+            row["element_token"] = observation.token
+            row["parent_token"] = item.parent.map { $0 as Any } ?? NSNull()
+            row["depth"] = item.depth
+            // Fixed reserve includes the final per-node traversal fields. The
+            // actual tree encoding is checked again before it can be returned.
+            let rowBytes = try JSONSerialization.data(withJSONObject: row, options: [.sortedKeys]).count + 160
+            if estimatedBytes + rowBytes > maxBytes { reasons.insert("max_tree_bytes"); break }
+            estimatedBytes += rowBytes
+            observations.append(observation); paths.append((item.parent, item.depth))
+            cursor += 1
+            if item.depth < maxDepth {
+                for child in observation.children where !discovered.contains(child) {
+                    if discovered.count >= maxNodes { reasons.insert("max_nodes"); continue }
+                    discovered.insert(child)
+                    queue.append((child, observation.token, item.depth + 1))
+                }
+            }
+        }
+        guard let first = observations.first else {
+            if reasons.contains("time_budget") {
+                throw failure("macos_tree_timeout", "Accessibility root was not observed within the subtree time budget")
+            }
+            throw failure("macos_resource_limit", "Accessibility root exceeds the subtree byte budget")
+        }
+        let included = Set(observations.map { $0.node })
+        var rows: [[String: Any]] = []
+        for (index, observation) in observations.enumerated() {
+            let returned = observation.children.filter { included.contains($0) }.count
+            let missing = returned < observation.children.count
+            if missing && paths[index].depth == maxDepth { reasons.insert("max_depth") }
+            var row = observation.metadata
+            row["element_token"] = observation.token
+            row["parent_token"] = paths[index].parent.map { $0 as Any } ?? NSNull()
+            row["depth"] = paths[index].depth
+            row["children_total"] = observation.children.count
+            row["children_returned"] = returned
+            row["children_truncated"] = missing
+            rows.append(row)
+        }
+        var tree: [String: Any] = ["nodes": rows, "node_count": rows.count,
+            "complete": reasons.isEmpty, "truncated_reasons": reasons.sorted(),
+            "max_depth": maxDepth, "max_nodes": maxNodes, "max_tree_bytes": maxBytes,
+            "tree_budget_ms": budgetMS, "elapsed_ms": (now() - started) * 1000,
+            "snapshot_atomic": false, "bytes": 0]
+        // This exact check is independent of the conservative linear estimates.
+        // Updating the byte count itself can change its digit width.
+        for _ in 0..<4 {
+            let size = try JSONSerialization.data(withJSONObject: tree, options: [.sortedKeys]).count
+            guard size <= maxBytes else {
+                throw failure("macos_resource_limit", "Accessibility subtree serialization exceeds its byte budget")
+            }
+            if tree["bytes"] as? Int == size { break }
+            tree["bytes"] = size
+        }
+        return (tree, first)
+    }
+    static func inspectTree(_ args: [String: Any], app: NSRunningApplication,
+                            root: AXUIElement) throws -> [String: Any] {
+        guard integer(args, "offset", 0) == 0, integer(args, "value_offset", 0) == 0,
+              args["expected_revision"] == nil else {
+            throw failure("invalid_cursor", "A subtree snapshot cannot continue a paginated Accessibility read")
+        }
+        let snapshot = try observedTree(root: TreeReference(element: root),
+            maxDepth: integer(args, "max_depth", 0), maxNodes: integer(args, "max_nodes", 256),
+            maxBytes: integer(args, "max_tree_bytes", 262144), budgetMS: integer(args, "tree_budget_ms", 1500)) { reference, deadline in
+            let selected = reference.element
+            try checkTreeDeadline(deadline)
+            try checkElementOwner(selected, pid: app.processIdentifier)
+            let before = try treeSummary(selected, deadline: deadline)
+            let children = try treeChildren(treeAttribute(selected, kAXChildrenAttribute, deadline: deadline))
+            guard children.count <= 5000 else {
+                throw failure("macos_resource_limit", "Accessibility subtree child reference budget exceeded")
+            }
+            for child in children {
+                try checkTreeDeadline(deadline)
+                try checkElementOwner(child, pid: app.processIdentifier)
+            }
+            let after = try treeSummary(selected, deadline: deadline)
+            let finalChildren = try treeChildren(treeAttribute(selected, kAXChildrenAttribute, deadline: deadline))
+            guard before["revision"] as? String == after["revision"] as? String,
+                  sameElements(children, finalChildren) else {
+                throw failure("macos_tree_changed", "Accessibility element or children changed during subtree read")
+            }
+            try checkTreeDeadline(deadline)
+            let token = try remember(selected, app: app, messagingTimeout: 0.1)
+            try checkTreeDeadline(deadline)
+            return TreeObservation(node: reference, token: token, metadata: before,
+                children: children.map { TreeReference(element: $0) })
+        }
+        _ = try target(args); try axGranted()
+        return ["application": try appIdentity(app), "element": snapshot.root.metadata,
+            "element_token": snapshot.root.token,
+            "revision": snapshot.root.metadata["revision"]!,
+            "revision_scope": "individual_root_element; not a paginated traversal revision",
+            "helper_pid": Int(ProcessInfo.processInfo.processIdentifier),
+            "worker_generation": String(describing: SystemBridgeRuntime.generation),
+            "tree": snapshot.tree, "effect": "none", "permission_requested": false]
+    }
     static func inspect(_ args: [String: Any]) throws -> [String: Any] {
         let app = try target(args)
         try axGranted()
         let root = args["element_token"] is String ? try element(args, app: app) : AXUIElementCreateApplication(app.processIdentifier)
+        if integer(args, "max_depth", 0) > 0 { return try inspectTree(args, app: app, root: root) }
         let metadata = try summary(root)
         let token = try remember(root, app: app)
         let rawChildren = attribute(root, kAXChildrenAttribute) as? [AXUIElement] ?? []

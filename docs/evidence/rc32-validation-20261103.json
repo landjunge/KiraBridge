@@ -1,0 +1,46 @@
+{
+  "schema": "kirabridge.rc32.validation.v1",
+  "python": "3.11.15 (main, Mar  3 2026, 00:52:57) [Clang 17.0.0 (clang-1700.6.4.2)]",
+  "architecture": "x86_64",
+  "base": "0f554bc64ba7d0cecfa5898990f1df67fc6c0591",
+  "branch": "perf/rc32-native-ipc-20261103",
+  "pytest": {
+    "files": [
+      "tests/test_accessibility_batch_native.py",
+      "tests/test_accessibility_tree.py",
+      "tests/test_accessibility_summary_native.py"
+    ],
+    "passed": 74,
+    "failed": 0,
+    "duration_seconds": 72.96,
+    "new_cases": 26,
+    "existing_tree_cases": 39,
+    "existing_legacy_summary_cases": 9
+  },
+  "product_source_sha256": {
+    "integrations/desktop/SystemControl.swift": "3b578d5ae885bd833c3f338b7b1c1c04e938308258df069386c9d37479721ace"
+  },
+  "same_swift_used_for_real_ax_and_synthetic_checks": true,
+  "ruff_check": true,
+  "ruff_format_check": true,
+  "git_diff_check": true,
+  "uv_lock_check": true,
+  "no_broad_suite_repeated": true,
+  "github_actions_used": false,
+  "real_fixture": {
+    "evidence": "rc32-owned-ax-launchservices-fixed-20261103.json",
+    "samples": 20,
+    "owned_buttons_per_arm": 12,
+    "baseline_and_candidate_result_bytes_identical": true,
+    "foreground_pid_before_and_after": 852,
+    "independent_owned_family_absent": true,
+    "permission_requests": 0,
+    "input_posts": 0
+  },
+  "benchmark_script_sha256": {
+    "scripts/benchmark_accessibility_native.py": "ae15344eab47e32af806c0342413639dcd95f9c08c6b4d6d53db27e5da0ddd8a",
+    "scripts/benchmark_native_metadata.py": "1c65ab4aaa9e634367813ed7add1685854c200f29e0532afc837e10ee288a2fc"
+  },
+  "production_installation_performed": false,
+  "scope": "Only optional native tree summary product code changed; legacy summary and existing authorization/native integrity checks retained."
+}

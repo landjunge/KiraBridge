@@ -104,6 +104,10 @@ class Store:
                     for statement in script.split(";"):
                         if statement.strip():
                             self.db.execute(statement)
+                # Event pages and existence checks are scoped to one task. The
+                # global sequence primary key alone scans unrelated task history.
+                # Install for existing databases too, in this same startup transaction.
+                self.db.execute("CREATE INDEX IF NOT EXISTS events_task_seq ON events(task_id,seq)")
                 from kirabridge.queue_management import install_schema
 
                 install_schema(self)

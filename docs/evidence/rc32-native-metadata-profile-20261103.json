@@ -1,0 +1,6111 @@
+{
+  "label": "rc31-native-integrity-baseline",
+  "version": "0.8.0rc31",
+  "scope": "Direct Python native.read, original transport and real metadata/stat/SHA checks; fake in-memory protocol child only, no HTTP/cloud/native OS query",
+  "state_scope": "owned temporary fixtures only; removed after explicit transport close",
+  "warmup": "none excluded; files are newly written so no claim of cold disk cache",
+  "percentiles": "P50 median, P95 nearest rank; all first samples retained",
+  "script_sha256": "8ee036ad3fdd73dec17ef8993c0a2ae5ca4adc1892c662ab78f727591b85e237",
+  "records": [
+    {
+      "fixture_binary_bytes": 32768,
+      "fixture_info_bytes": 539,
+      "fixture_binary_sha256": "816a60eb2fd7b5205eb290225900a1122eb9a57559aaf1982ad04fa626493b6c",
+      "fixture_info_sha256": "bad9c91b4f392cf651ddf9e85356a296b0b2cee7271e37e16131c4159ef53ba3",
+      "metadata_fixture_contract_validated": true,
+      "guarded_private_file_implementation_unchanged": true,
+      "source_hashes_before": {
+        "native_queries.py": "f0d994ba0395db70e19fd2d7b7149a3aac60c1fdf2f85800b99c6f9265bb9507",
+        "read_query.py": "25efb02116e393395bd7a500d8e70be910a3821eca0175a14fa31c7c2e1120db",
+        "platform_adapters/macos/provider.py": "c7f04dfba295dad7ec2dfa65fcb3d5a719f6c552187b55e68924bfc6bf7dd3d6",
+        "platform_adapters/macos/capabilities.py": "0e8d03db7eb94e3cef55b62397d3714a191a514ecd12e08aacdad4cd7194f816",
+        "platform_adapters/macos/system_transport.py": "e6b63b15d404142355eff100a2ba3c072e6c5d81c4867d76d0f8cea9b4a1f462",
+        "platform_adapters/macos/system_models.py": "985088daf504c345d332699124b91583a848c02775c799e188baa115466b9a23",
+        "permissions.py": "44887619a144681c57b9e4547685af1f99ab99b38498cb93126ebe1c0d751b5f"
+      },
+      "source_hashes_after": {
+        "native_queries.py": "f0d994ba0395db70e19fd2d7b7149a3aac60c1fdf2f85800b99c6f9265bb9507",
+        "read_query.py": "25efb02116e393395bd7a500d8e70be910a3821eca0175a14fa31c7c2e1120db",
+        "platform_adapters/macos/provider.py": "c7f04dfba295dad7ec2dfa65fcb3d5a719f6c552187b55e68924bfc6bf7dd3d6",
+        "platform_adapters/macos/capabilities.py": "0e8d03db7eb94e3cef55b62397d3714a191a514ecd12e08aacdad4cd7194f816",
+        "platform_adapters/macos/system_transport.py": "e6b63b15d404142355eff100a2ba3c072e6c5d81c4867d76d0f8cea9b4a1f462",
+        "platform_adapters/macos/system_models.py": "985088daf504c345d332699124b91583a848c02775c799e188baa115466b9a23",
+        "permissions.py": "44887619a144681c57b9e4547685af1f99ab99b38498cb93126ebe1c0d751b5f"
+      },
+      "source_unchanged": true,
+      "samples": [
+        {
+          "index": 0,
+          "wall_ms": 3.343664,
+          "cpu_ms": 2.728,
+          "private_file_reads": [
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.14649
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 32768,
+              "ms": 0.077117
+            },
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.10895
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 32768,
+              "ms": 0.078025
+            },
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.083482
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 32768,
+              "ms": 0.082821
+            }
+          ],
+          "snapshot_ms": [
+            0.445538,
+            0.425219,
+            0.382405
+          ],
+          "hashes": [
+            {
+              "bytes": 32768,
+              "ms": 0.0798
+            },
+            {
+              "bytes": 32768,
+              "ms": 0.080443
+            },
+            {
+              "bytes": 32768,
+              "ms": 0.081299
+            }
+          ],
+          "result_sha256": "ff4751dd7350d237a1b859c1c838c58365679e7c3e240d620e1ceaec7790dc94"
+        },
+        {
+          "index": 1,
+          "wall_ms": 4.209505,
+          "cpu_ms": 2.786,
+          "private_file_reads": [
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.09344
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 32768,
+              "ms": 0.083196
+            },
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.131792
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 32768,
+              "ms": 0.690625
+            },
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.087912
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 32768,
+              "ms": 0.093649
+            }
+          ],
+          "snapshot_ms": [
+            0.403767,
+            1.106566,
+            0.487217
+          ],
+          "hashes": [
+            {
+              "bytes": 32768,
+              "ms": 0.080875
+            },
+            {
+              "bytes": 32768,
+              "ms": 0.085076
+            },
+            {
+              "bytes": 32768,
+              "ms": 0.08515
+            }
+          ],
+          "result_sha256": "ff4751dd7350d237a1b859c1c838c58365679e7c3e240d620e1ceaec7790dc94"
+        },
+        {
+          "index": 2,
+          "wall_ms": 2.250405,
+          "cpu_ms": 2.112,
+          "private_file_reads": [
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.088566
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 32768,
+              "ms": 0.076546
+            },
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.06991
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 32768,
+              "ms": 0.0709
+            },
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.066471
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 32768,
+              "ms": 0.076534
+            }
+          ],
+          "snapshot_ms": [
+            0.392314,
+            0.34313,
+            0.43172
+          ],
+          "hashes": [
+            {
+              "bytes": 32768,
+              "ms": 0.081271
+            },
+            {
+              "bytes": 32768,
+              "ms": 0.080558
+            },
+            {
+              "bytes": 32768,
+              "ms": 0.079654
+            }
+          ],
+          "result_sha256": "ff4751dd7350d237a1b859c1c838c58365679e7c3e240d620e1ceaec7790dc94"
+        },
+        {
+          "index": 3,
+          "wall_ms": 2.646916,
+          "cpu_ms": 2.255,
+          "private_file_reads": [
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.084775
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 32768,
+              "ms": 0.079582
+            },
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.071431
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 32768,
+              "ms": 0.418824
+            },
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.094132
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 32768,
+              "ms": 0.091636
+            }
+          ],
+          "snapshot_ms": [
+            0.370984,
+            0.697459,
+            0.428159
+          ],
+          "hashes": [
+            {
+              "bytes": 32768,
+              "ms": 0.079287
+            },
+            {
+              "bytes": 32768,
+              "ms": 0.082697
+            },
+            {
+              "bytes": 32768,
+              "ms": 0.081176
+            }
+          ],
+          "result_sha256": "ff4751dd7350d237a1b859c1c838c58365679e7c3e240d620e1ceaec7790dc94"
+        },
+        {
+          "index": 4,
+          "wall_ms": 2.537981,
+          "cpu_ms": 2.249,
+          "private_file_reads": [
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.160657
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 32768,
+              "ms": 0.092639
+            },
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.073279
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 32768,
+              "ms": 0.070193
+            },
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.078824
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 32768,
+              "ms": 0.070733
+            }
+          ],
+          "snapshot_ms": [
+            0.499077,
+            0.376213,
+            0.377464
+          ],
+          "hashes": [
+            {
+              "bytes": 32768,
+              "ms": 0.081171
+            },
+            {
+              "bytes": 32768,
+              "ms": 0.110925
+            },
+            {
+              "bytes": 32768,
+              "ms": 0.080417
+            }
+          ],
+          "result_sha256": "ff4751dd7350d237a1b859c1c838c58365679e7c3e240d620e1ceaec7790dc94"
+        },
+        {
+          "index": 5,
+          "wall_ms": 2.236934,
+          "cpu_ms": 2.016,
+          "private_file_reads": [
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.095659
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 32768,
+              "ms": 0.076618
+            },
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.111221
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 32768,
+              "ms": 0.085288
+            },
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.070423
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 32768,
+              "ms": 0.067075
+            }
+          ],
+          "snapshot_ms": [
+            0.384459,
+            0.406943,
+            0.329641
+          ],
+          "hashes": [
+            {
+              "bytes": 32768,
+              "ms": 0.079249
+            },
+            {
+              "bytes": 32768,
+              "ms": 0.081361
+            },
+            {
+              "bytes": 32768,
+              "ms": 0.079203
+            }
+          ],
+          "result_sha256": "ff4751dd7350d237a1b859c1c838c58365679e7c3e240d620e1ceaec7790dc94"
+        },
+        {
+          "index": 6,
+          "wall_ms": 1.871757,
+          "cpu_ms": 1.847,
+          "private_file_reads": [
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.085728
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 32768,
+              "ms": 0.072909
+            },
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.064546
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 32768,
+              "ms": 0.064476
+            },
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.063288
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 32768,
+              "ms": 0.064734
+            }
+          ],
+          "snapshot_ms": [
+            0.360262,
+            0.313089,
+            0.307679
+          ],
+          "hashes": [
+            {
+              "bytes": 32768,
+              "ms": 0.079805
+            },
+            {
+              "bytes": 32768,
+              "ms": 0.079002
+            },
+            {
+              "bytes": 32768,
+              "ms": 0.078892
+            }
+          ],
+          "result_sha256": "ff4751dd7350d237a1b859c1c838c58365679e7c3e240d620e1ceaec7790dc94"
+        },
+        {
+          "index": 7,
+          "wall_ms": 2.158426,
+          "cpu_ms": 1.951,
+          "private_file_reads": [
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.073988
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 32768,
+              "ms": 0.068111
+            },
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.068602
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 32768,
+              "ms": 0.068496
+            },
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.068394
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 32768,
+              "ms": 0.066994
+            }
+          ],
+          "snapshot_ms": [
+            0.333745,
+            0.330588,
+            0.516688
+          ],
+          "hashes": [
+            {
+              "bytes": 32768,
+              "ms": 0.079132
+            },
+            {
+              "bytes": 32768,
+              "ms": 0.079984
+            },
+            {
+              "bytes": 32768,
+              "ms": 0.264387
+            }
+          ],
+          "result_sha256": "ff4751dd7350d237a1b859c1c838c58365679e7c3e240d620e1ceaec7790dc94"
+        },
+        {
+          "index": 8,
+          "wall_ms": 2.994692,
+          "cpu_ms": 2.358,
+          "private_file_reads": [
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.225016
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 32768,
+              "ms": 0.086268
+            },
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.272846
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 32768,
+              "ms": 0.097099
+            },
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.076459
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 32768,
+              "ms": 0.069058
+            }
+          ],
+          "snapshot_ms": [
+            0.547289,
+            0.720218,
+            0.349797
+          ],
+          "hashes": [
+            {
+              "bytes": 32768,
+              "ms": 0.08231
+            },
+            {
+              "bytes": 32768,
+              "ms": 0.082887
+            },
+            {
+              "bytes": 32768,
+              "ms": 0.080193
+            }
+          ],
+          "result_sha256": "ff4751dd7350d237a1b859c1c838c58365679e7c3e240d620e1ceaec7790dc94"
+        },
+        {
+          "index": 9,
+          "wall_ms": 2.072305,
+          "cpu_ms": 2.034,
+          "private_file_reads": [
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.099097
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 32768,
+              "ms": 0.084567
+            },
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.078882
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 32768,
+              "ms": 0.070739
+            },
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.066958
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 32768,
+              "ms": 0.066407
+            }
+          ],
+          "snapshot_ms": [
+            0.44949,
+            0.353482,
+            0.318685
+          ],
+          "hashes": [
+            {
+              "bytes": 32768,
+              "ms": 0.121989
+            },
+            {
+              "bytes": 32768,
+              "ms": 0.079822
+            },
+            {
+              "bytes": 32768,
+              "ms": 0.078998
+            }
+          ],
+          "result_sha256": "ff4751dd7350d237a1b859c1c838c58365679e7c3e240d620e1ceaec7790dc94"
+        },
+        {
+          "index": 10,
+          "wall_ms": 2.569905,
+          "cpu_ms": 2.126,
+          "private_file_reads": [
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.086877
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 32768,
+              "ms": 0.07346
+            },
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.072153
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 32768,
+              "ms": 0.092038
+            },
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.091702
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 32768,
+              "ms": 0.073158
+            }
+          ],
+          "snapshot_ms": [
+            0.364982,
+            0.417544,
+            0.487866
+          ],
+          "hashes": [
+            {
+              "bytes": 32768,
+              "ms": 0.079644
+            },
+            {
+              "bytes": 32768,
+              "ms": 0.081136
+            },
+            {
+              "bytes": 32768,
+              "ms": 0.193082
+            }
+          ],
+          "result_sha256": "ff4751dd7350d237a1b859c1c838c58365679e7c3e240d620e1ceaec7790dc94"
+        },
+        {
+          "index": 11,
+          "wall_ms": 2.655224,
+          "cpu_ms": 2.163,
+          "private_file_reads": [
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.103564
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 32768,
+              "ms": 0.080399
+            },
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.085437
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 32768,
+              "ms": 0.152522
+            },
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.086408
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 32768,
+              "ms": 0.074683
+            }
+          ],
+          "snapshot_ms": [
+            0.413712,
+            0.44707,
+            0.374715
+          ],
+          "hashes": [
+            {
+              "bytes": 32768,
+              "ms": 0.079804
+            },
+            {
+              "bytes": 32768,
+              "ms": 0.081226
+            },
+            {
+              "bytes": 32768,
+              "ms": 0.080576
+            }
+          ],
+          "result_sha256": "ff4751dd7350d237a1b859c1c838c58365679e7c3e240d620e1ceaec7790dc94"
+        },
+        {
+          "index": 12,
+          "wall_ms": 2.223521,
+          "cpu_ms": 2.139,
+          "private_file_reads": [
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.09875
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 32768,
+              "ms": 0.075142
+            },
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.11411
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 32768,
+              "ms": 0.088695
+            },
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.07041
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 32768,
+              "ms": 0.070763
+            }
+          ],
+          "snapshot_ms": [
+            0.396194,
+            0.430212,
+            0.33686
+          ],
+          "hashes": [
+            {
+              "bytes": 32768,
+              "ms": 0.079942
+            },
+            {
+              "bytes": 32768,
+              "ms": 0.080466
+            },
+            {
+              "bytes": 32768,
+              "ms": 0.080743
+            }
+          ],
+          "result_sha256": "ff4751dd7350d237a1b859c1c838c58365679e7c3e240d620e1ceaec7790dc94"
+        },
+        {
+          "index": 13,
+          "wall_ms": 2.106778,
+          "cpu_ms": 2.004,
+          "private_file_reads": [
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.087779
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 32768,
+              "ms": 0.075034
+            },
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.067869
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 32768,
+              "ms": 0.068299
+            },
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.085853
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 32768,
+              "ms": 0.073869
+            }
+          ],
+          "snapshot_ms": [
+            0.369265,
+            0.349699,
+            0.366733
+          ],
+          "hashes": [
+            {
+              "bytes": 32768,
+              "ms": 0.079387
+            },
+            {
+              "bytes": 32768,
+              "ms": 0.096353
+            },
+            {
+              "bytes": 32768,
+              "ms": 0.080131
+            }
+          ],
+          "result_sha256": "ff4751dd7350d237a1b859c1c838c58365679e7c3e240d620e1ceaec7790dc94"
+        },
+        {
+          "index": 14,
+          "wall_ms": 2.702729,
+          "cpu_ms": 2.285,
+          "private_file_reads": [
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.094389
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 32768,
+              "ms": 0.077416
+            },
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.09148
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 32768,
+              "ms": 0.244242
+            },
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.121279
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 32768,
+              "ms": 0.111184
+            }
+          ],
+          "snapshot_ms": [
+            0.389086,
+            0.557478,
+            0.459028
+          ],
+          "hashes": [
+            {
+              "bytes": 32768,
+              "ms": 0.081395
+            },
+            {
+              "bytes": 32768,
+              "ms": 0.081722
+            },
+            {
+              "bytes": 32768,
+              "ms": 0.082691
+            }
+          ],
+          "result_sha256": "ff4751dd7350d237a1b859c1c838c58365679e7c3e240d620e1ceaec7790dc94"
+        },
+        {
+          "index": 15,
+          "wall_ms": 2.268084,
+          "cpu_ms": 2.128,
+          "private_file_reads": [
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.138301
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 32768,
+              "ms": 0.09529
+            },
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.072383
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 32768,
+              "ms": 0.069646
+            },
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.068704
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 32768,
+              "ms": 0.066769
+            }
+          ],
+          "snapshot_ms": [
+            0.47567,
+            0.341883,
+            0.326988
+          ],
+          "hashes": [
+            {
+              "bytes": 32768,
+              "ms": 0.082363
+            },
+            {
+              "bytes": 32768,
+              "ms": 0.079841
+            },
+            {
+              "bytes": 32768,
+              "ms": 0.080043
+            }
+          ],
+          "result_sha256": "ff4751dd7350d237a1b859c1c838c58365679e7c3e240d620e1ceaec7790dc94"
+        },
+        {
+          "index": 16,
+          "wall_ms": 2.348313,
+          "cpu_ms": 2.042,
+          "private_file_reads": [
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.08472
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 32768,
+              "ms": 0.160448
+            },
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.084463
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 32768,
+              "ms": 0.074408
+            },
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.070473
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 32768,
+              "ms": 0.068277
+            }
+          ],
+          "snapshot_ms": [
+            0.4621,
+            0.365684,
+            0.33791
+          ],
+          "hashes": [
+            {
+              "bytes": 32768,
+              "ms": 0.086962
+            },
+            {
+              "bytes": 32768,
+              "ms": 0.079613
+            },
+            {
+              "bytes": 32768,
+              "ms": 0.079562
+            }
+          ],
+          "result_sha256": "ff4751dd7350d237a1b859c1c838c58365679e7c3e240d620e1ceaec7790dc94"
+        },
+        {
+          "index": 17,
+          "wall_ms": 3.367769,
+          "cpu_ms": 2.568,
+          "private_file_reads": [
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.084204
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 32768,
+              "ms": 0.180243
+            },
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.090764
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 32768,
+              "ms": 0.076682
+            },
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.066135
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 32768,
+              "ms": 0.174875
+            }
+          ],
+          "snapshot_ms": [
+            0.63208,
+            0.381287,
+            0.947685
+          ],
+          "hashes": [
+            {
+              "bytes": 32768,
+              "ms": 0.213625
+            },
+            {
+              "bytes": 32768,
+              "ms": 0.079226
+            },
+            {
+              "bytes": 32768,
+              "ms": 0.083358
+            }
+          ],
+          "result_sha256": "ff4751dd7350d237a1b859c1c838c58365679e7c3e240d620e1ceaec7790dc94"
+        },
+        {
+          "index": 18,
+          "wall_ms": 2.143334,
+          "cpu_ms": 2.111,
+          "private_file_reads": [
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.100457
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 32768,
+              "ms": 0.078868
+            },
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.071775
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 32768,
+              "ms": 0.068912
+            },
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.091051
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 32768,
+              "ms": 0.076577
+            }
+          ],
+          "snapshot_ms": [
+            0.406627,
+            0.333499,
+            0.397009
+          ],
+          "hashes": [
+            {
+              "bytes": 32768,
+              "ms": 0.079936
+            },
+            {
+              "bytes": 32768,
+              "ms": 0.079875
+            },
+            {
+              "bytes": 32768,
+              "ms": 0.080869
+            }
+          ],
+          "result_sha256": "ff4751dd7350d237a1b859c1c838c58365679e7c3e240d620e1ceaec7790dc94"
+        },
+        {
+          "index": 19,
+          "wall_ms": 2.219228,
+          "cpu_ms": 2.055,
+          "private_file_reads": [
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.137312
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 32768,
+              "ms": 0.083664
+            },
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.077743
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 32768,
+              "ms": 0.069044
+            },
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.071714
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 32768,
+              "ms": 0.066933
+            }
+          ],
+          "snapshot_ms": [
+            0.445539,
+            0.345164,
+            0.331622
+          ],
+          "hashes": [
+            {
+              "bytes": 32768,
+              "ms": 0.081359
+            },
+            {
+              "bytes": 32768,
+              "ms": 0.079741
+            },
+            {
+              "bytes": 32768,
+              "ms": 0.080045
+            }
+          ],
+          "result_sha256": "ff4751dd7350d237a1b859c1c838c58365679e7c3e240d620e1ceaec7790dc94"
+        },
+        {
+          "index": 20,
+          "wall_ms": 2.320697,
+          "cpu_ms": 2.166,
+          "private_file_reads": [
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.096944
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 32768,
+              "ms": 0.089711
+            },
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.096034
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 32768,
+              "ms": 0.073821
+            },
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.074242
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 32768,
+              "ms": 0.072437
+            }
+          ],
+          "snapshot_ms": [
+            0.450435,
+            0.390684,
+            0.347449
+          ],
+          "hashes": [
+            {
+              "bytes": 32768,
+              "ms": 0.101308
+            },
+            {
+              "bytes": 32768,
+              "ms": 0.079788
+            },
+            {
+              "bytes": 32768,
+              "ms": 0.080546
+            }
+          ],
+          "result_sha256": "ff4751dd7350d237a1b859c1c838c58365679e7c3e240d620e1ceaec7790dc94"
+        },
+        {
+          "index": 21,
+          "wall_ms": 2.953678,
+          "cpu_ms": 2.317,
+          "private_file_reads": [
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.327786
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 32768,
+              "ms": 0.099325
+            },
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.109661
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 32768,
+              "ms": 0.076261
+            },
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.230378
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 32768,
+              "ms": 0.099746
+            }
+          ],
+          "snapshot_ms": [
+            0.659,
+            0.401815,
+            0.56485
+          ],
+          "hashes": [
+            {
+              "bytes": 32768,
+              "ms": 0.082583
+            },
+            {
+              "bytes": 32768,
+              "ms": 0.080588
+            },
+            {
+              "bytes": 32768,
+              "ms": 0.084046
+            }
+          ],
+          "result_sha256": "ff4751dd7350d237a1b859c1c838c58365679e7c3e240d620e1ceaec7790dc94"
+        },
+        {
+          "index": 22,
+          "wall_ms": 2.268965,
+          "cpu_ms": 2.125,
+          "private_file_reads": [
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.095872
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 32768,
+              "ms": 0.078348
+            },
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.08166
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 32768,
+              "ms": 0.076066
+            },
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.081224
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 32768,
+              "ms": 0.073229
+            }
+          ],
+          "snapshot_ms": [
+            0.394171,
+            0.369306,
+            0.391805
+          ],
+          "hashes": [
+            {
+              "bytes": 32768,
+              "ms": 0.080508
+            },
+            {
+              "bytes": 32768,
+              "ms": 0.081099
+            },
+            {
+              "bytes": 32768,
+              "ms": 0.106867
+            }
+          ],
+          "result_sha256": "ff4751dd7350d237a1b859c1c838c58365679e7c3e240d620e1ceaec7790dc94"
+        },
+        {
+          "index": 23,
+          "wall_ms": 2.258302,
+          "cpu_ms": 2.108,
+          "private_file_reads": [
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.09443
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 32768,
+              "ms": 0.126978
+            },
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.092318
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 32768,
+              "ms": 0.07736
+            },
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.067779
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 32768,
+              "ms": 0.067743
+            }
+          ],
+          "snapshot_ms": [
+            0.439017,
+            0.382122,
+            0.323053
+          ],
+          "hashes": [
+            {
+              "bytes": 32768,
+              "ms": 0.080761
+            },
+            {
+              "bytes": 32768,
+              "ms": 0.079712
+            },
+            {
+              "bytes": 32768,
+              "ms": 0.079029
+            }
+          ],
+          "result_sha256": "ff4751dd7350d237a1b859c1c838c58365679e7c3e240d620e1ceaec7790dc94"
+        },
+        {
+          "index": 24,
+          "wall_ms": 2.919775,
+          "cpu_ms": 2.296,
+          "private_file_reads": [
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.10633
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 32768,
+              "ms": 0.079272
+            },
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.07337
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 32768,
+              "ms": 0.093404
+            },
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.075754
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 32768,
+              "ms": 0.074627
+            }
+          ],
+          "snapshot_ms": [
+            0.419795,
+            0.468122,
+            0.380437
+          ],
+          "hashes": [
+            {
+              "bytes": 32768,
+              "ms": 0.080582
+            },
+            {
+              "bytes": 32768,
+              "ms": 0.080376
+            },
+            {
+              "bytes": 32768,
+              "ms": 0.080285
+            }
+          ],
+          "result_sha256": "ff4751dd7350d237a1b859c1c838c58365679e7c3e240d620e1ceaec7790dc94"
+        },
+        {
+          "index": 25,
+          "wall_ms": 3.252141,
+          "cpu_ms": 2.218,
+          "private_file_reads": [
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.103815
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 32768,
+              "ms": 0.080711
+            },
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.069211
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 32768,
+              "ms": 0.068621
+            },
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.074612
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 32768,
+              "ms": 0.09884
+            }
+          ],
+          "snapshot_ms": [
+            0.405302,
+            0.331149,
+            0.42987
+          ],
+          "hashes": [
+            {
+              "bytes": 32768,
+              "ms": 0.07974
+            },
+            {
+              "bytes": 32768,
+              "ms": 0.079024
+            },
+            {
+              "bytes": 32768,
+              "ms": 0.092389
+            }
+          ],
+          "result_sha256": "ff4751dd7350d237a1b859c1c838c58365679e7c3e240d620e1ceaec7790dc94"
+        },
+        {
+          "index": 26,
+          "wall_ms": 2.014495,
+          "cpu_ms": 2.004,
+          "private_file_reads": [
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.110326
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 32768,
+              "ms": 0.077623
+            },
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.072729
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 32768,
+              "ms": 0.070218
+            },
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.071436
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 32768,
+              "ms": 0.069575
+            }
+          ],
+          "snapshot_ms": [
+            0.41474,
+            0.342324,
+            0.337802
+          ],
+          "hashes": [
+            {
+              "bytes": 32768,
+              "ms": 0.080936
+            },
+            {
+              "bytes": 32768,
+              "ms": 0.080918
+            },
+            {
+              "bytes": 32768,
+              "ms": 0.079851
+            }
+          ],
+          "result_sha256": "ff4751dd7350d237a1b859c1c838c58365679e7c3e240d620e1ceaec7790dc94"
+        },
+        {
+          "index": 27,
+          "wall_ms": 2.695572,
+          "cpu_ms": 2.217,
+          "private_file_reads": [
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.086799
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 32768,
+              "ms": 0.093021
+            },
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.105894
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 32768,
+              "ms": 0.084387
+            },
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.113628
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 32768,
+              "ms": 0.079863
+            }
+          ],
+          "snapshot_ms": [
+            0.53702,
+            0.636641,
+            0.410163
+          ],
+          "hashes": [
+            {
+              "bytes": 32768,
+              "ms": 0.152346
+            },
+            {
+              "bytes": 32768,
+              "ms": 0.08312
+            },
+            {
+              "bytes": 32768,
+              "ms": 0.08199
+            }
+          ],
+          "result_sha256": "ff4751dd7350d237a1b859c1c838c58365679e7c3e240d620e1ceaec7790dc94"
+        },
+        {
+          "index": 28,
+          "wall_ms": 4.635981,
+          "cpu_ms": 2.443,
+          "private_file_reads": [
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.10238
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 32768,
+              "ms": 0.078408
+            },
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.083706
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 32768,
+              "ms": 0.073126
+            },
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.071399
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 32768,
+              "ms": 0.319593
+            }
+          ],
+          "snapshot_ms": [
+            0.408524,
+            0.363914,
+            2.268412
+          ],
+          "hashes": [
+            {
+              "bytes": 32768,
+              "ms": 0.079786
+            },
+            {
+              "bytes": 32768,
+              "ms": 0.079846
+            },
+            {
+              "bytes": 32768,
+              "ms": 0.134053
+            }
+          ],
+          "result_sha256": "ff4751dd7350d237a1b859c1c838c58365679e7c3e240d620e1ceaec7790dc94"
+        },
+        {
+          "index": 29,
+          "wall_ms": 4.507956,
+          "cpu_ms": 2.298,
+          "private_file_reads": [
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.117215
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 32768,
+              "ms": 0.36982
+            },
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.083692
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 32768,
+              "ms": 0.072791
+            },
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.071141
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 32768,
+              "ms": 0.069202
+            }
+          ],
+          "snapshot_ms": [
+            0.73554,
+            0.366039,
+            0.331885
+          ],
+          "hashes": [
+            {
+              "bytes": 32768,
+              "ms": 0.085218
+            },
+            {
+              "bytes": 32768,
+              "ms": 0.079732
+            },
+            {
+              "bytes": 32768,
+              "ms": 0.079675
+            }
+          ],
+          "result_sha256": "ff4751dd7350d237a1b859c1c838c58365679e7c3e240d620e1ceaec7790dc94"
+        }
+      ],
+      "wall_ms": {
+        "n": 30,
+        "p50": 2.4431469999999997,
+        "p95": 4.507956,
+        "min": 1.871757,
+        "max": 4.635981,
+        "sum": 80.755032
+      },
+      "cpu_ms": {
+        "n": 30,
+        "p50": 2.151,
+        "p95": 2.728,
+        "min": 1.847,
+        "max": 2.786,
+        "sum": 66.14899999999997
+      },
+      "metadata_ms_per_call": {
+        "n": 30,
+        "p50": 1.1847945000000002,
+        "p95": 1.99755,
+        "min": 0.9810300000000001,
+        "max": 3.04085,
+        "sum": 40.581864
+      },
+      "private_read_ms_per_call": {
+        "n": 30,
+        "p50": 0.5144814999999999,
+        "p95": 0.943157,
+        "min": 0.41458500000000004,
+        "max": 1.1806140000000003,
+        "sum": 17.738768000000007
+      },
+      "binary_hash_ms_per_call": {
+        "n": 30,
+        "p50": 0.245599,
+        "p95": 0.376209,
+        "min": 0.237699,
+        "max": 0.42350299999999996,
+        "sum": 7.968431000000002
+      },
+      "metadata_snapshots_per_call": [
+        3
+      ],
+      "file_reads_per_call": [
+        6
+      ],
+      "binary_hashes_per_call": [
+        3
+      ],
+      "additional_allocation_only_call_peak_bytes": 87553,
+      "additional_profiler_only_calls": 1,
+      "profiler_top_cumulative": [
+        {
+          "file": "/Users/landjunge/KiraBridge-worktrees/rc32-native-ipc-20261103/src/kirabridge/read_query.py",
+          "line": 116,
+          "function": "read_query_async",
+          "primitive_calls": 2,
+          "calls": 2,
+          "self_ms": 0.010893,
+          "cumulative_ms": 5.034911
+        },
+        {
+          "file": "/Users/landjunge/KiraBridge-worktrees/rc32-native-ipc-20261103/src/kirabridge/native_queries.py",
+          "line": 67,
+          "function": "execute",
+          "primitive_calls": 2,
+          "calls": 2,
+          "self_ms": 0.028396,
+          "cumulative_ms": 5.024018
+        },
+        {
+          "file": "/Users/landjunge/KiraBridge-worktrees/rc32-native-ipc-20261103/src/kirabridge/platform_adapters/macos/provider.py",
+          "line": 222,
+          "function": "execute",
+          "primitive_calls": 2,
+          "calls": 2,
+          "self_ms": 0.033343000000000005,
+          "cumulative_ms": 4.644293
+        },
+        {
+          "file": "/Users/landjunge/KiraBridge-worktrees/rc32-native-ipc-20261103/src/kirabridge/platform_adapters/macos/provider.py",
+          "line": 198,
+          "function": "require",
+          "primitive_calls": 2,
+          "calls": 2,
+          "self_ms": 0.01679,
+          "cumulative_ms": 3.3264430000000003
+        },
+        {
+          "file": "/Users/landjunge/KiraBridge-worktrees/rc32-native-ipc-20261103/src/kirabridge/platform_adapters/macos/provider.py",
+          "line": 119,
+          "function": "snapshot",
+          "primitive_calls": 2,
+          "calls": 2,
+          "self_ms": 0.038128,
+          "cumulative_ms": 3.301561
+        },
+        {
+          "file": "/tmp/profile-rc32-native-metadata.py",
+          "line": 155,
+          "function": "metadata_snapshot",
+          "primitive_calls": 3,
+          "calls": 3,
+          "self_ms": 0.025027000000000004,
+          "cumulative_ms": 2.301399
+        },
+        {
+          "file": "/Users/landjunge/KiraBridge-worktrees/rc32-native-ipc-20261103/src/kirabridge/platform_adapters/macos/system_transport.py",
+          "line": 91,
+          "function": "snapshot_metadata",
+          "primitive_calls": 3,
+          "calls": 3,
+          "self_ms": 0.09288,
+          "cumulative_ms": 2.273547
+        },
+        {
+          "file": "/Users/landjunge/KiraBridge-worktrees/rc32-native-ipc-20261103/src/kirabridge/platform_adapters/macos/capabilities.py",
+          "line": 51,
+          "function": "snapshot",
+          "primitive_calls": 2,
+          "calls": 2,
+          "self_ms": 0.07476700000000001,
+          "cumulative_ms": 1.8494070000000002
+        },
+        {
+          "file": "/Users/landjunge/KiraBridge-worktrees/rc32-native-ipc-20261103/src/kirabridge/platform_adapters/macos/system_transport.py",
+          "line": 339,
+          "function": "snapshot_metadata",
+          "primitive_calls": 2,
+          "calls": 2,
+          "self_ms": 0.006119,
+          "cumulative_ms": 1.7300920000000002
+        },
+        {
+          "file": "/usr/local/Cellar/python@3.11/3.11.15_1/Frameworks/Python.framework/Versions/3.11/lib/python3.11/copy.py",
+          "line": 128,
+          "function": "deepcopy",
+          "primitive_calls": 2,
+          "calls": 410,
+          "self_ms": 0.6295810000000001,
+          "cumulative_ms": 1.1328310000000001
+        },
+        {
+          "file": "/usr/local/Cellar/python@3.11/3.11.15_1/Frameworks/Python.framework/Versions/3.11/lib/python3.11/copy.py",
+          "line": 227,
+          "function": "_deepcopy_dict",
+          "primitive_calls": 2,
+          "calls": 36,
+          "self_ms": 0.222177,
+          "cumulative_ms": 1.1175869999999999
+        },
+        {
+          "file": "/Users/landjunge/KiraBridge-worktrees/rc32-native-ipc-20261103/src/kirabridge/platform_adapters/macos/system_transport.py",
+          "line": 345,
+          "function": "execute",
+          "primitive_calls": 2,
+          "calls": 2,
+          "self_ms": 0.039214,
+          "cumulative_ms": 1.072224
+        },
+        {
+          "file": "/Users/landjunge/KiraBridge-worktrees/rc32-native-ipc-20261103/src/kirabridge/platform_adapters/macos/system_transport.py",
+          "line": 154,
+          "function": "request",
+          "primitive_calls": 2,
+          "calls": 2,
+          "self_ms": 0.060826000000000005,
+          "cumulative_ms": 0.995882
+        },
+        {
+          "file": "/tmp/profile-rc32-native-metadata.py",
+          "line": 142,
+          "function": "read",
+          "primitive_calls": 6,
+          "calls": 6,
+          "self_ms": 0.049733000000000006,
+          "cumulative_ms": 0.946346
+        },
+        {
+          "file": "/Users/landjunge/KiraBridge-worktrees/rc32-native-ipc-20261103/src/kirabridge/platform_adapters/macos/system_transport.py",
+          "line": 33,
+          "function": "_private_file",
+          "primitive_calls": 6,
+          "calls": 6,
+          "self_ms": 0.099312,
+          "cumulative_ms": 0.878549
+        },
+        {
+          "file": "/usr/local/Cellar/python@3.11/3.11.15_1/Frameworks/Python.framework/Versions/3.11/lib/python3.11/plistlib.py",
+          "line": 896,
+          "function": "loads",
+          "primitive_calls": 3,
+          "calls": 3,
+          "self_ms": 0.007892,
+          "cumulative_ms": 0.496047
+        },
+        {
+          "file": "/usr/local/Cellar/python@3.11/3.11.15_1/Frameworks/Python.framework/Versions/3.11/lib/python3.11/plistlib.py",
+          "line": 874,
+          "function": "load",
+          "primitive_calls": 3,
+          "calls": 3,
+          "self_ms": 0.027981000000000002,
+          "cumulative_ms": 0.48815500000000006
+        },
+        {
+          "file": "/Users/landjunge/KiraBridge-worktrees/rc32-native-ipc-20261103/src/kirabridge/bridge_core/models.py",
+          "line": 52,
+          "function": "digest",
+          "primitive_calls": 5,
+          "calls": 5,
+          "self_ms": 0.022447,
+          "cumulative_ms": 0.45671000000000006
+        },
+        {
+          "file": "/usr/local/Cellar/python@3.11/3.11.15_1/Frameworks/Python.framework/Versions/3.11/lib/python3.11/plistlib.py",
+          "line": 183,
+          "function": "parse",
+          "primitive_calls": 3,
+          "calls": 3,
+          "self_ms": 0.016522000000000002,
+          "cumulative_ms": 0.44310000000000005
+        },
+        {
+          "file": "/Users/landjunge/KiraBridge-worktrees/rc32-native-ipc-20261103/src/kirabridge/security_manager/__init__.py",
+          "line": 37,
+          "function": "authorize",
+          "primitive_calls": 3,
+          "calls": 3,
+          "self_ms": 0.032041,
+          "cumulative_ms": 0.442392
+        },
+        {
+          "file": "~",
+          "line": 0,
+          "function": "<method 'ParseFile' of 'pyexpat.xmlparser' objects>",
+          "primitive_calls": 3,
+          "calls": 3,
+          "self_ms": 0.16079700000000002,
+          "cumulative_ms": 0.412434
+        },
+        {
+          "file": "/Users/landjunge/KiraBridge-worktrees/rc32-native-ipc-20261103/src/kirabridge/permissions.py",
+          "line": 77,
+          "function": "decision",
+          "primitive_calls": 3,
+          "calls": 3,
+          "self_ms": 0.07722000000000001,
+          "cumulative_ms": 0.410351
+        },
+        {
+          "file": "/usr/local/Cellar/python@3.11/3.11.15_1/Frameworks/Python.framework/Versions/3.11/lib/python3.11/json/__init__.py",
+          "line": 183,
+          "function": "dumps",
+          "primitive_calls": 9,
+          "calls": 9,
+          "self_ms": 0.035488000000000006,
+          "cumulative_ms": 0.40306400000000003
+        },
+        {
+          "file": "/usr/local/Cellar/python@3.11/3.11.15_1/Frameworks/Python.framework/Versions/3.11/lib/python3.11/json/encoder.py",
+          "line": 183,
+          "function": "encode",
+          "primitive_calls": 9,
+          "calls": 9,
+          "self_ms": 0.055477000000000005,
+          "cumulative_ms": 0.353995
+        },
+        {
+          "file": "~",
+          "line": 0,
+          "function": "<built-in method _hashlib.openssl_sha256>",
+          "primitive_calls": 8,
+          "calls": 8,
+          "self_ms": 0.35239600000000004,
+          "cumulative_ms": 0.35239600000000004
+        }
+      ],
+      "in_memory_child_creations": 1,
+      "native_protocol_requests_including_extra_calls": 32,
+      "os_child_process_creations": 0,
+      "inventory": {
+        "tasks": 0,
+        "events": 0,
+        "completion_notices": 0
+      }
+    },
+    {
+      "fixture_binary_bytes": 1048576,
+      "fixture_info_bytes": 539,
+      "fixture_binary_sha256": "3e5da7fd00f80ad5f801c6a3ba0dff9b85e9c4cd3e3b2c0595f3bf949d644885",
+      "fixture_info_sha256": "bad9c91b4f392cf651ddf9e85356a296b0b2cee7271e37e16131c4159ef53ba3",
+      "metadata_fixture_contract_validated": true,
+      "guarded_private_file_implementation_unchanged": true,
+      "source_hashes_before": {
+        "native_queries.py": "f0d994ba0395db70e19fd2d7b7149a3aac60c1fdf2f85800b99c6f9265bb9507",
+        "read_query.py": "25efb02116e393395bd7a500d8e70be910a3821eca0175a14fa31c7c2e1120db",
+        "platform_adapters/macos/provider.py": "c7f04dfba295dad7ec2dfa65fcb3d5a719f6c552187b55e68924bfc6bf7dd3d6",
+        "platform_adapters/macos/capabilities.py": "0e8d03db7eb94e3cef55b62397d3714a191a514ecd12e08aacdad4cd7194f816",
+        "platform_adapters/macos/system_transport.py": "e6b63b15d404142355eff100a2ba3c072e6c5d81c4867d76d0f8cea9b4a1f462",
+        "platform_adapters/macos/system_models.py": "985088daf504c345d332699124b91583a848c02775c799e188baa115466b9a23",
+        "permissions.py": "44887619a144681c57b9e4547685af1f99ab99b38498cb93126ebe1c0d751b5f"
+      },
+      "source_hashes_after": {
+        "native_queries.py": "f0d994ba0395db70e19fd2d7b7149a3aac60c1fdf2f85800b99c6f9265bb9507",
+        "read_query.py": "25efb02116e393395bd7a500d8e70be910a3821eca0175a14fa31c7c2e1120db",
+        "platform_adapters/macos/provider.py": "c7f04dfba295dad7ec2dfa65fcb3d5a719f6c552187b55e68924bfc6bf7dd3d6",
+        "platform_adapters/macos/capabilities.py": "0e8d03db7eb94e3cef55b62397d3714a191a514ecd12e08aacdad4cd7194f816",
+        "platform_adapters/macos/system_transport.py": "e6b63b15d404142355eff100a2ba3c072e6c5d81c4867d76d0f8cea9b4a1f462",
+        "platform_adapters/macos/system_models.py": "985088daf504c345d332699124b91583a848c02775c799e188baa115466b9a23",
+        "permissions.py": "44887619a144681c57b9e4547685af1f99ab99b38498cb93126ebe1c0d751b5f"
+      },
+      "source_unchanged": true,
+      "samples": [
+        {
+          "index": 0,
+          "wall_ms": 12.434007,
+          "cpu_ms": 11.004,
+          "private_file_reads": [
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.07607
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 1048576,
+              "ms": 0.334872
+            },
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.101225
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 1048576,
+              "ms": 0.66769
+            },
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.116068
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 1048576,
+              "ms": 0.283721
+            }
+          ],
+          "snapshot_ms": [
+            3.07381,
+            4.631493,
+            3.283235
+          ],
+          "hashes": [
+            {
+              "bytes": 1048576,
+              "ms": 2.516239
+            },
+            {
+              "bytes": 1048576,
+              "ms": 3.700104
+            },
+            {
+              "bytes": 1048576,
+              "ms": 2.703181
+            }
+          ],
+          "result_sha256": "19a40b826d038103189b830971a2885ef8d4fb00fb12d898fdcd30908bf7ebc4"
+        },
+        {
+          "index": 1,
+          "wall_ms": 11.15264,
+          "cpu_ms": 10.351,
+          "private_file_reads": [
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.104723
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 1048576,
+              "ms": 0.249516
+            },
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.374031
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 1048576,
+              "ms": 0.273684
+            },
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.109221
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 1048576,
+              "ms": 0.345217
+            }
+          ],
+          "snapshot_ms": [
+            3.012273,
+            3.390413,
+            3.585656
+          ],
+          "hashes": [
+            {
+              "bytes": 1048576,
+              "ms": 2.500819
+            },
+            {
+              "bytes": 1048576,
+              "ms": 2.539753
+            },
+            {
+              "bytes": 1048576,
+              "ms": 2.957311
+            }
+          ],
+          "result_sha256": "19a40b826d038103189b830971a2885ef8d4fb00fb12d898fdcd30908bf7ebc4"
+        },
+        {
+          "index": 2,
+          "wall_ms": 11.634599,
+          "cpu_ms": 10.462,
+          "private_file_reads": [
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.10681
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 1048576,
+              "ms": 0.241102
+            },
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.114553
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 1048576,
+              "ms": 0.351393
+            },
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.110486
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 1048576,
+              "ms": 0.243583
+            }
+          ],
+          "snapshot_ms": [
+            3.320493,
+            3.637797,
+            3.451255
+          ],
+          "hashes": [
+            {
+              "bytes": 1048576,
+              "ms": 2.804927
+            },
+            {
+              "bytes": 1048576,
+              "ms": 2.831889
+            },
+            {
+              "bytes": 1048576,
+              "ms": 2.926181
+            }
+          ],
+          "result_sha256": "19a40b826d038103189b830971a2885ef8d4fb00fb12d898fdcd30908bf7ebc4"
+        },
+        {
+          "index": 3,
+          "wall_ms": 11.946437,
+          "cpu_ms": 10.651,
+          "private_file_reads": [
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.106681
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 1048576,
+              "ms": 0.265429
+            },
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.130586
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 1048576,
+              "ms": 0.251518
+            },
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.112553
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 1048576,
+              "ms": 0.469467
+            }
+          ],
+          "snapshot_ms": [
+            3.426931,
+            3.390683,
+            3.994358
+          ],
+          "hashes": [
+            {
+              "bytes": 1048576,
+              "ms": 2.871568
+            },
+            {
+              "bytes": 1048576,
+              "ms": 2.801574
+            },
+            {
+              "bytes": 1048576,
+              "ms": 3.234332
+            }
+          ],
+          "result_sha256": "19a40b826d038103189b830971a2885ef8d4fb00fb12d898fdcd30908bf7ebc4"
+        },
+        {
+          "index": 4,
+          "wall_ms": 13.67668,
+          "cpu_ms": 11.226,
+          "private_file_reads": [
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.109613
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 1048576,
+              "ms": 0.289712
+            },
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.13741
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 1048576,
+              "ms": 0.343049
+            },
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.162635
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 1048576,
+              "ms": 0.456997
+            }
+          ],
+          "snapshot_ms": [
+            3.772637,
+            3.917508,
+            4.282167
+          ],
+          "hashes": [
+            {
+              "bytes": 1048576,
+              "ms": 3.196997
+            },
+            {
+              "bytes": 1048576,
+              "ms": 3.077832
+            },
+            {
+              "bytes": 1048576,
+              "ms": 3.250932
+            }
+          ],
+          "result_sha256": "19a40b826d038103189b830971a2885ef8d4fb00fb12d898fdcd30908bf7ebc4"
+        },
+        {
+          "index": 5,
+          "wall_ms": 15.225183,
+          "cpu_ms": 11.387,
+          "private_file_reads": [
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.121685
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 1048576,
+              "ms": 0.370525
+            },
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.121208
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 1048576,
+              "ms": 0.566654
+            },
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.123532
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 1048576,
+              "ms": 0.383198
+            }
+          ],
+          "snapshot_ms": [
+            3.932972,
+            4.65859,
+            4.791758
+          ],
+          "hashes": [
+            {
+              "bytes": 1048576,
+              "ms": 3.012442
+            },
+            {
+              "bytes": 1048576,
+              "ms": 3.603937
+            },
+            {
+              "bytes": 1048576,
+              "ms": 3.591792
+            }
+          ],
+          "result_sha256": "19a40b826d038103189b830971a2885ef8d4fb00fb12d898fdcd30908bf7ebc4"
+        },
+        {
+          "index": 6,
+          "wall_ms": 13.496502,
+          "cpu_ms": 11.407,
+          "private_file_reads": [
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.127091
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 1048576,
+              "ms": 0.277615
+            },
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.109623
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 1048576,
+              "ms": 0.322436
+            },
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.204424
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 1048576,
+              "ms": 0.424995
+            }
+          ],
+          "snapshot_ms": [
+            4.119345,
+            3.734742,
+            4.152199
+          ],
+          "hashes": [
+            {
+              "bytes": 1048576,
+              "ms": 3.499668
+            },
+            {
+              "bytes": 1048576,
+              "ms": 3.066196
+            },
+            {
+              "bytes": 1048576,
+              "ms": 3.090901
+            }
+          ],
+          "result_sha256": "19a40b826d038103189b830971a2885ef8d4fb00fb12d898fdcd30908bf7ebc4"
+        },
+        {
+          "index": 7,
+          "wall_ms": 16.807533,
+          "cpu_ms": 11.312,
+          "private_file_reads": [
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.273663
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 1048576,
+              "ms": 0.349683
+            },
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.217474
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 1048576,
+              "ms": 0.671086
+            },
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.147662
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 1048576,
+              "ms": 0.543164
+            }
+          ],
+          "snapshot_ms": [
+            6.188965,
+            4.506096,
+            4.535908
+          ],
+          "hashes": [
+            {
+              "bytes": 1048576,
+              "ms": 5.357381
+            },
+            {
+              "bytes": 1048576,
+              "ms": 3.436104
+            },
+            {
+              "bytes": 1048576,
+              "ms": 3.494627
+            }
+          ],
+          "result_sha256": "19a40b826d038103189b830971a2885ef8d4fb00fb12d898fdcd30908bf7ebc4"
+        },
+        {
+          "index": 8,
+          "wall_ms": 14.29149,
+          "cpu_ms": 11.344,
+          "private_file_reads": [
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.135278
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 1048576,
+              "ms": 0.373321
+            },
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.294421
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 1048576,
+              "ms": 0.441282
+            },
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.207611
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 1048576,
+              "ms": 0.591132
+            }
+          ],
+          "snapshot_ms": [
+            4.151208,
+            4.040442,
+            4.493423
+          ],
+          "hashes": [
+            {
+              "bytes": 1048576,
+              "ms": 3.33207
+            },
+            {
+              "bytes": 1048576,
+              "ms": 3.0139
+            },
+            {
+              "bytes": 1048576,
+              "ms": 3.45438
+            }
+          ],
+          "result_sha256": "19a40b826d038103189b830971a2885ef8d4fb00fb12d898fdcd30908bf7ebc4"
+        },
+        {
+          "index": 9,
+          "wall_ms": 16.545124,
+          "cpu_ms": 11.287,
+          "private_file_reads": [
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.140102
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 1048576,
+              "ms": 0.529647
+            },
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.115387
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 1048576,
+              "ms": 0.360993
+            },
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.131445
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 1048576,
+              "ms": 0.329592
+            }
+          ],
+          "snapshot_ms": [
+            5.028832,
+            4.108457,
+            5.85356
+          ],
+          "hashes": [
+            {
+              "bytes": 1048576,
+              "ms": 3.691824
+            },
+            {
+              "bytes": 1048576,
+              "ms": 3.454271
+            },
+            {
+              "bytes": 1048576,
+              "ms": 5.148477
+            }
+          ],
+          "result_sha256": "19a40b826d038103189b830971a2885ef8d4fb00fb12d898fdcd30908bf7ebc4"
+        },
+        {
+          "index": 10,
+          "wall_ms": 16.182921,
+          "cpu_ms": 11.397,
+          "private_file_reads": [
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.249493
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 1048576,
+              "ms": 0.323614
+            },
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.146404
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 1048576,
+              "ms": 0.429761
+            },
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.1956
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 1048576,
+              "ms": 0.318207
+            }
+          ],
+          "snapshot_ms": [
+            4.352252,
+            4.776414,
+            5.088166
+          ],
+          "hashes": [
+            {
+              "bytes": 1048576,
+              "ms": 3.597084
+            },
+            {
+              "bytes": 1048576,
+              "ms": 4.003753
+            },
+            {
+              "bytes": 1048576,
+              "ms": 4.386511
+            }
+          ],
+          "result_sha256": "19a40b826d038103189b830971a2885ef8d4fb00fb12d898fdcd30908bf7ebc4"
+        },
+        {
+          "index": 11,
+          "wall_ms": 17.264289,
+          "cpu_ms": 11.227,
+          "private_file_reads": [
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.298704
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 1048576,
+              "ms": 0.398194
+            },
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.156583
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 1048576,
+              "ms": 0.715882
+            },
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.117298
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 1048576,
+              "ms": 0.29145
+            }
+          ],
+          "snapshot_ms": [
+            5.893793,
+            4.485305,
+            4.985076
+          ],
+          "hashes": [
+            {
+              "bytes": 1048576,
+              "ms": 4.985292
+            },
+            {
+              "bytes": 1048576,
+              "ms": 3.428577
+            },
+            {
+              "bytes": 1048576,
+              "ms": 4.397514
+            }
+          ],
+          "result_sha256": "19a40b826d038103189b830971a2885ef8d4fb00fb12d898fdcd30908bf7ebc4"
+        },
+        {
+          "index": 12,
+          "wall_ms": 15.917866,
+          "cpu_ms": 11.037,
+          "private_file_reads": [
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.14651
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 1048576,
+              "ms": 0.358515
+            },
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.117783
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 1048576,
+              "ms": 0.701241
+            },
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.115916
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 1048576,
+              "ms": 0.307505
+            }
+          ],
+          "snapshot_ms": [
+            4.052867,
+            5.245469,
+            5.059558
+          ],
+          "hashes": [
+            {
+              "bytes": 1048576,
+              "ms": 3.333801
+            },
+            {
+              "bytes": 1048576,
+              "ms": 4.201771
+            },
+            {
+              "bytes": 1048576,
+              "ms": 4.464174
+            }
+          ],
+          "result_sha256": "19a40b826d038103189b830971a2885ef8d4fb00fb12d898fdcd30908bf7ebc4"
+        },
+        {
+          "index": 13,
+          "wall_ms": 13.309031,
+          "cpu_ms": 10.794,
+          "private_file_reads": [
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.125227
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 1048576,
+              "ms": 0.258281
+            },
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.10769
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 1048576,
+              "ms": 0.288762
+            },
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.116009
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 1048576,
+              "ms": 0.257783
+            }
+          ],
+          "snapshot_ms": [
+            3.994604,
+            4.403287,
+            3.699673
+          ],
+          "hashes": [
+            {
+              "bytes": 1048576,
+              "ms": 3.365235
+            },
+            {
+              "bytes": 1048576,
+              "ms": 3.69057
+            },
+            {
+              "bytes": 1048576,
+              "ms": 3.122261
+            }
+          ],
+          "result_sha256": "19a40b826d038103189b830971a2885ef8d4fb00fb12d898fdcd30908bf7ebc4"
+        },
+        {
+          "index": 14,
+          "wall_ms": 14.994475,
+          "cpu_ms": 11.076,
+          "private_file_reads": [
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.112887
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 1048576,
+              "ms": 0.438988
+            },
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.145192
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 1048576,
+              "ms": 0.271026
+            },
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.202413
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 1048576,
+              "ms": 0.265236
+            }
+          ],
+          "snapshot_ms": [
+            4.000347,
+            4.994573,
+            4.03387
+          ],
+          "hashes": [
+            {
+              "bytes": 1048576,
+              "ms": 3.057805
+            },
+            {
+              "bytes": 1048576,
+              "ms": 4.369282
+            },
+            {
+              "bytes": 1048576,
+              "ms": 3.383142
+            }
+          ],
+          "result_sha256": "19a40b826d038103189b830971a2885ef8d4fb00fb12d898fdcd30908bf7ebc4"
+        },
+        {
+          "index": 15,
+          "wall_ms": 16.709813,
+          "cpu_ms": 11.268,
+          "private_file_reads": [
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.114239
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 1048576,
+              "ms": 0.314907
+            },
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.114325
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 1048576,
+              "ms": 0.274712
+            },
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.311781
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 1048576,
+              "ms": 0.392133
+            }
+          ],
+          "snapshot_ms": [
+            5.126762,
+            4.045794,
+            5.891089
+          ],
+          "hashes": [
+            {
+              "bytes": 1048576,
+              "ms": 3.967522
+            },
+            {
+              "bytes": 1048576,
+              "ms": 3.476326
+            },
+            {
+              "bytes": 1048576,
+              "ms": 4.997771
+            }
+          ],
+          "result_sha256": "19a40b826d038103189b830971a2885ef8d4fb00fb12d898fdcd30908bf7ebc4"
+        },
+        {
+          "index": 16,
+          "wall_ms": 20.140738,
+          "cpu_ms": 11.343,
+          "private_file_reads": [
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.16084
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 1048576,
+              "ms": 0.719633
+            },
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.563486
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 1048576,
+              "ms": 0.39893
+            },
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.118092
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 1048576,
+              "ms": 0.280434
+            }
+          ],
+          "snapshot_ms": [
+            8.476443,
+            5.441284,
+            3.889792
+          ],
+          "hashes": [
+            {
+              "bytes": 1048576,
+              "ms": 7.21675
+            },
+            {
+              "bytes": 1048576,
+              "ms": 4.094186
+            },
+            {
+              "bytes": 1048576,
+              "ms": 3.231394
+            }
+          ],
+          "result_sha256": "19a40b826d038103189b830971a2885ef8d4fb00fb12d898fdcd30908bf7ebc4"
+        },
+        {
+          "index": 17,
+          "wall_ms": 18.710903,
+          "cpu_ms": 10.916,
+          "private_file_reads": [
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.109683
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 1048576,
+              "ms": 0.371361
+            },
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.185021
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 1048576,
+              "ms": 0.278538
+            },
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.124782
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 1048576,
+              "ms": 1.948507
+            }
+          ],
+          "snapshot_ms": [
+            4.053616,
+            4.430188,
+            8.887289
+          ],
+          "hashes": [
+            {
+              "bytes": 1048576,
+              "ms": 3.410431
+            },
+            {
+              "bytes": 1048576,
+              "ms": 3.800057
+            },
+            {
+              "bytes": 1048576,
+              "ms": 6.529605
+            }
+          ],
+          "result_sha256": "19a40b826d038103189b830971a2885ef8d4fb00fb12d898fdcd30908bf7ebc4"
+        },
+        {
+          "index": 18,
+          "wall_ms": 13.356012,
+          "cpu_ms": 10.54,
+          "private_file_reads": [
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.111693
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 1048576,
+              "ms": 0.250361
+            },
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.239674
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 1048576,
+              "ms": 0.535889
+            },
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.107777
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 1048576,
+              "ms": 0.239826
+            }
+          ],
+          "snapshot_ms": [
+            3.826628,
+            4.26972,
+            4.139767
+          ],
+          "hashes": [
+            {
+              "bytes": 1048576,
+              "ms": 3.297221
+            },
+            {
+              "bytes": 1048576,
+              "ms": 3.203832
+            },
+            {
+              "bytes": 1048576,
+              "ms": 3.629448
+            }
+          ],
+          "result_sha256": "19a40b826d038103189b830971a2885ef8d4fb00fb12d898fdcd30908bf7ebc4"
+        },
+        {
+          "index": 19,
+          "wall_ms": 10.984588,
+          "cpu_ms": 10.269,
+          "private_file_reads": [
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.221362
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 1048576,
+              "ms": 0.302099
+            },
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.095469
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 1048576,
+              "ms": 0.251954
+            },
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.10866
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 1048576,
+              "ms": 0.256325
+            }
+          ],
+          "snapshot_ms": [
+            3.280231,
+            3.071263,
+            3.520621
+          ],
+          "hashes": [
+            {
+              "bytes": 1048576,
+              "ms": 2.53034
+            },
+            {
+              "bytes": 1048576,
+              "ms": 2.570204
+            },
+            {
+              "bytes": 1048576,
+              "ms": 2.94412
+            }
+          ],
+          "result_sha256": "19a40b826d038103189b830971a2885ef8d4fb00fb12d898fdcd30908bf7ebc4"
+        },
+        {
+          "index": 20,
+          "wall_ms": 11.644278,
+          "cpu_ms": 10.352,
+          "private_file_reads": [
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.100227
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 1048576,
+              "ms": 0.235025
+            },
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.232787
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 1048576,
+              "ms": 0.274653
+            },
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.086894
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 1048576,
+              "ms": 0.245332
+            }
+          ],
+          "snapshot_ms": [
+            3.071128,
+            3.734311,
+            3.236284
+          ],
+          "hashes": [
+            {
+              "bytes": 1048576,
+              "ms": 2.584863
+            },
+            {
+              "bytes": 1048576,
+              "ms": 2.938892
+            },
+            {
+              "bytes": 1048576,
+              "ms": 2.678368
+            }
+          ],
+          "result_sha256": "19a40b826d038103189b830971a2885ef8d4fb00fb12d898fdcd30908bf7ebc4"
+        },
+        {
+          "index": 21,
+          "wall_ms": 11.891257,
+          "cpu_ms": 10.438,
+          "private_file_reads": [
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.134591
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 1048576,
+              "ms": 0.268572
+            },
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.107541
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 1048576,
+              "ms": 0.266408
+            },
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.096574
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 1048576,
+              "ms": 0.272834
+            }
+          ],
+          "snapshot_ms": [
+            3.469949,
+            3.052022,
+            3.821903
+          ],
+          "hashes": [
+            {
+              "bytes": 1048576,
+              "ms": 2.830608
+            },
+            {
+              "bytes": 1048576,
+              "ms": 2.507036
+            },
+            {
+              "bytes": 1048576,
+              "ms": 3.292087
+            }
+          ],
+          "result_sha256": "19a40b826d038103189b830971a2885ef8d4fb00fb12d898fdcd30908bf7ebc4"
+        },
+        {
+          "index": 22,
+          "wall_ms": 14.746719,
+          "cpu_ms": 10.323,
+          "private_file_reads": [
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.109768
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 1048576,
+              "ms": 0.248391
+            },
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.097334
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 1048576,
+              "ms": 0.740932
+            },
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.100146
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 1048576,
+              "ms": 0.366627
+            }
+          ],
+          "snapshot_ms": [
+            3.997116,
+            6.234571,
+            3.416423
+          ],
+          "hashes": [
+            {
+              "bytes": 1048576,
+              "ms": 3.474025
+            },
+            {
+              "bytes": 1048576,
+              "ms": 5.231104
+            },
+            {
+              "bytes": 1048576,
+              "ms": 2.779388
+            }
+          ],
+          "result_sha256": "19a40b826d038103189b830971a2885ef8d4fb00fb12d898fdcd30908bf7ebc4"
+        },
+        {
+          "index": 23,
+          "wall_ms": 13.921596,
+          "cpu_ms": 10.565,
+          "private_file_reads": [
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.113829
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 1048576,
+              "ms": 0.282537
+            },
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.100497
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 1048576,
+              "ms": 0.279327
+            },
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.175508
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 1048576,
+              "ms": 0.29771
+            }
+          ],
+          "snapshot_ms": [
+            5.533672,
+            3.489497,
+            3.387035
+          ],
+          "hashes": [
+            {
+              "bytes": 1048576,
+              "ms": 4.982888
+            },
+            {
+              "bytes": 1048576,
+              "ms": 2.909398
+            },
+            {
+              "bytes": 1048576,
+              "ms": 2.720314
+            }
+          ],
+          "result_sha256": "19a40b826d038103189b830971a2885ef8d4fb00fb12d898fdcd30908bf7ebc4"
+        },
+        {
+          "index": 24,
+          "wall_ms": 13.910362,
+          "cpu_ms": 10.502,
+          "private_file_reads": [
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.10403
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 1048576,
+              "ms": 0.243883
+            },
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.094973
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 1048576,
+              "ms": 0.245922
+            },
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.151907
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 1048576,
+              "ms": 0.686138
+            }
+          ],
+          "snapshot_ms": [
+            3.01071,
+            3.226812,
+            6.049863
+          ],
+          "hashes": [
+            {
+              "bytes": 1048576,
+              "ms": 2.512104
+            },
+            {
+              "bytes": 1048576,
+              "ms": 2.723593
+            },
+            {
+              "bytes": 1048576,
+              "ms": 4.8355
+            }
+          ],
+          "result_sha256": "19a40b826d038103189b830971a2885ef8d4fb00fb12d898fdcd30908bf7ebc4"
+        },
+        {
+          "index": 25,
+          "wall_ms": 11.869575,
+          "cpu_ms": 10.538,
+          "private_file_reads": [
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.112289
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 1048576,
+              "ms": 0.251403
+            },
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.184845
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 1048576,
+              "ms": 0.282065
+            },
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.102648
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 1048576,
+              "ms": 0.331196
+            }
+          ],
+          "snapshot_ms": [
+            3.574255,
+            3.558303,
+            3.33876
+          ],
+          "hashes": [
+            {
+              "bytes": 1048576,
+              "ms": 2.979915
+            },
+            {
+              "bytes": 1048576,
+              "ms": 2.824364
+            },
+            {
+              "bytes": 1048576,
+              "ms": 2.704271
+            }
+          ],
+          "result_sha256": "19a40b826d038103189b830971a2885ef8d4fb00fb12d898fdcd30908bf7ebc4"
+        },
+        {
+          "index": 26,
+          "wall_ms": 13.479511,
+          "cpu_ms": 10.48,
+          "private_file_reads": [
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.098894
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 1048576,
+              "ms": 0.236961
+            },
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.096867
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 1048576,
+              "ms": 0.244531
+            },
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.108472
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 1048576,
+              "ms": 1.330982
+            }
+          ],
+          "snapshot_ms": [
+            4.170135,
+            3.318226,
+            4.580587
+          ],
+          "hashes": [
+            {
+              "bytes": 1048576,
+              "ms": 3.669791
+            },
+            {
+              "bytes": 1048576,
+              "ms": 2.808391
+            },
+            {
+              "bytes": 1048576,
+              "ms": 2.944601
+            }
+          ],
+          "result_sha256": "19a40b826d038103189b830971a2885ef8d4fb00fb12d898fdcd30908bf7ebc4"
+        },
+        {
+          "index": 27,
+          "wall_ms": 12.54074,
+          "cpu_ms": 10.547,
+          "private_file_reads": [
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.092761
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 1048576,
+              "ms": 0.29566
+            },
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.094701
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 1048576,
+              "ms": 0.279809
+            },
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.161264
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 1048576,
+              "ms": 0.254948
+            }
+          ],
+          "snapshot_ms": [
+            3.528325,
+            4.199778,
+            3.414331
+          ],
+          "hashes": [
+            {
+              "bytes": 1048576,
+              "ms": 2.98655
+            },
+            {
+              "bytes": 1048576,
+              "ms": 3.607655
+            },
+            {
+              "bytes": 1048576,
+              "ms": 2.667525
+            }
+          ],
+          "result_sha256": "19a40b826d038103189b830971a2885ef8d4fb00fb12d898fdcd30908bf7ebc4"
+        },
+        {
+          "index": 28,
+          "wall_ms": 14.277545,
+          "cpu_ms": 10.589,
+          "private_file_reads": [
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.11854
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 1048576,
+              "ms": 0.380407
+            },
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.123637
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 1048576,
+              "ms": 0.254892
+            },
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.128823
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 1048576,
+              "ms": 0.291981
+            }
+          ],
+          "snapshot_ms": [
+            4.557659,
+            3.296489,
+            4.430647
+          ],
+          "hashes": [
+            {
+              "bytes": 1048576,
+              "ms": 3.896947
+            },
+            {
+              "bytes": 1048576,
+              "ms": 2.746967
+            },
+            {
+              "bytes": 1048576,
+              "ms": 3.835582
+            }
+          ],
+          "result_sha256": "19a40b826d038103189b830971a2885ef8d4fb00fb12d898fdcd30908bf7ebc4"
+        },
+        {
+          "index": 29,
+          "wall_ms": 14.750758,
+          "cpu_ms": 10.453,
+          "private_file_reads": [
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.099117
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 1048576,
+              "ms": 0.254911
+            },
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.144384
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 1048576,
+              "ms": 0.252536
+            },
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.095855
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 1048576,
+              "ms": 0.239286
+            }
+          ],
+          "snapshot_ms": [
+            5.687597,
+            3.36742,
+            4.147786
+          ],
+          "hashes": [
+            {
+              "bytes": 1048576,
+              "ms": 5.172636
+            },
+            {
+              "bytes": 1048576,
+              "ms": 2.797956
+            },
+            {
+              "bytes": 1048576,
+              "ms": 3.653024
+            }
+          ],
+          "result_sha256": "19a40b826d038103189b830971a2885ef8d4fb00fb12d898fdcd30908bf7ebc4"
+        }
+      ],
+      "wall_ms": {
+        "n": 30,
+        "p50": 13.915979,
+        "p95": 18.710903,
+        "min": 10.984588,
+        "max": 20.140738,
+        "sum": 427.81317199999995
+      },
+      "cpu_ms": {
+        "n": 30,
+        "p50": 10.7225,
+        "p95": 11.397,
+        "min": 10.269,
+        "max": 11.407,
+        "sum": 325.08500000000004
+      },
+      "metadata_ms_per_call": {
+        "n": 30,
+        "p50": 12.28609,
+        "p95": 17.371093000000002,
+        "min": 9.872115,
+        "max": 17.807519,
+        "sum": 381.78454099999993
+      },
+      "private_read_ms_per_call": {
+        "n": 30,
+        "p50": 1.492318,
+        "p95": 2.241415,
+        "min": 1.0860889999999999,
+        "max": 3.017892,
+        "sum": 47.231753000000005
+      },
+      "binary_hash_ms_per_call": {
+        "n": 30,
+        "p50": 10.1542835,
+        "p95": 13.740093,
+        "min": 7.997883,
+        "max": 14.54233,
+        "sum": 313.143931
+      },
+      "metadata_snapshots_per_call": [
+        3
+      ],
+      "file_reads_per_call": [
+        6
+      ],
+      "binary_hashes_per_call": [
+        3
+      ],
+      "additional_allocation_only_call_peak_bytes": 1102746,
+      "additional_profiler_only_calls": 1,
+      "profiler_top_cumulative": [
+        {
+          "file": "/Users/landjunge/KiraBridge-worktrees/rc32-native-ipc-20261103/src/kirabridge/read_query.py",
+          "line": 116,
+          "function": "read_query_async",
+          "primitive_calls": 2,
+          "calls": 2,
+          "self_ms": 0.006923,
+          "cumulative_ms": 13.174050000000001
+        },
+        {
+          "file": "/Users/landjunge/KiraBridge-worktrees/rc32-native-ipc-20261103/src/kirabridge/native_queries.py",
+          "line": 67,
+          "function": "execute",
+          "primitive_calls": 2,
+          "calls": 2,
+          "self_ms": 0.018854000000000003,
+          "cumulative_ms": 13.167127
+        },
+        {
+          "file": "/Users/landjunge/KiraBridge-worktrees/rc32-native-ipc-20261103/src/kirabridge/platform_adapters/macos/provider.py",
+          "line": 222,
+          "function": "execute",
+          "primitive_calls": 2,
+          "calls": 2,
+          "self_ms": 0.033883,
+          "cumulative_ms": 12.871984000000001
+        },
+        {
+          "file": "/tmp/profile-rc32-native-metadata.py",
+          "line": 155,
+          "function": "metadata_snapshot",
+          "primitive_calls": 3,
+          "calls": 3,
+          "self_ms": 0.026773,
+          "cumulative_ms": 10.536641000000001
+        },
+        {
+          "file": "/Users/landjunge/KiraBridge-worktrees/rc32-native-ipc-20261103/src/kirabridge/platform_adapters/macos/system_transport.py",
+          "line": 91,
+          "function": "snapshot_metadata",
+          "primitive_calls": 3,
+          "calls": 3,
+          "self_ms": 0.10561400000000001,
+          "cumulative_ms": 10.506787
+        },
+        {
+          "file": "/Users/landjunge/KiraBridge-worktrees/rc32-native-ipc-20261103/src/kirabridge/platform_adapters/macos/provider.py",
+          "line": 198,
+          "function": "require",
+          "primitive_calls": 2,
+          "calls": 2,
+          "self_ms": 0.016646,
+          "cumulative_ms": 8.592780000000001
+        },
+        {
+          "file": "/Users/landjunge/KiraBridge-worktrees/rc32-native-ipc-20261103/src/kirabridge/platform_adapters/macos/provider.py",
+          "line": 119,
+          "function": "snapshot",
+          "primitive_calls": 2,
+          "calls": 2,
+          "self_ms": 0.027022000000000004,
+          "cumulative_ms": 8.56893
+        },
+        {
+          "file": "/tmp/profile-rc32-native-metadata.py",
+          "line": 149,
+          "function": "sha256",
+          "primitive_calls": 3,
+          "calls": 3,
+          "self_ms": 0.033667,
+          "cumulative_ms": 8.116433
+        },
+        {
+          "file": "~",
+          "line": 0,
+          "function": "<built-in method _hashlib.openssl_sha256>",
+          "primitive_calls": 8,
+          "calls": 8,
+          "self_ms": 8.115365,
+          "cumulative_ms": 8.115365
+        },
+        {
+          "file": "/Users/landjunge/KiraBridge-worktrees/rc32-native-ipc-20261103/src/kirabridge/platform_adapters/macos/capabilities.py",
+          "line": 51,
+          "function": "snapshot",
+          "primitive_calls": 2,
+          "calls": 2,
+          "self_ms": 0.06267400000000001,
+          "cumulative_ms": 7.252336000000001
+        },
+        {
+          "file": "/Users/landjunge/KiraBridge-worktrees/rc32-native-ipc-20261103/src/kirabridge/platform_adapters/macos/system_transport.py",
+          "line": 339,
+          "function": "snapshot_metadata",
+          "primitive_calls": 2,
+          "calls": 2,
+          "self_ms": 0.004922,
+          "cumulative_ms": 7.146816
+        },
+        {
+          "file": "/Users/landjunge/KiraBridge-worktrees/rc32-native-ipc-20261103/src/kirabridge/platform_adapters/macos/system_transport.py",
+          "line": 345,
+          "function": "execute",
+          "primitive_calls": 2,
+          "calls": 2,
+          "self_ms": 0.017768,
+          "cumulative_ms": 3.843884
+        },
+        {
+          "file": "/Users/landjunge/KiraBridge-worktrees/rc32-native-ipc-20261103/src/kirabridge/platform_adapters/macos/system_transport.py",
+          "line": 154,
+          "function": "request",
+          "primitive_calls": 2,
+          "calls": 2,
+          "self_ms": 0.052212,
+          "cumulative_ms": 3.7929500000000003
+        },
+        {
+          "file": "/tmp/profile-rc32-native-metadata.py",
+          "line": 142,
+          "function": "read",
+          "primitive_calls": 6,
+          "calls": 6,
+          "self_ms": 0.049548,
+          "cumulative_ms": 1.2985330000000002
+        },
+        {
+          "file": "/Users/landjunge/KiraBridge-worktrees/rc32-native-ipc-20261103/src/kirabridge/platform_adapters/macos/system_transport.py",
+          "line": 33,
+          "function": "_private_file",
+          "primitive_calls": 6,
+          "calls": 6,
+          "self_ms": 0.109449,
+          "cumulative_ms": 1.230048
+        },
+        {
+          "file": "/usr/local/Cellar/python@3.11/3.11.15_1/Frameworks/Python.framework/Versions/3.11/lib/python3.11/copy.py",
+          "line": 128,
+          "function": "deepcopy",
+          "primitive_calls": 2,
+          "calls": 410,
+          "self_ms": 0.560446,
+          "cumulative_ms": 1.0468530000000003
+        },
+        {
+          "file": "/usr/local/Cellar/python@3.11/3.11.15_1/Frameworks/Python.framework/Versions/3.11/lib/python3.11/copy.py",
+          "line": 227,
+          "function": "_deepcopy_dict",
+          "primitive_calls": 2,
+          "calls": 36,
+          "self_ms": 0.20774900000000002,
+          "cumulative_ms": 1.0208160000000002
+        },
+        {
+          "file": "/Users/landjunge/KiraBridge-worktrees/rc32-native-ipc-20261103/src/kirabridge/security_manager/__init__.py",
+          "line": 37,
+          "function": "authorize",
+          "primitive_calls": 3,
+          "calls": 3,
+          "self_ms": 0.028376000000000002,
+          "cumulative_ms": 0.6108260000000001
+        },
+        {
+          "file": "~",
+          "line": 0,
+          "function": "<method 'read' of '_io.BufferedReader' objects>",
+          "primitive_calls": 6,
+          "calls": 6,
+          "self_ms": 0.6086020000000001,
+          "cumulative_ms": 0.6086020000000001
+        },
+        {
+          "file": "/usr/local/Cellar/python@3.11/3.11.15_1/Frameworks/Python.framework/Versions/3.11/lib/python3.11/asyncio/base_events.py",
+          "line": 1859,
+          "function": "_run_once",
+          "primitive_calls": 1,
+          "calls": 1,
+          "self_ms": 0.019127,
+          "cumulative_ms": 0.590631
+        },
+        {
+          "file": "/Users/landjunge/KiraBridge-worktrees/rc32-native-ipc-20261103/src/kirabridge/permissions.py",
+          "line": 77,
+          "function": "decision",
+          "primitive_calls": 3,
+          "calls": 3,
+          "self_ms": 0.070561,
+          "cumulative_ms": 0.5824500000000001
+        },
+        {
+          "file": "/Users/landjunge/KiraBridge-worktrees/rc32-native-ipc-20261103/src/kirabridge/bridge_core/models.py",
+          "line": 52,
+          "function": "digest",
+          "primitive_calls": 5,
+          "calls": 5,
+          "self_ms": 0.021933,
+          "cumulative_ms": 0.5379450000000001
+        },
+        {
+          "file": "/usr/local/Cellar/python@3.11/3.11.15_1/Frameworks/Python.framework/Versions/3.11/lib/python3.11/json/__init__.py",
+          "line": 183,
+          "function": "dumps",
+          "primitive_calls": 9,
+          "calls": 9,
+          "self_ms": 0.033187,
+          "cumulative_ms": 0.535533
+        },
+        {
+          "file": "/usr/local/Cellar/python@3.11/3.11.15_1/Frameworks/Python.framework/Versions/3.11/lib/python3.11/plistlib.py",
+          "line": 896,
+          "function": "loads",
+          "primitive_calls": 3,
+          "calls": 3,
+          "self_ms": 0.007122000000000001,
+          "cumulative_ms": 0.529415
+        },
+        {
+          "file": "/usr/local/Cellar/python@3.11/3.11.15_1/Frameworks/Python.framework/Versions/3.11/lib/python3.11/plistlib.py",
+          "line": 874,
+          "function": "load",
+          "primitive_calls": 3,
+          "calls": 3,
+          "self_ms": 0.023651000000000002,
+          "cumulative_ms": 0.5222930000000001
+        }
+      ],
+      "in_memory_child_creations": 1,
+      "native_protocol_requests_including_extra_calls": 32,
+      "os_child_process_creations": 0,
+      "inventory": {
+        "tasks": 0,
+        "events": 0,
+        "completion_notices": 0
+      }
+    },
+    {
+      "fixture_binary_bytes": 4194304,
+      "fixture_info_bytes": 539,
+      "fixture_binary_sha256": "9bb06651ad6719206da16b80f2fa4f33ddf35de67b554f9159541b6f1edda1db",
+      "fixture_info_sha256": "bad9c91b4f392cf651ddf9e85356a296b0b2cee7271e37e16131c4159ef53ba3",
+      "metadata_fixture_contract_validated": true,
+      "guarded_private_file_implementation_unchanged": true,
+      "source_hashes_before": {
+        "native_queries.py": "f0d994ba0395db70e19fd2d7b7149a3aac60c1fdf2f85800b99c6f9265bb9507",
+        "read_query.py": "25efb02116e393395bd7a500d8e70be910a3821eca0175a14fa31c7c2e1120db",
+        "platform_adapters/macos/provider.py": "c7f04dfba295dad7ec2dfa65fcb3d5a719f6c552187b55e68924bfc6bf7dd3d6",
+        "platform_adapters/macos/capabilities.py": "0e8d03db7eb94e3cef55b62397d3714a191a514ecd12e08aacdad4cd7194f816",
+        "platform_adapters/macos/system_transport.py": "e6b63b15d404142355eff100a2ba3c072e6c5d81c4867d76d0f8cea9b4a1f462",
+        "platform_adapters/macos/system_models.py": "985088daf504c345d332699124b91583a848c02775c799e188baa115466b9a23",
+        "permissions.py": "44887619a144681c57b9e4547685af1f99ab99b38498cb93126ebe1c0d751b5f"
+      },
+      "source_hashes_after": {
+        "native_queries.py": "f0d994ba0395db70e19fd2d7b7149a3aac60c1fdf2f85800b99c6f9265bb9507",
+        "read_query.py": "25efb02116e393395bd7a500d8e70be910a3821eca0175a14fa31c7c2e1120db",
+        "platform_adapters/macos/provider.py": "c7f04dfba295dad7ec2dfa65fcb3d5a719f6c552187b55e68924bfc6bf7dd3d6",
+        "platform_adapters/macos/capabilities.py": "0e8d03db7eb94e3cef55b62397d3714a191a514ecd12e08aacdad4cd7194f816",
+        "platform_adapters/macos/system_transport.py": "e6b63b15d404142355eff100a2ba3c072e6c5d81c4867d76d0f8cea9b4a1f462",
+        "platform_adapters/macos/system_models.py": "985088daf504c345d332699124b91583a848c02775c799e188baa115466b9a23",
+        "permissions.py": "44887619a144681c57b9e4547685af1f99ab99b38498cb93126ebe1c0d751b5f"
+      },
+      "source_unchanged": true,
+      "samples": [
+        {
+          "index": 0,
+          "wall_ms": 38.17623,
+          "cpu_ms": 36.204,
+          "private_file_reads": [
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.07574
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 4194304,
+              "ms": 1.000101
+            },
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.102915
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 4194304,
+              "ms": 0.986902
+            },
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.114422
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 4194304,
+              "ms": 1.281182
+            }
+          ],
+          "snapshot_ms": [
+            11.936892,
+            11.909312,
+            12.132303
+          ],
+          "hashes": [
+            {
+              "bytes": 4194304,
+              "ms": 10.413947
+            },
+            {
+              "bytes": 4194304,
+              "ms": 10.344495
+            },
+            {
+              "bytes": 4194304,
+              "ms": 10.159841
+            }
+          ],
+          "result_sha256": "5da6fe0babc8c5e66f8ced88148448f13fceffb51ec4bcadc9635102451b5c12"
+        },
+        {
+          "index": 1,
+          "wall_ms": 44.745906,
+          "cpu_ms": 36.641,
+          "private_file_reads": [
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.107514
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 4194304,
+              "ms": 1.151255
+            },
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.147412
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 4194304,
+              "ms": 1.240301
+            },
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.171735
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 4194304,
+              "ms": 1.062491
+            }
+          ],
+          "snapshot_ms": [
+            14.847457,
+            14.782484,
+            12.963563
+          ],
+          "hashes": [
+            {
+              "bytes": 4194304,
+              "ms": 12.884943
+            },
+            {
+              "bytes": 4194304,
+              "ms": 12.872351
+            },
+            {
+              "bytes": 4194304,
+              "ms": 10.359608
+            }
+          ],
+          "result_sha256": "5da6fe0babc8c5e66f8ced88148448f13fceffb51ec4bcadc9635102451b5c12"
+        },
+        {
+          "index": 2,
+          "wall_ms": 50.320404,
+          "cpu_ms": 36.564,
+          "private_file_reads": [
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.161705
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 4194304,
+              "ms": 1.101539
+            },
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.110703
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 4194304,
+              "ms": 1.003985
+            },
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.110379
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 4194304,
+              "ms": 1.057142
+            }
+          ],
+          "snapshot_ms": [
+            13.130246,
+            14.715776,
+            21.088721
+          ],
+          "hashes": [
+            {
+              "bytes": 4194304,
+              "ms": 11.380889
+            },
+            {
+              "bytes": 4194304,
+              "ms": 13.109062
+            },
+            {
+              "bytes": 4194304,
+              "ms": 19.439946
+            }
+          ],
+          "result_sha256": "5da6fe0babc8c5e66f8ced88148448f13fceffb51ec4bcadc9635102451b5c12"
+        },
+        {
+          "index": 3,
+          "wall_ms": 54.926538,
+          "cpu_ms": 37.136,
+          "private_file_reads": [
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.115105
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 4194304,
+              "ms": 1.034646
+            },
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.099509
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 4194304,
+              "ms": 1.219622
+            },
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.231863
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 4194304,
+              "ms": 1.438931
+            }
+          ],
+          "snapshot_ms": [
+            14.84869,
+            18.336688,
+            20.00601
+          ],
+          "hashes": [
+            {
+              "bytes": 4194304,
+              "ms": 13.186221
+            },
+            {
+              "bytes": 4194304,
+              "ms": 16.161904
+            },
+            {
+              "bytes": 4194304,
+              "ms": 17.831868
+            }
+          ],
+          "result_sha256": "5da6fe0babc8c5e66f8ced88148448f13fceffb51ec4bcadc9635102451b5c12"
+        },
+        {
+          "index": 4,
+          "wall_ms": 50.525559,
+          "cpu_ms": 37.086,
+          "private_file_reads": [
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.120052
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 4194304,
+              "ms": 1.635214
+            },
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.099236
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 4194304,
+              "ms": 1.142467
+            },
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.101772
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 4194304,
+              "ms": 1.124865
+            }
+          ],
+          "snapshot_ms": [
+            19.01959,
+            17.375416,
+            12.655929
+          ],
+          "hashes": [
+            {
+              "bytes": 4194304,
+              "ms": 15.675589
+            },
+            {
+              "bytes": 4194304,
+              "ms": 15.154797
+            },
+            {
+              "bytes": 4194304,
+              "ms": 10.927104
+            }
+          ],
+          "result_sha256": "5da6fe0babc8c5e66f8ced88148448f13fceffb51ec4bcadc9635102451b5c12"
+        },
+        {
+          "index": 5,
+          "wall_ms": 52.818151,
+          "cpu_ms": 38.569,
+          "private_file_reads": [
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.118128
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 4194304,
+              "ms": 1.566652
+            },
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.09419
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 4194304,
+              "ms": 2.718133
+            },
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.099932
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 4194304,
+              "ms": 1.98615
+            }
+          ],
+          "snapshot_ms": [
+            16.214078,
+            17.099791,
+            18.133883
+          ],
+          "hashes": [
+            {
+              "bytes": 4194304,
+              "ms": 14.045144
+            },
+            {
+              "bytes": 4194304,
+              "ms": 13.756983
+            },
+            {
+              "bytes": 4194304,
+              "ms": 15.546052
+            }
+          ],
+          "result_sha256": "5da6fe0babc8c5e66f8ced88148448f13fceffb51ec4bcadc9635102451b5c12"
+        },
+        {
+          "index": 6,
+          "wall_ms": 54.253183,
+          "cpu_ms": 37.1,
+          "private_file_reads": [
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.098295
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 4194304,
+              "ms": 1.078637
+            },
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.107796
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 4194304,
+              "ms": 1.094428
+            },
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.120482
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 4194304,
+              "ms": 1.085173
+            }
+          ],
+          "snapshot_ms": [
+            13.827784,
+            20.300382,
+            16.021008
+          ],
+          "hashes": [
+            {
+              "bytes": 4194304,
+              "ms": 11.860565
+            },
+            {
+              "bytes": 4194304,
+              "ms": 18.514997
+            },
+            {
+              "bytes": 4194304,
+              "ms": 13.938405
+            }
+          ],
+          "result_sha256": "5da6fe0babc8c5e66f8ced88148448f13fceffb51ec4bcadc9635102451b5c12"
+        },
+        {
+          "index": 7,
+          "wall_ms": 51.146809,
+          "cpu_ms": 36.89,
+          "private_file_reads": [
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.098799
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 4194304,
+              "ms": 1.080944
+            },
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.101742
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 4194304,
+              "ms": 1.110414
+            },
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.116883
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 4194304,
+              "ms": 1.276269
+            }
+          ],
+          "snapshot_ms": [
+            17.591344,
+            17.953046,
+            12.884465
+          ],
+          "hashes": [
+            {
+              "bytes": 4194304,
+              "ms": 15.133108
+            },
+            {
+              "bytes": 4194304,
+              "ms": 16.212662
+            },
+            {
+              "bytes": 4194304,
+              "ms": 11.001353
+            }
+          ],
+          "result_sha256": "5da6fe0babc8c5e66f8ced88148448f13fceffb51ec4bcadc9635102451b5c12"
+        },
+        {
+          "index": 8,
+          "wall_ms": 41.410177,
+          "cpu_ms": 36.611,
+          "private_file_reads": [
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.099504
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 4194304,
+              "ms": 1.088155
+            },
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.105709
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 4194304,
+              "ms": 1.057551
+            },
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.16175
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 4194304,
+              "ms": 1.156137
+            }
+          ],
+          "snapshot_ms": [
+            13.415715,
+            12.868764,
+            13.174427
+          ],
+          "hashes": [
+            {
+              "bytes": 4194304,
+              "ms": 11.727445
+            },
+            {
+              "bytes": 4194304,
+              "ms": 11.198072
+            },
+            {
+              "bytes": 4194304,
+              "ms": 11.357331
+            }
+          ],
+          "result_sha256": "5da6fe0babc8c5e66f8ced88148448f13fceffb51ec4bcadc9635102451b5c12"
+        },
+        {
+          "index": 9,
+          "wall_ms": 40.157069,
+          "cpu_ms": 36.612,
+          "private_file_reads": [
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.096992
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 4194304,
+              "ms": 1.199225
+            },
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.110354
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 4194304,
+              "ms": 1.084542
+            },
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.120255
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 4194304,
+              "ms": 1.082081
+            }
+          ],
+          "snapshot_ms": [
+            14.016765,
+            12.240681,
+            12.71138
+          ],
+          "hashes": [
+            {
+              "bytes": 4194304,
+              "ms": 11.945818
+            },
+            {
+              "bytes": 4194304,
+              "ms": 10.549115
+            },
+            {
+              "bytes": 4194304,
+              "ms": 10.927642
+            }
+          ],
+          "result_sha256": "5da6fe0babc8c5e66f8ced88148448f13fceffb51ec4bcadc9635102451b5c12"
+        },
+        {
+          "index": 10,
+          "wall_ms": 37.120648,
+          "cpu_ms": 36.7,
+          "private_file_reads": [
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.09389
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 4194304,
+              "ms": 1.044814
+            },
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.102609
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 4194304,
+              "ms": 1.213599
+            },
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.096543
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 4194304,
+              "ms": 1.043213
+            }
+          ],
+          "snapshot_ms": [
+            12.084156,
+            11.856717,
+            12.134676
+          ],
+          "hashes": [
+            {
+              "bytes": 4194304,
+              "ms": 10.473764
+            },
+            {
+              "bytes": 4194304,
+              "ms": 10.031064
+            },
+            {
+              "bytes": 4194304,
+              "ms": 10.509712
+            }
+          ],
+          "result_sha256": "5da6fe0babc8c5e66f8ced88148448f13fceffb51ec4bcadc9635102451b5c12"
+        },
+        {
+          "index": 11,
+          "wall_ms": 37.86055,
+          "cpu_ms": 37.302,
+          "private_file_reads": [
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.088808
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 4194304,
+              "ms": 1.06591
+            },
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.091354
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 4194304,
+              "ms": 1.058014
+            },
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.172528
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 4194304,
+              "ms": 1.122294
+            }
+          ],
+          "snapshot_ms": [
+            11.973407,
+            12.577677,
+            12.243608
+          ],
+          "hashes": [
+            {
+              "bytes": 4194304,
+              "ms": 10.352026
+            },
+            {
+              "bytes": 4194304,
+              "ms": 10.919586
+            },
+            {
+              "bytes": 4194304,
+              "ms": 10.383049
+            }
+          ],
+          "result_sha256": "5da6fe0babc8c5e66f8ced88148448f13fceffb51ec4bcadc9635102451b5c12"
+        },
+        {
+          "index": 12,
+          "wall_ms": 37.535774,
+          "cpu_ms": 35.844,
+          "private_file_reads": [
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.094183
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 4194304,
+              "ms": 1.032512
+            },
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.096606
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 4194304,
+              "ms": 1.007531
+            },
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.105685
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 4194304,
+              "ms": 1.121752
+            }
+          ],
+          "snapshot_ms": [
+            11.893967,
+            12.222784,
+            12.314063
+          ],
+          "hashes": [
+            {
+              "bytes": 4194304,
+              "ms": 10.239252
+            },
+            {
+              "bytes": 4194304,
+              "ms": 10.657815
+            },
+            {
+              "bytes": 4194304,
+              "ms": 10.605168
+            }
+          ],
+          "result_sha256": "5da6fe0babc8c5e66f8ced88148448f13fceffb51ec4bcadc9635102451b5c12"
+        },
+        {
+          "index": 13,
+          "wall_ms": 155.364034,
+          "cpu_ms": 36.143,
+          "private_file_reads": [
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.088857
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 4194304,
+              "ms": 1.009821
+            },
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.14662
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 4194304,
+              "ms": 0.99775
+            },
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.340426
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 4194304,
+              "ms": 1.397861
+            }
+          ],
+          "snapshot_ms": [
+            12.977809,
+            32.448436,
+            108.81302
+          ],
+          "hashes": [
+            {
+              "bytes": 4194304,
+              "ms": 11.410773
+            },
+            {
+              "bytes": 4194304,
+              "ms": 29.950785
+            },
+            {
+              "bytes": 4194304,
+              "ms": 106.097337
+            }
+          ],
+          "result_sha256": "5da6fe0babc8c5e66f8ced88148448f13fceffb51ec4bcadc9635102451b5c12"
+        },
+        {
+          "index": 14,
+          "wall_ms": 108.42043,
+          "cpu_ms": 36.822,
+          "private_file_reads": [
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.094279
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 4194304,
+              "ms": 1.256341
+            },
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.105574
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 4194304,
+              "ms": 1.449597
+            },
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.109386
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 4194304,
+              "ms": 1.230383
+            }
+          ],
+          "snapshot_ms": [
+            69.819151,
+            21.700812,
+            14.986717
+          ],
+          "hashes": [
+            {
+              "bytes": 4194304,
+              "ms": 62.005488
+            },
+            {
+              "bytes": 4194304,
+              "ms": 19.649991
+            },
+            {
+              "bytes": 4194304,
+              "ms": 13.041843
+            }
+          ],
+          "result_sha256": "5da6fe0babc8c5e66f8ced88148448f13fceffb51ec4bcadc9635102451b5c12"
+        },
+        {
+          "index": 15,
+          "wall_ms": 49.462526,
+          "cpu_ms": 37.027,
+          "private_file_reads": [
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.114707
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 4194304,
+              "ms": 1.321882
+            },
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.702465
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 4194304,
+              "ms": 1.22765
+            },
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.105762
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 4194304,
+              "ms": 1.131346
+            }
+          ],
+          "snapshot_ms": [
+            17.097465,
+            14.863353,
+            15.972059
+          ],
+          "hashes": [
+            {
+              "bytes": 4194304,
+              "ms": 15.167452
+            },
+            {
+              "bytes": 4194304,
+              "ms": 11.730741
+            },
+            {
+              "bytes": 4194304,
+              "ms": 13.998589
+            }
+          ],
+          "result_sha256": "5da6fe0babc8c5e66f8ced88148448f13fceffb51ec4bcadc9635102451b5c12"
+        },
+        {
+          "index": 16,
+          "wall_ms": 80.978867,
+          "cpu_ms": 37.228,
+          "private_file_reads": [
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.105824
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 4194304,
+              "ms": 1.251949
+            },
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.29702
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 4194304,
+              "ms": 1.140968
+            },
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.120117
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 4194304,
+              "ms": 1.106644
+            }
+          ],
+          "snapshot_ms": [
+            52.458368,
+            13.611302,
+            13.056644
+          ],
+          "hashes": [
+            {
+              "bytes": 4194304,
+              "ms": 50.595483
+            },
+            {
+              "bytes": 4194304,
+              "ms": 11.469942
+            },
+            {
+              "bytes": 4194304,
+              "ms": 11.248877
+            }
+          ],
+          "result_sha256": "5da6fe0babc8c5e66f8ced88148448f13fceffb51ec4bcadc9635102451b5c12"
+        },
+        {
+          "index": 17,
+          "wall_ms": 41.739637,
+          "cpu_ms": 36.95,
+          "private_file_reads": [
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.129904
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 4194304,
+              "ms": 1.169664
+            },
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.098952
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 4194304,
+              "ms": 1.188045
+            },
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.142031
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 4194304,
+              "ms": 1.147874
+            }
+          ],
+          "snapshot_ms": [
+            12.899278,
+            13.591529,
+            13.884028
+          ],
+          "hashes": [
+            {
+              "bytes": 4194304,
+              "ms": 11.07467
+            },
+            {
+              "bytes": 4194304,
+              "ms": 11.801735
+            },
+            {
+              "bytes": 4194304,
+              "ms": 12.091754
+            }
+          ],
+          "result_sha256": "5da6fe0babc8c5e66f8ced88148448f13fceffb51ec4bcadc9635102451b5c12"
+        },
+        {
+          "index": 18,
+          "wall_ms": 50.812614,
+          "cpu_ms": 37.01,
+          "private_file_reads": [
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.17224
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 4194304,
+              "ms": 1.126884
+            },
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.124464
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 4194304,
+              "ms": 4.242021
+            },
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.102861
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 4194304,
+              "ms": 1.329334
+            }
+          ],
+          "snapshot_ms": [
+            14.880589,
+            16.28879,
+            18.083976
+          ],
+          "hashes": [
+            {
+              "bytes": 4194304,
+              "ms": 12.693218
+            },
+            {
+              "bytes": 4194304,
+              "ms": 11.448541
+            },
+            {
+              "bytes": 4194304,
+              "ms": 16.148851
+            }
+          ],
+          "result_sha256": "5da6fe0babc8c5e66f8ced88148448f13fceffb51ec4bcadc9635102451b5c12"
+        },
+        {
+          "index": 19,
+          "wall_ms": 44.630389,
+          "cpu_ms": 36.728,
+          "private_file_reads": [
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.3147
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 4194304,
+              "ms": 1.119771
+            },
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.138618
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 4194304,
+              "ms": 1.128282
+            },
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.111712
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 4194304,
+              "ms": 1.167193
+            }
+          ],
+          "snapshot_ms": [
+            15.786399,
+            14.633217,
+            12.983105
+          ],
+          "hashes": [
+            {
+              "bytes": 4194304,
+              "ms": 13.855676
+            },
+            {
+              "bytes": 4194304,
+              "ms": 12.875296
+            },
+            {
+              "bytes": 4194304,
+              "ms": 11.155733
+            }
+          ],
+          "result_sha256": "5da6fe0babc8c5e66f8ced88148448f13fceffb51ec4bcadc9635102451b5c12"
+        },
+        {
+          "index": 20,
+          "wall_ms": 38.32162,
+          "cpu_ms": 36.485,
+          "private_file_reads": [
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.122556
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 4194304,
+              "ms": 1.185135
+            },
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.099175
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 4194304,
+              "ms": 1.334362
+            },
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.118576
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 4194304,
+              "ms": 1.132593
+            }
+          ],
+          "snapshot_ms": [
+            12.45967,
+            12.223031,
+            12.311199
+          ],
+          "hashes": [
+            {
+              "bytes": 4194304,
+              "ms": 10.464368
+            },
+            {
+              "bytes": 4194304,
+              "ms": 10.278382
+            },
+            {
+              "bytes": 4194304,
+              "ms": 10.531024
+            }
+          ],
+          "result_sha256": "5da6fe0babc8c5e66f8ced88148448f13fceffb51ec4bcadc9635102451b5c12"
+        },
+        {
+          "index": 21,
+          "wall_ms": 49.801771,
+          "cpu_ms": 36.98,
+          "private_file_reads": [
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.115071
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 4194304,
+              "ms": 1.092215
+            },
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.186252
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 4194304,
+              "ms": 1.084111
+            },
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.119963
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 4194304,
+              "ms": 1.329612
+            }
+          ],
+          "snapshot_ms": [
+            12.091568,
+            21.227589,
+            15.131123
+          ],
+          "hashes": [
+            {
+              "bytes": 4194304,
+              "ms": 10.3139
+            },
+            {
+              "bytes": 4194304,
+              "ms": 19.400697
+            },
+            {
+              "bytes": 4194304,
+              "ms": 13.031964
+            }
+          ],
+          "result_sha256": "5da6fe0babc8c5e66f8ced88148448f13fceffb51ec4bcadc9635102451b5c12"
+        },
+        {
+          "index": 22,
+          "wall_ms": 66.248894,
+          "cpu_ms": 38.295,
+          "private_file_reads": [
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.110067
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 4194304,
+              "ms": 1.166109
+            },
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.213776
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 4194304,
+              "ms": 1.180105
+            },
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.150813
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 4194304,
+              "ms": 1.543411
+            }
+          ],
+          "snapshot_ms": [
+            12.694881,
+            22.618631,
+            29.387874
+          ],
+          "hashes": [
+            {
+              "bytes": 4194304,
+              "ms": 10.770342
+            },
+            {
+              "bytes": 4194304,
+              "ms": 20.639598
+            },
+            {
+              "bytes": 4194304,
+              "ms": 27.144489
+            }
+          ],
+          "result_sha256": "5da6fe0babc8c5e66f8ced88148448f13fceffb51ec4bcadc9635102451b5c12"
+        },
+        {
+          "index": 23,
+          "wall_ms": 283.278785,
+          "cpu_ms": 37.403,
+          "private_file_reads": [
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.107865
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 4194304,
+              "ms": 1.042445
+            },
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.112476
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 4194304,
+              "ms": 1.267578
+            },
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 33.092523
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 4194304,
+              "ms": 45.896507
+            }
+          ],
+          "snapshot_ms": [
+            15.494037,
+            113.235059,
+            109.827419
+          ],
+          "hashes": [
+            {
+              "bytes": 4194304,
+              "ms": 13.462572
+            },
+            {
+              "bytes": 4194304,
+              "ms": 109.561094
+            },
+            {
+              "bytes": 4194304,
+              "ms": 29.945939
+            }
+          ],
+          "result_sha256": "5da6fe0babc8c5e66f8ced88148448f13fceffb51ec4bcadc9635102451b5c12"
+        },
+        {
+          "index": 24,
+          "wall_ms": 47.111063,
+          "cpu_ms": 36.619,
+          "private_file_reads": [
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 3.689754
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 4194304,
+              "ms": 1.173529
+            },
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.100817
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 4194304,
+              "ms": 1.01658
+            },
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.103491
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 4194304,
+              "ms": 1.06488
+            }
+          ],
+          "snapshot_ms": [
+            17.844412,
+            12.822218,
+            15.282681
+          ],
+          "hashes": [
+            {
+              "bytes": 4194304,
+              "ms": 10.792003
+            },
+            {
+              "bytes": 4194304,
+              "ms": 11.172018
+            },
+            {
+              "bytes": 4194304,
+              "ms": 13.6036
+            }
+          ],
+          "result_sha256": "5da6fe0babc8c5e66f8ced88148448f13fceffb51ec4bcadc9635102451b5c12"
+        },
+        {
+          "index": 25,
+          "wall_ms": 44.703471,
+          "cpu_ms": 37.112,
+          "private_file_reads": [
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.354556
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 4194304,
+              "ms": 1.305677
+            },
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.120093
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 4194304,
+              "ms": 1.22566
+            },
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.109217
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 4194304,
+              "ms": 1.015907
+            }
+          ],
+          "snapshot_ms": [
+            14.192328,
+            12.706417,
+            14.579794
+          ],
+          "hashes": [
+            {
+              "bytes": 4194304,
+              "ms": 11.414339
+            },
+            {
+              "bytes": 4194304,
+              "ms": 10.645436
+            },
+            {
+              "bytes": 4194304,
+              "ms": 12.968781
+            }
+          ],
+          "result_sha256": "5da6fe0babc8c5e66f8ced88148448f13fceffb51ec4bcadc9635102451b5c12"
+        },
+        {
+          "index": 26,
+          "wall_ms": 145.307131,
+          "cpu_ms": 38.575,
+          "private_file_reads": [
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.107245
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 4194304,
+              "ms": 1.464614
+            },
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.155525
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 4194304,
+              "ms": 1.520222
+            },
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.122828
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 4194304,
+              "ms": 1.54536
+            }
+          ],
+          "snapshot_ms": [
+            27.915006,
+            70.465396,
+            42.102309
+          ],
+          "hashes": [
+            {
+              "bytes": 4194304,
+              "ms": 25.530417
+            },
+            {
+              "bytes": 4194304,
+              "ms": 68.268734
+            },
+            {
+              "bytes": 4194304,
+              "ms": 39.897756
+            }
+          ],
+          "result_sha256": "5da6fe0babc8c5e66f8ced88148448f13fceffb51ec4bcadc9635102451b5c12"
+        },
+        {
+          "index": 27,
+          "wall_ms": 171.768114,
+          "cpu_ms": 38.422,
+          "private_file_reads": [
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.106385
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 4194304,
+              "ms": 2.688556
+            },
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.104792
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 4194304,
+              "ms": 1.119109
+            },
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.112741
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 4194304,
+              "ms": 6.839313
+            }
+          ],
+          "snapshot_ms": [
+            37.557535,
+            56.182719,
+            72.11939
+          ],
+          "hashes": [
+            {
+              "bytes": 4194304,
+              "ms": 34.220081
+            },
+            {
+              "bytes": 4194304,
+              "ms": 54.444528
+            },
+            {
+              "bytes": 4194304,
+              "ms": 62.117023
+            }
+          ],
+          "result_sha256": "5da6fe0babc8c5e66f8ced88148448f13fceffb51ec4bcadc9635102451b5c12"
+        },
+        {
+          "index": 28,
+          "wall_ms": 56.456368,
+          "cpu_ms": 37.089,
+          "private_file_reads": [
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.222373
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 4194304,
+              "ms": 1.693421
+            },
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.132222
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 4194304,
+              "ms": 1.118936
+            },
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.115867
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 4194304,
+              "ms": 1.077921
+            }
+          ],
+          "snapshot_ms": [
+            13.890507,
+            13.107643,
+            28.153886
+          ],
+          "hashes": [
+            {
+              "bytes": 4194304,
+              "ms": 11.433853
+            },
+            {
+              "bytes": 4194304,
+              "ms": 11.335749
+            },
+            {
+              "bytes": 4194304,
+              "ms": 26.461896
+            }
+          ],
+          "result_sha256": "5da6fe0babc8c5e66f8ced88148448f13fceffb51ec4bcadc9635102451b5c12"
+        },
+        {
+          "index": 29,
+          "wall_ms": 88.757675,
+          "cpu_ms": 38.817,
+          "private_file_reads": [
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.128636
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 4194304,
+              "ms": 2.498915
+            },
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.105144
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 4194304,
+              "ms": 1.795701
+            },
+            {
+              "file": "Info.plist",
+              "bytes": 539,
+              "ms": 0.281783
+            },
+            {
+              "file": "KiraBridge",
+              "bytes": 4194304,
+              "ms": 2.486417
+            }
+          ],
+          "snapshot_ms": [
+            21.623818,
+            19.695122,
+            43.354953
+          ],
+          "hashes": [
+            {
+              "bytes": 4194304,
+              "ms": 18.373877
+            },
+            {
+              "bytes": 4194304,
+              "ms": 17.194805
+            },
+            {
+              "bytes": 4194304,
+              "ms": 38.543986
+            }
+          ],
+          "result_sha256": "5da6fe0babc8c5e66f8ced88148448f13fceffb51ec4bcadc9635102451b5c12"
+        }
+      ],
+      "wall_ms": {
+        "n": 30,
+        "p50": 50.422981500000006,
+        "p95": 171.768114,
+        "min": 37.120648,
+        "max": 283.278785,
+        "sum": 2114.1603869999994
+      },
+      "cpu_ms": {
+        "n": 30,
+        "p50": 36.995,
+        "p95": 38.575,
+        "min": 35.844,
+        "max": 38.817,
+        "sum": 1112.964
+      },
+      "metadata_ms_per_call": {
+        "n": 30,
+        "p50": 48.692511499999995,
+        "p95": 165.859644,
+        "min": 35.978507,
+        "max": 238.556515,
+        "sum": 2010.6379069999996
+      },
+      "private_read_ms_per_call": {
+        "n": 30,
+        "p50": 4.0074594999999995,
+        "p95": 10.970896,
+        "min": 3.4582689999999996,
+        "max": 81.519394,
+        "sum": 215.75311399999998
+      },
+      "binary_hash_ms_per_call": {
+        "n": 30,
+        "p50": 42.0523065,
+        "p95": 150.781632,
+        "min": 30.918283000000002,
+        "max": 152.969605,
+        "sum": 1725.264719
+      },
+      "metadata_snapshots_per_call": [
+        3
+      ],
+      "file_reads_per_call": [
+        6
+      ],
+      "binary_hashes_per_call": [
+        3
+      ],
+      "additional_allocation_only_call_peak_bytes": 4248416,
+      "additional_profiler_only_calls": 1,
+      "profiler_top_cumulative": [
+        {
+          "file": "/Users/landjunge/KiraBridge-worktrees/rc32-native-ipc-20261103/src/kirabridge/read_query.py",
+          "line": 116,
+          "function": "read_query_async",
+          "primitive_calls": 2,
+          "calls": 2,
+          "self_ms": 0.007483,
+          "cumulative_ms": 74.856772
+        },
+        {
+          "file": "/Users/landjunge/KiraBridge-worktrees/rc32-native-ipc-20261103/src/kirabridge/native_queries.py",
+          "line": 67,
+          "function": "execute",
+          "primitive_calls": 2,
+          "calls": 2,
+          "self_ms": 0.026678,
+          "cumulative_ms": 74.849289
+        },
+        {
+          "file": "/Users/landjunge/KiraBridge-worktrees/rc32-native-ipc-20261103/src/kirabridge/platform_adapters/macos/provider.py",
+          "line": 222,
+          "function": "execute",
+          "primitive_calls": 2,
+          "calls": 2,
+          "self_ms": 0.023698000000000004,
+          "cumulative_ms": 74.49505
+        },
+        {
+          "file": "/tmp/profile-rc32-native-metadata.py",
+          "line": 155,
+          "function": "metadata_snapshot",
+          "primitive_calls": 3,
+          "calls": 3,
+          "self_ms": 1.180587,
+          "cumulative_ms": 59.092266
+        },
+        {
+          "file": "/Users/landjunge/KiraBridge-worktrees/rc32-native-ipc-20261103/src/kirabridge/platform_adapters/macos/system_transport.py",
+          "line": 91,
+          "function": "snapshot_metadata",
+          "primitive_calls": 3,
+          "calls": 3,
+          "self_ms": 0.155138,
+          "cumulative_ms": 57.905861
+        },
+        {
+          "file": "/Users/landjunge/KiraBridge-worktrees/rc32-native-ipc-20261103/src/kirabridge/platform_adapters/macos/provider.py",
+          "line": 198,
+          "function": "require",
+          "primitive_calls": 2,
+          "calls": 2,
+          "self_ms": 0.018586000000000002,
+          "cumulative_ms": 53.13621800000001
+        },
+        {
+          "file": "/Users/landjunge/KiraBridge-worktrees/rc32-native-ipc-20261103/src/kirabridge/platform_adapters/macos/provider.py",
+          "line": 119,
+          "function": "snapshot",
+          "primitive_calls": 2,
+          "calls": 2,
+          "self_ms": 0.037296,
+          "cumulative_ms": 53.110142
+        },
+        {
+          "file": "/tmp/profile-rc32-native-metadata.py",
+          "line": 149,
+          "function": "sha256",
+          "primitive_calls": 3,
+          "calls": 3,
+          "self_ms": 0.318695,
+          "cumulative_ms": 51.0443
+        },
+        {
+          "file": "~",
+          "line": 0,
+          "function": "<built-in method _hashlib.openssl_sha256>",
+          "primitive_calls": 8,
+          "calls": 8,
+          "self_ms": 50.771849,
+          "cumulative_ms": 50.771849
+        },
+        {
+          "file": "/Users/landjunge/KiraBridge-worktrees/rc32-native-ipc-20261103/src/kirabridge/platform_adapters/macos/capabilities.py",
+          "line": 51,
+          "function": "snapshot",
+          "primitive_calls": 2,
+          "calls": 2,
+          "self_ms": 0.136618,
+          "cumulative_ms": 41.979292
+        },
+        {
+          "file": "/Users/landjunge/KiraBridge-worktrees/rc32-native-ipc-20261103/src/kirabridge/platform_adapters/macos/system_transport.py",
+          "line": 339,
+          "function": "snapshot_metadata",
+          "primitive_calls": 2,
+          "calls": 2,
+          "self_ms": 0.007254,
+          "cumulative_ms": 41.79739000000001
+        },
+        {
+          "file": "/Users/landjunge/KiraBridge-worktrees/rc32-native-ipc-20261103/src/kirabridge/platform_adapters/macos/system_transport.py",
+          "line": 345,
+          "function": "execute",
+          "primitive_calls": 2,
+          "calls": 2,
+          "self_ms": 0.025701,
+          "cumulative_ms": 21.153158
+        },
+        {
+          "file": "/Users/landjunge/KiraBridge-worktrees/rc32-native-ipc-20261103/src/kirabridge/platform_adapters/macos/system_transport.py",
+          "line": 154,
+          "function": "request",
+          "primitive_calls": 2,
+          "calls": 2,
+          "self_ms": 0.8444440000000001,
+          "cumulative_ms": 21.080555
+        },
+        {
+          "file": "/usr/local/Cellar/python@3.11/3.11.15_1/Frameworks/Python.framework/Versions/3.11/lib/python3.11/copy.py",
+          "line": 128,
+          "function": "deepcopy",
+          "primitive_calls": 2,
+          "calls": 410,
+          "self_ms": 9.743146000000001,
+          "cumulative_ms": 10.464253000000001
+        },
+        {
+          "file": "/usr/local/Cellar/python@3.11/3.11.15_1/Frameworks/Python.framework/Versions/3.11/lib/python3.11/copy.py",
+          "line": 227,
+          "function": "_deepcopy_dict",
+          "primitive_calls": 2,
+          "calls": 36,
+          "self_ms": 0.405377,
+          "cumulative_ms": 10.448195
+        },
+        {
+          "file": "/tmp/profile-rc32-native-metadata.py",
+          "line": 142,
+          "function": "read",
+          "primitive_calls": 6,
+          "calls": 6,
+          "self_ms": 0.06976600000000001,
+          "cumulative_ms": 5.141637
+        },
+        {
+          "file": "/Users/landjunge/KiraBridge-worktrees/rc32-native-ipc-20261103/src/kirabridge/platform_adapters/macos/system_transport.py",
+          "line": 33,
+          "function": "_private_file",
+          "primitive_calls": 6,
+          "calls": 6,
+          "self_ms": 0.21776800000000002,
+          "cumulative_ms": 5.0446919999999995
+        },
+        {
+          "file": "~",
+          "line": 0,
+          "function": "<method 'read' of '_io.BufferedReader' objects>",
+          "primitive_calls": 6,
+          "calls": 6,
+          "self_ms": 3.647506,
+          "cumulative_ms": 3.647506
+        },
+        {
+          "file": "/usr/local/Cellar/python@3.11/3.11.15_1/Frameworks/Python.framework/Versions/3.11/lib/python3.11/asyncio/base_events.py",
+          "line": 1859,
+          "function": "_run_once",
+          "primitive_calls": 1,
+          "calls": 1,
+          "self_ms": 0.025749,
+          "cumulative_ms": 2.033036
+        },
+        {
+          "file": "/usr/local/Cellar/python@3.11/3.11.15_1/Frameworks/Python.framework/Versions/3.11/lib/python3.11/asyncio/events.py",
+          "line": 82,
+          "function": "_run",
+          "primitive_calls": 1,
+          "calls": 1,
+          "self_ms": 0.0034980000000000002,
+          "cumulative_ms": 1.893221
+        },
+        {
+          "file": "~",
+          "line": 0,
+          "function": "<method 'run' of '_contextvars.Context' objects>",
+          "primitive_calls": 1,
+          "calls": 1,
+          "self_ms": 0.0021490000000000003,
+          "cumulative_ms": 1.889723
+        },
+        {
+          "file": "/tmp/profile-rc32-native-metadata.py",
+          "line": 240,
+          "function": "main",
+          "primitive_calls": 1,
+          "calls": 1,
+          "self_ms": 0.0011250000000000001,
+          "cumulative_ms": 1.887574
+        },
+        {
+          "file": "/tmp/profile-rc32-native-metadata.py",
+          "line": 99,
+          "function": "case",
+          "primitive_calls": 1,
+          "calls": 1,
+          "self_ms": 0.009373,
+          "cumulative_ms": 1.886449
+        },
+        {
+          "file": "/usr/local/Cellar/python@3.11/3.11.15_1/Frameworks/Python.framework/Versions/3.11/lib/python3.11/re/__init__.py",
+          "line": 168,
+          "function": "fullmatch",
+          "primitive_calls": 4,
+          "calls": 4,
+          "self_ms": 0.02006,
+          "cumulative_ms": 1.7176980000000002
+        },
+        {
+          "file": "/usr/local/Cellar/python@3.11/3.11.15_1/Frameworks/Python.framework/Versions/3.11/lib/python3.11/re/__init__.py",
+          "line": 272,
+          "function": "_compile",
+          "primitive_calls": 4,
+          "calls": 4,
+          "self_ms": 1.4839360000000001,
+          "cumulative_ms": 1.6801460000000001
+        }
+      ],
+      "in_memory_child_creations": 1,
+      "native_protocol_requests_including_extra_calls": 32,
+      "os_child_process_creations": 0,
+      "inventory": {
+        "tasks": 0,
+        "events": 0,
+        "completion_notices": 0
+      }
+    }
+  ],
+  "passed": true,
+  "reproduction": {
+    "captured_script_path": "/tmp/profile-rc32-native-metadata.py",
+    "captured_script_sha256": "8ee036ad3fdd73dec17ef8993c0a2ae5ca4adc1892c662ab78f727591b85e237",
+    "current_script_path": "scripts/benchmark_native_metadata.py",
+    "current_script_sha256": "1c65ab4aaa9e634367813ed7add1685854c200f29e0532afc837e10ee288a2fc",
+    "change_since_capture": "Ruff formatting and adjacent string-literal wrapping only; Python ASTs are exactly equal ignoring source locations. No fixture, loop, guard or measurement semantics changed; no measurement rerun.",
+    "ast_equal_ignoring_locations": true,
+    "source_base_git_commit": "0f554bc",
+    "cwd": "KiraBridge repository root",
+    "environment": {
+      "PYTHONPATH": "src"
+    },
+    "command": [
+      "/Users/landjunge/KiraBridge/.venv/bin/python",
+      "scripts/benchmark_native_metadata.py",
+      "--label",
+      "rc31-native-integrity-baseline",
+      "--repeat",
+      "30",
+      "--output",
+      "docs/evidence/rc32-native-metadata-profile-20261103.json"
+    ],
+    "source_requirement": "Run against the recorded source_file hashes in each case, or label a later-source comparison separately. The recorded capture is RC31 base, with no product metadata/transport changes."
+  }
+}
