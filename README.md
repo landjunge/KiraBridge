@@ -88,4 +88,4 @@ written permission. The German license text governs.
 
 [Windows preview dev2](https://github.com/landjunge/KiraBridge/releases/tag/windows-v0.8.0rc31.dev2):
 native keyboard and local MCP acceptance passed in a dedicated Windows 11 VM.
-[Results and limits](docs/WINDOWS-DEVELOPMENT-20261103.md); macOS RC30 stays separate.
+[Results and limits](docs/WINDOWS-DEVELOPMENT-20261103.md); macOS stays separate.

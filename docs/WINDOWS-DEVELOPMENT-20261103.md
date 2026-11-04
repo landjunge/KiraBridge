@@ -2,13 +2,15 @@
 
 Status on 4 November: native keyboard and guest-local HTTP MCP acceptance passed
 for dev2, and the private GitHub release was downloaded and hash-verified. The
-final retained installed-instance check is tracked separately below.
+retained installed instance was independently checked after its verifier exited.
+A fresh console image remains unconfirmed, as detailed below.
 
 The operator explicitly requested a Windows version with genuine keyboard tests
 inside a separate VM. This is a Windows development task, overriding the usual
-Kira rule against preparing unused Windows packages. The working macOS RC30
-installation and other sessions remain in place. No hosted CI/Actions or ARM
-build is used. Starting point: main `21a6abd`.
+Kira rule against preparing unused Windows packages. Development started from
+the verified macOS RC30 installation. This Windows work does not manage the
+parallel session or its macOS deployments. No hosted CI/Actions or ARM build is
+used. Starting point: main `21a6abd`.
 
 ## Implemented scope
 
@@ -165,7 +167,7 @@ loopback authenticated MCP in an ordinary visible console, using the exact
 prepared Python installation; no Windows service or host process is installed.
 An existing modified desktop launcher is preserved.
 
-## Published package and remaining installation check
+## Published package and retained installation
 
 [Windows preview dev2](https://github.com/landjunge/KiraBridge/releases/tag/windows-v0.8.0rc31.dev2)
 is published in the private GitHub repository, at source/tag commit
@@ -180,18 +182,38 @@ included wheel against the prepared guest package:
   SHA256 `babbde17fc8e23a9fc165fc211fbefbf168b61cfe09ef04ce14713bf223f8479`.
 
 The release bundles the verified Python/dependency payload, not a Windows ISO.
-The running macOS RC30 installation is unchanged. The complete Windows desktop
+This Windows work did not update the separate macOS installation; the parallel
+speed-optimization session manages its own deployment. The complete Windows desktop
 GUI, general file/process/terminal operations, Windows service installation,
 Windows 10 and external ChatGPT/Voice integration remain unsupported or untested.
 HTTP was exercised natively; stdio is implemented but has no native acceptance
 claim here.
 
-**Still open at this documentation snapshot:** start the installed package in its
-user-owned console after the release download and independently read back its
-version, PID/generation, authorization/capabilities and zero-task state while it
-remains running. The stopped preview smoke above does not satisfy that final
-installed-running check. The retained VM and durable receipts allow this read-only
-verification without replaying keyboard tasks.
+The installed package has now passed a separate read-only retained-instance check
+with no source-tree override: Python 3.14.10 AMD64, all 171 installed modules equal
+to the downloaded release wheel, runtime `0.8.0rc31.dev2`, PID `11720`, instance
+`fde5e30653a84c77a8fc78be8f8795e7`, creation FILETIME `134382301975786026`.
+Its Windows-normalized startup source digest is
+`0cc6ae16d2c2d3d78b1c968e869cb1be1768e07e677aa002e86a28bfe76c432d`.
+Authenticated health, exactly five minimal capabilities, unauthenticated HTTP401
+and an empty task list were verified. After the verifier exited, an independent
+parent-process check confirmed the same process generation still owned the
+listener on guest loopback `127.0.0.1:8765`. The owned console is left running;
+this is not a Windows service. `KiraBridge Windows Test.cmd` is installed on the
+guest desktop and matches the released launcher bytes.
+
+[Installed-instance evidence](evidence/windows-installed-preview-20261104.json)
+records the runtime, release-byte binding and post-parent-exit listener check.
+The host Mac was locked during the last macOS screenshot attempt. A bounded
+guest-only console diagnostic was dispatched once, but no report reached its
+owned receiver; its execution is unconfirmed and was not replayed. A fresh
+console image therefore remains unconfirmed. Neither the `CREATE_NEW_CONSOLE`
+flag nor the operator seeing the earlier test text establishes that image.
+The process/listener claims above apply to the recorded check time, not an
+unobserved later instant. No host unlock or OS-permission change was attempted.
+All 15 owned host HTTP staging/report helpers were stopped with exact command
+identity checks and independent absence checks. UTM and the guest backend were
+not signalled. The retained VM still reported `started` at final host cleanup.
 
 ## Primary references
 
@@ -229,12 +251,12 @@ No uncertain Windows keyboard task was repeated: none had started.
 [Actual first-install failure proof](evidence/windows-first-install-failure-20261103.json)
 · [Microsoft CommandLine limit](https://learn.microsoft.com/en-us/windows-hardware/customize/desktop/unattend/microsoft-windows-shell-setup-firstlogoncommands-synchronouscommand-commandline).
 
-## Further proven corrections during native bring-up
+## Further corrections and evidence during native bring-up
 
-PowerShell 5.1 exposed two bootstrap defects. A redirected `Start-Process
--PassThru` child could lose its native handle before waiting and expose a null
-`ExitCode`; the runner now retains the handle and verifies a real Int32 exit code
-instead of converting missing evidence into success (`2600f0d`). Quoting every
+PowerShell 5.1 exposed a null child exit-code result. The exact original cause
+was not isolated: the runner now retains the redirected `Start-Process
+-PassThru` native handle and verifies a real Int32 exit code instead of converting
+missing evidence into success (`2600f0d`). Quoting every
 argument also quoted `cmd.exe` switch tokens. The argument serializer now leaves
 simple tokens intact and correctly quotes whitespace, empty arguments and trailing
 backslashes (`8544bed`). Separate command/Python exit witnesses were preserved

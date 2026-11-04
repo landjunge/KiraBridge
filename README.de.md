@@ -91,4 +91,4 @@ benötigt eine gesonderte schriftliche Erlaubnis. Der deutsche Lizenztext ist ma
 
 [Windows-Vorschau dev2](https://github.com/landjunge/KiraBridge/releases/tag/windows-v0.8.0rc31.dev2):
 Native Tastatur und lokales MCP haben die Abnahme in einer eigenen Windows 11-VM bestanden.
-[Ergebnisse und Grenzen](docs/WINDOWS-DEVELOPMENT-20261103.md); macOS RC30 bleibt getrennt.
+[Ergebnisse und Grenzen](docs/WINDOWS-DEVELOPMENT-20261103.md); macOS bleibt getrennt.
