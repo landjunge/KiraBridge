@@ -9,7 +9,12 @@ from typing import Literal
 from pydantic import Field, model_validator
 
 from kirabridge.bridge_core.models import BridgeError, EmptyInput, Input, UncertainExecution
-from kirabridge.platform_adapters.windows.keyboard import KeyStroke, WindowsKeyboard, WindowTarget
+from kirabridge.platform_adapters.windows.keyboard import (
+    KeyStroke,
+    WindowsKeyboard,
+    WindowTarget,
+    shortcut_stroke,
+)
 
 
 class WindowsTargetInput(Input):
@@ -56,9 +61,26 @@ class WindowsSequenceInput(Input):
         return self
 
 
+class WindowsShortcutInput(Input):
+    target: WindowsTargetInput
+    key: str = Field(min_length=1, max_length=32, strict=True)
+    modifiers: list[Literal["control", "alt", "shift", "windows"]] = Field(
+        min_length=1, max_length=4
+    )
+
+    @model_validator(mode="after")
+    def coherent(self):
+        self.native()
+        return self
+
+    def native(self):
+        return shortcut_stroke(self.key, tuple(self.modifiers))
+
+
 WINDOWS_KEYBOARD_INPUTS = {
     "windows.keyboard.inspect": EmptyInput,
     "windows.keyboard.sequence": WindowsSequenceInput,
+    "windows.keyboard.shortcut": WindowsShortcutInput,
 }
 
 
@@ -110,7 +132,7 @@ class WindowsKeyboardManager:
                     )
 
             target = None
-            if operation == "windows.keyboard.sequence":
+            if operation in {"windows.keyboard.sequence", "windows.keyboard.shortcut"}:
                 target = WindowTarget.from_wire(args.target.model_dump())
                 if backend.inspect_foreground() != target:
                     raise BridgeError(
@@ -134,7 +156,9 @@ class WindowsKeyboardManager:
 
             result = backend.send(
                 target,
-                [step.native() for step in args.steps],
+                [args.native()]
+                if operation == "windows.keyboard.shortcut"
+                else [step.native() for step in args.steps],
                 before_send=before_send,
             )
             check_deadline()

@@ -1,4 +1,8 @@
-# Interactive Windows keyboard preview
+# Interactive Windows desktop preview
+
+The dev3 increment adds explicit keyboard shortcuts and top-level window control.
+[Current contracts and acceptance status](WINDOWS-DESKTOP-20261104.md) distinguish
+the candidate from the previously accepted dev2 installation.
 
 This entrypoint runs an owned local MCP service in an unlocked Windows user
 session. It does not install a service, alter UAC/OS permissions, configure an
@@ -38,7 +42,8 @@ arguments:
 
 Stdio stdout is reserved for the MCP protocol. Both transports use exactly one
 `local` principal with automatic permission for `bridge.health`, `task.read`,
-`task.cancel`, `windows.keyboard.inspect` and `windows.keyboard.sequence`. There
+`task.cancel`, `windows.keyboard.inspect`, `windows.keyboard.sequence`,
+`windows.keyboard.shortcut`, `windows.window.list` and `windows.window.control`. There
 is no full-permission expansion, executable/root grant or user-supplied token
 in an operation argument.
 

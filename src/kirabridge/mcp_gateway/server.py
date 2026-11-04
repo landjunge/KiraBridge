@@ -32,7 +32,9 @@ def inline_task_timeout(operation: str) -> float:
     """Bound result observation without changing the durable execution deadline."""
     from kirabridge.desktop_input import DESKTOP_EFFECT_OPERATIONS
 
-    if operation in DESKTOP_EFFECT_OPERATIONS or operation.startswith("keyboard."):
+    if operation in DESKTOP_EFFECT_OPERATIONS or operation.startswith(
+        ("keyboard.", "windows.keyboard.", "windows.window.")
+    ):
         return 13  # The existing desktop transaction has a twelve-second deadline.
     if operation in {"session.catalog", "session.read"}:
         from kirabridge.terminal_queries import TERMINAL_QUERY_SECONDS
@@ -523,6 +525,14 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
                 {
                     row["operation"]: row
                     for row in bridge.windows_keyboard.catalog(
+                        lambda op: decision(bridge.config, identity(ctx), op)
+                    )
+                }
+            )
+            platform_rows.update(
+                {
+                    row["operation"]: row
+                    for row in bridge.windows_windows.catalog(
                         lambda op: decision(bridge.config, identity(ctx), op)
                     )
                 }

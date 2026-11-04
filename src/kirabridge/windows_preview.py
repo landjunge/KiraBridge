@@ -1,4 +1,4 @@
-"""Interactive Windows keyboard preview: private local MCP, no service installation."""
+"""Interactive Windows desktop preview: private local MCP, no service installation."""
 
 from __future__ import annotations
 
@@ -25,6 +25,9 @@ CAPABILITIES = (
     "task.cancel",
     "windows.keyboard.inspect",
     "windows.keyboard.sequence",
+    "windows.keyboard.shortcut",
+    "windows.window.list",
+    "windows.window.control",
 )
 
 
@@ -37,7 +40,7 @@ class Preview:
     def public(self, transport):
         return {
             "status": "starting",
-            "preview": "Windows keyboard MCP",
+            "preview": "Windows keyboard and window MCP",
             "transport": transport,
             "endpoint": f"http://127.0.0.1:{self.config.port}/mcp" if transport == "http" else None,
             "state_dir": str(self.config.state_path),

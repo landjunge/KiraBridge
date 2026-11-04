@@ -1,10 +1,17 @@
-param([Parameter(Mandatory=$true)][string]$BootstrapUrl)
+param(
+    [Parameter(Mandatory=$true)][string]$BootstrapUrl,
+    [ValidatePattern('^[A-Za-z][A-Za-z0-9-]{0,63}$')][string]$WorkName='KiraBridgeDev',
+    [switch]$ReusePreparedPython
+)
 $ErrorActionPreference = 'Stop'
+if ($ReusePreparedPython -and $WorkName -eq 'KiraBridgeDev') {
+    throw 'Prepared interpreter reuse requires a separate new work directory'
+}
 $Base = $BootstrapUrl.TrimEnd('/')
 if ($Base -notmatch '^http://10\.0\.2\.2:[0-9]{1,5}/[A-Za-z0-9_-]{16,128}$') {
     throw 'Invalid isolated bootstrap endpoint'
 }
-$Work = Join-Path $env:LOCALAPPDATA 'KiraBridgeDev'
+$Work = Join-Path $env:LOCALAPPDATA $WorkName
 New-Item -ItemType Directory -Force $Work | Out-Null
 $Attempts = Join-Path $Work 'attempts'
 New-Item -ItemType Directory -Force $Attempts | Out-Null
@@ -55,6 +62,9 @@ function Download-Verified($Entry, [string]$Root) {
     return $target
 }
 function Invoke-Bounded([string]$Program, [string[]]$Arguments, [string]$Name, [int]$Seconds) {
+    if ($ReusePreparedPython -and $Program -eq $Python) {
+        $Arguments=@('-B')+$Arguments
+    }
     $stdout=Join-Path $Work ($Name+'-stdout.txt')
     $stderr=Join-Path $Work ($Name+'-stderr.txt')
     if ((Test-Path $stdout) -or (Test-Path $stderr)) { throw 'Process evidence already exists' }
@@ -193,9 +203,14 @@ try {
     }
     Event 'all_payload_hashes_verified'
     $version=[Version]$manifest.python_version
-    $PythonRoot=Join-Path $Work ('Python'+$version.Major+$version.Minor)
+    $PythonWork=$Work
+    if ($ReusePreparedPython) {
+        $PythonWork=Join-Path $env:LOCALAPPDATA 'KiraBridgeDev'
+    }
+    $PythonRoot=Join-Path $PythonWork ('Python'+$version.Major+$version.Minor)
     $Python=Join-Path $PythonRoot 'python.exe'
     if (-not (Test-Path -LiteralPath $Python)) {
+        if ($ReusePreparedPython) { throw 'Prepared interpreter missing; no replacement installation' }
         $receipt=Join-Path $Attempts 'python-install.json'
         New-PrivateReceipt $receipt '{"phase":"python-install","status":"attempted"}'
         $installer=Join-Path $Payload 'python-installer.exe'
@@ -205,7 +220,7 @@ try {
         $installed=Invoke-Bounded $installer $options 'python-install' 600
         if ($installed.exit_code -ne 0 -and $installed.exit_code -ne 3010) { throw 'Python installation failed' }
     }
-    $actual=& $Python -I -c 'import platform; print(platform.python_version())'
+    $actual=& $Python -I -B -c 'import platform; print(platform.python_version())'
     if ($LASTEXITCODE -ne 0 -or $actual.Trim() -ne $manifest.python_version) {
         throw 'Installed Python version differs from verified manifest'
     }
@@ -216,7 +231,29 @@ try {
     }
     if (@($manifest.requirements).Count -eq 0) { throw 'No pinned requirements' }
     $pipReceipt=Join-Path $Payload 'pip-completed.json'
-    if (-not (Test-Path -LiteralPath $pipReceipt)) {
+    if ($ReusePreparedPython) {
+        # Keep the installed dev2 package and its running preview untouched. All
+        # native tests below import the separately hash-verified source tree.
+        # Verify every dependency instead of writing to the shared interpreter.
+        $dependencyFile=Join-Path $Payload 'verify-installed-dependencies.txt'
+        $dependencies=@($manifest.requirements | Where-Object {$_ -notmatch '^kirabridge=='})
+        [IO.File]::WriteAllText($dependencyFile,($dependencies -join "`n"),$Utf8)
+        $dependencyCode=@'
+import importlib.metadata as m, pathlib, sys
+items=pathlib.Path(sys.argv[1]).read_text(encoding='utf-8-sig').splitlines()
+assert items
+for item in items:
+    name, expected=item.split('==',1)
+    assert m.version(name.split('[',1)[0])==expected, name
+print('Prepared dependency versions verified without package writes')
+'@
+        $dependencyScript=Join-Path $Payload 'verify-installed-dependencies.py'
+        [IO.File]::WriteAllText($dependencyScript,$dependencyCode,$Utf8)
+        $checked=Invoke-Bounded $Python @('-I',$dependencyScript,$dependencyFile) `
+            ('dependencies-readonly-'+$ManifestHash.Substring(0,12)) 60
+        if ($checked.exit_code -ne 0) { throw 'Prepared dependencies differ; no automatic installation' }
+        Event 'prepared_interpreter_verified_without_package_writes'
+    } elseif (-not (Test-Path -LiteralPath $pipReceipt)) {
         $wheelhouse=Join-Path $Payload 'wheels'
         $options=@('-m','pip','install','--no-index','--find-links',$wheelhouse,
             '--disable-pip-version-check','--no-warn-script-location','--no-user')+@($manifest.requirements)
@@ -243,6 +280,7 @@ try {
     if (-not (Test-Path (Join-Path $Source 'src\kirabridge'))) { throw 'Source archive layout invalid' }
     $env:PYTHONPATH=Join-Path $Source 'src'
     $env:PYTHONNOUSERSITE='1'
+    if ($ReusePreparedPython) { $env:PYTHONDONTWRITEBYTECODE='1' }
     Set-Location -LiteralPath $Source
     $runFile=Join-Path $Work 'run-id.txt'
     if (-not (Test-Path $runFile)) { New-PrivateReceipt $runFile ([guid]::NewGuid().ToString('N')) }
@@ -257,7 +295,11 @@ try {
     Run-Once 'mcp' @('scripts/accept_windows_mcp.py','--output',$mcpOut) 180 $mcpOut
     $previewOut=Join-Path $Work ('preview-'+$RunId+'.json')
     Run-Once 'preview' @('scripts/accept_windows_preview.py','--output',$previewOut) 180 $previewOut
-    $launcher=Join-Path ([Environment]::GetFolderPath('Desktop')) 'KiraBridge Windows Test.cmd'
+    $shortcutOut=Join-Path $Work ('shortcuts-'+$RunId+'.json')
+    Run-Once 'shortcuts' @('scripts/accept_windows_shortcuts.py','--output',$shortcutOut) 180 $shortcutOut
+    $windowOut=Join-Path $Work ('windows-'+$RunId+'.json')
+    Run-Once 'windows' @('scripts/accept_windows_windows.py','--output',$windowOut) 180 $windowOut
+    $launcher=Join-Path ([Environment]::GetFolderPath('Desktop')) 'KiraBridge Windows Desktop Test.cmd'
     $launcherSource=Join-Path $Source 'scripts\start_windows_preview.cmd'
     if (-not (Test-Path -LiteralPath $launcher)) {
         Copy-Item -LiteralPath $launcherSource -Destination $launcher -ErrorAction Stop

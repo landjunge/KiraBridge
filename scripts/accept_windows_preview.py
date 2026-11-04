@@ -72,6 +72,7 @@ async def inspect_child(child, state, log_path, endpoint, report):
     import kirabridge
     from kirabridge.mcp_gateway.client import MCPClientPool, Peer
     from kirabridge.private_files import private_json
+    from kirabridge.windows_preview import CAPABILITIES
 
     credential_file = state / "preview-credentials.json"
     deadline = time.monotonic() + 30
@@ -121,10 +122,19 @@ async def inspect_child(child, state, log_path, endpoint, report):
             raise RuntimeError("Preview version or dispatcher readiness differs from source")
         report["expected_version"] = kirabridge.__version__
         report["runtime_version"] = health["version"]
+        if health.get("discovery", {}).get("capabilities") != sorted(CAPABILITIES):
+            raise RuntimeError("Preview capabilities differ from the exact Windows desktop subset")
+        report["exact_preview_capabilities"] = sorted(CAPABILITIES)
         report["runtime_pid"] = health["runtime"]["pid"]
         if report["runtime_pid"] != child.pid:
             raise RuntimeError("Health reply came from a different process")
-        operations = ["windows.keyboard.inspect", "windows.keyboard.sequence"]
+        operations = [
+            "windows.keyboard.inspect",
+            "windows.keyboard.sequence",
+            "windows.keyboard.shortcut",
+            "windows.window.list",
+            "windows.window.control",
+        ]
         catalog = await read("operation_catalog", {"operations": operations})
         rows = catalog.get("operations", {})
         if set(rows) != set(operations):

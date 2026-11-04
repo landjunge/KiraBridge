@@ -12,6 +12,7 @@ from kirabridge.platform_adapters.windows.keyboard import WindowTarget
 from kirabridge.windows_keyboard import (
     WindowsKeyboardManager,
     WindowsSequenceInput,
+    WindowsShortcutInput,
     WindowsTargetInput,
 )
 
@@ -110,6 +111,7 @@ async def test_windows_platform_status_reports_only_real_preview_operations(brid
     assert {row["operation"] for row in result["operations"]} == {
         "windows.keyboard.inspect",
         "windows.keyboard.sequence",
+        "windows.keyboard.shortcut",
     }
     assert not result["interactive_desktop_observed"]
     assert "managed process execution" in result["unsupported_features"]
@@ -137,6 +139,36 @@ async def test_known_stale_foreground_fails_before_marking_running_or_input():
         )
     assert error.value.code == "windows_target_changed"
     assert not transitions and not backend.sent
+
+
+@pytest.mark.parametrize(
+    "key,modifiers", [("Ctrl+A", ["control"]), ("a", []), ("a", ["alt", "alt"])]
+)
+def test_shortcut_contract_rejects_ambiguous_chords(key, modifiers):
+    with pytest.raises(ValidationError):
+        WindowsShortcutInput(target=TARGET.to_wire(), key=key, modifiers=modifiers)
+
+
+async def test_shortcut_is_one_explicit_key_pair_with_modifiers():
+    backend = Backend()
+    manager = WindowsKeyboardManager(
+        lambda *args: None,
+        DesktopInput(asyncio.Lock()),
+        backend_factory=lambda: backend,
+        host="win32",
+    )
+
+    async def running(event):
+        pass
+
+    result = await manager.execute(
+        {"principal": "local", "operation": "windows.keyboard.shortcut"},
+        WindowsShortcutInput(target=TARGET.to_wire(), key="a", modifiers=["control"]),
+        running,
+    )
+    assert result["completed_keys"] == 1 and len(backend.sent) == 1
+    assert backend.sent[0][0].character == "a"
+    assert backend.sent[0][0].modifiers == ("control",)
 
 
 @pytest.mark.parametrize("expire_before_input", [True, False])

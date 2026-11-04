@@ -79,9 +79,11 @@ from kirabridge.task_manager.store import Store
 from kirabridge.terminal_manager import TerminalManager
 from kirabridge.visible_terminal import VisibleTerminal, VisibleTerminalInput
 from kirabridge.windows_keyboard import WINDOWS_KEYBOARD_INPUTS, WindowsKeyboardManager
+from kirabridge.windows_windows import WINDOWS_WINDOW_INPUTS, WindowsWindowManager
 
 INPUTS = {
     **WINDOWS_KEYBOARD_INPUTS,
+    **WINDOWS_WINDOW_INPUTS,
     **SYSTEM_INPUTS,
     **KEYBOARD_INPUTS,
     **CONTROL_INPUTS,
@@ -250,6 +252,7 @@ class Bridge:
             self.sessions.lock, timeout=self.system_modules.transport.timeout
         )
         self.windows_keyboard = WindowsKeyboardManager(self.security.authorize, self.desktop_input)
+        self.windows_windows = WindowsWindowManager(self.security.authorize, self.desktop_input)
         self.keyboard_profiles = KeyboardProfileManager(
             config.state_path, self.security.authorize, self.desktop_input
         )
@@ -299,6 +302,8 @@ class Bridge:
     def validate(self, request: TaskRequest) -> None:
         if request.operation in WINDOWS_KEYBOARD_INPUTS and self.windows_keyboard.host != "win32":
             raise BridgeError("unsupported_platform", "Windows keyboard requires Windows")
+        if request.operation in WINDOWS_WINDOW_INPUTS and self.windows_windows.host != "win32":
+            raise BridgeError("unsupported_platform", "Windows window tasks require Windows")
         model = INPUTS.get(request.operation)
         if not model:
             raise BridgeError("unknown_operation", "Operation is not supported")
@@ -502,7 +507,7 @@ class Bridge:
         from kirabridge.permissions import decision
 
         self.security.authorize(principal, "platform.status")
-        if self.windows_keyboard.host == "win32":
+        if self.windows_keyboard.host == "win32" or self.windows_windows.host == "win32":
             return {
                 "schema_version": 1,
                 "provider_id": "windows.sendinput.v1",
@@ -512,10 +517,11 @@ class Bridge:
                     for row in self.windows_keyboard.catalog(
                         lambda op: decision(self.config, principal, op)
                     )
-                    if row["policy"]["authorized"]
+                    + self.windows_windows.catalog(lambda op: decision(self.config, principal, op))
+                    if row["available"] and row["policy"]["authorized"]
                 ],
                 "interactive_desktop_observed": False,
-                "scope": "Windows keyboard preview metadata; inspect the foreground before input",
+                "scope": "Windows desktop preview metadata; inspect exact targets before effects",
                 "unsupported_features": [
                     "macOS system keys and profiles",
                     "public file-root tools",
@@ -557,6 +563,8 @@ class Bridge:
         scope = PathScope(roots, excluded=state_exclusions(self.config, policy))
         if operation in WINDOWS_KEYBOARD_INPUTS:
             return await self.windows_keyboard.execute(task, args, running, progress)
+        if operation in WINDOWS_WINDOW_INPUTS:
+            return await self.windows_windows.execute(task, args, running, progress)
         if operation == "platform.status":
             await running({"evidence_type": "platform_status_query"})
             return await self.platform_status(principal, check_helpers=args.check_helpers)

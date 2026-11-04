@@ -42,7 +42,11 @@ ALLOWED_FILE = re.compile(
     r"wheels/[A-Za-z0-9][A-Za-z0-9._+-]{0,200}\.whl)"
 )
 PRIVATE_VALUE = re.compile(r"[A-Za-z]:[\\/]|\\\\|/(?:Users|private|tmp|home)/|https?://")
-DOCS = ("docs/WINDOWS-PREVIEW.md", "docs/WINDOWS-DEVELOPMENT-20261103.md")
+DOCS = (
+    "docs/WINDOWS-PREVIEW.md",
+    "docs/WINDOWS-DEVELOPMENT-20261103.md",
+    "docs/WINDOWS-DESKTOP-20261104.md",
+)
 # Python.org release reference supplied/verified during the frozen staging run.
 # The x64 installer has a bootstrapper, so its outer PE machine alone is not an
 # adequate architecture attestation. Anchor the complete vendor installer bytes.
