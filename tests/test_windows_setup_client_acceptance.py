@@ -33,7 +33,7 @@ def test_native_check_only_uses_four_readonly_commands_and_redacts_diagnostics(
         calls.append(arguments)
         assert env[HELPER.client.AUTH_ENV] == "Bearer " + TOKEN
         if name == "version":
-            return 0, b"v0.0.19\n", b""
+            return 0, (HELPER.EXPECTED_VERSION_OUTPUT + "\n").encode(), b""
         if name == "quickstart":
             return 0, b"tunnel-client init run", b""
         if name == "parser":
@@ -98,3 +98,32 @@ def test_cli_timeout_preserves_original_child_and_does_not_kill_or_replay(tmp_pa
         HELPER._run(tmp_path / "unused.exe", ["--version"], {}, tmp_path, "fixture")
     assert error.value.code == "setup_client_native_unknown" and len(calls) == 1
     assert (tmp_path / "fixture-attempt.json").exists()
+
+
+@pytest.mark.parametrize(
+    "output",
+    [
+        "0.0.19",
+        "v0.0.19",
+        "0.0.19+" + "f" * 40 + " (git sha: " + "f" * 40 + ")",
+        HELPER.EXPECTED_VERSION_OUTPUT + " unexpected",
+    ],
+)
+def test_native_version_guard_rejects_unpinned_or_truncated_cli_identity(
+    tmp_path, monkeypatch, output
+):
+    binary = tmp_path / "official.exe"
+    monkeypatch.setattr(HELPER.client, "windows", lambda: None)
+    monkeypatch.setattr(HELPER.client, "find_client", lambda _: binary)
+    calls = []
+
+    def run(program, arguments, env, folder, name):
+        calls.append(arguments)
+        assert name == "version"
+        return 0, (output + "\n").encode(), b""
+
+    monkeypatch.setattr(HELPER, "_run", run)
+    with pytest.raises(BridgeError) as error:
+        HELPER.verify_client(binary, tmp_path, "http://127.0.0.1:8768/mcp", TOKEN)
+    assert error.value.code == "setup_client_native_version"
+    assert calls == [["--version"]]

@@ -23,6 +23,7 @@ from kirabridge.private_files import write_private
 from kirabridge.windows_setup_runtime import process_identity
 
 MAX_OUTPUT = 65536
+EXPECTED_VERSION_OUTPUT = f"0.0.19+{client.SOURCE_COMMIT} (git sha: {client.SOURCE_COMMIT})"
 REQUIRED_DOCTOR = {
     "config_source",
     "profile_load",
@@ -126,7 +127,7 @@ def verify_client(binary, state_dir, endpoint, bearer_token) -> dict:
     value = client.profile_value(state, "tunnel_" + "a" * 32, key, endpoint)
     write_private(profile, json.dumps(value, sort_keys=True))
     code, version, _ = _run(binary, ["--version"], env, folder, "version")
-    if code != 0 or version.decode("utf-8").strip() not in {"0.0.19", "v0.0.19"}:
+    if code != 0 or version.decode("utf-8").strip() != EXPECTED_VERSION_OUTPUT:
         raise failed("setup_client_native_version")
     code, help_text, _ = _run(binary, ["help", "quickstart"], env, folder, "quickstart")
     if code != 0 or any(
