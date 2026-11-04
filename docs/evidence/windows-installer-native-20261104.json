@@ -231,5 +231,12 @@
     "owned_host_helpers": "all eight task-owned staging/artifact servers terminated after command identity checks; independent PID absence confirmed"
   },
   "raw_logs_tokens_credentials_and_user_paths": "retained privately; excluded from this curated report",
-  "no_hosted_ci_or_arm_build_requested": true
+  "no_hosted_ci_or_arm_build_requested": true,
+  "publication": {
+    "download_url": "https://github.com/landjunge/KiraBridge/releases/download/v0.8.0rc33/KiraBridge-0.8.0rc33-Windows-x64-Setup.exe",
+    "downloaded_again_sha256_verified": true,
+    "preexisting_release_assets_unchanged": 11,
+    "installer_source_commit": "41fc3cbe429792c2b0358f1b560e69fc54087302",
+    "existing_prerelease": "v0.8.0rc33"
+  }
 }

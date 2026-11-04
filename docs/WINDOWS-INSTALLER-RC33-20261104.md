@@ -1,6 +1,6 @@
 # Windows RC33 installer work journal — 2026-11-04
 
-Final status: exact offline Setup.exe built and locally accepted on Windows 11 x64 through the composite evidence below. First install, reinstall, version guards, runtime/authentication, rollback, configuration UI and final uninstall/data retention are evidenced. The three old instances are unchanged. No main merge or release publication. See [native acceptance](reviews/windows-installer-native-20261104.md) and [structured evidence](evidence/windows-installer-native-20261104.json).
+Final status: exact offline Setup.exe built and locally accepted on Windows 11 x64 through the composite evidence below. First install, reinstall, version guards, runtime/authentication, rollback, configuration UI and final uninstall/data retention are evidenced. The three old instances are unchanged. No main merge. The accepted Setup is now a downloadable RC33 release asset. See [native acceptance](reviews/windows-installer-native-20261104.md) and [structured evidence](evidence/windows-installer-native-20261104.json).
 
 ## Scope and isolation
 
@@ -244,3 +244,7 @@ Final independent read-only receipt SHA256 `fe42a6b1fb77e7397b6be55503d3172b1c70
 Settings form displayed correct endpoint/port/data folder and cancelled normally. Earlier failed receipts remain failed; native acceptance is composite. Test infrastructure corrections include the ignored group override, SQLite connection/WAL baseline and stdout/Inno log collision; product bytes remained unchanged.
 
 Own guest test tab closed from its confirmed idle prompt, independently observed absent with original tab preserved. All eight own host helpers stopped and independently absent. VM remains running; no productive deployment, macOS modification, hosted CI or ARM build.
+
+## Download publication verified
+
+At the explicit request for a downloadable file, added the exact accepted Setup, its separately named checksum and curated Windows acceptance evidence to the existing RC33 prerelease. Direct [Windows Setup download](https://github.com/landjunge/KiraBridge/releases/download/v0.8.0rc33/KiraBridge-0.8.0rc33-Windows-x64-Setup.exe). Fresh authenticated download is 25,018,593 bytes and SHA256 `41203ce70d31795d7dc1ace80a40a462f5f834c7fea02165544cc3c7f7e83d91`. All eleven pre-existing release assets retain identical IDs, sizes, digests, URLs and updated timestamps. No replacement, new tag, main merge, hosted CI or ARM build. Installer source is committed/pushed as `41fc3cbe429792c2b0358f1b560e69fc54087302`.
