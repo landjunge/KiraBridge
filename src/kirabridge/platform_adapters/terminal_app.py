@@ -472,36 +472,12 @@ class TerminalAppTransport:
         # This is only the fresh-echo check. Codex's caller separately verifies
         # the WHOLE current widget and pinned footer before Return. Use complete
         # forward-rendered payloads, never a word from old output or chrome.
-        if target == "codex":
-            from kirabridge.literal_session_input import codex_payload_forms, codex_wrap_words
+        from kirabridge.cli_adapters import adapter_for
 
-            return (
-                "\nfunction observedPaste(before, after, columns) {"
-                "if(before===after) return false;"
-                "const prompts=Array.from(after.matchAll(/^[ \\t]*›[^\\n]*/gm));"
-                "if(!prompts.length) return false;"
-                "const current=after.slice(prompts[prompts.length-1].index)"
-                ".replace(/^[ \\t]*› ?/,'');"
-                "const forms="
-                + json.dumps(codex_payload_forms(text))
-                + "; const lines="
-                + json.dumps(codex_wrap_words(text))
-                + ";"
-                "if(lines && Number.isInteger(columns) && columns>=20 && columns<=4096) {"
-                "for(const width of [columns-3,columns-4]) {"
-                "if(lines.some(words=>words.some(word=>word.length>=width))) continue;"
-                "let rows=[], wrapped=false;"
-                "for(const words of lines) { let logical=words.length?[words[0]]:[''];"
-                "for(const word of words.slice(1)) {"
-                "if(logical[logical.length-1].length+1+word.length<=width)"
-                "logical[logical.length-1]+=' '+word;"
-                "else {logical.push(word); wrapped=true;} } rows=rows.concat(logical); }"
-                "if(wrapped) { forms.push(rows.join('\\n  '));"
-                "if(rows.slice(1).includes('')) forms.push(rows[0]+rows.slice(1)"
-                ".map(row=>row?'\\n  '+row:'\\n ').join('')); } } }"
-                "return forms.some(form=>current.startsWith(form) && "
-                "(current.length===form.length || current[form.length]==='\\n'));}\n"
-            )
+        specification = adapter_for(target).paste_source(text)
+        if specification is not None:
+            return specification
+
         return (
             "\nfunction observedPaste(before, after) {"
             "const a=Array.from(before), b=Array.from(after); "
@@ -1130,13 +1106,29 @@ entries[0].click();JSON.stringify({detached:true});
     async def press_return(
         self, pane_id, *, identity_guard=None, expected_screen=None, shell_snapshot=None
     ):
+        return await self.press_key(
+            pane_id,
+            "enter",
+            identity_guard=identity_guard,
+            expected_screen=expected_screen,
+            shell_snapshot=shell_snapshot,
+        )
+
+    async def press_key(
+        self, pane_id, key, *, identity_guard=None, expected_screen=None, shell_snapshot=None
+    ):
+        if key not in {"enter", "escape"}:
+            raise BridgeError("invalid_arguments", "Unsupported bound terminal key")
+        code = {"enter": 36, "escape": 53}[key]
         await self.native(
             self.native_focus(pane_id)
             + self.native_identity_guard(identity_guard)
             + (self.native_shell_guard(shell_snapshot) if shell_snapshot is not None else "")
             + "\ncheckFocus();"
             + self.native_screen_guard(expected_screen)
-            + "\nse.keyCode(36); JSON.stringify({return_sent:true});",
+            + "\nse.keyCode("
+            + str(code)
+            + "); JSON.stringify({key_sent:true});",
             mutation=True,
         )
 

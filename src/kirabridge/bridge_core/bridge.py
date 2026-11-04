@@ -748,7 +748,7 @@ class Bridge:
                 },
             }
         if operation == "session.input":
-            if args.key == "enter":
+            if args.key is not None:
                 from kirabridge.session_return import execute
 
                 return await execute(self, task, args, running, progress)

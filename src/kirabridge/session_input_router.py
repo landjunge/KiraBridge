@@ -4,7 +4,7 @@ from kirabridge.slash_commands import command_name
 
 
 def input_kind(args):
-    if args.key == "enter":
+    if args.key is not None:
         return "observed_return"
     return "slash_command" if command_name(args.text) is not None else "literal_text"
 

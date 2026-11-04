@@ -100,6 +100,10 @@ written permission. The German license text governs.
 
 [Developer documentation](docs/DEVELOPERS.md)
 
+Local CLI-module candidate: [Terminal/Codex/Grok adapter boundaries and test limits](docs/plans/TERMINAL-CLI-MODULES-20261104.md).
+This development package is separate from the published RC36 download and still
+requires real browserchat acceptance.
+
 [Earlier Windows preview dev2](https://github.com/landjunge/KiraBridge/releases/tag/windows-v0.8.0rc31.dev2):
 native keyboard and local MCP acceptance passed in a dedicated Windows 11 VM.
 [Results and limits](docs/WINDOWS-DEVELOPMENT-20261103.md); macOS stays separate.

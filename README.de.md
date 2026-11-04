@@ -103,6 +103,10 @@ benötigt eine gesonderte schriftliche Erlaubnis. Der deutsche Lizenztext ist ma
 
 [Entwicklerdokumentation](docs/DEVELOPERS.de.md)
 
+Lokaler CLI-Modulkandidat: [Terminal-/Codex-/Grok-Grenzen und Prüfgrenzen](docs/plans/TERMINAL-CLI-MODULES-20261104.md).
+Dieses Entwicklungspaket ist vom veröffentlichten RC36-Download getrennt; die
+echte Browserchat-Abnahme steht noch aus.
+
 [Frühere Windows-Vorschau dev2](https://github.com/landjunge/KiraBridge/releases/tag/windows-v0.8.0rc31.dev2):
 Native Tastatur und lokales MCP haben die Abnahme in einer eigenen Windows 11-VM bestanden.
 [Ergebnisse und Grenzen](docs/WINDOWS-DEVELOPMENT-20261103.md); macOS bleibt getrennt.
