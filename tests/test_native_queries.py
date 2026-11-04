@@ -232,9 +232,10 @@ async def test_oversized_read_is_explicit_and_does_not_create_task(bridge):
     no_tasks(bridge)
 
 
-async def test_native_capability_unavailable_never_dispatches(bridge):
+@pytest.mark.parametrize("host_platform", ["linux", "win32"])
+async def test_native_capability_unavailable_never_dispatches(bridge, host_platform):
     fixture = native(bridge)
-    bridge.macos.capability_probe.facts.update(platform="linux")
+    bridge.macos.capability_probe.facts.update(platform=host_platform)
     with pytest.raises(BridgeError) as caught:
         await read_query_async(bridge, "local", query())
     assert caught.value.code == "macos_capability_unavailable" and not fixture.calls

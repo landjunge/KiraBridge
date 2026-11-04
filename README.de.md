@@ -23,6 +23,11 @@ Arbeit an diese Terminalagenten weiter und verfolge ihre Antworten — mit den v
 Für die Downloads brauchst du ein GitHub-Konto mit Zugriff auf dieses private Repository.
 Dies ist eine Vorabversion; eine stabile Version gibt es noch nicht. RC32 ist für Intel-Macs verfügbar.
 
+Dieser Branch vereint macOS RC31/RC32 und Windows dev3 als **0.8.0rc33.dev1**,
+einen unveröffentlichten Integrationsstand der Quellen. Die Downloads oben und
+Windows-Links unten bleiben die getrennt geprüften Releases. Vor Paketbau oder
+Installation gelten die [Integrationsbelege und Plattformgrenzen](docs/INTEGRATION-DEV3-RC32-20261104.md).
+
 ## Wobei KiraBridge dir hilft
 
 - **An lokalen Projekten arbeiten:** Lass deine verbundene KI Projektdateien und
@@ -97,3 +102,13 @@ Private, nicht geschäftliche Nutzung ist unter der
 benötigt eine gesonderte schriftliche Erlaubnis. Der deutsche Lizenztext ist maßgeblich.
 
 [Entwicklerdokumentation](docs/DEVELOPERS.de.md)
+
+[Windows-Vorschau dev2](https://github.com/landjunge/KiraBridge/releases/tag/windows-v0.8.0rc31.dev2):
+Native Tastatur und lokales MCP haben die Abnahme in einer eigenen Windows 11-VM bestanden.
+[Ergebnisse und Grenzen](docs/WINDOWS-DEVELOPMENT-20261103.md); macOS bleibt getrennt.
+
+[Windows-Desktop-Vorschau dev3](https://github.com/landjunge/KiraBridge/releases/tag/windows-v0.8.0rc31.dev3): Alle sechs nativen
+Gastprüfungen bestanden, einschließlich Ctrl-/Alt-/Shift-Kombinationen und
+abgesicherter Fenstersteuerung. Veröffentlichte Downloads und die getrennte
+Windows 11-Installation sind geprüft. [Belege und Grenzen](docs/WINDOWS-DESKTOP-20261104.md);
+dev2 bleibt als Rückfallmöglichkeit erhalten.

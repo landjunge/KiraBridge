@@ -23,6 +23,11 @@ agents and follow their replies while choosing what they may access.
 Downloads require a GitHub account with access to this private repository.
 This is a preview; there is no stable release yet. RC32 is available for Intel Macs.
 
+This branch combines macOS RC31/RC32 and Windows dev3 as **0.8.0rc33.dev1**,
+an unpublished source integration. The downloads above and Windows links below
+remain their separately verified releases. See the [integration evidence and
+platform limits](docs/INTEGRATION-DEV3-RC32-20261104.md) before packaging or installation.
+
 ## What KiraBridge helps you do
 
 - **Work on local projects:** let your connected AI read project files and logs,
@@ -94,3 +99,12 @@ Private, non-business use is free under the
 written permission. The German license text governs.
 
 [Developer documentation](docs/DEVELOPERS.md)
+
+[Windows preview dev2](https://github.com/landjunge/KiraBridge/releases/tag/windows-v0.8.0rc31.dev2):
+native keyboard and local MCP acceptance passed in a dedicated Windows 11 VM.
+[Results and limits](docs/WINDOWS-DEVELOPMENT-20261103.md); macOS stays separate.
+
+[Windows desktop preview dev3](https://github.com/landjunge/KiraBridge/releases/tag/windows-v0.8.0rc31.dev3): all six native
+guest phases passed, including Ctrl/Alt/Shift shortcuts and guarded window control.
+Published downloads and the separate Windows 11 installation were verified.
+[Evidence and limits](docs/WINDOWS-DESKTOP-20261104.md); dev2 remains available for rollback.

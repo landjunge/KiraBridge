@@ -1,0 +1,42 @@
+{
+  "scope": "Actual first Windows11 guest installation; no KiraBridge guest tests ran",
+  "vm_uuid": "5F4A0DE9-40F6-42F4-9225-2B8FB530DF2B",
+  "provisioning_source_commit": "b96f5c79f1df92d6dcba36df6c6fe7fd9712ff61",
+  "observed_failure": "oobeSystem Windows-Shell-Setup FirstLogonCommands SynchronousCommand CommandLine value invalid",
+  "error_codes": [
+    "0x80220005",
+    "0x8030000C"
+  ],
+  "generated_command_characters": 1454,
+  "documented_maximum_characters": 1024,
+  "command_value_utf16_bytes_logged": 2910,
+  "diagnostic_log": {
+    "file": "Windows/Panther/UnattendGC/setuperr.log",
+    "bytes": 2081,
+    "selected": [
+      "2026-11-03 19:43:04, Error                 CSI    00000001 (F) 80220005 [Error,Facility=FACILITY_STATE_MANAGEMENT,Code=5] #137# from CWcmScalarInstanceCore::PutCurrentValue(options = 0, value = { type: 8204, bytes ( 2910 ): 70006f007700650072007300680065006c006c002e0065007800650020002d004e006f00500072006f00660069006c00650020002d0045007800650063007500740069006f006e0050006f006c00690063007900200042007900700061007300730020002d0045006e0063006f0064006500640043006f006d006d0061006e00... })",
+      "[gle=0x80004005]",
+      "2026-11-03 19:43:04, Error                        [oobeldr.exe] SMI data results dump: Source = Name: Microsoft-Windows-Shell-Setup, Language: neutral, ProcessorArchitecture: amd64, PublicKeyToken: 31bf3856ad364e35, VersionScope: nonSxS, /settings/FirstLogonCommands/SynchronousCommand/[Order=\"1\"]/CommandLine",
+      "2026-11-03 19:43:04, Error                        [oobeldr.exe] SMI data results dump: Description = Der Wert ist ung\ufffdltig.",
+      "2026-11-03 19:43:04, Error                        [oobeldr.exe] User input error was detected in unattend file. Error: [0x0]",
+      "\ufeff2026-11-03 19:43:04, Error                        [windeploy.exe] Command [%windir%\\system32\\oobe\\oobeldr.exe /system /quiet] failed with exit code [0x80220005]",
+      "2026-11-03 19:43:04, Error                        [windeploy.exe] Failure occured during online installation; cannot complete at this time [0x80220005]",
+      "2026-11-03 19:43:27, Error                        [oobeldr.exe] Pass has failed status; system is in an invalid state.",
+      "2026-11-03 19:43:27, Error                        [oobeldr.exe] Failed to complete RunSMIPass for oobeSystem.  Error: [0x8030000C]",
+      "2026-11-03 19:43:27, Error                        [oobeldr.exe] There was an error while processing oobeSystem. Error: [0x8030000C]",
+      "2026-11-03 19:45:13, Error                        [windeploy.exe] Command [%windir%\\system32\\oobe\\oobeldr.exe /system] failed with exit code [0x8030000c]",
+      "2026-11-03 19:45:13, Error                        [windeploy.exe] Failure occured during online installation; cannot complete at this time [0x8030000C]"
+    ]
+  },
+  "diagnostic_mount_read_only": true,
+  "not_a_windows_keyboard_backend_failure": true,
+  "native_keyboard_acceptance_run": false,
+  "reference": "https://learn.microsoft.com/en-us/windows-hardware/customize/desktop/unattend/microsoft-windows-shell-setup-firstlogoncommands-synchronouscommand-commandline",
+  "failed_vm_temporarily_paused_for_readonly_diagnosis": true,
+  "disk_cloned": true,
+  "ram_snapshot_supported": false,
+  "ram_snapshot_error": "UTM HVF: Suspend is not supported for virtualization",
+  "failed_vm_stopped_after_diagnosis": true,
+  "fixed_command_characters": 426,
+  "fixed_launcher_delegates_to_utf8_bom_seed_file": "first-logon.ps1"
+}
