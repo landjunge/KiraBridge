@@ -11,7 +11,7 @@
     "tk": "9.0.4"
   },
   "scope": "Fresh local native acceptance; no ChatGPT account, cloud or Voice acceptance",
-  "release_status": "candidate_publication_and_installation_in_progress",
+  "release_status": "published_and_separately_installed",
   "candidate": {
     "python_modules": 179,
     "wheel_sha256": "faa2d7cbad3f99881080b4291e94f2d77008e6d36642fbdcb56dd17b7dc11366",
@@ -166,6 +166,7 @@
     "Local simulated round trip is not a completed ChatGPT setup",
     "Full doctor did not pass: oauth_metadata FAIL; codex_plugin SKIP",
     "No account permissions or cloud/Voice latency measured",
-    "No published download or retained installation asserted by this candidate receipt"
-  ]
+    "Published download and retained setup UI installation are documented in the separate installed receipt"
+  ],
+  "installed_evidence": "windows-setup-installed-20261104.json"
 }

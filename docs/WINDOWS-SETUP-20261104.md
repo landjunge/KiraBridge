@@ -1,9 +1,10 @@
 # Windows-Einrichtungsassistent: Prüfung vom 4. November 2026
 
-**0.8.0rc37.dev1 ist als Windows-Kandidat lokal geprüft. Veröffentlichung,
-Downloadprüfung und getrennte Installation sind noch in Arbeit.** Der vorhandene
-macOS-Release RC36 bleibt davon getrennt. Diese Seite bestätigt noch keine
-veröffentlichte oder dauerhaft laufende neue Installation.
+**0.8.0rc37.dev1 ist als Windows-Vorabversion veröffentlicht, frisch heruntergeladen
+und getrennt installiert.** Alle sieben nativen Prüfphasen bestanden. Der sichtbare
+Assistent wurde mit der neuen installierten Version abgeglichen. Anmeldung und
+der echte ChatGPT-Verbindungstest bleiben für den Nutzer offen. Der vorhandene
+macOS-Release RC36 bleibt davon getrennt.
 
 Der neue Assistent führt in vier verständlichen Schritten durch den Windows-Start,
 die Vorbereitung der Verbindung, das Hinzufügen in ChatGPT und einen frischen
@@ -75,9 +76,9 @@ Originalberichte bleiben für die spätere Prüfung erhalten.
 
 Der zusätzliche Vorher-/Nachher-Bericht bestätigt unveränderte Modulbytes,
 Zugangsdaten, Starter, Prozessgenerationen und Listener der vorhandenen
-dev2-/dev3-/RC33-Installationen auf **8765, 8766 und 8767**. Der Assistent nutzt
-später einen eigenen Zustand und standardmäßig **8768**; die Abnahme verwendete
-einen eigenen freien Port. Sie ersetzt keinen Installationsnachweis.
+dev2-/dev3-/RC33-Installationen auf **8765, 8766 und 8767**. Der Assistent verwendet
+einen eigenen Zustand und standardmäßig **8768**; die native Abnahme verwendete
+einen eigenen freien Port. Die spätere Installation ist unten getrennt belegt.
 
 ## Frühere Versuche und Korrekturen
 
@@ -103,7 +104,44 @@ Vor dieser Abnahme bestanden außerdem **370 gezielte lokale Prüfungen** sowie
 die vorgesehenen Ruff-, Format-, Lock- und Diffprüfungen. Lokale Hosttests ersetzen
 keine native Abnahme; die sieben Gastphasen sind getrennte Nachweise.
 
-## Grenzen und Auslieferung
+## Veröffentlichtes Paket und getrennte Installation
+
+Das [Windows-Release 0.8.0rc37.dev1](https://github.com/landjunge/KiraBridge/releases/tag/windows-v0.8.0rc37.dev1)
+wurde am **2026-11-04 um 20:36:17 UTC** als Vorabversion veröffentlicht.
+Sein unveränderter Quellpin ist
+`0a2f7cb8cf84d47462a094917241950a152fe364`. Alle fünf Assets wurden frisch und
+authentifiziert heruntergeladen; Bytes und SHA256 stimmen mit den lokal
+geprüften Dateien und den GitHub-Digests überein. Das Dev-Kit-ZIP umfasst
+**83.879.137 Bytes**, SHA256
+`a21a214c77d21fec0e11a166147fc14dcb1d6dd88adc0fb2d45501ec8748772f`.
+Die [bereinigte Installationszusammenfassung](evidence/windows-setup-installed-20261104.json)
+verknüpft Download und Installation mit den Originalberichten.
+
+Die veröffentlichte Vorbereitung endete mit Exitcode 0. Alle **179** installierten
+Python-Moduldateien entsprachen bytegenau dem veröffentlichten Wheel; dessen
+SHA256 lautet
+`faa2d7cbad3f99881080b4291e94f2d77008e6d36642fbdcb56dd17b7dc11366`.
+Die neue getrennte Laufzeit nutzt Python 3.14.10 mit Tk. Der bestehende
+Basisinterpreter wurde wiederverwendet; kein neuer Python-Installer wurde
+gestartet. Auch der private gebündelte Client-Cache war korrekt.
+
+Der Installationsbeleg ordnet die sichtbare Tk-GUI eindeutig der neuen Laufzeit
+zu: PID **14264**, Erstellung `134382990217543018` in Windows-FILETIME,
+HWND `3474370`. Der tatsächliche Windows-Prozess ist der Basis-`pythonw.exe`;
+seine Argumente binden ihn an die neue Runtime. Der lebende Runtime-Redirector
+als Elternprozess wurde separat nach PID, Erstellungszeit und Elternbeziehung
+bestätigt. Das belegt mehr als einen passenden Fenstertitel. Das Fenster wurde
+bei dieser Beobachtung geöffnet belassen; daraus folgt keine Zusage für seine
+zukünftige Laufzeit.
+
+Der Desktop-Starter heißt **KiraBridge einrichten.cmd**. In dieser Installation
+wurde die Zustimmung nicht angeklickt, Bridge auf Port 8768 nicht automatisch
+gestartet und kein Konto eingerichtet. Die vorhandenen dev2-, dev3- und
+RC33-Module, Zugangsdaten, Starter, Prozessgenerationen und Listener waren vor
+und nach der Installation unverändert. Der Assistent richtet keinen Windows-Dienst
+oder Autostart ein und ändert keine Systemrechte.
+
+## Was noch beim Nutzer liegt
 
 Die Messungen und Rückwege dieses Laufs sind **lokal in der VM**. Sie belegen
 keine ChatGPT-/Voice-Latenz und keinen Ende-zu-Ende-Aufruf über die Cloud. Ein
@@ -111,11 +149,9 @@ echter ChatGPT-Prüfauftrag mit eigenem Konto bleibt offen. Auch dessen spätere
 Antwortcode ist eine Bestätigung des vom Nutzer durchlaufenen Rückwegs, keine
 kryptographische Cloud-Herkunftsbestätigung.
 
-Veröffentlichung, frischer Paketdownload und neue sichtbare Installation stehen
-für diesen Bericht noch aus. Der Kandidat umfasst 179 Python-Module; das
-geprüfte Wheel hat SHA256
-`faa2d7cbad3f99881080b4291e94f2d77008e6d36642fbdcb56dd17b7dc11366`.
-Nur der abschließend dokumentierte veröffentlichte Download kann die
-Verfügbarkeit belegen. Ein Windows-Dienst, automatische Anmeldung oder Änderungen
-an Systemrechten sind nicht Teil des Assistenten. Allgemeine Windows-Datei-,
-Prozess- und Terminalwerkzeuge bleiben außerhalb dieser Vorschau.
+Öffne den Assistenten, bestätige den gewünschten Zugriff und folge den vier
+Schritten. Kontoanmeldung, eigener Windows-Tunnel und Runtime-Schlüssel bleiben
+bei dir. Gib den Schlüssel nur im verdeckten Feld ein. Erst ein frischer
+Antwortcode aus deinem tatsächlichen ChatGPT-Prüfauftrag bestätigt diesen
+Verbindungsweg. Allgemeine Windows-Datei-, Prozess- und Terminalwerkzeuge
+bleiben außerhalb dieser Vorschau.

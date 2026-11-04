@@ -28,10 +28,12 @@ with native keyboard, shortcuts and guarded window control. It is a separate
 development kit; general Windows file, process and terminal tools remain outside
 its scope. See [RC33 package checks, installation status and limits](docs/RC33-DELIVERY-20261104.md).
 
-The new **Windows setup wizard 0.8.0rc37.dev1** candidate passed all seven local
-Windows acceptance phases; publication and separate installation are in progress.
-It guides setup in four steps. A real ChatGPT connection test using the owner's
-account remains open. [Evidence and limits](docs/WINDOWS-SETUP-20261104.md) ·
+The new [Windows setup wizard 0.8.0rc37.dev1](https://github.com/landjunge/KiraBridge/releases/tag/windows-v0.8.0rc37.dev1)
+is published; its download and separate Windows installation are verified.
+All seven native phases passed. Extract the package and open
+**Einrichtung-starten.cmd** for four guided steps. Account sign-in and a real
+ChatGPT connection test with your account remain yours to complete.
+[Evidence and limits](docs/WINDOWS-SETUP-20261104.md) ·
 [Setup guide, German](docs/WINDOWS-SETUP.md).
 
 ## What KiraBridge helps you do
