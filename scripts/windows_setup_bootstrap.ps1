@@ -109,13 +109,23 @@ try {
             if ($directory) { $Candidates+=Join-Path $directory 'python.exe' }
         }
     }
+    $PythonFound=$false
     foreach ($Candidate in $Candidates) {
         if (Test-Path -LiteralPath $Candidate -PathType Leaf) {
             No-Reparse $Candidate
-            & $Candidate -I -B -c 'import sys,struct,tkinter,venv; assert sys.version_info[:3]==(3,14,10) and struct.calcsize(''P'')==8' 2>$null
-            if ($LASTEXITCODE -eq 0) { $Python=$Candidate; break }
+            $PreviousPreference=$ErrorActionPreference
+            try {
+                # Windows PowerShell 5.1 applies ErrorActionPreference to
+                # redirected native stderr. An incompatible candidate is an
+                # expected read-only probe, not a failure of the whole setup.
+                $ErrorActionPreference='Continue'
+                & $Candidate -I -B -c 'import sys,struct,tkinter,venv; assert sys.version_info[:3]==(3,14,10) and struct.calcsize(''P'')==8' 2>$null
+                $ProbeExit=$LASTEXITCODE
+            } finally { $ErrorActionPreference=$PreviousPreference }
+            if ($ProbeExit -eq 0) { $Python=$Candidate; $PythonFound=$true; break }
         }
     }
+    if (-not $PythonFound -and (Test-Path -LiteralPath $Python)) { throw 'existing_python' }
     if (-not (Test-Path -LiteralPath $Python)) {
         if ($Registered) { throw 'existing_python' }
         if (Test-Path -LiteralPath ([IO.Path]::GetDirectoryName($Python))) {
@@ -137,7 +147,7 @@ try {
         $process.WaitForExit()
         if ($process.ExitCode -ne 0) { throw 'python_install_failed' }
     }
-    Run-Python $Python @('-c', 'import sys,tkinter,venv; assert sys.version_info[:3]==(3,14,10)')
+    Run-Python $Python @('-c', 'import sys,struct,tkinter,venv; assert sys.version_info[:3]==(3,14,10) and struct.calcsize(''P'')==8')
     Write-Host '3/4: KiraBridge ohne weitere Downloads installieren ...'
     $Marker=Join-Path $InstallRoot 'installed.json'
     if (Test-Path -LiteralPath $Runtime) {
