@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Package a frozen Windows preview only after four matching native reports.
+"""Package a frozen Windows preview only after six matching native reports.
 
 Default is validation/plan only; --build writes one new output directory.
 No Windows tests, VM actions, downloads, publication or production installation
@@ -20,14 +20,22 @@ import zipfile
 from email.parser import BytesParser
 from pathlib import Path
 
-VERSION = "0.8.0rc31.dev2"
+VERSION = "0.8.0rc31.dev3"
 ASSET = f"KiraBridge-{VERSION}-Windows-Dev-Kit.zip"
-PHASES = ("core", "keyboard", "mcp", "preview")
+PHASES = ("core", "keyboard", "mcp", "preview", "shortcuts", "windows")
 REUSED_PHASES = ("core", "keyboard", "mcp")
+FRESH_PHASES = ("preview", "shortcuts", "windows")
+RUNTIME_MODULE_COUNT = 173
 REUSED_HARNESSES = (
     "tests/test_windows_core_native.py",
     "scripts/accept_windows_keyboard.py",
     "scripts/accept_windows_mcp.py",
+)
+REQUIRED_HARNESSES = (
+    *REUSED_HARNESSES,
+    "scripts/accept_windows_preview.py",
+    "scripts/accept_windows_shortcuts.py",
+    "scripts/accept_windows_windows.py",
 )
 ALLOWED_FILE = re.compile(
     r"(?:source\.zip|python-installer\.exe|guest_runner\.ps1|"
@@ -83,9 +91,9 @@ def no_failure(report):
         return False
     if any(report.get(key) for key in ("error", "error_type", "provider_error", "unknown")):
         return False
-    return report.get("status") in (None, "passed", "completed", "success") and report.get(
-        "state"
-    ) not in ("started", "unknown", "failed", "error")
+    return all(
+        report.get(key) in (None, "passed", "completed", "success") for key in ("status", "state")
+    )
 
 
 def sanitize(value, key=""):
@@ -111,7 +119,7 @@ def verified_reports(directory: Path, manifest_hash: str, phases=PHASES, *, igno
     reports, run_ids = {}, set()
     ignored_preview = None
     for path in sorted(directory.glob("report-*.json")):
-        match = re.fullmatch(r"report-([a-f0-9]{32})-(core|keyboard|mcp|preview)\.json", path.name)
+        match = re.fullmatch(r"report-([a-f0-9]{32})-(" + "|".join(PHASES) + r")\.json", path.name)
         if not match:
             raise ValueError("Unexpected guest report filename")
         run_id, phase = match.groups()
@@ -180,7 +188,7 @@ def verified_reports(directory: Path, manifest_hash: str, phases=PHASES, *, igno
         run_ids.add(run_id)
     if set(reports) != set(phases) or len(run_ids) != 1:
         raise ValueError(
-            "Exactly four phases of one native guest run are required"
+            "Exactly six phases of one native guest run are required"
             if phases == PHASES
             else "Exactly the selected phases of one native guest run are required"
         )
@@ -279,6 +287,9 @@ def frozen_payload(staging: Path, source_commit: str | None = None):
     with zipfile.ZipFile(io.BytesIO(payload["source.zip"])) as archive:
         if archive.comment != manifest["source_commit"].encode("ascii"):
             raise ValueError("Source archive Git pin differs from native-tested commit")
+        files = source_files(payload["source.zip"])
+        if any(not files.get(name) for name in REQUIRED_HARNESSES):
+            raise ValueError("Source archive is missing a required native acceptance harness")
     return manifest, raw_manifest, payload, wheel_count
 
 
@@ -296,8 +307,10 @@ def runtime_modules(files, prefix):
         for name, data in files.items()
         if name.startswith(prefix) and name.endswith(".py")
     }
-    if len(result) != 171:
-        raise ValueError("Component reuse requires exactly 171 native-tested runtime modules")
+    if len(result) != RUNTIME_MODULE_COUNT:
+        raise ValueError(
+            f"Component reuse requires exactly {RUNTIME_MODULE_COUNT} native-tested runtime modules"
+        )
     return result
 
 
@@ -336,7 +349,7 @@ def reuse_components(current, previous):
     if runtime_modules(wheel_files, "kirabridge/") != modules:
         raise ValueError("Reused wheel runtime bytes differ from frozen source")
     return {
-        "runtime_module_count": 171,
+        "runtime_module_count": RUNTIME_MODULE_COUNT,
         "runtime_module_sha256": {name: digest(body) for name, body in sorted(modules.items())},
         "reused_harness_sha256": {name: digest(files[name]) for name in REUSED_HARNESSES},
         "bootstrap_runner_sha256": digest(payload["guest_runner.ps1"]),
@@ -367,11 +380,11 @@ def prepare(
     else:
         previous = frozen_payload(reuse_staging)
         old_manifest, old_raw, _, _ = previous
-        # Establish byte provenance BEFORE treating any four phases as accepted.
+        # Establish byte provenance BEFORE accepting any reused native phase.
         basis = reuse_components(current, previous)
         old_hash = digest(old_raw)
         old_proofs = verified_reports(reuse_reports, old_hash, REUSED_PHASES, ignore_preview=True)
-        new_proofs = verified_reports(reports, current_hash, ("preview",))
+        new_proofs = verified_reports(reports, current_hash, FRESH_PHASES)
         for phase in old_proofs["phases"]:
             if phase["phase"] != "core" and not re.fullmatch(
                 r"[a-f0-9]{64}", phase.get("raw_artifact_sha256") or ""
@@ -383,7 +396,10 @@ def prepare(
                 reused=True,
             )
         for phase in new_proofs["phases"]:
-            if phase["artifact"].get("keyboard_events_requested") != 0:
+            if (
+                phase["phase"] == "preview"
+                and phase["artifact"].get("keyboard_events_requested") != 0
+            ):
                 raise ValueError("Fresh preview must be read-only with zero requested keys")
             phase.update(
                 source_commit=source_commit, original_manifest_sha256=current_hash, reused=False
@@ -392,7 +408,10 @@ def prepare(
             "run_id": new_proofs["run_id"],
             "run_ids": sorted({old_proofs["run_id"], new_proofs["run_id"]}),
             "component_provenance_reuse": True,
-            "run_policy": "Three explicitly reused native phases; preview freshly executed",
+            "run_policy": (
+                "Three explicitly reused native phases; "
+                "preview, shortcuts and windows freshly executed"
+            ),
             "reuse_basis": {
                 **basis,
                 "original_source_commit": old_manifest["source_commit"],
@@ -421,6 +440,9 @@ def prepare(
         "supported_preview": [
             "Authenticated local MCP HTTP/stdio",
             "Guarded native keyboard tasks and sequences",
+            "Explicit Ctrl/Alt/Shift/Windows shortcuts with owned modifier release",
+            "Pinned native window listing, activation, geometry and window-state actions",
+            "Regular pinned window close requests without force termination",
             "Fresh target identity and durable no-replay receipts",
         ],
         "unsupported_preview": [
@@ -473,7 +495,10 @@ werden erst beim Start lokal angelegt; keine privaten Gast-/Mac-Zugaenge liegen 
 Details zur Verbindung und Bedienung stehen in docs/WINDOWS-PREVIEW.md.
 Das Paket installiert keinen Windows-Dienst und keinen Hintergrund-Autostart.
 
-Umfang: lokales authentifiziertes MCP sowie native Tastatur und Tastenfolgen.
+Umfang: lokales authentifiziertes MCP, native Tastatur und Tastenfolgen,
+explizite Ctrl-/Alt-/Shift-/Windows-Tastenkombinationen sowie Fenster auflisten,
+aktivieren, verschieben, Groesse aendern, minimieren, maximieren,
+wiederherstellen und regulaeres Schliessen anfordern. Keine Force-Kills.
 Datei-, allgemeine Prozess- und Terminalwerkzeuge sowie eine vollstaendige
 Windows-Bedienoberflaeche sind in dieser Vorschau noch nicht freigegeben.
 Nur im aktiven eigenen Windows-Desktop benutzen. Ungewisse Eingaben nicht

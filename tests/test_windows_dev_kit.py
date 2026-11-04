@@ -30,6 +30,8 @@ def fixture(tmp_path, monkeypatch):
         output.writestr("LICENSE", "Fixture license")
         for name in kit.DOCS:
             output.writestr(name, "Fixture public documentation")
+        for name in kit.REQUIRED_HARNESSES:
+            output.writestr(name, "# Synthetic guard fixture, never a native proof\n")
     files = {
         "source.zip": source.getvalue(),
         "python-installer.exe": b"NOT A REAL INSTALLER: unit guard fixture",
@@ -99,9 +101,10 @@ def modify_report(fixture, phase, fn):
     path.write_text(json.dumps(report))
 
 
-def test_missing_native_phase_blocks_before_any_archive(fixture, tmp_path):
-    (fixture[1] / f"report-{RUN_ID}-preview.json").unlink()
-    with pytest.raises(ValueError, match="four phases"):
+@pytest.mark.parametrize("phase", kit.PHASES)
+def test_missing_native_phase_blocks_before_any_archive(fixture, tmp_path, phase):
+    (fixture[1] / f"report-{RUN_ID}-{phase}.json").unlink()
+    with pytest.raises(ValueError, match="six phases"):
         kit.prepare(*fixture, PIN)
     assert not (tmp_path / "out").exists()
 
@@ -119,6 +122,35 @@ def test_missing_native_phase_blocks_before_any_archive(fixture, tmp_path):
 def test_failed_unknown_foreign_or_nonwindows_reports_block(fixture, change):
     modify_report(fixture, "keyboard", change)
     with pytest.raises(ValueError):
+        kit.prepare(*fixture, PIN)
+
+
+@pytest.mark.parametrize("phase", ["shortcuts", "windows"])
+@pytest.mark.parametrize(
+    "change",
+    [
+        lambda r: r.update(exit_code=1),
+        lambda r: r.update(status="unknown_or_failed_no_retry"),
+        lambda r: r.update(manifest_sha256="f" * 64),
+        lambda r: r["artifact"].pop("passed"),
+        lambda r: r["artifact"].update(passed=False),
+        lambda r: r["artifact"].update(passed=1),
+        lambda r: r["artifact"].update(unknown=True),
+        lambda r: r["artifact"].update(state="unknown"),
+        lambda r: r["artifact"].update(state="cancelled"),
+        lambda r: r["artifact"].update(error_type="UncertainExecution"),
+    ],
+)
+def test_new_phase_needs_explicit_true_and_no_failed_or_uncertain_report(fixture, phase, change):
+    modify_report(fixture, phase, change)
+    with pytest.raises(ValueError):
+        kit.prepare(*fixture, PIN)
+
+
+def test_previous_four_phase_proof_cannot_authorize_new_shortcuts_or_windows(fixture):
+    for phase in ("shortcuts", "windows"):
+        (fixture[1] / f"report-{RUN_ID}-{phase}.json").unlink()
+    with pytest.raises(ValueError, match="six phases"):
         kit.prepare(*fixture, PIN)
 
 
@@ -156,6 +188,9 @@ def test_archive_is_deterministic_and_contains_only_allowed_payloads_and_public_
     (fixture[0] / "Windows.iso").write_bytes(b"not a payload")
     contents, package = kit.prepare(*fixture, PIN)
     assert package["offline_wheels"] == 38
+    assert package["version"] == "0.8.0rc31.dev3"
+    assert package["native_guest_phases"] == list(kit.PHASES)
+    assert len(package["native_guest_phases"]) == 6
     first = kit.build(contents, package, tmp_path / "out1")
     second = kit.build(contents, package, tmp_path / "out2")
     assert first["asset_sha256"] == second["asset_sha256"]
@@ -207,7 +242,11 @@ def replace_source(stage, commit, changes):
     source = stage / "source.zip"
     with zipfile.ZipFile(source) as archive:
         files = {name: archive.read(name) for name in archive.namelist()}
-    files.update(changes)
+    for name, body in changes.items():
+        if body is None:
+            files.pop(name, None)
+        else:
+            files[name] = body
     output = io.BytesIO()
     with zipfile.ZipFile(output, "w") as archive:
         archive.comment = commit.encode()
@@ -223,12 +262,22 @@ def replace_source(stage, commit, changes):
     return kit.digest(raw)
 
 
+@pytest.mark.parametrize("harness", kit.REQUIRED_HARNESSES)
+def test_source_archive_must_include_each_required_native_harness(fixture, harness):
+    replace_source(fixture[0], PIN, {harness: None})
+    with pytest.raises(ValueError, match="required native acceptance harness"):
+        kit.prepare(*fixture, PIN)
+
+
 @pytest.fixture
 def reuse_fixture(fixture, tmp_path):
     import shutil
 
     current, original_reports = fixture
-    runtime = {f"src/kirabridge/module{i}.py": f"VALUE = {i}\n".encode() for i in range(171)}
+    runtime = {
+        f"src/kirabridge/module{i}.py": f"VALUE = {i}\n".encode()
+        for i in range(kit.RUNTIME_MODULE_COUNT)
+    }
     harnesses = {name: ("# synthetic " + name).encode() for name in kit.REUSED_HARNESSES}
     harnesses["scripts/windows_guest_runner.ps1"] = (current / "guest_runner.ps1").read_bytes()
     # A wheel/source comparison fixture is not an executable Windows package.
@@ -245,6 +294,11 @@ def reuse_fixture(fixture, tmp_path):
     shutil.copytree(original_reports, old_reports)
     for path in old_reports.glob("report-*.json"):
         report = json.loads(path.read_bytes())
+        if report["phase"] in ("shortcuts", "windows"):
+            # This synthetic original run stopped at preview; the later phases
+            # did not run and cannot supply either fresh required proof.
+            path.unlink()
+            continue
         report["manifest_sha256"] = old_hash
         if report["phase"] != "core":
             report["artifact_sha256"] = "a" * 64
@@ -254,15 +308,18 @@ def reuse_fixture(fixture, tmp_path):
         path.write_text(json.dumps(report))
     new_hash = kit.digest((current / "manifest.json").read_bytes())
     for path in original_reports.glob("report-*.json"):
-        if not path.name.endswith("-preview.json"):
+        report = json.loads(path.read_bytes())
+        if report["phase"] not in kit.FRESH_PHASES:
             path.unlink()
         else:
-            report = json.loads(path.read_bytes())
             report["manifest_sha256"] = new_hash
-            report["artifact"].update(keyboard_events_requested=0)
+            if report["phase"] == "preview":
+                report["artifact"].update(keyboard_events_requested=0)
             path.unlink()
             # Different actual run IDs are explicitly recorded, never merged.
-            (original_reports / f"report-{'b' * 32}-preview.json").write_text(json.dumps(report))
+            (original_reports / f"report-{'b' * 32}-{report['phase']}.json").write_text(
+                json.dumps(report)
+            )
     return current, original_reports, previous, old_reports
 
 
@@ -272,14 +329,15 @@ def test_component_reuse_records_each_original_source_manifest_and_run(reuse_fix
     proof = json.loads(contents["native-acceptance.json"])
     assert package["component_provenance_reuse"] is True
     assert proof["run_ids"] == ["a" * 32, "b" * 32]
-    assert [phase["reused"] for phase in proof["phases"]] == [True, True, True, False]
-    assert [phase["source_commit"] for phase in proof["phases"]] == ["c" * 40] * 3 + [PIN]
-    assert proof["reuse_basis"]["runtime_module_count"] == 171
+    assert [phase["reused"] for phase in proof["phases"]] == [True] * 3 + [False] * 3
+    assert [phase["source_commit"] for phase in proof["phases"]] == ["c" * 40] * 3 + [PIN] * 3
+    assert proof["reuse_basis"]["runtime_module_count"] == kit.RUNTIME_MODULE_COUNT == 173
     ignored = proof["reuse_basis"]["ignored_previous_preview"]
     assert ignored["accepted_as_passing_phase"] is False
     assert len(ignored["raw_report_sha256"]) == 64
     assert all(len(phase["raw_report_sha256"]) == 64 for phase in proof["phases"])
     assert proof["phases"][3]["artifact"]["independent_original_process_absent"] is True
+    assert [phase["phase"] for phase in proof["phases"]] == list(kit.PHASES)
 
 
 @pytest.mark.parametrize("component", ["runtime", "reused_harness"])
@@ -301,18 +359,19 @@ def test_component_reuse_refuses_failed_original_phase(reuse_fixture):
         kit.prepare(current, new_reports, PIN, previous, old_reports)
 
 
-def test_component_reuse_requires_paired_arguments_and_fresh_preview(reuse_fixture):
+@pytest.mark.parametrize("phase", kit.FRESH_PHASES)
+def test_component_reuse_requires_paired_arguments_and_all_fresh_phases(reuse_fixture, phase):
     current, new_reports, previous, old_reports = reuse_fixture
     with pytest.raises(ValueError, match="provided together"):
         kit.prepare(current, new_reports, PIN, previous, None)
-    next(new_reports.glob("report-*.json")).unlink()
+    (new_reports / f"report-{'b' * 32}-{phase}.json").unlink()
     with pytest.raises(ValueError, match="selected phases"):
         kit.prepare(current, new_reports, PIN, previous, old_reports)
 
 
 def test_component_reuse_refuses_preview_without_positive_pid_or_cleanup(reuse_fixture):
     current, new_reports, previous, old_reports = reuse_fixture
-    path = next(new_reports.glob("report-*.json"))
+    path = new_reports / f"report-{'b' * 32}-preview.json"
     report = json.loads(path.read_bytes())
     report["process_id"] = 0
     path.write_text(json.dumps(report))
