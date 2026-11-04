@@ -40,8 +40,12 @@ One owned separate visible window5030, TTYttys012, shellPID71567, test CodexPID7
 It ran only a read-only test CLI in the private native workspace, using the existing
 login. Nine pre-existing logical tabs were recorded at entry. During the run,
 several old idle shells and later own5030 disappeared from both Terminal inventory
-and process observation; their cause was not established. No script terminated
-those foreign shells. Primary repair agentPID52888 retained its process identity.
+and process observation. The later coordination note
+**KB-M1-TERMINAL-CLEANUP-F8C4** identifies own5030's closure: Kira closed the freshly
+observed empty shell after the test Codex had exited, task
+`kb_cleanup_idle_test_20261104_f8c4` completed according to that note. Other earlier
+shell disappearances remain unexplained. No repair script terminated those foreign
+shells. Primary repair agentPID52888 retained its process identity.
 Production remained RC38 during candidate source probes.
 
 Observed directly on Codex0.166.0:
@@ -110,6 +114,16 @@ PID/birth/TTY, empty controlled prompt and native CG/AX topology, focused, and
 detached exactly once through the existing `move_created_tab`. Original current
 logical/process identities were checked again. This recovered install setup;
 it does **not** claim the automatic window-open isolation issue is fixed.
+
+The F8C4 coordination note arrived after this installation had completed. Its
+reported closure explains why checkpoint `9cee604bb7ff`'s planned5030/71567 binding
+became invalid. It was not reused: original saved installer evidence proves one
+successful run in replacement5118/77256, finishing `2026-11-04T21:30:02.078800Z`.
+The later reconciliation read current RC39 daemon health and the original install
+result; no installer, Terminal window or input test was started again. The cleanup
+task is not exposed to this Codex principal (`task_get`: `not_found`); attribution
+comes from Kira's explicit coordination handover, not an independently retrieved
+task record. Main4740/52888 and work shell4543/51675 remain present.
 
 The regular installer then ran once in confirmed separate visible
 **5118 / ttys000 / shell77256**, with `--require-visible-terminal --desktop`.
