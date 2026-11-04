@@ -13,17 +13,17 @@ KiraBridge connects ChatGPT to **Grok Build and Codex running in terminal window
 on your computer**. Discuss what you need in chat, pass the work to those terminal
 agents and follow their replies while choosing what they may access.
 
-**macOS · Intel — [0.8.0rc33](https://github.com/landjunge/KiraBridge/releases/tag/v0.8.0rc33) · November 4, 2026 · Preview**
+**macOS · Intel — [0.8.0rc34](https://github.com/landjunge/KiraBridge/releases/tag/v0.8.0rc34) · November 4, 2026 · Preview**
 
-### [Download KiraBridge — app and installer](https://github.com/landjunge/KiraBridge/releases/download/v0.8.0rc33/KiraBridge-0.8.0rc33-Intel-Installer.zip)
+### [Download KiraBridge — app and installer](https://github.com/landjunge/KiraBridge/releases/download/v0.8.0rc34/KiraBridge-0.8.0rc34-Intel-Installer.zip)
 
-[Checksums](https://github.com/landjunge/KiraBridge/releases/download/v0.8.0rc33/SHA256SUMS)
+[Checksums](https://github.com/landjunge/KiraBridge/releases/download/v0.8.0rc34/SHA256SUMS)
 · [All releases](https://github.com/landjunge/KiraBridge/releases)
 
 Downloads require a GitHub account with access to this private repository.
-This is a preview; there is no stable release yet. RC33 is available for Intel Macs.
+This is a preview; there is no stable release yet. RC34 is available for Intel Macs.
 
-The same release includes a [Windows 11 development preview](https://github.com/landjunge/KiraBridge/releases/download/v0.8.0rc33/KiraBridge-0.8.0rc33-Windows-Dev-Kit.zip)
+The separate RC33 release includes a [Windows 11 development preview](https://github.com/landjunge/KiraBridge/releases/download/v0.8.0rc33/KiraBridge-0.8.0rc33-Windows-Dev-Kit.zip)
 with native keyboard, shortcuts and guarded window control. It is a separate
 development kit; general Windows file, process and terminal tools remain outside
 its scope. See [RC33 package checks, installation status and limits](docs/RC33-DELIVERY-20261104.md).
@@ -60,7 +60,7 @@ For terminal-agent tasks, install and sign in to Grok Build or Codex, then
 configure its terminal session as a target in KiraBridge.
 
 This preview has known terminal limitations, and the app is not Apple-notarized.
-See [RC33 package checks and limits](docs/RC33-DELIVERY-20261104.md) for the current
+See [RC34 fixes, checks and limits](docs/CODEX-FOOTER-20261104.md) for the current
 package and [earlier installation and help](docs/INSTALL-EN.md) for the RC20 guide.
 
 ## Keyboard sequences and fewer cloud calls

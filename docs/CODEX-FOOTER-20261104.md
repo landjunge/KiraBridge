@@ -103,3 +103,30 @@ for this focused Intel update.
 
 Private raw captures and operational evidence remain in
 `/Users/landjunge/KiraBridge-footer-audit-20261104/`; they are not release assets.
+
+## Published and installed outcome
+
+RC34 is published at [v0.8.0rc34](https://github.com/landjunge/KiraBridge/releases/tag/v0.8.0rc34),
+package source `1a57394e8250679f7b1af7598d5fae4c41c66152`. All ten uploaded
+assets matched the final build and GitHub digests. The published Intel installer
+and runtime archive were independently downloaded and SHA256-matched. The
+earlier source-only RC34 draft was never published or installed.
+
+The regular desktop installer ran once in a confirmed separate owned Terminal
+window, 15:24:25–15:24:46 UTC, exit 0. Core 37967 is actually running RC34,
+instance `93839d0cff304feead3d04f93b8159ff`; all 174 imported Python modules
+match the published wheel. Native-app source pin, manifest bytes and strict
+signature match. Four config/credential file hashes and all 11 protected
+Terminal process identities were preserved. The ordinary rollback backup is
+`~/.local/share/kirabridge/install/backups/20261104-162427-c2a15014`.
+
+A fresh postrestart `terminal.visible` command in that same own pane completed
+with exit 0 and output `KB_RC34_POST_RESTART_INPUT_OK`, with visible-window and
+TTY confirmation. It took 15.342 seconds inside the persisted task, including
+11.710 seconds from acceptance to running. This proves correct routing/input
+after the service switch, not acceptable latency for every terminal operation.
+The original unknown tasks remain unchanged. Only the owned idle install
+window was closed; its absence and all 11 protected identities were checked
+independently. No cloud CI or Windows build/installation was performed.
+
+[Machine-readable delivery and preservation evidence](evidence/rc34-delivery-20261104.json).

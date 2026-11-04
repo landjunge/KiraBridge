@@ -83,9 +83,13 @@ async def test_window_request_uses_existing_full_grant_without_second_local_toke
     config.principals["local"].capabilities.append("session.inspect")
     calls = []
 
-    async def opened(command):
+    async def opened(command, *, on_created=None, principal):
+        assert principal == "local"
         calls.append(command)
-        return {"tty": "/dev/ttys022"}
+        receipt = {"tty": "/dev/ttys022", "window_id": 222, "separate_window": True}
+        if on_created is not None:
+            await on_created(receipt)
+        return receipt
 
     async def catalog():
         return [{"pane_id": "terminal:222:ttys022", "expected_pid": 456, "tty": "/dev/ttys022"}]
@@ -101,6 +105,7 @@ async def test_window_request_uses_existing_full_grant_without_second_local_toke
         result = await bridge.tasks.wait("local", value.task_id, 5)
         assert result["state"] == "completed", result
         assert result["result"]["pane_id"] == "terminal:222:ttys022"
+        assert result["result"]["creation_receipt"]["separate_window"] is True
         bridge.prepare("local", value)
     assert len(calls) == 1
 
@@ -108,9 +113,13 @@ async def test_window_request_uses_existing_full_grant_without_second_local_toke
 async def test_manual_window_task_waits_for_exact_operator_approval(bridge, config, monkeypatch):
     calls = []
 
-    async def opened(command):
+    async def opened(command, *, on_created=None, principal):
+        assert principal == "local"
         calls.append(command)
-        return {"tty": "/dev/ttys022"}
+        receipt = {"tty": "/dev/ttys022", "window_id": 222, "separate_window": True}
+        if on_created is not None:
+            await on_created(receipt)
+        return receipt
 
     async def catalog():
         return [{"pane_id": "terminal:222:ttys022", "expected_pid": 456, "tty": "/dev/ttys022"}]
@@ -130,6 +139,7 @@ async def test_manual_window_task_waits_for_exact_operator_approval(bridge, conf
         bridge.tasks.approve(value.task_id)
         result = await bridge.tasks.wait("local", value.task_id, 5)
         assert result["state"] == "completed", result
+        assert result["result"]["creation_receipt"]["separate_window"] is True
     assert len(calls) == 1
 
 
@@ -141,7 +151,8 @@ async def test_chatgpt_legacy_terminal_is_visible_while_agent_internal_route_is_
         config.principals[name].capabilities.append("session.inspect")
     calls = []
 
-    async def visible(task, args, running):
+    async def visible(task, args, running, *, progress=None, privileged=False):
+        assert callable(progress) and not privileged
         calls.append((task["principal"], "visible"))
         return {"execution_route": "visible_terminal"}
 
@@ -268,9 +279,12 @@ async def test_file_params_descriptor_and_signed_url_never_persist(
                 },
             )
         ).structuredContent
-        assert result["state"] == "queued", result
+        # This immediate local download finishes within the existing inline
+        # observation budget; the returned result must match its durable task.
+        assert result["state"] == "completed", result
         task = await bridge.tasks.wait("local", "from-file-param", 10)
         assert task["state"] == "completed", task
+        assert (result["id"], result["receipt"]) == (task["id"], task["receipt"])
         assert task["result"]["manifest"]["size"] == len(payload)
         assert not task["result"]["import_successful"]
         dump = "\n".join(bridge.store.db.iterdump())

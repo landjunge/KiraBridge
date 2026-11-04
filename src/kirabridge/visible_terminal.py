@@ -51,7 +51,15 @@ class VisibleTerminal:
         processes = row["processes"]
         if any(p["name"].lstrip("-") not in {"login", "zsh", "bash", "sh"} for p in processes):
             return False
-        output = await self.sessions.read(principal, row["pane_id"], row["expected_pid"])
+        self.security.principal(principal, "session.inspect")
+        if row.get("identity_ambiguous"):
+            raise BridgeError(
+                "visible_target_ambiguous", "Several live tabs report this tty; no input"
+            )
+        # The caller just observed this row. Scope only this fresh screen read;
+        # final selection and native dispatch still verify input authority anew.
+        with self.sessions.observation_scope(principal, row):
+            output = await self.sessions.read(principal, row["pane_id"], row["expected_pid"])
         return empty_shell_prompt(output["text"])
 
     async def execute(self, task, args, running, *, progress=None, privileged=False):
