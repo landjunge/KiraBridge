@@ -167,3 +167,9 @@ post-install shell test do not substitute for those acceptance steps. Native Gro
 and the outstanding window-isolation/old fixture limits remain explicit.
 
 Sanitized [machine-readable installed evidence](evidence/terminal-cli-m1-installed-20261104.json).
+
+Subsequent handover **KB-RC39-CHAT-GATE-20261104-V1** reports a blocked original
+browserchat Escape and a separately reproduced Copy-footer prefix defect. Current
+Chat status is **Chat-Bedienung offen**; installed RC39 is unchanged. The narrow
+[diagnosis and uninstalled source correction](RC39-CHAT-GATE-20261104.md) do not
+constitute a successful chat invocation or another installation.
