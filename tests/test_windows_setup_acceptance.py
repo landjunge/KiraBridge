@@ -79,14 +79,23 @@ def test_stage_is_durable_before_effect_and_ui_diagnostic_excludes_sensitive_fie
     )
     assert persisted == [{"stage": "presenter_action", "operation": "install_client"}]
     state = SimpleNamespace(
-        message="Der Download ist fehlgeschlagen.", next_action="Prüfe die Verbindung.",
-        operation="", busy=False, client_ready=False, prompt="SECRET PROMPT",
-        response_code="SECRET RESPONSE", runtime_key="SECRET KEY", tunnel_id="SECRET ID",
+        message="Der Download ist fehlgeschlagen.",
+        next_action="Prüfe die Verbindung.",
+        operation="",
+        busy=False,
+        client_ready=False,
+        prompt="SECRET PROMPT",
+        response_code="SECRET RESPONSE",
+        runtime_key="SECRET KEY",
+        tunnel_id="SECRET ID",
     )
     result = HARNESS.public_ui_status(state)
     assert result == {
-        "message": state.message, "next_action": state.next_action, "operation": "",
-        "busy": False, "client_ready": False,
+        "message": state.message,
+        "next_action": state.next_action,
+        "operation": "",
+        "busy": False,
+        "client_ready": False,
     }
     assert "SECRET" not in json.dumps(result)
 
@@ -103,8 +112,11 @@ def test_bundled_client_is_verified_then_written_exclusively_to_own_state(tmp_pa
     receipt = HARNESS.prepare_client_cache(source, state)
     assert (state / "bundled-client.zip").read_bytes() == data
     assert receipt == {
-        "asset": archive.name, "size": len(data), "sha256": hashlib.sha256(data).hexdigest(),
-        "private_test_cache_written": True, "network_download_required": False,
+        "asset": archive.name,
+        "size": len(data),
+        "sha256": hashlib.sha256(data).hexdigest(),
+        "private_test_cache_written": True,
+        "network_download_required": False,
     }
     with pytest.raises(FileExistsError):
         HARNESS.prepare_client_cache(source, state)
@@ -116,9 +128,13 @@ def test_bad_bundled_client_refused_before_cache_write(tmp_path, monkeypatch, al
     source = tmp_path / "payload/source"
     source.mkdir(parents=True)
     archive, data = frozen_client(monkeypatch, source)
-    archive.write_bytes({
-        "short": data[:-1], "same_size_wrong_hash": b"X" * len(data), "oversized": data + b"X",
-    }[alteration])
+    archive.write_bytes(
+        {
+            "short": data[:-1],
+            "same_size_wrong_hash": b"X" * len(data),
+            "oversized": data + b"X",
+        }[alteration]
+    )
     state = tmp_path / "fresh-test-state"
     state.mkdir()
     with pytest.raises(RuntimeError, match="size/hash guard"):

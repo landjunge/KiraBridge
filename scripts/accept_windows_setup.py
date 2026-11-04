@@ -59,8 +59,14 @@ def public_ui_status(state):
         if type(value) is str and len(value) <= maximum:
             public[name] = value
     for name in (
-        "busy", "consent", "local_ready", "client_ready", "connection_saved",
-        "connected", "verification_pending", "verified",
+        "busy",
+        "consent",
+        "local_ready",
+        "client_ready",
+        "connection_saved",
+        "connected",
+        "verification_pending",
+        "verified",
     ):
         value = getattr(state, name, None)
         if type(value) is bool:
