@@ -217,7 +217,11 @@ def stub_process(prepared, monkeypatch):
     monkeypatch.setattr(client.subprocess, "CREATE_NEW_CONSOLE", 0x10, raising=False)
     monkeypatch.setattr(client.subprocess, "Popen", popen)
     monkeypatch.setattr(client, "process_identity", lambda pid: dict(record))
-    monkeypatch.setattr(client, "same_process", lambda value: value == record)
+    monkeypatch.setattr(
+        client,
+        "same_process",
+        lambda value: all(value.get(key) == record[key] for key in record),
+    )
     return binary, profile, state, record, calls
 
 
@@ -235,7 +239,9 @@ def test_start_is_one_visible_owned_run_with_secret_only_in_child_env(prepared, 
     assert len(calls) == 1
 
 
-def test_missing_or_reused_generation_never_causes_replacement_start(prepared, monkeypatch):
+def test_uncertain_generation_or_incomplete_record_never_causes_replacement_start(
+    prepared, monkeypatch
+):
     binary, profile, state, _, calls = stub_process(prepared, monkeypatch)
     client.start_client(binary, profile, state, TOKEN)
     monkeypatch.setattr(client, "same_process", lambda _: False)
@@ -454,3 +460,101 @@ def test_abandoned_reservation_blocks_before_a_new_download(bundle, tmp_path, mo
         client.install_client(tmp_path)
     assert error.value.code == "setup_client_existing"
     assert reservation.read_text() == '{"state":"original_unknown"}'
+
+
+@pytest.mark.parametrize("old_state", ["absent", "exited", "pid_reused"])
+def test_explicit_reconnect_archives_confirmed_exited_generation_once(
+    prepared, monkeypatch, old_state
+):
+    binary, profile, state, original, calls = stub_process(prepared, monkeypatch)
+    client.start_client(binary, profile, state, TOKEN)
+    connection = state / "connection"
+    write_private(connection / "tunnel.pid", str(original["pid"]))
+    write_private(connection / "tunnel-health.url", "http://127.0.0.1:23456")
+    previous = {name: (connection / name).read_bytes() for name in client.START_FILES}
+    protected = {path: path.read_bytes() for path in (profile, connection / "runtime.key")}
+    new = dict(original, pid=5678, created_100ns="134382301975786999")
+    old_current = {
+        "absent": None,
+        "exited": dict(original, running=False),
+        "pid_reused": dict(original, created_100ns="134382301975786888"),
+    }[old_state]
+    monkeypatch.setattr(client, "same_process", lambda _: False)
+    monkeypatch.setattr(
+        client, "process_identity", lambda pid: dict(new) if pid == new["pid"] else old_current
+    )
+
+    def new_child(arguments, **options):
+        calls.append((arguments, options))
+        return SimpleNamespace(pid=new["pid"])
+
+    monkeypatch.setattr(client.subprocess, "Popen", new_child)
+    assert client.start_client(binary, profile, state, TOKEN).pid == new["pid"]
+    assert len(calls) == 2
+    archives = list((connection / "history").iterdir())
+    assert len(archives) == 1
+    saved = archives[0]
+    assert {name: (saved / name).read_bytes() for name in client.START_FILES} == previous
+    assert json.loads((saved / "completed.json").read_bytes())["original_generation_absent"] is True
+    assert not (connection / "tunnel-archive-in-progress.json").exists()
+    current = json.loads((connection / "tunnel-start-attempt.json").read_bytes())
+    assert current["attempt_id"] != json.loads(previous["tunnel-start-attempt.json"])["attempt_id"]
+    assert {path: path.read_bytes() for path in protected} == protected
+    monkeypatch.setattr(client, "same_process", lambda _: True)
+    assert client.start_client(binary, profile, state, TOKEN) is None
+    assert len(calls) == 2
+
+
+@pytest.mark.parametrize(
+    "kind",
+    [
+        "missing_spawn",
+        "missing_attempt_id",
+        "profile_changed",
+        "wrong_pid_file",
+        "hardlink",
+        "symlink",
+        "interrupted_archive",
+    ],
+)
+def test_reconnect_preserves_unreconciled_evidence_and_does_not_start(prepared, monkeypatch, kind):
+    binary, profile, state, _, calls = stub_process(prepared, monkeypatch)
+    client.start_client(binary, profile, state, TOKEN)
+    connection = state / "connection"
+    monkeypatch.setattr(client, "same_process", lambda _: False)
+    monkeypatch.setattr(client, "process_identity", lambda _: None)
+    attempt_path = connection / "tunnel-start-attempt.json"
+    if kind == "missing_spawn":
+        (connection / "tunnel-spawned.json").unlink()
+    elif kind == "missing_attempt_id":
+        attempt = json.loads(attempt_path.read_bytes())
+        del attempt["attempt_id"]
+        attempt_path.write_text(json.dumps(attempt))
+    elif kind == "profile_changed":
+        profile.write_bytes(profile.read_bytes() + b" ")
+    elif kind == "wrong_pid_file":
+        write_private(connection / "tunnel.pid", "7777")
+    elif kind == "hardlink":
+        os.link(attempt_path, connection / "hardlink-evidence")
+    elif kind == "symlink":
+        (connection / "tunnel.pid").symlink_to(attempt_path)
+    else:
+        write_private(
+            connection / "tunnel-archive-in-progress.json", "original interrupted attempt"
+        )
+    before = attempt_path.read_bytes()
+    with pytest.raises(BridgeError):
+        client.start_client(binary, profile, state, TOKEN)
+    assert len(calls) == 1
+    assert attempt_path.read_bytes() == before
+    assert not (connection / "history").exists()
+
+
+def test_readonly_status_never_archives_an_exited_process(prepared, monkeypatch):
+    binary, profile, state, _, calls = stub_process(prepared, monkeypatch)
+    client.start_client(binary, profile, state, TOKEN)
+    monkeypatch.setattr(client, "same_process", lambda _: False)
+    monkeypatch.setattr(client, "process_identity", lambda _: None)
+    assert client.client_status(state)["state"] == "unknown"
+    assert len(calls) == 1
+    assert not (state / "connection/history").exists()

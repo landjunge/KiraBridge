@@ -2,7 +2,8 @@
 
 Only the Windows setup assistant uses this module. It never changes PATH, runs a
 package manager, stops a process, registers autostart, or replaces an existing
-installation/profile/start receipt. A lost start result requires reconciliation.
+installation or profile. Explicit reconnect archives a confirmed exited start;
+uncertain process state always preserves the original receipt and blocks replay.
 """
 
 from __future__ import annotations
@@ -21,6 +22,7 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
+import uuid
 import zipfile
 from pathlib import Path
 
@@ -406,9 +408,180 @@ def saved_process(connection):
         or record["pid"] <= 0
         or not isinstance(record.get("created_100ns"), str)
         or re.fullmatch(r"[1-9][0-9]{1,19}", record["created_100ns"]) is None
+        or not isinstance(record.get("image"), str)
+        or not record["image"]
+        or record.get("running") is not True
     ):
         raise fail("setup_client_start_unknown")
     return record
+
+
+START_FILES = (
+    "tunnel-start-attempt.json",
+    "tunnel-process.json",
+    "tunnel-spawned.json",
+    "tunnel-health.url",
+    "tunnel.pid",
+)
+
+
+def history_complete(connection):
+    if os.path.lexists(connection / "tunnel-archive-in-progress.json"):
+        raise fail("setup_client_start_unknown")
+    history = connection / "history"
+    if not os.path.lexists(history):
+        return
+    safe_path(history)
+    private_directory(history)
+    entries = list(history.iterdir())
+    if len(entries) > 128:
+        raise fail("setup_client_start_unknown")
+    for folder in entries:
+        safe_path(folder)
+        private_directory(folder)
+        try:
+            complete = private_json(folder / "completed.json")
+        except (OSError, ValueError):
+            raise fail("setup_client_start_unknown") from None
+        if not isinstance(complete, dict) or complete.get("completed") is not True:
+            raise fail("setup_client_start_unknown")
+
+
+def original_absent(record):
+    current = process_identity(record["pid"])
+    if current is None:
+        return True
+    if (
+        not isinstance(current, dict)
+        or current.get("pid") != record["pid"]
+        or type(current.get("running")) is not bool
+        or not isinstance(current.get("created_100ns"), str)
+        or re.fullmatch(r"[1-9][0-9]{1,19}", current["created_100ns"]) is None
+    ):
+        raise fail("setup_client_start_unknown")
+    return current["created_100ns"] != record["created_100ns"] or not current["running"]
+
+
+def archive_exited(connection, record, profile_hash):
+    """Only the explicit Connect action calls this, after proving the old generation gone."""
+    if not original_absent(record):
+        raise fail("setup_client_start_unknown")
+    required = set(START_FILES[:3])
+    held = []
+    try:
+        for name in START_FILES:
+            source = connection / name
+            if not os.path.lexists(source):
+                if name in required:
+                    raise fail("setup_client_start_unknown")
+                continue
+            safe_path(source)
+            if os.name == "nt":
+                from kirabridge.platform_adapters.windows.filesystem_security import private_open
+
+                descriptor = private_open(
+                    source
+                )  # Owner/SYSTEM, no reparse/hardlink, final handle path.
+            else:
+                descriptor = os.open(source, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0))
+            stream = os.fdopen(descriptor, "rb")
+            info = os.fstat(stream.fileno())
+            if (
+                not stat.S_ISREG(info.st_mode)
+                or info.st_nlink != 1
+                or info.st_size > 65536
+                or (os.name == "posix" and (info.st_uid != os.getuid() or info.st_mode & 0o077))
+            ):
+                stream.close()
+                raise fail("setup_client_start_unknown")
+            try:
+                raw = stream.read(65537)
+                if len(raw) != info.st_size:
+                    raise fail("setup_client_start_unknown")
+                if name == "tunnel.pid" and raw.decode("ascii").strip() != str(record["pid"]):
+                    raise fail("setup_client_start_unknown")
+                if name == "tunnel-health.url":
+                    endpoint(raw.decode("ascii").strip(), {"", "/"})
+            except BaseException:
+                stream.close()
+                raise
+            held.append((name, source, stream, info, raw))
+        if not original_absent(record):
+            raise fail("setup_client_start_unknown")
+        marker = connection / "tunnel-archive-in-progress.json"
+        write_json(
+            marker,
+            {
+                "pid": record["pid"],
+                "created_100ns": record["created_100ns"],
+                "profile_sha256": profile_hash,
+                "original_generation_absent": True,
+            },
+        )
+        private_directory(connection / "history")
+        history = connection / "history" / uuid.uuid4().hex
+        private_directory(history)  # Native creator; no Python3.14 mkdir(0700).
+        write_json(
+            history / "archive-attempt.json",
+            {
+                "files": {name: hashlib.sha256(raw).hexdigest() for name, _, _, _, raw in held},
+                "profile_sha256": profile_hash,
+            },
+        )
+        for name, source, _stream, info, raw in held:
+            current = os.stat(source, follow_symlinks=False)
+            if (current.st_dev, current.st_ino, current.st_size) != (
+                info.st_dev,
+                info.st_ino,
+                info.st_size,
+            ):
+                raise fail("setup_client_start_unknown")
+            destination = history / name
+            if os.path.lexists(destination):
+                raise fail("setup_client_start_unknown")
+            os.rename(source, destination)
+            if read_private(destination, 65536) != raw:
+                raise fail("setup_client_start_unknown")
+        write_json(
+            history / "completed.json",
+            {
+                "completed": True,
+                "original_generation_absent": True,
+                "pid": record["pid"],
+                "created_100ns": record["created_100ns"],
+            },
+        )
+        # Marker was exclusively created by this call in the private connection
+        # directory. Keep it in history instead of deleting any original evidence.
+        if os.path.lexists(history / "reservation.json"):
+            raise fail("setup_client_start_unknown")
+        os.rename(marker, history / "reservation.json")
+    finally:
+        for _, _, stream, _, _ in held:
+            stream.close()
+
+
+def complete_start_record(connection, attempt, record, binary, profile_hash):
+    if (
+        not isinstance(attempt, dict)
+        or re.fullmatch(r"[0-9a-f]{32}", str(attempt.get("attempt_id", ""))) is None
+        or attempt.get("state") != "attempted_no_automatic_restart"
+        or attempt.get("profile_sha256") != profile_hash
+        or not record
+        or Path(record.get("image", "")) != Path(binary)
+    ):
+        raise fail("setup_client_start_unknown")
+    try:
+        spawned = private_json(connection / "tunnel-spawned.json")
+    except (OSError, ValueError):
+        raise fail("setup_client_start_unknown") from None
+    if (
+        not isinstance(spawned, dict)
+        or spawned.get("pid") != record["pid"]
+        or spawned.get("attempt_id") != attempt.get("attempt_id")
+        or record.get("attempt_id") != attempt.get("attempt_id")
+    ):
+        raise fail("setup_client_start_unknown")
 
 
 @boundary
@@ -441,16 +614,13 @@ def start_client(binary, profile_path, state_dir, local_token) -> subprocess.Pop
         connection / "tunnel-start-attempt.json",
         connection / "tunnel-health.url",
     )
+    history_complete(connection)
     if os.path.lexists(attempt_path):
         attempt, record = private_json(attempt_path), saved_process(connection)
-        if (
-            attempt.get("profile_sha256") == profile_hash
-            and record
-            and same_process(record)
-            and Path(record.get("image", "")) == Path(binary)
-        ):
+        complete_start_record(connection, attempt, record, binary, profile_hash)
+        if same_process(record):
             return None  # Reuse this original live process; no second executable is started.
-        raise fail("setup_client_start_unknown")
+        archive_exited(connection, record, profile_hash)
     if any(
         os.path.lexists(connection / name)
         for name in (
@@ -462,9 +632,11 @@ def start_client(binary, profile_path, state_dir, local_token) -> subprocess.Pop
     ):
         raise fail("setup_client_start_unknown")
     try:
+        attempt_id = uuid.uuid4().hex
         write_json(
             attempt_path,
             {
+                "attempt_id": attempt_id,
                 "profile_sha256": profile_hash,
                 "started_at": time.time(),
                 "state": "attempted_no_automatic_restart",
@@ -488,10 +660,11 @@ def start_client(binary, profile_path, state_dir, local_token) -> subprocess.Pop
             creationflags=subprocess.CREATE_NEW_CONSOLE,
             close_fds=True,
         )
-        write_json(connection / "tunnel-spawned.json", {"pid": child.pid})
+        write_json(connection / "tunnel-spawned.json", {"pid": child.pid, "attempt_id": attempt_id})
         record = process_identity(child.pid)
         if not record or not record["running"] or Path(record["image"]) != Path(binary):
             raise fail("setup_client_start_unknown")
+        record["attempt_id"] = attempt_id
         write_json(connection / "tunnel-process.json", record)
         return child
     except (OSError, ValueError):
@@ -520,6 +693,7 @@ def health_get(base, route):
 def client_status(state_dir) -> dict:
     windows()
     _, folder, connection = paths(state_dir)
+    history_complete(connection)
     if not os.path.lexists(connection / "tunnel-start-attempt.json"):
         if any(
             os.path.lexists(connection / name)
