@@ -1,0 +1,297 @@
+{
+  "version": "0.8.0rc33",
+  "package_source_commit": "ce0687dd8831dae261bf285922a146bcf3aedc41",
+  "main_merge_pr": 58,
+  "main_merge_performed": true,
+  "release": {
+    "url": "https://github.com/landjunge/KiraBridge/releases/tag/v0.8.0rc33",
+    "id": 433674024,
+    "published": true,
+    "assets_verified_after_publication": 11,
+    "assets": {
+      "LICENSE": {
+        "bytes": 6373,
+        "sha256": "3316d5eda60ac1fea355aa43d196feea3567384179b55ca88c8636c0322021ec",
+        "github_digest": "sha256:3316d5eda60ac1fea355aa43d196feea3567384179b55ca88c8636c0322021ec",
+        "download_matches_local": true,
+        "asset_id": 708812732,
+        "browser_download_url": "https://github.com/landjunge/KiraBridge/releases/download/v0.8.0rc33/LICENSE"
+      },
+      "KiraBridge-0.8.0rc33-Intel-Installer.zip": {
+        "bytes": 3591188,
+        "sha256": "a245eff8b310cbfcffb52c2ac3ccfb61b1f7f714f57e0d8b37678241fc50516b",
+        "github_digest": "sha256:a245eff8b310cbfcffb52c2ac3ccfb61b1f7f714f57e0d8b37678241fc50516b",
+        "download_matches_local": true,
+        "asset_id": 708812721,
+        "browser_download_url": "https://github.com/landjunge/KiraBridge/releases/download/v0.8.0rc33/KiraBridge-0.8.0rc33-Intel-Installer.zip"
+      },
+      "kirabridge-0.8.0rc33-py3-none-any.whl": {
+        "bytes": 604531,
+        "sha256": "251cce320fdccfc0850f1703242b3014e34d870ca16b3051fb91b7653736556c",
+        "github_digest": "sha256:251cce320fdccfc0850f1703242b3014e34d870ca16b3051fb91b7653736556c",
+        "download_matches_local": true,
+        "asset_id": 708812734,
+        "browser_download_url": "https://github.com/landjunge/KiraBridge/releases/download/v0.8.0rc33/kirabridge-0.8.0rc33-py3-none-any.whl"
+      },
+      "KiraBridge-macos.tar.gz": {
+        "bytes": 3019307,
+        "sha256": "c59c7749551c71058407ecf61e70f7fd43e1caa04f450bf2951a81e2d919315c",
+        "github_digest": "sha256:c59c7749551c71058407ecf61e70f7fd43e1caa04f450bf2951a81e2d919315c",
+        "download_matches_local": true,
+        "asset_id": 708812735,
+        "browser_download_url": "https://github.com/landjunge/KiraBridge/releases/download/v0.8.0rc33/KiraBridge-macos.tar.gz"
+      },
+      "install-macos.sh": {
+        "bytes": 586,
+        "sha256": "9104b022cd7aeb997a4cbc7b35fca1a2d771645d237b9918e8bcac14177b3111",
+        "github_digest": "sha256:9104b022cd7aeb997a4cbc7b35fca1a2d771645d237b9918e8bcac14177b3111",
+        "download_matches_local": true,
+        "asset_id": 708812719,
+        "browser_download_url": "https://github.com/landjunge/KiraBridge/releases/download/v0.8.0rc33/install-macos.sh"
+      },
+      "smoke-Darwin-x86_64.json": {
+        "bytes": 848,
+        "sha256": "76a7e99c2f69b276da72e4151b0390984dc47c0eb925ff702d424842d659054c",
+        "github_digest": "sha256:76a7e99c2f69b276da72e4151b0390984dc47c0eb925ff702d424842d659054c",
+        "download_matches_local": true,
+        "asset_id": 708812773,
+        "browser_download_url": "https://github.com/landjunge/KiraBridge/releases/download/v0.8.0rc33/smoke-Darwin-x86_64.json"
+      },
+      "SHA256SUMS": {
+        "bytes": 549,
+        "sha256": "2c99d2470a0422a4d24b5337ee721f569c618cd35d2d98bf9390597542312159",
+        "github_digest": "sha256:2c99d2470a0422a4d24b5337ee721f569c618cd35d2d98bf9390597542312159",
+        "download_matches_local": true,
+        "asset_id": 708812846,
+        "browser_download_url": "https://github.com/landjunge/KiraBridge/releases/download/v0.8.0rc33/SHA256SUMS"
+      },
+      "KiraBridge-0.8.0rc33-Windows-Dev-Kit.zip": {
+        "bytes": 52696367,
+        "sha256": "1002e68cbef96c7fd9a383d542beb5abc727f5843316352a65638fe4266a919a",
+        "github_digest": "sha256:1002e68cbef96c7fd9a383d542beb5abc727f5843316352a65638fe4266a919a",
+        "download_matches_local": true,
+        "asset_id": 708813425,
+        "browser_download_url": "https://github.com/landjunge/KiraBridge/releases/download/v0.8.0rc33/KiraBridge-0.8.0rc33-Windows-Dev-Kit.zip"
+      },
+      "windows-SHA256SUMS-0.8.0rc33": {
+        "bytes": 311,
+        "sha256": "fe8d8b247506242ea7a298fe3ffc587b91d0b78eed3e0262b263e72f0aaa8e4a",
+        "github_digest": "sha256:fe8d8b247506242ea7a298fe3ffc587b91d0b78eed3e0262b263e72f0aaa8e4a",
+        "download_matches_local": true,
+        "asset_id": 708813423,
+        "browser_download_url": "https://github.com/landjunge/KiraBridge/releases/download/v0.8.0rc33/windows-SHA256SUMS-0.8.0rc33"
+      },
+      "windows-native-acceptance-0.8.0rc33.json": {
+        "bytes": 126931,
+        "sha256": "a0fb6f26dd2bbbbfb50491123bb46f8ab4cc13d7520961643be8acf1e512405b",
+        "github_digest": "sha256:a0fb6f26dd2bbbbfb50491123bb46f8ab4cc13d7520961643be8acf1e512405b",
+        "download_matches_local": true,
+        "asset_id": 708813421,
+        "browser_download_url": "https://github.com/landjunge/KiraBridge/releases/download/v0.8.0rc33/windows-native-acceptance-0.8.0rc33.json"
+      },
+      "windows-package-0.8.0rc33.json": {
+        "bytes": 1413,
+        "sha256": "e2be9997324b74c17a35ea3439fee6699ba7e234feb640ef19d639aaf71f54f1",
+        "github_digest": "sha256:e2be9997324b74c17a35ea3439fee6699ba7e234feb640ef19d639aaf71f54f1",
+        "download_matches_local": true,
+        "asset_id": 708814197,
+        "browser_download_url": "https://github.com/landjunge/KiraBridge/releases/download/v0.8.0rc33/windows-package-0.8.0rc33.json"
+      }
+    }
+  },
+  "tests": {
+    "shared_integration_passed": 622,
+    "shared_integration_windows_native_skipped_on_macos": 4,
+    "windows_native_core_passed_in_guest": 4,
+    "windows_packaging_guest_harness_passed": 63,
+    "native_swift_component_passed": 74,
+    "windows_fresh_native_phases_passed": 6,
+    "whole_suite_repeated": false,
+    "ruff_and_format_files": 667
+  },
+  "native_package_acceptance": {
+    "windows": "passed six fresh phases and independent package review",
+    "macos": {
+      "source_commit": "ce0687dd8831dae261bf285922a146bcf3aedc41",
+      "version": "0.8.0rc33",
+      "native_component_tests": {
+        "passed": 74,
+        "failures": 0,
+        "skipped": 0
+      },
+      "package_build": "passed once",
+      "installer_verify_package": {
+        "verified": true,
+        "files": 606,
+        "installation_performed": false
+      },
+      "isolated_smoke": "passed",
+      "real_launchd_acceptance": {
+        "passed": true,
+        "checks": [
+          "pinned previous 0.8.0rc32 wheel starts under isolated launchd",
+          "upgrade while authenticated completion_receive HTTP request remained open; old read settled without replay and new daemon PID healthy",
+          "built package upgrades 0.8.0rc32; authenticated version/status/start",
+          "config/credentials hashes, database row and user file preserved",
+          "daemon survives installer/terminal command exit",
+          "repeat install idempotent; same PID and no config rewrite",
+          "real launchctl kickstart restart and authenticated status",
+          "launchd KeepAlive automatically recovers a crashed daemon",
+          "real rollback restarts previous 0.8.0rc32 wheel and preserves secrets",
+          "fresh built-wheel installation starts actual isolated launchd service"
+        ],
+        "cleanup_absence": true,
+        "previous_wheel_sha256": "9157cc3ccc2bd98cbe324907dddd9d6b5dde0bba2348a5fda55e8d626708e8dd",
+        "completion_settled": "connection_ended"
+      },
+      "assets_still_match_frozen_hashes": true,
+      "evidence_sha256": "56d7021dcf6bd521af582c3e963164fdc5cdf3156a0124939f6f2acf2ded5182",
+      "failed_attempts_preserved": [
+        "release-smoke-offline-failure.log (before daemon, isolated empty offline cache)",
+        "launchd-ce0687d/evidence.json (first RC32 launchd readiness timed out, no cause proven)",
+        "previous-stack-diagnostic.json (immediate absence check raced asynchronous teardown; bounded readback confirmed absent)"
+      ],
+      "product_or_fixture_changes_during_acceptance": false,
+      "production_installation_performed": false,
+      "host_ui_actions_performed": false
+    }
+  },
+  "windows_installation": {
+    "installed": true,
+    "source_commit": "ce0687dd8831dae261bf285922a146bcf3aedc41",
+    "verified_at_utc": "2026-11-04T08:53:26.931703+00:00",
+    "pid": 5956,
+    "process_created_100ns": "134382553866962927",
+    "instance_id": "a84ab3ea1da346f3b5af401caddb335f",
+    "port": 8767,
+    "modules": 174,
+    "modules_equal_published_wheel": true,
+    "authenticated_http_401_without_token": true,
+    "capabilities": 8,
+    "operations": 5,
+    "task_count": 0,
+    "all_installer_parents_exited": true,
+    "dev2_dev3_preserved": true,
+    "own_setup_tab_closed": true,
+    "own_helpers_absent": [
+      5132,
+      5137,
+      7432,
+      7828,
+      8119
+    ],
+    "limits": [
+      "Windows-key global shortcut positive execution",
+      "native stdio acceptance",
+      "Windows10",
+      "external ChatGPT/Voice/cloud latency",
+      "full file/process/terminal automation"
+    ]
+  },
+  "macos_production_installation": {
+    "installed_rc33": false,
+    "current_version": "0.8.0rc30",
+    "core_pid": 66439,
+    "instance_id": "777222cce58e4b38b503c2f3d20900e1",
+    "reason": "Product interactive-desktop guard reported locked session before detach or installation input",
+    "installer_from_verified_published_zip": true,
+    "owned_preparation_tab": {
+      "window_id": 2870,
+      "tty": "/dev/ttys005"
+    },
+    "needs_unlocked_existing_session_for_update_and_cleanup": true,
+    "deferred_lock_preservation": {
+      "observed_utc": "2026-11-04T09:08:14.414617+00:00",
+      "installation_started": false,
+      "detach_attempted": false,
+      "installed_version": "0.8.0rc30",
+      "reason": "Product require_interactive reported locked desktop before further UI mutation",
+      "all_seven_config_files_unchanged": true,
+      "all_eleven_inventory_old_rows_unchanged": true,
+      "protected_agent_shell_count": 11,
+      "all_protected_agent_shell_identities_unchanged": true,
+      "owned_preparation_tab": {
+        "window_id": 2870,
+        "tty": "/dev/ttys005",
+        "installation_input_sent": false,
+        "cleanup_requires_interactive_unlocked_session": true
+      },
+      "files": {
+        ".config/kirabridge/config.toml": true,
+        ".config/kirabridge/credentials.json": true,
+        ".config/kirabridge/console-credentials.json": true,
+        ".config/kirabridge/openai-tunnel-runtime.key": true,
+        ".config/kirabridge/tunnel/kirabridge.yaml": true,
+        ".codex/config.toml": true,
+        ".grok/config.toml": true
+      },
+      "inventories": {
+        "completion_notices": {
+          "missing": 0,
+          "changed": 0
+        },
+        "message_jobs": {
+          "missing": 0,
+          "changed": 0
+        },
+        "messages": {
+          "missing": 0,
+          "changed": 0
+        },
+        "queue_holds": {
+          "missing": 0,
+          "changed": 0
+        },
+        "queue_withdrawals": {
+          "missing": 0,
+          "changed": 0
+        },
+        "session_input_buffers": {
+          "missing": 0,
+          "changed": 0
+        },
+        "tasks": {
+          "missing": 0,
+          "changed": 0
+        },
+        "team_work": {
+          "missing": 0,
+          "changed": 0
+        },
+        "visible_handoffs": {
+          "missing": 0,
+          "changed": 0
+        },
+        "voice_message_buffers": {
+          "missing": 0,
+          "changed": 0
+        },
+        "window_dispatches": {
+          "missing": 0,
+          "changed": 0
+        }
+      }
+    }
+  },
+  "cloud_ci_started": false,
+  "source_and_package_refs_sha256": {
+    "evidence/finish-rc33-independent-package-review.json": "2a7c7ce57fe03865c798a3c8baabfa54bfdbd9649ba813de6bae216c813691fd",
+    "evidence/finish-windows-independent-package-review.json": "d64a8520f3dcd24d1d3f57d2653ee8ea00569d3697108ec31e01d90213cc9289",
+    "evidence/windows-rc33-installed-final.json": "c613674a6f5d6871eb98e554f84f250023d90b19f1abb81ea00b02bf59019849",
+    "evidence/rc33-published-download-proof.json": "ae82f411c911243574e49896fd2c11b77070994469c7eb7141bbbad32a252df0",
+    "macos-rc33/macos-acceptance-final.json": "e6c22bdaeda2041c12027fd2f97369aa908e90915a91e8332c5c689dd1c7f4b5"
+  },
+  "worktree_preservation": {
+    "original_worktrees": 89,
+    "all_original_worktree_heads_statuses_and_changed_file_hashes_unchanged": true,
+    "changes": {},
+    "new_owned_worktrees": [
+      "/Users/landjunge/KiraBridge-worktrees/integration-dev3-rc32-20261104",
+      "/Users/landjunge/KiraBridge-worktrees/rc33-intel-package-20261104",
+      "/Users/landjunge/KiraBridge-worktrees/rc33-release-main-20261104",
+      "/Users/landjunge/KiraBridge-worktrees/windows-rc33-finish-20261104"
+    ],
+    "captured_before_utc": "2026-11-04T07:03:22.443879+00:00",
+    "captured_after_utc": "2026-11-04T09:10:13.158688+00:00"
+  }
+}

@@ -13,20 +13,20 @@ KiraBridge verbindet ChatGPT mit **Grok Build und Codex, die in Terminalfenstern
 auf deinem Computer laufen**. Besprich im Chat, was du erledigen möchtest, gib die
 Arbeit an diese Terminalagenten weiter und verfolge ihre Antworten — mit den von dir erlaubten Zugriffen.
 
-**macOS · Intel — [0.8.0rc32](https://github.com/landjunge/KiraBridge/releases/tag/v0.8.0rc32) · 3. November 2026 · Vorabversion**
+**macOS · Intel — [0.8.0rc33](https://github.com/landjunge/KiraBridge/releases/tag/v0.8.0rc33) · 4. November 2026 · Vorabversion**
 
-### [KiraBridge herunterladen — App und Installer](https://github.com/landjunge/KiraBridge/releases/download/v0.8.0rc32/KiraBridge-0.8.0rc32-Intel-Installer.zip)
+### [KiraBridge herunterladen — App und Installer](https://github.com/landjunge/KiraBridge/releases/download/v0.8.0rc33/KiraBridge-0.8.0rc33-Intel-Installer.zip)
 
-[Prüfsummen](https://github.com/landjunge/KiraBridge/releases/download/v0.8.0rc32/SHA256SUMS)
+[Prüfsummen](https://github.com/landjunge/KiraBridge/releases/download/v0.8.0rc33/SHA256SUMS)
 · [Alle Versionen](https://github.com/landjunge/KiraBridge/releases)
 
 Für die Downloads brauchst du ein GitHub-Konto mit Zugriff auf dieses private Repository.
-Dies ist eine Vorabversion; eine stabile Version gibt es noch nicht. RC32 ist für Intel-Macs verfügbar.
+Dies ist eine Vorabversion; eine stabile Version gibt es noch nicht. RC33 ist für Intel-Macs verfügbar.
 
-Dieser Branch vereint macOS RC31/RC32 und Windows dev3 als **0.8.0rc33.dev1**,
-einen unveröffentlichten Integrationsstand der Quellen. Die Downloads oben und
-Windows-Links unten bleiben die getrennt geprüften Releases. Vor Paketbau oder
-Installation gelten die [Integrationsbelege und Plattformgrenzen](docs/INTEGRATION-DEV3-RC32-20261104.md).
+Dieselbe Version enthält eine [Windows 11-Entwicklungsvorschau](https://github.com/landjunge/KiraBridge/releases/download/v0.8.0rc33/KiraBridge-0.8.0rc33-Windows-Dev-Kit.zip)
+mit nativer Tastatur, Shortcuts und abgesicherter Fenstersteuerung. Es ist ein
+separates Entwicklungspaket; allgemeine Windows-Datei-, Prozess- und Terminaltools
+gehören nicht zu seinem Umfang. Siehe [RC33-Paketprüfung, Installationsstand und Grenzen](docs/RC33-DELIVERY-20261104.md).
 
 ## Wobei KiraBridge dir hilft
 
@@ -61,7 +61,7 @@ Für Terminalaufträge müssen Grok Build oder Codex installiert und angemeldet 
 Richte ihre Terminalsitzung in KiraBridge als Ziel ein.
 
 Diese Vorabversion hat bekannte Einschränkungen bei der Terminalbedienung; die App
-ist nicht von Apple notarisiert. Der [RC32-Paketnachweis](docs/RC32-NATIVE-ATTRIBUTE-BATCHING-20261103.md)
+ist nicht von Apple notarisiert. Der [RC33-Paketnachweis](docs/RC33-DELIVERY-20261104.md)
 beschreibt das aktuelle Paket; [frühere Installation und Hilfe](docs/INSTALL-DE.md)
 dokumentiert weiterhin RC20.
 
@@ -103,11 +103,11 @@ benötigt eine gesonderte schriftliche Erlaubnis. Der deutsche Lizenztext ist ma
 
 [Entwicklerdokumentation](docs/DEVELOPERS.de.md)
 
-[Windows-Vorschau dev2](https://github.com/landjunge/KiraBridge/releases/tag/windows-v0.8.0rc31.dev2):
+[Frühere Windows-Vorschau dev2](https://github.com/landjunge/KiraBridge/releases/tag/windows-v0.8.0rc31.dev2):
 Native Tastatur und lokales MCP haben die Abnahme in einer eigenen Windows 11-VM bestanden.
 [Ergebnisse und Grenzen](docs/WINDOWS-DEVELOPMENT-20261103.md); macOS bleibt getrennt.
 
-[Windows-Desktop-Vorschau dev3](https://github.com/landjunge/KiraBridge/releases/tag/windows-v0.8.0rc31.dev3): Alle sechs nativen
+[Frühere Windows-Desktop-Vorschau dev3](https://github.com/landjunge/KiraBridge/releases/tag/windows-v0.8.0rc31.dev3): Alle sechs nativen
 Gastprüfungen bestanden, einschließlich Ctrl-/Alt-/Shift-Kombinationen und
 abgesicherter Fenstersteuerung. Veröffentlichte Downloads und die getrennte
 Windows 11-Installation sind geprüft. [Belege und Grenzen](docs/WINDOWS-DESKTOP-20261104.md);
