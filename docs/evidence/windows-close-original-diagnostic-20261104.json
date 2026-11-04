@@ -1,0 +1,52 @@
+{
+  "schema": "kirabridge.windows-close-original-diagnostic.v1",
+  "scope": "Read-only query of the original isolated V4 task; no close replay or task-state rewrite",
+  "task_id": "win_window_f96d7682b54a72c8_close_wm_close",
+  "manifest_sha256": "1ed5a07dcc79b212470ca9779f4fb5a99d4fea5dcf26f608996cb2baa2afa167",
+  "original_phase_report_sha256": "f3eb335bba6531ae0eafffcf1b642d0a6cbcf8a430e1ae6750cadd8ac3afba6e",
+  "original_phase_artifact_sha256": "6e2704eb28011848bd802adff5e6ed176ebe08af7a4058eade360d3473a02ba4",
+  "original_diagnostic_event_line_sha256": "24ec87fe6a6a28230f305fd8e4f895bb500a838c2baea345c8f367f770d8cb89",
+  "original_diagnostic": {
+    "received_at": "2026-11-04T05:21:42.417615+00:00",
+    "event": {
+      "phase": "original_close_diagnostic",
+      "state": "unknown",
+      "evidence": {
+        "automatic_retry": false,
+        "exception_type": "UncertainExecution",
+        "last_observation": {
+          "automatic_retry": false,
+          "evidence_type": "windows_window_started"
+        },
+        "provider_error": {
+          "cause_code": "windows_target_changed",
+          "cause_type": "BridgeError",
+          "native_request_accepted": true
+        },
+        "safe_to_retry": false
+      },
+      "error": {
+        "code": "windows_window_effect_unknown"
+      }
+    }
+  },
+  "interpretation": {
+    "native_wm_close_request_accepted": true,
+    "post_acceptance_readback_error": "windows_target_changed",
+    "precise_readback_substep_proven": false,
+    "window_closed_confirmed_by_this_diagnostic": false,
+    "original_task_remains_unknown": true
+  },
+  "original_window_phase": {
+    "passed": false,
+    "successful_cases": [
+      "move_resize",
+      "maximize",
+      "restore_from_maximized",
+      "minimize",
+      "restore_from_minimized",
+      "activate_from_owned_auxiliary"
+    ]
+  },
+  "automatic_retry_performed": false
+}

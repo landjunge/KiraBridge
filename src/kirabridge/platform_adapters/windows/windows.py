@@ -407,11 +407,32 @@ class WindowsWindows:
                             else "Windows did not confirm the asynchronous request"
                         )
                         raise BridgeError("windows_window_request_unconfirmed", reason)
+                    if action == "close":
+                        # WM_CLOSE may destroy the HWND during inspection or show
+                        # an unsaved-data dialog. A successful post acknowledges
+                        # this request only; never inspect its teardown as if it
+                        # were a failed delivery, or claim application completion.
+                        return {
+                            "action": action,
+                            "target": target.to_wire(),
+                            "request_accepted": True,
+                            "effect_attempted": True,
+                            "observed": False,
+                            "outcome": "requested",
+                            "observed_state": None,
+                            "application_processing_confirmed": False,
+                            "native_error": native_error,
+                            "coordinate_space": COORDINATE_SPACE,
+                            "automatic_retry": False,
+                            "scope": (
+                                "WM_CLOSE accepted; completion requires independent observation"
+                            ),
+                        }
                     self.api.validate_desktop()
                     after = self.api.snapshot(target.hwnd)
                     if after is not None and after["target"] != target:
                         raise BridgeError("windows_target_changed", "HWND was reused after request")
-                    if after is None and action != "close":
+                    if after is None:
                         raise BridgeError(
                             "windows_target_changed", "Window disappeared after request"
                         )
@@ -466,7 +487,7 @@ class WindowsWindows:
     @staticmethod
     def _observed(action, bounds, state):
         if action == "close":
-            return state is None
+            return False  # Closing is a request-only contract, never a backend completion claim.
         if action == "activate":
             return state["foreground"]
         if action == "minimize":

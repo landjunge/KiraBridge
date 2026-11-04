@@ -257,16 +257,28 @@ def test_move_resize_observes_exact_outer_rectangle_without_implicit_restore():
     assert [call[1] for call in api.calls] == ["move_resize"]
 
 
-def test_close_only_observes_original_handle_absence_not_process_termination():
+def test_close_acknowledges_request_without_any_post_request_window_inspection():
     api = FakeWindows()
-    api.after_request = lambda action, bounds: setattr(api, "present", False)
+
+    def accepted(action, bounds):
+        api.before_snapshot = lambda: pytest.fail("Close performed a post-request HWND read")
+        api.desktop_failure = "windows_desktop_changed"
+        api.target = replace(api.target, pid=999)
+
+    target = api.target
+    api.after_request = accepted
     result = WindowsWindows(api).control(api.target, "close")
-    assert result["observed"] and result["observed_state"] is None
+    assert result["target"] == target.to_wire()
+    assert result["request_accepted"] and result["effect_attempted"]
+    assert result["observed"] is False and result["outcome"] == "requested"
+    assert result["observed_state"] is None and result["application_processing_confirmed"] is False
+    assert result["scope"] == "WM_CLOSE accepted; completion requires independent observation"
+    assert api.desktop_checks == 4  # Both exact pre-effect guards, no post-effect desktop work.
     assert len(api.calls) == 1
 
 
-@pytest.mark.parametrize("action", ["close", "move_resize"])
-def test_reused_hwnd_after_attempt_is_unknown_and_never_reported_as_closed(action):
+@pytest.mark.parametrize("action", ["activate", "minimize", "maximize", "restore", "move_resize"])
+def test_other_actions_still_reject_reused_hwnd_after_attempt_as_unknown(action):
     api = FakeWindows()
     target = api.target
     api.after_request = lambda action, bounds: setattr(api, "target", replace(target, pid=999))
@@ -277,6 +289,17 @@ def test_reused_hwnd_after_attempt_is_unknown_and_never_reported_as_closed(actio
         ),
     )
     assert isinstance(error, UncertainExecution) and len(api.calls) == 1
+
+
+@pytest.mark.parametrize("accepted,failure", [(False, None), (True, OSError("Unconfirmed post"))])
+def test_failed_native_close_is_unknown_with_ack_evidence_without_retry(accepted, failure):
+    api = FakeWindows()
+    api.accepted, api.failure = accepted, failure
+    error = error_code(
+        "windows_window_effect_unknown", lambda: WindowsWindows(api).control(api.target, "close")
+    )
+    assert error.provider_error["native_request_accepted"] is (False if failure is None else None)
+    assert len(api.calls) == 1
 
 
 @pytest.mark.parametrize("failure", ["false", "exception", "readback", "desktop", "dpi_restore"])
@@ -573,8 +596,9 @@ def test_uncertain_provider_error_keeps_only_confirmed_ack_and_bounded_cause(
             api.target = replace(api.target, pid=999)
 
         api.after_request = readback
+    action = "minimize" if failure == "readback" else "close"
     error = error_code(
-        "windows_window_effect_unknown", lambda: WindowsWindows(api).control(api.target, "close")
+        "windows_window_effect_unknown", lambda: WindowsWindows(api).control(api.target, action)
     )
     assert error.provider_error["native_request_accepted"] is acknowledged
     assert error.provider_error["cause_code"] == cause

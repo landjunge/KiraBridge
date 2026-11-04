@@ -46,7 +46,11 @@ class WindowsWindowListInput(Input):
 
 class WindowsWindowControlInput(Input):
     target: WindowsWindowTargetInput
-    action: Literal["activate", "minimize", "maximize", "restore", "move_resize", "close"]
+    action: Literal["activate", "minimize", "maximize", "restore", "move_resize", "close"] = Field(
+        description=(
+            "close acknowledges a WM_CLOSE request only; application completion is unconfirmed"
+        )
+    )
     bounds: WindowsWindowBoundsInput | None = None
 
     @model_validator(mode="after")
@@ -84,7 +88,10 @@ class WindowsWindowManager:
                 "available": self.host == "win32",
                 "eligible_for_submission": self.host == "win32" and decide(operation)["authorized"],
                 "policy": decide(operation),
-                "scope": "Exact top-level Windows target; requested and observed effects differ",
+                "scope": (
+                    "Exact top-level Windows target; close acknowledges WM_CLOSE request only, "
+                    "other actions distinguish requested and observed effects"
+                ),
             }
             for operation in WINDOWS_WINDOW_INPUTS
         ]

@@ -31,6 +31,19 @@ def aggregate_attempts(report):
     report["effect_attempted"] = True if True in values else None if None in values else False
 
 
+def record_task_observation(item, task):
+    item["task_state"] = task.get("state")
+    item["error_code"] = (task.get("error") or {}).get("code")
+    # TaskManager's transition records provider diagnostics in evidence. Error
+    # deliberately contains only its public code, never the underlying message.
+    provider = (task.get("evidence") or {}).get("provider_error")
+    if isinstance(provider, dict):
+        item["provider_error"] = provider
+        acknowledged = provider.get("native_request_accepted")
+        if type(acknowledged) is bool:
+            item["native_request_accepted"] = acknowledged
+
+
 def instrument_windows(backend, report, persist):
     """Conservative test observations; a hook is not a receiver acknowledgement."""
     from kirabridge.bridge_core.models import BridgeError, UncertainExecution
@@ -482,14 +495,7 @@ async def run_mcp(fixture, probe, report, persist):
                                 )
                             await asyncio.sleep(0.02)
                             task = await call("task_get", {"task_id": task_id})
-                        item["task_state"] = task.get("state")
-                        item["error_code"] = (task.get("error") or {}).get("code")
-                        provider = (task.get("error") or {}).get("provider_error")
-                        if isinstance(provider, dict):
-                            item["provider_error"] = provider
-                            acknowledged = provider.get("native_request_accepted")
-                            if type(acknowledged) is bool:
-                                item["native_request_accepted"] = acknowledged
+                        record_task_observation(item, task)
                         item["elapsed_ms"] = (time.monotonic_ns() - began) / 1e6
                         persist()
                         return task, item
@@ -545,6 +551,14 @@ async def run_mcp(fixture, probe, report, persist):
                             )
                         if item["before_effect_hooks"] != 1 or item["effect_attempted"] is not True:
                             raise RuntimeError("Missing conservative before-effect evidence")
+                        if action == "close" and (
+                            task["result"].get("request_accepted") is not True
+                            or task["result"].get("observed") is not False
+                            or task["result"].get("outcome") != "requested"
+                            or task["result"].get("observed_state") is not None
+                            or task["result"].get("application_processing_confirmed") is not False
+                        ):
+                            raise RuntimeError("WM_CLOSE backend must acknowledge only its request")
                         after = await observe(probe, target, predicate, allow_absent=absent)
                         item["state"] = "independently_observed"
                         report["cases"].append(

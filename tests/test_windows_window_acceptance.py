@@ -23,6 +23,43 @@ TARGET = {
 }
 
 
+def test_task_provider_diagnostic_is_preserved_from_evidence_not_error():
+    provider = {
+        "native_request_accepted": True,
+        "cause_type": "BridgeError",
+        "cause_code": "windows_target_changed",
+    }
+    item = {"native_request_accepted": None}
+    HARNESS.record_task_observation(
+        item,
+        {
+            "state": "unknown",
+            "error": {
+                "code": "windows_window_effect_unknown",
+                "provider_error": {"native_request_accepted": False},
+            },
+            "evidence": {"provider_error": provider},
+        },
+    )
+    assert item["provider_error"] == provider and item["native_request_accepted"] is True
+    assert item["task_state"] == "unknown" and item["error_code"] == "windows_window_effect_unknown"
+
+
+def test_task_diagnostic_does_not_infer_ack_from_missing_evidence_or_error_payload():
+    item = {"native_request_accepted": None}
+    HARNESS.record_task_observation(
+        item,
+        {
+            "state": "unknown",
+            "error": {
+                "code": "windows_window_effect_unknown",
+                "provider_error": {"native_request_accepted": True},
+            },
+        },
+    )
+    assert item["native_request_accepted"] is None and "provider_error" not in item
+
+
 def pending():
     return {
         "effect_attempted": None,
