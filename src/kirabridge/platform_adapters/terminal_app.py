@@ -359,6 +359,23 @@ class TerminalAppTransport:
     if (tabs.length !== 1) throw Error("Selected tab no longer exists");
     const tab = tabs[0];"""
 
+    @staticmethod
+    def native_focus_check(pane_id):
+        window, tty = pane_id.split(":")[1:]
+        return f"""
+    function checkFocus() {{
+     const current=app.windows(),
+      frontmost=Application("System Events").processes.byName("Terminal").frontmost();
+     const windowID=current.length ? current[0].id() : null;
+     const currentTTY=current.length ? current[0].selectedTab().tty() : null;
+     if(!frontmost || windowID!=={int(window)} || currentTTY!=={json.dumps("/dev/" + tty)})
+      throw Error("Selected terminal focus changed; do not repeat input " + JSON.stringify({{
+       frontmost:frontmost, window_id:windowID, tty:currentTTY,
+       expected_window:{int(window)}, expected_tty:{json.dumps("/dev/" + tty)}
+      }}));
+    }}
+"""
+
     def native_focus(self, pane_id):
         window, tty = pane_id.split(":")[1:]
         return (
@@ -385,23 +402,16 @@ class TerminalAppTransport:
      if(!item.enabled()) throw Error("Selected terminal focus changed: window entry disabled");
      item.click(); delay(0.15);
     }}
-    function checkFocus() {{
-     const current=app.windows(), frontmost=se.processes.byName("Terminal").frontmost();
-     const windowID=current.length ? current[0].id() : null;
-     const currentTTY=current.length ? current[0].selectedTab().tty() : null;
-     if(!frontmost || windowID!=={int(window)} || currentTTY!=={json.dumps("/dev/" + tty)})
-      throw Error("Selected terminal focus changed; do not repeat input " + JSON.stringify({{
-       frontmost:frontmost, window_id:windowID, tty:currentTTY,
-       expected_window:{int(window)}, expected_tty:{json.dumps("/dev/" + tty)}
-      }}));
-    }}
+"""
+            + TerminalAppTransport.native_focus_check(pane_id)
+            + """
     // Window activation is asynchronous. Acquire once with a bounded wait;
     // later pre-input checks remain immediate and never reassert focus.
     const focusDeadline=Date.now()+2000;
-    while(true) {{
-     try {{ checkFocus(); break; }}
-     catch(error) {{ if(Date.now()>=focusDeadline) throw error; delay(0.05); }}
-    }}"""
+    while(true) {
+     try { checkFocus(); break; }
+     catch(error) { if(Date.now()>=focusDeadline) throw error; delay(0.05); }
+    }"""
         )
 
     @staticmethod
@@ -1069,25 +1079,48 @@ entries[0].click();JSON.stringify({detached:true});
         )
         if before_transport is not None:
             await before_transport()
-        return await self.native(
-            self.native_target(row["pane_id"])
-            + identity_guard
-            + own_boundary
-            + "\nconst host=Application.currentApplication(); host.includeStandardAdditions=true;"
+        target = self.native_target(row["pane_id"])
+        identity_check = (
+            "\nconst host=Application.currentApplication(); host.includeStandardAdditions=true;"
             + "\nconst observed=host.doShellScript("
             + json.dumps(command)
             + ").trim().replace(/\\s+/g,' ');"
             + "\nif(observed!=="
             + json.dumps(identity)
             + ") throw Error('Selected target identity changed');"
+        )
+        await self.native(
+            target
+            + identity_guard
+            + own_boundary
+            + identity_check
+            + "\nif(tab.busy()) throw Error('Selected terminal is busy');"
+            + self.native_screen_guard(screen)
+            + self.native_focus(row["pane_id"])[len(target) :]
+            + "\ncheckFocus(); JSON.stringify({focused:true});",
+            mutation=True,
+        )
+        # Tab selection may reflow history or change blank row padding. Accept
+        # only a fresh empty prompt AFTER that transition; compare it byte-for-
+        # byte later, without another selection or activation in the dispatch.
+        screen = await self.read(row["pane_id"])
+        if not empty_shell_prompt(screen):
+            raise BridgeError("visible_input_not_empty", "Focused shell input is not empty")
+        return await self.native(
+            target
+            + identity_guard
+            + own_boundary
+            + identity_check
+            + TerminalAppTransport.native_focus_check(row["pane_id"])
+            + "\ncheckFocus();"
             + "\nif(tab.busy()) throw Error('Selected terminal is busy');"
             # Use the accepted screen, not a second prompt parser that can drift.
             + self.native_screen_guard(screen)
-            + "\ntargetWindow.selectedTab=tab; targetWindow.index=1; app.activate();"
             + ("\ncheckTargetIdentity();" if expected_cwd is not None else "")
             + own_boundary
             + "\nif(tab.busy()) throw Error('Selected terminal is busy');"
             + self.native_screen_guard(screen)
+            + "\ncheckFocus();"
             + "\napp.doScript("
             + json.dumps(text)
             + ", {in:tab}); JSON.stringify({sent:true});",

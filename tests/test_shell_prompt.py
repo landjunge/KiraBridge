@@ -100,7 +100,10 @@ async def test_chatgpt_session_input_task_uses_confirmed_shell_path(direct_shell
     assert persisted["state"] == State.COMPLETED
     terminal = bridge.sessions.terminal_app
     terminal.process_identity.assert_awaited_once_with(900)
-    terminal.native.assert_awaited_once()
+    assert terminal.native.await_count == 2
+    sources = [call.args[0] for call in terminal.native.await_args_list]
+    assert "app.doScript(" not in sources[0]
+    assert sources[1].count("app.doScript(") == 1
     assert terminal.native.call_args.kwargs["mutation"] is True
     terminal.send.assert_not_awaited()
 
@@ -189,18 +192,19 @@ async def run_dispatch_js(source, state):
         "const state=" + json.dumps(state) + "; const calls=[];"
         "const tab={tty:()=>'/dev/ttys004',busy:()=>state.busy,"
         "contents:()=>state.screen,history:()=>state.screen};"
-        "const win={id:()=>123,tabs:()=>[tab]};"
+        "const win={id:()=>123,tabs:()=>[tab],selectedTab:()=>tab};"
         "const windows=()=>[win]; windows.byId=()=>win;"
         "const app={running:()=>true,windows,activate:()=>{"
         "if(state.focusScreen!==undefined)state.screen=state.focusScreen;"
         "if(state.focusBusy)state.busy=true;},"
         "doScript:(text,target)=>{if(target.in!==tab)throw Error('wrong target');"
         "calls.push(text);}};"
-        "const Application=()=>app;"
+        "const Application=name=>name==='System Events'?"
+        "{processes:{byName:()=>({frontmost:()=>true})}}:app;const delay=()=>{};"
         "Application.currentApplication=()=>({doShellScript:()=>state.identity});"
         "let result;try{result={value:JSON.parse(eval("
         + json.dumps(source)
-        + ")),calls};}catch(error){result={error:String(error),calls};}"
+        + ")),calls,state};}catch(error){result={error:String(error),calls,state};}"
     )
     harness += (
         "process.stdout.write(JSON.stringify(result));" if node else "JSON.stringify(result);"
@@ -259,6 +263,7 @@ async def test_actual_native_dispatch_guards_races(direct_shell, monkeypatch, ch
         assert mutation
         result = await run_dispatch_js(source, state)
         observed.append(result)
+        state.update(result["state"])
         if result.get("error"):
             raise BridgeError("fixture_native_refused", result["error"])
         return result["value"]
@@ -271,5 +276,5 @@ async def test_actual_native_dispatch_guards_races(direct_shell, monkeypatch, ch
     else:
         result = await bridge.sessions.send("local", arguments(row), before_transport=intent)
         assert result["submitted"] and result["input_handed_to_transport"]
-        assert observed[0]["calls"] == ["printf harmless"]
+        assert [call for result in observed for call in result["calls"]] == ["printf harmless"]
     terminal.send.assert_not_awaited()

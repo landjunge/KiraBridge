@@ -300,9 +300,11 @@ async def test_real_send_source_checks_full_image_parent_cwd_and_final_empty_scr
 const vm=require('node:vm');let sent=0,identity=cfg.identity,busy=false;
 let screen='KiraBridge visible % ';
 const tab={tty:()=>'/dev/ttys004',busy:()=>busy,history:()=>screen};
-const win={id:()=>123,tabs:()=>[tab]};function windows(){return [win];}windows.byId=()=>win;
+const win={id:()=>123,tabs:()=>[tab],selectedTab:()=>tab};
+function windows(){return [win];}windows.byId=()=>win;
 const app={running:()=>true,windows,activate:()=>{},doScript:()=>{sent++;}};
-function Application(){return app;}
+function Application(name){return name==='System Events'?
+ {processes:{byName:()=>({frontmost:()=>true})}}:app;}
 Application.currentApplication=()=>({doShellScript:command=>{
  if(command.includes('lsof')){
   if(cfg.change==='image')identity=identity.replace('/bin/zsh','/bin/fish');
