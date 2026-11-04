@@ -41,7 +41,7 @@ function New-PrivateReceipt([string]$Path, [string]$Text) {
     finally { $stream.Dispose() }
 }
 function Download-Verified($Entry, [string]$Root) {
-    if ($Entry.path -notmatch '^(guest_runner\.ps1|source\.zip|python-installer\.exe|wheels/[A-Za-z0-9][A-Za-z0-9._+-]{0,200}\.whl)$' -or
+    if ($Entry.path -cnotmatch '^(guest_runner\.ps1|source\.zip|python-installer\.exe|wheels/[A-Za-z0-9][A-Za-z0-9._+-]{0,200}\.whl|tools/tunnel-client-v0\.0\.19-windows-amd64\.zip)$' -or
         $Entry.sha256 -notmatch '^[a-fA-F0-9]{64}$' -or [long]$Entry.bytes -le 0) {
         throw 'Invalid manifest file entry'
     }

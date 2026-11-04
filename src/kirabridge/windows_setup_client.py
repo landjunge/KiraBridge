@@ -251,7 +251,14 @@ def install_client(state_dir: Path) -> Path:
     reservation = folder.parent / (folder.name + "-install-reservation.json")
     if os.path.lexists(reservation):
         raise fail("setup_client_existing")
-    data = download()
+    cached = state / "bundled-client.zip"
+    bundled = os.path.lexists(cached)
+    if bundled:
+        data = read_private(cached, ARCHIVE_SIZE)
+        if len(data) != ARCHIVE_SIZE or hashlib.sha256(data).hexdigest() != ARCHIVE_SHA256:
+            raise fail("setup_client_checksum")
+    else:
+        data = download()
     files = archive_files(data)
     private_directory(state)
     private_directory(folder.parent)
@@ -281,6 +288,7 @@ def install_client(state_dir: Path) -> Path:
             "file_sha256": FILE_SHA256,
             "verified_at": time.time(),
             "program_executed_by_installer": False,
+            "archive_source": "bundled_private_cache" if bundled else "official_download",
         },
     )
     return folder / "tunnel-client.exe"

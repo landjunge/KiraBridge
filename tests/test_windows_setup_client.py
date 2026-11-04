@@ -558,3 +558,43 @@ def test_readonly_status_never_archives_an_exited_process(prepared, monkeypatch)
     assert client.client_status(state)["state"] == "unknown"
     assert len(calls) == 1
     assert not (state / "connection/history").exists()
+
+
+def test_bundled_official_cache_installs_without_network_and_is_preserved(
+    bundle, tmp_path, monkeypatch
+):
+    cache = tmp_path / "bundled-client.zip"
+    write_private(cache, bundle[1])
+    monkeypatch.setattr(client, "download", lambda: pytest.fail("Bundled client must stay offline"))
+    monkeypatch.setattr(
+        client.subprocess, "Popen", lambda *a, **k: pytest.fail("Installer never executes")
+    )
+    binary = client.install_client(tmp_path)
+    assert cache.read_bytes() == bundle[1]
+    assert binary.read_bytes() == bundle[0]["tunnel-client.exe"]
+    proof = json.loads((binary.parent / "provenance.json").read_bytes())
+    assert proof["archive_source"] == "bundled_private_cache"
+
+
+@pytest.mark.parametrize("kind", ["changed", "truncated", "oversize", "symlink"])
+def test_bad_bundled_cache_is_preserved_and_never_falls_back_to_network(
+    bundle, tmp_path, monkeypatch, kind
+):
+    cache = tmp_path / "bundled-client.zip"
+    if kind == "symlink":
+        target = tmp_path / "original-client.zip"
+        write_private(target, bundle[1])
+        cache.symlink_to(target)
+    else:
+        data = {
+            "changed": b"X" + bundle[1][1:],
+            "truncated": bundle[1][:-1],
+            "oversize": bundle[1] + b"X",
+        }[kind]
+        write_private(cache, data)
+    before = cache.read_bytes()
+    monkeypatch.setattr(client, "download", lambda: pytest.fail("Bad cache must not fall back"))
+    with pytest.raises(BridgeError):
+        client.install_client(tmp_path)
+    assert cache.read_bytes() == before
+    assert not (tmp_path / "tools").exists()
