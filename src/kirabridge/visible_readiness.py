@@ -43,6 +43,14 @@ def _codex_standalone_warning_footer(lines):
     )
 
 
+def codex_input_footer_group(lines):
+    """Validate the complete composer footer; warning rows never stand alone."""
+    footer = [line.strip() for line in lines if line.strip()]
+    return all(codex_input_footer(line) for line in footer) or _codex_standalone_warning_footer(
+        footer
+    )
+
+
 def display_text(text):
     text = text.replace("\r\n", "\n")
     text = re.sub(r"\x1b\[[0-9;:]*m", "", text)
@@ -117,9 +125,7 @@ def assess(target, raw, binding, protocol=None):
         if scroll_controls and not (protocol and protocol.get("state") == "idle"):
             return result("scrolled", "current_scroll_controls")
         footer = [line.strip() for line in view.splitlines()[1:] if line.strip()]
-        known_footer = all(codex_input_footer(line) for line in footer) or (
-            _codex_standalone_warning_footer(footer)
-        )
+        known_footer = codex_input_footer_group(footer)
         if not known_footer:
             return result("unknown", "unrecognized_footer_or_dialog")
         # Real progress is above the prompt. An idle protocol observation cannot

@@ -6,7 +6,7 @@ from contextlib import AsyncExitStack
 from kirabridge.bridge_core.models import BridgeError
 from kirabridge.codex_menu import resume_readiness, resume_selector, unsupported_confirmation_frame
 from kirabridge.visible_handoff import VisibleReadinessError
-from kirabridge.visible_readiness import assess, codex_input_footer, display_text, input_view
+from kirabridge.visible_readiness import assess, codex_input_footer_group, display_text, input_view
 
 
 def return_readiness(target, raw, binding, protocol=None):
@@ -63,7 +63,7 @@ def return_readiness(target, raw, binding, protocol=None):
             )
             and nonempty_footer
             and re.match(r"^\s*GPT-\S+", nonempty_footer[0])
-            and all(codex_input_footer(line) for line in nonempty_footer)
+            and codex_input_footer_group(nonempty_footer)
         ):
             masked = "›\n" + "".join(footer)
             break

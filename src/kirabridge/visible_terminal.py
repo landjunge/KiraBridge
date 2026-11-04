@@ -60,7 +60,14 @@ class VisibleTerminal:
         # final selection and native dispatch still verify input authority anew.
         with self.sessions.observation_scope(principal, row):
             output = await self.sessions.read(principal, row["pane_id"], row["expected_pid"])
-        return empty_shell_prompt(output["text"])
+        if not empty_shell_prompt(output["text"]):
+            error = BridgeError(
+                "visible_input_unknown",
+                "Selected process is an idle shell, but empty input is not confirmed; preserve it",
+            )
+            error.provider_error = {"process_state": "idle_shell", "input_state": "unknown"}
+            raise error
+        return True
 
     async def execute(self, task, args, running, *, progress=None, privileged=False):
         bridge, principal = self, task["principal"]
@@ -97,15 +104,24 @@ class VisibleTerminal:
                 error = catalog.get("transport_errors", {}).get("terminal_app")
                 if error:
                     raise BridgeError(error["code"], error.get("message", "Terminal unavailable"))
-                candidates = []
+                candidates, unconfirmed_input = [], None
                 for candidate in catalog["sessions"]:
-                    if await self.suitable(principal, candidate):
-                        candidates.append(candidate)
+                    try:
+                        if await self.suitable(principal, candidate):
+                            candidates.append(candidate)
+                    except BridgeError as error:
+                        if error.code != "visible_input_unknown":
+                            raise
+                        unconfirmed_input = error
                 # Every candidate has independent fresh empty-shell evidence.
                 row = (
                     sorted(candidates, key=lambda item: item["pane_id"])[0] if candidates else None
                 )
                 if row is None:
+                    if unconfirmed_input is not None:
+                        # An ambiguous existing shell is not evidence that more
+                        # windows are needed. Preserve it and report input state.
+                        raise unconfirmed_input
                     if not args.create_if_needed:
                         raise BridgeError(
                             "visible_shell_missing", "No unique suitable visible shell"
@@ -159,7 +175,7 @@ class VisibleTerminal:
                         if await self.suitable(principal, row):
                             break
                     except BridgeError as exc:
-                        if exc.code != "session_selection_changed":
+                        if exc.code not in {"session_selection_changed", "visible_input_unknown"}:
                             raise
                 await asyncio.sleep(0.1)
             else:
