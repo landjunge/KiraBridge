@@ -26,6 +26,10 @@ IDENTITY = ("hwnd", "pid", "process_created_100ns", "thread_id")
 TERMINAL = {"completed", "failed", "unknown", "cancelled", "blocked", "withdrawn"}
 
 
+class SnapshotChanged(RuntimeError):
+    """The HWND changed during one independent read; this does not prove absence."""
+
+
 def aggregate_attempts(report):
     values = [item["effect_attempted"] for item in report["window_effect_attempts"]]
     report["effect_attempted"] = True if True in values else None if None in values else False
@@ -207,7 +211,7 @@ class NativeReadback:
             or again.value != pid.value
             or self.created(again.value) != created
         ):
-            raise RuntimeError("Owned window identity changed during independent readback")
+            raise SnapshotChanged("Owned window identity changed during independent readback")
         return {
             "exists": True,
             "target": {
@@ -381,9 +385,16 @@ async def observe(
 ):
     deadline = clock() + timeout
     while True:
-        state = checked_snapshot(probe, target, allow_absent=allow_absent)
-        if predicate(state):
-            return state
+        try:
+            state = checked_snapshot(probe, target, allow_absent=allow_absent)
+        except SnapshotChanged:
+            if not allow_absent:
+                raise
+            # Closing may race a read. Only a fresh snapshot may prove absence;
+            # checked_snapshot still rejects any stable foreign/reused identity.
+        else:
+            if predicate(state):
+                return state
         if clock() >= deadline:
             raise RuntimeError("Native window request was not independently observed; never replay")
         await pause(0.02)
