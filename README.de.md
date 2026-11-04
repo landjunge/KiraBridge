@@ -13,15 +13,15 @@ KiraBridge verbindet ChatGPT mit **Grok Build und Codex, die in Terminalfenstern
 auf deinem Computer laufen**. Besprich im Chat, was du erledigen möchtest, gib die
 Arbeit an diese Terminalagenten weiter und verfolge ihre Antworten — mit den von dir erlaubten Zugriffen.
 
-**macOS · Intel — [0.8.0rc34](https://github.com/landjunge/KiraBridge/releases/tag/v0.8.0rc34) · 4. November 2026 · Vorabversion**
+**macOS · Intel — [0.8.0rc36](https://github.com/landjunge/KiraBridge/releases/tag/v0.8.0rc36) · 4. November 2026 · Vorabversion**
 
-### [KiraBridge herunterladen — App und Installer](https://github.com/landjunge/KiraBridge/releases/download/v0.8.0rc34/KiraBridge-0.8.0rc34-Intel-Installer.zip)
+### [KiraBridge herunterladen — App und Installer](https://github.com/landjunge/KiraBridge/releases/download/v0.8.0rc36/KiraBridge-0.8.0rc36-Intel-Installer.zip)
 
-[Prüfsummen](https://github.com/landjunge/KiraBridge/releases/download/v0.8.0rc34/SHA256SUMS)
+[Prüfsummen](https://github.com/landjunge/KiraBridge/releases/download/v0.8.0rc36/SHA256SUMS)
 · [Alle Versionen](https://github.com/landjunge/KiraBridge/releases)
 
 Für die Downloads brauchst du ein GitHub-Konto mit Zugriff auf dieses private Repository.
-Dies ist eine Vorabversion; eine stabile Version gibt es noch nicht. RC34 ist für Intel-Macs verfügbar.
+Dies ist eine Vorabversion; eine stabile Version gibt es noch nicht. RC36 ist für Intel-Macs verfügbar.
 
 Das separate RC33-Release enthält eine [Windows 11-Entwicklungsvorschau](https://github.com/landjunge/KiraBridge/releases/download/v0.8.0rc33/KiraBridge-0.8.0rc33-Windows-Dev-Kit.zip)
 mit nativer Tastatur, Shortcuts und abgesicherter Fenstersteuerung. Es ist ein
@@ -61,7 +61,7 @@ Für Terminalaufträge müssen Grok Build oder Codex installiert und angemeldet 
 Richte ihre Terminalsitzung in KiraBridge als Ziel ein.
 
 Diese Vorabversion hat bekannte Einschränkungen bei der Terminalbedienung; die App
-ist nicht von Apple notarisiert. Der [RC34-Nachweis](docs/CODEX-FOOTER-20261104.md)
+ist nicht von Apple notarisiert. Der [RC36-Nachweis](docs/TERMINAL-MINIMIZED-RC36-20261104.md)
 beschreibt das aktuelle Paket; [frühere Installation und Hilfe](docs/INSTALL-DE.md)
 dokumentiert weiterhin RC20.
 

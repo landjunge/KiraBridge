@@ -1,0 +1,128 @@
+{
+  "observed_at": "2026-11-04T17:00:02.042525+00:00",
+  "release": {
+    "version": "0.8.0rc36",
+    "source_commit": "d4aebdd89a206045731f2692a3f363fddaa15ee0",
+    "url": "https://github.com/landjunge/KiraBridge/releases/tag/v0.8.0rc36",
+    "published_assets_verified": {
+      "KiraBridge-macos.tar.gz": {
+        "sha256": "7e9033a5851fda1b9f2991df7c4f7f1b991eda321916cb3781311787f47927dc",
+        "bytes": 3040713
+      },
+      "KiraBridge-macos.tar.gz.sha256": {
+        "sha256": "a80d6d54dd73ff39c12556be07104046a6fa3d71350086e40ec0e5fd0ce69659",
+        "bytes": 90
+      },
+      "kirabridge-0.8.0rc36-py3-none-any.whl": {
+        "sha256": "9867772148e31e19c69dfd1830f79c3eceb03f8056be884dd7efffba942f0111",
+        "bytes": 606491
+      },
+      "kirabridge-0.8.0rc36-py3-none-any.whl.sha256": {
+        "sha256": "a3a2e245d8b248302cbdac400602b2368fa7b68919c3544049b3b942e0d8648c",
+        "bytes": 104
+      },
+      "KiraBridge-0.8.0rc36-Intel-Installer.zip": {
+        "sha256": "35540760776e065a4c0cfddf95ca6f8fe5e2d90d2f9e58489ea4d04edd212dca",
+        "bytes": 3623180
+      },
+      "KiraBridge-0.8.0rc36-Intel-Installer.zip.sha256": {
+        "sha256": "33e26aaaf7e8dd29da7c6ca2197e94b4fc4cf5353400b6890bcea4bb0efc186d",
+        "bytes": 107
+      },
+      "install-macos.sh": {
+        "sha256": "7f1deda87b455fec29bb04819c881638eaa07299997618a7666e4bd88c02a73e",
+        "bytes": 586
+      },
+      "install-macos.sh.sha256": {
+        "sha256": "b0cca70d74038e242c43a79118a6156972823bf0ac9fecb136003421c4cb08ef",
+        "bytes": 83
+      },
+      "SHA256SUMS": {
+        "sha256": "03c8ea877859a05c7060c4282a2bec2454dfa0ef7c1639150cb43378b9b1bb6a",
+        "bytes": 458
+      },
+      "LICENSE": {
+        "sha256": "3316d5eda60ac1fea355aa43d196feea3567384179b55ca88c8636c0322021ec",
+        "bytes": 6373
+      }
+    },
+    "installed": false
+  },
+  "production": {
+    "version": "0.8.0rc34",
+    "pid": 37967,
+    "instance_id": "93839d0cff304feead3d04f93b8159ff",
+    "source_tree_sha256": "3e2f8753c2eb63fa9eef71ab738a8b4743cb5c65caeeb647b5d3bdda1864ba82"
+  },
+  "preservation": {
+    "observed_at": "2026-11-04T17:00:02.042525+00:00",
+    "protected_processes_checked": 11,
+    "changed_processes": [],
+    "protected_files_checked": 4,
+    "changed_files": [],
+    "private_tasks": [
+      [
+        "rc36_atomic_owned_app_focus",
+        "completed"
+      ],
+      [
+        "rc36_owned_bootstrap",
+        "unknown"
+      ]
+    ],
+    "install_started": false,
+    "install_result_exists": false,
+    "menu_success_marker": false,
+    "physical_reconciliation_proof": false,
+    "reconciliation_started": false
+  },
+  "historical_tasks": [
+    {
+      "task_id": "windows_installer_enter_1104",
+      "state": "failed",
+      "error_code": "visible_target_unknown"
+    },
+    {
+      "task_id": "windows_installer_prompt_1104",
+      "state": "unknown",
+      "error_code": "visible_insert_unknown"
+    },
+    {
+      "task_id": "kb_merge_return_newline",
+      "state": "unknown",
+      "error_code": "macos_terminal_route_required"
+    },
+    {
+      "task_id": "kb_merge_team_prompt_20261104",
+      "state": "unknown",
+      "error_code": "visible_insert_unknown"
+    }
+  ],
+  "owned_window": {
+    "pane_id": "terminal:3695:ttys005",
+    "shell_pid": 43218,
+    "private_bootstrap_state": "unknown",
+    "argv_dispatched": false,
+    "physical_surface_confirmed": false,
+    "menu_effect": "uncertain",
+    "menu_error": "macos_-1728",
+    "automatic_retry": false,
+    "window_left_for_reconciliation": true
+  },
+  "diagnostic_storage": {
+    "recording": "budget_exhausted",
+    "records": 20000,
+    "today": 0,
+    "max_records": 20000,
+    "max_events_per_day": 2000,
+    "dropped_by_this_observer": 13,
+    "retention": "existing audit preserved; bounded explicit export, no automatic deletion"
+  },
+  "limitations": [
+    "No RC36 production installation or latency comparison",
+    "No complete native new-chat/restart/thread matrix",
+    "Own logical and physical surfaces remain inconsistent",
+    "No complete original Enter protocol or historical geometry pair observations"
+  ],
+  "private_evidence_directory": "/Users/landjunge/KiraBridge-terminal-minimized-audit-20261104"
+}
