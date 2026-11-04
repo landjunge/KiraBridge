@@ -44,6 +44,50 @@ def environment():
     return env
 
 
+def stage(report, persist, name, operation=""):
+    """Persist the intended step before dispatch; cleanup never overwrites it."""
+    report.update(stage=name, operation=operation)
+    persist()
+
+
+def public_ui_status(state):
+    """Only already-public presenter fields; never prompts, replies or entry values."""
+    public = {}
+    for name in ("message", "next_action", "operation"):
+        value = getattr(state, name, None)
+        maximum = 64 if name == "operation" else 2000
+        if type(value) is str and len(value) <= maximum:
+            public[name] = value
+    for name in (
+        "busy", "consent", "local_ready", "client_ready", "connection_saved",
+        "connected", "verification_pending", "verified",
+    ):
+        value = getattr(state, name, None)
+        if type(value) is bool:
+            public[name] = value
+    return public
+
+
+def bundled_client(source):
+    from kirabridge.windows_setup_client import ARCHIVE_SHA256, ARCHIVE_SIZE, ASSET
+
+    archive = source.parent / "tools" / ASSET
+    with archive.open("rb") as handle:
+        data = handle.read(ARCHIVE_SIZE + 1)
+    if len(data) != ARCHIVE_SIZE or hashlib.sha256(data).hexdigest() != ARCHIVE_SHA256:
+        raise RuntimeError("Frozen bundled official client failed its size/hash guard")
+    return data, {"asset": ASSET, "size": len(data), "sha256": ARCHIVE_SHA256}
+
+
+def prepare_client_cache(source, state):
+    from kirabridge.private_files import write_private
+
+    data, receipt = bundled_client(source)
+    # Exclusive, durable private IO. Existing state/cache is never replaced.
+    write_private(state / "bundled-client.zip", data)
+    return {**receipt, "private_test_cache_written": True, "network_download_required": False}
+
+
 def prepare_command(arguments, report, label, *, timeout=150, allow_failure=False):
     report["preparation_steps"].append({"name": label, "exit_code": None})
     result = subprocess.run(
@@ -76,13 +120,15 @@ def outer(output, report):
     wheel = source.parent / "wheels" / f"kirabridge-{version}-py3-none-any.whl"
     if not wheel.is_file():
         raise RuntimeError("Frozen wheel beside source is required")
+    stage(report, lambda: save(output, report), "verify_bundled_client")
+    _, report["bundled_client"] = bundled_client(source)
     report["candidate_wheel_sha256"] = hashlib.sha256(wheel.read_bytes()).hexdigest()
     work = Path(output.name).parent / ("setup-acceptance-" + uuid.uuid4().hex)
     private_directory(work)
     runtime = work / "Runtime"
     report["isolated_test_work"] = str(work)
     report["state_retained_for_reconciliation"] = True
-    save(output, report)
+    stage(report, lambda: save(output, report), "fresh_venv")
     base = str(getattr(sys, "_base_executable", sys.executable))
     prepare_command(
         [base, "-I", "-B", "-m", "venv", "--system-site-packages", "--without-pip", str(runtime)],
@@ -90,6 +136,7 @@ def outer(output, report):
         "fresh_venv",
     )
     python = runtime / "Scripts/python.exe"
+    stage(report, lambda: save(output, report), "offline_wheel_install")
     prepare_command(
         [
             str(python),
@@ -112,7 +159,7 @@ def outer(output, report):
     )
     inner_output = work / "inner-receipt.json"
     report["phase"] = "owned_inner_gui_and_mcp"
-    save(output, report)
+    stage(report, lambda: save(output, report), "inner_acceptance")
     exit_code = prepare_command(
         [
             str(python),
@@ -198,6 +245,7 @@ async def require_zero_tasks(controller):
 
 
 def inner(output, report):
+    stage(report, lambda: save(output, report), "installed_runtime_check")
     import tkinter as tk
 
     import kirabridge.windows_setup_runtime as runtime_module
@@ -224,7 +272,10 @@ def inner(output, report):
         for rows in protected_before.values()
         for row in rows
     }
+    stage(report, lambda: save(output, report), "private_test_client_cache")
     private_directory(state)
+    report["bundled_client"] = prepare_client_cache(Path(__file__).resolve().parents[1], state)
+    stage(report, lambda: save(output, report), "controller_create")
     controller = WindowsSetup(state_dir=state, port=port)
     report.update(
         version=package.__version__,
@@ -255,6 +306,7 @@ def inner(output, report):
     runtime_module.subprocess = SimpleNamespace(
         Popen=capture_popen, CREATE_NEW_CONSOLE=subprocess.CREATE_NEW_CONSOLE
     )
+    stage(report, persist, "native_tk_create")
     root = tk.Tk()
     app = WindowsSetupApp(root, controller)
     root.update_idletasks()
@@ -306,7 +358,8 @@ def inner(output, report):
         if not app.presenter._closed:
             root.after(25, pump)
 
-    def action(function, *, timeout=150):
+    def action(operation, function, *, timeout=150):
+        stage(report, persist, "presenter_action", operation)
         if ui(function) is not True:
             raise RuntimeError("Own GUI rejected acceptance action")
         deadline = time.monotonic() + timeout
@@ -314,28 +367,35 @@ def inner(output, report):
             if time.monotonic() >= deadline:
                 raise RuntimeError("Own GUI action remains unresolved; no retry")
             time.sleep(0.02)
+        report["last_ui_status"] = ui(lambda: public_ui_status(app.presenter.state))
+        persist()
 
     def worker():
         original = None
         try:
-            action(app.presenter.inspect)
+            action("inspect", app.presenter.inspect)
+            stage(report, persist, "test_consent")
             ui(lambda: app.consent_value.set(True))
             ui(lambda: app.presenter.consent(True))
             report["consent_programmatic_test_only"] = True
-            action(app.presenter.start_local)
+            action("start_local", app.presenter.start_local)
             if not ui(lambda: app.presenter.state.local_ready) or len(captured) != 1:
                 raise RuntimeError("Actual controller did not start exactly one owned runtime")
             original = report["owned_server_initial"]
             if not original or not same_process(original):
                 raise RuntimeError("Own runtime generation not pinned")
-            action(app.presenter.install_client, timeout=150)
+            action("install_client", app.presenter.install_client, timeout=150)
             binary = find_client(state)
             if not binary or not ui(lambda: app.presenter.state.client_ready):
                 raise RuntimeError("Official client was not installed/checked")
+            stage(report, persist, "local_health_check")
             health = controller._require_local()
             verification = controller._verification(health)
+            stage(report, persist, "begin_simulated_verification", "begin_verification")
             challenge = verification.begin_verification(simulated=True)
+            stage(report, persist, "authenticated_local_mcp", "read_query")
             response, bearer = asyncio.run(authenticated_check(controller, challenge))
+            stage(report, persist, "official_client_checks", "version_profile_doctor")
             report["official_client_checks"] = client_helper()(
                 binary, state, controller.endpoint, bearer
             )
@@ -350,8 +410,9 @@ def inner(output, report):
             report["gui_prompt_scope"] = (
                 "Real service challenge with simulated=True; no tunnel/account"
             )
-            action(lambda: app.presenter.finish_verification(response))
+            action("finish_verification", lambda: app.presenter.finish_verification(response))
             response = None
+            stage(report, persist, "simulation_proof_check")
             proof = verification.public_proof()
             if (
                 proof.get("simulated") is not True
@@ -370,24 +431,35 @@ def inner(output, report):
                 public_proof=proof,
             )
             report["passed"] = True
+            stage(report, persist, "simulation_proved_no_cloud_attestation")
         except BaseException as error:
             report["passed"] = False
             report["error_type"] = type(error).__name__
             code = getattr(error, "code", None)
             if isinstance(code, str) and len(code) <= 64 and code.replace("_", "").isalnum():
                 report["error_code"] = code
+            try:
+                report["failed_ui_status"] = ui(lambda: public_ui_status(app.presenter.state))
+            except BaseException as diagnostic_error:
+                report["ui_diagnostic_error_type"] = type(diagnostic_error).__name__
+            persist()
         finally:
             try:
+                report["cleanup_stage"] = "owned_child_identity"
+                persist()
                 if len(captured) == 1:
                     child = captured[0]
                     original = original or report.get("owned_server_initial")
                     if not original or not same_process(original) or child.pid != original["pid"]:
                         raise RuntimeError("Original test runtime cannot be safely stopped")
                     # Contact only this pinned runtime and refuse cleanup with active tasks.
+                    report["cleanup_stage"] = "owned_child_health_and_task_zero"
+                    persist()
                     controller._require_local()
                     asyncio.run(require_zero_tasks(controller))
                     report["cleanup_zero_tasks_verified"] = True
                     report["cleanup_own_child_attempted"] = None
+                    report["cleanup_stage"] = "owned_child_stop"
                     persist()
                     try:
                         child.send_signal(signal.CTRL_BREAK_EVENT)
@@ -408,6 +480,8 @@ def inner(output, report):
                         else:
                             report["stop_method"] = "Own child exited after CTRL_BREAK request"
                     report["cleanup_own_child_attempted"] = True
+                    report["cleanup_stage"] = "owned_child_independent_absence"
+                    persist()
                     current = process_identity(original["pid"])
                     absent = (
                         not current
@@ -419,6 +493,8 @@ def inner(output, report):
                         raise RuntimeError("Own runtime absence not independently confirmed")
                 elif captured:
                     raise RuntimeError("Unexpected multiple owned runtime starts; preserve all")
+                report["cleanup_stage"] = "protected_runtime_readback"
+                persist()
                 if {str(p): listeners(p) for p in (8765, 8766, 8767, 8768)} != protected_before:
                     raise RuntimeError("Protected listener observations changed")
                 if any(
@@ -427,9 +503,13 @@ def inner(output, report):
                 ):
                     raise RuntimeError("Protected runtime generations changed")
                 report["protected_ports_unchanged"] = True
+                report["cleanup_stage"] = "complete"
             except BaseException as error:
                 report["passed"] = False
                 report["cleanup_error_type"] = type(error).__name__
+                code = getattr(error, "code", None)
+                if isinstance(code, str) and len(code) <= 64 and code.replace("_", "").isalnum():
+                    report["cleanup_error_code"] = code
             finally:
                 try:
                     controller.close()
