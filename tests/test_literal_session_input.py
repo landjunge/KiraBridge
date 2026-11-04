@@ -174,6 +174,93 @@ def test_captured_collapsed_paste_hides_only_empty_composer_shortcut_row(size):
     assert not insertion_observed("codex", after, payload + "X", before)
 
 
+@pytest.mark.parametrize("size", [1014, 1078])
+@pytest.mark.parametrize("badge", ["1 warning", "2 warnings"])
+def test_captured_collapsed_paste_keeps_hint_warning_at_its_bound_column(size, badge):
+    from kirabridge.literal_session_input import insertion_observed
+
+    # Layout of hash-verified 2026-11-04 task frames: the empty hint vanishes,
+    # but its right-aligned badge survives on the same footer row and column.
+    payload = ("Prüfe die Übergabe. " * size)[:size]
+    footer = "\n \n  GPT-6.1-Sol xhigh · ~\n"
+    hint = "  ← for agents · ? for shortcuts".ljust(106)
+    before = "› Ask Codex to do anything" + footer + hint + f"⚠ {badge} · f2 to view\n"
+    after = f"› [Pasted Content {size} chars]" + footer + " " * 106 + f"⚠ {badge} · f2 to view\n"
+    assert insertion_observed("codex", after, payload, before)
+    assert not insertion_observed("codex", after, payload + "X", before)
+
+
+@pytest.mark.parametrize(
+    "change",
+    ["column", "count", "extra", "model", "cwd", "hint", "unicode", "continuation"],
+)
+def test_hint_warning_transition_preserves_complete_payload_and_footer(change):
+    from kirabridge.literal_session_input import insertion_observed
+
+    footer = "\n \n  GPT-6.1-Sol xhigh · ~\n"
+    badge = "⚠ 1 warning · f2 to view\n"
+    hint = "  ← for agents · ? for shortcuts".ljust(106)
+    before = "› Ask Codex to do anything" + footer + hint + badge
+    after = "› /resume" + footer + " " * 106 + badge
+    if change == "column":
+        after = after.replace(" " * 106, " " * 105)
+    elif change == "count":
+        after = after.replace("1 warning", "2 warnings")
+    elif change == "extra":
+        after += " " * 106 + badge
+    elif change == "model":
+        after = after.replace("xhigh", "low")
+    elif change == "cwd":
+        after = after.replace("· ~", "· /another/directory")
+    elif change == "hint":
+        before = before.replace("? for shortcuts", "? for shortcuts EXTRA")
+    elif change == "unicode":
+        after = after.replace(" " * 106, "\u00a0" * 106)
+    else:
+        after = after.replace("› /resume\n", "› /resume\n  ← for agents · ? for shortcuts\n")
+    assert not insertion_observed("codex", after, "/resume", before)
+
+
+@pytest.mark.parametrize("size", [1014, 1078])
+async def test_captured_hint_warning_paste_sends_exactly_one_return(
+    literal_visible, monkeypatch, size
+):
+    bridge, transport, row = literal_visible
+    bridge.config.visible_handoffs.bindings[
+        "codex"
+    ].ready_pattern = r"(?m)^›(?: Ask Codex to do anything)?\s*$"
+    footer = "\n \n  GPT-6.1-Sol xhigh · ~\n"
+    badge = "⚠ 1 warning · f2 to view\n"
+    payload = ("Prüfe die Übergabe. " * size)[:size]
+    transport["text"] = (
+        "› Ask Codex to do anything"
+        + footer
+        + "  ← for agents · ? for shortcuts".ljust(106)
+        + badge
+    )
+
+    async def insert(pane, text, **guards):
+        assert guards["expected_screen"] == transport["text"]
+        assert guards["identity_guard"][901].endswith("/bin/codex")
+        transport["literal_calls"].append(("paste", text))
+        transport["text"] = f"› [Pasted Content {len(text)} chars]" + footer + " " * 106 + badge
+
+    monkeypatch.setattr(bridge.sessions.terminal_app, "insert", insert)
+    result = await bridge.execute(
+        {
+            "id": "captured-hint-warning",
+            "principal": "chatgpt",
+            "operation": "session.input",
+            "args": {"pane_id": row["pane_id"], "expected_pid": 900, "text": payload},
+        },
+        callback,
+        callback,
+    )
+    assert result["submitted"] and result["return_sent"]
+    assert transport["literal_calls"] == [("paste", payload), ("return", None)]
+    assert not bridge.store.db.execute("SELECT 1 FROM messages").fetchone()
+
+
 @pytest.mark.parametrize(
     "changed",
     [

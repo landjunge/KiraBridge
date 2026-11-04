@@ -30,6 +30,19 @@ def codex_input_footer(line):
     )
 
 
+def _codex_standalone_warning_footer(lines):
+    """The captured populated composer has exactly a model and warning row.
+
+    Do not recognize warning-looking rows individually: their placement and
+    the complete two-row footer distinguish this layout from extra content.
+    """
+    return bool(
+        len(lines) == 2
+        and re.fullmatch(r"GPT-\S+ [^·\n]+ · [^\n]+", lines[0])
+        and re.fullmatch(r"⚠ [1-9][0-9]* warnings? · f2 to view", lines[1])
+    )
+
+
 def display_text(text):
     text = text.replace("\r\n", "\n")
     text = re.sub(r"\x1b\[[0-9;:]*m", "", text)
@@ -104,7 +117,9 @@ def assess(target, raw, binding, protocol=None):
         if scroll_controls and not (protocol and protocol.get("state") == "idle"):
             return result("scrolled", "current_scroll_controls")
         footer = [line.strip() for line in view.splitlines()[1:] if line.strip()]
-        known_footer = all(codex_input_footer(line) for line in footer)
+        known_footer = all(codex_input_footer(line) for line in footer) or (
+            _codex_standalone_warning_footer(footer)
+        )
         if not known_footer:
             return result("unknown", "unrecognized_footer_or_dialog")
         # Real progress is above the prompt. An idle protocol observation cannot

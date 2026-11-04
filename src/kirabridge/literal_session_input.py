@@ -46,6 +46,27 @@ def _without_empty_composer_hint(suffix):
     return None
 
 
+def _same_hint_warning_footer(before, after):
+    """Bind the captured hint-to-warning transition, including its badge column.
+
+    Codex 0.166 hides the empty-composer hint but keeps its warning on the
+    same row. This is not permission to discard an added standalone row.
+    """
+    old = _without_viewport_padding(before).split("\n")
+    new = _without_viewport_padding(after).split("\n")
+    if (
+        len(old) < 2
+        or len(old) != len(new)
+        or old[:-1] != new[:-1]
+        or re.fullmatch(r"[ ]*GPT-\S+[^\n]*", old[-2]) is None
+    ):
+        return False
+    badge = r"(⚠ [1-9][0-9]* warnings? · f2 to view)"
+    hint = re.fullmatch(r"([ ]*← for agents · \? for shortcuts[ ]+)" + badge, old[-1])
+    warning = re.fullmatch(r"([ ]*)" + badge, new[-1])
+    return bool(hint and warning and hint[2] == warning[2] and len(hint[1]) == len(warning[1]))
+
+
 def _cwd_footer(suffix):
     rows = _without_viewport_padding(suffix).split("\n")
     found = []
@@ -269,6 +290,8 @@ def insertion_observed(target, raw, text, before, *, cwd=None, home=None, column
             actual_suffix = content[len(expected) :]
             if actual_suffix and not actual_suffix.startswith("\n"):
                 continue
+            if _same_hint_warning_footer(suffix, actual_suffix):
+                return True
             rendered_after = _codex_renderer_suffix(actual_suffix)
             for before_variant in before_variants:
                 if rendered_after == _codex_renderer_suffix(before_variant):

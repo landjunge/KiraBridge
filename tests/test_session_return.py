@@ -96,6 +96,29 @@ async def test_explicit_return_sends_one_key_without_paste_or_agent_work(key_vis
     assert transport["literal_calls"] == [("return", None)]
 
 
+@pytest.mark.parametrize("size", [1014, 1078])
+async def test_return_on_captured_collapsed_paste_with_standalone_warning(key_visible, size):
+    bridge, transport, _, observed = key_visible
+    screen = (
+        f"› [Pasted Content {size} chars]\n \n  GPT-6.1-Sol xhigh · ~\n"
+        + " " * 106
+        + "⚠ 1 warning · f2 to view\n"
+    )
+    args = await observed(screen)
+    result = await bridge.execute(
+        {
+            "id": "captured-hint-warning-return",
+            "principal": "chatgpt",
+            "operation": "session.input",
+            "args": args,
+        },
+        callback,
+        callback,
+    )
+    assert result["return_sent"] and not result["paste_event_sent"]
+    assert transport["literal_calls"] == [("return", None)]
+
+
 @pytest.mark.parametrize(
     "failure", ["changed", "foreign", "agent", "missing", "corrupt", "truncated"]
 )
@@ -138,6 +161,12 @@ async def test_stale_or_untrusted_return_capture_sends_no_key(key_visible, failu
         "Resume a previous session\nUnrecognized dialog controls",
         "› Existing draft\n  tab to queue message\n  GPT-6.1-Sol max · ~\n",
         "› Existing draft\n  Approval required\n  GPT-6.1-Sol max · ~\n",
+        "› Existing draft\n  ⚠ 1 warning · f2 to view\n",
+        "› Existing draft\n  GPT-6.1-Sol xhigh · ~\n  ⚠ 1 warning · f2 to view EXECUTE\n",
+        "› Existing draft\n  GPT-6.1-Sol xhigh · ~\n"
+        "  ⚠ 1 warning · f2 to view\n  ⚠ 1 warning · f2 to view\n",
+        "› Existing draft\n  Approval required\n  GPT-6.1-Sol xhigh · ~\n"
+        "  ⚠ 1 warning · f2 to view\n",
         "• Working (12s • esc to interrupt)\n" + RESUME_MENU,
     ],
 )

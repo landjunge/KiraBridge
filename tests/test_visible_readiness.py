@@ -37,6 +37,35 @@ async def test_clean_finished_screen_and_known_current_footer_are_ready(binding,
     assert result["state"] == "ready" and result["input_empty"]
 
 
+@pytest.mark.parametrize("badge", ["1 warning", "2 warnings"])
+@pytest.mark.parametrize("state", ["idle", "working", "unknown"])
+def test_standalone_warning_footer_does_not_override_bound_turn(binding, badge, state):
+    from kirabridge.session_return import return_readiness
+
+    screen = (
+        "› [Pasted Content 1014 chars]\n \n  GPT-6.1-Sol xhigh · ~\n"
+        + " " * 106
+        + f"⚠ {badge} · f2 to view\n"
+    )
+    result = return_readiness("codex", screen, binding, {"state": state})
+    assert result["state"] == ("ready" if state == "idle" else state)
+    assert result["ready"] is (state == "idle")
+
+
+@pytest.mark.parametrize(
+    "footer",
+    [
+        "  ⚠ 1 warning · f2 to view\n",
+        "  GPT-6.1-Sol xhigh · ~\n  ⚠ 1 warning · f2 to view EXTRA\n",
+        "  GPT-6.1-Sol xhigh · ~\n  ⚠ 1 warning · f2 to view\n  More text\n",
+        "  GPT-6.1-Sol xhigh · ~\n  ⚠ 1 warning · f2 to view\n  ⚠ 1 warning · f2 to view\n",
+        "  GPT-6.1-Sol xhigh · ~\n  ⚠ ١ warning · f2 to view\n",
+    ],
+)
+def test_standalone_warning_shape_does_not_hide_other_footer_content(binding, footer):
+    assert checked(EMPTY + "\n" + footer, binding, {"state": "idle"})["state"] == "unknown"
+
+
 @pytest.mark.parametrize(
     "history",
     [
