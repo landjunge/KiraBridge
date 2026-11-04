@@ -164,16 +164,37 @@ class TerminalWindowProof:
             "Duplicate native AX window identity",
         )
         ax_list_count = sum(w.get("role") == "AXWindow" for w in cg["accessibility_windows"])
-        if not len(ax_windows) == len(windows) == ax_list_count:
-            raise BridgeError(
+
+        def inventory_pending(visible_count=None, minimized_count=None):
+            error = BridgeError(
                 "session_window_inventory_pending",
                 f"Native AX/CG window inventory differs (CG={len(windows)}, "
                 f"AX={len(ax_windows)}, AX-list={ax_list_count})",
             )
-        groups = []
+            observation = {
+                "phase": "native_window_inventory",
+                "cg_window_count": len(windows),
+                "ax_window_count": len(ax_windows),
+                "ax_list_window_count": ax_list_count,
+                "visible_ax_window_count": visible_count,
+                "minimized_ax_window_count": minimized_count,
+            }
+            error.window_observation = observation
+            error.provider_error = {"window_observation": observation}
+            return error
+
+        if len(ax_windows) != ax_list_count:
+            raise inventory_pending()
+        groups, minimized = [], []
         for window in ax_windows:
             observed = await self.ax(window["element_token"])
             element = observed["element"]
+            require(element["role"] == "AXWindow", "Native AX window role changed")
+            if element.get("minimized") is True:
+                # A minimized AXDialog can legitimately have no on-screen CG
+                # surface. Preserve only its anchor; never adopt or restore it.
+                minimized.append({"token": observed["element_token"], "minimized": True})
+                continue
             require(
                 element["role"] == "AXWindow"
                 and element.get("subrole") == "AXStandardWindow"
@@ -213,7 +234,9 @@ class TerminalWindowProof:
             )
         tokens = [r["token"] for group in groups for r in group["radios"] or []]
         require(len(tokens) == len(set(tokens)), "Native AX radio appears in several groups")
-        return {"cg": windows, "ax": groups}
+        if len(groups) != len(windows):
+            raise inventory_pending(len(groups), len(minimized))
+        return {"cg": windows, "ax": groups, "minimized": minimized}
 
     async def prepare(self):
         self.logical_before = logical_windows(await self.terminal.window_inventory())
@@ -222,13 +245,18 @@ class TerminalWindowProof:
             self.app is not None or not self.logical_before,
             "Terminal before-inventory is unavailable",
         )
-        self.before = await self.snapshot() if self.app else {"cg": [], "ax": []}
+        self.before = await self.snapshot() if self.app else {"cg": [], "ax": [], "minimized": []}
         self.app_identity = (
             await self.terminal.process_identity(self.app["pid"], detailed=True)
             if self.app
             else None
         )
-        if self.logical_before and not self.before["cg"] and not self.before["ax"]:
+        if (
+            self.logical_before
+            and not self.before["cg"]
+            and not self.before["ax"]
+            and not self.before["minimized"]
+        ):
             source = self.terminal.native_existing_app_activation_source(
                 self.app["pid"], self.app_identity
             )
@@ -244,7 +272,7 @@ class TerminalWindowProof:
                 if self.before["cg"] or self.before["ax"]:
                     break
         require(
-            not self.logical_before or self.before["cg"],
+            not self.logical_before or self.before["cg"] or self.before["minimized"],
             "Existing Terminal surfaces are not observable",
         )
 
@@ -275,6 +303,11 @@ class TerminalWindowProof:
         return None if group["radios"] is None else [r["token"] for r in group["radios"]]
 
     def retained(self, before, after, *, exclude=None):
+        require(
+            sorted(item["token"] for item in before.get("minimized", []))
+            == sorted(item["token"] for item in after.get("minimized", [])),
+            "Original minimized native AX anchors changed",
+        )
         for original in before["ax"]:
             if original is exclude:
                 continue
@@ -304,6 +337,7 @@ class TerminalWindowProof:
                 "ax": sorted(
                     [[g["token"], self.members(g)] for g in snapshot["ax"] if g is not own]
                 ),
+                "minimized": sorted(item["token"] for item in snapshot.get("minimized", [])),
             }
         )
 
