@@ -42,18 +42,23 @@ def process_identity(pid: int) -> dict | None:
         raise BridgeError("setup_process_unavailable", "Cannot inspect the setup process")
     try:
         values = [ctypes.c_uint64() for _ in range(4)]
-        name, length = ctypes.create_unicode_buffer(32768), integer(32768)
-        if not kernel.GetProcessTimes(handle, *(ctypes.byref(v) for v in values)) or not (
-            kernel.QueryFullProcessImageNameW(handle, 0, name, ctypes.byref(length))
-        ):
+        if not kernel.GetProcessTimes(handle, *(ctypes.byref(v) for v in values)):
             raise BridgeError("setup_process_unavailable", "Cannot inspect the setup process")
         state = kernel.WaitForSingleObject(handle, 0)
         if state not in (0, 258):
             raise BridgeError("setup_process_unavailable", "Cannot inspect the setup process")
+        name = None
+        if state == 258:
+            image, length = ctypes.create_unicode_buffer(32768), integer(32768)
+            if not kernel.QueryFullProcessImageNameW(handle, 0, image, ctypes.byref(length)):
+                raise BridgeError("setup_process_unavailable", "Cannot inspect the setup process")
+            name = image.value
+        # A signaled process handle plus its creation time proves this generation
+        # exited. Windows may no longer provide its image; do not require it here.
         return {
             "pid": pid,
             "created_100ns": str(values[0].value),
-            "image": name.value,
+            "image": name,
             "running": state == 258,
         }
     finally:
