@@ -10,8 +10,8 @@ Der Assistent begleitet dich durch vier Schritte:
 1. **Windows prüfen:** Er prüft deinen angemeldeten Windows-Desktop. Bevor du
    KiraBridge startest, bestätigst du, dass ChatGPT Tasten drücken und Fenster
    bedienen darf. Der Start selbst drückt keine Tasten.
-2. **Verbindung vorbereiten:** Er installiert auf deinen Klick den offiziellen
-   OpenAI-Verbindungsclient und prüft dessen Download. Die Schaltflächen öffnen
+2. **Verbindung vorbereiten:** Er entpackt und prüft auf deinen Klick die beiliegende
+   offizielle OpenAI-Verbindungshilfe. Dafür ist kein weiterer Download nötig. Die Schaltflächen öffnen
    die passenden Kontoseiten. Dort meldest du dich selbst an. Du brauchst einen
    Tunnel für den richtigen ChatGPT-Arbeitsbereich und einen eingeschränkten
    Runtime-Schlüssel. Wenn du KiraBridge auch auf einem Mac nutzt, lege für

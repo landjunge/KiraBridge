@@ -38,6 +38,7 @@ def fixture(tmp_path, monkeypatch):
         "source.zip": source.getvalue(),
         "python-installer.exe": b"NOT A REAL INSTALLER: unit guard fixture",
         "guest_runner.ps1": b"# Fake fixture, never executed",
+        kit.CLIENT_ARCHIVE: b"NOT A REAL TUNNEL CLIENT: unit guard fixture",
     }
     requirements = []
     for package in ["kirabridge", *[f"fixture{i}" for i in range(37)]]:
@@ -100,6 +101,9 @@ def fixture(tmp_path, monkeypatch):
     # Unit fixtures deliberately override the vendor reference. Production CLI
     # has only the real Python.org digest and cannot accept this fake installer.
     monkeypatch.setitem(kit.PYTHON_INSTALLERS, "3.14.10", kit.digest(files["python-installer.exe"]))
+    monkeypatch.setitem(
+        kit.CLIENT_ARCHIVES, kit.CLIENT_ARCHIVE, kit.digest(files[kit.CLIENT_ARCHIVE])
+    )
     return stage, reports
 
 

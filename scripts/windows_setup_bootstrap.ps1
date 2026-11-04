@@ -61,7 +61,8 @@ try {
         $checksums[$name]=$expected
     }
     foreach ($name in @('package.json','manifest.json','requirements-win.txt','python-installer.exe',
-                        'Einrichtung-starten.cmd','Einrichtung.ps1')) {
+                        'Einrichtung-starten.cmd','Einrichtung.ps1',
+                        'tools/tunnel-client-v0.0.19-windows-amd64.zip')) {
         if (-not $checksums.ContainsKey($name)) { throw 'unsafe_package' }
     }
     $package=Get-Content -LiteralPath (Join-Path $PackageRoot 'package.json') -Raw | ConvertFrom-Json
@@ -75,6 +76,10 @@ try {
     $wheelName='wheels/kirabridge-'+$package.version+'-py3-none-any.whl'
     if (-not $checksums.ContainsKey($wheelName)) { throw 'unsafe_package' }
     $Wheel=Join-Path $PackageRoot $wheelName
+    $ClientArchive=Join-Path $PackageRoot 'tools/tunnel-client-v0.0.19-windows-amd64.zip'
+    if ((Hash $ClientArchive) -cne '1d0ecc3a54f2a51e27a635ac155f40fbb95df58c52cdeddf6c75532cc0bbeb25') {
+        throw 'package_changed'
+    }
     if ($CheckOnly) {
         Write-Host 'Das Paket ist vollstaendig und unveraendert. Noch nichts installiert.'
         exit 0
@@ -180,6 +185,22 @@ import kirabridge,tkinter
 assert kirabridge.__version__==sys.argv[2]
 '@
     Run-Python $RuntimePython @('-c',$verify,$Wheel,$package.version)
+    # Cache the original vendor bytes in the assistant's private state. No
+    # account/credentials are configured and no existing cache is overwritten.
+    $cache=@'
+import hashlib,pathlib,sys
+from kirabridge.bridge_core.config import private_directory
+from kirabridge.private_files import write_private
+from kirabridge.windows_setup_client import ARCHIVE_SHA256,ARCHIVE_SIZE,read_private
+source=pathlib.Path(sys.argv[1]);root=pathlib.Path(sys.argv[2]);data=source.read_bytes()
+assert len(data)==ARCHIVE_SIZE and hashlib.sha256(data).hexdigest()==ARCHIVE_SHA256
+private_directory(root);target=root/'bundled-client.zip'
+if target.exists():
+    assert hashlib.sha256(read_private(target,ARCHIVE_SIZE)).hexdigest()==ARCHIVE_SHA256
+else:
+    write_private(target,data)
+'@
+    Run-Python $RuntimePython @('-c',$cache,$ClientArchive,(Join-Path $env:LOCALAPPDATA 'KiraBridgeWindowsSetup'))
     Write-Host '4/4: Einrichtungsassistent oeffnen ...'
     $PythonW=Join-Path $Runtime 'Scripts\pythonw.exe'
     $Starter=Join-Path ([Environment]::GetFolderPath('Desktop')) 'KiraBridge einrichten.cmd'

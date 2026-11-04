@@ -40,8 +40,13 @@ REQUIRED_HARNESSES = (
 )
 ALLOWED_FILE = re.compile(
     r"(?:source\.zip|python-installer\.exe|guest_runner\.ps1|"
+    r"tools/tunnel-client-v0\.0\.19-windows-amd64\.zip|"
     r"wheels/[A-Za-z0-9][A-Za-z0-9._+-]{0,200}\.whl)"
 )
+CLIENT_ARCHIVE = "tools/tunnel-client-v0.0.19-windows-amd64.zip"
+CLIENT_ARCHIVES = {
+    CLIENT_ARCHIVE: "1d0ecc3a54f2a51e27a635ac155f40fbb95df58c52cdeddf6c75532cc0bbeb25"
+}
 PRIVATE_VALUE = re.compile(r"[A-Za-z]:[\\/]|\\\\|/(?:Users|private|tmp|home)/|https?://")
 DOCS = (
     "docs/WINDOWS-PREVIEW.md",
@@ -299,8 +304,13 @@ def frozen_payload(staging: Path, source_commit: str | None = None):
         if len(data) != entry["bytes"] or digest(data) != entry["sha256"].lower():
             raise ValueError("Payload differs from native-tested manifest")
         payload[name] = data
-    if not {"source.zip", "python-installer.exe", "guest_runner.ps1"} <= payload.keys():
+    if (
+        not {"source.zip", "python-installer.exe", "guest_runner.ps1", CLIENT_ARCHIVE}
+        <= payload.keys()
+    ):
         raise ValueError("Missing a required offline payload")
+    if digest(payload[CLIENT_ARCHIVE]) != CLIENT_ARCHIVES[CLIENT_ARCHIVE]:
+        raise ValueError("Bundled Windows tunnel client differs from its verified official release")
     if digest(payload["python-installer.exe"]) != PYTHON_INSTALLERS.get(manifest["python_version"]):
         raise ValueError("Python AMD64 installer differs from the verified vendor release")
     wheel_count = verify_wheels(payload, manifest["requirements"])
@@ -466,6 +476,7 @@ def prepare(
             "Regular pinned window close requests without force termination",
             "Fresh target identity and durable no-replay receipts",
             "German graphical setup assistant with explicit desktop scope and response-code test",
+            "Pinned official Windows tunnel client included for offline preparation",
         ],
         "unsupported_preview": [
             "Full Windows desktop GUI",
