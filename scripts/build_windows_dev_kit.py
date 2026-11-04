@@ -20,7 +20,7 @@ import zipfile
 from email.parser import BytesParser
 from pathlib import Path
 
-VERSION = "0.8.0rc31.dev1"
+VERSION = "0.8.0rc31.dev2"
 ASSET = f"KiraBridge-{VERSION}-Windows-Dev-Kit.zip"
 PHASES = ("core", "keyboard", "mcp", "preview")
 ALLOWED_FILE = re.compile(
