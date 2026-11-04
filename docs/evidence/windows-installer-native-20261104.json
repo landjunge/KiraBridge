@@ -1,0 +1,235 @@
+{
+  "schema_version": 1,
+  "date": "2026-11-04",
+  "status": "native_lifecycle_accepted_composite",
+  "acceptance_is_composite_not_a_relabelled_green_run": true,
+  "artifact": {
+    "name": "KiraBridge-0.8.0rc33-Windows-x64-Setup.exe",
+    "bytes": 25018593,
+    "sha256": "41203ce70d31795d7dc1ace80a40a462f5f834c7fea02165544cc3c7f7e83d91",
+    "production_app_id": "KiraBridge.Windows"
+  },
+  "inputs": {
+    "runtime_source_commit": "ce0687dd8831dae261bf285922a146bcf3aedc41",
+    "published_dev_kit_sha256": "1002e68cbef96c7fd9a383d542beb5abc727f5843316352a65638fe4266a919a",
+    "cpython_embeddable_version": "3.14.10",
+    "cpython_embeddable_sha256": "b553e7dac884469b40e0740bb527271c3378f700b427e0485835f1bb6424361c",
+    "runtime_release_id": "a0b8eaa2127c48a2a70d90e59064a5f4",
+    "frozen_stage_zip_sha256": "4809a086e2842d6e00f999b60d47fdf215d353adf4eb22ae4bf92683f0f0fe12"
+  },
+  "environment": {
+    "platform": "Windows 11 x64",
+    "os_version": "10.0.26300.0",
+    "powershell": "5.1.26100.9444",
+    "compiler": "Inno Setup 6.7.4",
+    "compiler_authenticode": "Valid, Pyrsys B.V.",
+    "compiler_was_portable_and_existing_compiler_registry_unchanged": true,
+    "vm_restarted_rebuilt_or_reconfigured": false,
+    "host_focus_or_clipboard_used": false
+  },
+  "receipts": {
+    "initial": {
+      "raw_wrapper_sha256": "cf00895e0b8872573353404523bd061c8dc01b7417cff4cb65090b8c0c9b8630",
+      "original_passed_flag": false,
+      "native_receipt_sha256": "523ded8b56fad97f9008471cdd7d8c564ebd55a28badd9e30176b7a7d9445342"
+    },
+    "continuation": {
+      "raw_wrapper_sha256": "59c02bcbce8ee83431b1a4327c3ef7cebd611fe21b598222132e078f3c8557cc",
+      "original_passed_flag": false,
+      "native_receipt_sha256": "792dc5f0cef27109b7b9c53b5f32a1a98f5aadae25ba598542c33bdd688a0b51"
+    },
+    "tail": {
+      "raw_wrapper_sha256": "d6786e5348ba3cf79b4f2f1a09d2ad537fab750b08c1e9052d1999f357b9f9f9",
+      "original_passed_flag": false,
+      "native_receipt_sha256": "e6875f345988298c5f4c6cf02cfb6f37845e0a6ad70194c28ccb4ba97077120d"
+    },
+    "final": {
+      "raw_wrapper_sha256": "fe42a6b1fb77e7397b6be55503d3172b1c7072861400e44684a514b327a6af90",
+      "original_passed_flag": true
+    }
+  },
+  "cases": [
+    {
+      "name": "fresh_install",
+      "status": "passed",
+      "observed_exit_or_status": 0
+    },
+    {
+      "name": "same_version_reinstall",
+      "status": "passed",
+      "observed_exit_or_status": 0
+    },
+    {
+      "name": "maintenance_mutex_setup_refusal",
+      "status": "passed",
+      "observed_exit_or_status": 1
+    },
+    {
+      "name": "maintenance_mutex_uninstall_refusal",
+      "status": "passed",
+      "observed_exit_or_status": 1
+    },
+    {
+      "name": "three_startmenu_targets",
+      "status": "passed"
+    },
+    {
+      "name": "shipped_launcher_status",
+      "status": "passed",
+      "observed_exit_or_status": 0
+    },
+    {
+      "name": "native_runtime_unauthenticated_http",
+      "status": "passed",
+      "observed_exit_or_status": 401
+    },
+    {
+      "name": "native_authenticated_health_catalog_zero_tasks",
+      "status": "passed"
+    },
+    {
+      "name": "busy_runtime_upgrade_refusal",
+      "status": "passed",
+      "observed_exit_or_status": 7
+    },
+    {
+      "name": "busy_runtime_uninstall_refusal",
+      "status": "passed",
+      "observed_exit_or_status": 1
+    },
+    {
+      "name": "malformed_configuration_preserved",
+      "status": "passed",
+      "observed_exit_or_status": 7
+    },
+    {
+      "name": "synthetic_newer_version_refused",
+      "status": "passed",
+      "observed_exit_or_status": 7
+    },
+    {
+      "name": "synthetic_prior_version_metadata_upgrade",
+      "status": "passed",
+      "observed_exit_or_status": 0
+    },
+    {
+      "name": "distinct_owned_runtime_journal_recovery",
+      "status": "passed",
+      "observed_exit_or_status": 0
+    },
+    {
+      "name": "first_clean_uninstall",
+      "status": "passed",
+      "observed_exit_or_status": 0
+    },
+    {
+      "name": "retained_data_reinstall_closed_db_baseline",
+      "status": "passed",
+      "observed_exit_or_status": 0
+    },
+    {
+      "name": "configuration_dialog_display_and_cancel",
+      "status": "passed"
+    },
+    {
+      "name": "root_final_uninstall_separate_log",
+      "status": "passed",
+      "observed_exit_or_status": 0
+    },
+    {
+      "name": "final_read_only_absence_data_sql_existing_instances",
+      "status": "passed"
+    }
+  ],
+  "runtime": {
+    "version": "0.8.0rc33",
+    "capabilities": 8,
+    "windows_operations": 5,
+    "tasks": 0,
+    "bridge_input_tasks_submitted": 0,
+    "owned_runtime_stop": "CTRL_BREAK to exact owned process group, independently absent"
+  },
+  "test_harness_corrections": [
+    {
+      "stage": "initial",
+      "original_result_remains_failed": true,
+      "cause": "/GROUP is ignored when DisableProgramGroupPage=yes; test queried a nonexistent override directory.",
+      "resolution": "Observed actual default group creation time and three own targets; continued after the completed install/mutex/reinstall phases."
+    },
+    {
+      "stage": "continuation",
+      "original_result_remains_failed": true,
+      "cause": "Immediate aggregate post-uninstall assertion failed. Later individual reads proved removal. SQLite connection context committed but did not close, so its old main-file-only hash was not a closed WAL baseline.",
+      "resolution": "Read-only integrity/sentinel/zero-task proof, then own FULL checkpoint busy=0, explicit connection close, stable new baseline. SQLite connections now close explicitly."
+    },
+    {
+      "stage": "tail",
+      "original_result_remains_failed": true,
+      "cause": "Test process stdout and Inno /LOG accidentally used the same open file; final uninstall returned 1 before acceptance.",
+      "resolution": "Distinct stdout/uninstaller filenames plus host collision guard; Root executed only the remaining uninstall with a distinct log and observed exit 0."
+    }
+  ],
+  "data": {
+    "configuration_credentials_user_file_hashes_unchanged": true,
+    "old_main_database_hash_not_used_as_closed_baseline": "5c9dec1886cc01f5f2307ee1ea87f9b32a4cef0f8f9a2c68beebc558013bedab",
+    "closed_database_baseline_sha256": "07e2518338001ab102d63c611fe1ced68e52f8250eafbca2d896f07945c2c162",
+    "own_full_checkpoint_busy": 0,
+    "wal_bytes_after_checkpoint_and_close": 0,
+    "four_final_hashes_equal_closed_baseline": true,
+    "sqlite_quick_check": "ok",
+    "sentinel_rows": 1,
+    "task_rows": 0
+  },
+  "final_observation": {
+    "finished_at_utc": "2026-11-04T16:13:09.2733371Z",
+    "absence": {
+      "current_absent": true,
+      "uninstaller_absent": true,
+      "launch_absent": true,
+      "registry_absent": true,
+      "startmenu_absent": true
+    },
+    "empty_application_directory_retained": true,
+    "application_remaining_entries": [],
+    "installer_or_bridge_runtime_started_by_observer": false,
+    "protected_existing_instances": {
+      "dev2": {
+        "module_count": 171,
+        "modules_credentials_launcher_pid_generation_listener_unchanged": true
+      },
+      "dev3": {
+        "module_count": 173,
+        "modules_credentials_launcher_pid_generation_listener_unchanged": true
+      },
+      "rc33": {
+        "module_count": 174,
+        "modules_credentials_launcher_pid_generation_listener_unchanged": true
+      }
+    }
+  },
+  "root_visual_evidence": {
+    "configuration_dialog": {
+      "opened_and_fields_observed": true,
+      "cancelled_without_saving": true,
+      "image_sha256": "ac7c724572e5b14a19246b6d7b70c17fea3bb0602b29de2054c0dae5655bac5a"
+    },
+    "final_uninstall_exit_zero": {
+      "retained_process_handle_and_wait_observed": true,
+      "image_sha256": "c19c89e60a2dd69d7e94569732113e2681879625b4167205aac968dd2e7076e7"
+    }
+  },
+  "limits": [
+    "No older Windows Setup/MSI was available; prior-version upgrade used synthetic version metadata, plus actual same-version reinstall.",
+    "Journal interruption/recovery was exercised with an owned alternate RC33 runtime fixture, not a VM power failure.",
+    "Configuration form was opened and cancelled natively; German installer wizard and a full interactive wizard click-through were not accepted.",
+    "Windows 10, ARM execution and downloaded-file SmartScreen/signing reputation were not accepted.",
+    "Runtime health used the installed Python/lifecycle entry; Start Menu targets and shipped launcher Status were checked, rather than claiming a Start Menu launch click-through.",
+    "RC33 remains the existing Windows desktop development preview; no broader file/process/terminal or service support was added."
+  ],
+  "operational_cleanup": {
+    "owned_guest_setup_shell": "closed at confirmed own idle prompt; independently observed only original historical tab remaining",
+    "owned_host_helpers": "all eight task-owned staging/artifact servers terminated after command identity checks; independent PID absence confirmed"
+  },
+  "raw_logs_tokens_credentials_and_user_paths": "retained privately; excluded from this curated report",
+  "no_hosted_ci_or_arm_build_requested": true
+}

@@ -1,0 +1,29 @@
+{
+  "kit_sha256": "1002e68cbef96c7fd9a383d542beb5abc727f5843316352a65638fe4266a919a",
+  "native_acceptance": false,
+  "offline_wheels": 38,
+  "python_archive_sha256": "b553e7dac884469b40e0740bb527271c3378f700b427e0485835f1bb6424361c",
+  "python_url": "https://www.python.org/ftp/python/3.14.10/python-3.14.10-embeddable-amd64.zip",
+  "python_version": "3.14.10",
+  "release_id": "a0b8eaa2127c48a2a70d90e59064a5f4",
+  "runtime_files": 2280,
+  "schema_version": 1,
+  "source_commit": "ce0687dd8831dae261bf285922a146bcf3aedc41",
+  "version": "0.8.0rc33",
+  "lifecycle_sha256": "11c8109173d89a360c316638960e299b74cf9f1b6faf3269ffcdfe7e22767eb3",
+  "setup_script_sha256": "7f2669a0eabf714833b9541e3b17bec59fba6a9e64b6659533cca5b56ab156f9",
+  "transfer_zip_sha256": "4809a086e2842d6e00f999b60d47fdf215d353adf4eb22ae4bf92683f0f0fe12",
+  "transfer_zip_bytes": 30505979,
+  "host_focused_tests": {
+    "passed": 18,
+    "failed": 0,
+    "native_windows_acceptance": false
+  },
+  "ruff_check": "passed",
+  "ruff_format": "passed",
+  "stage_revision": 3,
+  "maintenance_mutex_contract_test": {
+    "passed": 1,
+    "native": false
+  }
+}

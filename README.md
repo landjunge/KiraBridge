@@ -28,6 +28,9 @@ with native keyboard, shortcuts and guarded window control. It is a separate
 development kit; general Windows file, process and terminal tools remain outside
 its scope. See [RC33 package checks, installation status and limits](docs/RC33-DELIVERY-20261104.md).
 
+A separate offline Windows Setup.exe candidate has passed local Windows 11 tests; see its
+[build and acceptance status](docs/WINDOWS-INSTALLER-RC33-20261104.md).
+
 ## What KiraBridge helps you do
 
 - **Work on local projects:** let your connected AI read project files and logs,

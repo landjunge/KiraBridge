@@ -28,6 +28,9 @@ mit nativer Tastatur, Shortcuts und abgesicherter Fenstersteuerung. Es ist ein
 separates Entwicklungspaket; allgemeine Windows-Datei-, Prozess- und Terminaltools
 gehören nicht zu seinem Umfang. Siehe [RC33-Paketprüfung, Installationsstand und Grenzen](docs/RC33-DELIVERY-20261104.md).
 
+Ein separates Offline-Windows-Setup.exe hat lokale Windows-11-Tests bestanden; siehe
+[Build- und Abnahmestand](docs/WINDOWS-INSTALLER-RC33-20261104.md).
+
 ## Wobei KiraBridge dir hilft
 
 - **An lokalen Projekten arbeiten:** Lass deine verbundene KI Projektdateien und
