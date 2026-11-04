@@ -89,3 +89,8 @@ written permission. The German license text governs.
 [Windows preview dev2](https://github.com/landjunge/KiraBridge/releases/tag/windows-v0.8.0rc31.dev2):
 native keyboard and local MCP acceptance passed in a dedicated Windows 11 VM.
 [Results and limits](docs/WINDOWS-DEVELOPMENT-20261103.md); macOS stays separate.
+
+[Windows desktop preview dev3](https://github.com/landjunge/KiraBridge/releases/tag/windows-v0.8.0rc31.dev3): all six native
+guest phases passed, including Ctrl/Alt/Shift shortcuts and guarded window control.
+Published downloads and the separate Windows 11 installation were verified.
+[Evidence and limits](docs/WINDOWS-DESKTOP-20261104.md); dev2 remains available for rollback.

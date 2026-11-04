@@ -1,28 +1,36 @@
 # Interactive Windows desktop preview
 
 The dev3 increment adds explicit keyboard shortcuts and top-level window control.
-[Current contracts and acceptance status](WINDOWS-DESKTOP-20261104.md) distinguish
-the candidate from the previously accepted dev2 installation.
+All six native Windows 11 guest phases passed for source `271605a5049255b007ea903a28bdfe40c51cf7f7`.
+[Current contracts, receipts and installation status](WINDOWS-DESKTOP-20261104.md)
+separate native acceptance from release/download and retained-installation proof.
 
 This entrypoint runs an owned local MCP service in an unlocked Windows user
 session. It does not install a service, alter UAC/OS permissions, configure an
 external ChatGPT connector, send keys at startup or expose file/process/terminal
 operations. The macOS installation is independent.
 
-With the updated package/source available to the installed guest Python:
+[Dev3 is published](https://github.com/landjunge/KiraBridge/releases/tag/windows-v0.8.0rc31.dev3),
+fresh downloads matched all five assets, and the separate installed runtime was
+independently verified on 127.0.0.1:8766 after verifier exit at
+2026-11-04 06:23:50 UTC. [Installation evidence](evidence/windows-desktop-installed-20261104.json)
+records its exact identity. This is a timed observation, not a future-liveness
+promise. Keep that already running owned console; the command below is for a
+later intentional start after confirming its listener is absent.
 
 ```powershell
-python -m kirabridge.windows_preview --transport http --port 8765
+$python = "$env:LOCALAPPDATA\KiraBridgeDesktopDev3\Runtime\Scripts\python.exe"
+$state = "$env:LOCALAPPDATA\KiraBridgePreviewDev3"
+& $python -I -B -m kirabridge.windows_preview --transport http --state-dir $state --port 8766
 ```
 
-The isolated guest bootstrap does not change PATH. Its current private Python is
-`$env:LOCALAPPDATA\KiraBridgeDev\Python314\python.exe`; use that full path when
-`python` is unavailable. The updated preview module must be in that interpreter's
-installed package or verified `PYTHONPATH` source tree.
+The isolated guest bootstrap does not change PATH. Dev3 uses a separate venv and
+the existing pinned base dependencies. The previous dev2 interpreter/package,
+state and port 8765 remain separate rollback resources; do not install over them.
 
-Default state: `%LOCALAPPDATA%\KiraBridgePreview`. Override with
-`--state-dir C:\KiraBridgePreview` if needed. State remains after shutdown so old
-unknown tasks can be reconciled using their original IDs. Existing credentials
+The module's generic default state remains `%LOCALAPPDATA%\KiraBridgePreview`;
+the explicit dev3 state above keeps it separate from dev2. State remains after
+shutdown so old unknown tasks can be reconciled using their original IDs. Existing credentials
 are reused; malformed credentials are rejected and preserved, never rotated.
 
 HTTP binds **127.0.0.1 only**, at `/mcp`, using existing authenticated transport.
@@ -47,15 +55,25 @@ Stdio stdout is reserved for the MCP protocol. Both transports use exactly one
 is no full-permission expansion, executable/root grant or user-supplied token
 in an operation argument.
 
-Read the current Windows target with `windows_keyboard_inspect`. Submit a
-sequence using the exact target token returned by inspection. The native backend
-rechecks desktop/window/process identity and every authorization; inserted events
+Use `operation_catalog` to discover the Windows schemas. `read_query` can inspect
+the current keyboard target or list windows. Use `task_request`/`task_get` for
+`windows.keyboard.sequence`, `windows.keyboard.shortcut` and
+`windows.window.control`. Submit a sequence or shortcut with its exact freshly
+inspected keyboard target; window actions use the separately listed window
+target. The native backend rechecks desktop/window/process identity and every
+authorization; inserted events
 still do not prove application processing. Keep uncertain outcomes explicit and
-never resend under a new ID. Stop the owned preview console with Ctrl+C.
+never resend under a new ID. `close` acknowledges a regular WM_CLOSE request,
+not completed application processing; a save dialog may remain. Other window
+actions distinguish a request from immediate observation. Stop the owned preview
+console with Ctrl+C.
 
 On macOS, `--help` works, while actual execution fails before state or credential
 writes. Focused tests cover policy, credential persistence/refusal, protocol-only
 stdout, loopback binding and cleanup. The real Windows HTTP startup/stop smoke
-passed for dev2; [native results and installation status](WINDOWS-DEVELOPMENT-20261103.md)
-distinguish that stopped test child from a retained installed instance. Native
-stdio transport acceptance remains open.
+passed again for dev3 with exactly eight capabilities/five Windows operations,
+zero tasks/keys and independently confirmed child absence. It used CTRL_BREAK
+for that exact owned process group (observed child exit code 3); it was not a
+retained installation. [Current native results and installation status](WINDOWS-DESKTOP-20261104.md)
+keep these facts separate. Native stdio transport and external ChatGPT/Voice
+acceptance remain open.
