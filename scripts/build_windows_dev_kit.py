@@ -23,6 +23,12 @@ from pathlib import Path
 VERSION = "0.8.0rc31.dev2"
 ASSET = f"KiraBridge-{VERSION}-Windows-Dev-Kit.zip"
 PHASES = ("core", "keyboard", "mcp", "preview")
+REUSED_PHASES = ("core", "keyboard", "mcp")
+REUSED_HARNESSES = (
+    "tests/test_windows_core_native.py",
+    "scripts/accept_windows_keyboard.py",
+    "scripts/accept_windows_mcp.py",
+)
 ALLOWED_FILE = re.compile(
     r"(?:source\.zip|python-installer\.exe|guest_runner\.ps1|"
     r"wheels/[A-Za-z0-9][A-Za-z0-9._+-]{0,200}\.whl)"
@@ -100,28 +106,49 @@ def sanitize(value, key=""):
     return value
 
 
-def verified_reports(directory: Path, manifest_hash: str):
+def verified_reports(directory: Path, manifest_hash: str, phases=PHASES, *, ignore_preview=False):
     directory = safe_path(directory)
     reports, run_ids = {}, set()
+    ignored_preview = None
     for path in sorted(directory.glob("report-*.json")):
         match = re.fullmatch(r"report-([a-f0-9]{32})-(core|keyboard|mcp|preview)\.json", path.name)
         if not match:
             raise ValueError("Unexpected guest report filename")
         run_id, phase = match.groups()
+        if phase not in phases and not (ignore_preview and phase == "preview"):
+            raise ValueError("Unexpected phase in the selected evidence directory")
         if phase in reports:
             raise ValueError("Duplicate native phase; explicit reconciliation required")
         raw = read_owned(path, 2 * 1024 * 1024)
         report = json.loads(raw)
+        if phase not in phases:
+            if (
+                ignored_preview is not None
+                or report.get("phase") != "preview"
+                or report.get("manifest_sha256") != manifest_hash
+            ):
+                raise ValueError("Ignored old preview is duplicate or belongs to another payload")
+            # Reference only. This failed/superseded report never authorizes a
+            # phase and is not represented as a successful current execution.
+            ignored_preview = {
+                "raw_report_sha256": digest(raw),
+                "run_id": run_id,
+                "accepted_as_passing_phase": False,
+            }
+            continue
         if (
             report.get("phase") != phase
             or report.get("manifest_sha256") != manifest_hash
             or type(report.get("exit_code")) is not int
             or report["exit_code"] != 0
+            or type(report.get("process_id")) is not int
+            or report["process_id"] <= 0
             or not no_failure(report)
         ):
             raise ValueError("Native report failed, is uncertain, or belongs to another payload")
         public = {
             "phase": phase,
+            "run_id": run_id,
             "exit_code": 0,
             "manifest_sha256": manifest_hash,
             "raw_report_sha256": digest(raw),
@@ -151,9 +178,18 @@ def verified_reports(directory: Path, manifest_hash: str):
             public["raw_artifact_sha256"] = report.get("artifact_sha256")
         reports[phase] = public
         run_ids.add(run_id)
-    if set(reports) != set(PHASES) or len(run_ids) != 1:
-        raise ValueError("Exactly four phases of one native guest run are required")
-    return {"run_id": next(iter(run_ids)), "phases": [reports[name] for name in PHASES]}
+    if set(reports) != set(phases) or len(run_ids) != 1:
+        raise ValueError(
+            "Exactly four phases of one native guest run are required"
+            if phases == PHASES
+            else "Exactly the selected phases of one native guest run are required"
+        )
+    if ignored_preview is not None and ignored_preview["run_id"] not in run_ids:
+        raise ValueError("Ignored old preview belongs to a different original run")
+    result = {"run_id": next(iter(run_ids)), "phases": [reports[name] for name in phases]}
+    if ignored_preview is not None:
+        result["ignored_previous_preview"] = ignored_preview
+    return result
 
 
 def normalized(name):
@@ -205,8 +241,8 @@ def verify_wheels(payload, requirements):
     return len(provided)
 
 
-def prepare(staging: Path, reports: Path, source_commit: str):
-    if not re.fullmatch(r"[a-f0-9]{40}", source_commit):
+def frozen_payload(staging: Path, source_commit: str | None = None):
+    if source_commit is not None and not re.fullmatch(r"[a-f0-9]{40}", source_commit):
         raise ValueError("Use the full frozen source commit")
     staging = safe_path(staging)
     raw_manifest = read_owned(staging / "manifest.json", 1024 * 1024)
@@ -215,11 +251,11 @@ def prepare(staging: Path, reports: Path, source_commit: str):
         set(manifest)
         != {"schema_version", "python_version", "source_commit", "requirements", "files"}
         or manifest["schema_version"] != 1
-        or manifest["source_commit"] != source_commit
+        or not re.fullmatch(r"[a-f0-9]{40}", manifest["source_commit"])
+        or (source_commit is not None and manifest["source_commit"] != source_commit)
         or not re.fullmatch(r"3\.\d+\.\d+", manifest["python_version"])
     ):
         raise ValueError("Manifest schema/source pin is not the frozen preview")
-    proofs = verified_reports(reports, digest(raw_manifest))
     payload = {}
     for entry in manifest["files"]:
         name = entry.get("path", "")
@@ -241,8 +277,132 @@ def prepare(staging: Path, reports: Path, source_commit: str):
         raise ValueError("Python AMD64 installer differs from the verified vendor release")
     wheel_count = verify_wheels(payload, manifest["requirements"])
     with zipfile.ZipFile(io.BytesIO(payload["source.zip"])) as archive:
-        if archive.comment != source_commit.encode("ascii"):
+        if archive.comment != manifest["source_commit"].encode("ascii"):
             raise ValueError("Source archive Git pin differs from native-tested commit")
+    return manifest, raw_manifest, payload, wheel_count
+
+
+def source_files(source_zip):
+    with zipfile.ZipFile(io.BytesIO(source_zip)) as archive:
+        names = archive.namelist()
+        if len(names) != len(set(names)):
+            raise ValueError("Duplicate source archive entry")
+        return {name: archive.read(name) for name in names if not name.endswith("/")}
+
+
+def runtime_modules(files, prefix):
+    result = {
+        name[len(prefix) :]: data
+        for name, data in files.items()
+        if name.startswith(prefix) and name.endswith(".py")
+    }
+    if len(result) != 171:
+        raise ValueError("Component reuse requires exactly 171 native-tested runtime modules")
+    return result
+
+
+def reuse_components(current, previous):
+    manifest, _, payload, _ = current
+    old_manifest, _, old_payload, _ = previous
+    if (
+        manifest["python_version"] != old_manifest["python_version"]
+        or manifest["requirements"] != old_manifest["requirements"]
+    ):
+        raise ValueError("Reused Python version/requirements differ")
+    if payload["python-installer.exe"] != old_payload["python-installer.exe"]:
+        raise ValueError("Reused Python installer bytes differ")
+    wheels = {key: value for key, value in payload.items() if key.startswith("wheels/")}
+    old_wheels = {key: value for key, value in old_payload.items() if key.startswith("wheels/")}
+    if wheels != old_wheels:
+        raise ValueError("Reused offline wheelhouse bytes differ")
+    files, old_files = source_files(payload["source.zip"]), source_files(old_payload["source.zip"])
+    modules = runtime_modules(files, "src/kirabridge/")
+    if modules != runtime_modules(old_files, "src/kirabridge/"):
+        raise ValueError("Reused production runtime bytes differ")
+    for name in REUSED_HARNESSES:
+        if name not in files or files[name] != old_files.get(name):
+            raise ValueError("Reused native harness bytes differ")
+    runner = "scripts/windows_guest_runner.ps1"
+    if (
+        payload["guest_runner.ps1"] != old_payload["guest_runner.ps1"]
+        or files.get(runner) != payload["guest_runner.ps1"]
+        or old_files.get(runner) != old_payload["guest_runner.ps1"]
+    ):
+        raise ValueError("Reused bootstrap runner bytes differ")
+    own = [data for key, data in wheels.items() if key.startswith(f"wheels/kirabridge-{VERSION}-")]
+    if len(own) != 1:
+        raise ValueError("Expected one native-tested KiraBridge wheel")
+    wheel_files = source_files(own[0])
+    if runtime_modules(wheel_files, "kirabridge/") != modules:
+        raise ValueError("Reused wheel runtime bytes differ from frozen source")
+    return {
+        "runtime_module_count": 171,
+        "runtime_module_sha256": {name: digest(body) for name, body in sorted(modules.items())},
+        "reused_harness_sha256": {name: digest(files[name]) for name in REUSED_HARNESSES},
+        "bootstrap_runner_sha256": digest(payload["guest_runner.ps1"]),
+        "python_installer_sha256": digest(payload["python-installer.exe"]),
+        "offline_wheelhouse_byte_identical": True,
+        "requirements_identical": True,
+    }
+
+
+def prepare(
+    staging: Path,
+    reports: Path,
+    source_commit: str,
+    reuse_staging: Path | None = None,
+    reuse_reports: Path | None = None,
+):
+    if (reuse_staging is None) != (reuse_reports is None):
+        raise ValueError("Reuse staging and reports must be provided together")
+    current = frozen_payload(staging, source_commit)
+    manifest, raw_manifest, payload, wheel_count = current
+    current_hash = digest(raw_manifest)
+    if reuse_staging is None:
+        proofs = verified_reports(reports, current_hash)
+        for phase in proofs["phases"]:
+            phase.update(
+                source_commit=source_commit, original_manifest_sha256=current_hash, reused=False
+            )
+    else:
+        previous = frozen_payload(reuse_staging)
+        old_manifest, old_raw, _, _ = previous
+        # Establish byte provenance BEFORE treating any four phases as accepted.
+        basis = reuse_components(current, previous)
+        old_hash = digest(old_raw)
+        old_proofs = verified_reports(reuse_reports, old_hash, REUSED_PHASES, ignore_preview=True)
+        new_proofs = verified_reports(reports, current_hash, ("preview",))
+        for phase in old_proofs["phases"]:
+            if phase["phase"] != "core" and not re.fullmatch(
+                r"[a-f0-9]{64}", phase.get("raw_artifact_sha256") or ""
+            ):
+                raise ValueError("Reused native phase requires its original artifact hash")
+            phase.update(
+                source_commit=old_manifest["source_commit"],
+                original_manifest_sha256=old_hash,
+                reused=True,
+            )
+        for phase in new_proofs["phases"]:
+            if phase["artifact"].get("keyboard_events_requested") != 0:
+                raise ValueError("Fresh preview must be read-only with zero requested keys")
+            phase.update(
+                source_commit=source_commit, original_manifest_sha256=current_hash, reused=False
+            )
+        proofs = {
+            "run_id": new_proofs["run_id"],
+            "run_ids": sorted({old_proofs["run_id"], new_proofs["run_id"]}),
+            "component_provenance_reuse": True,
+            "run_policy": "Three explicitly reused native phases; preview freshly executed",
+            "reuse_basis": {
+                **basis,
+                "original_source_commit": old_manifest["source_commit"],
+                "original_manifest_sha256": old_hash,
+                "current_source_commit": source_commit,
+                "ignored_previous_preview": old_proofs.get("ignored_previous_preview"),
+            },
+            "phases": old_proofs["phases"] + new_proofs["phases"],
+        }
+    with zipfile.ZipFile(io.BytesIO(payload["source.zip"])) as archive:
         documentation = public_documentation(archive, source_commit)
     proof_bytes = json.dumps(proofs, sort_keys=True, indent=2, ensure_ascii=True).encode() + b"\n"
     package = {
@@ -256,6 +416,7 @@ def prepare(staging: Path, reports: Path, source_commit: str):
         "offline_wheels": wheel_count,
         "native_guest_phases": list(PHASES),
         "acceptance_reexecuted_by_builder": False,
+        "component_provenance_reuse": reuse_staging is not None,
         "acceptance_scope": "Existing matching native guest reports; not remote attestation",
         "supported_preview": [
             "Authenticated local MCP HTTP/stdio",
@@ -370,9 +531,19 @@ def main(argv=None):
     parser.add_argument("--guest-reports-dir", type=Path, required=True)
     parser.add_argument("--out-dir", type=Path, required=True)
     parser.add_argument("--source-commit", required=True)
+    parser.add_argument("--reuse-staging-dir", type=Path)
+    parser.add_argument("--reuse-reports-dir", type=Path)
     parser.add_argument("--build", action="store_true")
     args = parser.parse_args(argv)
-    contents, package = prepare(args.staging_dir, args.guest_reports_dir, args.source_commit)
+    if (args.reuse_staging_dir is None) != (args.reuse_reports_dir is None):
+        parser.error("--reuse-staging-dir and --reuse-reports-dir must be provided together")
+    contents, package = prepare(
+        args.staging_dir,
+        args.guest_reports_dir,
+        args.source_commit,
+        args.reuse_staging_dir,
+        args.reuse_reports_dir,
+    )
     print(
         json.dumps(
             build(contents, package, args.out_dir)

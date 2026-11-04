@@ -200,3 +200,126 @@ def test_filtered_guest_archive_reads_only_fixed_public_docs_at_exact_git_pin(mo
     with zipfile.ZipFile(io.BytesIO(data.getvalue())) as archive:
         result = kit.public_documentation(archive, PIN)
     assert len(calls) == 2 and set(result) == {"LICENSE", *kit.DOCS}
+
+
+def replace_source(stage, commit, changes):
+    manifest = json.loads((stage / "manifest.json").read_bytes())
+    source = stage / "source.zip"
+    with zipfile.ZipFile(source) as archive:
+        files = {name: archive.read(name) for name in archive.namelist()}
+    files.update(changes)
+    output = io.BytesIO()
+    with zipfile.ZipFile(output, "w") as archive:
+        archive.comment = commit.encode()
+        for name, body in files.items():
+            archive.writestr(name, body)
+    source.write_bytes(output.getvalue())
+    manifest["source_commit"] = commit
+    for entry in manifest["files"]:
+        body = (stage / entry["path"]).read_bytes()
+        entry.update(bytes=len(body), sha256=kit.digest(body))
+    raw = json.dumps(manifest).encode()
+    (stage / "manifest.json").write_bytes(raw)
+    return kit.digest(raw)
+
+
+@pytest.fixture
+def reuse_fixture(fixture, tmp_path):
+    import shutil
+
+    current, original_reports = fixture
+    runtime = {f"src/kirabridge/module{i}.py": f"VALUE = {i}\n".encode() for i in range(171)}
+    harnesses = {name: ("# synthetic " + name).encode() for name in kit.REUSED_HARNESSES}
+    harnesses["scripts/windows_guest_runner.ps1"] = (current / "guest_runner.ps1").read_bytes()
+    # A wheel/source comparison fixture is not an executable Windows package.
+    wheel = next((current / "wheels").glob("kirabridge-*.whl"))
+    with zipfile.ZipFile(wheel, "a") as archive:
+        for name, data in runtime.items():
+            archive.writestr(name[4:], data)
+    replace_source(current, PIN, {**runtime, **harnesses})
+    previous = tmp_path / "previous-stage"
+    shutil.copytree(current, previous)
+    old_pin = "c" * 40
+    old_hash = replace_source(previous, old_pin, {})
+    old_reports = tmp_path / "previous-reports"
+    shutil.copytree(original_reports, old_reports)
+    for path in old_reports.glob("report-*.json"):
+        report = json.loads(path.read_bytes())
+        report["manifest_sha256"] = old_hash
+        if report["phase"] != "core":
+            report["artifact_sha256"] = "a" * 64
+        if report["phase"] == "preview":
+            report["exit_code"] = 1
+            report["artifact"].update(passed=False, error_type="BridgeError")
+        path.write_text(json.dumps(report))
+    new_hash = kit.digest((current / "manifest.json").read_bytes())
+    for path in original_reports.glob("report-*.json"):
+        if not path.name.endswith("-preview.json"):
+            path.unlink()
+        else:
+            report = json.loads(path.read_bytes())
+            report["manifest_sha256"] = new_hash
+            report["artifact"].update(keyboard_events_requested=0)
+            path.unlink()
+            # Different actual run IDs are explicitly recorded, never merged.
+            (original_reports / f"report-{'b' * 32}-preview.json").write_text(json.dumps(report))
+    return current, original_reports, previous, old_reports
+
+
+def test_component_reuse_records_each_original_source_manifest_and_run(reuse_fixture):
+    current, new_reports, previous, old_reports = reuse_fixture
+    contents, package = kit.prepare(current, new_reports, PIN, previous, old_reports)
+    proof = json.loads(contents["native-acceptance.json"])
+    assert package["component_provenance_reuse"] is True
+    assert proof["run_ids"] == ["a" * 32, "b" * 32]
+    assert [phase["reused"] for phase in proof["phases"]] == [True, True, True, False]
+    assert [phase["source_commit"] for phase in proof["phases"]] == ["c" * 40] * 3 + [PIN]
+    assert proof["reuse_basis"]["runtime_module_count"] == 171
+    ignored = proof["reuse_basis"]["ignored_previous_preview"]
+    assert ignored["accepted_as_passing_phase"] is False
+    assert len(ignored["raw_report_sha256"]) == 64
+    assert all(len(phase["raw_report_sha256"]) == 64 for phase in proof["phases"])
+    assert proof["phases"][3]["artifact"]["independent_original_process_absent"] is True
+
+
+@pytest.mark.parametrize("component", ["runtime", "reused_harness"])
+def test_component_reuse_refuses_changed_runtime_or_reused_harness(reuse_fixture, component):
+    current, new_reports, previous, old_reports = reuse_fixture
+    change = "src/kirabridge/module0.py" if component == "runtime" else kit.REUSED_HARNESSES[0]
+    replace_source(current, PIN, {change: b"# changed after native acceptance"})
+    with pytest.raises(ValueError, match="runtime bytes differ|harness bytes differ"):
+        kit.prepare(current, new_reports, PIN, previous, old_reports)
+
+
+def test_component_reuse_refuses_failed_original_phase(reuse_fixture):
+    current, new_reports, previous, old_reports = reuse_fixture
+    path = old_reports / f"report-{RUN_ID}-keyboard.json"
+    report = json.loads(path.read_bytes())
+    report["exit_code"] = 1
+    path.write_text(json.dumps(report))
+    with pytest.raises(ValueError, match="Native report failed"):
+        kit.prepare(current, new_reports, PIN, previous, old_reports)
+
+
+def test_component_reuse_requires_paired_arguments_and_fresh_preview(reuse_fixture):
+    current, new_reports, previous, old_reports = reuse_fixture
+    with pytest.raises(ValueError, match="provided together"):
+        kit.prepare(current, new_reports, PIN, previous, None)
+    next(new_reports.glob("report-*.json")).unlink()
+    with pytest.raises(ValueError, match="selected phases"):
+        kit.prepare(current, new_reports, PIN, previous, old_reports)
+
+
+def test_component_reuse_refuses_preview_without_positive_pid_or_cleanup(reuse_fixture):
+    current, new_reports, previous, old_reports = reuse_fixture
+    path = next(new_reports.glob("report-*.json"))
+    report = json.loads(path.read_bytes())
+    report["process_id"] = 0
+    path.write_text(json.dumps(report))
+    with pytest.raises(ValueError, match="Native report failed"):
+        kit.prepare(current, new_reports, PIN, previous, old_reports)
+    report["process_id"] = 1234
+    report["artifact"]["independent_original_process_absent"] = False
+    path.write_text(json.dumps(report))
+    with pytest.raises(ValueError, match="cleanup"):
+        kit.prepare(current, new_reports, PIN, previous, old_reports)
