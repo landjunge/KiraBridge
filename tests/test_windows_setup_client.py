@@ -406,3 +406,51 @@ def test_health_body_is_bounded_and_proxy_free(monkeypatch):
     assert error.value.code == "setup_client_health_limit"
     assert isinstance(captured[0], urllib.request.ProxyHandler) and captured[0].proxies == {}
     assert isinstance(captured[1], client.NoRedirect)
+
+
+@pytest.mark.parametrize(
+    "name", ["tunnel-health.url", "tunnel-process.json", "tunnel-spawned.json", "tunnel.pid"]
+)
+def test_orphaned_start_evidence_blocks_even_without_original_attempt(prepared, monkeypatch, name):
+    binary, profile, state, _ = prepared
+    write_private(state / "connection" / name, "original evidence")
+    monkeypatch.setattr(
+        client.subprocess, "Popen", lambda *a, **k: pytest.fail("Orphaned start replayed")
+    )
+    with pytest.raises(BridgeError) as error:
+        client.start_client(binary, profile, state, TOKEN)
+    assert error.value.code == "setup_client_start_unknown"
+    assert client.client_status(state)["started"] is None
+    assert (state / "connection" / name).read_text() == "original evidence"
+
+
+def test_native_private_creator_receives_absent_target_after_exclusive_reservation(
+    bundle, tmp_path, monkeypatch
+):
+    original = client.private_directory
+    folder = tmp_path / "tools" / ("tunnel-client-" + client.VERSION)
+    reservation = folder.parent / (folder.name + "-install-reservation.json")
+    seen = []
+
+    def creating(path):
+        if path == folder:
+            assert not path.exists(), "Never precreate with Python3.14 mkdir(0700)"
+            assert reservation.is_file(), "Exclusive reservation must precede native creation"
+            seen.append(path)
+        original(path)
+
+    monkeypatch.setattr(client, "private_directory", creating)
+    assert client.install_client(tmp_path) == folder / "tunnel-client.exe"
+    assert seen == [folder]
+
+
+def test_abandoned_reservation_blocks_before_a_new_download(bundle, tmp_path, monkeypatch):
+    parent = tmp_path / "tools"
+    parent.mkdir(mode=0o700)
+    reservation = parent / ("tunnel-client-" + client.VERSION + "-install-reservation.json")
+    write_private(reservation, '{"state":"original_unknown"}')
+    monkeypatch.setattr(client, "download", lambda: pytest.fail("Reserved install replayed"))
+    with pytest.raises(BridgeError) as error:
+        client.install_client(tmp_path)
+    assert error.value.code == "setup_client_existing"
+    assert reservation.read_text() == '{"state":"original_unknown"}'

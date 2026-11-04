@@ -246,14 +246,21 @@ def install_client(state_dir: Path) -> Path:
         if found:
             return found
         raise fail("setup_client_existing")
+    reservation = folder.parent / (folder.name + "-install-reservation.json")
+    if os.path.lexists(reservation):
+        raise fail("setup_client_existing")
     data = download()
     files = archive_files(data)
     private_directory(state)
     private_directory(folder.parent)
     try:
-        folder.mkdir(mode=0o700)
+        write_json(reservation, {"archive_sha256": ARCHIVE_SHA256, "state": "reserved_no_replay"})
     except FileExistsError:
         raise fail("setup_client_existing") from None
+    if os.path.lexists(folder):
+        raise fail("setup_client_existing")
+    # Python3.14 mkdir(0700) adds an Administrators ACE on Windows. Let our
+    # native current-user/SYSTEM directory creator create the absent object.
     private_directory(folder)
     write_json(
         folder / "install-attempt.json", {"version": VERSION, "archive_sha256": ARCHIVE_SHA256}
@@ -444,7 +451,15 @@ def start_client(binary, profile_path, state_dir, local_token) -> subprocess.Pop
         ):
             return None  # Reuse this original live process; no second executable is started.
         raise fail("setup_client_start_unknown")
-    if os.path.lexists(health) or os.path.lexists(connection / "tunnel-process.json"):
+    if any(
+        os.path.lexists(connection / name)
+        for name in (
+            "tunnel-health.url",
+            "tunnel-process.json",
+            "tunnel-spawned.json",
+            "tunnel.pid",
+        )
+    ):
         raise fail("setup_client_start_unknown")
     try:
         write_json(
@@ -506,6 +521,21 @@ def client_status(state_dir) -> dict:
     windows()
     _, folder, connection = paths(state_dir)
     if not os.path.lexists(connection / "tunnel-start-attempt.json"):
+        if any(
+            os.path.lexists(connection / name)
+            for name in (
+                "tunnel-health.url",
+                "tunnel-process.json",
+                "tunnel-spawned.json",
+                "tunnel.pid",
+            )
+        ):
+            return {
+                "started": None,
+                "ready": False,
+                "state": "unknown",
+                "chatgpt_tool_call": "unverified",
+            }
         return {
             "started": False,
             "ready": False,
