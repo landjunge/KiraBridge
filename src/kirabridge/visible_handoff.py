@@ -45,6 +45,13 @@ class VisibleReadinessError(BridgeError):
             "target_changed": "Die zugeordnete CLI-Sitzung hat sich geändert; keine Eingabe.",
         }[observation["state"]]
         super().__init__(code, message)
+        # Persist only internal classifier labels, never screen/protocol contents.
+        readiness = {"state": observation["state"]}
+        for key in ("target", "reason"):
+            value = observation.get(key)
+            if isinstance(value, str) and re.fullmatch(r"[a-z][a-z0-9_]{0,95}", value):
+                readiness[key] = value
+        self.provider_error = {"readiness": readiness}
 
 
 class VisibleHandoffs:

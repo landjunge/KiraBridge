@@ -70,6 +70,9 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
         "Use task_request: automatic mode admits permitted work without a browser click. "
         "Use keyboard_sequence for requested genuine individual keystrokes; "
         "use keyboard_control text for literal text. Keep adaptive steps separate. "
+        "If a cached Apps catalog lacks keyboard_sequence, submit the same steps through "
+        "action_request request.operation=keyboard.sequence; never split known text or a "
+        "known key sequence into one cloud call per character. "
         "Use read_queries to combine independent reads in one roundtrip. "
         "Use read_tools or read_query operation=tool.batch for mixed read-only tools. "
         "Use read_query native.read for automatic apps/windows/accessibility reads without "
@@ -741,6 +744,8 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
         Do not ask them to copy task IDs between chats. A queued receipt is not proof of execution.
         New native work is attempted once; blocked targets fail clearly without a waiting backlog.
         Short work returns its finished result in this response when available.
+        Cached clients without keyboard_sequence can submit operation=keyboard.sequence
+        and args.steps here: ordered real key events in one request, not one call per key.
         An observation timeout never cancels work; inspect the same task ID.
         task.read is checked before admission, so a result can be read safely.
         For the Grok app, waits briefly and includes conversation_return. Speak its

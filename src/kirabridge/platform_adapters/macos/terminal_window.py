@@ -9,19 +9,34 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import json
+import math
 
 from kirabridge.bridge_core.models import BridgeError
 
 
-def require(value, message):
+def require(value, message, *, observation=None):
     if not value:
-        raise BridgeError("session_window_unconfirmed", message)
+        error = BridgeError("session_window_unconfirmed", message)
+        if observation is not None:
+            error.window_observation = observation
+        raise error
 
 
 def fingerprint(value):
     return hashlib.sha256(
         json.dumps(value, sort_keys=True, separators=(",", ":")).encode()
     ).hexdigest()
+
+
+def geometry_pair(value):
+    """Diagnostics retain finite coordinates, never arbitrary native values."""
+    return (
+        list(value)
+        if isinstance(value, (list, tuple))
+        and len(value) == 2
+        and all(type(item) in (int, float) and math.isfinite(item) for item in value)
+        else None
+    )
 
 
 def logical_windows(inventory):
@@ -292,6 +307,59 @@ class TerminalWindowProof:
             }
         )
 
+    def bind_shared_host(self, current, own_cg, own, original):
+        """Bind host identity across tab-induced reflow, preserving other surfaces."""
+        hosts = [group for group in self.before["ax"] if self.members(group) == original]
+        require(
+            len(hosts) == 1 and len(current["ax"]) == len(self.before["ax"]),
+            "Shared host is not positively bound to the pre-open radio partition",
+        )
+        host = hosts[0]
+        observation = {
+            "phase": "pre_detach_host_binding",
+            "before_host_position": geometry_pair(host["position"]),
+            "before_host_size": geometry_pair(host["size"]),
+            "after_host_position": geometry_pair(own["position"]),
+            "after_host_size": geometry_pair(own["size"]),
+            "current_cg_window_id": own_cg["window_id"],
+            "worker": list(self.worker),
+            "before_radio_partition_sha256": fingerprint(self.members(host)),
+            "after_retained_radio_partition_sha256": fingerprint(original),
+        }
+        require(
+            host["token"] == own["token"],
+            "Shared host native AX anchor changed",
+            observation=observation,
+        )
+        old_cg = [
+            window
+            for window in self.before["cg"]
+            if host["position"] == [window["bounds"]["X"], window["bounds"]["Y"]]
+            and host["size"] == [window["bounds"]["Width"], window["bounds"]["Height"]]
+        ]
+        require(
+            len(old_cg) == 1,
+            "Pre-open host CG geometry is ambiguous",
+            observation=observation,
+        )
+        unrelated = [window for window in self.before["cg"] if window is not old_cg[0]]
+        unrelated_ids = {window["window_id"] for window in unrelated}
+        require(
+            own_cg["window_id"] not in unrelated_ids
+            and {window["window_id"] for window in current["cg"]}
+            == unrelated_ids | {own_cg["window_id"]}
+            and all(
+                any(
+                    item["window_id"] == window["window_id"] and item["bounds"] == window["bounds"]
+                    for item in current["cg"]
+                )
+                for window in unrelated
+            ),
+            "Unrelated pre-open native CG surface changed",
+            observation=observation,
+        )
+        self.retained(self.before, current, exclude=host)
+
     async def isolate(self, receipt):
         if self.app is None:
             await self.application(receipt["app_pid"])
@@ -312,17 +380,7 @@ class TerminalWindowProof:
         moved = bool(radios and len(radios) > 1)
         if moved:
             original = [r["token"] for r in radios if r["token"] != own_radio]
-            old_hosts = [group for group in self.before["ax"] if self.members(group) == original]
-            require(
-                len(old_hosts) == 1 and len(before["ax"]) == len(self.before["ax"]),
-                "Shared host is not positively bound to the pre-open radio partition",
-            )
-            old_host = old_hosts[0]
-            require(
-                old_host["position"] == own["position"] and old_host["size"] == own["size"],
-                "Pre-open host native layout changed",
-            )
-            self.retained(self.before, before, exclude=old_host)
+            self.bind_shared_host(before, own_cg, own, original)
             await self.terminal.move_created_tab(receipt)
             for attempt in range(10):
                 try:

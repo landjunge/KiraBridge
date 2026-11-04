@@ -8,7 +8,7 @@ from pydantic import ValidationError
 from test_keyboard_control import setup
 from test_mcp import http_bridge  # noqa: F401 -- real authenticated HTTP fixture
 
-from kirabridge.bridge_core.models import UncertainExecution
+from kirabridge.bridge_core.models import BridgeError, TaskRequest, UncertainExecution
 from kirabridge.keyboard_sequence import KeyboardSequenceInput
 from kirabridge.mcp_gateway.client import MCPClientPool, Peer
 
@@ -44,11 +44,10 @@ async def test_sequence_posts_eight_real_key_pairs_with_fresh_targets(bridge, co
     assert result["post_calls_returned"] == 16
     assert result["physical_key_events"] and not result["app_processing_confirmed"]
     assert result["automatic_retry"] is False
-    assert [op for op, _ in calls] == [
+    assert [op for op, _ in calls] == ["apps.list"] + [
         op
         for index in range(8)
         for op in (
-            "apps.list",
             "keyboard.inspect",
             "keyboard.chord" if index == 0 else "keyboard.key",
         )
@@ -84,7 +83,7 @@ async def test_partial_unknown_stops_before_remaining_keys_and_records_completed
     bridge.keyboard.transport.request.side_effect = uncertain
     with pytest.raises(UncertainExecution) as observed:
         await execute(bridge)
-    assert count == 3 and len(calls) == 9
+    assert count == 3 and len(calls) == 7
     assert observed.value.provider_error == {
         "step_index": 2,
         "completed_steps": 2,
@@ -118,6 +117,61 @@ async def test_sequence_does_not_refocus_or_follow_replaced_target(bridge, confi
         await execute(bridge)
     assert count == 1 and observed.value.provider_error["completed_steps"] == 1
     assert not any(op == "app.focus" for op, _ in calls)
+
+
+@pytest.mark.parametrize(
+    "change", ["target-pid", "target-start", "bundle_id", "app_path", "executable", "closed"]
+)
+async def test_sequence_fresh_inspection_rejects_replaced_or_closed_application(
+    bridge, config, change
+):
+    calls, _, native = setup(bridge, config)
+    inspections = 0
+
+    async def altered(operation, arguments, **kwargs):
+        nonlocal inspections
+        result = await native(operation, arguments, **kwargs)
+        if operation == "keyboard.inspect":
+            inspections += 1
+            if inspections == 2:
+                if change == "closed":
+                    raise BridgeError("macos_target_changed", "Selected process exited")
+                if change.startswith("target-"):
+                    field = "pid" if change == "target-pid" else "expected_started_at"
+                    result["target"][field] += 1
+                else:
+                    result["application"][change] += ".replacement"
+        return result
+
+    bridge.keyboard.transport.request.side_effect = altered
+    with pytest.raises(UncertainExecution) as observed:
+        await execute(bridge)
+    assert observed.value.provider_error["completed_steps"] == 1
+    assert sum(op == "apps.list" for op, _ in calls) == 1
+    assert sum(op == "keyboard.inspect" for op, _ in calls) == 2
+    assert sum(op in {"keyboard.key", "keyboard.chord"} for op, _ in calls) == 1
+    assert not any(op == "app.focus" for op, _ in calls)
+
+
+async def test_sequence_rechecks_permission_after_each_fresh_inspection(bridge, config):
+    calls, _, native = setup(bridge, config)
+    inspections = 0
+
+    async def revoked(operation, arguments, **kwargs):
+        nonlocal inspections
+        result = await native(operation, arguments, **kwargs)
+        if operation == "keyboard.inspect":
+            inspections += 1
+            if inspections == 2:
+                config.principals["local"].capabilities.remove("keyboard.execute")
+        return result
+
+    bridge.keyboard.transport.request.side_effect = revoked
+    with pytest.raises(UncertainExecution) as observed:
+        await execute(bridge)
+    assert observed.value.provider_error["completed_steps"] == 1
+    assert inspections == 2
+    assert sum(op in {"keyboard.key", "keyboard.chord"} for op, _ in calls) == 1
 
 
 async def test_whole_sequence_owns_desktop_lock_without_interleaving(bridge, config):
@@ -183,6 +237,52 @@ async def test_sequence_mcp_admits_one_durable_task_and_duplicate_posts_nothing(
         assert duplicate["state"] == "completed" and duplicate["id"] == first["id"]
     assert sum(op in {"keyboard.key", "keyboard.chord"} for op, _ in calls) == 8
     assert bridge.store.db.execute("SELECT count(*) FROM tasks").fetchone()[0] == 1
+
+
+async def test_legacy_catalog_action_request_runs_one_idempotent_physical_sequence(
+    http_bridge,  # noqa: F811
+    config,
+    monkeypatch,
+):
+    bridge, endpoint = http_bridge
+    calls, _, _ = setup(bridge, config)
+    config.principals["local"].approval_mode = "automatic"
+    monkeypatch.setattr(bridge.tasks, "preflight", None)
+    request = TaskRequest(
+        task_id="legacy-apps-sequence",
+        idempotency_key="legacy-apps-sequence",
+        operation="keyboard.sequence",
+        arguments={"app": "Editor", "steps": steps()},
+    )
+    async with MCPClientPool() as pool:
+        await pool.connect(Peer("caller", url=endpoint, token="local-test-" + "a" * 40))
+        # An old Apps snapshot exposes the generic action tool but no dedicated
+        # sequence tool. The unchanged generic request schema carries its intent.
+        legacy_catalog = {
+            tool.name: tool
+            for tool in await pool.list_tools("caller")
+            if tool.name == "action_request"
+        }
+        assert "keyboard_sequence" not in legacy_catalog
+        assert legacy_catalog["action_request"].inputSchema["required"] == ["request"]
+
+        async def legacy_call():
+            assert "action_request" in legacy_catalog
+            return (
+                await pool.call("caller", "action_request", {"request": request.model_dump()})
+            ).structuredContent
+
+        first = await legacy_call()
+        assert first["state"] == "completed" and first["result"]["completed_steps"] == 8
+        before_duplicate = list(calls)
+        duplicate = await legacy_call()
+        assert duplicate["id"] == first["id"] and duplicate["state"] == "completed"
+        assert calls == before_duplicate
+    assert bridge.store.db.execute("SELECT count(*) FROM tasks").fetchone()[0] == 1
+    assert sum(op == "apps.list" for op, _ in calls) == 1
+    assert sum(op == "keyboard.inspect" for op, _ in calls) == 8
+    assert sum(op in {"keyboard.key", "keyboard.chord"} for op, _ in calls) == 8
+    assert not any(op.startswith("keyboard.text") for op, _ in calls)
 
 
 async def test_partial_http_sequence_is_not_replayed_by_same_request(

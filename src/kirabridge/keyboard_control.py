@@ -112,43 +112,54 @@ class KeyboardControl:
 
         authorize()
         await running({"evidence_type": "automatic_keyboard_resolution", "automatic_retry": False})
-        page = await read("apps.list", {"limit": 1000})
-        if page.get("eof") is not True:
-            raise BridgeError("keyboard_catalog_incomplete", "Running program list is incomplete")
-        applications = page["applications"]
-        if args.pid is not None:
-            matches = [
-                a
-                for a in applications
-                if a.get("pid") == args.pid and a.get("started_at") == args.expected_started_at
-            ]
-        elif args.app is not None:
-            label = args.app.strip().casefold()
-            matches = [
-                a
-                for a in applications
-                if label
-                in {str(a.get("bundle_id", "")).casefold(), str(a.get("name", "")).casefold()}
-            ]
+        if expected_application is not None:
+            # A sequence already owns one exact application generation. Its next
+            # fresh native inspection proves focus and identity without another
+            # full application catalogue. Never refocus or select a replacement.
+            app = dict(expected_application)
+            if (
+                args.scope != "app"
+                or args.key is None
+                or args.app is not None
+                or args.pid != app.get("pid")
+                or args.expected_started_at != app.get("started_at")
+                or app.get("active") is not True
+            ):
+                raise BridgeError(
+                    "keyboard_application_changed",
+                    "Sequence must retain its exact foreground application generation",
+                )
         else:
-            matches = [a for a in applications if a.get("active") is True]
-        if len(matches) != 1:
-            raise BridgeError(
-                "keyboard_application_ambiguous" if matches else "keyboard_application_unavailable",
-                "Choose one running program by exact name, bundle ID or PID generation",
-            )
-        app = dict(matches[0])
-        if expected_application is not None and (
-            any(
-                app.get(key) != expected_application.get(key)
-                for key in _APPLICATION_IDENTITY_FIELDS
-            )
-            or app.get("active") is not True
-        ):
-            raise BridgeError(
-                "keyboard_application_changed",
-                "Sequence program generation or foreground changed; no further keys",
-            )
+            page = await read("apps.list", {"limit": 1000})
+            if page.get("eof") is not True:
+                raise BridgeError(
+                    "keyboard_catalog_incomplete", "Running program list is incomplete"
+                )
+            applications = page["applications"]
+            if args.pid is not None:
+                matches = [
+                    a
+                    for a in applications
+                    if a.get("pid") == args.pid and a.get("started_at") == args.expected_started_at
+                ]
+            elif args.app is not None:
+                label = args.app.strip().casefold()
+                matches = [
+                    a
+                    for a in applications
+                    if label
+                    in {str(a.get("bundle_id", "")).casefold(), str(a.get("name", "")).casefold()}
+                ]
+            else:
+                matches = [a for a in applications if a.get("active") is True]
+            if len(matches) != 1:
+                raise BridgeError(
+                    "keyboard_application_ambiguous"
+                    if matches
+                    else "keyboard_application_unavailable",
+                    "Choose one running program by exact name, bundle ID or PID generation",
+                )
+            app = dict(matches[0])
         selected = {"pid": app["pid"], "expected_started_at": app["started_at"]}
         if app.get("active") is not True:
             if args.app is None and args.pid is None:
@@ -237,6 +248,7 @@ class KeyboardControl:
             target.get("pid") != app["pid"]
             or target.get("expected_started_at") != app["started_at"]
             or any(observed.get(key) != app.get(key) for key in _APPLICATION_IDENTITY_FIELDS)
+            or (expected_application is not None and observed.get("active") is not True)
         ):
             raise BridgeError("keyboard_application_changed", "Resolved program identity changed")
         if args.text is not None:

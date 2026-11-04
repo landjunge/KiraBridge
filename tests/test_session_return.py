@@ -119,6 +119,67 @@ async def test_return_on_captured_collapsed_paste_with_standalone_warning(key_vi
     assert transport["literal_calls"] == [("return", None)]
 
 
+@pytest.mark.parametrize("changed_agent", [False, True], ids=["same-agent", "replaced-agent"])
+async def test_saved_return_cursor_survives_bridge_reopen_but_rechecks_agent(
+    key_visible, monkeypatch, changed_agent
+):
+    from test_visible_selection import new_native_selection
+
+    from kirabridge.bridge_core.bridge import Bridge
+
+    bridge, _, row, observed = key_visible
+    screen = "› [Pasted Content 1014 chars]\n \n  GPT-6.1-Sol xhigh · ~\n"
+    screen += " " * 106 + "⚠ 1 warning · f2 to view\n"
+    args = await observed(screen)
+    bridge.store.close()
+    restarted = Bridge(bridge.config)
+    posts = []
+    try:
+        if changed_agent:
+            row["processes"][1]["pid"] += 1
+        await new_native_selection(restarted, monkeypatch, row)
+
+        async def read(pane):
+            assert pane == row["pane_id"]
+            return screen
+
+        async def press_return(pane, **guards):
+            assert pane == row["pane_id"] and guards["expected_screen"] == screen
+            assert args["expected_agent_pid"] in guards["identity_guard"]
+            posts.append("return")
+
+        async def no_real_catalog(*args, **kwargs):
+            raise AssertionError("Reopen fixture must never observe actual terminals")
+
+        monkeypatch.setattr(restarted.sessions, "catalog", no_real_catalog)
+        monkeypatch.setattr(restarted.sessions.terminal_app, "read", read)
+        monkeypatch.setattr(restarted.sessions.terminal_app, "press_return", press_return)
+        # A fresh client/chat retains its authenticated principal, not a chat ID.
+        assert (
+            restarted.outputs.captured_input_view(
+                "chatgpt", args["pane_id"], args["expected_pid"], args["expected_cursor"]
+            )
+            == screen
+        )
+        task = {
+            "id": "return-after-reopen",
+            "principal": "chatgpt",
+            "operation": "session.input",
+            "args": args,
+        }
+        if changed_agent:
+            with pytest.raises(BridgeError) as failure:
+                await restarted.execute(task, callback, callback)
+            assert failure.value.code == "visible_target_changed"
+            assert posts == []
+        else:
+            result = await restarted.execute(task, callback, callback)
+            assert result["return_sent"] and not result["paste_event_sent"]
+            assert posts == ["return"]
+    finally:
+        restarted.store.close()
+
+
 @pytest.mark.parametrize(
     "failure", ["changed", "foreign", "agent", "missing", "corrupt", "truncated"]
 )

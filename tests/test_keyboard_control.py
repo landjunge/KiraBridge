@@ -46,7 +46,7 @@ def setup(bridge, config, *, active=True):
         if operation == "app.focus":
             return {"active_observed": True}
         if operation == "keyboard.inspect":
-            return {"target": TARGET, "application": app}
+            return {"target": dict(TARGET), "application": dict(app)}
         if operation == "keyboard.text.begin":
             state.update(arguments)
             return {

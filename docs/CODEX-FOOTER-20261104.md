@@ -57,6 +57,44 @@ concrete observations; this patch claims no general repair for them.
 
 ## Delivery
 
+The operator subsequently expanded the request to the entire slow/blocking
+input chain and reliable window/tab control after restart or a new chat.
+
+The latest concrete Notes series used seventeen separate keyboard.control
+requests: 57.598 seconds overall, 7.086 seconds summed within tasks, 50.512
+seconds between tasks (87.697%). This does not isolate model, network and
+transport components from one another. The Apps tool view lacks the dedicated
+keyboard_sequence export and carries older descriptions, although the backend
+and direct connector provide it. The existing generic action_request route is
+now explicitly documented and tested as the compatible batching path.
+
+Sequence application catalogues fall from N to one; fresh native inspections
+and key mutations remain N. PID/start, immutable app identity, active focus and
+per-step authorization are checked; subsequent steps never refocus a different
+application. An actual HTTP/MCP regression with a simulated legacy catalogue
+posted eight simulated physical key pairs in one durable task, with eight fresh
+inspections and one catalogue. Repeating the same request posted nothing.
+
+Seven historical session.open tasks were unknown; five failed the exact
+pre/post host-layout comparison. Their original geometry values were not
+retained. A positive identity proof replaces that geometric equality: unchanged
+AX anchor and ordered original radio partition, unique baseline host-CG
+association, exact preservation of every unrelated CG ID/bounds and complete
+current surface accounting. Current AX/CG geometry stays coherent and remains
+the reference for unchanged guarded detach/postchecks. No guessed pixel
+tolerance is used. Reflow/resize positives and substituted/extra/ambiguous
+surface negatives passed; the cause of each historical geometry change is not
+retroactively claimed. New bounded diagnostics preserve the next refusal's
+classifier or geometry proof without screen text or window titles.
+
+Final focused validation comprises 317 distinct cases: 208 literal/readiness/
+Return cases, 56 keyboard/legacy-route cases, 29 window/diagnostic cases,
+22 persisted-binding/tab/receipt cases, and two new captured-cursor Bridge-reopen
+cases. Same-principal cursor reuse with unchanged freshly checked process
+identities returns once; changed agent identity posts nothing. These persistence
+tests simulate OS observations and do not constitute a full native new-chat
+matrix. No full suite, cloud CI or Windows build was run.
+
 Package, publication and actual installation results are recorded after those
 steps, independently of the parser results. The regular installer must retain
 its visibility, idle, backup, integrity and rollback gates. Other worktrees and

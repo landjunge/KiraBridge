@@ -916,6 +916,8 @@ entries[0].click();JSON.stringify({detached:true});
                 "cause_code": getattr(cause, "code", type(cause).__name__),
                 "cause_message": str(cause)[:512],
             }
+            if getattr(cause, "window_observation", None) is not None:
+                error.provider_error["window_observation"] = cause.window_observation
             raise error from cause
 
     async def verify_opened(self, opened, *, principal="session_open"):

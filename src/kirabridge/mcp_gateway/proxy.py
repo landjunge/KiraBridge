@@ -181,6 +181,8 @@ async def connect_stdio(config, principal):
             "discovery.revision after connection/version/session changes. "
             "Use keyboard_sequence for ordered genuine individual keystrokes in one call; "
             "use keyboard_control text only for literal text requests. No clipboard is used. "
+            "If a cached Apps catalog lacks keyboard_sequence, use action_request with "
+            "request.operation=keyboard.sequence and args.steps in one call. "
             "Reduce cloud roundtrips: read_query operation=tool.batch combines 1–8 existing "
             "read-only calls [{tool,arguments}]; read.batch combines query objects. "
             "read_query native.read accepts native_operation and arguments for automatic "
