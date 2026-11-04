@@ -30,7 +30,28 @@
     "passed": 622,
     "pytest_seconds": 41.1,
     "files": [
-      "tests"
+      "tests/test_event_push.py",
+      "tests/test_local_operation.py",
+      "tests/test_macos_system_transport.py",
+      "tests/test_mcp_schema_validation.py",
+      "tests/test_native_queries.py",
+      "tests/test_native_read_transport_guards.py",
+      "tests/test_process_output_ranges.py",
+      "tests/test_read_queries.py",
+      "tests/test_read_query.py",
+      "tests/test_read_query_ranges.py",
+      "tests/test_read_tool_batch.py",
+      "tests/test_system_modules_integration.py",
+      "tests/test_task_event_hotpaths.py",
+      "tests/test_task_observation_hotpaths.py",
+      "tests/test_windows_core.py",
+      "tests/test_windows_core_native.py",
+      "tests/test_windows_desktop_mcp.py",
+      "tests/test_windows_keyboard.py",
+      "tests/test_windows_keyboard_manager.py",
+      "tests/test_windows_preview.py",
+      "tests/test_windows_window_manager.py",
+      "tests/test_windows_windows.py"
     ],
     "skips": [
       {
