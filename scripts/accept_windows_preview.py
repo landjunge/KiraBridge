@@ -7,6 +7,8 @@ import asyncio
 import ctypes
 import json
 import os
+import re
+import secrets
 import signal
 import socket
 import subprocess
@@ -146,13 +148,32 @@ async def inspect_child(child, state, log_path, endpoint, report):
     credentials = None
 
 
-def run(report):
+def private_smoke_paths(report, *, persist):
     from kirabridge.bridge_core.config import private_directory
 
-    root = Path(tempfile.mkdtemp(prefix="kirabridge-preview-smoke-"))
-    private_directory(root)
+    # Native private_directory must create the object with its own protected DACL.
+    # Python's mkdtemp(mode700) can create a different Windows owner/ACL first.
+    root = Path(tempfile.gettempdir()) / ("kirabridge-preview-smoke-" + secrets.token_hex(16))
     state, log_path = root / "state", root / "owned-preview.log"
-    report.update({"state_dir": str(state), "private_log": str(log_path), "state_retained": True})
+    report.update(
+        {
+            "stage": "creating_private_smoke_directory",
+            "state_dir": str(state),
+            "private_log": str(log_path),
+            "owned_process_started": False,
+        }
+    )
+    persist()
+    if os.path.lexists(root):
+        raise FileExistsError("Fresh smoke path already exists; never reuse or overwrite it")
+    private_directory(root)
+    report.update({"stage": "private_smoke_directory_ready", "state_retained": True})
+    persist()
+    return state, log_path
+
+
+def run(report, *, persist):
+    state, log_path = private_smoke_paths(report, persist=persist)
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as reservation:
         reservation.bind(("127.0.0.1", 0))
         port = reservation.getsockname()[1]
@@ -175,6 +196,8 @@ def run(report):
     began = time.monotonic_ns()
     try:
         with log_path.open("xb") as log:
+            report.update({"stage": "launching_preview_child", "owned_process_started": None})
+            persist()  # A creation failure is not evidence that no child ever started.
             child = subprocess.Popen(
                 command,
                 cwd=source_root,
@@ -184,10 +207,14 @@ def run(report):
                 stderr=log,
                 creationflags=subprocess.CREATE_NEW_PROCESS_GROUP,
             )
+            report.update({"stage": "pinning_preview_child", "owned_process_started": True})
+            persist()
             original = process_snapshot(child.pid)
             if original is None or not original["running"]:
                 raise RuntimeError("Owned preview exited before process identity could be pinned")
             report["owned_process"] = original
+            report["stage"] = "inspecting_preview_child"
+            persist()
             asyncio.run(inspect_child(child, state, log_path, endpoint, report))
     finally:
         if child is not None:
@@ -217,10 +244,10 @@ def run(report):
         report["total_ms"] = (time.monotonic_ns() - began) / 1e6
 
 
-def main():
+def main(argv=None):
     parser = argparse.ArgumentParser()
     parser.add_argument("--output", required=True, type=Path)
-    arguments = parser.parse_args()
+    arguments = parser.parse_args(argv)
     if os.name != "nt":
         parser.error("Run only inside the Windows guest")
     try:
@@ -236,23 +263,31 @@ def main():
         "state_retained": True,
         "service_installed": False,
         "cloud_latency_measured": False,
+        "stage": "starting",
+        "owned_process_started": False,
     }
     with output:
-        output.write('{"state":"started","passed":false,"keyboard_events_requested":0}\n')
-        output.flush()
-        os.fsync(output.fileno())
-        try:
-            run(report)
-            report["passed"] = True
-        except Exception as error:
-            # Exception strings can contain tokens; retain only their type.
-            report["error_type"] = type(error).__name__
-        finally:
+
+        def persist():
             output.seek(0)
             output.write(json.dumps(report, indent=2) + "\n")
             output.truncate()
             output.flush()
             os.fsync(output.fileno())
+
+        persist()
+        try:
+            run(report, persist=persist)
+            report["passed"] = True
+            report["stage"] = "completed"
+        except Exception as error:
+            # Exception strings can contain tokens; retain only their type.
+            report["error_type"] = type(error).__name__
+            code = getattr(error, "code", None)
+            if isinstance(code, str) and re.fullmatch(r"[a-z0-9_]{1,80}", code):
+                report["error_code"] = code
+        finally:
+            persist()
     raise SystemExit(0 if report["passed"] else 1)
 
 
