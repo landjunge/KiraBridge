@@ -1,5 +1,9 @@
 # Begrenzte automatische Fortsetzung aus dem vorhandenen Whiteboard
 
+Aktuelle Arbeitsgrundlage: gemeinsamer Big-Plan-Skill **1.2.0 vom 05.11.2026**.
+Die folgende Mechanismuskennung bezeichnet dessen bestehende Implementierung,
+keine Produktversion. Windows für Dirk ist der nächste priorisierte Folgeauftrag.
+
 Paket `BIGPLAN-AUTONEXT-20261104-V1`, einziger schreibender Bearbeiter Codex.
 Branch `feat/bigplan-autonext-20261104`, Basis
 `bcb3b756f1b8dc8e62a27489d54f5be0445096e9`. Koordination und Freigabe:
@@ -185,9 +189,33 @@ Vor einer regulären produktiven Aktivierung fehlen weiterhin:
 3. gezielter echter Test dieser belegten Route und anschließende reguläre lokale
    Installation mit Backup, Integritäts-, Idle- und Rückweggates.
 
-Bis dahin bleibt RC39 `d9b0c0a770ca08ec951af78b87e687bf43eeded0` unverändert
-installiert. Der separat erhaltene, **nicht installierte** Chat-Gate-Fix
-`147e6f85f8a87485156eeeae9c83bacf19349602` ist nicht Teil dieses Branches.
+Dies war der historische Aktivierungsstand der Erstimplementierung am 04.11.2026:
+damals lief RC39 `d9b0c0a770ca08ec951af78b87e687bf43eeded0`, der Chat-Gate-Fix
+`147e6f85f8a87485156eeeae9c83bacf19349602` war noch separat und nicht installiert.
+Am 05.11.2026 wurden die bestehenden Reparaturen integriert, real begrenzt
+abgenommen und als RC39@8d33131 installiert; siehe den Status am Dokumentanfang.
 Es wurden keine alten Marker erneut gesendet und keine externe Sicherheitsprüfung
 umgangen. Dieses Paket löst keine Release-, Plattforminstallations- oder
 Cloud-Build-Schleife aus.
+
+## Historische Receiver-Scope-Pins (2026-11-05)
+
+`autonext.legacy_scope_pins` ist standardmäßig leer. Ein ausdrücklich
+konfigurierter Pin kann ausschließlich den fehlenden Arbeitsordner eines alten
+`UNKNOWN`-Receiverjobs mit `agent_timeout` belegen: Nachrichten-/Run-/Empfänger-
+und Session-ID sowie der SHA-256 der ursprünglichen Beobachtung müssen zum
+gespeicherten `message.agent_progress` passen. Eine private, eigene, reguläre
+Datei bindet dieselbe Identität und die exakten Hashes der ursprünglichen lokalen
+Grok-Sessionmetadaten bzw. Codex-Rollout-Metadaten. Diese Quellen müssen Session
+und absoluten Arbeitsordner unabhängig bestätigen; Symlinks, Mehrdeutigkeit,
+fehlende oder geänderte Quellen bleiben STOP. Die Prüfung erfolgt bei Aufnahme
+und nochmals vor Ausführung.
+
+Der belegte Ordner unterliegt unverändert der normalen Überlappungssperre.
+Pins gewähren keine Ausführung und ändern weder `UNKNOWN`, Auditgeschichte noch
+Zustellzustand; sie schließen, retirieren oder wiederholen keinen alten Auftrag.
+Heutige Receiverkonfiguration und freie Operatorerklärungen gelten nicht als
+historischer Scopebeleg. Die isolierten Regressionen stehen in
+`tests/test_autonext_legacy_scope.py`; private, inhaltsarme Belegdateien für die
+sieben untersuchten Altjobs liegen unter
+`~/.local/share/kirabridge/backups/autonext-legacy-scope-20261105/`.

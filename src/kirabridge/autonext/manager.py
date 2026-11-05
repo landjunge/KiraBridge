@@ -567,7 +567,8 @@ class AutoNextManager:
             if overlaps(other_cwd, cwd):
                 raise BridgeError("autonext_worktree_busy", "Existing handoff owns the worktree")
         for row in self.store.db.execute(
-            "SELECT j.state,j.execution_cwd,m.recipient FROM message_jobs j "
+            "SELECT j.message_id,j.run_id,j.state,j.error,j.evidence,j.execution_cwd,m.recipient "
+            "FROM message_jobs j "
             "JOIN messages m ON m.id=j.message_id "
             "WHERE j.state IN ('queued','running','unknown') "
             "AND (j.state='running' OR NOT EXISTS (SELECT 1 FROM queue_holds h "
@@ -577,6 +578,10 @@ class AutoNextManager:
             if row["state"] == "queued":
                 receiver = self.bridge.config.messaging.receivers.get(row["recipient"])
                 other_cwd = receiver.cwd if receiver else None
+            elif row["state"] == "unknown" and other_cwd is None:
+                from kirabridge.autonext.legacy_scope import legacy_scope_for_job
+
+                other_cwd = legacy_scope_for_job(self.settings, row, self.store.db)
             if not isinstance(other_cwd, str) or not Path(other_cwd).is_absolute():
                 raise BridgeError("autonext_scope_unknown", "Message worktree is unconfirmed")
             if overlaps(other_cwd, cwd):
@@ -680,6 +685,8 @@ class AutoNextManager:
                 "autonext_worktree_busy", "Task does not own the approved worktree lease"
             )
         self._budget()
+        if self.settings.legacy_scope_pins:
+            self._check_existing_routes(cwd)
         if item["lease_until"] - time.time() < self.bridge.config.team.workers["codex"].timeout + 5:
             raise BridgeError("autonext_budget_stop", "Remaining lease cannot cover execution")
         approved = next((c for c in self.settings.cards if c.task_id == item["task_id"]), None)
