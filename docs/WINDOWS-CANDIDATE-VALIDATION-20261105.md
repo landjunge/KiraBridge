@@ -49,6 +49,11 @@ Worktree und erklärt einen grünen Plan nicht zur nativen Abnahme.
 
 ## Offene native Gates
 
+Der [optionale Producer für neue Gastläufe](WINDOWS-CANDIDATE-PRODUCER-20261105.md)
+erfasst diese Bindung vor/nach jeder Phase im bestehenden Runner. Kandidaten mit
+diesem Collector binden zusätzlich dessen drei Producerdateien und den tatsächlich
+gestarteten Bootstrap. Alte RC33-Berichte werden nicht nachträglich ergänzt.
+
 Für `0.8.0rc39` und den aktuellen Modulstand gibt es hier keine frischen
 Windows-Gastberichte. Diese Prüfung startet keine VM, lädt nichts herunter,
 baut kein Release-Paket und installiert nichts. macOS-Nachweise und die

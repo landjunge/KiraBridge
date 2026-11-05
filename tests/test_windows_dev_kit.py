@@ -466,6 +466,35 @@ def use_candidate_git(monkeypatch, git_files):
     monkeypatch.setattr(kit, "read_candidate_source", lambda commit, files=dict(git_files): files)
 
 
+@pytest.mark.parametrize("change", [None, "archive-helper", "payload-bootstrap"])
+def test_collector_candidates_bind_all_producers_and_executed_bootstrap(
+    fixture, monkeypatch, change
+):
+    stage, reports = fixture
+    git_files = install_candidate_tree(stage, {"src/kirabridge/fixture.py": b"VALUE=1\n"})
+    producers = {
+        name: ("# Synthetic producer " + name).encode() for name in kit.CANDIDATE_PRODUCERS
+    }
+    git_files.update(producers)
+    (stage / "guest_runner.ps1").write_bytes(producers["scripts/windows_guest_runner.ps1"])
+    replace_source(stage, CANDIDATE_PIN, producers)
+    bind_reports(stage, reports, git_files)
+    use_candidate_git(monkeypatch, git_files)
+    if change == "archive-helper":
+        replace_source(stage, CANDIDATE_PIN, {kit.CANDIDATE_PRODUCERS[1]: b"# changed\n"})
+        bind_reports(stage, reports, git_files)
+    elif change == "payload-bootstrap":
+        (stage / "guest_runner.ps1").write_bytes(b"# other runner\n")
+        replace_source(stage, CANDIDATE_PIN, {})
+        bind_reports(stage, reports, git_files)
+    if change:
+        with pytest.raises(ValueError, match="Staged (harness|bootstrap)"):
+            kit.prepare(stage, reports, CANDIDATE_PIN, candidate_version=CANDIDATE_VERSION)
+    else:
+        _, package = kit.prepare(stage, reports, CANDIDATE_PIN, candidate_version=CANDIDATE_VERSION)
+        assert package["candidate_validation"] and not package["native_windows_acceptance"]
+
+
 def test_historical_rc33_profile_stays_174_and_does_not_require_candidate_inventory(fixture):
     assert kit.VERSION == "0.8.0rc33"
     assert kit.RUNTIME_MODULE_COUNT == 174

@@ -2,10 +2,14 @@ param(
     [Parameter(Mandatory=$true)][string]$BootstrapUrl,
     [ValidatePattern('^[A-Za-z][A-Za-z0-9-]{0,63}$')][string]$WorkName='KiraBridgeDev',
     [ValidatePattern('^([a-f0-9]{64})?$')][string]$ExpectedManifestSha256='',
-    [switch]$ReusePreparedPython
+    [switch]$ReusePreparedPython,
+    [ValidatePattern('^([A-Za-z0-9][A-Za-z0-9_.+!-]{0,79})?$')][string]$CandidateVersion=''
 )
 $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'
+if ($CandidateVersion -and -not $ExpectedManifestSha256) {
+    throw 'Candidate evidence requires an explicit expected manifest pin'
+}
 if ($ReusePreparedPython -and $WorkName -eq 'KiraBridgeDev') {
     throw 'Prepared interpreter reuse requires a separate new work directory'
 }
@@ -124,6 +128,24 @@ function Log-Tail([string]$Path) {
 function Publish([string]$Id, [string]$Path) {
     Post-Json ('reports/'+$Id) ([IO.File]::ReadAllText($Path))
 }
+function Observe-Candidate([string]$Phase) {
+    if (-not $CandidateVersion) { return $null }
+    # A bounded read of actual bytes, not a command that can label an old report.
+    $observed=Invoke-Bounded $Python @('scripts/windows_candidate_evidence.py',
+        '--source-root',$Source,'--manifest',$CandidateManifest,
+        '--manifest-sha256',$ManifestHash,'--candidate-version',$CandidateVersion,
+        '--source-commit',$manifest.source_commit) `
+        ('candidate-'+$Phase+'-'+[guid]::NewGuid().ToString('N')) 60
+    if ($observed.exit_code -ne 0) { throw 'Candidate source observation failed; no native replay' }
+    $value=Get-Content -LiteralPath $observed.stdout -Raw | ConvertFrom-Json
+    if ($value.evidence_platform -cne 'win32' -or
+        $value.candidate_version -cne $CandidateVersion -or
+        $value.source_commit -cne $manifest.source_commit -or
+        $value.inventory_sha256 -cnotmatch '^[a-f0-9]{64}$') {
+        throw 'Candidate observation does not match the native source identity'
+    }
+    return $value
+}
 function Run-Once([string]$Name, [string[]]$Arguments, [int]$Seconds, [string]$Artifact) {
     $receipt=Join-Path $Attempts ($Name+'.json')
     $report=Join-Path $Work ($Name+'-report.json')
@@ -140,15 +162,35 @@ function Run-Once([string]$Name, [string[]]$Arguments, [int]$Seconds, [string]$A
         if ($earlier.manifest_sha256 -cne $ManifestHash -or $earlier.phase -cne $Name) {
             throw 'Earlier report belongs to another payload; explicit reconciliation required'
         }
+        if ($CandidateVersion -and (
+            $attempt.candidate_version -cne $CandidateVersion -or
+            $attempt.source_commit -cne $manifest.source_commit -or
+            $earlier.candidate_version -cne $CandidateVersion -or
+            $earlier.source_commit -cne $manifest.source_commit -or
+            $earlier.evidence_platform -cne 'win32' -or
+            $earlier.inventory_sha256 -cne $script:CandidateEvidence.inventory_sha256)) {
+            throw 'Earlier report is not this candidate; no relabel or native replay'
+        }
         Publish ($RunId+'-'+$Name) $report
         if ($null -eq $earlier.exit_code -or $earlier.exit_code -ne 0) {
             throw 'Earlier failed or uncertain acceptance blocks subsequent native checks'
         }
         return
     }
-    New-PrivateReceipt $receipt (@{phase=$Name; started_at=[DateTime]::UtcNow.ToString('o');
-        manifest_sha256=$ManifestHash; status='attempted_no_automatic_replay'}|ConvertTo-Json -Compress)
+    $attempt=@{phase=$Name; started_at=[DateTime]::UtcNow.ToString('o');
+        manifest_sha256=$ManifestHash; status='attempted_no_automatic_replay'}
+    if ($CandidateVersion) {
+        $attempt.candidate_version=$CandidateVersion
+        $attempt.source_commit=$manifest.source_commit
+    }
+    New-PrivateReceipt $receipt ($attempt|ConvertTo-Json -Compress)
     try {
+        if ($CandidateVersion) {
+            $before=Observe-Candidate ($Name+'-before')
+            if ($before.inventory_sha256 -cne $script:CandidateEvidence.inventory_sha256) {
+                throw 'Candidate changed before native execution; no native command started'
+            }
+        }
         $run=Invoke-Bounded $Python $Arguments $Name $Seconds
         $result=@{phase=$Name; exit_code=$run.exit_code; process_id=$run.pid;
             manifest_sha256=$ManifestHash; stdout=(Log-Tail $run.stdout); stderr=(Log-Tail $run.stderr)}
@@ -158,6 +200,18 @@ function Run-Once([string]$Name, [string[]]$Arguments, [int]$Seconds, [string]$A
         if ($Artifact) {
             $result.artifact=Get-Content -LiteralPath $Artifact -Raw | ConvertFrom-Json
             $result.artifact_sha256=Digest $Artifact
+        }
+        if ($CandidateVersion) {
+            $after=Observe-Candidate ($Name+'-after')
+            if ($before.inventory_sha256 -cne $script:CandidateEvidence.inventory_sha256 -or
+                $after.inventory_sha256 -cne $before.inventory_sha256) {
+                throw 'Candidate changed during native execution; result cannot pass'
+            }
+            foreach ($field in @('candidate_version','source_commit','runtime_module_count',
+                'runtime_module_sha256','harness_sha256','version_file_sha256',
+                'inventory_sha256','evidence_platform')) {
+                $result[$field]=$before.$field
+            }
         }
         $json=$result|ConvertTo-Json -Depth 80 -Compress
         New-PrivateReceipt $report $json
@@ -207,6 +261,12 @@ try {
         throw 'Running guest bootstrap does not match the staged script'
     }
     Event 'all_payload_hashes_verified'
+    if ($CandidateVersion) {
+        $CandidateManifest=Join-Path $Payload 'manifest.json'
+        if (Test-Path -LiteralPath $CandidateManifest) {
+            if ((Digest $CandidateManifest) -cne $ManifestHash) { throw 'Cached manifest differs' }
+        } else { New-PrivateReceipt $CandidateManifest $manifestText }
+    }
     $version=[Version]$manifest.python_version
     $PythonWork=$Work
     if ($ReusePreparedPython) {
@@ -291,6 +351,7 @@ print('Prepared dependency versions verified without package writes')
     if (-not (Test-Path $runFile)) { New-PrivateReceipt $runFile ([guid]::NewGuid().ToString('N')) }
     $RunId=[IO.File]::ReadAllText($runFile).Trim()
     if ($RunId -notmatch '^[a-f0-9]{32}$') { throw 'Existing run identity invalid' }
+    $script:CandidateEvidence=Observe-Candidate 'initial'
     $baseTemp=Join-Path $Work ('pytest-tmp-'+$RunId)
     Run-Once 'core' @('-m','pytest','-q','--basetemp',$baseTemp,
         'tests/test_windows_core_native.py') 300 ''
@@ -304,12 +365,14 @@ print('Prepared dependency versions verified without package writes')
     Run-Once 'shortcuts' @('scripts/accept_windows_shortcuts.py','--output',$shortcutOut) 180 $shortcutOut
     $windowOut=Join-Path $Work ('windows-'+$RunId+'.json')
     Run-Once 'windows' @('scripts/accept_windows_windows.py','--output',$windowOut) 180 $windowOut
-    $launcher=Join-Path ([Environment]::GetFolderPath('Desktop')) 'KiraBridge RC33 Windows Preview.cmd'
-    $launcherSource=Join-Path $Source 'scripts\start_windows_preview.cmd'
-    if (-not (Test-Path -LiteralPath $launcher)) {
-        Copy-Item -LiteralPath $launcherSource -Destination $launcher -ErrorAction Stop
-    } elseif ((Digest $launcher) -ne (Digest $launcherSource)) {
-        Event 'existing_desktop_launcher_preserved'
+    if (-not $CandidateVersion) {
+        $launcher=Join-Path ([Environment]::GetFolderPath('Desktop')) 'KiraBridge RC33 Windows Preview.cmd'
+        $launcherSource=Join-Path $Source 'scripts\start_windows_preview.cmd'
+        if (-not (Test-Path -LiteralPath $launcher)) {
+            Copy-Item -LiteralPath $launcherSource -Destination $launcher -ErrorAction Stop
+        } elseif ((Digest $launcher) -ne (Digest $launcherSource)) {
+            Event 'existing_desktop_launcher_preserved'
+        }
     }
     Event 'guest_checks_finished'
 } catch {

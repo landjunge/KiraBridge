@@ -57,6 +57,11 @@ DOCS = (
 PYTHON_INSTALLERS = {"3.14.10": "92480239264744fe0386a1bd8275786fefa126e3129e56a68e22b52c73329965"}
 MODULE_PATH = re.compile(r"src/kirabridge/(?:[A-Za-z0-9_]+/)*[A-Za-z0-9_]+\.py")
 VERSION_PATHS = ("pyproject.toml", "src/kirabridge/__init__.py")
+CANDIDATE_PRODUCERS = (
+    "scripts/windows_guest_runner.ps1",
+    "scripts/windows_candidate_evidence.py",
+    "scripts/build_windows_dev_kit.py",
+)
 # Abuse guard only. The accepted module count stays derived from the candidate commit.
 CANDIDATE_BLOB_LIMIT = 2 * 1024 * 1024
 CANDIDATE_TREE_LIMIT = 2000
@@ -424,7 +429,10 @@ def read_candidate_source(commit: str) -> dict[str, bytes]:
             "Candidate commit is missing a required native acceptance harness or version file"
         )
     files = {}
-    for name in sorted(set([*modules, *REQUIRED_HARNESSES, *VERSION_PATHS])):
+    producers = CANDIDATE_PRODUCERS if CANDIDATE_PRODUCERS[1] in names else ()
+    if any(name not in names for name in producers):
+        raise ValueError("Candidate source lacks a required evidence producer")
+    for name in sorted(set([*modules, *REQUIRED_HARNESSES, *VERSION_PATHS, *producers])):
         shown = subprocess.run(
             ["git", "show", f"{commit}:{name}"],
             cwd=Path(__file__).resolve().parents[1],
@@ -480,13 +488,16 @@ def candidate_inventory(version: str, commit: str, files: dict[str, bytes]) -> t
     modules = {name: files[name] for name in sorted(files) if MODULE_PATH.fullmatch(name)}
     if not modules or any(name not in files or not files[name] for name in REQUIRED_HARNESSES):
         raise ValueError("Candidate source inventory is incomplete")
+    producers = CANDIDATE_PRODUCERS if CANDIDATE_PRODUCERS[1] in files else ()
+    if any(not files.get(name) for name in producers):
+        raise ValueError("Candidate source lacks a required evidence producer")
     document = {
         "schema": 1,
         "candidate_version": version,
         "source_commit": commit,
         "runtime_module_count": len(modules),
         "runtime_module_sha256": {name: digest(modules[name]) for name in modules},
-        "harness_sha256": {name: digest(files[name]) for name in REQUIRED_HARNESSES},
+        "harness_sha256": {name: digest(files[name]) for name in (*REQUIRED_HARNESSES, *producers)},
         "version_file_sha256": {name: digest(files[name]) for name in VERSION_PATHS},
     }
     raw = json.dumps(document, sort_keys=True, separators=(",", ":"), ensure_ascii=True).encode()
@@ -588,9 +599,12 @@ def prepare_candidate(
     zip_files = source_files(payload["source.zip"])
     zip_modules = {name: data for name, data in zip_files.items() if MODULE_PATH.fullmatch(name)}
     require_same_bytes(zip_modules, git_modules, "Staged source")
-    for name in REQUIRED_HARNESSES:
+    for name in document["harness_sha256"]:
         if zip_files.get(name) != git_files[name]:
             raise ValueError(f"Staged harness bytes differ from the candidate commit: {name}")
+    if CANDIDATE_PRODUCERS[1] in document["harness_sha256"]:
+        if payload["guest_runner.ps1"] != git_files["scripts/windows_guest_runner.ps1"]:
+            raise ValueError("Staged bootstrap differs from the candidate source")
     for name in VERSION_PATHS:
         if zip_files.get(name) != git_files[name]:
             raise ValueError(f"Staged version metadata differs from the candidate commit: {name}")
