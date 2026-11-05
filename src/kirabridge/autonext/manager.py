@@ -569,7 +569,9 @@ class AutoNextManager:
         for row in self.store.db.execute(
             "SELECT j.state,j.execution_cwd,m.recipient FROM message_jobs j "
             "JOIN messages m ON m.id=j.message_id "
-            "WHERE j.state IN ('queued','running','unknown')"
+            "WHERE j.state IN ('queued','running','unknown') "
+            "AND (j.state='running' OR NOT EXISTS (SELECT 1 FROM queue_holds h "
+            "WHERE h.queue_id='messages' AND h.item_id=j.message_id))"
         ):
             other_cwd = row["execution_cwd"]
             if row["state"] == "queued":
@@ -582,9 +584,15 @@ class AutoNextManager:
         # Visible delivery may have finished its core turn while acknowledgement
         # or reply is still pending. Its schema has no durable CWD pin: refuse
         # continuation rather than infer scope from a stale terminal binding.
+        # Existing explicit retirement releases an UNKNOWN delivery reservation
+        # after the queue owner's idle/absence proof. Preserve that decision and
+        # its unchanged history; view-only withdrawals never release a resource.
+        # A hold cannot establish that an actively inserting/submitting job ended.
         if self.store.db.execute(
-            "SELECT 1 FROM visible_handoffs WHERE state NOT IN "
-            "('completed','failed','blocked','cancelled','interrupted') LIMIT 1"
+            "SELECT 1 FROM visible_handoffs v WHERE v.state NOT IN "
+            "('completed','failed','blocked','cancelled','interrupted') "
+            "AND (v.state!='unknown' OR NOT EXISTS (SELECT 1 FROM queue_holds h "
+            "WHERE h.queue_id='handoffs' AND h.item_id=v.id)) LIMIT 1"
         ).fetchone():
             raise BridgeError("autonext_scope_unknown", "Visible delivery remains unconfirmed")
 

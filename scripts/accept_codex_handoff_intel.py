@@ -710,8 +710,11 @@ async def accept(args):
     for name, value in [("raw", raw_prompt), ("handoff", body), ("ambiguous", ambiguous)]:
         (root / (name + "-prompt.private.txt")).write_text(value)
     token_name = "KIRABRIDGE_CODEX_ACCEPT_" + nonce.upper()
+    worker_token_name = token_name + "_WORKER"
     require(token_name not in os.environ, "Private token name collision")
+    require(worker_token_name not in os.environ, "Private worker token name collision")
     os.environ[token_name] = secrets.token_urlsafe(48)
+    os.environ[worker_token_name] = secrets.token_urlsafe(48)
     try:
         config = Config(
             host="127.0.0.1",
@@ -742,6 +745,7 @@ async def accept(args):
                     ],
                 ),
                 "codex": PrincipalConfig(
+                    token_env=worker_token_name,
                     roots=[str(root)],
                     message_peers=["chatgpt"],
                     capabilities=["message.read", "message.send", "message.ack"],
@@ -750,8 +754,44 @@ async def accept(args):
             agents={"codex": AgentConfig(kind="codex", executable=str(args.codex))},
         )
         bridge = Bridge(config)
+        if args.autonext_budget_source:
+            require(args.autonext_board_workspace, "Existing coordination board workspace required")
+            login = await asyncio.to_thread(
+                subprocess.run,
+                [str(args.codex), "login", "status"],
+                capture_output=True,
+                text=True,
+                timeout=8,
+                check=True,
+            )
+            require(
+                "Logged in using ChatGPT" in login.stdout + login.stderr,
+                "Existing subscription login is not confirmed",
+            )
+            config.principals["chatgpt"].capabilities += [
+                "team.manage",
+                "team.write",
+                "team.read",
+                "threaddesk.read",
+                "threaddesk.manage",
+            ]
+            config.principals["codex"].capabilities += [
+                "bridge.health",
+                "agent.execute",
+                "terminal.execute",
+                "session.inspect",
+                "session.input",
+                "task.read",
+                "task.cancel",
+                "team.read",
+                "team.write",
+            ]
+            config.principals["codex"].approval_mode = "automatic"
+            config.principals["codex"].terminal_roots = [str(root)]
+            config.principals["codex"].agents = ["codex"]
     except BaseException:
         os.environ.pop(token_name, None)
+        os.environ.pop(worker_token_name, None)
         raise
     transport = bridge.sessions.terminal_app
     catalog, native, product_open = transport.catalog, transport.native, transport.open
@@ -1462,6 +1502,25 @@ async def accept(args):
                     )
                     await observe_originals()
                     check("unchanged body_only_v1 handoff and independently bound local answer")
+                    if args.autonext_budget_source:
+                        from autonext_native_acceptance import accept as accept_autonext
+
+                        await accept_autonext(
+                            bridge,
+                            args,
+                            workspace,
+                            binding,
+                            protocol,
+                            {
+                                "task_id": handoff["id"],
+                                "protocol": protocol,
+                                "source_sha256": args.source_sha256,
+                            },
+                            nonce,
+                            evidence,
+                            checkpoint,
+                        )
+                        check("two pinned real native AutoNext turns completed once in order")
                     evidence["tests_passed"] = True
             except BaseException as exc:
                 evidence["error"] = {
@@ -1500,6 +1559,7 @@ async def accept(args):
                 require(evidence["private_endpoint_absent"], "Private endpoint remains reachable")
         finally:
             os.environ.pop(token_name, None)
+            os.environ.pop(worker_token_name, None)
             checkpoint()
     require(
         evidence.get("tests_passed") and evidence.get("cleanup_complete"), "Acceptance incomplete"
@@ -1515,6 +1575,16 @@ async def accept(args):
 def parser():
     value = argparse.ArgumentParser(description=__doc__)
     value.add_argument("--execute", action="store_true")
+    value.add_argument(
+        "--autonext-budget-source",
+        type=Path,
+        help="Opt in to two real read-only continuation turns; actual Codex quota log",
+    )
+    value.add_argument(
+        "--autonext-board-workspace",
+        type=Path,
+        help="Existing ThreadDesk workspace containing coordination board 482f593429ad",
+    )
     value.add_argument("--allow-one-owned-visible-window", action="store_true")
     value.add_argument("--root", type=Path)
     value.add_argument("--expected-python", type=Path)

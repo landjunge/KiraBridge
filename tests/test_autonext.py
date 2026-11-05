@@ -785,3 +785,221 @@ async def test_operator_confirmation_is_bound_and_retrievable_over_existing_task
     assert b.autonext.receipt("local", "one")["acceptance"] == "operator_receipt"
     assert b.store.get("confirm-one", "local")["state"] == "completed"
     assert [x["task_id"] for x in s["calls"]()] == ["one", "two"]
+
+
+@pytest.mark.parametrize("disposition", ["unheld", "withdrawn", "retired"])
+async def test_existing_queue_retirement_releases_only_proven_delivery_reservations(
+    scenario, monkeypatch, disposition
+):
+    from kirabridge.bridge_core.config import VisibleTerminalBinding
+    from kirabridge.queue_management.models import QueueControl
+
+    s, b = scenario, scenario["bridge"]
+    s["grant"]([s["source"]("one")])
+    policy = s["config"].principals["local"]
+    policy.capabilities += ["message.send", "message.read", "message.ack", "task.cancel"]
+    policy.message_peers = ["codex"]
+    s["config"].principals["codex"].message_peers = ["local"]
+    s["config"].principals["codex"].capabilities += ["message.read", "message.ack"]
+    s["config"].messaging.receivers["codex"] = ReceiverConfig(cwd=str(s["root"]))
+    sent = b.messages.send(
+        "local",
+        MessageSend(
+            recipient="codex",
+            conversation_id="old-delivery",
+            idempotency_key="old-delivery",
+            body="An old uncertain delivery, never replay",
+            dispatch=True,
+        ),
+    )
+    b.store.db.execute(
+        "UPDATE message_jobs SET state='unknown',execution_cwd=NULL WHERE message_id=?",
+        (sent["id"],),
+    )
+    binding = VisibleTerminalBinding(
+        pane_id="terminal:1:ttys001", expected_pid=123, agent_pid=124, ready_pattern="ready"
+    )
+    s["config"].visible_handoffs.bindings["codex"] = binding
+    b.store.db.execute(
+        "INSERT INTO visible_handoffs VALUES(?,?,?,?,?,?,?,?,?,?)",
+        (
+            "retired-visible",
+            "local",
+            "codex",
+            "hash",
+            canonical(binding.model_dump()),
+            sent["id"],
+            "unknown",
+            1,
+            1,
+            canonical({"reason": "visible_paste_unconfirmed"}),
+        ),
+    )
+    if disposition != "unheld":
+        if disposition == "retired":
+
+            async def idle(*args, **kwargs):
+                assert kwargs["ready"] is True
+                return {"fresh_idle": True}
+
+            monkeypatch.setattr(b.visible_handoffs, "check_target", idle)
+        entry = b.queues.get("local", "handoffs", "retired-visible")
+        await b.queues.control(
+            "local",
+            QueueControl(
+                queue_id="handoffs",
+                item_id=entry["id"],
+                revision=entry["revision"],
+                action="retire" if disposition == "retired" else "withdraw",
+                reason="Explicit fixture retirement, no completed execution claimed",
+                acknowledge_execution_unknown=disposition == "withdrawn",
+            ),
+        )
+    old_handoff = tuple(b.store.db.execute("SELECT * FROM visible_handoffs").fetchone())
+    old_job = tuple(b.store.db.execute("SELECT * FROM message_jobs").fetchone())
+    await b.autonext.tick()
+    assert s["calls"]() == []
+    assert tuple(b.store.db.execute("SELECT * FROM visible_handoffs").fetchone()) == old_handoff
+    assert tuple(b.store.db.execute("SELECT * FROM message_jobs").fetchone()) == old_job
+    assert old_handoff[6] == "unknown"
+    if disposition == "retired":
+        assert b.store.db.execute("SELECT count(*) FROM autonext_items").fetchone()[0] == 1
+        assert {r[0] for r in b.store.db.execute("SELECT queue_id FROM queue_holds")} == {
+            "handoffs",
+            "messages",
+        }
+    else:
+        assert b.autonext.inspect()["reason"] == "autonext_scope_unknown"
+        assert not b.store.db.execute("SELECT 1 FROM autonext_items").fetchone()
+
+
+@pytest.mark.parametrize("route", ["running-message", "inserting-visible"])
+async def test_a_delivery_hold_never_proves_active_execution_has_ended(scenario, route):
+    s, b = scenario, scenario["bridge"]
+    s["grant"]([s["source"]("one")])
+    if route == "running-message":
+        policy = s["config"].principals["local"]
+        policy.capabilities += ["message.send", "message.read"]
+        policy.message_peers = ["codex"]
+        s["config"].principals["codex"].message_peers = ["local"]
+        s["config"].principals["codex"].capabilities += ["message.read"]
+        s["config"].messaging.receivers["codex"] = ReceiverConfig(cwd=str(s["root"]))
+        sent = b.messages.send(
+            "local",
+            MessageSend(
+                recipient="codex",
+                conversation_id="running-old",
+                idempotency_key="running-old",
+                body="Execution is still active",
+                dispatch=True,
+            ),
+        )
+        b.store.db.execute(
+            "UPDATE message_jobs SET state='running',execution_cwd=? WHERE message_id=?",
+            (str(s["root"]), sent["id"]),
+        )
+        family, identifier = "messages", sent["id"]
+    else:
+        identifier, family = "still-inserting", "handoffs"
+        b.store.db.execute(
+            "INSERT INTO visible_handoffs VALUES(?,?,?,?,?,?,?,?,?,?)",
+            (
+                identifier,
+                "local",
+                "codex",
+                "hash",
+                "{}",
+                "old",
+                "inserting",
+                1,
+                1,
+                "{}",
+            ),
+        )
+    b.store.db.execute(
+        "INSERT INTO queue_holds VALUES(?,?,?,?,?)",
+        (
+            family,
+            identifier,
+            "local",
+            time.time(),
+            "Old hold is not a process completion proof",
+        ),
+    )
+    await b.autonext.tick()
+    assert b.autonext.inspect()["reason"] == (
+        "autonext_worktree_busy" if route == "running-message" else "autonext_scope_unknown"
+    )
+    assert s["calls"]() == []
+    assert not b.store.db.execute("SELECT 1 FROM autonext_items").fetchone()
+
+
+async def test_never_started_cancelled_message_delivery_does_not_own_worktree(scenario):
+    from kirabridge.queue_management.models import QueueControl
+
+    s, b = scenario, scenario["bridge"]
+    s["grant"]([s["source"]("one")])
+    for name, peer in (("local", "codex"), ("codex", "local")):
+        s["config"].principals[name].capabilities += ["message.send", "message.read"]
+        s["config"].principals[name].message_peers = [peer]
+    s["config"].messaging.receivers["codex"] = ReceiverConfig(cwd=str(s["root"]))
+    sent = b.messages.send(
+        "local",
+        MessageSend(
+            recipient="codex",
+            conversation_id="cancelled-old",
+            idempotency_key="cancelled-old",
+            body="Never started old delivery",
+            dispatch=True,
+        ),
+    )
+    entry = b.queues.get("local", "messages", sent["id"])
+    await b.queues.control(
+        "local",
+        QueueControl(
+            queue_id="messages",
+            item_id=entry["id"],
+            revision=entry["revision"],
+            action="cancel",
+            reason="Operator cancels this never-started delivery",
+        ),
+    )
+    old_job = tuple(b.store.db.execute("SELECT * FROM message_jobs").fetchone())
+    assert b.message_receiver._claim(sent["id"]) is None
+    await s["start"]()
+    await until(lambda: b.autonext.inspect()["state"] == "complete")
+    assert [c["task_id"] for c in s["calls"]()] == ["one"]
+    assert tuple(b.store.db.execute("SELECT * FROM message_jobs").fetchone()) == old_job
+    assert b.messages.get("local", sent["id"])["acknowledged"] is None
+
+
+async def test_unknown_team_work_cannot_be_released_by_delivery_hold(scenario):
+    s, b = scenario, scenario["bridge"]
+    s["grant"]([s["source"]("one")])
+    s["config"].team.workers["grok"].cwd = str(s["root"])
+    work = b.teams.delegate(
+        "local",
+        TeamWorkCreate(
+            team_id="auto-team",
+            assignee="grok",
+            title="unconfirmed old execution",
+            body="A delivery hold cannot stop this execution",
+            idempotency_key="old-unknown-work",
+        ),
+    )
+    b.store.db.execute("UPDATE team_work SET state='unknown' WHERE id=?", (work["id"],))
+    b.store.db.execute(
+        "INSERT INTO queue_holds VALUES(?,?,?,?,?)",
+        (
+            "team-work",
+            work["id"],
+            "local",
+            time.time(),
+            "No process termination proof",
+        ),
+    )
+    await b.autonext.tick()
+    assert b.autonext.inspect()["reason"] == "autonext_worktree_busy"
+    assert not b.store.db.execute("SELECT 1 FROM autonext_items").fetchone()
+    assert b.teams.work_get("local", "auto-team", work["id"])["state"] == "unknown"
+    assert s["calls"]() == []

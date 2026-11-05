@@ -342,7 +342,12 @@ class TerminalWindowProof:
         )
 
     def bind_shared_host(self, current, own_cg, own, original):
-        """Bind host identity across tab-induced reflow, preserving other surfaces."""
+        """Bind the original tabs, rather than assuming their AX wrapper is permanent.
+
+        Terminal can replace its AXWindow when selecting the newly created tab.
+        The retained, ordered child references are the continuity evidence here;
+        titles and equal geometry alone never establish that transition.
+        """
         hosts = [group for group in self.before["ax"] if self.members(group) == original]
         require(
             len(hosts) == 1 and len(current["ax"]) == len(self.before["ax"]),
@@ -360,9 +365,23 @@ class TerminalWindowProof:
             "before_radio_partition_sha256": fingerprint(self.members(host)),
             "after_retained_radio_partition_sha256": fingerprint(original),
         }
+        radios = own.get("radios") or []
+        selected = [radio["token"] for radio in radios if radio.get("selected")]
+        tokens = [radio["token"] for radio in radios]
+        previous_radios = {
+            token for group in self.before["ax"] for token in self.members(group) or []
+        }
         require(
-            host["token"] == own["token"],
-            "Shared host native AX anchor changed",
+            original
+            and len(set(original)) == len(original)
+            and len(selected) == 1
+            and selected[0] not in previous_radios
+            and len(set(tokens)) == len(tokens)
+            and [token for token in tokens if token != selected[0]] == original
+            and own["token"]
+            not in {group["token"] for group in self.before["ax"] if group is not host}
+            and len([group for group in current["ax"] if group["token"] == own["token"]]) == 1,
+            "Shared host retained tab identities changed",
             observation=observation,
         )
         old_cg = [
@@ -393,6 +412,7 @@ class TerminalWindowProof:
             observation=observation,
         )
         self.retained(self.before, current, exclude=host)
+        return "same_ax_window" if host["token"] == own["token"] else "retained_tab_identities"
 
     async def isolate(self, receipt):
         if self.app is None:
@@ -412,9 +432,10 @@ class TerminalWindowProof:
             require(len(selected) == 1, "Created native tab is not uniquely selected")
         own_radio = selected[0] if selected else None
         moved = bool(radios and len(radios) > 1)
+        host_identity_basis = own_identity_basis = "same_ax_window"
         if moved:
             original = [r["token"] for r in radios if r["token"] != own_radio]
-            self.bind_shared_host(before, own_cg, own, original)
+            host_identity_basis = self.bind_shared_host(before, own_cg, own, original)
             await self.terminal.move_created_tab(receipt)
             for attempt in range(10):
                 try:
@@ -425,7 +446,6 @@ class TerminalWindowProof:
                     await asyncio.sleep(0.1)
                     continue
                 new_cg, new_own = self.own(after, nonce=receipt["nonce"])
-                require(new_own["token"] == own["token"], "Detached own AX window anchor changed")
                 if self.members(new_own) == self.members(own) and len(after["ax"]) == len(
                     before["ax"]
                 ):
@@ -473,6 +493,21 @@ class TerminalWindowProof:
                     or (self.members(new_own) == [own_radio] and new_own["radios"][0]["selected"]),
                     "Detached own radio was replaced",
                 )
+                # After the one recorded detach, the complete native split and
+                # retained host have been proved above. If the AXWindow wrapper
+                # changed, still require either the same CG surface or the same
+                # selected child reference; a new title alone is insufficient.
+                if new_own["token"] != own["token"]:
+                    require(
+                        new_cg["window_id"] == own_cg["window_id"]
+                        or self.members(new_own) == [own_radio],
+                        "Detached own native identity is unconfirmed",
+                    )
+                    own_identity_basis = (
+                        "same_cg_window"
+                        if new_cg["window_id"] == own_cg["window_id"]
+                        else "same_selected_tab"
+                    )
                 own_cg, own, before = new_cg, new_own, after
                 break
         else:
@@ -503,6 +538,8 @@ class TerminalWindowProof:
             "own_radio_token": own_radio,
             "own_tabbar_hidden": own["radios"] is None,
             "move_confirmed": moved,
+            "host_identity_basis": host_identity_basis,
+            "own_identity_basis": own_identity_basis,
             "logical_sha256": fingerprint(logical),
             "partition_sha256": self.partition(before, own, own_cg["window_id"]),
         }
