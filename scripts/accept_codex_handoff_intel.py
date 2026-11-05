@@ -1455,7 +1455,14 @@ async def accept(args):
                     require(
                         sum(r.get("result", {}).get("paste_event_sent") is True for r in receipts)
                         == 1
-                        and sum(r.get("result", {}).get("return_sent") is True for r in receipts)
+                        and sum(
+                            (
+                                r.get("result", {}).get("return_sent")
+                                or r.get("result", {}).get("key_sent")
+                            )
+                            is True
+                            for r in receipts
+                        )
                         == 1,
                         "Raw did not produce exactly one confirmed paste/Return",
                     )
@@ -1496,7 +1503,14 @@ async def accept(args):
                     require(
                         sum(r.get("result", {}).get("paste_event_sent") is True for r in receipts)
                         == 1
-                        and sum(r.get("result", {}).get("return_sent") is True for r in receipts)
+                        and sum(
+                            (
+                                r.get("result", {}).get("return_sent")
+                                or r.get("result", {}).get("key_sent")
+                            )
+                            is True
+                            for r in receipts
+                        )
                         == 1,
                         "Handoff did not produce exactly one paste/Return",
                     )
