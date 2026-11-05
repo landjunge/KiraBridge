@@ -423,7 +423,26 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
     @server.tool(annotations=read)
     def visible_handoff_status(handoff_id: str, ctx: Context) -> dict[str, Any]:
         """Read/reconcile visible input, Return and authenticated acknowledgement; never resend."""
-        return safe(lambda: bridge.visible_handoffs.reconcile(identity(ctx), handoff_id))
+
+        def action():
+            principal = identity(ctx)
+            result = bridge.visible_handoffs.reconcile(principal, handoff_id)
+            if result["state"] == "completed":
+                try:
+                    result["receiver_reconciliation"] = (
+                        bridge.message_receiver.reconcile_completed_handoff(principal, handoff_id)
+                    )
+                except BridgeError as exc:
+                    if exc.code != "forbidden":
+                        raise
+                    # Handoff readers without mailbox access retain their read.
+                    result["receiver_reconciliation"] = {
+                        "reconciled": False,
+                        "reason": "message_read_unavailable",
+                    }
+            return result
+
+        return safe(action)
 
     @server.tool(annotations=read)
     async def threaddesk_dynamic_catalog(ctx: Context) -> dict[str, Any]:

@@ -457,14 +457,102 @@ class MessageReceiver:
                 )
             self.recovered_handoffs.discard(message_id)
 
+    def reconcile_completed_handoff(self, principal, handoff_id):
+        """Explicit late-receipt correction; never restart an UNKNOWN receiver.
+
+        The existing visible_handoff_status call owns this reconciliation. An
+        authenticated reply alone is insufficient: the exact persisted run must
+        already have an independently completed handoff for this original message.
+        """
+        self.bridge.security.principal(principal, "task.read")
+        self.bridge.security.principal(principal, "message.read")
+        with self.bridge.store.transaction():
+            handoff = self.bridge.store.db.execute(
+                "SELECT * FROM visible_handoffs WHERE id=? AND (principal=? OR target=?)",
+                (handoff_id, principal, principal),
+            ).fetchone()
+            if handoff is None:
+                raise BridgeError("not_found", "Visible handoff not found")
+            message = self.messages._row(principal, handoff["message_id"])
+            job = self.bridge.store.db.execute(
+                "SELECT * FROM message_jobs WHERE message_id=?", (message["id"],)
+            ).fetchone()
+            unchanged = {"reconciled": False, "message_id": message["id"]}
+            if job is None or job["state"] != "unknown":
+                return {**unchanged, "state": job["state"] if job else None}
+            if (
+                handoff["state"] != "completed"
+                or job["run_id"] != handoff_id
+                or handoff["principal"] != message["sender"]
+                or handoff["target"] != message["recipient"]
+                or message["acknowledged"] is None
+            ):
+                return {**unchanged, "state": "unknown", "reason": "completion_unproven"}
+            reply = self.bridge.store.db.execute(
+                "SELECT id,body FROM messages WHERE reply_to=? AND sender=? AND recipient=? "
+                "AND conversation_id=? AND kind IN ('answer','result') ORDER BY seq LIMIT 1",
+                (
+                    message["id"],
+                    message["recipient"],
+                    message["sender"],
+                    message["conversation_id"],
+                ),
+            ).fetchone()
+            if reply is None:
+                return {**unchanged, "state": "unknown", "reason": "completion_unproven"}
+            try:
+                previous = json.loads(job["evidence"])
+            except (ValueError, TypeError, RecursionError):
+                return {**unchanged, "state": "unknown", "reason": "invalid_prior_evidence"}
+            if not isinstance(previous, dict):
+                return {**unchanged, "state": "unknown", "reason": "invalid_prior_evidence"}
+            notice = self.bridge.store.db.execute(
+                "SELECT id FROM completion_notices WHERE source='message' AND source_id=? "
+                "ORDER BY seq DESC LIMIT 1",
+                (message["id"],),
+            ).fetchone()
+            evidence = {
+                "reason": "completed_handoff_reply_reconciled",
+                "handoff_id": handoff_id,
+                "run_id": job["run_id"],
+                "completion_scope": "agent_turn",
+                "reply_source": "authenticated_bridge_mailbox",
+                "agent_confirmed": True,
+                "request_reply_satisfied": True,
+                "project_completion_verified": False,
+                "reconciled_without_input": True,
+                "automatic_retry": False,
+                "response_sha256": digest(reply["body"]),
+                "response_preview": reply["body"][:320],
+                "previous_state": "unknown",
+                "previous_error": job["error"],
+                "previous_finished": job["finished"],
+                "previous_evidence": previous,
+                "supersedes_notice_id": notice["id"] if notice else None,
+            }
+            self._record_finish(job, "completed", evidence, reply_id=reply["id"])
+            return {
+                "reconciled": True,
+                "message_id": message["id"],
+                "state": "completed",
+                "reply_id": reply["id"],
+                "reconciled_without_input": True,
+            }
+
     def _finish(self, message_id, state, evidence, error=None, reply_id=None):
-        from kirabridge.completion_manager import completion_payload, record_notice
 
         job = self.bridge.store.db.execute(
             "SELECT * FROM message_jobs WHERE message_id=?", (message_id,)
         ).fetchone()
         if job["state"] not in {"queued", "running"}:
             return  # same job must not create a second completion
+        self._record_finish(job, state, evidence, error=error, reply_id=reply_id)
+
+    def _record_finish(self, job, state, evidence, error=None, reply_id=None):
+        """Caller has validated the exact prior state and owns the transaction."""
+        from kirabridge.completion_manager import completion_payload, record_notice
+
+        message_id = job["message_id"]
         now = time.time()
         self.bridge.store.db.execute(
             "UPDATE message_jobs SET state=?,finished=?,evidence=?,error=?,reply_id=? "
@@ -516,6 +604,10 @@ class MessageReceiver:
             conversation_id=row["conversation_id"],
             reply_id=reply_id,
         )
+        if job["state"] == "unknown" and evidence.get("supersedes_notice_id"):
+            # Only explicit proven reconciliation can reach this writer from
+            # UNKNOWN. Existing notices stay immutable, including their receipts.
+            payload["supersedes"] = evidence["supersedes_notice_id"]
         if delivery_only:
             payload.update(
                 completion_scope="visible_input_delivery",

@@ -73,3 +73,40 @@ Laufnachweise dokumentiert; bis dahin nicht als bestanden oder aktiv behauptet.
 README DE/EN, Webseite und Abbildungen benötigen für die begrenzte technische
 Quellkorrektur keine Neugestaltung. Installationsweg bleibt der reguläre Installer
 mit Quellpin, Sicherung, sichtbarem eigenem Fenster, Idle- und Rollbackprüfungen.
+
+## Zusätzliche reale Befunde im selben Paket
+
+Die native Fensterisolierung bestand mit tatsächlichem AX-Wrapperwechsel und
+host_identity_basis=retained_tab_identities. Ein eigener Codex nahm die lange
+Literalnachricht und anschließend den body-only-Handoff mit jeweils einer Paste,
+einem Return und unabhängig gebundener Rollout-/Bildschirmantwort an.
+
+Die erste AutoNext-Karte zeigte dann ein weiteres belegtes Problem: kompakte
+Karten-JSON erzeugte harte Umbrüche innerhalb langer Schlüssel-/Hash-/Pfadfolgen,
+die der bewusst enge vorhandene Renderer nicht bestätigen kann. Kein Return
+wurde gesendet. Der Originalversuch bleibt UNKNOWN. Die Reparatur formatiert
+dieselbe vollständige Karte mit einem Feld je Zeile (indent=0) und verwendet im
+statischen Header normale Wortgrenzen. Pins, Karteninhalt und Rendererprüfung
+bleiben unverändert. Neue Regression prüft vollständige JSON-Gleichheit und
+Verifizierbarkeit mit dem vorhandenen Codex-Renderer. Folgeabnahme nur mit neuer
+Nonce; keine Wiederholung der unbestätigten alten Eingabe.
+
+Zusätzlich korrigiert der bestehende visible_handoff_status-Weg nun auf expliziten
+Aufruf einen veralteten UNKNOWN-Receiverstatus, wenn der exakt run-gebundene
+Handoff bereits abgeschlossen ist und ursprüngliches authentifiziertes ACK plus
+passende Antwort derselben Konversation und des umgekehrten Peer-Paars vorliegen.
+Alter Fehler, Evidence, Finished-Zeit, Ereignis und UNKNOWN-Notice bleiben erhalten;
+ein neuer Abschluss verweist per supersedes auf den bisherigen. Korrektur und
+Notice werden atomar gespeichert, Wiederholung erzeugt nichts doppelt.
+Startup-Recovery, normales _finish und bloßes message_get bleiben unverändert;
+fehlende Belege oder andere Zustände werden nicht pauschal abgeschlossen.
+27 neue eng begrenzte Korrekturfälle und 180 unmittelbar betroffene
+Bestandsfälle haben bestandene Prüfbelege. Format-/Renderer-/AutoNext-Lauf:
+47 bestanden. Zahlen sind getrennte, teilweise überlappende Läufe.
+
+Insgesamt sieben tote eigene Reservierungen wurden mit dem bestehenden strengen
+Originalziel-Abwesenheitsnachweis retirert, auch die eine der authentifizierten
+Codex-Identität. Ausführungszustände bleiben UNKNOWN. Native QA verwendet
+getrennte Daten/Token und ein eigenes read-only-Ziel, keine globale produktive
+Profil-/Sandboxänderung. Reale AutoNext-Gesamtabnahme und produktive Installation
+werden weiterhin erst nach tatsächlichem Abschluss als bestanden vermerkt.
