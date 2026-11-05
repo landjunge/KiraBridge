@@ -48,6 +48,11 @@ Neue bestätigte Beschlüsse haben Vorrang vor historischen Plantexten:
 - Alte ThreadDesk-Anweisungen mit ausschließlich ThreadDesk-Umfang beschreiben
   frühere Aufträge. Der aktuelle ausdrückliche Fünf-Produkte-Auftrag erweitert
   den Planungsumfang, ohne alte Daten, Quellstände oder Prüfgrenzen umzudeuten.
+- Ergänzender Nutzerauftrag vom 05.11.: eigener Ocean-MCP-Adapter für Dirks
+  bestehende Plattform. Nur Planung und Schnittstellenprüfung, keine ungefragte
+  Implementierung. Live-Sprache → KiraBridge → Ocean-Adapter → Ocean;
+  ThreadDesk bleibt unabhängig und optional. Details im
+  [Ocean-Adapterplan](OCEAN-MCP-ADAPTER-20261105.md).
 
 ## 2. Tatsächlicher Bestand vor neuen Aufträgen
 
@@ -63,6 +68,7 @@ Neue bestätigte Beschlüsse haben Vorrang vor historischen Plantexten:
 | 4AllPass | Integrierter Defaultpin `0b66a2fda7fcc831762e732eb20084137fa6029d`. Tresor/PWA/Extension und geschützter synthetischer Executorvertrag vorhanden; integrierte Source sperrt maschinelle Rohgeheimnisübergabe. | Veröffentlichter RC2 ist älterer Stand `60eef0a`; RC3-Kandidat ist kein ausgelieferter Fix. Produktive Secretisolation, vertrauenswürdiger Vault→Executor-Transfer und KB-Originbindung fehlen. Kein heutiger produktiver Secret-MCP-Dienst behauptet. |
 | TollGate | Defaultpin `6676bcfc69f85e77fec6192bc51ad8f9c0b26740`, Version1.0.12. Gateway/MCP/n8n, WorkflowControl mit atomarer Reserve/Dispatch/Settlement-Zuordnung und persistenten Stopps vorhanden. | Synthetische Vertragsbelege; kein allgemeines hartes Dollarcap für Abo-CLIs. Aktueller produktiver Gateway-/Serverstand nicht neu beobachtet. |
 | Agent Authority | Observer-Master `75fb14e99a50b967b8624191f0178963c433fbd9`; Projektionen, Warnregeln, CLI/Reader und native UI vorhanden. Separater Browser-/Debianzweig `e69abcd07e62873f4276fa3d1ff6ffd71a7b0327`. | Browserzweig enthält heutige `workflow.py`/`workflow_rules.py` des Masters **nicht**. Historischer Debianbeleg gehört zu `27db3a8`/Paket `f512ab6…`, nicht automatisch zu späteren Accountgrant-Updates. Keine Freigabe-/Budget-/Stoppautorität. |
+| Ocean als externe Anwendungsintegration | Plattform `ocean.com.de` und Developer-Portal eindeutig zugeordnet; aktuelle öffentliche Bot-/Skill-/Medien-/Spielverträge und öffentlicher JWKS-GET geprüft. Bestehende Recherche und Ocean-Thread `30e962aaed81` erhalten. | Kein implementierter Ocean-MCP-Adapter, kein Login oder fachlicher API-/Live-Test. Allgemeiner Galerie-/Speichervertrag, Projektfreigaben und Servergarantien offen; [eigener Plan](OCEAN-MCP-ADAPTER-20261105.md). |
 
 Die Hauptworktrees aller fünf Produkte enthalten teilweise alte, gestagte oder
 unversionierte Arbeit. Sie werden nicht zurückgesetzt, gestasht oder als „aktuelle
@@ -117,7 +123,9 @@ nur ergänzt, soweit der vorhandene Transport sie tatsächlich benötigt. Browse
 Returnhilfe und Chrome-Prototyp sind optionale Routen, keine neue Autorität und
 kein Ersatz für ein extern blockiertes Werkzeug.
 
-Es gibt **einen autorisierten mobilen Auftragseingang im ThreadDesk-Auftragsweg**.
+Für diesen Remoteablauf gibt es **einen autorisierten mobilen Auftragseingang im
+ThreadDesk-Auftragsweg**. Das ist keine ThreadDesk-Pflicht für unabhängige
+KiraBridge-Anwendungsadapter wie den gesonderten Ocean-Pfad in Abschnitt 3.4.
 Aufgabe und zugehörige Herkunfts-/Freigabereferenz werden revisionsgebunden
 gespeichert; KiraBridge Server vermittelt genau diesen Datensatz. Es gibt keine
 zusätzliche direkte Handy→KiraBridge-Auftragsanlage, keinen zweiten Freigabekatalog
@@ -165,6 +173,24 @@ gegen die vorhandenen APIs festgelegt, nicht hier als bereits implementiert verk
   privaten lokalen Dateifreigaben bleiben getrennt von replizierten Verweisen.
 - Zustellung, Claim, Arbeitsbeginn, Turnende, fachliche Abnahme und tatsächliche
   mobile Ergebnisanzeige bleiben unterscheidbare Zustände und Belege.
+
+### 3.4 Eigenständiger Ocean-MCP-Adapter
+
+Live-Sprache → vorhandene KiraBridge-MCP-/Policy-/Taskverwaltung → eigener
+Ocean-Adapter → Ocean. Chat, Bilder/Galerien, Speicher und browserbasierte Spiele
+erhalten eine eigene Capabilitymatrix. Ocean bleibt externes Produkt; der Adapter
+ist kein CLI-Modul und führt keine zweite Queue oder Rechteengine ein.
+ThreadDesk ist optionaler, ausdrücklich freigegebener Datenaustauschpartner.
+Der Kern besitzt lokale Ausführungsrechte; Ocean-Konten, Bot-/Raumrollen oder
+Dateilinks erteilen keine Tastatur-, Maus-, Fenster-, Programm- oder Terminalrechte.
+Vorhandene OS-Fähigkeiten werden pro Plattform und Route wiederverwendet und
+nachgewiesen. Fehlende APIs führen nicht zu einem stillen GUI-/Terminal-Fallback.
+
+Der [Ocean-Adapterplan](OCEAN-MCP-ADAPTER-20261105.md) dokumentiert die frisch
+geprüften offiziellen Portalverträge, den Schnittstellenentwurf, Authentifizierung,
+Berechtigungen, Sicherheit, Meilensteine und Tests. Die ältere statische APK-
+Analyse ist Herkunftsbeleg, keine öffentliche API-Freigabe. Nur Planung beauftragt;
+Implementierung, Projekt-App, echte Tests und produktive Aktivierung bleiben offen.
 
 ## 4. Plattform- und CLI-Migration
 
@@ -218,6 +244,7 @@ pakete erhalten vor Zustellung ihren konkreten Scope im vorhandenen ThreadDesk.
 | BP-TG-01 produktive Budgetbindung | Bestehende Reserve/Dispatch/Settlement-API an einen konkret quotierbaren, freigegebenen Providerweg binden; harte Cap-/Unknown-Grenzen wahrheitsgemäß prüfen. | TollGate getrennt weiterentwickeln; keine neuen API-Käufe. Abo-CLIs bleiben zunächst mit belegter Quota/Stopgrenzen eigenständig. |
 | BP-4AP-01 geschützte Nutzung | Vertrauenswürdige Host-/Origin-/Consent-/Revocationkette nachweisen, ohne Rohsecret im Agentenkontext; veröffentlichte/integrierte Artefaktgrenzen sauber halten. | Eigenständiges sicherheitsrelevantes Paket mit konkreter Freigabe. Kein unbeschränkter Passwort-/MCP-Zugriff für Agenten als Abkürzung. |
 | BP-AA-01 gemeinsame Beobachtung | Tatsächliche TD→KB→Agent→Rückgabe-Ereignisse lesend projizieren; Browserzweig/Mastervertrag abgleichen, fehlende Auth-/Coveragebelege explizit unknown. | Parallel ohne Steuerungsrechte. Eigener Browsergrant bleibt von fremder Agentenidentität getrennt. Kein unkontrollierter Branchmerge. |
+| `BIGPLAN-OCEAN-MCP-PLAN-20261105-V1` / OCEAN-00 | Eigenständiger Ocean-Adapterplan: aktuelles Developer-Portal/API-/Auth-/Scopeinventar, Vertrag, Sicherheitsgrenzen, Meilensteine und Tests; Live-Sprache→KB→Ocean, TD optional. | Dokumentationsauftrag von Codex; Details im [Ocean-Plan](OCEAN-MCP-ADAPTER-20261105.md). Keine Implementierungs-/AutoNext-READY-Freigabe. Nächster Ocean-Schritt OCEAN-01: freigegebener Testzugang und offene Speicher-/Widerrufs-/Idempotenzverträge mit Dirk/Kira. |
 | BP-LIEFERUNG Betrieb | Quellen/Pakete/Installationen, Backup/Restore, fehlgeschlagene/unklare Aufträge, betroffene READMEs und Downloadgrenzen gemeinsam prüfen. | Je abgenommenem Produktpaket; keine pauschale Freigabe aller Releases/Serverinstallationen. |
 
 Der kritische Remoteweg ist **Vertragsabgleich → isolierter Vertikalschnitt →
@@ -305,6 +332,9 @@ Primäre technische Verweise:
 - Private detaillierte Metadaten/Quittungen, Faktenprüfung mit Dateihashes,
   unberührte Worktreezustände und spätere Review-/Testlogs:
   `~/.local/share/kirabridge/backups/bigplan-overall-20261105-v1/`.
+- Ocean: [Adapterplan](OCEAN-MCP-ADAPTER-20261105.md), bestehender Bereich
+  `30e962aaed81`; öffentliche Portal-/JWKS-Abrufbelege mit Hashes unter
+  `~/.local/share/kirabridge/backups/bigplan-ocean-plan-20261105-v1/`.
 
 ThreadDesk enthält kurze Checkpoints mit Paket, Bearbeiter, Quellpin, Belegpfad
 und nächstem Schritt; nicht diesen gesamten Regeltext. Nach jedem Meilenstein
