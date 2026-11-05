@@ -237,7 +237,7 @@ pakete erhalten vor Zustellung ihren konkreten Scope im vorhandenen ThreadDesk.
 | `BIGPLAN-GROK-WINDOWS-CANDIDATE-20261105-V1` | Gelieferten `070ea70` unabhängig auf RC33-Erhalt, Kandidatenintegrität und Ablehnung alter Nachweise prüfen; passende vorhandene Tests ausführen; nur bei Bestehen integrieren. | **Quellschritt abgeschlossen:** Grok geliefert, Codex korrigiert, unabhängiger Review freigegeben, 69 Tests, Integration `ae699cb` im Featurebranch. Native Liefergates bleiben offen. |
 | `bigplan-windows-parity-audit-20261105-v1` | Vorhandener gepinnter Boardauftrag `c803df9cc369`, ausschließlich Paritätsbericht mit konkreter nächster Windowsänderung. | Bereits Codex/AutoNext zugeordnet, keine Übernahme belegt; globale Automatik aus. Erst Zustand/Besitz mit dem vorhandenen Ablauf abgleichen, keinen zweiten Worker starten. |
 | BP-REMOTE-01 gemeinsamer Vertrag | Bestehende TD-Server-/MCP-, KB-Task-/Handoff-/AutoNext-Verträge verbinden. Ein Task, ein Zielgerät, getrennte Zustände, Rechtequelle, Quittungen und Versionskonflikte; maschinenlesbares Schema und Negativtests. | **Passiver Quellschritt abgeschlossen:** [Vertrag v1](../contracts/remote-task-v1.md), Schema und synthetische Kompatibilitätsfälle auf `feat/remote-task-contract-20261105`; 61 gezielte Prüfungen bestanden, finaler unabhängiger Grok-Review bestätigt. Codex alleiniger Schreiber. Kein Remoteauth-/Transportadapter oder produktiver Start. |
-| BP-REMOTE-02 isolierter Vertikalschnitt | Bereits vorhandenen TD-Server und aktuellen KB-Core in separater lokaler Testumgebung verbinden: ausdrücklich autorisierter Auftrag → eigener Agent → Ergebnis in demselben Thread; genau ein Coreversuch. | Nach Vertragsreview und konkreter Paketfreigabe. Vorhandenen Team-/Receiver-/AutoNext-Mechanismus wiederverwenden. Kein Debian-Produktivdeploy. |
+| BP-REMOTE-02 isolierter Vertikalschnitt | Bereits vorhandenen TD-Server und aktuellen KB-Core in separater lokaler Testumgebung verbinden: ausdrücklich autorisierter Auftrag → eigener Agent → Ergebnis in demselben Thread; genau ein Coreversuch. | **Implementiert und lokal geprüft:** optionaler TD-HTTP-Handoffadapter und KB-Peer/Relay; 23 TLS/Core/TD-Integrationsfälle plus 133 gezielte Regressionen. [Architektur, Grenzen und Nachweise](REMOTE-VERTICAL-SLICE-20261105.md). Agent synthetisch; tatsächliche lokale TLS-/Store-/MCP-Strecken. Default-off, keine Installation oder Handy-/Debianabnahme. |
 | BP-DEBIAN-01 Staging und Geräteauth | Tatsächlichen vorhandenen Debianhost/OS/Dienste und freigegebene Verbindungswege prüfen; getrennte TD-/KB-Profile, TLS, Gerätebindung, Widerruf, Restart und Rückweg. | Kira/Nutzer bestätigen Ziel und produktive Rechte. Technische Umsetzung/Test durch Codex mit getrenntem Review. Keine neue VM/Account-/Port-/DNSänderung ohne passende Freigabe. |
 | BP-REMOTE-03 echte mobile Abnahme | Aus tatsächlichem Handy/ChatGPT über Debian auf den verbundenen Heim-Mac einen neuen harmlosen Auftrag einmal ausführen; Ergebnis mobil aus demselben Thread zurücklesen. | Nutzer/Kira führen den tatsächlichen mobilen Clientweg; Codex/Grok liefern technische Nachweise. Lokaler Ersatzclient zählt separat. |
 | BP-WINDOWS-01 Runtimeparität | Nach Paritätsbericht konkrete fehlende Terminal-/Sitzungsfunktion im bestehenden Windowsbackend korrigieren; Regression auf altem Stand und native Win32-Abnahme am neuen Pin. | Codex Hauptarbeit; Grok Review. Parallel zu Remotevertrag möglich, getrennte Dateien/Worktrees. Vorhandene lokale Windowsumgebung nach Identitäts-/Ressourcencheck verwenden. |
@@ -363,18 +363,19 @@ uneindeutigen zweiten Auftragseingang wurde korrigiert und im engen Recheck
 geschlossen; Diagramm und Vertrag beschreiben denselben freigegebenen TD-Auftrag.
 Das ist technische Planprüfung, keine Freigabe eines produktiven Deployments.
 
-**Aktueller Einstieg nach dem Nutzerauftrag „weiter im Plan“:** BP-REMOTE-01
-liefert den passiven versionierten Auftrags-/Freigabe-/Geräte-/Quittungsvertrag
-auf den vorhandenen TD-/KB-APIs. Die erste begrenzte Form beschreibt vorhandene
-Codex-Protokolle und ihre tatsächlich belegte Sessionroute. AutoNext-Bindungen
-bleiben reine Beobachtung vorhandener Team-/Coreaufträge. Der Handoff-Intent setzt
-eine verfügbare verwaltete Session voraus und ist bei aktivierter sichtbarer
-Konfiguration nicht bereit; kein stiller Routenwechsel. Schema-gültige Daten
-erzeugen keine Rechte. Die tatsächlich
-fehlenden Bindungen sind Geräte-Pairing, verifizierte Remotequelle/Grantauflösung,
-Widerruf und authentischer Quittungstransport. Nach Vertragsprüfung ist das nächste
-Paket BP-REMOTE-02 als isolierter Vertikalschnitt konkret abzugrenzen; kein
-produktiver Debian- oder Handy-Pass aus Schema-/Fixtureprüfungen.
+**Aktueller Einstieg nach „weiter im Plan, Punkt für Punkt“:** Auf BP-REMOTE-01
+folgt der implementierte und isoliert geprüfte BP-REMOTE-02-Quellschritt.
+Bestehende Grants/Tasks/Handoffs vermitteln Ergebnisse zurück in denselben
+TD-Thread. Die tatsächlichen TLS-Verbindungen, Originalrequest-/Gerätepins,
+Reservierung vor Submit, Quittungen und fehlendes Replay nach UNKNOWN sind lokal
+geprüft; Agent und Auftrag sind kostenfreie Fixtures. Ergebnisse bleiben
+`delivered_unverified`. Remote-Abnahme-/Antwortentscheidungen sind vollständig
+gesperrt, weil Cookie/CSRF mit demselben Owner-Zugang keine unabhängige Operatorrolle
+beweisen. Quellimplementierung, installierte Runtime und mobile Abnahme bleiben
+getrennt. Der Handoff-Start ist mit der installierten sichtbaren Sessionroute
+weiter nicht verfügbar; kein stiller Queue-/API-Wechsel und kein Abschalten des
+Schutzes. Produktives Pairing, zugelassener Agentenweg, unabhängiger Operatorweg,
+Debian-/Handyerreichbarkeit und echte Anzeige bleiben BP-REMOTE-03-Gates.
 Der bestehende Windows-Paritätsauftrag bleibt seiner ursprünglichen Zuständigkeit
 zugeordnet. Ocean bleibt beim freigegebenen Planumfang. Produktive Dienste, neue
 Kostenwege, zusätzliche Konten, Main-Merges oder öffentliche Releases werden
