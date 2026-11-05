@@ -30,6 +30,7 @@ Agenten, sichtbare Sitzungen und Berechtigungen jeweils getrennt.
 - [Queuevertrag](https://github.com/landjunge/KiraBridge/blob/307004e5b2e4285c19e8d7544bedf45b28297a0b/docs/QUEUE-MANAGEMENT.md) und [direkte Zulassung](https://github.com/landjunge/KiraBridge/blob/307004e5b2e4285c19e8d7544bedf45b28297a0b/docs/QUEUE-DIRECT-ADMISSION-20261029.md)
 - [Optionale ThreadDesk-Anbindung](https://github.com/landjunge/KiraBridge/blob/307004e5b2e4285c19e8d7544bedf45b28297a0b/docs/DYNAMIC-THREADDESK-PROXY.md)
 - [Begrenzte Whiteboard-Fortsetzung](plans/BIGPLAN-AUTONEXT-20261104.md): gepinnte READY-Aufträge, Abnahmequittungen und Aktivierungsgates; standardmäßig deaktiviert.
+- [Big Plan: belegter Bestand, Architektur und Lieferetappen](plans/BIGPLAN-GESAMTPLAN-20261105.md), einschließlich bereitgestelltem Quellbeschluss und nächstem Remote-Vertragseinstieg.
 - [RC20-Änderungen am veröffentlichten Quellpin](https://github.com/landjunge/KiraBridge/blob/v0.8.0rc20/docs/RELEASE-0.8.0rc20.md)
 
 Diese Detaildokumente enthalten datierte Betriebsstände; ihre alten Versionsangaben

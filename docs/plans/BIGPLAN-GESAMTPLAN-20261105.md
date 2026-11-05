@@ -56,7 +56,7 @@ Neue bestätigte Beschlüsse haben Vorrang vor historischen Plantexten:
 | KiraBridge Desktop Mac | Laufende **0.8.0rc39**, Quelle `8d331314b608d247ba160e04a898f9498cbb22d3`, 189 Pythonmodule; PID40336, Instanz `b988e7acdc284bbfb7da161a18585c46`. Dokumentationshead `511f289`. Aufgabenverwaltung, Policies, SQLite, TeamDispatcher, MessageReceiver, native Terminal-/Tastaturtechnik, CLI-Semantikregistry vorhanden. | Livehealth und Paketquellpfad frisch gelesen. Native Codex-/AutoNext-Abnahme ist für den dokumentierten Paketstand belegt; daraus folgt keine aktuelle universelle Grok-/Browserchat-/Windows-Abnahme. |
 | AutoNext | `2a8d2fe` integriert; ausdrückliche Boardpins, Startanker, Claim/Lease, Outbox/Readback, Abnahme vor Folgeauftrag. Zwei echte read-only Folgeaufträge auf eigenem Intel-Codex-Ziel einmalig abgeschlossen. | **Aktuell disabled**, keine dauerhafte freigegebene produktive Aufgabenliste. `b3c7336` enthält einen separaten Folgefix zu alten unbekannten Receiver-Scopes; nicht als installiert behandeln. |
 | Windows | RC33-Kit und native Win32-/Tastatur-/MCP-/Fenster-Vorarbeiten vorhanden. RC33-Quelle `ce0687dd8831dae261bf285922a146bcf3aedc41`; Kit-SHA256 `1002e68cbef96c7fd9a383d542beb5abc727f5843316352a65638fe4266a919a`. | Kein RC39-Paritätsnachweis. Mac-Terminalsemantik und Mac-Abnahme sind keine Windows-Unterstützung. Windows-spezifische Dateien waren im letzten Audit unverändert, gemeinsamer Kern inzwischen verändert. |
-| Groks Windows-Kandidatenpatch | **Geliefert**, `070ea70eed2600fd276dcb6ab5ea122cd274f481`, eigener sauberer Worktree `grok-windows-candidate-20261105`. Explizite Kandidatenversion und Git-Modulinventar statt bloßer RC33-Konstantenänderung. | Grok meldet 61 fokussierte Tests und zwei getrennte Reviews; Codex-Review/Integration stehen beim Einstieg aus. Kein Paketbuild, keine native Windows-Abnahme. Nicht erneut beauftragen. |
+| Groks Windows-Kandidatenpatch | **Geliefert**, `070ea70eed2600fd276dcb6ab5ea122cd274f481`, eigener sauberer Worktree `grok-windows-candidate-20261105`. Nach unabhängigem Review mit drei Rootkorrekturen im Koordinationsbranch als `ae699cb` integriert. | 69 gezielte Tests bestanden; Versions-/Berichtwechsel-/Dateinamenbefunde geschlossen. Kein echtes Windows-Paket gebaut, keine native Windows-Abnahme. Nicht erneut beauftragen. |
 | ThreadDesk | Frisch integrierter Defaultpin `067a525798817629ae1d2b8e741d109230f54d08`; geeigneter sauberer Leseworktree `codex2-file-receiver-20261024`. ThreadService/JsonStore, MCP, Whiteboards, Dateiempfang, Graph-/Bibliotheksfunktionen vorhanden. | Der alte Hauptworktree ist geändert und nicht die geeignete Basis für einen Neubau. Installierte Desktopquelle wurde in dieser Analyse nicht neu attestiert. |
 | ThreadDesk Server & Sync | Bereits implementiert und integriert: PR89, Merge `770bbc9f0c0a02699cc93cad47d2e2c3782f7080`, heute im neueren Defaultstand. Eigene Server-/Client-Entrypoints, Browser, TLS/Auth, Metadaten, Dateien/Chunks, Offlineinventar, Konflikte, Restart und Backup/Restore. | Historische Linux-/TLS-/CI- und lokale Belege vorhanden; PR-Merge frisch bestätigt. Kein daraus abgeleiteter aktueller produktiver Debian-Installationsstand oder Remote-Auftrag bis zum Heimagenten. **Diesen Server nicht neu entwickeln.** |
 | KiraBridge Server | Remote-Ref `development/server` frisch bei `e025dee524bd5a00712cc1f51d2f8a52941ff5fd`. Bestehender Plan und gemeinsamer MCP-/HTTP-/Taskkern als Ausgangsbasis. | Serverplan sagt ausdrücklich „Planung, keine Server-Implementierung oder Bereitstellung“. Kein belegter gerätegebundener Heimrechner-Auftragsrelay. Branch ist kein Vorfahr von `511f289`; keinen alten Branch blind über aktuellen Core mergen. |
@@ -205,7 +205,7 @@ pakete erhalten vor Zustellung ihren konkreten Scope im vorhandenen ThreadDesk.
 | Paket/Etappe | Ergebnis und Abnahmekriterium | Zuständigkeit / Abhängigkeit / Status |
 |---|---|---|
 | BP-00 Quellen und Besitz | Originalquellen/Entscheidungen mit Herkunft, tatsächliche Pins und laufende Pakete; keine doppelte Übernahme. | Codex. Bestand und vollständiger aktueller Nutzerbeschluss gelesen; Bibliotheks-Dateimetadaten/ältere Referenzpläne nicht direkt geprüft. Dieser Plan ist der erste eigene konsolidierte Stand. |
-| `BIGPLAN-GROK-WINDOWS-CANDIDATE-20261105-V1` | Gelieferten `070ea70` unabhängig auf RC33-Erhalt, Kandidatenintegrität und Ablehnung alter Nachweise prüfen; passende vorhandene Tests ausführen; nur bei Bestehen integrieren. | Grok geliefert; **Codex beginnt nach diesem Plan mit Review**. Kein neuer gleicher Grok-Auftrag. |
+| `BIGPLAN-GROK-WINDOWS-CANDIDATE-20261105-V1` | Gelieferten `070ea70` unabhängig auf RC33-Erhalt, Kandidatenintegrität und Ablehnung alter Nachweise prüfen; passende vorhandene Tests ausführen; nur bei Bestehen integrieren. | **Quellschritt abgeschlossen:** Grok geliefert, Codex korrigiert, unabhängiger Review freigegeben, 69 Tests, Integration `ae699cb` im Featurebranch. Native Liefergates bleiben offen. |
 | `bigplan-windows-parity-audit-20261105-v1` | Vorhandener gepinnter Boardauftrag `c803df9cc369`, ausschließlich Paritätsbericht mit konkreter nächster Windowsänderung. | Bereits Codex/AutoNext zugeordnet, keine Übernahme belegt; globale Automatik aus. Erst Zustand/Besitz mit dem vorhandenen Ablauf abgleichen, keinen zweiten Worker starten. |
 | BP-REMOTE-01 gemeinsamer Vertrag | Bestehende TD-Server-/MCP-, KB-Task-/Handoff-/AutoNext-Verträge verbinden. Ein Task, ein Zielgerät, getrennte Zustände, Rechtequelle, Quittungen und Versionskonflikte; Schema-/Negativtests definieren. | Codex entwirft, Grok unabhängiger Review. Grundlage ist der vollständig bereitgestellte aktuelle Beschluss; danach konkret freigegebenes Umsetzungspaket. |
 | BP-REMOTE-02 isolierter Vertikalschnitt | Bereits vorhandenen TD-Server und aktuellen KB-Core in separater lokaler Testumgebung verbinden: ausdrücklich autorisierter Auftrag → eigener Agent → Ergebnis in demselben Thread; genau ein Coreversuch. | Nach Vertragsreview und konkreter Paketfreigabe. Vorhandenen Team-/Receiver-/AutoNext-Mechanismus wiederverwenden. Kein Debian-Produktivdeploy. |
@@ -311,9 +311,25 @@ und nächstem Schritt; nicht diesen gesamten Regeltext. Nach jedem Meilenstein
 wird der Eintrag unabhängig zurückgelesen. Fehlende Quelle, fehlende laufende
 Abnahme und fehlende neue Freigabe sind unterschiedliche Blocker.
 
-**Nächster autorisierter Arbeitsschritt:** unabhängiger Codex-Review des bereits
-gelieferten Grok-Commits `070ea70`, gezielte Paketvalidatortests, anschließend
-bei Bestehen Integration im Koordinationsbranch. Danach erhalten Kira/Nutzer
-den quellengebundenen nächsten Remotevertrags-/Windows-Abnahmepunkt. Keine
-produktiven Dienste, neuen Kostenwege, zusätzlichen Konten oder öffentlichen
-Releases werden durch diesen Plan gestartet.
+**Erster autorisierter Quellschritt abgeschlossen:** Groks `070ea70` wurde im
+eigenen Koordinationsbranch mit drei überprüften Korrekturen als `ae699cb`
+integriert. Vier Regressionen schlugen am ursprünglichen Stand fehl; der finale
+gezielte Lauf umfasst 69 bestandene Fälle. Die echte eingefrorene RC39-Quelle
+`8d33131` wurde mit 189 Modulen und Versionsdateihashes gelesen. Dies sind
+synthetische Paketvalidierung und ein Git-Lesetest, kein Windows-/Paketbuild.
+Native Berichtsproduzenten/Erfassung müssen später das Kandidateninventar aus
+der tatsächlich getesteten Quelle liefern; alte Reports nachträglich zu
+beschriften ist keine Abnahme. Installation und Runtime wurden nicht geändert.
+
+Grok hat diesen fremden Gesamtplan unabhängig geprüft. Sein Befund F1 zu einem
+uneindeutigen zweiten Auftragseingang wurde korrigiert und im engen Recheck
+geschlossen; Diagramm und Vertrag beschreiben denselben freigegebenen TD-Auftrag.
+Das ist technische Planprüfung, keine Freigabe eines produktiven Deployments.
+
+**Aktueller nächster Einstieg:** BP-REMOTE-01, gemeinsamer versionierter
+Auftrags-/Freigabe-/Geräte-/Quittungsvertrag auf den vorhandenen TD-/KB-APIs.
+Daneben bleibt der bestehende Windows-Paritätsauftrag seiner ursprünglichen
+Zuständigkeit zugeordnet. Neue funktionale Remote- oder native Lieferpakete
+werden konkret anhand dieses Plans abgegrenzt; produktive Dienste, neue
+Kostenwege, zusätzliche Konten, Main-Merges oder öffentliche Releases werden
+dadurch nicht gestartet. Aktueller Commit und Übergabe stehen in ThreadDesk.
