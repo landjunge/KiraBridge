@@ -96,9 +96,8 @@ auf bestehender Infrastruktur verbunden; keine zusätzliche KI-Zentrale.
 
 ```mermaid
 flowchart LR
-    Phone[Handy / ChatGPT] -->|ausdrücklicher Auftrag| TD[ThreadDesk Server und Sync]
-    Phone -->|autorisierte Freigabe| Relay[KiraBridge Server]
-    TD -->|gepinntes Intent / Statusreferenzen| Relay
+    Phone[Handy / ChatGPT] -->|ein freigegebener Auftrag| TD[ThreadDesk Server und Sync]
+    TD -->|derselbe Task samt Freigabereferenz| Relay[KiraBridge Server]
     Home[KiraBridge auf Heimgerät] -->|ausgehend: authentifiziertes HTTPS| Relay
     Home -->|bestehender TaskManager / AutoNext| CLI[CLI-Adapter / Agent]
     CLI -->|gebundene Ergebnisbelege| Home
@@ -117,6 +116,17 @@ keine vorausgesetzte Portfreigabe im Heimnetz. Eine Verbindungserweiterung wird
 nur ergänzt, soweit der vorhandene Transport sie tatsächlich benötigt. Browser-
 Returnhilfe und Chrome-Prototyp sind optionale Routen, keine neue Autorität und
 kein Ersatz für ein extern blockiertes Werkzeug.
+
+Es gibt **einen autorisierten mobilen Auftragseingang im ThreadDesk-Auftragsweg**.
+Aufgabe und zugehörige Herkunfts-/Freigabereferenz werden revisionsgebunden
+gespeichert; KiraBridge Server vermittelt genau diesen Datensatz. Es gibt keine
+zusätzliche direkte Handy→KiraBridge-Auftragsanlage, keinen zweiten Freigabekatalog
+und keine zweite Benutzerbestätigung desselben Auftrags. Der bestehende
+KiraBridge-Policykern prüft beim Akzeptieren Herkunft, Gerät und erlaubten Scope;
+eine abweichende oder nicht belegbar autorisierte Kopie wird abgelehnt. Die
+gespeicherte Referenz ist kein selbst erteiltes Recht des ThreadDesk-Dokuments.
+Der konkrete Nachweis dieser Bindung gehört zu BP-REMOTE-01/02 und ist noch
+keine behauptete Funktion des heutigen Serverstands.
 
 **Eine stabile Auftrags-ID** verbindet Aufgabenabsicht, Freigabe, Transport und
 Core-Task. Das bestehende lokale TaskManager-Ledger bleibt Ausführungswahrheit.

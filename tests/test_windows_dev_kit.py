@@ -382,3 +382,325 @@ def test_component_reuse_refuses_preview_without_positive_pid_or_cleanup(reuse_f
     path.write_text(json.dumps(report))
     with pytest.raises(ValueError, match="cleanup"):
         kit.prepare(current, new_reports, PIN, previous, old_reports)
+
+
+CANDIDATE_VERSION = "0.8.0rc39"
+CANDIDATE_PIN = "d" * 40
+
+
+def install_candidate_tree(stage, modules, version=CANDIDATE_VERSION, commit=CANDIDATE_PIN):
+    """Point the staged wheel and source zip at one explicit candidate tree."""
+    present = {name: body for name, body in modules.items() if body is not None}
+    if "src/kirabridge/__init__.py" not in modules:
+        present["src/kirabridge/__init__.py"] = f'__version__ = "{version}"\n'.encode()
+    project = f'[project]\nname = "kirabridge"\nversion = "{version}"\n'.encode()
+    new_name = f"wheels/kirabridge-{version}-py3-none-any.whl"
+    new_path = stage / new_name
+    relative = {
+        name.removeprefix("src/kirabridge/"): body for name, body in sorted(present.items())
+    }
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, "w") as archive:
+        archive.writestr(
+            f"kirabridge-{version}.dist-info/METADATA",
+            f"Metadata-Version: 2.1\nName: kirabridge\nVersion: {version}\n",
+        )
+        for name, body in relative.items():
+            archive.writestr(f"kirabridge/{name}", body)
+    new_path.write_bytes(buffer.getvalue())
+    manifest = json.loads((stage / "manifest.json").read_bytes())
+    manifest["requirements"] = [
+        f"kirabridge=={version}" if item.startswith("kirabridge==") else item
+        for item in manifest["requirements"]
+    ]
+    old_path = None
+    for entry in manifest["files"]:
+        if entry["path"].startswith("wheels/kirabridge-"):
+            old_path = stage / entry["path"]
+            entry["path"] = new_name
+    if old_path is None:
+        raise AssertionError("missing kirabridge wheel entry")
+    (stage / "manifest.json").write_bytes(json.dumps(manifest).encode())
+    if old_path != new_path and old_path.exists():
+        old_path.unlink()
+    replace_source(stage, commit, {**modules, **present, "pyproject.toml": project})
+    with zipfile.ZipFile(stage / "source.zip") as archive:
+        return {
+            name: archive.read(name)
+            for name in archive.namelist()
+            if name in present or name in kit.REQUIRED_HARNESSES or name == "pyproject.toml"
+        }
+
+
+def bind_reports(stage, reports, git_files, version=CANDIDATE_VERSION, commit=CANDIDATE_PIN):
+    document, inventory_hash = kit.candidate_inventory(version, commit, git_files)
+    manifest_hash = kit.digest((stage / "manifest.json").read_bytes())
+    for phase in kit.PHASES:
+        path = reports / f"report-{RUN_ID}-{phase}.json"
+        report = json.loads(path.read_text())
+        report.update(
+            manifest_sha256=manifest_hash,
+            evidence_platform="win32",
+            candidate_version=version,
+            source_commit=commit,
+            inventory_sha256=inventory_hash,
+            runtime_module_sha256=document["runtime_module_sha256"],
+            harness_sha256=document["harness_sha256"],
+            version_file_sha256={
+                name: kit.digest(git_files[name])
+                for name in ("pyproject.toml", "src/kirabridge/__init__.py")
+            },
+        )
+        path.write_text(json.dumps(report))
+    return document, inventory_hash
+
+
+def stage_candidate(fixture, modules):
+    stage, reports = fixture
+    git_files = install_candidate_tree(stage, modules)
+    document, inventory_hash = bind_reports(stage, reports, git_files)
+    return git_files, document, inventory_hash
+
+
+def use_candidate_git(monkeypatch, git_files):
+    monkeypatch.setattr(kit, "read_candidate_source", lambda commit, files=dict(git_files): files)
+
+
+def test_historical_rc33_profile_stays_174_and_does_not_require_candidate_inventory(fixture):
+    assert kit.VERSION == "0.8.0rc33"
+    assert kit.RUNTIME_MODULE_COUNT == 174
+    short = {f"src/kirabridge/m{i}.py": b"x\n" for i in range(173)}
+    with pytest.raises(ValueError, match="exactly 174"):
+        kit.runtime_modules(short, "src/kirabridge/")
+    short["src/kirabridge/m173.py"] = b"x\n"
+    assert len(kit.runtime_modules(short, "src/kirabridge/")) == 174
+    contents, package = kit.prepare(*fixture, PIN)
+    assert package["version"] == "0.8.0rc33"
+    assert "candidate_validation" not in package
+    assert "native_windows_acceptance" not in package
+    readme = contents["README-DE.txt"].decode()
+    assert "KiraBridge 0.8.0rc33" in readme
+    assert "KiraBridgePreviewRC33" in readme
+    assert "Kandidat:" not in readme
+
+
+def test_candidate_binding_does_not_claim_native_windows_acceptance(fixture, monkeypatch):
+    modules = {
+        "src/kirabridge/core.py": b"VALUE = 1\n",
+        "src/kirabridge/extra.py": b"VALUE = 2\n",
+    }
+    git_files, document, inventory_hash = stage_candidate(fixture, modules)
+    use_candidate_git(monkeypatch, git_files)
+    contents, package = kit.prepare(*fixture, CANDIDATE_PIN, candidate_version=CANDIDATE_VERSION)
+    assert package["version"] == CANDIDATE_VERSION
+    assert package["candidate_validation"] is True
+    assert package["native_windows_acceptance"] is False
+    assert package["runtime_module_count"] == 3
+    assert package["module_inventory_sha256"] == inventory_hash
+    assert package["component_provenance_reuse"] is False
+    proof = json.loads(contents["native-acceptance.json"])
+    assert proof["native_windows_acceptance"] is False
+    assert proof["candidate_inventory"] == document
+    assert "did not execute Windows" in proof["acceptance_note"]
+    readme = contents["README-DE.txt"].decode()
+    assert "KiraBridgePreviewCandidate" in readme
+    assert "keine native Windows-Abnahme" in readme
+    assert "KiraBridgePreviewRC33" not in readme
+
+
+def test_candidate_rejects_old_reports_after_shared_core_change(fixture, monkeypatch):
+    git_files, _, _ = stage_candidate(fixture, {"src/kirabridge/core.py": b"VALUE = 1\n"})
+    git_files = install_candidate_tree(fixture[0], {"src/kirabridge/core.py": b"VALUE = 2\n"})
+    use_candidate_git(monkeypatch, git_files)
+    with pytest.raises(ValueError, match="module bytes differ"):
+        kit.prepare(*fixture, CANDIDATE_PIN, candidate_version=CANDIDATE_VERSION)
+
+
+def test_candidate_rejects_missing_module_in_source(fixture, monkeypatch):
+    stage_candidate(
+        fixture,
+        {"src/kirabridge/a.py": b"A = 1\n", "src/kirabridge/b.py": b"B = 1\n"},
+    )
+    git_files = install_candidate_tree(
+        fixture[0],
+        {"src/kirabridge/a.py": b"A = 1\n", "src/kirabridge/b.py": None},
+    )
+    use_candidate_git(monkeypatch, git_files)
+    with pytest.raises(ValueError, match="absent from the candidate source: src/kirabridge/b.py"):
+        kit.prepare(*fixture, CANDIDATE_PIN, candidate_version=CANDIDATE_VERSION)
+
+
+def test_candidate_rejects_new_module_absent_from_native_inventory(fixture, monkeypatch):
+    stage_candidate(fixture, {"src/kirabridge/a.py": b"A = 1\n"})
+    git_files = install_candidate_tree(
+        fixture[0],
+        {"src/kirabridge/a.py": b"A = 1\n", "src/kirabridge/b.py": b"B = 1\n"},
+    )
+    use_candidate_git(monkeypatch, git_files)
+    with pytest.raises(ValueError, match="absent from the native inventory: src/kirabridge/b.py"):
+        kit.prepare(*fixture, CANDIDATE_PIN, candidate_version=CANDIDATE_VERSION)
+
+
+def test_candidate_rejects_historical_rc33_reports_and_stale_digest(fixture, monkeypatch):
+    git_files, _, _ = stage_candidate(fixture, {"src/kirabridge/core.py": b"VALUE = 1\n"})
+    use_candidate_git(monkeypatch, git_files)
+    path = fixture[1] / f"report-{RUN_ID}-core.json"
+    report = json.loads(path.read_text())
+    report["inventory_sha256"] = "ab" * 32
+    path.write_text(json.dumps(report))
+    with pytest.raises(ValueError, match="Stale native inventory"):
+        kit.prepare(*fixture, CANDIDATE_PIN, candidate_version=CANDIDATE_VERSION)
+    for report_path in fixture[1].glob("report-*.json"):
+        current = json.loads(report_path.read_text())
+        for key in (
+            "evidence_platform",
+            "candidate_version",
+            "source_commit",
+            "inventory_sha256",
+            "runtime_module_sha256",
+            "harness_sha256",
+        ):
+            current.pop(key, None)
+        report_path.write_text(json.dumps(current))
+    with pytest.raises(ValueError, match="native Windows win32 report"):
+        kit.prepare(*fixture, CANDIDATE_PIN, candidate_version=CANDIDATE_VERSION)
+    # Version labels without a module inventory are still not candidate evidence.
+    relabelled = fixture[1] / f"report-{RUN_ID}-core.json"
+    current = json.loads(relabelled.read_text())
+    current["evidence_platform"] = "win32"
+    current["candidate_version"] = CANDIDATE_VERSION
+    current["source_commit"] = CANDIDATE_PIN
+    relabelled.write_text(json.dumps(current))
+    with pytest.raises(ValueError, match="missing the native module inventory"):
+        kit.prepare(*fixture, CANDIDATE_PIN, candidate_version=CANDIDATE_VERSION)
+
+
+@pytest.mark.parametrize(
+    ("field", "value", "message"),
+    [
+        ("evidence_platform", "darwin", "native Windows win32"),
+        ("os", "darwin", "non-Windows"),
+    ],
+)
+def test_candidate_rejects_non_windows_or_relabelled_evidence(
+    fixture, monkeypatch, field, value, message
+):
+    git_files, _, _ = stage_candidate(fixture, {"src/kirabridge/core.py": b"VALUE = 1\n"})
+    use_candidate_git(monkeypatch, git_files)
+    path = fixture[1] / f"report-{RUN_ID}-keyboard.json"
+    report = json.loads(path.read_text())
+    report[field] = value
+    path.write_text(json.dumps(report))
+    with pytest.raises(ValueError, match=message):
+        kit.prepare(*fixture, CANDIDATE_PIN, candidate_version=CANDIDATE_VERSION)
+
+
+def test_candidate_refuses_to_reuse_another_native_proof(fixture):
+    stage, reports = fixture
+    with pytest.raises(ValueError, match="cannot reuse"):
+        kit.prepare(stage, reports, PIN, stage, reports, candidate_version=CANDIDATE_VERSION)
+
+
+@pytest.mark.parametrize("changed", ["runtime", "project"])
+def test_candidate_rejects_relabelled_source_version(changed):
+    files = {
+        "src/kirabridge/__init__.py": b'__version__ = "0.8.0rc39"\n',
+        "pyproject.toml": b'[project]\nname = "kirabridge"\nversion = "0.8.0rc39"\n',
+        **{name: b"# synthetic harness\n" for name in kit.REQUIRED_HARNESSES},
+    }
+    path = "src/kirabridge/__init__.py" if changed == "runtime" else "pyproject.toml"
+    files[path] = files[path].replace(b"0.8.0rc39", b"0.8.0rc33")
+    with pytest.raises(ValueError, match="version"):
+        kit.candidate_inventory(CANDIDATE_VERSION, CANDIDATE_PIN, files)
+
+
+def test_candidate_uses_versioned_archive_name(fixture, monkeypatch, tmp_path):
+    files, _, _ = stage_candidate(fixture, {"src/kirabridge/core.py": b"VALUE = 1\n"})
+    use_candidate_git(monkeypatch, files)
+    contents, package = kit.prepare(*fixture, CANDIDATE_PIN, candidate_version=CANDIDATE_VERSION)
+    built = kit.build(contents, package, tmp_path / "candidate-archive")
+    name = f"KiraBridge-{CANDIDATE_VERSION}-Windows-Dev-Kit.zip"
+    assert Path(built["asset"]).name == name
+    sums = (Path(built["asset"]).parent / "SHA256SUMS").read_text()
+    assert name in sums and "KiraBridge-0.8.0rc33-" not in sums
+
+
+def test_candidate_exports_the_same_report_bytes_it_validated(fixture, monkeypatch):
+    files, _, _ = stage_candidate(fixture, {"src/kirabridge/core.py": b"VALUE = 1\n"})
+    use_candidate_git(monkeypatch, files)
+    original_read = kit.read_owned
+    original_hash = None
+
+    def replace_after_read(path, maximum):
+        nonlocal original_hash
+        raw = original_read(path, maximum)
+        if path.name.endswith("-mcp.json") and original_hash is None:
+            original_hash = kit.digest(raw)
+            changed = json.loads(raw)
+            changed["artifact"]["platform"] = "posix"
+            for key in ("evidence_platform", "runtime_module_sha256", "inventory_sha256"):
+                changed.pop(key, None)
+            # Simulate an atomic producer replacement between validation/export.
+            replacement = path.with_suffix(".replacement")
+            replacement.write_text(json.dumps(changed))
+            replacement.replace(path)
+        return raw
+
+    monkeypatch.setattr(kit, "read_owned", replace_after_read)
+    contents, _ = kit.prepare(*fixture, CANDIDATE_PIN, candidate_version=CANDIDATE_VERSION)
+    proof = json.loads(contents["native-acceptance.json"])
+    mcp = next(phase for phase in proof["phases"] if phase["phase"] == "mcp")
+    assert mcp["raw_report_sha256"] == original_hash
+    assert mcp["artifact"]["platform"] == "nt"
+
+
+def test_candidate_version_reader_never_executes_the_source(tmp_path):
+    marker = tmp_path / "executed"
+    files = {
+        "src/kirabridge/__init__.py": (
+            f'__version__ = "0.8.0rc39"\n__import__("pathlib").Path({str(marker)!r}).touch()\n'
+        ).encode(),
+        "pyproject.toml": b'[project]\nname = "kirabridge"\nversion = "0.8.0rc39"\n',
+    }
+    with pytest.raises(ValueError, match="literal"):
+        kit.candidate_inventory(CANDIDATE_VERSION, CANDIDATE_PIN, files)
+    assert not marker.exists()
+
+
+def test_candidate_requires_native_version_file_hashes(fixture, monkeypatch):
+    files, _, _ = stage_candidate(fixture, {"src/kirabridge/core.py": b"VALUE = 1\n"})
+    use_candidate_git(monkeypatch, files)
+    modify_report(fixture, "mcp", lambda report: report.pop("version_file_sha256"))
+    with pytest.raises(ValueError, match="version file inventory"):
+        kit.prepare(*fixture, CANDIDATE_PIN, candidate_version=CANDIDATE_VERSION)
+
+
+def test_candidate_refuses_staged_project_metadata_from_another_version(fixture, monkeypatch):
+    files, _, _ = stage_candidate(fixture, {"src/kirabridge/core.py": b"VALUE = 1\n"})
+    replace_source(
+        fixture[0],
+        CANDIDATE_PIN,
+        {"pyproject.toml": files["pyproject.toml"].replace(b"0.8.0rc39", b"0.8.0rc33")},
+    )
+    bind_reports(*fixture, files)
+    use_candidate_git(monkeypatch, files)
+    with pytest.raises(ValueError, match="Staged version metadata"):
+        kit.prepare(*fixture, CANDIDATE_PIN, candidate_version=CANDIDATE_VERSION)
+
+
+def test_historical_builder_loads_without_candidate_toml_dependency(monkeypatch):
+    import builtins
+
+    original_import = builtins.__import__
+
+    def older_host(name, *args, **kwargs):
+        if name == "tomllib":
+            raise ModuleNotFoundError("simulated historical Python host")
+        return original_import(name, *args, **kwargs)
+
+    monkeypatch.setattr(builtins, "__import__", older_host)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    assert module.VERSION == "0.8.0rc33"
+    with pytest.raises(ValueError, match="Python 3.11"):
+        module.require_source_version(CANDIDATE_VERSION, {})

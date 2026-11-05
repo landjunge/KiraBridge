@@ -1,7 +1,10 @@
 #!/usr/bin/env python3
 """Package a frozen Windows preview only after six matching native reports.
 
-Default is validation/plan only; --build writes one new output directory.
+Default is the historical RC33 validation/plan; --build writes one new output
+directory. --candidate-version selects a separate plan: the module and harness
+inventory is derived from that explicit git commit and version. Matching win32
+reports are required. Historical RC33 evidence is not candidate acceptance.
 No Windows tests, VM actions, downloads, publication or production installation
 are performed here. Guard tests with synthetic reports are not native acceptance.
 """
@@ -9,6 +12,7 @@ are performed here. Guard tests with synthetic reports are not native acceptance
 from __future__ import annotations
 
 import argparse
+import ast
 import hashlib
 import io
 import json
@@ -51,6 +55,25 @@ DOCS = (
 # The x64 installer has a bootstrapper, so its outer PE machine alone is not an
 # adequate architecture attestation. Anchor the complete vendor installer bytes.
 PYTHON_INSTALLERS = {"3.14.10": "92480239264744fe0386a1bd8275786fefa126e3129e56a68e22b52c73329965"}
+MODULE_PATH = re.compile(r"src/kirabridge/(?:[A-Za-z0-9_]+/)*[A-Za-z0-9_]+\.py")
+VERSION_PATHS = ("pyproject.toml", "src/kirabridge/__init__.py")
+# Abuse guard only. The accepted module count stays derived from the candidate commit.
+CANDIDATE_BLOB_LIMIT = 2 * 1024 * 1024
+CANDIDATE_TREE_LIMIT = 2000
+SUPPORTED_PREVIEW = [
+    "Authenticated local MCP HTTP/stdio",
+    "Guarded native keyboard tasks and sequences",
+    "Explicit Ctrl/Alt/Shift/Windows shortcuts with owned modifier release",
+    "Pinned native window listing, activation, geometry and window-state actions",
+    "Regular pinned window close requests without force termination",
+    "Fresh target identity and durable no-replay receipts",
+]
+UNSUPPORTED_PREVIEW = [
+    "Full Windows desktop GUI",
+    "General file/process/terminal tools",
+    "Windows service installation",
+    "External ChatGPT cloud latency acceptance",
+]
 
 
 def digest(data: bytes) -> str:
@@ -118,7 +141,9 @@ def sanitize(value, key=""):
     return value
 
 
-def verified_reports(directory: Path, manifest_hash: str, phases=PHASES, *, ignore_preview=False):
+def verified_reports(
+    directory: Path, manifest_hash: str, phases=PHASES, *, ignore_preview=False, candidate=None
+):
     directory = safe_path(directory)
     reports, run_ids = {}, set()
     ignored_preview = None
@@ -133,6 +158,11 @@ def verified_reports(directory: Path, manifest_hash: str, phases=PHASES, *, igno
             raise ValueError("Duplicate native phase; explicit reconciliation required")
         raw = read_owned(path, 2 * 1024 * 1024)
         report = json.loads(raw)
+        if candidate is not None:
+            # Validate and export the same immutable bytes. A separate pass can
+            # observe different reports even when each individual read is safe.
+            document, inventory_hash = candidate
+            require_windows_candidate_report(report, document, inventory_hash, phase)
         if phase not in phases:
             if (
                 ignored_preview is not None
@@ -226,7 +256,7 @@ def public_documentation(archive, source_commit):
     return result
 
 
-def verify_wheels(payload, requirements):
+def verify_wheels(payload, requirements, expected_version: str = VERSION):
     provided = {}
     for name, data in payload.items():
         if not name.startswith("wheels/"):
@@ -248,12 +278,14 @@ def verify_wheels(payload, requirements):
         if not match or normalized(match[1]) in pinned:
             raise ValueError("Requirements must uniquely pin every included wheel")
         pinned[normalized(match[1])] = match[2]
-    if pinned != provided or pinned.get("kirabridge") != VERSION:
+    if pinned != provided or pinned.get("kirabridge") != expected_version:
         raise ValueError("Offline wheelhouse does not exactly match all pinned requirements")
     return len(provided)
 
 
-def frozen_payload(staging: Path, source_commit: str | None = None):
+def frozen_payload(
+    staging: Path, source_commit: str | None = None, expected_version: str = VERSION
+):
     if source_commit is not None and not re.fullmatch(r"[a-f0-9]{40}", source_commit):
         raise ValueError("Use the full frozen source commit")
     staging = safe_path(staging)
@@ -287,7 +319,7 @@ def frozen_payload(staging: Path, source_commit: str | None = None):
         raise ValueError("Missing a required offline payload")
     if digest(payload["python-installer.exe"]) != PYTHON_INSTALLERS.get(manifest["python_version"]):
         raise ValueError("Python AMD64 installer differs from the verified vendor release")
-    wheel_count = verify_wheels(payload, manifest["requirements"])
+    wheel_count = verify_wheels(payload, manifest["requirements"], expected_version)
     with zipfile.ZipFile(io.BytesIO(payload["source.zip"])) as archive:
         if archive.comment != manifest["source_commit"].encode("ascii"):
             raise ValueError("Source archive Git pin differs from native-tested commit")
@@ -305,12 +337,16 @@ def source_files(source_zip):
         return {name: archive.read(name) for name in names if not name.endswith("/")}
 
 
-def runtime_modules(files, prefix):
-    result = {
+def runtime_module_map(files, prefix):
+    return {
         name[len(prefix) :]: data
         for name, data in files.items()
         if name.startswith(prefix) and name.endswith(".py")
     }
+
+
+def runtime_modules(files, prefix):
+    result = runtime_module_map(files, prefix)
     if len(result) != RUNTIME_MODULE_COUNT:
         raise ValueError(
             f"Component reuse requires exactly {RUNTIME_MODULE_COUNT} native-tested runtime modules"
@@ -363,15 +399,299 @@ def reuse_components(current, previous):
     }
 
 
+def read_candidate_source(commit: str) -> dict[str, bytes]:
+    """Read runtime modules and required harnesses from one full git commit."""
+    if not re.fullmatch(r"[a-f0-9]{40}", commit):
+        raise ValueError("Use the full frozen source commit")
+    listed = subprocess.run(
+        ["git", "ls-tree", "-r", "--name-only", "-z", commit],
+        cwd=Path(__file__).resolve().parents[1],
+        check=True,
+        capture_output=True,
+        timeout=15,
+    )
+    if len(listed.stdout) > 1024 * 1024:
+        raise ValueError("Candidate source inventory exceeds the validator safety bound")
+    names = [item.decode() for item in listed.stdout.split(b"\0") if item]
+    plain = [name for name in names if name.startswith("src/kirabridge/") and name.endswith(".py")]
+    modules = [name for name in plain if MODULE_PATH.fullmatch(name)]
+    if not modules:
+        raise ValueError("Candidate commit has no usable runtime module inventory")
+    if len(modules) != len(plain) or len(modules) > CANDIDATE_TREE_LIMIT:
+        raise ValueError("Candidate source inventory exceeds the validator safety bound")
+    if any(name not in names for name in (*REQUIRED_HARNESSES, *VERSION_PATHS)):
+        raise ValueError(
+            "Candidate commit is missing a required native acceptance harness or version file"
+        )
+    files = {}
+    for name in sorted(set([*modules, *REQUIRED_HARNESSES, *VERSION_PATHS])):
+        shown = subprocess.run(
+            ["git", "show", f"{commit}:{name}"],
+            cwd=Path(__file__).resolve().parents[1],
+            check=True,
+            capture_output=True,
+            timeout=15,
+        )
+        if len(shown.stdout) > CANDIDATE_BLOB_LIMIT:
+            raise ValueError("Candidate source file exceeds the validator safety bound")
+        files[name] = shown.stdout
+    return files
+
+
+def require_source_version(version: str, files: dict[str, bytes]) -> None:
+    """Read literal version metadata, never import/execute candidate code."""
+    try:
+        import tomllib
+    except ModuleNotFoundError as exc:
+        # Keep the historical RC33 builder importable on its original host.
+        raise ValueError("Candidate version validation requires Python 3.11 or newer") from exc
+    try:
+        project = tomllib.loads(files["pyproject.toml"].decode("utf-8"))["project"]
+        statements = ast.parse(files["src/kirabridge/__init__.py"]).body
+        versions = []
+        for statement in statements:
+            if (
+                isinstance(statement, ast.Expr)
+                and isinstance(statement.value, ast.Constant)
+                and isinstance(statement.value.value, str)
+            ):
+                continue  # Module documentation is inert.
+            if not isinstance(statement, ast.Assign) or not all(
+                isinstance(target, ast.Name) for target in statement.targets
+            ):
+                raise ValueError("Candidate runtime version module must be literal")
+            value = ast.literal_eval(statement.value)
+            for target in statement.targets:
+                if target.id == "__version__":
+                    versions.append(value)
+        if (
+            not isinstance(project, dict)
+            or project.get("name") != "kirabridge"
+            or project.get("version") != version
+            or versions != [version]
+        ):
+            raise ValueError("Candidate source version differs from the explicit version")
+    except (KeyError, UnicodeError, SyntaxError, TypeError) as exc:
+        raise ValueError("Candidate source version metadata is missing or invalid") from exc
+
+
+def candidate_inventory(version: str, commit: str, files: dict[str, bytes]) -> tuple[dict, str]:
+    require_source_version(version, files)
+    modules = {name: files[name] for name in sorted(files) if MODULE_PATH.fullmatch(name)}
+    if not modules or any(name not in files or not files[name] for name in REQUIRED_HARNESSES):
+        raise ValueError("Candidate source inventory is incomplete")
+    document = {
+        "schema": 1,
+        "candidate_version": version,
+        "source_commit": commit,
+        "runtime_module_count": len(modules),
+        "runtime_module_sha256": {name: digest(modules[name]) for name in modules},
+        "harness_sha256": {name: digest(files[name]) for name in REQUIRED_HARNESSES},
+        "version_file_sha256": {name: digest(files[name]) for name in VERSION_PATHS},
+    }
+    raw = json.dumps(document, sort_keys=True, separators=(",", ":"), ensure_ascii=True).encode()
+    return document, digest(raw)
+
+
+def require_same_bytes(actual: dict[str, bytes], expected: dict[str, bytes], label: str) -> None:
+    missing = sorted(set(expected) - set(actual))
+    extra = sorted(set(actual) - set(expected))
+    if missing:
+        raise ValueError(f"{label} is missing candidate source {missing[0]}")
+    if extra:
+        raise ValueError(f"{label} has a module absent from the candidate commit: {extra[0]}")
+    changed = sorted(name for name in expected if actual[name] != expected[name])
+    if changed:
+        raise ValueError(f"{label} bytes differ from the candidate commit: {changed[0]}")
+
+
+def compare_hash_map(attested, actual, kind: str) -> None:
+    if (
+        not isinstance(attested, dict)
+        or not attested
+        or any(
+            type(key) is not str or not re.fullmatch(r"[a-f0-9]{64}", str(value))
+            for key, value in attested.items()
+        )
+    ):
+        raise ValueError(f"Candidate report is missing the native {kind} inventory")
+    missing = sorted(set(attested) - set(actual))
+    extra = sorted(set(actual) - set(attested))
+    if missing:
+        raise ValueError(
+            f"Native inventory names a {kind} absent from the candidate source: {missing[0]}"
+        )
+    if extra:
+        raise ValueError(
+            f"Candidate source has a {kind} absent from the native inventory: {extra[0]}"
+        )
+    changed = sorted(name for name in actual if attested[name] != actual[name])
+    if changed:
+        raise ValueError(f"Candidate {kind} bytes differ from the native inventory: {changed[0]}")
+
+
+def require_windows_candidate_report(report, document: dict, inventory_hash: str, phase: str):
+    if not isinstance(report, dict) or report.get("evidence_platform") != "win32":
+        raise ValueError("Candidate evidence must be a native Windows win32 report")
+    for key in ("platform", "host_platform", "os"):
+        if key in report and report[key] not in {"win32", "nt"}:
+            raise ValueError("Stale or non-Windows evidence cannot authorize a candidate")
+    if report.get("candidate_version") != document["candidate_version"]:
+        raise ValueError("Candidate report version does not match the explicit candidate")
+    if report.get("source_commit") != document["source_commit"]:
+        raise ValueError("Candidate report source does not match the explicit candidate")
+    compare_hash_map(
+        report.get("runtime_module_sha256"), document["runtime_module_sha256"], "module"
+    )
+    compare_hash_map(report.get("harness_sha256"), document["harness_sha256"], "harness")
+    compare_hash_map(
+        report.get("version_file_sha256"), document["version_file_sha256"], "version file"
+    )
+    if report.get("inventory_sha256") != inventory_hash:
+        raise ValueError("Stale native inventory does not match the candidate source")
+    if phase != "core":
+        artifact = report.get("artifact")
+        if not isinstance(artifact, dict) or artifact.get("platform") != "nt":
+            raise ValueError("Candidate artifact must come from native Windows")
+
+
+def candidate_wheel_modules(payload, version: str) -> dict[str, bytes]:
+    own = [
+        data
+        for key, data in payload.items()
+        if key.startswith(f"wheels/kirabridge-{version}-") and key.endswith(".whl")
+    ]
+    if len(own) != 1:
+        raise ValueError("Expected one candidate KiraBridge wheel")
+    return runtime_module_map(source_files(own[0]), "kirabridge/")
+
+
+def prepare_candidate(
+    staging: Path,
+    reports: Path,
+    source_commit: str,
+    candidate_version: str,
+    reuse_staging: Path | None,
+    reuse_reports: Path | None,
+):
+    if reuse_staging is not None or reuse_reports is not None:
+        raise ValueError("Candidate validation cannot reuse another native proof")
+    if not re.fullmatch(r"[A-Za-z0-9_.+!-]+", candidate_version):
+        raise ValueError("Explicit candidate version is required")
+    if not re.fullmatch(r"[a-f0-9]{40}", source_commit):
+        raise ValueError("Use the full frozen source commit")
+    git_files = read_candidate_source(source_commit)
+    document, inventory_hash = candidate_inventory(candidate_version, source_commit, git_files)
+    current = frozen_payload(staging, source_commit, candidate_version)
+    manifest, raw_manifest, payload, wheel_count = current
+    git_modules = {name: git_files[name] for name in document["runtime_module_sha256"]}
+    zip_files = source_files(payload["source.zip"])
+    zip_modules = {name: data for name, data in zip_files.items() if MODULE_PATH.fullmatch(name)}
+    require_same_bytes(zip_modules, git_modules, "Staged source")
+    for name in REQUIRED_HARNESSES:
+        if zip_files.get(name) != git_files[name]:
+            raise ValueError(f"Staged harness bytes differ from the candidate commit: {name}")
+    for name in VERSION_PATHS:
+        if zip_files.get(name) != git_files[name]:
+            raise ValueError(f"Staged version metadata differs from the candidate commit: {name}")
+    relative = {name[len("src/kirabridge/") :]: body for name, body in git_modules.items()}
+    require_same_bytes(
+        candidate_wheel_modules(payload, candidate_version), relative, "Candidate wheel"
+    )
+    current_hash = digest(raw_manifest)
+    proofs = verified_reports(reports, current_hash, candidate=(document, inventory_hash))
+    for phase in proofs["phases"]:
+        phase.update(
+            source_commit=source_commit,
+            original_manifest_sha256=current_hash,
+            reused=False,
+            evidence_platform="win32",
+            inventory_sha256=inventory_hash,
+        )
+    proofs.update(
+        candidate_inventory=document,
+        inventory_sha256=inventory_hash,
+        native_windows_acceptance=False,
+        acceptance_note=(
+            "Report binding only. This validator did not execute Windows "
+            "and did not accept historical RC33 evidence."
+        ),
+    )
+    with zipfile.ZipFile(io.BytesIO(payload["source.zip"])) as archive:
+        documentation = public_documentation(archive, source_commit)
+    proof_bytes = json.dumps(proofs, sort_keys=True, indent=2, ensure_ascii=True).encode() + b"\n"
+    package = {
+        "name": "KiraBridge Windows Dev Kit",
+        "version": candidate_version,
+        "architecture": "Windows x86_64",
+        "source_commit": source_commit,
+        "python_version": manifest["python_version"],
+        "payload_manifest_sha256": digest(raw_manifest),
+        "payload_files": len(payload),
+        "offline_wheels": wheel_count,
+        "native_guest_phases": list(PHASES),
+        "acceptance_reexecuted_by_builder": False,
+        "component_provenance_reuse": False,
+        "candidate_validation": True,
+        "native_windows_acceptance": False,
+        "runtime_module_count": document["runtime_module_count"],
+        "module_inventory_sha256": inventory_hash,
+        "acceptance_scope": (
+            "Candidate report binding for the explicit source inventory. "
+            "Not native Windows acceptance and not an RC33 package."
+        ),
+        "supported_preview": list(SUPPORTED_PREVIEW),
+        "unsupported_preview": list(UNSUPPORTED_PREVIEW),
+        "windows_os_iso_included": False,
+        "mac_production_installation_changed": False,
+        "native_proofs_sha256": digest(proof_bytes),
+    }
+    note = (
+        "Kandidat: dieser Text ist nur der Validierungsplan zum expliziten Quellinventar.\n"
+        "Er ist keine native Windows-Abnahme. RC33-Berichte und macOS-Nachweise\n"
+        "gelten hier nicht.\n"
+        "Offen bleiben sechs frische win32-Gastberichte fuer genau diese Modul- und Harnessbytes."
+    )
+    contents = {
+        **payload,
+        **documentation,
+        "manifest.json": raw_manifest,
+        "requirements-win.txt": ("\n".join(manifest["requirements"]) + "\n").encode(),
+        "native-acceptance.json": proof_bytes,
+        "package.json": json.dumps(package, sort_keys=True, indent=2).encode() + b"\n",
+        "README-DE.txt": instructions(
+            manifest["python_version"],
+            source_commit,
+            version=candidate_version,
+            state_dir="KiraBridgePreviewCandidate",
+            candidate_note=note,
+        ).encode(),
+    }
+    sums = "".join(f"{digest(data)}  {name}\n" for name, data in sorted(contents.items()))
+    contents["SHA256SUMS"] = sums.encode()
+    return contents, package
+
+
 def prepare(
     staging: Path,
     reports: Path,
     source_commit: str,
     reuse_staging: Path | None = None,
     reuse_reports: Path | None = None,
+    *,
+    candidate_version: str | None = None,
 ):
     if (reuse_staging is None) != (reuse_reports is None):
         raise ValueError("Reuse staging and reports must be provided together")
+    if candidate_version is not None:
+        return prepare_candidate(
+            staging,
+            reports,
+            source_commit,
+            candidate_version,
+            reuse_staging,
+            reuse_reports,
+        )
     current = frozen_payload(staging, source_commit)
     manifest, raw_manifest, payload, wheel_count = current
     current_hash = digest(raw_manifest)
@@ -441,20 +761,8 @@ def prepare(
         "acceptance_reexecuted_by_builder": False,
         "component_provenance_reuse": reuse_staging is not None,
         "acceptance_scope": "Existing matching native guest reports; not remote attestation",
-        "supported_preview": [
-            "Authenticated local MCP HTTP/stdio",
-            "Guarded native keyboard tasks and sequences",
-            "Explicit Ctrl/Alt/Shift/Windows shortcuts with owned modifier release",
-            "Pinned native window listing, activation, geometry and window-state actions",
-            "Regular pinned window close requests without force termination",
-            "Fresh target identity and durable no-replay receipts",
-        ],
-        "unsupported_preview": [
-            "Full Windows desktop GUI",
-            "General file/process/terminal tools",
-            "Windows service installation",
-            "External ChatGPT cloud latency acceptance",
-        ],
+        "supported_preview": list(SUPPORTED_PREVIEW),
+        "unsupported_preview": list(UNSUPPORTED_PREVIEW),
         "windows_os_iso_included": False,
         "mac_production_installation_changed": False,
         "native_proofs_sha256": digest(proof_bytes),
@@ -473,9 +781,17 @@ def prepare(
     return contents, package
 
 
-def instructions(python_version: str, source_commit: str):
+def instructions(
+    python_version: str,
+    source_commit: str,
+    *,
+    version: str = VERSION,
+    state_dir: str = "KiraBridgePreviewRC33",
+    candidate_note: str = "",
+):
     compact = "".join(python_version.split(".")[:2])
-    return f"""KiraBridge {VERSION} - Windows-Entwicklungspaket (Vorschau)
+    note = f"\n{candidate_note}\n" if candidate_note else ""
+    return f"""KiraBridge {version} - Windows-Entwicklungspaket (Vorschau)
 
 Quellstand: {source_commit}
 Enthaelt Python {python_version} AMD64, alle exakt gepinnten Offline-Wheels,
@@ -491,7 +807,7 @@ $python = "$env:LOCALAPPDATA\\Programs\\Python\\Python{compact}\\python.exe"
 & $python -m venv .venv
 $previewPython = ".\\.venv\\Scripts\\python.exe"
 & $previewPython -m pip install --no-index --find-links .\\wheels -r .\\requirements-win.txt
-$stateDir = "$env:LOCALAPPDATA\\KiraBridgePreviewRC33"
+$stateDir = "$env:LOCALAPPDATA\\{state_dir}"
 & $previewPython -m kirabridge.windows_preview --state-dir $stateDir --port 8767
 
 Das Fenster fuer die Laufzeit offen lassen. Token und eigene Zustandsdateien
@@ -513,15 +829,19 @@ keine Abnahme auf jeder Windows-Hardware und keine externe ChatGPT-Cloudmessung.
 Pruefsummen pruefen; die Checksummen sind keine unabhaengige Herausgebersignatur.
 Python und alle Wheels behalten ihre mitgelieferten Drittanbieterlizenzen.
 Fuer KiraBridge gilt die beiliegende LICENSE.
-"""
+{note}"""
 
 
 def build(contents, package, out: Path):
+    version = package.get("version")
+    if not isinstance(version, str) or not re.fullmatch(r"[A-Za-z0-9_.+!-]+", version):
+        raise ValueError("Package version is missing or unsafe")
+    asset = f"KiraBridge-{version}-Windows-Dev-Kit.zip"
     out = safe_path(out)
     if os.path.lexists(out) or not out.parent.is_dir():
         raise ValueError("Output directory must be new with an existing parent")
     out.mkdir(mode=0o700)
-    archive = out / ASSET
+    archive = out / asset
     with zipfile.ZipFile(archive, "x", compression=zipfile.ZIP_DEFLATED, compresslevel=6) as output:
         for name, data in sorted(contents.items()):
             info = zipfile.ZipInfo("KiraBridge-Windows-Dev-Kit/" + name, (1980, 1, 1, 0, 0, 0))
@@ -540,7 +860,7 @@ def build(contents, package, out: Path):
             os.chmod(out / name, 0o600)
             file.write(data)
     checksums = {
-        ASSET: digest(archive.read_bytes()),
+        asset: digest(archive.read_bytes()),
         **{name: digest(data) for name, data in exported.items()},
     }
     with (out / "SHA256SUMS").open("x") as output:
@@ -549,7 +869,7 @@ def build(contents, package, out: Path):
     return {
         **package,
         "asset": str(archive),
-        "asset_sha256": checksums[ASSET],
+        "asset_sha256": checksums[asset],
         "bytes": archive.stat().st_size,
     }
 
@@ -562,16 +882,28 @@ def main(argv=None):
     parser.add_argument("--source-commit", required=True)
     parser.add_argument("--reuse-staging-dir", type=Path)
     parser.add_argument("--reuse-reports-dir", type=Path)
+    parser.add_argument(
+        "--candidate-version",
+        help=(
+            "Explicit candidate version. Derives the module inventory from "
+            "--source-commit and refuses historical RC33 evidence."
+        ),
+    )
     parser.add_argument("--build", action="store_true")
     args = parser.parse_args(argv)
     if (args.reuse_staging_dir is None) != (args.reuse_reports_dir is None):
         parser.error("--reuse-staging-dir and --reuse-reports-dir must be provided together")
+    if args.candidate_version and (
+        args.reuse_staging_dir is not None or args.reuse_reports_dir is not None
+    ):
+        parser.error("--candidate-version cannot reuse another native proof")
     contents, package = prepare(
         args.staging_dir,
         args.guest_reports_dir,
         args.source_commit,
         args.reuse_staging_dir,
         args.reuse_reports_dir,
+        candidate_version=args.candidate_version,
     )
     print(
         json.dumps(
