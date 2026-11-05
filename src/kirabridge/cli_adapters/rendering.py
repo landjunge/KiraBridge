@@ -302,6 +302,10 @@ def insertion_observed(target, raw, text, before, *, cwd=None, home=None, column
                     return True
         return False
     if target == "grok":
+        from .grok_echo import insertion_observed as grok_insertion_observed
+
+        if grok_insertion_observed(raw, text, before):
+            return True
         marker = re.search(r"(?m)^[ \t]*│[ \t]*❯ ?", view)
         if marker is None:
             return False

@@ -44,7 +44,9 @@ class GrokBuildAdapter:
         return False
 
     def paste_source(self, text):
-        return None
+        from .grok_echo import paste_source
+
+        return paste_source(text)
 
     def slash_insertion_observed(self, sessions, binding, raw, text, before, **options):
         return self.insertion_observed(raw, text, before, **options)
@@ -58,4 +60,21 @@ class GrokBuildAdapter:
         return True
 
     async def preflight_input(self, sessions, binding, text, before):
-        return None
+        from kirabridge.bridge_core.models import BridgeError
+
+        from .grok_echo import single_line_payload, single_row_capacity
+
+        capacity = single_row_capacity(before["text"])
+        if capacity is not None and (not single_line_payload(text) or len(text) > capacity):
+            error = BridgeError(
+                "visible_input_geometry_ambiguous",
+                "Grok's boxed renderer cannot verify this payload exactly; no text was pasted",
+            )
+            error.observation = {
+                "target": self.name,
+                "observed_content_columns": capacity,
+                "reason": "unsupported_grok_box_rendering",
+                "terminal_input_attempted": False,
+                "automatic_retry": False,
+            }
+            raise error

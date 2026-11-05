@@ -13,7 +13,7 @@ def _codex_transcript_navigation(line):
         re.fullmatch(
             r"New activity · (?:"
             r"(?:↓ )?Back to bottom · esc|"
-            r"enter/esc latest(?:[ \t]+⚠ \d+ warnings? · f2 to view)?"
+            r"enter/esc latest(?: · \? shortcuts)?(?:[ \t]+⚠ \d+ warnings? · f2 to view)?"
             r")",
             line.strip(),
         )

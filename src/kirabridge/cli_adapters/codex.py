@@ -59,12 +59,13 @@ class CodexAdapter:
         if re.search(r"(?m)^[ \t]*[•◦].*esc to interrupt", block) or view.lstrip().startswith("»"):
             return None
         kind, normalized = None, None
-        if footer and footer[-1] == COPY_TOOLBAR:
+        if footer and footer[-1] in {COPY_TOOLBAR, "New activity · " + COPY_TOOLBAR}:
             # Full known toolbar has different Return semantics. Never submit it.
-            normalized = (
-                text[: text.rfind(COPY_TOOLBAR)]
-                + text[text.rfind(COPY_TOOLBAR) + len(COPY_TOOLBAR) :]
-            )
+            # Activity decorates this complete control row; it is not a free
+            # warning/dialog prefix and does not establish an idle work state.
+            toolbar = footer[-1]
+            offset = text.rfind(toolbar)
+            normalized = text[:offset] + text[offset + len(toolbar) :]
             base = legacy.assess(self.name, normalized, binding, protocol)
             if base["ready"] and base["input_empty"]:
                 kind = "copy"

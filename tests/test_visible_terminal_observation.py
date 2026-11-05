@@ -204,3 +204,14 @@ async def test_auto_selection_uses_existing_safe_shell_beside_unknown_input(comm
     assert result["pane_id"] == safe["pane_id"] and result["exit_code"] == 0
     assert len(state["posts"]) == 1
     bridge.sessions.open.assert_not_awaited()
+
+
+async def test_dirty_git_prompt_is_confirmed_as_empty_without_posting_input(command):
+    bridge, state, _ = command
+    bridge.sessions.terminal_app.read = AsyncMock(
+        return_value=(
+            "Last login: Thursday\n➜  KiraBridge git:(fix/visible-busy-idle-20261021) ✗ \n\n"
+        )
+    )
+    assert await bridge.visible_terminal.suitable("local", state["row"])
+    assert not state["posts"]
