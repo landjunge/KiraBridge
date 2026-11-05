@@ -1,0 +1,309 @@
+# BIG PLAN: Gesamtentwicklungsplan und koordinierter Einstieg
+
+Auftrag `BIGPLAN-GESAMTPLAN-20261105-V1`, eigener Plan von Codex/root,
+Stand 5. November 2026. Technische Koordination: Codex; übergeordnete Ziele,
+zusätzliche Freigaben und produktive Entscheidungen: Kira und Nutzer.
+Planbranch `feat/bigplan-coordination-20261105`, Basis
+`511f289fc5109f5d6893d5df8843254628c385ba`. Dies ist ein Entwicklungsplan mit
+belegtem Einstieg, keine Behauptung einer fertigen Remoteplattform.
+
+## 1. Maßgebliche Quellen und Herkunftsgrenzen
+
+Gelesen: aktueller Nutzerauftrag, Big-Plan-Skill **1.2.0**, WORKFLOWS **1.0.1**,
+REFERENCES/TEMPLATES, einschlägige Repoanweisungen und vorhandene Verträge;
+Koordinationsboard `482f593429ad` einschließlich Threadrevision **32**,
+Entwicklungsboard `188ce4729a62`, Produkt-/Serverthreads und Git-/Runtimebelege.
+Separate lesende Faktenprüfung von 4AllPass, TollGate und Agent Authority liegt vor.
+
+Die genannte Originaldatei
+`/big plan/Big-Plan-Architektur-und-Remote-2026-11-05.md` aus der
+ChatGPT-Bibliothek konnte zunächst nicht direkt gelesen werden. Lokale
+Dateinamensuche, die verfügbaren ChatGPT-Pages-/Space-
+Kataloge einschließlich ihrer Folgeseiten und drei relevante gespeicherte
+ThreadDesk-Bibliotheksindizes lieferten keinen Zugriff auf diese Datei. Die
+ThreadDesk-Indizes sind dort noch nicht vorhanden. Das beweist nicht, dass die
+Datei in der Bibliothek fehlt. Der Nutzer hat den **vollständigen aktuellen
+Architektur- und Remote-Beschluss anschließend im Chat bereitgestellt**.
+Er ist die aktuelle Primärquelle und mit Herkunft unter
+[Architektur- und Remote-Beschluss](sources/BIGPLAN-ARCHITEKTUR-REMOTE-BESCHLUSS-20261105.md)
+gesichert. Der Plan wurde daran abgeglichen; die inhaltliche Quellenlücke dieses
+Beschlusses ist geschlossen. Bibliotheks-Dateimetadaten und die dort genannten
+drei älteren Masterpläne wurden nicht zusätzlich direkt gelesen. Die
+Koordinationsnotiz bleibt sekundäre Zusammenfassung. Vor späteren Änderungen
+an älteren Detailverträgen sind deren Originale gezielt abzugleichen; das ist
+kein pauschaler Stopp bereits autorisierter unabhängiger Arbeit.
+
+Neue bestätigte Beschlüsse haben Vorrang vor historischen Plantexten:
+
+- Zielbild: Handy/ChatGPT → Debian/ThreadDesk → KiraBridge-Transport →
+  Heimrechner/Agent → Ergebnis und Belege zurück an ThreadDesk.
+- Fünf eigenständige Produkte; Agent Authority **beobachtet ausschließlich**.
+  Der alte Serverplan vom 22.10. sagt noch „Agent Authority entscheidet
+  Berechtigungen“. Dieser Teil wird durch die bestätigte Entscheidung vom
+  05.11. ersetzt; der historische Branch bleibt unverändert erhalten.
+- Erste priorisierte CLI-Gruppe: Codex, Grok Build, Claude Code, Gemini, Cursor.
+  OpenCode, GitHub Copilot CLI und Aider bleiben eingeplant und werden erhalten.
+- Windows für Dirk bleibt ein praktischer Lieferpfad. Er wartet nicht darauf,
+  dass alle acht CLI-Module oder sämtliche Serverfunktionen fertig sind.
+- Alte ThreadDesk-Anweisungen mit ausschließlich ThreadDesk-Umfang beschreiben
+  frühere Aufträge. Der aktuelle ausdrückliche Fünf-Produkte-Auftrag erweitert
+  den Planungsumfang, ohne alte Daten, Quellstände oder Prüfgrenzen umzudeuten.
+
+## 2. Tatsächlicher Bestand vor neuen Aufträgen
+
+| Produkt/Strang | Vorhanden und Quellbezug | Grenze des Nachweises |
+|---|---|---|
+| KiraBridge Desktop Mac | Laufende **0.8.0rc39**, Quelle `8d331314b608d247ba160e04a898f9498cbb22d3`, 189 Pythonmodule; PID40336, Instanz `b988e7acdc284bbfb7da161a18585c46`. Dokumentationshead `511f289`. Aufgabenverwaltung, Policies, SQLite, TeamDispatcher, MessageReceiver, native Terminal-/Tastaturtechnik, CLI-Semantikregistry vorhanden. | Livehealth und Paketquellpfad frisch gelesen. Native Codex-/AutoNext-Abnahme ist für den dokumentierten Paketstand belegt; daraus folgt keine aktuelle universelle Grok-/Browserchat-/Windows-Abnahme. |
+| AutoNext | `2a8d2fe` integriert; ausdrückliche Boardpins, Startanker, Claim/Lease, Outbox/Readback, Abnahme vor Folgeauftrag. Zwei echte read-only Folgeaufträge auf eigenem Intel-Codex-Ziel einmalig abgeschlossen. | **Aktuell disabled**, keine dauerhafte freigegebene produktive Aufgabenliste. `b3c7336` enthält einen separaten Folgefix zu alten unbekannten Receiver-Scopes; nicht als installiert behandeln. |
+| Windows | RC33-Kit und native Win32-/Tastatur-/MCP-/Fenster-Vorarbeiten vorhanden. RC33-Quelle `ce0687dd8831dae261bf285922a146bcf3aedc41`; Kit-SHA256 `1002e68cbef96c7fd9a383d542beb5abc727f5843316352a65638fe4266a919a`. | Kein RC39-Paritätsnachweis. Mac-Terminalsemantik und Mac-Abnahme sind keine Windows-Unterstützung. Windows-spezifische Dateien waren im letzten Audit unverändert, gemeinsamer Kern inzwischen verändert. |
+| Groks Windows-Kandidatenpatch | **Geliefert**, `070ea70eed2600fd276dcb6ab5ea122cd274f481`, eigener sauberer Worktree `grok-windows-candidate-20261105`. Explizite Kandidatenversion und Git-Modulinventar statt bloßer RC33-Konstantenänderung. | Grok meldet 61 fokussierte Tests und zwei getrennte Reviews; Codex-Review/Integration stehen beim Einstieg aus. Kein Paketbuild, keine native Windows-Abnahme. Nicht erneut beauftragen. |
+| ThreadDesk | Frisch integrierter Defaultpin `067a525798817629ae1d2b8e741d109230f54d08`; geeigneter sauberer Leseworktree `codex2-file-receiver-20261024`. ThreadService/JsonStore, MCP, Whiteboards, Dateiempfang, Graph-/Bibliotheksfunktionen vorhanden. | Der alte Hauptworktree ist geändert und nicht die geeignete Basis für einen Neubau. Installierte Desktopquelle wurde in dieser Analyse nicht neu attestiert. |
+| ThreadDesk Server & Sync | Bereits implementiert und integriert: PR89, Merge `770bbc9f0c0a02699cc93cad47d2e2c3782f7080`, heute im neueren Defaultstand. Eigene Server-/Client-Entrypoints, Browser, TLS/Auth, Metadaten, Dateien/Chunks, Offlineinventar, Konflikte, Restart und Backup/Restore. | Historische Linux-/TLS-/CI- und lokale Belege vorhanden; PR-Merge frisch bestätigt. Kein daraus abgeleiteter aktueller produktiver Debian-Installationsstand oder Remote-Auftrag bis zum Heimagenten. **Diesen Server nicht neu entwickeln.** |
+| KiraBridge Server | Remote-Ref `development/server` frisch bei `e025dee524bd5a00712cc1f51d2f8a52941ff5fd`. Bestehender Plan und gemeinsamer MCP-/HTTP-/Taskkern als Ausgangsbasis. | Serverplan sagt ausdrücklich „Planung, keine Server-Implementierung oder Bereitstellung“. Kein belegter gerätegebundener Heimrechner-Auftragsrelay. Branch ist kein Vorfahr von `511f289`; keinen alten Branch blind über aktuellen Core mergen. |
+| 4AllPass | Integrierter Defaultpin `0b66a2fda7fcc831762e732eb20084137fa6029d`. Tresor/PWA/Extension und geschützter synthetischer Executorvertrag vorhanden; integrierte Source sperrt maschinelle Rohgeheimnisübergabe. | Veröffentlichter RC2 ist älterer Stand `60eef0a`; RC3-Kandidat ist kein ausgelieferter Fix. Produktive Secretisolation, vertrauenswürdiger Vault→Executor-Transfer und KB-Originbindung fehlen. Kein heutiger produktiver Secret-MCP-Dienst behauptet. |
+| TollGate | Defaultpin `6676bcfc69f85e77fec6192bc51ad8f9c0b26740`, Version1.0.12. Gateway/MCP/n8n, WorkflowControl mit atomarer Reserve/Dispatch/Settlement-Zuordnung und persistenten Stopps vorhanden. | Synthetische Vertragsbelege; kein allgemeines hartes Dollarcap für Abo-CLIs. Aktueller produktiver Gateway-/Serverstand nicht neu beobachtet. |
+| Agent Authority | Observer-Master `75fb14e99a50b967b8624191f0178963c433fbd9`; Projektionen, Warnregeln, CLI/Reader und native UI vorhanden. Separater Browser-/Debianzweig `e69abcd07e62873f4276fa3d1ff6ffd71a7b0327`. | Browserzweig enthält heutige `workflow.py`/`workflow_rules.py` des Masters **nicht**. Historischer Debianbeleg gehört zu `27db3a8`/Paket `f512ab6…`, nicht automatisch zu späteren Accountgrant-Updates. Keine Freigabe-/Budget-/Stoppautorität. |
+
+Die Hauptworktrees aller fünf Produkte enthalten teilweise alte, gestagte oder
+unversionierte Arbeit. Sie werden nicht zurückgesetzt, gestasht oder als „aktuelle
+Masterfassung“ überschrieben. Pro neuer Änderung wird ein geeigneter verifizierter
+Stand verwendet. Der aktuelle KiraBridge-Remote-main ist `34adc03`; er ist weder
+die installierte Quelle noch Groks Kandidat. Offene gestapelte PRs ersetzen keinen
+Integrationsnachweis. Initial gelesen wurden u.a. KB#57/#55/#54 und TD#98/#96;
+der PR-Suchlauf war auf 20 Treffer begrenzt, keine vollständige Mergefreigabe.
+
+## 3. Architekturentscheidungen
+
+### 3.1 Produkte und Verantwortung
+
+| Baustein | Besitzt | Besitzt nicht |
+|---|---|---|
+| ThreadDesk Desktop und Server & Sync | Projekt-/Thread-/Dateikontext, Aufgabenabsicht, Whiteboard, freigegebene Katalogreferenzen, replizierte Status-/Ergebnisansichten, Sync/Versionen/Konflikte | Shellausführung, eigenständige Agentenberechtigungen oder Modellkostenfreigabe |
+| KiraBridge Desktop | Lokale Ausführungsautorität: Policies, TaskManager, Idempotenz, Worktreebesitz, Prozess-/Sitzungsidentität, semantische Dispatchs und belegte Ergebnisse | Tresorentschlüsselung oder pauschale Übernahme von Boardtext als Befehl |
+| KiraBridge Server | Authentifizierter Geräte-/Nachrichtentransport und Capabilityvermittlung desselben Kerns, beschränkte Serverfähigkeiten, Referenzen auf vorhandene Aufgaben und Belege | Zweiter Heimrechner-Executor, konkurrierender Dispatcher oder permanente Chef-KI |
+| 4AllPass | Identitäten und kontrollierte Geheimnisnutzung über seinen geschützten Vertrag | Ungeprüfte Rohsecretübergabe an Agenten/LLM-Kontext/Whiteboards |
+| TollGate | Kostenadmission und Nachweis/Settlement für tatsächlich angeschlossene quotierbare API-Dispatchs | Erfundenes Abo-Budget, universelle Rechnungsgarantie oder Agentenidentitätsnachweis |
+| Agent Authority | Autorisierte lesende Projektion ausgewählter Ereignisse und Evidenz, Warnungen und Nachweisgrenzen | Genehmigen, Dispatchersteuerung, Widerruf fremder Rechte oder Stoppen fremder Arbeit |
+
+KiraBridge bleibt **ein Codekern im bestehenden Repository** mit Desktop- und
+Serverprofilen/Entrypoints. Betriebssystemadapter importieren den gemeinsamen
+Kern; Server- und Headlessprofile behaupten keine lokalen GUI-Fähigkeiten.
+ThreadDesk Server bleibt im ThreadDesk-Repository mit seinen eigenen
+Installations-/Syncregeln. Zunächst werden genau diese erforderlichen Dienste
+auf bestehender Infrastruktur verbunden; keine zusätzliche KI-Zentrale.
+
+### 3.2 Ein Auftrag und eine Ausführungsautorität
+
+```mermaid
+flowchart LR
+    Phone[Handy / ChatGPT] -->|ausdrücklicher Auftrag| TD[ThreadDesk Server und Sync]
+    Phone -->|autorisierte Freigabe| Relay[KiraBridge Server]
+    TD -->|gepinntes Intent / Statusreferenzen| Relay
+    Home[KiraBridge auf Heimgerät] -->|ausgehend: authentifiziertes HTTPS| Relay
+    Home -->|bestehender TaskManager / AutoNext| CLI[CLI-Adapter / Agent]
+    CLI -->|gebundene Ergebnisbelege| Home
+    Home -->|Ergebnis und Quittung| Relay
+    Relay -->|idempotenter Readback| TD
+    TD -->|Status und Ergebnis| Phone
+    Vault[4AllPass] -. geschützte Nutzung später .-> Home
+    Budget[TollGate] -. angeschlossene API-Dispatchs .-> Home
+    Home -. ausgewählte Metadaten .-> Observe[Agent Authority]
+    TD -. ausgewählte Metadaten .-> Observe
+```
+
+Für den ersten vertikalen Ablauf wird der existierende HTTP-/MCP-/Sync-Unterbau
+genutzt. Das Heimgerät baut den authentifizierten ausgehenden HTTPS-Kanal auf;
+keine vorausgesetzte Portfreigabe im Heimnetz. Eine Verbindungserweiterung wird
+nur ergänzt, soweit der vorhandene Transport sie tatsächlich benötigt. Browser-
+Returnhilfe und Chrome-Prototyp sind optionale Routen, keine neue Autorität und
+kein Ersatz für ein extern blockiertes Werkzeug.
+
+**Eine stabile Auftrags-ID** verbindet Aufgabenabsicht, Freigabe, Transport und
+Core-Task. Das bestehende lokale TaskManager-Ledger bleibt Ausführungswahrheit.
+Serverzustellung und ThreadDesk-Anzeige sind Quittungen/Projektionen dieses
+Auftrags, keine zweite Ausführungsqueue. Persistente Transportquittungen werden
+mit den vorhandenen Idempotenz-/Outboxfunktionen abgeglichen.
+
+Jede freigegebene Absicht bindet ein bestimmtes Gerät und einen bestimmten
+Principal/Scope. Mehrere Geräte können verschiedene Aufträge bearbeiten; ein
+Auftrag darf nicht gleichzeitig an mehrere Heimgeräte failovern. Solange die
+Ausführung des ersten Ziels unklar ist, entsteht kein Ersatzauftrag. Das löst
+die Doppelclaim-Gefahr, die zwei voneinander unabhängige lokale SQLite-Claims
+allein nicht über Geräte hinweg lösen würden.
+
+Der gemeinsame Remotevertrag bindet mindestens Protokollversion, Auftrags- und
+Idempotenz-ID, authentifizierten Auftraggeber, Projekt/Thread, Zielgerät,
+Freigabe-/Inhaltshash, erlaubten Scope/Route, Ablauf-/Widerrufsbezug und
+Ergebnisreferenzen. Die Freigabe kommt aus dem autorisierten Auftragsweg;
+**READY als freier Boardtext ist keine Freigabe**. ThreadDesk-Metadaten oder
+Modellantworten dürfen keine Ausführungsrechte erzeugen. Geräteauthentifizierung
+und Pairing müssen vor Remoteausführung praktisch nachgewiesen werden;
+das konkrete kompatible Nachrichten-/Freigabeschema wird im Vertragsarbeitspaket
+gegen die vorhandenen APIs festgelegt, nicht hier als bereits implementiert verkauft.
+
+### 3.3 Offline, Sync und unklare Wirkung
+
+- Ist das Heimgerät ausgeschaltet/offline, bleibt der Auftrag als nicht zur
+  Ausführung übernommen sichtbar. Der Server behauptet keine Agentenarbeit.
+- Reconnect fragt vorhandene Quittungen/Corezustände ab. Ein verlorener Versand-
+  oder Ergebnisabruf führt nicht zu einer zweiten Eingabe oder Modellausführung.
+- Intent-/Scopeänderungen benötigen einen neuen gültigen Inhalts-/Freigabepin;
+  Konflikte aus bidirektionalem Sync dürfen keine stillen Berechtigungsänderungen
+  bewirken. Originale, Historie und UNKNOWNs bleiben erhalten.
+- „Auch offline“ betrifft verifizierte Dateikopien, nicht die Erlaubnis, einen
+  Auftrag auf einem anderen Gerät auszuführen. Die vorhandenen Syncgrants und
+  privaten lokalen Dateifreigaben bleiben getrennt von replizierten Verweisen.
+- Zustellung, Claim, Arbeitsbeginn, Turnende, fachliche Abnahme und tatsächliche
+  mobile Ergebnisanzeige bleiben unterscheidbare Zustände und Belege.
+
+## 4. Plattform- und CLI-Migration
+
+Die vorhandenen `agent_manager`-Provider und `cli_adapters` haben unterschiedliche
+Verträge: strukturierter Agentenweg versus sichtbare UI-Semantik. Diese werden
+unter einer gemeinsamen Capabilityabfrage beschrieben, nicht zusammenphantasiert.
+Ein UI-Problem wählt keinen undokumentierten Queue-/API-Ersatzweg.
+
+| CLI | Belegter Ausgangspunkt | Nächste Ergänzung/Abnahme |
+|---|---|---|
+| Codex | Provider plus eigener UI-Adapter, Copy/Scroll/Status/Model-Zustände; reale Intel-Handoff-/Antwort-/AutoNext-Belege | Grenzen für neue Verbindung, Tab/Fokus und Remoteauftrag exakt pinnen; Windows-/Linux-Routen separat |
+| Grok Build | Vorhandener Connector/Provider, eigener UI-Adapter, tatsächlich arbeitender sichtbarer High-Partner | Bestehende Übergabeprobleme mit langen/wrapped Texten, Fokus und Placeholder als eigene belegte Fähigkeitengrenzen prüfen; keine pauschale Return-/Dialogfreigabe |
+| Claude Code | Strukturierter Adapter vorhanden; historischer Loginstatus vom 19.10. war nicht angemeldet | Bestehenden Login und CLI-Version ohne Modellkosten neu feststellen, dann kleinste genehmigte echte Route testen; sichtbare Semantik separat |
+| Gemini | Strukturierter Adapter vorhanden; historisch kontobedingte Ablehnung | Aktuellen bestehenden Zugang feststellen; kein kostenpflichtiger API-Ersatz. Danach gemeinsamer Vertrags-/Routingtest |
+| Cursor Agent | Im priorisierten Zielumfang; kein passender vollständiger Adapter im geprüften Registrybaum belegt | Dokumentierte installierte Schnittstelle bestimmen, danach kleinsten Adapter mit expliziten Fähigkeiten bauen |
+| OpenCode | Adapter und historischer isolierter lokaler Textantwortbeleg vorhanden | Bewahren; heutige Version/Route und Werkzeug-/Fortsetzungsgrenzen getrennt ausweisen |
+| GitHub Copilot CLI | Adapter vorhanden; historischer isolierter Zugang nicht angemeldet | Bewahren; aktueller freigegebener Zugang und beobachtete Fähigkeit entscheiden spätere Abnahme |
+| Aider | Fest eingeplant; in dieser Bestandsaufnahme kein vollständiger Provider-/UI-Adapter belegt | Nachrangiges eigenständiges Adapterpaket auf demselben Vertrag |
+
+Die fünf priorisierten Adapter werden nacheinander entlang realer Fähigkeitslücken
+ergänzt, bereits vorhandene Implementierungen werden migriert statt neu erfunden.
+Version, OS, Route, Menü-/Slash-/Returnsemantik und Nachweisgrad gehören zur
+Capabilitymatrix. Keine Garantie „alle Funktionen unter allen CLIs“.
+
+Windows nutzt seine vorhandenen Win32-/Tastatur-/Fenster-/Harnessbausteine und
+den gemeinsamen Core. Noch fehlende sichtbare Terminal-/Sitzungsfunktionen werden
+zuerst als Lücke reproduziert und dann im Windowsadapter ergänzt. Native Windows-
+und WSL-Ergebnisse bleiben getrennt. Linux Desktop verwendet den gleichen Core
+mit tatsächlich verfügbaren X11-/Wayland-/Terminalfähigkeiten; Debian Server hat
+ein beschränktes Headlessprofil. Kein Mac-Menüparser im allgemeinen OS-Kern.
+
+## 5. Prüffähige Etappen und nächste Arbeitspakete
+
+Dies ist ein Planregister, **keine zweite Queue und keine automatische READY-
+Freigabe**. Bestehende Paket-IDs werden weiterverwendet. Neue Implementierungs-
+pakete erhalten vor Zustellung ihren konkreten Scope im vorhandenen ThreadDesk.
+
+| Paket/Etappe | Ergebnis und Abnahmekriterium | Zuständigkeit / Abhängigkeit / Status |
+|---|---|---|
+| BP-00 Quellen und Besitz | Originalquellen/Entscheidungen mit Herkunft, tatsächliche Pins und laufende Pakete; keine doppelte Übernahme. | Codex. Bestand und vollständiger aktueller Nutzerbeschluss gelesen; Bibliotheks-Dateimetadaten/ältere Referenzpläne nicht direkt geprüft. Dieser Plan ist der erste eigene konsolidierte Stand. |
+| `BIGPLAN-GROK-WINDOWS-CANDIDATE-20261105-V1` | Gelieferten `070ea70` unabhängig auf RC33-Erhalt, Kandidatenintegrität und Ablehnung alter Nachweise prüfen; passende vorhandene Tests ausführen; nur bei Bestehen integrieren. | Grok geliefert; **Codex beginnt nach diesem Plan mit Review**. Kein neuer gleicher Grok-Auftrag. |
+| `bigplan-windows-parity-audit-20261105-v1` | Vorhandener gepinnter Boardauftrag `c803df9cc369`, ausschließlich Paritätsbericht mit konkreter nächster Windowsänderung. | Bereits Codex/AutoNext zugeordnet, keine Übernahme belegt; globale Automatik aus. Erst Zustand/Besitz mit dem vorhandenen Ablauf abgleichen, keinen zweiten Worker starten. |
+| BP-REMOTE-01 gemeinsamer Vertrag | Bestehende TD-Server-/MCP-, KB-Task-/Handoff-/AutoNext-Verträge verbinden. Ein Task, ein Zielgerät, getrennte Zustände, Rechtequelle, Quittungen und Versionskonflikte; Schema-/Negativtests definieren. | Codex entwirft, Grok unabhängiger Review. Grundlage ist der vollständig bereitgestellte aktuelle Beschluss; danach konkret freigegebenes Umsetzungspaket. |
+| BP-REMOTE-02 isolierter Vertikalschnitt | Bereits vorhandenen TD-Server und aktuellen KB-Core in separater lokaler Testumgebung verbinden: ausdrücklich autorisierter Auftrag → eigener Agent → Ergebnis in demselben Thread; genau ein Coreversuch. | Nach Vertragsreview und konkreter Paketfreigabe. Vorhandenen Team-/Receiver-/AutoNext-Mechanismus wiederverwenden. Kein Debian-Produktivdeploy. |
+| BP-DEBIAN-01 Staging und Geräteauth | Tatsächlichen vorhandenen Debianhost/OS/Dienste und freigegebene Verbindungswege prüfen; getrennte TD-/KB-Profile, TLS, Gerätebindung, Widerruf, Restart und Rückweg. | Kira/Nutzer bestätigen Ziel und produktive Rechte. Technische Umsetzung/Test durch Codex mit getrenntem Review. Keine neue VM/Account-/Port-/DNSänderung ohne passende Freigabe. |
+| BP-REMOTE-03 echte mobile Abnahme | Aus tatsächlichem Handy/ChatGPT über Debian auf den verbundenen Heim-Mac einen neuen harmlosen Auftrag einmal ausführen; Ergebnis mobil aus demselben Thread zurücklesen. | Nutzer/Kira führen den tatsächlichen mobilen Clientweg; Codex/Grok liefern technische Nachweise. Lokaler Ersatzclient zählt separat. |
+| BP-WINDOWS-01 Runtimeparität | Nach Paritätsbericht konkrete fehlende Terminal-/Sitzungsfunktion im bestehenden Windowsbackend korrigieren; Regression auf altem Stand und native Win32-Abnahme am neuen Pin. | Codex Hauptarbeit; Grok Review. Parallel zu Remotevertrag möglich, getrennte Dateien/Worktrees. Vorhandene lokale Windowsumgebung nach Identitäts-/Ressourcencheck verwenden. |
+| BP-WINDOWS-02 Dirk-Kit | Quellengebundene native Berichte, passendes Wheel/Inventar, Installation/Upgrade/Rollback, Tastatur/Terminal/Agentenantwort nach tatsächlich angebotenen Fähigkeiten; kurze DE/EN-Anleitung und Prüfliste. | Nach passenden nativen Gates. Dirks Windowsversion/Architektur/CLI-Zugänge noch nicht belegt; vor Kompatibilitätszusage klären. Kein Versand an Dirk ohne Auftrag. |
+| BP-CLI-01 erste Gruppe | Codex/Grok/Claude zuerst, dann Gemini/Cursor: Registry, Input/Return/Antwort, erlaubte Menüs/Slash/Rückkehr, Negative und echte verfügbare Zugänge pro Route. | Einzelne sinnvolle Adapterpakete; neue Anbieteranmeldung/Kosten vorher klären. Windows wird nicht hinter acht fertigen Modulen geparkt. |
+| BP-LINUX-01 Desktop/Server-Capabilities | Gemeinsame Coretests plus reale Linuxfähigkeiten, Headless-Fehler und erlaubte Desktopwege; kein Windows-/Mac-Pass als Linux-Pass. | Nach Remotevertrag, bei Bedarf parallel zu Windows mit getrennten Ressourcen. Keine unnötigen VMs/Builds. |
+| BP-TG-01 produktive Budgetbindung | Bestehende Reserve/Dispatch/Settlement-API an einen konkret quotierbaren, freigegebenen Providerweg binden; harte Cap-/Unknown-Grenzen wahrheitsgemäß prüfen. | TollGate getrennt weiterentwickeln; keine neuen API-Käufe. Abo-CLIs bleiben zunächst mit belegter Quota/Stopgrenzen eigenständig. |
+| BP-4AP-01 geschützte Nutzung | Vertrauenswürdige Host-/Origin-/Consent-/Revocationkette nachweisen, ohne Rohsecret im Agentenkontext; veröffentlichte/integrierte Artefaktgrenzen sauber halten. | Eigenständiges sicherheitsrelevantes Paket mit konkreter Freigabe. Kein unbeschränkter Passwort-/MCP-Zugriff für Agenten als Abkürzung. |
+| BP-AA-01 gemeinsame Beobachtung | Tatsächliche TD→KB→Agent→Rückgabe-Ereignisse lesend projizieren; Browserzweig/Mastervertrag abgleichen, fehlende Auth-/Coveragebelege explizit unknown. | Parallel ohne Steuerungsrechte. Eigener Browsergrant bleibt von fremder Agentenidentität getrennt. Kein unkontrollierter Branchmerge. |
+| BP-LIEFERUNG Betrieb | Quellen/Pakete/Installationen, Backup/Restore, fehlgeschlagene/unklare Aufträge, betroffene READMEs und Downloadgrenzen gemeinsam prüfen. | Je abgenommenem Produktpaket; keine pauschale Freigabe aller Releases/Serverinstallationen. |
+
+Der kritische Remoteweg ist **Vertragsabgleich → isolierter Vertikalschnitt →
+freigegebenes Debianstaging/Geräteauth → echte mobile Abnahme**. Windows-Kandidaten-
+review und bestehende Windowsarbeiten laufen daneben weiter. 4AllPass und ein
+vollständiger TollGate-Anschluss sind keine Voraussetzung für den ersten
+geheimnisfreien Abo-Auftrag; ihre späteren Verträge werden von Beginn an vorgesehen.
+Agent Authority kann Metadaten bereits parallel beobachten.
+
+## 6. Zusammenarbeit und AutoNext
+
+Codex hält den technischen Integrationsplan und prüft Partnerergebnisse. Grok
+entwickelt eigenständig abgegrenzte Pakete und prüft fremde gesicherte Stände.
+Keiner prüft seine eigene Änderung als „unabhängig“. Kira und Nutzer behalten
+die übergeordnete Produkt-/Prioritäts-/Risikofreigabe. Entscheidungen im bestätigten
+Scope werden ohne neue Routinefreigabeschleifen umgesetzt.
+
+Aktuelle eindeutige Zuordnung:
+
+- Plan/Integration: Codex im Koordinationsworktree; keine Änderung fremder
+  Worktrees. Groks Windowsworktree `070ea70` ist geliefert und sauber.
+- Vorhandener Windows-Auditauftrag bleibt seiner ursprünglichen ID und dem
+  vorhandenen AutoNext-Ablauf zugeordnet. Kein zweiter identischer Bauauftrag.
+- Alte und neue sichtbare Grok-/Codex-Sitzungen sowie unbekannte Effekte bleiben
+  erhalten. Nach Zustellung unterscheiden sich „gespeichert“, „angenommen“,
+  „arbeitet“ und „fertig“. Eine neue Session oder ein Queuereceipt allein genügt nicht.
+
+Neue Folgeaufträge nutzen die bestehenden Team-/MessageReceiver-/Handoff- und
+ThreadDesk-Pfade. Ein Boardeintrag allein weckt keinen Agenten. Ein stiller Wechsel
+von sichtbarem Terminal zu Headless/Queue/API findet nicht statt. Erst nach
+konkreter Freigabe-/Scope-/Budget-/Gerätebindung wird der existierende AutoNext-
+Katalog erweitert; der globale Schalter bleibt bis dahin unverändert. Keine
+zusätzliche Watcher-/Fünf-Minuten-Schleife wird neben ihm aufgebaut.
+
+Parallelisierung richtet sich nach echten Abhängigkeiten und verfügbaren
+Ressourcen, nicht nach einer künstlichen Quote. Je Worktree ein Schreiber;
+gemeinsame VM-/Desktop-/Produktionsressourcen werden zusätzlich abgestimmt.
+Höchste verfügbare Denkstufe wurde für diese initiale Gesamtanalyse angefordert;
+die bestehende Sitzung wurde gründlich genutzt, kein technisch unbelegter
+Modellwechsel oder Neustart behauptet. Spätere Tests/Builds laufen direkt;
+Reviewer erhalten konkrete Pins statt den vollständigen Gesprächsverlauf.
+
+## 7. Gemeinsame Abnahmematrix
+
+1. **Normalfall:** neue genehmigte ID, korrektes Gerät/Scope, ein Claim und ein
+   Ausführungsversuch, überprüfbare Antwort/Artefakt, ThreadDesk- und mobiler Readback.
+2. **Berechtigung:** unfreigegebene Idee/READY-Zeile, falscher Benutzer/Device/Scope,
+   manipulierte Pins, abgelaufene oder widerrufene Freigabe lösen keine Ausführung aus.
+3. **Doppelte Zustellung/Crash:** dasselbe Intent nach Reconnect/Neustart liefert
+   vorhandene Quittung; verlorener Return/Providerabschluss bleibt unknown,
+   kein automatischer neuer Versuch und keine konkurrierende Geräteübernahme.
+4. **Offline/Sync:** Heimgerät aus, Verbindung abgebrochen, Teiltransfer, konkurrierende
+   Datei-/Metadatenänderungen, volle Ablage und Restore erhalten Originale und
+   Rechte. Offlinebereitheit wird erst nach vollständiger Integrität gemeldet.
+5. **Agent/UI:** bestehender/fremder Entwurf, aktive Arbeit, Dialog, Fokus-/Tab-/PID-/TTY-
+   Wechsel, Cursoränderung und verlorene Antwort werden pro CLI/OS/Route geprüft;
+   keine globale Lockerung für eine erfolgreiche Demo.
+6. **Kosten/Geheimnisse:** fehlender bestätigter Zugang, Budgetgrenze, falsche
+   Preis-/Host-/Consentbindung, Secret im Log/Board/Prompt und verspätete Abrechnung
+   werden unterscheidbar abgelehnt oder als ungeklärt ausgewiesen.
+7. **Lieferung:** integrierte Source, getesteter Kandidat, gebautes Paket,
+   tatsächlich installierte Runtime und echte Clientabnahme sind getrennte Pins.
+   Passende Nachweise werden wiederverwendet, nur betroffene Prüfungen neu ausgeführt.
+
+Eine bestandene synthetische oder lokale MCP-Prüfung ist kein nativer Windows-
+und kein echter Handy-/Browserchat-Pass. Historische Tests behalten ihren Pin
+und ihre Umgebung; es wird keine erfundene Gesamtpasszahl gebildet.
+
+## 8. Nachweise, Freigaben und nächster Einstieg
+
+Primäre technische Verweise:
+
+- KiraBridge: `docs/BIGPLAN-UNBLOCK-20261105.md`,
+  `docs/plans/BIGPLAN-AUTONEXT-20261104.md`,
+  `docs/plans/TERMINAL-CLI-MODULES-20261104.md`,
+  `docs/providers/CLI-PROVIDERS-ACCEPTANCE-20261019.md`;
+  Serverplan am erhaltenen Ref `origin/development/server`.
+- ThreadDesk: `docs/SERVER-SYNC.md`, `docs/contracts/server-sync-v1.md`,
+  `docs/evidence/codex3-server-sync-followup-20261024/STATUS.md`;
+  [PR89](https://github.com/landjunge/threaddesk/pull/89) frisch als gemergt gelesen.
+- 4AllPass: `docs/security-boundary.md`, `docs/PROTECTED-ACCESS-20261018.md`,
+  `protected_executor/README.md`; TollGate: `docs/WORKFLOW-CONTROL.md` und
+  `docs/WORKFLOW-PROCESS-STOP.md`; Agent Authority: `docs/WORKFLOW-OBSERVATIONS.md`,
+  `docs/WORKFLOW-WARNINGS.md` und getrennter Browserzweig.
+- Private detaillierte Metadaten/Quittungen, Faktenprüfung mit Dateihashes,
+  unberührte Worktreezustände und spätere Review-/Testlogs:
+  `~/.local/share/kirabridge/backups/bigplan-overall-20261105-v1/`.
+
+ThreadDesk enthält kurze Checkpoints mit Paket, Bearbeiter, Quellpin, Belegpfad
+und nächstem Schritt; nicht diesen gesamten Regeltext. Nach jedem Meilenstein
+wird der Eintrag unabhängig zurückgelesen. Fehlende Quelle, fehlende laufende
+Abnahme und fehlende neue Freigabe sind unterschiedliche Blocker.
+
+**Nächster autorisierter Arbeitsschritt:** unabhängiger Codex-Review des bereits
+gelieferten Grok-Commits `070ea70`, gezielte Paketvalidatortests, anschließend
+bei Bestehen Integration im Koordinationsbranch. Danach erhalten Kira/Nutzer
+den quellengebundenen nächsten Remotevertrags-/Windows-Abnahmepunkt. Keine
+produktiven Dienste, neuen Kostenwege, zusätzlichen Konten oder öffentlichen
+Releases werden durch diesen Plan gestartet.
