@@ -1,0 +1,148 @@
+{
+  "schema": "bigplan.cli-routing-verification.v1",
+  "verified_at": "2026-11-05T22:05:28.308138+00:00",
+  "tests": {
+    "suite": "tests/test_capability_routing.py",
+    "passed": 56,
+    "duration_seconds": 5.04
+  },
+  "ruff": "check/format passed on changed files",
+  "skill_validation": "quick_validate passed with system python3 (project venv lacks PyYAML)",
+  "live_service_read": {
+    "schema": "bigplan.cli-decision.v1",
+    "task_id": "cli-matrix-live-read-20261105",
+    "cli": "codex",
+    "model": "gpt-6.1-sol",
+    "effort": "medium",
+    "provider": "openai",
+    "executable": "/Users/landjunge/.local/bin/codex",
+    "expected_version": "codex-cli 0.166.0",
+    "access_kind": "subscription",
+    "matrix_sha256": "f5dbc36c702f056a58c82abdb0d597fa13eae92814d899b5d4a16b0c151143c3",
+    "task_sha256": "67bc81c89135096aaa14d0135fd6aadceda1bed04da99d93b1ec6ce76d9cf882",
+    "runtime_sha256": "cf6ee08d2809409f77b7c285546ac59835f131af34ef94ecc4d77251303f754b",
+    "selected_at": "2026-11-05T21:56:17.037383+00:00",
+    "effective_model": "unverified",
+    "effective_effort": "unverified",
+    "coordinator": "codex",
+    "reason": "implementation; capabilities/access/version checked; minimum effort 2; suitability then cost rank; Codex budget preferred",
+    "excluded": [],
+    "thread_desk": {
+      "thread_id": "c9a396be4081",
+      "revision": 2
+    },
+    "state": "planned",
+    "starts_model": false
+  },
+  "native_grok_review": {
+    "schema": "bigplan.cli-native-review.v1",
+    "requested": {
+      "task_id": "cli-matrix-grok-hook-20261105-01",
+      "cli": "grok",
+      "model": "grok-4.7",
+      "effort": "high",
+      "thread_desk": {
+        "thread_id": "c9a396be4081",
+        "revision": 3
+      },
+      "matrix_sha256": "f5dbc36c702f056a58c82abdb0d597fa13eae92814d899b5d4a16b0c151143c3",
+      "observed_version": "grok 1.0.77 (50ca579fa996) [stable]"
+    },
+    "process_state": "process_completed",
+    "exit_code": 0,
+    "native_output_sha256": "e14f228cad0e8fa529cfcd620484a3d6ff122a2b1ef8a3b3e357e8d1f0ccbe24",
+    "native_metadata": {
+      "reported_model_ids": [
+        "grok-4.7-build"
+      ],
+      "model_evidence_source": "grok_json.modelUsage",
+      "model_matches_requested_id": false,
+      "effective_model": "grok-4.7-build",
+      "effective_model_status": "cli_reported",
+      "effective_effort": "unverified"
+    },
+    "result_text": "I'll read only `src/kirabridge/capability_routing/source.py` and answer from that file.Nested `Thread.context.notes` is read correctly when the top-level `notes` key is absent: `thread.get(\"notes\", thread.get(\"context\", {}).get(\"notes\", \"\"))` uses `context[\"notes\"]`. Duplicate matrix markers are rejected, because `notes.count(BEGIN)` and `notes.count(END)` must each equal 1 or `load` raises `RoutingError`. The nested lookup still runs when top-level `notes` exists, so a non-mapping `context` raises before that flat value is used.",
+    "source_followup": "Hardened source shape validation and delimiter order; duplicate JSON rejected, covered by tests. No second model run."
+  },
+  "independent_forward_plan": {
+    "cli": "grok",
+    "model": "grok-4.7",
+    "effort": "xhigh",
+    "revision": 3,
+    "starts_model": false,
+    "status": "passed"
+  },
+  "installed": {
+    "schema": "bigplan.cli-router-install.v1",
+    "payload_pin": "a2091b54938f4773",
+    "release": "/Users/landjunge/.local/share/bigplan-cli-routing/releases/a2091b54938f4773",
+    "source": "/Users/landjunge/KiraBridge-worktrees/cli-capability-routing-20261105",
+    "sha256": {
+      "src/kirabridge/capability_routing/__init__.py": "e449b655ea5a49dc6a956a1063ef2c196cc41966fe9d05636370eed5fa6bc810",
+      "src/kirabridge/capability_routing/__main__.py": "1be9652c3e54de5a20dd7d81d8189d98b08ab719bd6a8aa9e1af22e9272fc1cd",
+      "src/kirabridge/capability_routing/evidence.py": "c7d5dff3b08f4af60b8fee743aa95049995a0b73f27198b8525772a8f30f7f2f",
+      "src/kirabridge/capability_routing/hook.py": "4eac9b1fdc95aa3993a84a69f79c2009fc8fb80ac418d6e2cbb2d6a20f49c056",
+      "src/kirabridge/capability_routing/integration.py": "29fa079a4d3686e708b4765574c3aedeec8e53346e8ffeb6498970801b0e5690",
+      "src/kirabridge/capability_routing/launcher.py": "b85a7f5e93862dd470e52bb6301f7020da291586cf67b74fb031eba3c70e9786",
+      "src/kirabridge/capability_routing/process.py": "0c121a12369fd3a3eaf9d0c19c76f8439be7822e9e02838abdd47c819d0aec5a",
+      "src/kirabridge/capability_routing/router.py": "52d21d1a5355827f6ab504527871f16f03257169720467fa19eb5db0a94de74c",
+      "src/kirabridge/capability_routing/source.py": "a05a2eb00ad20cff43e4013ad84d619759f204242848071f367c2760b62eacc2",
+      "skills/cli-model-router/SKILL.md": "661640ed316f48faeb61a63d4cd773fa8fec4d6c9b67b0cc6e85f87fca6a775f",
+      "skills/cli-model-router/agents/openai.yaml": "33e235ac55af646cb2a3c98bee4f5933928b5a9105a4e3ca4d67a68b585f7c2a",
+      "docs/cli-routing/RESEARCH.md": "abfbf22e2520725c76d0206dde92afb5c3d5a0fdc154dc1fa5847859c56c570d",
+      "docs/cli-routing/matrix.json": "97413f8d79eb637af9fc8f58ad1fd3db96f978ab226d8ad8b5456471c238e620"
+    },
+    "launcher": "/Users/landjunge/.local/bin/bigplan-delegate",
+    "native_global_hooks_modified": false,
+    "services_restarted": false
+  },
+  "parallel_work": {
+    "existing_source_files_changed": false,
+    "existing_sessions_modified": false,
+    "existing_services_restarted": false,
+    "live_parallel_coordinator_activated": false
+  },
+  "remote_sync": {
+    "pushed": false,
+    "reason": "Unfiltered push workflow triggers hosted macOS and ARM jobs; no newly authorized cloud/ARM builds. Local commit/bundle instead."
+  },
+  "final_live_service_plan": {
+    "schema": "bigplan.cli-decision.v1",
+    "task_id": "cli-matrix-live-read-20261105",
+    "cli": "codex",
+    "model": "gpt-6.1-sol",
+    "effort": "medium",
+    "provider": "openai",
+    "executable": "/Users/landjunge/.local/bin/codex",
+    "expected_version": "codex-cli 0.166.0",
+    "access_kind": "subscription",
+    "matrix_sha256": "f5dbc36c702f056a58c82abdb0d597fa13eae92814d899b5d4a16b0c151143c3",
+    "task_sha256": "67bc81c89135096aaa14d0135fd6aadceda1bed04da99d93b1ec6ce76d9cf882",
+    "runtime_sha256": "cf6ee08d2809409f77b7c285546ac59835f131af34ef94ecc4d77251303f754b",
+    "selected_at": "2026-11-05T22:06:16.676673+00:00",
+    "effective_model": "unverified",
+    "effective_effort": "unverified",
+    "coordinator": "codex",
+    "reason": "implementation; capabilities/access/version checked; minimum effort 2; suitability then cost rank; Codex budget preferred",
+    "excluded": [],
+    "thread_desk": {
+      "thread_id": "c9a396be4081",
+      "revision": 5
+    },
+    "observed_version": "codex-cli 0.166.0",
+    "observed_auth_route": "chatgpt",
+    "state": "planned",
+    "starts_model": false
+  },
+  "cost_route_reverification": "codex login status / grok models required before native model start; API env stripped",
+  "lost_receipt_regression": "Lost final receipt after process effect stays unknown, never false not-started; original admission prevents replay",
+  "grok_skill_discovery": {
+    "exit": 0,
+    "skill_found": true,
+    "matches": [
+      "cli-model-router"
+    ]
+  },
+  "thread_desk_final_revision": 5,
+  "thread_create_side_effect": "ThreadService.create switched current thread; observed prior 0ab8b95a7369 restored and read back. All later reads/writes use explicit thread IDs."
+}

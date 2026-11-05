@@ -1,0 +1,8 @@
+{
+  "task_id": "cli-matrix-live-read-20261105",
+  "workload": "implementation",
+  "prompt": "Read-only: inspect the routing implementation and report issues. Do not edit or delegate.",
+  "cwd": "/Users/landjunge/KiraBridge-worktrees/cli-capability-routing-20261105",
+  "ownership_ref": "ThreadDesk 188ce4729a62 entry d165aebb2046",
+  "read_only": true
+}

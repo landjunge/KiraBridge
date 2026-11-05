@@ -1,0 +1,45 @@
+{
+  "checked_at": "2026-11-05T21:49:13.289077+00:00",
+  "scope": "official documentation plus local read-only CLI help; no account execution inferred",
+  "sources": {
+    "codex": [
+      "https://learn.chatgpt.com/docs/models?surface=cli",
+      "https://learn.chatgpt.com/docs/developer-commands?surface=cli",
+      "https://learn.chatgpt.com/docs/hooks"
+    ],
+    "grok": [
+      "https://docs.x.ai/build/cli/reference",
+      "https://docs.x.ai/build/features/hooks",
+      "https://docs.x.ai/developers/models/grok-4.7",
+      "https://docs.x.ai/build/features/mcp-servers"
+    ],
+    "claude": [
+      "https://code.claude.com/docs/en/model-config",
+      "https://code.claude.com/docs/en/hooks"
+    ],
+    "opencode": [
+      "https://opencode.ai/docs/models/",
+      "https://opencode.ai/docs/cli/",
+      "https://opencode.ai/docs/plugins/"
+    ],
+    "gemini": [
+      "https://geminicli.com/docs/reference/configuration/",
+      "https://geminicli.com/docs/cli/model/",
+      "https://geminicli.com/docs/hooks/reference/"
+    ],
+    "copilot": [
+      "https://docs.github.com/en/copilot/reference/copilot-cli-reference/cli-command-reference",
+      "https://docs.github.com/en/copilot/reference/hooks-reference"
+    ],
+    "cursor": [
+      "https://cursor.com/docs/cli/reference/parameters",
+      "https://cursor.com/docs/hooks",
+      "https://cursor.com/docs/sdk/typescript"
+    ],
+    "aider": [
+      "https://aider.chat/docs/config/options.html",
+      "https://aider.chat/docs/config/reasoning.html",
+      "https://aider.chat/docs/scripting.html"
+    ]
+  }
+}

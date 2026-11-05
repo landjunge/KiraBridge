@@ -1,0 +1,10 @@
+{
+  "argv": [
+    "claude",
+    "--version"
+  ],
+  "exit": 0,
+  "stdout": "2.1.236 (Claude Code)\n",
+  "stderr": "",
+  "observed_at": "2026-11-05T21:41:11.420026+00:00"
+}

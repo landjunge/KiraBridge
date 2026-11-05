@@ -1,0 +1,30 @@
+{
+  "schema": "bigplan.cli-native-review.v1",
+  "requested": {
+    "task_id": "cli-matrix-grok-hook-20261105-01",
+    "cli": "grok",
+    "model": "grok-4.7",
+    "effort": "high",
+    "thread_desk": {
+      "thread_id": "c9a396be4081",
+      "revision": 3
+    },
+    "matrix_sha256": "f5dbc36c702f056a58c82abdb0d597fa13eae92814d899b5d4a16b0c151143c3",
+    "observed_version": "grok 1.0.77 (50ca579fa996) [stable]"
+  },
+  "process_state": "process_completed",
+  "exit_code": 0,
+  "native_output_sha256": "e14f228cad0e8fa529cfcd620484a3d6ff122a2b1ef8a3b3e357e8d1f0ccbe24",
+  "native_metadata": {
+    "reported_model_ids": [
+      "grok-4.7-build"
+    ],
+    "model_evidence_source": "grok_json.modelUsage",
+    "model_matches_requested_id": false,
+    "effective_model": "grok-4.7-build",
+    "effective_model_status": "cli_reported",
+    "effective_effort": "unverified"
+  },
+  "result_text": "I'll read only `src/kirabridge/capability_routing/source.py` and answer from that file.Nested `Thread.context.notes` is read correctly when the top-level `notes` key is absent: `thread.get(\"notes\", thread.get(\"context\", {}).get(\"notes\", \"\"))` uses `context[\"notes\"]`. Duplicate matrix markers are rejected, because `notes.count(BEGIN)` and `notes.count(END)` must each equal 1 or `load` raises `RoutingError`. The nested lookup still runs when top-level `notes` exists, so a non-mapping `context` raises before that flat value is used.",
+  "source_followup": "Hardened source shape validation and delimiter order; duplicate JSON rejected, covered by tests. No second model run."
+}
