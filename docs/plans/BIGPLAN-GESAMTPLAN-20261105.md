@@ -136,8 +136,11 @@ gespeicherte Referenz ist kein selbst erteiltes Recht des ThreadDesk-Dokuments.
 Der konkrete Nachweis dieser Bindung gehört zu BP-REMOTE-01/02 und ist noch
 keine behauptete Funktion des heutigen Serverstands.
 
-**Eine stabile Auftrags-ID** verbindet Aufgabenabsicht, Freigabe, Transport und
-Core-Task. Das bestehende lokale TaskManager-Ledger bleibt Ausführungswahrheit.
+**Eine stabile fachliche Auftragsreferenz** verbindet Absicht, Freigabe und
+Transport mit dem bestehenden Core-Task. Vorhandene TD-Handoff-, Karten-, Team-
+Work- und Corekennungen bleiben getrennt und dauerhaft aufeinander gebunden;
+sie werden nicht umbenannt oder bei Wiederaufnahme als zweite Ausführung angelegt.
+Das bestehende lokale TaskManager-Ledger bleibt Ausführungswahrheit.
 Serverzustellung und ThreadDesk-Anzeige sind Quittungen/Projektionen dieses
 Auftrags, keine zweite Ausführungsqueue. Persistente Transportquittungen werden
 mit den vorhandenen Idempotenz-/Outboxfunktionen abgeglichen.
@@ -233,7 +236,7 @@ pakete erhalten vor Zustellung ihren konkreten Scope im vorhandenen ThreadDesk.
 | BP-00 Quellen und Besitz | Originalquellen/Entscheidungen mit Herkunft, tatsächliche Pins und laufende Pakete; keine doppelte Übernahme. | Codex. Bestand und vollständiger aktueller Nutzerbeschluss gelesen; Bibliotheks-Dateimetadaten/ältere Referenzpläne nicht direkt geprüft. Dieser Plan ist der erste eigene konsolidierte Stand. |
 | `BIGPLAN-GROK-WINDOWS-CANDIDATE-20261105-V1` | Gelieferten `070ea70` unabhängig auf RC33-Erhalt, Kandidatenintegrität und Ablehnung alter Nachweise prüfen; passende vorhandene Tests ausführen; nur bei Bestehen integrieren. | **Quellschritt abgeschlossen:** Grok geliefert, Codex korrigiert, unabhängiger Review freigegeben, 69 Tests, Integration `ae699cb` im Featurebranch. Native Liefergates bleiben offen. |
 | `bigplan-windows-parity-audit-20261105-v1` | Vorhandener gepinnter Boardauftrag `c803df9cc369`, ausschließlich Paritätsbericht mit konkreter nächster Windowsänderung. | Bereits Codex/AutoNext zugeordnet, keine Übernahme belegt; globale Automatik aus. Erst Zustand/Besitz mit dem vorhandenen Ablauf abgleichen, keinen zweiten Worker starten. |
-| BP-REMOTE-01 gemeinsamer Vertrag | Bestehende TD-Server-/MCP-, KB-Task-/Handoff-/AutoNext-Verträge verbinden. Ein Task, ein Zielgerät, getrennte Zustände, Rechtequelle, Quittungen und Versionskonflikte; Schema-/Negativtests definieren. | Codex entwirft, Grok unabhängiger Review. Grundlage ist der vollständig bereitgestellte aktuelle Beschluss; danach konkret freigegebenes Umsetzungspaket. |
+| BP-REMOTE-01 gemeinsamer Vertrag | Bestehende TD-Server-/MCP-, KB-Task-/Handoff-/AutoNext-Verträge verbinden. Ein Task, ein Zielgerät, getrennte Zustände, Rechtequelle, Quittungen und Versionskonflikte; maschinenlesbares Schema und Negativtests. | **Passiver Quellschritt abgeschlossen:** [Vertrag v1](../contracts/remote-task-v1.md), Schema und synthetische Kompatibilitätsfälle auf `feat/remote-task-contract-20261105`; 61 gezielte Prüfungen bestanden, finaler unabhängiger Grok-Review bestätigt. Codex alleiniger Schreiber. Kein Remoteauth-/Transportadapter oder produktiver Start. |
 | BP-REMOTE-02 isolierter Vertikalschnitt | Bereits vorhandenen TD-Server und aktuellen KB-Core in separater lokaler Testumgebung verbinden: ausdrücklich autorisierter Auftrag → eigener Agent → Ergebnis in demselben Thread; genau ein Coreversuch. | Nach Vertragsreview und konkreter Paketfreigabe. Vorhandenen Team-/Receiver-/AutoNext-Mechanismus wiederverwenden. Kein Debian-Produktivdeploy. |
 | BP-DEBIAN-01 Staging und Geräteauth | Tatsächlichen vorhandenen Debianhost/OS/Dienste und freigegebene Verbindungswege prüfen; getrennte TD-/KB-Profile, TLS, Gerätebindung, Widerruf, Restart und Rückweg. | Kira/Nutzer bestätigen Ziel und produktive Rechte. Technische Umsetzung/Test durch Codex mit getrenntem Review. Keine neue VM/Account-/Port-/DNSänderung ohne passende Freigabe. |
 | BP-REMOTE-03 echte mobile Abnahme | Aus tatsächlichem Handy/ChatGPT über Debian auf den verbundenen Heim-Mac einen neuen harmlosen Auftrag einmal ausführen; Ergebnis mobil aus demselben Thread zurücklesen. | Nutzer/Kira führen den tatsächlichen mobilen Clientweg; Codex/Grok liefern technische Nachweise. Lokaler Ersatzclient zählt separat. |
@@ -335,6 +338,10 @@ Primäre technische Verweise:
 - Ocean: [Adapterplan](OCEAN-MCP-ADAPTER-20261105.md), bestehender Bereich
   `30e962aaed81`; öffentliche Portal-/JWKS-Abrufbelege mit Hashes unter
   `~/.local/share/kirabridge/backups/bigplan-ocean-plan-20261105-v1/`.
+- Remotevertrag: [Spezifikation](../contracts/remote-task-v1.md),
+  [Schema](../contracts/remote-task.v1.schema.json), getrennte synthetische
+  Beispiele und `tests/test_remote_task_contract.py`; Quellen-/Prüf-/Reviewbelege
+  unter `~/.local/share/kirabridge/backups/bigplan-remote-contract-20261105-v1/`.
 
 ThreadDesk enthält kurze Checkpoints mit Paket, Bearbeiter, Quellpin, Belegpfad
 und nächstem Schritt; nicht diesen gesamten Regeltext. Nach jedem Meilenstein
@@ -356,10 +363,19 @@ uneindeutigen zweiten Auftragseingang wurde korrigiert und im engen Recheck
 geschlossen; Diagramm und Vertrag beschreiben denselben freigegebenen TD-Auftrag.
 Das ist technische Planprüfung, keine Freigabe eines produktiven Deployments.
 
-**Aktueller nächster Einstieg:** BP-REMOTE-01, gemeinsamer versionierter
-Auftrags-/Freigabe-/Geräte-/Quittungsvertrag auf den vorhandenen TD-/KB-APIs.
-Daneben bleibt der bestehende Windows-Paritätsauftrag seiner ursprünglichen
-Zuständigkeit zugeordnet. Neue funktionale Remote- oder native Lieferpakete
-werden konkret anhand dieses Plans abgegrenzt; produktive Dienste, neue
+**Aktueller Einstieg nach dem Nutzerauftrag „weiter im Plan“:** BP-REMOTE-01
+liefert den passiven versionierten Auftrags-/Freigabe-/Geräte-/Quittungsvertrag
+auf den vorhandenen TD-/KB-APIs. Die erste begrenzte Form beschreibt vorhandene
+Codex-Protokolle und ihre tatsächlich belegte Sessionroute. AutoNext-Bindungen
+bleiben reine Beobachtung vorhandener Team-/Coreaufträge. Der Handoff-Intent setzt
+eine verfügbare verwaltete Session voraus und ist bei aktivierter sichtbarer
+Konfiguration nicht bereit; kein stiller Routenwechsel. Schema-gültige Daten
+erzeugen keine Rechte. Die tatsächlich
+fehlenden Bindungen sind Geräte-Pairing, verifizierte Remotequelle/Grantauflösung,
+Widerruf und authentischer Quittungstransport. Nach Vertragsprüfung ist das nächste
+Paket BP-REMOTE-02 als isolierter Vertikalschnitt konkret abzugrenzen; kein
+produktiver Debian- oder Handy-Pass aus Schema-/Fixtureprüfungen.
+Der bestehende Windows-Paritätsauftrag bleibt seiner ursprünglichen Zuständigkeit
+zugeordnet. Ocean bleibt beim freigegebenen Planumfang. Produktive Dienste, neue
 Kostenwege, zusätzliche Konten, Main-Merges oder öffentliche Releases werden
-dadurch nicht gestartet. Aktueller Commit und Übergabe stehen in ThreadDesk.
+hierdurch nicht gestartet. Aktueller Commit und Übergabe stehen in ThreadDesk.
