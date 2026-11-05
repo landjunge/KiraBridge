@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Bounded AutoNext coordinator team turn",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "kirabridge_team": {
+      "type": "string",
+      "enum": ["1"]
+    },
+    "result": {
+      "type": "string"
+    },
+    "actions": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "maxItems": 0
+    }
+  },
+  "required": ["kirabridge_team", "result", "actions"]
+}

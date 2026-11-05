@@ -485,13 +485,38 @@ class Store:
         return result
 
     def claim(
-        self, owner: str, lease_seconds: float, control: bool | str = False, *, native_visible=False
+        self,
+        owner: str,
+        lease_seconds: float,
+        control: bool | str = False,
+        *,
+        native_visible=False,
+        managed_workers=(),
     ) -> dict | None:
         with self.transaction():
             selection, names = self.lane_selection(control)
             if native_visible:
+                agent_native = "operation='agent.execute'"
+                allowed = tuple(sorted(set(managed_workers)))
+                if len(allowed) > 16 or any(not isinstance(name, str) for name in allowed):
+                    raise ValueError("At most 16 configured managed workers are allowed")
+                if (
+                    allowed
+                    and self.db.execute(
+                        "SELECT 1 FROM sqlite_master WHERE type='table' AND name='team_work'"
+                    ).fetchone()
+                ):
+                    agent_native += (
+                        " AND NOT EXISTS (SELECT 1 FROM team_work w "
+                        "WHERE w.core_task_id=tasks.id AND w.assignee=tasks.principal "
+                        "AND w.core_request_hash=tasks.request_hash "
+                        "AND w.core_request_hash IS NOT NULL AND w.assignee IN ("
+                        + ",".join("?" for _ in allowed)
+                        + "))"
+                    )
+                    names.extend(allowed)
                 selection += (
-                    " AND NOT (operation IN ('agent.execute','terminal.visible') OR "
+                    " AND NOT ((" + agent_native + ") OR operation='terminal.visible' OR "
                     "(operation='terminal.execute' AND principal='chatgpt') OR "
                     "(operation='session.input' AND "
                     "json_extract(args,'$.pane_id') LIKE 'terminal:%'))"

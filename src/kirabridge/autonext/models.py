@@ -52,7 +52,8 @@ class AutoNextConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
     enabled: bool = False
     grant_id: str = Field(default="", max_length=96)
-    principal: Literal["local", "chatgpt"] = "local"
+    principal: Literal["local", "chatgpt", "codex"] = "local"
+    coordinator_mode: bool = False
     team_id: str = Field(default="", max_length=128)
     team_revision: int = Field(default=0, ge=0)
     board_id: str = Field(default="", max_length=128)
@@ -78,12 +79,14 @@ class AutoNextConfig(BaseModel):
                 self.legacy_scope_pins
             ):
                 raise ValueError("Legacy scope pins must have unique message, run and session IDs")
+        if self.coordinator_mode and self.principal != "codex":
+            raise ValueError("Coordinator mode requires the explicit Codex coordinator identity")
         if self.enabled:
             if (
                 not all((self.team_id, self.board_id, self.after_work_id))
                 or not re.fullmatch(ID, self.grant_id)
                 or not re.fullmatch(SHA, self.after_result_sha256)
-                or self.principal == "codex"
+                or (self.principal == "codex" and not self.coordinator_mode)
             ):
                 raise ValueError("AutoNext needs an explicit operator grant and completion anchor")
             if len({c.task_id for c in self.cards}) != len(self.cards):
@@ -91,14 +94,69 @@ class AutoNextConfig(BaseModel):
         return self
 
 
+class CoordinatorCheck(Input):
+    argv: list[str] = Field(min_length=1, max_length=64)
+    timeout_seconds: float = Field(default=10, gt=0, le=30)
+
+    @field_validator("argv")
+    @classmethod
+    def exact_command(cls, value):
+        if not Path(value[0]).is_absolute() or any(
+            "\x00" in arg or len(arg) > 4096 for arg in value
+        ):
+            raise ValueError("Checks require an absolute executable and bounded literal argv")
+        return value
+
+
 class Acceptance(Input):
-    kind: Literal["result_sha256", "operator_receipt"]
+    kind: Literal["result_sha256", "operator_receipt", "coordinator_checks"]
     expected_sha256: str | None = Field(default=None, pattern=SHA)
+    checks: list[CoordinatorCheck] = Field(default_factory=list, max_length=8)
+    review_with_grok: bool = False
+    review_files: list[str] = Field(default_factory=list, max_length=16)
+
+    @field_validator("review_files")
+    @classmethod
+    def explicit_review_paths(cls, values):
+        if len(values) != len(set(values)):
+            raise ValueError("Review paths must be unique")
+        for value in values:
+            path = Path(value)
+            if (
+                not value
+                or len(value) > 4096
+                or "\x00" in value
+                or "\\" in value
+                or path.is_absolute()
+                or ":" in value
+                or ".." in path.parts
+                or path == Path(".")
+            ):
+                raise ValueError("Review files require bounded relative paths without traversal")
+            for component in path.parts:
+                name = component.casefold()
+                stem = Path(name.lstrip(".")).stem
+                if (
+                    name == ".env"
+                    or name.startswith(".env.")
+                    or stem in {"key", "keys", "ssh", "id_rsa", "id_ed25519", "auth"}
+                    or "credential" in name
+                    or name.startswith(("credentials", "secrets", "private-key", "private_key"))
+                    or name.endswith((".pem", ".key", ".p12", ".pfx"))
+                ):
+                    raise ValueError("Secret and credential paths cannot be review evidence")
+        return values
 
     @model_validator(mode="after")
     def expected_result(self):
         if (self.kind == "result_sha256") != (self.expected_sha256 is not None):
             raise ValueError("Only exact-result acceptance carries a preapproved result hash")
+        if self.kind == "coordinator_checks" and not self.checks:
+            raise ValueError("Coordinator acceptance requires preapproved checks")
+        if self.kind != "coordinator_checks" and (
+            self.checks or self.review_with_grok or self.review_files
+        ):
+            raise ValueError("Checks and review are only allowed in coordinator acceptance")
         return self
 
 
@@ -122,7 +180,10 @@ class ReadyCard(Input):
 
     @model_validator(mode="after")
     def writing_acceptance(self):
-        if self.sandbox == "workspace-write" and self.acceptance.kind != "operator_receipt":
+        if self.sandbox == "workspace-write" and self.acceptance.kind not in {
+            "operator_receipt",
+            "coordinator_checks",
+        }:
             raise ValueError("Writing work requires independently confirmed completion evidence")
         return self
 

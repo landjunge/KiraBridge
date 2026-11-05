@@ -193,6 +193,12 @@ class AutoNextManager:
         return card
 
     def _identity(self, card):
+        if card.acceptance.kind == "coordinator_checks" and not getattr(
+            self, "supports_coordinator_checks", False
+        ):
+            raise BridgeError(
+                "autonext_coordinator_required", "Explicit coordinator adapter required"
+            )
         cfg = self.bridge.config
         team = self.bridge.teams.get(self.settings.principal, self.settings.team_id)
         if team["revision"] != self.settings.team_revision:
@@ -728,6 +734,9 @@ class AutoNextManager:
             if result_sha != card.acceptance.expected_sha256:
                 self._stop("autonext_acceptance_mismatch", item)
                 return False
+        elif card.acceptance.kind == "coordinator_checks":
+            if not self.coordinator_accept(item, work, card):
+                return False
         else:
             confirmed = self.store.db.execute(
                 "SELECT * FROM autonext_confirmations WHERE task_id=?", (item["task_id"],)
@@ -748,6 +757,8 @@ class AutoNextManager:
             "accepted_at": time.time(),
             "scope": "approved task acceptance contract, not blanket product acceptance",
         }
+        if card.acceptance.kind == "coordinator_checks":
+            receipt["coordinator"] = self.coordinator_receipt(item)
         with self.store.transaction():
             current = self.store.db.execute(
                 "SELECT state FROM autonext_items WHERE task_id=?", (item["task_id"],)
@@ -765,6 +776,12 @@ class AutoNextManager:
                 {"receipt_sha256": digest(receipt), "result_sha256": result_sha},
             )
         return True
+
+    def coordinator_accept(self, item, work, card):
+        raise BridgeError("autonext_coordinator_required", "Explicit coordinator adapter required")
+
+    def coordinator_receipt(self, item):
+        raise BridgeError("autonext_coordinator_required", "Explicit coordinator receipt required")
 
     def receipt(self, principal, task_id):
         if principal != self.settings.principal:
@@ -788,6 +805,8 @@ class AutoNextManager:
                 "autonext_operator_required", "Only the bound operator controls this grant"
             )
         self.bridge.teams.get(principal, self.settings.team_id)
+        if args.action == "confirm" and principal == "codex":
+            raise BridgeError("autonext_operator_required", "Codex cannot issue operator receipts")
         if args.action == "confirm":
             item = self.store.db.execute(
                 "SELECT * FROM autonext_items WHERE task_id=? AND grant_id=?",

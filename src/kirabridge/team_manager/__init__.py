@@ -962,6 +962,8 @@ class TeamManager:
                 core_task_id=core_id,
                 session_scope="existing_visible_terminal"
                 if self.config.visible_handoffs.enabled
+                and self.config.team.workers[work["assignee"]].execution_scope
+                == "existing_visible_terminal"
                 else "separate_managed_session",
             )
         return self._work(work_id)

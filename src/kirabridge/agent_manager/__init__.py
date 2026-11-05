@@ -12,6 +12,7 @@ import httpx
 from kirabridge.agent_manager.claude import ClaudeCodeAdapter
 from kirabridge.agent_manager.copilot import CopilotCLIAdapter
 from kirabridge.agent_manager.gemini import GeminiAdapter
+from kirabridge.agent_manager.grok_structured import GrokStructuredAdapter
 from kirabridge.agent_manager.opencode import OpenCodeAdapter
 from kirabridge.bridge_core.config import AgentConfig, Config
 from kirabridge.bridge_core.models import AgentInput, BridgeError, TerminalInput, UncertainExecution
@@ -181,6 +182,11 @@ class CodexAdapter:
             ]
         if config.model:
             command += ["--model", config.model]
+        if config.output_schema:
+            schema = Path(config.output_schema)
+            if not schema.is_absolute() or not schema.is_file():
+                raise BridgeError("agent_schema", "Explicit output schema is unavailable")
+            command += ["--output-schema", str(schema)]
         if owned_resume_session is not None:
             command += [owned_resume_session]
         command += ["-"]
@@ -522,6 +528,7 @@ class AgentManager:
             "codex": CodexAdapter(terminal, config),
             "grok_api": GrokAPIAdapter(),
             "grok_acp": GrokACPAdapter(terminal, config),
+            "grok_structured": GrokStructuredAdapter(terminal),
             "opencode": OpenCodeAdapter(terminal),
             "gemini_cli": GeminiAdapter(terminal),
             "claude_code": ClaudeCodeAdapter(terminal),

@@ -68,6 +68,7 @@ class NativeAdmission:
             and str(arguments.get("pane_id", "")).startswith("terminal:")
             or operation == "agent.execute"
             and self.manager.config.visible_handoffs.enabled
+            and not getattr(self.manager, "is_sealed_managed_task", lambda task: False)(task)
         )
 
     def target(self, task):

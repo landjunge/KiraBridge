@@ -799,7 +799,16 @@ class Bridge:
             )
         if operation == "agent.execute":
             self.teams.authorize_execution(task)
-            return await self.agents.execute(task, args, policy, running, progress)
+            # Only a sealed team assignment may select its configured dedicated worker.
+            # Direct agent requests retain the existing visible route.
+            work = self.store.db.execute(
+                "SELECT assignee FROM team_work WHERE core_task_id=?", (task["id"],)
+            ).fetchone()
+            worker = self.config.team.workers.get(work["assignee"]) if work else None
+            managed = bool(worker and worker.execution_scope == "separate_managed_session")
+            return await self.agents.execute(
+                task, args, policy, running, progress, separate_managed=managed
+            )
         if operation == "autonext.control":
             self.autonext.validate_control(principal, args)
             await running({"evidence_type": "autonext_control", "action": args.action})

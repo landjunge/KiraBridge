@@ -232,7 +232,10 @@ class TeamDispatcher:
             return
         # The fixed recipient selects the authenticated identity. No action,
         # model output, or caller-controlled sender can select another token.
-        async with MCPClientPool(call_timeout=15) as pool:
+        # Submission may inline-observe for MAX_WAIT_SECONDS; leave transport headroom.
+        from kirabridge.task_observation import MAX_WAIT_SECONDS
+
+        async with MCPClientPool(call_timeout=MAX_WAIT_SECONDS + 15) as pool:
             await pool.connect(peer(self.bridge.config, recipient))
             if existing:
                 claimed = work
@@ -412,6 +415,14 @@ class TeamDispatcher:
         limits = self.bridge.config.team
         result = core.get("result") or {}
         text = result.get("text", result.get("final_message", ""))
+        continuation = getattr(self.bridge, "autonext", None)
+        if (
+            continuation is not None
+            and continuation.settings.coordinator_mode
+            and continuation.owns(work["id"])
+        ):
+            # Commentary is retained in Core evidence; acceptance parses only the final message.
+            text = result.get("final_message", text)
         core_result_hash = None
         if isinstance(text, str):
             try:
@@ -450,6 +461,7 @@ class TeamDispatcher:
             "model_turn_completed": True,
             "session_scope": "existing_visible_terminal"
             if self.bridge.config.visible_handoffs.enabled
+            and (not worker or worker.execution_scope == "existing_visible_terminal")
             else "separate_managed_session",
             "completion_scope": "own_work_turn",
             "response_framing": framing,

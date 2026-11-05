@@ -86,6 +86,10 @@ class TeamWorkerConfig(BaseModel):
     cwd: str | None = Field(default=None, min_length=1, max_length=4096)
     timeout: float = Field(default=120, gt=0, le=300)
     response_framing: Literal["strict_json", "work_reply_header"] = "strict_json"
+    # Explicit per-worker route; never a fallback from a busy visible session.
+    execution_scope: Literal["existing_visible_terminal", "separate_managed_session"] = (
+        "existing_visible_terminal"
+    )
 
     @model_validator(mode="after")
     def execution_directory(self):
@@ -124,6 +128,7 @@ class AgentConfig(BaseModel):
     kind: str
     executable: str | None = None
     model: str | None = None
+    output_schema: str | None = Field(default=None, max_length=4096)
     api_key_env: str = "XAI_API_KEY"
     sandbox_mode: Literal["read-only", "workspace-write", "danger-full-access"] = "read-only"
     bridge_tools: bool = False

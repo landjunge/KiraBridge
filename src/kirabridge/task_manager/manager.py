@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import time
 import uuid
+from pathlib import Path
 from typing import Awaitable, Callable
 
 from kirabridge.bridge_core.config import Config
@@ -313,6 +314,48 @@ class TaskManager:
                 (time.time() + self.config.lease_seconds, task_id, self.owner),
             )
 
+    def managed_workers(self):
+        """Only fixed operator-configured team workers may use the managed lane."""
+        if not self.config.team.enabled:
+            return ()
+        return tuple(
+            name
+            for name, worker in self.config.team.workers.items()
+            if worker.agent and worker.execution_scope == "separate_managed_session"
+        )
+
+    def is_sealed_managed_task(self, task):
+        if (
+            task.get("operation") != "agent.execute"
+            or task.get("principal") not in self.managed_workers()
+        ):
+            return False
+        worker = self.config.team.workers[task["principal"]]
+        args = task.get("args", {})
+        timeout = args.get("timeout", 300)
+        if (
+            args.get("agent") != worker.agent
+            or args.get("local_tools", False)
+            or not isinstance(args.get("cwd"), str)
+            or Path(args["cwd"]).expanduser().absolute() != Path(worker.cwd).expanduser().absolute()
+            or type(timeout) not in {int, float}
+            or timeout > worker.timeout
+        ):
+            return False
+        if not self.store.db.execute(
+            "SELECT 1 FROM sqlite_master WHERE type='table' AND name='team_work'"
+        ).fetchone():
+            return False
+        return (
+            self.store.db.execute(
+                "SELECT 1 FROM team_work w JOIN tasks t ON t.id=w.core_task_id "
+                "WHERE t.id=? AND w.assignee=t.principal AND w.core_request_hash=t.request_hash "
+                "AND w.core_request_hash IS NOT NULL",
+                (task["id"],),
+            ).fetchone()
+            is not None
+        )
+
     async def _worker(self, lane: str) -> None:
         while True:
             self.wake.clear()
@@ -324,6 +367,7 @@ class TaskManager:
                 self.config.lease_seconds,
                 lane,
                 native_visible=self.config.visible_handoffs.enabled,
+                managed_workers=self.managed_workers(),
             )
             if task is None:
                 try:
