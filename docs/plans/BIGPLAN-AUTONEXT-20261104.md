@@ -7,11 +7,16 @@ ThreadDesk-Board `482f593429ad`, Notiz „Automatische Fortsetzung aus
 ThreadDesk-Whiteboard“, tatsächlich gelesene Threadrevision 22. Die historischen
 Boards `188ce4729a62` und `1b7530de7c5f` wurden als Kontext gelesen.
 
-**Implementiert; produktiv deaktiviert und nicht installiert.** Die Freigabe für
-den Mechanismus ist vorhanden. Eine konkrete unveränderlich freigegebene
-produktive READY-Liste und ein aktueller belastbarer Budget-/Zugangsbeleg liegen
-noch nicht vor. Alte Ideen, HOLDs und UNKNOWNs wurden weder umgewandelt noch
-abgearbeitet. Windows-Angleichung und Dirks Testpaket bleiben danach priorisiert.
+**Stand 05.11.2026: installiert als RC39@8d33131; globale produktive Aktivierung
+weiter deaktiviert.** Die begrenzte reale native Abnahme mit zwei gepinnten
+read-only-Karten, echten Providerturns und Empfangs-/Abschlussnachweisen ist
+bestanden. Die getestete Reparatur ist regulär mit Rollback installiert.
+Nachweise und verbleibende Produktionsgrenzen stehen in
+[BIGPLAN-UNBLOCK-20261105](../BIGPLAN-UNBLOCK-20261105.md).
+Eine konkrete unveränderlich freigegebene fachliche produktive READY-Liste und
+passende Workerroute für einen Folgegrant liegen weiterhin nicht vor. Alte
+Ideen und unbewiesene UNKNOWNs wurden nicht in ausführbare Aufträge umgewandelt.
+Windows-Angleichung und Dirks Testpaket bleiben danach priorisiert.
 
 ## Vorhandener Ablauf und der fehlende Schritt
 
