@@ -1,0 +1,79 @@
+{
+  "schema": "kirabridge.windows-parity-acceptance.v1",
+  "recorded_at": "2026-11-06T23:03:20.593281+00:00",
+  "technical_acceptance": "passed_bounded_native_scope",
+  "human_or_blanket_product_acceptance": false,
+  "tested_commit": "10ed989ae55ae8d2b38a723a903cfea8ed88c22b",
+  "grok": {
+    "model": "grok-4.7",
+    "effort_set": "high",
+    "setting_evidence": "actual CLI argv and acceptance file",
+    "provider_effort_attestation": "unverified",
+    "initial_session": "01a1b2e2-b5c0-76b3-be11-8095b9c3c293",
+    "last_turn": "cancelled after code commit/package; coordinator independently verified"
+  },
+  "vm": {
+    "uuid": "2B6EE828-02F0-42AE-B4FE-BE57C448F65E",
+    "name": "KiraBridge Windows Dev Fix1",
+    "system": "Windows 11 Enterprise Evaluation AMD64",
+    "python": "3.14.10 (tags/v3.14.10:b703b2c, Oct 25 2026, 17:36:52) [MSC v.1944 64 bit (AMD64)]",
+    "boot_stop_restart_performed": false,
+    "policy_after": "Restricted",
+    "policy_capture_task": "windows-parity-vm-capture-20261106-26"
+  },
+  "package": {
+    "sha256": "6709320ead6f5071d597e747da867de5bb85408cc5cff161e28c779c3b480ea2",
+    "bytes": 2609875,
+    "commit": "10ed989ae55ae8d2b38a723a903cfea8ed88c22b",
+    "payload_inventory_verified": true,
+    "filename": "KiraBridge-0.8.0rc40-Windows-10ed989-native.zip",
+    "kind": "ZIP for existing prepared Python; versioned file installation",
+    "host_bytes_equal_native": true
+  },
+  "checks": {
+    "pipeline_steps": 11,
+    "all_step_exit_codes_zero": true,
+    "keyboard_native_cases": 9,
+    "windows_native_cases": 7,
+    "new_native_groups": {
+      "unicode_text": "passed",
+      "applications": "passed",
+      "console": "passed",
+      "native_powershell_ansi": "passed",
+      "native_powershell_oem": "passed"
+    },
+    "authenticated_new_api_tasks": 9,
+    "all_effects_independently_verified": true,
+    "source_unchanged": true,
+    "baseline_install_update_rollback_restore": true,
+    "data_file_preserved": true,
+    "local_regression_cases": 24,
+    "local_regression_note": "23 passed initially; incorrect substring path assertion fixed; only affected case rerun:1 passed in1.80s. Initial failure retained in coordinator checkpoint.",
+    "ruff": "passed"
+  },
+  "final_installed_release": "C:\\Users\\Kiradev\\AppData\\Local\\KiraParity20261106Grok01\\install\\releases\\0.8.0rc40-10ed989ae55a",
+  "remaining": [
+    "existing Windows Terminal tabs/interactive agent sessions",
+    "standalone EXE/MSI and Windows service/autostart installer",
+    "migration of existing RC31/RC33 setups and all their configuration/state",
+    "Windows 10/Dirk machine and remote ChatGPT/mobile end-to-end",
+    "full macOS AX/clipboard/voice/system-key feature parity"
+  ],
+  "evidence": {
+    "raw_native_pipeline": "docs/evidence/windows-parity-native-raw-20261106.json",
+    "raw_native_pipeline_sha256": "57ec73dfb4edf3f2f22074aaacc98052ffffdb8371a4ce1f80c4141934bb4a3d",
+    "local_state_root": "/Users/landjunge/.local/state/windows-parity-grok-20261106",
+    "driver_sha256": "8aa4cff94c8e7fb3c063cfdacf67969c7558fdf0f574c80c14612c2c0840e7d1",
+    "pipeline_driver_sha256": "48765ba4b03632551f65e97fc018380f6199afba8193239da280d820c6a58904"
+  },
+  "mac_production_changed": false,
+  "cleanup": {
+    "at": "2026-11-06T23:07:00.254720+00:00",
+    "owned_transfer_host_pid_absent": 56173,
+    "owned_transfer_listener_closed": 65394,
+    "owned_guest_console_absence_capture": "windows-parity-vm-capture-20261106-27",
+    "vm_original_minimized_state_restored": true,
+    "native_fixtures_confirmed_absent_in_e2e_report": true,
+    "unknown_replays": false
+  }
+}
