@@ -8,6 +8,8 @@ again.
 
 from __future__ import annotations
 
+import base64
+import codecs
 import hashlib
 import json
 import os
@@ -113,11 +115,50 @@ def _hex64(value: object) -> bool:
     )
 
 
+def _bound_stream(result: dict, name: str) -> bool:
+    """Text, codec, length and hash must describe the same bytes."""
+    text = result.get(name)
+    encoding = result.get(f"{name}_encoding")
+    digest = result.get(f"{name}_sha256")
+    length = result.get(f"{name}_byte_length")
+    if not isinstance(text, str) or result.get(f"{name}_decoded_strict") is not True:
+        return False
+    if result.get(f"{name}_ambiguous") is True:
+        return False
+    if not isinstance(encoding, str) or not encoding:
+        return False
+    if type(length) is not int or not 0 <= length <= RESULT_LIMIT:
+        return False
+    if not _hex64(digest):
+        return False
+    try:
+        raw = text.encode(encoding)
+    except (LookupError, UnicodeEncodeError):
+        return False
+    if len(raw) != length or hashlib.sha256(raw).hexdigest() != digest:
+        return False
+    encoded = result.get(f"{name}_raw_base64")
+    if encoded is None:
+        return True
+    if not isinstance(encoded, str):
+        return False
+    try:
+        return base64.b64decode(encoded, validate=True) == raw
+    except (ValueError, TypeError):
+        return False
+
+
 def valid_console_result(record: dict, result: dict) -> bool:
-    """A late result matches the original task, argv and source identity."""
+    """A completion matches the task and the unchanged output bytes.
+
+    exit_code must be an int. True and False are not exit codes. A hash,
+    length or encoding that does not reproduce the text stays open.
+    """
     if not isinstance(record, dict) or not isinstance(result, dict):
         return False
     if result.get("visible") is not True or result.get("state") != "completed":
+        return False
+    if type(result.get("exit_code")) is not int:
         return False
     if result.get("handoff_id") != record.get("handoff_id"):
         return False
@@ -130,15 +171,7 @@ def valid_console_result(record: dict, result: dict) -> bool:
         return False
     if not path_is_inside(result["runtime_root"], result["import_path"]):
         return False
-    if not isinstance(result.get("stdout"), str) or not isinstance(result.get("stderr"), str):
-        return False
-    for key in ("stdout_sha256", "stderr_sha256"):
-        if not _hex64(result.get(key)):
-            return False
-    for key in ("stdout_encoding", "stderr_encoding"):
-        if not isinstance(result.get(key), str) or not result[key]:
-            return False
-    return True
+    return _bound_stream(result, "stdout") and _bound_stream(result, "stderr")
 
 
 def legacy_code_pages() -> tuple[str, ...]:
@@ -156,24 +189,158 @@ def legacy_code_pages() -> tuple[str, ...]:
     return tuple(names)
 
 
-def decode_console_bytes(data: bytes, *, legacy: tuple[str, ...] | None = None) -> dict:
-    """Return text plus the encoding that produced it. Never raise for bytes."""
-    encodings = ("utf-8", *(legacy_code_pages() if legacy is None else legacy))
-    chosen, text, strict = "latin-1", data.decode("latin-1"), False
-    for encoding in encodings:
-        try:
-            text = data.decode(encoding, "strict")
-        except (LookupError, UnicodeDecodeError):
-            continue
-        chosen, strict = encoding, True
-        break
+def _decode_result(
+    data: bytes,
+    *,
+    text: str,
+    encoding: str | None,
+    strict: bool,
+    ambiguous: bool,
+    status: str,
+    candidates: list[str],
+    requested: str | None,
+) -> dict:
     return {
         "text": text,
-        "encoding": chosen,
+        "encoding": encoding,
         "sha256": hashlib.sha256(data).hexdigest(),
         "byte_length": len(data),
         "decoded_strict": strict,
+        "ambiguous": ambiguous,
+        "text_status": status,
+        "candidate_encodings": candidates,
+        "requested_encoding": requested,
+        "raw_base64": base64.b64encode(data).decode("ascii"),
     }
+
+
+def _output_encoding(value: str | None) -> str | None:
+    if value is None:
+        return None
+    if (
+        not isinstance(value, str)
+        or not 2 <= len(value) <= 32
+        or any(char.isspace() or ord(char) < 33 for char in value)
+    ):
+        raise ValueError("Console output encoding must be a codec name")
+    try:
+        codecs.lookup(value)
+    except LookupError as error:
+        raise ValueError("Console output encoding is unknown") from error
+    return value
+
+
+def _round_trip(data: bytes, encoding: str) -> str | None:
+    try:
+        text = data.decode(encoding, "strict")
+        if text.encode(encoding) == data:
+            return text
+    except (LookupError, UnicodeDecodeError, UnicodeEncodeError):
+        return None
+    return None
+
+
+def decode_console_bytes(
+    data: bytes, *, legacy: tuple[str, ...] | None = None, encoding: str | None = None
+) -> dict:
+    """Decode console bytes without treating every single-byte page as proof.
+
+    `encoding` selects one output codec, for example `cp850`, `cp1252` or
+    `utf-8`. No other page is tried. Without it, UTF-8 is accepted only when
+    the bytes are strict UTF-8. Legacy pages are accepted only when every page
+    that round-trips produces the same text. Disagreeing pages stay ambiguous:
+    `decoded_strict` is false, `text` is empty, and `raw_base64` keeps the bytes.
+    """
+    if not isinstance(data, bytes):
+        raise TypeError("console output must be bytes")
+    if encoding is not None:
+        if not isinstance(encoding, str) or not encoding:
+            return _decode_result(
+                data,
+                text="",
+                encoding=None,
+                strict=False,
+                ambiguous=False,
+                status="decode-failed",
+                candidates=[],
+                requested=None,
+            )
+        text = _round_trip(data, encoding)
+        if text is None:
+            return _decode_result(
+                data,
+                text="",
+                encoding=None,
+                strict=False,
+                ambiguous=False,
+                status="decode-failed",
+                candidates=[],
+                requested=encoding,
+            )
+        return _decode_result(
+            data,
+            text=text,
+            encoding=encoding,
+            strict=True,
+            ambiguous=False,
+            status="selected",
+            candidates=[encoding],
+            requested=encoding,
+        )
+    text = _round_trip(data, "utf-8")
+    if text is not None:
+        return _decode_result(
+            data,
+            text=text,
+            encoding="utf-8",
+            strict=True,
+            ambiguous=False,
+            status="utf-8",
+            candidates=["utf-8"],
+            requested=None,
+        )
+    pages = legacy_code_pages() if legacy is None else legacy
+    decoded = []
+    for name in pages:
+        if not isinstance(name, str) or not name or name.lower() == "utf-8":
+            continue
+        page = _round_trip(data, name)
+        if page is not None:
+            decoded.append((name, page))
+    texts = {page for _, page in decoded}
+    if decoded and len(texts) == 1:
+        name, page = decoded[0]
+        return _decode_result(
+            data,
+            text=page,
+            encoding=name,
+            strict=True,
+            ambiguous=False,
+            status="legacy",
+            candidates=[item for item, _ in decoded],
+            requested=None,
+        )
+    if len(texts) > 1:
+        return _decode_result(
+            data,
+            text="",
+            encoding=None,
+            strict=False,
+            ambiguous=True,
+            status="ambiguous",
+            candidates=[item for item, _ in decoded],
+            requested=None,
+        )
+    return _decode_result(
+        data,
+        text=data.decode("latin-1"),
+        encoding="latin-1",
+        strict=False,
+        ambiguous=False,
+        status="latin-1",
+        candidates=[],
+        requested=None,
+    )
 
 
 def console_plan(
@@ -188,6 +355,7 @@ def console_plan(
     runtime_root: str,
     source_sha256: str,
     import_path: str,
+    output_encoding: str | None = None,
 ) -> dict:
     if any(token.lower() in FORBIDDEN_TOKENS for token in argv):
         raise BridgeError(
@@ -204,6 +372,7 @@ def console_plan(
         or not path_is_inside(runtime_root, import_path)
     ):
         raise ValueError("Console runtime identity is incomplete")
+    selected_encoding = _output_encoding(output_encoding)
     flags = CREATE_NEW_CONSOLE | CREATE_UNICODE_ENVIRONMENT
     if flags & (CREATE_NO_WINDOW | DETACHED_PROCESS):
         raise BridgeError("windows_console_hidden", "Refusing a hidden console handoff")
@@ -222,6 +391,7 @@ def console_plan(
         str(hold_seconds),
         str(timeout_seconds),
         cwd,
+        *(("--encoding", selected_encoding) if selected_encoding else ()),
         *argv,
     ]
     return {
@@ -240,6 +410,7 @@ def console_plan(
         "redirect_stdio": False,
         "environment_keys": tuple(sorted(visible_environment())),
         "command_preview": " ".join(quote_windows(part) for part in argv),
+        "output_encoding": selected_encoding,
     }
 
 
@@ -354,11 +525,83 @@ def run_owned_command(
     }
 
 
+def _parse_console_argv(argv: list[str]):
+    if argv[:1] != ["--"] or len(argv) < 8:
+        return None
+    runtime, expected, handoff_id, result_path, hold_text, timeout_text, cwd, *tail = argv[1:]
+    encoding = None
+    if len(tail) >= 2 and tail[0] == "--encoding":
+        encoding = tail[1]
+        tail = tail[2:]
+    if not tail:
+        return None
+    return (
+        runtime,
+        expected,
+        handoff_id,
+        result_path,
+        hold_text,
+        timeout_text,
+        cwd,
+        encoding,
+        tail,
+    )
+
+
+def _visible_text_state(outcome: dict, stdout: dict, stderr: dict) -> str:
+    unresolved = (
+        stdout["ambiguous"]
+        or stderr["ambiguous"]
+        or stdout["text_status"] == "decode-failed"
+        or stderr["text_status"] == "decode-failed"
+    )
+    if outcome["state"] == "completed" and unresolved:
+        return "open"
+    return outcome["state"]
+
+
+def _write_console(stream, decoded: dict, raw: bytes) -> None:
+    if decoded["decoded_strict"]:
+        stream.write(decoded["text"])
+        return
+    stream.flush()
+    buffer = getattr(stream, "buffer", None)
+    if buffer is not None:
+        buffer.write(raw)
+        buffer.flush()
+
+
+def _stream_fields(name: str, decoded: dict) -> dict:
+    return {
+        name: decoded["text"],
+        f"{name}_encoding": decoded["encoding"],
+        f"{name}_sha256": decoded["sha256"],
+        f"{name}_byte_length": decoded["byte_length"],
+        f"{name}_decoded_strict": decoded["decoded_strict"],
+        f"{name}_ambiguous": decoded["ambiguous"],
+        f"{name}_text_status": decoded["text_status"],
+        f"{name}_candidate_encodings": decoded["candidate_encodings"],
+        f"{name}_requested_encoding": decoded["requested_encoding"],
+        f"{name}_raw_base64": decoded["raw_base64"],
+    }
+
+
 def console_main(argv: list[str]) -> int:
     """Run inside the visible console. Print the child output, then store it."""
-    if argv[:1] != ["--"] or len(argv) < 8:
+    parsed = _parse_console_argv(argv)
+    if parsed is None:
         return 2
-    runtime, expected, handoff_id, result_path, hold_text, timeout_text, cwd, *command = argv[1:]
+    (
+        runtime,
+        expected,
+        handoff_id,
+        result_path,
+        hold_text,
+        timeout_text,
+        cwd,
+        output_encoding,
+        command,
+    ) = parsed
     try:
         hold, timeout = int(hold_text), int(timeout_text)
     except ValueError:
@@ -410,29 +653,22 @@ def console_main(argv: list[str]) -> int:
             body["stderr"] = type(error).__name__
             code = 1
         else:
-            stdout = decode_console_bytes(outcome["stdout"])
-            stderr = decode_console_bytes(outcome["stderr"])
+            stdout = decode_console_bytes(outcome["stdout"], encoding=output_encoding)
+            stderr = decode_console_bytes(outcome["stderr"], encoding=output_encoding)
+            state = _visible_text_state(outcome, stdout, stderr)
             body.update(
                 {
-                    "state": outcome["state"],
+                    "state": state,
                     "exit_code": outcome["exit_code"],
                     "child_pid": outcome["child_pid"],
-                    "stdout": stdout["text"],
-                    "stderr": stderr["text"],
-                    "stdout_encoding": stdout["encoding"],
-                    "stderr_encoding": stderr["encoding"],
-                    "stdout_sha256": stdout["sha256"],
-                    "stderr_sha256": stderr["sha256"],
-                    "stdout_byte_length": stdout["byte_length"],
-                    "stderr_byte_length": stderr["byte_length"],
-                    "stdout_decoded_strict": stdout["decoded_strict"],
-                    "stderr_decoded_strict": stderr["decoded_strict"],
+                    **_stream_fields("stdout", stdout),
+                    **_stream_fields("stderr", stderr),
                 }
             )
-            sys.stdout.write(stdout["text"])
-            if stderr["text"]:
-                sys.stderr.write(stderr["text"])
-            code = 0 if outcome["state"] == "completed" else 1
+            _write_console(sys.stdout, stdout, outcome["stdout"])
+            if outcome["stderr"]:
+                _write_console(sys.stderr, stderr, outcome["stderr"])
+            code = 0 if state == "completed" else 1
     marker = f"KIRABRIDGE_VISIBLE_RESULT {handoff_id} {body['state']} {body['exit_code']}"
     sys.stdout.write(f"\n{marker}\n")
     sys.stdout.flush()

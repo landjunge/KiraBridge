@@ -25,6 +25,7 @@ class WindowsConsoleHandoffInput(Input):
     cwd: str = Field(min_length=3, max_length=240, strict=True)
     timeout_seconds: int = Field(default=8, ge=1, le=8, strict=True)
     hold_seconds: int = Field(default=0, ge=0, le=15, strict=True)
+    output_encoding: str | None = None
 
     @model_validator(mode="after")
     def bounded_command(self):
@@ -34,6 +35,12 @@ class WindowsConsoleHandoffInput(Input):
             raise ValueError("The console directory cannot contain parent segments")
         if any(not isinstance(item, str) or not item or len(item) > 240 for item in self.argv):
             raise ValueError("Each console argument must be a short string")
+        encoding = self.output_encoding
+        if encoding is not None and (
+            not 2 <= len(encoding) <= 32
+            or any(char.isspace() or ord(char) < 33 for char in encoding)
+        ):
+            raise ValueError("output_encoding must be a codec name such as cp850, cp1252, or utf-8")
         return self
 
 
@@ -134,7 +141,13 @@ class WindowsConsoleManager:
             "stderr_encoding": result["stderr_encoding"],
             "stdout_sha256": result["stdout_sha256"],
             "stderr_sha256": result["stderr_sha256"],
-            "exit_code": result.get("exit_code"),
+            "stdout_byte_length": result["stdout_byte_length"],
+            "stderr_byte_length": result["stderr_byte_length"],
+            "stdout_decoded_strict": result["stdout_decoded_strict"],
+            "stderr_decoded_strict": result["stderr_decoded_strict"],
+            "stdout_ambiguous": result.get("stdout_ambiguous") is True,
+            "stderr_ambiguous": result.get("stderr_ambiguous") is True,
+            "exit_code": result["exit_code"],
             "visible": True,
             "deduplicated": not spawned,
             "spawned": spawned,
@@ -219,6 +232,7 @@ class WindowsConsoleManager:
                 runtime_root=identity["runtime_root"],
                 source_sha256=identity["source_sha256"],
                 import_path=identity["import_path"],
+                output_encoding=args.output_encoding,
             )
             if plan["hidden"] or plan["redirect_stdio"]:
                 raise BridgeError("windows_console_hidden", "Refusing a hidden console handoff")

@@ -5,6 +5,10 @@ The zip is a deterministic source payload plus provenance. It is not a
 standalone executable. Install it with the existing Python inside an explicit
 root. PowerShell ExecutionPolicy is never set. A --commit value is accepted
 only when it equals the commit recorded in the payload provenance.
+
+A repository build records `git rev-parse HEAD`. A guest without git can
+rebuild that same zip from an unchanged provenance.json after the file
+inventory matches. The export bytes are not rewritten and git is not invented.
 """
 
 from __future__ import annotations
@@ -12,6 +16,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import re
 import subprocess
 import sys
 import zipfile
@@ -87,6 +92,10 @@ def provenance_document(files: dict[str, bytes]) -> dict:
         "entry": {
             "python": "Existing Python >=3.11. The prepared guest is Python 3.14.10.",
             "build": "python -B scripts/windows_parity_package.py build --output dist/parity.zip",
+            "build_from_export": (
+                "python -B scripts/windows_parity_package.py build "
+                "--output dist/parity.zip --provenance-export provenance.json"
+            ),
             "install": (
                 "python -B scripts/windows_parity_package.py install "
                 "--root <new-root> --payload <extracted-zip>"
@@ -104,23 +113,89 @@ def provenance_document(files: dict[str, bytes]) -> dict:
     }
 
 
-def build(output: Path) -> dict:
+_COMMIT = re.compile(r"[0-9a-f]{40}\Z")
+_INVENTORY_NAME = re.compile(r"[A-Za-z0-9_./-]+\Z")
+
+
+def _hex64(value: object) -> bool:
+    return (
+        isinstance(value, str)
+        and len(value) == 64
+        and all(char in "0123456789abcdef" for char in value)
+    )
+
+
+def _inventory_name(name: object) -> bool:
+    if not isinstance(name, str) or _INVENTORY_NAME.fullmatch(name) is None:
+        return False
+    if name in {"", ".", "..", "provenance.json"} or name.startswith("/") or name.endswith("/"):
+        return False
+    return not name.startswith("../") and "/../" not in f"/{name}/"
+
+
+def read_provenance_export(path: Path) -> tuple[dict, bytes]:
+    """Load one unchanged provenance export. Do not call git and do not rewrite it."""
+    if path.is_symlink() or not path.is_file():
+        raise SystemExit("Refusing a provenance export that is not a regular file")
+    raw = path.read_bytes()
+    try:
+        document = json.loads(raw)
+    except json.JSONDecodeError as error:
+        raise SystemExit("Provenance export is not JSON") from error
+    if not isinstance(document, dict):
+        raise SystemExit("Provenance export must be an object")
+    if document.get("commit_source") != "git-rev-parse-HEAD":
+        raise SystemExit("Refusing a provenance export that did not come from git rev-parse HEAD")
+    if document.get("dirty") is not False:
+        raise SystemExit("Refusing a dirty provenance export")
+    commit = document.get("commit")
+    if not isinstance(commit, str) or _COMMIT.fullmatch(commit) is None:
+        raise SystemExit("Provenance export commit is not a full lowercase hash")
+    files = document.get("files")
+    if not isinstance(files, dict) or not files:
+        raise SystemExit("Provenance export has no file inventory")
+    for name, digest in files.items():
+        if not _inventory_name(name) or not _hex64(digest):
+            raise SystemExit("Provenance export inventory is not a path-to-sha256 map")
+    return document, raw
+
+
+def _require_same_inventory(members: dict[str, bytes], expected: dict) -> None:
+    actual = {name: hashlib.sha256(data).hexdigest() for name, data in members.items()}
+    if actual != expected:
+        raise SystemExit("Refusing changed export bytes: file inventory does not match provenance")
+
+
+def _zip_info(name: str) -> zipfile.ZipInfo:
+    # Pin the system id. Windows CPython would otherwise write 0 and change the hash.
+    info = zipfile.ZipInfo(name)
+    info.date_time = (1980, 1, 1, 0, 0, 0)
+    info.compress_type = zipfile.ZIP_STORED
+    info.create_system = 3
+    info.create_version = 20
+    info.extract_version = 20
+    info.external_attr = 0o644 << 16
+    info.flag_bits = 0
+    return info
+
+
+def build(output: Path, provenance_export: Path | None = None) -> dict:
     output.parent.mkdir(parents=True, exist_ok=True)
     if output.exists():
         output.unlink()
     members = {path.relative_to(ROOT).as_posix(): path.read_bytes() for path in payload_files()}
-    document = provenance_document(members)
-    encoded = json.dumps(document, sort_keys=True, separators=(",", ":")).encode()
+    if provenance_export is None:
+        document = provenance_document(members)
+        encoded = json.dumps(document, sort_keys=True, separators=(",", ":")).encode()
+    else:
+        document, encoded = read_provenance_export(provenance_export)
+        _require_same_inventory(members, document["files"])
     members["provenance.json"] = encoded
     digest = hashlib.sha256()
-    with zipfile.ZipFile(output, "w", compression=zipfile.ZIP_DEFLATED) as archive:
+    with zipfile.ZipFile(output, "w", compression=zipfile.ZIP_STORED) as archive:
         for name in sorted(members):
-            info = zipfile.ZipInfo(name)
-            info.date_time = (1980, 1, 1, 0, 0, 0)
-            info.compress_type = zipfile.ZIP_DEFLATED
-            info.external_attr = 0o644 << 16
             data = members[name]
-            archive.writestr(info, data)
+            archive.writestr(_zip_info(name), data)
             digest.update(name.encode())
             digest.update(data)
     file_hash = hashlib.sha256(output.read_bytes()).hexdigest()
@@ -129,6 +204,7 @@ def build(output: Path) -> dict:
         "sha256": file_hash,
         "content_sha256": digest.hexdigest(),
         "commit": document["commit"],
+        "commit_source": document.get("commit_source"),
         "dirty": document["dirty"],
         "members": len(members),
         "standalone_executable": False,
@@ -151,12 +227,15 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--output", type=Path)
     parser.add_argument("--root", type=Path)
     parser.add_argument("--payload", type=Path)
+    parser.add_argument("--provenance-export", type=Path)
     parser.add_argument("--version", default="0.8.0rc40")
     parser.add_argument("--commit", default="")
     args = parser.parse_args(argv)
+    if args.provenance_export is not None and args.action != "build":
+        raise SystemExit("--provenance-export is only valid for build")
     if args.action == "build":
         output = args.output or Path("dist/KiraBridge-0.8.0rc40-windows-parity-20261106.zip")
-        print(build(output)["sha256"])
+        print(build(output, provenance_export=args.provenance_export)["sha256"])
         return 0
     if args.root is None:
         raise SystemExit("An explicit --root is required")

@@ -1,5 +1,6 @@
 """Portable Windows parity contracts. No Win32 call and no execution-policy change."""
 
+import base64
 import hashlib
 import json
 import os
@@ -27,6 +28,7 @@ from kirabridge.platform_adapters.windows.visible_console import (
     decode_console_bytes,
     legacy_code_pages,
     runtime_identity,
+    valid_console_result,
     visible_environment,
 )
 from kirabridge.windows_apps import WindowsAppFocusInput, WindowsAppLaunchInput, WindowsAppManager
@@ -232,6 +234,32 @@ def test_console_main_returns_unicode_from_the_same_session(tmp_path):
     assert body["visible"] is True
 
 
+def _completed_streams(source, text, stdout, *, encoding="utf-8"):
+    command = source["command"] if "command" in source else source["argv"]
+    return {
+        "handoff_id": source["handoff_id"],
+        "state": "completed",
+        "visible": True,
+        "exit_code": 0,
+        "argv": list(command),
+        "runtime_root": source["runtime_root"],
+        "import_path": source["import_path"],
+        "source_sha256": source["source_sha256"],
+        "stdout": text,
+        "stderr": "",
+        "stdout_encoding": encoding,
+        "stderr_encoding": "utf-8",
+        "stdout_sha256": hashlib.sha256(stdout).hexdigest(),
+        "stderr_sha256": hashlib.sha256(b"").hexdigest(),
+        "stdout_byte_length": len(stdout),
+        "stderr_byte_length": 0,
+        "stdout_decoded_strict": True,
+        "stderr_decoded_strict": True,
+        "stdout_ambiguous": False,
+        "stderr_ambiguous": False,
+    }
+
+
 class Spawner:
     python = r"C:\Python314\python.exe"
 
@@ -252,24 +280,7 @@ class Spawner:
         result = Path(plan["result_path"])
         result.parent.mkdir(parents=True, exist_ok=True)
         result.write_text(
-            json.dumps(
-                {
-                    "handoff_id": plan["handoff_id"],
-                    "state": "completed",
-                    "exit_code": 0,
-                    "argv": list(plan["command"]),
-                    "runtime_root": plan["runtime_root"],
-                    "import_path": plan["import_path"],
-                    "source_sha256": plan["source_sha256"],
-                    "stdout": self.result_text,
-                    "stderr": "",
-                    "stdout_encoding": "utf-8",
-                    "stderr_encoding": "utf-8",
-                    "stdout_sha256": hashlib.sha256(stdout).hexdigest(),
-                    "stderr_sha256": hashlib.sha256(b"").hexdigest(),
-                    "visible": True,
-                }
-            ),
+            json.dumps(_completed_streams(plan, self.result_text, stdout)),
             encoding="utf-8",
         )
         return {"pid": 77}
@@ -390,18 +401,7 @@ async def test_late_result_reconciles_once_without_a_new_start(tmp_path):
         json.dumps(record), encoding="utf-8"
     )
     stdout = "spät".encode()
-    result = {
-        **record,
-        "state": "completed",
-        "exit_code": 0,
-        "stdout": "spät",
-        "stderr": "",
-        "stdout_encoding": "utf-8",
-        "stderr_encoding": "utf-8",
-        "stdout_sha256": hashlib.sha256(stdout).hexdigest(),
-        "stderr_sha256": hashlib.sha256(b"").hexdigest(),
-        "visible": True,
-    }
+    result = _completed_streams(record, "spät", stdout)
     (tmp_path / "windows-console" / "handoff01.result.json").write_text(
         json.dumps(result), encoding="utf-8"
     )
@@ -437,6 +437,66 @@ async def test_late_result_reconciles_once_without_a_new_start(tmp_path):
     assert spawner.calls == 0
 
 
+async def test_inconsistent_receipt_stays_open_without_a_new_start(tmp_path):
+    spawner = Spawner()
+    manager = _manager(tmp_path, spawner)
+    identity = runtime_identity()
+    argv = [r"C:\Python314\python.exe", "-c", "print(1)"]
+    record = {
+        "handoff_id": "goodrec1",
+        "state": "unknown",
+        "argv": argv,
+        "runtime_root": identity["runtime_root"],
+        "import_path": identity["import_path"],
+        "source_sha256": identity["source_sha256"],
+    }
+    valid = _completed_streams(record, "Größe", "Größe".encode())
+    assert valid_console_result(record, valid) is True
+    altered = {
+        **valid,
+        "stdout": "altered",
+        "stdout_sha256": "0" * 64,
+        "stderr_sha256": "0" * 64,
+    }
+    del altered["exit_code"]
+    assert valid_console_result(record, altered) is False
+    mutations = {
+        "badrec00": altered,
+        "badrec01": {**valid, "exit_code": True},
+        "badrec02": {**valid, "stdout_sha256": "0" * 64},
+        "badrec03": {**valid, "stdout_byte_length": valid["stdout_byte_length"] + 1},
+        "badrec04": {**valid, "stdout_encoding": "not-a-codec"},
+        "badrec05": {key: value for key, value in valid.items() if key != "stdout_sha256"},
+        "badrec06": {key: value for key, value in valid.items() if key != "stdout_encoding"},
+        "badrec07": {**valid, "stdout_decoded_strict": False},
+        "badrec08": {**valid, "exit_code": False},
+    }
+    directory = tmp_path / "windows-console"
+    directory.mkdir()
+    (directory / "goodrec1.json").write_text(
+        json.dumps({**record, "state": "unknown"}), encoding="utf-8"
+    )
+    (directory / "goodrec1.result.json").write_text(json.dumps(valid), encoding="utf-8")
+
+    async def running(_event):
+        return None
+
+    task = {"principal": "local", "operation": "windows.console.handoff"}
+    reconciled = await manager.execute(task, _handoff("goodrec1", command=argv), running)
+    assert reconciled["reconciled"] is True and reconciled["spawned"] is False
+    assert reconciled["stdout"] == "Größe"
+    assert type(reconciled["exit_code"]) is int and reconciled["exit_code"] == 0
+    for handoff, result in mutations.items():
+        row = {**record, "handoff_id": handoff, "state": "unknown"}
+        body = {**result, "handoff_id": handoff}
+        assert valid_console_result(row, body) is False
+        (directory / f"{handoff}.json").write_text(json.dumps(row), encoding="utf-8")
+        (directory / f"{handoff}.result.json").write_text(json.dumps(body), encoding="utf-8")
+        with pytest.raises(UncertainExecution):
+            await manager.execute(task, _handoff(handoff, command=argv), running)
+    assert spawner.calls == 0
+
+
 def test_oem_bytes_round_trip_and_do_not_become_unknown(tmp_path, monkeypatch):
     payload = "Größe".encode("cp850")
     monkeypatch.setattr(
@@ -468,7 +528,159 @@ def test_oem_bytes_round_trip_and_do_not_become_unknown(tmp_path, monkeypatch):
     assert body["stdout"] == "Größe"
     assert body["stdout_encoding"] == "cp850"
     assert body["stdout_sha256"] == hashlib.sha256(payload).hexdigest()
+    assert body["stdout_decoded_strict"] is True
+    assert body["stdout_ambiguous"] is False
+    assert body["exit_code"] == 0 and type(body["exit_code"]) is int
     assert legacy_code_pages() == ()
+
+
+def test_cp1252_and_cp850_need_an_explicit_output_encoding():
+    ansi = "Größe".encode("cp1252")
+    oem = "Größe".encode("cp850")
+    guessed = decode_console_bytes(ansi, legacy=("cp850", "cp1252"))
+    assert guessed["text"] == ""
+    assert guessed["encoding"] is None
+    assert guessed["decoded_strict"] is False
+    assert guessed["ambiguous"] is True
+    assert guessed["text_status"] == "ambiguous"
+    assert guessed["candidate_encodings"] == ["cp850", "cp1252"]
+    assert base64.b64decode(guessed["raw_base64"]) == ansi
+    assert guessed["sha256"] == hashlib.sha256(ansi).hexdigest()
+    assert guessed["byte_length"] == len(ansi)
+    assert "Gr÷▀e" not in guessed["text"]
+
+    selected_ansi = decode_console_bytes(ansi, legacy=("cp850", "cp1252"), encoding="cp1252")
+    assert selected_ansi["text"] == "Größe"
+    assert selected_ansi["encoding"] == "cp1252"
+    assert selected_ansi["decoded_strict"] is True
+    assert selected_ansi["ambiguous"] is False
+    assert selected_ansi["requested_encoding"] == "cp1252"
+    assert selected_ansi["text"].encode("cp1252") == ansi
+
+    selected_oem = decode_console_bytes(oem, encoding="cp850")
+    assert selected_oem["text"] == "Größe"
+    assert selected_oem["encoding"] == "cp850"
+    assert selected_oem["decoded_strict"] is True
+    assert selected_oem["ambiguous"] is False
+    assert selected_oem["text"].encode("cp850") == oem
+
+    failed = decode_console_bytes(ansi, encoding="utf-8")
+    assert failed["decoded_strict"] is False
+    assert failed["ambiguous"] is False
+    assert failed["text"] == ""
+    assert failed["text_status"] == "decode-failed"
+    assert base64.b64decode(failed["raw_base64"]) == ansi
+
+
+def test_selected_encoding_and_ambiguous_pages_reach_the_visible_result(tmp_path, monkeypatch):
+    ansi = "Größe".encode("cp1252")
+    oem = "Größe".encode("cp850")
+    ansi_result = tmp_path / "ansi.json"
+    code = console_main(
+        [
+            "--",
+            *_identity_argv(),
+            "handoff01",
+            str(ansi_result),
+            "0",
+            "8",
+            str(tmp_path),
+            "--encoding",
+            "cp1252",
+            sys.executable,
+            "-c",
+            "import sys; sys.stdout.buffer.write(" + repr(ansi) + ")",
+        ]
+    )
+    ansi_body = json.loads(ansi_result.read_text(encoding="utf-8"))
+    assert code == 0
+    assert ansi_body["state"] == "completed"
+    assert ansi_body["stdout"] == "Größe"
+    assert ansi_body["stdout_encoding"] == "cp1252"
+    assert ansi_body["stdout_decoded_strict"] is True
+    assert ansi_body["stdout_requested_encoding"] == "cp1252"
+    assert type(ansi_body["exit_code"]) is int and ansi_body["exit_code"] == 0
+
+    oem_result = tmp_path / "oem.json"
+    code = console_main(
+        [
+            "--",
+            *_identity_argv(),
+            "handoff02",
+            str(oem_result),
+            "0",
+            "8",
+            str(tmp_path),
+            "--encoding",
+            "cp850",
+            sys.executable,
+            "-c",
+            "import sys; sys.stdout.buffer.write(" + repr(oem) + ")",
+        ]
+    )
+    oem_body = json.loads(oem_result.read_text(encoding="utf-8"))
+    assert code == 0
+    assert oem_body["stdout"] == "Größe"
+    assert oem_body["stdout_encoding"] == "cp850"
+    assert oem_body["stdout_decoded_strict"] is True
+
+    monkeypatch.setattr(
+        "kirabridge.platform_adapters.windows.visible_console.legacy_code_pages",
+        lambda: ("cp850", "cp1252"),
+    )
+    open_result = tmp_path / "open.json"
+    code = console_main(
+        [
+            "--",
+            *_identity_argv(),
+            "handoff03",
+            str(open_result),
+            "0",
+            "8",
+            str(tmp_path),
+            sys.executable,
+            "-c",
+            "import sys; sys.stdout.buffer.write(" + repr(ansi) + ")",
+        ]
+    )
+    open_body = json.loads(open_result.read_text(encoding="utf-8"))
+    assert code == 1
+    assert open_body["state"] == "open"
+    assert open_body["stdout"] == ""
+    assert open_body["stdout_decoded_strict"] is False
+    assert open_body["stdout_ambiguous"] is True
+    assert open_body["stdout_candidate_encodings"] == ["cp850", "cp1252"]
+    assert base64.b64decode(open_body["stdout_raw_base64"]) == ansi
+    assert open_body["stdout_sha256"] == hashlib.sha256(ansi).hexdigest()
+
+
+def test_handoff_plan_passes_output_encoding_to_the_visible_console():
+    args = WindowsConsoleHandoffInput.model_validate(
+        {
+            "handoff_id": "handoff01",
+            "argv": ["powershell.exe", "-NoProfile", "-Command", "[Console]::Write('Größe')"],
+            "cwd": r"C:\Temp",
+            "output_encoding": "cp1252",
+        }
+    )
+    identity = runtime_identity()
+    plan = console_plan(
+        python=r"C:\Python314\python.exe",
+        handoff_id=args.handoff_id,
+        result_path=r"C:\Temp\result.json",
+        cwd=args.cwd,
+        argv=tuple(args.argv),
+        hold_seconds=args.hold_seconds,
+        timeout_seconds=args.timeout_seconds,
+        runtime_root=identity["runtime_root"],
+        source_sha256=identity["source_sha256"],
+        import_path=identity["import_path"],
+        output_encoding=args.output_encoding,
+    )
+    selected = plan["argv"].index("--encoding")
+    assert plan["output_encoding"] == "cp1252"
+    assert plan["argv"][selected + 1] == "cp1252"
+    assert plan["argv"][selected + 2] == "powershell.exe"
 
 
 def test_invalid_utf8_keeps_byte_evidence(tmp_path, monkeypatch):
@@ -720,6 +932,7 @@ def test_zip_install_imports_the_activated_runtime_and_rejects_a_foreign_commit(
     assert "scripts/accept_windows_keyboard.py" in archive_names
     assert "scripts/accept_windows_windows.py" in archive_names
     assert built["standalone_executable"] is False
+    assert built["commit_source"] == "git-rev-parse-HEAD"
     extracted = tmp_path / "extracted"
     extracted.mkdir()
     __import__("zipfile").ZipFile(output).extractall(extracted)
@@ -802,3 +1015,87 @@ def test_extracted_payload_roundtrip_does_not_call_git(tmp_path):
     assert report["data"] == "behalten"
     assert commit[:12] in report["first_import"]["import_path"]
     assert report["first_import"]["import_path"] != report["second_import"]["import_path"]
+
+
+def _parity_package_module():
+    import importlib.util
+
+    script = Path(__file__).resolve().parents[1] / "scripts" / "windows_parity_package.py"
+    spec = importlib.util.spec_from_file_location("windows_parity_package_export", script)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def _export_document(module):
+    members = {
+        path.relative_to(module.ROOT).as_posix(): path.read_bytes()
+        for path in module.payload_files()
+    }
+    document = {
+        "commit": "3f8ab70abc1234567890abcdef1234567890abcd",
+        "commit_source": "git-rev-parse-HEAD",
+        "dirty": False,
+        "version": "0.8.0rc40",
+        "standalone_executable": False,
+        "kind": "existing-python-plus-zip",
+        "files": {name: hashlib.sha256(data).hexdigest() for name, data in members.items()},
+    }
+    raw = json.dumps(document, sort_keys=True, separators=(",", ":")).encode()
+    return document, raw
+
+
+def test_validated_export_rebuilds_without_git_and_refuses_changes(tmp_path, monkeypatch):
+    import zipfile
+
+    module = _parity_package_module()
+
+    def git_missing(*_args, **_kwargs):
+        raise FileNotFoundError("git")
+
+    monkeypatch.setattr(module.subprocess, "check_output", git_missing)
+    document, raw = _export_document(module)
+    export = tmp_path / "provenance.json"
+    export.write_bytes(raw)
+    first = module.build(tmp_path / "one.zip", provenance_export=export)
+    second = module.build(tmp_path / "two.zip", provenance_export=export)
+    assert first["sha256"] == second["sha256"]
+    assert first["dirty"] is False
+    assert first["commit_source"] == "git-rev-parse-HEAD"
+    assert first["commit"] == document["commit"]
+    with zipfile.ZipFile(tmp_path / "one.zip") as archive:
+        assert archive.read("provenance.json") == raw
+        info = archive.getinfo("src/kirabridge/__init__.py")
+        assert info.compress_type == zipfile.ZIP_STORED
+        assert info.create_system == 3
+    changed = json.loads(raw)
+    changed["files"]["pyproject.toml"] = "0" * 64
+    changed_path = tmp_path / "changed.json"
+    changed_path.write_bytes(json.dumps(changed, sort_keys=True, separators=(",", ":")).encode())
+    with pytest.raises(SystemExit, match="changed export bytes"):
+        module.build(tmp_path / "changed.zip", provenance_export=changed_path)
+    dirty = json.loads(raw)
+    dirty["dirty"] = True
+    dirty_path = tmp_path / "dirty.json"
+    dirty_path.write_bytes(json.dumps(dirty, sort_keys=True, separators=(",", ":")).encode())
+    with pytest.raises(SystemExit, match="dirty provenance export"):
+        module.build(tmp_path / "dirty.zip", provenance_export=dirty_path)
+    invented = json.loads(raw)
+    invented["commit_source"] = "guest-without-git"
+    invented_path = tmp_path / "invented.json"
+    invented_path.write_bytes(
+        json.dumps(invented, sort_keys=True, separators=(",", ":")).encode()
+    )
+    with pytest.raises(SystemExit, match="git rev-parse HEAD"):
+        module.build(tmp_path / "invented.zip", provenance_export=invented_path)
+
+
+def test_repository_provenance_still_uses_git_rev_parse():
+    module = _parity_package_module()
+    observed = module.git_provenance()
+    commit = subprocess.check_output(
+        ["git", "rev-parse", "HEAD"], cwd=module.ROOT, text=True
+    ).strip()
+    assert observed["commit"] == commit
+    assert observed["commit_source"] == "git-rev-parse-HEAD"
+    assert type(observed["dirty"]) is bool
