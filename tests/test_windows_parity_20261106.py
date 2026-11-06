@@ -837,9 +837,7 @@ def test_package_rejects_links_tampering_and_foreign_rollback(tmp_path):
     (second / "app.py").write_text("print('two')\n", encoding="utf-8")
     installed = install(install_root, first, version="0.8.0rc40", commit="d12838ae97c7")
     (install_root / "data" / "keep.txt").write_text("behalten", encoding="utf-8")
-    updated = install(
-        install_root, second, version="0.8.0rc40", commit="aabbccddeeff", update=True
-    )
+    updated = install(install_root, second, version="0.8.0rc40", commit="aabbccddeeff", update=True)
     release = install_root / "releases" / installed["release"]
     (release / "app.py").write_text("tampered\n", encoding="utf-8")
     before = (install_root / "current.json").read_bytes()
@@ -1083,9 +1081,7 @@ def test_validated_export_rebuilds_without_git_and_refuses_changes(tmp_path, mon
     invented = json.loads(raw)
     invented["commit_source"] = "guest-without-git"
     invented_path = tmp_path / "invented.json"
-    invented_path.write_bytes(
-        json.dumps(invented, sort_keys=True, separators=(",", ":")).encode()
-    )
+    invented_path.write_bytes(json.dumps(invented, sort_keys=True, separators=(",", ":")).encode())
     with pytest.raises(SystemExit, match="git rev-parse HEAD"):
         module.build(tmp_path / "invented.zip", provenance_export=invented_path)
 

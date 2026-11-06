@@ -78,9 +78,7 @@ def git_provenance() -> dict:
 
 def provenance_document(files: dict[str, bytes]) -> dict:
     observed = git_provenance()
-    inventory = {
-        name: hashlib.sha256(data).hexdigest() for name, data in sorted(files.items())
-    }
+    inventory = {name: hashlib.sha256(data).hexdigest() for name, data in sorted(files.items())}
     return {
         "commit": observed["commit"],
         "commit_source": observed["commit_source"],
@@ -102,7 +100,7 @@ def provenance_document(files: dict[str, bytes]) -> dict:
             ),
             "import": (
                 "python -P -B -c \"import sys; sys.path.insert(0, r'<release>/src'); "
-                "import kirabridge; print(kirabridge.__file__)\""
+                'import kirabridge; print(kirabridge.__file__)"'
             ),
             "dependencies": (
                 "Use the prepared Python environment. If a module is missing, install it only "

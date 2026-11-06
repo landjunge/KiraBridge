@@ -181,9 +181,7 @@ def activate_roundtrip(root: Path, payload: Path, commit: str) -> dict:
     (root / "install" / "data" / "keep.txt").write_text("behalten", encoding="utf-8")
     first = _import_release(root / "install" / "releases" / installed["release"] / "src")
     copy, copy_commit = _distinguished(payload, root / "copy")
-    updated = install(
-        root / "install", copy, version="0.8.0rc40", commit=copy_commit, update=True
-    )
+    updated = install(root / "install", copy, version="0.8.0rc40", commit=copy_commit, update=True)
     second = _import_release(root / "install" / "releases" / updated["release"] / "src")
     restored = rollback(root / "install")
     rolled = _import_release(root / "install" / "releases" / restored["release"] / "src")
