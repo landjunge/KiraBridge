@@ -11,6 +11,9 @@ struct AccessibilityBatchHarness {
         var scalarReads = 0, scalarActions = 0, scalarValueReads = 0
         var batchCalls = 0, batchActions = 0, fallbackCalls = 0, prepares = 0
         var requested: [[String]] = [], currentTitle = "synthetic title", fallbackSecure = false
+        var optionalRecovered = false
+        let optionalFailure = ["optional_both_failure", "optional_failure_fallback",
+            "secure_optional_failure", "optional_failure_recovery"].contains(scenario)
         let isSecure = scenario.hasPrefix("secure")
         func errorValue(_ error: AXError) -> CFTypeRef {
             var value = error
@@ -18,27 +21,42 @@ struct AccessibilityBatchHarness {
         }
         func fixtureValue(_ name: String) -> CFTypeRef {
             if name == kAXRoleAttribute {
+                if scenario == "role_failure" { return errorValue(.failure) }
                 if scenario == "missing_role" { return kCFNull }
                 if scenario == "bad_role_type" { return NSNumber(value: 7) }
                 if scenario == "wrapped_success" { return errorValue(.success) }
                 return (scenario == "secure_role" ? "AXSecureTextField" : "AXTextField") as CFString
             }
             if name == kAXSubroleAttribute {
+                if scenario == "classification_failure" { return errorValue(.failure) }
                 if scenario == "bad_subrole_type" { return NSNumber(value: 8) }
                 if scenario == "classification_error" { return errorValue(.cannotComplete) }
                 return (isSecure || fallbackSecure ? "AXSecureTextField" : "") as CFString
             }
             if name == kAXTitleAttribute {
+                if scenario == "title_failure" { return errorValue(.failure) }
                 if scenario == "metadata_error" { return errorValue(.cannotComplete) }
                 if scenario == "slot_not_implemented" { return errorValue(.notImplemented) }
                 if scenario == "missing_optional" { return kCFNull }
                 return currentTitle as CFString
             }
             if name == kAXDescriptionAttribute {
+                if scenario == "description_cannot_complete" { return errorValue(.cannotComplete) }
+                if scenario == "description_not_implemented" { return errorValue(.notImplemented) }
+                if optionalFailure || scenario == "optional_description_failure" {
+                    return optionalRecovered ? "" as CFString : errorValue(.failure)
+                }
                 return scenario == "missing_optional" ? errorValue(.noValue) : "synthetic description" as CFString
             }
-            if name == kAXIdentifierAttribute { return "synthetic-id" as CFString }
+            if name == kAXIdentifierAttribute {
+                if scenario == "identifier_invalid_element" { return errorValue(.invalidUIElement) }
+                if optionalFailure || scenario == "optional_identifier_failure" {
+                    return optionalRecovered ? "" as CFString : errorValue(.failure)
+                }
+                return "synthetic-id" as CFString
+            }
             if name == kAXValueAttribute {
+                if scenario == "value_failure" { return errorValue(.failure) }
                 return scenario == "numeric_value" ? NSNumber(value: 42) : "synthetic value" as CFString
             }
             if name == kAXEnabledAttribute {
@@ -59,6 +77,7 @@ struct AccessibilityBatchHarness {
         }
         func scalarSummary() throws -> [String: Any] {
             var failure: Error?
+            var unavailable: Set<String> = []
             do {
                 let summary = try SystemControl.observedSummary(prepare: {}, read: { name in
                     guard failure == nil else { return nil }
@@ -71,9 +90,10 @@ struct AccessibilityBatchHarness {
                         if AXValueGetType(wrapped) == .axError {
                             var error = AXError.failure
                             _ = AXValueGetValue(wrapped, .axError, &error)
-                            if error == .attributeUnsupported || error == .noValue { return nil }
-                            failure = SystemControl.failure("macos_accessibility_unavailable", "synthetic scalar error")
-                            return nil
+                            do {
+                                return try SystemControl.treeAttributeValue(name, status: error, value: nil,
+                                    unavailableMetadata: { unavailable.insert($0) })
+                            } catch { failure = error; return nil }
                         }
                     }
                     if [kAXRoleAttribute, kAXSubroleAttribute].contains(name), !(value is String) {
@@ -84,7 +104,7 @@ struct AccessibilityBatchHarness {
                 }, actionNames: {
                     scalarActions += 1
                     return scenario == "actions_not_implemented" ? nil : [kAXPressAction]
-                })
+                }, unavailableMetadata: { unavailable.sorted() })
                 if let error = failure { throw error }
                 return summary
             } catch { throw failure ?? error }
@@ -109,7 +129,10 @@ struct AccessibilityBatchHarness {
                     return (.notImplemented, nil)
                 }
                 if scenario == "secure_fallback" && batchCalls == 2 { return (.notImplemented, nil) }
+                if scenario == "optional_failure_fallback" && batchCalls == 2 { return (.notImplemented, nil) }
                 if scenario == "fallback_new_secure" && batchCalls == 2 { return (.notImplemented, nil) }
+                if scenario == "whole_failure" { return (.failure, nil) }
+                if scenario == "whole_metadata_failure" && batchCalls == 2 { return (.failure, nil) }
                 if scenario == "whole_error" { return (.cannotComplete, nil) }
                 if scenario == "whole_unsupported" { return (.attributeUnsupported, nil) }
                 if scenario == "success_nil" { return (.success, nil) }
@@ -141,6 +164,13 @@ struct AccessibilityBatchHarness {
                 let second = try batched()
                 result["second_summary"] = second
                 result["fresh_revision_changed"] = candidate["revision"] as? String != second["revision"] as? String
+            }
+            if scenario == "optional_failure_recovery" {
+                optionalRecovered = true
+                let second = try batched()
+                result["second_summary"] = second
+                result["recovery_revision_changed"] = candidate["revision"] as? String != second["revision"] as? String
+                result["recovery_matches_scalar"] = NSDictionary(dictionary: try scalarSummary()).isEqual(to: second)
             }
         } catch let failure as SystemBridgeFailure { result["error"] = failure.code }
         catch SystemControl.TreeReadLimit.deadline { result["error"] = "deadline" }
