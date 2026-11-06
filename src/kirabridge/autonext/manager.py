@@ -260,6 +260,8 @@ class AutoNextManager:
 
     def _queue_note(self, task_id, phase, details):
         key = "autonext-" + digest([self.settings.grant_id, task_id, phase])[:48]
+        if phase == "claimed" and getattr(self, "continuation_guard", None):
+            key = "autonext-claim-" + digest([self.settings.board_id, task_id])[:40]
         content = canonical(
             {
                 "autonext": 1,
@@ -521,6 +523,8 @@ class AutoNextManager:
             self._budget()
             if self._card(approved) != card:
                 raise BridgeError("autonext_source_changed", "Source changed during preflight")
+            if guard := getattr(self, "continuation_guard", None):
+                guard(card)
             cwd, identity = self._identity(card)
             if self.store.db.execute(
                 "SELECT 1 FROM autonext_items WHERE grant_id=? AND state='waiting'",
@@ -549,12 +553,28 @@ class AutoNextManager:
                     raise BridgeError(
                         "autonext_worktree_busy", "Another agent task owns the worktree"
                     )
+            review_scope = bool(getattr(self, "supports_coordinator_checks", False))
             for row in self.store.db.execute(
-                "SELECT assignee FROM team_work WHERE state NOT IN "
+                "SELECT w.assignee,"
+                + ("coalesce(i.cwd,p.cwd)" if review_scope else "i.cwd")
+                + " AS pinned_cwd,t.args AS core_args FROM team_work w "
+                "LEFT JOIN autonext_items i ON i.work_id=w.id "
+                + (
+                    "LEFT JOIN autonext_coordinator r ON w.id IN (r.grok_work_id,r.verify_work_id) "
+                    "LEFT JOIN autonext_items p ON p.task_id=r.task_id "
+                    if review_scope
+                    else ""
+                )
+                + "LEFT JOIN tasks t ON t.id=w.core_task_id WHERE w.state NOT IN "
                 "('completed','failed','blocked','cancelled')"
             ):
                 worker = self.bridge.config.team.workers.get(row["assignee"])
-                if worker and worker.cwd and overlaps(worker.cwd, cwd):
+                other_cwd = row["pinned_cwd"]
+                if not other_cwd and row["core_args"]:
+                    other_cwd = json.loads(row["core_args"]).get("cwd")
+                if not other_cwd:
+                    other_cwd = worker.cwd if worker else None
+                if other_cwd and overlaps(other_cwd, cwd):
                     raise BridgeError(
                         "autonext_worktree_busy", "Existing or unknown team work owns the worktree"
                     )
@@ -740,6 +760,8 @@ class AutoNextManager:
                 "autonext_worktree_busy", "Task does not own the approved worktree lease"
             )
         self._budget()
+        if guard := getattr(self, "continuation_guard", None):
+            guard(ReadyCard.model_validate_json(item["card"]))
         if self.settings.legacy_scope_pins:
             self._check_existing_routes(cwd)
         if item["lease_until"] - time.time() < self.bridge.config.team.workers["codex"].timeout + 5:

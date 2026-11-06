@@ -2,6 +2,8 @@
 
 Nutzerauftrag vom 05.11.2026. Der lokale Codex-Koordinator nimmt nacheinander ausdrücklich freigegebene ThreadDesk-Karten an. Er nutzt vorhandenes AutoNext, TeamWork, versiegelte Core-Tasks, Claims, Worktree-Leases und Outbox. Die bisherige Codex/Grok-Übergabe bleibt erhalten. Es entsteht keine zweite Aufgabenqueue.
 
+Ergänzung vom 06.11.2026: Der [Fortsetzungs-Supervisor](COORDINATOR-CONTINUATION-20261106.md) verwendet denselben Ablauf mit bestehendem Nutzerauftrag und interner Aufgabenzuordnung. Die folgenden Einzelpin-Regeln beschreiben den ursprünglichen manuellen Batchmodus; daraus entsteht keine zusätzliche Nutzerfreigabe für bereits beauftragte Folgearbeit.
+
 Die neue Route ist ein eigenes KiraBridge-Profil mit privatem Zustand, eigenem Arbeitsbereich und eigener Loopback-Verbindung für den bestehenden TeamDispatcher. Der produktive Bridge-Dienst und dessen sichtbare Codex-/Grok-Bindungen werden weder verändert noch neu gestartet. `TeamWorker.execution_scope=separate_managed_session` ist ausdrücklich konfiguriert. Der Standard bleibt `existing_visible_terminal`; direkte Aufträge können keine andere Route über Eingabefelder wählen. Das globale Visible-Flag bleibt eingeschaltet. Nur ein versiegelter Teamauftrag kann den separaten Workerpfad nutzen.
 
 Der C1-Quellkandidat wählt den Koordinatormanager inzwischen direkt durch `autonext.coordinator_mode=true` im KiraBridge-Core. Der Runtimeadapter verwendet diese native Auswahl statt eines eigenen Manageraustauschs. Ein optionales, im Grant gebundenes `completion_target` liefert terminale Meldungen über das vorhandene Completion-Postfach; MCP `coordinator_status` liest den begrenzten aktuellen Stand. Vertrag und getrennte Liefergrenzen: [Native Koordination C1](COORDINATOR-NATIVE-20261106.md).

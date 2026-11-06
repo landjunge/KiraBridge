@@ -10,6 +10,7 @@ import hashlib
 import json
 import os
 import re
+from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
 from uuid import uuid4
@@ -139,6 +140,44 @@ def append_whiteboard(
     actor_name = _actor(actor)
     board = _inside(root, root / "whiteboard" / thread_id)
     board.mkdir(mode=0o700, exist_ok=True)
+    # Share ThreadDesk JsonStore's existing append lock. In particular a common
+    # logical-task external_key must reserve exactly one coordinator across
+    # independent Bridge stores, rather than racing two read/append sequences.
+    with _append_lock(board):
+        return _append_locked(
+            board, thread_path, thread_id, actor_name, chosen_actor_type, chosen_type, text, key
+        )
+
+
+@contextmanager
+def _append_lock(board):
+    fd = os.open(
+        board / ".append.lock", os.O_RDWR | os.O_CREAT | getattr(os, "O_NOFOLLOW", 0), 0o600
+    )
+    with os.fdopen(fd, "a+b") as lock:
+        if os.name == "nt":
+            import msvcrt
+
+            if lock.seek(0, os.SEEK_END) == 0:
+                lock.write(b" ")
+                lock.flush()
+            lock.seek(0)
+            msvcrt.locking(lock.fileno(), msvcrt.LK_LOCK, 1)
+        else:
+            import fcntl
+
+            fcntl.flock(lock.fileno(), fcntl.LOCK_EX)
+        try:
+            yield
+        finally:
+            lock.seek(0)
+            if os.name == "nt":
+                msvcrt.locking(lock.fileno(), msvcrt.LK_UNLCK, 1)
+            else:
+                fcntl.flock(lock.fileno(), fcntl.LOCK_UN)
+
+
+def _append_locked(board, thread_path, thread_id, actor_name, actor_type, entry_type, text, key):
     existing = _load_entries(board)
     if key:
         for current in existing:
@@ -146,9 +185,9 @@ def append_whiteboard(
                 continue
             if (
                 current.get("content") != text
-                or current.get("entry_type") != chosen_type
+                or current.get("entry_type") != entry_type
                 or current.get("actor") != actor_name
-                or current.get("actor_type") != chosen_actor_type
+                or current.get("actor_type") != actor_type
             ):
                 raise BridgeError("conflict", "Whiteboard key already stores different content")
             return _confirmation(current, duplicate=True)
@@ -160,8 +199,8 @@ def append_whiteboard(
         "thread_id": thread_id,
         "ordinal": ordinal,
         "actor": actor_name,
-        "actor_type": chosen_actor_type,
-        "entry_type": chosen_type,
+        "actor_type": actor_type,
+        "entry_type": entry_type,
         "content": text,
         "external_key": key,
         "created_at": created_at,
@@ -297,6 +336,7 @@ def _full_entries(board: Path) -> list[dict]:
                 "content_sha256": hashlib.sha256(content.encode()).hexdigest(),
                 "truncated": len(content) > _CONTENT_LIMIT,
                 "untrusted": True,
+                **{key: item.get(key) for key in ("task_id", "handoff_id", "run_id", "metadata")},
             }
         )
     return rows

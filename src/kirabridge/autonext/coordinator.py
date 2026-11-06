@@ -355,6 +355,8 @@ class CoordinatedAutoNext(AutoNextManager):
             raise BridgeError("autonext_worktree_busy", "Review no longer owns the parent lease")
         self._budget()
         card = ReadyCard.model_validate_json(parent["card"])
+        if guard := getattr(self, "continuation_guard", None):
+            guard(card)
         approved = next((c for c in self.settings.cards if c.task_id == card.task_id), None)
         if approved is None or canonical(self._card(approved).model_dump()) != parent["card"]:
             raise BridgeError("autonext_source_changed", "Review source changed")
@@ -433,9 +435,11 @@ class CoordinatedAutoNext(AutoNextManager):
             await asyncio.gather(*self._check_tasks.values(), return_exceptions=True)
 
     @staticmethod
-    async def _run_checks(card):
+    async def _run_checks(card, *, before_check=None):
         results = []
         for check in card.acceptance.checks:
+            if before_check is not None:
+                before_check()
             # The existing platform adapter owns and reaps only this process group.
             with tempfile.TemporaryFile() as output:
                 process = None
@@ -481,7 +485,27 @@ class CoordinatedAutoNext(AutoNextManager):
                     return {"passed": False, "checks": results}
         return {"passed": True, "checks": results}
 
+    async def _guarded_checks(self, card):
+        if guard := getattr(self, "continuation_guard", None):
+
+            def before_check():
+                item = self.store.db.execute(
+                    "SELECT work_id FROM autonext_items WHERE task_id=?", (card.task_id,)
+                ).fetchone()
+                if item is None or not self.work_ready(item["work_id"]):
+                    raise BridgeError(
+                        "continuation_stopped", "Check chain no longer owns its grant"
+                    )
+                self._budget()
+                guard(card)
+
+            before_check()
+            return await self._run_checks(card, before_check=before_check)
+        return await self._run_checks(card)
+
     def coordinator_accept(self, item, work, card):
+        if guard := getattr(self, "continuation_guard", None):
+            guard(card)
         self._identity(card)
         if time.time() >= item["lease_until"]:
             raise BridgeError("autonext_review_timeout", "Review/check lease expired")
@@ -544,7 +568,7 @@ class CoordinatedAutoNext(AutoNextManager):
                 "UPDATE autonext_coordinator SET checks_state='running' WHERE task_id=?",
                 (item["task_id"],),
             )
-        task = asyncio.create_task(self._run_checks(card))
+        task = asyncio.create_task(self._guarded_checks(card))
         self._check_tasks[item["task_id"]] = task
         task.add_done_callback(lambda done: self.notify())
         return False
