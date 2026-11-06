@@ -253,6 +253,37 @@ async def test_live_gate_changed_in_progress_stops_before_spawn(routed, change):
     assert applied and not starts(r)
 
 
+@pytest.mark.parametrize("change", ["budget", "claim"])
+async def test_last_shim_io_revocation_is_checked_before_native_start(routed, monkeypatch, change):
+    import kirabridge.capability_routing.integration as integration
+
+    r = routed
+    original = integration.effort_shim
+    shim_calls = 0
+    revoked = False
+
+    def revoked_during_io(decision, state_dir):
+        nonlocal shim_calls, revoked
+        shim_calls += 1
+        path = original(decision, state_dir)
+        # Config creation, adapter preflight, then the actual TerminalManager callback.
+        if shim_calls == 3:
+            if change == "budget":
+                r.cfg.autonext.budget_state = "exhausted"
+            else:
+                r.b.store.db.execute(
+                    "UPDATE team_work SET claimed=NULL WHERE core_task_id IS NOT NULL"
+                )
+            revoked = True
+        return path
+
+    monkeypatch.setattr(integration, "effort_shim", revoked_during_io)
+    status = await complete(r)
+    assert revoked and shim_calls >= 3
+    assert starts(r) == [], "Authority withdrawn during last shim I/O must prevent native starts"
+    assert status["state"] == "stopped", status
+
+
 @pytest.mark.parametrize("routed", ["workspace-write"], indirect=True)
 async def test_write_profile_requires_original_sandbox_and_runtime_grant(routed):
     r = routed

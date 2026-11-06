@@ -135,8 +135,9 @@ class RoutedAdapter:
         if self.authorize is not None:
 
             def before_spawn():
-                self.authorize(task, args, profile, decision)
+                # Finish shim file I/O before the final live authority check.
                 effort_shim(decision, self.guard.runtime.state_dir)
+                self.authorize(task, args, profile, decision)
 
             before_spawn()
             kwargs = {**kwargs, "before_spawn": before_spawn}

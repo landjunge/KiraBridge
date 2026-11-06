@@ -64,6 +64,8 @@ Matrix-ID, Revision **und** Inhaltsdigest sowie Runtime-/Profilbindung erneut.
 Derselbe synchrone Callback läuft im vorhandenen nativen Spawnpfad unmittelbar
 vor dem Prozessstart, nach möglichen Warte-/Progressschritten. Dabei werden Team-
 Autorisierung und der vorhandene Worktree-/Lease-/Budgetguard erneut aufgerufen.
+Dateierzeugung und Inhaltsprüfung des Effortwrappers erfolgen vor diesem letzten
+Livecheck; danach folgt der vorhandene Spawnaufruf.
 Ein gekippter Claim, abgelaufener Lease/Budgetbeleg oder geänderte Matrix stoppt
 ohne Modellstart. Kein unvermeidlicher Profilkonflikt führt zu einem anderen Provider.
 
@@ -109,8 +111,19 @@ Erprobungsziel; C2 erfindet dafür keine weitere Rolle oder zusätzliche Realsta
   Workerchain/Configimmuabilität 2 bestanden; die neue direkte Fixture hatte zuerst
   keinen PATH (gesonderter Umgebungsfehler). Korrigierte Billing-/UNKNOWNproben:
   2 bestanden in2,48s. Der alte Fehlversuch bleibt erhalten, kein Produkt-PASS daraus.
-- Ruff, Format- und Diffprüfung bestanden. Unabhängiger C2-Lesereview folgt auf
-  dem exakten Freeze; dessen Ergebnis steht getrennt im Board/Handoff.
+- Der unabhängige Review des ersten Freeze `6159640` fand Datei-I/O des
+  Effortwrappers nach der letzten Autorisierung: Budgetentzug dabei erlaubte einen,
+  Claimrücknahme drei synthetische Starts. Eigene zwei Negativregressionen gegen
+  den unveränderten Produktcode scheiterten ebenso in9,88s. Die enge Korrektur
+  prüft den Wrapper zuerst und autorisiert danach: beide Fälle bestanden in2,32s,
+  jeweils ohne Start. Alte Belege bleiben erhalten; neuer exakter Reviewfreeze
+  und dessen unabhängiger Nachtest werden getrennt im Board/Handoff dokumentiert.
+- Nach der Korrektur bestanden 82 betroffene native und bisherige Routerfälle in
+  37,04s. Die zusätzliche ausdrückliche Entzugsbestätigung verhindert einen
+  scheinbaren Erfolg bei frühem Shimabbruch: beide verschärften Proben bestanden
+  danach in2,62s. Diese Läufe überlappen und werden nicht addiert.
+- Ruff, Format- und Diffprüfung bestanden. Unabhängige Abnahme bleibt bis zum
+  Nachtest der Korrektur offen.
 
 Einstieg: `tests/test_native_capability_routing.py`. `Bridge(..., routing_guard=...)`
 ist eine explizite vertrauenswürdige Dependency-Injektion für vorhandene Reader/
