@@ -189,12 +189,21 @@ class HttpHandoffPeer:
             "envelope_sha256": digest(envelope),
         }
         receipt = await self._post_call("reserve_handoff_delivery", marker)
-        lookup = await self.call("get_issued_handoff", {"handoff_id": marker["handoff_id"]})
+        # The reservation may already be durable. A failed readback cannot turn
+        # that write into a safe rejection or authorize a new delivery attempt.
+        try:
+            lookup = await self.call("get_issued_handoff", {"handoff_id": marker["handoff_id"]})
+        except BridgeError:
+            raise UncertainExecution(
+                "remote_delivery_unknown", "Reservation readback unavailable; do not replay"
+            ) from None
+        issued = lookup.get("issued")
         if (
             not isinstance(receipt, dict)
             or receipt.get("marker") != marker
             or type(receipt.get("duplicate")) is not bool
-            or lookup.get("issued", {}).get("remote_delivery") != marker
+            or not isinstance(issued, dict)
+            or issued.get("remote_delivery") != marker
         ):
             raise UncertainExecution(
                 "remote_delivery_unknown", "No matching durable transport receipt"
@@ -205,6 +214,9 @@ class HttpHandoffPeer:
         """Executor-side check, including direct Core submissions outside the relay."""
         if certificate_identity(device_certificate).public_key_sha256 != self.device_key_sha256:
             raise BridgeError("remote_execution_binding", "Executor certificate differs")
+        request_hash = task.get("request_sha256")
+        if not isinstance(request_hash, str) or not re.fullmatch(r"[a-f0-9]{64}", request_hash):
+            raise BridgeError("remote_execution_binding", "Exact Core request fingerprint required")
         marker = record.get("remote_delivery")
         if not isinstance(marker, dict) or any(
             marker.get(key) != expected
@@ -213,7 +225,7 @@ class HttpHandoffPeer:
                 "device_ref": self.device_ref,
                 "operator_scope": self.operator_ref,
                 "principal_ref": digest(task["principal"]),
-                "request_sha256": task.get("request_sha256"),
+                "request_sha256": request_hash,
             }.items()
         ):
             raise BridgeError("remote_execution_binding", "No exact device/request reservation")

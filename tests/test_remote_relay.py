@@ -420,6 +420,7 @@ async def test_cancellation_after_reservation_never_replays(remote, monkeypatch)
 
 async def test_grant_revocation_after_reservation_stops_before_core_submit(remote, monkeypatch):
     envelope = await intent(remote)
+    original_grants = dict(remote.grants)
     original = remote.source.reserve_attempt
 
     async def revoke_after_reservation(value, principal):
@@ -431,6 +432,40 @@ async def test_grant_revocation_after_reservation_stops_before_core_submit(remot
     async with relay(remote) as coordinator:
         with pytest.raises(BridgeError, match="Grant changed before submission"):
             await coordinator.deliver(envelope)
+    assert remote.bridge.store.db.execute("SELECT count(*) FROM tasks").fetchone()[0] == 0
+    assert not remote.counter.exists()
+    remote.grants.update(original_grants)
+    async with relay(remote) as restarted:
+        with pytest.raises(UncertainExecution, match="Existing dispatch marker"):
+            await restarted.deliver(envelope)
+    assert remote.bridge.store.db.execute("SELECT count(*) FROM tasks").fetchone()[0] == 0
+    assert not remote.counter.exists()
+
+
+async def test_reserved_readback_failure_keeps_unknown_and_does_not_submit(remote, monkeypatch):
+    envelope = await intent(remote)
+    original = remote.source._request
+    lose_readback = False
+
+    async def request(method, **kwargs):
+        nonlocal lose_readback
+        result = await original(method, **kwargs)
+        tool = kwargs.get("json", {}).get("tool")
+        if tool == "reserve_handoff_delivery":
+            lose_readback = result["call"]["result"]["duplicate"] is False
+        elif tool == "get_issued_handoff" and lose_readback:
+            lose_readback = False
+            raise httpx.ReadError("Lost reserved marker readback")
+        return result
+
+    monkeypatch.setattr(remote.source, "_request", request)
+    async with relay(remote) as coordinator:
+        with pytest.raises(UncertainExecution) as exc:
+            await coordinator.deliver(envelope)
+        assert exc.value.code == "remote_delivery_unknown"
+    async with relay(remote) as restarted:
+        with pytest.raises(UncertainExecution, match="Existing dispatch marker"):
+            await restarted.deliver(envelope)
     assert remote.bridge.store.db.execute("SELECT count(*) FROM tasks").fetchone()[0] == 0
     assert not remote.counter.exists()
 
