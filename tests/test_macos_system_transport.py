@@ -275,11 +275,17 @@ async def test_acl_revalidated_after_async_native_worker_creation(monkeypatch):
 )
 async def test_foreign_helper_refuses_and_reaps_without_replay(monkeypatch, change):
     worker, child, calls = transport(
-        monkeypatch, lambda req, proc: response(req, proc, helper_delta=change)
+        monkeypatch,
+        lambda req, proc: response(req, proc, helper_delta=change),
+        # Reach response validation even if CI delays the fake worker's creation.
+        timeout=3,
     )
-    with pytest.raises(UncertainExecution, match="no automatic replay"):
+    with pytest.raises(UncertainExecution, match="no automatic replay") as caught:
         await worker.request("app.focus", {}, principal="alice")
-    assert child.killed and len(calls) == 1 and worker.process is None
+    assert isinstance(caught.value.__cause__, ValueError)
+    assert str(caught.value.__cause__) == "Native response identity changed"
+    assert len(child.requests) == 1
+    assert child.killed and child.stdin.closed and len(calls) == 1 and worker.process is None
 
 
 @pytest.mark.parametrize(
