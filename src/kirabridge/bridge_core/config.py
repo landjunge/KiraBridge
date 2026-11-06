@@ -8,10 +8,11 @@ from pathlib import Path
 from typing import Literal
 from urllib.parse import urlsplit
 
-from pydantic import BaseModel, ConfigDict, Field, PrivateAttr, model_validator
+from pydantic import BaseModel, ConfigDict, Field, PrivateAttr, model_serializer, model_validator
 
 from kirabridge.autonext.models import AutoNextConfig
 from kirabridge.bridge_core.models import BridgeError
+from kirabridge.capability_routing.router import NativeRoutingSettings, WorkerRouting
 
 _FULL_KEYBOARD_CAPABILITIES = frozenset(
     {
@@ -90,6 +91,14 @@ class TeamWorkerConfig(BaseModel):
     execution_scope: Literal["existing_visible_terminal", "separate_managed_session"] = (
         "existing_visible_terminal"
     )
+    routing: WorkerRouting | None = None
+
+    @model_serializer(mode="wrap")
+    def routing_opt_out(self, handler):
+        value = handler(self)
+        if self.routing is None:
+            value.pop("routing", None)
+        return value
 
     @model_validator(mode="after")
     def execution_directory(self):
@@ -101,6 +110,7 @@ class TeamWorkerConfig(BaseModel):
 class TeamConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
     enabled: bool = False
+    routing: NativeRoutingSettings | None = None
     workers: dict[str, TeamWorkerConfig] = Field(default_factory=dict, max_length=16)
     concurrency: int = Field(default=2, ge=1, le=8)
     max_teams: int = Field(default=64, ge=1, le=1024)
@@ -113,6 +123,13 @@ class TeamConfig(BaseModel):
     max_result_bytes: int = Field(default=65536, ge=256, le=262144)
     max_actions_per_turn: int = Field(default=4, ge=1, le=4)
     max_runs_per_hour: int = Field(default=24, ge=1, le=1000)
+
+    @model_serializer(mode="wrap")
+    def routing_opt_out(self, handler):
+        value = handler(self)
+        if self.routing is None:
+            value.pop("routing", None)
+        return value
 
     @model_validator(mode="after")
     def participant_names(self):

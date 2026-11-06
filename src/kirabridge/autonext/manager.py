@@ -400,18 +400,19 @@ class AutoNextManager:
             stat = path.stat()
             file_ref = [str(path), stat.st_dev, stat.st_ino, stat.st_size, stat.st_mtime_ns]
         policy = cfg.principals.get("codex")
-        return digest(
-            {
-                "grant": grant,
-                "worker": worker.model_dump() if worker else None,
-                "agent": agent.model_dump() if agent else None,
-                "executor_file": file_ref,
-                "policy": policy.model_dump() if policy else None,
-                "operator_policy": cfg.principals[self.settings.principal].model_dump(),
-                "route": cfg.visible_handoffs.model_dump(),
-                "team_enabled": cfg.team.enabled,
-            }
-        )
+        binding = {
+            "grant": grant,
+            "worker": worker.model_dump() if worker else None,
+            "agent": agent.model_dump() if agent else None,
+            "executor_file": file_ref,
+            "policy": policy.model_dump() if policy else None,
+            "operator_policy": cfg.principals[self.settings.principal].model_dump(),
+            "route": cfg.visible_handoffs.model_dump(),
+            "team_enabled": cfg.team.enabled,
+        }
+        if cfg.team.routing is not None:
+            binding["routing"] = cfg.team.routing.model_dump()
+        return digest(binding)
 
     async def tick(self):
         if not self.settings.enabled:

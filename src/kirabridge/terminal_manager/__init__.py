@@ -81,6 +81,7 @@ class TerminalManager:
         stdin: bytes | None = None,
         line_callback: Callable[[str], Awaitable[None]] | None = None,
         allow_any_executable: bool = False,
+        before_spawn: Callable[[], None] | None = None,
     ) -> dict:
         executable = check_executable(
             args.argv[0], executables, allow_any_executable, self.environment["PATH"]
@@ -101,6 +102,8 @@ class TerminalManager:
                     if self.output_store is not None:
                         self.output_store.start(principal, task_id)
                         spool_started = True
+                    if before_spawn is not None:
+                        before_spawn()
                     process = await spawn_process(
                         [executable, *args.argv[1:]],
                         cwd_fd,

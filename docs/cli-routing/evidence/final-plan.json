@@ -1,0 +1,28 @@
+{
+  "schema": "bigplan.cli-decision.v1",
+  "task_id": "cli-matrix-live-read-20261105",
+  "cli": "codex",
+  "model": "gpt-6.1-sol",
+  "effort": "medium",
+  "provider": "openai",
+  "executable": "/Users/landjunge/.local/bin/codex",
+  "expected_version": "codex-cli 0.166.0",
+  "access_kind": "subscription",
+  "matrix_sha256": "f5dbc36c702f056a58c82abdb0d597fa13eae92814d899b5d4a16b0c151143c3",
+  "task_sha256": "67bc81c89135096aaa14d0135fd6aadceda1bed04da99d93b1ec6ce76d9cf882",
+  "runtime_sha256": "cf6ee08d2809409f77b7c285546ac59835f131af34ef94ecc4d77251303f754b",
+  "selected_at": "2026-11-05T22:06:16.676673+00:00",
+  "effective_model": "unverified",
+  "effective_effort": "unverified",
+  "coordinator": "codex",
+  "reason": "implementation; capabilities/access/version checked; minimum effort 2; suitability then cost rank; Codex budget preferred",
+  "excluded": [],
+  "thread_desk": {
+    "thread_id": "c9a396be4081",
+    "revision": 5
+  },
+  "observed_version": "codex-cli 0.166.0",
+  "observed_auth_route": "chatgpt",
+  "state": "planned",
+  "starts_model": false
+}

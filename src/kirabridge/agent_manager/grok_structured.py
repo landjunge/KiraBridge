@@ -47,7 +47,9 @@ class GrokStructuredAdapter:
     def __init__(self, terminal):
         self.terminal = terminal
 
-    async def execute(self, task, args, config, roots, running, progress) -> dict:
+    async def execute(
+        self, task, args, config, roots, running, progress, *, before_spawn=None
+    ) -> dict:
         if not config.executable:
             raise BridgeError("agent_config", "Grok executable must be explicitly configured")
         if (
@@ -109,6 +111,7 @@ class GrokStructuredAdapter:
                 [config.executable],
                 spawned,
                 env=env,
+                **({"before_spawn": before_spawn} if before_spawn is not None else {}),
             )
         if native["timed_out"] or native.get("terminated"):
             raise UncertainExecution("agent_timeout", "Grok verdict turn was interrupted")
@@ -125,6 +128,9 @@ class GrokStructuredAdapter:
                 "agent_protocol", "Native Grok returned no strict structured verdict receipt"
             ) from None
         verdict = result.structuredOutput.model_dump()
+        from kirabridge.capability_routing.evidence import native_metadata
+
+        metadata = native_metadata("grok", native["stdout"], config.model)
         text = json.dumps({"kirabridge_team": "1", "result": json.dumps(verdict), "actions": []})
         await progress(
             {"agent": args.agent, "session_id": session, "event": "native_verdict_completed"}
@@ -145,6 +151,7 @@ class GrokStructuredAdapter:
                 "local_tools_enabled": False,
                 "read_only_review": True,
                 "structured_output_validated": True,
+                **metadata,
             },
             "scope": "agent_turn",
             "project_completion_verified": False,

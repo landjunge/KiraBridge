@@ -1,0 +1,10 @@
+{
+  "task_id": "cli-matrix-grok-hook-20261105-01",
+  "workload": "review",
+  "prompt": "Read only src/kirabridge/capability_routing/source.py. In at most three sentences assess whether nested Thread.context.notes is read correctly and duplicate matrix markers are rejected. Do not edit files, run commands, start agents, or make any changes. This is a bounded independent source review. Answer directly; do not make a work plan.",
+  "cwd": "/Users/landjunge/KiraBridge-worktrees/cli-capability-routing-20261105",
+  "ownership_ref": "ThreadDesk 188ce4729a62 entry d165aebb2046",
+  "read_only": true,
+  "independent_of_provider": "openai",
+  "timeout_seconds": 180
+}

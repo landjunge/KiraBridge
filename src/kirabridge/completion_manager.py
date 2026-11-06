@@ -113,6 +113,26 @@ def completion_payload(task, event_seq, *, source="task"):
         if source == "task"
         else {"message_get": task["message_id"]},
     }
+    decision = (task.get("evidence") or {}).get("routing_decision")
+    if isinstance(decision, dict) and decision.get("schema") == "bigplan.cli-decision.v1":
+        # Native router metadata only. Never derive settings from model prose or
+        # expose task prompts, access records, executable paths or credentials.
+        payload["routing"] = {
+            key: decision[key]
+            for key in (
+                "cli",
+                "model",
+                "effort",
+                "effective_model",
+                "effective_effort",
+                "effective_model_status",
+                "model_evidence_source",
+                "model_matches_requested_id",
+                "matrix_sha256",
+                "thread_desk",
+            )
+            if key in decision
+        }
     if state == "completed" and result.get("scope") == "visible_input_delivery":
         payload.update(
             completion_scope="visible_input_delivery",
@@ -212,9 +232,7 @@ class CompletionManager:
                 raise BridgeError("invalid_arguments", "Completion source id is invalid")
         policy = self.security.principal(principal)
         sources = [
-            source
-            for source, cap in SOURCE_CAPABILITIES.items()
-            if cap in policy.capabilities
+            source for source, cap in SOURCE_CAPABILITIES.items() if cap in policy.capabilities
         ]
         if not sources:
             raise BridgeError(

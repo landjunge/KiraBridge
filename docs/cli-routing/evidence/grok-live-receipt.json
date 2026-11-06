@@ -1,0 +1,31 @@
+{
+  "schema": "bigplan.cli-decision.v1",
+  "task_id": "cli-matrix-grok-hook-20261105-01",
+  "cli": "grok",
+  "model": "grok-4.7",
+  "effort": "high",
+  "provider": "xai",
+  "executable": "/Users/landjunge/.grok/bin/grok",
+  "expected_version": "grok 1.0.77 (50ca579fa996) [alpha]",
+  "access_kind": "subscription",
+  "matrix_sha256": "f5dbc36c702f056a58c82abdb0d597fa13eae92814d899b5d4a16b0c151143c3",
+  "task_sha256": "818b43944e2e945eda6c5cc456436cea926d13ffa3a903db97d12d4fa8485523",
+  "runtime_sha256": "cf6ee08d2809409f77b7c285546ac59835f131af34ef94ecc4d77251303f754b",
+  "selected_at": "2026-11-05T21:58:44.287034+00:00",
+  "effective_model": "unverified",
+  "effective_effort": "unverified",
+  "coordinator": "codex",
+  "reason": "review; capabilities/access/version checked; minimum effort 3; suitability then cost rank; Codex budget preferred",
+  "excluded": [],
+  "thread_desk": {
+    "thread_id": "c9a396be4081",
+    "revision": 3
+  },
+  "observed_version": "grok 1.0.77 (50ca579fa996) [stable]",
+  "automatic_retry": false,
+  "state": "process_completed",
+  "exit_code": 0,
+  "output_path": "/Users/landjunge/.local/state/bigplan-cli-routing/cli-matrix-grok-hook-20261105-01.stdout",
+  "stderr_path": "/Users/landjunge/.local/state/bigplan-cli-routing/cli-matrix-grok-hook-20261105-01.stderr",
+  "output_truncated": false
+}

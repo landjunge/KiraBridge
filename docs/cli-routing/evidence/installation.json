@@ -1,0 +1,24 @@
+{
+  "schema": "bigplan.cli-router-install.v1",
+  "payload_pin": "a2091b54938f4773",
+  "release": "/Users/landjunge/.local/share/bigplan-cli-routing/releases/a2091b54938f4773",
+  "source": "/Users/landjunge/KiraBridge-worktrees/cli-capability-routing-20261105",
+  "sha256": {
+    "src/kirabridge/capability_routing/__init__.py": "e449b655ea5a49dc6a956a1063ef2c196cc41966fe9d05636370eed5fa6bc810",
+    "src/kirabridge/capability_routing/__main__.py": "1be9652c3e54de5a20dd7d81d8189d98b08ab719bd6a8aa9e1af22e9272fc1cd",
+    "src/kirabridge/capability_routing/evidence.py": "c7d5dff3b08f4af60b8fee743aa95049995a0b73f27198b8525772a8f30f7f2f",
+    "src/kirabridge/capability_routing/hook.py": "4eac9b1fdc95aa3993a84a69f79c2009fc8fb80ac418d6e2cbb2d6a20f49c056",
+    "src/kirabridge/capability_routing/integration.py": "29fa079a4d3686e708b4765574c3aedeec8e53346e8ffeb6498970801b0e5690",
+    "src/kirabridge/capability_routing/launcher.py": "b85a7f5e93862dd470e52bb6301f7020da291586cf67b74fb031eba3c70e9786",
+    "src/kirabridge/capability_routing/process.py": "0c121a12369fd3a3eaf9d0c19c76f8439be7822e9e02838abdd47c819d0aec5a",
+    "src/kirabridge/capability_routing/router.py": "52d21d1a5355827f6ab504527871f16f03257169720467fa19eb5db0a94de74c",
+    "src/kirabridge/capability_routing/source.py": "a05a2eb00ad20cff43e4013ad84d619759f204242848071f367c2760b62eacc2",
+    "skills/cli-model-router/SKILL.md": "661640ed316f48faeb61a63d4cd773fa8fec4d6c9b67b0cc6e85f87fca6a775f",
+    "skills/cli-model-router/agents/openai.yaml": "33e235ac55af646cb2a3c98bee4f5933928b5a9105a4e3ca4d67a68b585f7c2a",
+    "docs/cli-routing/RESEARCH.md": "abfbf22e2520725c76d0206dde92afb5c3d5a0fdc154dc1fa5847859c56c570d",
+    "docs/cli-routing/matrix.json": "97413f8d79eb637af9fc8f58ad1fd3db96f978ab226d8ad8b5456471c238e620"
+  },
+  "launcher": "/Users/landjunge/.local/bin/bigplan-delegate",
+  "native_global_hooks_modified": false,
+  "services_restarted": false
+}

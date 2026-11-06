@@ -145,7 +145,7 @@ INPUTS = {
 
 
 class Bridge:
-    def __init__(self, config: Config):
+    def __init__(self, config: Config, *, routing_guard=None):
         self.config = config
         from kirabridge.readiness import runtime_snapshot
 
@@ -199,7 +199,12 @@ class Bridge:
         self.images = ImageManager()
         self.clipboard = ClipboardManager()
         self.processes = ProcessManager(self.terminal)
-        self.agents = AgentManager(config, self.terminal)
+        if config.team.routing is not None:
+            from kirabridge.capability_routing.native import native_routed_manager
+
+            self.agents = native_routed_manager(self, routing_guard)
+        else:
+            self.agents = AgentManager(config, self.terminal)
         from kirabridge.configured_workflow import configured_workflow_control
 
         self.workflow_control = configured_workflow_control(self)
