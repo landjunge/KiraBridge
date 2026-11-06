@@ -21,6 +21,7 @@ LEGACY_TD = "770bbc9f0c0a02699cc93cad47d2e2c3782f7080"
 REMOTE_TD = "a0dd4c39478b031e0e31d335c2a15435dfbc52eb"
 TOLLGATE = "53fc57cc2e082d022e65e5929cb2a1e186fba852"
 REMOTE_MODULES = ("test_remote_relay", "test_remote_os_restart")
+PREFLIGHT_MAX_BYTES = 16 * 1024
 REMOTE_REQUIREMENTS = (
     "pypdf>=6.19,<7",
     "jsonschema==4.25.1",
@@ -302,6 +303,69 @@ def prepare_temp_scope(runner_temp, report_dir, lane):
     }
 
 
+def emit_preflight(evidence):
+    """Flush bounded observed bindings before pytest; this cannot grant acceptance."""
+    required = {
+        "run_id",
+        "lane",
+        "python",
+        "version",
+        "platform",
+        "sources",
+        "imports_before",
+        "temp_scope",
+        "environment",
+    }
+    require(required <= evidence.keys(), "Preflight bindings missing")
+    require(
+        not {"gate", "pytest_exit", "junit", "finished_ns"} & evidence.keys(),
+        "Preflight must precede pytest completion",
+    )
+    scope_keys = (
+        "identity",
+        "runner_temp",
+        "effective_python_temp",
+        "report_dir",
+        "pytest_basetemp",
+        "filesystem_before",
+        "report_filesystem",
+        "runner_filesystem",
+        "workspace_device",
+        "root_device",
+    )
+    require(
+        {"kb", "td"} <= evidence["sources"].keys()
+        and {"kirabridge", "threaddesk"} <= evidence["imports_before"].keys()
+        and set(scope_keys) <= evidence["temp_scope"].keys(),
+        "Preflight bindings missing",
+    )
+    record = {
+        "schema": "kirabridge.ci-preflight.v1",
+        "phase": "PREFLIGHT",
+        "acceptance": "not_evaluated",
+        "pytest_started": False,
+        "at_ns": time.time_ns(),
+        **{key: evidence[key] for key in ("run_id", "lane", "python", "version", "platform")},
+        "job": {
+            key: evidence["environment"].get(key)
+            for key in ("GITHUB_RUN_ID", "GITHUB_RUN_ATTEMPT", "GITHUB_JOB", "GITHUB_SHA")
+        },
+        "sources": {
+            name: {
+                **{key: source[key] for key in ("root", "commit", "manifest_sha256")},
+                "file_count": len(source["files"]),
+            }
+            for name in ("kb", "td", "tollgate")
+            if (source := evidence["sources"].get(name)) is not None
+        },
+        "imports": dict(evidence["imports_before"]),
+        "temp_scope": {key: evidence["temp_scope"][key] for key in scope_keys},
+    }
+    payload = json.dumps(record, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+    require(len(payload.encode("utf-8")) + 1 <= PREFLIGHT_MAX_BYTES, "Preflight record too large")
+    print(payload, flush=True)
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("lane", choices=("legacy", "remote"))
@@ -411,6 +475,7 @@ def main(argv=None):
         evidence["dependencies"] = dependencies(args.lane)
         evidence["imports_before"] = imports(kb_src, td_src, args.lane)
         evidence_path.write_text(json.dumps(evidence, indent=2) + "\n")
+        emit_preflight(evidence)
         import pytest
 
         started = time.time_ns()

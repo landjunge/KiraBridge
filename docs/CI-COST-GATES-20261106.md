@@ -6,8 +6,10 @@ Basis ist `6067fb0907bcdeaf91ef3ea6608b1468190a2536`.
 Die Scope-Semantik ist gemäß Präzisierung `188ce4729a62/855841f2821b`
 und unabhängigem Review `188ce4729a62/707741aacd48` korrigiert.
 
-Die drei Workflows begrenzen bereits die Laufzeit ihrer einzelnen Jobs auf
-10, 20 beziehungsweise 15 Minuten. Die Änderung begrenzt den automatischen
+Verify begrenzt bestehende selbstgehostete Jobs mit `matrix.runner=kirabridge`
+auf 20 Minuten; die Hosted-Mac-Jobs bleiben bei 10 Minuten. Die beiden
+Paketworkflows behalten ihre Grenzen von 20 beziehungsweise 15 Minuten.
+Die ursprüngliche Auswahländerung begrenzt den automatischen
 Hosted-Mac-Fanout: Ein normaler Push startete bisher Intel- und ARM-Verify,
 ein PR zusätzlich beide Mac-Paketprüfungen und ein `release/**`-Push zusätzlich
 ARM-Paketsmoke. Wiederholte Ereignisse können weitere Läufe auslösen.
@@ -72,12 +74,36 @@ Required-Check-Kontexte gewertet werden. Es werden keine Anforderungen entfernt,
 keine erfolgreichen Ersatzstatus erzeugt und keine fehlenden, abgebrochenen
 oder übersprungenen Prüfungen als bestanden gemeldet.
 
-Der Remote-CI-Kontext ist getrennt: Verify setzt weiterhin keinen
-`KIRABRIDGE_TEST_REMOTE_THREADDESK_SOURCE`. Ohne expliziten M4-Snapshot wird
-`tests/test_remote_relay.py` übersprungen. Die separat mit explizitem M4-Pin
-durchgeführten lokalen No-Skip-Integrationsprüfungen sind eigene Belege;
-diese Workflowänderung ersetzt weder deren Quellenbindung noch fehlende CI-
-oder produktive Remote-Abnahme.
+Am historischen Ausgangspin `6067fb0` fehlte der explizite M4-Kontext noch;
+Remote-Tests konnten dadurch übersprungen werden. Seit dem integrierten Stand
+`0da9abbcc3fd60f7e0d1f7a89724d6c07bb83892` verwendet Verify getrennte frische
+Prozesse für Legacy mit TD770 und Remote R2/R3 mit festem M4-Pin. Die
+Remote-Lane verlangt vollständige, fehlerfreie Ergebnisse ohne Skips.
+Lokale No-Skip-Belege bleiben getrennt von tatsächlich ausgeführten CI-
+oder produktiven Remote-Abnahmen.
+
+## Begrenzte Zeit- und Provenienzkorrektur
+
+Folgeauftrag `188ce4729a62/5c22b7db3b49` betrifft nur die Verify-Zeitgrenze
+und die frühe Logprovenienz. Run `42210252095`, Versuch 1 auf `0da9abb`,
+wurde an der bisherigen 10-Minuten-Grenze abgebrochen. Beide Legacy-Lanes
+zeigten zuletzt 82 Prozent; weitere Fortschrittszeilen erschienen ungefähr
+2 beziehungsweise 7 Sekunden vor der Zeitgrenze. Es fehlen abschließende
+Testzahlen und Exitstatus; Remote und Build wurden nicht ausgeführt.
+Das belegt weder einen vollständigen PASS noch den Ausschluss eines Hängers.
+Die unabhängige Verlaufsauswertung bleibt ein eigener Beleg.
+
+Der Helper gibt nach tatsächlicher Quellen-, Import-, Abhängigkeits- und
+Temp-Bindung unmittelbar vor pytest einen einzelnen kompakten JSON-Satz mit
+`phase=PREFLIGHT` aus und leert stdout sofort. Er enthält Quellenpins und
+Manifestdigests, Importpfade sowie die beobachteten Temp-/Device-/Freiplatz-
+und Inodewerte. Die Ausgabe ist einschließlich Zeilenende auf 16 KiB UTF-8
+begrenzt; ein zu großer Satz wird vor pytest abgelehnt, nicht abgeschnitten.
+`acceptance=not_evaluated` und `pytest_started=false` vergeben keinen
+Teststatus und keine zusätzliche Berechtigung. Vollständige Dateiinventare
+und Abhängigkeitslisten bleiben im bestehenden Provenienzbericht.
+Die abschließenden Quellen-, Import-, Exit-, JUnit- und No-Skip-Gates bleiben
+erhalten. Auch bei frühem Logbeleg bleibt ein harter Abbruch unvollständig.
 
 Die Regeln gelten für Ereignisse, die diese Workflowrevision auswählen.
 Alte Referenzen, vorhandene PRs und bereits laufende Jobs können weiterhin
@@ -88,7 +114,9 @@ Billing-, Server-, Runner- oder Schutzregeln.
 Die ursprüngliche statische 28-Fall-Tabelle zum Commit `7adb9d2` ordnete
 `workflow_dispatch`/`ALL` fälschlich Linux zu. Sie bleibt als fehlerhafter
 historischer Beleg erhalten. Die getrennte Folgeauswertung verwendet die
-dokumentierte GitHub-Semantik; die drei Workflowdateien bleiben bytegleich.
+dokumentierte GitHub-Semantik; bei dieser historischen Folgeauswertung
+blieben die drei Workflowdateien bytegleich. Der jetzige Folgeauftrag
+ändert ausschließlich die genannte Verify-Zeitgrenze.
 
 Referenzen: [Workflowsyntax](https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax),
 [Stringvergleiche](https://docs.github.com/en/actions/reference/workflows-and-actions/expressions#operators),

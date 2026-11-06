@@ -35,7 +35,7 @@ jobs:
       UV_PYTHON_DOWNLOADS: never
       PYTHONNOUSERSITE: '1'
       PYTHONDONTWRITEBYTECODE: '1'
-    timeout-minutes: 10
+    timeout-minutes: ${{ matrix.runner == 'kirabridge' && 20 || 10 }}
     steps:
       - name: Prepare fresh job temporary directory on runner storage
         shell: bash
