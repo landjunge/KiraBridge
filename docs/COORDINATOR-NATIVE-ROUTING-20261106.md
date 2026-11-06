@@ -1,5 +1,10 @@
 # C2: native Modellwahl für versiegelte Managed-Worker
 
+Aktueller zusammengeführter Stand: [Integrationsübersicht](BIGPLAN-INTEGRATION-STATUS-20261106.md).
+Der korrigierte Pin `843db415ad2fa7b619ae00d7fae2f973bdaaf7ee` ist unabhängig
+angenommen. Die offenen Nachtestangaben unten gehören zum damaligen Quellabschluss;
+der erste Freeze `6159640` und seine roten Belege bleiben unverändert erhalten.
+
 `BP-COORD-NATIVE-ROUTING-20261106-C2`, Karte `188ce4729a62/d1e023e96e11`,
 Claim `a1f44a24a2ab`. Ein KB-Schreiber01a1a7d1 im eigenen Worktree
 `coordinator-native-routing-20261106`. Grundlage ist C1

@@ -1,5 +1,9 @@
 # Native Koordination und Remote-Handoff: lokaler Integrationskandidat
 
+Aktueller zusammengeführter Stand: [Integrationsübersicht](BIGPLAN-INTEGRATION-STATUS-20261106.md).
+Dieser Bericht beschreibt den Einstieg auf `2b18cad`; R3 und der neue R4-Fall
+sind inzwischen integriert und auf dem gemeinsamen Quellstand geprüft.
+
 Dieser Kandidat verbindet den geprüften nativen Stand
 `017dc44458eaf5087a349a937c2ae7066ca58485` mit dem Remote-Produktvertrag und
 den R2-Harnessdateien aus `21d2e2cad8e9930931b02031addfc25d819a9ed3`.

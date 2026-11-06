@@ -1,5 +1,9 @@
 # R3: dauerhafte Remotequittung nach echtem Core-Prozessrestart
 
+Aktueller zusammengeführter Stand: [Integrationsübersicht](../BIGPLAN-INTEGRATION-STATUS-20261106.md).
+Der unten noch folgende unabhängige Integrationsnachtest ist inzwischen erfolgt;
+die ursprünglichen R3-Quell- und Laufbelege bleiben als Checkpoint erhalten.
+
 06.11.2026 · Auftrag BP-REMOTE-OS-RESTART-20261106-R3.
 Karte 188ce4729a62/83c362aa0e0a (#285), Claim 1c81e7674083 (#288).
 Einziger Writer Codex01a1a7d1; eigener Worktree remote-os-restart-20261106,

@@ -74,11 +74,10 @@ import json
 from pathlib import Path
 from threaddesk.services import project_start
 
-data = json.loads(Path(
-    "docs/contracts/fixtures/remote-project-draft.m2.examples.json"
-).read_text())
-assert hashlib.sha256(Path(project_start.__file__).read_bytes()).hexdigest() == (
-    data["producer"]["sha256"]
+data = json.loads(Path("docs/contracts/fixtures/remote-project-draft.m2.examples.json").read_text())
+assert (
+    hashlib.sha256(Path(project_start.__file__).read_bytes()).hexdigest()
+    == (data["producer"]["sha256"])
 )
 for case in data["cases"].values():
     assert project_start.preview(None, case["arguments"]) == case["preview"]

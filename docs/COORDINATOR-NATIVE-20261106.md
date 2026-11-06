@@ -1,5 +1,9 @@
 # Native Koordination über Core und MCP
 
+Aktueller zusammengeführter Stand: [Integrationsübersicht](BIGPLAN-INTEGRATION-STATUS-20261106.md).
+Dieser Bericht dokumentiert den ursprünglichen C1-Checkpoint; das damals folgende
+Routingpaket C2 ist inzwischen integriert und unabhängig angenommen.
+
 Auftrag `BP-COORD-NATIVE-20261106-C1`, 6. November 2026. Basis des gesonderten
 Quellkandidaten ist der geprüfte Koordinator `4bdf851`. Der laufende installierte
 Koordinator und das veröffentlichte Desktop-Paket erhalten durch diesen
