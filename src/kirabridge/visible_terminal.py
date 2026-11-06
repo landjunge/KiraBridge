@@ -190,7 +190,10 @@ class VisibleTerminal:
         folder.mkdir(mode=0o700)
         result_path, script_path = folder / "result.json", folder / "command.zsh"
         nonce = secrets.token_hex(24)
-        row = await bridge.sessions.selected(principal, reference.pane_id, reference.expected_pid)
+        # Keep the observation that selected this reference as the comparison
+        # baseline. The locked selection below is fresh and must still match it;
+        # another catalogue here would only replace that baseline before the
+        # same final revalidation, adding a native roundtrip without authority.
         # A one-shot script in this window inherits its real TTY. No subprocess
         # daemon, tmux pane, detached session or provider adapter executes the command.
         result = json.dumps({"nonce": nonce, "exit_code": "%s"}).replace('"%s"', "%s")
