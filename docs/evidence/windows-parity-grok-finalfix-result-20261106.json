@@ -1,0 +1,100 @@
+{
+  "task_id": "WIN-PARITY-GROK-20261106-CORRECTION-02",
+  "phase": "finalfix",
+  "accepted_by_operator": false,
+  "implementer": "grok",
+  "model": "grok-4.7",
+  "effort": "high",
+  "branch": "feat/windows-parity-grok-20261106",
+  "base_commit": "3f8ab70",
+  "package_commit": "57de232b33d4ddd8a85d7abb14e5dfd1e2d66f5d",
+  "package_subject": "fix: bind console encoding, receipts, and export rebuilds",
+  "pushed": false,
+  "release_started": false,
+  "mac_production_install": false,
+  "vm_write": false,
+  "execution_policy_changed": false,
+  "subagents": false,
+  "subagents_reason": "The order forbids delegation. This process made the product edits itself.",
+  "tests": {
+    "interpreter": "/Users/landjunge/KiraBridge-worktrees/windows-parity-grok-20261106/.venv/bin/python",
+    "version": "3.14.4",
+    "ruff": {
+      "command": "/usr/local/bin/ruff check src/kirabridge/platform_adapters/windows/visible_console.py src/kirabridge/windows_console.py scripts/windows_parity_package.py tests/test_windows_parity_20261106.py",
+      "result": "All checks passed"
+    },
+    "pytest": {
+      "command": "PYTHONPATH=src .venv/bin/python -m pytest -q tests/test_windows_parity_20261106.py",
+      "result": "24 passed in 5.33s"
+    },
+    "not_rerun": "No full-suite run. Only ruff on the touched files and tests/test_windows_parity_20261106.py."
+  },
+  "package": {
+    "kind": "deterministic stored source zip plus the unchanged provenance bytes",
+    "path": "dist/KiraBridge-0.8.0rc40-windows-parity-20261106.zip",
+    "absolute_path": "/Users/landjunge/KiraBridge-worktrees/windows-parity-grok-20261106/dist/KiraBridge-0.8.0rc40-windows-parity-20261106.zip",
+    "sha256": "54871603954e4e00b638609b8abce4157cfd6db1b92bc07d2785b29e7e907ee8",
+    "bytes": 2609838,
+    "members": 228,
+    "inventory_files": 227,
+    "provenance_commit": "57de232b33d4ddd8a85d7abb14e5dfd1e2d66f5d",
+    "provenance_commit_source": "git-rev-parse-HEAD",
+    "provenance_dirty": false,
+    "compression": "ZIP_STORED",
+    "create_system": 3,
+    "rebuilt_twice_same_hash": true,
+    "export_rebuild_same_hash": true,
+    "gitignored": true,
+    "rebuild_command": "python -B scripts/windows_parity_package.py build --output dist/KiraBridge-0.8.0rc40-windows-parity-20261106.zip",
+    "export_rebuild_command": "python -B scripts/windows_parity_package.py build --output dist/KiraBridge-0.8.0rc40-windows-parity-20261106.zip --provenance-export provenance.json",
+    "note": "This result file is a later commit and is not a zip member. Rebuilding at the result commit changes the provenance commit and the hash. The pinned zip is the clean build at 57de232."
+  },
+  "api": {
+    "decode_console_bytes": {
+      "signature": "decode_console_bytes(data, *, legacy=None, encoding=None)",
+      "encoding": "Optional codec name. Use cp850, cp1252, or utf-8 for the console's actual OutputEncoding. Only that codec is decoded. There is no fallback to another page.",
+      "omitted_encoding": "UTF-8 is accepted only when the bytes are strict UTF-8. Legacy pages are accepted only when every page that round-trips yields the same text. cp850 and cp1252 of Größe disagree, so the result is ambiguous and is not a text success.",
+      "ambiguous_fields": {
+        "text": "",
+        "encoding": null,
+        "decoded_strict": false,
+        "ambiguous": true,
+        "text_status": "ambiguous",
+        "candidate_encodings": ["cp850", "cp1252"],
+        "raw_base64": "original bytes, lossless",
+        "sha256": "sha256 of the original bytes",
+        "byte_length": "length of the original bytes"
+      },
+      "selected_fields": {
+        "text": "Größe",
+        "encoding": "cp1252 or cp850",
+        "decoded_strict": true,
+        "ambiguous": false,
+        "text_status": "selected",
+        "requested_encoding": "the encoding argument"
+      }
+    },
+    "console_main_argv": "-- <runtime_root> <source_sha256> <handoff_id> <result_path> <hold_seconds> <timeout_seconds> <cwd> --encoding cp1252 <command...>",
+    "console_plan": "console_plan(..., output_encoding='cp1252') inserts --encoding before the command",
+    "handoff_field": "WindowsConsoleHandoffInput.output_encoding, optional, for example cp850, cp1252, or utf-8",
+    "completion_rule": "state completed requires type(exit_code) is int, both streams decoded_strict true, and stdout/stderr sha256 plus byte_length equal to text.encode(encoding). A bool exit code, a missing field, or a hash that does not match the text stays open. An open or invalid receipt is not started again."
+  },
+  "codex_driver": {
+    "do_not": [
+      "Do not pass -ExecutionPolicy, Bypass, or -EncodedCommand.",
+      "Do not omit encoding when the guest has both an OEM and an ANSI page. That case stays open on purpose.",
+      "Do not treat decoded_strict false or state open as a successful Größe text.",
+      "Do not rebuild with an invented commit, a dirty flag flipped to false, or a changed provenance file.",
+      "Do not test the old RC31 installation. Use the new staging install."
+    ],
+    "default_write": "In the same normal console, read [Console]::OutputEncoding.CodePage and pass encoding='cp' plus that number to decode_console_bytes, or output_encoding on the handoff, then run [Console]::Write('Größe').",
+    "explicit_1252": "Set [Console]::OutputEncoding = [Text.Encoding]::GetEncoding(1252) in that console and pass encoding='cp1252'. The expected text is Größe, decoded_strict true, encoding cp1252.",
+    "cp850_case": "When the code page is 850, pass encoding='cp850'. The expected text is Größe, decoded_strict true, encoding cp850.",
+    "ambiguous_case": "decode_console_bytes(bytes, legacy=('cp850','cp1252')) without encoding must return text '', ambiguous true, decoded_strict false, and raw_base64 of the original bytes. cp1252 bytes must not come back as Gr÷▀e with cp850 and decoded_strict true.",
+    "receipt_case": "A result with stdout altered, sha256 of 64 zeroes, encoding utf-8, and no int exit_code must not reconcile as completed and must not start a new process.",
+    "guest_build": "From the extracted tree, with the validated provenance.json left byte-for-byte unchanged: python -B scripts/windows_parity_package.py build --output dist\\KiraBridge-0.8.0rc40-windows-parity-20261106.zip --provenance-export provenance.json",
+    "expected_sha256": "54871603954e4e00b638609b8abce4157cfd6db1b92bc07d2785b29e7e907ee8",
+    "staging": "C:/Users/Kiradev/AppData/Local/KiraParity20261106Grok01",
+    "wheels_if_needed": "/Users/landjunge/KiraBridge-integration-audit-20261104/release-rc33-final/KiraBridge-0.8.0rc33-Windows-Dev-Kit.zip"
+  }
+}

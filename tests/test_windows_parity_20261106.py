@@ -805,7 +805,7 @@ def test_child_imports_the_pinned_runtime_not_an_older_package(tmp_path):
     assert completed.returncode == 0
     assert body["import_path"] == pinned["import_path"]
     assert body["source_sha256"] == pinned["source_sha256"]
-    assert "old" not in body["import_path"]
+    assert not Path(body["import_path"]).resolve().is_relative_to(old.resolve())
     assert body["stdout"].strip() == "pinned"
 
 
