@@ -119,9 +119,18 @@ def test_whole_not_implemented_restarts_a_complete_fresh_scalar_observation(
         ("bad_role_type", 1),
         ("bad_subrole_type", 1),
         ("classification_error", 1),
+        ("classification_failure", 1),
+        ("role_failure", 1),
         ("metadata_error", 2),
+        ("title_failure", 2),
+        ("value_failure", 2),
+        ("description_cannot_complete", 2),
+        ("identifier_invalid_element", 2),
+        ("description_not_implemented", 2),
         ("slot_not_implemented", 2),
         ("whole_error", 1),
+        ("whole_failure", 1),
+        ("whole_metadata_failure", 2),
         ("whole_unsupported", 1),
         ("success_nil", 1),
         ("wrong_container", 1),
@@ -187,3 +196,62 @@ def test_unimplemented_actions_are_omitted_without_replaying_the_scalar_summary(
     assert result["batch_copy_calls"] == 2
     assert result["batch_action_calls"] == 1
     assert result["fallback_calls"] == 0
+
+
+@pytest.mark.parametrize(
+    "scenario,unavailable",
+    [
+        ("optional_description_failure", ["AXDescription"]),
+        ("optional_identifier_failure", ["AXIdentifier"]),
+        ("optional_both_failure", ["AXDescription", "AXIdentifier"]),
+        ("optional_failure_fallback", ["AXDescription", "AXIdentifier"]),
+        ("secure_optional_failure", ["AXDescription", "AXIdentifier"]),
+    ],
+)
+def test_optional_cocoa_metadata_failure_preserves_observation_and_revision(
+    batch_harness, scenario, unavailable
+):
+    result = observation(batch_harness, scenario)
+    summary = result["summary"]
+    assert result["matches_individual_summary"] is True
+    assert summary["unavailable_metadata"] == unavailable
+    assert summary["position"] == [12, 34]
+    assert summary["size"] == [100, 50]
+    assert summary["actions"] == ["AXPress"]
+    assert result["batch_copy_calls"] == 2
+    assert result["fallback_calls"] == (scenario == "optional_failure_fallback")
+    if scenario == "secure_optional_failure":
+        assert summary["secure_value_redacted"] is True
+        assert not {"value", "value_sha256", "value_characters"}.intersection(summary)
+        assert all("AXValue" not in names for names in result["batch_requested_attributes"])
+    else:
+        assert summary["value_characters"] == len("synthetic value")
+
+
+def test_metadata_recovery_changes_revision_even_when_the_observed_text_is_empty(batch_harness):
+    result = observation(batch_harness, "optional_failure_recovery")
+    assert result["summary"]["description"] == result["second_summary"]["description"] == ""
+    assert result["summary"]["identifier"] == result["second_summary"]["identifier"] == ""
+    assert "unavailable_metadata" in result["summary"]
+    assert "unavailable_metadata" not in result["second_summary"]
+    assert result["recovery_revision_changed"] is True
+    assert result["recovery_matches_scalar"] is True
+
+
+@pytest.mark.parametrize(
+    "scenario",
+    [
+        "classification_failure",
+        "role_failure",
+        "title_failure",
+        "value_failure",
+        "description_cannot_complete",
+        "identifier_invalid_element",
+        "description_not_implemented",
+    ],
+)
+def test_scalar_decoder_keeps_nonoptional_and_transport_errors_fatal(batch_harness, scenario):
+    result = observation(batch_harness, scenario)
+    assert result["baseline_error"] == "macos_accessibility_unavailable"
+    assert result["error"] == "macos_accessibility_unavailable"
+    assert "summary" not in result

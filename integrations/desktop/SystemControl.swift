@@ -94,9 +94,17 @@ enum SystemControl {
             throw failure("macos_permission_denied", "This native worker has no current Accessibility grant; no request was made")
         }
     }
-    static func attribute(_ element: AXUIElement, _ name: String) -> CFTypeRef? {
+    // Cocoa text views can report .failure for these optional descriptive
+    // fields. This is not a license to ignore transport or classification errors.
+    static func unavailableOptionalMetadata(_ name: String, status: AXError) -> Bool {
+        status == .failure && [kAXDescriptionAttribute, kAXIdentifierAttribute].contains(name)
+    }
+    static func attribute(_ element: AXUIElement, _ name: String,
+                          unavailableMetadata: (String) -> Void = { _ in }) -> CFTypeRef? {
         var result: CFTypeRef?
-        guard AXUIElementCopyAttributeValue(element, name as CFString, &result) == .success else { return nil }
+        let status = AXUIElementCopyAttributeValue(element, name as CFString, &result)
+        if unavailableOptionalMetadata(name, status: status) { unavailableMetadata(name) }
+        guard status == .success else { return nil }
         return result
     }
     static func string(_ element: AXUIElement, _ name: String) -> String {
@@ -106,20 +114,22 @@ enum SystemControl {
         string(element, kAXRoleAttribute).contains("Secure") || string(element, kAXSubroleAttribute).contains("Secure")
     }
     static func summary(_ element: AXUIElement) throws -> [String: Any] {
-        try observedSummary(prepare: {
+        var unavailable: Set<String> = []
+        return try observedSummary(prepare: {
                 guard AXUIElementSetMessagingTimeout(element, 1.0) == .success else {
                     throw failure("macos_accessibility_unavailable", "Accessibility timeout could not be configured")
                 }
             },
-            read: { attribute(element, $0) }, actionNames: {
+            read: { attribute(element, $0, unavailableMetadata: { unavailable.insert($0) }) }, actionNames: {
                 var actions: CFArray?
                 guard AXUIElementCopyActionNames(element, &actions) == .success else { return nil }
                 return actions as? [String] ?? []
-            })
+            }, unavailableMetadata: { unavailable.sorted() })
     }
     static func observedSummary(prepare: () throws -> Void,
                                 read: (String) -> CFTypeRef?,
-                                actionNames: () -> [String]?) throws -> [String: Any] {
+                                actionNames: () -> [String]?,
+                                unavailableMetadata: () -> [String] = { [] }) throws -> [String: Any] {
         func text(_ name: String) -> String { read(name) as? String ?? "" }
         try prepare()
         let role = text(kAXRoleAttribute)
@@ -162,6 +172,8 @@ enum SystemControl {
             }
         }
         if let actions = actionNames() { result["actions"] = actions }
+        let unavailable = unavailableMetadata()
+        if !unavailable.isEmpty { result["unavailable_metadata"] = unavailable }
         result["revision"] = try hash(result)
         return result
     }
@@ -257,11 +269,19 @@ enum SystemControl {
             throw failure("macos_accessibility_unavailable", "Accessibility timeout could not be configured")
         }
     }
-    static func treeAttribute(_ element: AXUIElement, _ name: String, deadline: Double) throws -> CFTypeRef? {
+    static func treeAttribute(_ element: AXUIElement, _ name: String, deadline: Double,
+                              unavailableMetadata: (String) -> Void = { _ in }) throws -> CFTypeRef? {
         try checkTreeDeadline(deadline)
         var value: CFTypeRef?
         let status = AXUIElementCopyAttributeValue(element, name as CFString, &value)
         try checkTreeDeadline(deadline)
+        return try treeAttributeValue(name, status: status, value: value,
+            unavailableMetadata: unavailableMetadata)
+    }
+    // The same decoder is used by scalar and positional batch reads and the
+    // synthetic harness. Only a named optional metadata failure is tolerated.
+    static func treeAttributeValue(_ name: String, status: AXError, value: CFTypeRef?,
+                                   unavailableMetadata: (String) -> Void = { _ in }) throws -> CFTypeRef? {
         if status == .success {
             guard let observed = value else {
                 throw failure("macos_accessibility_unavailable", "Accessibility reported success without an observable attribute value")
@@ -269,6 +289,10 @@ enum SystemControl {
             return observed
         }
         if status == .attributeUnsupported || status == .noValue { return nil }
+        if unavailableOptionalMetadata(name, status: status) {
+            unavailableMetadata(name)
+            return nil
+        }
         throw failure("macos_accessibility_unavailable", "Accessibility attribute could not be observed during subtree read")
     }
     static func treeChildren(_ raw: CFTypeRef?) throws -> [AXUIElement] {
@@ -309,12 +333,14 @@ enum SystemControl {
     // partial fields from an unsupported batch are reused.
     static func individualTreeSummary(_ element: AXUIElement, deadline: Double) throws -> [String: Any] {
         var readError: Error?
+        var unavailable: Set<String> = []
         do {
             let result = try observedSummary(prepare: { try prepareTreeElement(element, deadline: deadline) },
                 read: { name in
                     guard readError == nil else { return nil }
                     do {
-                        let value = try treeAttribute(element, name, deadline: deadline)
+                        let value = try treeAttribute(element, name, deadline: deadline,
+                            unavailableMetadata: { unavailable.insert($0) })
                         if [kAXRoleAttribute, kAXSubroleAttribute].contains(name),
                            let observed = value, !(observed is String) {
                             throw failure("macos_accessibility_unavailable", "Accessibility secure classification is not observable")
@@ -335,7 +361,7 @@ enum SystemControl {
                         }
                         return try treeActionNames(actions)
                     } catch { readError = error; return nil }
-                })
+                }, unavailableMetadata: { unavailable.sorted() })
             if let error = readError { throw error }
             return result
         } catch {
@@ -351,10 +377,11 @@ enum SystemControl {
         kAXMinimizedAttribute, kAXPositionAttribute, kAXSizeAttribute]
 
     /// CopyMultiple(options:0) reports missing attributes as CFNull or an
-    /// AXValue(.axError) in their original position. Only supported absence is
-    /// omitted, matching strict scalar tree reads. Transport/unknown errors
-    /// never become empty fields or compatibility fallbacks.
-    static func treeBatchAttributes(_ names: [String], status: AXError, raw: CFArray?) throws -> [String: CFTypeRef] {
+    /// AXValue(.axError) in their original position. Supported absence is omitted;
+    /// narrowly allowed descriptive failures are recorded in the summary/revision.
+    /// Transport/unknown errors never become compatibility fallbacks.
+    static func treeBatchAttributes(_ names: [String], status: AXError, raw: CFArray?,
+                                   unavailableMetadata: (String) -> Void = { _ in }) throws -> [String: CFTypeRef] {
         guard !names.isEmpty, names.count <= 32, Set(names).count == names.count else {
             throw failure("invalid_arguments", "Invalid Accessibility attribute batch")
         }
@@ -375,8 +402,9 @@ enum SystemControl {
                     guard AXValueGetValue(value, .axError, &error), error != .success else {
                         throw failure("macos_accessibility_unavailable", "Accessibility batch contains an invalid error value")
                     }
-                    if error == .attributeUnsupported || error == .noValue { continue }
-                    throw failure("macos_accessibility_unavailable", "Accessibility batch attribute could not be observed")
+                    _ = try treeAttributeValue(name, status: error, value: nil,
+                        unavailableMetadata: unavailableMetadata)
+                    continue
                 }
             }
             result[name] = item
@@ -390,6 +418,7 @@ enum SystemControl {
         actionNames: () throws -> [String]?,
         individual: () throws -> [String: Any]) throws -> [String: Any] {
         do {
+            var unavailable: Set<String> = []
             try prepare()
             let classification = try copy(treeClassificationAttributes)
             var values = try treeBatchAttributes(treeClassificationAttributes,
@@ -405,9 +434,11 @@ enum SystemControl {
             let names = Array(treeMetadataAttributes.prefix(3))
                 + (secure ? [] : [kAXValueAttribute]) + Array(treeMetadataAttributes.dropFirst(3))
             let metadata = try copy(names)
-            values.merge(try treeBatchAttributes(names, status: metadata.0, raw: metadata.1)) { _, new in new }
+            values.merge(try treeBatchAttributes(names, status: metadata.0, raw: metadata.1,
+                unavailableMetadata: { unavailable.insert($0) })) { _, new in new }
             let actions = try actionNames()
-            return try observedSummary(prepare: {}, read: { values[$0] }, actionNames: { actions })
+            return try observedSummary(prepare: {}, read: { values[$0] }, actionNames: { actions },
+                unavailableMetadata: { unavailable.sorted() })
         } catch TreeBatchFailure.notImplemented {
             return try individual()
         }
