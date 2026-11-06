@@ -1,3 +1,6 @@
+> Späteres RC40-Quellupdate nach PR61: [aktueller Installationsnachweis](RC40-PR61-SHIM-INSTALL-20261106.md).
+> Die folgende Erstinstallation aus5f4dd46 bleibt als historischer Nachweis erhalten.
+
 # RC40: Quellenintegration und tatsächliche Macinstallation
 
 Stand: 6. November 2026. Auftrag: GitHub-Abgleich, sinnvolle Zusammenführung,
