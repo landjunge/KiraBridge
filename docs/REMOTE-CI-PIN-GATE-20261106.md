@@ -33,6 +33,11 @@ im selben Interpreter HEAD, tatsächliche Commitblobs, nicht getrackte Quelldate
 276 M4-src-Dateien, konkrete KB-/TD-Importe, gecachte Module und die Herkunft der
 installierten Distributionen. Nach pytest werden Quellen und Importe erneut
 geprüft. Jeder Aufruf braucht ein neues Berichtverzeichnis. Provenienz erfasst
+auch die Hashes entfernter abgeleiteter Bytecodecaches: bestehende Fixture-Kinder
+mit Minimalumgebung erben das Schreibverbot teilweise nicht. Der Helfer entfernt
+nur normale __pycache__-Dateien zu bereits gepinnten .py-Quellen im eigenen Checkout,
+vor Imports und nach dem Lauf. Verwaiste Caches, Symlinks und unbekannte Quelldateien
+bleiben Fehler; kein getrackter Produktinhalt wird dabei verändert. Die Provenienz erfasst
 Interpreter/Version, argv/pytest-Argumente, cwd, ausgewählte Umgebungswerte,
 Importdateien, Dependencies und Quellmanifeste; sie wird auch ins CI-Log geschrieben.
 JUnit erhält eine zufällige laufgebundene Suitekennung. Remote akzeptiert nur
@@ -66,6 +71,8 @@ including exact jsonschema4.25.1. No global dependency overlay or TD distributio
 is installed. Python runtime downloads are disabled. The helper verifies actual
 source blobs, the 276-file M4 source inventory, imports and dependency origins in
 the interpreter that calls pytest.main, then verifies sources/imports again.
+Only disposable __pycache__ files belonging to pinned sources are removed and
+hash-recorded before imports and after tests; unknown sources or linked caches fail.
 Provenance records interpreter, command, environment, paths, versions and pins.
 A fresh run directory, unique suite binding, true pytest exit0, fresh JUnit,
 zero skips/errors/failures and positive executed case counts in **both** modules

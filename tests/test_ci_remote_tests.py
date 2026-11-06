@@ -2,6 +2,7 @@
 
 import importlib.util
 import os
+import py_compile
 import subprocess
 import sys
 import xml.etree.ElementTree as ET
@@ -190,6 +191,53 @@ def test_actual_blob_content_and_inventory_pin(pinned_repo):
     result = gate.checkout(repo, pin, ["src"], src_count=1)
     assert set(result["files"]) == {"src/module.py"}
     assert result["commit"] == pin
+
+
+def test_only_derived_cache_of_a_pinned_source_can_be_pruned(pinned_repo):
+    repo, pin = pinned_repo
+    source = repo / "src/module.py"
+    cache = Path(py_compile.compile(str(source), doraise=True))
+    assert cache.is_file()
+    cleanup = []
+    result = gate.checkout(repo, pin, ["src"], src_count=1, cache_log=cleanup)
+    assert not cache.exists() and len(cleanup) == 1
+    assert cleanup[0]["path"] == str(cache) and len(cleanup[0]["sha256"]) == 64
+    assert source.read_text() == "value = 1\n" and len(result["files"]) == 1
+
+
+def test_linked_source_directory_is_rejected_before_cache_cleanup(pinned_repo, tmp_path):
+    repo, pin = pinned_repo
+    foreign = tmp_path / "foreign-src"
+    (repo / "src").rename(foreign)
+    (repo / "src").symlink_to(foreign, target_is_directory=True)
+    cache = Path(py_compile.compile(str(foreign / "module.py"), doraise=True))
+    with pytest.raises(gate.GateError, match="Linked source directory"):
+        gate.checkout(repo, pin, ["src"], cache_log=[])
+    assert cache.exists()
+
+
+@pytest.mark.parametrize("kind", ["orphan", "symlink", "linked-directory", "unknown-source"])
+def test_cache_cleanup_never_removes_unowned_or_linked_data(pinned_repo, tmp_path, kind):
+    repo, pin = pinned_repo
+    cache = Path(py_compile.compile(str(repo / "src/module.py"), doraise=True))
+    target = cache
+    if kind == "orphan":
+        target = cache.with_name("untracked.cpython-311.pyc")
+        cache.rename(target)
+    elif kind == "symlink":
+        outside = tmp_path / "outside.pyc"
+        outside.write_bytes(cache.read_bytes())
+        cache.unlink()
+        cache.symlink_to(outside)
+    elif kind == "linked-directory":
+        outside = tmp_path / "foreign-cache"
+        cache.parent.rename(outside)
+        cache.parent.symlink_to(outside, target_is_directory=True)
+    elif kind == "unknown-source":
+        (repo / "src/unknown.py").write_text("value = 'untracked'\n")
+    with pytest.raises(gate.GateError):
+        gate.checkout(repo, pin, ["src"], cache_log=[])
+    assert target.exists()  # Validate the entire candidate list before removing any cache.
 
 
 @pytest.mark.parametrize(

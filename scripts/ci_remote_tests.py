@@ -4,6 +4,7 @@ import argparse
 import hashlib
 import importlib
 import importlib.metadata
+import importlib.util
 import json
 import os
 import platform
@@ -41,7 +42,7 @@ def git(repo, *args):
     return subprocess.check_output(["git", "-C", str(repo), *args])
 
 
-def checkout(repo, expected, paths, *, src_count=None):
+def checkout(repo, expected, paths, *, src_count=None, cache_log=None):
     """Bind actual bytes, including absence of untracked source, to commit blobs."""
     require(bool(re.fullmatch(r"[0-9a-f]{40}", expected)), "Full commit pin required")
     require(git(repo, "rev-parse", "HEAD").decode().strip() == expected, "Wrong checkout pin")
@@ -56,12 +57,39 @@ def checkout(repo, expected, paths, *, src_count=None):
         path = repo / name
         require(kind == "blob" and mode in {"100644", "100755"}, f"Non-file source: {name}")
         require(path.is_file() and not path.is_symlink(), f"Missing/linked source: {name}")
+        require(path.resolve() == path, f"Linked source directory: {name}")
         data = path.read_bytes()
         actual = hashlib.sha1(b"blob " + str(len(data)).encode() + b"\0" + data).hexdigest()
         require(actual == blob, f"Modified source: {name}")
         files[name] = hashlib.sha256(data).hexdigest()
     require(bool(files), "Empty pinned source tree")
-    require(not git(repo, "ls-files", "--others", "--", *paths).strip(), "Untracked source")
+    untracked = git(repo, "ls-files", "--others", "-z", "--", *paths).split(b"\0")
+    caches = []
+    for name in filter(None, untracked):
+        path = repo / name.decode()
+        # Existing fixture children with minimal envs can generate bytecode despite
+        # the parent's -B. Prune only caches of pinned .py sources in this checkout.
+        try:
+            original = Path(importlib.util.source_from_cache(str(path)))
+        except ValueError:
+            raise GateError(f"Untracked source: {path.relative_to(repo)}") from None
+        require(
+            cache_log is not None
+            and original.relative_to(repo).as_posix() in files
+            and path.is_file()
+            and not path.is_symlink(),
+            "Untracked source",
+        )
+        require(
+            path.parent.resolve() == original.parent.resolve() / "__pycache__",
+            "Linked bytecode cache directory",
+        )
+        caches.append(path)
+    for path in caches:
+        cache_log.append(
+            {"path": str(path), "sha256": hashlib.sha256(path.read_bytes()).hexdigest()}
+        )
+        path.unlink()
     if src_count is not None:
         require(sum(n.startswith("src/") for n in files) == src_count, "Wrong src inventory count")
     manifest = json.dumps(files, sort_keys=True, separators=(",", ":")).encode()
@@ -187,17 +215,20 @@ def main(argv=None):
     kb = Path(__file__).resolve().parents[1]
     require(Path.cwd().resolve() == kb, "Run from the pinned KB checkout")
     td = args.td.resolve()
+    cache_log = []
     sources = {
         "kb": checkout(
             kb,
             args.expected_kb,
             ["src", "tests", "scripts/ci_remote_tests.py", "pyproject.toml", "uv.lock"],
+            cache_log=cache_log,
         ),
         "td": checkout(
             td,
             REMOTE_TD if args.lane == "remote" else LEGACY_TD,
             ["src", "pyproject.toml"],
             src_count=276 if args.lane == "remote" else None,
+            cache_log=cache_log,
         ),
     }
     kb_src, td_src = kb / "src", td / "src"
@@ -218,7 +249,7 @@ def main(argv=None):
     else:
         require(args.tollgate is not None, "Legacy TollGate checkout required")
         tg = args.tollgate.resolve()
-        sources["tollgate"] = checkout(tg, TOLLGATE, ["."])
+        sources["tollgate"] = checkout(tg, TOLLGATE, ["."], cache_log=cache_log)
         require(os.environ.get("KIRABRIDGE_TEST_TOLLGATE_SOURCE") == str(tg), "Wrong TollGate env")
     report_dir = args.report_dir.resolve()
     # Reuse is an error: a prior successful XML can never substitute for this invocation.
@@ -253,6 +284,7 @@ def main(argv=None):
         "cwd": str(kb),
         "sys_path": sys.path[:],
         "sources": sources,
+        "removed_derived_bytecode": cache_log,
         "environment": {
             key: os.environ.get(key)
             for key in (
@@ -286,7 +318,13 @@ def main(argv=None):
         # Detect source mutation during the test run as well as incorrect initial bytes.
         for name, source in sources.items():
             root = Path(source["root"])
-            after = checkout(root, source["commit"], source["paths"], src_count=source["src_count"])
+            after = checkout(
+                root,
+                source["commit"],
+                source["paths"],
+                src_count=source["src_count"],
+                cache_log=cache_log,
+            )
             require(after == source, f"Source changed during pytest: {name}")
         if args.lane == "remote":
             evidence["junit"] = validate_junit(xml, suite, started, exit_code)
