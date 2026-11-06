@@ -36,6 +36,8 @@ ChatGPT connection test with your account remain yours to complete.
 [Evidence and limits](docs/WINDOWS-SETUP-20261104.md) ·
 [Setup guide, German](docs/WINDOWS-SETUP.md).
 
+**Current integrated source and local Intel installation: RC40.** [Merge, CI, native package, installation and live evidence](docs/RC40-INTEGRATION-INSTALL-20261106.md). The published download above remains RC36; no public RC40 download is claimed.
+
 ## What KiraBridge helps you do
 
 - **Work on local projects:** let your connected AI read project files and logs,

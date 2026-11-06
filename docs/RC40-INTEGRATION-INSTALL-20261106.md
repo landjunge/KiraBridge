@@ -1,0 +1,123 @@
+# RC40: Quellenintegration und tatsächliche Macinstallation
+
+Stand: 6. November 2026. Auftrag: GitHub-Abgleich, sinnvolle Zusammenführung,
+Tests/Review/CI, regulärer Merge und tatsächliche geprüfte KiraBridge-Installation.
+
+## Ergebnis und Identität
+
+[PR59](https://github.com/landjunge/KiraBridge/pull/59) ist regulär gemergt,
+Maincommit `1b77d78e5b3af7f9d5380854575ba4036b4cf6ff`. Der geprüfte und paketierte Quellpin ist
+`5f4dd46007742f4a09afa8b196b3da071b115ec5`; der Main-Dateibaum war beim Merge
+exakt gleich. Main `34adc03e9a3eef81abba478027c13dcb48b01314` und Integration
+`0da9abbcc3fd60f7e0d1f7a89724d6c07bb83892` sind Vorfahren: alle 15 zusätzlichen
+Maincommits und alle 46 Integrationscommits bleiben erhalten.
+
+Am Intel-Mac mit macOS15.7.4 sind **Dienst und Desktop-App0.8.0rc40 tatsächlich
+installiert**. Installer-Exit0, sichtbares eigenes Terminal6160/ttys005, Quellpin
+`5f4dd46`. Erster unabhängiger Live-Readback: DienstPID85537,
+Instanz `5754188249e24f83b1f00f8baa596099`; AppPID85582. Der native Helfer meldete
+bei echter App-Abfrage ebenfalls diesen Quellpin. Dateiabruf und sichtbarer
+Terminalbefehl `RC40_LIVE_TERMINAL_OK` bestanden.
+
+Dies ist ein lokal gebautes und geprüftes Intel-Paket; **kein neu veröffentlichtes
+GitHub-Release und kein neuer öffentlicher RC40-Download**. Der bestehende
+veröffentlichte Download bleibt getrennt bezeichnet. Dokumentationsänderungen
+nach dem Produktmerge verändern den installierten Laufzeitcode nicht.
+
+## Tatsächliche Prüfungen
+
+| Gate | Ergebnis und Umfang |
+| --- | --- |
+| Lokale statische Prüfung | Ruff check und format bestanden. |
+| Gezielte eigene Tests | 76 Fälle bestanden,13,34s; CI-Preflight,Timing,Runtime,Windows-Verify und Native-Package. |
+| Unabhängiger Quellenreview | 33 Fälle bestanden,10,51s,0Skips;10 zusätzliche Mergeproben; beide ReadQuery-Routen, Challengegrenzen, Versionen und Elternlinien geprüft. |
+| Echte Linux-CI | [Run42217252448](https://github.com/landjunge/KiraBridge/actions/runs/42217252448) erfolgreich auf Python3.11 und3.13. Je4938 Legacyfälle bestanden und224 plattform-/voraussetzungsbedingte Skips; getrennt je29 Remotefälle ohne Skips bestanden. Beide Builds erfolgreich. Kein Null-Skip-Gesamtpass behauptet. |
+| Paketvertrag | Release-Smoke erfolgreich;228 Wheel-Runtimedateien exakt Gitquelle,729 Manifestmember,232 Gitpayload-Dateien und4 Installerdateien unabhängig geprüft. |
+| Native App | Intel x86_64; codesign verify strict bestanden, ad-hoc signiert. |
+| Echte isolierte macOS-Abnahme | RC39 aus8d331314b608→RC40:Upgrade,Datenerhalt,Idempotenz,Neustart,KeepAlive,Rollback und frische Installation bestanden. Offene Completion-Leseverbindung endete beim Wechsel ohne Replay. Testdienst unabhängig als entfernt bestätigt. |
+| Produktive Aktivierung | Gebautes Bundle im eigenen bestätigten sichtbaren Terminal mit `--desktop --require-visible-terminal` aktiviert; Exit0; anschließend authentifizierter CLI- und MCP-Readback. |
+
+Der Pushlauf42217151208 wurde durch die PR-Concurrency ersetzt; er ist kein
+Timeoutnachweis und kein erfolgreicher Lauf. Alte Timeouts und rote Teilprüfungen
+bleiben im [historischen Integrationscheckpoint](BIGPLAN-INTEGRATION-STATUS-20261106.md)
+erhalten. Testumfänge überlappen und werden nicht zu einem künstlichen Gesamtzähler addiert.
+
+## Datenerhalt und Rückweg
+
+Konfiguration und Zugangsdaten sind nach Hash und Modus unverändert. Alle8170
+bisherigen Task-IDs,159 ursprünglichen UNKNOWN-Zustände samt Fehlerbytes und
+58 Queue-Holds sind erhalten. Kein UNKNOWN wurde wiederholt oder durch
+Datenbankrücksetzung bereinigt.
+
+Der transaktionale Installer sicherte den Rückweg unter
+`/Users/landjunge/.local/share/kirabridge/install/backups/20261106-133750-263da082`.
+Vorherige RC39-Laufzeit und Daten bleiben erhalten. Ein Rückweg nutzt den
+vorhandenen Installerbefehl `rollback --require-visible-terminal` in einem
+frisch bestätigten sichtbaren Terminal und prüft vorher erneut Leerlauf und
+Kompatibilität. Keine alte Datenbanksicherung über neue Nutzerdaten kopieren.
+
+## Übergabe und beobachteter Betrieb
+
+Der frühere Codex-Koordinator bestätigte die Schreibzuständigkeit dieser neuen
+Sitzung; sein geänderter Dokumentationsstand und seine Belege wurden gesichert.
+Die Inventur erfasste132 KiraBridge- und34 ThreadDesk-Worktreeeinträge. Elf bzw.
+vier geänderte Arbeitsstände bleiben erhalten; fünf bereits fehlende historische
+KiraBridge-Pfade wurden weder als aktive Quelle benutzt noch pauschal bereinigt.
+
+Der **separate** Supervisor bleibt PID77398 aus0da9abb; sein Profil und launchd-
+Plist sind bytegleich. AutoNext ist weiter deaktiviert; der Supervisor beobachtet,
+ohne neue Aufgabe oder Providerläufe aus dieser Installation abzuleiten.
+`coordinator.status` am Hauptdienst weist einen fremden/nicht konfigurierten
+Koordinatorbesitzer mit `coordinator_owner_required` zurück; der tatsächliche
+separate Status wird über `bigplan-loop status` geprüft. Das ist keine unbegrenzte
+Dauerbetriebsabnahme und kein Beweis neuer automatischer Folgearbeit.
+Das eigene Installationsfenster wurde anschließend geschlossen und per frischer
+Sitzungsinventur sowie Prozessprüfung als abwesend bestätigt. Hauptdienst85537
+und Supervisor77398 liefen danach weiter; andere Agentensitzungen blieben erhalten.
+
+## ThreadDesk und getrennte Windowslinien
+
+[ThreadDesk-PR99](https://github.com/landjunge/threaddesk/pull/99) verbindet
+Main067a525, Plan cd5c994, Remote a0dd4c3 und Kurzberichte6eeb465.
+Seine vollständige Linuxabnahme und sein Merge werden gesondert im Abschluss
+festgehalten. Die tatsächliche TD-MCP-Gegenstelle bleibt der bisherige
+`threaddesk-770bbc9/src`-Stand. Die neuen Projektfunktionen sind dort nicht
+installiert; Kurzberichte verwenden weiterhin ihren eigenen6eeb465-Adapter.
+
+Die Mainlinie enthält den separat geprüften/veröffentlichten Windows-
+EinrichtungsassistentenRC37.dev1 mit sieben nativen Phasen. Das ist ein anderer
+Quell-/Prüfumfang als der spätere Big-Plan-/Dirk-Kandidat179bb6f mit noch nicht
+gestarteten eigenen Phasen und seiner offenen Prozessausnahme. Beide Nachweise
+bleiben getrennt. Zusätzliche Windows-Producer-/Inventararbeit wurde wegen der
+semantischen Abweichung vom neueren Wizard nicht blind in das Macpaket gemergt.
+Sie bleibt auf GitHub `test/remote-project-verify-20261106-r2` bei21d2e2c und
+`feat/bigplan-windows-parity-20261105` bei ce50405 sowie als geprüftes lokales
+Gitbundle erhalten. Nativeevents9cc005c ist patchäquivalent bereits enthalten.
+
+Die zuvor nur in jener Linie stehenden [Gesamtplanung](plans/BIGPLAN-GESAMTPLAN-20261105.md),
+[Architekturquelle](plans/sources/BIGPLAN-ARCHITEKTUR-REMOTE-BESCHLUSS-20261105.md),
+[Oceanplanung](plans/OCEAN-MCP-ADAPTER-20261105.md) und Windows-Kandidatenbelege
+werden als datierte historische Quellen übernommen; ihre alten Gates erteilen
+keine neue Autorität und ersetzen diesen aktuellen Installationsnachweis nicht.
+
+## Lokale Belege
+
+Private Belegwurzel: `~/.local/state/current-mac-integration-20261106/`.
+Dort liegen Git-/Worktreeinventar, CI-Rohlog und JSON, Gate-/Mergebeleg, JUnit,
+Paketmanifest/Hashes, `macos-acceptance/evidence.json`, sichtbarer Installations-
+start/-abschluss, Vorher-/Nachhererhalt und Live-Readbacks. Unabhängiger Review:
+`kb-rc40-independent-review-k2zbpxbt` unter dem macOS-Tempverzeichnis.
+
+Bundle-SHA256: `6829c9e10f4de3bd7abf5c0836631ade0ea1ee2a94128a507a576ab325420abb`.
+Wheel-SHA256: `b1cc2caa7d828c47e858a2d86a991e078f7051074557e7a6903419eb51e24831`.
+
+## English
+
+RC40 was built from5f4dd46, independently reviewed, accepted on the native Intel
+Mac and installed visibly with the existing transactional desktop installer.
+PR59 merged both histories; both Linux lanes, remote tests and builds passed.
+Runtime, desktop and native helper identities were read back live. Existing
+configuration, credentials,8170 tasks,159 historical UNKNOWNs and58 queue holds
+were retained. The separate supervisor remains unchanged with AutoNext disabled.
+ThreadDesk source integration, its CI/merge and the older installed TD peer are
+separate states. No new public RC40 release or ARM/Windows acceptance is claimed.

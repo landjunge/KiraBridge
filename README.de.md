@@ -35,6 +35,8 @@ Alle sieben nativen Prüfphasen bestanden. Entpacke das Paket und öffne
 ChatGPT-Verbindungstest mit deinem Konto bleiben bei dir.
 [Prüfstand und Grenzen](docs/WINDOWS-SETUP-20261104.md) · [Anleitung](docs/WINDOWS-SETUP.md).
 
+**Aktueller integrierter Quellstand und lokale Intel-Installation: RC40.** [Merge, CI, natives Paket, Installation und Livebelege](docs/RC40-INTEGRATION-INSTALL-20261106.md). Der veröffentlichte Download oben bleibt RC36; ein öffentlicher RC40-Download wird nicht behauptet.
+
 ## Wobei KiraBridge dir hilft
 
 - **An lokalen Projekten arbeiten:** Lass deine verbundene KI Projektdateien und
