@@ -800,6 +800,55 @@ def test_managed_shim_passes_real_effort_and_keeps_arguments(tmp_path, cli, pref
     assert effort_shim(decision, tmp_path / "state") == shim
 
 
+@pytest.mark.parametrize(
+    "arguments,expected",
+    [
+        (["agent", "stdio"], ["--no-auto-update", "--effort", "high", "agent", "stdio"]),
+        (
+            ["--no-auto-update", "--json-schema", "{}"],
+            ["--effort", "high", "--no-auto-update", "--json-schema", "{}"],
+        ),
+        (
+            ["--", "--no-auto-update"],
+            ["--no-auto-update", "--effort", "high", "--", "--no-auto-update"],
+        ),
+        (
+            ["--no-auto-update", "--no-auto-update"],
+            ["--effort", "high", "--no-auto-update", "--no-auto-update"],
+        ),
+    ],
+)
+def test_grok_shim_adds_update_guard_only_when_not_supplied(tmp_path, arguments, expected):
+    import sys
+
+    from kirabridge.capability_routing.integration import effort_shim
+
+    exe = tmp_path / "argv-grok"
+    exe.write_text(f"#!{sys.executable}\nimport sys,json\nprint(json.dumps(sys.argv[1:]))\n")
+    exe.chmod(0o700)
+    decision = {
+        "cli": "grok",
+        "model": "model",
+        "effort": "high",
+        "executable": str(exe),
+        "expected_version": "fixture",
+    }
+    state = tmp_path / "state"
+    old_identity = {
+        k: decision[k] for k in ("cli", "model", "effort", "executable", "expected_version")
+    }
+    from kirabridge.capability_routing.router import fingerprint
+
+    old = state / "effort-shims" / (fingerprint(old_identity) + ".py")
+    old.parent.mkdir(parents=True)
+    old.write_text("historical immutable shim")
+    shim = effort_shim(decision, state)
+    assert shim != str(old) and old.read_text() == "historical immutable shim"
+    result = subprocess.run([shim, *arguments], capture_output=True, text=True, check=True)
+    assert json.loads(result.stdout) == expected
+    assert effort_shim(decision, state) == shim
+
+
 @pytest.mark.asyncio
 async def test_managed_adapter_keeps_config_immutable(setup):
     from kirabridge.bridge_core.config import AgentConfig

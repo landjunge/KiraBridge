@@ -26,12 +26,22 @@ def effort_shim(decision, state_dir):
         raise RoutingError("Managed adapter has no verified effort injection")
     directory = Path(state_dir) / "effort-shims"
     directory.mkdir(mode=0o700, parents=True, exist_ok=True)
-    path = directory / (
-        fingerprint(
-            {k: decision[k] for k in ("cli", "model", "effort", "executable", "expected_version")}
+    identity = {
+        k: decision[k] for k in ("cli", "model", "effort", "executable", "expected_version")
+    }
+    if cli == "grok":
+        identity["shim_revision"] = 2  # Keep earlier immutable shims and run evidence intact.
+    path = directory / (fingerprint(identity) + ".py")
+    dispatch = f"os.execve(exe, [exe] + {prefix!r} + sys.argv[1:], env)\n"
+    if cli == "grok":
+        dispatch = (
+            "args = sys.argv[1:]\n"
+            "options = args[:args.index('--')] if '--' in args else args\n"
+            f"prefix = {prefix!r}\n"
+            "if '--no-auto-update' in options:\n"
+            "    prefix = prefix[1:]\n"
+            "os.execve(exe, [exe] + prefix + args, env)\n"
         )
-        + ".py"
-    )
     content = (
         f"#!{sys.executable}\n"
         "import os, sys\n"
@@ -39,8 +49,7 @@ def effort_shim(decision, state_dir):
         "for key in ('OPENAI_API_KEY', 'CODEX_API_KEY', 'OPENAI_BASE_URL', "
         "'OPENAI_ORG_ID', 'OPENAI_PROJECT_ID', 'GROK_API_KEY', 'XAI_API_KEY', 'XAI_BASE_URL'):\n"
         "    env.pop(key, None)\n"
-        f"exe = {decision['executable']!r}\n"
-        f"os.execve(exe, [exe] + {prefix!r} + sys.argv[1:], env)\n"
+        f"exe = {decision['executable']!r}\n" + dispatch
     )
     try:
         fd = os.open(path, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o700)
