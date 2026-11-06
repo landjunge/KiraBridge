@@ -1,0 +1,9 @@
+Interpreter: /Users/landjunge/KiraBridge/.venv/bin/python 3.11.15 (main, Mar  3 2026, 00:52:57) [Clang 17.0.0 (clang-1700.6.4.2)]
+cwd: /Users/landjunge/KiraBridge-worktrees/coordinator-closure-20261106
+PYTHONPATH: /Users/landjunge/KiraBridge-worktrees/coordinator-closure-20261106/src:/Users/landjunge/.local/share/kirabridge/install/shared/threaddesk-770bbc9/src
+kirabridge: /Users/landjunge/KiraBridge-worktrees/coordinator-closure-20261106/src/kirabridge/__init__.py
+Initial targeted run: 35 passed in 24.26s (closure, continuation, runtime).
+After receipt hash validation: closure 3 passed in 0.11s.
+Integration after real acceptance/readback assertions: 2 passed, 19 deselected in 6.29s.
+Commands: python -m pytest -q tests/test_coordinator_closure.py tests/test_coordinator_continuation.py tests/test_coordinator_runtime.py; then closure file; then continuation -k standing_mandate.
+Ruff check / format and git diff --check passed. No live activation or product acceptance.

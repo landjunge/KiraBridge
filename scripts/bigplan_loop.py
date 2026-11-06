@@ -323,12 +323,12 @@ def configuration(profile):
     )
 
 
-def report(profile, done, text, status="working"):
-    report_id = "loop-" + secrets.token_hex(12)
+def report(profile, done, text, status="working", *, report_id=None, next_step=None):
+    report_id = report_id or "loop-" + secrets.token_hex(12)
     message = {
         "done": ", ".join(done)[-500:] or "Noch kein Aufgabenabschluss",
         "working": text[:600],
-        "next": "Nächste passende bestehende Aufgabe im beauftragten Umfang",
+        "next": next_step or "Nächste passende bestehende Aufgabe im beauftragten Umfang",
     }
     return run_status_report(
         [
@@ -538,6 +538,45 @@ async def advance(bridge, profile, team, anchor, active_revision):
     return active_revision, intake
 
 
+def closure_status(bridge):
+    """Use persisted acceptance and board readback; worker completion alone is insufficient."""
+    closed, missing = [], []
+    for item in bridge.store.db.execute(
+        "SELECT task_id,grant_id,receipt FROM autonext_items "
+        "WHERE state IN ('completed','stopped') ORDER BY task_id"
+    ):
+        task = item["task_id"]
+        try:
+            receipt = json.loads(item["receipt"] or "null")
+        except (TypeError, ValueError):
+            receipt = None
+        if not isinstance(receipt, dict) or receipt.get("task_id") != task:
+            missing.append(f"{task}: Abnahmebeleg fehlt")
+            continue
+        outbox = bridge.store.db.execute(
+            "SELECT verified,content FROM autonext_outbox "
+            "WHERE task_id=? AND grant_id=? AND phase='completed'",
+            (task, item["grant_id"]),
+        ).fetchone()
+        if not outbox or not outbox["verified"]:
+            missing.append(f"{task}: bestätigter Board-Readback des Abschlusses fehlt")
+            continue
+        try:
+            matches = json.loads(outbox["content"]).get("receipt_sha256") == digest(receipt)
+        except (TypeError, ValueError, AttributeError):
+            matches = False
+        if not matches:
+            missing.append(f"{task}: Board-Abnahmebeleg stimmt nicht mit dem Ergebnis überein")
+            continue
+        closed.append(task)
+    return {"closed": closed, "missing": missing}
+
+
+def should_wait_for_status(state):
+    # A missing acceptance stays open for new evidence; it never prompts a worker again.
+    return state["state"] == "waiting"
+
+
 def process_completions(bridge, profile):
     """Consume the existing durable inbox after validating its original outbox."""
     target = profile.get("completion_target")
@@ -622,6 +661,7 @@ async def serve(path):
     last_report = 0
     last_summary = None
     worker_reports = {}
+    closure_reports = set()
     reporting = {"coordinator": None, "workers": {}}
     team, anchor = seed(bridge)
     if profile.get("continuation"):
@@ -673,15 +713,28 @@ async def serve(path):
                         report_worker, profile, row
                     )
                     worker_reports[row["id"]] = (fingerprint, time.monotonic())
-                done = [
-                    r["task_id"]
-                    for r in bridge.store.db.execute(
-                        "SELECT task_id FROM autonext_items WHERE state='completed' ORDER BY rowid"
+                closure = closure_status(bridge)
+                done = closure["closed"]
+                active = should_wait_for_status(state)
+                for task_id in done:
+                    if task_id not in closure_reports:
+                        reporting["coordinator"] = await asyncio.to_thread(
+                            report,
+                            profile,
+                            [task_id],
+                            "Abschluss belegt",
+                            "done",
+                            report_id="closure-" + digest(task_id)[:32],
+                            next_step="Auftrag abgeschlossen; keine weiteren Statusabfragen",
+                        )
+                        closure_reports.add(task_id)
+                summary = digest([state, closure])
+                if (
+                    not stop.is_set()
+                    and (active or closure["missing"] or not done)
+                    and (
+                        (active and time.monotonic() - last_report >= 60) or summary != last_summary
                     )
-                ]
-                summary = digest([state, done])
-                if not stop.is_set() and (
-                    time.monotonic() - last_report >= 60 or summary != last_summary
                 ):
                     mode = (
                         "blocked"
@@ -695,8 +748,18 @@ async def serve(path):
                         report,
                         profile,
                         done,
-                        "Koordinator: " + state["state"] + " / " + str(state.get("reason")),
-                        mode,
+                        ("Offen: " + "; ".join(closure["missing"]))
+                        if closure["missing"]
+                        else "Abschluss belegt"
+                        if done and not active
+                        else "Koordinator: " + state["state"] + " / " + str(state.get("reason")),
+                        "blocked"
+                        if closure["missing"]
+                        else "done"
+                        if done and not active
+                        else mode,
+                        report_id=None if active else "closure-state-" + summary[:32],
+                        next_step="Auf neuen Nachweis oder Auftrag warten" if not active else None,
                     )
                     last_report = time.monotonic()
                     last_summary = summary
@@ -708,6 +771,7 @@ async def serve(path):
                         "execution_scope": "separate_managed_session",
                         "autonext": state,
                         "completions": processed,
+                        "closure": closure,
                         "reporting": reporting,
                         "continuation": {
                             "authority_ref": intake["authority_ref"],
@@ -727,7 +791,8 @@ async def serve(path):
                     break
                 try:
                     if (
-                        latest.get("completion_target")
+                        active
+                        and latest.get("completion_target")
                         and not processed["pending"]
                         and cfg.autonext.cards
                     ):

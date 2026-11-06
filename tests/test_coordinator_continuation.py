@@ -105,7 +105,10 @@ async def test_standing_mandate_advances_existing_tasks_once_without_approve(
     assert first and b.autonext.inspect()["state"] == "complete"
     b.store.db.execute("UPDATE autonext_outbox SET verified=0 WHERE phase='completed'")
     assert runtime.process_completions(b, profile) == {"processed": [], "pending": 1}
+    assert runtime.closure_status(b)["missing"]
+    assert not runtime.closure_status(b)["closed"]
     b.store.db.execute("UPDATE autonext_outbox SET verified=1 WHERE phase='completed'")
+    assert runtime.closure_status(b) == {"closed": [card["task_id"]], "missing": []}
     consumed = runtime.process_completions(b, profile)
     assert len(consumed["processed"]) == 1 and consumed["pending"] == 0
     assert runtime.process_completions(b, profile) == {"processed": [], "pending": 0}
