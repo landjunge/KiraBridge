@@ -629,6 +629,99 @@ def test_transport_diagnostic_success_and_invalid_metadata_remain_transport_succ
     assert result["effective_model"] == "unverified"
 
 
+@pytest.mark.parametrize(
+    ("stream", "operation"),
+    [
+        ("stdin", "write"),
+        ("stdin", "flush"),
+        ("stdin", "close"),
+        ("stdout", "close"),
+        ("stderr", "close"),
+    ],
+)
+def test_transport_stream_io_failures_keep_native_zero_unknown_and_lease(
+    setup, monkeypatch, stream, operation
+):
+    import errno
+    import io
+    import threading
+    from pathlib import Path
+
+    import kirabridge.capability_routing.process as module
+
+    matrix, runtime, task = setup
+    runtime.allow_write = True
+    task = task.model_copy(update={"read_only": False})
+    source, _ = source_for(matrix)
+    injected, calls, thread_errors = [], [], []
+
+    class Faulty(io.BytesIO):
+        def inject(self, current):
+            if current == operation:
+                injected.append(current)
+                raise OSError(errno.EIO, "synthetic-private-io-error")
+
+        def write(self, value):
+            self.inject("write")
+            return super().write(value)
+
+        def flush(self):
+            self.inject("flush")
+            return super().flush()
+
+        def close(self):
+            super().close()
+            self.inject("close")
+
+    pipes = {
+        "stdin": io.BytesIO(),
+        "stdout": io.BytesIO(b"partial"),
+        "stderr": io.BytesIO(b"problem"),
+    }
+    pipes[stream] = Faulty(b"partial" if stream == "stdout" else b"problem")
+    child = SimpleNamespace(
+        pid=4242,
+        returncode=0,
+        **pipes,
+        wait=lambda **kw: 0,
+        kill=lambda: pytest.fail("completed fake child must not be killed"),
+    )
+    monkeypatch.setattr(module.subprocess, "Popen", lambda *a, **k: child)
+    monkeypatch.setattr(threading, "excepthook", lambda e: thread_errors.append(e.exc_type))
+
+    def runner(*args, **kwargs):
+        calls.append(True)
+        return module.run_bounded(
+            ["owned-fake"], input=b"assigned prompt", cwd=task.cwd, timeout=0.1, env={}
+        )
+
+    result = launch(source, runtime, task, execute=True, probe=False, runner=runner)
+    assert injected == [operation]  # The requested error really occurred.
+    assert result["native_exit_code"] == 0
+    assert result["state"] == "unknown" and result["automatic_retry"] is False
+    assert result["transport_error"]["stage"] == "stream_io"
+    assert any(
+        e["stream_name"] == stream and e["operation"] == operation and e["errno"] == errno.EIO
+        for e in result["process_evidence"]["stream_errors"]
+    )
+    assert not thread_errors
+    assert "synthetic-private-io-error" not in json.dumps(result)
+    assert Path(result["output_path"]).read_bytes() == b"partial"
+    assert Path(result["stderr_path"]).read_bytes() == b"problem"
+    state = Path(runtime.state_dir)
+    assert len(list(state.glob("cwd-*.lock"))) == 1
+    receipt = state / (task.task_id + ".json")
+    before = receipt.read_bytes()
+    with pytest.raises(RoutingError):
+        launch(source, runtime, task, execute=True, probe=False, runner=runner)
+    other = task.model_copy(update={"task_id": "other-owned-fixture"})
+    assert (
+        launch(source, runtime, other, execute=True, probe=False, runner=runner)["state"]
+        == "blocked"
+    )
+    assert calls == [True] and receipt.read_bytes() == before
+
+
 def test_revision_change_prevents_spawn(setup):
     matrix, runtime, task = setup
     count = 0

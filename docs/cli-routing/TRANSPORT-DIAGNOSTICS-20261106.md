@@ -75,3 +75,18 @@ Receiptfinalisierung; dort bleibt die vorhandene Admission als UNKNOWN-Grenze.
 Eine fehlgeschlagene finale Receiptspeicherung bleibt `OutcomeUncertain`.
 README DE/EN und Webseite sind nicht betroffen: kein neuer Nutzerbefehl,
 Installationsweg oder veröffentlichter Download.
+
+## Enger IO-Nachtrag nach unabhängigem Review
+
+Der erste Freeze280421a erhielt NEEDS_FIX: Ein stdin-write-EIO wurde verschluckt,
+ein stdout-close-EIO entwich als Threadexception. Trotz Kindexit0 war dadurch ein
+falsches `process_completed` mit freigegebener Schreiblease möglich.
+Der Nachtrag erfasst auch stdin-write/flush und das Schließen jedes Streams als
+`stream_io`. Die Fehlerkarte nennt `stream_name`, `operation`, Klasse und errno;
+die bisherigen stdout-/stderr-Indizes0/1 bleiben bestehen, stdin erhält2.
+Arbiträrer Fehlertext wird nicht übernommen. Eine tatsächlich beobachtete native0
+bleibt erhalten; der Transport bleibt UNKNOWN und die Schreiblease bestehen.
+Es gibt keine Parser-, Prozesskill- oder Wiederholungsänderung. Zusätzliche lokale
+EIO-Injektionen prüfen echte Fehlereinwirkung, keine entwichenen Threadexceptions,
+Teilpuffer, Lease und unveränderte NoReplay-Receipts. Alte Original- und
+unabhängige280421a-Belege bleiben separat erhalten.

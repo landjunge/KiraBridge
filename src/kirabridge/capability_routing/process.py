@@ -63,6 +63,24 @@ def run_bounded(argv, *, input, cwd, timeout, env):
     except OSError as exc:
         fail(exc, "spawn")
 
+    def stream_error(index, operation, exc):
+        evidence = {
+            "stream": index,
+            "stream_name": ("stdout", "stderr", "stdin")[index],
+            "operation": operation,
+            "exception_type": type(exc).__name__,
+        }
+        if isinstance(getattr(exc, "errno", None), int):
+            evidence["errno"] = exc.errno
+        with lock:
+            stream_errors.append(evidence)
+
+    def close_stream(pipe, index):
+        try:
+            pipe.close()
+        except OSError as exc:
+            stream_error(index, "close", exc)
+
     def drain(pipe, index, limit):
         try:
             read = getattr(pipe, "read1", pipe.read)
@@ -73,19 +91,20 @@ def run_bounded(argv, *, input, cwd, timeout, env):
                     buffers[index].extend(chunk[:space])
                     truncated[index] |= len(chunk) > space
         except OSError as exc:
-            with lock:
-                stream_errors.append({"stream": index, "exception_type": type(exc).__name__})
+            stream_error(index, "read", exc)
         finally:
-            pipe.close()
+            close_stream(pipe, index)
 
     def feed():
+        operation = "write"
         try:
             process.stdin.write(input or b"")
+            operation = "flush"
             process.stdin.flush()
-        except (BrokenPipeError, OSError):
-            pass
+        except OSError as exc:
+            stream_error(2, operation, exc)
         finally:
-            process.stdin.close()
+            close_stream(process.stdin, 2)
 
     threads = [
         threading.Thread(target=drain, args=(process.stdout, 0, 1048576), daemon=True),
@@ -117,7 +136,7 @@ def run_bounded(argv, *, input, cwd, timeout, env):
     if any(thread.is_alive() for thread in threads):
         fail(subprocess.TimeoutExpired("owned CLI", timeout), "drain_after_exit")
     if stream_errors:
-        fail(subprocess.SubprocessError("Stream read failed"), "stream_io")
+        fail(subprocess.SubprocessError("Stream IO failed"), "stream_io")
     output, errors, evidence = snapshot("completed")
     return SimpleNamespace(
         returncode=process.returncode,
