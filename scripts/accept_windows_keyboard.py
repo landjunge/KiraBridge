@@ -15,12 +15,17 @@ import math
 import os
 import queue
 import secrets
+import sys
 import threading
 import time
 from contextlib import contextmanager
 from pathlib import Path
 
-from kirabridge.platform_adapters.windows.keyboard import (
+_SRC = Path(__file__).resolve().parents[1] / "src"
+if _SRC.is_dir():
+    sys.path.insert(0, str(_SRC))
+
+from kirabridge.platform_adapters.windows.keyboard import (  # noqa: E402
     INPUT,
     MOUSEINPUT,
     KeyStroke,

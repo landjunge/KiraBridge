@@ -16,11 +16,16 @@ import json
 import os
 import secrets
 import socket
+import sys
 import tempfile
 import threading
 import time
 from contextlib import contextmanager
 from pathlib import Path
+
+_SRC = Path(__file__).resolve().parents[1] / "src"
+if _SRC.is_dir():
+    sys.path.insert(0, str(_SRC))
 
 IDENTITY = ("hwnd", "pid", "process_created_100ns", "thread_id")
 TERMINAL = {"completed", "failed", "unknown", "cancelled", "blocked", "withdrawn"}

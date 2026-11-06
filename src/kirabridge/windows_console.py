@@ -12,6 +12,8 @@ from pydantic import Field, model_validator
 from kirabridge.bridge_core.models import BridgeError, Input, UncertainExecution
 from kirabridge.platform_adapters.windows.visible_console import (
     console_plan,
+    runtime_identity,
+    valid_console_result,
     visible_environment,
     wait_result,
 )
@@ -89,43 +91,122 @@ class WindowsConsoleManager:
 
     def _read(self, handoff_id: str) -> dict | None:
         path = self._path(handoff_id)
-        if not path.exists():
+        if not path.exists() or path.is_symlink():
             return None
         return json.loads(path.read_text(encoding="utf-8"))
+
+    def _result_path(self, handoff_id: str) -> Path:
+        return self._path(handoff_id).with_suffix(".result.json")
+
+    def _load_result(self, handoff_id: str) -> dict | None:
+        path = self._result_path(handoff_id)
+        if not path.is_file() or path.is_symlink():
+            return None
+        try:
+            value = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            return None
+        return value if isinstance(value, dict) else None
+
+    def _duplicate(self, record: dict) -> dict:
+        return {
+            **record,
+            "deduplicated": True,
+            "spawned": False,
+            "reconciled": record.get("reconciled") is True,
+            "provider": "windows.console.v1",
+            "automatic_retry": False,
+        }
+
+    def _accepted(
+        self, record: dict, result: dict, *, spawned: bool, reconciled: bool, pid=None
+    ) -> dict:
+        completed = {
+            "handoff_id": record["handoff_id"],
+            "state": "completed",
+            "argv": list(record["argv"]),
+            "runtime_root": record["runtime_root"],
+            "import_path": record["import_path"],
+            "source_sha256": record["source_sha256"],
+            "stdout": result["stdout"],
+            "stderr": result["stderr"],
+            "stdout_encoding": result["stdout_encoding"],
+            "stderr_encoding": result["stderr_encoding"],
+            "stdout_sha256": result["stdout_sha256"],
+            "stderr_sha256": result["stderr_sha256"],
+            "exit_code": result.get("exit_code"),
+            "visible": True,
+            "deduplicated": not spawned,
+            "spawned": spawned,
+            "reconciled": reconciled,
+            "pid": pid,
+            "creation_flags": record.get("creation_flags"),
+            "show": record.get("show"),
+            "environment_keys": list(record.get("environment_keys") or []),
+            "credential_environment_copied": any(
+                "TOKEN" in key or "SECRET" in key or key.endswith("_KEY")
+                for key in visible_environment()
+            ),
+            "provider": "windows.console.v1",
+            "automatic_retry": False,
+        }
+        return completed
+
+    def _reconcile(self, record: dict | None, handoff_id: str) -> dict | None:
+        if not record or record.get("state") == "completed":
+            return None
+        result = self._load_result(handoff_id)
+        if result is None or not valid_console_result(record, result):
+            return None
+        return self._accepted(record, result, spawned=False, reconciled=True, pid=record.get("pid"))
 
     async def execute(self, task, args, running, progress=None):
         operation, principal = task["operation"], task["principal"]
         self.authorize(principal, operation)
         self.require()
-        if operation == "windows.console.status":
-            record = self._read(args.handoff_id)
-            await running({"evidence_type": "windows_console_status", "automatic_retry": False})
-            return {
-                "handoff_id": args.handoff_id,
-                "state": None if record is None else record["state"],
-                "record": record,
-                "provider": "windows.console.v1",
-                "effect_attempted": False,
-            }
-        existing = self._read(args.handoff_id)
-        if existing and existing.get("state") == "completed":
-            await running({"evidence_type": "windows_console_duplicate", "automatic_retry": False})
-            return {
-                **existing,
-                "deduplicated": True,
-                "spawned": False,
-                "provider": "windows.console.v1",
-            }
-        if existing:
-            raise UncertainExecution(
-                "windows_console_unknown",
-                "This handoff already started and has no completed result; no replay",
-            )
         async with self.desktop_input.transaction() as turn:
             self.authorize(principal, operation)
+            record = self._read(args.handoff_id)
+            if operation == "windows.console.status":
+                reconciled = self._reconcile(record, args.handoff_id)
+                if reconciled is not None:
+                    _atomic_json(self._path(args.handoff_id), reconciled)
+                    record = reconciled
+                await running({"evidence_type": "windows_console_status", "automatic_retry": False})
+                return {
+                    "handoff_id": args.handoff_id,
+                    "state": None if record is None else record["state"],
+                    "record": record,
+                    "deduplicated": bool(record and record.get("state") == "completed"),
+                    "provider": "windows.console.v1",
+                    "effect_attempted": False,
+                }
             self.authorize(principal, "windows.console.status")
+            if record and list(record.get("argv") or []) != list(args.argv):
+                raise UncertainExecution(
+                    "windows_console_unknown",
+                    "This handoff id belongs to a different command; no replay",
+                )
+            if record and record.get("state") == "completed":
+                await running(
+                    {"evidence_type": "windows_console_duplicate", "automatic_retry": False}
+                )
+                return self._duplicate(record)
+            reconciled = self._reconcile(record, args.handoff_id)
+            if reconciled is not None:
+                _atomic_json(self._path(args.handoff_id), reconciled)
+                await running(
+                    {"evidence_type": "windows_console_duplicate", "automatic_retry": False}
+                )
+                return reconciled
+            if record is not None:
+                raise UncertainExecution(
+                    "windows_console_unknown",
+                    "This handoff already started and has no completed result; no replay",
+                )
             record_path = self._path(args.handoff_id)
-            result_path = record_path.with_suffix(".result.json")
+            result_path = self._result_path(args.handoff_id)
+            identity = runtime_identity()
             python = sys.executable if self.spawner is None else self.spawner.python
             plan = console_plan(
                 python=python,
@@ -135,20 +216,27 @@ class WindowsConsoleManager:
                 argv=tuple(args.argv),
                 hold_seconds=args.hold_seconds,
                 timeout_seconds=args.timeout_seconds,
+                runtime_root=identity["runtime_root"],
+                source_sha256=identity["source_sha256"],
+                import_path=identity["import_path"],
             )
             if plan["hidden"] or plan["redirect_stdio"]:
                 raise BridgeError("windows_console_hidden", "Refusing a hidden console handoff")
-            _atomic_json(
-                record_path,
-                {
-                    "handoff_id": args.handoff_id,
-                    "state": "started",
-                    "argv": list(args.argv),
-                    "creation_flags": plan["creation_flags"],
-                    "show": plan["show"],
-                    "deduplicated": False,
-                },
-            )
+            reserved = {
+                "handoff_id": args.handoff_id,
+                "state": "started",
+                "argv": list(args.argv),
+                "cwd": args.cwd,
+                "runtime_root": plan["runtime_root"],
+                "import_path": plan["import_path"],
+                "source_sha256": plan["source_sha256"],
+                "creation_flags": plan["creation_flags"],
+                "show": plan["show"],
+                "environment_keys": list(plan["environment_keys"]),
+                "deduplicated": False,
+                "spawned": False,
+            }
+            _atomic_json(record_path, reserved)
             turn.mark_attempted()
             await running({"evidence_type": "windows_console_started", "automatic_retry": False})
             try:
@@ -159,7 +247,12 @@ class WindowsConsoleManager:
 
                     self.spawner = Win32VisibleSpawner()
                 spawned = self.spawner.start(plan)
-                result = wait_result(result_path, args.timeout_seconds + 2)
+                try:
+                    result = wait_result(result_path, args.timeout_seconds + 2)
+                except UncertainExecution:
+                    result = self._load_result(args.handoff_id)
+                    if result is None:
+                        raise
             except UncertainExecution:
                 _atomic_json(
                     record_path,
@@ -175,13 +268,13 @@ class WindowsConsoleManager:
                     "windows_console_unknown",
                     "Visible console handoff stopped after start; no replay",
                 ) from error
-            if result.get("handoff_id") != args.handoff_id or result.get("state") != "completed":
+            if not valid_console_result(reserved, result):
                 _atomic_json(
                     record_path,
                     {
                         **self._read(args.handoff_id),
                         "state": "unknown",
-                        "result_state": result.get("state"),
+                        "result_state": result.get("state") if isinstance(result, dict) else None,
                         "automatic_retry": False,
                     },
                 )
@@ -189,21 +282,8 @@ class WindowsConsoleManager:
                     "windows_console_unknown",
                     "Visible console result is not a completion; no replay",
                 )
-            completed = {
-                **result,
-                "state": "completed",
-                "deduplicated": False,
-                "spawned": True,
-                "pid": spawned.get("pid"),
-                "creation_flags": plan["creation_flags"],
-                "show": plan["show"],
-                "environment_keys": list(plan["environment_keys"]),
-                "credential_environment_copied": any(
-                    "TOKEN" in key or "SECRET" in key or key.endswith("_KEY")
-                    for key in visible_environment()
-                ),
-                "provider": "windows.console.v1",
-                "automatic_retry": False,
-            }
+            completed = self._accepted(
+                reserved, result, spawned=True, reconciled=False, pid=spawned.get("pid")
+            )
             _atomic_json(record_path, completed)
             return completed
