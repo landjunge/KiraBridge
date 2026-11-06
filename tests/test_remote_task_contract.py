@@ -24,6 +24,9 @@ from kirabridge.security_manager import request_hash
 CONTRACTS = Path(__file__).resolve().parents[1] / "docs" / "contracts"
 SCHEMA = json.loads((CONTRACTS / "remote-task.v1.schema.json").read_text())
 EXAMPLES = json.loads((CONTRACTS / "fixtures" / "remote-task.v1.examples.json").read_text())
+PROJECT_DRAFTS = json.loads(
+    (CONTRACTS / "fixtures" / "remote-project-draft.m2.examples.json").read_text()
+)
 
 
 def validate(message):
@@ -252,3 +255,22 @@ def test_shape_checks_do_not_pretend_to_verify_context_or_grants():
     # A contextual adapter MUST reject this binding mismatch; none is implemented here.
     assert digest(message) != EXAMPLES["messages"]["queued_receipt"]["binding"]["envelope_sha256"]
     assert canonical(message) != canonical(EXAMPLES["messages"]["card_binding"])
+
+
+@pytest.mark.parametrize("name", PROJECT_DRAFTS["cases"])
+def test_td_m2_project_draft_is_neither_remote_intent_nor_issued_source(name):
+    # Produced by the pinned TD M2 pure preview, including READY prose. No TD
+    # import, workspace, grant resolver or remote delivery runs in this check.
+    preview = PROJECT_DRAFTS["cases"][name]["preview"]
+    assert preview["plan_status"] == "draft"
+    assert preview["execution_started"] is False
+    assert preview["source_verification"] == "referenced_unverified"
+    with pytest.raises(ValidationError):
+        validate(preview)
+    with pytest.raises(ModelValidationError):
+        TaskRequest.model_validate(preview)
+
+    message = copy.deepcopy(EXAMPLES["messages"]["handoff_intent"])
+    message["source"] = copy.deepcopy(preview)
+    with pytest.raises(ValidationError):
+        validate(message)
