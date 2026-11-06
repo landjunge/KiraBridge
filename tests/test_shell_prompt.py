@@ -86,7 +86,7 @@ def direct_shell(bridge, config, monkeypatch):
     monkeypatch.setattr(terminal, "read", AsyncMock(return_value="➜  ~ \n\n"))
     # Executing this fallback would conceal a broken ChatGPT preflight path.
     monkeypatch.setattr(terminal, "send", AsyncMock(side_effect=AssertionError("raw send")))
-    monkeypatch.setattr(terminal, "native", AsyncMock(return_value={"sent": True}))
+    monkeypatch.setattr(terminal, "native", AsyncMock(side_effect=["➜  ~ \n\n", {"sent": True}]))
     return bridge, row, identity
 
 
@@ -107,6 +107,7 @@ async def test_chatgpt_session_input_task_uses_confirmed_shell_path(direct_shell
     assert persisted["state"] == State.COMPLETED
     terminal = bridge.sessions.terminal_app
     terminal.process_identity.assert_awaited_once_with(900)
+    terminal.read.assert_awaited_once_with(row["pane_id"])
     assert terminal.native.await_count == 2
     sources = [call.args[0] for call in terminal.native.await_args_list]
     assert "app.doScript(" not in sources[0]
@@ -239,7 +240,7 @@ async def run_dispatch_js(source, state):
         ("none", None),
         ("before-input", "Selected terminal input changed"),
         ("before-prompt", "Selected terminal input changed"),
-        ("focus-input", "Selected terminal input changed"),
+        ("focus-input", "Focused shell input is not empty"),
         ("focus-busy", "Selected terminal is busy"),
         ("busy", "Selected terminal is busy"),
         ("identity", "Selected target identity changed"),
@@ -277,9 +278,11 @@ async def test_actual_native_dispatch_guards_races(direct_shell, monkeypatch, ch
 
     monkeypatch.setattr(terminal, "native", native)
     if error:
-        with pytest.raises(BridgeError, match=error):
+        with pytest.raises(BridgeError, match=error) as failure:
             await bridge.sessions.send("local", arguments(row), before_transport=intent)
-        assert observed[0]["calls"] == []
+        assert all(result["calls"] == [] for result in observed)
+        if change == "focus-input":
+            assert failure.value.code == "visible_input_not_empty"
     else:
         result = await bridge.sessions.send("local", arguments(row), before_transport=intent)
         assert result["submitted"] and result["input_handed_to_transport"]

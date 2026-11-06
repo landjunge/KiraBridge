@@ -34,11 +34,17 @@ def command(bridge, config, monkeypatch):
 
     async def catalog():
         state["catalogs"] += 1
+        if state["catalogs"] == 1 and state.get("initially_missing"):
+            return []
         result = copy.deepcopy(row)
-        if state.get("revoke_after_catalog"):
+        if state.get("revoke_after_catalog") == state["catalogs"]:
             policy.capabilities.remove("session.inspect")
-        if state["catalogs"] == 3 and state.get("final_busy"):
+        if state["catalogs"] == 2 and state.get("final_busy"):
             result["busy"] = True
+        if state["catalogs"] == 2 and state.get("final_process_change"):
+            result["processes"].append(
+                {"pid": 346, "ppid": 345, "name": "vim", "image": "/usr/bin/vim"}
+            )
         return [result]
 
     async def read(pane):
@@ -77,7 +83,7 @@ def command(bridge, config, monkeypatch):
     return bridge, state, args
 
 
-async def test_visible_command_uses_four_catalogues_with_fresh_screens_and_no_replay(command):
+async def test_visible_command_keeps_final_selection_screens_and_no_replay(command):
     bridge, state, args = command
     value = request("terminal.visible", args, task_id="scoped-command")
     async with bridge:
@@ -89,10 +95,10 @@ async def test_visible_command_uses_four_catalogues_with_fresh_screens_and_no_re
         assert bridge.prepare("local", value)["state"] == "completed"
         assert state == before_duplicate
     # Actual SessionManager.selected/read/catalog methods ran throughout.
-    assert state["catalogs"] == 4
-    assert state["catalogs_at_dispatch"] == 3
+    assert state["catalogs"] == 3
+    assert state["catalogs_at_dispatch"] == 2
     assert state["reads_at_dispatch"] == 2
-    assert state["reads"] == [1, 3, 4]
+    assert state["reads"] == [1, 2, 3]
     assert state["identities"] == [345] and len(state["posts"]) == 1
 
 
@@ -107,9 +113,54 @@ async def test_visible_command_final_busy_change_still_stops_before_any_input(co
             running,
         )
     assert failure.value.code == "visible_target_changed"
-    assert state["catalogs"] == 3 and state["reads"] == [1]
+    assert state["catalogs"] == 2 and state["reads"] == [1]
     assert not state["identities"] and not state["posts"]
     running.assert_not_awaited()
+
+
+@pytest.mark.parametrize("change", ["final_process_change", "revoke_after_catalog"])
+async def test_visible_command_revalidates_process_and_authority_before_dispatch(command, change):
+    bridge, state, args = command
+    state[change] = 2 if change == "revoke_after_catalog" else True
+    running = AsyncMock()
+    with pytest.raises(BridgeError):
+        await bridge.visible_terminal.execute(
+            {"id": "final-revalidation", "principal": "local"},
+            VisibleTerminalInput.model_validate(args),
+            running,
+        )
+    assert state["catalogs"] == 2 and state["reads"] == [1]
+    assert not state["identities"] and not state["posts"]
+    running.assert_not_awaited()
+
+
+@pytest.mark.parametrize("target", ["legacy", "created"])
+async def test_visible_command_retains_canonical_row_for_legacy_and_created_shell(command, target):
+    bridge, state, args = command
+    if target == "legacy":
+        state["row"]["legacy_expected_pid"] = 344
+        args["expected_pid"] = 344
+    else:
+        state["initially_missing"] = True
+        args.pop("pane_id")
+        args.pop("expected_pid")
+        args["create_if_needed"] = True
+        bridge.sessions.open = AsyncMock(
+            return_value={
+                "pane_id": state["row"]["pane_id"],
+                "expected_pid": 345,
+                "tty": state["row"]["tty"],
+            }
+        )
+    result = await bridge.visible_terminal.execute(
+        {"id": "canonical-row", "principal": "local"},
+        VisibleTerminalInput.model_validate(args),
+        AsyncMock(),
+    )
+    assert result["expected_pid"] == 345 and result["exit_code"] == 0
+    assert state["identities"] == [345] and len(state["posts"]) == 1
+    if target == "created":
+        bridge.sessions.open.assert_awaited_once()
 
 
 @pytest.mark.parametrize("failure", ["ambiguous", "revoked"])

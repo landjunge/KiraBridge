@@ -273,7 +273,7 @@ async def test_real_send_source_checks_full_image_parent_cwd_and_final_empty_scr
     fixture = fixture_module("test_codex_window_isolation")
     leaf = TerminalAppTransport(asyncio.Lock(), desktop=object())
     leaf.read = AsyncMock(return_value="KiraBridge visible % ")
-    leaf.native = AsyncMock(return_value={"sent": True})
+    leaf.native = AsyncMock(side_effect=["KiraBridge visible % ", {"sent": True}] * 2)
     before_transport = AsyncMock()
     row = {"pane_id": "terminal:123:ttys004", "tty": "/dev/ttys004", "expected_pid": 345}
     await leaf.send_confirmed(
