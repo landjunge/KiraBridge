@@ -721,8 +721,8 @@ class TerminalAppTransport:
         )
 
     async def close_tab(self, pane_id):
-        """Close one scripting tab. Other tab ids must still exist afterwards."""
-        return await self.native(
+        """Confirm target absence; a pending close dialog is not a closed tab."""
+        result = await self.native(
             self.native_target(pane_id)
             + """
             const id = targetWindow.id();
@@ -733,10 +733,16 @@ class TerminalAppTransport:
             const left = app.windows().map(w => w.id());
             const missing = others.filter(value => !left.includes(value));
             if (missing.length) throw Error("Close removed other tabs");
-            JSON.stringify({closed:true, closed_window_id:id, remaining:left.length});
+            JSON.stringify({closed:!left.includes(id), closed_window_id:id, remaining:left.length});
             """,
             mutation=True,
         )
+        if result.get("closed") is not True:
+            raise UncertainExecution(
+                "session_close_unconfirmed",
+                "Terminal target is still present after close; inspect before any further action",
+            )
+        return result
 
     async def read(self, pane_id):
         return await self.native(
