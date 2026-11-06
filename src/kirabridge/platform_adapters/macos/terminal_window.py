@@ -58,7 +58,7 @@ class TerminalWindowProof:
                 break
             except BridgeError as error:
                 if (
-                    operation != "accessibility.inspect"
+                    operation not in {"accessibility.inspect", "windows.list"}
                     or error.code != "macos_tree_changed"
                     or attempt == 2
                 ):
@@ -349,6 +349,19 @@ class TerminalWindowProof:
         titles and equal geometry alone never establish that transition.
         """
         hosts = [group for group in self.before["ax"] if self.members(group) == original]
+        hidden_host = False
+        if not hosts and len(original) == 1:
+            # A singleton with its tab bar hidden has no AXRadioButton yet.
+            # Bind only the unique missing AX window in an otherwise complete,
+            # retained partition. The old AX anchor must return after detach;
+            # this provisional observation never authorizes command dispatch.
+            current_tokens = {group["token"] for group in current["ax"]}
+            hosts = [
+                group
+                for group in self.before["ax"]
+                if group["radios"] is None and group["token"] not in current_tokens
+            ]
+            hidden_host = True
         require(
             len(hosts) == 1 and len(current["ax"]) == len(self.before["ax"]),
             "Shared host is not positively bound to the pre-open radio partition",
@@ -412,6 +425,9 @@ class TerminalWindowProof:
             observation=observation,
         )
         self.retained(self.before, current, exclude=host)
+        self.hidden_host = host if hidden_host else None
+        if hidden_host:
+            return "hidden_singleton_partition"
         return "same_ax_window" if host["token"] == own["token"] else "retained_tab_identities"
 
     async def isolate(self, receipt):
@@ -456,7 +472,17 @@ class TerminalWindowProof:
                     len(after["ax"]) == len(before["ax"]) + 1,
                     "Detached native partition is incomplete",
                 )
-                hosts = [g for g in after["ax"] if g is not new_own and self.members(g) == original]
+                hidden_host = getattr(self, "hidden_host", None)
+                hosts = [
+                    g
+                    for g in after["ax"]
+                    if g is not new_own
+                    and (
+                        g["token"] == hidden_host["token"] and self.members(g) in (None, original)
+                        if hidden_host
+                        else self.members(g) == original
+                    )
+                ]
                 require(len(hosts) == 1, "Original host radio partition changed")
                 self.retained(before, after, exclude=own)
                 for old in before["cg"]:
@@ -481,11 +507,24 @@ class TerminalWindowProof:
                     "Shared CG surface did not split into one retained and one new surface",
                 )
                 host_surfaces = [w for w in split if w["window_id"] != new_cg["window_id"]]
-                require(
-                    len(host_surfaces) == 1
+                host_layout = (
+                    host["position"] == own["position"]
+                    and host["size"] == own["size"]
+                    and host_surfaces
                     and host_surfaces[0]["bounds"] == own_cg["bounds"]
-                    and host["position"] == own["position"]
-                    and host["size"] == own["size"],
+                )
+                if hidden_host and len(host_surfaces) == 1:
+                    # Hiding the singleton tab bar again can reflow its height.
+                    # Require the original AX anchor and coherent CG/AX geometry,
+                    # retaining its position and width, rather than equal heights.
+                    bounds = host_surfaces[0]["bounds"]
+                    host_layout = (
+                        host["position"] == hidden_host["position"] == [bounds["X"], bounds["Y"]]
+                        and host["size"] == [bounds["Width"], bounds["Height"]]
+                        and host["size"][0] == hidden_host["size"][0]
+                    )
+                require(
+                    len(host_surfaces) == 1 and host_layout,
                     "Original host native layout changed",
                 )
                 require(
