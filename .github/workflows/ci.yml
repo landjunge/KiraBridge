@@ -21,13 +21,13 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # Automatic events retain all four rows. Only an explicit manual 'all'
-        # selects hosted runners; missing/unknown manual scope stays Linux-only.
+        # Automatic events and missing/unknown scope use the existing Linux runners.
+        # Hosted macOS requires an explicit, separately authorized manual 'all' run.
         include: >-
           ${{ fromJSON(
-            github.event_name == 'workflow_dispatch' && inputs.scope != 'all' &&
-            '[{"os":"ubuntu-24.04","runner":"kirabridge","python":"3.11"},{"os":"ubuntu-24.04","runner":"kirabridge","python":"3.13"}]' ||
-            '[{"os":"ubuntu-24.04","runner":"kirabridge","python":"3.11"},{"os":"ubuntu-24.04","runner":"kirabridge","python":"3.13"},{"os":"macos-15-intel","runner":"macos-15-intel","python":"3.11"},{"os":"macos-15","runner":"macos-15","python":"3.11"}]'
+            github.event_name == 'workflow_dispatch' && inputs.scope == 'all' &&
+            '[{"os":"ubuntu-24.04","runner":"kirabridge","python":"3.11"},{"os":"ubuntu-24.04","runner":"kirabridge","python":"3.13"},{"os":"macos-15-intel","runner":"macos-15-intel","python":"3.11"},{"os":"macos-15","runner":"macos-15","python":"3.11"}]' ||
+            '[{"os":"ubuntu-24.04","runner":"kirabridge","python":"3.11"},{"os":"ubuntu-24.04","runner":"kirabridge","python":"3.13"}]'
           ) }}
     runs-on: ${{ matrix.runner }}
     env:
