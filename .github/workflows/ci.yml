@@ -35,8 +35,15 @@ jobs:
       UV_PYTHON_DOWNLOADS: never
       PYTHONNOUSERSITE: '1'
       PYTHONDONTWRITEBYTECODE: '1'
+      TMPDIR: ${{ runner.temp }}/kb-ci-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.python }}-tmp
     timeout-minutes: 10
     steps:
+      - name: Prepare fresh job temporary directory on runner storage
+        shell: bash
+        run: |
+          test -d "$RUNNER_TEMP"
+          umask 077
+          mkdir "$TMPDIR"
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         if: ${{ matrix.runner != 'kirabridge' }}
@@ -73,7 +80,8 @@ jobs:
         run: >-
           uv run --locked --group remote-ci python scripts/ci_remote_tests.py legacy
           --expected-kb "${{ github.sha }}" --td .ci-threaddesk --tollgate .ci-tollgate
-          --report-dir "${{ runner.temp }}/kb-ci-${{ github.run_id }}-${{ github.run_attempt }}-legacy"
+          --runner-temp "${{ runner.temp }}"
+          --report-dir "${{ runner.temp }}/kb-ci-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.python }}-legacy"
         env:
           PYTHONPATH: ${{ github.workspace }}/src:${{ github.workspace }}/.ci-threaddesk/src
           KIRABRIDGE_TEST_THREADDESK_SOURCE: ${{ github.workspace }}/.ci-threaddesk/src
@@ -85,7 +93,8 @@ jobs:
         run: >-
           uv run --locked --group remote-ci python scripts/ci_remote_tests.py remote
           --expected-kb "${{ github.sha }}" --td .ci-threaddesk-m4
-          --report-dir "${{ runner.temp }}/kb-ci-${{ github.run_id }}-${{ github.run_attempt }}-remote"
+          --runner-temp "${{ runner.temp }}"
+          --report-dir "${{ runner.temp }}/kb-ci-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.python }}-remote"
         env:
           PYTHONPATH: ${{ github.workspace }}/src:${{ github.workspace }}/.ci-threaddesk-m4/src
           KIRABRIDGE_TEST_THREADDESK_SOURCE: ${{ github.workspace }}/.ci-threaddesk-m4/src

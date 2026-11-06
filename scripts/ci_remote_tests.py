@@ -11,6 +11,7 @@ import platform
 import re
 import subprocess
 import sys
+import tempfile
 import time
 import uuid
 import xml.etree.ElementTree as ET
@@ -212,6 +213,95 @@ def validate_junit(path, suite_name, started_ns, pytest_exit):
     return {"cases": counts, "total": len(cases), "skipped": 0, "errors": 0, "failures": 0}
 
 
+def filesystem_snapshot(path):
+    stat = path.stat()
+    usage = os.statvfs(path)
+    return {
+        "path": str(path.resolve()),
+        "device": stat.st_dev,
+        "bytes_total": usage.f_blocks * usage.f_frsize,
+        "bytes_free": usage.f_bfree * usage.f_frsize,
+        "bytes_available": usage.f_bavail * usage.f_frsize,
+        "inodes_total": usage.f_files,
+        "inodes_free": usage.f_ffree,
+        "inodes_available": usage.f_favail,
+    }
+
+
+def prepare_temp_scope(runner_temp, report_dir, lane):
+    """Validate the pre-interpreter job scope; create only a fresh lane report dir."""
+    require(lane in {"legacy", "remote"}, "CI temp: unknown lane")
+    require(
+        runner_temp is not None and runner_temp.is_absolute(),
+        "CI temp: absolute runner.temp required",
+    )
+    try:
+        parent = runner_temp.resolve(strict=True)
+    except (OSError, RuntimeError) as exc:
+        raise GateError("CI temp: runner.temp parent unavailable") from exc
+    require(parent.is_dir(), "CI temp: runner.temp parent is not a directory")
+    runner_value = os.environ.get("RUNNER_TEMP", "")
+    require(
+        bool(runner_value) and Path(runner_value).is_absolute(),
+        "CI temp: absolute RUNNER_TEMP environment required",
+    )
+    try:
+        declared_parent = Path(runner_value).resolve(strict=True)
+    except (OSError, RuntimeError) as exc:
+        raise GateError("CI temp: RUNNER_TEMP environment unavailable") from exc
+    require(parent == declared_parent, "CI temp: parent differs from RUNNER_TEMP")
+    values = {
+        key: os.environ.get(key, "") for key in ("GITHUB_RUN_ID", "GITHUB_RUN_ATTEMPT", "UV_PYTHON")
+    }
+    require(
+        bool(re.fullmatch(r"[0-9]+", values["GITHUB_RUN_ID"]))
+        and bool(re.fullmatch(r"[0-9]+", values["GITHUB_RUN_ATTEMPT"]))
+        and bool(re.fullmatch(r"[0-9]+\.[0-9]+", values["UV_PYTHON"])),
+        "CI temp: explicit run/attempt/Python scope required",
+    )
+    name = "kb-ci-{GITHUB_RUN_ID}-{GITHUB_RUN_ATTEMPT}-{UV_PYTHON}".format(**values)
+    expected_tmp = parent / (name + "-tmp")
+    tmp_value = os.environ.get("TMPDIR", "")
+    require(bool(tmp_value) and Path(tmp_value).is_absolute(), "CI temp: absolute TMPDIR required")
+    try:
+        actual_tmp = Path(tmp_value).resolve(strict=True)
+        report = report_dir.resolve()
+    except (OSError, RuntimeError) as exc:
+        raise GateError("CI temp: temporary path unavailable") from exc
+    require(
+        actual_tmp == expected_tmp and actual_tmp.is_dir(), "CI temp: TMPDIR outside this job scope"
+    )
+    require(
+        report_dir.is_absolute() and report == parent / (name + "-" + lane),
+        "CI temp: report outside this job/lane scope",
+    )
+    # Do not reset tempfile's cache: a fallback or prior external selection is a failure.
+    effective = Path(tempfile.gettempdir()).resolve(strict=True)
+    require(effective == actual_tmp, "CI temp: effective Python tempfile scope differs")
+    require(
+        actual_tmp.stat().st_dev == parent.stat().st_dev,
+        "CI temp: temporary directory on a different filesystem",
+    )
+    require(not report.exists() and not report.is_symlink(), "CI temp: report directory reused")
+    report.mkdir(mode=0o700)
+    basetemp = report / "pytest-basetemp"
+    return {
+        "identity": values,
+        "runner_temp_input": str(runner_temp),
+        "runner_temp": str(parent),
+        "tmpdir_environment": tmp_value,
+        "effective_python_temp": str(effective),
+        "report_dir": str(report),
+        "pytest_basetemp": str(basetemp),
+        "filesystem_before": filesystem_snapshot(effective),
+        "report_filesystem": filesystem_snapshot(report),
+        "runner_filesystem": filesystem_snapshot(parent),
+        "workspace_device": Path.cwd().stat().st_dev,
+        "root_device": Path("/").stat().st_dev,
+        "capacity_limit": "Observed counters only; no free-space guarantee or threshold.",
+    }
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("lane", choices=("legacy", "remote"))
@@ -219,6 +309,7 @@ def main(argv=None):
     parser.add_argument("--td", type=Path, required=True)
     parser.add_argument("--tollgate", type=Path)
     parser.add_argument("--report-dir", type=Path, required=True)
+    parser.add_argument("--runner-temp", type=Path, required=True)
     args = parser.parse_args(argv)
     kb = Path(__file__).resolve().parents[1]
     require(Path.cwd().resolve() == kb, "Run from the pinned KB checkout")
@@ -259,9 +350,8 @@ def main(argv=None):
         tg = args.tollgate.resolve()
         sources["tollgate"] = checkout(tg, TOLLGATE, ["."], cache_log=cache_log)
         require(os.environ.get("KIRABRIDGE_TEST_TOLLGATE_SOURCE") == str(tg), "Wrong TollGate env")
-    report_dir = args.report_dir.resolve()
-    # Reuse is an error: a prior successful XML can never substitute for this invocation.
-    report_dir.mkdir(parents=True, exist_ok=False)
+    temp_scope = prepare_temp_scope(args.runner_temp, args.report_dir, args.lane)
+    report_dir = Path(temp_scope["report_dir"])
     run_id = uuid.uuid4().hex
     suite = f"{args.lane}-{run_id}"
     xml = report_dir / "pytest.xml"
@@ -276,6 +366,8 @@ def main(argv=None):
         "error::pytest.PytestUnraisableExceptionWarning",
         "--junitxml",
         str(xml),
+        "--basetemp",
+        temp_scope["pytest_basetemp"],
         "-o",
         f"junit_suite_name={suite}",
         *selection,
@@ -292,6 +384,7 @@ def main(argv=None):
         "cwd": str(kb),
         "sys_path": sys.path[:],
         "sources": sources,
+        "temp_scope": temp_scope,
         "removed_derived_bytecode": cache_log,
         "environment": {
             key: os.environ.get(key)
@@ -308,6 +401,8 @@ def main(argv=None):
                 "GITHUB_RUN_ATTEMPT",
                 "GITHUB_JOB",
                 "GITHUB_SHA",
+                "RUNNER_TEMP",
+                "TMPDIR",
             )
         },
     }
@@ -344,6 +439,13 @@ def main(argv=None):
         evidence["error"] = f"{type(exc).__name__}: {exc}"
         raise
     finally:
+        try:
+            temp_scope["filesystem_after"] = filesystem_snapshot(
+                Path(temp_scope["effective_python_temp"])
+            )
+        except OSError as exc:
+            # Retain the actual test/gate outcome if post-run telemetry is unavailable.
+            temp_scope["filesystem_after_error"] = f"{type(exc).__name__}: {exc}"
         evidence["finished_ns"] = time.time_ns()
         evidence_path.write_text(json.dumps(evidence, indent=2) + "\n")
         print(json.dumps(evidence, sort_keys=True), flush=True)
