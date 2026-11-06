@@ -1073,7 +1073,7 @@ entries[0].click();JSON.stringify({detached:true});
             + json.dumps(identity)
             + ") throw Error('Selected target identity changed');"
         )
-        await self.native(
+        screen = await self.native(
             target
             + identity_guard
             + own_boundary
@@ -1081,13 +1081,15 @@ entries[0].click();JSON.stringify({detached:true});
             + "\nif(tab.busy()) throw Error('Selected terminal is busy');"
             + self.native_screen_guard(screen)
             + self.native_focus(row["pane_id"])[len(target) :]
-            + "\ncheckFocus(); JSON.stringify({focused:true});",
+            + "\ncheckFocus(); JSON.stringify("
+            + self.native_input_tail(65536)
+            + ");",
             mutation=True,
         )
         # Tab selection may reflow history or change blank row padding. Accept
-        # only a fresh empty prompt AFTER that transition; compare it byte-for-
-        # byte later, without another selection or activation in the dispatch.
-        screen = await self.read(row["pane_id"])
+        # only the fresh history tail read AFTER that transition in the same
+        # focus call. Compare it byte-for-byte later, without another selection
+        # or activation in the dispatch.
         if not empty_shell_prompt(screen):
             raise BridgeError("visible_input_not_empty", "Focused shell input is not empty")
         return await self.native(

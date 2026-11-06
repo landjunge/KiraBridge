@@ -34,6 +34,8 @@ def command(bridge, config, monkeypatch):
 
     async def catalog():
         state["catalogs"] += 1
+        if state["catalogs"] == 1 and state.get("initially_missing"):
+            return []
         result = copy.deepcopy(row)
         if state.get("revoke_after_catalog") == state["catalogs"]:
             policy.capabilities.remove("session.inspect")
@@ -130,6 +132,35 @@ async def test_visible_command_revalidates_process_and_authority_before_dispatch
     assert state["catalogs"] == 2 and state["reads"] == [1]
     assert not state["identities"] and not state["posts"]
     running.assert_not_awaited()
+
+
+@pytest.mark.parametrize("target", ["legacy", "created"])
+async def test_visible_command_retains_canonical_row_for_legacy_and_created_shell(command, target):
+    bridge, state, args = command
+    if target == "legacy":
+        state["row"]["legacy_expected_pid"] = 344
+        args["expected_pid"] = 344
+    else:
+        state["initially_missing"] = True
+        args.pop("pane_id")
+        args.pop("expected_pid")
+        args["create_if_needed"] = True
+        bridge.sessions.open = AsyncMock(
+            return_value={
+                "pane_id": state["row"]["pane_id"],
+                "expected_pid": 345,
+                "tty": state["row"]["tty"],
+            }
+        )
+    result = await bridge.visible_terminal.execute(
+        {"id": "canonical-row", "principal": "local"},
+        VisibleTerminalInput.model_validate(args),
+        AsyncMock(),
+    )
+    assert result["expected_pid"] == 345 and result["exit_code"] == 0
+    assert state["identities"] == [345] and len(state["posts"]) == 1
+    if target == "created":
+        bridge.sessions.open.assert_awaited_once()
 
 
 @pytest.mark.parametrize("failure", ["ambiguous", "revoked"])
