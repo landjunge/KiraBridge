@@ -15,7 +15,14 @@ Platzmangel noch, dass sämtliche Testfehler dadurch verursacht wurden.
 Verify setzt nun vor dem ersten Pythonstart ein jobeigenes `TMPDIR` unter dem
 vorhandenen `runner.temp` und legt das Verzeichnis als ersten Schritt frisch an:
 `kb-ci-<run>-<attempt>-<python>-tmp`. Vorhandene Verzeichnisse werden nicht
-wiederverwendet oder gelöscht. Die Variablen gelten auch für die bestehenden
+wiederverwendet oder gelöscht. Der erste Bash-Schritt bildet den Pfad aus
+`RUNNER_TEMP`, `GITHUB_RUN_ID`, `GITHUB_RUN_ATTEMPT` und `UV_PYTHON`, legt ihn mit
+Modus0700 an und schreibt `TMPDIR` in `GITHUB_ENV`. Damit erhalten nachfolgende
+Schritte den Wert vor ihrem Interpreterstart. `runner` ist im Job-`env`-Kontext
+nicht verfügbar; die frühere Job-`env`-Expression ist entfernt.
+[GitHub-Kontexttabelle](https://docs.github.com/en/actions/reference/workflows-and-actions/contexts#context-availability),
+[GitHub-Umgebungsdatei](https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-commands#setting-an-environment-variable).
+Die Variablen gelten auch für die bestehenden
 UV-Sync-/Buildschritte; Python muss sie bereits beim Interpreterstart erhalten.
 Kinder mit absichtlich bereinigten Umgebungen übernehmen TMPDIR nicht automatisch.
 Die expliziten pytest-`tmp_path`-Daten bleiben durch den Basetemp-Pfad gebunden.
@@ -62,7 +69,10 @@ Dieser interne CI-Patch ändert keine README-/Webseiten-/Downloadverfügbarkeit.
 ## English
 
 Verify now creates a fresh job-specific TMPDIR under the existing runner.temp
-before Python starts. The helper verifies the declared runner parent, resolved
+before Python starts. The first Bash step computes the path from runner-provided
+environment variables, creates it with mode0700 and publishes it through
+GITHUB_ENV for subsequent steps. No unsupported runner context is used in job.env.
+The helper verifies the declared runner parent, resolved
 run/attempt/Python/lane paths and Python's actual tempfile selection, refusing
 external paths, stale caches and reused report directories. Each lane receives
 an explicit fresh pytest basetemp under its report directory.

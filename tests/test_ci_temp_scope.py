@@ -235,3 +235,90 @@ def test_wrong_missing_or_external_scope_fails_without_touching_other_data(conte
     assert failure["error_type"] == "GateError" and failure["error"].startswith("CI temp:")
     assert not Path(context["report"]).exists() and not report.exists()
     assert Path(context["sentinel"]).read_bytes() == b"preserve owned test sentinel"
+
+
+def actual_prepare_script():
+    """Execute the checked-in literal run block, not a copied approximation."""
+    workflow = HARNESS.parents[1] / ".github/workflows/ci.yml"
+    body = (
+        workflow.read_text()
+        .split("      - name: Prepare fresh job temporary directory on runner storage\n", 1)[1]
+        .split("        run: |\n", 1)[1]
+    )
+    script = []
+    for line in body.splitlines():
+        if line and not line.startswith("          "):
+            break
+        script.append(line[10:] if line else "")
+    assert script
+    return "\n".join(script) + "\n"
+
+
+def run_actual_prepare(config):
+    env_file = Path(config["root"]) / "step environment"
+    env_file.write_text("ORIGINAL=preserve\n")
+    environment = {
+        **os.environ,
+        "RUNNER_TEMP": config["parent"],
+        "GITHUB_RUN_ID": "42",
+        "GITHUB_RUN_ATTEMPT": "1",
+        "UV_PYTHON": config["python"],
+        "GITHUB_ENV": str(env_file),
+        "LC_ALL": "C",
+    }
+    environment.pop("TMPDIR", None)
+    result = subprocess.run(
+        ["bash", "--noprofile", "--norc", "-e", "-o", "pipefail", "-c", actual_prepare_script()],
+        env=environment,
+        capture_output=True,
+        text=True,
+        timeout=10,
+    )
+    return result, env_file
+
+
+def test_prepare_workflow_has_no_unavailable_job_env_runner_context():
+    workflow = (HARNESS.parents[1] / ".github/workflows/ci.yml").read_text()
+    job_env = workflow.split("    env:\n", 1)[1].split("    timeout-minutes:", 1)[0]
+    assert "runner." not in job_env and "TMPDIR:" not in job_env
+
+
+def test_prepare_script_publishes_scope_for_a_fresh_following_python(context):
+    Path(context["job_tmp"]).rmdir()  # This fixture directory is ours; Prepare must create it.
+    prepared, env_file = run_actual_prepare(context)
+    assert prepared.returncode == 0, prepared.stderr
+    assert Path(context["job_tmp"]).stat().st_mode & 0o777 == 0o700
+    published = dict(line.split("=", 1) for line in env_file.read_text().splitlines())
+    assert published == {"ORIGINAL": "preserve", "TMPDIR": context["job_tmp"]}
+    # Feed precisely the value published by the actual script to the next process.
+    following, evidence = run_child(context, changes={"TMPDIR": published["TMPDIR"]})
+    assert following.returncode == 0 and evidence["accepted"]
+    assert evidence["actual_probe_parent"] == published["TMPDIR"]
+    assert evidence["scope"]["effective_python_temp"] == published["TMPDIR"]
+
+
+@pytest.mark.parametrize("kind", ["reused", "live-link", "dangling-link", "missing-parent"])
+def test_prepare_script_refuses_existing_or_linked_scope_without_export(context, kind):
+    target = Path(context["job_tmp"])
+    if kind == "reused":
+        (target / "keep").write_text("old owned test data")
+    elif kind in {"live-link", "dangling-link"}:
+        target.rmdir()
+        destination = (
+            Path(context["outside"])
+            if kind == "live-link"
+            else Path(context["root"]) / "not-created"
+        )
+        target.symlink_to(destination, target_is_directory=True)
+    else:
+        context["parent"] = str(Path(context["root"]) / "missing-parent")
+    prepared, env_file = run_actual_prepare(context)
+    assert prepared.returncode != 0
+    assert env_file.read_text() == "ORIGINAL=preserve\n"
+    assert Path(context["sentinel"]).read_bytes() == b"preserve owned test sentinel"
+    if kind == "reused":
+        assert str(target) in prepared.stderr and "File exists" in prepared.stderr
+        assert (target / "keep").read_text() == "old owned test data"
+    elif kind in {"live-link", "dangling-link"}:
+        assert str(target) in prepared.stderr and "File exists" in prepared.stderr
+        assert target.is_symlink()
