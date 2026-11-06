@@ -110,6 +110,8 @@ The coordinator source candidate also supports native Core activation, owner-sco
 
 The optional [native worker routing candidate](docs/COORDINATOR-NATIVE-ROUTING-20261106.md) reuses the verified CLI matrix for sealed managed tasks, preserving visible sessions and the separate structured Grok review protocol. Requested model/effort and observed metadata remain distinct; local fixture tests do not establish provider or deployment acceptance.
 
+[CLI return-message fix and existing workaround](docs/NATIVE-COMPLETION-RETURNS-20261106.md): the source candidate keeps answers/results in the requesting client's inbox. Existing installations can already use `--inbox-only`; completion acknowledgements do not require another agent turn.
+
 [Earlier Windows preview dev2](https://github.com/landjunge/KiraBridge/releases/tag/windows-v0.8.0rc31.dev2):
 native keyboard and local MCP acceptance passed in a dedicated Windows 11 VM.
 [Results and limits](docs/WINDOWS-DEVELOPMENT-20261103.md); macOS stays separate.

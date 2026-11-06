@@ -279,7 +279,15 @@ async def execute(args) -> None:
                 kind=args.kind,
                 reply_to=args.reply_to,
                 task_id=args.task_id,
-                dispatch=not args.inbox_only,
+                # Return messages belong to the requesting client, not a new turn.
+                # None also preserves a historical message's pinned dispatch decision.
+                dispatch=(
+                    False
+                    if args.inbox_only
+                    else None
+                    if args.kind in {"answer", "result"}
+                    else True
+                ),
                 request_reply=False if args.no_reply else None,
             ).model_dump()
         elif args.action in {"get", "ack", "release"}:

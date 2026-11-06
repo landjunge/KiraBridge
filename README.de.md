@@ -113,6 +113,8 @@ Der Koordinator-Quellkandidat unterstützt außerdem native Core-Aktivierung, de
 
 Der optionale [Quellkandidat für natives Worker-Routing](docs/COORDINATOR-NATIVE-ROUTING-20261106.md) verwendet die geprüfte CLI-Matrix für versiegelte Managed-Aufträge; sichtbare Sitzungen und das eigene strukturierte Grok-Reviewprotokoll bleiben erhalten. Angeforderte Modell-/Effortwerte und beobachtete Metadaten bleiben getrennt; lokale Fixturetests sind keine Provider- oder Deploymentabnahme.
 
+[CLI-Rückgabefix und vorhandener Übergangsweg](docs/NATIVE-COMPLETION-RETURNS-20261106.md): Der Quellkandidat belässt Antworten/Ergebnisse im Postfach des anfragenden Clients. Bestehende Installationen können bereits `--inbox-only` verwenden; Completionquittungen benötigen keinen weiteren Agententurn.
+
 [Frühere Windows-Vorschau dev2](https://github.com/landjunge/KiraBridge/releases/tag/windows-v0.8.0rc31.dev2):
 Native Tastatur und lokales MCP haben die Abnahme in einer eigenen Windows 11-VM bestanden.
 [Ergebnisse und Grenzen](docs/WINDOWS-DEVELOPMENT-20261103.md); macOS bleibt getrennt.
