@@ -326,11 +326,13 @@ class TaskManager:
         )
 
     def native_principals(self):
-        """Match the executor's configured ChatGPT aliases, not one literal name."""
+        """Keep the canonical route and configured aliases out of the replay queue."""
         from kirabridge.permissions import direct_terminal_required
 
         return tuple(
-            name for name in self.config.principals if direct_terminal_required(self.config, name)
+            name
+            for name in sorted(set(self.config.principals) | {"chatgpt"})
+            if direct_terminal_required(self.config, name)
         )
 
     def is_sealed_managed_task(self, task):

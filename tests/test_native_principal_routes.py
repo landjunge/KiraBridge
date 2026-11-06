@@ -71,6 +71,35 @@ async def test_historical_visible_routes_never_dispatch_after_start(bridge, prin
 
 
 @pytest.mark.parametrize("operation", ["terminal.execute", "admin.execute"])
+async def test_removed_chatgpt_principal_preserves_historical_queue(bridge, operation):
+    cwd = configure(bridge, "chatgpt")
+    value = command(operation, cwd, "removed-principal-command")
+    old = bridge.submit("chatgpt", value, bridge.security.grant("chatgpt", value))
+    assert old["state"] == State.QUEUED
+    events_before = list(
+        bridge.store.db.execute("SELECT * FROM events WHERE task_id=? ORDER BY seq", (old["id"],))
+    )
+    del bridge.config.principals["chatgpt"]
+    sentinel = request("file.list", {"path": cwd}, task_id="remaining-principal-sentinel")
+    bridge.submit("local", sentinel, bridge.security.grant("local", sentinel))
+    await bridge.tasks.start()
+    try:
+        await bridge.tasks.wait("local", sentinel.task_id, timeout=3)
+        assert bridge.store.get(sentinel.task_id)["state"] == State.COMPLETED
+        assert bridge.store.get(old["id"])["state"] == State.QUEUED
+        assert (
+            list(
+                bridge.store.db.execute(
+                    "SELECT * FROM events WHERE task_id=? ORDER BY seq", (old["id"],)
+                )
+            )
+            == events_before
+        )
+    finally:
+        await bridge.tasks.stop()
+
+
+@pytest.mark.parametrize("operation", ["terminal.execute", "admin.execute"])
 async def test_fresh_alias_commands_use_native_admission_and_execute_once(bridge, operation):
     principal = "voice_alias"
     cwd = configure(bridge, principal)
