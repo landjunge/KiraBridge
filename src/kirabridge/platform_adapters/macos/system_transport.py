@@ -17,7 +17,7 @@ from pathlib import Path
 
 from pydantic import ValidationError
 
-from kirabridge.bridge_core.models import BridgeError, UncertainExecution
+from kirabridge.bridge_core.models import BridgeError, NativeFailureEvidence, UncertainExecution
 from kirabridge.image_manager import MAX_IMAGE_BYTES, validate_png
 from kirabridge.platform_adapters import reap_process
 from kirabridge.platform_adapters.macos.system_models import SYSTEM_INPUTS
@@ -28,6 +28,27 @@ BUNDLE_ID = "de.netzwerkpunkt.kirabridge"
 MAX_REQUEST_BYTES = 65536
 MAX_RESPONSE_BYTES = 12 * 1024 * 1024
 KEYBOARD_COMMIT_LIMIT = 256  # Matches the native worker's consumed-transfer budget.
+
+
+def _failure_stage(operation, error):
+    # Only exact static backend messages become stage names. Arbitrary messages
+    # may contain user data; never attach them to exceptions or task evidence.
+    stages = {
+        ("windows.focus", "macos_focus_unknown"): {
+            "Window raise outcome is unknown": "window_raise",
+            "Window activation outcome is unknown": "application_activation",
+            "Application identity changed after window raise": "target_revalidation",
+        },
+        ("keyboard.key", "keyboard_unsupported"): {
+            "Physical modifier/system key is unsupported": "physical_key_validation",
+            "Current input source/layout identity is invalid": "keyboard_layout_validation",
+            "Current keyboard layout exceeds its bounded limit": "keyboard_layout_validation",
+        },
+    }
+    message = error.get("message")
+    if not isinstance(message, str) or len(message) > 256:
+        return "unspecified"
+    return stages.get((operation, error["code"]), {}).get(message, "unspecified")
 
 
 def _private_file(path, limit):
@@ -282,7 +303,20 @@ class NativeSystemTransport:
                         ):
                             raise ValueError("Invalid native failure")
                         cls = UncertainExecution if error["effect_unknown"] else BridgeError
-                        raise cls(error["code"], "Native system operation refused or failed")
+                        raise cls(
+                            error["code"],
+                            "Native system operation refused or failed",
+                            native_failure=NativeFailureEvidence(
+                                operation=operation,
+                                stage=_failure_stage(operation, error),
+                                backend_effect_unknown=error["effect_unknown"],
+                                helper_pid=helper["pid"],
+                                helper_generation=helper["generation"],
+                                helper_source_commit=helper["source_commit"],
+                                contract_binary_sha256=contract["binary_sha256"],
+                                request_id=request_id,
+                            ),
+                        )
                     result = response.get("result")
                     if not isinstance(result, dict):
                         raise ValueError("Invalid native result")
