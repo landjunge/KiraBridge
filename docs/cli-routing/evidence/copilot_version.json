@@ -1,0 +1,10 @@
+{
+  "argv": [
+    "copilot",
+    "--version"
+  ],
+  "exit": 0,
+  "stdout": "GitHub Copilot CLI 1.0.67.\nRun 'copilot update' to check for updates.\n",
+  "stderr": "",
+  "observed_at": "2026-11-05T21:41:21.304544+00:00"
+}

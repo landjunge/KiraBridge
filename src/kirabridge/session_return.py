@@ -1,74 +1,16 @@
 """Explicit Return on one observed native view, with no paste or agent-work message."""
 
-import re
 from contextlib import AsyncExitStack
 
 from kirabridge.bridge_core.models import BridgeError
-from kirabridge.codex_menu import resume_readiness, resume_selector, unsupported_confirmation_frame
 from kirabridge.visible_handoff import VisibleReadinessError
-from kirabridge.visible_readiness import assess, codex_input_footer, display_text, input_view
 
 
 def return_readiness(target, raw, binding, protocol=None):
-    """Return intent differs from permission to paste into an empty composer."""
-    text, controls = display_text(raw)
+    """Legacy entry point; program semantics belong to the selected adapter."""
+    from kirabridge.cli_adapters import adapter_for
 
-    def result(state, reason):
-        return {"target": target, "ready": state == "ready", "state": state, "reason": reason}
-
-    if controls or target != "codex":
-        return result("unknown", "unsupported_return_frame")
-    if protocol is not None and protocol.get("state") != "idle":
-        return result(
-            "working" if protocol.get("state") == "working" else "unknown",
-            "bound_codex_turn_active_or_unknown",
-        )
-    if resume_selector(text):
-        return resume_readiness(text)
-    if unsupported_confirmation_frame(text):
-        return result("unknown", "unsupported_confirmation_dialog")
-    view = input_view(target, text)
-    if not view:
-        return result("unknown", "current_input_frame_not_found")
-    lines = view.splitlines(keepends=True)
-    first = lines[0].strip()
-    if first.startswith("»"):
-        return result("working", "current_queue_composer")
-    if not first.startswith("›"):
-        return result("unknown", "unsupported_return_frame")
-    # Only the observed first input row (including Codex's collapsed paste) is
-    # a supported draft. Keep all other rows: indented activity or a dialog is
-    # not evidence of a draft continuation and must never be hidden.
-    masked = "›" + ("\n" if lines[0].endswith("\n") else "") + "".join(lines[1:])
-    # Explicit cursor-bound Return can confirm a visible wrapped draft too.
-    # Require a separate blank delimiter and the known model footer. Never mask
-    # an arbitrary indented dialog or a progress row outside the composer.
-    for index in range(2, len(lines)):
-        if lines[index].strip():
-            continue
-        continuation, footer = lines[1:index], lines[index:]
-        nonempty_footer = [line for line in footer if line.strip()]
-        if (
-            continuation
-            and first != "›"
-            and all(
-                (line.startswith("  ") and line.strip()) or line in {"\n", " \n", "  \n"}
-                for line in continuation
-            )
-            and all(
-                not unsupported_confirmation_frame(line + "\n› ")
-                and "tab to queue message" not in line
-                and assess(target, line + "\n›\n" + "".join(footer), binding, protocol)["ready"]
-                for line in continuation
-            )
-            and nonempty_footer
-            and re.match(r"^\s*GPT-\S+", nonempty_footer[0])
-            and all(codex_input_footer(line) for line in nonempty_footer)
-        ):
-            masked = "›\n" + "".join(footer)
-            break
-    observation = assess(target, text[: len(text) - len(view)] + masked, binding, protocol)
-    return {**observation, "input_empty": bool(re.fullmatch(binding.ready_pattern, first))}
+    return adapter_for(target).return_readiness(raw, binding, protocol)
 
 
 async def execute(bridge, task, args, running, progress):
@@ -107,14 +49,54 @@ async def execute(bridge, task, args, running, progress):
             if observed.get("state") == "target_changed":
                 raise VisibleReadinessError(observed)
             readiness = return_readiness(target, expected, binding, observed.get("protocol"))
+            if args.key == "escape":
+                from kirabridge.cli_navigation import return_to_input
+
+                bridge.tasks.input_policy.dispatch(principal, args, task["id"])
+                await return_to_input(
+                    bridge, task, target, binding, view, observed, running, progress
+                )
+                bridge.tasks.input_policy.sent(principal, task["id"])
+                return {
+                    "pane_id": args.pane_id,
+                    "expected_pid": args.expected_pid,
+                    "input_kind": "navigation",
+                    "semantic_action": "return_to_input",
+                    "navigation_key_sent": True,
+                    "navigation_observed": True,
+                    "return_sent": False,
+                    "paste_event_sent": False,
+                    "execution_confirmed": False,
+                    "automatic_retry": False,
+                }
+            if readiness.get("return_requires_navigation"):
+                from kirabridge.cli_navigation import return_to_input
+
+                bridge.tasks.input_policy.dispatch(principal, args, task["id"])
+                view, observed = await return_to_input(
+                    bridge, task, target, binding, view, readiness, running, progress
+                )
+                expected = view["text"]
+                readiness = return_readiness(target, expected, binding, observed.get("protocol"))
+                navigation_dispatched = True
+            else:
+                navigation_dispatched = False
             if not readiness["ready"]:
                 raise VisibleReadinessError(readiness)
-            if readiness["reason"] == "observed_codex_resume_selector":
+            if readiness.get("semantic_action") == "menu_confirmation":
                 input_kind = "menu_confirmation"
             await bridge.visible_handoffs.reconcile_target_reservations(
                 principal, target, binding, explicit_return_task_id=task["id"]
             )
-        approved = bridge.tasks.input_policy.dispatch(principal, args, task["id"])
+        if args.key == "escape":
+            raise BridgeError(
+                "visible_navigation_unsupported", "Navigation requires a program adapter"
+            )
+        approved = (
+            args
+            if target and navigation_dispatched
+            else bridge.tasks.input_policy.dispatch(principal, args, task["id"])
+        )
 
         def evidence(return_sent):
             return {
@@ -133,7 +115,7 @@ async def execute(bridge, task, args, running, progress):
             }
 
         async def return_attempted():
-            await running(evidence(False))
+            await (progress if target and navigation_dispatched else running)(evidence(False))
 
         result = await bridge.sessions.return_key(
             principal, approved, expected_screen=expected, before_transport=return_attempted

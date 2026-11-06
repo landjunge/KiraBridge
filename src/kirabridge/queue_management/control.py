@@ -3,6 +3,7 @@
 import time
 
 from kirabridge.bridge_core.models import BridgeError, digest
+from kirabridge.completion_manager import completion_capability
 from kirabridge.queue_management.schema import TERMINAL
 from kirabridge.queue_management.views import QueueViews
 
@@ -28,7 +29,7 @@ class QueueManager(QueueViews):
         if family == "voice-buffers":
             return "message.send"
         if family == "completions":
-            return "task.read" if detail["source"] == "task" else "message.read"
+            return completion_capability(detail["source"])
         return "task.cancel"
 
     async def control(self, principal, args, *, approved=False, control_task_id=None):

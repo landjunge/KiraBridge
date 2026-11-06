@@ -11,6 +11,7 @@ import uuid
 from kirabridge.bridge_core.models import BridgeError, canonical, digest
 
 TERMINAL = {"completed", "failed", "cancelled", "unknown", "blocked"}
+SOURCE_CAPABILITIES = {"task": "task.read", "message": "message.read", "autonext": "team.read"}
 SCHEMA = (
     "CREATE TABLE IF NOT EXISTS message_completion_routes ("
     "message_id TEXT PRIMARY KEY REFERENCES messages(id), target TEXT NOT NULL)",
@@ -30,6 +31,13 @@ def valid_target(target):
     if not isinstance(target, str) or not re.fullmatch(r"[A-Za-z0-9_.:-]{1,128}", target):
         raise BridgeError("invalid_completion_target", "Use a stable opaque completion target")
     return target
+
+
+def completion_capability(source):
+    try:
+        return SOURCE_CAPABILITIES[source]
+    except KeyError:
+        raise BridgeError("capability_denied", "Unknown completion source") from None
 
 
 def find_evidence(value, key, depth=0):
@@ -105,6 +113,26 @@ def completion_payload(task, event_seq, *, source="task"):
         if source == "task"
         else {"message_get": task["message_id"]},
     }
+    decision = (task.get("evidence") or {}).get("routing_decision")
+    if isinstance(decision, dict) and decision.get("schema") == "bigplan.cli-decision.v1":
+        # Native router metadata only. Never derive settings from model prose or
+        # expose task prompts, access records, executable paths or credentials.
+        payload["routing"] = {
+            key: decision[key]
+            for key in (
+                "cli",
+                "model",
+                "effort",
+                "effective_model",
+                "effective_effort",
+                "effective_model_status",
+                "model_evidence_source",
+                "model_matches_requested_id",
+                "matrix_sha256",
+                "thread_desk",
+            )
+            if key in decision
+        }
     if state == "completed" and result.get("scope") == "visible_input_delivery":
         payload.update(
             completion_scope="visible_input_delivery",
@@ -187,29 +215,34 @@ class CompletionManager:
         self.store, self.security = store, security
 
     def _policy(self, principal, source):
-        self.security.principal(principal, "task.read" if source == "task" else "message.read")
+        self.security.principal(principal, completion_capability(source))
 
     def receive(self, principal, target="default", limit=20, source_id=None):
         valid_target(target)
         if not 1 <= limit <= 50:
             raise BridgeError("invalid_limit", "Use limit 1..50")
-        if source_id is not None and (
-            not isinstance(source_id, str) or not re.fullmatch(r"[A-Za-z0-9_-]{1,128}", source_id)
-        ):
-            raise BridgeError("invalid_arguments", "Completion source id is invalid")
+        if source_id is not None:
+            from kirabridge.autonext.models import ID
+
+            if not isinstance(source_id, str) or not (
+                re.fullmatch(r"[A-Za-z0-9_-]{1,128}", source_id)
+                or re.fullmatch(ID, source_id)
+                or (source_id.startswith("grant-") and re.fullmatch(ID, source_id[6:]))
+            ):
+                raise BridgeError("invalid_arguments", "Completion source id is invalid")
         policy = self.security.principal(principal)
         sources = [
-            source
-            for source, cap in [("task", "task.read"), ("message", "message.read")]
-            if cap in policy.capabilities
+            source for source, cap in SOURCE_CAPABILITIES.items() if cap in policy.capabilities
         ]
         if not sources:
-            raise BridgeError("capability_denied", "Own task.read or message.read required")
+            raise BridgeError(
+                "capability_denied", "Own task.read, message.read or team.read required"
+            )
         with self.store.transaction():
             if source_id is None:
                 rows = self.store.db.execute(
                     "SELECT * FROM completion_notices WHERE principal=? AND target=? "
-                    "AND acknowledged IS NULL AND source IN (?,?) "
+                    "AND acknowledged IS NULL AND source IN (?,?,?) "
                     "AND NOT EXISTS (SELECT 1 FROM queue_holds h WHERE "
                     "h.queue_id='completions' AND h.item_id=completion_notices.id) "
                     "ORDER BY seq LIMIT ?",
@@ -218,14 +251,15 @@ class CompletionManager:
                         target,
                         "task" if "task" in sources else "-",
                         "message" if "message" in sources else "-",
+                        "autonext" if "autonext" in sources else "-",
                         limit,
                     ),
                 ).fetchall()
             else:
-                # A known task is readable even when older unacked notices fill the inbox.
+                # A known source is readable even when older unacked notices fill the inbox.
                 rows = self.store.db.execute(
                     "SELECT * FROM completion_notices WHERE principal=? AND target=? "
-                    "AND source_id=? AND acknowledged IS NULL AND source IN (?,?) "
+                    "AND source_id=? AND acknowledged IS NULL AND source IN (?,?,?) "
                     "AND NOT EXISTS (SELECT 1 FROM queue_holds h WHERE "
                     "h.queue_id='completions' AND h.item_id=completion_notices.id) "
                     "ORDER BY seq LIMIT ?",
@@ -235,6 +269,7 @@ class CompletionManager:
                         source_id,
                         "task" if "task" in sources else "-",
                         "message" if "message" in sources else "-",
+                        "autonext" if "autonext" in sources else "-",
                         limit,
                     ),
                 ).fetchall()

@@ -134,3 +134,84 @@ async def test_scoped_shell_read_preserves_ambiguity_and_fresh_read_permission(c
     assert state["catalogs"] == 1
     assert not state["reads"] and not state["identities"] and not state["posts"]
     running.assert_not_awaited()
+
+
+@pytest.mark.parametrize("prompt", ["host project%   ", "➜  ~     ", "host project% typed"])
+async def test_idle_shell_unconfirmed_input_is_not_reported_as_process_busy(command, prompt):
+    bridge, state, args = command
+
+    async def unconfirmed(pane):
+        assert pane == state["row"]["pane_id"]
+        return prompt
+
+    bridge.sessions.terminal_app.read = unconfirmed
+    running = AsyncMock()
+    with pytest.raises(BridgeError) as failure:
+        await bridge.visible_terminal.execute(
+            {"id": "input-unknown", "principal": "local"},
+            VisibleTerminalInput.model_validate(args),
+            running,
+        )
+    assert failure.value.code == "visible_input_unknown"
+    assert not state["row"]["busy"] and not state["posts"]
+    running.assert_not_awaited()
+
+
+async def test_unknown_input_without_safe_shell_does_not_open_replacement_window(command):
+    bridge, state, args = command
+    bridge.sessions.terminal_app.read = AsyncMock(return_value="host project%    ")
+    bridge.sessions.open = AsyncMock(side_effect=AssertionError("must preserve ambiguous input"))
+    args.pop("pane_id")
+    args.pop("expected_pid")
+    args["create_if_needed"] = True
+    with pytest.raises(BridgeError) as failure:
+        await bridge.visible_terminal.execute(
+            {"id": "no-window-loop", "principal": "local"},
+            VisibleTerminalInput.model_validate(args),
+            AsyncMock(),
+        )
+    assert failure.value.code == "visible_input_unknown"
+    assert not state["posts"]
+    bridge.sessions.open.assert_not_awaited()
+
+
+async def test_auto_selection_uses_existing_safe_shell_beside_unknown_input(command):
+    bridge, state, args = command
+    leaf = bridge.sessions.terminal_app
+    safe = state["row"]
+    unknown = copy.deepcopy(safe)
+    unknown.update(pane_id="terminal:122:ttys003", tty="/dev/ttys003", expected_pid=344)
+    unknown["processes"] = [{"pid": 344, "ppid": 343, "name": "zsh", "image": "/bin/zsh"}]
+
+    async def catalog():
+        state["catalogs"] += 1
+        return [copy.deepcopy(unknown), copy.deepcopy(safe)]
+
+    async def read(pane):
+        state["reads"].append(state["catalogs"])
+        return "host project%    " if pane == unknown["pane_id"] else "host project% "
+
+    leaf.catalog, leaf.read = catalog, read
+    bridge.sessions.open = AsyncMock(side_effect=AssertionError("existing safe shell is available"))
+    args.pop("pane_id")
+    args.pop("expected_pid")
+    args["create_if_needed"] = True
+    result = await bridge.visible_terminal.execute(
+        {"id": "safe-existing-shell", "principal": "local"},
+        VisibleTerminalInput.model_validate(args),
+        AsyncMock(),
+    )
+    assert result["pane_id"] == safe["pane_id"] and result["exit_code"] == 0
+    assert len(state["posts"]) == 1
+    bridge.sessions.open.assert_not_awaited()
+
+
+async def test_dirty_git_prompt_is_confirmed_as_empty_without_posting_input(command):
+    bridge, state, _ = command
+    bridge.sessions.terminal_app.read = AsyncMock(
+        return_value=(
+            "Last login: Thursday\n➜  KiraBridge git:(fix/visible-busy-idle-20261021) ✗ \n\n"
+        )
+    )
+    assert await bridge.visible_terminal.suitable("local", state["row"])
+    assert not state["posts"]

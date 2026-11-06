@@ -1,0 +1,63 @@
+{
+  "source_commit": "59fd9d05b9a5ba831da05bb8b14769d1517bc85a",
+  "installed_version": "0.8.0rc37",
+  "installed_pid": 56071,
+  "installed_instance": "56d0c4bdfde743bebd71ad13a8e91770",
+  "source_tree_sha256": "24e7edc963212929b3c63cb7f7ca1f8d2f6bfd9b4a0f5cb789f03466a57dd8ba",
+  "platform": "native Intel x86_64 macOS15.7.4",
+  "simulated_scoped_tests_passed": 123,
+  "native_positive_cases": [
+    {
+      "case": "rc37_freshclient_tabswitch_v2",
+      "tty": "/dev/ttys011",
+      "cg_target": 4914,
+      "passed": true
+    },
+    {
+      "case": "rc37_tabswitch_back",
+      "tty": "/dev/ttys012",
+      "cg_target": 4962,
+      "passed": true
+    },
+    {
+      "case": "rc37_minimized_mixed",
+      "tty": "/dev/ttys011",
+      "cg_target": 4914,
+      "passed": true
+    },
+    {
+      "case": "rc37_single_window",
+      "tty": "/dev/ttys011",
+      "cg_target": 4914,
+      "passed": true
+    }
+  ],
+  "native_negative_cases": [
+    {
+      "case": "occupied own tab",
+      "error": "session_busy",
+      "terminal_input_attempted": false
+    },
+    {
+      "case": "wrong exact PID on own tab",
+      "error": "session_selection_changed",
+      "terminal_input_attempted": false
+    }
+  ],
+  "native_single_printf_output_count": 1,
+  "owned_cleanup": true,
+  "protected_files_and_agent_processes": "unchanged",
+  "not_tested": [
+    "entire desktop with all foreign windows minimized",
+    "other Spaces/fullscreen target routing",
+    "fresh ChatGPT browser/voice conversation",
+    "live Codex/Grok prompt handoff or Return on an agent"
+  ],
+  "unchanged_known_limitations": [
+    "geometry-group ui_window_count is not physical visibility",
+    "historical focus-only acquisition/nonce-startup races not changed",
+    "diagnostics metadata capacity exhausted; original records preserved"
+  ],
+  "release": "local Intel source-pinned artifact; no published RC37 release",
+  "cloud_builds": "none"
+}

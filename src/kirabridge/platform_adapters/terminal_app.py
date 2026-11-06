@@ -359,6 +359,23 @@ class TerminalAppTransport:
     if (tabs.length !== 1) throw Error("Selected tab no longer exists");
     const tab = tabs[0];"""
 
+    @staticmethod
+    def native_focus_check(pane_id):
+        window, tty = pane_id.split(":")[1:]
+        return f"""
+    function checkFocus() {{
+     const current=app.windows(),
+      frontmost=Application("System Events").processes.byName("Terminal").frontmost();
+     const windowID=current.length ? current[0].id() : null;
+     const currentTTY=current.length ? current[0].selectedTab().tty() : null;
+     if(!frontmost || windowID!=={int(window)} || currentTTY!=={json.dumps("/dev/" + tty)})
+      throw Error("Selected terminal focus changed; do not repeat input " + JSON.stringify({{
+       frontmost:frontmost, window_id:windowID, tty:currentTTY,
+       expected_window:{int(window)}, expected_tty:{json.dumps("/dev/" + tty)}
+      }}));
+    }}
+"""
+
     def native_focus(self, pane_id):
         window, tty = pane_id.split(":")[1:]
         return (
@@ -385,23 +402,16 @@ class TerminalAppTransport:
      if(!item.enabled()) throw Error("Selected terminal focus changed: window entry disabled");
      item.click(); delay(0.15);
     }}
-    function checkFocus() {{
-     const current=app.windows(), frontmost=se.processes.byName("Terminal").frontmost();
-     const windowID=current.length ? current[0].id() : null;
-     const currentTTY=current.length ? current[0].selectedTab().tty() : null;
-     if(!frontmost || windowID!=={int(window)} || currentTTY!=={json.dumps("/dev/" + tty)})
-      throw Error("Selected terminal focus changed; do not repeat input " + JSON.stringify({{
-       frontmost:frontmost, window_id:windowID, tty:currentTTY,
-       expected_window:{int(window)}, expected_tty:{json.dumps("/dev/" + tty)}
-      }}));
-    }}
+"""
+            + TerminalAppTransport.native_focus_check(pane_id)
+            + """
     // Window activation is asynchronous. Acquire once with a bounded wait;
     // later pre-input checks remain immediate and never reassert focus.
     const focusDeadline=Date.now()+2000;
-    while(true) {{
-     try {{ checkFocus(); break; }}
-     catch(error) {{ if(Date.now()>=focusDeadline) throw error; delay(0.05); }}
-    }}"""
+    while(true) {
+     try { checkFocus(); break; }
+     catch(error) { if(Date.now()>=focusDeadline) throw error; delay(0.05); }
+    }"""
         )
 
     @staticmethod
@@ -462,36 +472,12 @@ class TerminalAppTransport:
         # This is only the fresh-echo check. Codex's caller separately verifies
         # the WHOLE current widget and pinned footer before Return. Use complete
         # forward-rendered payloads, never a word from old output or chrome.
-        if target == "codex":
-            from kirabridge.literal_session_input import codex_payload_forms, codex_wrap_words
+        from kirabridge.cli_adapters import adapter_for
 
-            return (
-                "\nfunction observedPaste(before, after, columns) {"
-                "if(before===after) return false;"
-                "const prompts=Array.from(after.matchAll(/^[ \\t]*›[^\\n]*/gm));"
-                "if(!prompts.length) return false;"
-                "const current=after.slice(prompts[prompts.length-1].index)"
-                ".replace(/^[ \\t]*› ?/,'');"
-                "const forms="
-                + json.dumps(codex_payload_forms(text))
-                + "; const lines="
-                + json.dumps(codex_wrap_words(text))
-                + ";"
-                "if(lines && Number.isInteger(columns) && columns>=20 && columns<=4096) {"
-                "for(const width of [columns-3,columns-4]) {"
-                "if(lines.some(words=>words.some(word=>word.length>=width))) continue;"
-                "let rows=[], wrapped=false;"
-                "for(const words of lines) { let logical=words.length?[words[0]]:[''];"
-                "for(const word of words.slice(1)) {"
-                "if(logical[logical.length-1].length+1+word.length<=width)"
-                "logical[logical.length-1]+=' '+word;"
-                "else {logical.push(word); wrapped=true;} } rows=rows.concat(logical); }"
-                "if(wrapped) { forms.push(rows.join('\\n  '));"
-                "if(rows.slice(1).includes('')) forms.push(rows[0]+rows.slice(1)"
-                ".map(row=>row?'\\n  '+row:'\\n ').join('')); } } }"
-                "return forms.some(form=>current.startsWith(form) && "
-                "(current.length===form.length || current[form.length]==='\\n'));}\n"
-            )
+        specification = adapter_for(target).paste_source(text)
+        if specification is not None:
+            return specification
+
         return (
             "\nfunction observedPaste(before, after) {"
             "const a=Array.from(before), b=Array.from(after); "
@@ -1069,25 +1055,48 @@ entries[0].click();JSON.stringify({detached:true});
         )
         if before_transport is not None:
             await before_transport()
-        return await self.native(
-            self.native_target(row["pane_id"])
-            + identity_guard
-            + own_boundary
-            + "\nconst host=Application.currentApplication(); host.includeStandardAdditions=true;"
+        target = self.native_target(row["pane_id"])
+        identity_check = (
+            "\nconst host=Application.currentApplication(); host.includeStandardAdditions=true;"
             + "\nconst observed=host.doShellScript("
             + json.dumps(command)
             + ").trim().replace(/\\s+/g,' ');"
             + "\nif(observed!=="
             + json.dumps(identity)
             + ") throw Error('Selected target identity changed');"
+        )
+        await self.native(
+            target
+            + identity_guard
+            + own_boundary
+            + identity_check
+            + "\nif(tab.busy()) throw Error('Selected terminal is busy');"
+            + self.native_screen_guard(screen)
+            + self.native_focus(row["pane_id"])[len(target) :]
+            + "\ncheckFocus(); JSON.stringify({focused:true});",
+            mutation=True,
+        )
+        # Tab selection may reflow history or change blank row padding. Accept
+        # only a fresh empty prompt AFTER that transition; compare it byte-for-
+        # byte later, without another selection or activation in the dispatch.
+        screen = await self.read(row["pane_id"])
+        if not empty_shell_prompt(screen):
+            raise BridgeError("visible_input_not_empty", "Focused shell input is not empty")
+        return await self.native(
+            target
+            + identity_guard
+            + own_boundary
+            + identity_check
+            + TerminalAppTransport.native_focus_check(row["pane_id"])
+            + "\ncheckFocus();"
             + "\nif(tab.busy()) throw Error('Selected terminal is busy');"
             # Use the accepted screen, not a second prompt parser that can drift.
             + self.native_screen_guard(screen)
-            + "\ntargetWindow.selectedTab=tab; targetWindow.index=1; app.activate();"
             + ("\ncheckTargetIdentity();" if expected_cwd is not None else "")
             + own_boundary
             + "\nif(tab.busy()) throw Error('Selected terminal is busy');"
             + self.native_screen_guard(screen)
+            + "\ncheckFocus();"
             + "\napp.doScript("
             + json.dumps(text)
             + ", {in:tab}); JSON.stringify({sent:true});",
@@ -1097,13 +1106,29 @@ entries[0].click();JSON.stringify({detached:true});
     async def press_return(
         self, pane_id, *, identity_guard=None, expected_screen=None, shell_snapshot=None
     ):
+        return await self.press_key(
+            pane_id,
+            "enter",
+            identity_guard=identity_guard,
+            expected_screen=expected_screen,
+            shell_snapshot=shell_snapshot,
+        )
+
+    async def press_key(
+        self, pane_id, key, *, identity_guard=None, expected_screen=None, shell_snapshot=None
+    ):
+        if key not in {"enter", "escape"}:
+            raise BridgeError("invalid_arguments", "Unsupported bound terminal key")
+        code = {"enter": 36, "escape": 53}[key]
         await self.native(
             self.native_focus(pane_id)
             + self.native_identity_guard(identity_guard)
             + (self.native_shell_guard(shell_snapshot) if shell_snapshot is not None else "")
             + "\ncheckFocus();"
             + self.native_screen_guard(expected_screen)
-            + "\nse.keyCode(36); JSON.stringify({return_sent:true});",
+            + "\nse.keyCode("
+            + str(code)
+            + "); JSON.stringify({key_sent:true});",
             mutation=True,
         )
 

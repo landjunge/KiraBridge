@@ -278,3 +278,47 @@ def test_old_queue_composer_does_not_override_later_idle_widget(binding):
     text = "» old queued text\n\n• Completed reply.\n\n" + EMPTY + FOOTER
     result = checked(text, binding, {"state": "idle"})
     assert result["state"] == "ready" and result["input_empty"]
+
+
+@pytest.mark.parametrize("protocol", [None, {"state": "idle"}])
+@pytest.mark.parametrize("badge", ["1 warning", "2 warnings"])
+def test_wrapped_return_accepts_only_complete_standalone_warning_group(binding, protocol, badge):
+    from kirabridge.session_return import return_readiness
+    from kirabridge.visible_readiness import codex_input_footer
+
+    warning = f"⚠ {badge} · f2 to view"
+    footer = "\n  GPT-6.1-Sol xhigh · ~\n" + " " * 106 + warning + "\n"
+    screen = "› Existing wrapped draft\n  continues on the next row\n" + footer
+    # The warning remains unsupported on its own. Placement and the whole
+    # footer group authorize the existing cursor-bound Return parser branch.
+    assert not codex_input_footer(warning)
+    observed = return_readiness("codex", screen, binding, protocol)
+    assert observed["ready"] and not observed["input_empty"]
+
+
+@pytest.mark.parametrize(
+    "suffix",
+    [
+        "  ⚠ 1 warning · f2 to view\n",
+        "  GPT-6.1-Sol xhigh · ~\n  ⚠ 1 warning · f2 to view EXECUTE\n",
+        "  GPT-6.1-Sol xhigh · ~\n  ⚠ 1 warning · f2 to view\n  Approval required\n",
+        "  ⚠ 1 warning · f2 to view\n  GPT-6.1-Sol xhigh · ~\n",
+        "  GPT-6.1-Sol xhigh · ~\n  ⚠ 1 warning · f2 to view\n  ⚠ 1 warning · f2 to view\n",
+    ],
+)
+def test_wrapped_return_warning_never_masks_unknown_footer(binding, suffix):
+    from kirabridge.session_return import return_readiness
+
+    screen = "› Existing wrapped draft\n  continues on the next row\n\n" + suffix
+    assert not return_readiness("codex", screen, binding, {"state": "idle"})["ready"]
+
+
+@pytest.mark.parametrize("state", ["working", "unknown"])
+def test_wrapped_warning_return_preserves_bound_turn_guard(binding, state):
+    from kirabridge.session_return import return_readiness
+
+    screen = (
+        "› Existing wrapped draft\n  continues on the next row\n\n"
+        "  GPT-6.1-Sol xhigh · ~\n  ⚠ 1 warning · f2 to view\n"
+    )
+    assert return_readiness("codex", screen, binding, {"state": state})["state"] == state

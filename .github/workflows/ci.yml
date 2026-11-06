@@ -21,19 +21,30 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # Automatic events retain all four rows. Only an explicit manual 'all'
-        # selects hosted runners; missing/unknown manual scope stays Linux-only.
+        # Automatic events and missing/unknown scope use the existing Linux runners.
+        # Hosted macOS requires an explicit, separately authorized manual 'all' run.
         include: >-
           ${{ fromJSON(
-            github.event_name == 'workflow_dispatch' && inputs.scope != 'all' &&
-            '[{"os":"ubuntu-24.04","runner":"kirabridge","python":"3.11"},{"os":"ubuntu-24.04","runner":"kirabridge","python":"3.13"}]' ||
-            '[{"os":"ubuntu-24.04","runner":"kirabridge","python":"3.11"},{"os":"ubuntu-24.04","runner":"kirabridge","python":"3.13"},{"os":"macos-15-intel","runner":"macos-15-intel","python":"3.11"},{"os":"macos-15","runner":"macos-15","python":"3.11"}]'
+            github.event_name == 'workflow_dispatch' && inputs.scope == 'all' &&
+            '[{"os":"ubuntu-24.04","runner":"kirabridge","python":"3.11"},{"os":"ubuntu-24.04","runner":"kirabridge","python":"3.13"},{"os":"macos-15-intel","runner":"macos-15-intel","python":"3.11"},{"os":"macos-15","runner":"macos-15","python":"3.11"}]' ||
+            '[{"os":"ubuntu-24.04","runner":"kirabridge","python":"3.11"},{"os":"ubuntu-24.04","runner":"kirabridge","python":"3.13"}]'
           ) }}
     runs-on: ${{ matrix.runner }}
     env:
       UV_PYTHON: ${{ matrix.python }}
-    timeout-minutes: 10
+      UV_PYTHON_DOWNLOADS: never
+      PYTHONNOUSERSITE: '1'
+      PYTHONDONTWRITEBYTECODE: '1'
+    timeout-minutes: ${{ matrix.runner == 'kirabridge' && 20 || 10 }}
     steps:
+      - name: Prepare fresh job temporary directory on runner storage
+        shell: bash
+        run: |
+          test -d "$RUNNER_TEMP"
+          TMPDIR="$RUNNER_TEMP/kb-ci-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT-$UV_PYTHON-tmp"
+          umask 077
+          mkdir -m 700 "$TMPDIR"
+          printf 'TMPDIR=%s\n' "$TMPDIR" >> "$GITHUB_ENV"
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         if: ${{ matrix.runner != 'kirabridge' }}
@@ -42,15 +53,22 @@ jobs:
       - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
         with:
           version: '0.11.6'
-      - run: uv sync --locked --dev
-      - run: uv run ruff check .
-      - run: uv run ruff format --check .
+      - run: uv sync --locked --dev --group remote-ci
+      - run: uv run --locked --group remote-ci ruff check .
+      - run: uv run --locked --group remote-ci ruff format --check .
       - name: Check out fixed reviewed ThreadDesk source for the actual MCP roundtrip
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: landjunge/threaddesk
           ref: 770bbc9f0c0a02699cc93cad47d2e2c3782f7080
           path: .ci-threaddesk
+          persist-credentials: false
+      - name: Check out fixed M4 ThreadDesk source for remote R2 and R3
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: landjunge/threaddesk
+          ref: a0dd4c39478b031e0e31d335c2a15435dfbc52eb
+          path: .ci-threaddesk-m4
           persist-credentials: false
       - name: Check out fixed reviewed TollGate stop-only journal source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -59,8 +77,30 @@ jobs:
           ref: 53fc57cc2e082d022e65e5929cb2a1e186fba852
           path: .ci-tollgate
           persist-credentials: false
-      - run: uv run pytest -q -W error::pytest.PytestUnraisableExceptionWarning
+      - name: Legacy tests in a fresh process bound to TD770
+        run: >-
+          uv run --locked --group remote-ci python scripts/ci_remote_tests.py legacy
+          --expected-kb "${{ github.sha }}" --td .ci-threaddesk --tollgate .ci-tollgate
+          --runner-temp "${{ runner.temp }}"
+          --report-dir "${{ runner.temp }}/kb-ci-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.python }}-legacy"
         env:
+          PYTHONPATH: ${{ github.workspace }}/src:${{ github.workspace }}/.ci-threaddesk/src
           KIRABRIDGE_TEST_THREADDESK_SOURCE: ${{ github.workspace }}/.ci-threaddesk/src
+          KIRABRIDGE_TEST_REMOTE_THREADDESK_SOURCE: ''
           KIRABRIDGE_TEST_TOLLGATE_SOURCE: ${{ github.workspace }}/.ci-tollgate
+          PYTEST_ADDOPTS: ''
+          PYTEST_PLUGINS: ''
+      - name: Remote R2 and R3 in a fresh process bound to M4 with no skips
+        run: >-
+          uv run --locked --group remote-ci python scripts/ci_remote_tests.py remote
+          --expected-kb "${{ github.sha }}" --td .ci-threaddesk-m4
+          --runner-temp "${{ runner.temp }}"
+          --report-dir "${{ runner.temp }}/kb-ci-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.python }}-remote"
+        env:
+          PYTHONPATH: ${{ github.workspace }}/src:${{ github.workspace }}/.ci-threaddesk-m4/src
+          KIRABRIDGE_TEST_THREADDESK_SOURCE: ${{ github.workspace }}/.ci-threaddesk-m4/src
+          KIRABRIDGE_TEST_REMOTE_THREADDESK_SOURCE: ${{ github.workspace }}/.ci-threaddesk-m4/src
+          KIRABRIDGE_TEST_TOLLGATE_SOURCE: ''
+          PYTEST_ADDOPTS: ''
+          PYTEST_PLUGINS: ''
       - run: uv build

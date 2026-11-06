@@ -1,3 +1,7 @@
+> Update: RC36 was subsequently installed and its tab-switch failure reproduced.
+> The local RC37 repair is installed and natively verified on Intel; see
+> [current recovery evidence](TERMINAL-RECOVERY-20261104.md). Historical tasks below remain unchanged.
+
 # Terminal-Kette · Befund und Lieferstand vom 4. November 2026
 
 **RC34 ist tatsächlich installiert; RC36 ist gepusht, veröffentlicht und vorbereitet,

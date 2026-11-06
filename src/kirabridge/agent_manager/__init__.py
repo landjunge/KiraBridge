@@ -12,6 +12,7 @@ import httpx
 from kirabridge.agent_manager.claude import ClaudeCodeAdapter
 from kirabridge.agent_manager.copilot import CopilotCLIAdapter
 from kirabridge.agent_manager.gemini import GeminiAdapter
+from kirabridge.agent_manager.grok_structured import GrokStructuredAdapter
 from kirabridge.agent_manager.opencode import OpenCodeAdapter
 from kirabridge.bridge_core.config import AgentConfig, Config
 from kirabridge.bridge_core.models import AgentInput, BridgeError, TerminalInput, UncertainExecution
@@ -77,6 +78,7 @@ class CodexAdapter:
         *,
         owned_resume_session=None,
         handoff_reply=False,
+        before_spawn=None,
     ) -> dict:
         if not config.executable:
             raise BridgeError("agent_config", "Codex executable must be configured explicitly")
@@ -181,6 +183,11 @@ class CodexAdapter:
             ]
         if config.model:
             command += ["--model", config.model]
+        if config.output_schema:
+            schema = Path(config.output_schema)
+            if not schema.is_absolute() or not schema.is_file():
+                raise BridgeError("agent_schema", "Explicit output schema is unavailable")
+            command += ["--output-schema", str(schema)]
         if owned_resume_session is not None:
             command += [owned_resume_session]
         command += ["-"]
@@ -198,6 +205,7 @@ class CodexAdapter:
             env=agent_environment(config, self.terminal),
             stdin=args.prompt.encode(),
             line_callback=event,
+            **({"before_spawn": before_spawn} if before_spawn is not None else {}),
         )
         evidence = {
             "agent": args.agent,
@@ -330,7 +338,9 @@ class GrokACPAdapter:
         self.terminal = terminal
         self.bridge_config = bridge_config
 
-    async def execute(self, task, args, config, roots, running, progress) -> dict:
+    async def execute(
+        self, task, args, config, roots, running, progress, *, before_spawn=None
+    ) -> dict:
         if not config.executable:
             raise BridgeError("agent_config", "Grok executable must be configured explicitly")
         local_tools = config.allow_local_tools and args.local_tools
@@ -369,6 +379,8 @@ class GrokACPAdapter:
         if config.model:
             command[1:1] = ["--model", config.model]
         with PathScope(roots).directory(args.cwd) as fd:
+            if before_spawn is not None:
+                before_spawn()
             process = await spawn_process(
                 command,
                 fd,
@@ -522,6 +534,7 @@ class AgentManager:
             "codex": CodexAdapter(terminal, config),
             "grok_api": GrokAPIAdapter(),
             "grok_acp": GrokACPAdapter(terminal, config),
+            "grok_structured": GrokStructuredAdapter(terminal),
             "opencode": OpenCodeAdapter(terminal),
             "gemini_cli": GeminiAdapter(terminal),
             "claude_code": ClaudeCodeAdapter(terminal),
@@ -599,6 +612,8 @@ class AgentManager:
         config = self.config.agents.get(args.agent)
         if config is None or config.kind not in self.adapters:
             raise BridgeError("agent_unavailable", "Agent adapter is not configured")
+        if guard := getattr(self, "worktree_guard", None):
+            guard(task, args)
         if self.config.visible_handoffs.enabled and not separate_managed:
             if owned_resume_session is not None or handoff_reply:
                 raise BridgeError(
@@ -613,6 +628,8 @@ class AgentManager:
             return await self.visible_handoffs.execute(
                 task, args, running, progress, binding_override=visible_binding
             )
+        if separate_managed and (guard := getattr(self, "managed_routing_guard", None)):
+            guard(task, args)
         full_access = (
             principal.permission_level is not None
             and config.bridge_tools

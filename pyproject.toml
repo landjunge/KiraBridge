@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "kirabridge"
-version = "0.8.0rc37.dev1"
+version = "0.8.0rc40"
 description = "Private, permission-scoped desktop and agent bridge"
 license = "LicenseRef-Netzwerkpunkt-Personal-Use-1.0"
 license-files = ["LICENSE"]
@@ -17,6 +17,14 @@ kirabridge = "kirabridge.cli:main"
 
 [dependency-groups]
 dev = ["pytest>=8,<10", "pytest-asyncio>=1,<2", "ruff>=0.14,<1"]
+# Exact TD M4 base + server requirements; CI imports its pinned source, not a TD install.
+remote-ci = [
+    "pypdf>=6.19,<7",
+    "jsonschema==4.25.1",
+    "fastapi>=0.110",
+    "uvicorn>=0.54,<1",
+    "httpx>=0.28,<1",
+]
 
 [tool.hatch.build.targets.sdist]
 include = ["LICENSE", "src/", "pyproject.toml", "uv.lock", "docs/", "examples/", "installer/", "scripts/"]

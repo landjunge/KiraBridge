@@ -15,8 +15,12 @@ from kirabridge.platform_adapters.macos.terminal_window import TerminalWindowPro
 from kirabridge.visible_handoff import VisibleReadinessError
 
 
-async def test_preopen_layout_failure_retains_geometry_without_repeating_creation(product):  # noqa: F811
-    scene, leaf, events, receipt, created = product
+@pytest.mark.parametrize("fault", [None, "missing_child", "worker", "application"])
+async def test_replaced_host_wrapper_requires_retained_child_and_generation_evidence(
+    product,  # noqa: F811
+    fault,
+):
+    scene, leaf, events, _, created = product
     native_request = leaf.system_transport.request
 
     async def changed_layout(operation, arguments, **kwargs):
@@ -26,48 +30,44 @@ async def test_preopen_layout_failure_retains_geometry_without_repeating_creatio
         value = await native_request(operation, forwarded, **kwargs)
         if arguments.get("element_token") == "f" * 32:
             value["element_token"] = "f" * 32
-        if scene.phase == "tagged":
+        if scene.phase in {"tagged", "detached"}:
             if operation == "windows.list":
-                value["windows"][0]["bounds"].update(Y=30, Height=580)
-            elif operation == "accessibility.inspect" and "element_token" not in arguments:
-                value["children"][0]["element_token"] = "f" * 32
-            elif (
-                operation == "accessibility.inspect" and arguments.get("element_token") == "f" * 32
+                host_id = 777 if scene.phase == "tagged" else 231
+                next(w for w in value["windows"] if w["window_id"] == host_id)["bounds"].update(
+                    Y=30, Height=580
+                )
+            elif operation == "accessibility.inspect":
+                host_token = "f" * 32 if scene.phase == "tagged" else f"{2:032x}"
+                if scene.phase == "tagged" and "element_token" not in arguments:
+                    value["children"][0]["element_token"] = host_token
+                if arguments.get("element_token") == host_token:
+                    value["element"].update(position=[0, 30], size=[800, 580])
+        if scene.phase == "tagged":
+            if (
+                fault == "missing_child"
+                and operation == "accessibility.inspect"
+                and value["element"]["role"] == "AXTabGroup"
             ):
-                value["element"].update(position=[0, 30], size=[800, 580])
+                value["children"][0]["element_token"] = "e" * 32
+            if fault == "worker":
+                value["native_helper"]["generation"] = "c" * 36
+            if fault == "application" and "application" in value:
+                value["application"]["started_at"] += 1
         return value
 
     leaf.system_transport.request = changed_layout
-    with pytest.raises(UncertainExecution) as failure:
-        await leaf.open("cd -- /private/work", on_created=created, principal="chatgpt")
-    provider = failure.value.provider_error
-    assert provider["cause_message"] == "Shared host native AX anchor changed"
-    assert provider["creation_receipt"] == receipt
-    assert provider["automatic_retry"] is False
-    observed = provider["window_observation"]
-    assert observed["phase"] == "pre_detach_host_binding"
-    assert observed["before_host_position"] == [0, 0]
-    assert observed["before_host_size"] == [800, 600]
-    assert observed["after_host_position"] == [0, 30]
-    assert observed["after_host_size"] == [800, 580]
-    assert observed["current_cg_window_id"] == 777
-    assert (
-        observed["before_radio_partition_sha256"]
-        == observed["after_retained_radio_partition_sha256"]
-    )
-    assert set(observed) == {
-        "phase",
-        "before_host_position",
-        "before_host_size",
-        "after_host_position",
-        "after_host_size",
-        "current_cg_window_id",
-        "worker",
-        "before_radio_partition_sha256",
-        "after_retained_radio_partition_sha256",
-    }
-    assert "title" not in json.dumps(observed)
-    assert events == ["create", "receipt", "focus"]
+    if fault:
+        with pytest.raises(UncertainExecution):
+            await leaf.open("cd -- /private/work", on_created=created, principal="chatgpt")
+        assert events == ["create", "receipt", "focus"]
+    else:
+        result = await leaf.open("cd -- /private/work", on_created=created, principal="chatgpt")
+        proof = result["physical_window"]
+        assert proof["host_identity_basis"] == "retained_tab_identities"
+        assert proof["own_identity_basis"] == "same_cg_window"
+        assert proof["move_confirmed"] and result["separate_window"]
+        assert events == ["create", "receipt", "focus", "move"]
+        await leaf.verify_opened(result, principal="chatgpt")
 
 
 @pytest.mark.parametrize("position,size", [([0, 30], [800, 580]), ([120, 70], [900, 640])])
@@ -104,7 +104,7 @@ async def test_same_host_reflow_or_resize_binds_identity_and_preserves_fresh_lay
 
 
 @pytest.mark.parametrize(
-    "change", ["foreign_bounds", "anchor", "radio", "extra", "ambiguous", "reused_cg"]
+    "change", ["foreign_bounds", "reused_radio", "radio", "extra", "ambiguous", "reused_cg"]
 )
 def test_shared_host_reflow_never_adopts_foreign_or_unbound_surfaces(change):
     proof = TerminalWindowProof(object(), object(), "chatgpt")
@@ -121,13 +121,13 @@ def test_shared_host_reflow_never_adopts_foreign_or_unbound_surfaces(change):
     other_cg = {"window_id": 888, "bounds": {"X": 1000, "Y": 0, "Width": 400, "Height": 600}}
     proof.before = {"cg": [old_host_cg, other_cg], "ax": [host, other]}
     own = {**deepcopy(host), "position": [0, 30], "size": [800, 580]}
-    own["radios"].append({"token": "new-tab"})
+    own["radios"].append({"token": "new-tab", "selected": True})
     own_cg = {"window_id": 777, "bounds": {"X": 0, "Y": 30, "Width": 800, "Height": 580}}
     current = {"cg": [own_cg, deepcopy(other_cg)], "ax": [own, deepcopy(other)]}
     if change == "foreign_bounds":
         current["cg"][1]["bounds"]["X"] += 1
-    elif change == "anchor":
-        own["token"] = "foreign-anchor"
+    elif change == "reused_radio":
+        own["radios"][-1]["token"] = "tab-1"
     elif change == "radio":
         original = ["tab-1", "foreign-tab"]
     elif change == "extra":

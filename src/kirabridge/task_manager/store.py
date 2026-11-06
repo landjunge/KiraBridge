@@ -33,7 +33,8 @@ CREATE INDEX message_inbox ON messages(recipient,acknowledged,seq);
 CREATE TABLE message_jobs (
  message_id TEXT PRIMARY KEY REFERENCES messages(id), state TEXT NOT NULL,
  run_id TEXT UNIQUE, claimed REAL, started REAL, finished REAL,
- reply_id TEXT REFERENCES messages(id), evidence TEXT NOT NULL DEFAULT '{}', error TEXT
+ reply_id TEXT REFERENCES messages(id), evidence TEXT NOT NULL DEFAULT '{}', error TEXT,
+ execution_cwd TEXT
 );
 CREATE INDEX message_queue ON message_jobs(state);
 CREATE TABLE message_events (
@@ -118,6 +119,12 @@ class Store:
                     for statement in script.split(";"):
                         if statement.strip():
                             self.db.execute(statement)
+                if "execution_cwd" not in {
+                    row[1] for row in self.db.execute("PRAGMA table_info(message_jobs)")
+                }:
+                    # Historical unknown jobs stay unknown with an unconfirmed
+                    # scope; a current receiver configuration cannot rewrite it.
+                    self.db.execute("ALTER TABLE message_jobs ADD COLUMN execution_cwd TEXT")
                 # Event pages and existence checks are scoped to one task. The
                 # global sequence primary key alone scans unrelated task history.
                 # Install for existing databases too, in this same startup transaction.
@@ -308,7 +315,8 @@ class Store:
         result = dict(row)
         for key in ("args", "evidence", "result", "error"):
             result[key] = json.loads(result[key]) if result[key] is not None else None
-        result.pop("request_hash")
+        # Owned readback can verify the original immutable request without resubmission.
+        result["request_sha256"] = result.pop("request_hash")
         if resolve_output and self.result_codec:
             result["result"] = self.result_codec.resolve_result(
                 result["principal"], result["result"]
@@ -478,13 +486,38 @@ class Store:
         return result
 
     def claim(
-        self, owner: str, lease_seconds: float, control: bool | str = False, *, native_visible=False
+        self,
+        owner: str,
+        lease_seconds: float,
+        control: bool | str = False,
+        *,
+        native_visible=False,
+        managed_workers=(),
     ) -> dict | None:
         with self.transaction():
             selection, names = self.lane_selection(control)
             if native_visible:
+                agent_native = "operation='agent.execute'"
+                allowed = tuple(sorted(set(managed_workers)))
+                if len(allowed) > 16 or any(not isinstance(name, str) for name in allowed):
+                    raise ValueError("At most 16 configured managed workers are allowed")
+                if (
+                    allowed
+                    and self.db.execute(
+                        "SELECT 1 FROM sqlite_master WHERE type='table' AND name='team_work'"
+                    ).fetchone()
+                ):
+                    agent_native += (
+                        " AND NOT EXISTS (SELECT 1 FROM team_work w "
+                        "WHERE w.core_task_id=tasks.id AND w.assignee=tasks.principal "
+                        "AND w.core_request_hash=tasks.request_hash "
+                        "AND w.core_request_hash IS NOT NULL AND w.assignee IN ("
+                        + ",".join("?" for _ in allowed)
+                        + "))"
+                    )
+                    names.extend(allowed)
                 selection += (
-                    " AND NOT (operation IN ('agent.execute','terminal.visible') OR "
+                    " AND NOT ((" + agent_native + ") OR operation='terminal.visible' OR "
                     "(operation='terminal.execute' AND principal='chatgpt') OR "
                     "(operation='session.input' AND "
                     "json_extract(args,'$.pane_id') LIKE 'terminal:%'))"

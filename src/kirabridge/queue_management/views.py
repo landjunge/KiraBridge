@@ -4,6 +4,7 @@ import hashlib
 import json
 
 from kirabridge.bridge_core.models import BridgeError, digest
+from kirabridge.completion_manager import SOURCE_CAPABILITIES, completion_capability
 from kirabridge.operations import OPERATIONS
 from kirabridge.queue_management.schema import SPECS, TERMINAL
 
@@ -31,7 +32,7 @@ class QueueViews:
             self.security.principal(principal, cap)
         else:
             policy = self.security.principal(principal)
-            if not {"task.read", "message.read"}.intersection(policy.capabilities):
+            if not set(SOURCE_CAPABILITIES.values()).intersection(policy.capabilities):
                 raise BridgeError("forbidden", "Completion read permission required")
         return family, target, table, key
 
@@ -64,8 +65,7 @@ class QueueViews:
         elif family == "session-input":
             self.store.get(row["task_id"], principal)
         if family == "completions":
-            cap = "task.read" if row["source"] == "task" else "message.read"
-            self.security.principal(principal, cap)
+            self.security.principal(principal, completion_capability(row["source"]))
 
     def _view(self, principal, family, row):
         identifier = row[SPECS[family][1]]

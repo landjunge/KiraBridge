@@ -182,6 +182,21 @@ def test_schema_one_migration_preserves_existing_task(tmp_path):
         store.close()
 
 
+def test_schema_two_adds_receiver_scope_without_rewriting_history(tmp_path):
+    path = tmp_path / "bridge.sqlite3"
+    store = Store(path)
+    store.db.execute("ALTER TABLE message_jobs DROP COLUMN execution_cwd")
+    store.close()
+    store = Store(path)
+    try:
+        assert "execution_cwd" in {
+            r[1] for r in store.db.execute("PRAGMA table_info(message_jobs)")
+        }
+        assert store.db.execute("PRAGMA user_version").fetchone()[0] == 2
+    finally:
+        store.close()
+
+
 def test_concurrent_schema_migration_is_serialized(tmp_path):
     state = tmp_path / "state"
     state.mkdir(mode=0o700)

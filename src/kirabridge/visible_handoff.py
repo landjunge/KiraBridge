@@ -6,6 +6,7 @@ import re
 import time
 
 from kirabridge.bridge_core.models import BridgeError, UncertainExecution, canonical, digest
+from kirabridge.cli_adapters import adapter_for
 from kirabridge.message_manager import MessageSend
 from kirabridge.session_manager import SessionInput
 from kirabridge.visible_binding import (
@@ -34,6 +35,7 @@ class VisibleReadinessError(BridgeError):
             "scrolled": "visible_target_scrolled",
             "unknown": "visible_target_unknown",
             "target_changed": "visible_target_changed",
+            "navigation_required": "visible_navigation_required",
         }[observation["state"]]
         message = {
             "working": (
@@ -43,6 +45,9 @@ class VisibleReadinessError(BridgeError):
             "scrolled": "Die aktuelle Eingabeansicht ist nicht erreichbar; keine Eingabe.",
             "unknown": "Die aktuelle Eingabebereitschaft ist nicht eindeutig; keine Eingabe.",
             "target_changed": "Die zugeordnete CLI-Sitzung hat sich geändert; keine Eingabe.",
+            "navigation_required": (
+                "Bekannte CLI-Ansicht erfordert gebundene Navigation; keine Eingabe."
+            ),
         }[observation["state"]]
         super().__init__(code, message)
         # Persist only internal classifier labels, never screen/protocol contents.
@@ -137,7 +142,7 @@ class VisibleHandoffs:
         observed = self.insertion_observed(
             target, after["text"], prompt, None, before=before["text"]
         )
-        if not observed and target == "codex":
+        if not observed and adapter_for(target).capabilities.softwrap:
             selection = self.sessions.current_selection()
             if selection and len(prompt) <= 1000:
                 try:
@@ -331,10 +336,7 @@ class VisibleHandoffs:
                 "observed_at": time.time(),
             }
         protocol = None
-        if target == "codex" and binding.codex_thread_id:
-            protocol = await self.codex_state.read(
-                binding.codex_rollout_path, binding.codex_thread_id
-            )
+        protocol = await adapter_for(target).protocol_state(binding, self.codex_state)
         return {
             **assess(target, output["text"], binding, protocol),
             "binding": {
@@ -512,8 +514,7 @@ class VisibleHandoffs:
                 (status["message_id"], target, row["principal"]),
             ).fetchone()
             if (
-                target == "codex"
-                and binding.codex_thread_id
+                adapter_for(target).has_bound_protocol(binding)
                 and status["state"] in {"sent", "confirmed", "unknown"}
                 and message["acknowledged"]
                 and not reply
@@ -1066,9 +1067,7 @@ class VisibleHandoffs:
             )
             if len(prompt) > 16384 or "\x00" in prompt:
                 raise BridgeError("payload_limit", "Visible prompt exceeds terminal input limit")
-            from kirabridge.literal_session_input import check_codex_paste_geometry
-
-            await check_codex_paste_geometry(self.sessions, target, binding, prompt, before)
+            await adapter_for(target).preflight_input(self.sessions, binding, prompt, before)
             # The partial unique index still owns sent/confirmed rows. Parking a
             # proven-dead row as unknown releases that slot and does not resend it.
             await self._park_proven_dead(principal, target, binding, observed_sessions)
@@ -1132,7 +1131,7 @@ class VisibleHandoffs:
 
             async def before_paste():
                 nonlocal input_attempted, local_reply
-                if target == "codex" and args.wait_for_reply:
+                if adapter_for(target).capabilities.bound_reply and args.wait_for_reply:
                     selection = self.sessions.current_selection()
                     expected_identity = (
                         selection[2].get(binding.agent_pid)
@@ -1183,7 +1182,8 @@ class VisibleHandoffs:
 
                 before_cwd = (
                     await _task_cwd(self.sessions, binding)
-                    if target == "codex" and _needs_cwd_proof(before["text"])
+                    if adapter_for(target).capabilities.cwd_proof
+                    and _needs_cwd_proof(before["text"])
                     else None
                 )
                 await self.sessions.insert(

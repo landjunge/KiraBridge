@@ -21,6 +21,7 @@ class ReadQuery(Input):
         "platform.status",
         "task.observe",
         "native.read",
+        "coordinator.status",
         "windows.setup.verify",
     ]
     path: str | None = Field(default=None, max_length=4096)
@@ -47,6 +48,19 @@ class ReadQuery(Input):
 
     @model_validator(mode="after")
     def selector(self):
+        if self.challenge is not None and self.operation != "windows.setup.verify":
+            raise ValueError("Setup challenge requires windows.setup.verify")
+        if self.operation == "coordinator.status":
+            allowed = {"operation", "max_bytes"}
+            if (
+                any(
+                    getattr(self, field) != type(self).model_fields[field].get_default()
+                    for field in self.model_fields_set - allowed
+                )
+                or self.max_bytes > 65536
+            ):
+                raise ValueError("Coordinator status accepts only its bounded read budget")
+            return self
         if self.operation == "windows.setup.verify":
             from kirabridge.windows_setup_verification import WindowsSetupVerifyInput
 
@@ -57,8 +71,6 @@ class ReadQuery(Input):
             ):
                 raise ValueError("Setup verification accepts only its public challenge")
             return self
-        if self.challenge is not None:
-            raise ValueError("Setup challenge requires windows.setup.verify")
         if self.operation == "native.read":
             from kirabridge.native_queries import native_arguments
 
@@ -131,6 +143,15 @@ class ReadQuery(Input):
 
 async def read_query_async(bridge, principal: str, query: ReadQuery) -> dict:
     """Existing dictionary-shaped tool also works with cached client tool lists."""
+    if query.operation == "coordinator.status":
+        import json
+
+        from kirabridge.autonext.status import coordinator_status
+
+        value = coordinator_status(bridge, principal)
+        if len(json.dumps(value, ensure_ascii=False).encode("utf-8")) > query.max_bytes:
+            raise BridgeError("read_result_limit", "Coordinator status exceeds read budget")
+        return value
     if query.operation == "windows.setup.verify":
         from kirabridge.windows_setup_verification import verify_read
 

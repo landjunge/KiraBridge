@@ -150,6 +150,9 @@ class TeamDispatcher:
             (False, self.teams.pending(limit=16)),
         ):
             for work in rows:
+                continuation = getattr(self.bridge, "autonext", None)
+                if continuation is not None and not continuation.work_ready(work["id"]):
+                    continue
                 if not existing and not self.bridge.store.can_claim(work["created"]):
                     continue
                 if work["id"] not in self._active and self._defer.get(work["id"], 0) <= now:
@@ -229,7 +232,10 @@ class TeamDispatcher:
             return
         # The fixed recipient selects the authenticated identity. No action,
         # model output, or caller-controlled sender can select another token.
-        async with MCPClientPool(call_timeout=15) as pool:
+        # Submission may inline-observe for MAX_WAIT_SECONDS; leave transport headroom.
+        from kirabridge.task_observation import MAX_WAIT_SECONDS
+
+        async with MCPClientPool(call_timeout=MAX_WAIT_SECONDS + 15) as pool:
             await pool.connect(peer(self.bridge.config, recipient))
             if existing:
                 claimed = work
@@ -307,6 +313,10 @@ class TeamDispatcher:
                 return
 
     async def _prompt(self, pool, work):
+        continuation = getattr(self.bridge, "autonext", None)
+        scoped = continuation.prompt_for(work) if continuation is not None else None
+        if scoped is not None:
+            return scoped
         snapshot = await self._call(pool, "team_context", {"team_id": work["team_id"]})
         team = snapshot["team"]
         context = []
@@ -405,6 +415,14 @@ class TeamDispatcher:
         limits = self.bridge.config.team
         result = core.get("result") or {}
         text = result.get("text", result.get("final_message", ""))
+        continuation = getattr(self.bridge, "autonext", None)
+        if (
+            continuation is not None
+            and continuation.settings.coordinator_mode
+            and continuation.owns(work["id"])
+        ):
+            # Commentary is retained in Core evidence; acceptance parses only the final message.
+            text = result.get("final_message", text)
         core_result_hash = None
         if isinstance(text, str):
             try:
@@ -419,6 +437,11 @@ class TeamDispatcher:
                 raise BridgeError("team_agent_no_text", "Agent returned no team result")
             if len(turn.actions) > limits.max_actions_per_turn:
                 raise BridgeError("team_action_limit", "Team action count exceeds policy")
+            continuation = getattr(self.bridge, "autonext", None)
+            if turn.actions and continuation is not None and continuation.owns(work["id"]):
+                raise BridgeError(
+                    "autonext_followups_denied", "This grant authorizes no delegated actions"
+                )
         except BridgeError as exc:
             self.teams.fail(
                 work["id"],
@@ -438,6 +461,7 @@ class TeamDispatcher:
             "model_turn_completed": True,
             "session_scope": "existing_visible_terminal"
             if self.bridge.config.visible_handoffs.enabled
+            and (not worker or worker.execution_scope == "existing_visible_terminal")
             else "separate_managed_session",
             "completion_scope": "own_work_turn",
             "response_framing": framing,

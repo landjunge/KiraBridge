@@ -1,4 +1,6 @@
 import asyncio
+import json
+import shlex
 import shutil
 import subprocess
 import sys
@@ -7,6 +9,7 @@ from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
 import pytest
+from test_terminal_window_creation import product  # noqa: F401 -- complete synthetic window proof
 
 from kirabridge.bridge_core.models import BridgeError
 from kirabridge.session_manager import SessionInput, SessionManager, SessionOpen
@@ -174,34 +177,77 @@ async def test_native_session_selection_read_and_input(bridge, config, monkeypat
 
 
 @pytest.mark.asyncio
-async def test_native_open_checks_authority_and_quotes_command(bridge, config, monkeypatch):
-    manager = SessionManager(bridge.sessions.ports)
-    calls = []
+async def test_native_open_checks_authority_and_quotes_command(
+    bridge,
+    config,
+    monkeypatch,
+    product,  # noqa: F811 -- synthetic fixture
+):
+    scene, leaf, events, receipt, created = product
+    manager = SessionManager(bridge.sessions.ports, terminal_app=leaf)
+    observer = leaf.system_transport.request
 
-    async def native(source, *, mutation=False):
-        calls.append(source)
-        return {"opened": True, "tty": "/dev/ttys009"}
+    async def observe(operation, arguments, *, principal):
+        assert principal == "local"
+        # The reusable fake scene has a fixed observer subject; the manager's
+        # actual window authority and transport principal remain local.
+        return await observer(operation, arguments, principal="chatgpt")
 
-    async def catalog():
-        return [{"pane_id": "terminal:333:ttys009", "expected_pid": 444, "tty": "/dev/ttys009"}]
-
-    monkeypatch.setattr(manager.terminal_app, "native", native)
-    monkeypatch.setattr(manager.terminal_app, "catalog", catalog)
+    leaf.system_transport.request = observe
     with pytest.raises(BridgeError):
         await manager.open("local", SessionOpen(cwd="/"))
-    assert not calls
-    cwd = config.principals["local"].roots[0]
+    assert not events and leaf.native.await_count == 0
+    from pathlib import Path
+
+    cwd = str(Path(config.principals["local"].roots[0]) / "quoted ' directory")
+    Path(cwd).mkdir()
+    scene.workspace = cwd
+    selected = {
+        "pane_id": "terminal:123:ttys004",
+        "expected_pid": 345,
+        "tty": receipt["tty"],
+        "busy": False,
+    }
+    leaf.catalog = AsyncMock(return_value=[selected])
+    monkeypatch.setattr(manager, "read", AsyncMock(return_value={"text": "KiraBridge visible % "}))
     args = SessionOpen(cwd=cwd, argv=[sys.executable, "-c", "print('hello')"])
+
+    async def sent(row, text, identity, *, expected_cwd, before_transport):
+        assert row == selected and text == shlex.join(args.argv)
+        assert identity == await scene.identity(selected["expected_pid"], detailed=True)
+        assert expected_cwd == cwd
+        await before_transport()  # Exercise the real TerminalWindowProof.verify on the fake scene.
+        events.append("argv")
+        return {"sent": True}
+
+    leaf.send_confirmed = AsyncMock(side_effect=sent)
     token = bridge.security.grant_window("local", "explicit-new-window", args)
     args = args.model_copy(update={"window_authorization": token})
     with bridge.store.transaction():
         bridge.security.consume_window("local", "explicit-new-window", args)
-    result = await manager.open("local", args, task_id="explicit-new-window")
-    assert result["opened"] and result["expected_pid"] == 444
-    assert len(calls) == 1 and "app.doScript" in calls[0]
+    result = await manager.open("local", args, task_id="explicit-new-window", on_created=created)
+    assert result["opened"] and result["expected_pid"] == selected["expected_pid"]
+    assert result["pane_id"] == selected["pane_id"] and result["tty"] == selected["tty"]
+    assert result["separate_window"] and result["creation_receipt"]["physical_window"]
+    creations = [
+        call.args[0]
+        for call in leaf.native.await_args_list
+        if "const tab=app.doScript(" in call.args[0]
+    ]
+    assert len(creations) == 1 and json.dumps("cd -- " + shlex.quote(cwd)) in creations[0]
+    assert events == ["create", "receipt", "focus", "move", "argv"]
+    assert leaf.native.await_count == 3  # One creation, plus required focus/move calls.
+    leaf.send_confirmed.assert_awaited_once()
+    assert {operation for operation, _ in scene.calls} >= {
+        "apps.list",
+        "apps.inspect",
+        "windows.list",
+        "accessibility.inspect",
+    }
     with pytest.raises(BridgeError) as exc:
         await manager.open("local", args, task_id="explicit-new-window")
-    assert exc.value.code == "window_already_dispatched" and len(calls) == 1
+    assert exc.value.code == "window_already_dispatched" and leaf.native.await_count == 3
+    leaf.send_confirmed.assert_awaited_once()
 
 
 @pytest.mark.parametrize(

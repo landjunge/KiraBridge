@@ -67,15 +67,19 @@ class SessionInput(SessionReference):
     text: str = Field(default="", max_length=16384)
     submit: bool = True
     require_idle: bool = False
-    key: Literal["enter"] | None = None
+    key: Literal["enter", "escape"] | None = None
     expected_cursor: str = Field(default="", pattern=r"^$|^[0-9a-f]{64}$")
     expected_agent_pid: int | None = Field(default=None, gt=0)
 
     @model_validator(mode="after")
     def explicit_input_mode(self):
-        if self.key == "enter":
+        if self.key is not None:
             if self.text or not self.submit or not self.expected_cursor:
-                raise ValueError("Return requires empty text, submit=true and an observed cursor")
+                raise ValueError(
+                    "A bound key requires empty text, submit=true and an observed cursor"
+                )
+            if self.key == "escape" and self.expected_agent_pid is None:
+                raise ValueError("Navigation requires the observed agent PID")
         elif not self.text or self.expected_cursor or self.expected_agent_pid is not None:
             raise ValueError("Literal text must be nonempty and cannot include Return-only guards")
         return self
@@ -223,6 +227,9 @@ class SessionManager:
                 binding = bindings.get(process["name"])
                 row["agent_candidate"] = process["name"]
                 row["agent_pid"] = process["pid"]
+                from kirabridge.cli_adapters import default_registry
+
+                row["cli_adapter"] = default_registry().describe(process["name"])
                 row["configured_binding_current"] = bool(
                     binding and self.binding_matches(row, binding, process["name"])
                 )
@@ -529,7 +536,7 @@ class SessionManager:
         """One key for the separately authorized, observed view; never paste text."""
         self.authorization.principal(principal, "session.input")
         self.authorization.principal(principal, "terminal.execute")
-        if args.key != "enter" or args.text or not args.submit:
+        if args.key not in {"enter", "escape"} or args.text or not args.submit:
             raise BridgeError("invalid_arguments", "A standalone Return requires explicit key mode")
         async with self.lock:
             selected = await self.selected(principal, args.pane_id, args.expected_pid)
@@ -558,13 +565,21 @@ class SessionManager:
                     raise BridgeError("visible_input_changed", "Observed terminal view changed")
                 identities, snapshot = context["identities"], context["snapshot"]
             await before_transport()
-            await self.terminal_app.press_return(
-                args.pane_id,
-                identity_guard=identities,
-                expected_screen=expected_screen,
+            guards = {
+                "identity_guard": identities,
+                "expected_screen": expected_screen,
                 **({"shell_snapshot": snapshot} if snapshot is not None else {}),
-            )
-        return {"paste_event_sent": False, "return_sent": True, "agent_confirmed": False}
+            }
+            if args.key == "enter":
+                await self.terminal_app.press_return(args.pane_id, **guards)
+            else:
+                await self.terminal_app.press_key(args.pane_id, "escape", **guards)
+        return {
+            "paste_event_sent": False,
+            "return_sent": args.key == "enter",
+            "navigation_key_sent": args.key == "escape",
+            "agent_confirmed": False,
+        }
 
     async def send(self, principal, args, *, task_id=None, before_transport=None):
         self.authorization.principal(principal, "session.input")

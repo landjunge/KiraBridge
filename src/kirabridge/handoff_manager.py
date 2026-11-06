@@ -40,11 +40,14 @@ WRITES = TOOLS - {"get_issued_handoff", "get_return"}
 
 
 class HandoffManager:
-    def __init__(self, bridge):
+    def __init__(self, bridge, *, peer=None):
         self.bridge, self.store = bridge, bridge.store
+        self.peer = peer
 
     @property
     def operator_ref(self):
+        if self.peer is not None:
+            return self.peer.operator_ref
         return digest(self.bridge.config.threaddesk.workspace)
 
     def identity(self, principal, handoff_id, revision):
@@ -142,6 +145,8 @@ class HandoffManager:
 
     async def rpc(self, task, tool, arguments):
         assert tool in TOOLS
+        if self.peer is not None:
+            return await self.peer.call(tool, arguments, task_id=task["id"])
         manager = self.bridge.threaddesk
         async with manager.lock:
             if manager.observer_factory:
@@ -208,6 +213,8 @@ class HandoffManager:
         self.ensure_not_stopped(task["principal"], args.handoff_id, args.revision)
         policy, configured = self.agent_preflight(task["principal"], args.agent, args.cwd)
         record = await self.issued(task, args.handoff_id, args.revision)
+        if self.peer is not None:
+            self.peer.validate_run(task, record, device_certificate=self.bridge.config.tls_cert)
         self.ensure_not_stopped(task["principal"], args.handoff_id, args.revision)
         packet = record["handoff"]
         if packet.get("target_system") not in {"generic", "codex"}:

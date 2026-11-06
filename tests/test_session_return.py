@@ -556,3 +556,21 @@ async def test_shell_return_native_script_compiles_without_executing_ui(
         subprocess.run, command, capture_output=True, text=True, timeout=10
     )
     assert result.returncode == 0, result.stderr
+
+
+async def test_wrapped_standalone_warning_return_uses_one_cursor_bound_key_in_fixture(key_visible):
+    bridge, transport, _, observed = key_visible
+    screen = (
+        "› Existing wrapped draft\n  continues on the next row\n\n"
+        "  GPT-6.1-Sol xhigh · ~\n  ⚠ 1 warning · f2 to view\n"
+    )
+    args = await observed(screen)
+    value = request("session.input", args, task_id="wrapped-footer-return")
+    async with bridge:
+        bridge.prepare("chatgpt", value)
+        task = await bridge.tasks.wait("chatgpt", value.task_id, timeout=5)
+        assert task["state"] == "completed", task
+        assert task["result"]["return_sent"] and not task["result"]["paste_event_sent"]
+        assert not task["result"]["execution_confirmed"]
+        assert bridge.submit("chatgpt", value, "")["state"] == "completed"
+    assert transport["literal_calls"] == [("return", None)]

@@ -239,13 +239,19 @@ def test_repeat_chatgpt_setup_preserves_key_profile_and_policy(
     monkeypatch.setattr(
         "kirabridge.setup_dependencies.shutil.which", lambda n: "/fake/tunnel-client"
     )
-    monkeypatch.setattr(
-        "kirabridge.chatgpt_setup.runtime_status", lambda b: {"connected": connected}
-    )
+    status_calls = []
+
+    def status(binary, config_path):
+        assert binary == "/fake/tunnel-client" and config_path == path
+        status_calls.append((binary, config_path))
+        return {"connected": connected}
+
+    monkeypatch.setattr("kirabridge.chatgpt_setup.runtime_status", status)
     monkeypatch.setattr(
         "kirabridge.chatgpt_setup.getpass.getpass", lambda *a: pytest.fail("key requested")
     )
     result = wizard(load_config(str(path)), path, "setup", language="en")
+    assert status_calls == [("/fake/tunnel-client", path)]
     assert (
         result["chatgpt_tool_call"] == "unverified"
         if connected

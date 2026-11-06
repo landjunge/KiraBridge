@@ -98,6 +98,10 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
         "Query task_get and task_events for additional evidence. "
         "Use message_send/message_receive for addressed peer communication. "
         "Use team_* tools for shared role-based teams, addressed communication and delegated work. "
+        "For an explicitly configured native AutoNext coordinator, coordinator_status reads "
+        "its owner-scoped phases; completion_receive/ack consumes its durable terminal notices. "
+        "Only pinned grants and successful checks advance work; reading or acknowledging "
+        "a notice grants no execution rights. "
         "Team results are shared only with team members; private tasks stay private. "
         "ChatGPT is an external participant and is never automatically awakened by a team role. "
         "Agent handoffs require assigned existing visible terminals, with no background fallback; "
@@ -423,7 +427,26 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
     @server.tool(annotations=read)
     def visible_handoff_status(handoff_id: str, ctx: Context) -> dict[str, Any]:
         """Read/reconcile visible input, Return and authenticated acknowledgement; never resend."""
-        return safe(lambda: bridge.visible_handoffs.reconcile(identity(ctx), handoff_id))
+
+        def action():
+            principal = identity(ctx)
+            result = bridge.visible_handoffs.reconcile(principal, handoff_id)
+            if result["state"] == "completed":
+                try:
+                    result["receiver_reconciliation"] = (
+                        bridge.message_receiver.reconcile_completed_handoff(principal, handoff_id)
+                    )
+                except BridgeError as exc:
+                    if exc.code != "forbidden":
+                        raise
+                    # Handoff readers without mailbox access retain their read.
+                    result["receiver_reconciliation"] = {
+                        "reconciled": False,
+                        "reason": "message_read_unavailable",
+                    }
+            return result
+
+        return safe(action)
 
     @server.tool(annotations=read)
     async def threaddesk_dynamic_catalog(ctx: Context) -> dict[str, Any]:
@@ -1136,6 +1159,20 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
     delivery = ToolAnnotations(
         readOnlyHint=False, destructiveHint=False, idempotentHint=True, openWorldHint=False
     )
+
+    @server.tool(annotations=read)
+    def coordinator_status(ctx: Context) -> dict[str, Any]:
+        """Read your configured coordinator's bounded phases without starting work.
+
+        Requires team.read and the configured owner. Returns only the current
+        pinned grant, work IDs/states and completion channel; no prompts/results.
+        Use completion_receive on that target and completion_ack after processing
+        for durable accepted/stopped notices. Cached clients can use read_query
+        operation=coordinator.status. Receipt delivery does not wake an inactive chat.
+        """
+        from kirabridge.autonext.status import coordinator_status as project_status
+
+        return safe(lambda: project_status(bridge, identity(ctx)))
 
     @server.tool(annotations=delivery)
     async def completion_receive(

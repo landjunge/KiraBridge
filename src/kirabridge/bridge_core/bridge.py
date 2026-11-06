@@ -8,6 +8,7 @@ from pydantic import ValidationError
 
 from kirabridge import API_VERSION, LOCAL_APPROVAL_URL, __version__
 from kirabridge.agent_manager import AgentManager
+from kirabridge.autonext.models import AutoNextControl
 from kirabridge.bridge_core.config import Config
 from kirabridge.bridge_core.models import (
     AgentInput,
@@ -82,6 +83,7 @@ from kirabridge.windows_keyboard import WINDOWS_KEYBOARD_INPUTS, WindowsKeyboard
 from kirabridge.windows_windows import WINDOWS_WINDOW_INPUTS, WindowsWindowManager
 
 INPUTS = {
+    "autonext.control": AutoNextControl,
     **WINDOWS_KEYBOARD_INPUTS,
     **WINDOWS_WINDOW_INPUTS,
     **SYSTEM_INPUTS,
@@ -143,7 +145,7 @@ INPUTS = {
 
 
 class Bridge:
-    def __init__(self, config: Config):
+    def __init__(self, config: Config, *, routing_guard=None, handoff_peer=None):
         self.config = config
         from kirabridge.readiness import runtime_snapshot
 
@@ -165,7 +167,7 @@ class Bridge:
         )
         from kirabridge.handoff_manager import HandoffManager
 
-        self.handoffs = HandoffManager(self)
+        self.handoffs = HandoffManager(self, peer=handoff_peer)
         self.security = SecurityManager(config, self.store)
         from kirabridge.file_transfer.authorization import TransferAuthorization
         from kirabridge.file_transfer.repository import TransferRepository
@@ -197,7 +199,12 @@ class Bridge:
         self.images = ImageManager()
         self.clipboard = ClipboardManager()
         self.processes = ProcessManager(self.terminal)
-        self.agents = AgentManager(config, self.terminal)
+        if config.team.routing is not None:
+            from kirabridge.capability_routing.native import native_routed_manager
+
+            self.agents = native_routed_manager(self, routing_guard)
+        else:
+            self.agents = AgentManager(config, self.terminal)
         from kirabridge.configured_workflow import configured_workflow_control
 
         self.workflow_control = configured_workflow_control(self)
@@ -298,6 +305,17 @@ class Bridge:
         self.teams = TeamManager(self)
         self.messages.voice_policy.teams = self.teams
         self.team_dispatcher = TeamDispatcher(self)
+        from kirabridge.autonext.manager import AutoNextManager
+
+        if config.autonext.coordinator_mode:
+            from kirabridge.autonext.coordinator import CoordinatedAutoNext
+
+            self.autonext = CoordinatedAutoNext(self)
+        else:
+            self.autonext = AutoNextManager(self)
+        self.agents.worktree_guard = lambda task, args: self.autonext.authorize_execution(
+            {**task, "args": args.model_dump()}
+        )
         from kirabridge.queue_management import QueueManager
 
         self.queues = QueueManager(
@@ -430,6 +448,7 @@ class Bridge:
             "message_receiver_active": bool(
                 self.message_receiver.worker and not self.message_receiver.worker.done()
             ),
+            "autonext": self.autonext.inspect(),
             "message_receiver_scope": "bridge_dispatcher_for_configured_receivers",
         }
 
@@ -748,7 +767,7 @@ class Bridge:
                 },
             }
         if operation == "session.input":
-            if args.key == "enter":
+            if args.key is not None:
                 from kirabridge.session_return import execute
 
                 return await execute(self, task, args, running, progress)
@@ -790,7 +809,20 @@ class Bridge:
             )
         if operation == "agent.execute":
             self.teams.authorize_execution(task)
-            return await self.agents.execute(task, args, policy, running, progress)
+            # Only a sealed team assignment may select its configured dedicated worker.
+            # Direct agent requests retain the existing visible route.
+            work = self.store.db.execute(
+                "SELECT assignee FROM team_work WHERE core_task_id=?", (task["id"],)
+            ).fetchone()
+            worker = self.config.team.workers.get(work["assignee"]) if work else None
+            managed = bool(worker and worker.execution_scope == "separate_managed_session")
+            return await self.agents.execute(
+                task, args, policy, running, progress, separate_managed=managed
+            )
+        if operation == "autonext.control":
+            self.autonext.validate_control(principal, args)
+            await running({"evidence_type": "autonext_control", "action": args.action})
+            return self.autonext.control(principal, args)
         if operation.startswith("handoff."):
             return await self.handoffs.execute(task, args, policy, running, progress)
         if operation == "workflow.stop":
@@ -940,19 +972,27 @@ class Bridge:
             self.record_runtime_load()
             await self.message_receiver.start()
             await self.team_dispatcher.start()
+            await self.autonext.start()
         except BaseException:
-            await self.team_dispatcher.stop()
-            await self.message_receiver.stop()
-            await self.tasks.stop()
+            for stop in (
+                self.autonext.stop,
+                self.team_dispatcher.stop,
+                self.message_receiver.stop,
+                self.tasks.stop,
+            ):
+                await asyncio.gather(stop(), return_exceptions=True)
             raise
         return self
 
     async def __aexit__(self, *exc):
         try:
             try:
-                await self.team_dispatcher.stop()
+                await self.autonext.stop()
             finally:
-                await self.message_receiver.stop()
+                try:
+                    await self.team_dispatcher.stop()
+                finally:
+                    await self.message_receiver.stop()
         finally:
             await self.tasks.stop()
             await self.system_modules.close()

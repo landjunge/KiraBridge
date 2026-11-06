@@ -1,3 +1,7 @@
+> Update: RC36 was subsequently installed and its tab-switch failure reproduced.
+> The local RC37 repair is installed and natively verified on Intel; see
+> [current recovery evidence](TERMINAL-RECOVERY-20261104.md). Historical tasks below remain unchanged.
+
 # RC36 · create an owned window while existing windows are minimized
 
 The RC35 install bootstrap task `terminal_rc35_install_20261104` failed before
