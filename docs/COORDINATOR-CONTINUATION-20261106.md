@@ -117,3 +117,30 @@ Restart restores the original execution identity before workers start. Disabled
 profiles preserve queued work. The native model router and durable completion
 consumer remain the execution and return paths. Local deterministic tests,
 provider runs, service activation and public releases have separate evidence.
+
+## Lokaler Nachweis am 6. November 2026
+
+Der Supervisor `4b821c6` wurde im eigenen bestätigten Terminalfenster mit
+Sicherung aktualisiert. Anschließend wurden zwei unabhängige Routinetextaufgaben
+über echte Codex-Hauptturns, separate Codex-Verifikation und gepinnte Checks
+angenommen. Genau vier native Coreturns und zwei Annahmequittungen; der zweite
+Hauptturn begann 10,13 Sekunden nach der ersten Annahme. Beide dauerhaften
+Completionmeldungen wurden nach geprüftem Boardreadback quittiert. Der Router
+setzte tatsächlich Luna/low für Routine und Sol/high für Verifikation;
+anbieterintern effektive Werte wurden nicht separat attestiert.
+
+Ein vorheriger Codingturn endete nach 120 Sekunden Bestandslektüre als
+UNKNOWN/agent_timeout. Originalkennungen und Lease bleiben erhalten, der Prozess
+ist beendet und der Checkout unverändert. Dies ist kein erfolgreicher nativer
+Schreibnachweis und wurde nicht wiederholt. Die fachliche Zeitprojektion wurde
+anschließend in einem disjunkten Checkout fertiggestellt und unabhängig geprüft.
+Der primäre Bridge-Dienst und fremde Sitzungen blieben unverändert.
+
+Die neue lesende Statusprojektion liefert pro aktueller Aufgabe gespeicherte
+Corezeitpunkte, Receipt-Abnahmezeit und daraus geordnete endliche Dauern für
+Queue, Ausführung, Abnahme und Gesamtzeit. Fehlende Daten bleiben `null`, ohne
+Hochrechnung auf die aktuelle Uhrzeit oder Ersatz aus fremden Teamzeitpunkten.
+Owner-, Grant- und Teamrechte bleiben maßgeblich. Dies ist ein weiterer geprüfter
+Quellschritt; die lokale Supervisoraktivierung bleibt an ihren eigenen Pin
+gebunden. Evidenz: `~/.local/state/coordinator-continuation-20261106/`,
+ThreadDesk `188ce4729a62/9336dde91791` und der dort folgende Quellenabschluss.

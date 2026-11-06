@@ -115,6 +115,8 @@ Der [aktuelle Quellenintegrationsstand](docs/BIGPLAN-INTEGRATION-STATUS-20261106
 
 Der Koordinator-Quellkandidat unterstützt außerdem native Core-Aktivierung, den auf den Eigentümer begrenzten MCP-Aufruf `coordinator_status` und dauerhafte Angenommen-/Stoppmeldungen im vorhandenen Completion-Postfach. Nach erfolgreichem Review und Prüfungen setzt er gepinnte Aufgaben ohne Laden eines Skills fort. [Nativer Vertrag und Prüfnachweise](docs/COORDINATOR-NATIVE-20261106.md) beschreiben den Stand; Desktop- und Liveabnahme bleiben gesondert.
 
+Sein Status zeigt gespeicherte Warte-, Ausführungs- und Abnahmezeiten aus dem gebundenen Core und Receipt. Fehlende oder ungültige Zeitwerte bleiben unbekannt; das Lesen startet keine Arbeit.
+
 Der optionale [Quellkandidat für natives Worker-Routing](docs/COORDINATOR-NATIVE-ROUTING-20261106.md) verwendet die geprüfte CLI-Matrix für versiegelte Managed-Aufträge; sichtbare Sitzungen und das eigene strukturierte Grok-Reviewprotokoll bleiben erhalten. Angeforderte Modell-/Effortwerte und beobachtete Metadaten bleiben getrennt; lokale Fixturetests sind keine Provider- oder Deploymentabnahme.
 
 [CLI-Rückgabefix und vorhandener Übergangsweg](docs/NATIVE-COMPLETION-RETURNS-20261106.md): Der Quellkandidat belässt Antworten/Ergebnisse im Postfach des anfragenden Clients. Bestehende Installationen können bereits `--inbox-only` verwenden; Completionquittungen benötigen keinen weiteren Agententurn.
