@@ -20,7 +20,7 @@ class InstallerSourceReadinessTests(unittest.TestCase):
         spec.loader.exec_module(self.installer)
         self.directory = tempfile.TemporaryDirectory()
         self.addCleanup(self.directory.cleanup)
-        self.root = Path(self.directory.name)
+        self.root = Path(self.directory.name).resolve()
         self.config = self.root / "config.toml"
         self.config.write_text('data_dir = "/unused-fixture"\n')
         self.release = self.root / "new"
