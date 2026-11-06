@@ -6,6 +6,7 @@ reads model output. Durable terminal notices use the existing completion inbox.
 
 from collections import Counter
 
+from kirabridge.autonext.timings import task_timings
 from kirabridge.bridge_core.models import BridgeError
 
 
@@ -56,6 +57,7 @@ def coordinator_status(bridge, principal):
                             "coordinator_state_unknown", "Coordinator work binding is unavailable"
                         )
                     item["work"][role] = dict(work)
+                item["timings"] = task_timings(bridge, principal, row["task_id"])
                 items.append(item)
     return {
         "schema": "kirabridge.coordinator-status.v1",
