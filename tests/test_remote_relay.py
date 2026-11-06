@@ -6,7 +6,7 @@ import ipaddress
 import json
 import os
 import socket
-from contextlib import asynccontextmanager
+from contextlib import AsyncExitStack, asynccontextmanager
 from dataclasses import replace
 from pathlib import Path
 from types import SimpleNamespace
@@ -96,7 +96,7 @@ async def tls_server(app_factory, cert, key):
 
 
 @pytest.fixture
-async def remote(config, tmp_path, monkeypatch):
+async def remote(config, tmp_path, monkeypatch, request):
     source_root = os.environ["KIRABRIDGE_TEST_REMOTE_THREADDESK_SOURCE"]
     monkeypatch.syspath_prepend(source_root)
     monkeypatch.setenv("KIRABRIDGE_TEST_THREADDESK_SOURCE", source_root)
@@ -116,6 +116,7 @@ async def remote(config, tmp_path, monkeypatch):
     config.tls_cert, config.tls_key = str(kb_cert), str(kb_key)
     data = tmp_path / "remote-source"
     token = provision(data, "alice")
+    plan = seed_project_plan(data) if getattr(request, "param", None) == "project_plan" else None
     td_identity, kb_identity = certificate_identity(td_cert), certificate_identity(kb_cert)
     async with tls_server(
         lambda origin: create_app(data, public_origin=origin, handoff_rpc=True), td_cert, td_key
@@ -126,9 +127,14 @@ async def remote(config, tmp_path, monkeypatch):
             verify=pinned_context(str(td_cert), td_identity.certificate_sha256),
             trust_env=False,
         ) as http:
-            response = await http.post("/api/projects", json={"title": "Owned synthetic remote"})
-            assert response.status_code == 200, response.text
-            pid = response.json()["id"]
+            if plan:
+                pid = plan["thread_id"]
+            else:
+                response = await http.post(
+                    "/api/projects", json={"title": "Owned synthetic remote"}
+                )
+                assert response.status_code == 200, response.text
+                pid = response.json()["id"]
             async with HttpHandoffPeer(
                 td_origin,
                 pid,
@@ -141,40 +147,117 @@ async def remote(config, tmp_path, monkeypatch):
                 certificate_file=str(td_cert),
                 certificate_sha256=td_identity.certificate_sha256,
             ) as source:
-                bridge = Bridge(config, handoff_peer=source)
-                async with bridge:
-                    async with tls_server(lambda _: create_http_app(bridge), kb_cert, kb_key) as kb:
-                        peer = Peer(
+                async with AsyncExitStack() as core_stack:
+
+                    async def boot_core():
+                        bridge = await core_stack.enter_async_context(
+                            Bridge(config, handoff_peer=source)
+                        )
+                        kb = await core_stack.enter_async_context(
+                            tls_server(lambda _: create_http_app(bridge), kb_cert, kb_key)
+                        )
+                        return bridge, Peer(
                             "device",
                             url=kb + "/mcp",
                             token="k" * 40,
                             ca_file=str(kb_cert),
                             certificate_sha256=kb_identity.certificate_sha256,
                         )
-                        binding = DeviceBinding(
+
+                    bridge, peer = await boot_core()
+                    grants = {}
+                    remote = SimpleNamespace(
+                        source=source,
+                        bridge=bridge,
+                        peer=peer,
+                        binding=DeviceBinding(
                             "owned-device",
                             kb_identity.public_key_sha256,
                             1,
                             "owned-workspace",
                             config.principals["local"].roots[0],
-                        )
-                        grants = {}
-                        yield SimpleNamespace(
-                            source=source,
-                            bridge=bridge,
-                            peer=peer,
-                            binding=binding,
-                            grants=grants,
-                            resolve=grants.get,
-                            http=http,
-                            pid=pid,
-                            counter=counter,
-                            token=token,
-                            config=config,
-                            td_cert=td_cert,
-                            td_origin=td_origin,
-                        )
-                bridge.store.close()
+                        ),
+                        grants=grants,
+                        resolve=grants.get,
+                        http=http,
+                        pid=pid,
+                        counter=counter,
+                        token=token,
+                        config=config,
+                        td_cert=td_cert,
+                        td_origin=td_origin,
+                        plan=plan,
+                    )
+
+                    async def restart_core():
+                        # Close the owned TLS server and Core/store before reopening
+                        # the same persisted state. No OS process or CLI is restarted.
+                        await core_stack.aclose()
+                        remote.bridge, remote.peer = await boot_core()
+
+                    remote.restart_core = restart_core
+                    yield remote
+
+
+def seed_project_plan(data):
+    """Public M3 commands on owned test data, before the TD server starts."""
+    from threaddesk.api.service import ThreadService
+    from threaddesk.server_sync.auth import Credentials
+    from threaddesk.server_sync.store import SyncStore
+    from threaddesk.services.commands import CommandApplication
+    from threaddesk.storage.json_store import JsonStore
+
+    root = Credentials(data).user_root("alice")
+    svc = ThreadService(JsonStore(root / "core"))
+    app = CommandApplication(svc)
+    source = {"source_ref": "synthetic:r2-plan", "source_revision": "synthetic-message-1"}
+    started = app.call(
+        {
+            "version": 1,
+            "workspace_id": app.workspace_id,
+            "command": "project.start",
+            "operation_id": "synthetic-project-start",
+            "expected_revision": 0,
+            "arguments": {"idea": "Owned synthetic M3 integration", **source},
+        }
+    )["result"]
+    scope = {key: started[key] for key in ("project_id", "thread_id")}
+    before = app.call(
+        {
+            "version": 1,
+            "workspace_id": app.workspace_id,
+            "command": "project.plan.get",
+            "arguments": scope,
+        }
+    )["result"]
+    revised = app.call(
+        {
+            "version": 1,
+            "workspace_id": app.workspace_id,
+            "command": "project.plan.revise",
+            "operation_id": "synthetic-project-revise",
+            "expected_revision": before["thread_revision"],
+            "arguments": {
+                **scope,
+                **source,
+                "expected_plan_revision": before["plan_revision"],
+                "expected_basis": before["basis_digest"],
+                "plan": {
+                    "goals": ["Check evidence"],
+                    "next_steps": ["SYNTHETIC READY is only plan text"],
+                    "open_questions": [],
+                },
+                "reason": "Synthetic R2 revision; no execution grant",
+            },
+        }
+    )["result"]
+    assert not started["execution_started"] and not revised["execution_started"]
+    assert not svc.store.list_issued_handoffs()
+    # The sync transport calls a thread a project. Keep the graph ID distinct.
+    SyncStore(root / "sync").create_project(
+        "Owned synthetic M3 remote", project_id=scope["thread_id"]
+    )
+    return {**scope, "revision_result": revised}
 
 
 async def intent(remote, suffix="one", *, ttl=120, timeout=10.0):
@@ -310,7 +393,7 @@ async def test_two_authorized_tasks_once_returns_read_back_and_restart(remote):
     assert (Path(remote.binding.workspace_path) / "synthetic-result.txt").read_text() == "blue"
 
 
-@pytest.mark.parametrize("field", ["target", "source", "request", "authorization"])
+@pytest.mark.parametrize("field", ["target", "source", "request", "request_hash", "authorization"])
 async def test_changed_binding_never_starts_any_task(remote, field):
     envelope = await intent(remote)
     if field == "target":
@@ -319,6 +402,8 @@ async def test_changed_binding_never_starts_any_task(remote, field):
         envelope[field]["tenant_ref"] = "foreign-tenant"
     elif field == "request":
         envelope[field]["arguments"]["cwd"] = "/foreign-workspace"
+    elif field == "request_hash":
+        envelope["request_sha256"] = "f" * 64
     else:
         envelope[field]["grant_ref"] = "missing-grant"
     async with relay(remote) as coordinator:
@@ -326,6 +411,52 @@ async def test_changed_binding_never_starts_any_task(remote, field):
             await coordinator.deliver(envelope)
     assert remote.bridge.store.db.execute("SELECT count(*) FROM tasks").fetchone()[0] == 0
     assert not remote.counter.exists()
+
+
+@pytest.mark.parametrize("remote", ["project_plan"], indirect=True)
+async def test_m3_plan_is_context_and_issued_handoff_submits_once_across_client_restart(
+    remote, monkeypatch
+):
+    assert remote.plan["project_id"] != remote.pid == remote.plan["thread_id"]
+    assert remote.plan["revision_result"]["plan_revision"] == 2
+    submits = []
+
+    def observe(coordinator):
+        call = coordinator.pool.call
+
+        async def observed(peer, tool, arguments, **kwargs):
+            if tool == "task_submit":
+                submits.append(arguments["request"]["task_id"])
+            return await call(peer, tool, arguments, **kwargs)
+
+        monkeypatch.setattr(coordinator.pool, "call", observed)
+
+    async with relay(remote) as coordinator:
+        observe(coordinator)
+        with pytest.raises(BridgeError) as rejected:
+            await coordinator.deliver(remote.plan["revision_result"])
+        assert rejected.value.code == "remote_envelope_invalid"
+        assert not submits and not remote.counter.exists()
+        assert remote.bridge.store.db.execute("SELECT count(*) FROM tasks").fetchone()[0] == 0
+        envelope = await intent(remote, "m3-plan")
+        await coordinator.deliver(envelope)
+        task = await final(remote, coordinator, envelope)
+        assert task["state"] == "completed", task
+        value = task["result"]["value"]
+        assert value["phase"] == "delivered_unverified"
+        assert not value["project_completion_verified"]
+        returned = await remote.source.call("get_return", {"return_id": value["return_id"]})
+        assert returned["item"]["decision"] is None
+        assert returned["item"]["binding_status"] == "issued_bound"
+    previous_core, previous_db = remote.bridge, remote.bridge.store.db
+    await remote.restart_core()
+    assert remote.bridge is not previous_core and remote.bridge.store.db is not previous_db
+    async with relay(remote, clock=lambda: envelope["expires_at"] + 1) as restarted:
+        observe(restarted)
+        assert (await restarted.deliver(envelope))["receipt"] == task["receipt"]
+    assert submits == [envelope["request"]["task_id"]]
+    assert remote.bridge.store.db.execute("SELECT count(*) FROM tasks").fetchone()[0] == 1
+    assert len(remote.counter.read_text().splitlines()) == 1
 
 
 async def test_expired_and_ungranted_work_is_not_started(remote):
