@@ -195,6 +195,14 @@ def validate_junit(path, suite_name, started_ns, pytest_exit):
         )
     except (KeyError, ValueError) as exc:
         raise GateError("Missing/invalid JUnit counters") from exc
+    # pytest normally leaves root counters absent. Other producers may supply
+    # any subset; present aggregates must agree with the actual child cases.
+    for counter in ("tests", "skipped", "errors", "failures", "disabled"):
+        if counter in root.attrib:
+            value = root.attrib[counter]
+            require(bool(re.fullmatch(r"[0-9]+", value)), f"Root JUnit invalid counter: {counter}")
+            expected = len(cases) if counter == "tests" else 0
+            require(int(value) == expected, f"Root JUnit inconsistent counter: {counter}")
     counts = dict.fromkeys(REMOTE_MODULES, 0)
     for case in cases:
         module = case.get("classname", "").removeprefix("tests.")

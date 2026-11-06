@@ -5,6 +5,8 @@ import os
 import py_compile
 import subprocess
 import sys
+import time
+import uuid
 import xml.etree.ElementTree as ET
 from pathlib import Path
 from types import ModuleType
@@ -59,6 +61,78 @@ def test_nonzero_summary_is_rejected_even_without_status_child(report, counter):
     report[2].set(counter, "1")
     with pytest.raises(gate.GateError, match="nonzero"):
         check(report)
+
+
+def fresh_aggregate_report(tmp_path):
+    name = "remote-aggregate-" + uuid.uuid4().hex
+    root = ET.Element("testsuites")
+    suite = ET.SubElement(
+        root, "testsuite", name=name, tests="2", skipped="0", errors="0", failures="0"
+    )
+    for module in gate.REMOTE_MODULES:
+        ET.SubElement(suite, "testcase", classname=f"tests.{module}", name="aggregate_probe")
+    path = tmp_path / "current-aggregate.xml"
+    return path, root, name
+
+
+def write_fresh_aggregate(path, root):
+    started = time.time_ns()
+    ET.ElementTree(root).write(path)
+    assert path.stat().st_mtime_ns >= started
+    assert len(root.findall("testsuite/testcase")) == 2
+    assert root[0].attrib["tests"] == "2"
+    assert all(root[0].attrib[k] == "0" for k in ("skipped", "errors", "failures"))
+    return started
+
+
+@pytest.mark.parametrize(
+    "counter,value",
+    [
+        ("failures", "1"),
+        ("errors", "1"),
+        ("skipped", "1"),
+        ("disabled", "1"),
+        ("tests", "0"),
+        ("tests", "3"),
+        ("tests", "-1"),
+        ("failures", "-1"),
+        ("errors", "one"),
+        ("skipped", "1.0"),
+        ("disabled", ""),
+        ("tests", "+2"),
+        ("tests", " 2"),
+    ],
+)
+def test_root_aggregate_cannot_contradict_fresh_valid_children(tmp_path, counter, value):
+    path, root, name = fresh_aggregate_report(tmp_path)
+    # Positive control proves this same fresh suite/modules/exit pass before
+    # injecting only the aggregate contradiction. A different gate cannot mask it.
+    started = write_fresh_aggregate(path, root)
+    assert gate.validate_junit(path, name, started, 0)["total"] == 2
+    root.set(counter, value)
+    started = write_fresh_aggregate(path, root)
+    assert ET.parse(path).getroot().attrib[counter] == value
+    with pytest.raises(gate.GateError, match="Root JUnit"):
+        gate.validate_junit(path, name, started, 0)
+
+
+@pytest.mark.parametrize(
+    "attributes",
+    [
+        {},
+        {"tests": "2"},
+        {"failures": "0"},
+        {"tests": "2", "failures": "0", "errors": "0", "skipped": "0", "disabled": "0"},
+        {"tests": "002", "skipped": "00"},
+    ],
+)
+def test_optional_consistent_root_aggregate_accepts_fresh_report(tmp_path, attributes):
+    path, root, name = fresh_aggregate_report(tmp_path)
+    root.attrib.update(attributes)
+    started = write_fresh_aggregate(path, root)
+    assert gate.validate_junit(path, name, started, 0)["cases"] == dict.fromkeys(
+        gate.REMOTE_MODULES, 1
+    )
 
 
 @pytest.mark.parametrize(
