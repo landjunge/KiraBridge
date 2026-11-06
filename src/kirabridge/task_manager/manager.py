@@ -9,6 +9,7 @@ from typing import Awaitable, Callable
 from kirabridge.bridge_core.config import Config
 from kirabridge.bridge_core.models import (
     BridgeError,
+    NativeFailureEvidence,
     State,
     TaskRequest,
     UncertainExecution,
@@ -473,6 +474,7 @@ class TaskManager:
             )
             # Exception text from subprocesses, HTTP and validation may include secrets.
             code = exc.code if isinstance(exc, BridgeError) else "execution_error"
+            native_failure = getattr(exc, "native_failure", None)
             self.store.transition(
                 task["id"],
                 state,
@@ -483,6 +485,11 @@ class TaskManager:
                     and not observed_effect
                     and not self.native.native(task),
                     "automatic_retry": False,
+                    **(
+                        {"native_failure": native_failure.model_dump()}
+                        if isinstance(native_failure, NativeFailureEvidence)
+                        else {}
+                    ),
                     **({"terminal_input_attempted": False} if not observed_effect else {}),
                     "last_observation": self.store.get(task["id"])["evidence"],
                 },

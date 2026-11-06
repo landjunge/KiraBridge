@@ -8,10 +8,37 @@ from typing import Any, Literal
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
+class NativeFailureEvidence(BaseModel):
+    """Bounded failure metadata, without backend messages or user content."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True, strict=True)
+
+    operation: str = Field(max_length=80, pattern=r"^[a-z][a-z0-9_.]*$")
+    stage: Literal[
+        "window_raise",
+        "application_activation",
+        "target_revalidation",
+        "physical_key_validation",
+        "keyboard_layout_validation",
+        "unspecified",
+    ]
+    backend_effect_unknown: bool
+    helper_pid: int = Field(gt=0)
+    helper_generation: str = Field(
+        pattern=r"^[A-Fa-f0-9]{8}(?:-[A-Fa-f0-9]{4}){3}-[A-Fa-f0-9]{12}$"
+    )
+    helper_source_commit: str = Field(pattern=r"^[a-f0-9]{40}$")
+    contract_binary_sha256: str = Field(pattern=r"^[a-f0-9]{64}$")
+    request_id: str = Field(pattern=r"^[a-f0-9]{32}$")
+
+
 class BridgeError(Exception):
-    def __init__(self, code: str, message: str):
+    def __init__(
+        self, code: str, message: str, *, native_failure: NativeFailureEvidence | None = None
+    ):
         super().__init__(message)
         self.code = code
+        self.native_failure = native_failure
 
 
 class UncertainExecution(BridgeError):
