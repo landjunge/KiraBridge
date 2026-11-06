@@ -41,7 +41,7 @@ function New-PrivateReceipt([string]$Path, [string]$Text) {
     finally { $stream.Dispose() }
 }
 function Download-Verified($Entry, [string]$Root) {
-    if ($Entry.path -notmatch '^(guest_runner\.ps1|source\.zip|python-installer\.exe|wheels/[A-Za-z0-9][A-Za-z0-9._+-]{0,200}\.whl)$' -or
+    if ($Entry.path -cnotmatch '^(guest_runner\.ps1|source\.zip|python-installer\.exe|wheels/[A-Za-z0-9][A-Za-z0-9._+-]{0,200}\.whl|tools/tunnel-client-v0\.0\.19-windows-amd64\.zip)$' -or
         $Entry.sha256 -notmatch '^[a-fA-F0-9]{64}$' -or [long]$Entry.bytes -le 0) {
         throw 'Invalid manifest file entry'
     }
@@ -304,6 +304,8 @@ print('Prepared dependency versions verified without package writes')
     Run-Once 'shortcuts' @('scripts/accept_windows_shortcuts.py','--output',$shortcutOut) 180 $shortcutOut
     $windowOut=Join-Path $Work ('windows-'+$RunId+'.json')
     Run-Once 'windows' @('scripts/accept_windows_windows.py','--output',$windowOut) 180 $windowOut
+    $setupOut=Join-Path $Work ('setup-'+$RunId+'.json')
+    Run-Once 'setup' @('scripts/accept_windows_setup.py','--output',$setupOut) 420 $setupOut
     $launcher=Join-Path ([Environment]::GetFolderPath('Desktop')) 'KiraBridge RC33 Windows Preview.cmd'
     $launcherSource=Join-Path $Source 'scripts\start_windows_preview.cmd'
     if (-not (Test-Path -LiteralPath $launcher)) {

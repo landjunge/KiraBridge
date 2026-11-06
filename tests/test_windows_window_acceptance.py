@@ -1,10 +1,13 @@
 """Harness guards only: synthetic states do not prove native Windows acceptance."""
 
 import asyncio
+import ctypes
 import importlib.util
 import json
 import os
+from contextlib import nullcontext
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -210,6 +213,120 @@ def test_observation_timeout_is_bounded_without_control_retry():
             )
         )
     assert now[0] == pytest.approx(0.04) and len(calls) == 3
+
+
+def test_mid_read_disappearance_requires_a_new_independent_absent_snapshot():
+    class RECT(ctypes.Structure):
+        _fields_ = [(name, ctypes.c_int32) for name in ("left", "top", "right", "bottom")]
+
+    class PLACEMENT(ctypes.Structure):
+        _fields_ = [("length", ctypes.c_uint32)]
+
+    checks, geometry, predicates, now = [], [], [], [0.0]
+
+    def is_window(hwnd):
+        checks.append(hwnd)
+        return len(checks) == 1  # True at entry; destroyed by end; fresh read is absent.
+
+    def owner(hwnd, pid):
+        pid._obj.value = os.getpid()
+        return int(TARGET["thread_id"])
+
+    probe = HARNESS.NativeReadback.__new__(HARNESS.NativeReadback)
+    probe.RECT, probe.PLACEMENT = RECT, PLACEMENT
+    probe.created = lambda pid: TARGET["process_created_100ns"]
+    probe.physical = nullcontext
+    probe.user = SimpleNamespace(
+        IsWindow=is_window,
+        GetWindowThreadProcessId=owner,
+        GetWindowRect=lambda hwnd, rect: geometry.append(hwnd) or True,
+        GetWindowPlacement=lambda *args: True,
+    )
+
+    async def pause(seconds):
+        now[0] += seconds
+
+    def absent(state):
+        predicates.append(state)
+        return not state["exists"]
+
+    result = asyncio.run(
+        HARNESS.observe(probe, TARGET, absent, allow_absent=True, clock=lambda: now[0], pause=pause)
+    )
+    assert result == {"exists": False, "hwnd": TARGET["hwnd"]}
+    assert checks == [100, 100, 100] and geometry == [100]
+    assert predicates == [result] and now[0] == pytest.approx(0.02)
+
+
+@pytest.mark.parametrize("allow_absent,error", [(False, "changed"), (True, "other")])
+def test_observation_does_not_swallow_nonabsence_or_other_read_failures(allow_absent, error):
+    calls = []
+    failure = HARNESS.SnapshotChanged("Read raced") if error == "changed" else RuntimeError("Other")
+
+    class Probe:
+        def snapshot(self, hwnd):
+            calls.append(hwnd)
+            raise failure
+
+    async def pause(seconds):
+        pytest.fail("A hard read failure must not schedule another read")
+
+    with pytest.raises(type(failure)) as caught:
+        asyncio.run(
+            HARNESS.observe(
+                Probe(), TARGET, lambda state: False, allow_absent=allow_absent, pause=pause
+            )
+        )
+    assert caught.value is failure and calls == [100]
+
+
+def test_absence_observation_still_refuses_fresh_foreign_identity_after_read_race():
+    calls = []
+
+    class Probe:
+        def snapshot(self, hwnd):
+            calls.append(hwnd)
+            if len(calls) == 1:
+                raise HARNESS.SnapshotChanged("Read raced reuse")
+            return {"exists": True, "target": {**TARGET, "process_created_100ns": "901"}}
+
+    async def pause(seconds):
+        pass
+
+    with pytest.raises(RuntimeError, match="generation differs"):
+        asyncio.run(
+            HARNESS.observe(
+                Probe(), TARGET, lambda state: not state["exists"], allow_absent=True, pause=pause
+            )
+        )
+    assert calls == [100, 100]
+
+
+def test_continuous_changed_snapshots_never_invent_absence_or_extend_deadline():
+    now, calls, predicates = [0.0], [], []
+
+    class Probe:
+        def snapshot(self, hwnd):
+            calls.append(hwnd)
+            raise HARNESS.SnapshotChanged("Read raced")
+
+    async def pause(seconds):
+        now[0] += seconds
+
+    with pytest.raises(RuntimeError, match="never replay"):
+        asyncio.run(
+            HARNESS.observe(
+                Probe(),
+                TARGET,
+                lambda state: predicates.append(state) or not state["exists"],
+                allow_absent=True,
+                timeout=0.04,
+                clock=lambda: now[0],
+                pause=pause,
+            )
+        )
+    assert calls == [100, 100, 100] and not predicates
+    assert now[0] == pytest.approx(0.04)
 
 
 def test_native_cli_refuses_host_before_creating_output(tmp_path):

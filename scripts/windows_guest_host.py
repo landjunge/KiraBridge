@@ -3,7 +3,8 @@
 
 Manifest: schema_version=1, python_version=X.Y.Z, files=[{path,sha256,bytes}],
 requirements=["package==version",...]. Required paths: guest_runner.ps1,
-source.zip, python-installer.exe; additional paths may only be wheels/*.whl.
+source.zip, python-installer.exe; additional paths may only be wheels/*.whl
+and the exact pinned official Windows tunnel-client ZIP.
 No host command execution, arbitrary paths, shared directories or token logging.
 """
 
@@ -24,7 +25,8 @@ from urllib.parse import urlsplit
 
 SAFE_ID = re.compile(r"[A-Za-z0-9_-]{1,120}")
 FILE_PATH = re.compile(
-    r"(?:guest_runner\.ps1|source\.zip|python-installer\.exe|wheels/[A-Za-z0-9][A-Za-z0-9._+-]{0,200}\.whl)"
+    r"(?:guest_runner\.ps1|source\.zip|python-installer\.exe|wheels/[A-Za-z0-9][A-Za-z0-9._+-]{0,200}\.whl"
+    r"|tools/tunnel-client-v0\.0\.19-windows-amd64\.zip)"
 )
 MAX_REPORT = 2 * 1024 * 1024
 MAX_EVENT = 64 * 1024

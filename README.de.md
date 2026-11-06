@@ -28,6 +28,13 @@ mit nativer Tastatur, Shortcuts und abgesicherter Fenstersteuerung. Es ist ein
 separates Entwicklungspaket; allgemeine Windows-Datei-, Prozess- und Terminaltools
 gehören nicht zu seinem Umfang. Siehe [RC33-Paketprüfung, Installationsstand und Grenzen](docs/RC33-DELIVERY-20261104.md).
 
+Der neue [Windows-Einrichtungsassistent 0.8.0rc37.dev1](https://github.com/landjunge/KiraBridge/releases/tag/windows-v0.8.0rc37.dev1)
+ist veröffentlicht; Download und getrennte Windows-Installation sind geprüft.
+Alle sieben nativen Prüfphasen bestanden. Entpacke das Paket und öffne
+**Einrichtung-starten.cmd** für die vier Schritte. Kontoanmeldung und der echte
+ChatGPT-Verbindungstest mit deinem Konto bleiben bei dir.
+[Prüfstand und Grenzen](docs/WINDOWS-SETUP-20261104.md) · [Anleitung](docs/WINDOWS-SETUP.md).
+
 ## Wobei KiraBridge dir hilft
 
 - **An lokalen Projekten arbeiten:** Lass deine verbundene KI Projektdateien und

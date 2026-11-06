@@ -46,7 +46,7 @@ class Preview:
             "state_dir": str(self.config.state_path),
             "credential_file": str(self.credential_path),
             "credential_key": "local",
-            "capabilities": list(CAPABILITIES),
+            "capabilities": list(self.config.principals["local"].capabilities),
             "interactive_user_desktop_required": True,
             "service_installed": False,
             "native_acceptance": "not_asserted_by_startup",
@@ -64,8 +64,10 @@ def require_desktop():
     Win32KeyboardAPI().validate_desktop()  # Read-only; no foreground keys or focus changes.
 
 
-def prepare(state_dir: Path | None = None, *, port=8765) -> Preview:
+def prepare(state_dir: Path | None = None, *, port=8765, setup_verification=False) -> Preview:
     require_windows()  # Must precede all directory, credential or desktop work.
+    if type(setup_verification) is not bool:
+        raise BridgeError("invalid_setup_mode", "Setup verification requires an explicit boolean")
     if type(port) is not int or not 1024 <= port <= 65535:
         raise BridgeError("invalid_port", "Choose a port between 1024 and 65535")
     require_desktop()
@@ -103,7 +105,7 @@ def prepare(state_dir: Path | None = None, *, port=8765) -> Preview:
         approval_mode="automatic",
         client_type="operator",
         token_env=TOKEN_ENV,
-        capabilities=list(CAPABILITIES),
+        capabilities=list(CAPABILITIES) + (["windows.setup.verify"] if setup_verification else []),
         roots=[],
         read_roots=[],
         executables=[],
@@ -116,6 +118,7 @@ def prepare(state_dir: Path | None = None, *, port=8765) -> Preview:
         host="127.0.0.1",
         port=port,
         allow_remote=False,
+        windows_setup_verification_enabled=setup_verification,
         concurrency=1,
         read_concurrency=1,
         principals={"local": policy},
@@ -206,9 +209,15 @@ def main(argv=None):
     parser.add_argument("--transport", choices=("http", "stdio"), default="http")
     parser.add_argument("--state-dir", type=Path)
     parser.add_argument("--port", type=int, default=8765)
+    parser.add_argument("--setup-verification", action="store_true")
     args = parser.parse_args(argv)
     try:
-        asyncio.run(serve(prepare(args.state_dir, port=args.port), args.transport))
+        asyncio.run(
+            serve(
+                prepare(args.state_dir, port=args.port, setup_verification=args.setup_verification),
+                args.transport,
+            )
+        )
     except BridgeError as error:
         print(f"{error.code}: {error}", file=sys.stderr)
         return 1

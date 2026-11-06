@@ -1,0 +1,123 @@
+{
+  "schema": "kirabridge.windows-setup.installed.v1",
+  "version": "0.8.0rc37.dev1",
+  "source_commit": "0a2f7cb8cf84d47462a094917241950a152fe364",
+  "release_tag": "windows-v0.8.0rc37.dev1",
+  "release_url": "https://github.com/landjunge/KiraBridge/releases/tag/windows-v0.8.0rc37.dev1",
+  "release_published_at": "2026-11-04T20:36:17Z",
+  "release_draft": false,
+  "release_prerelease": true,
+  "github_release_status_and_five_digests_independently_read_back": true,
+  "authenticated_fresh_download": true,
+  "published_assets": [
+    {
+      "name": "KiraBridge-0.8.0rc37.dev1-Windows-Dev-Kit.zip",
+      "bytes": 83879137,
+      "sha256": "a21a214c77d21fec0e11a166147fc14dcb1d6dd88adc0fb2d45501ec8748772f"
+    },
+    {
+      "name": "LICENSE",
+      "bytes": 6373,
+      "sha256": "3316d5eda60ac1fea355aa43d196feea3567384179b55ca88c8636c0322021ec"
+    },
+    {
+      "name": "SHA256SUMS",
+      "bytes": 354,
+      "sha256": "be8840a21f0a7f4acea6871c67be61a0edb680c6ee1d571da8da7ddd2dd8f9bb"
+    },
+    {
+      "name": "native-acceptance.json",
+      "bytes": 142521,
+      "sha256": "c68bba16de5b945a11c147ee23fc8c5e11419568dfc5a723cc91bcec0fe385fa"
+    },
+    {
+      "name": "package.json",
+      "bytes": 1600,
+      "sha256": "1c6b0f0d479a26d2892ed3a7f79c55a6c7577ce53c8f5344a66653f3359bf61a"
+    }
+  ],
+  "raw_download_report_sha256": "c358c8ef3d1125cc707bfc2b86b9774a8be393479555727bfc6416429803e831",
+  "raw_delivery_report_sha256": "28d418014bae43b86ecd2baa8540cc2e6c465b3c15d5a48c9687036b3f1fbe8d",
+  "delivery_manifest_sha256": "27c4c590279ad3148bd3a3c491840c29cdf986e909141c747c4abbe6655dac87",
+  "installation": {
+    "passed": true,
+    "installation_succeeded": true,
+    "public_bootstrap_exit_code": 0,
+    "public_bootstrap_sha256": "6fb9935eb27497632a0b0af7a7aae657c1cbb418395950ee5e9aab0e53f3fc7f",
+    "no_python_installer_invoked": true,
+    "base_python_binaries_unchanged": true,
+    "gui_version_binding_verified": true,
+    "gui_commandline_bound_to_new_runtime": true,
+    "gui_version_binding_method": "runtime_path_in_child_argv",
+    "gui_left_open": true,
+    "account_configured": false,
+    "consent_clicked": false,
+    "input_attempted": false,
+    "automatic_retry": false,
+    "no_stop_kill_or_autostart": true
+  },
+  "installed_runtime": {
+    "passed": true,
+    "version": "0.8.0rc37.dev1",
+    "python_version": "3.14.10",
+    "runtime_module_count": 179,
+    "all_module_bytes_equal_wheel": true,
+    "wheel_sha256": "faa2d7cbad3f99881080b4291e94f2d77008e6d36642fbdcb56dd17b7dc11366",
+    "runtime_prefix_verified": true,
+    "tk_imported": true,
+    "base_python_reused": true,
+    "bundled_private_client_cache_verified": true,
+    "bundled_client_bytes": 29539887,
+    "bundled_client_sha256": "1d0ecc3a54f2a51e27a635ac155f40fbb95df58c52cdeddf6c75532cc0bbeb25"
+  },
+  "published_wheel_179_module_hashes_independently_equal_installed_receipt": true,
+  "visible_gui": {
+    "pid": 14264,
+    "created_100ns": "134382990217543018",
+    "hwnd": "3474370",
+    "class_name": "TkTopLevel",
+    "foreground": false
+  },
+  "gui_process_image_kind": "base_pythonw_with_argv_bound_to_new_runtime",
+  "gui_generation_confirmed_twice": true,
+  "gui_runtime_redirector_parent": {
+    "pid": 6980,
+    "created_100ns": "134382990214547916",
+    "relation": "live_runtime_redirector_parent",
+    "argv_verified": true,
+    "cim_parent_pid_matches": true,
+    "creation_between_bootstrap_and_child": true,
+    "original_handle_live_after_cim": true
+  },
+  "desktop_launcher": {
+    "name": "KiraBridge einrichten.cmd",
+    "sha256": "d3814325bbab0c808d5665867db645868e3e055ea5570f42a2e929ea7db2fbcc"
+  },
+  "existing_installations": {
+    "before_equals_after": true,
+    "modules_credentials_launchers_process_generations_listeners_unchanged": true,
+    "slots": [
+      {
+        "name": "dev2",
+        "port": 8765
+      },
+      {
+        "name": "dev3",
+        "port": 8766
+      },
+      {
+        "name": "rc33",
+        "port": 8767
+      }
+    ]
+  },
+  "scope": "Installed published bytes and visible version-bound Tk setup UI; observation-bound, no promise of future liveness",
+  "bridge_8768_automatically_started": false,
+  "account_connection_verified": false,
+  "cloud_attested": false,
+  "limits": [
+    "No consent clicked, account configured or runtime key supplied",
+    "Local simulated MCP acceptance is recorded separately",
+    "A real ChatGPT account round trip and Voice/cloud latency remain untested"
+  ]
+}

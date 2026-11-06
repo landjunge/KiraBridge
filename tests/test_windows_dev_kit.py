@@ -32,10 +32,13 @@ def fixture(tmp_path, monkeypatch):
             output.writestr(name, "Fixture public documentation")
         for name in kit.REQUIRED_HARNESSES:
             output.writestr(name, "# Synthetic guard fixture, never a native proof\n")
+        for name in kit.BOOTSTRAP_FILES.values():
+            output.writestr(name, "# Synthetic bootstrap fixture, never executed\n")
     files = {
         "source.zip": source.getvalue(),
         "python-installer.exe": b"NOT A REAL INSTALLER: unit guard fixture",
         "guest_runner.ps1": b"# Fake fixture, never executed",
+        kit.CLIENT_ARCHIVE: b"NOT A REAL TUNNEL CLIENT: unit guard fixture",
     }
     requirements = []
     for package in ["kirabridge", *[f"fixture{i}" for i in range(37)]]:
@@ -87,10 +90,20 @@ def fixture(tmp_path, monkeypatch):
                 "password": "never-package-password",
                 "endpoint": "http://10.0.2.2:8123/private-capability",
             }
+            if phase == "setup":
+                report["artifact"].update(
+                    gui_native_smoke=True,
+                    authenticated_roundtrip_simulated=True,
+                    cloud_attested=False,
+                    keyboard_events_requested=0,
+                )
         (reports / f"report-{RUN_ID}-{phase}.json").write_text(json.dumps(report))
     # Unit fixtures deliberately override the vendor reference. Production CLI
     # has only the real Python.org digest and cannot accept this fake installer.
     monkeypatch.setitem(kit.PYTHON_INSTALLERS, "3.14.10", kit.digest(files["python-installer.exe"]))
+    monkeypatch.setitem(
+        kit.CLIENT_ARCHIVES, kit.CLIENT_ARCHIVE, kit.digest(files[kit.CLIENT_ARCHIVE])
+    )
     return stage, reports
 
 
@@ -104,7 +117,7 @@ def modify_report(fixture, phase, fn):
 @pytest.mark.parametrize("phase", kit.PHASES)
 def test_missing_native_phase_blocks_before_any_archive(fixture, tmp_path, phase):
     (fixture[1] / f"report-{RUN_ID}-{phase}.json").unlink()
-    with pytest.raises(ValueError, match="six phases"):
+    with pytest.raises(ValueError, match="seven phases"):
         kit.prepare(*fixture, PIN)
     assert not (tmp_path / "out").exists()
 
@@ -150,7 +163,7 @@ def test_new_phase_needs_explicit_true_and_no_failed_or_uncertain_report(fixture
 def test_previous_four_phase_proof_cannot_authorize_new_shortcuts_or_windows(fixture):
     for phase in ("shortcuts", "windows"):
         (fixture[1] / f"report-{RUN_ID}-{phase}.json").unlink()
-    with pytest.raises(ValueError, match="six phases"):
+    with pytest.raises(ValueError, match="seven phases"):
         kit.prepare(*fixture, PIN)
 
 
@@ -188,9 +201,9 @@ def test_archive_is_deterministic_and_contains_only_allowed_payloads_and_public_
     (fixture[0] / "Windows.iso").write_bytes(b"not a payload")
     contents, package = kit.prepare(*fixture, PIN)
     assert package["offline_wheels"] == 38
-    assert package["version"] == "0.8.0rc33"
+    assert package["version"] == "0.8.0rc37.dev1"
     assert package["native_guest_phases"] == list(kit.PHASES)
-    assert len(package["native_guest_phases"]) == 6
+    assert len(package["native_guest_phases"]) == 7
     first = kit.build(contents, package, tmp_path / "out1")
     second = kit.build(contents, package, tmp_path / "out2")
     assert first["asset_sha256"] == second["asset_sha256"]
@@ -234,7 +247,7 @@ def test_filtered_guest_archive_reads_only_fixed_public_docs_at_exact_git_pin(mo
     monkeypatch.setattr(kit.subprocess, "run", run)
     with zipfile.ZipFile(io.BytesIO(data.getvalue())) as archive:
         result = kit.public_documentation(archive, PIN)
-    assert len(calls) == 3 and set(result) == {"LICENSE", *kit.DOCS}
+    assert len(calls) == len(kit.DOCS) and set(result) == {"LICENSE", *kit.DOCS}
 
 
 def replace_source(stage, commit, changes):
@@ -294,7 +307,7 @@ def reuse_fixture(fixture, tmp_path):
     shutil.copytree(original_reports, old_reports)
     for path in old_reports.glob("report-*.json"):
         report = json.loads(path.read_bytes())
-        if report["phase"] in ("shortcuts", "windows"):
+        if report["phase"] in ("shortcuts", "windows", "setup"):
             # This synthetic original run stopped at preview; the later phases
             # did not run and cannot supply either fresh required proof.
             path.unlink()
@@ -329,9 +342,13 @@ def test_component_reuse_records_each_original_source_manifest_and_run(reuse_fix
     proof = json.loads(contents["native-acceptance.json"])
     assert package["component_provenance_reuse"] is True
     assert proof["run_ids"] == ["a" * 32, "b" * 32]
-    assert [phase["reused"] for phase in proof["phases"]] == [True] * 3 + [False] * 3
-    assert [phase["source_commit"] for phase in proof["phases"]] == ["c" * 40] * 3 + [PIN] * 3
-    assert proof["reuse_basis"]["runtime_module_count"] == kit.RUNTIME_MODULE_COUNT == 174
+    assert [phase["reused"] for phase in proof["phases"]] == [True] * 3 + [False] * len(
+        kit.FRESH_PHASES
+    )
+    assert [phase["source_commit"] for phase in proof["phases"]] == ["c" * 40] * 3 + [PIN] * len(
+        kit.FRESH_PHASES
+    )
+    assert proof["reuse_basis"]["runtime_module_count"] == kit.RUNTIME_MODULE_COUNT == 179
     ignored = proof["reuse_basis"]["ignored_previous_preview"]
     assert ignored["accepted_as_passing_phase"] is False
     assert len(ignored["raw_report_sha256"]) == 64

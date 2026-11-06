@@ -548,12 +548,14 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
             from kirabridge.permissions import LEVELS, decision, level_for, permission_summary
             from kirabridge.terminal_access import terminal_access
             from kirabridge.terminal_queries import TERMINAL_QUERY_SECONDS
+            from kirabridge.windows_setup_verification import verification_catalog
 
             policy = bridge.security.principal(identity(ctx))
+            setup_reads = verification_catalog(bridge, identity(ctx))
             if operations is not None and (
                 not 1 <= len(operations) <= 32
                 or len(set(operations)) != len(operations)
-                or any(name not in INPUTS for name in operations)
+                or any(name not in INPUTS and name not in setup_reads for name in operations)
             ):
                 raise BridgeError("invalid_arguments", "Select 1–32 distinct known operations")
             platform_rows = {
@@ -581,7 +583,7 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
             # Host platform is a process-lifetime fact. Do not reconstruct the
             # full native capability snapshot for every operation in this request.
             native_host = bridge.macos.host_platform == "darwin"
-            return {
+            result = {
                 "api_version": "1",
                 "approval_mode": policy.approval_mode,
                 "permission_level": level_for(policy),
@@ -636,6 +638,14 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
                     )
                 },
             }
+            result["operations"].update(
+                {
+                    name: entry
+                    for name, entry in setup_reads.items()
+                    if operations is None or name in operations
+                }
+            )
+            return result
 
         from kirabridge.discovery import live, snapshot
 

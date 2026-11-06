@@ -398,6 +398,7 @@ class Config(BaseModel):
     host: str = "127.0.0.1"
     port: int = Field(default=8765, ge=1, le=65535)
     allow_remote: bool = False
+    windows_setup_verification_enabled: bool = Field(default=False, strict=True)
     credentials_file: str | None = None
     tls_cert: str | None = None
     tls_key: str | None = None

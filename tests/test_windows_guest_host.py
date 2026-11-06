@@ -30,6 +30,7 @@ def staging(tmp_path):
         "source.zip",
         "python-installer.exe",
         "wheels/example-1.0-py3-none-any.whl",
+        "tools/tunnel-client-v0.0.19-windows-amd64.zip",
     ]:
         path = stage / name
         path.parent.mkdir(exist_ok=True)
@@ -86,6 +87,16 @@ def test_only_exact_capability_and_manifest_files_are_served(live, capsys):
     assert status == 200 and json.loads(body)["python_version"] == "3.14.10"
     status, body = request(live, "GET", "/" + TOKEN + "/wheels/example-1.0-py3-none-any.whl")
     assert status == 200 and body.startswith(b"fixture:")
+    status, body = request(
+        live, "GET", "/" + TOKEN + "/tools/tunnel-client-v0.0.19-windows-amd64.zip"
+    )
+    assert status == 200 and body.startswith(b"fixture:")
+    for name in [
+        "tools/other.zip",
+        "tools/tunnel-client-v0.0.20-windows-amd64.zip",
+        "tools/../source.zip",
+    ]:
+        assert request(live, "GET", "/" + TOKEN + "/" + name)[0] == 404
     assert TOKEN not in capsys.readouterr().err
 
 
@@ -169,3 +180,22 @@ def test_state_directory_is_never_exposed_or_permissions_silently_changed(stagin
     with pytest.raises(ValueError, match="private"):
         host.GuestState(staging, state, TOKEN)
     assert state.stat().st_mode & 0o777 == 0o755
+
+
+@pytest.mark.parametrize(
+    "name",
+    [
+        "tools/other.zip",
+        "tools/tunnel-client-v0.0.20-windows-amd64.zip",
+        "tools/tunnel-client-v0.0.19-windows-arm64.zip",
+        "tools/TUNNEL-client-v0.0.19-windows-amd64.zip",
+        "tools/../source.zip",
+    ],
+)
+def test_manifest_refuses_every_other_tool_archive_path(staging, tmp_path, name):
+    manifest_path = staging / "manifest.json"
+    manifest = json.loads(manifest_path.read_bytes())
+    manifest["files"].append({"path": name, "sha256": "a" * 64, "bytes": 1})
+    manifest_path.write_text(json.dumps(manifest))
+    with pytest.raises(ValueError, match="Invalid or duplicate manifest path"):
+        host.GuestState(staging, tmp_path / "state", TOKEN)
