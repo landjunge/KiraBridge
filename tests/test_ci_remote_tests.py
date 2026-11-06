@@ -146,8 +146,11 @@ def test_foreign_cached_kb_submodule_is_rejected(tmp_path, monkeypatch):
     module = ModuleType("kirabridge.ci_foreign_fixture")
     module.__file__ = str(tmp_path / "foreign.py")
     monkeypatch.setitem(sys.modules, module.__name__, module)
+    cached_td = sys.modules.get("threaddesk")
+    td_src = Path(cached_td.__file__).resolve().parents[1] if cached_td else tmp_path / "td"
     with pytest.raises(gate.GateError, match="Foreign cached KB module"):
-        gate.imports(Path(__file__).resolve().parents[1] / "src", tmp_path / "td", "remote")
+        gate.imports(Path(__file__).resolve().parents[1] / "src", td_src, "remote")
+    assert sys.modules[module.__name__] is module
 
 
 def test_resolved_import_outside_requested_source_fails(tmp_path, monkeypatch):
