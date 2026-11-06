@@ -78,11 +78,52 @@ def fresh_aggregate_report(tmp_path):
 def write_fresh_aggregate(path, root):
     started = time.time_ns()
     ET.ElementTree(root).write(path)
+    # Automatic write mtimes can lag the wall clock on a coarser filesystem.
+    # Stamp only this synthetic XML with a time actually observed after writing.
+    observed_after_write = time.time_ns()
+    os.utime(path, ns=(observed_after_write, observed_after_write))
     assert path.stat().st_mtime_ns >= started
     assert len(root.findall("testsuite/testcase")) == 2
     assert root[0].attrib["tests"] == "2"
     assert all(root[0].attrib[k] == "0" for k in ("skipped", "errors", "failures"))
     return started
+
+
+def test_aggregate_fixture_repairs_coarse_write_mtime(tmp_path, monkeypatch):
+    path, root, name = fresh_aggregate_report(tmp_path)
+    before_calls = time.time_ns()
+    coarse_mtime = before_calls - 5_000_000
+    original_write = ET.ElementTree.write
+    writes = []
+
+    def coarse_write(tree, destination, *args, **kwargs):
+        assert Path(destination) == path
+        entered = time.time_ns()
+        result = original_write(tree, destination, *args, **kwargs)
+        # Model the observed Linux automatic-write timestamp independently of
+        # this host filesystem's clock precision. Explicit utime stays real.
+        os.utime(path, ns=(coarse_mtime, coarse_mtime))
+        assert path.stat().st_mtime_ns < before_calls
+        writes.append({"entered": entered, "finished": time.time_ns()})
+        return result
+
+    monkeypatch.setattr(ET.ElementTree, "write", coarse_write)
+    for invalid in (False, True):
+        if invalid:
+            root.set("failures", "1")
+        before = time.time_ns()
+        started = write_fresh_aggregate(path, root)
+        observed_mtime = path.stat().st_mtime_ns
+        assert 0 < before <= started <= writes[-1]["entered"]
+        assert writes[-1]["finished"] <= observed_mtime <= time.time_ns()
+        assert observed_mtime >= started
+        if invalid:
+            assert ET.parse(path).getroot().attrib["failures"] == "1"
+            with pytest.raises(gate.GateError, match="Root JUnit inconsistent counter: failures"):
+                gate.validate_junit(path, name, started, 0)
+        else:
+            assert gate.validate_junit(path, name, started, 0)["total"] == 2
+    assert len(writes) == 2
 
 
 @pytest.mark.parametrize(
