@@ -868,7 +868,51 @@ def start_service(args):
             time.sleep(min(1, max(0, deadline - time.monotonic())))
 
 
-def wait_health(args, release, version):
+SOURCE_FIELDS = ("source_package_path", "source_tree_sha256", "source_file_count")
+
+
+def release_source(release):
+    # Version strings can be shared by distinct builds. Resolve the installed
+    # package with the target venv, ignoring the caller's PYTHONPATH/user site.
+    package = Path(
+        json.loads(
+            run(
+                [
+                    python(release),
+                    "-I",
+                    "-c",
+                    "import json,pathlib,kirabridge; "
+                    "print(json.dumps(str(pathlib.Path(kirabridge.__file__).resolve().parent)))",
+                ],
+                capture=True,
+                timeout=8,
+            )
+        )
+    ).resolve(strict=True)
+    if not package.is_relative_to((release / "source/.venv").resolve(strict=True)):
+        raise RuntimeError("Target runtime imports a package outside its release")
+    manifest = {str(p.relative_to(package)): sha(p) for p in sorted(package.rglob("*.py"))}
+    if not manifest:
+        raise RuntimeError("Target runtime source is unavailable")
+    canonical = json.dumps(manifest, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+    return {
+        "source_package_path": str(package),
+        "source_tree_sha256": hashlib.sha256(canonical.encode()).hexdigest(),
+        "source_file_count": len(manifest),
+    }
+
+
+def wait_health(args, release, version, *, expected_source=None):
+    expected = release_source(release) if expected_source is None else expected_source
+    if (
+        not isinstance(expected.get("source_package_path"), str)
+        or not Path(expected["source_package_path"]).is_absolute()
+        or not isinstance(expected.get("source_tree_sha256"), str)
+        or not re.fullmatch(r"[a-f0-9]{64}", expected.get("source_tree_sha256", ""))
+        or type(expected.get("source_file_count")) is not int
+        or expected["source_file_count"] <= 0
+    ):
+        raise RuntimeError("Expected daemon source identity is unavailable")
     deadline = time.monotonic() + 30
     while time.monotonic() < deadline:
         try:
@@ -877,6 +921,9 @@ def wait_health(args, release, version):
                 health.get("version") == version
                 and health.get("dispatcher_active")
                 and health.get("runtime", {}).get("config_sha256") == sha(args.config)
+                and all(
+                    health.get("runtime", {}).get(key) == expected[key] for key in SOURCE_FIELDS
+                )
             ):
                 return health
         except (RuntimeError, subprocess.TimeoutExpired, ValueError):
@@ -1046,6 +1093,9 @@ def activate(args, release):
         "had_plist": had_plist,
         "was_loaded": was_loaded,
         "previous_version": (previous_health or {}).get("version"),
+        "previous_source": {
+            key: (previous_health or {}).get("runtime", {}).get(key) for key in SOURCE_FIELDS
+        },
         "config": str(args.config),
         "launcher": str(args.launcher),
         "plist": str(args.plist),
@@ -1203,7 +1253,18 @@ def rollback(args, *, _compensating=False):
     if active.get("desktop"):
         desktop_module(args).restore(types.SimpleNamespace(**globals()), active, current)
     if active["was_loaded"] and active.get("previous_version"):
-        wait_health(args, Path(active["release"]), active["previous_version"])
+        previous_release = (active.get("previous") or {}).get("release")
+        if previous_release:
+            wait_health(args, Path(previous_release), active["previous_version"])
+        else:
+            # An existing manually installed service may have no versioned
+            # release record. Its authenticated pre-switch source is the target.
+            wait_health(
+                args,
+                Path(active["release"]),
+                active["previous_version"],
+                expected_source=active.get("previous_source", {}),
+            )
     # Keep the complete active recovery record until every affected component
     # is restored. Desktop failure must not erase its transaction checkpoint.
     if active["previous"]:

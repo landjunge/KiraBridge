@@ -25,7 +25,10 @@ class TerminalCloseConfirmation(unittest.IsolatedAsyncioTestCase):
                 const app = {windows: () => ids.map(id => ({id: () => id}))};
                 const targetWindow = {
                     id: () => 101,
+                    tabs: () => mode === 'multi_tab' ? [{}, {}] : [{}],
                     close: () => {
+                        if (mode === 'multi_tab')
+                            throw Error('Unexpected close of multi-tab window');
                         if (mode === 'closed') ids = [202];
                         if (mode === 'foreign_removed') ids = [];
                     }
@@ -65,3 +68,9 @@ class TerminalCloseConfirmation(unittest.IsolatedAsyncioTestCase):
     async def test_only_window_is_preserved(self):
         with self.assertRaises(subprocess.CalledProcessError):
             await self.close("only")
+
+    async def test_multi_tab_window_is_refused_before_close_attempt(self):
+        with self.assertRaises(subprocess.CalledProcessError) as raised:
+            await self.close("multi_tab")
+        self.assertIn("Refusing to close a multi-tab Terminal window", raised.exception.stderr)
+        self.assertNotIn("Unexpected close of multi-tab window", raised.exception.stderr)
