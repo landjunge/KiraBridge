@@ -80,6 +80,16 @@ abgewartete Hilfsprozess-Closure explizit gebunden. Die exakt ausgeführten
 Treiberbytes bleiben als [Rohquelle](evidence/windows-parity-native-driver-20261106.txt)
 mit dem Hash aus dem nativen Bericht erhalten.
 
+Die breite Linux-CI auf `6b282c3` deckte zusätzlich einen bestehenden
+Kalenderfehler in Routingtests auf: Hook-/Launcherpfade verwendeten die reale
+Uhr gegen feste, inzwischen abgelaufene Nachweise vom 5. November. Nur die
+Testuhr des Routers wurde an das vorhandene `NOW` gebunden; echte Transport-
+und Timeoutuhren sowie sämtliche produktiven Ablaufprüfungen bleiben erhalten.
+Alle 73 Routingtests bestanden anschließend lokal mit strikter Unraisable-
+Prüfung. [Fehler und Korrektur](evidence/windows-parity-ci-clock-20261107.json)
+bleiben dokumentiert; die endgültige breite CI ist in den Checks von PR #70
+ausgewiesen. Das nativ geprüfte Paket wird dadurch nicht verändert.
+
 [Zusammenfassung und Fingerprints](evidence/windows-parity-native-acceptance-20261106.json)
 · [Native Rohbelege](evidence/windows-parity-native-raw-20261106.json)
 · [Initiale Grok-Annahme](evidence/windows-parity-grok-acceptance-20261106.json)

@@ -24,6 +24,18 @@ from kirabridge.capability_routing.source import BEGIN, END, ThreadDeskSource
 NOW = datetime(2026, 11, 5, 21, 0, tzinfo=timezone.utc)
 
 
+@pytest.fixture(autouse=True)
+def routing_clock(monkeypatch):
+    # Hook/launcher paths must use the same clock as the dated evidence fixtures.
+    # Patch only routing wall time; transport timeouts retain their real clocks.
+    class FixedDateTime(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return NOW.replace(tzinfo=None) if tz is None else NOW.astimezone(tz)
+
+    monkeypatch.setattr("kirabridge.capability_routing.router.datetime", FixedDateTime)
+
+
 @pytest.fixture
 def setup(tmp_path):
     exe = tmp_path / "native-cli"
