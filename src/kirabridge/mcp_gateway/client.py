@@ -76,6 +76,7 @@ class Peer:
     ca_file: str | None = None
     env: dict[str, str] | None = field(default=None, repr=False)
     cwd: str | None = None
+    certificate_sha256: str | None = None
 
 
 class MCPClientPool:
@@ -190,6 +191,16 @@ class MCPClientPool:
                     if peer.url:
                         import ssl
 
+                        from kirabridge.tls_identity import pinned_context
+
+                        verify = (
+                            pinned_context(peer.ca_file, peer.certificate_sha256)
+                            if peer.certificate_sha256
+                            else ssl.create_default_context(cafile=peer.ca_file)
+                            if peer.ca_file
+                            else True
+                        )
+
                         client = await stack.enter_async_context(
                             httpx.AsyncClient(
                                 headers={"Authorization": f"Bearer {peer.token}"}
@@ -198,9 +209,7 @@ class MCPClientPool:
                                 timeout=httpx.Timeout(self.call_timeout, read=300),
                                 trust_env=False,
                                 follow_redirects=False,
-                                verify=ssl.create_default_context(cafile=peer.ca_file)
-                                if peer.ca_file
-                                else True,
+                                verify=verify,
                             )
                         )
                         read, write, _ = await stack.enter_async_context(

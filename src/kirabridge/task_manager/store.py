@@ -315,7 +315,8 @@ class Store:
         result = dict(row)
         for key in ("args", "evidence", "result", "error"):
             result[key] = json.loads(result[key]) if result[key] is not None else None
-        result.pop("request_hash")
+        # Owned readback can verify the original immutable request without resubmission.
+        result["request_sha256"] = result.pop("request_hash")
         if resolve_output and self.result_codec:
             result["result"] = self.result_codec.resolve_result(
                 result["principal"], result["result"]

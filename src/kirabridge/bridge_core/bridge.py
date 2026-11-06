@@ -145,7 +145,7 @@ INPUTS = {
 
 
 class Bridge:
-    def __init__(self, config: Config, *, routing_guard=None):
+    def __init__(self, config: Config, *, routing_guard=None, handoff_peer=None):
         self.config = config
         from kirabridge.readiness import runtime_snapshot
 
@@ -167,7 +167,7 @@ class Bridge:
         )
         from kirabridge.handoff_manager import HandoffManager
 
-        self.handoffs = HandoffManager(self)
+        self.handoffs = HandoffManager(self, peer=handoff_peer)
         self.security = SecurityManager(config, self.store)
         from kirabridge.file_transfer.authorization import TransferAuthorization
         from kirabridge.file_transfer.repository import TransferRepository

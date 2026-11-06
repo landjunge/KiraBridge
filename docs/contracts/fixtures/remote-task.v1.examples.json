@@ -1,0 +1,203 @@
+{
+  "warning": "SYNTHETIC CONTRACT FIXTURES ONLY. No approval, device, execution or live acceptance evidence. Never dispatch.",
+  "ready_card_text": "{\"acceptance\":{\"expected_sha256\":null,\"kind\":\"operator_receipt\"},\"autonext\":1,\"cwd\":\"/owned/synthetic-workspace\",\"instruction\":\"Synthetic fixture only. Do not execute this record.\",\"product\":\"KiraBridge\",\"sandbox\":\"read-only\",\"state\":\"READY\",\"task_id\":\"remote-example-card\",\"title\":\"Synthetic contract example; never dispatch\"}\n",
+  "messages": {
+    "card_binding": {
+      "format": "kirabridge.remote-task.v1",
+      "kind": "execution_binding",
+      "route": "existing_visible_terminal",
+      "request": {
+        "api_version": "1",
+        "task_id": "team-tw-synthetic",
+        "operation": "agent.execute",
+        "arguments": {
+          "local_tools": false,
+          "agent": "codex",
+          "prompt": "Synthetic fixture only. Do not execute.",
+          "cwd": "/owned/synthetic-workspace",
+          "timeout": 30.0
+        },
+        "idempotency_key": "team-tw-synthetic",
+        "parent_id": null
+      },
+      "request_sha256": "3e93f216b64b97372eeaa03a412f48410b08710009ab8007f22cba1c4654d142",
+      "source": {
+        "kind": "approved_card",
+        "service_ref": "synthetic-td-server",
+        "tenant_ref": "synthetic-tenant",
+        "actor_ref": "synthetic-actor",
+        "thread_id": "synthetic-thread",
+        "thread_revision": 7,
+        "entry_id": "synthetic-entry",
+        "content_sha256": "3717ea1bb7dfd598b93e089ba4ecadc1e0211c09d003e4f4d7ab2ff5d71fbbd9",
+        "card_task_id": "remote-example-card",
+        "work_id": "tw-synthetic"
+      },
+      "target": {
+        "device_ref": "synthetic-home-device",
+        "device_key_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+        "authority_revision": 1,
+        "workspace_ref": "synthetic-workspace"
+      },
+      "authorization": {
+        "grant_ref": "synthetic-grant",
+        "grant_sha256": "2222222222222222222222222222222222222222222222222222222222222222"
+      },
+      "issued_at": 1793900000,
+      "expires_at": 1793900300
+    },
+    "handoff_intent": {
+      "format": "kirabridge.remote-task.v1",
+      "kind": "intent",
+      "route": "separate_managed_session",
+      "request": {
+        "api_version": "1",
+        "task_id": "remote-example-handoff",
+        "operation": "handoff.start",
+        "arguments": {
+          "handoff_id": "synthetic-handoff",
+          "revision": 1,
+          "agent": "codex",
+          "cwd": "/owned/synthetic-workspace",
+          "timeout": 30.0
+        },
+        "idempotency_key": "remote-example-handoff",
+        "parent_id": null
+      },
+      "request_sha256": "d0bd6f6837d87fb8a112083861fc4d865782e26495b1d737e02f7ef94b79db77",
+      "source": {
+        "service_ref": "synthetic-td-server",
+        "tenant_ref": "synthetic-tenant",
+        "actor_ref": "synthetic-actor",
+        "thread_id": "synthetic-thread",
+        "thread_revision": 7,
+        "content_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+        "kind": "issued_handoff",
+        "handoff_id": "synthetic-handoff",
+        "handoff_revision": 1,
+        "original_task_id": "synthetic-thread:task"
+      },
+      "target": {
+        "device_ref": "synthetic-home-device",
+        "device_key_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+        "authority_revision": 1,
+        "workspace_ref": "synthetic-workspace"
+      },
+      "authorization": {
+        "grant_ref": "synthetic-grant",
+        "grant_sha256": "2222222222222222222222222222222222222222222222222222222222222222"
+      },
+      "issued_at": 1793900000,
+      "expires_at": 1793900300
+    },
+    "queued_receipt": {
+      "format": "kirabridge.remote-task.v1",
+      "kind": "execution_receipt",
+      "binding": {
+        "task_id": "team-tw-synthetic",
+        "request_sha256": "3e93f216b64b97372eeaa03a412f48410b08710009ab8007f22cba1c4654d142",
+        "device_ref": "synthetic-home-device",
+        "envelope_sha256": "e376f539366ede4869e7b492977deaf7756c934339c6d5b4df2d5053d8b13737"
+      },
+      "observed_at": 1793900010,
+      "event_seq": 2,
+      "state": "queued",
+      "runtime": {
+        "instance_ref": "synthetic-instance",
+        "version": "synthetic-contract-fixture",
+        "source_sha256": "4444444444444444444444444444444444444444444444444444444444444444"
+      },
+      "evidence": {
+        "ref": "synthetic-core-event-2",
+        "sha256": "5555555555555555555555555555555555555555555555555555555555555555"
+      }
+    },
+    "unknown_receipt": {
+      "format": "kirabridge.remote-task.v1",
+      "kind": "execution_receipt",
+      "binding": {
+        "task_id": "team-tw-synthetic",
+        "request_sha256": "3e93f216b64b97372eeaa03a412f48410b08710009ab8007f22cba1c4654d142",
+        "device_ref": "synthetic-home-device",
+        "envelope_sha256": "e376f539366ede4869e7b492977deaf7756c934339c6d5b4df2d5053d8b13737"
+      },
+      "observed_at": 1793900010,
+      "event_seq": 5,
+      "state": "unknown",
+      "runtime": {
+        "instance_ref": "synthetic-instance",
+        "version": "synthetic-contract-fixture",
+        "source_sha256": "4444444444444444444444444444444444444444444444444444444444444444"
+      },
+      "evidence": {
+        "ref": "synthetic-core-event-5",
+        "sha256": "6666666666666666666666666666666666666666666666666666666666666666"
+      },
+      "error": {
+        "code": "effect_unknown"
+      }
+    },
+    "completed_receipt": {
+      "format": "kirabridge.remote-task.v1",
+      "kind": "execution_receipt",
+      "binding": {
+        "task_id": "team-tw-synthetic",
+        "request_sha256": "3e93f216b64b97372eeaa03a412f48410b08710009ab8007f22cba1c4654d142",
+        "device_ref": "synthetic-home-device",
+        "envelope_sha256": "e376f539366ede4869e7b492977deaf7756c934339c6d5b4df2d5053d8b13737"
+      },
+      "observed_at": 1793900010,
+      "event_seq": 6,
+      "state": "completed",
+      "runtime": {
+        "instance_ref": "synthetic-instance",
+        "version": "synthetic-contract-fixture",
+        "source_sha256": "4444444444444444444444444444444444444444444444444444444444444444"
+      },
+      "evidence": {
+        "ref": "synthetic-core-event-6",
+        "sha256": "8888888888888888888888888888888888888888888888888888888888888888"
+      },
+      "result": {
+        "ref": "synthetic-result",
+        "sha256": "7777777777777777777777777777777777777777777777777777777777777777"
+      }
+    },
+    "acceptance_receipt": {
+      "format": "kirabridge.remote-task.v1",
+      "binding": {
+        "task_id": "team-tw-synthetic",
+        "request_sha256": "3e93f216b64b97372eeaa03a412f48410b08710009ab8007f22cba1c4654d142",
+        "device_ref": "synthetic-home-device",
+        "envelope_sha256": "e376f539366ede4869e7b492977deaf7756c934339c6d5b4df2d5053d8b13737"
+      },
+      "observed_at": 1793900020,
+      "result_sha256": "7777777777777777777777777777777777777777777777777777777777777777",
+      "evidence": {
+        "ref": "synthetic-external-proof",
+        "sha256": "9999999999999999999999999999999999999999999999999999999999999999"
+      },
+      "kind": "acceptance_receipt",
+      "decision": "accepted",
+      "method": "operator_receipt"
+    },
+    "display_receipt": {
+      "format": "kirabridge.remote-task.v1",
+      "binding": {
+        "task_id": "team-tw-synthetic",
+        "request_sha256": "3e93f216b64b97372eeaa03a412f48410b08710009ab8007f22cba1c4654d142",
+        "device_ref": "synthetic-home-device",
+        "envelope_sha256": "e376f539366ede4869e7b492977deaf7756c934339c6d5b4df2d5053d8b13737"
+      },
+      "observed_at": 1793900020,
+      "result_sha256": "7777777777777777777777777777777777777777777777777777777777777777",
+      "evidence": {
+        "ref": "synthetic-external-proof",
+        "sha256": "9999999999999999999999999999999999999999999999999999999999999999"
+      },
+      "kind": "display_receipt",
+      "client_ref": "synthetic-mobile-client",
+      "state": "displayed"
+    }
+  }
+}
