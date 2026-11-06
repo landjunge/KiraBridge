@@ -1,4 +1,4 @@
-"""Private R3 Core child; invoked only by test_remote_os_restart.py."""
+"""Private R3/R4 Core child; invoked only by test_remote_os_restart.py."""
 
 import asyncio
 import json
@@ -92,6 +92,14 @@ async def main():
                     source_package_path=bridge.runtime["source_package_path"],
                     source_tree_sha256=bridge.runtime["source_tree_sha256"],
                     fixture_profile=settings["fixture_profile"],
+                    sys_executable=sys.executable,
+                    python_version=sys.version,
+                    cwd=os.getcwd(),
+                    pythonpath=os.environ.get("PYTHONPATH"),
+                    dependency_modules={
+                        name: getattr(sys.modules.get(name), "__file__", None)
+                        for name in ("mcp", "httpx", "uvicorn", "pydantic", "cryptography")
+                    },
                 )
                 await serving
                 record("http_stopped")

@@ -7,12 +7,14 @@ import signal
 import socket
 import sqlite3
 import sys
+import time
+import uuid
 from pathlib import Path
 from types import SimpleNamespace
 
 import httpx
 import pytest
-from test_handoff import configure
+from test_handoff import SESSION, configure
 from test_remote_relay import certificate, final, intent, relay, tls_server
 
 from kirabridge.mcp_gateway.client import Peer
@@ -127,7 +129,7 @@ class OwnedCore:
         assert child is not None and child.returncode is None
         assert self.identities[-1]["pid"] == child.pid
         # This handle came from our own create_subprocess_exec; no PID lookup or
-        # operator process is targeted. The tested kill point is completed below.
+        # operator process is targeted. Each test observes its own kill point.
         child.send_signal(signal.SIGKILL if hard else signal.SIGTERM)
         code = await asyncio.wait_for(child.wait(), 15)
         self.exits.append({"pid": child.pid, "returncode": code, "hard": hard})
@@ -306,3 +308,186 @@ async def test_completed_receipt_survives_real_core_process_restart_once(remote_
         ],
     }
     (tmp_path / "r3-evidence.json").write_text(json.dumps(evidence, indent=2) + "\n")
+
+
+async def test_inflight_core_kill_recovers_original_unknown_without_replay(remote_os, tmp_path):
+    remote = remote_os
+    nonce = uuid.uuid4().hex
+    control = {
+        "nonce": nonce,
+        "session": SESSION,
+        "counter": str(remote.counter),
+        "started": str(tmp_path / "fixture-started.json"),
+        "release": str(tmp_path / "fixture-release.json"),
+        "exited": str(tmp_path / "fixture-exited.json"),
+    }
+    control_path = tmp_path / "inflight-control.json"
+    control_path.write_text(json.dumps(control))
+    executable = Path(remote.config.agents["codex"].executable)
+    fixture = Path(__file__).with_name("remote_inflight_fixture.py")
+    executable.write_text(
+        f"#!{sys.executable}\nimport runpy\n"
+        f"runpy.run_path({str(fixture)!r}, init_globals={{'R4_CONTROL': {str(control_path)!r}}}, "
+        "run_name='__main__')\n"
+    )
+    submits = []
+
+    def observe(coordinator):
+        original = coordinator.pool.call
+
+        async def call(peer, tool, arguments, **context):
+            if tool == "task_submit":
+                submits.append(arguments["request"]["task_id"])
+            return await original(peer, tool, arguments, **context)
+
+        coordinator.pool.call = call
+
+    async def read_marker(path, seconds=5):
+        async with asyncio.timeout(seconds):
+            while not Path(path).exists():
+                await asyncio.sleep(0.02)
+        return json.loads(Path(path).read_text())
+
+    async def absent(pid):
+        async with asyncio.timeout(5):
+            while True:
+                probe = await asyncio.create_subprocess_exec(
+                    "ps",
+                    "-p",
+                    str(pid),
+                    "-o",
+                    "pid=,ppid=,stat=,comm=",
+                    stdout=asyncio.subprocess.PIPE,
+                    stderr=asyncio.subprocess.PIPE,
+                )
+                output, _ = await probe.communicate()
+                if probe.returncode == 1 and not output.strip():
+                    return {"pid": pid, "present": False, "ps_exit": 1}
+                await asyncio.sleep(0.05)
+
+    before = after = checkpoint = started = exited = None
+    fixture_absence = None
+    try:
+        envelope = await intent(remote, "inflight-one")
+        remote.peer = await remote.core.start()
+        async with relay(remote) as coordinator:
+            observe(coordinator)
+            admitted = await coordinator.deliver(envelope)
+            started = await read_marker(control["started"])
+            assert started["nonce"] == nonce and started["ppid"] == remote.core.process.pid
+            assert started["stage"] == "started" and len(lines(remote.counter)) == 1
+            before = await coordinator.reconcile(envelope)
+            assert before["id"] == admitted["id"] == envelope["request"]["task_id"]
+            assert before["receipt"] == admitted["receipt"] and before["receipt"]
+            assert before["state"] == "running" and before["finished"] is None
+            assert before.get("result") is None and not Path(control["exited"]).exists()
+        checkpoint = durable_tasks(remote.config)
+        assert len(checkpoint) == 1 and checkpoint[0]["state"] == "running"
+        assert checkpoint[0]["receipt"] == before["receipt"]
+        probe = await asyncio.create_subprocess_exec(
+            "ps",
+            "-p",
+            str(started["pid"]),
+            "-o",
+            "pid=,ppid=,stat=,comm=",
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+        live_output, _ = await probe.communicate()
+        live_fields = live_output.decode().strip().split(None, 3)
+        assert probe.returncode == 0 and len(live_fields) == 4
+        assert int(live_fields[0]) == started["pid"]
+        assert int(live_fields[1]) == remote.core.process.pid
+        assert not live_fields[2].startswith("Z") and not Path(control["exited"]).exists()
+        kill_requested_at = time.time()
+        (tmp_path / "r4-before-kill.json").write_text(
+            json.dumps(
+                {
+                    "task": before,
+                    "durable_tasks": checkpoint,
+                    "fixture": started,
+                    "live_fixture_ps": live_output.decode(),
+                    "kill_requested_at": kill_requested_at,
+                },
+                indent=2,
+            )
+            + "\n"
+        )
+        await remote.core.stop(hard=True)
+        with sqlite3.connect(
+            f"file:{remote.config.state_path / 'bridge.sqlite3'}?mode=ro", uri=True
+        ) as db:
+            frozen_observation = json.loads(
+                db.execute("SELECT evidence FROM tasks WHERE id=?", (before["id"],)).fetchone()[0]
+            )
+        assert durable_tasks(remote.config)[0]["state"] == "running"
+        (tmp_path / "r4-after-kill-db.json").write_text(
+            json.dumps({"last_observation": frozen_observation}, indent=2) + "\n"
+        )
+        remote.peer = await remote.core.start()
+        old, new = remote.core.identities
+        assert old["pid"] != new["pid"] and old["generation"] != new["generation"]
+        async with relay(remote, clock=lambda: envelope["expires_at"] + 1) as restarted:
+            observe(restarted)
+            after = await restarted.deliver(envelope)
+            readback = await restarted.reconcile(envelope)
+        (tmp_path / "r4-after-restart.json").write_text(
+            json.dumps({"task": after, "readback": readback}, indent=2) + "\n"
+        )
+        assert after["id"] == readback["id"] == before["id"]
+        assert after["receipt"] == readback["receipt"] == before["receipt"]
+        assert after["state"] == readback["state"] == "unknown"
+        assert after["evidence"]["reason"] == "dispatcher_restart"
+        assert after["evidence"]["last_observation"] == frozen_observation
+        assert after["finished"] is None and after.get("result") is None
+        recovered = durable_tasks(remote.config)
+        assert len(recovered) == 1 and recovered[0]["state"] == "unknown"
+        assert recovered[0]["receipt"] == before["receipt"]
+        assert recovered[0]["request_hash"] == checkpoint[0]["request_hash"]
+        assert submits == [before["id"]]
+        server_submits = [r for r in lines(remote.core.trace) if r["event"] == "task_submit"]
+        assert len(server_submits) == len(lines(remote.counter)) == 1
+        board = (await remote.http.get(f"/api/projects/{remote.pid}/whiteboard")).json()["entries"]
+        assert not any("Synthetisches Ergebnis" in entry["content"] for entry in board)
+    finally:
+        # Only the private nonce signal is used for the fixture. It self-exits
+        # after at most ten seconds even if this parent cannot finish cleanup.
+        release = Path(control["release"])
+        temporary = release.with_suffix(".tmp")
+        with temporary.open("w") as stream:
+            json.dump({"nonce": nonce}, stream)
+            stream.flush()
+            os.fsync(stream.fileno())
+        temporary.replace(release)
+        if Path(control["started"]).exists():
+            started = started or await read_marker(control["started"])
+            exited = await read_marker(control["exited"], seconds=12)
+            assert exited["nonce"] == nonce and exited["pid"] == started["pid"]
+            fixture_absence = await absent(started["pid"])
+    assert exited["reason"] == "released"
+    assert started["at"] <= kill_requested_at < exited["at"]
+    assert len(lines(remote.counter)) == len(submits) == 1
+    await remote.core.stop()
+    core_absence = [await absent(identity["pid"]) for identity in remote.core.identities]
+    evidence = {
+        "case": "inflight-sigkill",
+        "task_id": before["id"],
+        "receipt": before["receipt"],
+        "state_before": before["state"],
+        "state_after": after["state"],
+        "recovery_reason": after["evidence"]["reason"],
+        "client_task_submit_calls": len(submits),
+        "server_submit_calls": len(server_submits),
+        "core_task_count": len(recovered),
+        "fixture_starts": len(lines(remote.counter)),
+        "fixture_started": started,
+        "kill_requested_at": kill_requested_at,
+        "fixture_exited": exited,
+        "fixture_absence": fixture_absence,
+        "core_identities": remote.core.identities,
+        "core_exits": remote.core.exits,
+        "core_absence": core_absence,
+        "completion_or_return_claimed": False,
+        "limits": ["Synthetic R2 fixture profile; no productive provider, TD restart or OS reboot"],
+    }
+    (tmp_path / "r4-evidence.json").write_text(json.dumps(evidence, indent=2) + "\n")
