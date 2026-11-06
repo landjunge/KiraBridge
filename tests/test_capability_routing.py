@@ -429,6 +429,206 @@ def test_timeout_is_unknown_no_retry(setup):
         launch(source, runtime, task, execute=True, runner=runner)
 
 
+def test_transport_diagnostic_real_timeout_preserves_partial_output(setup):
+    import stat
+    import sys
+    from pathlib import Path
+
+    from kirabridge.capability_routing.process import run_bounded
+
+    matrix, runtime, task = setup
+    source, _ = source_for(matrix)
+    calls = []
+
+    def runner(*args, **kwargs):
+        calls.append(True)
+        return run_bounded(
+            [
+                sys.executable,
+                "-c",
+                "import sys,time;print('partial',flush=True);"
+                "print('problem',file=sys.stderr,flush=True);time.sleep(5)",
+            ],
+            input=None,
+            cwd=task.cwd,
+            timeout=0.4,
+            env={},
+        )
+
+    result = launch(source, runtime, task, execute=True, runner=runner)
+    assert result["state"] == "unknown" and result["automatic_retry"] is False
+    assert result["transport_error"]["stage"] == "wait_main"
+    assert result["process_evidence"]["pid"] > 0
+    assert result["native_exit_code"] == -9
+    assert Path(result["output_path"]).read_bytes() == b"partial\n"
+    assert Path(result["stderr_path"]).read_bytes() == b"problem\n"
+    assert stat.S_IMODE(Path(result["output_path"]).stat().st_mode) == 0o600
+    receipt = Path(runtime.state_dir) / (task.task_id + ".json")
+    before = receipt.read_bytes()
+    with pytest.raises(RoutingError):
+        launch(source, runtime, task, execute=True, runner=runner)
+    assert calls == [True] and receipt.read_bytes() == before
+
+
+def test_transport_diagnostic_timeout_runner_does_not_leak_argv(setup):
+    from pathlib import Path
+
+    matrix, runtime, task = setup
+    source, _ = source_for(matrix)
+
+    def runner(*args, **kwargs):
+        raise subprocess.TimeoutExpired(
+            "synthetic-private-prompt", 1, output=b"partial", stderr=b"problem"
+        )
+
+    result = launch(source, runtime, task, execute=True, runner=runner)
+    assert result["state"] == "unknown"
+    assert "native_exit_code" not in result
+    assert result["transport_error"]["exception_type"] == "TimeoutExpired"
+    assert "synthetic-private-prompt" not in json.dumps(result)
+    assert Path(result["output_path"]).read_bytes() == b"partial"
+    assert Path(result["stderr_path"]).read_bytes() == b"problem"
+
+
+def test_transport_diagnostic_known_exit_survives_capture_io_failure(setup, monkeypatch):
+    import kirabridge.capability_routing.launcher as module
+
+    matrix, runtime, task = setup
+    source, _ = source_for(matrix)
+
+    def fail(*args, **kwargs):
+        raise PermissionError("synthetic capture failure")
+
+    monkeypatch.setattr(module, "_write_private", fail, raising=False)
+    result = launch(
+        source,
+        runtime,
+        task,
+        execute=True,
+        runner=lambda *a, **k: SimpleNamespace(returncode=7, stdout=b"part", stderr=b"err"),
+    )
+    assert result["state"] == "unknown"
+    assert result["native_exit_code"] == 7
+    assert result["transport_error"]["stage"] == "output_persist"
+    assert "output_path" not in result
+
+
+def test_transport_diagnostic_drain_timeout_retains_native_zero(tmp_path, monkeypatch):
+    import io
+    import threading
+
+    import kirabridge.capability_routing.process as module
+
+    release = threading.Event()
+
+    class Pipe:
+        def __init__(self):
+            self.closed = threading.Event()
+
+        def read(self, size):
+            release.wait(4)
+            return b""
+
+        read1 = read
+
+        def close(self):
+            self.closed.set()
+
+    child = SimpleNamespace(
+        pid=4242,
+        returncode=0,
+        stdin=io.BytesIO(),
+        stdout=Pipe(),
+        stderr=Pipe(),
+        wait=lambda **kwargs: 0,
+        kill=lambda: pytest.fail("already exited child must not be killed"),
+    )
+    monkeypatch.setattr(module.subprocess, "Popen", lambda *a, **k: child)
+    try:
+        with pytest.raises(subprocess.TimeoutExpired) as caught:
+            module.run_bounded(["fake"], input=None, cwd=tmp_path, timeout=0.1, env={})
+        assert caught.value.process_evidence["stage"] == "drain_after_exit"
+        assert caught.value.process_evidence["native_exit_code"] == 0
+    finally:
+        release.set()
+        assert child.stdout.closed.wait(1) and child.stderr.closed.wait(1)
+
+
+def test_transport_diagnostic_spawn_error_has_no_fake_native_exit(tmp_path, monkeypatch):
+    import kirabridge.capability_routing.process as module
+
+    def missing(*args, **kwargs):
+        raise FileNotFoundError(2, "synthetic-private-argument")
+
+    monkeypatch.setattr(module.subprocess, "Popen", missing)
+    with pytest.raises(subprocess.SubprocessError) as caught:
+        module.run_bounded(["fake"], input=None, cwd=tmp_path, timeout=1, env={})
+    evidence = caught.value.process_evidence
+    assert evidence["stage"] == "spawn" and evidence["spawn_observed"] is False
+    assert evidence["pid"] is None and evidence["native_exit_code"] is None
+    assert evidence["exception_type"] == "FileNotFoundError" and evidence["errno"] == 2
+    assert "synthetic-private-argument" not in str(caught.value)
+
+
+def test_transport_diagnostic_partial_capture_bounded_and_private(setup):
+    import stat
+    from pathlib import Path
+
+    matrix, runtime, task = setup
+    source, _ = source_for(matrix)
+
+    def runner(*args, **kwargs):
+        raise subprocess.TimeoutExpired("owned", 1, output=b"x" * 1100000, stderr=b"e" * 70000)
+
+    result = launch(source, runtime, task, execute=True, runner=runner)
+    assert result["state"] == "unknown" and result["output_truncated"]
+    assert Path(result["output_path"]).stat().st_size == 1048576
+    assert Path(result["stderr_path"]).stat().st_size == 65536
+    assert stat.S_IMODE(Path(result["stderr_path"]).stat().st_mode) == 0o600
+
+
+def test_transport_diagnostic_existing_capture_is_not_workspace_denial(setup):
+    from pathlib import Path
+
+    matrix, runtime, task = setup
+    source, _ = source_for(matrix)
+    state = Path(runtime.state_dir)
+    state.mkdir()
+    victim = state / "unrelated"
+    victim.write_bytes(b"original")
+    (state / (task.task_id + ".stdout")).symlink_to(victim)
+    result = launch(
+        source,
+        runtime,
+        task,
+        execute=True,
+        runner=lambda *a, **k: SimpleNamespace(returncode=0, stdout=b"part", stderr=b"err"),
+    )
+    assert result["state"] == "unknown" and result["native_exit_code"] == 0
+    assert result["transport_error"]["stage"] == "output_persist"
+    assert result["transport_error"]["exception_type"] == "FileExistsError"
+    assert victim.read_bytes() == b"original"
+    assert Path(result["stderr_path"]).read_bytes() == b"err"
+
+
+def test_transport_diagnostic_success_and_invalid_metadata_remain_transport_success(setup):
+    matrix, runtime, task = setup
+    source, _ = source_for(matrix)
+    task = task.model_copy(update={"explicit_cli": "grok", "independent_of_provider": "openai"})
+    result = launch(
+        source,
+        runtime,
+        task,
+        execute=True,
+        probe=False,
+        runner=lambda *a, **k: SimpleNamespace(returncode=0, stdout=b"not json", stderr=b""),
+    )
+    assert result["state"] == "process_completed"
+    assert result["exit_code"] == result["native_exit_code"] == 0
+    assert "transport_error" not in result
+    assert result["effective_model"] == "unverified"
+
+
 def test_revision_change_prevents_spawn(setup):
     matrix, runtime, task = setup
     count = 0

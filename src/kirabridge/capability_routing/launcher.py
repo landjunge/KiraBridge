@@ -18,6 +18,38 @@ class OutcomeUncertain(RoutingError):
     """The effect boundary was crossed; never label a lost receipt as not started."""
 
 
+def _write_private(path, data):
+    # Never follow or replace a pre-existing output file; task admission is exclusive.
+    fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+    with os.fdopen(fd, "wb") as stream:
+        stream.write(data)
+        stream.flush()
+        os.fsync(stream.fileno())
+
+
+def _capture(state, task_id, output, errors, result):
+    first_error = None
+    for suffix, data, limit, field in (
+        (".stdout", output, 1048576, "output_path"),
+        (".stderr", errors, 65536, "stderr_path"),
+    ):
+        if data is None:
+            continue
+        if isinstance(data, str):
+            data = data.encode()
+        if len(data) > limit:
+            result["output_truncated"] = True
+        path = state / (task_id + suffix)
+        try:
+            _write_private(path, data[:limit])
+            result[field] = str(path)
+        except OSError as exc:
+            if first_error is None:
+                first_error = exc
+    if first_error is not None:
+        raise first_error
+
+
 def launch(source, runtime, task, *, execute=False, probe=True, runner=run_bounded):
     decision = before_delegation(source, runtime, task, probe=probe)
     argv, stdin = command_for(decision, task)
@@ -53,17 +85,20 @@ def launch(source, runtime, task, *, execute=False, probe=True, runner=run_bound
     lease = state / ("cwd-" + hashlib.sha256(str(workroot).encode()).hexdigest() + ".lock")
     locked = False
     result = {**decision, "automatic_retry": False}
+    stage = "lease"
     try:
         if not task.read_only:
             lease_fd = os.open(lease, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
             os.close(lease_fd)
             locked = True
+        stage = "preflight"
         # Re-read authoritative revision at the effect boundary; no stale decision launch.
         matrix, binding = source.load()
         from .router import fingerprint
 
         if binding != decision["thread_desk"] or fingerprint(matrix) != decision["matrix_sha256"]:
             raise RoutingError("ThreadDesk changed during preflight; new decision required")
+        stage = "runner"
         child = runner(
             argv,
             input=stdin,
@@ -72,38 +107,57 @@ def launch(source, runtime, task, *, execute=False, probe=True, runner=run_bound
             env=subscription_environment(),
         )
         # Exit 0 is transport completion, not accepted work or verified model identity.
-        output = state / (task.task_id + ".stdout")
-        output.write_bytes(child.stdout or b"")
-        output.chmod(0o600)
-        errors = state / (task.task_id + ".stderr")
-        errors.write_bytes(getattr(child, "stderr", b"") or b"")
-        errors.chmod(0o600)
+        # Preserve observed child exit before any subsequent evidence-file IO.
         result.update(
             state="process_completed" if child.returncode == 0 else "process_failed",
             exit_code=child.returncode,
-            output_path=str(output),
-            stderr_path=str(errors),
+            native_exit_code=child.returncode,
             output_truncated=getattr(child, "output_truncated", False),
         )
+        if hasattr(child, "process_evidence"):
+            result["process_evidence"] = child.process_evidence
+        stage = "output_persist"
+        _capture(state, task.task_id, child.stdout or b"", getattr(child, "stderr", b""), result)
+        stage = "metadata_parse"
         if child.returncode == 0:
             result.update(native_metadata(decision["cli"], child.stdout, decision["model"]))
-    except FileExistsError:
-        result.update(state="blocked", error="Workspace already leased by this launcher")
     except RoutingError as exc:
         result.update(state="blocked", error=str(exc))
     except (OSError, subprocess.SubprocessError) as exc:
-        result.update(
-            state="unknown",
-            error="Own process outcome uncertain; no automatic retry",
-            transport_error={
-                "category": "timeout"
-                if isinstance(exc, subprocess.TimeoutExpired)
-                else "process_transport",
-                "exception_type": type(exc).__name__,
-                "source": "controlled_cli_runner",
-                "native_effect_status": "unknown",
-            },
-        )
+        if isinstance(exc, FileExistsError) and stage == "lease":
+            result.update(state="blocked", error="Workspace already leased by this launcher")
+        else:
+            evidence = getattr(exc, "process_evidence", {})
+            if evidence:
+                result["process_evidence"] = evidence
+                if evidence.get("native_exit_code") is not None:
+                    result["native_exit_code"] = evidence["native_exit_code"]
+                result["output_truncated"] = evidence.get("output_truncated", False)
+            result.update(
+                state="unknown",
+                error="Own process outcome uncertain; no automatic retry",
+                transport_error={
+                    "category": "timeout"
+                    if isinstance(exc, subprocess.TimeoutExpired)
+                    else "process_transport",
+                    "exception_type": evidence.get("exception_type", type(exc).__name__),
+                    "stage": evidence.get("stage", stage),
+                    "source": "controlled_cli_runner",
+                    "native_effect_status": "unknown",
+                },
+            )
+            # No argv or arbitrary exception text; secondary capture IO must not
+            # replace the primary error or a known native exit status.
+            try:
+                _capture(
+                    state,
+                    task.task_id,
+                    getattr(exc, "output", None),
+                    getattr(exc, "stderr", None),
+                    result,
+                )
+            except OSError as capture:
+                result["transport_error"]["capture_error_type"] = type(capture).__name__
     finally:
         # Unknown may still have living child processes; preserve the lease.
         if locked and result.get("state") != "unknown":
