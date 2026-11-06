@@ -77,3 +77,25 @@ def test_profile_does_not_treat_string_false_as_permission(tmp_path):
     path.write_text(json.dumps(value))
     with pytest.raises(ValueError):
         runtime.load_profile(path)
+
+
+def test_explicit_worker_deadlines_reach_the_existing_executor_profile(tmp_path):
+    value = profile(tmp_path)
+    value["worker_timeouts"] = {"codex": 300, "codex_verify": 180}
+    cfg = runtime.configuration(value)
+    assert cfg.team.workers["codex"].timeout == 300
+    assert cfg.team.workers["codex_verify"].timeout == 180
+    assert cfg.team.workers["grok"].timeout == 120
+
+
+@pytest.mark.parametrize("timeout", [0, -1, 301, "300"])
+def test_worker_deadline_does_not_exceed_existing_core_contract(tmp_path, timeout):
+    value = profile(tmp_path)
+    value.update(
+        report_cli="/bin/false",
+        instance="fixture-loop",
+        board_id="board",
+        worker_timeouts={"codex": timeout},
+    )
+    with pytest.raises(ValueError):
+        runtime.LoopProfile.model_validate(value)

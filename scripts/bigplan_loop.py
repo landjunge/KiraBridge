@@ -15,7 +15,7 @@ import subprocess
 import time
 from datetime import datetime
 from pathlib import Path
-from typing import Literal
+from typing import Annotated, Literal
 
 import uvicorn
 from pydantic import BaseModel, ConfigDict, Field
@@ -65,6 +65,9 @@ class LoopProfile(BaseModel):
         default_factory=dict
     )
     quota_events: list[str] = Field(default_factory=list, max_length=16)
+    worker_timeouts: dict[
+        Literal["codex", "grok", "codex_verify"], Annotated[float, Field(gt=0, le=300)]
+    ] = Field(default_factory=dict)
 
 
 def load_profile(path):
@@ -269,7 +272,7 @@ def configuration(profile):
                         name: {
                             "agent": name,
                             "cwd": root,
-                            "timeout": 120,
+                            "timeout": profile.get("worker_timeouts", {}).get(name, 120),
                             "execution_scope": "separate_managed_session",
                             "routing": profile.get("worker_routing", {}).get(name),
                         }

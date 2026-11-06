@@ -70,6 +70,13 @@ vorhandenen nativen C2-Router mit tatsächlichen Modell-/Effortparametern. Matri
 Zugang, versiegelte Requests und aktuelle Budget-/Leasebelege bleiben maßgeblich.
 Die Koordination wählt passende Profile; Modelltext schaltet nichts um.
 
+`worker_timeouts` setzt vorhandene Core-Zeitprofile pro Worker ausdrücklich,
+beispielsweise Codex300s und Verifikation180s für einen Codingabschnitt. Ohne
+Angabe bleibt der frühere Wert120s erhalten. Die bestehende Core-Obergrenze und
+die Abdeckung der gesamten Review-/Checkkette durch Lease und Kontingentbeleg
+werden weiter geprüft. Ein Profilwechsel verlängert keinen bereits versiegelten
+Auftrag und wiederholt keinen UNKNOWN.
+
 `quota_events` kann ausdrücklich zugeordnete native Codex-Sitzungslogs enthalten.
 Nur tatsächliche `event_msg/token_count/rate_limits` innerhalb der letzten fünf
 Minuten zählen: neuester Beleg, Abonnementplan, gültige Grenzen und Resetzeit,
