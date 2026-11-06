@@ -13,6 +13,8 @@ READ_OPERATIONS = frozenset(
     {
         "windows.keyboard.inspect",
         "windows.window.list",
+        "windows.app.list",
+        "windows.console.status",
         *SYSTEM_READ_OPERATIONS,
         "keyboard.profiles.list",
         "keyboard.profiles.get",
@@ -86,7 +88,11 @@ for _name in (
     "keyboard.sequence",
     "windows.keyboard.sequence",
     "windows.keyboard.shortcut",
+    "windows.keyboard.text",
     "windows.window.control",
+    "windows.app.launch",
+    "windows.app.focus",
+    "windows.console.handoff",
     "keyboard.chord",
     "keyboard.text",
     "keyboard.action",
@@ -160,7 +166,13 @@ for _name in (
         else "control"
         if _name in STOP_OPERATIONS
         else "execute"
-        if _name in {"terminal.execute", "admin.execute", "agent.execute"}
+        if _name
+        in {
+            "terminal.execute",
+            "admin.execute",
+            "agent.execute",
+            "windows.console.handoff",
+        }
         else "write",
         execution_class="stop"
         if _name in STOP_OPERATIONS

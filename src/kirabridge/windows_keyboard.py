@@ -15,6 +15,7 @@ from kirabridge.platform_adapters.windows.keyboard import (
     WindowTarget,
     shortcut_stroke,
 )
+from kirabridge.platform_adapters.windows.text import text_batches
 
 
 class WindowsTargetInput(Input):
@@ -50,6 +51,16 @@ class WindowsStrokeInput(Input):
         return self
 
 
+class WindowsTextInput(Input):
+    target: WindowsTargetInput
+    text: str = Field(min_length=1, max_length=4096, strict=True)
+
+    @model_validator(mode="after")
+    def native_text(self):
+        text_batches(self.text)
+        return self
+
+
 class WindowsSequenceInput(Input):
     target: WindowsTargetInput
     steps: list[WindowsStrokeInput] = Field(min_length=1, max_length=32)
@@ -81,6 +92,7 @@ WINDOWS_KEYBOARD_INPUTS = {
     "windows.keyboard.inspect": EmptyInput,
     "windows.keyboard.sequence": WindowsSequenceInput,
     "windows.keyboard.shortcut": WindowsShortcutInput,
+    "windows.keyboard.text": WindowsTextInput,
 }
 
 
@@ -132,7 +144,11 @@ class WindowsKeyboardManager:
                     )
 
             target = None
-            if operation in {"windows.keyboard.sequence", "windows.keyboard.shortcut"}:
+            if operation in {
+                "windows.keyboard.sequence",
+                "windows.keyboard.shortcut",
+                "windows.keyboard.text",
+            }:
                 target = WindowTarget.from_wire(args.target.model_dump())
                 if backend.inspect_foreground() != target:
                     raise BridgeError(
@@ -154,12 +170,35 @@ class WindowsKeyboardManager:
                 check_deadline()
                 turn.mark_attempted()
 
-            result = backend.send(
-                target,
-                [args.native()]
-                if operation == "windows.keyboard.shortcut"
-                else [step.native() for step in args.steps],
-                before_send=before_send,
-            )
+            if operation == "windows.keyboard.text":
+                completed = inserted = calls = 0
+                physical = True
+                sent_target = None
+                for batch in text_batches(args.text):
+                    result = backend.send(target, list(batch), before_send=before_send)
+                    completed += result["completed_keys"]
+                    inserted += result.get("inserted_events", 0)
+                    calls += result.get("native_calls", 1)
+                    physical = physical and result.get("physical_key_events", False)
+                    sent_target = result.get("target", sent_target)
+                result = {
+                    "requested_keys": completed,
+                    "completed_keys": completed,
+                    "inserted_events": inserted,
+                    "native_calls": calls,
+                    "physical_key_events": physical,
+                    "receiver_processing_confirmed": False,
+                    "automatic_retry": False,
+                    "target": sent_target,
+                    "scope": "Unicode SendInput text; not application acknowledgement",
+                }
+            else:
+                result = backend.send(
+                    target,
+                    [args.native()]
+                    if operation == "windows.keyboard.shortcut"
+                    else [step.native() for step in args.steps],
+                    before_send=before_send,
+                )
             check_deadline()
             return {**result, "provider": "windows.sendinput.v1"}
