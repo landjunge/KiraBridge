@@ -13,9 +13,10 @@ Prerequisites: the prepared python.exe, a new LOCALAPPDATA root, and this
 extracted payload or a git archive of the pinned commit. Do not point PYTHONPATH
 at an older RC31/RC33 checkout.
 
-1. python -B scripts/windows_parity_package.py build --output dist\\parity.zip
+1. From a git checkout: python -B scripts/windows_parity_package.py build --output dist\\parity.zip
+   An extracted zip already has provenance.json. Do not rebuild it and do not call git.
 2. Compare the printed SHA256 with the correction result JSON.
-3. python -B scripts/windows_parity_package.py install --root <new-root>\\install --payload <zip>
+3. python -B scripts/windows_parity_package.py install --root <new-root>\\install --payload <dir>
 4. python -B scripts/accept_windows_parity.py --native-visible --root <new-root>
 5. Optional original harnesses, after the activated release is the script tree
    or sys.path[0] is that release's src (these scripts insert their own src):
@@ -174,17 +175,12 @@ def _distinguished(payload: Path, copy_root: Path) -> tuple[Path, str]:
     return copy_root, commit
 
 
-def package_roundtrip(root: Path) -> dict:
-    extracted, built = _extract_build(root / "build")
-    installed = install(
-        root / "install",
-        extracted,
-        version="0.8.0rc40",
-        commit=built["commit"],
-    )
+def activate_roundtrip(root: Path, payload: Path, commit: str) -> dict:
+    """Install, import, update, and roll back one payload. No git command."""
+    installed = install(root / "install", payload, version="0.8.0rc40", commit=commit)
     (root / "install" / "data" / "keep.txt").write_text("behalten", encoding="utf-8")
     first = _import_release(root / "install" / "releases" / installed["release"] / "src")
-    copy, copy_commit = _distinguished(extracted, root / "copy")
+    copy, copy_commit = _distinguished(payload, root / "copy")
     updated = install(
         root / "install", copy, version="0.8.0rc40", commit=copy_commit, update=True
     )
@@ -194,7 +190,7 @@ def package_roundtrip(root: Path) -> dict:
     kept = (root / "install" / "data" / "keep.txt").read_text(encoding="utf-8")
     return {
         "installed": installed["release"],
-        "provenance_commit": built["commit"],
+        "provenance_commit": commit,
         "provenance_verified": installed["provenance_verified"],
         "standalone_executable": False,
         "first_import": first,
@@ -203,9 +199,26 @@ def package_roundtrip(root: Path) -> dict:
         "restored": restored["release"],
         "rollback_import": rolled,
         "data": kept,
-        "license_in_package": True,
+        "license_in_package": (payload / "LICENSE").is_file(),
         "execution_policy_changed": False,
     }
+
+
+def package_roundtrip(root: Path) -> dict:
+    provenance_path = ROOT / "provenance.json"
+    extracted_package = (
+        provenance_path.is_file()
+        and not provenance_path.is_symlink()
+        and (ROOT / "LICENSE").is_file()
+    )
+    if extracted_package:
+        provenance = json.loads(provenance_path.read_text(encoding="utf-8"))
+        commit = provenance.get("commit")
+        if not isinstance(commit, str):
+            raise SystemExit("Payload provenance has no commit")
+        return activate_roundtrip(root, ROOT, commit)
+    extracted, built = _extract_build(root / "build")
+    return activate_roundtrip(root, extracted, built["commit"])
 
 
 async def native_visible(root: Path) -> dict:

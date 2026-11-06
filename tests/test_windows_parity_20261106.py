@@ -762,3 +762,43 @@ def test_zip_install_imports_the_activated_runtime_and_rejects_a_foreign_commit(
                 "bbbbbbbbbbbb",
             ]
         )
+
+
+def test_extracted_payload_roundtrip_does_not_call_git(tmp_path):
+    import importlib.util
+
+    script = Path(__file__).resolve().parents[1] / "scripts" / "accept_windows_parity.py"
+    spec = importlib.util.spec_from_file_location("accept_windows_parity_guest", script)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    payload = tmp_path / "payload"
+    package = payload / "src" / "kirabridge"
+    package.mkdir(parents=True)
+    (package / "__init__.py").write_text('__version__ = "0.8.0rc40"\n', encoding="utf-8")
+    (payload / "LICENSE").write_text("license\n", encoding="utf-8")
+    inventory = {
+        path.relative_to(payload).as_posix(): hashlib.sha256(path.read_bytes()).hexdigest()
+        for path in payload.rglob("*")
+        if path.is_file()
+    }
+    commit = "37ea23911d20133b3ca80e6ecb65442f2d49dad5"
+    (payload / "provenance.json").write_text(
+        json.dumps(
+            {
+                "commit": commit,
+                "commit_source": "test-fixture",
+                "version": "0.8.0rc40",
+                "files": inventory,
+                "standalone_executable": False,
+            }
+        ),
+        encoding="utf-8",
+    )
+    report = module.activate_roundtrip(tmp_path / "work", payload, commit)
+    assert report["provenance_verified"] is True
+    assert report["first_import"]["marker"] == "absent"
+    assert report["second_import"]["marker"] == "two"
+    assert report["rollback_import"]["marker"] == "absent"
+    assert report["data"] == "behalten"
+    assert commit[:12] in report["first_import"]["import_path"]
+    assert report["first_import"]["import_path"] != report["second_import"]["import_path"]
