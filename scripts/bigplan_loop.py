@@ -19,7 +19,6 @@ from typing import Literal
 import uvicorn
 from pydantic import BaseModel, ConfigDict, Field
 
-from kirabridge.autonext.coordinator import CoordinatedAutoNext
 from kirabridge.autonext.manager import digest, text_sha
 from kirabridge.autonext.models import ApprovedCard, AutoNextConfig
 from kirabridge.bridge_core.bridge import Bridge
@@ -49,6 +48,7 @@ class LoopProfile(BaseModel):
     enabled: bool = False
     cards: list[ApprovedCard] = Field(default_factory=list, max_length=16)
     approval_revision: str = ""
+    completion_target: str | None = Field(default=None, pattern=r"^[A-Za-z0-9_.:-]{1,128}$")
 
 
 def load_profile(path):
@@ -215,6 +215,11 @@ def configuration(profile):
                 "source_root": profile["threaddesk_source"],
                 "storage": "json",
             },
+            "autonext": {
+                "principal": "codex",
+                "coordinator_mode": True,
+                "completion_target": profile.get("completion_target"),
+            },
         }
     )
 
@@ -365,7 +370,6 @@ async def serve(path):
     else:
         save(marker, identity)
     bridge = Bridge(cfg)
-    bridge.autonext = CoordinatedAutoNext(bridge)
     sock = socket.socket()
     sock.bind(("127.0.0.1", 0))
     sock.listen(64)
@@ -438,6 +442,7 @@ async def serve(path):
                             budget_valid_until=observation["observed_at"] + 3500,
                             budget_source_ref=observation["source"],
                             billing_evidence_ref="Cached ChatGPT subscription; API keys absent",
+                            completion_target=latest.get("completion_target"),
                         )
                         save(cache, grant.model_dump())
                     cfg.autonext = grant

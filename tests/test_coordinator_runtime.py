@@ -47,6 +47,8 @@ def test_dedicated_worker_route_is_explicit_and_global_visible_route_stays_on(tm
     )
     assert cfg.state_path == tmp_path / "state"
     assert not cfg.autonext.enabled
+    assert cfg.autonext.coordinator_mode
+    assert cfg.autonext.principal == "codex"
 
 
 def test_runtime_refuses_productive_state(tmp_path):

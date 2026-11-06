@@ -4,6 +4,8 @@ Nutzerauftrag vom 05.11.2026. Der lokale Codex-Koordinator nimmt nacheinander au
 
 Die neue Route ist ein eigenes KiraBridge-Profil mit privatem Zustand, eigenem Arbeitsbereich und eigener Loopback-Verbindung für den bestehenden TeamDispatcher. Der produktive Bridge-Dienst und dessen sichtbare Codex-/Grok-Bindungen werden weder verändert noch neu gestartet. `TeamWorker.execution_scope=separate_managed_session` ist ausdrücklich konfiguriert. Der Standard bleibt `existing_visible_terminal`; direkte Aufträge können keine andere Route über Eingabefelder wählen. Das globale Visible-Flag bleibt eingeschaltet. Nur ein versiegelter Teamauftrag kann den separaten Workerpfad nutzen.
 
+Der C1-Quellkandidat wählt den Koordinatormanager inzwischen direkt durch `autonext.coordinator_mode=true` im KiraBridge-Core. Der Runtimeadapter verwendet diese native Auswahl statt eines eigenen Manageraustauschs. Ein optionales, im Grant gebundenes `completion_target` liefert terminale Meldungen über das vorhandene Completion-Postfach; MCP `coordinator_status` liest den begrenzten aktuellen Stand. Vertrag und getrennte Liefergrenzen: [Native Koordination C1](COORDINATOR-NATIVE-20261106.md).
+
 ## Ablauf
 
 1. Eine `READY`-Karte enthält feste Aufgaben-ID, Produkt, Arbeitsbereich, Sandbox und `acceptance.kind=coordinator_checks`. Ein lokaler Freigabepin bindet exakte Eintrags-ID und Inhalts-SHA256. Andere Notizen und historische Aufgaben sind keine Aufträge.

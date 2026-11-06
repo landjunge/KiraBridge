@@ -109,6 +109,8 @@ echte Browserchat-Abnahme steht noch aus.
 
 Lokaler Big-Plan-Koordinatoradapter: [freigegebener Aufgaben-Loop, Codex/Grok-Prüfung und Agentenberichte](docs/COORDINATOR-LOOP.md). Eigenes Opt-in-Profil; bestehende sichtbare Sitzungen und veröffentlichte Pakete behalten ihren bisherigen Stand.
 
+Der Koordinator-Quellkandidat unterstützt außerdem native Core-Aktivierung, den auf den Eigentümer begrenzten MCP-Aufruf `coordinator_status` und dauerhafte Angenommen-/Stoppmeldungen im vorhandenen Completion-Postfach. Nach erfolgreichem Review und Prüfungen setzt er gepinnte Aufgaben ohne Laden eines Skills fort. [Nativer Vertrag und Prüfnachweise](docs/COORDINATOR-NATIVE-20261106.md) beschreiben den Stand; Desktop- und Liveabnahme bleiben gesondert.
+
 [Frühere Windows-Vorschau dev2](https://github.com/landjunge/KiraBridge/releases/tag/windows-v0.8.0rc31.dev2):
 Native Tastatur und lokales MCP haben die Abnahme in einer eigenen Windows 11-VM bestanden.
 [Ergebnisse und Grenzen](docs/WINDOWS-DEVELOPMENT-20261103.md); macOS bleibt getrennt.

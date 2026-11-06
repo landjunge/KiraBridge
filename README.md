@@ -106,6 +106,8 @@ requires real browserchat acceptance.
 
 Local Big Plan coordinator adapter: [approved-task loop, Codex/Grok review and agent reports](docs/COORDINATOR-LOOP.md). Uses a separate opt-in profile; existing visible sessions and published packages retain their current behavior.
 
+The coordinator source candidate also supports native Core activation, owner-scoped MCP `coordinator_status` and durable accepted/stopped notices through the existing completion inbox. It follows pinned tasks after successful review and checks without loading a skill. See [native coordinator contract and validation](docs/COORDINATOR-NATIVE-20261106.md); desktop and live deployment acceptance remain separate.
+
 [Earlier Windows preview dev2](https://github.com/landjunge/KiraBridge/releases/tag/windows-v0.8.0rc31.dev2):
 native keyboard and local MCP acceptance passed in a dedicated Windows 11 VM.
 [Results and limits](docs/WINDOWS-DEVELOPMENT-20261103.md); macOS stays separate.

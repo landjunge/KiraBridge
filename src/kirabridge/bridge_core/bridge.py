@@ -302,7 +302,12 @@ class Bridge:
         self.team_dispatcher = TeamDispatcher(self)
         from kirabridge.autonext.manager import AutoNextManager
 
-        self.autonext = AutoNextManager(self)
+        if config.autonext.coordinator_mode:
+            from kirabridge.autonext.coordinator import CoordinatedAutoNext
+
+            self.autonext = CoordinatedAutoNext(self)
+        else:
+            self.autonext = AutoNextManager(self)
         self.agents.worktree_guard = lambda task, args: self.autonext.authorize_execution(
             {**task, "args": args.model_dump()}
         )

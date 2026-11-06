@@ -21,6 +21,7 @@ class ReadQuery(Input):
         "platform.status",
         "task.observe",
         "native.read",
+        "coordinator.status",
     ]
     path: str | None = Field(default=None, max_length=4096)
     task_id: str | None = Field(default=None, max_length=128)
@@ -43,6 +44,17 @@ class ReadQuery(Input):
 
     @model_validator(mode="after")
     def selector(self):
+        if self.operation == "coordinator.status":
+            allowed = {"operation", "max_bytes"}
+            if (
+                any(
+                    getattr(self, field) != type(self).model_fields[field].get_default()
+                    for field in self.model_fields_set - allowed
+                )
+                or self.max_bytes > 65536
+            ):
+                raise ValueError("Coordinator status accepts only its bounded read budget")
+            return self
         if self.operation == "native.read":
             from kirabridge.native_queries import native_arguments
 
@@ -115,6 +127,15 @@ class ReadQuery(Input):
 
 async def read_query_async(bridge, principal: str, query: ReadQuery) -> dict:
     """Existing dictionary-shaped tool also works with cached client tool lists."""
+    if query.operation == "coordinator.status":
+        import json
+
+        from kirabridge.autonext.status import coordinator_status
+
+        value = coordinator_status(bridge, principal)
+        if len(json.dumps(value, ensure_ascii=False).encode("utf-8")) > query.max_bytes:
+            raise BridgeError("read_result_limit", "Coordinator status exceeds read budget")
+        return value
     if query.operation == "native.read":
         return await bridge.native_queries.execute(
             principal, query.native_operation, query.arguments, max_bytes=query.max_bytes

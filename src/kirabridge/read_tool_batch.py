@@ -26,6 +26,7 @@ READ_TOOLS = frozenset(
     {
         "bridge_health",
         "clipboard_info",
+        "coordinator_status",
         "operation_catalog",
         "task_get",
         "task_events",
