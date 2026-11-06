@@ -1,6 +1,7 @@
 """Explicit sealed team-managed work never enters native input admission."""
 
 import asyncio
+import json
 
 import pytest
 from conftest import request
@@ -27,7 +28,15 @@ async def test_managed_team_turn_outlives_native_deadline(scenario, tmp_path, mo
 
             path = Path(executable)
             text = path.read_text()
-            text = text.replace("import json,sys", "import json,sys,time\ntime.sleep(.4)", 1)
+            text = text.replace("import json,sys", "import json,sys,time", 1)
+            emitter = "]:print(json.dumps(event),flush=True)"
+            assert text.count(emitter) == 1
+            text = text.replace(
+                emitter,
+                "]:\n print(json.dumps(event),flush=True)\n"
+                " if event['type']=='turn.started':time.sleep(.4)",
+                1,
+            )
             path.write_text(text)
     await s["start"]()
     await until(lambda: bridge.autonext.inspect()["state"] in {"complete", "stopped"})
@@ -36,6 +45,7 @@ async def test_managed_team_turn_outlives_native_deadline(scenario, tmp_path, mo
     verify = bridge.store.db.execute("SELECT verify_work_id FROM autonext_coordinator").fetchone()[
         0
     ]
+    intervals = []
     for work_id in (source, verify):
         work = bridge.teams.work_get("codex", "auto-team", work_id)
         core = bridge.store.get(work["core_task_id"])
@@ -44,6 +54,16 @@ async def test_managed_team_turn_outlives_native_deadline(scenario, tmp_path, mo
         assert bridge.tasks.native.native(core) is False
         assert core["id"] not in bridge.tasks.native.active
         assert work["evidence"]["session_scope"] == "separate_managed_session"
+        intervals.append(
+            {
+                "task_id": core["id"],
+                "started": core["started"],
+                "finished": core["finished"],
+                "elapsed": core["finished"] - core["started"],
+                "native_timeout": bridge.tasks.native.timeout,
+            }
+        )
+    (tmp_path / "managed-turn-intervals.json").write_text(json.dumps(intervals, indent=2) + "\n")
     assert bridge.config.visible_handoffs.enabled is True
 
 

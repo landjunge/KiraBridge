@@ -126,7 +126,9 @@ async def test_http_status_and_catalog_share_provider_revision_without_ui(
         assert {"macos_status", "session_enter"} <= {tool.name for tool in tools}
         assert not probes, "tools/list must not perform permission checks"
         status = (await clients.call("local", "macos_status", {})).structuredContent
-        assert probes == ["accessibility", "screen_capture"]
+        resources = ["accessibility", "screen_capture", "post_events", "input_monitoring"]
+        assert probes == resources
+        assert {row["resource"] for row in status["permissions"]} == set(resources)
         assert status["permissions"][0]["actor"] == "core"
         assert status["capabilities"]["capture"]["available"] is False
         rows = {row["operation"]: row for row in status["operations"]}
@@ -136,9 +138,11 @@ async def test_http_status_and_catalog_share_provider_revision_without_ui(
         catalogue = (await clients.call("local", "operation_catalog", {})).structuredContent
         assert "platform.status" in catalogue["operations"]
         assert catalogue["discovery"]["platform"]["revision"] == status["revision"]
+        assert probes == resources
         config.principals["local"].capabilities.remove("bridge.health")
         denied = (await clients.call("local", "macos_status", {})).structuredContent
         assert denied["error"]["code"] == "forbidden"
+        assert probes == resources
 
 
 async def test_matching_native_denial_blocks_transport_before_any_worker(bridge, monkeypatch):

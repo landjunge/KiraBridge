@@ -396,6 +396,7 @@ def builder_fixture(tmp_path, monkeypatch, host):
         "pyproject.toml": f'[project]\nversion="{VERSION}"\nlicense="private"\n'.encode(),
         "uv.lock": b"fixture lock",
         "installer/install.py": b"fixture installer",
+        "installer/desktop.py": b"fixture desktop",
         "installer/presentation.py": b"fixture presentation",
         "installer/visible_terminal.py": b"fixture guard",
         "src/kirabridge/terminal_design.py": b"fixture design",
@@ -452,6 +453,9 @@ def test_darwin_runtime_contains_exact_signed_app_members_and_modes(tmp_path, mo
     with tarfile.open(output / "KiraBridge-macos.tar.gz") as archive:
         pin = json.load(archive.extractfile("KiraBridge/release.json"))
         assert pin["native_app_required"] is True and pin["native_app"] == descriptor()
+        desktop = archive.extractfile("KiraBridge/installer/desktop.py").read()
+        assert desktop == b"fixture desktop"
+        assert pin["files"]["installer/desktop.py"] == hashlib.sha256(desktop).hexdigest()
         for name, data in app_files().items():
             member = archive.getmember("KiraBridge/" + name)
             assert archive.extractfile(member).read() == data

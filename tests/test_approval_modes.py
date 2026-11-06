@@ -144,6 +144,12 @@ async def test_real_stdio_automatic_mode_and_optional_token(tmp_path):
                 "auto",
                 command=sys.executable,
                 args=("-m", "kirabridge.cli", "--config", str(config), "serve"),
+                cwd=str(Path(__file__).resolve().parents[1]),
+                env={
+                    "PYTHONPATH": str(Path(__file__).resolve().parents[1] / "src"),
+                    "PYTHONNOUSERSITE": "1",
+                    "PYTHONDONTWRITEBYTECODE": "1",
+                },
             )
         )
         health = (await clients.call("auto", "bridge_health", {})).structuredContent
@@ -151,7 +157,13 @@ async def test_real_stdio_automatic_mode_and_optional_token(tmp_path):
         for tool in ["task_request", "task_submit"]:
             value = request(arguments={"path": str(root)}, task_id=tool)
             initial = await clients.call("auto", tool, {"request": value.model_dump()})
-            assert not initial.isError and initial.structuredContent["state"] == "queued"
+            assert not initial.isError and not initial.structuredContent.get("error")
+            admitted = initial.structuredContent
+            assert admitted["id"] == value.task_id and admitted["principal"] == "local"
+            assert admitted["operation"] == value.operation
+            assert admitted["state"] in {"queued", "accepted", "running", "completed"}
+            if tool == "task_request":
+                assert admitted["approval_required"] is False
             async with asyncio.timeout(10):
                 while True:
                     final = (
@@ -160,6 +172,8 @@ async def test_real_stdio_automatic_mode_and_optional_token(tmp_path):
                     if final["state"] == "completed":
                         break
                     await asyncio.sleep(0.02)
+            assert final["id"] == value.task_id and final["principal"] == "local"
+            assert final["operation"] == value.operation and not final.get("error")
         catalog = (await clients.call("auto", "operation_catalog", {})).structuredContent
         assert catalog["operations"]["file.list"]["approval_required"] is False
         tools = (await clients.sessions["auto"].list_tools()).tools
