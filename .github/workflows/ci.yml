@@ -32,6 +32,9 @@ jobs:
     runs-on: ${{ matrix.runner }}
     env:
       UV_PYTHON: ${{ matrix.python }}
+      UV_PYTHON_DOWNLOADS: never
+      PYTHONNOUSERSITE: '1'
+      PYTHONDONTWRITEBYTECODE: '1'
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -42,15 +45,22 @@ jobs:
       - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
         with:
           version: '0.11.6'
-      - run: uv sync --locked --dev
-      - run: uv run ruff check .
-      - run: uv run ruff format --check .
+      - run: uv sync --locked --dev --group remote-ci
+      - run: uv run --locked --group remote-ci ruff check .
+      - run: uv run --locked --group remote-ci ruff format --check .
       - name: Check out fixed reviewed ThreadDesk source for the actual MCP roundtrip
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: landjunge/threaddesk
           ref: 770bbc9f0c0a02699cc93cad47d2e2c3782f7080
           path: .ci-threaddesk
+          persist-credentials: false
+      - name: Check out fixed M4 ThreadDesk source for remote R2 and R3
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: landjunge/threaddesk
+          ref: a0dd4c39478b031e0e31d335c2a15435dfbc52eb
+          path: .ci-threaddesk-m4
           persist-credentials: false
       - name: Check out fixed reviewed TollGate stop-only journal source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -59,8 +69,28 @@ jobs:
           ref: 53fc57cc2e082d022e65e5929cb2a1e186fba852
           path: .ci-tollgate
           persist-credentials: false
-      - run: uv run pytest -q -W error::pytest.PytestUnraisableExceptionWarning
+      - name: Legacy tests in a fresh process bound to TD770
+        run: >-
+          uv run --locked --group remote-ci python scripts/ci_remote_tests.py legacy
+          --expected-kb "${{ github.sha }}" --td .ci-threaddesk --tollgate .ci-tollgate
+          --report-dir "${{ runner.temp }}/kb-ci-${{ github.run_id }}-${{ github.run_attempt }}-legacy"
         env:
+          PYTHONPATH: ${{ github.workspace }}/src:${{ github.workspace }}/.ci-threaddesk/src
           KIRABRIDGE_TEST_THREADDESK_SOURCE: ${{ github.workspace }}/.ci-threaddesk/src
+          KIRABRIDGE_TEST_REMOTE_THREADDESK_SOURCE: ''
           KIRABRIDGE_TEST_TOLLGATE_SOURCE: ${{ github.workspace }}/.ci-tollgate
+          PYTEST_ADDOPTS: ''
+          PYTEST_PLUGINS: ''
+      - name: Remote R2 and R3 in a fresh process bound to M4 with no skips
+        run: >-
+          uv run --locked --group remote-ci python scripts/ci_remote_tests.py remote
+          --expected-kb "${{ github.sha }}" --td .ci-threaddesk-m4
+          --report-dir "${{ runner.temp }}/kb-ci-${{ github.run_id }}-${{ github.run_attempt }}-remote"
+        env:
+          PYTHONPATH: ${{ github.workspace }}/src:${{ github.workspace }}/.ci-threaddesk-m4/src
+          KIRABRIDGE_TEST_THREADDESK_SOURCE: ${{ github.workspace }}/.ci-threaddesk-m4/src
+          KIRABRIDGE_TEST_REMOTE_THREADDESK_SOURCE: ${{ github.workspace }}/.ci-threaddesk-m4/src
+          KIRABRIDGE_TEST_TOLLGATE_SOURCE: ''
+          PYTEST_ADDOPTS: ''
+          PYTEST_PLUGINS: ''
       - run: uv build
