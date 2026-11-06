@@ -19,7 +19,9 @@ Instanz `5754188249e24f83b1f00f8baa596099`; AppPID85582. Der native Helfer melde
 bei echter App-Abfrage ebenfalls diesen Quellpin. Dateiabruf und sichtbarer
 Terminalbefehl `RC40_LIVE_TERMINAL_OK` bestanden. Nach der Installation wurden
 alle228 Wheel-Dateien und alle3 nativen App-Dateien nochmals direkt mit dem
-geprüften Paket verglichen: sämtliche Bytes/Hashes stimmen überein.
+geprüften Paket verglichen: sämtliche Bytes/Hashes stimmen überein. Der aktuelle
+native Helfer bestätigte zusätzlich seine Bedienungshilfen-Berechtigung als
+`granted=true`, ohne eine neue Rechteanfrage auszulösen.
 
 Dies ist ein lokal gebautes und geprüftes Intel-Paket; **kein neu veröffentlichtes
 GitHub-Release und kein neuer öffentlicher RC40-Download**. Der bestehende
@@ -75,9 +77,18 @@ Die Inventur erfasste132 KiraBridge- und34 ThreadDesk-Worktreeeinträge. Elf bzw
 vier geänderte Arbeitsstände bleiben erhalten; fünf bereits fehlende historische
 KiraBridge-Pfade wurden weder als aktive Quelle benutzt noch pauschal bereinigt.
 
-Der **separate** Supervisor bleibt PID77398 aus0da9abb; sein Profil und launchd-
-Plist sind bytegleich. AutoNext ist weiter deaktiviert; der Supervisor beobachtet,
-ohne neue Aufgabe oder Providerläufe aus dieser Installation abzuleiten.
+Der **separate** Supervisor bleibt PID77398 aus0da9abb. Bei der Installation
+waren Profil und launchd-Plist bytegleich und AutoNext deaktiviert. Während des
+nachgelagerten CI-Wartens arbeitete eine zusätzliche Koordinationssitzung
+`01a1b10a-957f-7622-ba78-2fd04b43c0db` an neuen Runbook-Aufgaben. Der frische
+Betriebsabgleich fand danach ausschließlich den Profilabschnitt `continuation`
+geändert; PID, Quellpfad und Plist bleiben erhalten. Alle zehn ursprünglichen
+Core-Tasks sind mit Zustand und Fehlerbytes unverändert, jetzt sind insgesamt
+14 Tasks bei diesem Abgleich vorhanden. AutoNext meldete am06.11. um13:46UTC `enabled=true`, aber
+`stopped/continuation_external_claim`; Fortsetzung weiterhin `watching`. Diese
+parallele Arbeit wird nicht zurückgesetzt oder als Leistung dieser Installation
+angenommen. Die andere Sitzung berichtete DE-Abschluss und EN-Folgestart nach
+22,9Sekunden; das ist deren Bericht, kein hier neu abgenommener Dauerbetrieb.
 `coordinator.status` am Hauptdienst weist einen fremden/nicht konfigurierten
 Koordinatorbesitzer mit `coordinator_owner_required` zurück; der tatsächliche
 separate Status wird über `bigplan-loop status` geprüft. Das ist keine unbegrenzte
@@ -96,8 +107,11 @@ Quelllinien sind als Vorfahren erhalten. [PR-CI42217592012](https://github.com/l
 bestand zwei vollständige Läufe mit jeweils2680 Fällen,0Fehlern und0Skips;
 [Linux-TLS/Restore42217592084](https://github.com/landjunge/threaddesk/actions/runs/42217592084)
 bestand ebenfalls. Beide echten JUnit-Dateien wurden unabhängig zurückgelesen.
-Die automatisch gestartete Main-CI42223212219 und Main-TLS42223212208 werden
-vor dem abschließenden Dokumentationsmerge mit ihrem tatsächlichen Ergebnis ergänzt.
+Auch die automatisch gestartete [Main-CI42223212219](https://github.com/landjunge/threaddesk/actions/runs/42223212219)
+bestand am tatsächlichen Mergecommit b6774db beide Gesamtläufe mit jeweils
+2680 Fällen,0Fehlern und0Skips; beide JUnit-Berichte wurden unabhängig gelesen.
+[Main-TLS42223212208](https://github.com/landjunge/threaddesk/actions/runs/42223212208)
+und die automatische Pages-Auslieferung42223210326 bestanden ebenfalls.
 Die tatsächliche TD-MCP-Gegenstelle bleibt der bisherige
 `threaddesk-770bbc9/src`-Stand. Die neuen Projektfunktionen sind dort nicht
 installiert; Kurzberichte verwenden weiterhin ihren eigenen6eeb465-Adapter.
@@ -118,6 +132,16 @@ Die zuvor nur in jener Linie stehenden [Gesamtplanung](plans/BIGPLAN-GESAMTPLAN-
 werden als datierte historische Quellen übernommen; ihre alten Gates erteilen
 keine neue Autorität und ersetzen diesen aktuellen Installationsnachweis nicht.
 
+## Bereits vorhandener Linux-Tauri-Hinweis
+
+Beim Abgleich wurde [Dependabot1](https://github.com/landjunge/threaddesk/security/dependabot/1)
+frisch gelesen: seit 24.10.2026 offener moderater Hinweis auf `glib 0.18.5` im
+unveränderten ThreadDesk-Tauri-Cargo.lock. [RustSec](https://rustsec.org/advisories/RUSTSEC-2024-0429.html)
+nennt 0.20.0 als erste korrigierte Version. Das lokale Tauri 2.12-Manifest bindet
+GTK/WebKitGTK an Linux/BSD; dieser Pfad ist kein Bestandteil des installierten
+Swift/Python-KiraBridge-Macpakets. Der Hinweis bleibt als konkreter Linux-Tauri-
+Paketpunkt offen; keine Alertunterdrückung oder ungeprüfte GTK-Majoränderung.
+
 ## Lokale Belege
 
 Private Belegwurzel: `~/.local/state/current-mac-integration-20261106/`.
@@ -136,6 +160,9 @@ Mac and installed visibly with the existing transactional desktop installer.
 PR59 merged both histories; both Linux lanes, remote tests and builds passed.
 Runtime, desktop and native helper identities were read back live. Existing
 configuration, credentials,8170 tasks,159 historical UNKNOWNs and58 queue holds
-were retained. The separate supervisor remains unchanged with AutoNext disabled.
-ThreadDesk source integration, its CI/merge and the older installed TD peer are
+were retained. At installation the separate supervisor was unchanged with
+AutoNext disabled. A later parallel coordinator changed only its continuation
+profile; the original ten Core tasks were retained. A later observation reported
+AutoNext enabled but stopped on an external claim; no new chain acceptance is
+inferred by this installation task. ThreadDesk source integration, its CI/merge and the older installed TD peer are
 separate states. No new public RC40 release or ARM/Windows acceptance is claimed.
