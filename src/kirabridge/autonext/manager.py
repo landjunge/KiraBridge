@@ -595,6 +595,8 @@ class AutoNextManager:
                     assignee="codex",
                     title=card.title,
                     body=card.instruction,
+                    model=card.model,
+                    effort=card.effort,
                     idempotency_key="autonext-"
                     + digest([self.settings.grant_id, card.task_id])[:48],
                 ),

@@ -82,6 +82,25 @@ def agent_request(config, name="codex", task_id="agent-task"):
     )
 
 
+@pytest.mark.parametrize("choice", [{"model": "fixture"}, {"effort": "high"}])
+@pytest.mark.parametrize("visible", [False, True])
+async def test_unrouted_model_selection_is_rejected_before_any_cli(
+    bridge, config, tmp_path, choice, visible
+):
+    marker = tmp_path / "must-not-start"
+    body = f"from pathlib import Path\nPath({str(marker)!r}).write_text('started')\n"
+    config.agents["codex"] = AgentConfig(kind="codex", executable=fake_cli(tmp_path, body))
+    config.visible_handoffs.enabled = visible
+    value = agent_request(config)
+    value.arguments.update(choice)
+    async with bridge:
+        submit(bridge, value)
+        final = await bridge.tasks.wait("local", value.task_id)
+    assert final["state"] in {"failed", "blocked"}
+    assert final["error"]["code"] == "agent_selection_unsupported"
+    assert not marker.exists()
+
+
 @pytest.mark.parametrize(
     "ending,expected",
     [

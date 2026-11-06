@@ -256,6 +256,11 @@ class TeamDispatcher:
                         "cwd": worker.cwd,
                         "timeout": worker.timeout,
                         "local_tools": False,
+                        **{
+                            field: claimed[field]
+                            for field in ("model", "effort")
+                            if field in claimed
+                        },
                     },
                 )
                 # Seal the exact generated request before even looking up its

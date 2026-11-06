@@ -1,0 +1,30 @@
+{
+  "schema": "bigplan.berlin-book-selection-demo.v1",
+  "synthetic_manuscript": true,
+  "format_input": "  # berlin – ein spaziergang  \n\n##  am tor \n\nDas Brandenburger Tor steht am Pariser Platz.\n\n  ## notizen \n\nZwei Quellen werden gesondert geprüft.  \n",
+  "format_expected": "# Berlin – ein Spaziergang\n\n## Am Tor\n\nDas Brandenburger Tor steht am Pariser Platz.\n\n## Notizen\n\nZwei Quellen werden gesondert geprüft.\n",
+  "source_snapshots": [
+    {
+      "id": "S1",
+      "url": "https://www.berlin.de/sehenswuerdigkeiten/3560266-3558930-brandenburger-tor.html",
+      "publisher": "Berlin.de",
+      "retrieved_date": "2026-11-06",
+      "kind": "manually_verified_paraphrase",
+      "text": "Das Berliner Stadtportal beschreibt das Brandenburger Tor am Pariser Platz in Berlin. Es nennt Carl Gotthard Langhans als Architekten und 1788 bis 1791 als Bauzeit."
+    },
+    {
+      "id": "S2",
+      "url": "https://denkmaldatenbank.berlin.de/daobj.php?obj_dok_nr=09065019",
+      "publisher": "Landesdenkmalamt Berlin",
+      "retrieved_date": "2026-11-06",
+      "kind": "manually_verified_paraphrase",
+      "text": "Die Denkmaldatenbank führt das Brandenburger Tor unter 09065019 als Baudenkmal am Pariser Platz im Bezirk und Ortsteil Mitte. Die Beschreibung nennt fünf Durchfahrten der Toranlage."
+    }
+  ],
+  "claims": [
+    {"id": "C1", "text": "Das Brandenburger Tor steht am Pariser Platz in Berlin.", "expected": "supported"},
+    {"id": "C2", "text": "Architekt des Brandenburger Tores war Karl Friedrich Schinkel.", "expected": "contradicted"},
+    {"id": "C3", "text": "2025 besuchten exakt 12,3 Millionen Menschen das Tor.", "expected": "unsupported"},
+    {"id": "C4", "text": "Die Toranlage besitzt fünf Durchfahrten.", "expected": "supported"}
+  ]
+}

@@ -18,6 +18,47 @@ class OutcomeUncertain(RoutingError):
     """The effect boundary was crossed; never label a lost receipt as not started."""
 
 
+def _parameters(argv, decision):
+    """Read actual bounded CLI options, never the prompt or environment."""
+    try:
+        if argv.count("--model") != 1:
+            raise ValueError("One model setting required")
+        model = argv[argv.index("--model") + 1]
+        if decision["cli"] == "grok":
+            if argv.count("--effort") != 1:
+                raise ValueError("One effort setting required")
+            effort = argv[argv.index("--effort") + 1]
+        else:
+            values = [
+                arg.split("=", 1)[1] for arg in argv if arg.startswith("model_reasoning_effort=")
+            ]
+            if len(values) != 1:
+                raise ValueError("One effort setting required")
+            effort = json.loads(values[0])
+    except (ValueError, IndexError):
+        raise RoutingError("CLI arguments contain no unambiguous model/effort") from None
+    if model != decision["model"] or effort != decision["effort"]:
+        raise RoutingError("Actual CLI arguments differ from selected model/effort")
+    return {"cli": decision["cli"], "model": model, "effort": effort}
+
+
+def _start_observation(parameters, evidence):
+    observed = (
+        isinstance(evidence, dict)
+        and evidence.get("spawn_observed") is True
+        and type(evidence.get("pid")) is int
+        and evidence["pid"] > 0
+    )
+    return {
+        "scope": "local_cli_arguments_and_process_only",
+        "spawn_observed": observed,
+        "pid": evidence["pid"] if observed else None,
+        "spawned_at": evidence.get("spawned_at") if observed else None,
+        "confirmed_parameters": parameters if observed else None,
+        "matches_selection": True if observed else None,
+    }
+
+
 def _write_private(path, data):
     # Never follow or replace a pre-existing output file; task admission is exclusive.
     fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
@@ -53,8 +94,14 @@ def _capture(state, task_id, output, errors, result):
 def launch(source, runtime, task, *, execute=False, probe=True, runner=run_bounded):
     decision = before_delegation(source, runtime, task, probe=probe)
     argv, stdin = command_for(decision, task)
+    parameters = _parameters(argv, decision)
     if not execute:
-        return {**decision, "state": "planned", "starts_model": False}
+        return {
+            **decision,
+            "state": "planned",
+            "starts_model": False,
+            "selected_parameters": parameters,
+        }
     if decision["access_kind"] != "subscription":
         raise RoutingError("This launcher implements only the existing subscription routes")
     state = Path(runtime.state_dir)
@@ -66,7 +113,15 @@ def launch(source, runtime, task, *, execute=False, probe=True, runner=run_bound
     except FileExistsError:
         raise RoutingError("Task ID already admitted; inspect its receipt, never replay") from None
     with os.fdopen(fd, "w") as stream:
-        json.dump({**decision, "state": "admitted", "automatic_retry": False}, stream)
+        json.dump(
+            {
+                **decision,
+                "selected_parameters": parameters,
+                "state": "admitted",
+                "automatic_retry": False,
+            },
+            stream,
+        )
         stream.flush()
         os.fsync(stream.fileno())
     # Persist the directory entry as well as the receipt before any model effect.
@@ -84,7 +139,7 @@ def launch(source, runtime, task, *, execute=False, probe=True, runner=run_bound
     workroot = min(roots, key=lambda root: len(root.parts))
     lease = state / ("cwd-" + hashlib.sha256(str(workroot).encode()).hexdigest() + ".lock")
     locked = False
-    result = {**decision, "automatic_retry": False}
+    result = {**decision, "selected_parameters": parameters, "automatic_retry": False}
     stage = "lease"
     try:
         if not task.read_only:
@@ -116,6 +171,9 @@ def launch(source, runtime, task, *, execute=False, probe=True, runner=run_bound
         )
         if hasattr(child, "process_evidence"):
             result["process_evidence"] = child.process_evidence
+        result["start_observation"] = _start_observation(
+            parameters, getattr(child, "process_evidence", None)
+        )
         stage = "output_persist"
         _capture(state, task.task_id, child.stdout or b"", getattr(child, "stderr", b""), result)
         stage = "metadata_parse"
@@ -130,6 +188,7 @@ def launch(source, runtime, task, *, execute=False, probe=True, runner=run_bound
             evidence = getattr(exc, "process_evidence", {})
             if evidence:
                 result["process_evidence"] = evidence
+                result["start_observation"] = _start_observation(parameters, evidence)
                 if evidence.get("native_exit_code") is not None:
                     result["native_exit_code"] = evidence["native_exit_code"]
                 result["output_truncated"] = evidence.get("output_truncated", False)

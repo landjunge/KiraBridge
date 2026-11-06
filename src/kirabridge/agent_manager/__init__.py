@@ -614,6 +614,13 @@ class AgentManager:
             raise BridgeError("agent_unavailable", "Agent adapter is not configured")
         if guard := getattr(self, "worktree_guard", None):
             guard(task, args)
+        requested_selection = args.model is not None or args.effort is not None
+        routing_guard = getattr(self, "managed_routing_guard", None)
+        if requested_selection and (not separate_managed or routing_guard is None):
+            raise BridgeError(
+                "agent_selection_unsupported",
+                "Per-task model/effort requires an explicitly routed managed worker",
+            )
         if self.config.visible_handoffs.enabled and not separate_managed:
             if owned_resume_session is not None or handoff_reply:
                 raise BridgeError(
@@ -628,8 +635,12 @@ class AgentManager:
             return await self.visible_handoffs.execute(
                 task, args, running, progress, binding_override=visible_binding
             )
-        if separate_managed and (guard := getattr(self, "managed_routing_guard", None)):
-            guard(task, args)
+        if separate_managed and routing_guard is not None:
+            profile = routing_guard(task, args)
+            if requested_selection and profile is None:
+                raise BridgeError(
+                    "agent_selection_unsupported", "Selected worker has no routing policy"
+                )
         full_access = (
             principal.permission_level is not None
             and config.bridge_tools

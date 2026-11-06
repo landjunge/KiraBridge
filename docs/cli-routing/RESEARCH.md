@@ -1,7 +1,11 @@
 # KI-/CLI-Fähigkeitsmatrix und Delegationsauswahl
 
-Stand: 05.11.2026. Auftrag CLI-MATRIX-20261105. Codex koordiniert; Grok ist ein
-gezielter unabhängiger Prüfer. Der dokumentierte größere Codex-Zugang bleibt bei
+Stand der Recherche: 05.11.2026. Auftrag CLI-MATRIX-20261105. Die vom Nutzer
+eingesetzte Instanz koordiniert; CLI und Anbieter begründen keine feste Leitungsrolle.
+Aktueller [Auswahlvertrag und Masterprompt](PROJECT-ROLE-MASTERPROMPT.md), 06.11.2026:
+Auftragsvorgabe vor Workeranforderung vor automatischer Wahl; Koordinator-Denkstufe
+getrennt halten. Grok kann einen unabhängigen Prüfauftrag übernehmen.
+Der dokumentierte größere Codex-Zugang bleibt bei
 vergleichbarer Eignung bevorzugt. Es gibt keine erfundene Restquote oder Preisersparnis.
 
 Der Nutzer nennt sieben CLIs. Auf diesem Mac sind sieben auffindbar. Der aktuelle

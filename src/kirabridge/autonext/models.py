@@ -5,7 +5,7 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
-from kirabridge.bridge_core.models import BridgeError, Input
+from kirabridge.bridge_core.models import BridgeError, DelegationSelection, Input
 
 ID = r"^[A-Za-z0-9][A-Za-z0-9_.-]{0,95}$"
 SHA = r"^[a-f0-9]{64}$"
@@ -173,7 +173,7 @@ class Acceptance(Input):
         return self
 
 
-class ReadyCard(Input):
+class ReadyCard(DelegationSelection):
     autonext: Literal[1]
     task_id: str = Field(pattern=ID)
     state: Literal["READY", "IDEA", "HOLD", "UNKNOWN", "STALE", "CANCELLED"]

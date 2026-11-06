@@ -5,7 +5,7 @@ import json
 from enum import StrEnum
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, model_serializer, model_validator
 
 
 class NativeFailureEvidence(BaseModel):
@@ -154,7 +154,22 @@ class ProcessInput(Input):
     task_id: str
 
 
-class AgentInput(Input):
+class DelegationSelection(Input):
+    """Optional per-assignment preferences, never a change to global defaults."""
+
+    model: str | None = Field(default=None, pattern=r"^[A-Za-z0-9][A-Za-z0-9_./:+-]{0,160}$")
+    effort: str | None = Field(default=None, pattern=r"^[a-z][a-z0-9_-]{0,31}$")
+
+    @model_serializer(mode="wrap")
+    def omit_unspecified_selection(self, handler):
+        value = handler(self)
+        for field in ("model", "effort"):
+            if value.get(field) is None:
+                value.pop(field, None)
+        return value
+
+
+class AgentInput(DelegationSelection):
     local_tools: bool = False
     wait_for_reply: bool = True
     agent: str = Field(pattern=r"^[a-z][a-z0-9_-]{0,40}$")
