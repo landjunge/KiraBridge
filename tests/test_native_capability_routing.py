@@ -34,6 +34,7 @@ argv=sys.argv[1:]
 prompt=pathlib.Path(argv[argv.index('--prompt-file')+1]).read_text()
 data=json.loads(prompt.split('\\n',1)[1])
 assert '--json-schema' in argv and '--no-subagents' in argv
+assert argv.count('--no-auto-update') == 1
 assert '--disable-web-search' in argv and '--no-leader' in argv
 assert [argv[i+1] for i,v in enumerate(argv) if v=='--deny']==['Bash','Edit','MCPTool']
 print(json.dumps({'sessionId':'fixture-routed-grok','requestId':'fixture-request',
