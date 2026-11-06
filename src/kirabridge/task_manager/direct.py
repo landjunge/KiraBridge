@@ -3,6 +3,7 @@
 import asyncio
 
 from kirabridge.bridge_core.models import State, TerminalInput, canonical
+from kirabridge.permissions import direct_terminal_required
 
 
 class NativeAdmission:
@@ -35,7 +36,8 @@ class NativeAdmission:
                 rows = self.manager.store.db.execute(
                     "SELECT id FROM tasks WHERE state='queued' AND ("
                     "operation='terminal.visible' OR "
-                    "(operation='terminal.execute' AND principal='chatgpt') OR "
+                    "(operation IN ('terminal.execute','admin.execute') AND "
+                    "principal IN (SELECT value FROM json_each(?))) OR "
                     "(operation='session.input' AND "
                     "json_extract(args,'$.pane_id') LIKE 'terminal:%') OR "
                     "(operation='agent.execute' AND ?)) AND EXISTS ("
@@ -44,6 +46,7 @@ class NativeAdmission:
                     "OR EXISTS (SELECT 1 FROM events c WHERE c.task_id=tasks.id "
                     "AND c.state='created' AND c.seq>?))) ORDER BY created,id LIMIT ?",
                     (
+                        canonical(self.manager.native_principals()),
                         self.manager.config.visible_handoffs.enabled,
                         self.after_event,
                         self.after_event,
@@ -62,8 +65,8 @@ class NativeAdmission:
         operation, arguments = task["operation"], task.get("args", {})
         return (
             operation == "terminal.visible"
-            or operation == "terminal.execute"
-            and task.get("principal") == "chatgpt"
+            or operation in {"terminal.execute", "admin.execute"}
+            and direct_terminal_required(self.manager.config, task.get("principal"))
             or operation == "session.input"
             and str(arguments.get("pane_id", "")).startswith("terminal:")
             or operation == "agent.execute"
@@ -159,7 +162,9 @@ class NativeAdmission:
 
     @staticmethod
     def _managed_background(task):
-        if task["operation"] != "terminal.execute" or task.get("principal") != "chatgpt":
+        # submit() has already admitted only a configured native principal. The
+        # immutable route identity below binds every later spawn observation.
+        if task["operation"] != "terminal.execute":
             return False
         try:
             # Match the executor's strict typed route, not arbitrary truthy args.

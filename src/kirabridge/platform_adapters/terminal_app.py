@@ -726,6 +726,8 @@ class TerminalAppTransport:
             self.native_target(pane_id)
             + """
             const id = targetWindow.id();
+            if (targetWindow.tabs().length !== 1)
+                throw Error("Refusing to close a multi-tab Terminal window");
             const others = app.windows().filter(w => w.id() !== id).map(w => w.id());
             if (!others.length) throw Error("Refusing to close the only Terminal tab");
             targetWindow.close();

@@ -11,7 +11,6 @@ import os
 import secrets
 import signal
 import socket
-import subprocess
 import time
 from datetime import datetime
 from pathlib import Path
@@ -33,6 +32,7 @@ from kirabridge.autonext.models import ApprovedCard, AutoNextConfig
 from kirabridge.bridge_core.bridge import Bridge
 from kirabridge.bridge_core.config import Config
 from kirabridge.capability_routing.router import NativeRoutingSettings, WorkerRouting
+from kirabridge.coordinator_reporting import run_status_report
 from kirabridge.mcp_gateway.http import create_http_app
 from kirabridge.team_manager.models import (
     TeamCreate,
@@ -324,12 +324,13 @@ def configuration(profile):
 
 
 def report(profile, done, text, status="working"):
+    report_id = "loop-" + secrets.token_hex(12)
     message = {
         "done": ", ".join(done)[-500:] or "Noch kein Aufgabenabschluss",
         "working": text[:600],
         "next": "Nächste passende bestehende Aufgabe im beauftragten Umfang",
     }
-    subprocess.run(
+    return run_status_report(
         [
             profile["report_cli"],
             "report",
@@ -338,7 +339,7 @@ def report(profile, done, text, status="working"):
             "--agent",
             "Codex Loop",
             "--report-id",
-            "loop-" + secrets.token_hex(12),
+            report_id,
             "--status",
             status,
             "--done",
@@ -348,13 +349,12 @@ def report(profile, done, text, status="working"):
             "--next",
             message["next"],
         ],
-        check=True,
-        timeout=20,
-        stdout=subprocess.DEVNULL,
+        report_id=report_id,
     )
 
 
 def report_worker(profile, work):
+    report_id = "observe-" + secrets.token_hex(12)
     state = work["state"]
     status = (
         "done"
@@ -374,7 +374,7 @@ def report_worker(profile, work):
         if work["assignee"] == "codex_verify"
         else "Codex Worker"
     )
-    subprocess.run(
+    return run_status_report(
         [
             profile["report_cli"],
             "report",
@@ -383,7 +383,7 @@ def report_worker(profile, work):
             "--agent",
             actor,
             "--report-id",
-            "observe-" + secrets.token_hex(12),
+            report_id,
             "--status",
             status,
             "--done",
@@ -395,9 +395,7 @@ def report_worker(profile, work):
             "--next",
             "Koordinator prüft den gebundenen Core-Beleg " + str(work["core_task_id"]),
         ],
-        check=True,
-        timeout=20,
-        stdout=subprocess.DEVNULL,
+        report_id=report_id,
     )
 
 
@@ -624,6 +622,7 @@ async def serve(path):
     last_report = 0
     last_summary = None
     worker_reports = {}
+    reporting = {"coordinator": None, "workers": {}}
     team, anchor = seed(bridge)
     if profile.get("continuation"):
         active_revision = restore(bridge, profile)
@@ -652,6 +651,8 @@ async def serve(path):
                 for work in bridge.store.db.execute(
                     "SELECT id,assignee,state,core_task_id FROM team_work WHERE assignee!='local'"
                 ).fetchall():
+                    if stop.is_set():
+                        break
                     fingerprint = digest([work["state"], work["core_task_id"]])
                     previous = worker_reports.get(work["id"])
                     terminal = work["state"] in (
@@ -668,8 +669,37 @@ async def serve(path):
                     ):
                         continue
                     row = dict(work)
-                    await asyncio.to_thread(report_worker, profile, row)
+                    reporting["workers"][row["id"]] = await asyncio.to_thread(
+                        report_worker, profile, row
+                    )
                     worker_reports[row["id"]] = (fingerprint, time.monotonic())
+                done = [
+                    r["task_id"]
+                    for r in bridge.store.db.execute(
+                        "SELECT task_id FROM autonext_items WHERE state='completed' ORDER BY rowid"
+                    )
+                ]
+                summary = digest([state, done])
+                if not stop.is_set() and (
+                    time.monotonic() - last_report >= 60 or summary != last_summary
+                ):
+                    mode = (
+                        "blocked"
+                        if (state["state"] == "stopped" and not intake)
+                        or (intake and intake.get("resource_stop"))
+                        else "idle"
+                        if state["state"] in ("disabled", "complete", "idle")
+                        else "working"
+                    )
+                    reporting["coordinator"] = await asyncio.to_thread(
+                        report,
+                        profile,
+                        done,
+                        "Koordinator: " + state["state"] + " / " + str(state.get("reason")),
+                        mode,
+                    )
+                    last_report = time.monotonic()
+                    last_summary = summary
                 save(
                     cfg.state_path / "status.json",
                     {
@@ -678,6 +708,7 @@ async def serve(path):
                         "execution_scope": "separate_managed_session",
                         "autonext": state,
                         "completions": processed,
+                        "reporting": reporting,
                         "continuation": {
                             "authority_ref": intake["authority_ref"],
                             "source_revision": intake["source_revision"],
@@ -692,31 +723,8 @@ async def serve(path):
                         else None,
                     },
                 )
-                done = [
-                    r["task_id"]
-                    for r in bridge.store.db.execute(
-                        "SELECT task_id FROM autonext_items WHERE state='completed' ORDER BY rowid"
-                    )
-                ]
-                summary = digest([state, done])
-                if time.monotonic() - last_report >= 60 or summary != last_summary:
-                    mode = (
-                        "blocked"
-                        if (state["state"] == "stopped" and not intake)
-                        or (intake and intake.get("resource_stop"))
-                        else "idle"
-                        if state["state"] in ("disabled", "complete", "idle")
-                        else "working"
-                    )
-                    await asyncio.to_thread(
-                        report,
-                        profile,
-                        done,
-                        "Koordinator: " + state["state"] + " / " + str(state.get("reason")),
-                        mode,
-                    )
-                    last_report = time.monotonic()
-                    last_summary = summary
+                if stop.is_set():
+                    break
                 try:
                     if (
                         latest.get("completion_target")

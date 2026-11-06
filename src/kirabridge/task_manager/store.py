@@ -493,6 +493,7 @@ class Store:
         *,
         native_visible=False,
         managed_workers=(),
+        native_principals=("chatgpt",),
     ) -> dict | None:
         with self.transaction():
             selection, names = self.lane_selection(control)
@@ -518,10 +519,12 @@ class Store:
                     names.extend(allowed)
                 selection += (
                     " AND NOT ((" + agent_native + ") OR operation='terminal.visible' OR "
-                    "(operation='terminal.execute' AND principal='chatgpt') OR "
+                    "(operation IN ('terminal.execute','admin.execute') AND "
+                    "principal IN (SELECT value FROM json_each(?))) OR "
                     "(operation='session.input' AND "
                     "json_extract(args,'$.pane_id') LIKE 'terminal:%'))"
                 )
+                names.append(canonical(native_principals))
             row = self.db.execute(
                 "SELECT id,principal,created,operation FROM tasks WHERE state='queued' "
                 "AND " + selection + " ORDER BY created,id LIMIT 1",

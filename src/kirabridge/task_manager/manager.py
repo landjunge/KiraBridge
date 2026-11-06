@@ -325,6 +325,16 @@ class TaskManager:
             if worker.agent and worker.execution_scope == "separate_managed_session"
         )
 
+    def native_principals(self):
+        """Keep the canonical route and configured aliases out of the replay queue."""
+        from kirabridge.permissions import direct_terminal_required
+
+        return tuple(
+            name
+            for name in sorted(set(self.config.principals) | {"chatgpt"})
+            if direct_terminal_required(self.config, name)
+        )
+
     def is_sealed_managed_task(self, task):
         if (
             task.get("operation") != "agent.execute"
@@ -369,6 +379,7 @@ class TaskManager:
                 lane,
                 native_visible=self.config.visible_handoffs.enabled,
                 managed_workers=self.managed_workers(),
+                native_principals=self.native_principals(),
             )
             if task is None:
                 try:

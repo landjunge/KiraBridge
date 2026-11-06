@@ -99,3 +99,31 @@ def test_worker_deadline_does_not_exceed_existing_core_contract(tmp_path, timeou
     )
     with pytest.raises(ValueError):
         runtime.LoopProfile.model_validate(value)
+
+
+@pytest.mark.parametrize("worker_report", [False, True])
+def test_reporting_timeout_does_not_exit_the_coordinator(monkeypatch, worker_report):
+    import subprocess
+
+    calls = []
+
+    def timed_out(command, **kwargs):
+        calls.append((command, kwargs))
+        raise subprocess.TimeoutExpired(command, kwargs["timeout"])
+
+    monkeypatch.setattr(subprocess, "run", timed_out)
+    value = {"report_cli": "/unused-reporter", "instance": "fixture-loop"}
+    if worker_report:
+        result = runtime.report_worker(
+            value,
+            {"state": "completed", "assignee": "codex", "id": "work-1", "core_task_id": "task-1"},
+        )
+    else:
+        result = runtime.report(value, ["task-1"], "next observation")
+    assert result["state"] == "unknown"
+    assert result["error"] == "report_timeout"
+    assert result["automatic_retry"] is False
+    assert len(calls) == 1
+    command, options = calls[0]
+    assert result["report_id"] == command[command.index("--report-id") + 1]
+    assert options["timeout"] == 20
