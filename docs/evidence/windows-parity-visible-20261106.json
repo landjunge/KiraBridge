@@ -1,0 +1,77 @@
+{
+  "task_id": "KB-WINDOWS-PARITY-VISIBLE-20261106-01",
+  "phase": "native-acceptance",
+  "accepted_by_operator": false,
+  "implementer": "grok",
+  "source_commit": "10ed989ae55ae8d2b38a723a903cfea8ed88c22b",
+  "source_subject": "test: check pinned runtime directory boundaries on macOS",
+  "parent_fix": "57de232b33d4ddd8a85d7abb14e5dfd1e2d66f5d",
+  "branch": "feat/windows-parity-grok-20261106",
+  "pushed": false,
+  "release_started": false,
+  "mac_production_install": false,
+  "execution_policy": "Restricted",
+  "execution_policy_changed": false,
+  "standalone_executable": false,
+  "vm": {
+    "name": "KiraBridge Windows Dev Fix1",
+    "uuid": "2B6EE828-02F0-42AE-B4FE-BE57C448F65E",
+    "utmctl_status": "started",
+    "guest": "Windows 11 Enterprise Evaluation, x86_64",
+    "guest_agent": "not running",
+    "directory_share": "None",
+    "python": "3.14.10 AMD64",
+    "python_path": "C:\\Users\\Kiradev\\AppData\\Local\\KiraBridgeDev\\Python314\\python.exe",
+    "stage": "C:\\Users\\Kiradev\\AppData\\Local\\KiraParity20261106Grok01",
+    "console": "visible Windows PowerShell",
+    "finished_visible": "2026-11-07T00:01 local, passed_native_scope on screen, then get-executionpolicy returned Restricted"
+  },
+  "package": {
+    "path": "dist/KiraBridge-0.8.0rc40-Windows-tested-source.zip",
+    "absolute_path": "/Users/landjunge/KiraBridge-worktrees/windows-parity-grok-20261106/dist/KiraBridge-0.8.0rc40-Windows-tested-source.zip",
+    "sha256": "6709320ead6f5071d597e747da867de5bb85408cc5cff161e28c779c3b480ea2",
+    "bytes": 2609875,
+    "provenance_commit": "10ed989ae55ae8d2b38a723a903cfea8ed88c22b",
+    "native_rebuild_sha256": "6709320ead6f5071d597e747da867de5bb85408cc5cff161e28c779c3b480ea2",
+    "kind": "existing Python plus deterministic zip, not an exe or msi"
+  },
+  "portable_tests": {
+    "commit": "10ed989ae55ae8d2b38a723a903cfea8ed88c22b",
+    "ruff": "All checks passed on the four touched Python files",
+    "pytest": "PYTHONPATH=src .venv/bin/python -m pytest -q tests/test_windows_parity_20261106.py -> 24 passed in 5.24s",
+    "interpreter": "3.14.4"
+  },
+  "native_pipeline": {
+    "report": "/Users/landjunge/.local/state/windows-parity-grok-20261106/guest-pipeline-final.json",
+    "state": "passed_native_scope",
+    "passed": true,
+    "finished_at_local": "2026-11-06T23:58:16",
+    "data_preserved": true,
+    "installed_release": "C:\\Users\\Kiradev\\AppData\\Local\\KiraParity20261106Grok01\\install\\releases\\0.8.0rc40-10ed989ae55a",
+    "steps_exit_0": [
+      "native-build",
+      "install-baseline",
+      "update-native",
+      "native-package-harness",
+      "native-e2e",
+      "rollback-baseline",
+      "restore-tested-native"
+    ]
+  },
+  "native_functions": {
+    "powershell_cp1252": {"stdout": "Größe", "encoding": "cp1252", "exit_code": 0},
+    "powershell_cp850": {"stdout": "Größe", "encoding": "cp850", "exit_code": 0},
+    "visible_console": {"text": "Größe € 😀", "console_visible": true, "exit_code": 0},
+    "unicode_text": "passed",
+    "applications": "launched, listed, focused, original windows cleaned up",
+    "keyboard_harness": "accept_windows_keyboard exit 0",
+    "window_harness": "accept_windows_windows exit 0"
+  },
+  "not_claimed": [
+    "standalone exe or msi",
+    "Windows service",
+    "attachment to an existing Windows Terminal tab",
+    "full macOS clipboard and voice parity",
+    "push, release, or a change of the Mac production install"
+  ]
+}
