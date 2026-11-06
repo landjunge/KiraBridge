@@ -5,7 +5,7 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
-from kirabridge.bridge_core.models import Input
+from kirabridge.bridge_core.models import BridgeError, Input
 
 ID = r"^[A-Za-z0-9][A-Za-z0-9_.-]{0,95}$"
 SHA = r"^[a-f0-9]{64}$"
@@ -54,6 +54,7 @@ class AutoNextConfig(BaseModel):
     grant_id: str = Field(default="", max_length=96)
     principal: Literal["local", "chatgpt", "codex"] = "local"
     coordinator_mode: bool = False
+    completion_target: str | None = None
     team_id: str = Field(default="", max_length=128)
     team_revision: int = Field(default=0, ge=0)
     board_id: str = Field(default="", max_length=128)
@@ -69,6 +70,18 @@ class AutoNextConfig(BaseModel):
     budget_valid_until: float = Field(default=0, ge=0)
     budget_source_ref: str = Field(default="", max_length=256)
     billing_evidence_ref: str = Field(default="", max_length=256)
+
+    @field_validator("completion_target")
+    @classmethod
+    def bounded_completion_target(cls, value):
+        from kirabridge.completion_manager import valid_target
+
+        if value is None:
+            return value
+        try:
+            return valid_target(value)
+        except BridgeError as error:
+            raise ValueError(str(error)) from None
 
     @model_validator(mode="after")
     def bounded_grant(self):

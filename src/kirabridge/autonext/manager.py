@@ -9,6 +9,7 @@ import asyncio
 import hashlib
 import json
 import os
+import re
 import shutil
 import time
 from pathlib import Path
@@ -16,8 +17,9 @@ from uuid import uuid4
 
 from pydantic import ValidationError
 
-from kirabridge.autonext.models import ReadyCard
+from kirabridge.autonext.models import SHA, ReadyCard
 from kirabridge.bridge_core.models import BridgeError, canonical, digest
+from kirabridge.completion_manager import record_notice, valid_target
 from kirabridge.filesystem_manager import PathScope
 from kirabridge.team_manager.models import TeamWorkCreate
 from kirabridge.whiteboard_read import append_whiteboard, read_whiteboard
@@ -267,10 +269,53 @@ class AutoNextManager:
                 **details,
             }
         )
-        self.store.db.execute(
+        inserted = self.store.db.execute(
             "INSERT OR IGNORE INTO autonext_outbox(key,grant_id,task_id,phase,content) "
             "VALUES(?,?,?,?,?)",
             (key, self.settings.grant_id, task_id, phase, content),
+        )
+        if (
+            inserted.rowcount != 1
+            or phase not in {"completed", "stopped"}
+            or not self.settings.coordinator_mode
+            or self.settings.completion_target is None
+        ):
+            return
+        # All callers own the source/state transaction. The existing outbox row
+        # is the event identity, so replay/restart neither backfills nor executes.
+        event_seq = inserted.lastrowid
+        evidence = {"autonext_outbox_key": key, "content_sha256": text_sha(content)}
+        for name in ("receipt_sha256", "result_sha256"):
+            value = details.get(name)
+            if isinstance(value, str) and re.fullmatch(SHA, value):
+                evidence[name] = value
+        completed = phase == "completed"
+        payload = {
+            "source": "autonext",
+            "task_id": task_id,
+            "grant_id": self.settings.grant_id,
+            "team_id": self.settings.team_id,
+            "phase": phase,
+            "state": phase,
+            "outcome": "success" if completed else "stopped",
+            "completion_scope": "accepted_autonext_task"
+            if completed
+            else "autonext_continuation_stop",
+            "agent_work_completion_verified": completed,
+            "project_completion_verified": False,
+            "chat_completion_verified": False,
+            "automatic_retry": False,
+            "event_seq": event_seq,
+            "evidence_refs": evidence,
+        }
+        record_notice(
+            self.store,
+            self.settings.principal,
+            valid_target(self.settings.completion_target),
+            "autonext",
+            task_id,
+            event_seq,
+            payload,
         )
 
     def _flush(self):
@@ -338,6 +383,9 @@ class AutoNextManager:
 
     def _configuration_ref(self):
         cfg = self.bridge.config
+        grant = self.settings.model_dump()
+        if grant["completion_target"] is None:
+            del grant["completion_target"]  # Preserve existing opt-out grant fingerprints.
         worker, agent = cfg.team.workers.get("codex"), cfg.agents.get("codex")
         executable = (
             shutil.which(
@@ -354,7 +402,7 @@ class AutoNextManager:
         policy = cfg.principals.get("codex")
         return digest(
             {
-                "grant": self.settings.model_dump(),
+                "grant": grant,
                 "worker": worker.model_dump() if worker else None,
                 "agent": agent.model_dump() if agent else None,
                 "executor_file": file_ref,
