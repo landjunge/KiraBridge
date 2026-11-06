@@ -17,7 +17,9 @@ installiert**. Installer-Exit0, sichtbares eigenes Terminal6160/ttys005, Quellpi
 `5f4dd46`. Erster unabhängiger Live-Readback: DienstPID85537,
 Instanz `5754188249e24f83b1f00f8baa596099`; AppPID85582. Der native Helfer meldete
 bei echter App-Abfrage ebenfalls diesen Quellpin. Dateiabruf und sichtbarer
-Terminalbefehl `RC40_LIVE_TERMINAL_OK` bestanden.
+Terminalbefehl `RC40_LIVE_TERMINAL_OK` bestanden. Nach der Installation wurden
+alle228 Wheel-Dateien und alle3 nativen App-Dateien nochmals direkt mit dem
+geprüften Paket verglichen: sämtliche Bytes/Hashes stimmen überein.
 
 Dies ist ein lokal gebautes und geprüftes Intel-Paket; **kein neu veröffentlichtes
 GitHub-Release und kein neuer öffentlicher RC40-Download**. Der bestehende
@@ -36,6 +38,10 @@ nach dem Produktmerge verändern den installierten Laufzeitcode nicht.
 | Native App | Intel x86_64; codesign verify strict bestanden, ad-hoc signiert. |
 | Echte isolierte macOS-Abnahme | RC39 aus8d331314b608→RC40:Upgrade,Datenerhalt,Idempotenz,Neustart,KeepAlive,Rollback und frische Installation bestanden. Offene Completion-Leseverbindung endete beim Wechsel ohne Replay. Testdienst unabhängig als entfernt bestätigt. |
 | Produktive Aktivierung | Gebautes Bundle im eigenen bestätigten sichtbaren Terminal mit `--desktop --require-visible-terminal` aktiviert; Exit0; anschließend authentifizierter CLI- und MCP-Readback. |
+
+Auch der nach dem Merge automatisch gestartete [Mainlauf42219066041](https://github.com/landjunge/KiraBridge/actions/runs/42219066041)
+bestand beide Python-Lanes mit Remoteprüfungen und Builds am tatsächlichen
+Maincommit1b77d78.
 
 Der Pushlauf42217151208 wurde durch die PR-Concurrency ersetzt; er ist kein
 Timeoutnachweis und kein erfolgreicher Lauf. Alte Timeouts und rote Teilprüfungen
@@ -60,6 +66,11 @@ Kompatibilität. Keine alte Datenbanksicherung über neue Nutzerdaten kopieren.
 
 Der frühere Codex-Koordinator bestätigte die Schreibzuständigkeit dieser neuen
 Sitzung; sein geänderter Dokumentationsstand und seine Belege wurden gesichert.
+Die älteren KiraBridge-PRs35,36,40,41,42 und57 wurden nach frischem
+Head-/Statusabgleich als redundant geschlossen: ihre exakten Headcommits sind
+Vorfahren des geprüften RC40-Main. Branches und historische Belege bleiben
+erhalten; abweichende PRs wurden nicht blind gemergt oder geschlossen.
+
 Die Inventur erfasste132 KiraBridge- und34 ThreadDesk-Worktreeeinträge. Elf bzw.
 vier geänderte Arbeitsstände bleiben erhalten; fünf bereits fehlende historische
 KiraBridge-Pfade wurden weder als aktive Quelle benutzt noch pauschal bereinigt.
@@ -79,8 +90,15 @@ und Supervisor77398 liefen danach weiter; andere Agentensitzungen blieben erhalt
 
 [ThreadDesk-PR99](https://github.com/landjunge/threaddesk/pull/99) verbindet
 Main067a525, Plan cd5c994, Remote a0dd4c3 und Kurzberichte6eeb465.
-Seine vollständige Linuxabnahme und sein Merge werden gesondert im Abschluss
-festgehalten. Die tatsächliche TD-MCP-Gegenstelle bleibt der bisherige
+Die reguläre Mainintegration ist `b6774db87781be65a43a581d6637c3220ae75fbd`;
+der Main-Dateibaum entspricht exakt dem geprüften PR-Head87d91ab, alle vier
+Quelllinien sind als Vorfahren erhalten. [PR-CI42217592012](https://github.com/landjunge/threaddesk/actions/runs/42217592012)
+bestand zwei vollständige Läufe mit jeweils2680 Fällen,0Fehlern und0Skips;
+[Linux-TLS/Restore42217592084](https://github.com/landjunge/threaddesk/actions/runs/42217592084)
+bestand ebenfalls. Beide echten JUnit-Dateien wurden unabhängig zurückgelesen.
+Die automatisch gestartete Main-CI42223212219 und Main-TLS42223212208 werden
+vor dem abschließenden Dokumentationsmerge mit ihrem tatsächlichen Ergebnis ergänzt.
+Die tatsächliche TD-MCP-Gegenstelle bleibt der bisherige
 `threaddesk-770bbc9/src`-Stand. Die neuen Projektfunktionen sind dort nicht
 installiert; Kurzberichte verwenden weiterhin ihren eigenen6eeb465-Adapter.
 
