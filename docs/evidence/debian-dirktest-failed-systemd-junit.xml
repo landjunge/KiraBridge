@@ -1,0 +1,1 @@
+<testsuite name="final-delivery-package" tests="3" failures="2"><testcase name="final-package-integrity" time="0.095" /><testcase name="final-package-install" time="38.117"><failure message="(1, 'sh')" /></testcase><testcase name="cleanup" time="0.178"><failure message="" /></testcase></testsuite>
