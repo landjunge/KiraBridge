@@ -133,6 +133,9 @@ def _bound_stream(result: dict, name: str) -> bool:
         return False
     try:
         raw = text.encode(encoding)
+        if text == "" and length == 0:
+            # An absent stream has no BOM, even when this codec emits one.
+            raw = b""
     except (LookupError, UnicodeEncodeError):
         return False
     if len(raw) != length or hashlib.sha256(raw).hexdigest() != digest:
@@ -233,7 +236,7 @@ def _output_encoding(value: str | None) -> str | None:
 def _round_trip(data: bytes, encoding: str) -> str | None:
     try:
         text = data.decode(encoding, "strict")
-        if text.encode(encoding) == data:
+        if not data or text.encode(encoding) == data:
             return text
     except (LookupError, UnicodeDecodeError, UnicodeEncodeError):
         return None

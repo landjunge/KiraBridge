@@ -8,6 +8,8 @@ import threading
 import time
 from pathlib import Path
 
+import pytest
+
 from kirabridge.agent_manager.full_access import bridge_server
 from kirabridge.platform_adapters.windows.visible_console import run_owned_command
 
@@ -209,3 +211,37 @@ def test_explicitly_detached_background_child_survives_completed_command(tmp_pat
                 os.killpg(result["child_pid"], signal.SIGKILL)
             except ProcessLookupError:
                 pass
+
+
+@pytest.mark.parametrize("encoding", ["utf-16", "utf-8-sig"])
+def test_bom_codec_empty_stderr_completes_with_bound_bytes(tmp_path, encoding):
+    from kirabridge.platform_adapters.windows.visible_console import (
+        _bound_stream,
+        _visible_text_state,
+        decode_console_bytes,
+    )
+
+    payload = "completed ä".encode(encoding)
+    outcome = run_owned_command(
+        [sys.executable, "-B", "-c", f"import sys;sys.stdout.buffer.write({payload!r})"],
+        cwd=str(tmp_path),
+        env=dict(os.environ),
+        timeout=5,
+        limit=65536,
+    )
+    assert outcome["state"] == "completed"
+    streams = {
+        name: decode_console_bytes(outcome[name], encoding=encoding)
+        for name in ("stdout", "stderr")
+    }
+    assert streams["stdout"]["text"] == "completed ä"
+    assert streams["stderr"]["text"] == ""
+    assert _visible_text_state(outcome, streams["stdout"], streams["stderr"]) == "completed"
+    for name, decoded in streams.items():
+        result = {
+            name: decoded["text"],
+            **{f"{name}_{key}": value for key, value in decoded.items() if key != "text"},
+        }
+        assert _bound_stream(result, name)
+        result[f"{name}_sha256"] = "0" * 64
+        assert not _bound_stream(result, name)
