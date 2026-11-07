@@ -12,7 +12,13 @@ from pathlib import Path
 
 PAYLOAD = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PAYLOAD / "src"))
-from kirabridge.windows_package import PackageError, install, rollback, status, uninstall  # noqa: E402
+from kirabridge.windows_package import (  # noqa: E402
+    PackageError,
+    install,
+    rollback,
+    status,
+    uninstall,
+)
 from kirabridge.windows_runtime import validate_bundled_runtime  # noqa: E402
 
 
