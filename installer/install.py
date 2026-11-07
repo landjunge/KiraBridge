@@ -362,7 +362,9 @@ def python(release):
         ".venv/bin/python3",
     ):
         candidate = release / relative
-        if candidate.is_file() and not candidate.is_symlink():
+        # uv venv executables normally link to its managed Python installation.
+        # Package import containment is verified separately by release_source().
+        if candidate.is_file():
             return candidate
     return release / "source/.venv/bin/python"
 
@@ -650,9 +652,10 @@ def prepare_bundle(args):
 
 def adopt_release(args):
     """Use a runtime already prepared by install.sh. Do not download or rebuild it."""
-    root = args.release_root.expanduser().resolve()
-    if root.is_symlink():
+    supplied = args.release_root.expanduser()
+    if supplied.is_symlink():
         raise RuntimeError("Symlink release root refused")
+    root = supplied.resolve()
     runtime = python(root)
     if not runtime.is_file():
         raise RuntimeError("Prepared release runtime is missing")

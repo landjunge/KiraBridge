@@ -28,6 +28,19 @@ def installer_module():
     return module
 
 
+def test_linux_runtime_accepts_normal_venv_python_link_but_refuses_linked_release(tmp_path):
+    installer = installer_module()
+    release = tmp_path / "release"
+    venv = release / ".venv/bin"
+    venv.mkdir(parents=True)
+    (venv / "python").symlink_to(sys.executable)
+    assert installer.python(release) == venv / "python"
+    linked = tmp_path / "linked-release"
+    linked.symlink_to(release, target_is_directory=True)
+    with pytest.raises(RuntimeError, match="Symlink release root"):
+        installer.adopt_release(SimpleNamespace(release_root=linked))
+
+
 def test_linux_unit_quotes_server_command_and_keeps_secrets_optional():
     config = "/srv/kira bridge/config.toml"
     body = render_linux_unit(
