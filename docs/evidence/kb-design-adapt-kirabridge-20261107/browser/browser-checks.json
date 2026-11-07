@@ -1,0 +1,250 @@
+{
+  "status": "passed",
+  "browser": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/130.0.6723.31 Safari/537.36",
+  "engine": "Chromium headless shell single-process persistent context; worker sandbox unchanged",
+  "url": "http://127.0.0.1:62594",
+  "runtimeSourceVersion": "0.8.0rc40",
+  "views": [
+    "/",
+    "/protocol",
+    "/team",
+    "/grok-connector"
+  ],
+  "checks": [
+    {
+      "name": "unauthenticated header is unknown; actual control API401",
+      "passed": true
+    },
+    {
+      "name": "/ dark 1280: five originals, own authenticated status/version, foreign unknown, DE/EN, scroll visibility, keys/focus/pointer",
+      "passed": true
+    },
+    {
+      "name": "/protocol dark 1280: five originals, own authenticated status/version, foreign unknown, DE/EN, scroll visibility, keys/focus/pointer",
+      "passed": true
+    },
+    {
+      "name": "/team dark 1280: five originals, own authenticated status/version, foreign unknown, DE/EN, scroll visibility, keys/focus/pointer",
+      "passed": true
+    },
+    {
+      "name": "/grok-connector dark 1280: five originals, own authenticated status/version, foreign unknown, DE/EN, scroll visibility, keys/focus/pointer",
+      "passed": true
+    },
+    {
+      "name": "/ dark 390: five originals, own authenticated status/version, foreign unknown, DE/EN, scroll visibility, keys/focus/pointer",
+      "passed": true
+    },
+    {
+      "name": "/protocol dark 390: five originals, own authenticated status/version, foreign unknown, DE/EN, scroll visibility, keys/focus/pointer",
+      "passed": true
+    },
+    {
+      "name": "/team dark 390: five originals, own authenticated status/version, foreign unknown, DE/EN, scroll visibility, keys/focus/pointer",
+      "passed": true
+    },
+    {
+      "name": "/grok-connector dark 390: five originals, own authenticated status/version, foreign unknown, DE/EN, scroll visibility, keys/focus/pointer",
+      "passed": true
+    },
+    {
+      "name": "/ dark 320: five originals, own authenticated status/version, foreign unknown, DE/EN, scroll visibility, keys/focus/pointer",
+      "passed": true
+    },
+    {
+      "name": "/protocol dark 320: five originals, own authenticated status/version, foreign unknown, DE/EN, scroll visibility, keys/focus/pointer",
+      "passed": true
+    },
+    {
+      "name": "/team dark 320: five originals, own authenticated status/version, foreign unknown, DE/EN, scroll visibility, keys/focus/pointer",
+      "passed": true
+    },
+    {
+      "name": "/grok-connector dark 320: five originals, own authenticated status/version, foreign unknown, DE/EN, scroll visibility, keys/focus/pointer",
+      "passed": true
+    },
+    {
+      "name": "/ light 1280: five originals, own authenticated status/version, foreign unknown, DE/EN, scroll visibility, keys/focus/pointer",
+      "passed": true
+    },
+    {
+      "name": "/protocol light 1280: five originals, own authenticated status/version, foreign unknown, DE/EN, scroll visibility, keys/focus/pointer",
+      "passed": true
+    },
+    {
+      "name": "/team light 1280: five originals, own authenticated status/version, foreign unknown, DE/EN, scroll visibility, keys/focus/pointer",
+      "passed": true
+    },
+    {
+      "name": "/grok-connector light 1280: five originals, own authenticated status/version, foreign unknown, DE/EN, scroll visibility, keys/focus/pointer",
+      "passed": true
+    },
+    {
+      "name": "/ light 390: five originals, own authenticated status/version, foreign unknown, DE/EN, scroll visibility, keys/focus/pointer",
+      "passed": true
+    },
+    {
+      "name": "/protocol light 390: five originals, own authenticated status/version, foreign unknown, DE/EN, scroll visibility, keys/focus/pointer",
+      "passed": true
+    },
+    {
+      "name": "/team light 390: five originals, own authenticated status/version, foreign unknown, DE/EN, scroll visibility, keys/focus/pointer",
+      "passed": true
+    },
+    {
+      "name": "/grok-connector light 390: five originals, own authenticated status/version, foreign unknown, DE/EN, scroll visibility, keys/focus/pointer",
+      "passed": true
+    },
+    {
+      "name": "/ light 320: five originals, own authenticated status/version, foreign unknown, DE/EN, scroll visibility, keys/focus/pointer",
+      "passed": true
+    },
+    {
+      "name": "/protocol light 320: five originals, own authenticated status/version, foreign unknown, DE/EN, scroll visibility, keys/focus/pointer",
+      "passed": true
+    },
+    {
+      "name": "/team light 320: five originals, own authenticated status/version, foreign unknown, DE/EN, scroll visibility, keys/focus/pointer",
+      "passed": true
+    },
+    {
+      "name": "/grok-connector light 320: five originals, own authenticated status/version, foreign unknown, DE/EN, scroll visibility, keys/focus/pointer",
+      "passed": true
+    },
+    {
+      "name": "actual isolated dispatcher stop removes connected glow",
+      "passed": true
+    },
+    {
+      "name": "injected maintenance/error metadata renders busy/error; no peer state fabricated",
+      "passed": true
+    },
+    {
+      "name": "removed real browser session invalidates status/version",
+      "passed": true
+    }
+  ],
+  "screenshots": [
+    {
+      "file": "control-unauthenticated-1280.png",
+      "sha256": "03195f64b9c9116cbe1d19e9eae8080c1c9e7f90a963ccefa9066df61c794da6"
+    },
+    {
+      "file": "control-dark-1280.png",
+      "sha256": "d60543c4fb1ba6adf5b2515c13edb3c9639d1bbed96d9c2c8d6b9c1edf0a77a6"
+    },
+    {
+      "file": "protocol-dark-1280.png",
+      "sha256": "d67bb630e6c8393f177c14619988fe1c5fb09f111be003bcf8e87581a3dd2145"
+    },
+    {
+      "file": "team-dark-1280.png",
+      "sha256": "d2c41f904bc9f57e199d2aa86f5208b099b8c01358de8f8621c14d0c008028e2"
+    },
+    {
+      "file": "connector-dark-1280.png",
+      "sha256": "eedeb6f2a76515d8dafda9ce31fedad1eb3fa3e9df1b1744292e2c09a00d4ee2"
+    },
+    {
+      "file": "control-dark-390.png",
+      "sha256": "e3fcaa098752acc659259da10c27c14ff7dc0c1c5d0d06824ea96d7f963cb46b"
+    },
+    {
+      "file": "protocol-dark-390.png",
+      "sha256": "486c30c936de0ff18157bcbbd6cea485d1b4ac457cf3263dd60644bfdc61252e"
+    },
+    {
+      "file": "team-dark-390.png",
+      "sha256": "456a1659f4b6fb102cd7080313fd0888a78bfb2a674e93187ece3e3f0bdc95f0"
+    },
+    {
+      "file": "connector-dark-390.png",
+      "sha256": "5a1724b53c1537359b0da2fa8ebdf3b2252c11ad2044966b3952052e7f7ffd2c"
+    },
+    {
+      "file": "control-dark-320.png",
+      "sha256": "fe394e2bfc1d2fdf8f190a0e3c9071925aa3ca3fc0e8783f639952b84df06505"
+    },
+    {
+      "file": "protocol-dark-320.png",
+      "sha256": "694471749c3eab8c327b1393b0ea91a3709154b635f4ec94ef8bb3b4b0f2df76"
+    },
+    {
+      "file": "team-dark-320.png",
+      "sha256": "ac22c75039a4864a43bd680a48b4cbfa8fa5b131a13f7d5a40ef49bda9cdb822"
+    },
+    {
+      "file": "connector-dark-320.png",
+      "sha256": "35f5240723bd18d76d0d3dbe4a5221bd9c0ffa16c24b8e3624a3b90f29cf85d9"
+    },
+    {
+      "file": "control-light-1280.png",
+      "sha256": "35be3ca70098b19994dc06c9dfd93d3712f65b77d9c6936406c59caba821f841"
+    },
+    {
+      "file": "protocol-light-1280.png",
+      "sha256": "d8612d93a8517e1bae0bff7a8fe87a627c52984cff41067fdfe2bc751408af86"
+    },
+    {
+      "file": "team-light-1280.png",
+      "sha256": "34e920190eee5d795e97a8fee7937ef09ddf8e3541928f1239b643e23756f0db"
+    },
+    {
+      "file": "connector-light-1280.png",
+      "sha256": "eedeb6f2a76515d8dafda9ce31fedad1eb3fa3e9df1b1744292e2c09a00d4ee2"
+    },
+    {
+      "file": "control-light-390.png",
+      "sha256": "33d1985869b89b2a0f06a56a4a11a7a0d3d83170d98773f3210cd2a687c48a54"
+    },
+    {
+      "file": "protocol-light-390.png",
+      "sha256": "486c30c936de0ff18157bcbbd6cea485d1b4ac457cf3263dd60644bfdc61252e"
+    },
+    {
+      "file": "team-light-390.png",
+      "sha256": "f6314fb3be06c84cfdf19f64dd35c2bbf0713ac95511d0ef5d3947d32dabaac1"
+    },
+    {
+      "file": "connector-light-390.png",
+      "sha256": "5a1724b53c1537359b0da2fa8ebdf3b2252c11ad2044966b3952052e7f7ffd2c"
+    },
+    {
+      "file": "control-light-320.png",
+      "sha256": "fe394e2bfc1d2fdf8f190a0e3c9071925aa3ca3fc0e8783f639952b84df06505"
+    },
+    {
+      "file": "protocol-light-320.png",
+      "sha256": "694471749c3eab8c327b1393b0ea91a3709154b635f4ec94ef8bb3b4b0f2df76"
+    },
+    {
+      "file": "team-light-320.png",
+      "sha256": "1fe9767292e5fed145b14704f4457666b2d2c023c39005dbb04b2232b0a96f5b"
+    },
+    {
+      "file": "connector-light-320.png",
+      "sha256": "35f5240723bd18d76d0d3dbe4a5221bd9c0ffa16c24b8e3624a3b90f29cf85d9"
+    },
+    {
+      "file": "control-real-dispatcher-stopped.png",
+      "sha256": "e0d753c3183f988f2fffcce7d61a93cb6aeb895f23a6236a002066db77cc88c9"
+    },
+    {
+      "file": "control-synthetic-maintenance-presentation.png",
+      "sha256": "d49b124838f75a6de4fb5209396f3c63ad92da220972d060d6b25a2259c7e030"
+    },
+    {
+      "file": "control-injected-transport-error.png",
+      "sha256": "19a1494b10d9d9b960b7993ed85a590362619b71a78fe6f2bc4061a40952865c"
+    },
+    {
+      "file": "control-session-removed-unknown.png",
+      "sha256": "ef0290bcb575550e5dda09201a525907f46f6b6abcd161989d2abf6378847014"
+    }
+  ],
+  "pageErrors": [],
+  "productActionPosts": [],
+  "productionServicesChanged": false,
+  "foreignPeerAcceptance": false,
+  "fixtureBoundary": "Real loopback HTTP/auth/UI/control handlers and actual isolated Bridge dispatcher. OS process inventory disabled. Only maintenance/error metadata is deliberately injected for presentation checks."
+}

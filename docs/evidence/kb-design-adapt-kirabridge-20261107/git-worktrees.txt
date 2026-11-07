@@ -1,0 +1,7 @@
+worktree /Users/landjunge/threaddesk-worktrees/five-tool-design-codex-20261107/.runtime/kb-design-adapt-regular/repository
+HEAD 8b338b66752fb9d65a4c05959c04cf2505412ed2
+branch refs/heads/reference/current-main
+
+worktree /Users/landjunge/threaddesk-worktrees/five-tool-design-codex-20261107/.runtime/kb-design-adapt-regular/worktree
+HEAD 24b0c6faccf9da53f5e5132a0a5e5dd820878aae
+branch refs/heads/feat/design-adapt-kirabridge-20261107

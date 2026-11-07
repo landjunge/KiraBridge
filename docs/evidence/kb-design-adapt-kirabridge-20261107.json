@@ -1,0 +1,549 @@
+{
+  "schema": "kb-design-adapt-evidence-v1",
+  "task": "KB-DESIGN-ADAPT-KIRABRIDGE-20261107",
+  "date": "2026-11-07",
+  "reasoningEffort": "high; user-configured, no override",
+  "status": "implemented, normally imported and browser-accepted local integration delivery; no production installation/release",
+  "git": {
+    "repository": "/Users/landjunge/threaddesk-worktrees/five-tool-design-codex-20261107/.runtime/kb-design-adapt-regular/repository",
+    "worktree": "/Users/landjunge/threaddesk-worktrees/five-tool-design-codex-20261107/.runtime/kb-design-adapt-regular/worktree",
+    "branch": "feat/design-adapt-kirabridge-20261107",
+    "bare": false,
+    "registeredWorktree": true,
+    "main": "8b338b66752fb9d65a4c05959c04cf2505412ed2",
+    "mainRecheckedBeforeDelivery": true,
+    "originalDesign": "d9b433d922258b7ace610d809776dfa47cb317fa",
+    "preparation": "eb1df079a220d8a005c0e12635554c8b50217bfe",
+    "initialIntegration": "2c191e95ee3c2f1d8884de45585375b96f552d20",
+    "implementation": "24b0c6faccf9da53f5e5132a0a5e5dd820878aae",
+    "finalEvidenceCommit": "this documentation-only commit or descendant; runtime bytes equal implementation pin",
+    "primaryCheckoutUntouched": true,
+    "readmeMainBytesUnchanged": true,
+    "conflicts": "No source conflict; README changes intentionally excluded to preserve main/README worker ownership"
+  },
+  "views": [
+    "/",
+    "/protocol",
+    "/team",
+    "/grok-connector"
+  ],
+  "originalAssets": [
+    {
+      "appId": "kirabridge",
+      "file": "np-appbar-kirabridge-dark-256.png",
+      "source": "assets/design/icons/dark/KiraBridge-dark-256.png",
+      "sourceRepository": "KiraBridge",
+      "sourcePin": "d12838ae97c7efcc053c45c3bc9fba5e78f5fe5d",
+      "sha256": "df48979210f0d2fda32ca1c704f818f8c57fa40cdcf8cc7f682616263f7a8f75",
+      "dimensions": [
+        256,
+        256
+      ],
+      "viewport": [
+        14,
+        26,
+        214,
+        204
+      ],
+      "derivation": "Original bytes unchanged; CSS viewport encloses original colored frame; no raster edit",
+      "color": "#fc63ad",
+      "colorSource": "kirabridge:assets/design/icons/dark/KiraBridge-dark-256.png#original-frame-color; dominant original colored-frame pixel, presentation accent only",
+      "originalLocalRepository": "/Users/landjunge/KiraBridge",
+      "originalSource": "assets/design/originals/KiraBridge-dark.png",
+      "originalSha256": "11ceabd0363001f95ec0e23e3940c8e62d20f40388a151348387f5b1c215fd3b"
+    },
+    {
+      "appId": "threaddesk",
+      "file": "np-appbar-threaddesk-dark-256.png",
+      "source": "assets/design/icons/dark/ThreadDesk-dark-256.png",
+      "sourceRepository": "threaddesk",
+      "sourcePin": "40fac387582700ce56c42b856dfe2405f942c012",
+      "sha256": "37acc1808d685b19a17ad6aa50919304877c44730afe3c105771508cb00e12a7",
+      "dimensions": [
+        256,
+        256
+      ],
+      "viewport": [
+        35,
+        40,
+        186,
+        176
+      ],
+      "derivation": "Original bytes unchanged; CSS viewport encloses original colored frame; no raster edit",
+      "color": "#b99cff",
+      "colorSource": "threaddesk:brand/README.md",
+      "originalLocalRepository": "/Users/landjunge/threaddesk",
+      "originalSource": "assets/design/originals/ThreadDesk-dark.png",
+      "originalSha256": "279f1890239390b11909227836ea2c1dc8e6f70ce1b19354b5dac29a81fc1b9e"
+    },
+    {
+      "appId": "4allpass",
+      "file": "np-appbar-4allpass-dark-256.png",
+      "source": "brand/ap4/dark/4allpass-dark-256.png",
+      "sourceRepository": "4AllPass",
+      "sourcePin": "0b66a2fda7fcc831762e732eb20084137fa6029d",
+      "sha256": "62019c4aab70164b092c9e6543e49aaa6f46a86400a0fd258bab7b81ead9406a",
+      "dimensions": [
+        256,
+        256
+      ],
+      "viewport": [
+        33,
+        38,
+        190,
+        180
+      ],
+      "derivation": "Original bytes unchanged; CSS viewport encloses original colored frame; no raster edit",
+      "color": "#6be4f2",
+      "colorSource": "4allpass:brand/ap4/dark/4allpass-dark-256.png#original-frame-color; dominant original colored-frame pixel, presentation accent only",
+      "originalLocalRepository": "/Users/landjunge/4AllPass",
+      "originalSource": "brand/ap4/4allpass-dark.png",
+      "originalSha256": "e34a5925bee7a35434145646c8fca497edc26eef015b3e88a40411e006bbb094"
+    },
+    {
+      "appId": "tollgate",
+      "file": "np-appbar-tollgate-dark-256.png",
+      "source": "assets/design/icons/dark/TollGate-dark-256.png",
+      "sourceRepository": "tollgate",
+      "sourcePin": "6676bcfc69f85e77fec6192bc51ad8f9c0b26740",
+      "sha256": "98e90b668ed712361a05ae16efaa0768f6abd71e4bde40d9ece9ca59b018aed5",
+      "dimensions": [
+        256,
+        256
+      ],
+      "viewport": [
+        35,
+        40,
+        186,
+        176
+      ],
+      "derivation": "Original bytes unchanged; CSS viewport encloses original colored frame; no raster edit",
+      "color": "#e77745",
+      "colorSource": "tollgate:brand/README.md",
+      "originalLocalRepository": "/Users/landjunge/tollgate",
+      "originalSource": "assets/design/originals/TollGate-dark.png",
+      "originalSha256": "80ee4d9a63f960e16a47504e2c2e46cd399eaf66997eb230e85deab82c249751"
+    },
+    {
+      "appId": "agent-authority",
+      "file": "np-appbar-agent-authority-dark-256.png",
+      "source": "assets/design/icons/dark/Agent-Authority-dark-256.png",
+      "sourceRepository": "agent-authority-lab",
+      "sourcePin": "75fb14e99a50b967b8624191f0178963c433fbd9",
+      "sha256": "ddbde6d384d6e78bb727f5d68552c1f18c46db1535f885c91a11b8ac5da7bbe9",
+      "dimensions": [
+        256,
+        256
+      ],
+      "viewport": [
+        14,
+        23,
+        219,
+        211
+      ],
+      "derivation": "Original bytes unchanged; CSS viewport encloses original colored frame; no raster edit",
+      "color": "#3b78fc",
+      "colorSource": "agent-authority:assets/design/icons/dark/Agent-Authority-dark-256.png#original-frame-color; dominant original colored-frame pixel, presentation accent only",
+      "originalLocalRepository": "/Users/landjunge/agent-authority-lab",
+      "originalSource": "assets/design/originals/Agent-Authority-dark.png",
+      "originalSha256": "eee8cb4c22f79db51730d1e674b8deaa39d1a1176a4030e13e2fb1dbe362cfff"
+    }
+  ],
+  "assetReadback": "kb-design-adapt-kirabridge-20261107/asset-original-readback.json",
+  "bundle": {
+    "version": "1.1.1",
+    "upstreamVersion": "1.1.0",
+    "localPatch": "delayed native dialog close focus guard",
+    "all13ChecksumsVerified": true,
+    "sharedOriginBackport": "separate follow-up, other four product copies not changed by continuation"
+  },
+  "sourceFiles": [
+    {
+      "path": "src/kirabridge/approval_console.py",
+      "sha256": "455872c231cbf25673c5e0e0c08c8839bf99f2a1290482e2c97321c4c1ea84c9"
+    },
+    {
+      "path": "src/kirabridge/console_assets/center.html",
+      "sha256": "471c7569a91e8f0d9e7e304874ad59c09d75a185df935d4c93614fea734a64c0"
+    },
+    {
+      "path": "src/kirabridge/console_assets/center.js",
+      "sha256": "ed3e7417366f19293f0db890f8ea8f11f541187a7324fc03e302c3afc2416988"
+    },
+    {
+      "path": "src/kirabridge/console_assets/index.html",
+      "sha256": "ca0bbe98334fc4b9a2441c180983741160ca985c076379b869d458404fb8e346"
+    },
+    {
+      "path": "src/kirabridge/console_assets/networkpunkt-appbar-SHA256SUMS",
+      "sha256": "d41cc5ef49db1c6d4b04865f94ee2e884fbd878237882d7042a3ef0bf826cd9b"
+    },
+    {
+      "path": "src/kirabridge/console_assets/networkpunkt-appbar-assets.json",
+      "sha256": "ef529525531940e847fcc1ae2b33f2c98b150aefcfce5f5d96a9722732b7896a"
+    },
+    {
+      "path": "src/kirabridge/console_assets/networkpunkt-appbar-bundle.json",
+      "sha256": "1f7ed13ea5a6a9da2192620b2657a95e6cccead14ecf62bd45af419d2015b4c4"
+    },
+    {
+      "path": "src/kirabridge/console_assets/networkpunkt-appbar-catalog.js",
+      "sha256": "b4934d9f4f26a44c3658c5693c6d4646e91cd2fefbeff2cf4ca31cce26ad8845"
+    },
+    {
+      "path": "src/kirabridge/console_assets/networkpunkt-appbar-state.js",
+      "sha256": "b58576bcd8e5bc0265f1ea6de42ba49a772203facfc7149b9e2e6348803c9ff9"
+    },
+    {
+      "path": "src/kirabridge/console_assets/networkpunkt-appbar.css",
+      "sha256": "c3ab64479f7e46a54d3fbf1a6a6a7519fd2ea7bd5992d3a46cc8af99748ad5f8"
+    },
+    {
+      "path": "src/kirabridge/console_assets/networkpunkt-appbar.js",
+      "sha256": "510b0f0e5e9b5698ad8cae1f6b8baceb872c80ff2e2fef82945457cba95c3765"
+    },
+    {
+      "path": "src/kirabridge/console_assets/networkpunkt-product-header.js",
+      "sha256": "b9297d673905983303070a791a2ddff5d6a04fd9ad89faf11fd16feef911143b"
+    },
+    {
+      "path": "src/kirabridge/console_assets/np-appbar-4allpass-dark-256.png",
+      "sha256": "62019c4aab70164b092c9e6543e49aaa6f46a86400a0fd258bab7b81ead9406a"
+    },
+    {
+      "path": "src/kirabridge/console_assets/np-appbar-agent-authority-dark-256.png",
+      "sha256": "ddbde6d384d6e78bb727f5d68552c1f18c46db1535f885c91a11b8ac5da7bbe9"
+    },
+    {
+      "path": "src/kirabridge/console_assets/np-appbar-kirabridge-dark-256.png",
+      "sha256": "df48979210f0d2fda32ca1c704f818f8c57fa40cdcf8cc7f682616263f7a8f75"
+    },
+    {
+      "path": "src/kirabridge/console_assets/np-appbar-threaddesk-dark-256.png",
+      "sha256": "37acc1808d685b19a17ad6aa50919304877c44730afe3c105771508cb00e12a7"
+    },
+    {
+      "path": "src/kirabridge/console_assets/np-appbar-tollgate-dark-256.png",
+      "sha256": "98e90b668ed712361a05ae16efaa0768f6abd71e4bde40d9ece9ca59b018aed5"
+    },
+    {
+      "path": "src/kirabridge/console_assets/product-header.css",
+      "sha256": "d30946227f4ab926e54e130ec85e3a188c33e1a207f78071bdc513e0de207b4e"
+    },
+    {
+      "path": "src/kirabridge/console_assets/product-header.js",
+      "sha256": "969df02a4cbee45ad7abf04260708f07e2aee40c80679b035d661afbef2ec64d"
+    },
+    {
+      "path": "src/kirabridge/console_assets/protocol.html",
+      "sha256": "e7d2b83e5a64b41a8c4f922c80846ea92be48373027f2506ee5672f2ad6fbf1d"
+    },
+    {
+      "path": "src/kirabridge/grok_connector/console.py",
+      "sha256": "452835a0e288cd5a704d775b7dc27d4154285611138be0d8704854e9d8fc1dc8"
+    },
+    {
+      "path": "src/kirabridge/team_console.py",
+      "sha256": "2d9904a4e9501c8ad4f2463dfabe2c7796019ea544143d925934aebc29abd72a"
+    },
+    {
+      "path": "tests/product_header_browser_probe.py",
+      "sha256": "0d30784516f57b1fe451ffcadbf173b5eb4ecb9c31407a4dc7e2b4b9bcca9966"
+    },
+    {
+      "path": "tests/test_product_header.py",
+      "sha256": "c7dd9067ce1f0ae73c31dd312641e128da72abf3b0196566be639646fa980bb5"
+    }
+  ],
+  "statusAndVersion": {
+    "source": "authenticated existing /api/control/status; home reuses its actual control events, other views same existing HTTP endpoint",
+    "ownConnectionMeaning": "local Bridge dispatcher health, not external ChatGPT/Grok connection",
+    "version": "bridge.runtime.version; observed0.8.0rc40 equals actual tested runtime version",
+    "primarySnapshotMaxAgeMs": 8000,
+    "peerState": "all four peers unknown; no binding/target fabricated",
+    "ownClick": "focus existing main, navigate existing root route from subviews",
+    "foreignClick": "explicit accessible missing-target dialog, no invented route"
+  },
+  "tests": [
+    {
+      "type": "targeted pytest",
+      "passed": 47,
+      "log": "kb-design-adapt-kirabridge-20261107/ui-targeted.log",
+      "junit": "kb-design-adapt-kirabridge-20261107/ui-targeted.xml",
+      "command": "PYTHONPATH=src /Users/landjunge/KiraBridge/.venv/bin/python -m pytest -q tests/test_product_header.py tests/test_console_design.py tests/test_control_center.py tests/test_team_console.py tests/test_grok_connector_console.py",
+      "pin": "2c191e95ee3c2f1d8884de45585375b96f552d20; later source changes verified by final browser and repeated asset checks"
+    },
+    {
+      "type": "pytest after MIME cleanup",
+      "passed": 2,
+      "log": "kb-design-adapt-kirabridge-20261107/asset-final.log",
+      "command": "PYTHONPATH=src /Users/landjunge/KiraBridge/.venv/bin/python -m pytest -q tests/test_product_header.py tests/test_console_design.py --tb=short"
+    },
+    {
+      "type": "ruff changed Python files",
+      "result": "All checks passed",
+      "log": "kb-design-adapt-kirabridge-20261107/lint-final.log"
+    },
+    {
+      "type": "git diff --check",
+      "result": "passed"
+    }
+  ],
+  "browser": {
+    "result": "passed",
+    "checks": 28,
+    "screenshots": 29,
+    "widths": [
+      1280,
+      390,
+      320
+    ],
+    "preferences": [
+      "dark",
+      "light"
+    ],
+    "labels": [
+      "de",
+      "en"
+    ],
+    "engine": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/130.0.6723.31 Safari/537.36",
+    "testScript": "tests/product_header_browser_probe.py",
+    "artifact": "kb-design-adapt-kirabridge-20261107/compatible-browser-artifact.json",
+    "resultFile": "kb-design-adapt-kirabridge-20261107/browser/browser-checks.json",
+    "args": [
+      "--single-process",
+      "--no-zygote",
+      "--disable-gpu"
+    ],
+    "command": "PYTHONPATH=src /Users/landjunge/KiraBridge/.venv/bin/python tests/product_header_browser_probe.py --output <task-evidence>/browser-final-02 --chromium <isolated-official130-headless-shell>",
+    "realChecks": [
+      "real loopback HTTP and signed login",
+      "all five original PNGs load under actual CSP",
+      "four actual views and fixed44x56 controls within narrow viewport",
+      "own status/version authenticated, foreign unknown",
+      "pointer all five and keyboard Enter/Space/Tab/Escape",
+      "modal focus return and subsequent Tab",
+      "DE/EN aria labels; existing language switches on team/connector; documented host-language input on root/protocol",
+      "icons visible after actual document scroll where content overflows",
+      "actual isolated dispatcher stop/start changes connected glow",
+      "session removal expires own state/version"
+    ],
+    "explicitInjections": [
+      "maintenance metadata for busy presentation",
+      "bridge RPC transport failure for error presentation"
+    ],
+    "fixtureBoundary": "Real loopback HTTP/auth/UI/control handlers and actual isolated Bridge dispatcher. OS process inventory disabled. Only maintenance/error metadata is deliberately injected for presentation checks.",
+    "teamWorkflowCapability": "bridge.health-only fixture principal; actual team forbidden UI is expected, no Team workflow acceptance claimed",
+    "productionServicesChanged": false,
+    "pageErrors": [],
+    "productActionPosts": [],
+    "manualScreenshotInspection": [
+      "initial passed control-dark1280, protocol-dark390, team-light320, connector-light1280",
+      "final passed control-dark1280 and team-light320"
+    ],
+    "workerSandboxChanged": false,
+    "systemInstall": false
+  },
+  "review": {
+    "agent": "/root/design_review",
+    "result": "no blocking source finding; 13bundle checksums and29initial successful screenshot hashes verified",
+    "evidence": "kb-design-adapt-kirabridge-20261107/independent-review.md"
+  },
+  "documentation": {
+    "deEn": "docs/FIVE-TOOL-DESIGN-20261107.md",
+    "existingPlan": "E05/UI-01 continuation; no new roadmap",
+    "priorEvidence": "ThreadDesk docs/evidence/five-tool-design-20261107.json retained historically, not silently rewritten as fully passed"
+  },
+  "delivery": {
+    "liveBoard": "blocked before execution by approval policy never; payload and reason recorded",
+    "boardResult": "kb-design-adapt-kirabridge-20261107/board-write-result.json",
+    "coordinator": "final result to be queued once via existing passive inbox; actual receipt preserved in task report, not assumed delivered"
+  },
+  "remainingBoundaries": [
+    "No installed native desktop/runtime acceptance or app installation",
+    "Four actual productive foreign connections/launch targets are unavailable and honestly unknown",
+    "Shared origin focus patch backport separate from KiraBridge-only continuation",
+    "Live board append needs coordinator authorized context; no direct store mutation"
+  ],
+  "scopeExclusions": [
+    "installer",
+    "Debian release",
+    "server repair",
+    "audit",
+    "productive service switch",
+    "push",
+    "main merge",
+    "release",
+    "deployment"
+  ],
+  "evidenceFiles": [
+    {
+      "path": "kb-design-adapt-kirabridge-20261107/asset-final.log",
+      "sha256": "648f61b28a6ca4eb85ba2122b740c102b9a1ab7253ec32bb3c23bf9e19d5ad8c"
+    },
+    {
+      "path": "kb-design-adapt-kirabridge-20261107/asset-original-readback.json",
+      "sha256": "946b8c2ad820ffab55c8f64d975710cd1e1771cf133c81999c4e2ea3d1e4d41f"
+    },
+    {
+      "path": "kb-design-adapt-kirabridge-20261107/board-write-result.json",
+      "sha256": "9b985e5a0946606c546bf67a2a8f289416d1d784e91a99ca7559bdc253510d5a"
+    },
+    {
+      "path": "kb-design-adapt-kirabridge-20261107/browser/browser-checks.json",
+      "sha256": "9c2133772ae0255bbd59a02c59b433033b713c3ed2312b481d1c95111b03184a"
+    },
+    {
+      "path": "kb-design-adapt-kirabridge-20261107/browser/connector-dark-1280.png",
+      "sha256": "eedeb6f2a76515d8dafda9ce31fedad1eb3fa3e9df1b1744292e2c09a00d4ee2"
+    },
+    {
+      "path": "kb-design-adapt-kirabridge-20261107/browser/connector-dark-320.png",
+      "sha256": "35f5240723bd18d76d0d3dbe4a5221bd9c0ffa16c24b8e3624a3b90f29cf85d9"
+    },
+    {
+      "path": "kb-design-adapt-kirabridge-20261107/browser/connector-dark-390.png",
+      "sha256": "5a1724b53c1537359b0da2fa8ebdf3b2252c11ad2044966b3952052e7f7ffd2c"
+    },
+    {
+      "path": "kb-design-adapt-kirabridge-20261107/browser/connector-light-1280.png",
+      "sha256": "eedeb6f2a76515d8dafda9ce31fedad1eb3fa3e9df1b1744292e2c09a00d4ee2"
+    },
+    {
+      "path": "kb-design-adapt-kirabridge-20261107/browser/connector-light-320.png",
+      "sha256": "35f5240723bd18d76d0d3dbe4a5221bd9c0ffa16c24b8e3624a3b90f29cf85d9"
+    },
+    {
+      "path": "kb-design-adapt-kirabridge-20261107/browser/connector-light-390.png",
+      "sha256": "5a1724b53c1537359b0da2fa8ebdf3b2252c11ad2044966b3952052e7f7ffd2c"
+    },
+    {
+      "path": "kb-design-adapt-kirabridge-20261107/browser/control-dark-1280.png",
+      "sha256": "d60543c4fb1ba6adf5b2515c13edb3c9639d1bbed96d9c2c8d6b9c1edf0a77a6"
+    },
+    {
+      "path": "kb-design-adapt-kirabridge-20261107/browser/control-dark-320.png",
+      "sha256": "fe394e2bfc1d2fdf8f190a0e3c9071925aa3ca3fc0e8783f639952b84df06505"
+    },
+    {
+      "path": "kb-design-adapt-kirabridge-20261107/browser/control-dark-390.png",
+      "sha256": "e3fcaa098752acc659259da10c27c14ff7dc0c1c5d0d06824ea96d7f963cb46b"
+    },
+    {
+      "path": "kb-design-adapt-kirabridge-20261107/browser/control-injected-transport-error.png",
+      "sha256": "19a1494b10d9d9b960b7993ed85a590362619b71a78fe6f2bc4061a40952865c"
+    },
+    {
+      "path": "kb-design-adapt-kirabridge-20261107/browser/control-light-1280.png",
+      "sha256": "35be3ca70098b19994dc06c9dfd93d3712f65b77d9c6936406c59caba821f841"
+    },
+    {
+      "path": "kb-design-adapt-kirabridge-20261107/browser/control-light-320.png",
+      "sha256": "fe394e2bfc1d2fdf8f190a0e3c9071925aa3ca3fc0e8783f639952b84df06505"
+    },
+    {
+      "path": "kb-design-adapt-kirabridge-20261107/browser/control-light-390.png",
+      "sha256": "33d1985869b89b2a0f06a56a4a11a7a0d3d83170d98773f3210cd2a687c48a54"
+    },
+    {
+      "path": "kb-design-adapt-kirabridge-20261107/browser/control-real-dispatcher-stopped.png",
+      "sha256": "e0d753c3183f988f2fffcce7d61a93cb6aeb895f23a6236a002066db77cc88c9"
+    },
+    {
+      "path": "kb-design-adapt-kirabridge-20261107/browser/control-session-removed-unknown.png",
+      "sha256": "ef0290bcb575550e5dda09201a525907f46f6b6abcd161989d2abf6378847014"
+    },
+    {
+      "path": "kb-design-adapt-kirabridge-20261107/browser/control-synthetic-maintenance-presentation.png",
+      "sha256": "d49b124838f75a6de4fb5209396f3c63ad92da220972d060d6b25a2259c7e030"
+    },
+    {
+      "path": "kb-design-adapt-kirabridge-20261107/browser/control-unauthenticated-1280.png",
+      "sha256": "03195f64b9c9116cbe1d19e9eae8080c1c9e7f90a963ccefa9066df61c794da6"
+    },
+    {
+      "path": "kb-design-adapt-kirabridge-20261107/browser/protocol-dark-1280.png",
+      "sha256": "d67bb630e6c8393f177c14619988fe1c5fb09f111be003bcf8e87581a3dd2145"
+    },
+    {
+      "path": "kb-design-adapt-kirabridge-20261107/browser/protocol-dark-320.png",
+      "sha256": "694471749c3eab8c327b1393b0ea91a3709154b635f4ec94ef8bb3b4b0f2df76"
+    },
+    {
+      "path": "kb-design-adapt-kirabridge-20261107/browser/protocol-dark-390.png",
+      "sha256": "486c30c936de0ff18157bcbbd6cea485d1b4ac457cf3263dd60644bfdc61252e"
+    },
+    {
+      "path": "kb-design-adapt-kirabridge-20261107/browser/protocol-light-1280.png",
+      "sha256": "d8612d93a8517e1bae0bff7a8fe87a627c52984cff41067fdfe2bc751408af86"
+    },
+    {
+      "path": "kb-design-adapt-kirabridge-20261107/browser/protocol-light-320.png",
+      "sha256": "694471749c3eab8c327b1393b0ea91a3709154b635f4ec94ef8bb3b4b0f2df76"
+    },
+    {
+      "path": "kb-design-adapt-kirabridge-20261107/browser/protocol-light-390.png",
+      "sha256": "486c30c936de0ff18157bcbbd6cea485d1b4ac457cf3263dd60644bfdc61252e"
+    },
+    {
+      "path": "kb-design-adapt-kirabridge-20261107/browser/team-dark-1280.png",
+      "sha256": "d2c41f904bc9f57e199d2aa86f5208b099b8c01358de8f8621c14d0c008028e2"
+    },
+    {
+      "path": "kb-design-adapt-kirabridge-20261107/browser/team-dark-320.png",
+      "sha256": "ac22c75039a4864a43bd680a48b4cbfa8fa5b131a13f7d5a40ef49bda9cdb822"
+    },
+    {
+      "path": "kb-design-adapt-kirabridge-20261107/browser/team-dark-390.png",
+      "sha256": "456a1659f4b6fb102cd7080313fd0888a78bfb2a674e93187ece3e3f0bdc95f0"
+    },
+    {
+      "path": "kb-design-adapt-kirabridge-20261107/browser/team-light-1280.png",
+      "sha256": "34e920190eee5d795e97a8fee7937ef09ddf8e3541928f1239b643e23756f0db"
+    },
+    {
+      "path": "kb-design-adapt-kirabridge-20261107/browser/team-light-320.png",
+      "sha256": "1fe9767292e5fed145b14704f4457666b2d2c023c39005dbb04b2232b0a96f5b"
+    },
+    {
+      "path": "kb-design-adapt-kirabridge-20261107/browser/team-light-390.png",
+      "sha256": "f6314fb3be06c84cfdf19f64dd35c2bbf0713ac95511d0ef5d3947d32dabaac1"
+    },
+    {
+      "path": "kb-design-adapt-kirabridge-20261107/browser-final.log",
+      "sha256": "9b8775f818b2bc6b557b235a36933cd2e3fe987a405186a522a2c67871bb6084"
+    },
+    {
+      "path": "kb-design-adapt-kirabridge-20261107/browser-history.json",
+      "sha256": "2149ce84ce3dc49b7e5a1bffd65492b2f8bbd5144fa5eb077452635a05efb1f0"
+    },
+    {
+      "path": "kb-design-adapt-kirabridge-20261107/compatible-browser-artifact.json",
+      "sha256": "7d47da52bbb9d8775a35eaa993fce61b164124aca3d2886fac38042021216337"
+    },
+    {
+      "path": "kb-design-adapt-kirabridge-20261107/git-worktrees.txt",
+      "sha256": "03c273979f49310ccaf9d7bb99d2ba4760477a5cbf557e9b9df7f35827654d19"
+    },
+    {
+      "path": "kb-design-adapt-kirabridge-20261107/independent-review.md",
+      "sha256": "a66cfc302887f66b3104cfecf013826792549db444eaa2c2509cebe1325ed24f"
+    },
+    {
+      "path": "kb-design-adapt-kirabridge-20261107/lint-final.log",
+      "sha256": "82b3e6a6c090a57601d22943bd23fca9218d1031dbe5a7b754092f9a156b4f18"
+    },
+    {
+      "path": "kb-design-adapt-kirabridge-20261107/regular-import.json",
+      "sha256": "d9d001f71d03ffa2369aa38d23466ecf40e14fbc1d23e1a2eb0666ca0a858426"
+    },
+    {
+      "path": "kb-design-adapt-kirabridge-20261107/ui-targeted.log",
+      "sha256": "cb6ad7608c1ed996a805340b332b8b86f2b054f7feb41e7feb5b8dbbcc1750c9"
+    },
+    {
+      "path": "kb-design-adapt-kirabridge-20261107/ui-targeted.xml",
+      "sha256": "8c8ee2a6178dd7b40cd0dca8c8be5d9b3a8cb80e3ab0a8d3e589e5e20fc0f664"
+    }
+  ]
+}
