@@ -24,6 +24,20 @@ from kirabridge.capability_routing.source import BEGIN, END, ThreadDeskSource
 NOW = datetime(2026, 11, 5, 21, 0, tzinfo=timezone.utc)
 
 
+@pytest.fixture(autouse=True)
+def fixture_clock(monkeypatch):
+    # Hook/launcher tests call select without an explicit clock. Bind those
+    # calls to the dated synthetic evidence too; production freshness stays real.
+    from kirabridge.capability_routing import router
+
+    class Clock(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return NOW.astimezone(tz) if tz is not None else NOW.replace(tzinfo=None)
+
+    monkeypatch.setattr(router, "datetime", Clock)
+
+
 @pytest.fixture
 def setup(tmp_path):
     exe = tmp_path / "native-cli"

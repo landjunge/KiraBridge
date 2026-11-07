@@ -41,6 +41,52 @@ def test_linux_runtime_accepts_normal_venv_python_link_but_refuses_linked_releas
         installer.adopt_release(SimpleNamespace(release_root=linked))
 
 
+@pytest.mark.parametrize("name", ["config%test.toml", 'config$"\\test.toml'])
+def test_systemd_owner_matches_escaped_argument_and_rejects_other_config(tmp_path, name):
+    installer = installer_module()
+    config = tmp_path / name
+    unit = tmp_path / "test.service"
+    unit.write_text(
+        render_linux_unit(["python", "-m", "kirabridge.cli", "--config", str(config), "serve"])
+    )
+    args = SimpleNamespace(service="systemd-user", config=config, plist=unit)
+    installer.validate_service_owner(args)
+    args.config = tmp_path / "another.toml"
+    with pytest.raises(RuntimeError, match="expected KiraBridge config"):
+        installer.validate_service_owner(args)
+
+
+def test_no_service_activation_records_selected_mode_for_rollback(tmp_path):
+    installer = installer_module()
+    prefix = tmp_path / "install"
+    prefix.mkdir(mode=0o700)
+    config = tmp_path / "config.toml"
+    config.write_text("data_dir = " + json.dumps(str(tmp_path / "data")) + "\n")
+    release = tmp_path / "release"
+    release.mkdir()
+    (release / "release.json").write_text(
+        json.dumps(
+            {
+                "version": "0.8.0rc41",
+                "commit": "c" * 40,
+                "service": "systemd-user",
+            }
+        )
+    )
+    args = SimpleNamespace(
+        prefix=prefix,
+        config=config,
+        launcher=tmp_path / "bin/kirabridge",
+        plist=tmp_path / "test.service",
+        service="none",
+        full_access=False,
+    )
+    installer.activate(args, release)
+    assert json.loads((prefix / "current.json").read_text())["service"] == "none"
+    installer.rollback(args)
+    assert not args.launcher.exists() and not (prefix / "current.json").exists()
+
+
 def test_linux_unit_quotes_server_command_and_keeps_secrets_optional():
     config = "/srv/kira bridge/config.toml"
     body = render_linux_unit(

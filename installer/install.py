@@ -1084,8 +1084,14 @@ def validate_service_owner(args):
     if args.service == "none" or not args.plist.exists():
         return
     if args.service == "systemd-user":
+        from kirabridge.installation import quote_systemd
+
         text = args.plist.read_text()
-        if str(args.config) not in text or '"serve"' not in text or "kirabridge" not in text:
+        if (
+            quote_systemd(args.config) not in text
+            or '"serve"' not in text
+            or "kirabridge" not in text
+        ):
             raise RuntimeError(
                 "Existing service is not the expected KiraBridge config; left untouched"
             )
@@ -1241,6 +1247,7 @@ def activate(args, release):
         if previous_health and not was_loaded:
             raise RuntimeError("Backend runs outside expected launchd service; no switch")
     before = {
+        **manifest,
         "previous": old,
         "release": str(release),
         "backup": str(backup),
@@ -1255,7 +1262,6 @@ def activate(args, release):
         "launcher": str(args.launcher),
         "plist": str(args.plist),
         "service": args.service,
-        **manifest,
     }
     jwrite(backup / "transaction.json", before)
     if getattr(args, "desktop", False):

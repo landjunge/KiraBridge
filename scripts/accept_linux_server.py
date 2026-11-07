@@ -78,16 +78,23 @@ def main():
     parser.add_argument("--previous", type=Path, required=True)
     parser.add_argument("--root", type=Path, required=True)
     parser.add_argument("--port", type=int, default=18765)
+    parser.add_argument("--resume-update", action="store_true")
     args = parser.parse_args()
     root = args.root.absolute()
     unit = "kirabridge-debian-dirktest-20261107.service"
     unit_path = Path.home() / ".config/systemd/user" / unit
     assert sys.platform == "linux" and platform.machine() == "x86_64"
-    assert os.getuid() != 0 and not root.exists() and not unit_path.exists()
+    assert os.getuid() != 0 and not unit_path.exists()
+    if args.resume_update:
+        prior = json.loads((root / "evidence.json").read_text())
+        assert prior["result"] == "failed" and prior["cleanup"]["unit_absent"]
+        assert prior["steps"][-1]["name"] == "previous-runtime-baseline"
+    else:
+        assert not root.exists()
     assert root.is_relative_to(Path.home()) and root.name.startswith("kb-debian-dirktest-")
     with socket.socket() as sock:
         sock.bind(("127.0.0.1", args.port))
-    root.mkdir(mode=0o700)
+    root.mkdir(mode=0o700, exist_ok=args.resume_update)
     os.umask(0o077)
     evidence = {
         "schema": "kirabridge.native-linux-acceptance.v1",
@@ -105,7 +112,13 @@ def main():
         "result": "running",
     }
     suite = ET.Element("testsuite", name="native-debian-package")
-    log = (root / "acceptance.log").open("w")
+    suffix = "-resume" if args.resume_update else ""
+    log_path = root / ("acceptance" + suffix + ".log")
+    log = log_path.open("x")
+    if args.resume_update:
+        evidence["previous_attempt"] = prior
+        evidence["previous_evidence_sha256"] = sha(root / "evidence.json")
+        evidence["identity"]["harness_sha256"] = sha(Path(__file__))
 
     def run(argv, *, timeout=180):
         log.write("$ " + shlex.join(map(str, argv)) + "\n")
@@ -165,12 +178,13 @@ def main():
 
     def unpack(archive, name):
         destination = root / name
-        destination.mkdir()
+        destination.mkdir(exist_ok=args.resume_update)
         with tarfile.open(archive) as tar:
             for member in tar.getmembers():
                 assert member.isfile() and not Path(member.name).is_absolute()
                 assert ".." not in Path(member.name).parts
-            tar.extractall(destination, filter="data")
+            if not args.resume_update:
+                tar.extractall(destination, filter="data")
         bundle = next(destination.iterdir())
         manifest = json.loads((bundle / "release.json").read_text())
         for name, digest in manifest["files"].items():
@@ -185,6 +199,8 @@ def main():
             "version": manifest["version"],
             "manifest_files": len(manifest["files"]),
         }
+        if args.resume_update:
+            assert evidence["artifacts"][archive.name] == prior["artifacts"][archive.name]
         return bundle
 
     def bootstrap(bundle):
@@ -257,58 +273,38 @@ def main():
         run(["systemctl", "--user", "is-system-running"])
         candidate = unpack(args.candidate.absolute(), "candidate")
         previous = unpack(args.previous.absolute(), "previous")
-        step("fresh-package-install", lambda: {"output": bootstrap(candidate)})
-        first = step("authenticated-mcp-health-and-401", lambda: probe(runtime))
-        step("repeat-install-cleans-bootstrap-lock", lambda: {"output": bootstrap(candidate)})
-        run(["systemctl", "--user", "restart", unit])
-        time.sleep(1)
-        restarted = step("native-systemd-restart", lambda: probe(runtime))
-        assert restarted["runtime"]["pid"] != first["runtime"]["pid"]
-        listeners = run(["ss", "-ltn"])
-        matches = [line for line in listeners.splitlines() if f":{args.port} " in line]
-        assert len(matches) == 1 and f"127.0.0.1:{args.port}" in matches[0]
-        evidence["loopback_listener"] = matches
-        step(
-            "fresh-install-rollback", lambda: {"output": installer(candidate, runtime, "rollback")}
-        )
-        assert not unit_path.exists() and not launcher.exists()
-        run(["systemctl", "--user", "daemon-reload"])
+        if not args.resume_update:
+            step("fresh-package-install", lambda: {"output": bootstrap(candidate)})
+            first = step("authenticated-mcp-health-and-401", lambda: probe(runtime))
+            step("repeat-install-cleans-bootstrap-lock", lambda: {"output": bootstrap(candidate)})
+            run(["systemctl", "--user", "restart", unit])
+            time.sleep(1)
+            restarted = step("native-systemd-restart", lambda: probe(runtime))
+            assert restarted["runtime"]["pid"] != first["runtime"]["pid"]
+            listeners = run(["ss", "-ltn"])
+            matches = [line for line in listeners.splitlines() if f":{args.port} " in line]
+            assert len(matches) == 1 and f"127.0.0.1:{args.port}" in matches[0]
+            evidence["loopback_listener"] = matches
+            step(
+                "fresh-install-rollback",
+                lambda: {"output": installer(candidate, runtime, "rollback")},
+            )
+            assert not unit_path.exists() and not launcher.exists()
+            run(["systemctl", "--user", "daemon-reload"])
         # The previous Grok archive rejects Debian at its shell guard. Prepare its
         # verified payload explicitly, without claiming that bootstrap as accepted.
         old = previous / "payload"
         uv = root / "uv"
-        run(
-            [
-                "curl",
-                "--fail",
-                "--location",
-                "--proto",
-                "=https",
-                "--tlsv1.2",
-                "--max-time",
-                "120",
-                "https://github.com/astral-sh/uv/releases/download/0.11.6/uv-x86_64-unknown-linux-gnu.tar.gz",
-                "-o",
-                root / "uv.tar.gz",
-            ]
-        )
-        assert (
-            sha(root / "uv.tar.gz")
-            == "0c6bab77a67a445dc849ed5e8ee8d3cb333b6e2eba863643ce1e228075f27943"
-        )
-        with tarfile.open(root / "uv.tar.gz") as tar:
-            tar.extractall(uv, filter="data")
-        uv_bin = uv / "uv-x86_64-unknown-linux-gnu/uv"
-        run(
-            [uv_bin, "sync", "--project", old, "--locked", "--no-dev", "--python", "3.11.15"],
-            timeout=420,
-        )
+        if not args.resume_update:
+            prepare_previous(run, root, uv, old)
         (old / ".kirabridge-source").write_text(
             evidence["artifacts"][args.previous.name]["source_commit"]
         )
+        # Use the fixed installer to activate the unchanged, verified RC40
+        # runtime. The original RC40 installer rejects uv interpreter links.
         step(
             "previous-runtime-baseline",
-            lambda: {"output": installer(previous, old, "install"), "health": probe(old)},
+            lambda: {"output": installer(candidate, old, "install"), "health": probe(old)},
         )
         (workspace / "dirk-note.txt").write_text(
             "synthetic Dirk data, preserve across update/rollback\n"
@@ -341,46 +337,86 @@ def main():
             },
         )
         evidence["result"] = "passed"
+    except Exception:
+        evidence["result"] = "failed"
+        raise
     finally:
-        # Only this exact owned test unit; leave all test data/evidence for review.
-        if unit_path.exists():
-            assert str(config) in unit_path.read_text()
-            run(["systemctl", "--user", "disable", "--now", unit])
-            unit_path.unlink()
-        run(["systemctl", "--user", "daemon-reload"])
-        state = run(
-            [
-                "systemctl",
-                "--user",
-                "show",
-                unit,
-                "-p",
-                "LoadState",
-                "-p",
-                "ActiveState",
-                "-p",
-                "MainPID",
-            ]
-        )
-        assert (
-            "MainPID=0" in state
-            and "ActiveState=inactive" in state
-            and "LoadState=not-found" in state
-        )
-        with socket.socket() as sock:
-            sock.bind(("127.0.0.1", args.port))
-        evidence["cleanup"] = {
-            "unit_absent": not unit_path.exists(),
-            "systemd": state,
-            "port_unbound": True,
-        }
-        log.close()
-        evidence["log_sha256"] = sha(root / "acceptance.log")
-        suite.set("tests", str(len(suite)))
-        suite.set("failures", str(len(suite.findall(".//failure"))))
-        ET.ElementTree(suite).write(root / "junit.xml", encoding="unicode")
-        (root / "evidence.json").write_text(json.dumps(evidence, indent=2) + "\n")
+        try:
+            cleanup(run, unit_path, config, unit, args.port, evidence)
+        finally:
+            log.close()
+            evidence["log_sha256"] = sha(log_path)
+            suite.set("tests", str(len(suite)))
+            suite.set("failures", str(len(suite.findall(".//failure"))))
+            ET.ElementTree(suite).write(root / ("junit" + suffix + ".xml"), encoding="unicode")
+            (root / ("evidence" + suffix + ".json")).write_text(
+                json.dumps(evidence, indent=2) + "\n"
+            )
     print(json.dumps({"result": evidence["result"], "root": str(root)}, indent=2))
+
+
+def prepare_previous(run, root, uv, old):
+    run(
+        [
+            "curl",
+            "--fail",
+            "--location",
+            "--proto",
+            "=https",
+            "--tlsv1.2",
+            "--max-time",
+            "120",
+            "https://github.com/astral-sh/uv/releases/download/0.11.6/uv-x86_64-unknown-linux-gnu.tar.gz",
+            "-o",
+            root / "uv.tar.gz",
+        ]
+    )
+    assert sha(root / "uv.tar.gz") == (
+        "0c6bab77a67a445dc849ed5e8ee8d3cb333b6e2eba863643ce1e228075f27943"
+    )
+    with tarfile.open(root / "uv.tar.gz") as tar:
+        tar.extractall(uv, filter="data")
+    uv_bin = uv / "uv-x86_64-unknown-linux-gnu/uv"
+    run(
+        [uv_bin, "sync", "--project", old, "--locked", "--no-dev", "--python", "3.11.15"],
+        timeout=420,
+    )
+
+
+def cleanup(run, unit_path, config, unit, port, evidence):
+    # Only this exact owned test unit; leave all test data/evidence for review.
+    if unit_path.exists():
+        escaped = (
+            str(config).replace("\\", "\\\\").replace('"', '\\"').replace("%", "%%").replace("$", "$$")
+        )
+        assert '"' + escaped + '"' in unit_path.read_text()
+        run(["systemctl", "--user", "disable", "--now", unit])
+        unit_path.unlink()
+    run(["systemctl", "--user", "daemon-reload"])
+    state = run(
+        [
+            "systemctl",
+            "--user",
+            "show",
+            unit,
+            "-p",
+            "LoadState",
+            "-p",
+            "ActiveState",
+            "-p",
+            "MainPID",
+        ]
+    )
+    assert (
+        "MainPID=0" in state and "ActiveState=inactive" in state and "LoadState=not-found" in state
+    )
+    with socket.socket() as sock:
+        sock.bind(("127.0.0.1", port))
+    evidence["cleanup"] = {
+        "unit_absent": not unit_path.exists(),
+        "systemd": state,
+        "port_unbound": True,
+    }
 
 
 if __name__ == "__main__":
