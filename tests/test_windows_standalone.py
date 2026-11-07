@@ -45,6 +45,7 @@ def test_installed_launcher_tracks_update_rollback_and_data(tmp_path, monkeypatc
     data = root / "data/user.db"
     data.write_bytes(b"original")
     initial = (root / "KiraBridge.cmd").read_bytes()
+    assert initial.endswith(b"%* & exit /b\r\n")
     invoke(monkeypatch, root, second, "update")
     assert initial != (root / "KiraBridge.cmd").read_bytes()
     data.write_bytes(b"newer user data")

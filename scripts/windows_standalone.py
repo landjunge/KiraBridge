@@ -19,12 +19,14 @@ from kirabridge.windows_runtime import validate_bundled_runtime  # noqa: E402
 def launcher(root: Path) -> None:
     current = status(root)["current"]
     release = root / "releases" / current["release"]
+    # CMD must exit from this already parsed line: rollback can rewrite this
+    # batch file to a different length while the Python process is running.
     command = (
         '@echo off\r\n"%~dp0releases\\'
         + current["release"]
         + '\\runtime\\python.exe" -I -B "%~dp0releases\\'
         + current["release"]
-        + '\\scripts\\windows_standalone.py" --root "%~dp0." %*\r\n'
+        + '\\scripts\\windows_standalone.py" --root "%~dp0." %* & exit /b\r\n'
     )
     target = root / "KiraBridge.cmd"
     if target.is_symlink():
