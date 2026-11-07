@@ -52,6 +52,15 @@ def build(
         with zipfile.ZipFile(archive) as zipped:
             zipped.extractall(payload)
         _copy_regular_tree(runtime, payload / "runtime")
+        # The development runtime can contain an older KiraBridge. Child Python
+        # processes must resolve this release's source too, including under -I.
+        site = payload / "runtime" / "Lib" / "site-packages"
+        for path in site.glob("kirabridge*"):
+            if path.name == "kirabridge" or (
+                path.name.startswith("kirabridge-") and path.name.endswith(".dist-info")
+            ):
+                shutil.rmtree(path)
+        (site / "kirabridge-source.pth").write_text("../../../src\n", encoding="utf-8")
         # Runtime bytecode can embed machine paths and is regenerated nowhere (-B).
         for path in (payload / "runtime").rglob("__pycache__"):
             shutil.rmtree(path)
@@ -59,9 +68,22 @@ def build(
             b"@echo off\r\n"
             b'"%~dp0runtime\\python.exe" -I -B "%~dp0scripts\\windows_standalone.py" %*\r\n'
         )
+        for action, filename in (
+            ("install", "Install.cmd"),
+            ("update", "Update.cmd"),
+            ("uninstall", "Uninstall.cmd"),
+        ):
+            command = (
+                "@echo off\r\n"
+                '"%~dp0runtime\\python.exe" -I -B '
+                '"%~dp0scripts\\windows_standalone.py" '
+                '--root "%LOCALAPPDATA%\\KiraBridge" ' + action + "\r\n"
+                "if errorlevel 1 pause\r\n"
+            )
+            (payload / filename).write_bytes(command.encode("utf-8"))
         (payload / "INSTALL.txt").write_text(
             "Offline Windows x64 package. Extract the complete directory.\n"
-            "No Python installation required.\n"
+            "No Python installation required. Run Install.cmd for the default per-user root.\n"
             'Manage.cmd --root "%LOCALAPPDATA%\\KiraBridge" install\n'
             'Installed: "%LOCALAPPDATA%\\KiraBridge\\KiraBridge.cmd" status\n'
             "Start: KiraBridge.cmd run --help (then setup/serve using an explicit config).\n"

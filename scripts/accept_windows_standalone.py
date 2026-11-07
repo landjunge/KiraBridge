@@ -42,6 +42,16 @@ async def health(root, report, persist):
         m.__name__: str(Path(m.__file__).resolve())
         for m in (kirabridge, windows_package, mcp, httpx, uvicorn)
     }
+    child = await asyncio.to_thread(
+        subprocess.run,
+        [sys.executable, "-I", "-B", "-c", "import kirabridge;print(kirabridge.__file__)"],
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    expected = ROOT / "src" / "kirabridge" / "__init__.py"
+    assert Path(child.stdout.strip()).resolve() == expected.resolve(), child.stdout
+    report["isolated_child_import"] = child.stdout.strip()
     report["python"] = sys.executable
     report["platform"] = platform.platform()
     path = ROOT / "scripts/accept_windows_parity_e2e.py"

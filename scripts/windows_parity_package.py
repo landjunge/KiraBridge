@@ -221,7 +221,9 @@ def main(argv: list[str] | None = None) -> int:
     argv = list(sys.argv[1:] if argv is None else argv)
     refuse_policy(argv)
     parser = argparse.ArgumentParser()
-    parser.add_argument("action", choices=("build", "install", "update", "rollback", "uninstall", "status"))
+    parser.add_argument(
+        "action", choices=("build", "install", "update", "rollback", "uninstall", "status")
+    )
     parser.add_argument("--output", type=Path)
     parser.add_argument("--root", type=Path)
     parser.add_argument("--payload", type=Path)
