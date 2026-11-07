@@ -110,7 +110,7 @@ def main():
                 }
             )
 
-        def run(argv, label, env=None):
+        def run(argv, label, env=None, expect_success=True):
             item = {"label": label, "argv": [str(x) for x in argv], "state": "started"}
             report["commands"].append(item)
             persist()
@@ -126,7 +126,7 @@ def main():
             item.update(returncode=result.returncode, stdout=result.stdout, stderr=result.stderr)
             item["state"] = "finished"
             persist()
-            assert result.returncode == 0, item
+            assert (result.returncode == 0) == expect_success, item
 
         def manage(package, action):
             if args.root.name == "KiraBridge" and action in {"install", "update", "uninstall"}:
@@ -181,6 +181,15 @@ def main():
 
         manage(args.package, "install")
         initial = json.loads((args.root / "current.json").read_text())
+        # A rejected install must reach the caller as a nonzero exit status.
+        if args.root.name == "KiraBridge":
+            run(
+                ["C:\\Windows\\System32\\cmd.exe", "/d", "/c", args.update / "Install.cmd"],
+                "duplicate_install_rejected",
+                env=dict(os.environ, LOCALAPPDATA=str(args.root.parent)),
+                expect_success=False,
+            )
+            assert json.loads((args.root / "current.json").read_text()) == initial
         data = args.root / "data/user-record.bin"
         data.write_bytes(b"created after initial installation")
         run(

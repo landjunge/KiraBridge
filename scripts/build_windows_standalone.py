@@ -78,7 +78,6 @@ def build(
                 '"%~dp0runtime\\python.exe" -I -B '
                 '"%~dp0scripts\\windows_standalone.py" '
                 '--root "%LOCALAPPDATA%\\KiraBridge" ' + action + "\r\n"
-                "if errorlevel 1 pause\r\n"
             )
             (payload / filename).write_bytes(command.encode("utf-8"))
         (payload / "INSTALL.txt").write_text(

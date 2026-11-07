@@ -44,6 +44,7 @@ def test_export_build_replaces_old_source_and_records_every_byte(tmp_path, monke
         assert archive.read("runtime/Lib/site-packages/dependency.py") == b"retained"
         assert archive.read("runtime/Lib/site-packages/kirabridge-source.pth") == b"../../../src\n"
         assert b"%LOCALAPPDATA%\\KiraBridge" in archive.read("Install.cmd")
+        assert b"pause" not in archive.read("Install.cmd")
         document = json.loads(archive.read("provenance.json"))
         assert document["source_archive_sha256"] == expected
         assert document["files"] == {
