@@ -237,7 +237,7 @@ def main():
     def installer(bundle, release, action):
         return run(
             [
-                release / ".venv/bin/python3",
+                sys.executable,
                 bundle / "installer/install.py",
                 action,
                 "--release-root",
@@ -306,6 +306,7 @@ def main():
             "previous-runtime-baseline",
             lambda: {"output": installer(candidate, old, "install"), "health": probe(old)},
         )
+        run(["systemctl", "--user", "disable", unit])
         (workspace / "dirk-note.txt").write_text(
             "synthetic Dirk data, preserve across update/rollback\n"
         )
@@ -328,6 +329,13 @@ def main():
                 "data": preserve(expected, ["dirk-before", "dirk-after"]),
             },
         )
+        enablement = subprocess.run(
+            ["systemctl", "--user", "is-enabled", unit],
+            capture_output=True,
+            text=True,
+        )
+        assert enablement.returncode == 1 and enablement.stdout.strip() == "disabled"
+        evidence["rollback_preserves_disabled_unit"] = True
         step(
             "reapply-update",
             lambda: {

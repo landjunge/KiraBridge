@@ -44,6 +44,7 @@ def test_linux_runtime_accepts_normal_venv_python_link_but_refuses_linked_releas
 @pytest.mark.parametrize("name", ["config%test.toml", 'config$"\\test.toml'])
 def test_systemd_owner_matches_escaped_argument_and_rejects_other_config(tmp_path, name):
     installer = installer_module()
+    assert installer.systemd_argument(tmp_path / name) == quote_systemd(tmp_path / name)
     config = tmp_path / name
     unit = tmp_path / "test.service"
     unit.write_text(
@@ -251,11 +252,12 @@ def test_update_and_rollback_keep_config_credentials_and_unknowns(tmp_path, monk
     )
     monkeypatch.setattr(installer, "stop_service", lambda args: None)
     monkeypatch.setattr(installer, "start_service", lambda args: None)
+    monkeypatch.setattr(installer, "systemd_unit", lambda release, argv: render_linux_unit(argv))
     systemd_calls = []
 
     def systemctl(args, *command, **kwargs):
         systemd_calls.append(command)
-        return CompletedProcess(command, 0, stdout="", stderr="")
+        return CompletedProcess(command, 0, stdout="disabled", stderr="")
 
     monkeypatch.setattr(installer, "_systemctl", systemctl)
     installer.activate(args, release)
@@ -264,7 +266,11 @@ def test_update_and_rollback_keep_config_credentials_and_unknowns(tmp_path, monk
     with sqlite3.connect(database) as db:
         db.execute("insert into tasks values ('later', 'unknown', 'after-switch')")
     installer.rollback(args)
-    assert systemd_calls == [("daemon-reload",)]
+    assert systemd_calls == [
+        ("is-enabled", "--", unit.name),
+        ("daemon-reload",),
+        ("disable", "--", unit.name),
+    ]
     assert unit.read_bytes() == old_unit
     assert config.read_bytes() == before_config
     assert credentials.read_bytes() == before_credentials

@@ -907,6 +907,29 @@ def _systemd_fields(text):
     return fields
 
 
+def systemd_argument(value):
+    # This installer also runs under a system Python without KiraBridge installed.
+    escaped = (
+        str(value).replace("\\", "\\\\").replace('"', '\\"').replace("%", "%%").replace("$", "$$")
+    )
+    return '"' + escaped + '"'
+
+
+def systemd_unit(release, argv):
+    # Reuse the shared renderer inside the verified target runtime.
+    return run(
+        [
+            python(release),
+            "-I",
+            "-c",
+            "import json,sys;from kirabridge.installation import render_linux_unit;"
+            "print(render_linux_unit(json.loads(sys.argv[1])),end='')",
+            json.dumps(argv),
+        ],
+        capture=True,
+    )
+
+
 def loaded(args):
     if args.service == "none":
         return False
@@ -1084,11 +1107,9 @@ def validate_service_owner(args):
     if args.service == "none" or not args.plist.exists():
         return
     if args.service == "systemd-user":
-        from kirabridge.installation import quote_systemd
-
         text = args.plist.read_text()
         if (
-            quote_systemd(args.config) not in text
+            systemd_argument(args.config) not in text
             or '"serve"' not in text
             or "kirabridge" not in text
         ):
@@ -1237,6 +1258,21 @@ def activate(args, release):
     if credentials:
         snapshot_file(credentials, backup, "credentials.before.json")
     was_loaded = loaded(args)
+    systemd_enabled_before = None
+    if args.service == "systemd-user":
+        systemd_enabled_before = _systemctl(
+            args, "is-enabled", "--", args.plist.name
+        ).stdout.strip()
+        if systemd_enabled_before not in {
+            "",
+            "enabled",
+            "enabled-runtime",
+            "disabled",
+            "static",
+            "indirect",
+            "not-found",
+        }:
+            raise RuntimeError("Unsupported existing user-unit enablement; preserved")
     previous_health = None
     if args.service != "none":
         try:
@@ -1254,6 +1290,7 @@ def activate(args, release):
         "had_wrapper": had_wrapper,
         "had_plist": had_plist,
         "was_loaded": was_loaded,
+        "systemd_enabled_before": systemd_enabled_before,
         "previous_version": (previous_health or {}).get("version"),
         "previous_source": {
             key: (previous_health or {}).get("runtime", {}).get(key) for key in SOURCE_FIELDS
@@ -1298,11 +1335,10 @@ def activate(args, release):
             )
             atomic(args.launcher, wrapper, 0o700)
             if args.service == "systemd-user":
-                from kirabridge.installation import render_linux_unit
-
                 atomic(
                     args.plist,
-                    render_linux_unit(
+                    systemd_unit(
+                        release,
                         [
                             str(python(release)),
                             "-m",
@@ -1312,7 +1348,7 @@ def activate(args, release):
                             "serve",
                             "--transport",
                             "http",
-                        ]
+                        ],
                     ),
                 )
             elif args.service != "none":
@@ -1436,6 +1472,16 @@ def rollback(args, *, _compensating=False):
             raise RuntimeError("Cannot reload user manager after rollback; recovery retained")
     if active["was_loaded"] and (not core_already_restored or not loaded(args)):
         start_service(args)
+    if args.service == "systemd-user" and active["had_plist"]:
+        previous_enablement = active.get("systemd_enabled_before")
+        if previous_enablement in {"disabled", "static", "indirect", "enabled-runtime"}:
+            if _systemctl(args, "disable", "--", args.plist.name).returncode:
+                raise RuntimeError("Cannot restore prior disabled user unit; recovery retained")
+            if (
+                previous_enablement == "enabled-runtime"
+                and _systemctl(args, "enable", "--runtime", "--", args.plist.name).returncode
+            ):
+                raise RuntimeError("Cannot restore prior runtime enablement; recovery retained")
     if active.get("desktop"):
         desktop_module(args).restore(types.SimpleNamespace(**globals()), active, current)
     if active["was_loaded"] and active.get("previous_version"):
