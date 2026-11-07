@@ -8,14 +8,14 @@
   "files": {
     "builder-local.xml": "2fab7b675b120a8c32bb0c699845070266acd9c1f6fcddf760a77414a1d8285e",
     "integrated-local.xml": "3d90dbd1aec617672d8ea8428c40def4f2aec48d1f95a0dd5634f4dbee330b17",
-    "native-cmd-rewrite-regression.json": "6168252894ad9c7374bf4a3ee23f536750527c0d9ecd3fc4eae7d1658e196bd4",
+    "native-cmd-rewrite-regression.json": "c5cb49746d02e2e9e0818d6acfafa0b056055f14215aef082fa45256b8935264",
     "native-first-failures.xml": "da07a0f79551450279b8aa605aa247cf9edb1b02eff45a5c0c7700f7d2fbf130",
-    "native-security-context.json": "4cee6447de1a6903f1e4bac6139257a57c5c656b5e823eb9ea8f9b79c6de9d07",
+    "native-security-context.json": "5b65586ea41c6473cdd2d4ff4b26e797071d7a31e40f87d4c5241b9cb0e28e15",
     "native-security-tests.xml": "1ce7fae9676e4c7f6720ae27393c7255e28cca67d9d0b7e4a84fd77643c5ef18",
     "native-user-first-failures.xml": "e8fe95246782a8d7941917ece6976f1e4c6ef5d2e5c6ded5efa421532bb36ccf",
     "native-user-tests.xml": "8ac8d83e08c44f75a1a1a51f1bec3a9d2c2663c9c5e38ee6cd04b02163812fad",
     "original-installer-blocker.json": "906a8c04427ec4e86ad3905c4c20a9c4fa69869da7bd42bf7f0988e35cf668d4",
-    "original-native-cmd-rollback-failure.json": "692e7cfe2d30d6841151132b7e054b5c8060e03dfdbfe7f7feb81e8f038e9bd3"
+    "original-native-cmd-rollback-failure.json": "c18ad52e7a94a4f35cc21405469103f2cfd7305da68cc125dd682337df161b02"
   },
   "native_security": {
     "failures": 0,
@@ -35,6 +35,23 @@
     "native-first-failures.xml": "Four broader legacy parity fixture assumptions: platform code pages, POSIX process lookup, two git checkout requirements",
     "native-user-first-failures.xml": "One platform newline difference fixed; four symlink fixture permission failures covered by security context",
     "original-native-cmd-rollback-failure.json": "Actual rollback succeeded but self-rewritten CMD returned1; parsed-line exit fix proven separately"
+  },
+  "raw_windows_evidence": {
+    "native-cmd-rewrite-regression.json": {
+      "path": "/Users/landjunge/KiraBridge-artifacts/windows-standalone-20261107/evidence/raw-windows/native-cmd-rewrite-regression.json",
+      "repository_copy": "CRLF normalized to LF; JSON content unchanged",
+      "sha256": "6168252894ad9c7374bf4a3ee23f536750527c0d9ecd3fc4eae7d1658e196bd4"
+    },
+    "native-security-context.json": {
+      "path": "/Users/landjunge/KiraBridge-artifacts/windows-standalone-20261107/evidence/raw-windows/native-security-context.json",
+      "repository_copy": "CRLF normalized to LF; JSON content unchanged",
+      "sha256": "4cee6447de1a6903f1e4bac6139257a57c5c656b5e823eb9ea8f9b79c6de9d07"
+    },
+    "original-native-cmd-rollback-failure.json": {
+      "path": "/Users/landjunge/KiraBridge-artifacts/windows-standalone-20261107/evidence/raw-windows/original-native-cmd-rollback-failure.json",
+      "repository_copy": "CRLF normalized to LF; JSON content unchanged",
+      "sha256": "692e7cfe2d30d6841151132b7e054b5c8060e03dfdbfe7f7feb81e8f038e9bd3"
+    }
   },
   "scope": "Component proofs for the Windows installer; full delivery acceptance recorded separately with the artifact and PR74",
   "source_commit": "4732ab473844a61d656d2ffa48974d7915f5508b",
