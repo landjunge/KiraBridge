@@ -106,7 +106,162 @@ def native_payload(output, commit, version):
         )
 
 
-def build(output):
+def git_blob(commit, name):
+    return subprocess.check_output(["git", "show", f"{commit}:{name}"])
+
+
+def presentation_for(commit):
+    mapping = {
+        "payload/src/kirabridge/terminal_design.py": "src/kirabridge/terminal_design.py",
+        "payload/src/kirabridge/install_ui.py": "src/kirabridge/install_ui.py",
+        "installer/presentation.py": "installer/presentation.py",
+    }
+    return {
+        "schema": "kirabridge.installer.presentation.v1",
+        "assets": {
+            member: hashlib.sha256(git_blob(commit, source)).hexdigest()
+            for member, source in mapping.items()
+        },
+        "palette": "#F06DB0",
+        "output": "human-stderr-only",
+    }
+
+
+def server_install_page(version, language):
+    english = language == "EN"
+    command = "sh install.sh --yes" + (" --language en" if english else "")
+    if english:
+        text = f"""# KiraBridge {version} — Linux server
+
+User-level systemd service, without sudo. This is not the macOS desktop build
+and it is not ThreadDesk Server&Sync.
+
+Verify with `sha256sum -c SHA256SUMS` in the extracted package.
+
+```sh
+{command}
+```
+
+Service: `systemctl --user restart kirabridge.service`.
+Rollback restores the launcher and unit. Configuration, credentials, tasks and
+UNKNOWN states stay in place; a database backup is not written back over them.
+
+HTTP MCP, bearer authentication and `bridge_health` are the server surface.
+The macOS GUI, Terminal.app and native keyboard are unavailable. Clipboard
+tools are optional and are not required. A macOS run is not Linux acceptance.
+
+Details: [INSTALL-LINUX-SERVER.md](docs/INSTALL-LINUX-SERVER.md).
+"""
+    else:
+        text = f"""# KiraBridge {version} — Linux-Server
+
+Benutzerdienst unter systemd, ohne sudo. Das ist nicht die macOS-Desktopfassung
+und nicht ThreadDesk Server&Sync.
+
+Prüfung im entpackten Paket: `sha256sum -c SHA256SUMS`.
+
+```sh
+{command}
+```
+
+Dienst: `systemctl --user restart kirabridge.service`.
+Rollback stellt Launcher und Unit wieder her. Konfiguration, Zugangsdaten,
+Tasks und UNKNOWN-Zustände bleiben liegen; ein Datenbankbackup wird nicht
+darüber zurückgeschrieben.
+
+HTTP-MCP, Bearer-Authentifizierung und `bridge_health` sind der Serverbetrieb.
+macOS-GUI, Terminal.app und native Tastatur sind nicht verfügbar. Zwischenablage
+ist optional und nicht erforderlich. Ein macOS-Lauf ist kein Linux-Nachweis.
+
+Ausführlich: [INSTALL-LINUX-SERVER.de.md](docs/INSTALL-LINUX-SERVER.de.md).
+"""
+    return text.encode()
+
+
+def write_linux_server_bundle(output, commit, version, license_fields, presentation):
+    """Source package for an existing Linux host. No native app and no network."""
+    linux_name = f"KiraBridge-{version}-Linux-x86_64"
+    linux_files = {
+        "payload/" + name: git_blob(commit, name)
+        for name in git("ls-files").splitlines()
+        if name.startswith(("src/", "docs/", "examples/"))
+        or name in {"LICENSE", "pyproject.toml", "uv.lock"}
+    }
+    linux_files.update(
+        {
+            name.removeprefix("payload/"): data
+            for name, data in list(linux_files.items())
+            if name.startswith(("payload/docs/", "payload/examples/"))
+        }
+    )
+    linux_files["install.sh"] = (
+        Path("scripts/release-install.sh")
+        .read_bytes()
+        .replace(b"@PLATFORM@", b"Linux-x86_64")
+        .replace(b"@SOURCE_SHORT@", commit[:12].encode())
+        .replace(b"@SOURCE@", commit.encode())
+        .replace(b"@VERSION@", version.encode())
+    )
+    linux_files["LICENSE"] = Path("LICENSE").read_bytes()
+    linux_files["installer/install.py"] = git_blob(commit, "installer/install.py")
+    linux_files["installer/presentation.py"] = git_blob(commit, "installer/presentation.py")
+    for language in ("DE", "EN"):
+        linux_files[f"INSTALL-{language}.md"] = server_install_page(version, language)
+    notes = Path(f"docs/RELEASE-{version}.md")
+    if notes.is_file():
+        linux_files["RELEASE-NOTES.md"] = notes.read_bytes()
+    listed = {
+        name: hashlib.sha256(data).hexdigest() for name, data in sorted(linux_files.items())
+    }
+    linux_files["release.json"] = (
+        json.dumps(
+            {
+                "version": version,
+                "commit": commit,
+                "source_commit": commit,
+                "platform": "Linux-x86_64",
+                "role": "linux-server",
+                "service": "systemd-user",
+                "desktop_gui": "unavailable",
+                "gui_parity": False,
+                **license_fields,
+                "presentation": presentation,
+                "files": listed,
+                "maturity": (
+                    "source-pinned Linux server package; "
+                    "native host acceptance is recorded separately"
+                ),
+            },
+            indent=2,
+        )
+        + "\n"
+    ).encode()
+    linux_files["SHA256SUMS"] = "".join(
+        hashlib.sha256(data).hexdigest() + "  " + name + "\n"
+        for name, data in sorted(linux_files.items())
+    ).encode()
+    linux_bundle = output / (linux_name + ".tar.gz")
+    with (
+        linux_bundle.open("xb") as raw,
+        gzip.GzipFile(fileobj=raw, mode="wb", mtime=0, filename="") as gz,
+    ):
+        with tarfile.open(fileobj=gz, mode="w") as archive:
+            for name, data in sorted(linux_files.items()):
+                item = tarfile.TarInfo(linux_name + "/" + name)
+                item.size, item.mode, item.mtime = (
+                    len(data),
+                    0o755 if name == "install.sh" else 0o644,
+                    0,
+                )
+                archive.addfile(item, io.BytesIO(data))
+    digest = hashlib.sha256(linux_bundle.read_bytes()).hexdigest()
+    (output / (linux_bundle.name + ".sha256")).write_text(
+        digest + "  " + linux_bundle.name + "\n"
+    )
+    return linux_bundle
+
+
+def build(output, *, target=None):
     if output.is_symlink() or (output.exists() and any(output.iterdir())):
         raise SystemExit("Use a new empty output directory; existing artifacts are preserved")
     if git("status", "--porcelain"):
@@ -121,6 +276,23 @@ def build(output):
     }
     output.mkdir(parents=True, exist_ok=True)
     (output / "LICENSE").write_bytes(license_bytes)
+    if target == "linux-server":
+        # Explicit server artifact. The default macOS release still returns
+        # before any Linux bytes are written.
+        presentation = presentation_for(commit)
+        bundle = write_linux_server_bundle(
+            output, commit, version, license_fields, presentation
+        )
+        (output / "SHA256SUMS").write_text(
+            hashlib.sha256(bundle.read_bytes()).hexdigest()
+            + "  "
+            + bundle.name
+            + "\n"
+            + hashlib.sha256(license_bytes).hexdigest()
+            + "  LICENSE\n"
+        )
+        print(json.dumps({"version": version, "commit": commit, "bundle": str(bundle)}, indent=2))
+        return
     subprocess.run(
         ["uv", "build", "--wheel", "--out-dir", str(output)],
         check=True,
@@ -252,71 +424,9 @@ exec python3.11 "$bundle/installer/install.py" install --bundle "$bundle" "$@"
         print(json.dumps({"version": version, "commit": commit, "bundle": str(bundle)}, indent=2))
         return
     # Preserve the existing Linux route for builds performed on Linux.
-    linux_name = f"KiraBridge-{version}-Linux-x86_64"
-    linux_files = {
-        "payload/" + name: subprocess.check_output(["git", "show", f"{commit}:{name}"])
-        for name in git("ls-files").splitlines()
-        if name.startswith(("src/", "docs/", "examples/"))
-        or name in {"LICENSE", "pyproject.toml", "uv.lock"}
-    }
-    linux_files.update(
-        {
-            name.removeprefix("payload/"): data
-            for name, data in list(linux_files.items())
-            if name.startswith(("payload/docs/", "payload/examples/"))
-        }
+    linux_bundle = write_linux_server_bundle(
+        output, commit, version, license_fields, presentation
     )
-    linux_files["install.sh"] = (
-        Path("scripts/release-install.sh")
-        .read_bytes()
-        .replace(b"@PLATFORM@", b"Linux-x86_64")
-        .replace(b"@SOURCE_SHORT@", commit[:12].encode())
-        .replace(b"@SOURCE@", commit.encode())
-        .replace(b"@VERSION@", version.encode())
-    )
-    linux_files["LICENSE"] = Path("LICENSE").read_bytes()
-    linux_files["installer/presentation.py"] = files["installer/presentation.py"]
-    for language in ("DE", "EN"):
-        command = "sh install.sh" + (" --language en" if language == "EN" else "")
-        linux_files[f"INSTALL-{language}.md"] = (
-            f"# KiraBridge {version} — unapproved candidate\n\n"
-            f"[Installation {language}](docs/INSTALL-{language}.md)\n\n"
-            f"```sh\n{command}\n```\n\n"
-            "Linux installation acceptance is not established by a macOS build.\n"
-        ).encode()
-    linux_files["RELEASE-NOTES.md"] = Path(f"docs/RELEASE-{version}.md").read_bytes()
-    linux_files["release.json"] = (
-        json.dumps(
-            {
-                "version": version,
-                "source_commit": commit,
-                "platform": "Linux-x86_64",
-                **license_fields,
-                "presentation": presentation,
-                "maturity": "unpublished candidate; Linux package acceptance not performed",
-            },
-            indent=2,
-        )
-        + "\n"
-    ).encode()
-    linux_files["SHA256SUMS"] = "".join(
-        hashlib.sha256(data).hexdigest() + "  " + name + "\n"
-        for name, data in sorted(linux_files.items())
-    ).encode()
-    linux_bundle = output / (linux_name + ".tar.gz")
-    with (
-        linux_bundle.open("xb") as raw,
-        gzip.GzipFile(fileobj=raw, mode="wb", mtime=0, filename="") as gz,
-    ):
-        with tarfile.open(fileobj=gz, mode="w") as archive:
-            for name, data in sorted(linux_files.items()):
-                item = tarfile.TarInfo(linux_name + "/" + name)
-                item.size, item.mode, item.mtime = (
-                    len(data),
-                    0o755 if name == "install.sh" else 0o644,
-                    0,
-                )
-                archive.addfile(item, io.BytesIO(data))
     (output / "SHA256SUMS").write_text(
         "".join(
             hashlib.sha256(p.read_bytes()).hexdigest() + "  " + p.name + "\n"
@@ -335,4 +445,6 @@ exec python3.11 "$bundle/installer/install.py" install --bundle "$bundle" "$@"
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--out", type=Path, required=True)
-    build(parser.parse_args().out.resolve())
+    parser.add_argument("--target", choices=("host", "linux-server"), default="host")
+    args = parser.parse_args()
+    build(args.out.resolve(), target=None if args.target == "host" else args.target)

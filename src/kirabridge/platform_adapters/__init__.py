@@ -38,6 +38,27 @@ class LinuxAdapter:
             raise BridgeError("clipboard_unavailable", "Install wl-clipboard or xclip")
         return [executable, *args]
 
+    def server_facts(self) -> dict:
+        """Headless server limits. This is not a claim of macOS desktop parity."""
+        try:
+            self.clipboard_command(False)
+            clipboard = "optional-tool"
+        except BridgeError:
+            clipboard = "unavailable"
+        return {
+            "role": "linux-server",
+            "gui_parity": False,
+            "mcp_http": "available",
+            "authentication": "bearer",
+            "health": "bridge_health",
+            "service_manager": "systemd-user" if shutil.which("systemctl") else "unavailable",
+            "desktop_gui": "unavailable",
+            "macos_terminal_app": "unavailable",
+            "native_keyboard": "unavailable",
+            "clipboard": clipboard,
+            "clipboard_required_for_server": False,
+        }
+
 
 class WindowsAdapter:
     name = "windows"

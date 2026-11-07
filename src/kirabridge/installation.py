@@ -81,24 +81,48 @@ def idle_queue(config):
         store.close()
 
 
+def quote_systemd(value):
+    """Quote one ExecStart argument. systemd is not a shell and expands % and $."""
+    escaped = (
+        str(value).replace("\\", "\\\\").replace('"', '\\"').replace("%", "%%").replace("$", "$$")
+    )
+    return '"' + escaped + '"'
+
+
+def render_linux_unit(argv):
+    """User-service unit aligned with examples/kirabridge.service.
+
+    secrets.env stays optional. A missing EnvironmentFile must not stop the server.
+    Desktop session variables are intentionally absent.
+    """
+    if not argv:
+        raise BridgeError("service_install", "Linux server command is empty")
+    return (
+        "[Unit]\n"
+        "Description=KiraBridge private MCP bridge\n"
+        "After=network.target\n"
+        "\n"
+        "[Service]\n"
+        "Type=simple\n"
+        "UMask=0077\n"
+        "EnvironmentFile=-%h/.config/kirabridge/secrets.env\n"
+        "ExecStart=" + " ".join(quote_systemd(part) for part in argv) + "\n"
+        "Restart=on-failure\n"
+        "RestartSec=3\n"
+        "TimeoutStopSec=15\n"
+        "NoNewPrivileges=true\n"
+        "\n"
+        "[Install]\n"
+        "WantedBy=default.target\n"
+    )
+
+
 def linux_service(config_path, command):
     if not shutil.which("systemctl"):
         raise BridgeError("service_manager_missing", "A user systemd session is required")
     unit = Path.home() / ".config/systemd/user/kirabridge.service"
-    # systemd command parsing is not shell parsing; quote each argument and escape specifiers.
     args = [command, "--config", str(config_path), "serve", "--transport", "http"]
-    quoted = " ".join(
-        '"'
-        + x.replace("\\", "\\\\").replace('"', '\\"').replace("%", "%%").replace("$", "$$")
-        + '"'
-        for x in args
-    )
-    body = (
-        "[Unit]\nDescription=KiraBridge private MCP bridge\nAfter=network.target\n"
-        "[Service]\nType=simple\nUMask=0077\nExecStart="
-        + quoted
-        + "\nRestart=on-failure\nRestartSec=3\n[Install]\nWantedBy=default.target\n"
-    )
+    body = render_linux_unit(args)
     unit.parent.mkdir(parents=True, exist_ok=True)
     if unit.exists() and unit.read_text() != body:
         raise BridgeError("service_conflict", "Existing user service differs; it was preserved")
