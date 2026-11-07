@@ -10,9 +10,9 @@
 <p align="center"><picture><source media="(prefers-color-scheme: dark)" srcset="assets/design/wordmarks/KiraBridge-dark.svg"><img src="assets/design/wordmarks/KiraBridge-light.svg" alt="KiraBridge" width="312"></picture></p>
 
 <p align="center">
-  <a href="https://github.com/landjunge/KiraBridge/releases"><img alt="Releases / RC" src="https://img.shields.io/badge/macOS%20Intel-Releases%20%2F%20RC-6060c0?style=flat-square"></a>
+  <a href="https://github.com/landjunge/KiraBridge/releases/tag/v0.8.0rc36"><img src="assets/readme/download-macos-intel.svg" alt="macOS Intel 0.8.0rc36" width="170"></a>
   &nbsp;
-  <a href="https://github.com/landjunge/KiraBridge/releases"><img alt="Preview releases" src="https://img.shields.io/badge/Windows-Preview%20releases-6060c0?style=flat-square"></a>
+  <a href="https://github.com/landjunge/KiraBridge/releases/tag/windows-v0.8.0rc37.dev1"><img src="assets/readme/download-windows-preview.svg" alt="Windows Preview 0.8.0rc37.dev1" width="170"></a>
 </p>
 
 **Talk to your AI. Get the work done on your computer.**
