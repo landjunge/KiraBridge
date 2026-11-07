@@ -19,13 +19,30 @@ from kirabridge.windows_package import _copy_regular_tree, _digest_tree  # noqa:
 from kirabridge.windows_runtime import validate_bundled_runtime  # noqa: E402
 
 
-def build(runtime: Path, output: Path, version: str) -> dict:
-    pin = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip()
-    # Export committed bytes: unrelated dirty work cannot enter a release.
-    source = subprocess.check_output(
-        ["git", "archive", "--format=zip", pin, "src", "scripts", "pyproject.toml", "LICENSE"],
-        cwd=ROOT,
-    )
+def build(
+    runtime: Path,
+    output: Path,
+    version: str,
+    source_export: Path | None = None,
+    source_sha256: str | None = None,
+    commit: str | None = None,
+) -> dict:
+    if source_export is not None:
+        if not source_sha256 or not commit:
+            raise ValueError("Native export builds require --source-sha256 and --commit")
+        source = source_export.read_bytes()
+        if hashlib.sha256(source).hexdigest() != source_sha256:
+            raise ValueError("Source export SHA256 mismatch")
+        if len(commit) != 40 or any(c not in "0123456789abcdef" for c in commit):
+            raise ValueError("Expected a complete source commit")
+        pin = commit
+    else:
+        pin = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip()
+        # Export committed bytes: unrelated dirty work cannot enter a release.
+        source = subprocess.check_output(
+            ["git", "archive", "--format=zip", pin, "src", "scripts", "pyproject.toml", "LICENSE"],
+            cwd=ROOT,
+        )
     runtime_identity = validate_bundled_runtime(runtime)
     with tempfile.TemporaryDirectory() as temporary:
         payload = Path(temporary) / "payload"
@@ -58,7 +75,8 @@ def build(runtime: Path, output: Path, version: str) -> dict:
         inventory = _digest_tree(payload)
         document = {
             "commit": pin,
-            "commit_source": "git-archive",
+            "commit_source": "git-archive-sha256",
+            "source_archive_sha256": hashlib.sha256(source).hexdigest(),
             "dirty": False,
             "version": version,
             "kind": "offline-bundled-cpython-windows-x64",
@@ -87,5 +105,20 @@ if __name__ == "__main__":
     parser.add_argument("--runtime", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--version", default="0.8.0rc40")
+    parser.add_argument("--source-export", type=Path)
+    parser.add_argument("--source-sha256")
+    parser.add_argument("--commit")
     args = parser.parse_args()
-    print(json.dumps(build(args.runtime, args.output, args.version), sort_keys=True))
+    print(
+        json.dumps(
+            build(
+                args.runtime,
+                args.output,
+                args.version,
+                args.source_export,
+                args.source_sha256,
+                args.commit,
+            ),
+            sort_keys=True,
+        )
+    )
