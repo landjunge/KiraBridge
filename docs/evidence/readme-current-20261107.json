@@ -2,8 +2,8 @@
   "schema": "kirabridge.readme-current.v1",
   "task_id": "KB-README-CURRENT-CODEX-20261107",
   "instance": "codex-current-readme-20261107",
-  "recorded_at": "2026-11-07T10:54:19.747960+00:00",
-  "status": "local_documentation_checks_and_independent_review_passed_ready_for_PR",
+  "recorded_at": "2026-11-07T11:11:02.236861+00:00",
+  "status": "documentation_ready_PR71_merge_blocked_by_existing_time_dependent_test_fixtures",
   "scope": {
     "written_files": [
       "README.md",
@@ -345,7 +345,7 @@
       "result": "passed; no install command executed"
     },
     "initial_checker_findings": "First in-progress link check found the not-yet-written evidence file and overly strict duplicate-count comparison between translations. Final check uses semantic target/pin sets; DE macOS-contract reference aligned. This was not a product test failure.",
-    "local_products_tests": "not run: documentation-only; required Verify CI remains an integration gate",
+    "local_products_tests": "Initially none for documentation. After mandatory CI failure, exactly one affected existing test rerun for diagnosis: test_every_preflight_reads_live_thread, 1 failed in0.66s, same RoutingError. No whole suite or platform build repeated locally.",
     "temporary_probe_failure": "Initial read-only installed byte comparison used system python3 (older than project minimum); str.removeprefix raised AttributeError. Corrected helper interpreter to Python 3.11 and reran only the comparison.",
     "documentation_static": {
       "status": "passed",
@@ -388,6 +388,131 @@
     "git_diff_check": {
       "command": "git diff --check",
       "result": "passed"
+    },
+    "documentation_static_after_ci_status_note": {
+      "status": "passed",
+      "counts": {
+        "links_and_assets": 54,
+        "local_links_and_assets": 40,
+        "external_references": 14,
+        "pinned_git_links": 10,
+        "shell_syntax_blocks": 4
+      },
+      "issues": [],
+      "files": [
+        {
+          "path": "docs/DEVELOPERS.md",
+          "sha256": "bfad9552079402eef8a718421ffde398da64294c6a15fa30c835eae78bd55df1"
+        },
+        {
+          "path": "docs/DEVELOPERS.de.md",
+          "sha256": "438df1450d6a3601ebf9915b60f385beb692552b4f55b237233e5e9fec2c8d7b"
+        }
+      ],
+      "scope": "local targets/anchors, pinned Git blobs, HTML image sources, fence/whitespace and shell syntax, DE/EN source/version/GitHub-link parity, unchanged README artwork"
+    },
+    "required_PR_CI": {
+      "run_id": 42365946670,
+      "url": "https://github.com/landjunge/KiraBridge/actions/runs/42365946670",
+      "attempt": 1,
+      "head_sha": "77c3aae9f0e05b7b7f987c3582e1e8a4dc342d1b",
+      "tested_synthetic_merge": "46edd57dcf438d84f98a28c6a70d946a17fcf201",
+      "synthetic_merge_parents": [
+        "d12838ae97c7efcc053c45c3bc9fba5e78f5fe5d",
+        "77c3aae9f0e05b7b7f987c3582e1e8a4dc342d1b"
+      ],
+      "conclusion": "failure",
+      "lanes": {
+        "311": {
+          "job_id": 128383981892,
+          "summary": [
+            "20 failed, 4966 passed, 254 skipped, 4 subtests passed in 650.81s (0:10:50)"
+          ],
+          "failed_nodes": [
+            "tests/test_capability_routing.py::test_every_preflight_reads_live_thread",
+            "tests/test_capability_routing.py::test_changed_authentication_does_not_enable_api_billing",
+            "tests/test_capability_routing.py::test_dry_run_no_process_no_receipt",
+            "tests/test_capability_routing.py::test_double_dispatch_refused_even_after_success",
+            "tests/test_capability_routing.py::test_lost_final_receipt_does_not_claim_no_model_started",
+            "tests/test_capability_routing.py::test_timeout_is_unknown_no_retry",
+            "tests/test_capability_routing.py::test_transport_diagnostic_real_timeout_preserves_partial_output",
+            "tests/test_capability_routing.py::test_transport_diagnostic_timeout_runner_does_not_leak_argv",
+            "tests/test_capability_routing.py::test_transport_diagnostic_known_exit_survives_capture_io_failure",
+            "tests/test_capability_routing.py::test_transport_diagnostic_partial_capture_bounded_and_private",
+            "tests/test_capability_routing.py::test_transport_diagnostic_existing_capture_is_not_workspace_denial",
+            "tests/test_capability_routing.py::test_transport_diagnostic_success_and_invalid_metadata_remain_transport_success",
+            "tests/test_capability_routing.py::test_transport_stream_io_failures_keep_native_zero_unknown_and_lease[stdin-write]",
+            "tests/test_capability_routing.py::test_transport_stream_io_failures_keep_native_zero_unknown_and_lease[stdin-flush]",
+            "tests/test_capability_routing.py::test_transport_stream_io_failures_keep_native_zero_unknown_and_lease[stdin-close]",
+            "tests/test_capability_routing.py::test_transport_stream_io_failures_keep_native_zero_unknown_and_lease[stdout-close]",
+            "tests/test_capability_routing.py::test_transport_stream_io_failures_keep_native_zero_unknown_and_lease[stderr-close]",
+            "tests/test_capability_routing.py::test_revision_change_prevents_spawn",
+            "tests/test_capability_routing.py::test_managed_adapter_keeps_config_immutable",
+            "tests/test_capability_routing.py::test_unknown_writer_keeps_root_lease_and_blocks_subdirectory"
+          ],
+          "raw_log_path": "/tmp/kb-readme-ci-311.log",
+          "raw_log_bytes": 323483,
+          "raw_log_sha256": "bf1ea9729210aeb613bda2a796a6ca68c435fcd23d63ce2561e31c11fa0282b8"
+        },
+        "313": {
+          "job_id": 128383982028,
+          "summary": [
+            "21 failed, 4965 passed, 254 skipped, 2 errors, 4 subtests passed in 645.77s (0:10:45)"
+          ],
+          "failed_nodes": [
+            "tests/test_capability_routing.py::test_every_preflight_reads_live_thread",
+            "tests/test_capability_routing.py::test_changed_authentication_does_not_enable_api_billing",
+            "tests/test_capability_routing.py::test_dry_run_no_process_no_receipt",
+            "tests/test_capability_routing.py::test_double_dispatch_refused_even_after_success",
+            "tests/test_capability_routing.py::test_lost_final_receipt_does_not_claim_no_model_started",
+            "tests/test_capability_routing.py::test_timeout_is_unknown_no_retry",
+            "tests/test_capability_routing.py::test_transport_diagnostic_real_timeout_preserves_partial_output",
+            "tests/test_capability_routing.py::test_transport_diagnostic_timeout_runner_does_not_leak_argv",
+            "tests/test_capability_routing.py::test_transport_diagnostic_known_exit_survives_capture_io_failure",
+            "tests/test_capability_routing.py::test_transport_diagnostic_partial_capture_bounded_and_private",
+            "tests/test_capability_routing.py::test_transport_diagnostic_existing_capture_is_not_workspace_denial",
+            "tests/test_capability_routing.py::test_transport_diagnostic_success_and_invalid_metadata_remain_transport_success",
+            "tests/test_capability_routing.py::test_transport_stream_io_failures_keep_native_zero_unknown_and_lease[stdin-write]",
+            "tests/test_capability_routing.py::test_transport_stream_io_failures_keep_native_zero_unknown_and_lease[stdin-flush]",
+            "tests/test_capability_routing.py::test_transport_stream_io_failures_keep_native_zero_unknown_and_lease[stdin-close]",
+            "tests/test_capability_routing.py::test_transport_stream_io_failures_keep_native_zero_unknown_and_lease[stdout-close]",
+            "tests/test_capability_routing.py::test_transport_stream_io_failures_keep_native_zero_unknown_and_lease[stderr-close]",
+            "tests/test_capability_routing.py::test_revision_change_prevents_spawn",
+            "tests/test_capability_routing.py::test_managed_adapter_keeps_config_immutable",
+            "tests/test_capability_routing.py::test_unknown_writer_keeps_root_lease_and_blocks_subdirectory",
+            "tests/test_cli_message_returns.py::test_cli_explicit_followup_work_runs_once_and_auto_result_never_kicks_requester"
+          ],
+          "raw_log_path": "/tmp/kb-readme-ci-313.log",
+          "raw_log_bytes": 347355,
+          "raw_log_sha256": "08e692b64a13683f395b7763464b39f26d0f4e70e7d3748c2fc31d98a0daca8e"
+        }
+      },
+      "successful_steps": "Both lanes: fresh locked dependencies, Ruff check, Ruff format, all three source checkouts.",
+      "not_executed": "Remote R2/R3 no-skip lane and uv build skipped after legacy failure; not accepted.",
+      "superseded_push_run": {
+        "run_id": 42365913153,
+        "conclusion": "cancelled",
+        "reason": "existing branch concurrency when PR opened; not a pass"
+      },
+      "logs_retrieval": "gh run view --log-failed could not write /Users/landjunge/.cache/gh cache; raw logs then read through authorized actions/jobs/{id}/logs API into /tmp, hashes above; no rerun to obtain logs"
+    },
+    "focused_failure_diagnosis": {
+      "command": "UV_CACHE_DIR=/tmp/kb-readme-uv-cache UV_PYTHON_DOWNLOADS=never uv run --locked pytest -q tests/test_capability_routing.py::test_every_preflight_reads_live_thread --tb=short -W error::pytest.PytestUnraisableExceptionWarning",
+      "cwd": "/Users/landjunge/KiraBridge-worktrees/current-readme-codex-20261107",
+      "python": "checkout .venv Python3.11.15; kirabridge imports from this checkout src",
+      "exit_code": 1,
+      "result": "1 failed in0.66s",
+      "error": "RoutingError: Evidence expired, stale, or future-dated; refresh before delegation",
+      "causal_sources": [
+        "tests/test_capability_routing.py:71-83 fixes checked/verified at2026-11-05T20:00Z and expires at2026-11-06T20:00Z",
+        "tests/test_capability_routing.py:210-211 calls before_delegation without controlled clock",
+        "src/kirabridge/capability_routing/hook.py:43-45 calls select without now",
+        "src/kirabridge/capability_routing/router.py:180-181 uses actual datetime.now(timezone.utc); lines164-167 correctly reject expired evidence"
+      ],
+      "independent_confirmation": "Native read-only reviewer confirmed the source chain and unchanged src/tests/scripts/workflows/manifests.",
+      "additional_python313_errors": "Observed PytestUnraisableExceptionWarning from Faulty stream objects and two errors; their causal explanation remains unresolved, not silently attributed to expiry.",
+      "documentation_code_change_check": "git diff --name-only baseline..77c3aae -- src tests scripts .github pyproject.toml uv.lock returned empty",
+      "required_followup": "Routing fixture owner must make positive fixtures clock-controlled while retaining expiry/rights guards; separately investigate Python3.13 unraisable cleanup and rerun affected checks, then required PR CI. These test/product files are outside this documentation-only write scope."
     }
   },
   "independent_review": {
@@ -458,7 +583,7 @@
     "design_read_only_observation": "Existing design thread read without input; latest visible message concerned source header cache/language and 4AllPass offline icons. No successful coordination message or README ownership acknowledgement claimed; this change preserves artwork and main README content outside factual scope."
   },
   "integration": {
-    "state": "ready_for_branch_push_PR_and_required_checks",
+    "state": "PR71_open_not_merged_required_CI_failed",
     "authorized": "User explicitly authorizes branch push, PR, required checks/review and regular merge; no release/tag/deployment",
     "primary_worktree_git_blockers": [
       "git fetch origin main: cannot open .../FETCH_HEAD: Operation not permitted",
@@ -466,9 +591,17 @@
     ],
     "method": "Temporary local clone of the same repository within /tmp for normal commit/push/PR. Original protected Git metadata is not modified; its local branch synchronization must be reported separately.",
     "final_proof_location": "PR check/review/merge records and final coordinator handoff; avoid another mandatory whole-CI cycle solely to self-record its own resulting commit SHA.",
-    "temporary_clone": "/tmp/kb-readme-integration-20261107"
+    "temporary_clone": "/tmp/kb-readme-integration-20261107",
+    "documentation_commit": "77c3aae9f0e05b7b7f987c3582e1e8a4dc342d1b",
+    "pr_url": "https://github.com/landjunge/KiraBridge/pull/71",
+    "review_comment": "https://github.com/landjunge/KiraBridge/pull/71#issuecomment-6705905320",
+    "remote_main_last_observed": "d12838ae97c7efcc053c45c3bc9fba5e78f5fe5d",
+    "blocker": "Existing routing test fixtures expired on2026-11-06T20:00Z; source/test changes are explicitly outside authorized write scope. Required CI is failed, no merge or check bypass.",
+    "final_report_update": "This followup only records actual CI failure and updates developer status. A normal push necessarily triggers existing Verify again; no workflow change, skip marker, manual full-suite rerun or successful replacement status is used. Its later result must be read from PR71.",
+    "local_sync_limit": "Original worktree branch/index still at d12838a due protected metadata; documentation files match supplied branch contents. Temporary integration clone clean after commit/push."
   },
   "remaining_limits": [
+    "Regular main integration NOT completed: PR71 blocked on actual failed required CI, with focused reproduction and separate fixture-owner followup. No success claimed for skipped remote/build steps.",
     "Windows parity, standalone Windows installer and current Linux/Debian server remain separate active work; no worker code changed.",
     "Apple Silicon and other OS/native/provider acceptance not performed here.",
     "Website TLS/content could not be verified.",

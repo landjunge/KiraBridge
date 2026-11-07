@@ -137,6 +137,12 @@ nötigen Lint-/Testprüfungen und `uv build` aus. Automatische Jobs nutzen die b
 selbstgehosteten Linux-Runner für Python 3.11/3.13; gehostete macOS- und Paketprüfungen
 benötigen manuelle Auswahl. [CI-Auswahl, Kosten und Plattformgrenzen](CI-COST-GATES-20261106.md).
 
+
+Die [PR71-Prüfung vom 7. November](https://github.com/landjunge/KiraBridge/actions/runs/42365946670)
+ist durch abgelaufene Routing-Testfixtures blockiert; Python 3.13 meldet zusätzlich
+ungeklärte Unraisable-Exception-Fehler. Testfixtures und produktiver Frischeguard
+bleiben in diesem Dokumentationsauftrag unverändert. [Diagnose und exakte Fehlergebnisse](evidence/readme-current-20261107.json).
+
 Vollständige Integrationsreproduktion benötigt `uv sync --locked --dev --group remote-ci`
 und die exakten externen Checkouts unten. CI verwendet `scripts/ci_remote_tests.py`
 in getrennten frischen Legacy-/Remoteprozessen mit gebundenen Importen, Pins und Ergebnissen:
