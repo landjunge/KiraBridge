@@ -19,6 +19,7 @@ def bridge_server(source_path, identity):
     return {
         "command": sys.executable,
         "args": [
+            "-B",
             "-m",
             "kirabridge.cli",
             "--config",

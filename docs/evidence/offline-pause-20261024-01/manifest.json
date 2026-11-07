@@ -1,0 +1,8 @@
+{
+  "head": "bc13d392ed4e69489133c7b94a144b8074dd3e12",
+  "sha256": {
+    "installer/install.py": "7142e0f46acfd59583772e4eca4fe70b0f737f4af69560e87001e86eda185187",
+    "tests/test_installer.py": "ddcda694dde34254df32c332c617dee9bcb3c172c7ef483a7109e479e862de81",
+    "working-tree.patch": "c95f1b4fd1e803ae2f08ef56449ab6f920be564a059911841dca6161866d6ca8"
+  }
+}

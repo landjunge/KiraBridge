@@ -17,6 +17,7 @@ from starlette.responses import HTMLResponse, JSONResponse, Response
 from starlette.routing import Route
 
 from kirabridge.bridge_core.models import BridgeError
+from kirabridge.permissions import automatic_for
 from kirabridge.team_manager.models import (
     TeamCreate,
     TeamMessageSend,
@@ -125,9 +126,7 @@ class TeamConsole:
     async def list_teams(self, request: Request):
         principal = self._principal(request)
         self.security.principal(principal, "team.read")
-        result = (
-            self.teams.list(principal) if self.config.team.enabled else {"teams": []}
-        )
+        result = self.teams.list(principal) if self.config.team.enabled else {"teams": []}
         roster = []
         for name, worker in self.config.team.workers.items():
             policy = self.config.principals.get(name)
@@ -136,7 +135,7 @@ class TeamConsole:
                 worker.agent
                 and worker.cwd
                 and policy
-                and policy.approval_mode == "automatic"
+                and automatic_for(policy, "agent.execute")
                 and "agent.execute" in policy.capabilities
                 and worker.agent in policy.agents
                 and adapter

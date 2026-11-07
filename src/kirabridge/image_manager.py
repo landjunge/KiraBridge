@@ -183,7 +183,10 @@ def image_task_result(task: dict):
     """
     from mcp.types import CallToolResult, ImageContent, TextContent
 
-    if task.get("operation") != "file.image" or task.get("state") != "completed":
+    if (
+        task.get("operation") not in {"file.image", "capture.window", "capture.display"}
+        or task.get("state") != "completed"
+    ):
         return task
     result = task.get("result")
     if not isinstance(result, dict):

@@ -1,0 +1,61 @@
+{
+  "observed_at_utc": "2026-11-02T22:51:04.754038+00:00",
+  "scope": "local authenticated loopback MCP read-only bridge_health; no keyboard/clipboard/UI; not ChatGPT cloud/stdio timing",
+  "baseline_commit": "78b182b",
+  "protocolVersion": "2025-11-25",
+  "sdk_version": "1.30.0",
+  "tools": 72,
+  "catalog_json_bytes": 88143,
+  "samples": [
+    {
+      "variant": "before",
+      "operation": "bridge_health",
+      "call_ms": [
+        92.98178499739151,
+        87.93830699869432,
+        117.26577900117263,
+        85.3339529967343,
+        79.3123050025315,
+        79.84604900047998,
+        77.68013699751464,
+        79.74485600061598,
+        158.3889020002971,
+        275.0881110005139
+      ],
+      "summary": {
+        "count": 10,
+        "p50_ms": 86.6361299977143,
+        "min_ms": 77.68013699751464,
+        "max_ms": 275.0881110005139,
+        "sum_ms": 1133.5801839959458
+      },
+      "metadata_list_requests": 10,
+      "actual_tool_dispatches": 10
+    },
+    {
+      "variant": "after",
+      "operation": "bridge_health",
+      "call_ms": [
+        126.37475700103096,
+        31.16767999745207,
+        29.271011000673752,
+        28.90096800183528,
+        28.163757000584155,
+        28.177743002743227,
+        28.896651998365996,
+        29.888478999055224,
+        28.76354500040179,
+        28.1071229983354
+      ],
+      "summary": {
+        "count": 10,
+        "p50_ms": 28.89881000010064,
+        "min_ms": 28.1071229983354,
+        "max_ms": 126.37475700103096,
+        "sum_ms": 387.71171500047785
+      },
+      "metadata_list_requests": 1,
+      "actual_tool_dispatches": 10
+    }
+  ]
+}

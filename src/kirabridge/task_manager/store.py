@@ -33,7 +33,8 @@ CREATE INDEX message_inbox ON messages(recipient,acknowledged,seq);
 CREATE TABLE message_jobs (
  message_id TEXT PRIMARY KEY REFERENCES messages(id), state TEXT NOT NULL,
  run_id TEXT UNIQUE, claimed REAL, started REAL, finished REAL,
- reply_id TEXT REFERENCES messages(id), evidence TEXT NOT NULL DEFAULT '{}', error TEXT
+ reply_id TEXT REFERENCES messages(id), evidence TEXT NOT NULL DEFAULT '{}', error TEXT,
+ execution_cwd TEXT
 );
 CREATE INDEX message_queue ON message_jobs(state);
 CREATE TABLE message_events (
@@ -79,8 +80,22 @@ class Store:
         private_directory(path.parent)
         if path.is_symlink():
             raise BridgeError("unsafe_state", "Database must not be a symlink")
-        fd = os.open(path, os.O_CREAT | os.O_RDWR | getattr(os, "O_NOFOLLOW", 0), 0o600)
-        os.close(fd)
+        if os.name == "nt":
+            from kirabridge.platform_adapters.windows.filesystem_security import (
+                WindowsFiles,
+                ensure_private_file,
+            )
+
+            ensure_private_file(path)
+            files = WindowsFiles()
+            for suffix in ("-wal", "-shm"):
+                sidecar = Path(str(path) + suffix)
+                if sidecar.exists():
+                    handle = files.open(sidecar)
+                    files.close(handle)
+        else:
+            fd = os.open(path, os.O_CREAT | os.O_RDWR | getattr(os, "O_NOFOLLOW", 0), 0o600)
+            os.close(fd)
         if os.name != "nt" and path.stat().st_mode & 0o077:
             raise BridgeError("unsafe_state", "Database must be owner-only")
         self.db = sqlite3.connect(path, isolation_level=None, timeout=5)
@@ -104,6 +119,19 @@ class Store:
                     for statement in script.split(";"):
                         if statement.strip():
                             self.db.execute(statement)
+                if "execution_cwd" not in {
+                    row[1] for row in self.db.execute("PRAGMA table_info(message_jobs)")
+                }:
+                    # Historical unknown jobs stay unknown with an unconfirmed
+                    # scope; a current receiver configuration cannot rewrite it.
+                    self.db.execute("ALTER TABLE message_jobs ADD COLUMN execution_cwd TEXT")
+                # Event pages and existence checks are scoped to one task. The
+                # global sequence primary key alone scans unrelated task history.
+                # Install for existing databases too, in this same startup transaction.
+                self.db.execute("CREATE INDEX IF NOT EXISTS events_task_seq ON events(task_id,seq)")
+                from kirabridge.queue_management import install_schema
+
+                install_schema(self)
                 from kirabridge.completion_manager import SCHEMA as COMPLETION_SCHEMA
 
                 for statement in COMPLETION_SCHEMA:
@@ -287,7 +315,8 @@ class Store:
         result = dict(row)
         for key in ("args", "evidence", "result", "error"):
             result[key] = json.loads(result[key]) if result[key] is not None else None
-        result.pop("request_hash")
+        # Owned readback can verify the original immutable request without resubmission.
+        result["request_sha256"] = result.pop("request_hash")
         if resolve_output and self.result_codec:
             result["result"] = self.result_codec.resolve_result(
                 result["principal"], result["result"]
@@ -456,9 +485,46 @@ class Store:
         result.pop("principal", None)
         return result
 
-    def claim(self, owner: str, lease_seconds: float, control: bool | str = False) -> dict | None:
+    def claim(
+        self,
+        owner: str,
+        lease_seconds: float,
+        control: bool | str = False,
+        *,
+        native_visible=False,
+        managed_workers=(),
+        native_principals=("chatgpt",),
+    ) -> dict | None:
         with self.transaction():
             selection, names = self.lane_selection(control)
+            if native_visible:
+                agent_native = "operation='agent.execute'"
+                allowed = tuple(sorted(set(managed_workers)))
+                if len(allowed) > 16 or any(not isinstance(name, str) for name in allowed):
+                    raise ValueError("At most 16 configured managed workers are allowed")
+                if (
+                    allowed
+                    and self.db.execute(
+                        "SELECT 1 FROM sqlite_master WHERE type='table' AND name='team_work'"
+                    ).fetchone()
+                ):
+                    agent_native += (
+                        " AND NOT EXISTS (SELECT 1 FROM team_work w "
+                        "WHERE w.core_task_id=tasks.id AND w.assignee=tasks.principal "
+                        "AND w.core_request_hash=tasks.request_hash "
+                        "AND w.core_request_hash IS NOT NULL AND w.assignee IN ("
+                        + ",".join("?" for _ in allowed)
+                        + "))"
+                    )
+                    names.extend(allowed)
+                selection += (
+                    " AND NOT ((" + agent_native + ") OR operation='terminal.visible' OR "
+                    "(operation IN ('terminal.execute','admin.execute') AND "
+                    "principal IN (SELECT value FROM json_each(?))) OR "
+                    "(operation='session.input' AND "
+                    "json_extract(args,'$.pane_id') LIKE 'terminal:%'))"
+                )
+                names.append(canonical(native_principals))
             row = self.db.execute(
                 "SELECT id,principal,created,operation FROM tasks WHERE state='queued' "
                 "AND " + selection + " ORDER BY created,id LIMIT 1",
@@ -481,6 +547,56 @@ class Store:
             )
             self.audit("task.accepted", row["principal"], row["id"], {"receipt_id": receipt})
         return self.get(row["id"])
+
+    def claim_exact(self, owner: str, lease_seconds: float, task_id: str) -> dict | None:
+        """Accept one newly authorized ID, never select another queued record."""
+        with self.transaction():
+            row = self.db.execute(
+                "SELECT id,principal,created,operation FROM tasks WHERE id=? AND state='queued' "
+                "AND accepted IS NULL AND started IS NULL AND receipt IS NULL "
+                "AND lease_owner IS NULL AND lease_until IS NULL "
+                "AND finished IS NULL AND result IS NULL AND error IS NULL AND evidence='{}' "
+                "AND NOT EXISTS (SELECT 1 FROM events e WHERE e.task_id=tasks.id "
+                "AND e.state NOT IN ('created','queued')) "
+                "AND NOT EXISTS (SELECT 1 FROM queue_holds h WHERE h.queue_id IN "
+                "('tasks','session-input') AND h.item_id=tasks.id) "
+                "AND NOT EXISTS (SELECT 1 FROM queue_withdrawals w WHERE w.queue_id IN "
+                "('tasks','session-input') AND w.item_id=tasks.id)",
+                (task_id,),
+            ).fetchone()
+            if row is None or not self.can_claim(
+                row["created"], task_id=task_id, operation=row["operation"]
+            ):
+                return None
+            has_handoffs = self.db.execute(
+                "SELECT 1 FROM sqlite_master WHERE type='table' AND name='visible_handoffs'"
+            ).fetchone()
+            if (
+                has_handoffs
+                and self.db.execute(
+                    "SELECT 1 FROM visible_handoffs WHERE id=?", (task_id,)
+                ).fetchone()
+            ):
+                return None
+            now, receipt = time.time(), str(uuid.uuid4())
+            evidence = {
+                "receiver": "kirabridge.dispatcher",
+                "receipt_id": receipt,
+                "worker": owner,
+                "admission": "direct_native_once",
+                "automatic_retry": False,
+            }
+            self.db.execute(
+                "UPDATE tasks SET state='accepted',accepted=?,updated=?,receipt=?,evidence=?,"
+                "lease_owner=?,lease_until=? WHERE id=? AND state='queued'",
+                (now, now, receipt, canonical(evidence), owner, now + lease_seconds, task_id),
+            )
+            self.db.execute(
+                "INSERT INTO events(task_id,at,state,evidence) VALUES(?,?,?,?)",
+                (task_id, now, "accepted", canonical(evidence)),
+            )
+            self.audit("task.accepted", row["principal"], task_id, {"receipt_id": receipt})
+        return self.get(task_id)
 
     def recover(self) -> int:
         # Runtime exclusive lock proves the previous dispatcher no longer owns this DB.

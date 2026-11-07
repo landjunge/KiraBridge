@@ -1,0 +1,11 @@
+{
+  "task_id": "WIN-PARITY-GROK-20261106-CORRECTION-02",
+  "kind": "assumption",
+  "accepted_by_operator": false,
+  "decisions": [
+    "decode_console_bytes(data, encoding=None) does not treat the first single-byte page as proof. When cp850 and cp1252 round-trip to different text, the result stays ambiguous: decoded_strict is false, text is empty, and raw_base64 keeps the bytes.",
+    "encoding='cp850', encoding='cp1252', or encoding='utf-8' decodes that codec only. console_main reads optional --encoding <codec> after cwd. WindowsConsoleHandoffInput.output_encoding and console_plan(output_encoding=...) pass the same name.",
+    "valid_console_result requires type(exit_code) is int, decoded_strict true, and sha256 plus byte_length of text.encode(encoding). A bool exit code or a missing or mismatched hash, length, or encoding stays open and is not started again.",
+    "build --provenance-export provenance.json rebuilds from those unchanged bytes after the file inventory matches. It does not call git. A dirty export or a changed inventory is refused. A repository build still uses git rev-parse HEAD. The zip is ZIP_STORED with create_system 3."
+  ]
+}

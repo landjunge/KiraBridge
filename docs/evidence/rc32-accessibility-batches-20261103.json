@@ -1,0 +1,259 @@
+{
+  "schema": "kirabridge.rc32.accessibility-batches.synthetic.v1",
+  "captured_at": "2026-11-03T21:03:24.028328+00:00",
+  "scope": "Synthetic production Swift public AX API call planner and canonical scalar formatter. No real accessibility application, physical IPC, Cloud roundtrip or latency is measured.",
+  "platform": {
+    "system": "Darwin",
+    "machine": "x86_64"
+  },
+  "source_sha256": {
+    "tests/fixtures/desktop_bootstrap/AccessibilityBatchHarness.swift": "6558b08cb4424b724c74649e997d4123ccb65a5fd62a0c7a0d0f26439591806d",
+    "integrations/desktop/SystemControl.swift": "3b578d5ae885bd833c3f338b7b1c1c04e938308258df069386c9d37479721ace",
+    "integrations/desktop/SystemBridge.swift": "b4893ce4f59ecc49c5b2fddc04843730292686aecd56d08483c8ed95204c72db",
+    "integrations/desktop/SystemServices.swift": "4908af5acfcb9059220116f7ea8fe666e69451966217d4d386743173de08ad89",
+    "integrations/desktop/SystemKeyboard.swift": "711bf4d674eb28da67a467d278adad4e18c9902ffa7bbf6bf51aa310c66a4db5",
+    "integrations/desktop/SystemShortcuts.swift": "8407fd5424ca2e124e23bc1f82189d376564c5d2b6e33c845c4525bb458dd3e1",
+    "integrations/desktop/SystemSpecialKeys.swift": "3d0e753085204270b13d45297b644492d8456dd9810f3ebe8f1aa62e92c489cd",
+    "tests/test_accessibility_batch_native.py": "b7b9a1e8340de9892d38811d6179428b3ebf60c79d7646af467d0434875febad"
+  },
+  "source_and_binary_unchanged_during_capture": true,
+  "fixture_binary": {
+    "path": "/private/var/folders/v1/z7b9nf2s7879dvxxbzy7bqv00000gn/T/pytest-of-landjunge/pytest-126/synthetic-accessibility-batch0/batch-fixture",
+    "sha256": "89d161be2ab3e5672409805596833295d11cbf854302c6ddbc4e1130b298d9e7",
+    "compiled_source_match": true,
+    "match_basis": "Parent final integration completed 74 cases in 72.96 s: new 26 batching cases, 39 tree cases and 9 legacy summary cases. No product changes occurred after freeze; current production, harness and test fingerprints match the pre-integration freeze exactly."
+  },
+  "reproduce": "PYTHONPATH=src python -m pytest -q tests/test_accessibility_batch_native.py; its module fixture compiles AccessibilityBatchHarness.swift with the listed production Swift sources. Invoke the compiled batch-fixture binary with the scenario names below.",
+  "methodology": {
+    "runs_per_scenario": 1,
+    "baseline": "Unchanged production observedSummary executes one injected scalar attribute read for each requested field, plus actionNames. The retained individualTreeSummary uses this same formatter with strict native reads.",
+    "candidate": "Production observedBatchedTreeSummary executes one role/subrole copy batch, then one metadata batch with AXValue only when nonsecure, then actionNames.",
+    "count_scope": "Counts are executed injected public API boundaries, excluding timeout setters, owner/PID checks, framework internal work and IPC internals.",
+    "payload_equality": "Full normal result including revision and geometry is compared to the canonical scalar result. The deliberately changing fallback_new_secure fixture has a different initial baseline and must freshly classify the secure state.",
+    "timing_measured": false,
+    "native_ui_calls": 0,
+    "permission_requests": 0,
+    "input_posts": 0
+  },
+  "measured_summary_api_call_counts": {
+    "ordinary": {
+      "scalar_attributes": 13,
+      "scalar_actions": 1,
+      "scalar_total": 14,
+      "batch_copies": 2,
+      "batch_actions": 1,
+      "batch_total": 3
+    },
+    "secure": {
+      "scalar_attributes": 12,
+      "scalar_actions": 1,
+      "scalar_total": 13,
+      "batch_copies": 2,
+      "batch_actions": 1,
+      "batch_total": 3
+    }
+  },
+  "derived_tree_node_api_call_counts": {
+    "scope": "Derived from the two stable before/after summaries plus two separate children copies in unchanged inspectTree, not a separately measured whole-node native execution.",
+    "ordinary": {
+      "baseline_formula": "2 * (13 + 1) + 2",
+      "baseline_total": 30,
+      "candidate_formula": "2 * (2 + 1) + 2",
+      "candidate_total": 8
+    },
+    "secure": {
+      "baseline_formula": "2 * (12 + 1) + 2",
+      "baseline_total": 28,
+      "candidate_formula": "2 * (2 + 1) + 2",
+      "candidate_total": 8
+    }
+  },
+  "scenarios": {
+    "ordinary": {
+      "baseline_attribute_calls": 13,
+      "baseline_action_calls": 1,
+      "batch_copy_calls": 2,
+      "batch_action_calls": 1,
+      "fallback_calls": 0,
+      "fallback_attribute_calls": 0,
+      "fallback_action_calls": 0,
+      "fallback_value_reads": 0,
+      "candidate_public_copy_action_calls": 3,
+      "requested_value_attribute": true,
+      "initial_baseline_payload_and_revision_equal": true,
+      "secure_value_redacted": false,
+      "value_or_hash_fields_present": true,
+      "actions_present": true
+    },
+    "missing_optional": {
+      "baseline_attribute_calls": 13,
+      "baseline_action_calls": 1,
+      "batch_copy_calls": 2,
+      "batch_action_calls": 1,
+      "fallback_calls": 0,
+      "fallback_attribute_calls": 0,
+      "fallback_action_calls": 0,
+      "fallback_value_reads": 0,
+      "candidate_public_copy_action_calls": 3,
+      "requested_value_attribute": true,
+      "initial_baseline_payload_and_revision_equal": true,
+      "secure_value_redacted": false,
+      "value_or_hash_fields_present": true,
+      "actions_present": true
+    },
+    "secure_subrole": {
+      "baseline_attribute_calls": 12,
+      "baseline_action_calls": 1,
+      "batch_copy_calls": 2,
+      "batch_action_calls": 1,
+      "fallback_calls": 0,
+      "fallback_attribute_calls": 0,
+      "fallback_action_calls": 0,
+      "fallback_value_reads": 0,
+      "candidate_public_copy_action_calls": 3,
+      "requested_value_attribute": false,
+      "initial_baseline_payload_and_revision_equal": true,
+      "secure_value_redacted": true,
+      "value_or_hash_fields_present": false,
+      "actions_present": true
+    },
+    "secure_fallback": {
+      "baseline_attribute_calls": 12,
+      "baseline_action_calls": 1,
+      "batch_copy_calls": 2,
+      "batch_action_calls": 0,
+      "fallback_calls": 1,
+      "fallback_attribute_calls": 12,
+      "fallback_action_calls": 1,
+      "fallback_value_reads": 0,
+      "candidate_public_copy_action_calls": 15,
+      "requested_value_attribute": false,
+      "initial_baseline_payload_and_revision_equal": true,
+      "secure_value_redacted": true,
+      "value_or_hash_fields_present": false,
+      "actions_present": true
+    },
+    "whole_not_implemented_first": {
+      "baseline_attribute_calls": 13,
+      "baseline_action_calls": 1,
+      "batch_copy_calls": 1,
+      "batch_action_calls": 0,
+      "fallback_calls": 1,
+      "fallback_attribute_calls": 13,
+      "fallback_action_calls": 1,
+      "fallback_value_reads": 1,
+      "candidate_public_copy_action_calls": 15,
+      "requested_value_attribute": false,
+      "initial_baseline_payload_and_revision_equal": true,
+      "secure_value_redacted": false,
+      "value_or_hash_fields_present": true,
+      "actions_present": true
+    },
+    "whole_not_implemented_second": {
+      "baseline_attribute_calls": 13,
+      "baseline_action_calls": 1,
+      "batch_copy_calls": 2,
+      "batch_action_calls": 0,
+      "fallback_calls": 1,
+      "fallback_attribute_calls": 13,
+      "fallback_action_calls": 1,
+      "fallback_value_reads": 1,
+      "candidate_public_copy_action_calls": 16,
+      "requested_value_attribute": true,
+      "initial_baseline_payload_and_revision_equal": true,
+      "secure_value_redacted": false,
+      "value_or_hash_fields_present": true,
+      "actions_present": true
+    },
+    "fallback_new_secure": {
+      "baseline_attribute_calls": 13,
+      "baseline_action_calls": 1,
+      "batch_copy_calls": 2,
+      "batch_action_calls": 0,
+      "fallback_calls": 1,
+      "fallback_attribute_calls": 12,
+      "fallback_action_calls": 1,
+      "fallback_value_reads": 0,
+      "candidate_public_copy_action_calls": 15,
+      "requested_value_attribute": true,
+      "initial_baseline_payload_and_revision_equal": false,
+      "secure_value_redacted": true,
+      "value_or_hash_fields_present": false,
+      "actions_present": true
+    },
+    "actions_not_implemented": {
+      "baseline_attribute_calls": 13,
+      "baseline_action_calls": 1,
+      "batch_copy_calls": 2,
+      "batch_action_calls": 1,
+      "fallback_calls": 0,
+      "fallback_attribute_calls": 0,
+      "fallback_action_calls": 0,
+      "fallback_value_reads": 0,
+      "candidate_public_copy_action_calls": 3,
+      "requested_value_attribute": true,
+      "initial_baseline_payload_and_revision_equal": true,
+      "secure_value_redacted": false,
+      "value_or_hash_fields_present": true,
+      "actions_present": false
+    },
+    "classification_error": {
+      "baseline_attribute_calls": 2,
+      "baseline_action_calls": 1,
+      "batch_copy_calls": 1,
+      "batch_action_calls": 0,
+      "fallback_calls": 0,
+      "fallback_attribute_calls": 0,
+      "fallback_action_calls": 0,
+      "fallback_value_reads": 0,
+      "candidate_public_copy_action_calls": 1,
+      "requested_value_attribute": false,
+      "error": "macos_accessibility_unavailable"
+    },
+    "wrong_count": {
+      "baseline_attribute_calls": 13,
+      "baseline_action_calls": 1,
+      "batch_copy_calls": 1,
+      "batch_action_calls": 0,
+      "fallback_calls": 0,
+      "fallback_attribute_calls": 0,
+      "fallback_action_calls": 0,
+      "fallback_value_reads": 0,
+      "candidate_public_copy_action_calls": 1,
+      "requested_value_attribute": false,
+      "error": "macos_accessibility_unavailable"
+    },
+    "slot_not_implemented": {
+      "baseline_attribute_calls": 3,
+      "baseline_action_calls": 1,
+      "batch_copy_calls": 2,
+      "batch_action_calls": 0,
+      "fallback_calls": 0,
+      "fallback_attribute_calls": 0,
+      "fallback_action_calls": 0,
+      "fallback_value_reads": 0,
+      "candidate_public_copy_action_calls": 2,
+      "requested_value_attribute": true,
+      "error": "macos_accessibility_unavailable"
+    },
+    "copy_deadline": {
+      "baseline_attribute_calls": 13,
+      "baseline_action_calls": 1,
+      "batch_copy_calls": 1,
+      "batch_action_calls": 0,
+      "fallback_calls": 0,
+      "fallback_attribute_calls": 0,
+      "fallback_action_calls": 0,
+      "fallback_value_reads": 0,
+      "candidate_public_copy_action_calls": 1,
+      "requested_value_attribute": false,
+      "error": "deadline"
+    }
+  },
+  "limitations": [
+    "Default legacy summary remains unchanged; batching applies only to the opt-in tree read path.",
+    "Whole notImplemented compatibility fallback adds one or two failed batch calls before a fresh full scalar observation; those cases are not faster. Other errors fail closed without replay.",
+    "Fewer public AX API calls do not prove fewer underlying IPC messages or faster Cloud calls. Any actual accessibility timing belongs to a separate controlled fixture measurement.",
+    "Ownership, before/after node checks and cooperative tree deadlines remain. The framework and OS determine timing of an already-started call."
+  ]
+}

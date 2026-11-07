@@ -113,3 +113,22 @@ def test_config_origin_snapshot_does_not_change_after_file_edit(tmp_path):
     assert runtime_snapshot(config)["config_sha256"] == snapshot["config_sha256"]
     assert runtime_snapshot(load_config(str(path)))["config_sha256"] != snapshot["config_sha256"]
     assert "read_roots" in config.principals["chatgpt"].model_dump()
+
+
+async def test_owned_stop_readiness_separates_abort_from_optional_durable_barrier(bridge):
+    async with bridge:
+        value = readiness(bridge, "local", ReadinessInput(operations=["workflow.stop"]))
+        assert value["requested_prerequisites_ready"] is True
+        operation = value["operation_checks"][0]
+        assert operation["owned_abort_available"] is True
+        assert operation["barrier_confirmed"] is False
+        assert operation["durable_barrier_prerequisites"] == {
+            "ok": False,
+            "code": "workflow_control_unavailable",
+        }
+        bridge.config.principals["local"].capabilities.remove("process.terminate")
+        denied = readiness(bridge, "local", ReadinessInput(operations=["workflow.stop"]))
+        assert denied["requested_prerequisites_ready"] is False
+        assert denied["operation_checks"][0]["code"] == "forbidden"
+        assert "owned_abort_available" not in denied["operation_checks"][0]
+        assert bridge.store.db.execute("SELECT count(*) FROM tasks").fetchone()[0] == 0

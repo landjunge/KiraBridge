@@ -1,0 +1,83 @@
+{
+  "date": "2026-10-31",
+  "whiteboard_id": "0ab8b95a7369",
+  "whiteboard_milestone_revision": 9,
+  "original": {
+    "id": "dc4d2181-2b44-4ee7-892e-385dc7f8c521",
+    "conversation_id": "kb-macos-whiteboard-updates-20261031",
+    "state": "failed",
+    "phase": "direct_admission",
+    "error": "visible_target_working",
+    "observation_reason": "current_progress_row",
+    "terminal_input_attempted": false,
+    "automatic_retry": false,
+    "delivered": null,
+    "receipt": null,
+    "acknowledged": null,
+    "queue_hold": "direct_admission_rejected",
+    "exact_inbox_receive_empty": true,
+    "history_preserved": true
+  },
+  "live_test": {
+    "message_id": "kb-working-inbox-live-20261031-01",
+    "conversation_id": "kb-working-inbox-test-20261031",
+    "seq": 374,
+    "sender": "chatgpt",
+    "recipient": "codex",
+    "kind": "note",
+    "dispatch": false,
+    "processing": null,
+    "processing_route": "external_client_inbox",
+    "created": 1793453090.194331,
+    "delivered": 1793453091.430311,
+    "receipt": "62b3d519-7460-454d-a15f-ec51bd5ab588",
+    "acknowledged": 1793453270.2079942,
+    "repeated_receive_same_id": true,
+    "repeated_receive_same_receipt": true,
+    "after_ack_messages": 0,
+    "repeated_external_send_same_id": true,
+    "repeated_external_send_same_ack": true,
+    "actual_external_chatgpt_connector": true,
+    "actual_already_working_codex_recipient": true,
+    "new_business_execution_requested": false
+  },
+  "tests": {
+    "passed": 88,
+    "duration_seconds": 5.86,
+    "files": [
+      "tests/test_working_session_delivery.py",
+      "tests/test_messages.py",
+      "tests/test_direct_delivery.py",
+      "tests/test_visible_message_evidence.py"
+    ],
+    "new_cases": 10,
+    "terminal_busy_boundary": "simulated in real authenticated isolated HTTP tests",
+    "ruff": "passed",
+    "format": "passed"
+  },
+  "limitations": [
+    "Recipient must actively poll; no automatic wake or steering.",
+    "Receipt and ACK do not guarantee exactly-once external business effects.",
+    "Old held work was not replayed, released or acknowledged."
+  ],
+  "native_api_sources": [
+    "https://learn.chatgpt.com/docs/app-server#steer-an-active-turn",
+    "https://developers.openai.com/blog/mastering-codex-remote-for-engineering"
+  ],
+  "private_evidence": "~/.local/share/kirabridge/backups/macos-implementation-20261031T121031Z/working-session-live-20261031.private.json",
+  "deployment": {
+    "commit": "c573709df91544f4094265e61d351ad00827cfbf",
+    "source_tree_sha256": "c95246efe9d208bb0ec7141a35fa31e39aaad433e9965babd77b3987feb02fc4",
+    "pid": 29698,
+    "started_at": "2026-10-31T13:41:11.017772+00:00",
+    "actual_external_original_message_route": "failed_visible_admission",
+    "original_stored_record_and_job_unchanged": true,
+    "all_28_holds_unchanged": true,
+    "existing_note_receipt_and_ack_preserved_after_restart": true,
+    "repeat_receive_after_ack_messages": 0,
+    "fresh_tool_catalog_guidance_verified": true,
+    "independent_verification_path": "/Users/landjunge/.local/share/kirabridge/backups/macos-implementation-20261031T121031Z/working-messaging-install-c573709/independent-running-verification.json",
+    "private_postinstall_proof_sha256": "f2c795d4e69dd5b52247b9b1bea90ff43bf7dafdf8f63722fdfa36d9e6e6bb9b",
+    "whiteboard_milestone_revision": 12
+  }
+}

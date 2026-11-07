@@ -1,0 +1,4 @@
+interface:
+  display_name: "Big Plan CLI-Modellwahl"
+  short_description: "CLI, Modell und Denkstufe aus ThreadDesk wählen"
+  default_prompt: "Nutze $cli-model-router für die nächste freigegebene Big-Plan-Delegation."

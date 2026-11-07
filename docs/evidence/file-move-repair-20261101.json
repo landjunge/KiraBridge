@@ -1,0 +1,27 @@
+{
+  "schema": "kirabridge.file-move-review.v1",
+  "baseline": "257e72221f751a06767c485ebad253203bdca121",
+  "tests": {
+    "file_move_related": "89 passed in 2.96s",
+    "proxy_related": "33 passed in 8.94s",
+    "initial_namespace_red": "2 failed before reserved guard",
+    "independent": "22 adversarial cases plus final two catch regressions verified by review_mcp"
+  },
+  "review": "review_mcp approved final frozen filesystem and proxy diffs",
+  "semantics": "sentinel type guard, held hardlink identity, no-clobber publication and restore, no public-source unlink; retained unknown receipt; no automatic recovery/retry",
+  "production": "RC22 unchanged; no install/restart/native acceptance",
+  "sha256": {
+    "src/kirabridge/filesystem_manager/__init__.py": "585680998c863fd7e369730af1d2e836c3876bd00be5d58dc81e76ee013de241",
+    "src/kirabridge/filesystem_manager/move.py": "18f672ed3b3fba5612d1d73ebef9ded94555e94c8779e25149d0fea902a6d004",
+    "src/kirabridge/mcp_gateway/proxy.py": "ca8f251bad9ab626a5d8394f45b2ef0919aca1f7169319606270c558a22f9a84",
+    "tests/test_health_poll_audit.py": "92eb8eacac7294a053dc052a96105b3ec294d247397f114f2c62e5a2fb355c1c",
+    "tests/test_file_move_namespace.py": "c806391c822e9aa8f66b5463c0eef70f31b2ad20d011b576fabfe2c25935de87",
+    "tests/test_file_move_staging.py": "a395fec4ba62c55d541cc0d4b1c191affffc3869a07cc085ccf6009f6a83ab62",
+    "tests/test_file_move_independent.py": "d3d5ad462680cebdea5379ae61cdd051f317ca6912011fc9143d7a0476db98f4",
+    "tests/test_file_move_task_contract.py": "e36c99ca7a9c7384607e734feb0b9310f4c3a1f4fb0f15865ec174addbd2ce00",
+    "docs/FILE-MOVE-CONTRACT.md": "4c65add9a3158a41c151b747d207b22ca999a4c32acaa24fef5f09021f2e4e7b",
+    "docs/RELIABILITY-FOLLOWUP-20261101.md": "e63ca0e7ce9f3d28ea437534b094235cb8c6d4977dc7e5c323d5c28e08cbe69a",
+    "docs/RELEASE-0.8.0rc24.md": "df4ef68651e73f69baeade792307ef9690c78ca171fa6e180c36c46151c6f6c3"
+  },
+  "private_backup": "/Users/landjunge/.local/share/kirabridge/backups/reliability-continuation-20261101T144926Z"
+}

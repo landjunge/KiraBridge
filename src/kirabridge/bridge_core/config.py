@@ -8,14 +8,29 @@ from pathlib import Path
 from typing import Literal
 from urllib.parse import urlsplit
 
-from pydantic import BaseModel, ConfigDict, Field, PrivateAttr, model_validator
+from pydantic import BaseModel, ConfigDict, Field, PrivateAttr, model_serializer, model_validator
 
+from kirabridge.autonext.models import AutoNextConfig
 from kirabridge.bridge_core.models import BridgeError
+from kirabridge.capability_routing.router import NativeRoutingSettings, WorkerRouting
+
+_FULL_KEYBOARD_CAPABILITIES = frozenset(
+    {
+        "keyboard.inspect",
+        "keyboard.shortcuts.read",
+        "keyboard.execute",
+        "keyboard.profiles.read",
+        "keyboard.profiles.manage",
+        "apps.list",
+        "app.focus",
+    }
+)
 
 
 class PrincipalConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
     approval_mode: Literal["manual", "automatic"] = "manual"
+    client_type: Literal["chatgpt", "agent", "operator"] | None = None
     capabilities: list[str] = Field(default_factory=lambda: ["bridge.health", "task.read"])
     roots: list[str] = Field(default_factory=list)
     read_roots: list[str] = Field(default_factory=list)
@@ -28,6 +43,13 @@ class PrincipalConfig(BaseModel):
     team_only_execution: bool = False
     permission_level: Literal["full", "medium", "ask"] | None = None
     automatic_operations: list[Literal["session.input"]] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def full_keyboard_access(self):
+        """Extend an explicit unrestricted full grant without rewriting its source file."""
+        if self.permission_level == "full" and self.allow_any_executable and "/" in self.roots:
+            self.capabilities = sorted(set(self.capabilities) | _FULL_KEYBOARD_CAPABILITIES)
+        return self
 
 
 class ReceiverConfig(BaseModel):
@@ -45,7 +67,16 @@ class MessagingConfig(BaseModel):
     max_reply_depth: int = Field(default=8, ge=1, le=32)
     max_runs_per_conversation: int = Field(default=4, ge=1, le=16)
     max_runs_per_hour: int = Field(default=24, ge=1, le=1000)
+    # None keeps every message on the existing visible route. A cutoff admits
+    # only messages created at or after that instant to the separate adapter.
+    separate_managed_after: float | None = Field(default=None, ge=0)
     receivers: dict[str, ReceiverConfig] = Field(default_factory=dict)
+
+    @model_validator(mode="after")
+    def cutoff_is_not_the_epoch(self):
+        if self.separate_managed_after == 0:
+            raise ValueError("separate_managed_after of zero would admit every stored message")
+        return self
 
 
 class TeamWorkerConfig(BaseModel):
@@ -56,6 +87,18 @@ class TeamWorkerConfig(BaseModel):
     cwd: str | None = Field(default=None, min_length=1, max_length=4096)
     timeout: float = Field(default=120, gt=0, le=300)
     response_framing: Literal["strict_json", "work_reply_header"] = "strict_json"
+    # Explicit per-worker route; never a fallback from a busy visible session.
+    execution_scope: Literal["existing_visible_terminal", "separate_managed_session"] = (
+        "existing_visible_terminal"
+    )
+    routing: WorkerRouting | None = None
+
+    @model_serializer(mode="wrap")
+    def routing_opt_out(self, handler):
+        value = handler(self)
+        if self.routing is None:
+            value.pop("routing", None)
+        return value
 
     @model_validator(mode="after")
     def execution_directory(self):
@@ -67,6 +110,7 @@ class TeamWorkerConfig(BaseModel):
 class TeamConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
     enabled: bool = False
+    routing: NativeRoutingSettings | None = None
     workers: dict[str, TeamWorkerConfig] = Field(default_factory=dict, max_length=16)
     concurrency: int = Field(default=2, ge=1, le=8)
     max_teams: int = Field(default=64, ge=1, le=1024)
@@ -79,6 +123,13 @@ class TeamConfig(BaseModel):
     max_result_bytes: int = Field(default=65536, ge=256, le=262144)
     max_actions_per_turn: int = Field(default=4, ge=1, le=4)
     max_runs_per_hour: int = Field(default=24, ge=1, le=1000)
+
+    @model_serializer(mode="wrap")
+    def routing_opt_out(self, handler):
+        value = handler(self)
+        if self.routing is None:
+            value.pop("routing", None)
+        return value
 
     @model_validator(mode="after")
     def participant_names(self):
@@ -94,6 +145,7 @@ class AgentConfig(BaseModel):
     kind: str
     executable: str | None = None
     model: str | None = None
+    output_schema: str | None = Field(default=None, max_length=4096)
     api_key_env: str = "XAI_API_KEY"
     sandbox_mode: Literal["read-only", "workspace-write", "danger-full-access"] = "read-only"
     bridge_tools: bool = False
@@ -157,6 +209,34 @@ class DiagnosticsConfig(BaseModel):
     max_records: int = Field(default=20000, ge=10, le=1000000)
 
 
+class FileTransferConfig(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    enabled: bool = False
+    source_hosts: list[str] = Field(default_factory=list, max_length=32)
+    export_roots: list[str] = Field(default_factory=list, max_length=32)
+    allowed_projects: list[str] = Field(default_factory=list, max_length=256)
+    from kirabridge.file_transfer.models import Limits as _Limits
+
+    limits: _Limits = Field(default_factory=_Limits)
+
+    @model_validator(mode="after")
+    def explicit_sources(self):
+        import re
+
+        if any(
+            not re.fullmatch(r"[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?", host)
+            or "." not in host
+            or host.endswith(".local")
+            for host in self.source_hosts
+        ):
+            raise ValueError("Use exact operator-approved public download host names")
+        if any(
+            not Path(root).is_absolute() or ".." in Path(root).parts for root in self.export_roots
+        ):
+            raise ValueError("Export roots must be explicit absolute directories")
+        return self
+
+
 class ThreadDeskConfig(BaseModel):
     """Operator-owned local endpoint; requests cannot select a process or store."""
 
@@ -169,6 +249,8 @@ class ThreadDeskConfig(BaseModel):
     storage: Literal["json", "sqlite"] = "json"
     timeout: float = Field(default=15, gt=0, le=60)
     max_result_bytes: int = Field(default=524288, ge=1024, le=1048576)
+    dynamic_read_proxy: bool = False  # Legacy read-only opt-in remains supported.
+    dynamic_tool_proxy: bool = False  # Explicit all-tools opt-in; mutations use durable tasks.
 
 
 class WorkflowControlConfig(BaseModel):
@@ -316,6 +398,7 @@ class Config(BaseModel):
     host: str = "127.0.0.1"
     port: int = Field(default=8765, ge=1, le=65535)
     allow_remote: bool = False
+    windows_setup_verification_enabled: bool = Field(default=False, strict=True)
     credentials_file: str | None = None
     tls_cert: str | None = None
     tls_key: str | None = None
@@ -328,8 +411,10 @@ class Config(BaseModel):
     agents: dict[str, AgentConfig] = Field(default_factory=dict)
     messaging: MessagingConfig = Field(default_factory=MessagingConfig)
     team: TeamConfig = Field(default_factory=TeamConfig)
+    autonext: AutoNextConfig = Field(default_factory=AutoNextConfig)
     grok_connector: GrokConnectorConfig = Field(default_factory=GrokConnectorConfig)
     diagnostics: DiagnosticsConfig = Field(default_factory=DiagnosticsConfig)
+    file_transfer: FileTransferConfig = Field(default_factory=FileTransferConfig)
     threaddesk: ThreadDeskConfig = Field(default_factory=ThreadDeskConfig)
     workflow_control: WorkflowControlConfig = Field(default_factory=WorkflowControlConfig)
     session_input_policy: SessionInputPolicyConfig = Field(default_factory=SessionInputPolicyConfig)
@@ -354,9 +439,9 @@ class Config(BaseModel):
         if not any(p.token_env for p in self.principals.values()):
             raise BridgeError("auth_config", "HTTP requires a configured bearer token environment")
         tokens = [os.environ.get(p.token_env, "") for p in self.principals.values() if p.token_env]
-        if any(len(t) < 32 for t in tokens) or len(set(tokens)) != len(tokens):
+        if any(len(t) < 32 or not t.isascii() for t in tokens) or len(set(tokens)) != len(tokens):
             raise BridgeError(
-                "auth_config", "HTTP tokens must be unique and at least 32 characters"
+                "auth_config", "HTTP tokens must be unique ASCII strings of at least 32 characters"
             )
 
 
@@ -379,6 +464,11 @@ def load_config(path: str | None = None) -> Config:
 
 
 def private_directory(path: Path) -> None:
+    if sys.platform == "win32":
+        from kirabridge.platform_adapters.windows.filesystem_security import private_directory
+
+        private_directory(path)
+        return
     if path.is_symlink():
         raise BridgeError("unsafe_state", "State directory must not be a symlink")
     path.mkdir(parents=True, exist_ok=True, mode=0o700)

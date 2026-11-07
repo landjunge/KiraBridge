@@ -7,6 +7,8 @@ import sys
 import time
 
 from kirabridge.bridge_core.models import BridgeError
+from kirabridge.platform_adapters import reap_process
+from kirabridge.timing import timed_async
 
 DESKTOP_MESSAGES = {
     "desktop_locked": "Der Mac ist gesperrt. Bitte die bestehende Benutzersitzung entsperren. "
@@ -35,10 +37,21 @@ def console_state(raw, uid):
 
 
 class MacDesktop:
+    # Lock/active state changes on user action, not within a single polling burst;
+    # a short cache avoids re-spawning ioreg on every rapid catalog() call.
+    cache_seconds = 1.0
+
     def __init__(self):
         self.last = {"state": "not_probed", "observed_at": None}
 
+    @timed_async("ioreg_probe")
     async def probe(self):
+        cached = self.last
+        if (
+            cached.get("observed_at") is not None
+            and time.time() - cached["observed_at"] < self.cache_seconds
+        ):
+            return cached
         if sys.platform != "darwin":
             self.last = {"state": "not_applicable", "observed_at": time.time()}
             return self.last
@@ -61,12 +74,12 @@ class MacDesktop:
         except (OSError, TimeoutError, ValueError, plistlib.InvalidFileException):
             pass  # An unavailable extra probe never removes an existing grant.
         finally:
-            if child is not None and child.returncode is None:
+            if child is not None:
                 try:
-                    child.kill()
-                except ProcessLookupError:
-                    pass
-                await child.wait()
+                    await reap_process(child, process_group=False)
+                except BridgeError:
+                    if state not in DESKTOP_MESSAGES:
+                        state = "unknown"
         self.last = {
             "state": state,
             "observed_at": time.time(),

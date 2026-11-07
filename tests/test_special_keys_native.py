@@ -1,0 +1,134 @@
+"""Native system-key planning, event construction and guards without OS input."""
+
+import json
+import platform
+import shutil
+import subprocess
+import sys
+from pathlib import Path
+
+import pytest
+
+
+def run_native_harness(tmp_path, harness):
+    root = Path(__file__).resolve().parents[1]
+    sources = [root / "tests/fixtures/desktop_bootstrap" / harness]
+    sources += [
+        root / "integrations/desktop" / name
+        for name in (
+            "SystemSpecialKeys.swift",
+            "SystemKeyboard.swift",
+            "SystemShortcuts.swift",
+            "SystemControl.swift",
+            "SystemBridge.swift",
+            "SystemServices.swift",
+        )
+    ]
+    # Other team members can edit their own native files while this narrow
+    # harness runs; compile one immutable observation of all dependencies.
+    pinned = tmp_path / "sources"
+    pinned.mkdir()
+    for source in sources:
+        shutil.copy2(source, pinned / source.name)
+    sources = [pinned / source.name for source in sources]
+    binary = tmp_path / "system-special-keys"
+    command = [
+        "xcrun",
+        "swiftc",
+        "-swift-version",
+        "5",
+        "-parse-as-library",
+        "-target",
+        f"{platform.machine()}-apple-macosx12.0",
+        *map(str, sources),
+        "-o",
+        str(binary),
+    ]
+    for name in (
+        "Cocoa",
+        "ApplicationServices",
+        "CryptoKit",
+        "ScreenCaptureKit",
+        "UserNotifications",
+        "ImageIO",
+        "UniformTypeIdentifiers",
+        "SystemConfiguration",
+        "Security",
+        "CoreAudio",
+        "IOKit",
+        "Carbon",
+    ):
+        command += ["-framework", name]
+    compiled = subprocess.run(command, capture_output=True, text=True, timeout=90)
+    assert compiled.returncode == 0, compiled.stderr
+    result = subprocess.run([str(binary)], capture_output=True, text=True, timeout=10)
+    assert result.returncode == 0, result.stdout + result.stderr
+    return json.loads(result.stdout)
+
+
+@pytest.mark.skipif(
+    sys.platform != "darwin" or not shutil.which("xcrun"), reason="Darwin SDK required"
+)
+def test_system_key_contract_without_hardware_changes(tmp_path):
+    receipt = run_native_harness(tmp_path, "SpecialKeysHarness.swift")
+    assert receipt["checks"] >= 40
+    assert receipt["system_event_types"] == 19
+    assert receipt["simulated_posts"] == 6
+    assert all(
+        receipt[key] == 0
+        for key in ("real_event_posts", "real_hardware_writes", "permission_requests")
+    )
+
+
+@pytest.mark.skipif(
+    sys.platform != "darwin" or not shutil.which("xcrun"), reason="Darwin SDK required"
+)
+def test_system_key_observation_delta_without_os_input(tmp_path):
+    receipt = run_native_harness(tmp_path, "SpecialKeysDeltaHarness.swift")
+    assert receipt["checks"] >= 12
+    assert receipt["real_event_posts"] == receipt["permission_requests"] == 0
+
+
+@pytest.mark.skipif(
+    sys.platform != "darwin" or not shutil.which("xcrun"), reason="Darwin SDK required"
+)
+def test_system_hardware_modifier_combinations_without_os_input(tmp_path):
+    receipt = run_native_harness(tmp_path, "SpecialKeysModifiersHarness.swift")
+    assert receipt["checks"] >= 140
+    assert receipt["nx_action_count"] == 19
+    assert receipt["combinations_per_action"] == 7
+    assert receipt["real_event_posts"] == receipt["hardware_writes"] == 0
+
+
+@pytest.mark.skipif(
+    sys.platform != "darwin" or not shutil.which("xcrun"), reason="Darwin SDK required"
+)
+def test_system_modifier_release_delta_without_os_input(tmp_path):
+    receipt = run_native_harness(tmp_path, "ModifierReleaseHarness.swift")
+    assert receipt["checks"] >= 138
+    assert receipt["real_event_posts"] == receipt["permission_requests"] == 0
+    assert receipt["fixture_keyboard_posts"] == 6
+    assert receipt["fixture_modifier_releases"] == 3
+
+
+@pytest.mark.skipif(
+    sys.platform != "darwin" or not shutil.which("xcrun"), reason="Darwin SDK required"
+)
+def test_system_modifier_ownership_delta_without_os_input(tmp_path):
+    receipt = run_native_harness(tmp_path, "ModifierOwnershipHarness.swift")
+    assert receipt["checks"] >= 1159
+    assert receipt["real_event_posts"] == receipt["permission_requests"] == 0
+    assert receipt["cmd_shift_tab_fixture_total_posts"] == 4
+    assert receipt["delayed_hid_clear_polls"] == 3
+    assert receipt["timeout_release_batches"] == 1
+
+
+@pytest.mark.skipif(
+    sys.platform != "darwin" or not shutil.which("xcrun"), reason="Darwin SDK required"
+)
+def test_fn_classification_keyup_delta_without_os_input(tmp_path):
+    receipt = run_native_harness(tmp_path, "FnClassificationKeyUpHarness.swift")
+    assert receipt["checks"] >= 1539
+    assert receipt["classification_key_up_clears_fn"] is True
+    assert receipt["explicit_fn_preserved"] is True
+    assert receipt["real_event_posts"] == receipt["additional_event_posts"] == 0

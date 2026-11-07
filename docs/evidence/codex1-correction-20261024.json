@@ -1,0 +1,29 @@
+{
+  "state": "completed",
+  "revision": 12,
+  "full_note_present": true,
+  "marker_count": 1,
+  "thread_id": "188ce4729a62",
+  "marker": "KB-CODEX1-CORRECTION-20261024-01",
+  "server_sync_work_started": false,
+  "target_read_only": {
+    "window": 38077,
+    "tty": "ttys001",
+    "expected_pid": 12591,
+    "agent_pid": 12657,
+    "input_sent": false
+  },
+  "previous_append_failure": {
+    "operation": "team-interop-plan-188-20261024-01",
+    "code": "tool_error",
+    "details": {},
+    "reconciliation_found": false,
+    "board_revision_when_absent": 11,
+    "blindly_retried": false
+  },
+  "integration": {
+    "ruff_changed_python": "passed",
+    "format": "initial two test-signature format failures; formatter displaced noqa causing two F811; affected file corrected and Ruff/format passed",
+    "behavior_tests_repeated": false
+  }
+}

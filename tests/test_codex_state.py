@@ -125,9 +125,19 @@ async def test_changed_source_does_not_reuse_previously_idle_state(rollout, chan
     assert (await reader.read(str(path), "thread-one"))["state"] == "unknown"
 
 
-async def test_bounds_incremental_scan_and_never_accepts_unscanned_end(rollout):
+async def test_bounds_incremental_scan_and_never_accepts_unscanned_end(rollout, monkeypatch):
+    import os
+
     root, path, _ = rollout
     reader = CodexTurnState(root, max_bytes=512, max_line_bytes=256)
+    original = os.pread
+    verification_bytes = []
+
+    def bounded_read(fd, size, offset):
+        verification_bytes.append(size)
+        return original(fd, size, offset)
+
+    monkeypatch.setattr(os, "pread", bounded_read)
     write(
         path,
         record("task_started"),
@@ -137,8 +147,11 @@ async def test_bounds_incremental_scan_and_never_accepts_unscanned_end(rollout):
     )
     result = await reader.read(str(path), "thread-one")
     assert result["state"] == "unknown" and result["reason"] == "session_scan_incomplete"
+    assert sum(verification_bytes) <= reader.max_bytes
     for _ in range(20):
+        verification_bytes.clear()
         result = await reader.read(str(path), "thread-one")
+        assert sum(verification_bytes) <= reader.max_bytes
         if result["state"] != "unknown":
             break
     assert result["state"] == "idle"

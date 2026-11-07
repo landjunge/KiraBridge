@@ -1,0 +1,21 @@
+{
+  "observed_at": "2026-10-18T19:03:26.460201+00:00",
+  "base_source": "583c000a8f226d5d9e71c51310fb0a81a3bafb49",
+  "source": "isolated synthetic Store using existing actual schema/audit/transition functions; no dispatcher or agent start",
+  "method": "real standalone Python script subprocess -> mode=ro SQLite snapshot -> existing fixed AA reader",
+  "exported_events": 3,
+  "actual_agent_or_provider_started": false,
+  "production_database_used": false,
+  "actual_runtime_or_tunnel_observed": false,
+  "historical_runtime_fields": "synthetic preflight record only",
+  "aa_source_pin": "c62149b567ce090df44fa8e942906c3025e879be",
+  "private_aa_dependency_required": false,
+  "artifact_build_or_runtime_change": false,
+  "initial_probe_blocker": "temporary config used a symlink ancestor; unsafe_state refusal retained, canonical private temporary path used for final proof",
+  "source_sha256": {
+    "src/kirabridge/observation_export.py": "98158c8ec9ae0654c91623fcbc456eda10d1107a002148efae5c517f22a6212d",
+    "scripts/export_workflow_observations.py": "592ce51a9cbad98d20db42be82f8e388399512ed2b818e6ade40083d8dd9b121"
+  },
+  "followup_guard_source_sha256": "ee1aa5c935475da295a30dc7aae43abc14dd197759b5cce02ef9646d3821d44d",
+  "followup_note": "After the real reader probe, added owner-private/no-symlink checks for SQLite WAL/SHM and non-string principal guard; two specific negative checks passed. Original probe source hashes preserved."
+}

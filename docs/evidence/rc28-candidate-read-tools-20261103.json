@@ -1,0 +1,255 @@
+{
+  "source_label": "rc28-candidate",
+  "package": "/Users/landjunge/KiraBridge-worktrees/rc28-e2e-20261103/src/kirabridge",
+  "source_sha256": "f303535cedb79fe149a467ca53b2beacebc455cebe79cd47635c3059ed55985e",
+  "version": "0.8.0rc27",
+  "scope": "private loopback MCP, same bounded grants and payload; excludes cloud/model/voice",
+  "response_contents_saved": false,
+  "passed": false,
+  "protocol_version": "2025-11-25",
+  "read_queries_advertised": true,
+  "domains": {
+    "scope": "private loopback backend with same grants; no voice/cloud model timing",
+    "samples": [
+      {
+        "tool": "bridge_health",
+        "index": 0,
+        "elapsed_ms": 15.159514
+      },
+      {
+        "tool": "clipboard_info",
+        "index": 0,
+        "elapsed_ms": 6.209659
+      },
+      {
+        "tool": "policy_inspect",
+        "index": 0,
+        "elapsed_ms": 26.264742
+      },
+      {
+        "tool": "operation_catalog",
+        "index": 0,
+        "elapsed_ms": 27.549068
+      },
+      {
+        "tool": "clipboard_info",
+        "index": 1,
+        "elapsed_ms": 6.890302
+      },
+      {
+        "tool": "policy_inspect",
+        "index": 1,
+        "elapsed_ms": 23.441489
+      },
+      {
+        "tool": "operation_catalog",
+        "index": 1,
+        "elapsed_ms": 27.078117
+      },
+      {
+        "tool": "bridge_health",
+        "index": 1,
+        "elapsed_ms": 13.855756
+      },
+      {
+        "tool": "policy_inspect",
+        "index": 2,
+        "elapsed_ms": 23.602795
+      },
+      {
+        "tool": "operation_catalog",
+        "index": 2,
+        "elapsed_ms": 27.402071
+      },
+      {
+        "tool": "bridge_health",
+        "index": 2,
+        "elapsed_ms": 12.892323
+      },
+      {
+        "tool": "clipboard_info",
+        "index": 2,
+        "elapsed_ms": 6.184886
+      },
+      {
+        "tool": "operation_catalog",
+        "index": 3,
+        "elapsed_ms": 26.048224
+      },
+      {
+        "tool": "bridge_health",
+        "index": 3,
+        "elapsed_ms": 13.968528
+      },
+      {
+        "tool": "clipboard_info",
+        "index": 3,
+        "elapsed_ms": 6.293026
+      },
+      {
+        "tool": "policy_inspect",
+        "index": 3,
+        "elapsed_ms": 23.847432
+      },
+      {
+        "tool": "bridge_health",
+        "index": 4,
+        "elapsed_ms": 13.543098
+      },
+      {
+        "tool": "clipboard_info",
+        "index": 4,
+        "elapsed_ms": 6.812528
+      },
+      {
+        "tool": "policy_inspect",
+        "index": 4,
+        "elapsed_ms": 23.977515
+      },
+      {
+        "tool": "operation_catalog",
+        "index": 4,
+        "elapsed_ms": 27.521893
+      },
+      {
+        "tool": "clipboard_info",
+        "index": 5,
+        "elapsed_ms": 6.486654
+      },
+      {
+        "tool": "policy_inspect",
+        "index": 5,
+        "elapsed_ms": 23.884977
+      },
+      {
+        "tool": "operation_catalog",
+        "index": 5,
+        "elapsed_ms": 27.517203
+      },
+      {
+        "tool": "bridge_health",
+        "index": 5,
+        "elapsed_ms": 12.640284
+      },
+      {
+        "tool": "policy_inspect",
+        "index": 6,
+        "elapsed_ms": 23.498273
+      },
+      {
+        "tool": "operation_catalog",
+        "index": 6,
+        "elapsed_ms": 27.346928
+      },
+      {
+        "tool": "bridge_health",
+        "index": 6,
+        "elapsed_ms": 13.564671
+      },
+      {
+        "tool": "clipboard_info",
+        "index": 6,
+        "elapsed_ms": 6.44636
+      },
+      {
+        "tool": "operation_catalog",
+        "index": 7,
+        "elapsed_ms": 27.600929
+      },
+      {
+        "tool": "bridge_health",
+        "index": 7,
+        "elapsed_ms": 12.676924
+      },
+      {
+        "tool": "clipboard_info",
+        "index": 7,
+        "elapsed_ms": 6.157207
+      },
+      {
+        "tool": "policy_inspect",
+        "index": 7,
+        "elapsed_ms": 24.568654
+      },
+      {
+        "tool": "bridge_health",
+        "index": 8,
+        "elapsed_ms": 13.81141
+      },
+      {
+        "tool": "clipboard_info",
+        "index": 8,
+        "elapsed_ms": 6.518551
+      },
+      {
+        "tool": "policy_inspect",
+        "index": 8,
+        "elapsed_ms": 24.702267
+      },
+      {
+        "tool": "operation_catalog",
+        "index": 8,
+        "elapsed_ms": 26.511037
+      },
+      {
+        "tool": "clipboard_info",
+        "index": 9,
+        "elapsed_ms": 6.486843
+      },
+      {
+        "tool": "policy_inspect",
+        "index": 9,
+        "elapsed_ms": 24.424443
+      },
+      {
+        "tool": "operation_catalog",
+        "index": 9,
+        "elapsed_ms": 26.639739
+      },
+      {
+        "tool": "bridge_health",
+        "index": 9,
+        "elapsed_ms": 12.520789
+      }
+    ],
+    "summary": {
+      "bridge_health": {
+        "count": 10,
+        "total_ms": 134.633297,
+        "p50_ms": 13.5538845,
+        "p95_ms": 15.159514,
+        "min_ms": 12.520789,
+        "max_ms": 15.159514,
+        "p95_method": "nearest rank ceil(0.95*n); small n is not a population guarantee"
+      },
+      "clipboard_info": {
+        "count": 10,
+        "total_ms": 64.486016,
+        "p50_ms": 6.466507,
+        "p95_ms": 6.890302,
+        "min_ms": 6.157207,
+        "max_ms": 6.890302,
+        "p95_method": "nearest rank ceil(0.95*n); small n is not a population guarantee"
+      },
+      "policy_inspect": {
+        "count": 10,
+        "total_ms": 242.212587,
+        "p50_ms": 23.931246,
+        "p95_ms": 26.264742,
+        "min_ms": 23.441489,
+        "max_ms": 26.264742,
+        "p95_method": "nearest rank ceil(0.95*n); small n is not a population guarantee"
+      },
+      "operation_catalog": {
+        "count": 10,
+        "total_ms": 271.215209,
+        "p50_ms": 27.3744995,
+        "p95_ms": 27.600929,
+        "min_ms": 26.048224,
+        "max_ms": 27.600929,
+        "p95_method": "nearest rank ceil(0.95*n); small n is not a population guarantee"
+      }
+    }
+  },
+  "private_endpoint_absent": true
+}

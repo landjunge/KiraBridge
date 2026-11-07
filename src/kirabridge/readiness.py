@@ -291,8 +291,8 @@ def task_preflight(bridge, task: dict) -> dict:
                 bridge.handoffs.agent_preflight(principal, binding["agent"], binding["cwd"])
 
             check("agent_workflow", "owned_waiting_session", waiting_agent)
-    elif operation in {"terminal.execute", "admin.execute", "agent.execute"}:
-        if operation in {"terminal.execute", "admin.execute"}:
+    elif operation in {"terminal.execute", "terminal.visible", "admin.execute", "agent.execute"}:
+        if operation in {"terminal.execute", "terminal.visible", "admin.execute"}:
             executable = args["argv"][0]
             check(
                 "executable",

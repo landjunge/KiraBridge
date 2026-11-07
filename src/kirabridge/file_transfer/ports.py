@@ -1,0 +1,29 @@
+"""Dependency direction: domain/service depend on protocols, never the Bridge/UI."""
+
+from collections.abc import AsyncIterator
+from typing import Protocol
+
+from kirabridge.file_transfer.models import Manifest
+
+
+class FileSource(Protocol):
+    name: str
+    mime_type: str
+    kind: str
+    reference: str
+
+    def chunks(self, chunk_bytes: int) -> AsyncIterator[bytes]: ...
+
+
+class ImportReceiver(Protocol):
+    @property
+    def identity(self) -> str: ...
+
+    async def capabilities(self) -> dict: ...
+    async def begin(self, operation_id: str, manifest: Manifest) -> dict: ...
+    async def status(self, operation_id: str) -> dict: ...
+    async def chunk(self, operation_id: str, offset: int, data: bytes, sha256: str) -> dict: ...
+    async def commit(self, operation_id: str) -> dict: ...
+    async def receipt(self, operation_id: str) -> dict: ...
+
+    async def abort(self, operation_id: str) -> dict: ...

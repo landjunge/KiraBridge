@@ -1,0 +1,42 @@
+{
+  "source_base": "cffcd68daa36d335e84134e541d4223862c4a817",
+  "original_ci_run": "https://github.com/landjunge/KiraBridge/actions/runs/40452690289",
+  "original_failures": "Both Linux Python 3.11 and 3.13 reported these same eight fixture failures. Existing failed CI evidence is retained; this local check does not turn CI green.",
+  "changes": [
+    "Completed desktop probe workers must also be reaped; fake wait preserves an existing exit code.",
+    "TTY worker fakes now expose normal async Process.wait and stdin/stdout/stderr attributes.",
+    "Mac-only cleanup tests explicitly inject module-local Darwin context or native availability instead of assuming the host is Darwin."
+  ],
+  "production_source_changes": false,
+  "test_nodes": [
+    "tests/test_mac_desktop.py::test_extra_probe_failure_does_not_remove_terminal_permission[invalid_plist]",
+    "tests/test_mac_desktop.py::test_extra_probe_failure_does_not_remove_terminal_permission[nonzero]",
+    "tests/test_plain_shell_paste.py::test_shell_snapshot_requires_positive_complete_os_observation[nonzero]",
+    "tests/test_plain_shell_paste.py::test_shell_snapshot_requires_positive_complete_os_observation[stderr]",
+    "tests/test_plain_shell_paste.py::test_shell_snapshot_requires_positive_complete_os_observation[empty]",
+    "tests/test_worker_pipe_cleanup.py::test_desktop_cleanup_failure_preserves_known_lock_else_unknown[False]",
+    "tests/test_worker_pipe_cleanup.py::test_desktop_cleanup_failure_preserves_known_lock_else_unknown[True]",
+    "tests/test_worker_pipe_cleanup.py::test_unconfirmed_pid_observation_cleanup_never_proves_absence"
+  ],
+  "local_environment": {
+    "platform": "Darwin",
+    "machine": "x86_64",
+    "python": "3.11.15",
+    "source_import": "PYTHONPATH=$PWD/src",
+    "interpreter": "../rc17-braille-integration-20261026/.venv/bin/python"
+  },
+  "command": "PYTHONPATH=\"$PWD/src\" ../rc17-braille-integration-20261026/.venv/bin/python -m pytest -q -W error::pytest.PytestUnraisableExceptionWarning 'tests/test_mac_desktop.py::test_extra_probe_failure_does_not_remove_terminal_permission[invalid_plist]' 'tests/test_mac_desktop.py::test_extra_probe_failure_does_not_remove_terminal_permission[nonzero]' 'tests/test_plain_shell_paste.py::test_shell_snapshot_requires_positive_complete_os_observation[nonzero]' 'tests/test_plain_shell_paste.py::test_shell_snapshot_requires_positive_complete_os_observation[stderr]' 'tests/test_plain_shell_paste.py::test_shell_snapshot_requires_positive_complete_os_observation[empty]' 'tests/test_worker_pipe_cleanup.py::test_desktop_cleanup_failure_preserves_known_lock_else_unknown[False]' 'tests/test_worker_pipe_cleanup.py::test_desktop_cleanup_failure_preserves_known_lock_else_unknown[True]' 'tests/test_worker_pipe_cleanup.py::test_unconfirmed_pid_observation_cleanup_never_proves_absence'",
+  "result": "8 passed in 0.43s",
+  "log": "dist/native-reap-worker-20261027/ci-eight-fixtures.log (ignored local evidence)",
+  "checks": [
+    "ruff format changed tests",
+    "ruff check changed tests: passed",
+    "git diff --check: passed"
+  ],
+  "pending": "Mandatory Linux Python3.11/Python3.13 Verify rerun after the integration push; no extra local suite run.",
+  "no_live_actions": [
+    "No Terminal/clipboard/GUI actions",
+    "No production reads/writes or installation",
+    "No live-child regression repeated for this fixture-only patch"
+  ]
+}

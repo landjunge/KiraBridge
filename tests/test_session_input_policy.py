@@ -23,8 +23,15 @@ def buffered(bridge, config, monkeypatch):
     config.principals["local"].capabilities += ["session.inspect"]
     calls = []
 
-    async def selected(*args):
-        return None
+    async def selected(principal, pane_id, expected_pid):
+        # Real selection returns a current row or raises; never a None sentinel.
+        return {
+            "pane_id": pane_id,
+            "expected_pid": expected_pid,
+            "transport": "tmux",
+            "processes": [],
+            "busy": False,
+        }
 
     async def command(*args, **kwargs):
         calls.append(args)

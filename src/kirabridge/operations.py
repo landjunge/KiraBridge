@@ -7,8 +7,23 @@ manager, platform adapter or configuration and cannot start work.
 from dataclasses import asdict, dataclass
 from typing import Literal
 
+from kirabridge.system_operations import SYSTEM_LEAVES, SYSTEM_READ_OPERATIONS
+
 READ_OPERATIONS = frozenset(
     {
+        "windows.keyboard.inspect",
+        "windows.window.list",
+        "windows.app.list",
+        "windows.console.status",
+        *SYSTEM_READ_OPERATIONS,
+        "keyboard.profiles.list",
+        "keyboard.profiles.get",
+        "keyboard.profiles.resolve",
+        "process.output",
+        "system.report",
+        "platform.status",
+        "files.inventory",
+        "files.status",
         "connection.check",
         "session.catalog",
         "session.read",
@@ -26,11 +41,16 @@ READ_OPERATIONS = frozenset(
         "observations.read",
     }
 )
-STOP_OPERATIONS = frozenset({"process.terminate", "workflow.stop"})
+STOP_OPERATIONS = frozenset(
+    {"process.terminate", "workflow.stop", "files.pause", "files.abort", "queue.control"}
+)
 RESERVED_READ_OPERATIONS = frozenset(
     {
+        "platform.status",
         "session.catalog",
         "session.read",
+        "files.inventory",
+        "files.status",
         "process.list",
         "process.inspect",
         "agent.status",
@@ -55,11 +75,34 @@ class Operation:
 
 OPERATIONS = {}
 for _name in (
+    "autonext.control",
     *READ_OPERATIONS,
     *STOP_OPERATIONS,
+    *SYSTEM_LEAVES,
+    "files.prepare",
+    "files.transfer",
     "session.open",
+    "keyboard.key",
+    "keyboard.system_key",
+    "keyboard.control",
+    "keyboard.sequence",
+    "windows.keyboard.sequence",
+    "windows.keyboard.shortcut",
+    "windows.keyboard.text",
+    "windows.window.control",
+    "windows.app.launch",
+    "windows.app.focus",
+    "windows.console.handoff",
+    "keyboard.chord",
+    "keyboard.text",
+    "keyboard.action",
+    "keyboard.profiles.put",
+    "keyboard.profiles.delete",
     "session.input",
+    "session.focus",
+    "session.close",
     "terminal.execute",
+    "terminal.visible",
     "file.write",
     "file.mkdir",
     "file.move",
@@ -72,18 +115,64 @@ for _name in (
     "handoff.answer",
     "handoff.reconcile",
     "handoff.decide",
+    "threaddesk.dynamic",
     "threaddesk.manage",
     "threaddesk.knowledge",
     "admin.execute",
 ):
     OPERATIONS[_name] = Operation(
-        capability="session.inspect" if _name in {"session.catalog", "session.read"} else _name,
+        capability="process.inspect"
+        if _name == "process.output"
+        else "keyboard.profiles.read"
+        if _name in {"keyboard.profiles.list", "keyboard.profiles.get", "keyboard.profiles.resolve"}
+        else "keyboard.profiles.manage"
+        if _name in {"keyboard.profiles.put", "keyboard.profiles.delete"}
+        else "keyboard.shortcuts.read"
+        if _name == "keyboard.shortcuts.discover"
+        else "keyboard.execute"
+        if _name
+        in {
+            "keyboard.key",
+            "keyboard.chord",
+            "keyboard.text",
+            "keyboard.action",
+            "keyboard.control",
+            "keyboard.sequence",
+            "keyboard.system_key",
+        }
+        else "keyboard.inspect"
+        if _name == "keyboard.system_inventory"
+        else "bridge.health"
+        if _name == "platform.status"
+        else "team.manage"
+        if _name == "autonext.control"
+        else "threaddesk.manage"
+        if _name == "threaddesk.dynamic"
+        else "task.cancel"
+        if _name == "queue.control"
+        else "files.inspect"
+        if _name in {"files.inventory", "files.status"}
+        else "files.transfer"
+        if _name in {"files.pause", "files.abort"}
+        else "session.input"
+        if _name in {"session.focus", "session.close"}
+        else "session.inspect"
+        if _name in {"session.catalog", "session.read"}
+        else "terminal.execute"
+        if _name == "terminal.visible"
+        else _name,
         effect="read"
         if _name in READ_OPERATIONS or _name == "clipboard.read"
         else "control"
         if _name in STOP_OPERATIONS
         else "execute"
-        if _name in {"terminal.execute", "admin.execute", "agent.execute"}
+        if _name
+        in {
+            "terminal.execute",
+            "admin.execute",
+            "agent.execute",
+            "windows.console.handoff",
+        }
         else "write",
         execution_class="stop"
         if _name in STOP_OPERATIONS

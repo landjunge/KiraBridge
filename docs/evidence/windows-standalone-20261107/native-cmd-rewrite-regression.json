@@ -1,0 +1,26 @@
+{
+  "passed": true,
+  "username": "KIRABRI-350OGKG$",
+  "generator_commit": "4732ab473844a61d656d2ffa48974d7915f5508b",
+  "scope": "Already parsed launcher exit across real rollback rewrite in the preserved owned 77ac82 fixture",
+  "before": {
+    "commit": "77ac82a9fae3ca0a09fb203d06b9c8546acbe8ce",
+    "execution_policy_changed": false,
+    "previous": "0.8.0rc40-77ac82a9fae3",
+    "provenance_verified": true,
+    "release": "0.8.0rc40.previous-77ac82a9fae3",
+    "version": "0.8.0rc40.previous"
+  },
+  "after": {
+    "commit": "77ac82a9fae3ca0a09fb203d06b9c8546acbe8ce",
+    "execution_policy_changed": false,
+    "previous": "0.8.0rc40.previous-77ac82a9fae3",
+    "provenance_verified": true,
+    "release": "0.8.0rc40-77ac82a9fae3",
+    "version": "0.8.0rc40"
+  },
+  "returncode": 0,
+  "stdout": "{\"action\": \"rollback\", \"data_preserved\": true, \"execution_policy_changed\": false, \"previous\": \"0.8.0rc40.previous-77ac82a9fae3\", \"release\": \"0.8.0rc40-77ac82a9fae3\"}\n",
+  "stderr": "",
+  "data_sha256": "8963cc375335360d6069e28dac086125eb1abfccd8f212d83c13e7e49b8c9141"
+}

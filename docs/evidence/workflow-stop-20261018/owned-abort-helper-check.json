@@ -1,0 +1,21 @@
+{
+  "observed_at": "2026-10-18T22:12:35.089648+00:00",
+  "previous_source_commit": "40c850477a9a54ed7ea8ff358399ae165eeefb5b",
+  "tg_source_commit": "a8fe638fe2ee2fffd5909ac2f6474e5614d97f8d",
+  "tg_source_visibility": "PUBLIC",
+  "kb_source_visibility": "PRIVATE",
+  "source_sha256": {
+    "src/kirabridge/workflow_control_adapter.py": "c7e9be2ef4788a9ac6b9269bc22f2e28bb0d6f79e33495606c4c2dd2e8023cfd",
+    "tests/test_workflow_control_adapter.py": "17315eee99cee381764dcbf9f1b846c7d3fa3a0386bd296f12b6b880737a2258"
+  },
+  "targeted_checks": [
+    "4 passed,14 deselected0.59s:2newFallback/Foreign+2directlyaffectedActualTask/Owner",
+    "1 passed,17 deselected0.31s:changed error whitelist fallback only, no TG package needed"
+  ],
+  "new_cases_added": 2,
+  "runtime_or_root_files_modified": false,
+  "fallback_control_mode": "abort_only",
+  "fallback_barrier_status": "UNKNOWN",
+  "fallback_further_dispatch_blocked": false,
+  "original_proofs_preserved": true
+}

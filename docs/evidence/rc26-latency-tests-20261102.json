@@ -1,0 +1,37 @@
+{
+  "targeted_runtime_tests": {
+    "passed": 101,
+    "seconds": 14.2,
+    "command": "PYTHONPATH=src python -m pytest -q tests/test_keyboard_access_mcp.py tests/test_keyboard_control.py tests/test_keyboard_latency_analysis.py tests/test_mcp_proxy_catalog_cache.py tests/test_mcp_proxy_cache_review.py tests/test_mcp_connection_races.py tests/test_mcp_proxy_connection_deadline.py tests/test_mcp_total_deadline.py tests/test_mcp_catalog_budget.py tests/test_mcp.py"
+  },
+  "release_contract_tests": {
+    "passed": 28,
+    "seconds": 0.38,
+    "command": "PYTHONPATH=src python -m pytest -q tests/test_release_builder.py tests/test_release_package_contract.py tests/test_installer_app.py"
+  },
+  "lint": "ruff check and format --check on all changed/new Python files passed",
+  "lock": "uv lock --check passed",
+  "unrelated_baseline_failures": {
+    "file": "tests/test_discovery_visible.py",
+    "count": 3,
+    "reproduced_on_unmodified_rc26": true,
+    "excluded_terminal_status_issue": true
+  },
+  "native_acceptance": {
+    "passed": true,
+    "evidence": "rc26-native-keyboard-latency-20261102.json",
+    "failed_prior_runs_preserved": true
+  },
+  "review": "two independent native subagents reviewed metadata cache and inline wait; no blocking source defect",
+  "cross_domain_server_changes": {
+    "new_snapshot_tests": 3,
+    "final_focused_http_tests": 7,
+    "seconds": 3.4,
+    "purpose": "Request-local native snapshot counts, current rights, no implicit terminal catalog; explicit fresh/cached/failure observations preserved"
+  },
+  "final_common_path_regressions": {
+    "passed": 27,
+    "seconds": 13.63,
+    "command": "PYTHONPATH=src python -m pytest -q tests/test_mcp_request_snapshots.py tests/test_mcp.py tests/test_keyboard_access_mcp.py tests/test_discovery_visible.py::test_real_http_initialization_and_fresh_catalog_agree_with_grants"
+  }
+}

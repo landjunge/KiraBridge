@@ -1,0 +1,25 @@
+{
+  "broad_targeted": {
+    "passed": 228,
+    "seconds": 20.34,
+    "scope": "keyboard sequence/control/dispatch/contracts, read queries, MCP timing/proxy/races/deadlines, harness and release contracts; before removal of one redundant test"
+  },
+  "final_changed_subset": {
+    "passed": 45,
+    "seconds": 3.43,
+    "files": [
+      "test_read_queries.py",
+      "test_mcp_timing.py",
+      "test_mcp_proxy_catalog_cache.py",
+      "test_keyboard_sequence.py"
+    ]
+  },
+  "read_timing_after_review": {
+    "passed": 14,
+    "seconds": 1.29
+  },
+  "review": "Independent review corrected JSON type equality and cooperative deadline between synchronous reads; no remaining blocker",
+  "lint": "ruff check passed on all changed/new Python; format checked",
+  "lock": "uv lock --check passed",
+  "actions": "not used"
+}

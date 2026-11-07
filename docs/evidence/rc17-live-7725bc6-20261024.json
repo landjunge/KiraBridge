@@ -1,0 +1,72 @@
+{
+  "version": "0.8.0rc17",
+  "source_commit": "7725bc668db5e895b61228a5b0455819fe5ce961",
+  "platform": "actual Intel macOS 15.7.4 x86_64",
+  "runtime": {
+    "instance_id": "057bd289844f4797a0d91d528258c47e",
+    "version": "0.8.0rc17",
+    "pid": 68867,
+    "started_at": "2026-10-24T18:33:26.642250+00:00",
+    "config_path": "/Users/landjunge/.config/kirabridge/config.toml",
+    "config_sha256": "4d1167412a0d6b2e4362170d63af77c6a25ee883aa3b8271918ed2316bfc8fd3",
+    "effective_config_sha256": "d2630b0afe5515a9b16303e34a1b3dd3e073c12c8b2dc2e03c818e9cc4a623a5",
+    "source_tree_sha256": "66b2005be63082d89da6641bda59f1a30462af65a1ac8771904bbc25cba6b544",
+    "source_file_count": 116,
+    "source_package_path": "/Users/landjunge/.local/share/kirabridge/install/releases/0.8.0rc17-7725bc668db5/source/.venv/lib/python3.11/site-packages/kirabridge",
+    "source_scope": "package Python files observed at startup; no remote attestation"
+  },
+  "release": {
+    "published": "v0.8.0rc14",
+    "rc17": "draft",
+    "pr": "https://github.com/landjunge/KiraBridge/pull/32",
+    "merge": "not merged; Actions did not start due account billing/spending limits"
+  },
+  "grants": {
+    "principal": "chatgpt",
+    "operations": 42,
+    "all_authorized_automatic": true,
+    "added": [
+      "files.inspect",
+      "files.prepare",
+      "files.transfer"
+    ],
+    "unrelated_principals_credentials_handoffs_preserved": true
+  },
+  "native_input": {
+    "task_id": "kira-rc17-axpress-submitfalse-20261024-05",
+    "principal": "chatgpt",
+    "state": "completed",
+    "agent_confirmed": false,
+    "execution_confirmed": false,
+    "expected_pid": 65583,
+    "pane_id": "terminal:46256:ttys003",
+    "paste_event_sent": true,
+    "return_sent": false,
+    "scope": "literal paste event only; no Return or agent acknowledgement",
+    "submitted": false,
+    "readback_task": "kira-rc17-axpress-readback-20261024-05",
+    "readback_state": "completed",
+    "literal_present": true,
+    "readiness": "input_not_empty",
+    "overwrite_attempt": {
+      "task_id": "kira-rc17-existing-input-refusal-20261024-06",
+      "state": "failed",
+      "error": "visible_input_not_empty",
+      "original_preserved": true,
+      "forbidden_text_absent": true
+    },
+    "clipboard_known_fixture_restored": true
+  },
+  "prior_failures": "Preserved unknown focus/timeout tasks were not replayed. One initial direct read timed out; separate queued Kira readback and subsequent direct read succeeded. Not all read-timeout causes are proven eliminated.",
+  "lifecycle": "Final exact package reproduced twice; actual isolated upgrade/status/data/rollback passed. Productive service stayed active with same PID after closing one owned idle fixture; second fixture preserved because input changed.",
+  "limitations": [
+    "No Apple Silicon execution test",
+    "No published RC17 or passing GitHub Actions",
+    "Current fresh configured frontdoor is NoEvents; injected Apps schemas remain stale; empty legacy field works",
+    "File-transfer feature and real ThreadDesk receiver/source/destination setup remain prerequisites; no binary import claimed"
+  ],
+  "sha256": {
+    "bundle": "896b7d1510cd164459b9cb1767a9b26ffc75164f2f6ca3791b119ddffc272f8c",
+    "wheel": "6708a174ad6bc1d6d57fc0aec5d2d7665522ec1dfdca3ab4cf79dbb32d399e04"
+  }
+}

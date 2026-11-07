@@ -1,6 +1,6 @@
 # KiraBridge
 
-Private, modular local desktop and multi-agent bridge. **Status: specification only; no implementation or agent assignment has been launched.**
+Private, modular local desktop and multi-agent bridge. This document is the original architectural baseline. Implementation and team assignment have since been carried out; current evidence and limits are recorded in [STATUS.md](STATUS.md), [team operation](TEAM-ORCHESTRATION.md) and the versioned release notes.
 
 ## Goal
 
@@ -34,7 +34,7 @@ Provide secure local file, terminal and process capabilities to multiple authori
 - Multiple independent MCP clients and agent adapters cannot cross task or authorization boundaries.
 - Targeted tests cover failure recovery, idempotency, authorization and protocol interoperability.
 
-## Work division (not yet dispatched)
+## Initial work division
 
 **Codex:** implement foundation, task lifecycle, adapters, desktop tools and MCP interfaces in isolated increments; document actual test results and remaining blockers.
 
@@ -43,3 +43,15 @@ Provide secure local file, terminal and process capabilities to multiple authori
 ## Operating constraints
 
 Keep the repository private. Do not alter existing Agent Authority, ThreadDesk, Tollgate or Help Center projects, publish a service, deploy to production, stop existing agents or grant external access without explicit authorization. Minimize tests but never omit necessary safety checks. Keep source and review evidence versioned.
+
+
+## Current evidence delta · KB-INTEL-20261029
+
+Intel rc18 is merged, published and visibly installed under authorization
+rc18_release_install_20261029. Published-download, guarded productive stop/start/restart,
+input/Return, busy/stale-target refusal, restart idempotency and data preservation
+are verified. [Current release/install evidence and remaining issue51 acceptance](RC18-PUBLISH-INSTALL-20261029.md).
+[Historical build acceptance, hashes and original approval boundary](INTEL-RELEASE-20261029.md)
+are retained. ARM/paid hostedMac remain deferred/external. Native ready-Codex and
+actual ChatGPT Host/voice acceptance remain separate from the tested shell/protocol.
+The existing architecture and modules above are not replanned.

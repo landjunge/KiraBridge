@@ -1,0 +1,1263 @@
+{
+  "schema_version": 1,
+  "generated_at_utc": "2026-11-02T22:50:29.387302+00:00",
+  "source": "bridge.sqlite3 read-only snapshot transaction",
+  "timestamp_unit": "Unix epoch seconds UTC; historical wall clock, not monotonic",
+  "prefix": "notes_poem_key_20261102_2340_",
+  "task_count": 10,
+  "states": {
+    "completed": 10
+  },
+  "first_created_to_last_finished_ms": 64481.66298866272,
+  "statistics": {
+    "created_to_accepted": {
+      "n": 10,
+      "min_ms": 2.328157424926758,
+      "p50_ms": 3.1626224517822266,
+      "max_ms": 18.269062042236328,
+      "sum_ms": 50.61030387878418
+    },
+    "accepted_to_started": {
+      "n": 10,
+      "min_ms": 10.537862777709961,
+      "p50_ms": 10.82754135131836,
+      "max_ms": 41.812896728515625,
+      "sum_ms": 144.78659629821777
+    },
+    "started_to_target_bound": {
+      "n": 10,
+      "min_ms": 85.21199226379395,
+      "p50_ms": 106.98449611663818,
+      "max_ms": 180.26018142700195,
+      "sum_ms": 1124.9232292175293
+    },
+    "target_bound_to_native_attempt": {
+      "n": 10,
+      "min_ms": 0.8628368377685547,
+      "p50_ms": 1.0238885879516602,
+      "max_ms": 16.570091247558594,
+      "sum_ms": 55.811166763305664
+    },
+    "native_attempt_to_finished": {
+      "n": 10,
+      "min_ms": 82.4289321899414,
+      "p50_ms": 93.83046627044678,
+      "max_ms": 123.96812438964844,
+      "sum_ms": 970.2844619750977
+    },
+    "started_to_finished": {
+      "n": 10,
+      "min_ms": 168.9889430999756,
+      "p50_ms": 210.06298065185547,
+      "max_ms": 317.5230026245117,
+      "sum_ms": 2151.0188579559326
+    },
+    "created_to_finished": {
+      "n": 10,
+      "min_ms": 181.98299407958984,
+      "p50_ms": 225.22711753845215,
+      "max_ms": 377.6049613952637,
+      "sum_ms": 2346.4157581329346
+    },
+    "between_admissions": {
+      "n": 9,
+      "min_ms": 5037.629842758179,
+      "p50_ms": 6987.815141677856,
+      "max_ms": 9931.082010269165,
+      "sum_ms": 64275.72202682495
+    },
+    "previous_finished_to_created": {
+      "n": 9,
+      "min_ms": 4773.8659381866455,
+      "p50_ms": 6744.80414390564,
+      "max_ms": 9711.973905563354,
+      "sum_ms": 62135.247230529785
+    }
+  },
+  "tasks": [
+    {
+      "id": "notes_poem_key_20261102_2340_0",
+      "principal": "chatgpt",
+      "operation": "keyboard.control",
+      "state": "completed",
+      "created": 1793659042.411907,
+      "accepted": 1793659042.417556,
+      "started": 1793659042.4283662,
+      "finished": 1793659042.643253,
+      "has_error": false,
+      "events": [
+        {
+          "seq": 37116,
+          "at": 1793659042.411907,
+          "state": "created"
+        },
+        {
+          "seq": 37117,
+          "at": 1793659042.411907,
+          "state": "queued"
+        },
+        {
+          "seq": 37118,
+          "at": 1793659042.417556,
+          "state": "accepted"
+        },
+        {
+          "seq": 37119,
+          "at": 1793659042.4283662,
+          "state": "running",
+          "evidence_type": "automatic_keyboard_resolution"
+        },
+        {
+          "seq": 37120,
+          "at": 1793659042.51823,
+          "state": "running",
+          "evidence_type": "automatic_keyboard_target_bound"
+        },
+        {
+          "seq": 37121,
+          "at": 1793659042.519285,
+          "state": "running",
+          "evidence_type": "native_keyboard_attempt"
+        },
+        {
+          "seq": 37122,
+          "at": 1793659042.643253,
+          "state": "completed"
+        }
+      ],
+      "receipt": {
+        "automatic_retry": false,
+        "app_processing_confirmed": false,
+        "post_calls_returned": 2
+      },
+      "completion_notices": [
+        {
+          "created": 1793659042.647212,
+          "delivered": null,
+          "acknowledged": null
+        }
+      ],
+      "durations_ms": {
+        "created_to_accepted": 5.649089813232422,
+        "accepted_to_started": 10.810136795043945,
+        "started_to_target_bound": 89.86377716064453,
+        "target_bound_to_native_attempt": 1.055002212524414,
+        "native_attempt_to_finished": 123.96812438964844,
+        "started_to_finished": 214.88690376281738,
+        "created_to_finished": 231.34613037109375
+      }
+    },
+    {
+      "id": "notes_poem_key_20261102_2340_1",
+      "principal": "chatgpt",
+      "operation": "keyboard.control",
+      "state": "completed",
+      "created": 1793659048.609237,
+      "accepted": 1793659048.611565,
+      "started": 1793659048.628437,
+      "finished": 1793659048.883487,
+      "has_error": false,
+      "events": [
+        {
+          "seq": 37123,
+          "at": 1793659048.609237,
+          "state": "created"
+        },
+        {
+          "seq": 37124,
+          "at": 1793659048.609237,
+          "state": "queued"
+        },
+        {
+          "seq": 37125,
+          "at": 1793659048.611565,
+          "state": "accepted"
+        },
+        {
+          "seq": 37126,
+          "at": 1793659048.628437,
+          "state": "running",
+          "evidence_type": "automatic_keyboard_resolution"
+        },
+        {
+          "seq": 37127,
+          "at": 1793659048.7821472,
+          "state": "running",
+          "evidence_type": "automatic_keyboard_target_bound"
+        },
+        {
+          "seq": 37128,
+          "at": 1793659048.78301,
+          "state": "running",
+          "evidence_type": "native_keyboard_attempt"
+        },
+        {
+          "seq": 37129,
+          "at": 1793659048.883487,
+          "state": "completed"
+        }
+      ],
+      "receipt": {
+        "automatic_retry": false,
+        "app_processing_confirmed": false,
+        "post_calls_returned": 2
+      },
+      "completion_notices": [
+        {
+          "created": 1793659048.8872378,
+          "delivered": null,
+          "acknowledged": null
+        }
+      ],
+      "durations_ms": {
+        "created_to_accepted": 2.328157424926758,
+        "accepted_to_started": 16.871929168701172,
+        "started_to_target_bound": 153.71012687683105,
+        "target_bound_to_native_attempt": 0.8628368377685547,
+        "native_attempt_to_finished": 100.47698020935059,
+        "started_to_finished": 255.0499439239502,
+        "created_to_finished": 274.2500305175781,
+        "between_admissions": 6197.329998016357,
+        "previous_finished_to_created": 5965.983867645264
+      }
+    },
+    {
+      "id": "notes_poem_key_20261102_2340_2",
+      "principal": "chatgpt",
+      "operation": "keyboard.control",
+      "state": "completed",
+      "created": 1793659053.657353,
+      "accepted": 1793659053.660473,
+      "started": 1793659053.6712818,
+      "finished": 1793659053.893506,
+      "has_error": false,
+      "events": [
+        {
+          "seq": 37130,
+          "at": 1793659053.657353,
+          "state": "created"
+        },
+        {
+          "seq": 37131,
+          "at": 1793659053.657353,
+          "state": "queued"
+        },
+        {
+          "seq": 37132,
+          "at": 1793659053.660473,
+          "state": "accepted"
+        },
+        {
+          "seq": 37133,
+          "at": 1793659053.6712818,
+          "state": "running",
+          "evidence_type": "automatic_keyboard_resolution"
+        },
+        {
+          "seq": 37134,
+          "at": 1793659053.777277,
+          "state": "running",
+          "evidence_type": "automatic_keyboard_target_bound"
+        },
+        {
+          "seq": 37135,
+          "at": 1793659053.79346,
+          "state": "running",
+          "evidence_type": "native_keyboard_attempt"
+        },
+        {
+          "seq": 37136,
+          "at": 1793659053.893506,
+          "state": "completed"
+        }
+      ],
+      "receipt": {
+        "automatic_retry": false,
+        "app_processing_confirmed": false,
+        "post_calls_returned": 2
+      },
+      "completion_notices": [
+        {
+          "created": 1793659053.898505,
+          "delivered": null,
+          "acknowledged": null
+        }
+      ],
+      "durations_ms": {
+        "created_to_accepted": 3.1201839447021484,
+        "accepted_to_started": 10.808706283569336,
+        "started_to_target_bound": 105.99517822265625,
+        "target_bound_to_native_attempt": 16.182899475097656,
+        "native_attempt_to_finished": 100.04615783691406,
+        "started_to_finished": 222.22423553466797,
+        "created_to_finished": 236.15312576293945,
+        "between_admissions": 5048.115968704224,
+        "previous_finished_to_created": 4773.8659381866455
+      }
+    },
+    {
+      "id": "notes_poem_key_20261102_2340_3",
+      "principal": "chatgpt",
+      "operation": "keyboard.control",
+      "state": "completed",
+      "created": 1793659063.404707,
+      "accepted": 1793659063.422976,
+      "started": 1793659063.464789,
+      "finished": 1793659063.782312,
+      "has_error": false,
+      "events": [
+        {
+          "seq": 37137,
+          "at": 1793659063.404707,
+          "state": "created"
+        },
+        {
+          "seq": 37138,
+          "at": 1793659063.404707,
+          "state": "queued"
+        },
+        {
+          "seq": 37139,
+          "at": 1793659063.422976,
+          "state": "accepted"
+        },
+        {
+          "seq": 37140,
+          "at": 1793659063.464789,
+          "state": "running",
+          "evidence_type": "automatic_keyboard_resolution"
+        },
+        {
+          "seq": 37141,
+          "at": 1793659063.645049,
+          "state": "running",
+          "evidence_type": "automatic_keyboard_target_bound"
+        },
+        {
+          "seq": 37142,
+          "at": 1793659063.661243,
+          "state": "running",
+          "evidence_type": "native_keyboard_attempt"
+        },
+        {
+          "seq": 37143,
+          "at": 1793659063.782312,
+          "state": "completed"
+        }
+      ],
+      "receipt": {
+        "automatic_retry": false,
+        "app_processing_confirmed": false,
+        "post_calls_returned": 2
+      },
+      "completion_notices": [
+        {
+          "created": 1793659063.788047,
+          "delivered": null,
+          "acknowledged": null
+        }
+      ],
+      "durations_ms": {
+        "created_to_accepted": 18.269062042236328,
+        "accepted_to_started": 41.812896728515625,
+        "started_to_target_bound": 180.26018142700195,
+        "target_bound_to_native_attempt": 16.193866729736328,
+        "native_attempt_to_finished": 121.06895446777344,
+        "started_to_finished": 317.5230026245117,
+        "created_to_finished": 377.6049613952637,
+        "between_admissions": 9747.35403060913,
+        "previous_finished_to_created": 9511.200904846191
+      }
+    },
+    {
+      "id": "notes_poem_key_20261102_2340_4",
+      "principal": "chatgpt",
+      "operation": "keyboard.control",
+      "state": "completed",
+      "created": 1793659069.649292,
+      "accepted": 1793659069.6517289,
+      "started": 1793659069.662286,
+      "finished": 1793659069.831275,
+      "has_error": false,
+      "events": [
+        {
+          "seq": 37144,
+          "at": 1793659069.649292,
+          "state": "created"
+        },
+        {
+          "seq": 37145,
+          "at": 1793659069.649292,
+          "state": "queued"
+        },
+        {
+          "seq": 37146,
+          "at": 1793659069.6517289,
+          "state": "accepted"
+        },
+        {
+          "seq": 37147,
+          "at": 1793659069.662286,
+          "state": "running",
+          "evidence_type": "automatic_keyboard_resolution"
+        },
+        {
+          "seq": 37148,
+          "at": 1793659069.747832,
+          "state": "running",
+          "evidence_type": "automatic_keyboard_target_bound"
+        },
+        {
+          "seq": 37149,
+          "at": 1793659069.748846,
+          "state": "running",
+          "evidence_type": "native_keyboard_attempt"
+        },
+        {
+          "seq": 37150,
+          "at": 1793659069.831275,
+          "state": "completed"
+        }
+      ],
+      "receipt": {
+        "automatic_retry": false,
+        "app_processing_confirmed": false,
+        "post_calls_returned": 2
+      },
+      "completion_notices": [
+        {
+          "created": 1793659069.835657,
+          "delivered": null,
+          "acknowledged": null
+        }
+      ],
+      "durations_ms": {
+        "created_to_accepted": 2.4368762969970703,
+        "accepted_to_started": 10.557174682617188,
+        "started_to_target_bound": 85.54601669311523,
+        "target_bound_to_native_attempt": 1.0139942169189453,
+        "native_attempt_to_finished": 82.4289321899414,
+        "started_to_finished": 168.9889430999756,
+        "created_to_finished": 181.98299407958984,
+        "between_admissions": 6244.585037231445,
+        "previous_finished_to_created": 5866.980075836182
+      }
+    },
+    {
+      "id": "notes_poem_key_20261102_2340_5",
+      "principal": "chatgpt",
+      "operation": "keyboard.control",
+      "state": "completed",
+      "created": 1793659076.711987,
+      "accepted": 1793659076.7150111,
+      "started": 1793659076.725856,
+      "finished": 1793659076.9310951,
+      "has_error": false,
+      "events": [
+        {
+          "seq": 37151,
+          "at": 1793659076.711987,
+          "state": "created"
+        },
+        {
+          "seq": 37152,
+          "at": 1793659076.711987,
+          "state": "queued"
+        },
+        {
+          "seq": 37153,
+          "at": 1793659076.7150111,
+          "state": "accepted"
+        },
+        {
+          "seq": 37154,
+          "at": 1793659076.725856,
+          "state": "running",
+          "evidence_type": "automatic_keyboard_resolution"
+        },
+        {
+          "seq": 37155,
+          "at": 1793659076.8410912,
+          "state": "running",
+          "evidence_type": "automatic_keyboard_target_bound"
+        },
+        {
+          "seq": 37156,
+          "at": 1793659076.8420649,
+          "state": "running",
+          "evidence_type": "native_keyboard_attempt"
+        },
+        {
+          "seq": 37157,
+          "at": 1793659076.9310951,
+          "state": "completed"
+        }
+      ],
+      "receipt": {
+        "automatic_retry": false,
+        "app_processing_confirmed": false,
+        "post_calls_returned": 2
+      },
+      "completion_notices": [
+        {
+          "created": 1793659076.935564,
+          "delivered": null,
+          "acknowledged": null
+        }
+      ],
+      "durations_ms": {
+        "created_to_accepted": 3.0241012573242188,
+        "accepted_to_started": 10.844945907592773,
+        "started_to_target_bound": 115.2350902557373,
+        "target_bound_to_native_attempt": 0.9737014770507812,
+        "native_attempt_to_finished": 89.03026580810547,
+        "started_to_finished": 205.23905754089355,
+        "created_to_finished": 219.10810470581055,
+        "between_admissions": 7062.695026397705,
+        "previous_finished_to_created": 6880.712032318115
+      }
+    },
+    {
+      "id": "notes_poem_key_20261102_2340_6",
+      "principal": "chatgpt",
+      "operation": "keyboard.control",
+      "state": "completed",
+      "created": 1793659086.643069,
+      "accepted": 1793659086.646274,
+      "started": 1793659086.657203,
+      "finished": 1793659086.88608,
+      "has_error": false,
+      "events": [
+        {
+          "seq": 37158,
+          "at": 1793659086.643069,
+          "state": "created"
+        },
+        {
+          "seq": 37159,
+          "at": 1793659086.643069,
+          "state": "queued"
+        },
+        {
+          "seq": 37160,
+          "at": 1793659086.646274,
+          "state": "accepted"
+        },
+        {
+          "seq": 37161,
+          "at": 1793659086.657203,
+          "state": "running",
+          "evidence_type": "automatic_keyboard_resolution"
+        },
+        {
+          "seq": 37162,
+          "at": 1793659086.771487,
+          "state": "running",
+          "evidence_type": "automatic_keyboard_target_bound"
+        },
+        {
+          "seq": 37163,
+          "at": 1793659086.788057,
+          "state": "running",
+          "evidence_type": "native_keyboard_attempt"
+        },
+        {
+          "seq": 37164,
+          "at": 1793659086.88608,
+          "state": "completed"
+        }
+      ],
+      "receipt": {
+        "automatic_retry": false,
+        "app_processing_confirmed": false,
+        "post_calls_returned": 2
+      },
+      "completion_notices": [
+        {
+          "created": 1793659086.890456,
+          "delivered": null,
+          "acknowledged": null
+        }
+      ],
+      "durations_ms": {
+        "created_to_accepted": 3.2050609588623047,
+        "accepted_to_started": 10.928869247436523,
+        "started_to_target_bound": 114.28403854370117,
+        "target_bound_to_native_attempt": 16.570091247558594,
+        "native_attempt_to_finished": 98.0229377746582,
+        "started_to_finished": 228.87706756591797,
+        "created_to_finished": 243.0109977722168,
+        "between_admissions": 9931.082010269165,
+        "previous_finished_to_created": 9711.973905563354
+      }
+    },
+    {
+      "id": "notes_poem_key_20261102_2340_7",
+      "principal": "chatgpt",
+      "operation": "keyboard.control",
+      "state": "completed",
+      "created": 1793659093.6308842,
+      "accepted": 1793659093.6378481,
+      "started": 1793659093.648386,
+      "finished": 1793659093.8188229,
+      "has_error": false,
+      "events": [
+        {
+          "seq": 37165,
+          "at": 1793659093.6308842,
+          "state": "created"
+        },
+        {
+          "seq": 37166,
+          "at": 1793659093.6308842,
+          "state": "queued"
+        },
+        {
+          "seq": 37167,
+          "at": 1793659093.6378481,
+          "state": "accepted"
+        },
+        {
+          "seq": 37168,
+          "at": 1793659093.648386,
+          "state": "running",
+          "evidence_type": "automatic_keyboard_resolution"
+        },
+        {
+          "seq": 37169,
+          "at": 1793659093.735229,
+          "state": "running",
+          "evidence_type": "automatic_keyboard_target_bound"
+        },
+        {
+          "seq": 37170,
+          "at": 1793659093.7362628,
+          "state": "running",
+          "evidence_type": "native_keyboard_attempt"
+        },
+        {
+          "seq": 37171,
+          "at": 1793659093.8188229,
+          "state": "completed"
+        }
+      ],
+      "receipt": {
+        "automatic_retry": false,
+        "app_processing_confirmed": false,
+        "post_calls_returned": 2
+      },
+      "completion_notices": [
+        {
+          "created": 1793659093.8228,
+          "delivered": null,
+          "acknowledged": null
+        }
+      ],
+      "durations_ms": {
+        "created_to_accepted": 6.963968276977539,
+        "accepted_to_started": 10.537862777709961,
+        "started_to_target_bound": 86.84301376342773,
+        "target_bound_to_native_attempt": 1.033782958984375,
+        "native_attempt_to_finished": 82.56006240844727,
+        "started_to_finished": 170.43685913085938,
+        "created_to_finished": 187.93869018554688,
+        "between_admissions": 6987.815141677856,
+        "previous_finished_to_created": 6744.80414390564
+      }
+    },
+    {
+      "id": "notes_poem_key_20261102_2340_8",
+      "principal": "chatgpt",
+      "operation": "keyboard.control",
+      "state": "completed",
+      "created": 1793659101.6499991,
+      "accepted": 1793659101.6523461,
+      "started": 1793659101.663317,
+      "finished": 1793659101.839079,
+      "has_error": false,
+      "events": [
+        {
+          "seq": 37172,
+          "at": 1793659101.6499991,
+          "state": "created"
+        },
+        {
+          "seq": 37173,
+          "at": 1793659101.6499991,
+          "state": "queued"
+        },
+        {
+          "seq": 37174,
+          "at": 1793659101.6523461,
+          "state": "accepted"
+        },
+        {
+          "seq": 37175,
+          "at": 1793659101.663317,
+          "state": "running",
+          "evidence_type": "automatic_keyboard_resolution"
+        },
+        {
+          "seq": 37176,
+          "at": 1793659101.748529,
+          "state": "running",
+          "evidence_type": "automatic_keyboard_target_bound"
+        },
+        {
+          "seq": 37177,
+          "at": 1793659101.749441,
+          "state": "running",
+          "evidence_type": "native_keyboard_attempt"
+        },
+        {
+          "seq": 37178,
+          "at": 1793659101.839079,
+          "state": "completed"
+        }
+      ],
+      "receipt": {
+        "automatic_retry": false,
+        "app_processing_confirmed": false,
+        "post_calls_returned": 2
+      },
+      "completion_notices": [
+        {
+          "created": 1793659101.843282,
+          "delivered": null,
+          "acknowledged": null
+        }
+      ],
+      "durations_ms": {
+        "created_to_accepted": 2.3469924926757812,
+        "accepted_to_started": 10.970830917358398,
+        "started_to_target_bound": 85.21199226379395,
+        "target_bound_to_native_attempt": 0.9119510650634766,
+        "native_attempt_to_finished": 89.63799476623535,
+        "started_to_finished": 175.76193809509277,
+        "created_to_finished": 189.07976150512695,
+        "between_admissions": 8019.114971160889,
+        "previous_finished_to_created": 7831.176280975342
+      }
+    },
+    {
+      "id": "notes_poem_key_20261102_2340_9",
+      "principal": "chatgpt",
+      "operation": "keyboard.control",
+      "state": "completed",
+      "created": 1793659106.687629,
+      "accepted": 1793659106.6908958,
+      "started": 1793659106.701539,
+      "finished": 1793659106.89357,
+      "has_error": false,
+      "events": [
+        {
+          "seq": 37179,
+          "at": 1793659106.687629,
+          "state": "created"
+        },
+        {
+          "seq": 37180,
+          "at": 1793659106.687629,
+          "state": "queued"
+        },
+        {
+          "seq": 37181,
+          "at": 1793659106.6908958,
+          "state": "accepted"
+        },
+        {
+          "seq": 37182,
+          "at": 1793659106.701539,
+          "state": "running",
+          "evidence_type": "automatic_keyboard_resolution"
+        },
+        {
+          "seq": 37183,
+          "at": 1793659106.8095129,
+          "state": "running",
+          "evidence_type": "automatic_keyboard_target_bound"
+        },
+        {
+          "seq": 37184,
+          "at": 1793659106.810526,
+          "state": "running",
+          "evidence_type": "native_keyboard_attempt"
+        },
+        {
+          "seq": 37185,
+          "at": 1793659106.89357,
+          "state": "completed"
+        }
+      ],
+      "receipt": {
+        "automatic_retry": false,
+        "app_processing_confirmed": false,
+        "post_calls_returned": 2
+      },
+      "completion_notices": [
+        {
+          "created": 1793659106.89781,
+          "delivered": null,
+          "acknowledged": null
+        }
+      ],
+      "durations_ms": {
+        "created_to_accepted": 3.2668113708496094,
+        "accepted_to_started": 10.643243789672852,
+        "started_to_target_bound": 107.97381401062012,
+        "target_bound_to_native_attempt": 1.013040542602539,
+        "native_attempt_to_finished": 83.04405212402344,
+        "started_to_finished": 192.0309066772461,
+        "created_to_finished": 205.94096183776855,
+        "between_admissions": 5037.629842758179,
+        "previous_finished_to_created": 4848.550081253052
+      }
+    }
+  ],
+  "additional_tasks": [
+    {
+      "id": "notes_new_shortcut_20261102_2335",
+      "principal": "chatgpt",
+      "operation": "keyboard.control",
+      "state": "completed",
+      "created": 1793658873.541229,
+      "accepted": 1793658873.5436292,
+      "started": 1793658873.554538,
+      "finished": 1793658873.896072,
+      "has_error": false,
+      "events": [
+        {
+          "seq": 37074,
+          "at": 1793658873.541229,
+          "state": "created"
+        },
+        {
+          "seq": 37075,
+          "at": 1793658873.541229,
+          "state": "queued"
+        },
+        {
+          "seq": 37076,
+          "at": 1793658873.5436292,
+          "state": "accepted"
+        },
+        {
+          "seq": 37077,
+          "at": 1793658873.554538,
+          "state": "running",
+          "evidence_type": "automatic_keyboard_resolution"
+        },
+        {
+          "seq": 37078,
+          "at": 1793658873.7397602,
+          "state": "running",
+          "evidence_type": "automatic_keyboard_target_bound"
+        },
+        {
+          "seq": 37079,
+          "at": 1793658873.7559738,
+          "state": "running",
+          "evidence_type": "native_keyboard_attempt"
+        },
+        {
+          "seq": 37080,
+          "at": 1793658873.896072,
+          "state": "completed"
+        }
+      ],
+      "receipt": {
+        "automatic_retry": false,
+        "app_processing_confirmed": false,
+        "post_calls_returned": 2
+      },
+      "completion_notices": [
+        {
+          "created": 1793658873.900245,
+          "delivered": null,
+          "acknowledged": null
+        }
+      ],
+      "durations_ms": {
+        "created_to_accepted": 2.4001598358154297,
+        "accepted_to_started": 10.908842086791992,
+        "started_to_target_bound": 185.22214889526367,
+        "target_bound_to_native_attempt": 16.213655471801758,
+        "native_attempt_to_finished": 140.09809494018555,
+        "started_to_finished": 341.533899307251,
+        "created_to_finished": 354.8429012298584
+      }
+    },
+    {
+      "id": "notes_key_a_20261102_2336",
+      "principal": "chatgpt",
+      "operation": "keyboard.control",
+      "state": "completed",
+      "created": 1793658907.6126962,
+      "accepted": 1793658907.63253,
+      "started": 1793658907.674826,
+      "finished": 1793658907.916704,
+      "has_error": false,
+      "events": [
+        {
+          "seq": 37081,
+          "at": 1793658907.6126962,
+          "state": "created"
+        },
+        {
+          "seq": 37082,
+          "at": 1793658907.6126962,
+          "state": "queued"
+        },
+        {
+          "seq": 37083,
+          "at": 1793658907.63253,
+          "state": "accepted"
+        },
+        {
+          "seq": 37084,
+          "at": 1793658907.674826,
+          "state": "running",
+          "evidence_type": "automatic_keyboard_resolution"
+        },
+        {
+          "seq": 37085,
+          "at": 1793658907.824898,
+          "state": "running",
+          "evidence_type": "automatic_keyboard_target_bound"
+        },
+        {
+          "seq": 37086,
+          "at": 1793658907.8258371,
+          "state": "running",
+          "evidence_type": "native_keyboard_attempt"
+        },
+        {
+          "seq": 37087,
+          "at": 1793658907.916704,
+          "state": "completed"
+        }
+      ],
+      "receipt": {
+        "automatic_retry": false,
+        "app_processing_confirmed": false,
+        "post_calls_returned": 2
+      },
+      "completion_notices": [
+        {
+          "created": 1793658907.922261,
+          "delivered": null,
+          "acknowledged": null
+        }
+      ],
+      "durations_ms": {
+        "created_to_accepted": 19.833803176879883,
+        "accepted_to_started": 42.29593276977539,
+        "started_to_target_bound": 150.0720977783203,
+        "target_bound_to_native_attempt": 0.9391307830810547,
+        "native_attempt_to_finished": 90.8668041229248,
+        "started_to_finished": 241.87803268432617,
+        "created_to_finished": 304.00776863098145
+      }
+    },
+    {
+      "id": "notes_key_b_20261102_2336",
+      "principal": "chatgpt",
+      "operation": "keyboard.control",
+      "state": "completed",
+      "created": 1793658919.546012,
+      "accepted": 1793658919.553416,
+      "started": 1793658919.564717,
+      "finished": 1793658919.779674,
+      "has_error": false,
+      "events": [
+        {
+          "seq": 37088,
+          "at": 1793658919.546012,
+          "state": "created"
+        },
+        {
+          "seq": 37089,
+          "at": 1793658919.546012,
+          "state": "queued"
+        },
+        {
+          "seq": 37090,
+          "at": 1793658919.553416,
+          "state": "accepted"
+        },
+        {
+          "seq": 37091,
+          "at": 1793658919.564717,
+          "state": "running",
+          "evidence_type": "automatic_keyboard_resolution"
+        },
+        {
+          "seq": 37092,
+          "at": 1793658919.654277,
+          "state": "running",
+          "evidence_type": "automatic_keyboard_target_bound"
+        },
+        {
+          "seq": 37093,
+          "at": 1793658919.671277,
+          "state": "running",
+          "evidence_type": "native_keyboard_attempt"
+        },
+        {
+          "seq": 37094,
+          "at": 1793658919.779674,
+          "state": "completed"
+        }
+      ],
+      "receipt": {
+        "automatic_retry": false,
+        "app_processing_confirmed": false,
+        "post_calls_returned": 2
+      },
+      "completion_notices": [
+        {
+          "created": 1793658919.7849522,
+          "delivered": null,
+          "acknowledged": null
+        }
+      ],
+      "durations_ms": {
+        "created_to_accepted": 7.404088973999023,
+        "accepted_to_started": 11.301040649414062,
+        "started_to_target_bound": 89.56003189086914,
+        "target_bound_to_native_attempt": 16.99995994567871,
+        "native_attempt_to_finished": 108.39700698852539,
+        "started_to_finished": 214.95699882507324,
+        "created_to_finished": 233.66212844848633
+      }
+    },
+    {
+      "id": "notes_key_c_20261102_2336",
+      "principal": "chatgpt",
+      "operation": "keyboard.control",
+      "state": "completed",
+      "created": 1793658932.560269,
+      "accepted": 1793658932.567669,
+      "started": 1793658932.579434,
+      "finished": 1793658932.787838,
+      "has_error": false,
+      "events": [
+        {
+          "seq": 37095,
+          "at": 1793658932.560269,
+          "state": "created"
+        },
+        {
+          "seq": 37096,
+          "at": 1793658932.560269,
+          "state": "queued"
+        },
+        {
+          "seq": 37097,
+          "at": 1793658932.567669,
+          "state": "accepted"
+        },
+        {
+          "seq": 37098,
+          "at": 1793658932.579434,
+          "state": "running",
+          "evidence_type": "automatic_keyboard_resolution"
+        },
+        {
+          "seq": 37099,
+          "at": 1793658932.671113,
+          "state": "running",
+          "evidence_type": "automatic_keyboard_target_bound"
+        },
+        {
+          "seq": 37100,
+          "at": 1793658932.6873758,
+          "state": "running",
+          "evidence_type": "native_keyboard_attempt"
+        },
+        {
+          "seq": 37101,
+          "at": 1793658932.787838,
+          "state": "completed"
+        }
+      ],
+      "receipt": {
+        "automatic_retry": false,
+        "app_processing_confirmed": false,
+        "post_calls_returned": 2
+      },
+      "completion_notices": [
+        {
+          "created": 1793658932.792116,
+          "delivered": null,
+          "acknowledged": null
+        }
+      ],
+      "durations_ms": {
+        "created_to_accepted": 7.399797439575195,
+        "accepted_to_started": 11.765003204345703,
+        "started_to_target_bound": 91.67909622192383,
+        "target_bound_to_native_attempt": 16.26276969909668,
+        "native_attempt_to_finished": 100.46219825744629,
+        "started_to_finished": 208.4040641784668,
+        "created_to_finished": 227.5688648223877
+      }
+    },
+    {
+      "id": "notes_key_enter_20261102_2337",
+      "principal": "chatgpt",
+      "operation": "keyboard.control",
+      "state": "completed",
+      "created": 1793658963.810233,
+      "accepted": 1793658963.813322,
+      "started": 1793658963.824192,
+      "finished": 1793658964.054018,
+      "has_error": false,
+      "events": [
+        {
+          "seq": 37102,
+          "at": 1793658963.810233,
+          "state": "created"
+        },
+        {
+          "seq": 37103,
+          "at": 1793658963.810233,
+          "state": "queued"
+        },
+        {
+          "seq": 37104,
+          "at": 1793658963.813322,
+          "state": "accepted"
+        },
+        {
+          "seq": 37105,
+          "at": 1793658963.824192,
+          "state": "running",
+          "evidence_type": "automatic_keyboard_resolution"
+        },
+        {
+          "seq": 37106,
+          "at": 1793658963.909512,
+          "state": "running",
+          "evidence_type": "automatic_keyboard_target_bound"
+        },
+        {
+          "seq": 37107,
+          "at": 1793658963.910474,
+          "state": "running",
+          "evidence_type": "native_keyboard_attempt"
+        },
+        {
+          "seq": 37108,
+          "at": 1793658964.054018,
+          "state": "completed"
+        }
+      ],
+      "receipt": {
+        "automatic_retry": false,
+        "app_processing_confirmed": false,
+        "post_calls_returned": 2
+      },
+      "completion_notices": [
+        {
+          "created": 1793658964.057857,
+          "delivered": null,
+          "acknowledged": null
+        }
+      ],
+      "durations_ms": {
+        "created_to_accepted": 3.0889511108398438,
+        "accepted_to_started": 10.869979858398438,
+        "started_to_target_bound": 85.31999588012695,
+        "target_bound_to_native_attempt": 0.9620189666748047,
+        "native_attempt_to_finished": 143.54395866394043,
+        "started_to_finished": 229.8259735107422,
+        "created_to_finished": 243.78490447998047
+      }
+    },
+    {
+      "id": "notes_key_backspace_20261102_2338",
+      "principal": "chatgpt",
+      "operation": "keyboard.control",
+      "state": "completed",
+      "created": 1793659004.425267,
+      "accepted": 1793659004.4327471,
+      "started": 1793659004.4433842,
+      "finished": 1793659004.667588,
+      "has_error": false,
+      "events": [
+        {
+          "seq": 37109,
+          "at": 1793659004.425267,
+          "state": "created"
+        },
+        {
+          "seq": 37110,
+          "at": 1793659004.425267,
+          "state": "queued"
+        },
+        {
+          "seq": 37111,
+          "at": 1793659004.4327471,
+          "state": "accepted"
+        },
+        {
+          "seq": 37112,
+          "at": 1793659004.4433842,
+          "state": "running",
+          "evidence_type": "automatic_keyboard_resolution"
+        },
+        {
+          "seq": 37113,
+          "at": 1793659004.547549,
+          "state": "running",
+          "evidence_type": "automatic_keyboard_target_bound"
+        },
+        {
+          "seq": 37114,
+          "at": 1793659004.564037,
+          "state": "running",
+          "evidence_type": "native_keyboard_attempt"
+        },
+        {
+          "seq": 37115,
+          "at": 1793659004.667588,
+          "state": "completed"
+        }
+      ],
+      "receipt": {
+        "automatic_retry": false,
+        "app_processing_confirmed": false,
+        "post_calls_returned": 2
+      },
+      "completion_notices": [
+        {
+          "created": 1793659004.671891,
+          "delivered": null,
+          "acknowledged": null
+        }
+      ],
+      "durations_ms": {
+        "created_to_accepted": 7.480144500732422,
+        "accepted_to_started": 10.637044906616211,
+        "started_to_target_bound": 104.16483879089355,
+        "target_bound_to_native_attempt": 16.488075256347656,
+        "native_attempt_to_finished": 103.55091094970703,
+        "started_to_finished": 224.20382499694824,
+        "created_to_finished": 242.32101440429688
+      }
+    }
+  ],
+  "historical_connection_diagnostics": {
+    "records": 19902,
+    "last_at": 1793409104.549518
+  },
+  "limits": [
+    "Task persistence follows MCP ingress and precedes returned tool response.",
+    "Between-task gaps include transport return, orchestration and next ingress.",
+    "Native posting receipts do not prove application consumption.",
+    "No inference about absent pre-admission requests from missing tasks.",
+    "Undelivered completion notices do not imply missing synchronous tool responses.",
+    "The platform tool-call-limit error is user-reported, not measured by this export."
+  ]
+}

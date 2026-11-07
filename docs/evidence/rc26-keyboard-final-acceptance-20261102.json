@@ -1,0 +1,270 @@
+{
+  "schema": "kirabridge.macos-keyboard.final-acceptance.v1",
+  "recorded_at": "2026-11-02T21:42:37.768756+00:00",
+  "version": "0.8.0rc26",
+  "code_commit": "34f5e6da7d7232407c20ca98afd168021e7804ce",
+  "release_tag": "v0.8.0rc26",
+  "release_url": "https://github.com/landjunge/KiraBridge/releases/tag/v0.8.0rc26",
+  "host": {
+    "model": "iMac17,1",
+    "architecture": "x86_64",
+    "macos": "15.7.4",
+    "display": "built-in Retina 5K"
+  },
+  "pins": {
+    "installer_zip_sha256": "51b066d2fa3abe38ce47f49aaed32e079b8646995bd06e46f2dc0b2637d37885",
+    "native_binary_sha256": "5ef3c6a1fcba528af1f0d0a28c371f7e347e9c2d8eadcf9e553cb5a53db4ace4",
+    "python_source_sha256": "301c80d46734797f2b9e21503f6919855482275a4ba12ee1700f8d4e0712087a",
+    "runtime_python_files": 159
+  },
+  "verification": {
+    "local_intel_build": true,
+    "package_git_wheel_native_comparison": true,
+    "official_release_smoke": true,
+    "isolated_macos_upgrade_data_preservation_idempotence_restart_crash_rollback_fresh_install": true,
+    "optional_open_completion_read_tested": false,
+    "installer_zip_signature_member_mode_comparison": true,
+    "github_download_hash_match": true,
+    "installed_runtime_native_http_assets_match": true,
+    "required_worker_permissions_present": true,
+    "resumed_connector_health_same_core_instance": true,
+    "github_actions_used": false
+  },
+  "actual_chatgpt_apps_tasks": [
+    {
+      "id": "rc26-prod-control-left-auto-20261102",
+      "operation": "keyboard.control",
+      "state": "completed",
+      "principal": "chatgpt",
+      "native_source_commit": "34f5e6da7d7232407c20ca98afd168021e7804ce",
+      "native_operation": "keyboard.system_key",
+      "post_calls_returned": 3,
+      "requested_repeat": 1,
+      "completed_repeat": 1,
+      "system_processing_confirmed": false,
+      "resolved_system_action": "space_left"
+    },
+    {
+      "id": "rc26-prod-control-right-auto-20261102",
+      "operation": "keyboard.control",
+      "state": "completed",
+      "principal": "chatgpt",
+      "native_source_commit": "34f5e6da7d7232407c20ca98afd168021e7804ce",
+      "native_operation": "keyboard.system_key",
+      "post_calls_returned": 3,
+      "requested_repeat": 1,
+      "completed_repeat": 1,
+      "system_processing_confirmed": false,
+      "resolved_system_action": "space_right"
+    },
+    {
+      "id": "rc26-prod-empty-note-inspect-20261102",
+      "operation": "keyboard.inspect",
+      "state": "completed",
+      "principal": "chatgpt",
+      "native_source_commit": "34f5e6da7d7232407c20ca98afd168021e7804ce"
+    },
+    {
+      "id": "rc26-prod-empty-note-text-20261102",
+      "operation": "keyboard.control",
+      "state": "completed",
+      "principal": "chatgpt",
+      "native_source_commit": "34f5e6da7d7232407c20ca98afd168021e7804ce",
+      "native_operation": "keyboard.text",
+      "post_calls_returned": 0,
+      "text_verified": true,
+      "selection_verified": true,
+      "insertion_method": "ax_selected_text"
+    },
+    {
+      "id": "rc26-prod-final-inventory-20261102",
+      "operation": "keyboard.system_inventory",
+      "state": "completed",
+      "principal": "chatgpt",
+      "native_source_commit": "34f5e6da7d7232407c20ca98afd168021e7804ce",
+      "system_processing_confirmed": false
+    },
+    {
+      "id": "rc26-prod-inventory-20261102",
+      "operation": "keyboard.system_inventory",
+      "state": "completed",
+      "principal": "chatgpt",
+      "native_source_commit": "34f5e6da7d7232407c20ca98afd168021e7804ce",
+      "system_processing_confirmed": false
+    },
+    {
+      "id": "rc26-prod-notes-return-inspect-20261102",
+      "operation": "keyboard.inspect",
+      "state": "completed",
+      "principal": "chatgpt",
+      "native_source_commit": "34f5e6da7d7232407c20ca98afd168021e7804ce"
+    },
+    {
+      "id": "rc26-prod-notes-return2-20261102",
+      "operation": "keyboard.control",
+      "state": "completed",
+      "principal": "chatgpt",
+      "native_source_commit": "34f5e6da7d7232407c20ca98afd168021e7804ce",
+      "native_operation": "keyboard.key",
+      "post_calls_returned": 4,
+      "requested_repeat": 2,
+      "completed_repeat": 2
+    },
+    {
+      "id": "rc26-prod-notes-unicode-20261102",
+      "operation": "keyboard.control",
+      "state": "completed",
+      "principal": "chatgpt",
+      "native_source_commit": "34f5e6da7d7232407c20ca98afd168021e7804ce",
+      "native_operation": "keyboard.text",
+      "post_calls_returned": 0,
+      "text_verified": true,
+      "selection_verified": true,
+      "insertion_method": "ax_selected_text"
+    },
+    {
+      "id": "rc26-prod-permissions-20261102",
+      "operation": "system.permissions",
+      "state": "completed",
+      "principal": "chatgpt",
+      "native_source_commit": "34f5e6da7d7232407c20ca98afd168021e7804ce"
+    },
+    {
+      "id": "rc26-prod-volume-restore-20261102",
+      "operation": "keyboard.control",
+      "state": "completed",
+      "principal": "chatgpt",
+      "native_source_commit": "34f5e6da7d7232407c20ca98afd168021e7804ce",
+      "native_operation": "keyboard.system_key",
+      "post_calls_returned": 2,
+      "requested_repeat": 1,
+      "completed_repeat": 1,
+      "system_processing_confirmed": false,
+      "resolved_system_action": "volume_down"
+    },
+    {
+      "id": "rc26-prod-volume-up-20261102",
+      "operation": "keyboard.control",
+      "state": "completed",
+      "principal": "chatgpt",
+      "native_source_commit": "34f5e6da7d7232407c20ca98afd168021e7804ce",
+      "native_operation": "keyboard.system_key",
+      "post_calls_returned": 2,
+      "requested_repeat": 1,
+      "completed_repeat": 1,
+      "system_processing_confirmed": false,
+      "resolved_system_action": "volume_up"
+    },
+    {
+      "id": "rc26-prod-volume-up-read-20261102",
+      "operation": "keyboard.system_inventory",
+      "state": "completed",
+      "principal": "chatgpt",
+      "native_source_commit": "34f5e6da7d7232407c20ca98afd168021e7804ce",
+      "system_processing_confirmed": false
+    }
+  ],
+  "permission_checks": [
+    {
+      "resource": "accessibility",
+      "state": "granted",
+      "required_for_keyboard": true
+    },
+    {
+      "resource": "post_events",
+      "state": "granted",
+      "required_for_keyboard": true
+    },
+    {
+      "resource": "input_monitoring",
+      "state": "granted",
+      "required_for_keyboard": false
+    },
+    {
+      "resource": "screen_capture",
+      "state": "granted",
+      "required_for_keyboard": false
+    },
+    {
+      "resource": "automation",
+      "state": "not_required",
+      "required_for_keyboard": false
+    }
+  ],
+  "practical_results": {
+    "named_keys": {
+      "received": 54,
+      "expected": 54,
+      "scope": "own receiver during development; key map retained; later affected paths checked separately"
+    },
+    "key_repetition": {
+      "down_events": 20,
+      "up_events": 20
+    },
+    "all_five_modifiers": {
+      "key": "f20",
+      "repeat": 2,
+      "down_events": 2,
+      "up_events": 2,
+      "received_modifier_mask": 10354688
+    },
+    "notes": {
+      "existing_owned_note_unicode_insertions": 1,
+      "previously_blank_owned_note_unicode_insertions": 1,
+      "return_repeat": 2,
+      "return_post_calls": 4,
+      "caret_before": 22,
+      "caret_after": 24,
+      "after_value_utf16_units": 25
+    },
+    "visual_system_checks": [
+      "app_next",
+      "app_previous",
+      "independent_window_next",
+      "space_right",
+      "space_left",
+      "mission_control_open_close",
+      "application_windows_open_close",
+      "spotlight_open_escape_close",
+      "show_desktop_open_close"
+    ],
+    "system_effect_scope": "Visual/readback checks were separate controlled desktop tests; completed productive system-key receipts alone confirm dispatch, not processing or a Space ID.",
+    "volume": {
+      "baseline_each_channel": 0.2543666958808899,
+      "normal_step": 0.3097164034843445,
+      "fine_step": 0.2632136046886444,
+      "restored_channels": [
+        0.2543666958808899,
+        0.2543666958808899
+      ],
+      "readback_scope": "later separate inventory calls"
+    },
+    "brightness": {
+      "baseline": 0.37500572204589844,
+      "normal_step": 0.43750667572021484,
+      "fine_step": 0.39063096046447754,
+      "restored": 0.37500572204589844
+    },
+    "mute_restored": true,
+    "caps_lock_restored": true,
+    "caps_shift_matches_active_macos_layout": true
+  },
+  "preservation": {
+    "private_config_credential_profile_hashes_unchanged": 6,
+    "original_codex_process_identities_unchanged": true,
+    "owned_install_window_absent_twice": true,
+    "all_other_observed_terminal_windows_preserved": true,
+    "only_two_owned_test_notes_deleted": true,
+    "private_test_workers_closed": true
+  },
+  "limits": [
+    "Media playback effects were not tested because Brave had active audio output; the prepared media receiver was not activated.",
+    "Keyboard illumination, eject, mirror, contrast and unknown registered shortcut effects remain hardware/configuration dependent and are not claimed successful.",
+    "Touch ID, power, secure attention and a standalone physical Globe/Fn identity are not emulated.",
+    "Secure fields, ambiguous focus and held user keys remain guarded.",
+    "Public Space notification count stayed zero; it was not used as success evidence; no private Space API.",
+    "No additional complete Mac reboot or separate manual Web/Mobile/Voice UI delivery test claimed.",
+    "Ad-hoc signatures; no Apple notarization."
+  ],
+  "privacy": "Allowlisted summary only. No credentials or credential hashes, native target tokens, Notes identifiers/content, private device IDs/serials/UUIDs or desktop screenshots exported."
+}

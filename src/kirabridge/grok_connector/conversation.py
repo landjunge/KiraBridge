@@ -48,15 +48,28 @@ def confirmed_input_reply(bridge, principal, task, result):
     )
 
 
-async def result_for_conversation(bridge, principal, task):
+async def result_for_conversation(bridge, principal, task, *, wait_seconds=None):
     """An authenticated tool response is not evidence of audio playback."""
     if not enabled_for(bridge, principal) or "id" not in task:
         return task
+    if (task.get("delivery") or {}).get("status") == "not_admitted":
+        return {
+            **task,
+            "conversation_return": {
+                "text": "Dieser gespeicherte Auftrag hat keinen aktiven Zustellversuch. "
+                "Zustand abgleichen; historische Arbeit nicht erneut starten.",
+                "final": True,
+                "continue_required": False,
+                "next_call": None,
+                "scope": "stored_native_delivery_not_admitted",
+            },
+        }
     # Re-read through the normal owner/permission check, including on reconnect.
     task = bridge.task(principal, task["id"])
-    if task["state"] in ACTIVE:
+    timeout = WAIT_SECONDS if wait_seconds is None else min(WAIT_SECONDS, max(0, wait_seconds))
+    if task["state"] in ACTIVE and timeout > 0:
         try:
-            await bridge.tasks.wait(principal, task["id"], timeout=WAIT_SECONDS)
+            await bridge.tasks.wait(principal, task["id"], timeout=timeout)
         except TimeoutError:
             pass
         task = bridge.task(principal, task["id"])
@@ -168,6 +181,18 @@ async def message_for_conversation(bridge, principal, message):
     """Keep an addressed agent's answer on the requesting Grok voice turn."""
     if not enabled_for(bridge, principal) or "id" not in message:
         return message
+    if (message.get("delivery") or {}).get("status") == "not_admitted":
+        return {
+            **message,
+            "conversation_return": {
+                "text": "Diese gespeicherte Nachricht hat keinen aktiven Zustellversuch. "
+                "Originalzustand abgleichen; nicht erneut senden.",
+                "final": True,
+                "continue_required": False,
+                "next_call": None,
+                "scope": "stored_visible_delivery_not_admitted",
+            },
+        }
     if message.get("transport") == "team":
         return message
     buffer = message.get("message_buffer")

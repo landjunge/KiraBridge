@@ -1,0 +1,81 @@
+{
+  "schema": "kirabridge.rc32.independent-package-review.v1",
+  "observed_at_utc": "2026-11-03T21:19:23.447882+00:00",
+  "scope": "Read-only package manifests, exact Git/wheel bytes, native binary/signature inspection. No rebuild, tests, UI input, native worker or productive installation.",
+  "source_commit": "300df69ec55d236ef1059d1b146a0ff89c2f003c",
+  "version": "0.8.0rc32",
+  "artifacts_directory": "/Users/landjunge/Downloads/KiraBridge-RC32-Intel-300df69",
+  "inspection_directory": "/tmp/kirabridge-rc32-package-audit-p63g3bmi",
+  "tar": {
+    "members": 578,
+    "manifest_hashes_checked": 577,
+    "all_manifest_hashes_match": true,
+    "unsafe_or_duplicate_members": false,
+    "platforms": [
+      "Darwin-x86_64"
+    ],
+    "sha256": "0f282cf779e0c20334a6db11c4ec89dd6afde9f0dbe23215caf07a198d278f2c"
+  },
+  "python": {
+    "git_sources": 166,
+    "tar_sources": 166,
+    "wheel_sources": 166,
+    "all_source_bytes_match_git_and_wheel": true,
+    "bundled_wheel_matches_standalone": true,
+    "wheel_sha256": "9157cc3ccc2bd98cbe324907dddd9d6b5dde0bba2348a5fda55e8d626708e8dd"
+  },
+  "native": {
+    "files_checked": 3,
+    "architecture": "x86_64",
+    "codesign_deep_strict_verified": true,
+    "source_pin": "300df69ec55d236ef1059d1b146a0ff89c2f003c",
+    "version": "0.8.0rc32",
+    "binary_sha256": "1e21056edd01d73e16edb5fb9e3925cb659b027dc9ce8bdc1b7917ddd8dd1ad4",
+    "compiled_batch_and_tree_symbols": {
+      "inspectTree": true,
+      "observedTree": true,
+      "treeBatchAttributes": true,
+      "observedBatchedTreeSummary": true,
+      "individualTreeSummary": true
+    },
+    "feature_scope": "Static compiled implementation symbols. Prior recorded tests and owned-AX timing establish behavior; no new native UI test in package review."
+  },
+  "release_note_from_exact_git": true,
+  "sidecar_checksums": {
+    "kirabridge-0.8.0rc32-py3-none-any.whl.sha256": true,
+    "install-macos.sh.sha256": true,
+    "KiraBridge-macos.tar.gz.sha256": true
+  },
+  "root_sha256sums_valid": true,
+  "linux_or_arm_artifacts": [],
+  "installer": {
+    "manifest_files_checked": 579,
+    "all_manifest_hashes_match": true,
+    "runtime_files_byte_identical_to_tar": 578,
+    "manifest_digest_matches_signed_plist": true,
+    "architecture": "x86_64",
+    "codesign_deep_strict_verified": true,
+    "source_pin": "300df69ec55d236ef1059d1b146a0ff89c2f003c",
+    "version": "0.8.0rc32",
+    "verify_package": {
+      "file_count": 579,
+      "installation_performed": false,
+      "signing": "ad-hoc",
+      "source_commit": "300df69ec55d236ef1059d1b146a0ff89c2f003c",
+      "verified": true,
+      "version": "0.8.0rc32"
+    }
+  },
+  "installer_zip": {
+    "bytes": 3459081,
+    "sha256": "9dc2d582f3a8075a06d8a84ae36e6fbf1da2075a0fa308a7ebb84e04acbf72c3",
+    "entries": 643,
+    "files_checked": 583,
+    "all_zipped_files_and_modes_match_signed_installer": true,
+    "crc_valid": true,
+    "unsafe_duplicate_or_symlink_paths": false
+  },
+  "completed_at_utc": "2026-11-03T21:21:10.874978+00:00",
+  "passed": true,
+  "productive_installation_performed": false
+}

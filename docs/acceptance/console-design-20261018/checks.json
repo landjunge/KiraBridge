@@ -1,0 +1,23 @@
+{
+  "status": "passed",
+  "browser": "155.0.8059.85",
+  "checks": [
+    "real synthetic approve/deny with exact request hash",
+    "stale decision conflict",
+    "lost POST response never repeated",
+    "HTML arguments rendered as inert text",
+    "no dispatcher/agent/clipboard/file execution",
+    "unknown future operation/fields remain inert text",
+    "dark: authenticated DE/EN, modes, state scope, small view, focus, reduced motion",
+    "light: authenticated DE/EN, modes, state scope, small view, focus, reduced motion"
+  ],
+  "page_errors": [],
+  "scope": "isolated console with synthetic recorded task-state fixtures; no real agent completion or live runtime acceptance",
+  "assets": {
+    "index.html": "ce239f690851d24f6737ec3a1f0949f2f0ead7d19ba2d279dd7c3d5ecd9fe96a",
+    "login.js": "ee895c6ad55434218bb22c8ce4e3c9db117e2d17cdd6896016a6e77aedfcc926",
+    "style.css": "edea854edb143a502c9182133d104d2869ebfd678547520086d790fd9f55b47e",
+    "networkpunkt.css": "98371bd9edc96fb940a0e0de34933740fed1062b510aa516498fcb53e112591e",
+    "app.js": "5274df0e660164ad1b913d257b352c3613e9d92e6e5e0edfb00c887c274853c4"
+  }
+}

@@ -17,6 +17,20 @@ def level_for(policy: PrincipalConfig) -> str:
     return "full" if policy.allow_any_executable and "/" in policy.roots else "medium"
 
 
+def direct_terminal_required(config, principal):
+    policy = config.principals.get(principal)
+    return principal == "chatgpt" or bool(policy and policy.client_type == "chatgpt")
+
+
+def visible_execution(config, principal, operation, *, background=False):
+    """ChatGPT commands stay visible unless the caller explicitly asks for a background process."""
+    if operation == "terminal.execute" and background:
+        return False
+    return operation == "terminal.visible" or (
+        operation == "terminal.execute" and direct_terminal_required(config, principal)
+    )
+
+
 def automatic_for(policy: PrincipalConfig, operation: str) -> bool:
     if operation in policy.automatic_operations:
         return True
@@ -32,6 +46,7 @@ def permission_revision(config):
     """Explicit authorization whitelist; never serialize credentials in status paths."""
     fields = (
         "capabilities",
+        "client_type",
         "permission_level",
         "approval_mode",
         "automatic_operations",
@@ -68,8 +83,31 @@ def decision(config, principal, operation, *, text=None):
     """
     policy = config.principals.get(principal)
     required = {capability_for(operation)}
-    if operation == "session.input":
-        required.update({"session.inspect", "terminal.execute"})
+    if operation in {
+        "windows.keyboard.sequence",
+        "windows.keyboard.shortcut",
+        "windows.keyboard.text",
+    }:
+        required.add("windows.keyboard.inspect")
+    if operation == "windows.window.control":
+        required.add("windows.window.list")
+    if operation in {"windows.app.launch", "windows.app.focus"}:
+        required.add("windows.app.list")
+    if operation == "windows.app.focus":
+        required.add("windows.window.control")
+    if operation == "windows.console.handoff":
+        required.add("windows.console.status")
+    if operation in {"keyboard.control", "keyboard.sequence"}:
+        required.update({"keyboard.inspect", "apps.list", "app.focus"})
+    if operation == "keyboard.action":
+        required.add("keyboard.profiles.read")
+    if operation in {"session.input", "terminal.visible"} or (
+        operation in {"terminal.execute", "admin.execute"}
+        and direct_terminal_required(config, principal)
+    ):
+        required.update({"session.inspect", "session.input", "terminal.execute"})
+    if operation == "session.open":
+        required.add("terminal.execute")
     missing = sorted(required - set(policy.capabilities if policy else []))
     exception = bool(policy and operation in policy.automatic_operations)
     gate = config.session_input_policy

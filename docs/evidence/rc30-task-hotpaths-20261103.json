@@ -1,0 +1,554 @@
+{
+  "scope": "Synthetic temporary SQLite/OutputHistory, no production state, native helper, worker, network or UI; direct Python handler excludes wire serialization and Cloud latency.",
+  "baseline": "adf69e0 source / RC29 observer implementation",
+  "percentiles": "30 calls per arm and case; P50 median, P95 nearest rank",
+  "cpu_scope": "process_time_ns includes observer, synthetic completion UPDATE and identical SQLite trace callback overhead; other processes excluded",
+  "poll_policy_after": "at most ten 5ms state-only checks anchored to monotonic start, then anchored 50ms ticks; elapsed ticks skipped after scheduling stalls",
+  "control": "Already completed submit record remains one output resolution; timing variation is not claimed as an optimization.",
+  "unknown_limit": "Existing Bridge.task failure/unknown diagnostics can resolve output again internally; kept unchanged.",
+  "provenance": {
+    "output_before": "/tmp/rc30-task-observation-before.json",
+    "output_after": "/tmp/rc30-task-observation-after.json",
+    "poll_before": "/tmp/rc30-task-poll-before.json",
+    "poll_after": "/tmp/rc30-task-poll-after.json"
+  },
+  "output_cases": [
+    {
+      "path": "chatgpt_task_get_completed",
+      "payload_bytes": 32768,
+      "before": {
+        "path": "chatgpt_task_get_completed",
+        "payload_bytes": 32768,
+        "timings": {
+          "n": 30,
+          "p50_ms": 0.8911990000000001,
+          "p95_ms": 1.081289,
+          "min_ms": 0.877262,
+          "max_ms": 3.746798
+        },
+        "output_resolutions_per_call": [
+          4
+        ],
+        "resolver_timings": {
+          "n": 30,
+          "p50_ms": 0.6180950000000001,
+          "p95_ms": 0.685415,
+          "min_ms": 0.612088,
+          "max_ms": 0.701367
+        }
+      },
+      "after": {
+        "path": "chatgpt_task_get_completed",
+        "payload_bytes": 32768,
+        "timings": {
+          "n": 30,
+          "p50_ms": 0.27370700000000003,
+          "p95_ms": 0.543004,
+          "min_ms": 0.225185,
+          "max_ms": 1.04013
+        },
+        "output_resolutions_per_call": [
+          1
+        ],
+        "resolver_timings": {
+          "n": 30,
+          "p50_ms": 0.17265,
+          "p95_ms": 0.315811,
+          "min_ms": 0.146937,
+          "max_ms": 0.383857
+        }
+      }
+    },
+    {
+      "path": "task_observe_completed",
+      "payload_bytes": 32768,
+      "before": {
+        "path": "task_observe_completed",
+        "payload_bytes": 32768,
+        "timings": {
+          "n": 30,
+          "p50_ms": 0.6648080000000001,
+          "p95_ms": 0.774418,
+          "min_ms": 0.653938,
+          "max_ms": 0.777985
+        },
+        "output_resolutions_per_call": [
+          3
+        ],
+        "resolver_timings": {
+          "n": 30,
+          "p50_ms": 0.4588935,
+          "p95_ms": 0.524636,
+          "min_ms": 0.45587099999999997,
+          "max_ms": 0.535358
+        }
+      },
+      "after": {
+        "path": "task_observe_completed",
+        "payload_bytes": 32768,
+        "timings": {
+          "n": 30,
+          "p50_ms": 0.29298650000000004,
+          "p95_ms": 0.788565,
+          "min_ms": 0.253573,
+          "max_ms": 1.371367
+        },
+        "output_resolutions_per_call": [
+          1
+        ],
+        "resolver_timings": {
+          "n": 30,
+          "p50_ms": 0.16495949999999998,
+          "p95_ms": 0.63774,
+          "min_ms": 0.146873,
+          "max_ms": 1.217467
+        }
+      }
+    },
+    {
+      "path": "submitted_completed_record",
+      "payload_bytes": 32768,
+      "before": {
+        "path": "submitted_completed_record",
+        "payload_bytes": 32768,
+        "timings": {
+          "n": 30,
+          "p50_ms": 0.2131785,
+          "p95_ms": 0.22003,
+          "min_ms": 0.210921,
+          "max_ms": 0.22467
+        },
+        "output_resolutions_per_call": [
+          1
+        ],
+        "resolver_timings": {
+          "n": 30,
+          "p50_ms": 0.1554295,
+          "p95_ms": 0.156636,
+          "min_ms": 0.154629,
+          "max_ms": 0.158512
+        }
+      },
+      "after": {
+        "path": "submitted_completed_record",
+        "payload_bytes": 32768,
+        "timings": {
+          "n": 30,
+          "p50_ms": 0.22251500000000002,
+          "p95_ms": 0.376105,
+          "min_ms": 0.215682,
+          "max_ms": 3.332346
+        },
+        "output_resolutions_per_call": [
+          1
+        ],
+        "resolver_timings": {
+          "n": 30,
+          "p50_ms": 0.151834,
+          "p95_ms": 0.272113,
+          "min_ms": 0.149191,
+          "max_ms": 3.225136
+        }
+      }
+    },
+    {
+      "path": "chatgpt_task_get_completed",
+      "payload_bytes": 4194304,
+      "before": {
+        "path": "chatgpt_task_get_completed",
+        "payload_bytes": 4194304,
+        "timings": {
+          "n": 30,
+          "p50_ms": 103.2291905,
+          "p95_ms": 142.205449,
+          "min_ms": 82.928688,
+          "max_ms": 175.708294
+        },
+        "output_resolutions_per_call": [
+          4
+        ],
+        "resolver_timings": {
+          "n": 30,
+          "p50_ms": 99.7638025,
+          "p95_ms": 138.849289,
+          "min_ms": 80.387837,
+          "max_ms": 172.22471
+        }
+      },
+      "after": {
+        "path": "chatgpt_task_get_completed",
+        "payload_bytes": 4194304,
+        "timings": {
+          "n": 30,
+          "p50_ms": 23.0273235,
+          "p95_ms": 28.443094,
+          "min_ms": 20.800474,
+          "max_ms": 33.520816
+        },
+        "output_resolutions_per_call": [
+          1
+        ],
+        "resolver_timings": {
+          "n": 30,
+          "p50_ms": 22.280044,
+          "p95_ms": 27.809557,
+          "min_ms": 20.300868,
+          "max_ms": 32.560588
+        }
+      }
+    },
+    {
+      "path": "task_observe_completed",
+      "payload_bytes": 4194304,
+      "before": {
+        "path": "task_observe_completed",
+        "payload_bytes": 4194304,
+        "timings": {
+          "n": 30,
+          "p50_ms": 63.738496,
+          "p95_ms": 69.06451,
+          "min_ms": 60.360927,
+          "max_ms": 69.546552
+        },
+        "output_resolutions_per_call": [
+          3
+        ],
+        "resolver_timings": {
+          "n": 30,
+          "p50_ms": 61.344931,
+          "p95_ms": 66.287702,
+          "min_ms": 58.623867,
+          "max_ms": 67.542753
+        }
+      },
+      "after": {
+        "path": "task_observe_completed",
+        "payload_bytes": 4194304,
+        "timings": {
+          "n": 30,
+          "p50_ms": 24.3182765,
+          "p95_ms": 33.68012,
+          "min_ms": 20.883019,
+          "max_ms": 54.96206
+        },
+        "output_resolutions_per_call": [
+          1
+        ],
+        "resolver_timings": {
+          "n": 30,
+          "p50_ms": 22.8140115,
+          "p95_ms": 31.690426,
+          "min_ms": 20.391664,
+          "max_ms": 54.226963
+        }
+      }
+    },
+    {
+      "path": "submitted_completed_record",
+      "payload_bytes": 4194304,
+      "before": {
+        "path": "submitted_completed_record",
+        "payload_bytes": 4194304,
+        "timings": {
+          "n": 30,
+          "p50_ms": 24.1195475,
+          "p95_ms": 51.453761,
+          "min_ms": 20.656312,
+          "max_ms": 59.543679
+        },
+        "output_resolutions_per_call": [
+          1
+        ],
+        "resolver_timings": {
+          "n": 30,
+          "p50_ms": 23.237197000000002,
+          "p95_ms": 45.345135,
+          "min_ms": 20.08906,
+          "max_ms": 48.829458
+        }
+      },
+      "after": {
+        "path": "submitted_completed_record",
+        "payload_bytes": 4194304,
+        "timings": {
+          "n": 30,
+          "p50_ms": 22.015447,
+          "p95_ms": 28.017008,
+          "min_ms": 20.673314,
+          "max_ms": 29.589075
+        },
+        "output_resolutions_per_call": [
+          1
+        ],
+        "resolver_timings": {
+          "n": 30,
+          "p50_ms": 21.3477825,
+          "p95_ms": 27.053453,
+          "min_ms": 20.015911,
+          "max_ms": 28.465448
+        }
+      }
+    }
+  ],
+  "poll_cases": [
+    {
+      "completion_delay_ms": 0,
+      "before": {
+        "path": "completion_after_delay",
+        "completion_delay_ms": 0,
+        "timings": {
+          "n": 30,
+          "p50_ms": 51.440056,
+          "p95_ms": 52.74096,
+          "min_ms": 50.513419,
+          "max_ms": 53.410777
+        },
+        "cpu_timings": {
+          "n": 30,
+          "p50_ms": 1.3735,
+          "p95_ms": 1.562,
+          "min_ms": 0.541,
+          "max_ms": 1.668
+        },
+        "state_only_queries_per_call": [
+          1
+        ],
+        "all_sql_statements_per_call": [
+          12
+        ]
+      },
+      "after": {
+        "path": "completion_after_delay",
+        "completion_delay_ms": 0,
+        "timings": {
+          "n": 30,
+          "p50_ms": 6.219749,
+          "p95_ms": 9.610969,
+          "min_ms": 5.482026,
+          "max_ms": 15.557651
+        },
+        "cpu_timings": {
+          "n": 30,
+          "p50_ms": 1.4024999999999999,
+          "p95_ms": 1.625,
+          "min_ms": 1.283,
+          "max_ms": 1.739
+        },
+        "state_only_queries_per_call": [
+          2
+        ],
+        "all_sql_statements_per_call": [
+          9
+        ]
+      }
+    },
+    {
+      "completion_delay_ms": 5,
+      "before": {
+        "path": "completion_after_delay",
+        "completion_delay_ms": 5,
+        "timings": {
+          "n": 30,
+          "p50_ms": 51.03231649999999,
+          "p95_ms": 53.89846,
+          "min_ms": 50.403184,
+          "max_ms": 54.185685
+        },
+        "cpu_timings": {
+          "n": 30,
+          "p50_ms": 0.6975,
+          "p95_ms": 0.818,
+          "min_ms": 0.625,
+          "max_ms": 0.877
+        },
+        "state_only_queries_per_call": [
+          1
+        ],
+        "all_sql_statements_per_call": [
+          12
+        ]
+      },
+      "after": {
+        "path": "completion_after_delay",
+        "completion_delay_ms": 5,
+        "timings": {
+          "n": 30,
+          "p50_ms": 10.9377445,
+          "p95_ms": 14.16889,
+          "min_ms": 10.345752,
+          "max_ms": 14.997378
+        },
+        "cpu_timings": {
+          "n": 30,
+          "p50_ms": 1.513,
+          "p95_ms": 1.666,
+          "min_ms": 1.448,
+          "max_ms": 1.669
+        },
+        "state_only_queries_per_call": [
+          3
+        ],
+        "all_sql_statements_per_call": [
+          10
+        ]
+      }
+    },
+    {
+      "completion_delay_ms": 16,
+      "before": {
+        "path": "completion_after_delay",
+        "completion_delay_ms": 16,
+        "timings": {
+          "n": 30,
+          "p50_ms": 51.3570145,
+          "p95_ms": 53.842274,
+          "min_ms": 50.4431,
+          "max_ms": 55.443489
+        },
+        "cpu_timings": {
+          "n": 30,
+          "p50_ms": 0.7315,
+          "p95_ms": 0.811,
+          "min_ms": 0.675,
+          "max_ms": 0.834
+        },
+        "state_only_queries_per_call": [
+          1
+        ],
+        "all_sql_statements_per_call": [
+          12
+        ]
+      },
+      "after": {
+        "path": "completion_after_delay",
+        "completion_delay_ms": 16,
+        "timings": {
+          "n": 30,
+          "p50_ms": 21.099671,
+          "p95_ms": 31.524522,
+          "min_ms": 20.267549,
+          "max_ms": 31.58669
+        },
+        "cpu_timings": {
+          "n": 30,
+          "p50_ms": 1.0554999999999999,
+          "p95_ms": 1.94,
+          "min_ms": 0.842,
+          "max_ms": 2.01
+        },
+        "state_only_queries_per_call": [
+          5
+        ],
+        "all_sql_statements_per_call": [
+          12
+        ]
+      }
+    },
+    {
+      "completion_delay_ms": 35,
+      "before": {
+        "path": "completion_after_delay",
+        "completion_delay_ms": 35,
+        "timings": {
+          "n": 30,
+          "p50_ms": 51.459633,
+          "p95_ms": 52.136088,
+          "min_ms": 50.456926,
+          "max_ms": 59.724787
+        },
+        "cpu_timings": {
+          "n": 30,
+          "p50_ms": 0.749,
+          "p95_ms": 0.832,
+          "min_ms": 0.661,
+          "max_ms": 0.864
+        },
+        "state_only_queries_per_call": [
+          1
+        ],
+        "all_sql_statements_per_call": [
+          12
+        ]
+      },
+      "after": {
+        "path": "completion_after_delay",
+        "completion_delay_ms": 35,
+        "timings": {
+          "n": 30,
+          "p50_ms": 40.901165500000005,
+          "p95_ms": 45.403308,
+          "min_ms": 36.083218,
+          "max_ms": 50.488094
+        },
+        "cpu_timings": {
+          "n": 30,
+          "p50_ms": 1.6085,
+          "p95_ms": 1.714,
+          "min_ms": 1.373,
+          "max_ms": 1.735
+        },
+        "state_only_queries_per_call": [
+          8,
+          9
+        ],
+        "all_sql_statements_per_call": [
+          15,
+          16
+        ]
+      }
+    },
+    {
+      "completion_delay_ms": 60,
+      "before": {
+        "path": "completion_after_delay",
+        "completion_delay_ms": 60,
+        "timings": {
+          "n": 30,
+          "p50_ms": 102.144061,
+          "p95_ms": 105.336023,
+          "min_ms": 100.624955,
+          "max_ms": 106.078905
+        },
+        "cpu_timings": {
+          "n": 30,
+          "p50_ms": 0.9245000000000001,
+          "p95_ms": 1.033,
+          "min_ms": 0.804,
+          "max_ms": 1.049
+        },
+        "state_only_queries_per_call": [
+          2
+        ],
+        "all_sql_statements_per_call": [
+          13
+        ]
+      },
+      "after": {
+        "path": "completion_after_delay",
+        "completion_delay_ms": 60,
+        "timings": {
+          "n": 30,
+          "p50_ms": 101.5388695,
+          "p95_ms": 103.44179,
+          "min_ms": 100.368753,
+          "max_ms": 110.088944
+        },
+        "cpu_timings": {
+          "n": 30,
+          "p50_ms": 2.106,
+          "p95_ms": 2.33,
+          "min_ms": 1.932,
+          "max_ms": 2.376
+        },
+        "state_only_queries_per_call": [
+          11,
+          12
+        ],
+        "all_sql_statements_per_call": [
+          18,
+          19
+        ]
+      }
+    }
+  ]
+}

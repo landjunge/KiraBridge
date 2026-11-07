@@ -1,0 +1,86 @@
+{
+  "result": "passed",
+  "steps": [
+    {
+      "name": "native-exact-legacy-unit-migration",
+      "result": "passed",
+      "detail": {
+        "loaded": true,
+        "unit": "/home/daniel/.config/systemd/user/kirabridge-debian-dirktest-20261107.service",
+        "legacy_definition_preserved": true
+      }
+    },
+    {
+      "name": "native-managed-unit-idempotency",
+      "result": "passed",
+      "detail": {
+        "loaded": true,
+        "unit": "/home/daniel/.config/systemd/user/kirabridge-debian-dirktest-20261107.service",
+        "legacy_definition_preserved": true
+      }
+    },
+    {
+      "name": "native-mcp-after-migrated-unit-restart",
+      "result": "passed",
+      "detail": {
+        "version": "0.8.0rc41",
+        "runtime": {
+          "instance_id": "b848b972c0364bbabb5a17059b8fef78",
+          "version": "0.8.0rc41",
+          "pid": 1512624,
+          "started_at": "2026-11-07T12:45:17.783499+00:00",
+          "config_path": "/home/daniel/kb-debian-dirktest-20261107-systemd%dirk/config/config.toml",
+          "config_sha256": "600e01051e285937981ad61825f0bf8d959654ec2746844503ef09311b4d731e",
+          "effective_config_sha256": "7c781d72b094f774e81301da4a99fc7f88dbc68f6e919fbda2166dfdcfe7009d",
+          "source_tree_sha256": "e759610739ba65abc13668ebea9ce7b76321f5c84305b0d04de0d2959b91d561",
+          "source_file_count": 214,
+          "source_package_path": "/home/daniel/kb-debian-dirktest-20261107-systemd%dirk/candidate-runtime/src/kirabridge",
+          "source_scope": "package Python files observed at startup; no remote attestation"
+        },
+        "server": {
+          "role": "linux-server",
+          "gui_parity": false,
+          "mcp_http": "available",
+          "authentication": "bearer",
+          "health": "bridge_health",
+          "service_manager": "systemd-user",
+          "desktop_gui": "unavailable",
+          "macos_terminal_app": "unavailable",
+          "native_keyboard": "unavailable",
+          "clipboard": "unavailable",
+          "clipboard_required_for_server": false
+        },
+        "missing_bearer": 401,
+        "wrong_bearer": 401
+      }
+    },
+    {
+      "name": "native-foreign-unit-preserved",
+      "result": "passed",
+      "detail": {
+        "foreign_unit_preserved": true
+      }
+    },
+    {
+      "name": "native-intervening-edit-preserved",
+      "result": "passed",
+      "detail": {
+        "intervening_definition_preserved": true
+      }
+    },
+    {
+      "name": "cleanup",
+      "result": "passed",
+      "detail": null
+    }
+  ],
+  "source_commit": "428271a806588d95e133ef2b7fa0544b8ff96264",
+  "harness_sha256": "ff4302d15a799805a38a408f2b40073e2ac25a56e21bc05d7aa844ebdee3f223",
+  "configuration_credentials_unchanged": true,
+  "cleanup": {
+    "unit_absent": true,
+    "systemd": "MainPID=0\nLoadState=not-found\nActiveState=inactive\n",
+    "port_unbound": true
+  },
+  "log_sha256": "7bcdfcc3b5dcb63ce283de47cef383a29d9a8d756bf9589b3aa64719ef4151dc"
+}

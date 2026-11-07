@@ -1,0 +1,860 @@
+{
+  "workload": "Stern am",
+  "native_binary_sha256": "d0d762bb11ad8c31951d63ff5d55ad50c97323db7922c94752cfdc328d0d9502",
+  "fixture_template_sha256": "d54d0ce793550cbb01e08b71611ed35a023fff89cf13c1ef8bd90a70a69a4f26",
+  "scope": "Owned receiver, real native key/chord pairs through private loopback MCP+proxy. No clipboard/text route; no Voice/cloud/model timing. Instrumented sync evidence writes included.",
+  "baseline": {
+    "rounds": [
+      {
+        "end_to_end_ms": 1562.06208,
+        "keys": 8,
+        "mode": "single",
+        "native_key_downs": 8,
+        "native_key_ups": 8,
+        "receiver_readback_ms": 51.366805,
+        "round": 0,
+        "rpc_elapsed_ms": 1510.695275,
+        "rpc_samples_ms": [
+          271.87738,
+          166.46076,
+          164.100745,
+          164.956272,
+          164.954218,
+          237.55944,
+          164.123425,
+          165.066602
+        ],
+        "tool_calls": 8,
+        "receiver": {
+          "text_sha256": "51eee786a11585b19c9f7a1e12c07afb9e78fc00727d47edb60d0498da02ebf2",
+          "utf8_bytes": 8,
+          "utf16_units": 8,
+          "selection_utf16": {
+            "length": 0,
+            "location": 8
+          },
+          "return_count": 0,
+          "down_count": 8,
+          "up_count": 8,
+          "event_counts": {
+            "key_down": 8,
+            "key_up": 8
+          },
+          "event_sequence": 16,
+          "event_records_dropped": 0,
+          "clipboard_generation": 15
+        }
+      },
+      {
+        "end_to_end_ms": 1459.766756,
+        "keys": 8,
+        "mode": "single",
+        "native_key_downs": 8,
+        "native_key_ups": 8,
+        "receiver_readback_ms": 50.884926,
+        "round": 1,
+        "rpc_elapsed_ms": 1408.88183,
+        "rpc_samples_ms": [
+          163.25937,
+          165.381426,
+          164.745589,
+          198.184789,
+          214.778426,
+          164.16662,
+          165.010588,
+          162.969285
+        ],
+        "tool_calls": 8,
+        "receiver": {
+          "text_sha256": "51eee786a11585b19c9f7a1e12c07afb9e78fc00727d47edb60d0498da02ebf2",
+          "utf8_bytes": 8,
+          "utf16_units": 8,
+          "selection_utf16": {
+            "length": 0,
+            "location": 8
+          },
+          "return_count": 0,
+          "down_count": 8,
+          "up_count": 8,
+          "event_counts": {
+            "key_down": 8,
+            "key_up": 8
+          },
+          "event_sequence": 32,
+          "event_records_dropped": 0,
+          "clipboard_generation": 15
+        }
+      },
+      {
+        "end_to_end_ms": 1550.916227,
+        "keys": 8,
+        "mode": "single",
+        "native_key_downs": 8,
+        "native_key_ups": 8,
+        "receiver_readback_ms": 51.129637,
+        "round": 2,
+        "rpc_elapsed_ms": 1499.78659,
+        "rpc_samples_ms": [
+          173.330358,
+          250.514031,
+          164.330274,
+          164.53419,
+          215.254409,
+          164.39647,
+          163.60397,
+          194.064678
+        ],
+        "tool_calls": 8,
+        "receiver": {
+          "text_sha256": "51eee786a11585b19c9f7a1e12c07afb9e78fc00727d47edb60d0498da02ebf2",
+          "utf8_bytes": 8,
+          "utf16_units": 8,
+          "selection_utf16": {
+            "length": 0,
+            "location": 8
+          },
+          "return_count": 0,
+          "down_count": 8,
+          "up_count": 8,
+          "event_counts": {
+            "key_down": 8,
+            "key_up": 8
+          },
+          "event_sequence": 48,
+          "event_records_dropped": 0,
+          "clipboard_generation": 15
+        }
+      },
+      {
+        "end_to_end_ms": 1401.650265,
+        "keys": 8,
+        "mode": "single",
+        "native_key_downs": 8,
+        "native_key_ups": 8,
+        "receiver_readback_ms": 52.068518,
+        "round": 3,
+        "rpc_elapsed_ms": 1349.581747,
+        "rpc_samples_ms": [
+          164.877133,
+          162.538248,
+          163.922121,
+          163.758235,
+          163.387795,
+          192.658381,
+          164.537684,
+          163.424188
+        ],
+        "tool_calls": 8,
+        "receiver": {
+          "text_sha256": "51eee786a11585b19c9f7a1e12c07afb9e78fc00727d47edb60d0498da02ebf2",
+          "utf8_bytes": 8,
+          "utf16_units": 8,
+          "selection_utf16": {
+            "length": 0,
+            "location": 8
+          },
+          "return_count": 0,
+          "down_count": 8,
+          "up_count": 8,
+          "event_counts": {
+            "key_down": 8,
+            "key_up": 8
+          },
+          "event_sequence": 64,
+          "event_records_dropped": 0,
+          "clipboard_generation": 15
+        }
+      },
+      {
+        "end_to_end_ms": 1408.722532,
+        "keys": 8,
+        "mode": "single",
+        "native_key_downs": 8,
+        "native_key_ups": 8,
+        "receiver_readback_ms": 51.595084,
+        "round": 4,
+        "rpc_elapsed_ms": 1357.127448,
+        "rpc_samples_ms": [
+          162.905459,
+          164.284308,
+          165.535508,
+          196.728145,
+          164.671337,
+          163.920926,
+          164.915712,
+          163.797259
+        ],
+        "tool_calls": 8,
+        "receiver": {
+          "text_sha256": "51eee786a11585b19c9f7a1e12c07afb9e78fc00727d47edb60d0498da02ebf2",
+          "utf8_bytes": 8,
+          "utf16_units": 8,
+          "selection_utf16": {
+            "length": 0,
+            "location": 8
+          },
+          "return_count": 0,
+          "down_count": 8,
+          "up_count": 8,
+          "event_counts": {
+            "key_down": 8,
+            "key_up": 8
+          },
+          "event_sequence": 80,
+          "event_records_dropped": 0,
+          "clipboard_generation": 15
+        }
+      }
+    ],
+    "round_end_to_end": {
+      "count": 5,
+      "total_ms": 7383.117859999999,
+      "p50_ms": 1459.766756,
+      "p95_ms": 1562.06208,
+      "min_ms": 1401.650265,
+      "max_ms": 1562.06208,
+      "p95_method": "nearest rank ceil(0.95*n); small n is not a population guarantee"
+    },
+    "rpc": {
+      "count": 40,
+      "total_ms": 7073.485753999998,
+      "p50_ms": 164.708463,
+      "p95_ms": 237.55944,
+      "min_ms": 162.538248,
+      "max_ms": 271.87738,
+      "p95_method": "nearest rank ceil(0.95*n); small n is not a population guarantee"
+    },
+    "tool_calls": 40,
+    "native_key_pairs": 40,
+    "native_timings_all_arm_modes": {
+      "apps.inspect": {
+        "count": 1,
+        "total_ms": 5.138628,
+        "p50_ms": 5.138628,
+        "p95_ms": 5.138628,
+        "min_ms": 5.138628,
+        "max_ms": 5.138628,
+        "p95_method": "nearest rank ceil(0.95*n); small n is not a population guarantee"
+      },
+      "keyboard.inspect": {
+        "count": 40,
+        "total_ms": 1913.805951,
+        "p50_ms": 46.761137,
+        "p95_ms": 50.76246,
+        "min_ms": 40.917687,
+        "max_ms": 111.53544,
+        "p95_method": "nearest rank ceil(0.95*n); small n is not a population guarantee"
+      },
+      "keyboard.key": {
+        "count": 35,
+        "total_ms": 2036.554298,
+        "p50_ms": 58.810085,
+        "p95_ms": 62.877012,
+        "min_ms": 52.519237,
+        "max_ms": 63.862508,
+        "p95_method": "nearest rank ceil(0.95*n); small n is not a population guarantee"
+      },
+      "apps.list": {
+        "count": 40,
+        "total_ms": 958.926735,
+        "p50_ms": 24.112360000000002,
+        "p95_ms": 28.583316,
+        "min_ms": 19.962726,
+        "max_ms": 29.059936,
+        "p95_method": "nearest rank ceil(0.95*n); small n is not a population guarantee"
+      },
+      "keyboard.chord": {
+        "count": 5,
+        "total_ms": 327.115134,
+        "p50_ms": 59.900443,
+        "p95_ms": 94.869144,
+        "min_ms": 54.510009,
+        "max_ms": 94.869144,
+        "p95_method": "nearest rank ceil(0.95*n); small n is not a population guarantee"
+      },
+      "app.focus": {
+        "count": 1,
+        "total_ms": 71.740536,
+        "p50_ms": 71.740536,
+        "p95_ms": 71.740536,
+        "min_ms": 71.740536,
+        "max_ms": 71.740536,
+        "p95_method": "nearest rank ceil(0.95*n); small n is not a population guarantee"
+      },
+      "apps.launch": {
+        "count": 1,
+        "total_ms": 396.216082,
+        "p50_ms": 396.216082,
+        "p95_ms": 396.216082,
+        "min_ms": 396.216082,
+        "max_ms": 396.216082,
+        "p95_method": "nearest rank ceil(0.95*n); small n is not a population guarantee"
+      }
+    }
+  },
+  "candidate_single": {
+    "rounds": [
+      {
+        "end_to_end_ms": 1520.093991,
+        "keys": 8,
+        "mode": "single",
+        "native_key_downs": 8,
+        "native_key_ups": 8,
+        "receiver_readback_ms": 51.796568,
+        "round": 0,
+        "rpc_elapsed_ms": 1468.297423,
+        "rpc_samples_ms": [
+          269.8494,
+          164.11401,
+          163.8134,
+          165.169807,
+          164.216292,
+          165.246686,
+          198.843835,
+          165.312995
+        ],
+        "tool_calls": 8,
+        "receiver": {
+          "text_sha256": "51eee786a11585b19c9f7a1e12c07afb9e78fc00727d47edb60d0498da02ebf2",
+          "utf8_bytes": 8,
+          "utf16_units": 8,
+          "selection_utf16": {
+            "length": 0,
+            "location": 8
+          },
+          "return_count": 0,
+          "down_count": 8,
+          "up_count": 8,
+          "event_counts": {
+            "key_down": 8,
+            "key_up": 8
+          },
+          "event_sequence": 16,
+          "event_records_dropped": 0,
+          "clipboard_generation": 15
+        }
+      },
+      {
+        "end_to_end_ms": 1390.996652,
+        "keys": 8,
+        "mode": "single",
+        "native_key_downs": 8,
+        "native_key_ups": 8,
+        "receiver_readback_ms": 51.521441,
+        "round": 1,
+        "rpc_elapsed_ms": 1339.475211,
+        "rpc_samples_ms": [
+          163.876993,
+          163.229183,
+          163.989967,
+          163.489665,
+          164.123892,
+          177.800687,
+          163.844949,
+          167.051967
+        ],
+        "tool_calls": 8,
+        "receiver": {
+          "text_sha256": "51eee786a11585b19c9f7a1e12c07afb9e78fc00727d47edb60d0498da02ebf2",
+          "utf8_bytes": 8,
+          "utf16_units": 8,
+          "selection_utf16": {
+            "length": 0,
+            "location": 8
+          },
+          "return_count": 0,
+          "down_count": 8,
+          "up_count": 8,
+          "event_counts": {
+            "key_down": 8,
+            "key_up": 8
+          },
+          "event_sequence": 64,
+          "event_records_dropped": 0,
+          "clipboard_generation": 15
+        }
+      },
+      {
+        "end_to_end_ms": 1370.178876,
+        "keys": 8,
+        "mode": "single",
+        "native_key_downs": 8,
+        "native_key_ups": 8,
+        "receiver_readback_ms": 51.880274,
+        "round": 2,
+        "rpc_elapsed_ms": 1318.298602,
+        "rpc_samples_ms": [
+          163.704826,
+          163.304575,
+          162.382402,
+          162.657579,
+          164.364241,
+          164.28385,
+          164.23628,
+          162.580151
+        ],
+        "tool_calls": 8,
+        "receiver": {
+          "text_sha256": "51eee786a11585b19c9f7a1e12c07afb9e78fc00727d47edb60d0498da02ebf2",
+          "utf8_bytes": 8,
+          "utf16_units": 8,
+          "selection_utf16": {
+            "length": 0,
+            "location": 8
+          },
+          "return_count": 0,
+          "down_count": 8,
+          "up_count": 8,
+          "event_counts": {
+            "key_down": 8,
+            "key_up": 8
+          },
+          "event_sequence": 80,
+          "event_records_dropped": 0,
+          "clipboard_generation": 15
+        }
+      },
+      {
+        "end_to_end_ms": 1427.87938,
+        "keys": 8,
+        "mode": "single",
+        "native_key_downs": 8,
+        "native_key_ups": 8,
+        "receiver_readback_ms": 103.035313,
+        "round": 3,
+        "rpc_elapsed_ms": 1324.844067,
+        "rpc_samples_ms": [
+          164.326872,
+          166.322421,
+          162.921525,
+          163.582623,
+          165.16293,
+          163.902337,
+          163.379207,
+          164.353395
+        ],
+        "tool_calls": 8,
+        "receiver": {
+          "text_sha256": "51eee786a11585b19c9f7a1e12c07afb9e78fc00727d47edb60d0498da02ebf2",
+          "utf8_bytes": 8,
+          "utf16_units": 8,
+          "selection_utf16": {
+            "length": 0,
+            "location": 8
+          },
+          "return_count": 0,
+          "down_count": 8,
+          "up_count": 8,
+          "event_counts": {
+            "key_down": 8,
+            "key_up": 8
+          },
+          "event_sequence": 128,
+          "event_records_dropped": 0,
+          "clipboard_generation": 15
+        }
+      },
+      {
+        "end_to_end_ms": 1372.750178,
+        "keys": 8,
+        "mode": "single",
+        "native_key_downs": 8,
+        "native_key_ups": 8,
+        "receiver_readback_ms": 51.096814,
+        "round": 4,
+        "rpc_elapsed_ms": 1321.653364,
+        "rpc_samples_ms": [
+          163.672068,
+          162.710051,
+          164.04838,
+          164.139515,
+          164.400476,
+          164.540095,
+          163.674125,
+          164.500602
+        ],
+        "tool_calls": 8,
+        "receiver": {
+          "text_sha256": "51eee786a11585b19c9f7a1e12c07afb9e78fc00727d47edb60d0498da02ebf2",
+          "utf8_bytes": 8,
+          "utf16_units": 8,
+          "selection_utf16": {
+            "length": 0,
+            "location": 8
+          },
+          "return_count": 0,
+          "down_count": 8,
+          "up_count": 8,
+          "event_counts": {
+            "key_down": 8,
+            "key_up": 8
+          },
+          "event_sequence": 144,
+          "event_records_dropped": 0,
+          "clipboard_generation": 15
+        }
+      }
+    ],
+    "round_end_to_end": {
+      "count": 5,
+      "total_ms": 7081.899077,
+      "p50_ms": 1390.996652,
+      "p95_ms": 1520.093991,
+      "min_ms": 1370.178876,
+      "max_ms": 1520.093991,
+      "p95_method": "nearest rank ceil(0.95*n); small n is not a population guarantee"
+    },
+    "rpc": {
+      "count": 40,
+      "total_ms": 6717.124254,
+      "p50_ms": 164.118951,
+      "p95_ms": 177.800687,
+      "min_ms": 162.382402,
+      "max_ms": 269.8494,
+      "p95_method": "nearest rank ceil(0.95*n); small n is not a population guarantee"
+    },
+    "tool_calls": 40,
+    "native_key_pairs": 40,
+    "native_timings_all_arm_modes": {
+      "apps.inspect": {
+        "count": 1,
+        "total_ms": 5.438481,
+        "p50_ms": 5.438481,
+        "p95_ms": 5.438481,
+        "min_ms": 5.438481,
+        "max_ms": 5.438481,
+        "p95_method": "nearest rank ceil(0.95*n); small n is not a population guarantee"
+      },
+      "keyboard.inspect": {
+        "count": 80,
+        "total_ms": 3580.2427940000002,
+        "p50_ms": 43.07763,
+        "p95_ms": 48.66425,
+        "min_ms": 41.301322,
+        "max_ms": 106.132353,
+        "p95_method": "nearest rank ceil(0.95*n); small n is not a population guarantee"
+      },
+      "keyboard.key": {
+        "count": 70,
+        "total_ms": 3859.3466419999995,
+        "p50_ms": 53.858754000000005,
+        "p95_ms": 60.888863,
+        "min_ms": 51.718183,
+        "max_ms": 64.621868,
+        "p95_method": "nearest rank ceil(0.95*n); small n is not a population guarantee"
+      },
+      "apps.list": {
+        "count": 80,
+        "total_ms": 1802.9456550000004,
+        "p50_ms": 22.123897,
+        "p95_ms": 26.103653,
+        "min_ms": 19.713905,
+        "max_ms": 27.996092,
+        "p95_method": "nearest rank ceil(0.95*n); small n is not a population guarantee"
+      },
+      "keyboard.chord": {
+        "count": 10,
+        "total_ms": 590.1797550000001,
+        "p50_ms": 55.9219865,
+        "p95_ms": 91.851438,
+        "min_ms": 51.580096,
+        "max_ms": 91.851438,
+        "p95_method": "nearest rank ceil(0.95*n); small n is not a population guarantee"
+      },
+      "app.focus": {
+        "count": 1,
+        "total_ms": 45.290626,
+        "p50_ms": 45.290626,
+        "p95_ms": 45.290626,
+        "min_ms": 45.290626,
+        "max_ms": 45.290626,
+        "p95_method": "nearest rank ceil(0.95*n); small n is not a population guarantee"
+      },
+      "apps.launch": {
+        "count": 1,
+        "total_ms": 374.699843,
+        "p50_ms": 374.699843,
+        "p95_ms": 374.699843,
+        "min_ms": 374.699843,
+        "max_ms": 374.699843,
+        "p95_method": "nearest rank ceil(0.95*n); small n is not a population guarantee"
+      }
+    }
+  },
+  "candidate_sequence": {
+    "rounds": [
+      {
+        "end_to_end_ms": 1188.898293,
+        "keys": 8,
+        "mode": "sequence",
+        "native_key_downs": 8,
+        "native_key_ups": 8,
+        "receiver_readback_ms": 51.204363,
+        "round": 0,
+        "rpc_elapsed_ms": 1137.69393,
+        "rpc_samples_ms": [
+          1135.205745
+        ],
+        "tool_calls": 1,
+        "receiver": {
+          "text_sha256": "51eee786a11585b19c9f7a1e12c07afb9e78fc00727d47edb60d0498da02ebf2",
+          "utf8_bytes": 8,
+          "utf16_units": 8,
+          "selection_utf16": {
+            "length": 0,
+            "location": 8
+          },
+          "return_count": 0,
+          "down_count": 8,
+          "up_count": 8,
+          "event_counts": {
+            "key_down": 8,
+            "key_up": 8
+          },
+          "event_sequence": 32,
+          "event_records_dropped": 0,
+          "clipboard_generation": 15
+        }
+      },
+      {
+        "end_to_end_ms": 1140.213064,
+        "keys": 8,
+        "mode": "sequence",
+        "native_key_downs": 8,
+        "native_key_ups": 8,
+        "receiver_readback_ms": 51.941427,
+        "round": 1,
+        "rpc_elapsed_ms": 1088.271637,
+        "rpc_samples_ms": [
+          1085.542016
+        ],
+        "tool_calls": 1,
+        "receiver": {
+          "text_sha256": "51eee786a11585b19c9f7a1e12c07afb9e78fc00727d47edb60d0498da02ebf2",
+          "utf8_bytes": 8,
+          "utf16_units": 8,
+          "selection_utf16": {
+            "length": 0,
+            "location": 8
+          },
+          "return_count": 0,
+          "down_count": 8,
+          "up_count": 8,
+          "event_counts": {
+            "key_down": 8,
+            "key_up": 8
+          },
+          "event_sequence": 48,
+          "event_records_dropped": 0,
+          "clipboard_generation": 15
+        }
+      },
+      {
+        "end_to_end_ms": 1090.476561,
+        "keys": 8,
+        "mode": "sequence",
+        "native_key_downs": 8,
+        "native_key_ups": 8,
+        "receiver_readback_ms": 51.713736,
+        "round": 2,
+        "rpc_elapsed_ms": 1038.762825,
+        "rpc_samples_ms": [
+          1036.110135
+        ],
+        "tool_calls": 1,
+        "receiver": {
+          "text_sha256": "51eee786a11585b19c9f7a1e12c07afb9e78fc00727d47edb60d0498da02ebf2",
+          "utf8_bytes": 8,
+          "utf16_units": 8,
+          "selection_utf16": {
+            "length": 0,
+            "location": 8
+          },
+          "return_count": 0,
+          "down_count": 8,
+          "up_count": 8,
+          "event_counts": {
+            "key_down": 8,
+            "key_up": 8
+          },
+          "event_sequence": 96,
+          "event_records_dropped": 0,
+          "clipboard_generation": 15
+        }
+      },
+      {
+        "end_to_end_ms": 1086.348458,
+        "keys": 8,
+        "mode": "sequence",
+        "native_key_downs": 8,
+        "native_key_ups": 8,
+        "receiver_readback_ms": 51.139118,
+        "round": 3,
+        "rpc_elapsed_ms": 1035.20934,
+        "rpc_samples_ms": [
+          1032.528854
+        ],
+        "tool_calls": 1,
+        "receiver": {
+          "text_sha256": "51eee786a11585b19c9f7a1e12c07afb9e78fc00727d47edb60d0498da02ebf2",
+          "utf8_bytes": 8,
+          "utf16_units": 8,
+          "selection_utf16": {
+            "length": 0,
+            "location": 8
+          },
+          "return_count": 0,
+          "down_count": 8,
+          "up_count": 8,
+          "event_counts": {
+            "key_down": 8,
+            "key_up": 8
+          },
+          "event_sequence": 112,
+          "event_records_dropped": 0,
+          "clipboard_generation": 15
+        }
+      },
+      {
+        "end_to_end_ms": 1041.55755,
+        "keys": 8,
+        "mode": "sequence",
+        "native_key_downs": 8,
+        "native_key_ups": 8,
+        "receiver_readback_ms": 51.5565,
+        "round": 4,
+        "rpc_elapsed_ms": 990.00105,
+        "rpc_samples_ms": [
+          987.266124
+        ],
+        "tool_calls": 1,
+        "receiver": {
+          "text_sha256": "51eee786a11585b19c9f7a1e12c07afb9e78fc00727d47edb60d0498da02ebf2",
+          "utf8_bytes": 8,
+          "utf16_units": 8,
+          "selection_utf16": {
+            "length": 0,
+            "location": 8
+          },
+          "return_count": 0,
+          "down_count": 8,
+          "up_count": 8,
+          "event_counts": {
+            "key_down": 8,
+            "key_up": 8
+          },
+          "event_sequence": 160,
+          "event_records_dropped": 0,
+          "clipboard_generation": 15
+        }
+      }
+    ],
+    "round_end_to_end": {
+      "count": 5,
+      "total_ms": 5547.493925999999,
+      "p50_ms": 1090.476561,
+      "p95_ms": 1188.898293,
+      "min_ms": 1041.55755,
+      "max_ms": 1188.898293,
+      "p95_method": "nearest rank ceil(0.95*n); small n is not a population guarantee"
+    },
+    "rpc": {
+      "count": 5,
+      "total_ms": 5276.652873999999,
+      "p50_ms": 1036.110135,
+      "p95_ms": 1135.205745,
+      "min_ms": 987.266124,
+      "max_ms": 1135.205745,
+      "p95_method": "nearest rank ceil(0.95*n); small n is not a population guarantee"
+    },
+    "tool_calls": 5,
+    "native_key_pairs": 40,
+    "native_timings_all_arm_modes": {
+      "apps.inspect": {
+        "count": 1,
+        "total_ms": 5.438481,
+        "p50_ms": 5.438481,
+        "p95_ms": 5.438481,
+        "min_ms": 5.438481,
+        "max_ms": 5.438481,
+        "p95_method": "nearest rank ceil(0.95*n); small n is not a population guarantee"
+      },
+      "keyboard.inspect": {
+        "count": 80,
+        "total_ms": 3580.2427940000002,
+        "p50_ms": 43.07763,
+        "p95_ms": 48.66425,
+        "min_ms": 41.301322,
+        "max_ms": 106.132353,
+        "p95_method": "nearest rank ceil(0.95*n); small n is not a population guarantee"
+      },
+      "keyboard.key": {
+        "count": 70,
+        "total_ms": 3859.3466419999995,
+        "p50_ms": 53.858754000000005,
+        "p95_ms": 60.888863,
+        "min_ms": 51.718183,
+        "max_ms": 64.621868,
+        "p95_method": "nearest rank ceil(0.95*n); small n is not a population guarantee"
+      },
+      "apps.list": {
+        "count": 80,
+        "total_ms": 1802.9456550000004,
+        "p50_ms": 22.123897,
+        "p95_ms": 26.103653,
+        "min_ms": 19.713905,
+        "max_ms": 27.996092,
+        "p95_method": "nearest rank ceil(0.95*n); small n is not a population guarantee"
+      },
+      "keyboard.chord": {
+        "count": 10,
+        "total_ms": 590.1797550000001,
+        "p50_ms": 55.9219865,
+        "p95_ms": 91.851438,
+        "min_ms": 51.580096,
+        "max_ms": 91.851438,
+        "p95_method": "nearest rank ceil(0.95*n); small n is not a population guarantee"
+      },
+      "app.focus": {
+        "count": 1,
+        "total_ms": 45.290626,
+        "p50_ms": 45.290626,
+        "p95_ms": 45.290626,
+        "min_ms": 45.290626,
+        "max_ms": 45.290626,
+        "p95_method": "nearest rank ceil(0.95*n); small n is not a population guarantee"
+      },
+      "apps.launch": {
+        "count": 1,
+        "total_ms": 374.699843,
+        "p50_ms": 374.699843,
+        "p95_ms": 374.699843,
+        "min_ms": 374.699843,
+        "max_ms": 374.699843,
+        "p95_method": "nearest rank ceil(0.95*n); small n is not a population guarantee"
+      }
+    }
+  },
+  "candidate_idempotency_probe": true,
+  "p95_method": "nearest-rank ceil(.95*n); five round samples yield maximum, not a population guarantee",
+  "baseline_harness_outcome": {
+    "key_phase_passed": true,
+    "whole_run_passed": false,
+    "later_failure": "Private readonly policy_inspect grant missing after all five native rounds; original failed evidence retained. Successful native phase reused instead of reposting forty keys."
+  },
+  "candidate_harness_passed": true,
+  "cleanup": {
+    "baseline": {
+      "cleanup_complete": true,
+      "fixture_absent_twice": true,
+      "native_worker_absent_twice": true,
+      "private_endpoint_absent": true
+    },
+    "candidate": {
+      "cleanup_complete": true,
+      "fixture_absent_twice": true,
+      "native_worker_absent_twice": true,
+      "private_endpoint_absent": true
+    }
+  }
+}

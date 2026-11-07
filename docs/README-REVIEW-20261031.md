@@ -11,7 +11,8 @@ installed service, credentials, OS settings or other project was changed.
   `fix/visible-busy-idle-20261021`, source commit `dfbae48`.
   Existing application-code changes were preserved. The README and associated
   documentation were updated directly here after the user's clarification.
-- The earlier draft worktree remains at `KiraBridge-worktrees/readme-bilingual-20261031`.
+- The publication worktree is `KiraBridge-worktrees/readme-bilingual-20261031`,
+  branch `docs/readme-bilingual-20261031`, based on upstream `main`.
   Refreshed upstream `main` is `307004e5b2e4285c19e8d7544bedf45b28297a0b`;
   the release source was verified separately. No branch was switched or merged.
 - Latest published release: [v0.8.0rc20](https://github.com/landjunge/KiraBridge/releases/tag/v0.8.0rc20),
@@ -108,7 +109,9 @@ references. The existing archive was not presented as current setup guidance.
 
 Only KiraBridge documentation was edited. The user's explicit scope excludes
 ThreadDesk/Whiteboard writes and overrides the broader repository workflow.
-No push, PR, release publication or installation was performed.
+No release publication or installation was performed. The user subsequently
+authorized the documentation push to GitHub; its final commit and remote readback
+are reported separately.
 
 ## Revision after user feedback
 
@@ -124,3 +127,14 @@ The latest GitHub release inventory and remote main/tag references were checked
 again before the direct update. RC20 remains the latest published preview.
 Documentation files absent from the older working checkout are linked to the
 verified upstream commit instead of importing unrelated source changes.
+
+## Publication preparation
+
+The user explicitly authorized pushing this documentation to GitHub. Only the
+nine README/documentation files are included. Application code, releases and
+installations are excluded. The existing design inventory, app resources and
+approved light/dark presentation were inspected again: they contain KB monogram
+icons, but no separate KiraBridge wordmark artwork. The existing icon is reused
+with the product name, without creating a new wordmark. Remote README HTML and
+its image files are checked after pushing; no success is inferred from local
+paths alone.

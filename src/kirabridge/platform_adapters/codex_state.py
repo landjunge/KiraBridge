@@ -118,6 +118,8 @@ class CodexTurnState:
                     )
                     self._cursors[key] = cursor
                 stream.seek(cursor.offset)
+                scan_start = cursor.offset
+                scanned = hashlib.sha256()
                 remaining = self.max_bytes - len(header)
                 incomplete = None
                 while stream.tell() < before.st_size:
@@ -142,7 +144,23 @@ class CodexTurnState:
                     except (ValueError, TypeError, AttributeError):
                         cursor.invalid = "session_parse_error"
                         break
+                    scanned.update(line)
                     cursor.offset = start + len(line)
+                if not cursor.invalid:
+                    # Stat timestamps may remain equal across an in-place write.
+                    # Re-read only this bounded scan, bypassing the buffered reader:
+                    # its cached bytes cannot validate the file that was just parsed.
+                    cursor.invalid = "session_verification_incomplete"
+                    if not self._matches_range(
+                        stream.fileno(), 0, len(header), hashlib.sha256(header).digest()
+                    ):
+                        cursor.invalid = "session_header_changed"
+                    elif not self._matches_range(
+                        stream.fileno(), scan_start, cursor.offset - scan_start, scanned.digest()
+                    ):
+                        cursor.invalid = "session_rewritten"
+                    else:
+                        cursor.invalid = None
                 after = os.fstat(stream.fileno())
                 current = selected.stat()
                 if (current.st_dev, current.st_ino) != identity:
@@ -168,6 +186,19 @@ class CodexTurnState:
                 return self._result(cursor)
         except (OSError, ValueError, TypeError, AttributeError):
             return self._result(cursor, reason="session_unavailable_or_invalid")
+
+    @staticmethod
+    def _matches_range(fd, offset, size, expected):
+        """Verify at most one scan budget with constant memory and no buffered replay."""
+        observed = hashlib.sha256()
+        while size:
+            data = os.pread(fd, min(size, 1024 * 1024), offset)
+            if not data:
+                return False
+            observed.update(data)
+            offset += len(data)
+            size -= len(data)
+        return observed.digest() == expected
 
     @staticmethod
     def _event(cursor, record):

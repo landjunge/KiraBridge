@@ -1,0 +1,96 @@
+{
+  "task": "KB-CHAT-REWORK-20261104-C6D1",
+  "status": "bereit zur Chat-Abnahme",
+  "source_commit": "5af2e788d48f56b39c45d4b763a76a16553df756",
+  "installed_version": "0.8.0rc38",
+  "runtime": {
+    "instance_id": "8f7321700cc54e549574748bd70008d7",
+    "version": "0.8.0rc38",
+    "pid": 61681,
+    "started_at": "2026-11-04T19:41:57.337201+00:00",
+    "config_path": "/Users/landjunge/.config/kirabridge/config.toml",
+    "config_sha256": "642e81b96399a4136e5e86ac0f38bed8afe81a42ad464e850049436cadeff1ed",
+    "effective_config_sha256": "66a84b6ac8baf03070f68f7eca9147493a9c475ab5b842a01fee9e738cd5a270",
+    "source_tree_sha256": "2dfaca4a4fc8cd5edcaeb2c920d41cab882de2b9e382e137713f125c151c5125",
+    "source_file_count": 174,
+    "source_package_path": "/Users/landjunge/.local/share/kirabridge/install/releases/0.8.0rc38-5af2e788d48f/source/.venv/lib/python3.11/site-packages/kirabridge",
+    "source_scope": "package Python files observed at startup; no remote attestation"
+  },
+  "package": {
+    "source_commit": "5af2e788d48f56b39c45d4b763a76a16553df756",
+    "version": "0.8.0rc38",
+    "archive_sha256": "fc22c78121ca9a1512ac8ccf91ec9016138df427cb5d60638e7b596661aa73ae",
+    "files_checked": 622,
+    "native_architecture": "x86_64",
+    "signature": "passed",
+    "only_host_assets": true
+  },
+  "installed_verification": {
+    "version": "0.8.0rc38",
+    "source_commit": "5af2e788d48f56b39c45d4b763a76a16553df756",
+    "installed_wheel_files_checked": 186,
+    "bad": [],
+    "four_protected_files_unchanged": {
+      "/Users/landjunge/.config/kirabridge/config.toml": true,
+      "/Users/landjunge/.config/kirabridge/credentials.json": true,
+      "/Users/landjunge/.config/kirabridge/console-credentials.json": true,
+      "/Users/landjunge/.config/kirabridge/openai-tunnel-runtime.key": true
+    },
+    "protected_processes_unchanged": true,
+    "desktop_native_bytes_match": true,
+    "rollback_backup": "/Users/landjunge/.local/share/kirabridge/install/backups/20261104-204148-fb84ea46"
+  },
+  "simulated_tests": {
+    "passed": 210,
+    "scope": "footer/readiness, cursor-bound Return fixture, visible terminal selection/diagnosis, strict shell prompt",
+    "before_fix_new_cases_failed": 8,
+    "native_agent_return_sent": false
+  },
+  "independent_review": "approved; evidence private independent-review-c6d1.json",
+  "historical_capture_replay": {
+    "canonical_snapshot_sha256": "8df641db6b49468780b849602cc9896c5496ae9464285445716e19040ad2c071",
+    "RC37": "unrecognized_footer_or_dialog",
+    "installed_RC38": "ready in parser-only replay",
+    "working_and_unknown_refused": true,
+    "input_sent": false
+  },
+  "native_local_tests": {
+    "positive_task": "kb_c6d1_local_own_shell_20261104",
+    "positive_attempt": 1,
+    "positive_exit_code": 0,
+    "positive_tty": "/dev/ttys011",
+    "own_CG_visibility_observed_during_execution": true,
+    "negative_task": "kb_c6d1_local_unknown_spaces_20261104",
+    "negative_error": "visible_input_unknown",
+    "negative_input_attempted": false,
+    "two_known_spaces_typed_only_in_owned_shell": true,
+    "history_unchanged_after_denial": true
+  },
+  "cleanup_and_preservation": {
+    "own_window_absent_logical_and_cg": true,
+    "original_nine_tabs_ttys_preserved": true,
+    "protected_processes_unchanged": true,
+    "original_draft_text_present": true,
+    "original_draft_view_sha256": "96cecc189dfdd88e0a89da1a1dc048733a378ec9869734a6ac5ed814fb1b78e5",
+    "original_draft_view_bytes_unchanged": true,
+    "draft_return_sent": false,
+    "existing_safe_shell_candidate": {
+      "pane_id": "terminal:4543:ttys002",
+      "expected_pid": 51675,
+      "empty_raw_prompt": true,
+      "input_sent_by_this_task": false
+    }
+  },
+  "historical_task_states": "preserved; original failed/unknown tasks not replayed",
+  "actual_historical_many_space_cause": "unproven; not assumed rendering",
+  "chat_acceptance": "pending; Kira must use original browserchat route after this primary turn, fresh cursor/agent identity, exactly one Return and actual response readback, then appropriate focus/tab test",
+  "not_performed": [
+    "input or Return to Kira draft",
+    "replacement-client Chat acceptance",
+    "public release",
+    "cloud CI",
+    "ARM/Windows/Linux builds",
+    "new API billing"
+  ],
+  "next_step": "Kira original browserchat acceptance; no further product work started"
+}

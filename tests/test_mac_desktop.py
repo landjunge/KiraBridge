@@ -63,7 +63,9 @@ async def test_extra_probe_failure_does_not_remove_terminal_permission(monkeypat
 
         async def wait(self):
             events.append("owned probe reaped")
-            self.returncode = -9
+            if self.returncode is None:
+                self.returncode = -9
+            return self.returncode
 
     async def spawn(*argv, **kwargs):
         assert argv == ("/usr/sbin/ioreg", "-n", "Root", "-d1", "-a")
@@ -79,9 +81,12 @@ async def test_extra_probe_failure_does_not_remove_terminal_permission(monkeypat
     await desktop.require_interactive()
     assert desktop.last["state"] == "unknown"
     assert desktop.last["observed_at"] is not None
-    assert events == (
-        ["probe", "owned probe killed", "owned probe reaped"] if failure == "timeout" else ["probe"]
-    )
+    expected = ["probe"]
+    if failure == "timeout":
+        expected += ["owned probe killed", "owned probe reaped"]
+    elif failure != "missing":
+        expected += ["owned probe reaped"]
+    assert events == expected
 
 
 async def test_probe_cancellation_reaps_only_its_own_child(monkeypatch):
@@ -117,6 +122,8 @@ async def test_probe_cancellation_reaps_only_its_own_child(monkeypatch):
 async def test_known_unavailable_desktop_blocks_osascript_before_any_ui_action(
     bridge, monkeypatch, code
 ):
+    bridge.macos.capability_probe.facts.update(platform="darwin", os_version="15.7.4")
+    bridge.macos.capability_probe.executable = lambda path: True
     monkeypatch.setattr(
         "kirabridge.platform_adapters.terminal_app.sys", SimpleNamespace(platform="darwin")
     )
@@ -142,7 +149,7 @@ async def test_selected_native_target_retains_concrete_desktop_error(
 ):
     config.principals["local"].capabilities += ["session.inspect"]
 
-    async def catalog(principal):
+    async def catalog(principal, *, transport=None):
         return {
             "status": "available",  # An unrelated tmux pane does not unblock Terminal.app.
             "sessions": [{"pane_id": "%1", "expected_pid": 100}],

@@ -1,0 +1,52 @@
+{
+  "scope": "native collaboration subagents; no external main-agent assignment",
+  "baseline_commit": "a813f08be2603e312cb036ef79703b011c36c313",
+  "integration_branch": "fix/terminal-whiteboard-20261024",
+  "whiteboard_id": "188ce4729a62",
+  "plan_before_delegation": {
+    "thread_id": "188ce4729a62",
+    "revision": 5,
+    "verified": true
+  },
+  "team": [
+    {
+      "agent": "/root/terminal_repair",
+      "worktree": "terminal-next",
+      "branch": "team/terminal-next-20261024",
+      "responsibility": "terminal selection/input; only private native fixtures"
+    },
+    {
+      "agent": "/root/whiteboard_repair",
+      "worktree": "whiteboard-next",
+      "branch": "team/whiteboard-next-20261024",
+      "responsibility": "declared long-text limits and safe errors; isolated MCP fixtures"
+    },
+    {
+      "agent": "/root/receiver_contract_audit",
+      "responsibility": "read-only receiver/index audit and independent terminal security review"
+    }
+  ],
+  "startup_owned_running_tasks": 0,
+  "startup_queued_library_message": {
+    "id": "dc52c315-b9d5-48c5-8de6-3fdf69970b9b",
+    "state": "queued",
+    "delivered": null,
+    "terminal_input_attempted": false
+  },
+  "audit_milestone": {
+    "verified": true,
+    "revision": 9
+  },
+  "whiteboard_cas_conflict": {
+    "task": "team-audit-append-188-20261024-01",
+    "code": "revision_conflict",
+    "expected_revision": 6,
+    "actual_revision": 8,
+    "mutation_replayed_blindly": false,
+    "reconciled_marker_absent_before_new_revision": true,
+    "accepted_task": "team-audit-append-188-20261024-02",
+    "accepted_revision": 9
+  },
+  "production_installation_changed": false,
+  "queue_reimplemented": false
+}

@@ -80,10 +80,27 @@ class ControlActionRepository:
                 {"action_id": identity, "service": value.get("service"), "result": result},
             )
 
+    def observe(self, identity):
+        identity = action_identity({"action_id": identity})
+        row = self.store.db.execute(
+            "SELECT state,result FROM control_actions WHERE id=?", (identity,)
+        ).fetchone()
+        return (
+            None
+            if row is None
+            else {
+                "state": row["state"],
+                "result": json.loads(row["result"]) if row["result"] else None,
+            }
+        )
+
 
 class ControlActions:
     def __init__(self, repository):
         self.repository = repository
+
+    def observe(self, identity):
+        return self.repository.observe(identity)
 
     async def execute(self, value, dispatch):
         identity = action_identity(value)

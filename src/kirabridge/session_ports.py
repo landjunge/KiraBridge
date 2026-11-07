@@ -33,7 +33,10 @@ class TerminalAppPort(SessionTransport, Protocol):
     available: bool
     desktop: object
 
-    async def open(self, command): ...
+    async def open(self, command, *, on_created=None, principal="session_open"): ...
+    async def window_inventory(self): ...
+    async def process_ids(self): ...
+    async def process_working_directory(self, pid, *, expected_identity): ...
 
 
 @dataclass(frozen=True)
@@ -45,3 +48,4 @@ class SessionPorts:
     agent_registry: Callable
     clipboard_lock: object
     readiness: Callable | None = None
+    visible_required: Callable | None = None

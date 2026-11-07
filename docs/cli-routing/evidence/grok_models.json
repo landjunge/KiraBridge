@@ -1,0 +1,11 @@
+{
+  "argv": [
+    "grok",
+    "--no-auto-update",
+    "models"
+  ],
+  "exit": 0,
+  "stdout": "You are logged in with grok.com.\n\nDefault model: grok-4.7-build-fast\n\nAvailable models:\n  * grok-4.7-build-fast (default)\n  - grok-4.6\n  - grok-4.5\n  - grok-4.7\n",
+  "stderr": "",
+  "observed_at": "2026-11-05T21:41:12.808080+00:00"
+}

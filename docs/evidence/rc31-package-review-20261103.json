@@ -1,0 +1,83 @@
+{
+  "schema": "kirabridge.rc31.independent-package-review.v1",
+  "observed_at_utc": "2026-11-03T20:09:09.364923+00:00",
+  "scope": "Read-only manifests, source, binaries, signatures and installer --verify-package; no rebuild, new tests, native worker/UI input or productive installation",
+  "source_commit": "fc4063fef33c273fe5b33aadea3f99dddf88b757",
+  "artifacts_directory": "/Users/landjunge/Downloads/KiraBridge-RC31-Intel-fc4063f",
+  "tar": {
+    "members": 567,
+    "manifest_hashes_checked": 566,
+    "all_manifest_hashes_match": true,
+    "unsafe_or_duplicate_members": false,
+    "version": "0.8.0rc31",
+    "platforms": [
+      "Darwin-x86_64"
+    ],
+    "sha256": "de80c10dd47fb6fad66ba38e20580a81f947a490844b3238e0136194c6c895a8"
+  },
+  "python": {
+    "git_sources": 166,
+    "tar_sources": 166,
+    "wheel_sources": 166,
+    "all_source_bytes_match_git_and_wheel": true,
+    "bundled_wheel_matches_standalone": true,
+    "native_queries_included": true,
+    "wheel_sha256": "ea59be955d001ad242839297d4af7bd01892ae363b8065c42fd19458b8dacfc2"
+  },
+  "native": {
+    "files_checked": 3,
+    "architecture": "x86_64",
+    "codesign_deep_strict_verified": true,
+    "source_pin": "fc4063fef33c273fe5b33aadea3f99dddf88b757",
+    "version": "0.8.0rc31",
+    "binary_sha256": "1a228f63168fc5cf623885658709410921d88fd05acf7e7ad0cbcd54977fdaad",
+    "compiled_tree_symbols": {
+      "inspectTree": true,
+      "observedTree": true,
+      "treeChildren": true,
+      "treeSummary": true
+    },
+    "long_feature_markers": {
+      "children_truncated": true,
+      "macos_tree_timeout": true
+    },
+    "feature_scope": "Static compiled symbols/markers and exact packaged Python models; functional traversal covered by recorded prior tests, not re-executed here"
+  },
+  "release_note_from_exact_git": true,
+  "installer": {
+    "manifest_files_checked": 568,
+    "all_manifest_hashes_match": true,
+    "runtime_files_byte_identical_to_tar": 567,
+    "manifest_digest_matches_signed_plist": true,
+    "architecture": "x86_64",
+    "codesign_deep_strict_verified": true,
+    "source_pin": "fc4063fef33c273fe5b33aadea3f99dddf88b757",
+    "version": "0.8.0rc31",
+    "verify_package": {
+      "file_count": 568,
+      "installation_performed": false,
+      "signing": "ad-hoc",
+      "source_commit": "fc4063fef33c273fe5b33aadea3f99dddf88b757",
+      "verified": true,
+      "version": "0.8.0rc31"
+    }
+  },
+  "installer_zip": {
+    "bytes": 3411769,
+    "sha256": "9f9cb87ec910faa197f26c12a221f81f62c2a9961b11352a22cb935d4ca0f2ec",
+    "entries": 632,
+    "files_checked": 572,
+    "all_zipped_files_match_signed_installer": true,
+    "crc_valid": true,
+    "unsafe_or_duplicate_paths": false
+  },
+  "sidecar_checksums": {
+    "install-macos.sh.sha256": true,
+    "KiraBridge-macos.tar.gz.sha256": true,
+    "kirabridge-0.8.0rc31-py3-none-any.whl.sha256": true
+  },
+  "root_sha256sums_valid": true,
+  "linux_or_arm_artifacts": [],
+  "passed": true,
+  "productive_installation_performed": false
+}

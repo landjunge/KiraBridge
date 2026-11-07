@@ -1,0 +1,51 @@
+{
+  "base_commit": "32df98b",
+  "reused_renderer_commit": "ada6e37df1be607bfdc0dec8428e609c12d46ef8",
+  "loaded_source": "/Users/landjunge/KiraBridge-release-20261024/.worktrees/braille-renderer-20261026/src/kirabridge/terminal_design.py",
+  "interpreter": "/Users/landjunge/KiraBridge-release-20261024/.worktrees/current-release/.venv/bin/python",
+  "python": "3.11.15",
+  "os": "macOS-15.7.4-x86_64-i386-64bit",
+  "machine": "x86_64",
+  "api_version": 1,
+  "primary_color": "#F06DB0",
+  "checks": [
+    {
+      "log": "renderer-tests.log",
+      "result": "28 passed: geometry hash, exact palette, SVG cell equality, capability matrix, width, ordered dots/pulse, budgets/cancel/urgent/standalone import"
+    },
+    {
+      "log": "preview-interrupt-tests.log",
+      "result": "2 passed: KeyboardInterrupt/BrokenPipe during colored preview write reset without more graphics"
+    },
+    {
+      "log": "preview-flush-tests.log",
+      "result": "4 passed: KeyboardInterrupt/BrokenPipe during either write or buffered flush reset without further graphics; supersedes 2-case initial preview check"
+    }
+  ],
+  "one_sample_timing": {
+    "static_100_columns_seconds": 0.010956304147839546,
+    "controller_constructor_and_first_160_column_frame_seconds": 0.02802582085132599,
+    "scope": "one local sample, no independent iMac2015 or ARM benchmark"
+  },
+  "byte_budgets": {
+    "max_frame": 131072,
+    "max_output": 262144,
+    "sample_static_100": 16913,
+    "sample_frame_160": 17201
+  },
+  "sha256": {
+    "src/kirabridge/terminal_design.py": "099d3f496599aefeb29f8c70a3f2e9156b48a6678a22f13a661411ca669bc837",
+    "scripts/preview_terminal_design.py": "c3fb038f65ba94e6b306b96388ada1099e234f408a48c2f8ceb02dd2b4327054",
+    "tests/test_terminal_design.py": "97b6c47a589314e04d5f3127cc55711043851b55432dba72f98b9e773ea0c0a8",
+    "docs/design-preview/terminal-braille-f06db0-100.txt": "0c856011697f5592fe0a55a3a9108b0833e5c1025efeda527dc5bbff2c900201",
+    "docs/design-preview/terminal-braille-f06db0-100.svg": "6aa6735dc76e98a92b08979302c7e996bba66e78ab739d350018fe6902bf3149"
+  },
+  "limitations": [
+    "Pure renderer/controller never owns an output stream; caller must cancel on prompt/error/slow output and best-effort reset interrupted writes",
+    "Event-polled opt-in motion may skip obsolete frames, never waits for animation completion",
+    "No actual installer, window visibility, launchd, package or production acceptance performed by this renderer task",
+    "SVG appearance depends on local monospace font"
+  ],
+  "no_production_ui_service_queue_or_install_change": true,
+  "unique_passing_cases": 32
+}

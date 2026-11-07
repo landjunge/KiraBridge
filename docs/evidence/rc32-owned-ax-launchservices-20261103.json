@@ -1,0 +1,36 @@
+{
+  "schema": "kirabridge.rc32.owned-ax-timing.v1",
+  "source_sha256": {
+    "tests/fixtures/desktop_bootstrap/AccessibilityTimingHarness.swift": "4534777f535405a5d6d1e290fc8567e16ae0fc1db8d6c6c45ac68cb940898892",
+    "integrations/desktop/SystemControl.swift": "3b578d5ae885bd833c3f338b7b1c1c04e938308258df069386c9d37479721ace",
+    "integrations/desktop/SystemBridge.swift": "b4893ce4f59ecc49c5b2fddc04843730292686aecd56d08483c8ed95204c72db",
+    "integrations/desktop/SystemServices.swift": "4908af5acfcb9059220116f7ea8fe666e69451966217d4d386743173de08ad89",
+    "integrations/desktop/SystemKeyboard.swift": "711bf4d674eb28da67a467d278adad4e18c9902ffa7bbf6bf51aa310c66a4db5",
+    "integrations/desktop/SystemShortcuts.swift": "8407fd5424ca2e124e23bc1f82189d376564c5d2b6e33c845c4525bb458dd3e1",
+    "integrations/desktop/SystemSpecialKeys.swift": "3d0e753085204270b13d45297b644492d8456dd9810f3ebe8f1aa62e92c489cd"
+  },
+  "scope": "real native AX reads of one owned background fixture; no Cloud/Voice/input",
+  "permission_requested": false,
+  "input_posts": 0,
+  "window_created": false,
+  "binary_sha256": "35242e67d6b9a50aa9b47e55f6afca3aceb3862f6f7620edcfb6191d1b1b3424",
+  "initial_probe": {
+    "foreground_pid": 852,
+    "owned_other_pids": [],
+    "permission_requested": false,
+    "trusted": true
+  },
+  "status": "failed",
+  "error_type": "AttributeError",
+  "error": "module 'os' has no attribute 'listxattr'",
+  "cleanup_inventory": {
+    "applications": [],
+    "foreground_pid": 852
+  },
+  "independent_absence": {
+    "applications": [],
+    "foreground_pid": 852
+  },
+  "owned_process_terminated": true,
+  "source_unchanged": true
+}

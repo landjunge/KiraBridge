@@ -5,13 +5,40 @@ import json
 from enum import StrEnum
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
+
+
+class NativeFailureEvidence(BaseModel):
+    """Bounded failure metadata, without backend messages or user content."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True, strict=True)
+
+    operation: str = Field(max_length=80, pattern=r"^[a-z][a-z0-9_.]*$")
+    stage: Literal[
+        "window_raise",
+        "application_activation",
+        "target_revalidation",
+        "physical_key_validation",
+        "keyboard_layout_validation",
+        "unspecified",
+    ]
+    backend_effect_unknown: bool
+    helper_pid: int = Field(gt=0)
+    helper_generation: str = Field(
+        pattern=r"^[A-Fa-f0-9]{8}(?:-[A-Fa-f0-9]{4}){3}-[A-Fa-f0-9]{12}$"
+    )
+    helper_source_commit: str = Field(pattern=r"^[a-f0-9]{40}$")
+    contract_binary_sha256: str = Field(pattern=r"^[a-f0-9]{64}$")
+    request_id: str = Field(pattern=r"^[a-f0-9]{32}$")
 
 
 class BridgeError(Exception):
-    def __init__(self, code: str, message: str):
+    def __init__(
+        self, code: str, message: str, *, native_failure: NativeFailureEvidence | None = None
+    ):
         super().__init__(message)
         self.code = code
+        self.native_failure = native_failure
 
 
 class UncertainExecution(BridgeError):
@@ -71,6 +98,8 @@ class TerminalInput(Input):
     cwd: str
     timeout: float = Field(default=60.0, gt=0, le=3600)
     max_output: int = Field(default=65536, ge=0, le=1048576)
+    # Explicit opt-in. Default stays on the visible Terminal.app route for ChatGPT.
+    background: bool = False
 
 
 class ConnectionCheckInput(Input):
@@ -84,6 +113,16 @@ class PathInput(Input):
 
 class ReadInput(PathInput):
     max_bytes: int = Field(default=65536, ge=1, le=1048576)
+    offset: int = Field(default=0, ge=0, le=2**63 - 1, strict=True)
+    tail: bool = False
+    encoding: Literal["utf-8", "base64"] = "utf-8"
+    expected_identity: str | None = Field(default=None, pattern=r"^[a-f0-9]{64}$")
+
+    @model_validator(mode="after")
+    def range_selector(self):
+        if self.tail and self.offset:
+            raise ValueError("use either tail or offset")
+        return self
 
 
 class ImageInput(Input):
@@ -117,10 +156,17 @@ class ProcessInput(Input):
 
 class AgentInput(Input):
     local_tools: bool = False
+    wait_for_reply: bool = True
     agent: str = Field(pattern=r"^[a-z][a-z0-9_-]{0,40}$")
     prompt: str = Field(min_length=1, max_length=262144)
     cwd: str
     timeout: float = Field(default=300.0, gt=0, le=3600)
+
+
+class ThreadDeskDynamicInput(Input):
+    name: str = Field(pattern=r"^[A-Za-z][A-Za-z0-9_-]{0,63}$")
+    arguments: dict[str, Any] = Field(default_factory=dict)
+    contract_sha256: str = Field(pattern=r"^[a-f0-9]{64}$")
 
 
 class ThreadDeskReadInput(Input):
@@ -131,6 +177,8 @@ class ThreadDeskReadInput(Input):
         "list_snapshots",
         "thread_operation_status",
         "get_reentry",
+        "whiteboard_list",
+        "whiteboard_get",
     ]
     arguments: dict[str, Any] = Field(default_factory=dict)
 
@@ -148,6 +196,7 @@ class ThreadDeskManageInput(Input):
         "unarchive",
         "delete",
         "switch",
+        "whiteboard_append",
     ]
     id: str | None = Field(default=None, min_length=1, max_length=128)
     expected_revision: int = Field(ge=0)

@@ -1,0 +1,36 @@
+{
+  "source_commit": "449d85175309e2fce17e536b9036036073695757",
+  "tty": "/dev/ttys005",
+  "viewport": [
+    131,
+    35
+  ],
+  "trace": [
+    {
+      "requested_bytes": 9666,
+      "braille_cells": 3120,
+      "accepted": false,
+      "error_type": "BlockingIOError"
+    },
+    {
+      "requested_bytes": 5,
+      "braille_cells": 0,
+      "accepted": true,
+      "returned_chars": 5
+    }
+  ],
+  "accepted_braille_cells": 0,
+  "nonblocking_writer": true,
+  "installation_performed": false,
+  "scope": "actual built449 standalone native presentation diagnosis; no installation",
+  "visible_braille_cells_observed": 311,
+  "requested_frame_braille_cells": 3120,
+  "defect_confirmed": "single nonblocking short write was treated as permanent presentation failure",
+  "test_window_cleanup": {
+    "window_id": 60091,
+    "tty": "/dev/ttys005",
+    "closed_owned_test_window": true,
+    "absence_verified": true,
+    "other_windows_touched": false
+  }
+}

@@ -1,0 +1,116 @@
+{
+  "scope": "Read-only snapshot of the local KiraBridge store; provider queues are separate. No production queue mutations.",
+  "base_commit": "36a7c5c452eee8b94454ac78833f37855a9b3477",
+  "backup_path": "/Users/landjunge/.local/share/kirabridge/backups/queue-priority1-20261029-201843",
+  "backup_sqlite_sha256": "35bc59b2ef6c15e1f8bf78e515292718174ff7f8d18e67b706568db55c09a5ae",
+  "snapshot": {
+    "tasks": {
+      "cancelled": 7,
+      "completed": 5971,
+      "failed": 463,
+      "unknown": 46
+    },
+    "message_jobs": {
+      "blocked": 3,
+      "cancelled": 8,
+      "completed": 50,
+      "failed": 14,
+      "unknown": 14
+    },
+    "visible_handoffs": {
+      "completed": 54,
+      "confirmed": 2,
+      "interrupted": 3,
+      "unknown": 3
+    }
+  },
+  "cleared_entries": [],
+  "protected_messages": [
+    {
+      "id": "61ccf5a9-3f5c-46f4-8bb6-b5930e168a0d",
+      "delivered": 1793247801.993976,
+      "acknowledged": 1793247893.07252,
+      "state": "unknown",
+      "run_id": "channel-2924bd3d9ba84657900a79e53f0dc860",
+      "claimed": 1793247801.964669,
+      "started": 1793247815.240968,
+      "error": "interrupted",
+      "evidence": {
+        "last_observation": {
+          "agent_confirmed": true,
+          "handoff_id": "channel-2924bd3d9ba84657900a79e53f0dc860",
+          "state": "confirmed"
+        },
+        "reason": "receiver_restart"
+      }
+    },
+    {
+      "id": "ed182f06-b5cc-4841-8b8c-5ef5829a137e",
+      "delivered": null,
+      "acknowledged": null,
+      "state": "blocked",
+      "run_id": null,
+      "claimed": null,
+      "started": null,
+      "error": null,
+      "evidence": {
+        "reason": "conversation_run_limit"
+      }
+    },
+    {
+      "id": "013a112e-b9fc-4271-b9ff-ebd19f279ac7",
+      "delivered": null,
+      "acknowledged": null,
+      "state": "blocked",
+      "run_id": null,
+      "claimed": null,
+      "started": null,
+      "error": null,
+      "evidence": {
+        "reason": "conversation_run_limit"
+      }
+    }
+  ],
+  "runtime_before": {
+    "pid": 60636,
+    "instance_id": "31849a4ff7c346f396b99e31d6fd807d",
+    "startup_source_sha256": "4bb8e3b989a005568ed26a3b0cc1df4459c3cbfd22ca0e53177694455cbf7b8d",
+    "config_sha256": "52747b8353bef4cc162997c34c30d8e759ca0691725d902f313ce4653cf903c2"
+  },
+  "task_failures": [
+    {
+      "id": "codex-masterplan-answers-20261029-01",
+      "operation": "session.input",
+      "state": "failed",
+      "created": 1793301148.632567,
+      "accepted": 1793301195.9721909,
+      "started": null,
+      "error": {
+        "code": "visible_target_busy"
+      }
+    },
+    {
+      "id": "codex-thread-cleanup-manual-tab-20261029",
+      "operation": "session.input",
+      "state": "failed",
+      "created": 1793300704.873903,
+      "accepted": 1793300704.876145,
+      "started": null,
+      "error": {
+        "code": "session_selection_changed"
+      }
+    },
+    {
+      "id": "start-codex-cleanup-newtab-20261029",
+      "operation": "terminal.visible",
+      "state": "failed",
+      "created": 1793300627.335459,
+      "accepted": 1793300627.3542972,
+      "started": null,
+      "error": {
+        "code": "session_busy"
+      }
+    }
+  ],
+  "tests_scope": "Synthetic private stores, fake terminal adapters and loopback MCP; no live terminal input or daemon restart."
+}

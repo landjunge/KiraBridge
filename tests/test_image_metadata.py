@@ -52,9 +52,9 @@ def test_png_metadata_preserved_byte_for_byte(tmp_path):
     assert result["content_sha256"] == hashlib.sha256(original).hexdigest()
     assert result["bytes"] == len(original)
 
-    delivered = image_task_result({
-        "operation": "file.image", "state": "completed", "result": result
-    })
+    delivered = image_task_result(
+        {"operation": "file.image", "state": "completed", "result": result}
+    )
     images = [entry for entry in delivered.content if entry.type == "image"]
     assert len(images) == 1
     assert base64.b64decode(images[0].data) == original
@@ -80,9 +80,12 @@ def test_reject_interrupted_image_stream():
     header = chunk(b"IHDR", struct.pack(">IIBBBBB", 1, 1, 8, 6, 0, 0, 0))
     full = zlib.compress(bytes([0, 12, 34, 56, 255]))
     invalid = (
-        b"\x89PNG\r\n\x1a\n" + header
-        + chunk(b"IDAT", full[:4]) + chunk(b"eXIf", b"metadata")
-        + chunk(b"IDAT", full[4:]) + chunk(b"IEND")
+        b"\x89PNG\r\n\x1a\n"
+        + header
+        + chunk(b"IDAT", full[:4])
+        + chunk(b"eXIf", b"metadata")
+        + chunk(b"IDAT", full[4:])
+        + chunk(b"IEND")
     )
     with pytest.raises(BridgeError) as exception:
         validate_png(invalid)

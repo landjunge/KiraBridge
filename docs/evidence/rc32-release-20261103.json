@@ -1,0 +1,115 @@
+{
+  "schema": "kirabridge.rc32.release.v1",
+  "source_commit": "300df69ec55d236ef1059d1b146a0ff89c2f003c",
+  "release": {
+    "id": 433232164,
+    "html_url": "https://github.com/landjunge/KiraBridge/releases/tag/v0.8.0rc32",
+    "tag_name": "v0.8.0rc32",
+    "draft": false,
+    "prerelease": true,
+    "published_at": "2026-11-03T21:25:50Z",
+    "source_commit": "300df69ec55d236ef1059d1b146a0ff89c2f003c",
+    "assets": [
+      {
+        "id": 707139015,
+        "name": "install-macos.sh",
+        "size": 586,
+        "digest": "sha256:d804a4415abe0a822ece6eda9e00893ceabfaf99c0061a84c09a5f0f85e26363",
+        "state": "uploaded",
+        "browser_download_url": "https://github.com/landjunge/KiraBridge/releases/download/v0.8.0rc32/install-macos.sh"
+      },
+      {
+        "id": 707138973,
+        "name": "KiraBridge-0.8.0rc32-Intel-Installer.zip",
+        "size": 3459081,
+        "digest": "sha256:9dc2d582f3a8075a06d8a84ae36e6fbf1da2075a0fa308a7ebb84e04acbf72c3",
+        "state": "uploaded",
+        "browser_download_url": "https://github.com/landjunge/KiraBridge/releases/download/v0.8.0rc32/KiraBridge-0.8.0rc32-Intel-Installer.zip"
+      },
+      {
+        "id": 707138972,
+        "name": "kirabridge-0.8.0rc32-py3-none-any.whl",
+        "size": 579442,
+        "digest": "sha256:9157cc3ccc2bd98cbe324907dddd9d6b5dde0bba2348a5fda55e8d626708e8dd",
+        "state": "uploaded",
+        "browser_download_url": "https://github.com/landjunge/KiraBridge/releases/download/v0.8.0rc32/kirabridge-0.8.0rc32-py3-none-any.whl"
+      },
+      {
+        "id": 707139018,
+        "name": "KiraBridge-macos.tar.gz",
+        "size": 2909706,
+        "digest": "sha256:0f282cf779e0c20334a6db11c4ec89dd6afde9f0dbe23215caf07a198d278f2c",
+        "state": "uploaded",
+        "browser_download_url": "https://github.com/landjunge/KiraBridge/releases/download/v0.8.0rc32/KiraBridge-macos.tar.gz"
+      },
+      {
+        "id": 707138968,
+        "name": "LICENSE",
+        "size": 6373,
+        "digest": "sha256:3316d5eda60ac1fea355aa43d196feea3567384179b55ca88c8636c0322021ec",
+        "state": "uploaded",
+        "browser_download_url": "https://github.com/landjunge/KiraBridge/releases/download/v0.8.0rc32/LICENSE"
+      },
+      {
+        "id": 707139096,
+        "name": "SHA256SUMS",
+        "size": 549,
+        "digest": "sha256:3430e49e0a0f76c585368dde4caf76c2ae7bd827c95f5858cfd441eb4bab5a08",
+        "state": "uploaded",
+        "browser_download_url": "https://github.com/landjunge/KiraBridge/releases/download/v0.8.0rc32/SHA256SUMS"
+      },
+      {
+        "id": 707139137,
+        "name": "smoke-Darwin-x86_64.json",
+        "size": 848,
+        "digest": "sha256:798e2d82ba4bb99f9304e04309fed484a50d0fbb2d132f9f9f0786a09b688893",
+        "state": "uploaded",
+        "browser_download_url": "https://github.com/landjunge/KiraBridge/releases/download/v0.8.0rc32/smoke-Darwin-x86_64.json"
+      }
+    ]
+  },
+  "branch": "perf/rc32-native-ipc-20261103",
+  "pr": "https://github.com/landjunge/KiraBridge/pull/57",
+  "stacked_on": "perf/rc31-latency-20261103",
+  "base_unchanged": "0f554bc64ba7d0cecfa5898990f1df67fc6c0591",
+  "main_unchanged": "21a6abda85aadc8d0c361b4106d328953af9aa02",
+  "local_smoke": {
+    "platform": "Darwin-x86_64",
+    "version": "0.8.0rc32",
+    "source_commit": "300df69ec55d236ef1059d1b146a0ff89c2f003c",
+    "archive_sha256": "0f282cf779e0c20334a6db11c4ec89dd6afde9f0dbe23215caf07a198d278f2c",
+    "packaged_start_command": "passed isolated bundled installer preparation",
+    "installed_authenticated_dispatcher": true,
+    "concrete_preflight_and_loaded_source_match": true,
+    "corrupt_package_rejected_before_install": true,
+    "config_and_credentials_preserved": true,
+    "license_in_bundle_payload_wheel_and_separate_asset": true,
+    "license_sha256": "3316d5eda60ac1fea355aa43d196feea3567384179b55ca88c8636c0322021ec",
+    "license_expression": "LicenseRef-Netzwerkpunkt-Personal-Use-1.0",
+    "real_user_setup_service_tunnel_changed": false,
+    "new_chatgpt_account_call": "not performed",
+    "real_user_service_manager": "not exercised"
+  },
+  "installer_verification": {
+    "verified": true,
+    "file_count": 579,
+    "installation_performed": false
+  },
+  "download_verified": {
+    "name": "KiraBridge-0.8.0rc32-Intel-Installer.zip",
+    "bytes": 3459081,
+    "sha256": "9dc2d582f3a8075a06d8a84ae36e6fbf1da2075a0fa308a7ebb84e04acbf72c3"
+  },
+  "independent_package_review": "rc32-package-review-20261103.json",
+  "preserved_live_runtime": {
+    "version": "0.8.0rc30",
+    "pid": 66439,
+    "started_at": "2026-11-03T03:30:12.398324+00:00",
+    "instance_id": "777222cce58e4b38b503c2f3d20900e1",
+    "dispatcher_active": true
+  },
+  "github_actions_runs": [],
+  "production_installation_performed": false,
+  "parallel_windows_work_or_agent_sessions_changed": false,
+  "runtime_changes_after_test_freeze": false
+}

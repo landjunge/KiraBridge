@@ -1,0 +1,62 @@
+{
+  "schema": "kirabridge.windows-installed-preview.v1",
+  "observed_at_utc": "2026-11-04T01:43:28.197628+00:00",
+  "vm": {
+    "name": "KiraBridge Windows Dev Fix1",
+    "uuid": "2B6EE828-02F0-42AE-B4FE-BE57C448F65E",
+    "retained_at_operator_request": true
+  },
+  "version": "0.8.0rc31.dev2",
+  "runtime": {
+    "pid": 11720,
+    "instance_id": "fde5e30653a84c77a8fc78be8f8795e7",
+    "source_file_count": 171,
+    "source_tree_sha256": "0cc6ae16d2c2d3d78b1c968e869cb1be1768e07e677aa002e86a28bfe76c432d",
+    "source_scope": "package Python files observed at startup; no remote attestation"
+  },
+  "created_100ns": "134382301975786026",
+  "parent_verifier_exited": true,
+  "listener_pid_confirmed_after_parent_exit": true,
+  "listen_scope": "Windows guest loopback 127.0.0.1:8765",
+  "all_171_installed_modules_equal_release_wheel": true,
+  "release_wheel_sha256": "babbde17fc8e23a9fc165fc211fbefbf168b61cfe09ef04ce14713bf223f8479",
+  "release_asset_sha256": "28eac747e35f3cd33d5eb05918740a5e1fb234a68e8e9017a43ce10a6878999d",
+  "published_asset_download_verified_with_github_authentication": true,
+  "repository_visibility": "PRIVATE",
+  "capabilities": [
+    "bridge.health",
+    "task.cancel",
+    "task.read",
+    "windows.keyboard.inspect",
+    "windows.keyboard.sequence"
+  ],
+  "exact_minimal_capabilities_verified": true,
+  "unauthenticated_http_status": 401,
+  "task_count": 0,
+  "input_attempted": false,
+  "clipboard_used": false,
+  "service_installed": false,
+  "os_rights_changed": false,
+  "credential_rotation_requested": false,
+  "console_creation_flag": "CREATE_NEW_CONSOLE",
+  "console_left_running": true,
+  "desktop_launcher": {
+    "name": "KiraBridge Windows Test.cmd",
+    "sha256": "dbd687e56cc4644fad79f82d4ec96d324bc9a42eca14ec9ca1bf33101d15a98d"
+  },
+  "raw_guest_report_sha256": "c545e53db4187e73bdfa019fb8458ad7883874d91115c9289895848db29251ea",
+  "host_screen_capture_unavailable_due_to_host_session_lock": true,
+  "guest_console_visual_verification": "not_confirmed",
+  "external_chatgpt_cloud_acceptance": false,
+  "release_url": "https://github.com/landjunge/KiraBridge/releases/tag/windows-v0.8.0rc31.dev2",
+  "guest_console_diagnostic_report_received": false,
+  "guest_console_diagnostic_dispatch": "attempted; no automatic replay",
+  "verification_limit": "Installed process, source bytes, authenticated MCP and post-parent-exit listener were verified at observed_at_utc. A fresh console image was not obtained; no current screenshot or later process liveness is inferred.",
+  "final_host_cleanup": {
+    "owned_loopback_helper_servers_stopped": 15,
+    "all_stopped_server_processes_independently_absent": true,
+    "utm_or_guest_backend_signalled": false,
+    "retained_vm_status": "started",
+    "observed_at_utc": "2026-11-04T02:36:05.188018+00:00"
+  }
+}

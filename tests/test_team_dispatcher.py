@@ -1,4 +1,5 @@
 import asyncio
+import hashlib
 import json
 from pathlib import Path
 from types import SimpleNamespace
@@ -109,6 +110,53 @@ def test_ordinary_duplicate_json_without_envelope_is_inert_text():
     text = '{"body":"first","body":"second"}'
     turn = parse_team_turn(text)
     assert turn.result == text and turn.actions == []
+
+
+def test_work_reply_header_requires_explicit_framing_opt_in():
+    text = 'Here is the work reply:\n\n{"kirabridge_team":"1","result":"done","actions":[]}'
+    inert = parse_team_turn(text)
+    assert inert.result == text and inert.actions == []
+    framed = parse_team_turn(text, framing="work_reply_header")
+    assert framed.result == "done" and framed.actions == []
+    assert (
+        parse_team_turn(
+            '{"kirabridge_team":"1","result":"direct"}', framing="work_reply_header"
+        ).result
+        == "direct"
+    )
+
+
+@pytest.mark.parametrize(
+    "tail",
+    [
+        '{"kirabridge_team":"1","result":"done"}\nTrailing prose',
+        '```json\n{"kirabridge_team":"1","result":"done"}\n```',
+        '{"kirabridge_team":"1","result":"unfinished',
+        '{"kirabridge_team":"1","result":"done","result":"other"}',
+        '{"kirabridge_team":"1","result":"done","actions":[{"type":"message",'
+        '"recipient":"grok","body":"first","body":"second"}]}',
+        '{"result":"missing version marker"}',
+        "[]",
+    ],
+)
+def test_work_reply_frame_is_one_strict_envelope_without_fences_or_trailing_text(tail):
+    with pytest.raises(BridgeError) as error:
+        parse_team_turn("Here is the work reply:\n\n" + tail, framing="work_reply_header")
+    assert error.value.code == "team_action_protocol"
+
+
+def test_work_reply_frame_never_searches_inside_other_prose_or_examples():
+    envelope = '{"kirabridge_team":"1","result":"done","actions":[]}'
+    for text in (
+        "Before Here is the work reply:\n" + envelope,
+        "Another header:\n" + envelope,
+        "\nHere is the work reply:\n" + envelope,
+        "```\nHere is the work reply:\n" + envelope + "\n```",
+    ):
+        turn = parse_team_turn(text, framing="work_reply_header")
+        assert turn.result == text and turn.actions == []
+    with pytest.raises(BridgeError):
+        parse_team_turn("Here is the work reply: " + envelope, framing="work_reply_header")
 
 
 def configure_team(bridge, config, tmp_path, monkeypatch, *, answer=None):
@@ -526,6 +574,52 @@ def isolated_dispatcher(config):
     return TeamDispatcher(SimpleNamespace(config=config, teams=teams)), teams
 
 
+@pytest.mark.parametrize("framing,action_count", [("strict_json", 0), ("work_reply_header", 1)])
+async def test_result_consumption_uses_only_the_fixed_workers_response_framing(
+    config, framing, action_count
+):
+    config.team.workers["codex"] = TeamWorkerConfig(
+        agent="codex",
+        cwd=config.principals["local"].roots[0],
+        response_framing=framing,
+    )
+    dispatcher, teams = isolated_dispatcher(config)
+    calls = []
+
+    async def called(pool, tool, arguments):
+        assert tool == "team_message_send"
+        calls.append(arguments)
+        return {"id": "accepted-message"}
+
+    dispatcher._call = called
+    envelope = json.dumps(
+        {
+            "kirabridge_team": "1",
+            "result": "framed result",
+            "actions": [
+                {"type": "message", "recipient": "grok", "body": "A question", "kind": "question"},
+            ],
+        }
+    )
+    text = "Here is the work reply:\n\n" + envelope
+    await dispatcher._complete(
+        None,
+        {
+            "id": "parent",
+            "team_id": "team",
+            "assignee": "codex",
+        },
+        {"id": "core", "result": {"text": text}},
+    )
+    assert len(calls) == action_count and not teams.failures
+    assert teams.finished[0][1] == ("framed result" if action_count else text)
+    assert teams.finished[0][2]["response_framing"] == framing
+    assert teams.finished[0][2]["core_result_sha256"] == hashlib.sha256(text.encode()).hexdigest()
+    if calls:
+        assert calls[0]["request"]["recipient"] == "grok"
+        assert "sender" not in calls[0]["request"]
+
+
 async def test_completed_core_action_recovery_uses_identical_keys_without_native_turn(config):
     dispatcher, teams = isolated_dispatcher(config)
     calls = []
@@ -638,6 +732,24 @@ async def test_empty_native_result_is_a_visible_failure(config):
     )
     assert not teams.finished
     assert teams.failures[0][1:3] == ("failed", "team_agent_no_text")
+    assert teams.failures[0][3]["core_result_sha256"] == hashlib.sha256(b"  ").hexdigest()
+
+
+async def test_parse_failure_preserves_exact_native_utf8_result_hash(config):
+    dispatcher, teams = isolated_dispatcher(config)
+    text = '{"kirabridge_team":"1","result":"Unvollständig ä'
+    await dispatcher._complete(
+        None,
+        {"id": "parent", "team_id": "team"},
+        {
+            "id": "core",
+            "result": {"text": text},
+        },
+    )
+    assert teams.failures[0][1:3] == ("failed", "team_action_protocol")
+    evidence = teams.failures[0][3]
+    assert evidence["actions_applied"] == 0
+    assert evidence["core_result_sha256"] == hashlib.sha256(text.encode("utf-8")).hexdigest()
 
 
 async def test_terminal_team_work_cannot_apply_late_completed_core_actions(config):

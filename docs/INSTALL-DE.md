@@ -1,10 +1,12 @@
-# KiraBridge installieren und aktualisieren · 0.8.0rc20
+# KiraBridge installieren und aktualisieren · 0.8.0rc36
 
 [English](INSTALL-EN.md) · [README](../README.de.md)
 
-Die [veröffentlichte Intel-Vorabversion](https://github.com/landjunge/KiraBridge/releases/tag/v0.8.0rc20) stammt vom 30. Oktober 2026.
-Ihr Code ist auf `da1bdaed019c31aa11bb28a39ef8bead7e73c1d4` festgelegt.
-[Release- und Downloadprüfung](README-REVIEW-20261031.md).
+Die [veröffentlichte Intel-Vorabversion](https://github.com/landjunge/KiraBridge/releases/tag/v0.8.0rc36) stammt vom 4. November 2026.
+Ihr Code ist auf `d4aebdd89a206045731f2692a3f363fddaa15ee0` festgelegt.
+[Release- und Downloadprüfung](evidence/readme-current-20261107.json).
+Diese Anleitung installiert dieses veröffentlichte Paket. Die getrennt installierte
+lokale RC40-Laufzeit bei `d12838a` ist ein späterer Quellbuild ohne veröffentlichten RC40-Download.
 
 ## Voraussetzungen
 
@@ -23,31 +25,30 @@ Keine Tokens kopieren.
 
 ## Installation / Update
 
-1. Lade das ZIP **App und Dienst-Installer** aus der [README](../README.de.md)
-   herunter und entpacke es vollständig. `INSTALLIEREN-DE.txt` enthält die Paketanleitung.
-2. Öffne `KiraBridge-Installieren.command`. Sie startet den Dienst-Installer in
-   einem sichtbaren Terminalfenster. Nicht in einer arbeitenden Codex-/Grok-Sitzung ausführen.
-3. Kopiere nach erfolgreicher Installation `KiraBridge.app` nach `~/Applications`
-   (Ordner bei Bedarf anlegen) und öffne sie. Eine vorhandene App vor dem Ersetzen schließen.
+1. Lade **KiraBridge-0.8.0rc36-Intel-Installer.zip** aus der [README](../README.de.md)
+   herunter und entpacke es vollständig. Das Release bietet `SHA256SUMS` zur Prüfung.
+2. Öffne `KiraBridge-Installer.app`, bestätige und folge der sichtbaren
+   Terminalinstallation. Keine arbeitende Codex-/Grok-Sitzung als Installationsfenster verwenden.
+3. Der Installer aktualisiert Dienst und Desktop-App gemeinsam und erstellt eine
+   Rückfallsicherung. Öffne nach erfolgreichem Abschluss `KiraBridge.app` in `~/Applications`.
 
-Das separate ZIP **Nur die App** benötigt einen bereits installierten Dienst.
-Python und uv liegen keinem der ZIPs bei; Python 3.11 und uv 0.11.6 müssen vorher
-im Terminal verfügbar sein. Der Installer verbindet kein ChatGPT-Konto automatisch.
+Das ZIP enthält das App-/Dienstpaket; Python und uv bleiben Voraussetzungen.
+Python 3.11 und uv 0.11.6 müssen vorher im Terminal verfügbar sein. Der Installer verbindet kein ChatGPT-Konto automatisch.
 Nur bei fehlender Verbindung im lokalen Terminal
 `~/.local/bin/kirabridge chatgpt setup --language de` starten und der
 [Verbindungsanleitung](CHATGPT.md) folgen.
 
-Für die Installation im Terminal bleibt der authentifizierte Bootstrap verfügbar:
+Für dieselbe App-/Dienstinstallation im Terminal ist der authentifizierte Bootstrap verfügbar:
 
 ```sh
-d=$(mktemp -d) && gh release download v0.8.0rc20 -R landjunge/KiraBridge -p 'install-macos.sh*' -D "$d" && (cd "$d" && shasum -a 256 -c install-macos.sh.sha256 && sh install-macos.sh --require-visible-terminal --language de)
+d=$(mktemp -d) && gh release download v0.8.0rc36 -R landjunge/KiraBridge -p 'install-macos.sh*' -D "$d" && (cd "$d" && shasum -a 256 -c install-macos.sh.sha256 && sh install-macos.sh --desktop --require-visible-terminal --language de)
 ```
 
 Er lädt den Installer als Datei, prüft ihn und anschließend das festgelegte
 Dienstpaket. Nach dem vollständigen Entpacken des Dienstarchivs ist der direkte Einstieg:
 
 ```sh
-sh KiraBridge/install.sh --require-visible-terminal --language de --motion full
+sh KiraBridge/install.sh --desktop --require-visible-terminal --language de --motion full
 ```
 
 Reduzierte Bewegung: `--motion reduced`; Sprache: `--language de` oder `--language en`.
@@ -95,37 +96,40 @@ Rückweg. Ein Timeout oder nur zurückgesetzter Versionszeiger reicht nicht.
 
 [Nachgewiesener Intel-Rollback und ursprünglicher Fehler](https://github.com/landjunge/KiraBridge/blob/307004e5b2e4285c19e8d7544bedf45b28297a0b/docs/RC14-ROLLBACK-20261026.md).
 
-## Bekannte Einschränkungen in RC20
+## Bekannte Einschränkungen in RC36
 
-Interaktive Agentenbefehle wie `/resume` können über KiraBridge als Arbeitsauftrag
-ankommen, statt das Menü des Agenten zu öffnen. Gib sie direkt im Terminal des
-Agenten ein. Manche bereiten Codex-Sitzungen können außerdem als nicht verfügbar
-erscheinen. Spätere lokale Reparaturen sind nicht im veröffentlichten RC20-Download enthalten.
+RC36 repariert die Fenstererzeugung bei minimierten Terminalfenstern; spätere
+native Prüfungen reproduzierten aber einen Tabwechselfehler. Die lokalen
+RC37–RC40-Reparaturen sind nicht in diesem Download enthalten. Siehe [RC36-Bericht](TERMINAL-MINIMIZED-RC36-20261104.md)
+und [anschließende Reparatur](TERMINAL-RECOVERY-20261104.md).
+Interaktive Agentenmenüs wie `/resume` entsprechen keinem gewöhnlichen Arbeitsauftrag;
+benutze bei benötigtem Menü das eigene Terminal des Agenten.
 
 Apple Silicon, andere macOS-Versionen und andere Plattformen sind durch die
 Intel-Releaseprüfungen nicht bestätigt. Eine empfangene oder freigegebene Anfrage
 ist noch kein fertiger Auftrag; prüfe unklare Ergebnisse vor einer Wiederholung.
 Gespeicherte Ergebnisse wecken keinen inaktiven Chat automatisch auf. Nicht jeder
 Chat- oder Sprachmodus ist garantiert verfügbar.
-[Releasedetails und Belege](README-REVIEW-20261031.md).
+[Releasedetails und Belege](evidence/readme-current-20261107.json).
 
 ## Wenn macOS die App blockiert
 
 Die App hat keine Apple-Notarisierung. Prüfe die Herkunft vom verlinkten Release
-und die Prüfsumme aus `SHA256SUMS-INTEL`; bei Abweichung abbrechen. Wenn macOS eine
+und die Prüfsumme aus `SHA256SUMS`; bei Abweichung abbrechen. Wenn macOS eine
 geprüfte App blockiert, der du vertraust, nutze die Freigabe für diese einzelne App
 unter Systemeinstellungen → Datenschutz & Sicherheit, sofern angeboten.
 Gatekeeper nicht pauschal deaktivieren. [Apples Anleitung](https://support.apple.com/en-us/102445).
 
 ## Andere Plattformen und optionale Werkzeuge
 
-RC20 veröffentlicht kein direkt installierbares Linux-, Windows- oder Apple-Silicon-Paket.
-Der eigenständige Linux-Quellinstaller bleibt erhalten. Linuxpakete werden auf
-Ubuntu24.04-x86_64 getestet; dieser Mac-Lauf ist kein Linux- oder ARM-Nachweis.
-Ein Linuxpaket startet über seinen eigenen `sh install.sh`-Pfad und unterstützt
-`--language en`; vorhandene Guided-Setup-/ChatGPT-Konfiguration bleibt getrennt
-vom macOS-Versionsinstaller. Codex/Grok und weitere Providerzugänge sind separat
-einzurichten. ThreadDesk ist optional und keine Installationsvoraussetzung.
+Die separate [Windows-Einrichtungsvorschau](WINDOWS-SETUP-20261104.md) bietet ein
+begrenztes Tastatur-/Fenster-/MCP-Paket, keinen aktuellen macOS-Funktionsgleichstand
+oder Windows-Dienstinstaller. Windows-/Installer- und Linux-/Debian-Serverarbeit
+läuft weiter. Ältere veröffentlichte Linuxartefakte belegen keine Abnahme dieser
+aktuellen Serverarbeit. Der Quellstand enthält einen separaten Linuxinstaller;
+Paketbau und native Abnahme sind von dieser Intel-macOS-Anleitung getrennt.
+ThreadDesk und Providerintegrationen sind optional, keine Kernvoraussetzungen.
 
+[macOS-Vertrag](https://github.com/landjunge/KiraBridge/blob/307004e5b2e4285c19e8d7544bedf45b28297a0b/docs/INSTALL-MACOS.md),
 [Teamkoordination](TEAM-ORCHESTRATION.md), [Werkzeuge und Grenzen](../README.de.md),
-[ChatGPT-Einrichtung](CHATGPT.md), [RC20-Releasehinweise](https://github.com/landjunge/KiraBridge/blob/v0.8.0rc20/docs/RELEASE-0.8.0rc20.md).
+[ChatGPT-Einrichtung](CHATGPT.md), [RC36-Releasehinweise](https://github.com/landjunge/KiraBridge/blob/v0.8.0rc36/docs/RELEASE-0.8.0rc36.md).

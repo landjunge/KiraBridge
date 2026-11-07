@@ -1,0 +1,725 @@
+"""Private acceptance only: prove physical isolation of one receipt-owned Terminal tab.
+
+The product NativeSystemTransport supplies all AX/CG observations. Only the
+receipt-owned tab is tagged; at most one exact detach-menu click follows. This
+module never opens terminals, sends keys, changes preferences or retries effects.
+"""
+
+from __future__ import annotations
+
+import asyncio
+import hashlib
+import json
+import re
+
+from kirabridge.bridge_core.models import BridgeError
+
+
+def require(value, message):
+    if not value:
+        raise RuntimeError(message)
+
+
+class BaselineTitlesUnsettled(RuntimeError):
+    """Separate native reads have not supplied one exact CG/AX title pair."""
+
+
+class BaselineNotVisible(RuntimeError):
+    """Existing logical views have no current physical surface; read again only."""
+
+
+def cwd_guard(pid, workspace):
+    require(
+        not any(ord(char) < 32 or ord(char) == 127 for char in str(workspace)),
+        "CWD contains controls",
+    )
+    return (
+        "\nif(identityHost.doShellScript("
+        + json.dumps(f"/usr/sbin/lsof -a -p {int(pid)} -d cwd -Fpfn")
+        + ").replace(/\\r\\n?/g,'\\n').replace(/\\n$/,'')!=="
+        + json.dumps(f"p{int(pid)}\nfcwd\nn{workspace}")
+        + ")throw Error('Own CWD changed');checkTargetIdentity();\n"
+    )
+
+
+def created_row(rows, created, original_windows):
+    matches = [row for row in rows if row.get("tty") == created["tty"]]
+    require(len(matches) == 1, "Created TTY is missing or ambiguous")
+    row = matches[0]
+    require(
+        row["pane_id"] == created["pane_id"]
+        and row["expected_pid"] == created["expected_pid"]
+        and row["window_id"] not in original_windows
+        and not row.get("identity_ambiguous"),
+        "Created logical target changed; no replacement is permitted",
+    )
+    return row
+
+
+class PhysicalIsolation:
+    def __init__(self, terminal, native, *, nonce, workspace, record):
+        require(re.fullmatch(r"[a-f0-9]{16}", nonce), "Fresh own title nonce required")
+        self.terminal, self.native = terminal, native
+        self.nonce = "KB_WINDOW_" + nonce
+        self.workspace, self.record = str(workspace), record
+        self.app = self.worker = self.baseline = None
+        self.created = self.identity = None
+        self.tag_attempted = self.move_attempted = self.confirmed = False
+        self.move_accepted = False
+        self.activation_attempted = False
+        self.own_radio_token = None
+        self.pre_move_ax_window_token = None
+
+    def activation_source(self, identity):
+        return (
+            'const app=Application("Terminal");'
+            + self.terminal.native_identity_guard({self.app["pid"]: identity})
+            + "\nconst se=Application('System Events');"
+            "const owners=se.processes().filter(p=>p.unixId()===" + str(self.app["pid"]) + ");"
+            "if(owners.length!==1 || owners[0].bundleIdentifier()!=='com.apple.Terminal' ||"
+            "!app.running())throw Error('Existing Terminal owner changed');"
+            "checkTargetIdentity();app.activate();JSON.stringify({activation_sent:true,pid:"
+            + str(self.app["pid"])
+            + ",frontmost:app.frontmost()});"
+        )
+
+    async def prepare_visible_baseline(self, *, timeout=10, poll_interval=0.15):
+        require(not self.activation_attempted, "Baseline activation must never be replayed")
+        _, applications = await self.pages("apps.list", {"limit": 1000}, "applications")
+        matches = [app for app in applications if app.get("bundle_id") == "com.apple.Terminal"]
+        require(len(matches) == 1, "Exact existing Terminal application required")
+        require(
+            self.app is None
+            or all(self.app[key] == matches[0][key] for key in ("pid", "started_at", "bundle_id")),
+            "Terminal activation generation changed",
+        )
+        self.app = matches[0]
+        identity = await self.terminal.process_identity(self.app["pid"], detailed=True)
+        require(
+            isinstance(identity, str) and len(identity.split(None, 8)) == 9,
+            "Full Terminal process generation required",
+        )
+        await self.read(
+            "apps.inspect", {"pid": self.app["pid"], "expected_started_at": self.app["started_at"]}
+        )
+        source = self.activation_source(identity)
+        receipt = {
+            "state": "attempted",
+            "pid": self.app["pid"],
+            "bundle_id": self.app["bundle_id"],
+            "started_at": self.app["started_at"],
+            "process_identity": identity,
+            "source_sha256": hashlib.sha256(source.encode()).hexdigest(),
+            "automatic_retry": False,
+        }
+        self.activation_attempted = True
+        self.record({"baseline_activation": dict(receipt)})
+        try:
+            result = await self.terminal.native(source, mutation=True)
+            receipt.update(state="returned", result=result)
+            self.record({"baseline_activation": dict(receipt)})
+            require(
+                result.get("activation_sent") is True and result.get("pid") == self.app["pid"],
+                "Baseline activation result unknown; never retry",
+            )
+        except BaseException as error:
+            receipt.update(state="unconfirmed", error_type=type(error).__name__)
+            self.record({"baseline_activation": dict(receipt)})
+            raise
+        async with asyncio.timeout(timeout):
+            while True:  # noqa: ASYNC110 -- only observe after exactly one activation
+                try:
+                    return await self.capture_baseline()
+                except (BaselineNotVisible, BaselineTitlesUnsettled) as error:
+                    self.record(
+                        {
+                            "baseline_surface_pending": True,
+                            "reason": type(error).__name__,
+                            "activation_retry": False,
+                        }
+                    )
+                    await asyncio.sleep(poll_interval)
+
+    async def read(self, operation, arguments):
+        require(
+            operation in {"apps.list", "apps.inspect", "windows.list", "accessibility.inspect"},
+            "Physical observation cannot dispatch a mutating native operation",
+        )
+        for attempt in range(1, 4):
+            try:
+                result = await self.native.request(operation, arguments, principal="chatgpt")
+                break
+            except BridgeError as error:
+                retry = (
+                    operation == "accessibility.inspect"
+                    and error.code == "macos_tree_changed"
+                    and self.activation_attempted
+                    and self.baseline is None
+                    and attempt < 3
+                )
+                self.record(
+                    {
+                        "native_read_failed": {
+                            "operation": operation,
+                            "arguments": dict(arguments),
+                            "code": error.code,
+                            "worker": list(self.worker) if self.worker else None,
+                            "application": dict(self.app) if self.app else None,
+                            "attempt": attempt,
+                            "same_request_retry": retry,
+                        }
+                    }
+                )
+                if not retry:
+                    raise
+                await asyncio.sleep(0.05)
+        helper = result["native_helper"]
+        worker = (helper["pid"], helper["generation"], helper["source_commit"])
+        require(self.worker in {None, worker}, "Native observation worker changed")
+        self.worker = worker
+        if operation in {"apps.inspect", "accessibility.inspect"}:
+            require(
+                all(
+                    result["application"][key] == self.app[key]
+                    for key in ("pid", "started_at", "bundle_id")
+                ),
+                "Terminal application generation changed",
+            )
+        self.record({"native_read": operation, "arguments": arguments, "result": result})
+        return result
+
+    async def pages(self, operation, arguments, key, *, token=None):
+        rows, revision, total = [], None, None
+        offset = 0
+        for _ in range(20):
+            args = {**arguments, "offset": offset}
+            if revision is not None:
+                args["expected_revision"] = revision
+                if operation == "accessibility.inspect":
+                    args.update(token)
+            result = await self.read(operation, args)
+            require(result.get("offset") == offset, "Incomplete native page offset")
+            size = result.get("total_children" if key == "children" else "total")
+            require(type(size) is int and size >= 0, "Incomplete native page count")
+            require(total in {None, size}, "Native page count changed")
+            require(revision in {None, result.get("revision")}, "Native page revision changed")
+            total, revision = size, result["revision"]
+            if operation == "accessibility.inspect":
+                require(
+                    result["helper_pid"] == self.worker[0]
+                    and result["worker_generation"] == self.worker[1]
+                    and result["application"]["pid"] == self.app["pid"]
+                    and result["application"]["started_at"] == self.app["started_at"],
+                    "AX token application/worker generation changed",
+                )
+                token = {
+                    name: result[name]
+                    for name in ("element_token", "helper_pid", "worker_generation")
+                }
+                if arguments.get("element_token"):
+                    require(
+                        result["element_token"] == arguments["element_token"],
+                        "AX target token changed",
+                    )
+            page = result[key]
+            require(
+                isinstance(page, list) and len(rows) + len(page) <= total, "Invalid native page"
+            )
+            rows.extend(page)
+            if len(rows) == total:
+                require(result.get("truncated") is False, "Incomplete native traversal")
+                if key == "children":
+                    require(result.get("eof") is True, "AX traversal is not complete")
+                return result, rows
+            require(page and result.get("next_offset") == len(rows), "Native traversal stalled")
+            offset = len(rows)
+        raise RuntimeError("Native traversal budget exceeded")
+
+    async def ax(self, token=None):
+        args = {
+            "pid": self.app["pid"],
+            "expected_started_at": self.app["started_at"],
+            "limit": 250,
+            "max_value_chars": 1,
+        }
+        if token:
+            args.update(
+                element_token=token, helper_pid=self.worker[0], worker_generation=self.worker[1]
+            )
+        return await self.pages("accessibility.inspect", args, "children")
+
+    async def snapshot(self):
+        if self.app is None:
+            _, apps = await self.pages("apps.list", {"limit": 1000}, "applications")
+            matches = [app for app in apps if app.get("bundle_id") == "com.apple.Terminal"]
+            require(len(matches) == 1, "Exact existing Terminal application required")
+            self.app = matches[0]
+        inspected = await self.read(
+            "apps.inspect", {"pid": self.app["pid"], "expected_started_at": self.app["started_at"]}
+        )
+        require(
+            inspected["application"]["bundle_id"] == "com.apple.Terminal", "Terminal owner changed"
+        )
+        cg, windows = await self.pages(
+            "windows.list",
+            {
+                "owner_pid": self.app["pid"],
+                "expected_start": f"{self.app['started_at']:.6f}",
+                "include_titles": True,
+                "include_ax": True,
+                "limit": 100,
+            },
+            "windows",
+        )
+        require(cg.get("titles_redacted") is False, "Native titles are unavailable")
+        windows = [window for window in windows if window["layer"] == 0]
+        require(
+            len({window["window_id"] for window in windows}) == len(windows),
+            "Duplicate CG window identity",
+        )
+        require(
+            all(
+                window["on_screen"] is True
+                and window["title_available"] is True
+                and window["owner_pid"] == self.app["pid"]
+                and window["application_start"] == f"{self.app['started_at']:.6f}"
+                and isinstance(window.get("title"), str)
+                for window in windows
+            ),
+            "Incomplete visible Terminal CG inventory",
+        )
+        root, children = await self.ax()
+        require(root["element"]["role"] == "AXApplication", "AX application root unavailable")
+        ax_windows = [child for child in children if child["role"] == "AXWindow"]
+        require(
+            len({window["element_token"] for window in ax_windows}) == len(ax_windows),
+            "Duplicate AX window identity",
+        )
+        require(
+            len(ax_windows)
+            == len(windows)
+            == sum(window.get("role") == "AXWindow" for window in cg["accessibility_windows"]),
+            "AX/CG physical inventory differs",
+        )
+        groups = []
+        for window in ax_windows:
+            require(
+                not window.get("title_truncated") and not window.get("minimized"),
+                "AX physical window unavailable",
+            )
+            observed, children = await self.ax(window["element_token"])
+            require(observed["element"]["role"] == "AXWindow", "AX window token changed")
+            require(
+                observed["element"].get("title_truncated") is False
+                and observed["element"].get("minimized") is False
+                and observed["element"].get("subrole") == "AXStandardWindow",
+                "Incomplete current AX window metadata",
+            )
+            tabs = [child for child in children if child["role"] == "AXTabGroup"]
+            require(len(tabs) <= 1, "Ambiguous AX tab groups")
+            radios = None
+            if tabs:
+                tab_group, members = await self.ax(tabs[0]["element_token"])
+                require(tab_group["element"]["role"] == "AXTabGroup", "AX tab-group token changed")
+                require(
+                    all(child["role"] in {"AXRadioButton", "AXButton"} for child in members),
+                    "Unknown AX tab-group structure",
+                )
+                radios = [child for child in members if child["role"] == "AXRadioButton"]
+                require(
+                    len({child["element_token"] for child in radios}) == len(radios),
+                    "Duplicate AX tab identity",
+                )
+                require(
+                    radios and all(not child.get("title_truncated") for child in radios),
+                    "Incomplete AX tab members",
+                )
+            groups.append(
+                {
+                    "title": observed["element"]["title"],
+                    "token": window["element_token"],
+                    "radios": radios,
+                    "tabs": len(radios) if radios is not None else None,
+                    "position": observed["element"].get("position"),
+                    "size": observed["element"].get("size"),
+                }
+            )
+        result = {
+            "app": inspected["application"],
+            "worker": list(self.worker),
+            "cg": windows,
+            "ax": groups,
+        }
+        self.record({"observation": result})
+        return result
+
+    async def logical(self):
+        inventory = await self.terminal.window_inventory()
+        require(inventory["running"] is True, "Terminal is no longer running")
+        windows = inventory["windows"]
+        require(
+            len({row["window_id"] for row in windows}) == len(windows)
+            and all(len(row["ttys"]) == 1 for row in windows),
+            "Logical scripting windows are not single unique tabs",
+        )
+        rows = await self.terminal.catalog()
+        require(not self.terminal.last_catalog_incomplete, "Complete logical inventory required")
+        require(
+            {(row["window_id"], row["tty"]) for row in rows}
+            == {(row["window_id"], row["ttys"][0]) for row in windows},
+            "Logical catalog is incomplete",
+        )
+        require(
+            len(rows) == len({row["tty"] for row in rows})
+            and not any(row.get("identity_ambiguous") for row in rows),
+            "Logical TTY mapping is ambiguous",
+        )
+        identities = {
+            process["pid"]: await self.terminal.process_identity(process["pid"], detailed=True)
+            for row in rows
+            for process in row["processes"]
+        }
+        return {"rows": rows, "identities": identities}
+
+    async def capture_baseline(self):
+        logical, native = await self.logical(), await self.snapshot()
+        if logical["rows"] and not native["cg"] and not native["ax"]:
+            raise BaselineNotVisible("Existing logical Terminal views have no physical surface")
+        require(
+            len(native["cg"]) == len(native["ax"]) == 1,
+            "Only one observed baseline physical tab group is supported",
+        )
+        if native["cg"][0]["title"] != native["ax"][0]["title"]:
+            raise BaselineTitlesUnsettled("Baseline CG/AX titles have not matched exactly")
+        self.physical_pairs(native)
+        require(
+            native["ax"][0]["tabs"] == len(logical["rows"]) and native["ax"][0]["radios"],
+            "Baseline AX/logical topology differs",
+        )
+        self.baseline = {"logical": logical, "native": native}
+        self.baseline["terminal_identity"] = await self.terminal.process_identity(
+            self.app["pid"], detailed=True
+        )
+        self.record({"baseline": self.baseline})
+        return self.baseline
+
+    async def preserve_logical(self):
+        current = await self.logical()
+        old = self.baseline["logical"]
+        ids = {row["window_id"] for row in old["rows"]}
+        row = created_row(current["rows"], self.created, ids)
+        require(
+            {item["pane_id"] for item in current["rows"]}
+            == {item["pane_id"] for item in old["rows"]} | {self.created["pane_id"]},
+            "Logical tab inventory changed",
+        )
+        for original in old["rows"]:
+            matching = [item for item in current["rows"] if item["pane_id"] == original["pane_id"]]
+            require(
+                len(matching) == 1
+                and all(
+                    matching[0].get(key) == original.get(key)
+                    for key in ("tty", "expected_pid", "legacy_expected_pid")
+                ),
+                "Original logical binding changed",
+            )
+        require(
+            all(
+                current["identities"].get(pid) == identity
+                for pid, identity in old["identities"].items()
+            ),
+            "Original process generation changed",
+        )
+        require(
+            current["identities"].get(self.created["expected_pid"]) == self.identity,
+            "Created process generation changed",
+        )
+        require(
+            await self.terminal.process_working_directory(
+                self.created["expected_pid"], expected_identity=self.identity
+            )
+            == self.workspace,
+            "Created CWD changed",
+        )
+        return row
+
+    @staticmethod
+    def physical_pairs(snapshot):
+        """Match current native surfaces by exact title and independently read layout."""
+        require(len(snapshot["cg"]) == len(snapshot["ax"]), "Incomplete physical topology")
+        pairs = []
+        for group in snapshot["ax"]:
+            matches = [window for window in snapshot["cg"] if window["title"] == group["title"]]
+            require(len(matches) == 1, "Current CG/AX titles are not uniquely coherent")
+            window = matches[0]
+            bounds = window.get("bounds", {})
+            require(
+                group.get("position") == [bounds.get("X"), bounds.get("Y")]
+                and group.get("size") == [bounds.get("Width"), bounds.get("Height")]
+                and all(
+                    type(bounds.get(key)) in {int, float} for key in ("X", "Y", "Width", "Height")
+                ),
+                "Current CG/AX layout is unavailable or differs",
+            )
+            pairs.append((group, window))
+        require(
+            len({window["window_id"] for _, window in pairs}) == len(pairs),
+            "Current CG/AX pairing is ambiguous",
+        )
+        return pairs
+
+    def topology(self, snapshot, *, after_move=False):
+        baseline = self.baseline["native"]
+        require(
+            len(baseline["cg"]) == len(baseline["ax"]) == 1,
+            "Only one observed baseline physical tab group is supported",
+        )
+        require(
+            snapshot["worker"] == baseline["worker"]
+            and all(
+                snapshot["app"][key] == baseline["app"][key]
+                for key in ("pid", "started_at", "bundle_id")
+            )
+            and all(
+                window["owner_pid"] == baseline["app"]["pid"]
+                and window["application_start"] == f"{baseline['app']['started_at']:.6f}"
+                for window in snapshot["cg"]
+            ),
+            "Physical owner or worker generation changed",
+        )
+        pairs = self.physical_pairs(snapshot)
+        own_pairs = [(group, window) for group, window in pairs if self.nonce in group["title"]]
+        require(
+            len(own_pairs) == 1 and own_pairs[0][0]["title"].count(self.nonce) == 1,
+            "Own nonce title is missing or ambiguous",
+        )
+        own, own_cg = own_pairs[0]
+        original = [radio["element_token"] for radio in baseline["ax"][0]["radios"]]
+        if own["tabs"] is None:
+            require(
+                after_move
+                and self.move_attempted
+                and self.move_accepted
+                and self.own_radio_token is not None
+                and self.own_radio_token not in original
+                and self.pre_move_ax_window_token == own["token"]
+                and own["radios"] is None
+                and len(pairs) == 2,
+                "Hidden own tabbar lacks the known move and preserved pre-move own binding",
+            )
+            host, host_cg = next(pair for pair in pairs if pair[0] is not own)
+            require(
+                host["radios"]
+                and host["tabs"] == len(original)
+                and [radio["element_token"] for radio in host["radios"]] == original
+                and host_cg["bounds"] == baseline["cg"][0]["bounds"],
+                "Hidden own tabbar has no complete ordered original baseline partition",
+            )
+            return {
+                "tab_count": 1,
+                "cg_window_id": own_cg["window_id"],
+                "ax_window_token": own["token"],
+                "own_radio_token": self.own_radio_token,
+                "own_tabbar_hidden": True,
+                "own_radio_observation": "pre_move_only",
+                "evidence": "known_move_preserved_own_ax_and_ordered_original_radios",
+            }
+        require(
+            all(group["radios"] and group["tabs"] == len(group["radios"]) for group, _ in pairs),
+            "Current AX tab membership is incomplete; no hidden-group inference is permitted",
+        )
+        tokens = [radio["element_token"] for group, _ in pairs for radio in group["radios"]]
+        require(
+            len(tokens) == len(set(tokens))
+            and set(original).issubset(tokens)
+            and len(tokens) == len(original) + 1,
+            "Original baseline radio membership changed or is ambiguous",
+        )
+        added = set(tokens) - set(original)
+        require(len(added) == 1, "Exactly one new own radio token is required")
+        own_token = added.pop()
+        require(
+            self.own_radio_token in {None, own_token},
+            "Own radio token changed after its first positive binding",
+        )
+        own_tokens = [radio["element_token"] for radio in own["radios"]]
+        require(own_token in own_tokens, "New own radio is outside the nonce-bound window")
+        selected = [radio["element_token"] for radio in own["radios"] if radio.get("value") is True]
+        require(selected == [own_token], "Own AX tab is not uniquely selected")
+        hosts = [
+            (group, window)
+            for group, window in pairs
+            if any(radio["element_token"] in original for radio in group["radios"])
+        ]
+        require(len(hosts) == 1, "Original baseline radios no longer share one physical group")
+        host, host_cg = hosts[0]
+        require(
+            [
+                radio["element_token"]
+                for radio in host["radios"]
+                if radio["element_token"] != own_token
+            ]
+            == original,
+            "Original baseline radio order changed",
+        )
+        require(
+            host_cg["bounds"] == baseline["cg"][0]["bounds"],
+            "Original baseline host layout changed",
+        )
+        if host is own:
+            require(len(pairs) == 1, "Shared baseline physical topology changed")
+        else:
+            require(
+                len(pairs) == 2 and own_tokens == [own_token],
+                "Detached own radio or remaining baseline topology is unproven",
+            )
+        # Parent AX and CG identifiers, and radio titles, are volatile on this host.
+        # Bind the sole added radio only after all positive membership checks pass.
+        self.own_radio_token = own_token
+        if not self.move_attempted:
+            self.pre_move_ax_window_token = own["token"]
+        return {
+            "tab_count": len(own_tokens),
+            "cg_window_id": own_cg["window_id"],
+            "ax_window_token": own["token"],
+            "own_radio_token": own_token,
+            "own_tabbar_hidden": False,
+        }
+
+    async def context(self):
+        physical = await self.snapshot()
+        if self.tag_attempted:
+            self.topology(physical, after_move=self.move_accepted)
+        row = await self.preserve_logical()
+        require(
+            not row["busy"]
+            and [p["pid"] for p in row["processes"]] == [self.created["expected_pid"]],
+            "Own display target is not a child-free idle shell",
+        )
+        context = await self.terminal.prepare_shell_paste(row)
+        require(
+            context["identities"][self.created["expected_pid"]] == self.identity
+            and context["screen"].rstrip("\n").split("\n")[-1] == "KiraBridge visible % ",
+            "Own controlled shell context changed",
+        )
+        terminal_identity = await self.terminal.process_identity(self.app["pid"], detailed=True)
+        require(
+            terminal_identity == self.baseline["terminal_identity"],
+            "Terminal process identity changed",
+        )
+        context["identities"][self.app["pid"]] = terminal_identity
+        return context
+
+    def source(self, context, *, detach):
+        terminal, created = self.terminal, self.created
+        pid, tty = created["expected_pid"], created["tty"]
+        guard = (
+            "\nfunction checkOwnFastBoundary(){" + "\nif(targetWindow.tabs().length!==1 || "
+            "app.windows().flatMap(w=>w.tabs()).filter(t=>t.tty()==="
+            + json.dumps(tty)
+            + ").length!==1)throw Error('Own logical tab changed');"
+            "if(tab.busy())throw Error('Own tab became busy');"
+            + terminal.native_screen_guard(context["screen"])
+            + "}\nfunction checkOwnDisplayTarget(){checkTargetIdentity();"
+            + terminal.native_shell_guard(context["snapshot"])
+            + cwd_guard(pid, self.workspace)
+            + "checkOwnFastBoundary();}\n"
+        )
+        source = (
+            terminal.native_target(created["pane_id"])
+            + terminal.native_identity_guard(context["identities"])
+            + guard
+            + "checkOwnDisplayTarget();\n{"
+            + terminal.native_focus(created["pane_id"])
+            + "}\ncheckOwnDisplayTarget();\n"
+        )
+        if not detach:
+            return (
+                source
+                + "if(app.windows().filter(w=>w.name().includes("
+                + json.dumps(self.nonce)
+                + ")).length)throw Error('Nonce already exists');"
+                + "checkOwnFastBoundary();"
+                + "tab.customTitle="
+                + json.dumps(self.nonce)
+                + ";tab.titleDisplaysCustomTitle=true;JSON.stringify({tagged:true});"
+            )
+        return (
+            source
+            + """
+const seOwn=Application('System Events');
+const processesOwn=seOwn.processes().filter(p=>p.unixId()===__OWNER__);
+if(processesOwn.length!==1 || !processesOwn[0].frontmost())
+ throw Error('Own Terminal owner/focus changed');
+const nonceOwn=__NONCE__;
+const ownAXWindows=processesOwn[0].windows().filter(w=>{
+ try{return w.name().includes(nonceOwn);}catch(e){return false;}});
+if(ownAXWindows.length!==1 || !targetWindow.name().includes(nonceOwn) ||
+ app.windows().filter(w=>w.name().includes(nonceOwn)).length!==1 ||
+ app.windows()[0].id()!==__WINDOW__ || app.windows()[0].selectedTab().tty()!==__TTY__)
+ throw Error('Own nonce/selected tab changed');
+const bars=processesOwn[0].menuBars();
+if(bars.length!==1)throw Error('Own menu bar changed');
+const menus=bars[0].menuBarItems().filter(m=>{
+ try{return ['Window','Fenster'].includes(m.name());}catch(e){return false;}});
+if(menus.length!==1 || menus[0].menus().length!==1)throw Error('Own window menu ambiguous');
+const labels=['Move Tab to New Window','Tab in ein neues Fenster bewegen'];
+const entries=menus[0].menus()[0].menuItems().filter(m=>{
+ try{return labels.includes(m.name());}catch(e){return false;}});
+if(entries.length!==1 || !entries[0].enabled())throw Error('Own detach menu unavailable');
+checkOwnDisplayTarget();
+checkOwnFastBoundary();
+if(!processesOwn[0].frontmost() || app.windows()[0].id()!==__WINDOW__ ||
+ app.windows()[0].selectedTab().tty()!==__TTY__)throw Error('Own focus changed before detach');
+if(!targetWindow.name().includes(nonceOwn) ||
+ processesOwn[0].windows().filter(w=>w.name().includes(nonceOwn)).length!==1 ||
+ !labels.includes(entries[0].name()) || !entries[0].enabled())
+ throw Error('Own nonce/menu changed before detach');
+entries[0].click();JSON.stringify({detached:true});
+""".replace("__OWNER__", str(self.app["pid"]))
+            .replace("__NONCE__", json.dumps(self.nonce))
+            .replace("__WINDOW__", str(int(created["pane_id"].split(":")[1])))
+            .replace("__TTY__", json.dumps(tty))
+        )
+
+    async def isolate(self, created, identity):
+        require(
+            self.baseline is not None and not self.tag_attempted,
+            "Display attempt must never be replayed",
+        )
+        self.created, self.identity = created, identity
+        context = await self.context()
+        self.tag_attempted = True
+        self.record({"title_attempted": True, "automatic_retry": False})
+        result = await self.terminal.native(self.source(context, detach=False), mutation=True)
+        require(result.get("tagged") is True, "Own title result unknown; never retry")
+        await self.preserve_logical()
+        before = await self.snapshot()
+        bound = self.topology(before)
+        if bound["tab_count"] > 1:
+            require(before["app"]["active"] is True, "Terminal is not active for detach")
+            context = await self.context()
+            self.move_attempted = True
+            self.record({"move_attempted": True, "automatic_retry": False})
+            result = await self.terminal.native(self.source(context, detach=True), mutation=True)
+            require(result.get("detached") is True, "Detach result unknown; never retry or adopt")
+            self.move_accepted = True
+        await self.preserve_logical()
+        async with asyncio.timeout(10):
+            while True:  # noqa: ASYNC110 -- observe one known display action; never retry it
+                await self.preserve_logical()
+                bound = self.topology(await self.snapshot(), after_move=self.move_accepted)
+                if bound["tab_count"] == 1:
+                    break
+                require(self.move_accepted, "Own physical window is not isolated")
+                await asyncio.sleep(0.15)
+        self.confirmed = True
+        self.record({"confirmed": True, "binding": bound})
+        return bound
+
+    async def current(self):
+        require(self.confirmed, "Fresh physical proof required before input or geometry")
+        row = await self.preserve_logical()
+        bound = self.topology(await self.snapshot(), after_move=self.move_accepted)
+        require(bound["tab_count"] == 1, "Own physical isolation changed")
+        return row

@@ -1,0 +1,310 @@
+{
+  "scope": "Actual Apps/ChatGPT connector -> native tunnel -> RC27 -> owned Cocoa fixture. 8 separate physical key pairs per round; no Voice or model turns included.",
+  "word": "Stern am",
+  "rounds": [
+    {
+      "round": 0,
+      "total_ms": 33907,
+      "samples": [
+        {
+          "task_id": "rc28_cloud_before_r0_20261103_k0",
+          "index": 0,
+          "elapsed_ms": 3711,
+          "state": "completed",
+          "created": 1793663838.447336,
+          "started": 1793663838.480405,
+          "finished": 1793663839.10116,
+          "post_calls_returned": 2
+        },
+        {
+          "task_id": "rc28_cloud_before_r0_20261103_k1",
+          "index": 1,
+          "elapsed_ms": 7075,
+          "state": "completed",
+          "created": 1793663846.100922,
+          "started": 1793663846.114941,
+          "finished": 1793663846.2411442,
+          "post_calls_returned": 2
+        },
+        {
+          "task_id": "rc28_cloud_before_r0_20261103_k2",
+          "index": 2,
+          "elapsed_ms": 5838,
+          "state": "completed",
+          "created": 1793663851.95569,
+          "started": 1793663851.9837172,
+          "finished": 1793663852.1576462,
+          "post_calls_returned": 2
+        },
+        {
+          "task_id": "rc28_cloud_before_r0_20261103_k3",
+          "index": 3,
+          "elapsed_ms": 5901,
+          "state": "completed",
+          "created": 1793663857.941301,
+          "started": 1793663857.962085,
+          "finished": 1793663858.13742,
+          "post_calls_returned": 2
+        },
+        {
+          "task_id": "rc28_cloud_before_r0_20261103_k4",
+          "index": 4,
+          "elapsed_ms": 3619,
+          "state": "completed",
+          "created": 1793663860.366394,
+          "started": 1793663860.424978,
+          "finished": 1793663860.551648,
+          "post_calls_returned": 2
+        },
+        {
+          "task_id": "rc28_cloud_before_r0_20261103_k5",
+          "index": 5,
+          "elapsed_ms": 2625,
+          "state": "completed",
+          "created": 1793663863.926964,
+          "started": 1793663863.9474292,
+          "finished": 1793663864.278948,
+          "post_calls_returned": 2
+        },
+        {
+          "task_id": "rc28_cloud_before_r0_20261103_k6",
+          "index": 6,
+          "elapsed_ms": 2907,
+          "state": "completed",
+          "created": 1793663866.9883032,
+          "started": 1793663867.047371,
+          "finished": 1793663867.217217,
+          "post_calls_returned": 2
+        },
+        {
+          "task_id": "rc28_cloud_before_r0_20261103_k7",
+          "index": 7,
+          "elapsed_ms": 2230,
+          "state": "completed",
+          "created": 1793663869.273888,
+          "started": 1793663869.289396,
+          "finished": 1793663869.467548,
+          "post_calls_returned": 2
+        }
+      ],
+      "receiver": {
+        "text_sha256": "51eee786a11585b19c9f7a1e12c07afb9e78fc00727d47edb60d0498da02ebf2",
+        "utf8_bytes": 8,
+        "selection_utf16": {
+          "length": 0,
+          "location": 8
+        },
+        "down_count": 8,
+        "up_count": 8,
+        "clipboard_generation": 15,
+        "event_records_dropped": 0
+      }
+    },
+    {
+      "round": 1,
+      "total_ms": 21456,
+      "samples": [
+        {
+          "task_id": "rc28_cloud_before_r1_20261103_k0",
+          "index": 0,
+          "elapsed_ms": 2524,
+          "state": "completed",
+          "created": 1793663925.447542,
+          "started": 1793663925.4608,
+          "finished": 1793663925.712368,
+          "post_calls_returned": 2
+        },
+        {
+          "task_id": "rc28_cloud_before_r1_20261103_k1",
+          "index": 1,
+          "elapsed_ms": 2216,
+          "state": "completed",
+          "created": 1793663927.826161,
+          "started": 1793663927.839519,
+          "finished": 1793663927.9663801,
+          "post_calls_returned": 2
+        },
+        {
+          "task_id": "rc28_cloud_before_r1_20261103_k2",
+          "index": 2,
+          "elapsed_ms": 2890,
+          "state": "completed",
+          "created": 1793663930.582111,
+          "started": 1793663930.5948641,
+          "finished": 1793663930.7189581,
+          "post_calls_returned": 2
+        },
+        {
+          "task_id": "rc28_cloud_before_r1_20261103_k3",
+          "index": 3,
+          "elapsed_ms": 2767,
+          "state": "completed",
+          "created": 1793663933.105731,
+          "started": 1793663933.16395,
+          "finished": 1793663933.363578,
+          "post_calls_returned": 2
+        },
+        {
+          "task_id": "rc28_cloud_before_r1_20261103_k4",
+          "index": 4,
+          "elapsed_ms": 4286,
+          "state": "completed",
+          "created": 1793663937.647857,
+          "started": 1793663937.663889,
+          "finished": 1793663937.882433,
+          "post_calls_returned": 2
+        },
+        {
+          "task_id": "rc28_cloud_before_r1_20261103_k5",
+          "index": 5,
+          "elapsed_ms": 2134,
+          "state": "completed",
+          "created": 1793663939.854812,
+          "started": 1793663939.871007,
+          "finished": 1793663939.999501,
+          "post_calls_returned": 2
+        },
+        {
+          "task_id": "rc28_cloud_before_r1_20261103_k6",
+          "index": 6,
+          "elapsed_ms": 2179,
+          "state": "completed",
+          "created": 1793663942.046005,
+          "started": 1793663942.063651,
+          "finished": 1793663942.186114,
+          "post_calls_returned": 2
+        },
+        {
+          "task_id": "rc28_cloud_before_r1_20261103_k7",
+          "index": 7,
+          "elapsed_ms": 2460,
+          "state": "completed",
+          "created": 1793663944.404572,
+          "started": 1793663944.417857,
+          "finished": 1793663944.543287,
+          "post_calls_returned": 2
+        }
+      ],
+      "receiver": {
+        "text_sha256": "51eee786a11585b19c9f7a1e12c07afb9e78fc00727d47edb60d0498da02ebf2",
+        "utf8_bytes": 8,
+        "selection_utf16": {
+          "length": 0,
+          "location": 8
+        },
+        "down_count": 8,
+        "up_count": 8,
+        "clipboard_generation": 15,
+        "event_records_dropped": 0
+      }
+    },
+    {
+      "round": 2,
+      "total_ms": 19953,
+      "samples": [
+        {
+          "task_id": "rc28_cloud_before_r2_20261103_k0",
+          "index": 0,
+          "elapsed_ms": 2575,
+          "state": "completed",
+          "created": 1793663962.931972,
+          "started": 1793663962.990259,
+          "finished": 1793663963.215462,
+          "post_calls_returned": 2
+        },
+        {
+          "task_id": "rc28_cloud_before_r2_20261103_k1",
+          "index": 1,
+          "elapsed_ms": 2629,
+          "state": "completed",
+          "created": 1793663965.6035242,
+          "started": 1793663965.6164548,
+          "finished": 1793663965.739691,
+          "post_calls_returned": 2
+        },
+        {
+          "task_id": "rc28_cloud_before_r2_20261103_k2",
+          "index": 2,
+          "elapsed_ms": 2151,
+          "state": "completed",
+          "created": 1793663967.806966,
+          "started": 1793663967.820311,
+          "finished": 1793663967.942923,
+          "post_calls_returned": 2
+        },
+        {
+          "task_id": "rc28_cloud_before_r2_20261103_k3",
+          "index": 3,
+          "elapsed_ms": 2146,
+          "state": "completed",
+          "created": 1793663970.020063,
+          "started": 1793663970.033304,
+          "finished": 1793663970.155893,
+          "post_calls_returned": 2
+        },
+        {
+          "task_id": "rc28_cloud_before_r2_20261103_k4",
+          "index": 4,
+          "elapsed_ms": 2457,
+          "state": "completed",
+          "created": 1793663972.0486112,
+          "started": 1793663972.063339,
+          "finished": 1793663972.275732,
+          "post_calls_returned": 2
+        },
+        {
+          "task_id": "rc28_cloud_before_r2_20261103_k5",
+          "index": 5,
+          "elapsed_ms": 2462,
+          "state": "completed",
+          "created": 1793663974.776143,
+          "started": 1793663974.793382,
+          "finished": 1793663974.9161322,
+          "post_calls_returned": 2
+        },
+        {
+          "task_id": "rc28_cloud_before_r2_20261103_k6",
+          "index": 6,
+          "elapsed_ms": 3375,
+          "state": "completed",
+          "created": 1793663978.0422778,
+          "started": 1793663978.057034,
+          "finished": 1793663978.2056031,
+          "post_calls_returned": 2
+        },
+        {
+          "task_id": "rc28_cloud_before_r2_20261103_k7",
+          "index": 7,
+          "elapsed_ms": 2158,
+          "state": "completed",
+          "created": 1793663980.508131,
+          "started": 1793663980.520919,
+          "finished": 1793663980.643085,
+          "post_calls_returned": 2
+        }
+      ],
+      "receiver": {
+        "text_sha256": "51eee786a11585b19c9f7a1e12c07afb9e78fc00727d47edb60d0498da02ebf2",
+        "utf8_bytes": 8,
+        "selection_utf16": {
+          "length": 0,
+          "location": 8
+        },
+        "down_count": 8,
+        "up_count": 8,
+        "clipboard_generation": 15,
+        "event_records_dropped": 0
+      }
+    }
+  ],
+  "stats": {
+    "calls": 24,
+    "total_ms": 75316,
+    "rpc_p50_ms": 2600,
+    "rpc_p95_ms": 5901,
+    "round_p50_ms": 21456,
+    "round_p95_ms": 33907,
+    "p95_definition": "nearest rank; three rounds, 24 RPCs"
+  },
+  "fixture_absent_twice": true
+}

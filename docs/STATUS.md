@@ -1,3 +1,93 @@
+# Aktueller Integrationsstand / Current integration status
+
+24.10.2026: RC17 ist ein unveröffentlichter Zusammenführungskandidat aus main, RC15, RC16 und den nachfolgenden Reparaturen. Veröffentlicht bleibt RC14. Historische Betriebsnachweise unten sind keine aktuelle Produktivabnahme.
+
+[Zusammenführung / Consolidation](CONSOLIDATION-20261024.md) · [Reparaturstand](REPAIR-SEQUENCE-20261024.md)
+
+## Historische Nachweise aus main
+
+# Grok-App-Connector · 19.10.2026 · 0.7.0rc2
+
+Der getrennte OAuth-/MCP-Gateway ist auf dem Ziel-Mac aktiv und über einen
+eigenen HTTPS-Tunnel erreichbar. Der bisherige CLI-Arbeitsagent `grok` bleibt
+erhalten; die Web-/Handy-App erhält den eigenen Zugang `grok_app`. Das vorhandene
+automatische Freigabeprofil ist übernommen, ohne zusätzliche Einzelauftragsklicks.
+ChatGPT bleibt Koordinator. Die App benötigt einmalig ihre eigene Verknüpfung
+im Grok-Konto und eine lokale Bestätigung der zugehörigen Anmeldung.
+
+Ein kontrollierter Client hat über den echten öffentlichen TLS-Eingang den
+vollständigen OAuth-/PKCE-Ablauf, MCP-Health, eine adressierte Teamnachricht an
+den echten Grok-CLI-Zugang samt Quittierung und einen automatischen Datei-
+Schreibauftrag abgeschlossen. Nachricht und Auftrag behalten bei Wiederholung
+ihre IDs; der Schreibauftrag lief genau einmal. Gefälschter Absender, Zugriff
+auf fremde private Aufgaben sowie wiederverwendete Codes und Refresh-Tokens
+wurden zurückgewiesen. Die kontrollierten Testclients sind widerrufen.
+
+101 gezielte Auth-, Transport-, Oberflächen- und Supervisorprüfungen bestanden.
+Alle 638 vor Aktivierung gesicherten Aufgaben, bisherigen Zugangsdaten und
+ursprünglichen Policies sind unverändert. Die bestehende Runtime behält ihre
+Versionsanzeige 0.5.2 und fremde Erweiterungen; der neue Code ist gezielt ergänzt.
+Eine kostenpflichtige Voice-API oder ein neues KI-Konto wurde nicht eingerichtet.
+
+Ein echter Aufruf aus dem Grok-Konto am Handy beziehungsweise aus Eve ist noch
+**nicht verifiziert**. Ein lokaler Test ersetzt diesen Nachweis nicht. Temporäre
+Quick-Tunnel-Adressen können sich bei Neustarts ändern; die aktuelle Adresse
+steht unter `kirabridge grok-connector status` und im lokalen Bereich **Grok App**.
+
+[Einrichtung und Grenzen](GROK-APP-CONNECTOR.md) ·
+[Prüfnachweis](evidence/grok-app-connector-20261019.json) ·
+[Releasehinweise](RELEASE-NOTES-0.7.0rc2.md).
+
+---
+
+# Teamsteuerung · 19.10.2026 · 0.7.0rc1
+
+Teamrollen, wählbarer Koordinator, dauerhafte adressierte Nachrichten und
+bewusst geteilte Aufträge/Ergebnisse sind implementiert. Alle sieben eingerichteten
+Agentenzugänge haben über echte authentifizierte MCP-Verbindungen die 42
+Richtungen geprüft und quittiert. ChatGPT ist im lokalen Team Koordinator.
+Ein Rollenwechsel ChatGPT → Codex → ChatGPT wurde durchgeführt; ein normaler
+Bearbeiter konnte sich nicht selbst befördern. Private Einzelaufträge bleiben
+für andere Zugänge gesperrt.
+
+Der echte automatische Ablauf Codex → OpenCode/Ollama → Codex ist mit drei
+abgeschlossenen nativen Turns und einer quittierten Rücknachricht nachgewiesen.
+Die vollständige gespeicherte OpenCode-Antwort benötigte ein ausdrücklich
+aktiviertes festes Antwortformat und einmalige, hashgebundene Nachverarbeitung;
+die ursprünglichen Modellaufrufe wurden nicht erneut gestartet. Zwei frühere
+begrenzte Versuche und ihr tatsächlicher Ausgang bleiben dokumentiert.
+
+Die Funktion ist als gezielter Backport in der bestehenden eigenen Runtime
+(Versionsanzeige weiterhin 0.5.2) aktiv. Nach geordnetem Neustart sind alle
+633 vorher gesicherten Aufgaben unverändert, 42 Nachrichten/Quittungen erhalten
+und die ursprünglichen Zugangsdaten unverändert. Das saubere private Release
+0.7.0rc1 wird separat mit eigenem Quellpin und Prüfsummen gebaut.
+
+[Bedienung und Grenzen](TEAM-ORCHESTRATION.md) ·
+[Prüfnachweise](evidence/team-orchestration-20261019.json) ·
+[Releasehinweise](RELEASE-NOTES-0.7.0rc1.md).
+ChatGPT bleibt ein externer aktiver Chat; Rollen wecken keine geschlossenen Chats.
+Gemini benötigt einen anderen unterstützten Anbieterzugang; Claude/Copilot sind
+hier noch nicht beim Anbieter angemeldet. Die zusätzlichen vier CLI-Adapter sind
+Textadapter ohne native Projekttools oder Übernahme bestehender Sitzungen.
+
+---
+
+# Fortschreibung Betreiberrechte · 18.10.2026
+
+Regulärer Terminal-Vollzugriff für chatgpt/local ist ausdrücklich konfiguriert
+und über die verbundene ChatGPT-App einschließlich Codex-Schreiben/Rücklesen,
+ps/Git, isolierter Paketinstallation/-entfernung und eigenem Prozessabbruch
+geprüft. Administratoradapter mit lokalem macOS-Dialog implementiert; die echte
+Root-Abnahme bleibt nach Timeout unbekannt. Historische Belege unten bleiben
+unverändert; insbesondere frühere Aussagen zur fehlenden App-Schnittstelle sind
+historisch. [Aktueller Stand DE/EN und konkrete Taskbelege](DEVELOPMENT-ACCESS-20261018.md).
+
+---
+
+
+## Historische Nachweise aus Runtime-Zweig
+
 # Abnahmestand 0.5.2
 
 **Aktueller Stand:** [Korrigierte Events-Anbindung erneut aktiviert; echter Empfang im ursprünglichen Chat weiterhin offen](MCP-SCHEMA-CACHE-20261019.md). Die nachfolgenden Betriebsstände sind historische Nachweise.

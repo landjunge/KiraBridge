@@ -179,8 +179,15 @@ async def test_eve_session_input_standing_grant_bypasses_gate_and_manual_approva
     policy.automatic_operations = ["session.input"]
     calls = []
 
-    async def selected(*args):
-        return None
+    async def selected(principal, pane_id, expected_pid):
+        # The real selector returns a current session row or raises.
+        return {
+            "pane_id": pane_id,
+            "expected_pid": expected_pid,
+            "transport": "tmux",
+            "processes": [],
+            "busy": False,
+        }
 
     async def command(*args, **kwargs):
         calls.append(args)

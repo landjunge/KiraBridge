@@ -12,6 +12,7 @@ import uuid
 from pathlib import Path
 
 from kirabridge.bridge_core.models import BridgeError, TaskRequest, canonical, digest
+from kirabridge.permissions import automatic_for
 from kirabridge.team_manager.models import (
     TeamCreate,
     TeamMessageSend,
@@ -157,6 +158,7 @@ class TeamManager:
         self.bridge = bridge
         self.config, self.store, self.security = bridge.config, bridge.store, bridge.security
         self.wake = asyncio.Event()
+        self.on_change = None
         with self.store.transaction():
             for statement in SCHEMA.split(";"):
                 if statement.strip():
@@ -206,7 +208,7 @@ class TeamManager:
 
     def _automatic(self, principal, capability="team.write"):
         policy = self._principal(principal, capability)
-        if policy.approval_mode != "automatic":
+        if not automatic_for(policy, capability):
             raise BridgeError(
                 "approval_required", "Team writes require local automatic authorization"
             )
@@ -249,6 +251,8 @@ class TeamManager:
         self.store.audit(
             kind, principal, None, {"team_id": team_id, "object_id": object_id, **metadata}
         )
+        if self.on_change is not None:
+            self.on_change()
 
     def _view_team(self, team_id):
         result = dict(
@@ -454,7 +458,9 @@ class TeamManager:
             ):
                 raise BridgeError("message_store_full", "Team message archive capacity reached")
             count = self.store.db.execute(
-                "SELECT count(*) FROM team_messages WHERE recipient=? AND acknowledged IS NULL",
+                "SELECT count(*) FROM team_messages WHERE recipient=? AND acknowledged IS NULL "
+                "AND NOT EXISTS (SELECT 1 FROM queue_holds h WHERE "
+                "h.queue_id='team-messages' AND h.item_id=team_messages.id)",
                 (request.recipient,),
             ).fetchone()[0]
             if count >= self.config.team.max_pending_per_member:
@@ -636,7 +642,9 @@ class TeamManager:
         ]
         pending = self.store.db.execute(
             "SELECT * FROM team_messages WHERE team_id=? AND recipient=? "
-            "AND acknowledged IS NULL ORDER BY seq LIMIT 16",
+            "AND acknowledged IS NULL "
+            "AND NOT EXISTS (SELECT 1 FROM queue_holds h WHERE "
+            "h.queue_id='team-messages' AND h.item_id=team_messages.id) ORDER BY seq LIMIT 16",
             (team_id, principal),
         ).fetchall()
         latest = self.store.db.execute(
@@ -913,7 +921,7 @@ class TeamManager:
         if not worker or not worker.agent or not worker.cwd:
             raise BridgeError("team_worker_unavailable", "No automatic worker is configured")
         policy = self.security.principal(work["assignee"], "agent.execute")
-        if policy.approval_mode != "automatic" or worker.agent not in policy.agents:
+        if not automatic_for(policy, "agent.execute") or worker.agent not in policy.agents:
             raise BridgeError("team_worker_denied", "Worker execution is not authorized")
         if worker.agent not in self.config.agents:
             raise BridgeError("agent_unavailable", "Worker adapter is not configured")
@@ -925,6 +933,9 @@ class TeamManager:
             if not self.store.can_claim(work["created"]):
                 return None
             if work["state"] != "queued" or work["core_task_id"] is not None:
+                return None
+            continuation = getattr(self.bridge, "autonext", None)
+            if continuation is not None and not continuation.work_ready(work_id):
                 return None
             try:
                 self._execution_allowed(work)
@@ -951,6 +962,8 @@ class TeamManager:
                 core_task_id=core_id,
                 session_scope="existing_visible_terminal"
                 if self.config.visible_handoffs.enabled
+                and self.config.team.workers[work["assignee"]].execution_scope
+                == "existing_visible_terminal"
                 else "separate_managed_session",
             )
         return self._work(work_id)

@@ -1,0 +1,37 @@
+{
+  "schema_version": "bigplan.cli-runtime.v1",
+  "access": [
+    {
+      "cli": "codex",
+      "executable": "/Users/landjunge/.local/bin/codex",
+      "version": "codex-cli 0.166.0",
+      "models": [
+        "gpt-6-luna",
+        "gpt-6.1-terra",
+        "gpt-6.1-sol",
+        "gpt-6-astra"
+      ],
+      "access_kind": "subscription",
+      "verified_at": "2026-11-05T21:49:13.289077+00:00",
+      "expires_at": "2026-11-06T21:49:13.289077+00:00",
+      "evidence": "codex login status: ChatGPT; model cache"
+    },
+    {
+      "cli": "grok",
+      "executable": "/Users/landjunge/.grok/bin/grok",
+      "version": "grok 1.0.77 (50ca579fa996) [alpha]",
+      "models": [
+        "grok-4.7"
+      ],
+      "access_kind": "subscription",
+      "verified_at": "2026-11-05T21:49:13.289077+00:00",
+      "expires_at": "2026-11-06T21:49:13.289077+00:00",
+      "evidence": "grok --no-auto-update models: logged in grok.com; no API credentials"
+    }
+  ],
+  "allowed_roots": [
+    "/Users/landjunge/KiraBridge-worktrees/cli-capability-routing-20261105"
+  ],
+  "state_dir": "/Users/landjunge/.local/state/bigplan-cli-routing",
+  "allow_write": false
+}

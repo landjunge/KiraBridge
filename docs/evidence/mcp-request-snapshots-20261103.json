@@ -1,0 +1,127 @@
+{
+  "scope": "Direct FastMCP tool function with temporary state and real installed native metadata hashing; no HTTP, external platform, OS input or process launch",
+  "baseline_commit": "08209f1a256c63c5e05a9ba96234a5c164297238",
+  "change": "Request-local native-host fact reuse and one default health discovery snapshot",
+  "samples": [
+    {
+      "mode": "before",
+      "repeat": 0,
+      "tool": "bridge_health",
+      "elapsed_ms": 11.706452,
+      "native_metadata_calls": 2,
+      "native_metadata_elapsed_ms": 8.425699999999999,
+      "native_available": true,
+      "operation_count": null
+    },
+    {
+      "mode": "before",
+      "repeat": 0,
+      "tool": "operation_catalog",
+      "elapsed_ms": 285.095301,
+      "native_metadata_calls": 50,
+      "native_metadata_elapsed_ms": 175.86385999999996,
+      "native_available": true,
+      "operation_count": 76
+    },
+    {
+      "mode": "after",
+      "repeat": 0,
+      "tool": "bridge_health",
+      "elapsed_ms": 4.782734,
+      "native_metadata_calls": 1,
+      "native_metadata_elapsed_ms": 3.270913,
+      "native_available": true,
+      "operation_count": null
+    },
+    {
+      "mode": "after",
+      "repeat": 0,
+      "tool": "operation_catalog",
+      "elapsed_ms": 66.612836,
+      "native_metadata_calls": 2,
+      "native_metadata_elapsed_ms": 7.106353,
+      "native_available": true,
+      "operation_count": 76
+    },
+    {
+      "mode": "after",
+      "repeat": 1,
+      "tool": "bridge_health",
+      "elapsed_ms": 4.819036,
+      "native_metadata_calls": 1,
+      "native_metadata_elapsed_ms": 3.443306,
+      "native_available": true,
+      "operation_count": null
+    },
+    {
+      "mode": "after",
+      "repeat": 1,
+      "tool": "operation_catalog",
+      "elapsed_ms": 64.383514,
+      "native_metadata_calls": 2,
+      "native_metadata_elapsed_ms": 6.813078,
+      "native_available": true,
+      "operation_count": 76
+    },
+    {
+      "mode": "before",
+      "repeat": 1,
+      "tool": "bridge_health",
+      "elapsed_ms": 9.282043,
+      "native_metadata_calls": 2,
+      "native_metadata_elapsed_ms": 6.8733699999999995,
+      "native_available": true,
+      "operation_count": null
+    },
+    {
+      "mode": "before",
+      "repeat": 1,
+      "tool": "operation_catalog",
+      "elapsed_ms": 243.322382,
+      "native_metadata_calls": 50,
+      "native_metadata_elapsed_ms": 169.43174500000003,
+      "native_available": true,
+      "operation_count": 76
+    },
+    {
+      "mode": "before",
+      "repeat": 2,
+      "tool": "bridge_health",
+      "elapsed_ms": 9.151336,
+      "native_metadata_calls": 2,
+      "native_metadata_elapsed_ms": 6.863044,
+      "native_available": true,
+      "operation_count": null
+    },
+    {
+      "mode": "before",
+      "repeat": 2,
+      "tool": "operation_catalog",
+      "elapsed_ms": 250.027812,
+      "native_metadata_calls": 50,
+      "native_metadata_elapsed_ms": 173.44905399999993,
+      "native_available": true,
+      "operation_count": 76
+    },
+    {
+      "mode": "after",
+      "repeat": 2,
+      "tool": "bridge_health",
+      "elapsed_ms": 5.347552,
+      "native_metadata_calls": 1,
+      "native_metadata_elapsed_ms": 3.730743,
+      "native_available": true,
+      "operation_count": null
+    },
+    {
+      "mode": "after",
+      "repeat": 2,
+      "tool": "operation_catalog",
+      "elapsed_ms": 65.961164,
+      "native_metadata_calls": 2,
+      "native_metadata_elapsed_ms": 7.143772,
+      "native_available": true,
+      "operation_count": 76
+    }
+  ]
+}

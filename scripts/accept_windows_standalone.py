@@ -1,0 +1,317 @@
+#!/usr/bin/env python3
+"""Native offline-package lifecycle acceptance in a new explicit Windows root."""
+
+from __future__ import annotations
+
+import argparse
+import asyncio
+import hashlib
+import importlib.util
+import json
+import os
+import platform
+import secrets
+import subprocess
+import sys
+import traceback
+from pathlib import Path
+from types import SimpleNamespace
+
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / "src"))
+
+
+def digest(path):
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def save(path, report):
+    path.write_text(json.dumps(report, sort_keys=True, indent=2), encoding="utf-8")
+
+
+async def health(root, report, persist):
+    import httpx
+    import mcp
+    import uvicorn
+
+    import kirabridge
+    from kirabridge import windows_package
+
+    for module in (kirabridge, windows_package, mcp, httpx, uvicorn):
+        location = Path(module.__file__).resolve()
+        assert ROOT in location.parents, str(location)
+    report["imports"] = {
+        m.__name__: str(Path(m.__file__).resolve())
+        for m in (kirabridge, windows_package, mcp, httpx, uvicorn)
+    }
+    child = await asyncio.to_thread(
+        subprocess.run,
+        [sys.executable, "-I", "-B", "-c", "import kirabridge;print(kirabridge.__file__)"],
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    expected = ROOT / "src" / "kirabridge" / "__init__.py"
+    assert Path(child.stdout.strip()).resolve() == expected.resolve(), child.stdout
+    report["isolated_child_import"] = child.stdout.strip()
+    report["python"] = sys.executable
+    report["platform"] = platform.platform()
+    path = ROOT / "scripts/accept_windows_parity_e2e.py"
+    spec = importlib.util.spec_from_file_location("native_health_support", path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    async with module.NativeMCP(SimpleNamespace(root=root), report, persist) as client:
+        reply = await client.call("bridge_health", {})
+        assert "error" not in reply, reply
+        report["authenticated_health"] = reply
+        from kirabridge.agent_manager.full_access import bridge_server
+        from kirabridge.mcp_gateway.client import MCPClientPool, Peer
+        from kirabridge.platform_adapters.windows.visible_console import visible_environment
+
+        nonce = secrets.token_hex(8)
+        environment_key = client.environment_key
+        config = root / ("stdio-" + nonce + ".toml")
+        config.write_text(
+            "data_dir = "
+            + json.dumps(str(root / ("stdio-state-" + nonce)))
+            + "\n"
+            + "port = "
+            + str(client.bridge.config.port)
+            + "\n"
+            '[principals.local]\ncapabilities = ["bridge.health", "task.read"]\n'
+            'approval_mode = "automatic"\nclient_type = "operator"\n'
+            'token_env = "' + environment_key + '"\n',
+            encoding="utf-8",
+        )
+        server = bridge_server(str(config), "local")
+        assert server["args"][:2] == ["-B", "-m"]
+        environment = visible_environment()
+        environment.pop("PYTHONDONTWRITEBYTECODE", None)  # Test the generated -B itself.
+        environment[environment_key] = os.environ[environment_key]
+        async with MCPClientPool(call_timeout=20) as clients:
+            await clients.connect(
+                Peer(
+                    "agent-child",
+                    command=server["command"],
+                    args=tuple(server["args"]),
+                    env=environment,
+                    cwd=str(ROOT),
+                )
+            )
+            response = await clients.call("agent-child", "bridge_health", {})
+            assert not response.isError and "error" not in response.structuredContent
+            report["full_access_child_health"] = response.structuredContent
+    manifest = json.loads((ROOT / "manifest.json").read_text(encoding="utf-8"))
+    windows_package._verify_release_bytes(ROOT, manifest["files"])
+    report["release_inventory_unchanged_after_agent_child"] = True
+    report["passed"] = True
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--package", type=Path)
+    parser.add_argument("--update", type=Path)
+    parser.add_argument("--root", type=Path, required=True)
+    parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--health-only", action="store_true")
+    args = parser.parse_args()
+    assert sys.platform == "win32", "Native Windows required"
+    assert not args.output.exists(), "Preserve original evidence; choose a new run"
+    report = {
+        "passed": False,
+        "platform": platform.platform(),
+        "python": sys.executable,
+        "root": str(args.root),
+        "commands": [],
+    }
+
+    def persist():
+        save(args.output, report)
+
+    persist()
+    try:
+        if args.health_only:
+            asyncio.run(health(args.root, report, persist))
+            persist()
+            return
+        assert not args.root.exists(), "Preserve original installation; no replay"
+        assert args.package and args.update
+        packages = [args.package, args.update]
+        for package in packages:
+            provenance = json.loads((package / "provenance.json").read_text(encoding="utf-8"))
+            report.setdefault("provenance", []).append(
+                {
+                    "path": str(package / "provenance.json"),
+                    "sha256": digest(package / "provenance.json"),
+                    "commit": provenance["commit"],
+                    "version": provenance["version"],
+                    "source_archive_sha256": provenance.get("source_archive_sha256"),
+                    "runtime": provenance["runtime"],
+                    "file_count": len(provenance["files"]),
+                }
+            )
+
+        def run(argv, label, env=None, expect_success=True):
+            item = {"label": label, "argv": [str(x) for x in argv], "state": "started"}
+            report["commands"].append(item)
+            persist()
+            result = subprocess.run(
+                [str(x) for x in argv],
+                capture_output=True,
+                text=True,
+                timeout=900,
+                encoding="utf-8",
+                errors="replace",
+                env=env,
+            )
+            item.update(returncode=result.returncode, stdout=result.stdout, stderr=result.stderr)
+            item["state"] = "finished"
+            persist()
+            assert (result.returncode == 0) == expect_success, item
+            return result
+
+        def manage(package, action):
+            if args.root.name == "KiraBridge" and action in {"install", "update", "uninstall"}:
+                env = dict(os.environ, LOCALAPPDATA=str(args.root.parent))
+                run(
+                    [
+                        "C:\\Windows\\System32\\cmd.exe",
+                        "/d",
+                        "/c",
+                        package / (action.capitalize() + ".cmd"),
+                    ],
+                    action,
+                    env=env,
+                )
+                return
+            run(
+                [
+                    "C:\\Windows\\System32\\cmd.exe",
+                    "/d",
+                    "/c",
+                    package / "Manage.cmd",
+                    "--root",
+                    args.root,
+                    action,
+                ],
+                action,
+            )
+
+        def installed_health(label):
+            current = json.loads((args.root / "current.json").read_text())
+            release = args.root / "releases" / current["release"]
+            output = args.output.with_name(args.output.stem + "-" + label + ".json")
+            run(
+                [
+                    release / "runtime/python.exe",
+                    "-I",
+                    "-B",
+                    release / "scripts/accept_windows_standalone.py",
+                    "--root",
+                    args.root / "data",
+                    "--output",
+                    output,
+                    "--health-only",
+                ],
+                label,
+            )
+            found = json.loads(output.read_text())
+            assert found["passed"]
+            assert found["mcp_sessions"][-1]["unauthenticated_http_status"] == 401
+            report[label] = found
+            persist()
+
+        manage(args.package, "install")
+        initial = json.loads((args.root / "current.json").read_text())
+        # A rejected install must reach the caller as a nonzero exit status.
+        if args.root.name == "KiraBridge":
+            run(
+                ["C:\\Windows\\System32\\cmd.exe", "/d", "/c", args.update / "Install.cmd"],
+                "duplicate_install_rejected",
+                env=dict(os.environ, LOCALAPPDATA=str(args.root.parent)),
+                expect_success=False,
+            )
+            assert json.loads((args.root / "current.json").read_text()) == initial
+        data = args.root / "data/user-record.bin"
+        data.write_bytes(b"created after initial installation")
+        run(
+            [
+                "C:\\Windows\\System32\\cmd.exe",
+                "/d",
+                "/c",
+                args.root / "KiraBridge.cmd",
+                "run",
+                "--version",
+            ],
+            "initial_version",
+        )
+        installed_health("initial_health")
+        manage(args.update, "update")
+        updated = json.loads((args.root / "current.json").read_text())
+        assert updated["release"] != initial["release"]
+        assert data.read_bytes() == b"created after initial installation"
+        data.write_bytes(b"new user data after update must survive rollback")
+        expected = digest(data)
+        cli_help = run(
+            [
+                "C:\\Windows\\System32\\cmd.exe",
+                "/d",
+                "/c",
+                args.root / "KiraBridge.cmd",
+                "run",
+                "--help",
+            ],
+            "installed_cli",
+        )
+        assert "KiraBridge private desktop bridge" in cli_help.stdout
+        subcommand_help = run(
+            [
+                "C:\\Windows\\System32\\cmd.exe",
+                "/d",
+                "/c",
+                args.root / "KiraBridge.cmd",
+                "run",
+                "setup",
+                "--help",
+            ],
+            "installed_subcommand_help",
+        )
+        assert "--workspace" in subcommand_help.stdout
+        installed_health("updated_health")
+        assert report["updated_health"]["release_inventory_unchanged_after_agent_child"]
+        run(
+            [
+                "C:\\Windows\\System32\\cmd.exe",
+                "/d",
+                "/c",
+                args.root / "KiraBridge.cmd",
+                "rollback",
+            ],
+            "rollback",
+        )
+        reverted = json.loads((args.root / "current.json").read_text())
+        assert reverted["release"] == initial["release"]
+        assert digest(data) == expected
+        installed_health("rollback_health")
+        manage(args.package, "uninstall")
+        assert digest(data) == expected
+        assert not (args.root / "current.json").exists()
+        assert not (args.root / "KiraBridge.cmd").exists()
+        assert not list((args.root / "releases").iterdir())
+        report.update(
+            passed=True,
+            initial=initial,
+            updated=updated,
+            reverted=reverted,
+            preserved_data_sha256=expected,
+            uninstalled=True,
+        )
+        persist()
+    except BaseException:
+        report["original_error"] = traceback.format_exc()
+        persist()
+        raise
+
+
+if __name__ == "__main__":
+    main()

@@ -1,0 +1,61 @@
+{
+  "platform": "macOS-15.7.4-x86_64-i386-64bit",
+  "label": "com.kirabridge.test.rollback-proof-20261026-a",
+  "source": "14468ad5e7b28be1c1c4312d2f4517582dbc7701",
+  "checks": [
+    "isolated RC14 starts",
+    "isolated current starts",
+    "rollback readiness passed"
+  ],
+  "before_rollback": {
+    "at": 1793029140.6912441,
+    "launchctl_returncode": 0,
+    "state": "running",
+    "pid": "1067",
+    "runs": "1",
+    "last exit code": "(never exited)",
+    "previous_client": {
+      "exit_code": 0,
+      "stderr_bytes": 0,
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "version": "0.8.0rc17",
+      "dispatcher_active": true,
+      "runtime_pid": 1067
+    },
+    "candidate_client": {
+      "exit_code": 0,
+      "stderr_bytes": 0,
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "version": "0.8.0rc17",
+      "dispatcher_active": true,
+      "runtime_pid": 1067
+    }
+  },
+  "passed": true,
+  "after_rollback_before_cleanup": {
+    "at": 1793029151.747809,
+    "launchctl_returncode": 0,
+    "state": "running",
+    "pid": "1167",
+    "runs": "1",
+    "last exit code": "(never exited)",
+    "previous_client": {
+      "exit_code": 0,
+      "stderr_bytes": 0,
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "version": "0.8.0rc14",
+      "dispatcher_active": true,
+      "runtime_pid": 1167
+    },
+    "candidate_client": {
+      "exit_code": 0,
+      "stderr_bytes": 0,
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "version": "0.8.0rc14",
+      "dispatcher_active": true,
+      "runtime_pid": 1167
+    }
+  },
+  "preserved": true,
+  "cleanup_absence": true
+}

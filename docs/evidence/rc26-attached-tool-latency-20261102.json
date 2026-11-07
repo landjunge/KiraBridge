@@ -1,0 +1,32 @@
+{
+  "scope": "Actual attached Codex desktop MCP tool, connection_check, sequential calls within one functions.exec. Includes host tool handoff and response; excludes model time between turns. Does not measure the historical ChatGPT cloud connector.",
+  "samples": [
+    {
+      "i": 0,
+      "start_utc": "2026-11-02T22:48:56.490Z",
+      "elapsed_ms": 1079
+    },
+    {
+      "i": 1,
+      "start_utc": "2026-11-02T22:48:57.569Z",
+      "elapsed_ms": 655
+    },
+    {
+      "i": 2,
+      "start_utc": "2026-11-02T22:48:58.224Z",
+      "elapsed_ms": 849
+    },
+    {
+      "i": 3,
+      "start_utc": "2026-11-02T22:48:59.073Z",
+      "elapsed_ms": 716
+    },
+    {
+      "i": 4,
+      "start_utc": "2026-11-02T22:48:59.789Z",
+      "elapsed_ms": 913
+    }
+  ],
+  "errors": 0,
+  "automatic_retry": false
+}

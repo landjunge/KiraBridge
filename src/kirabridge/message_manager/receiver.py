@@ -3,9 +3,12 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import json
+import re
 import time
 import uuid
+from pathlib import Path
 
 from kirabridge.bridge_core.models import (
     AgentInput,
@@ -17,6 +20,18 @@ from kirabridge.bridge_core.models import (
 from kirabridge.local_runtime import peer
 from kirabridge.mcp_gateway.client import MCPClientPool
 from kirabridge.message_manager import MessageSend
+
+
+def separate_managed_eligible(config, created: float) -> bool:
+    """True only for messages created at or after an explicit operator cutoff.
+
+    The default cutoff is unset, so existing visible delivery stays unchanged.
+    Holds, unknown jobs and older rows are not made eligible by this check.
+    """
+    cutoff = config.messaging.separate_managed_after
+    if cutoff is None:
+        return False
+    return float(created) >= float(cutoff)
 
 
 class MessageReceiver:
@@ -36,20 +51,33 @@ class MessageReceiver:
         self.messages = bridge.messages
         self.worker = None
         self.stopping = False
+        self.recovered_handoffs = set()
+        self._stops_in_progress = 0
+        from kirabridge.message_manager.direct import DirectDelivery
+
+        self.direct = DirectDelivery(self)
 
     async def start(self):
+        if self._stops_in_progress:
+            return
+        if self.direct._stop_task is not None and not self.direct._stop_task.done():
+            return  # A cancelled stop observer must not reopen admission during owned cleanup.
         if self.worker and self.worker.done():
             if not self.worker.cancelled():
                 self.worker.exception()  # Consume the finished task before replacing its handle.
             self.worker = None
         if self.worker or not self.bridge.config.messaging.receivers:
             return
+        self.recovered_handoffs.clear()
         # The task dispatcher owns the exclusive runtime lock before this is called.
         with self.bridge.store.transaction():
             rows = self.bridge.store.db.execute(
                 "SELECT message_id,evidence FROM message_jobs WHERE state='running'"
             ).fetchall()
             for row in rows:
+                if self._reply_can_finish(row):
+                    self.recovered_handoffs.add(row["message_id"])
+                    continue  # Return already happened; do not interrupt or paste again.
                 self._finish(
                     row[0],
                     "unknown",
@@ -60,35 +88,471 @@ class MessageReceiver:
                     "interrupted",
                 )
             queued = self.bridge.store.db.execute(
-                "SELECT m.id,m.recipient FROM messages m JOIN message_jobs j ON j.message_id=m.id "
-                "WHERE j.state='queued'"
+                "SELECT m.id,m.recipient,m.created FROM messages m "
+                "JOIN message_jobs j ON j.message_id=m.id WHERE j.state='queued'"
             ).fetchall()
+            cutoff = self.bridge.config.messaging.separate_managed_after
             for row in queued:
                 if row["recipient"] not in self.bridge.config.messaging.receivers:
+                    # A configured cutoff preserves older jobs instead of
+                    # marking them blocked when their receiver is absent.
+                    if cutoff is not None and row["created"] < cutoff:
+                        continue
                     self._finish(row["id"], "blocked", {"reason": "receiver_removed"})
+        self._reconcile_recovered_handoffs()
         self.stopping = False
+        self.direct.accepting = True
+        self.messages.delivery_hook = self._submit_new
         self.worker = asyncio.create_task(self._loop())
 
     async def stop(self):
+        self._stops_in_progress += 1
+        self.messages.delivery_hook = None
         self.stopping = True
         self.messages.wake.set()
         worker = self.worker
-        if worker:
-            # Each adapter invocation has its own configured finite timeout.
+        try:
             try:
-                await asyncio.shield(worker)
+                await self.direct.stop()
             finally:
-                if self.worker is worker and worker.done():
-                    self.worker = None
+                if worker:
+                    # Never observe a replacement worker from a concurrent start.
+                    try:
+                        await asyncio.shield(worker)
+                    finally:
+                        if self.worker is worker and worker.done():
+                            self.worker = None
+        finally:
+            self._stops_in_progress -= 1
+
+    def _submit_new(self, principal, message_id):
+        row = self.bridge.store.db.execute(
+            "SELECT created FROM messages WHERE id=?", (message_id,)
+        ).fetchone()
+        if self.bridge.config.visible_handoffs.enabled and not separate_managed_eligible(
+            self.bridge.config, row["created"]
+        ):
+            self.direct.submit(principal, message_id)
+
+    async def send(self, principal, message, *, completion_target=None):
+        """Observe one new visible admission, never resubmit a recorded ID."""
+        recorded = self.bridge.store.db.execute(
+            "SELECT id FROM messages WHERE sender=? AND idem=?",
+            (principal, message.idempotency_key),
+        ).fetchone()
+        result = self.messages.send(principal, message, completion_target=completion_target)
+        if "id" not in result or result.get("message_buffer"):
+            return result
+        identifier = result["id"]
+        job = result.get("processing")
+        visible = self.bridge.config.visible_handoffs.enabled and not separate_managed_eligible(
+            self.bridge.config, result["created"]
+        )
+        if not job or not visible:
+            return result
+        if not recorded and job["state"] == "queued" and not self.direct.accepting:
+            self.direct.fail(
+                identifier, BridgeError("receiver_unavailable", "Direct receiver is not running")
+            )
+        if identifier in self.direct.active:
+            await self.direct.wait_delivery(identifier)
+        result = self.messages.get(principal, identifier)
+        job = result["processing"]
+        if job["state"] == "queued":
+            # No active runtime attempt means a historical/unadmitted record.
+            # Its ID remains readable, but reading it never starts delivery.
+            result["delivery"] = {
+                "status": "not_admitted",
+                "automatic_retry": False,
+                "next_step": "Inspect the original record; do not resend or release history",
+            }
+            result["error"] = {
+                "code": "delivery_not_admitted",
+                "message": "No active delivery attempt for this record; inspect without replay",
+            }
+        elif job["state"] in {"failed", "blocked", "cancelled", "unknown"}:
+            result["error"] = {
+                "code": job["error"] or job["evidence"].get("reason", "delivery_not_admitted"),
+                "message": "Visible delivery unconfirmed; inspect this message ID, never replay",
+            }
+        return result
+
+    def _reply_can_finish(self, row):
+        """A delivered visible handoff is waiting for its reply, not for another paste."""
+        try:
+            evidence = json.loads(row["evidence"] or "{}")
+        except (TypeError, ValueError):
+            return False
+        handoff_id = evidence.get("handoff_id") if isinstance(evidence, dict) else None
+        if not handoff_id:
+            return False
+        handoff = self.bridge.store.db.execute(
+            "SELECT h.state FROM visible_handoffs h JOIN messages m ON m.id=h.message_id "
+            "WHERE h.id=? AND m.id=? AND h.principal=m.sender AND h.target=m.recipient",
+            (handoff_id, row["message_id"]),
+        ).fetchone()
+        return bool(handoff) and handoff["state"] in {
+            "return_sent",
+            "sent",
+            "confirmed",
+            "completed",
+        }
+
+    def _local_reply_evidence(self, message_id, run_id, result, *, recovered=False):
+        """Observed local protocol results never impersonate an authenticated peer."""
+        from kirabridge.bridge_core.config import VisibleTerminalBinding
+        from kirabridge.platform_adapters.codex_reply import MAX_ANSWER_BYTES, MAX_LOG_BYTES
+
+        try:
+            proof = result.get("evidence") if isinstance(result, dict) else None
+            if (
+                not isinstance(result, dict)
+                or result.get("success") is not True
+                or result.get("scope") != "local_agent_turn"
+                or result.get("reply_source") != "bound_local_codex_rollout"
+                or result.get("agent_confirmed") is not False
+                or result.get("request_reply_satisfied") is not True
+                or result.get("work_completion_verified") is not False
+                or result.get("project_completion_verified") is not False
+                or result.get("reply_id") is not None
+                or not isinstance(result.get("text"), str)
+                or not result["text"].strip()
+                or len(result["text"].encode("utf-8")) > MAX_ANSWER_BYTES
+                or not isinstance(proof, dict)
+                or proof.get("message_id") != message_id
+                or proof.get("handoff_id") != run_id
+                or proof.get("reply_id") is not None
+                or proof.get("reply_source") != "bound_local_codex_rollout"
+                or proof.get("completion_scope") != "local_agent_turn"
+                or proof.get("identity_scope")
+                != "OS_process_and_local_protocol_not_authenticated_mailbox"
+                or proof.get("agent_confirmed") is not False
+                or proof.get("request_reply_satisfied") is not True
+                or proof.get("process_writer_verified") is not True
+                or proof.get("task_complete_observed") is not True
+                or type(proof.get("baseline_offset")) is not int
+                or not 0 < proof["baseline_offset"] <= MAX_LOG_BYTES
+                or any(
+                    not isinstance(value, str) or not re.fullmatch(r"[a-zA-Z0-9_.:-]{1,256}", value)
+                    for value in (
+                        proof.get(key) for key in ("turn_id", "user_item_id", "final_item_id")
+                    )
+                )
+                or proof["user_item_id"] == proof["final_item_id"]
+                or any(
+                    not isinstance(proof.get(key), str)
+                    or not re.fullmatch(r"[a-f0-9]{64}", proof[key])
+                    for key in ("baseline_sha256", "appended_sha256", "expected_payload_sha256")
+                )
+                or any(
+                    key.startswith("authenticated_")
+                    for value in (result, proof, proof.get("protocol_binding"))
+                    if isinstance(value, dict)
+                    for key in value
+                )
+                or not isinstance(proof.get("binding"), dict)
+                or not isinstance(proof.get("protocol_binding"), dict)
+            ):
+                raise ValueError("invalid_local_reply_result")
+            binding = VisibleTerminalBinding.model_validate(proof["binding"])
+            protocol = proof["protocol_binding"]
+            thread, path, cwd = (protocol.get(key) for key in ("thread_id", "rollout_path", "cwd"))
+            if (
+                not isinstance(thread, str)
+                or not re.fullmatch(r"[a-f0-9-]{36}", thread)
+                or not isinstance(path, str)
+                or len(path) > 4096
+                or not Path(path).is_absolute()
+                or ".." in Path(path).parts
+                or Path(path).suffix != ".jsonl"
+                or any(ord(char) < 32 for char in path)
+                or binding.expected_pid == binding.agent_pid
+                or (
+                    cwd is not None
+                    and (
+                        not isinstance(cwd, str)
+                        or len(cwd) > 4096
+                        or not Path(cwd).is_absolute()
+                        or ".." in Path(cwd).parts
+                        or any(ord(char) < 32 for char in cwd)
+                    )
+                )
+                or (
+                    binding.codex_thread_id is not None
+                    and (
+                        protocol.get("origin") != "explicit_verified_writer"
+                        or binding.codex_thread_id != thread
+                        or binding.codex_rollout_path != path
+                    )
+                )
+                or (
+                    binding.codex_thread_id is None
+                    and (protocol.get("origin") != "process_writer_discovery" or cwd is None)
+                )
+            ):
+                raise ValueError("invalid_local_protocol_binding")
+            original = self.bridge.store.db.execute(
+                "SELECT body,sender,recipient FROM messages WHERE id=?", (message_id,)
+            ).fetchone()
+            if (
+                original is None
+                or original["recipient"] != "codex"
+                or proof["expected_payload_sha256"]
+                != hashlib.sha256(original["body"].encode("utf-8")).hexdigest()
+            ):
+                raise ValueError("original_body_mismatch")
+            handoff = self.bridge.store.db.execute(
+                "SELECT binding,state,message_id,principal,target FROM visible_handoffs WHERE id=?",
+                (run_id,),
+            ).fetchone()
+            if handoff and (
+                handoff["state"] != "completed"
+                or handoff["message_id"] != message_id
+                or handoff["principal"] != original["sender"]
+                or handoff["target"] != original["recipient"]
+                or json.loads(handoff["binding"]) != proof["binding"]
+            ):
+                raise ValueError("original_handoff_binding_mismatch")
+        except (ValueError, TypeError, KeyError, AttributeError, RecursionError):
+            raise BridgeError(
+                "local_reply_conflict", "Bound local reply evidence does not match this message"
+            ) from None
+        return {
+            **proof,
+            "run_id": run_id,
+            "session_scope": "existing_visible_terminal",
+            "completion_scope": "local_agent_turn",
+            "reply_source": "bound_local_codex_rollout",
+            "agent_confirmed": False,
+            "agent_turn_completed": True,
+            "agent_work_completion_verified": False,
+            "project_completion_verified": False,
+            "request_reply_satisfied": True,
+            "response_sha256": digest(result["text"]),
+            "response_preview": result["text"][:320],
+            "response_truncated": False,
+            "local_reply_result": result,
+            "reconciled_without_input": recovered,
+            "automatic_retry": False,
+        }
+
+    def _existing_reply(self, message_id):
+        original = self.bridge.store.db.execute(
+            "SELECT sender, recipient, acknowledged FROM messages WHERE id=?", (message_id,)
+        ).fetchone()
+        if original is None or original["acknowledged"] is None:
+            return None
+        reply = self.bridge.store.db.execute(
+            "SELECT id FROM messages WHERE reply_to=? AND sender=? AND recipient=? "
+            "AND kind IN ('result','answer') ORDER BY seq LIMIT 1",
+            (message_id, original["recipient"], original["sender"]),
+        ).fetchone()
+        return reply["id"] if reply else None
+
+    def _reconcile_recovered_handoffs(self, recipient=None):
+        """Observe only waiters lost at startup; never touch a new running turn or send input."""
+        for message_id in tuple(self.recovered_handoffs):
+            with self.bridge.store.transaction():
+                row = self.bridge.store.db.execute(
+                    "SELECT j.message_id,j.state,j.evidence,j.run_id,m.sender,m.recipient "
+                    "FROM message_jobs j JOIN messages m ON m.id=j.message_id "
+                    "WHERE j.message_id=?",
+                    (message_id,),
+                ).fetchone()
+                if row is not None and recipient is not None and row["recipient"] != recipient:
+                    continue
+                if row is None or row["state"] != "running" or not self._reply_can_finish(row):
+                    self.recovered_handoffs.discard(message_id)
+                    continue  # In particular, never reconcile an unknown or blocked history.
+                local_handoff = self.bridge.store.db.execute(
+                    "SELECT state,evidence FROM visible_handoffs WHERE id=? AND message_id=? "
+                    "AND principal=? AND target=?",
+                    (row["run_id"], message_id, row["sender"], row["recipient"]),
+                ).fetchone()
+                reply_id = self._existing_reply(message_id)
+                if local_handoff and local_handoff["state"] == "completed":
+                    if reply_id:
+                        # A genuine authenticated return does not depend on the
+                        # shape of an optional local cache. This handoff is already
+                        # terminal; retain the existing principal read check.
+                        try:
+                            self.bridge.security.principal(row["sender"], "task.read")
+                        except BridgeError as exc:
+                            if exc.code != "forbidden":
+                                raise
+                            continue
+                        evidence = json.loads(row["evidence"])
+                        evidence.pop("local_reply_result", None)
+                        if evidence.get("completion_scope") == "local_agent_turn":
+                            evidence.pop("response_preview", None)
+                            evidence.pop("response_sha256", None)
+                        self._finish(
+                            message_id,
+                            "completed",
+                            {
+                                **evidence,
+                                "completion_scope": "agent_turn",
+                                "reply_source": "authenticated_bridge_mailbox",
+                                "agent_confirmed": True,
+                                "request_reply_satisfied": True,
+                                "reason": "reply_already_recorded",
+                                "reconciled_without_input": True,
+                                "automatic_retry": False,
+                            },
+                            reply_id=reply_id,
+                        )
+                        self.recovered_handoffs.discard(message_id)
+                        continue
+                    try:
+                        saved = json.loads(local_handoff["evidence"])
+                        if not isinstance(saved, dict):
+                            raise ValueError("invalid_local_handoff_evidence")
+                        has_local = (
+                            "local_reply_result" in saved
+                            or saved.get("completion_scope") == "local_agent_turn"
+                        )
+                        if has_local:
+                            local = self._local_reply_evidence(
+                                message_id,
+                                row["run_id"],
+                                saved.get("local_reply_result"),
+                                recovered=True,
+                            )
+                    except (ValueError, TypeError, AttributeError, RecursionError, BridgeError):
+                        self._finish(
+                            message_id,
+                            "unknown",
+                            {"reason": "local_reply_conflict", "automatic_retry": False},
+                            "local_reply_conflict",
+                        )
+                        self.recovered_handoffs.discard(message_id)
+                        continue
+                    if has_local:
+                        self._finish(message_id, "completed", local)
+                        self.recovered_handoffs.discard(message_id)
+                        continue
+                if not reply_id:
+                    continue
+                evidence = json.loads(row["evidence"])
+                try:
+                    handoff = self.bridge.visible_handoffs.reconcile(
+                        row["sender"], evidence["handoff_id"]
+                    )
+                except BridgeError as exc:
+                    if exc.code != "forbidden":
+                        raise
+                    continue  # Revoked historical access must not stop other receiver work.
+                if handoff["state"] != "completed":
+                    continue
+                self._finish(
+                    message_id,
+                    "completed",
+                    {
+                        **evidence,
+                        "reason": "reply_already_recorded",
+                        "reconciled_without_input": True,
+                        "automatic_retry": False,
+                    },
+                    reply_id=reply_id,
+                )
+            self.recovered_handoffs.discard(message_id)
+
+    def reconcile_completed_handoff(self, principal, handoff_id):
+        """Explicit late-receipt correction; never restart an UNKNOWN receiver.
+
+        The existing visible_handoff_status call owns this reconciliation. An
+        authenticated reply alone is insufficient: the exact persisted run must
+        already have an independently completed handoff for this original message.
+        """
+        self.bridge.security.principal(principal, "task.read")
+        self.bridge.security.principal(principal, "message.read")
+        with self.bridge.store.transaction():
+            handoff = self.bridge.store.db.execute(
+                "SELECT * FROM visible_handoffs WHERE id=? AND (principal=? OR target=?)",
+                (handoff_id, principal, principal),
+            ).fetchone()
+            if handoff is None:
+                raise BridgeError("not_found", "Visible handoff not found")
+            message = self.messages._row(principal, handoff["message_id"])
+            job = self.bridge.store.db.execute(
+                "SELECT * FROM message_jobs WHERE message_id=?", (message["id"],)
+            ).fetchone()
+            unchanged = {"reconciled": False, "message_id": message["id"]}
+            if job is None or job["state"] != "unknown":
+                return {**unchanged, "state": job["state"] if job else None}
+            if (
+                handoff["state"] != "completed"
+                or job["run_id"] != handoff_id
+                or handoff["principal"] != message["sender"]
+                or handoff["target"] != message["recipient"]
+                or message["acknowledged"] is None
+            ):
+                return {**unchanged, "state": "unknown", "reason": "completion_unproven"}
+            reply = self.bridge.store.db.execute(
+                "SELECT id,body FROM messages WHERE reply_to=? AND sender=? AND recipient=? "
+                "AND conversation_id=? AND kind IN ('answer','result') ORDER BY seq LIMIT 1",
+                (
+                    message["id"],
+                    message["recipient"],
+                    message["sender"],
+                    message["conversation_id"],
+                ),
+            ).fetchone()
+            if reply is None:
+                return {**unchanged, "state": "unknown", "reason": "completion_unproven"}
+            try:
+                previous = json.loads(job["evidence"])
+            except (ValueError, TypeError, RecursionError):
+                return {**unchanged, "state": "unknown", "reason": "invalid_prior_evidence"}
+            if not isinstance(previous, dict):
+                return {**unchanged, "state": "unknown", "reason": "invalid_prior_evidence"}
+            notice = self.bridge.store.db.execute(
+                "SELECT id FROM completion_notices WHERE source='message' AND source_id=? "
+                "ORDER BY seq DESC LIMIT 1",
+                (message["id"],),
+            ).fetchone()
+            evidence = {
+                "reason": "completed_handoff_reply_reconciled",
+                "handoff_id": handoff_id,
+                "run_id": job["run_id"],
+                "completion_scope": "agent_turn",
+                "reply_source": "authenticated_bridge_mailbox",
+                "agent_confirmed": True,
+                "request_reply_satisfied": True,
+                "project_completion_verified": False,
+                "reconciled_without_input": True,
+                "automatic_retry": False,
+                "response_sha256": digest(reply["body"]),
+                "response_preview": reply["body"][:320],
+                "previous_state": "unknown",
+                "previous_error": job["error"],
+                "previous_finished": job["finished"],
+                "previous_evidence": previous,
+                "supersedes_notice_id": notice["id"] if notice else None,
+            }
+            self._record_finish(job, "completed", evidence, reply_id=reply["id"])
+            return {
+                "reconciled": True,
+                "message_id": message["id"],
+                "state": "completed",
+                "reply_id": reply["id"],
+                "reconciled_without_input": True,
+            }
 
     def _finish(self, message_id, state, evidence, error=None, reply_id=None):
-        from kirabridge.completion_manager import completion_payload, record_notice
 
         job = self.bridge.store.db.execute(
             "SELECT * FROM message_jobs WHERE message_id=?", (message_id,)
         ).fetchone()
         if job["state"] not in {"queued", "running"}:
             return  # same job must not create a second completion
+        self._record_finish(job, state, evidence, error=error, reply_id=reply_id)
+
+    def _record_finish(self, job, state, evidence, error=None, reply_id=None):
+        """Caller has validated the exact prior state and owns the transaction."""
+        from kirabridge.completion_manager import completion_payload, record_notice
+
+        message_id = job["message_id"]
         now = time.time()
         self.bridge.store.db.execute(
             "UPDATE message_jobs SET state=?,finished=?,evidence=?,error=?,reply_id=? "
@@ -119,6 +583,20 @@ class MessageReceiver:
             "finished": now,
             "result": {"text": evidence.get("response_preview", "")},
         }
+        delivery_only = evidence.get("completion_scope") == "visible_input_delivery"
+        if delivery_only:
+            task["operation"] = "message.visible_input_delivery"
+            task["result"] = {
+                "submitted": True,
+                "agent_confirmed": False,
+                "agent_work_completion_verified": False,
+                "request_reply_satisfied": False,
+                "scope": "visible_input_delivery",
+            }
+        local_reply = evidence.get("completion_scope") == "local_agent_turn"
+        if local_reply:
+            task["operation"] = "message.local_agent_turn"
+            task["result"] = evidence["local_reply_result"]
         payload = completion_payload(task, seq, source="message")
         payload.update(
             message_id=message_id,
@@ -126,6 +604,18 @@ class MessageReceiver:
             conversation_id=row["conversation_id"],
             reply_id=reply_id,
         )
+        if job["state"] == "unknown" and evidence.get("supersedes_notice_id"):
+            # Only explicit proven reconciliation can reach this writer from
+            # UNKNOWN. Existing notices stay immutable, including their receipts.
+            payload["supersedes"] = evidence["supersedes_notice_id"]
+        if delivery_only:
+            payload.update(
+                completion_scope="visible_input_delivery",
+                agent_confirmed=False,
+                agent_work_completion_verified=False,
+                request_reply_satisfied=False,
+                summary="Message text submitted; agent acknowledgement and reply unconfirmed",
+            )
         if evidence.get("externally_acknowledged"):
             payload["outcome"] = "not_executed"
             payload["summary"] = "Message acknowledged externally; no receiver turn executed"
@@ -142,12 +632,14 @@ class MessageReceiver:
             payload,
         )
 
-    def _claim(self, message_id):
+    def _claim(self, message_id, *, direct=False):
         config = self.bridge.config.messaging
         with self.bridge.store.transaction():
             row = self.bridge.store.db.execute(
                 "SELECT m.* FROM messages m JOIN message_jobs j ON j.message_id=m.id "
-                "WHERE m.id=? AND j.state='queued'",
+                "WHERE m.id=? AND j.state='queued' "
+                "AND NOT EXISTS (SELECT 1 FROM queue_holds h WHERE "
+                "h.queue_id='messages' AND h.item_id=m.id)",
                 (message_id,),
             ).fetchone()
             if not row:
@@ -157,42 +649,75 @@ class MessageReceiver:
             if row["acknowledged"]:
                 self._finish(message_id, "completed", {"externally_acknowledged": True})
                 return None
+
+            def blocked(reason):
+                evidence = {"reason": reason}
+                if direct:
+                    evidence.update(
+                        phase="direct_admission",
+                        terminal_input_attempted=False,
+                        automatic_retry=False,
+                    )
+                self._finish(message_id, "blocked", evidence)
+                if direct:
+                    # Only this fresh direct attempt was refused before claim.
+                    # Its body must not be delivered later by an inbox poll.
+                    self.bridge.queues._place_hold(
+                        row["sender"], "messages", message_id, "direct_admission_rejected"
+                    )
+                    self.bridge.store.audit(
+                        "queue.admission_rejected",
+                        row["sender"],
+                        None,
+                        {
+                            "queue": "messages",
+                            "item_id": message_id,
+                            "reason": reason,
+                            "terminal_input_attempted": False,
+                            "history_preserved": True,
+                        },
+                    )
+
             count = self.bridge.store.db.execute(
                 "SELECT count(*) FROM message_jobs j JOIN messages m ON m.id=j.message_id "
                 "WHERE m.conversation_id=? AND j.claimed IS NOT NULL",
                 (row["conversation_id"],),
             ).fetchone()[0]
             if count >= config.max_runs_per_conversation:
-                self._finish(message_id, "blocked", {"reason": "conversation_run_limit"})
+                blocked("conversation_run_limit")
                 return None
             count = self.bridge.store.db.execute(
                 "SELECT count(*) FROM message_jobs WHERE claimed>?",
                 (time.time() - 3600,),
             ).fetchone()[0]
             if count >= config.max_runs_per_hour:
-                self._finish(message_id, "blocked", {"reason": "hourly_run_limit"})
+                blocked("hourly_run_limit")
                 return None
             run_id = "channel-" + uuid.uuid4().hex
             scope = (
-                "existing_visible_terminal"
+                "separate_managed_session"
+                if separate_managed_eligible(self.bridge.config, row["created"])
+                else "existing_visible_terminal"
                 if self.bridge.config.visible_handoffs.enabled
                 else "separate_managed_session"
             )
             self.bridge.store.db.execute(
-                "UPDATE message_jobs SET state='running',run_id=?,claimed=?,evidence=? "
+                "UPDATE message_jobs SET state='running',run_id=?,claimed=?,evidence=?,"
+                "execution_cwd=? "
                 "WHERE message_id=?",
-                (run_id, time.time(), canonical({"session_scope": scope}), message_id),
+                (
+                    run_id,
+                    time.time(),
+                    canonical({"session_scope": scope}),
+                    config.receivers[row["recipient"]].cwd,
+                    message_id,
+                ),
             )
             self.messages._event(
                 message_id,
                 "message.processing_claimed",
                 row["recipient"],
-                {
-                    "run_id": run_id,
-                    "session_scope": "existing_visible_terminal"
-                    if self.bridge.config.visible_handoffs.enabled
-                    else "separate_managed_session",
-                },
+                {"run_id": run_id, "session_scope": scope},
             )
             return dict(row), run_id
 
@@ -273,7 +798,7 @@ class MessageReceiver:
                 return False
             self.bridge.store.db.execute(
                 "UPDATE message_jobs SET state='queued',run_id=NULL,claimed=NULL,started=NULL,"
-                "finished=NULL,error=NULL,reply_id=NULL WHERE message_id=?",
+                "finished=NULL,error=NULL,reply_id=NULL,execution_cwd=NULL WHERE message_id=?",
                 (message_id,),
             )
             evidence = {
@@ -358,18 +883,40 @@ class MessageReceiver:
                 evidence["terminal_input_attempted"] = False
             self._finish(message_id, "failed" if unclaimed else "unknown", evidence, code)
 
-    async def _dispatch_next(self, recipient=None):
+    async def _dispatch_next(self, recipient=None, *, include_visible=True):
         # One oldest message per recipient: a busy Codex must not hide ready Grok.
+        # A cutoff removes older rows from that contest so they are neither
+        # dispatched nor able to hide a newer eligible message.
+        cutoff = self.bridge.config.messaging.separate_managed_after
         rows = self.bridge.store.db.execute(
             "SELECT m.id,m.sender,m.recipient,m.created,m.acknowledged,j.evidence FROM messages m "
             "JOIN message_jobs j ON j.message_id=m.id WHERE j.state='queued' "
+            "AND NOT EXISTS (SELECT 1 FROM queue_holds h WHERE "
+            "h.queue_id='messages' AND h.item_id=m.id) "
+            "AND (? IS NULL OR m.created>=?) "
             "AND (? IS NULL OR m.recipient=?) "
             "AND NOT EXISTS (SELECT 1 FROM messages older JOIN message_jobs q "
             "ON q.message_id=older.id WHERE q.state='queued' "
+            "AND NOT EXISTS (SELECT 1 FROM queue_holds h WHERE "
+            "h.queue_id='messages' AND h.item_id=older.id) "
+            "AND (? IS NULL OR older.created>=?) "
             "AND older.recipient=m.recipient AND older.seq<m.seq) ORDER BY m.seq LIMIT 17",
-            (recipient, recipient),
+            (cutoff, cutoff, recipient, recipient, cutoff, cutoff),
         ).fetchall()
         for row in rows:
+            if row["acknowledged"] is not None:
+                # External ACK can close only this never-claimed delivery;
+                # it never restarts a historical visible turn.
+                self._claim(row["id"])
+                continue
+            if (
+                not include_visible
+                and self.bridge.config.visible_handoffs.enabled
+                and not separate_managed_eligible(self.bridge.config, row["created"])
+            ):
+                # Old visible backlog is inventory, never fresh authorization.
+                # New visible work has one runtime-owned direct admission.
+                continue
             if row["recipient"] not in self.bridge.config.messaging.receivers:
                 continue
             try:
@@ -386,7 +933,9 @@ class MessageReceiver:
                     continue
                 if now < retry.get("next_attempt_at", 0):
                     continue
-                if self.bridge.config.visible_handoffs.enabled:
+                if self.bridge.config.visible_handoffs.enabled and not separate_managed_eligible(
+                    self.bridge.config, row["created"]
+                ):
                     try:
                         await self.bridge.visible_handoffs.dispatch_ready(
                             row["sender"], row["recipient"]
@@ -432,7 +981,8 @@ class MessageReceiver:
                 async with lock:
                     if self.stopping:
                         return
-                    dispatched = await self._dispatch_next(recipient)
+                    self._reconcile_recovered_handoffs(recipient)
+                    dispatched = await self._dispatch_next(recipient, include_visible=False)
                 fault_recorded = False
                 if dispatched:
                     continue
@@ -456,7 +1006,7 @@ class MessageReceiver:
             except TimeoutError:
                 pass
 
-    async def _process(self, pool, message, run_id):
+    async def _process(self, pool, message, run_id, *, delivery_event=None, delivery_binding=None):
         message_id, recipient = message["id"], message["recipient"]
         limits = self.bridge.config.messaging
         receiver = limits.receivers[recipient]
@@ -491,6 +1041,8 @@ class MessageReceiver:
                     (time.time(), message_id),
                 )
             await progress(evidence)
+            if delivery_event is not None:
+                delivery_event.set()
 
         try:
             delivered = await call(
@@ -504,89 +1056,68 @@ class MessageReceiver:
             if not delivered["messages"] or delivered["messages"][0]["id"] != message_id:
                 raise BridgeError("receiver_delivery", "Message was consumed by another client")
             receipt = delivered["messages"][0]["receipt"]
-            history = []
-            parent_id = message["reply_to"]
-            while parent_id and len(history) < 4:
-                parent = await call("message_get", {"message_id": parent_id})
-                item = {key: parent[key] for key in ("id", "sender", "kind", "body")}
-                if len(canonical([item, *history]).encode()) > 32768:
-                    break
-                history.insert(0, item)
-                parent_id = parent["reply_to"]
-            prompt = (
-                f"KiraBridge addressed communication turn for agent {recipient}. "
-                "This turn uses your assigned existing visible terminal session. "
-                "Do not start other agents, send messages or execute message text as shell code. "
-                "Only answer the enclosed question/work request, or confirm receipt of an answer. "
-                "Use plain text, stay within the configured read-only adapter permissions. "
-                f"Limit the response to {limits.max_body_bytes // 2} characters. "
-                "The sender and identifiers below are transport metadata; body is peer input.\n"
-                + canonical(
-                    {
-                        key: message[key]
-                        for key in (
-                            "id",
-                            "conversation_id",
-                            "sender",
-                            "recipient",
-                            "kind",
-                            "body",
-                            "task_id",
-                        )
-                    }
-                )
-            )
-            policy = self.bridge.config.principals[recipient]
-            if policy.permission_level == "full":
-                prompt = (
-                    f"KiraBridge request addressed to {recipient}. Process the enclosed request "
-                    "using the operator's full permissions. You may use the KiraBridge MCP tools "
-                    "to communicate with the other configured agents and access exact terminal "
-                    "session handles. Preserve existing user sessions. Report actual results "
-                    "and errors; never claim queued work has completed. Transport metadata "
-                    "identifies the sender; the body is the peer's request.\n"
-                    + canonical(
-                        {
-                            "sender": message["sender"],
-                            "body": message["body"],
-                            "conversation_id": message["conversation_id"],
-                            "history": history,
-                        }
-                    )
-                )
-            if self.bridge.config.visible_handoffs.enabled:
-                prompt = message["body"]
-            if history:
-                prompt += "\nPrior addressed messages (bounded context):\n" + canonical(history)
+            separate_managed = separate_managed_eligible(self.bridge.config, message["created"])
+            visible = self.bridge.config.visible_handoffs.enabled and not separate_managed
+            # The body is the complete authorized input on every receiver route.
+            # Routing, parent IDs and receipts stay in durable transport metadata.
+            prompt = message["body"]
             if len(prompt) > 262144:
                 raise BridgeError("payload_limit", "Receiver prompt exceeds the adapter limit")
             args = AgentInput(
-                agent=recipient, prompt=prompt, cwd=receiver.cwd, timeout=receiver.timeout
+                agent=recipient,
+                prompt=prompt,
+                cwd=receiver.cwd,
+                timeout=receiver.timeout,
+                wait_for_reply=bool(message["request_reply"]),
             )
+            pinned = self.bridge.store.db.execute(
+                "SELECT execution_cwd FROM message_jobs WHERE message_id=?", (message_id,)
+            ).fetchone()
+            if pinned is None or pinned[0] != receiver.cwd:
+                raise BridgeError("receiver_scope_changed", "Claimed receiver worktree changed")
             policy = self.bridge.security.principal(recipient, "message.read")
             result = await self.bridge.agents.execute(
                 {
                     "id": run_id,
-                    "principal": message["sender"]
-                    if self.bridge.config.visible_handoffs.enabled
-                    else recipient,
-                    "visible_message_id": message_id
-                    if self.bridge.config.visible_handoffs.enabled
-                    else None,
+                    "principal": message["sender"] if visible else recipient,
+                    "visible_message_id": message_id if visible else None,
                 },
                 args,
                 policy,
                 running,
                 progress,
+                separate_managed=separate_managed,
+                **({"visible_binding": delivery_binding} if delivery_binding is not None else {}),
             )
             if not result.get("success"):
                 await progress(result.get("evidence", {}))
                 raise BridgeError("agent_failed", "Receiving agent did not complete successfully")
+            if visible and result.get("scope") == "local_agent_turn":
+                evidence = self._local_reply_evidence(message_id, run_id, result)
+                with self.bridge.store.transaction():
+                    self._finish(message_id, "completed", evidence)
+                return
+            if visible and result.get("scope") == "visible_input_delivery":
+                # Native Paste+Return confirms delivery only. No protocol text
+                # was injected, so do not invent a recipient ACK or final reply.
+                evidence = {
+                    **result.get("evidence", {}),
+                    "run_id": run_id,
+                    "session_scope": "existing_visible_terminal",
+                    "completion_scope": "visible_input_delivery",
+                    "agent_confirmed": False,
+                    "agent_work_completion_verified": False,
+                    "request_reply_satisfied": False,
+                    "automatic_retry": False,
+                }
+                with self.bridge.store.transaction():
+                    self._finish(message_id, "completed", evidence)
+                return
             evidence = {
                 **result.get("evidence", {}),
                 "run_id": run_id,
                 "session_scope": "existing_visible_terminal"
-                if self.bridge.config.visible_handoffs.enabled
+                if visible
                 else "separate_managed_session",
                 "response_sha256": digest(result.get("text", "")),
                 "response_preview": result.get("text", "")[:320],
@@ -609,7 +1140,7 @@ class MessageReceiver:
                     # Starting another receiver here can consume its awaited answer.
                     dispatch=False,
                 )
-                if self.bridge.config.visible_handoffs.enabled:
+                if visible:
                     reply = await call(
                         "message_get", {"message_id": result["evidence"]["reply_id"]}
                     )
@@ -626,6 +1157,18 @@ class MessageReceiver:
                 self._finish(message_id, "completed", evidence, reply_id=reply_id)
         except asyncio.CancelledError:
             with self.bridge.store.transaction():
+                job = self.bridge.store.db.execute(
+                    "SELECT message_id,evidence FROM message_jobs WHERE message_id=?",
+                    (message_id,),
+                ).fetchone()
+                if (
+                    delivery_event is not None
+                    and delivery_event.is_set()
+                    and self._reply_can_finish(job)
+                ):
+                    # Shutdown loses only the waiter, not the authenticated
+                    # return path. Startup observes ACK/late reply without input.
+                    raise
                 observed = self.bridge.store.db.execute(
                     "SELECT evidence FROM message_jobs WHERE message_id=?", (message_id,)
                 ).fetchone()[0]
@@ -640,8 +1183,13 @@ class MessageReceiver:
                 )
             raise
         except Exception as exc:
-            if isinstance(exc, BridgeError) and self._queue_unsent(
-                message_id, exc.code, run_id, "running"
+            if delivery_event is not None:
+                self.direct.fail(message_id, exc)
+                return  # One admission attempt; no pre-input requeue or replay.
+            if (
+                delivery_event is None
+                and isinstance(exc, BridgeError)
+                and self._queue_unsent(message_id, exc.code, run_id, "running")
             ):
                 return  # Readiness changed before any input attempt.
             state = (

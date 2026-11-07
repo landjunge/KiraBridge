@@ -1,0 +1,47 @@
+name: Refresh README downloads
+on:
+  release:
+    types: [published, edited, deleted]
+  schedule:
+    - cron: '37 5 * * *'
+  workflow_dispatch:
+permissions:
+  contents: write
+  pull-requests: write
+concurrency:
+  group: readme-downloads
+  cancel-in-progress: false
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Update badges from published release assets
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: python3 scripts/update_readme_downloads.py
+      - name: Propose changed README and badges as a pull request
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          BASE_BRANCH: ${{ github.event.repository.default_branch }}
+        run: |
+          set -eu
+          # Never push to the default branch: generated content is reviewed first.
+          git add -A -- README.md README.de.md assets/readme
+          if git diff --cached --quiet; then
+            echo "Download buttons are already current."
+            exit 0
+          fi
+          branch=automation/readme-downloads
+          git switch -C "$branch"
+          git -c user.name='github-actions[bot]' \
+            -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
+            commit -m "docs: refresh download buttons"
+          # Dedicated bot branch: a rerun replaces its previous proposal.
+          git push --force origin "$branch"
+          open=$(gh pr list --head "$branch" --base "$BASE_BRANCH" --state open --json number --jq length)
+          if [ "$open" = "0" ]; then
+            gh pr create --base "$BASE_BRANCH" --head "$branch" \
+              --title "docs: refresh download buttons" \
+              --body "Automatically generated from the published release assets. Review the changed README and badge files before merging."
+          fi

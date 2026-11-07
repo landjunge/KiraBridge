@@ -30,18 +30,25 @@ class MessageManager:
     interface_version = "1"
 
     def activation_work_count(self, *, active_only=False, context=None):
+        # An externally ACKed queued job has no delivery left to start. Never
+        # infer that a running receiver finished merely because its message is ACKed.
         db = context.db if context is not None else self.store.db
         states = ("running",) if active_only else ("queued", "running")
         return db.execute(
             "SELECT count(*) FROM message_jobs WHERE state IN ("
             + ",".join("?" for _ in states)
-            + ")",
+            + ") AND (state='running' OR (NOT EXISTS (SELECT 1 FROM queue_holds h "
+            "WHERE h.queue_id='messages' AND h.item_id=message_jobs.message_id) "
+            "AND NOT EXISTS (SELECT 1 FROM messages m WHERE m.id=message_jobs.message_id "
+            "AND m.acknowledged IS NOT NULL)))",
             states,
         ).fetchone()[0]
 
     def operator_work_count(self):
         return self.store.db.execute(
-            "SELECT count(*) FROM message_jobs WHERE state IN ('queued','running')"
+            "SELECT count(*) FROM message_jobs WHERE state IN ('queued','running') "
+            "AND (state='running' OR NOT EXISTS (SELECT 1 FROM queue_holds h "
+            "WHERE h.queue_id='messages' AND h.item_id=message_jobs.message_id))"
         ).fetchone()[0]
 
     def operator_protocol_snapshot(self, message_id, at):
@@ -60,6 +67,9 @@ class MessageManager:
     def __init__(self, config, store, security):
         self.config, self.store, self.security = config, store, security
         self.wake = asyncio.Event()
+        # Runtime-owned admission of NEW records only. Idempotent reads and
+        # historical inbox entries never call this hook.
+        self.delivery_hook = None
         from kirabridge.voice_channel import VoiceChannel
         from kirabridge.voice_message_policy import VoiceMessagePolicy
 
@@ -117,15 +127,53 @@ class MessageManager:
         )
         if job:
             result["processing"]["evidence"] = json.loads(job["evidence"])
+            if result["processing"]["evidence"].get("completion_scope") == "visible_input_delivery":
+                result["processing"].update(
+                    completion_scope="visible_input_delivery",
+                    agent_confirmed=False,
+                    agent_work_completion_verified=False,
+                    request_reply_satisfied=False,
+                )
+            if result["processing"]["evidence"].get("completion_scope") == "local_agent_turn":
+                local = result["processing"]["evidence"].pop("local_reply_result", None)
+                result["processing"].update(
+                    completion_scope="local_agent_turn",
+                    reply_source="bound_local_codex_rollout",
+                    agent_confirmed=False,
+                    request_reply_satisfied=True,
+                    agent_work_completion_verified=False,
+                    result=local,
+                )
             scope = result["processing"]["evidence"].get("session_scope")
             if scope == "existing_visible_terminal":
                 result["processing_route"] = scope
+            elif (
+                not visible
+                and job["state"] in {"failed", "blocked"}
+                and result["processing"]["evidence"].get("phase") == "direct_admission"
+            ):
+                result["processing_route"] = "failed_visible_admission"
             elif job["state"] == "queued":
                 result["processing_route"] = (
                     "pending_visible_terminal"
                     if self.config.visible_handoffs.enabled
                     else "pending_managed_receiver"
                 )
+        if visible:
+            # Preserve the original failure and expose only already-recorded evidence.
+            # Reading a message must never release a reservation or repeat input.
+            try:
+                self._identity(principal, "task.read")
+            except BridgeError:
+                pass  # Message-only readers keep their existing response.
+            else:
+                from kirabridge.visible_message_evidence import visible_message_evidence
+
+                handoff = visible_message_evidence(
+                    self.store.db, principal, message_id, job["run_id"]
+                )
+                if handoff is not None:
+                    result["processing"]["handoff"] = handoff
         result["request_reply"] = bool(result["request_reply"])
         return {"api_version": "1", **result}
 
@@ -322,7 +370,9 @@ class MessageManager:
             ):
                 raise BridgeError("message_store_full", "Message archive capacity reached")
             pending = self.store.db.execute(
-                "SELECT count(*) FROM messages WHERE recipient=? AND acknowledged IS NULL",
+                "SELECT count(*) FROM messages WHERE recipient=? AND acknowledged IS NULL "
+                "AND NOT EXISTS (SELECT 1 FROM queue_holds h WHERE "
+                "h.queue_id='messages' AND h.item_id=messages.id)",
                 (message.recipient,),
             ).fetchone()[0]
             if pending >= limits.max_pending_per_recipient:
@@ -381,6 +431,8 @@ class MessageManager:
                 },
             )
         self.wake.set()
+        if dispatch and self.delivery_hook is not None:
+            self.delivery_hook(principal, message_id)
         return self.get(principal, message_id)
 
     def receive(self, principal, after=0, limit=20, conversation_id=None):
@@ -393,6 +445,8 @@ class MessageManager:
             rows = self.store.db.execute(
                 "SELECT id,seq,delivered FROM messages WHERE recipient=? AND seq>? "
                 "AND acknowledged IS NULL AND (? IS NULL OR conversation_id=?) "
+                "AND NOT EXISTS (SELECT 1 FROM queue_holds h WHERE "
+                "h.queue_id='messages' AND h.item_id=messages.id) "
                 "ORDER BY seq LIMIT ?",
                 (principal, after, conversation_id, conversation_id, limit),
             ).fetchall()

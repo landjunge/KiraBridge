@@ -1,0 +1,772 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:kirabridge:remote-task:v1",
+  "title": "Passive remote-task contract draft v1",
+  "description": "Shape validation only. No dispatch, identity, permission, pairing or attestation is granted by this document. See remote-task-v1.md.",
+  "oneOf": [
+    {
+      "$ref": "#/$defs/intent"
+    },
+    {
+      "$ref": "#/$defs/execution_binding"
+    },
+    {
+      "$ref": "#/$defs/execution_receipt"
+    },
+    {
+      "$ref": "#/$defs/acceptance_receipt"
+    },
+    {
+      "$ref": "#/$defs/display_receipt"
+    }
+  ],
+  "$defs": {
+    "id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]*$",
+      "not": {
+        "pattern": "[\\u0000-\\u001f\\u007f]"
+      }
+    },
+    "core_task_id": {
+      "maxLength": 128,
+      "minLength": 1,
+      "pattern": "^[a-zA-Z0-9_-]+$",
+      "title": "Task Id",
+      "type": "string",
+      "not": {
+        "pattern": "[\\u0000-\\u001f\\u007f]"
+      }
+    },
+    "sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$",
+      "minLength": 64,
+      "maxLength": 64
+    },
+    "integer": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "agent_arguments": {
+      "additionalProperties": false,
+      "properties": {
+        "local_tools": {
+          "const": false
+        },
+        "wait_for_reply": {
+          "const": true
+        },
+        "agent": {
+          "const": "codex"
+        },
+        "prompt": {
+          "maxLength": 262144,
+          "minLength": 1,
+          "title": "Prompt",
+          "type": "string"
+        },
+        "cwd": {
+          "title": "Cwd",
+          "type": "string"
+        },
+        "timeout": {
+          "default": 300.0,
+          "exclusiveMinimum": 0,
+          "maximum": 3600,
+          "title": "Timeout",
+          "type": "number"
+        }
+      },
+      "required": [
+        "agent",
+        "prompt",
+        "cwd"
+      ],
+      "title": "AgentInput",
+      "type": "object"
+    },
+    "handoff_arguments": {
+      "additionalProperties": false,
+      "properties": {
+        "handoff_id": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[a-zA-Z0-9_-]+$",
+          "title": "Handoff Id",
+          "type": "string",
+          "not": {
+            "pattern": "[\\u0000-\\u001f\\u007f]"
+          }
+        },
+        "revision": {
+          "minimum": 1,
+          "title": "Revision",
+          "type": "integer"
+        },
+        "agent": {
+          "const": "codex"
+        },
+        "cwd": {
+          "title": "Cwd",
+          "type": "string"
+        },
+        "timeout": {
+          "default": 120.0,
+          "exclusiveMinimum": 0,
+          "maximum": 300,
+          "title": "Timeout",
+          "type": "number"
+        }
+      },
+      "required": [
+        "handoff_id",
+        "revision",
+        "cwd"
+      ],
+      "title": "HandoffStartInput",
+      "type": "object"
+    },
+    "core_request": {
+      "additionalProperties": false,
+      "properties": {
+        "api_version": {
+          "const": "1"
+        },
+        "task_id": {
+          "$ref": "#/$defs/core_task_id"
+        },
+        "operation": {
+          "enum": [
+            "agent.execute",
+            "handoff.start"
+          ]
+        },
+        "arguments": {
+          "additionalProperties": true,
+          "title": "Arguments",
+          "type": "object"
+        },
+        "idempotency_key": {
+          "maxLength": 128,
+          "minLength": 1,
+          "title": "Idempotency Key",
+          "type": "string"
+        },
+        "parent_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Parent Id"
+        }
+      },
+      "required": [
+        "api_version",
+        "task_id",
+        "operation",
+        "arguments",
+        "idempotency_key",
+        "parent_id"
+      ],
+      "title": "TaskRequest",
+      "type": "object",
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "operation": {
+                "const": "agent.execute"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "arguments": {
+                "$ref": "#/$defs/agent_arguments"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "operation": {
+                "const": "handoff.start"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "arguments": {
+                "$ref": "#/$defs/handoff_arguments"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "approved_card": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "const": "approved_card"
+        },
+        "service_ref": {
+          "$ref": "#/$defs/id"
+        },
+        "tenant_ref": {
+          "$ref": "#/$defs/id"
+        },
+        "actor_ref": {
+          "$ref": "#/$defs/id"
+        },
+        "thread_id": {
+          "$ref": "#/$defs/id"
+        },
+        "thread_revision": {
+          "$ref": "#/$defs/integer"
+        },
+        "entry_id": {
+          "$ref": "#/$defs/id"
+        },
+        "content_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "card_task_id": {
+          "$ref": "#/$defs/id"
+        },
+        "work_id": {
+          "$ref": "#/$defs/id"
+        }
+      },
+      "required": [
+        "kind",
+        "service_ref",
+        "tenant_ref",
+        "actor_ref",
+        "thread_id",
+        "thread_revision",
+        "entry_id",
+        "content_sha256",
+        "card_task_id",
+        "work_id"
+      ]
+    },
+    "issued_handoff": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "const": "issued_handoff"
+        },
+        "service_ref": {
+          "$ref": "#/$defs/id"
+        },
+        "tenant_ref": {
+          "$ref": "#/$defs/id"
+        },
+        "actor_ref": {
+          "$ref": "#/$defs/id"
+        },
+        "thread_id": {
+          "$ref": "#/$defs/id"
+        },
+        "thread_revision": {
+          "$ref": "#/$defs/integer"
+        },
+        "handoff_id": {
+          "$ref": "#/$defs/id"
+        },
+        "handoff_revision": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "original_task_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 512,
+          "pattern": "^[^\\u0000-\\u001f\\u007f]+$",
+          "not": {
+            "pattern": "[\\u0000-\\u001f\\u007f]"
+          }
+        },
+        "content_sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      },
+      "required": [
+        "kind",
+        "service_ref",
+        "tenant_ref",
+        "actor_ref",
+        "thread_id",
+        "thread_revision",
+        "handoff_id",
+        "handoff_revision",
+        "original_task_id",
+        "content_sha256"
+      ]
+    },
+    "target": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "device_ref": {
+          "$ref": "#/$defs/id"
+        },
+        "device_key_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "authority_revision": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "workspace_ref": {
+          "$ref": "#/$defs/id"
+        }
+      },
+      "required": [
+        "device_ref",
+        "device_key_sha256",
+        "authority_revision",
+        "workspace_ref"
+      ]
+    },
+    "intent": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "format": {
+          "const": "kirabridge.remote-task.v1"
+        },
+        "kind": {
+          "const": "intent"
+        },
+        "route": {
+          "const": "separate_managed_session"
+        },
+        "request": {
+          "allOf": [
+            {
+              "$ref": "#/$defs/core_request"
+            },
+            {
+              "properties": {
+                "operation": {
+                  "const": "handoff.start"
+                }
+              }
+            }
+          ]
+        },
+        "request_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "source": {
+          "$ref": "#/$defs/issued_handoff"
+        },
+        "target": {
+          "$ref": "#/$defs/target"
+        },
+        "authorization": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "grant_ref": {
+              "$ref": "#/$defs/id"
+            },
+            "grant_sha256": {
+              "$ref": "#/$defs/sha256"
+            }
+          },
+          "required": [
+            "grant_ref",
+            "grant_sha256"
+          ]
+        },
+        "issued_at": {
+          "$ref": "#/$defs/integer"
+        },
+        "expires_at": {
+          "$ref": "#/$defs/integer"
+        }
+      },
+      "required": [
+        "format",
+        "kind",
+        "route",
+        "request",
+        "request_sha256",
+        "source",
+        "target",
+        "authorization",
+        "issued_at",
+        "expires_at"
+      ]
+    },
+    "binding": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "task_id": {
+          "$ref": "#/$defs/core_task_id"
+        },
+        "request_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "device_ref": {
+          "$ref": "#/$defs/id"
+        },
+        "envelope_sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      },
+      "required": [
+        "task_id",
+        "envelope_sha256",
+        "request_sha256",
+        "device_ref"
+      ]
+    },
+    "evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "ref": {
+          "$ref": "#/$defs/id"
+        },
+        "sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      },
+      "required": [
+        "ref",
+        "sha256"
+      ]
+    },
+    "result": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "ref": {
+          "$ref": "#/$defs/id"
+        }
+      },
+      "required": [
+        "sha256",
+        "ref"
+      ]
+    },
+    "execution_receipt": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "format": {
+          "const": "kirabridge.remote-task.v1"
+        },
+        "binding": {
+          "$ref": "#/$defs/binding"
+        },
+        "observed_at": {
+          "$ref": "#/$defs/integer"
+        },
+        "kind": {
+          "const": "execution_receipt"
+        },
+        "event_seq": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "state": {
+          "enum": [
+            "created",
+            "queued",
+            "accepted",
+            "running",
+            "completed",
+            "failed",
+            "blocked",
+            "unknown",
+            "cancelled"
+          ]
+        },
+        "runtime": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "instance_ref": {
+              "$ref": "#/$defs/id"
+            },
+            "version": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64
+            },
+            "source_sha256": {
+              "$ref": "#/$defs/sha256"
+            }
+          },
+          "required": [
+            "instance_ref",
+            "version",
+            "source_sha256"
+          ]
+        },
+        "evidence": {
+          "$ref": "#/$defs/evidence"
+        },
+        "result": {
+          "$ref": "#/$defs/result"
+        },
+        "error": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "code": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 80,
+              "pattern": "^[a-z][a-z0-9_]*$",
+              "not": {
+                "pattern": "[\\u0000-\\u001f\\u007f]"
+              }
+            }
+          },
+          "required": [
+            "code"
+          ]
+        }
+      },
+      "required": [
+        "format",
+        "binding",
+        "observed_at",
+        "kind",
+        "event_seq",
+        "state",
+        "runtime",
+        "evidence"
+      ],
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "state": {
+                "const": "completed"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "result"
+            ],
+            "not": {
+              "required": [
+                "error"
+              ]
+            }
+          },
+          "else": {
+            "not": {
+              "required": [
+                "result"
+              ]
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "state": {
+                "enum": [
+                  "failed",
+                  "blocked",
+                  "unknown"
+                ]
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "error"
+            ]
+          }
+        }
+      ]
+    },
+    "acceptance_receipt": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "format": {
+          "const": "kirabridge.remote-task.v1"
+        },
+        "binding": {
+          "$ref": "#/$defs/binding"
+        },
+        "observed_at": {
+          "$ref": "#/$defs/integer"
+        },
+        "kind": {
+          "const": "acceptance_receipt"
+        },
+        "result_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "decision": {
+          "enum": [
+            "accepted",
+            "rejected",
+            "rework"
+          ]
+        },
+        "method": {
+          "enum": [
+            "operator_receipt",
+            "result_sha256"
+          ]
+        },
+        "evidence": {
+          "$ref": "#/$defs/evidence"
+        }
+      },
+      "required": [
+        "format",
+        "binding",
+        "observed_at",
+        "kind",
+        "result_sha256",
+        "decision",
+        "method",
+        "evidence"
+      ]
+    },
+    "display_receipt": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "format": {
+          "const": "kirabridge.remote-task.v1"
+        },
+        "binding": {
+          "$ref": "#/$defs/binding"
+        },
+        "observed_at": {
+          "$ref": "#/$defs/integer"
+        },
+        "kind": {
+          "const": "display_receipt"
+        },
+        "result_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "client_ref": {
+          "$ref": "#/$defs/id"
+        },
+        "state": {
+          "const": "displayed"
+        },
+        "evidence": {
+          "$ref": "#/$defs/evidence"
+        }
+      },
+      "required": [
+        "format",
+        "binding",
+        "observed_at",
+        "kind",
+        "result_sha256",
+        "client_ref",
+        "state",
+        "evidence"
+      ]
+    },
+    "execution_binding": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "format": {
+          "const": "kirabridge.remote-task.v1"
+        },
+        "kind": {
+          "const": "execution_binding"
+        },
+        "route": {
+          "enum": [
+            "existing_visible_terminal",
+            "separate_managed_session"
+          ]
+        },
+        "request": {
+          "allOf": [
+            {
+              "$ref": "#/$defs/core_request"
+            },
+            {
+              "properties": {
+                "operation": {
+                  "const": "agent.execute"
+                }
+              }
+            }
+          ]
+        },
+        "request_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "source": {
+          "$ref": "#/$defs/approved_card"
+        },
+        "target": {
+          "$ref": "#/$defs/target"
+        },
+        "authorization": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "grant_ref": {
+              "$ref": "#/$defs/id"
+            },
+            "grant_sha256": {
+              "$ref": "#/$defs/sha256"
+            }
+          },
+          "required": [
+            "grant_ref",
+            "grant_sha256"
+          ]
+        },
+        "issued_at": {
+          "$ref": "#/$defs/integer"
+        },
+        "expires_at": {
+          "$ref": "#/$defs/integer"
+        }
+      },
+      "required": [
+        "format",
+        "kind",
+        "route",
+        "request",
+        "request_sha256",
+        "source",
+        "target",
+        "authorization",
+        "issued_at",
+        "expires_at"
+      ]
+    }
+  }
+}

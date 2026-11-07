@@ -232,5 +232,10 @@
     "existing_application_changes_preserved": true,
     "push": false,
     "publication": false
+  },
+  "publication_authorization": {
+    "user_authorized_push": true,
+    "target_branch": "main",
+    "scope": "README and associated documentation only; no program code or release assets"
   }
 }

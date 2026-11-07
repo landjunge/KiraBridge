@@ -1,0 +1,740 @@
+{
+  "schema_version": "agent-authority-workflow-report-v1",
+  "role": "observer_only",
+  "source_authenticated": false,
+  "identity": "UNBEKANNT",
+  "effect": "UNBEKANNT",
+  "observation_report": {
+    "schema_version": "agent-authority-observation-report-v1",
+    "role": "observer_only",
+    "source": {
+      "scope": "selected_local_observations",
+      "kind": "workflow-jsonl",
+      "source_id": "kb-audit-ddec4b61be3197c8f1a5c43f95be59f3",
+      "files_seen": 1,
+      "files_examined": 1,
+      "files_seen_is_lower_bound": false,
+      "directory_entries_seen": 1,
+      "directory_scan_complete": true,
+      "bytes_read": 11098,
+      "entries_read": 14,
+      "complete_observed_read": false,
+      "coverage_of_all_agent_activity": "UNBEKANNT",
+      "source_authenticated": false,
+      "identity": "UNBEKANNT",
+      "effect": "UNBEKANNT"
+    },
+    "summary": {
+      "reported_kind_counts": {
+        "claimed": 3,
+        "progress": 4,
+        "question": 1,
+        "result": 2,
+        "system": 4
+      },
+      "tasks_with_reported_association": 4,
+      "claims_without_later_result_in_read_entries": 1,
+      "structural_warning_count": 0
+    },
+    "tasks": [
+      {
+        "task_alias": "A4",
+        "association_basis": "reported_task_id_only",
+        "last_reported_kind": "system",
+        "order_ambiguous": false,
+        "entry_count": 3,
+        "reported_kind_counts": {
+          "claimed": 1,
+          "progress": 1,
+          "system": 1
+        },
+        "claim_without_later_result": true,
+        "evidence": [
+          {
+            "entry_id": "wf-6511d9612cd32e860f17027b94d9f160",
+            "ordinal": 12,
+            "file_sha256": "e8d17bd0691e2da3f3c9fe4ec49f3108fb48b051ab58dddfcc49f963f0f230ca"
+          },
+          {
+            "entry_id": "wf-286930553e512ff84aa65346cd6be877",
+            "ordinal": 13,
+            "file_sha256": "e8d17bd0691e2da3f3c9fe4ec49f3108fb48b051ab58dddfcc49f963f0f230ca"
+          },
+          {
+            "entry_id": "wf-89878fb829e0c5995f38de9d1192b8d8",
+            "ordinal": 14,
+            "file_sha256": "e8d17bd0691e2da3f3c9fe4ec49f3108fb48b051ab58dddfcc49f963f0f230ca"
+          }
+        ]
+      },
+      {
+        "task_alias": "A3",
+        "association_basis": "reported_task_id_only",
+        "last_reported_kind": "result",
+        "order_ambiguous": false,
+        "entry_count": 5,
+        "reported_kind_counts": {
+          "claimed": 1,
+          "progress": 1,
+          "result": 1,
+          "system": 2
+        },
+        "claim_without_later_result": false,
+        "evidence": [
+          {
+            "entry_id": "wf-4587a9d54a8db1446bb3029f79a38fe7",
+            "ordinal": 9,
+            "file_sha256": "e8d17bd0691e2da3f3c9fe4ec49f3108fb48b051ab58dddfcc49f963f0f230ca"
+          },
+          {
+            "entry_id": "wf-d2663dea4fe715ab7fa7f59a36d7a403",
+            "ordinal": 10,
+            "file_sha256": "e8d17bd0691e2da3f3c9fe4ec49f3108fb48b051ab58dddfcc49f963f0f230ca"
+          },
+          {
+            "entry_id": "wf-d1dd545e03b867739531bab8e87ab277",
+            "ordinal": 11,
+            "file_sha256": "e8d17bd0691e2da3f3c9fe4ec49f3108fb48b051ab58dddfcc49f963f0f230ca"
+          }
+        ]
+      },
+      {
+        "task_alias": "A1",
+        "association_basis": "reported_task_id_only",
+        "last_reported_kind": "result",
+        "order_ambiguous": false,
+        "entry_count": 3,
+        "reported_kind_counts": {
+          "claimed": 1,
+          "progress": 1,
+          "result": 1
+        },
+        "claim_without_later_result": false,
+        "evidence": [
+          {
+            "entry_id": "wf-faacbf6b0423c9dbf0ba68c34b0c5087",
+            "ordinal": 1,
+            "file_sha256": "e8d17bd0691e2da3f3c9fe4ec49f3108fb48b051ab58dddfcc49f963f0f230ca"
+          },
+          {
+            "entry_id": "wf-fdd6eef6acc465fc03040000b4203301",
+            "ordinal": 2,
+            "file_sha256": "e8d17bd0691e2da3f3c9fe4ec49f3108fb48b051ab58dddfcc49f963f0f230ca"
+          },
+          {
+            "entry_id": "wf-ce6c70ab883a05336dd22503668d314c",
+            "ordinal": 6,
+            "file_sha256": "e8d17bd0691e2da3f3c9fe4ec49f3108fb48b051ab58dddfcc49f963f0f230ca"
+          }
+        ]
+      },
+      {
+        "task_alias": "A2",
+        "association_basis": "reported_task_id_only",
+        "last_reported_kind": "question",
+        "order_ambiguous": false,
+        "entry_count": 3,
+        "reported_kind_counts": {
+          "progress": 1,
+          "question": 1,
+          "system": 1
+        },
+        "claim_without_later_result": false,
+        "evidence": [
+          {
+            "entry_id": "wf-27c4842a6150cc34ec9cb6b9875749ae",
+            "ordinal": 3,
+            "file_sha256": "e8d17bd0691e2da3f3c9fe4ec49f3108fb48b051ab58dddfcc49f963f0f230ca"
+          },
+          {
+            "entry_id": "wf-e1d3f4ba5cd27ad53bbe0ae2f8c92d7b",
+            "ordinal": 4,
+            "file_sha256": "e8d17bd0691e2da3f3c9fe4ec49f3108fb48b051ab58dddfcc49f963f0f230ca"
+          },
+          {
+            "entry_id": "wf-890de0fa5b7964af40b07c9086745ef8",
+            "ordinal": 5,
+            "file_sha256": "e8d17bd0691e2da3f3c9fe4ec49f3108fb48b051ab58dddfcc49f963f0f230ca"
+          }
+        ]
+      }
+    ],
+    "recent_entries": [
+      {
+        "entry_id": "wf-89878fb829e0c5995f38de9d1192b8d8",
+        "ordinal": 14,
+        "file_sha256": "e8d17bd0691e2da3f3c9fe4ec49f3108fb48b051ab58dddfcc49f963f0f230ca",
+        "reported_kind": "system",
+        "reported_actor_type": "kirabridge"
+      },
+      {
+        "entry_id": "wf-286930553e512ff84aa65346cd6be877",
+        "ordinal": 13,
+        "file_sha256": "e8d17bd0691e2da3f3c9fe4ec49f3108fb48b051ab58dddfcc49f963f0f230ca",
+        "reported_kind": "progress",
+        "reported_actor_type": "kirabridge"
+      },
+      {
+        "entry_id": "wf-6511d9612cd32e860f17027b94d9f160",
+        "ordinal": 12,
+        "file_sha256": "e8d17bd0691e2da3f3c9fe4ec49f3108fb48b051ab58dddfcc49f963f0f230ca",
+        "reported_kind": "claimed",
+        "reported_actor_type": "kirabridge"
+      },
+      {
+        "entry_id": "wf-d1dd545e03b867739531bab8e87ab277",
+        "ordinal": 11,
+        "file_sha256": "e8d17bd0691e2da3f3c9fe4ec49f3108fb48b051ab58dddfcc49f963f0f230ca",
+        "reported_kind": "result",
+        "reported_actor_type": "kirabridge"
+      },
+      {
+        "entry_id": "wf-d2663dea4fe715ab7fa7f59a36d7a403",
+        "ordinal": 10,
+        "file_sha256": "e8d17bd0691e2da3f3c9fe4ec49f3108fb48b051ab58dddfcc49f963f0f230ca",
+        "reported_kind": "system",
+        "reported_actor_type": "kirabridge"
+      },
+      {
+        "entry_id": "wf-4587a9d54a8db1446bb3029f79a38fe7",
+        "ordinal": 9,
+        "file_sha256": "e8d17bd0691e2da3f3c9fe4ec49f3108fb48b051ab58dddfcc49f963f0f230ca",
+        "reported_kind": "system",
+        "reported_actor_type": "kirabridge"
+      },
+      {
+        "entry_id": "wf-232cddfa445fe300a89e18390e053072",
+        "ordinal": 8,
+        "file_sha256": "e8d17bd0691e2da3f3c9fe4ec49f3108fb48b051ab58dddfcc49f963f0f230ca",
+        "reported_kind": "progress",
+        "reported_actor_type": "kirabridge"
+      },
+      {
+        "entry_id": "wf-222a5dbad101d504e9d1ebaec20ca0d4",
+        "ordinal": 7,
+        "file_sha256": "e8d17bd0691e2da3f3c9fe4ec49f3108fb48b051ab58dddfcc49f963f0f230ca",
+        "reported_kind": "claimed",
+        "reported_actor_type": "kirabridge"
+      },
+      {
+        "entry_id": "wf-ce6c70ab883a05336dd22503668d314c",
+        "ordinal": 6,
+        "file_sha256": "e8d17bd0691e2da3f3c9fe4ec49f3108fb48b051ab58dddfcc49f963f0f230ca",
+        "reported_kind": "result",
+        "reported_actor_type": "kirabridge"
+      },
+      {
+        "entry_id": "wf-890de0fa5b7964af40b07c9086745ef8",
+        "ordinal": 5,
+        "file_sha256": "e8d17bd0691e2da3f3c9fe4ec49f3108fb48b051ab58dddfcc49f963f0f230ca",
+        "reported_kind": "question",
+        "reported_actor_type": "kirabridge"
+      },
+      {
+        "entry_id": "wf-e1d3f4ba5cd27ad53bbe0ae2f8c92d7b",
+        "ordinal": 4,
+        "file_sha256": "e8d17bd0691e2da3f3c9fe4ec49f3108fb48b051ab58dddfcc49f963f0f230ca",
+        "reported_kind": "progress",
+        "reported_actor_type": "kirabridge"
+      },
+      {
+        "entry_id": "wf-27c4842a6150cc34ec9cb6b9875749ae",
+        "ordinal": 3,
+        "file_sha256": "e8d17bd0691e2da3f3c9fe4ec49f3108fb48b051ab58dddfcc49f963f0f230ca",
+        "reported_kind": "system",
+        "reported_actor_type": "kirabridge"
+      },
+      {
+        "entry_id": "wf-fdd6eef6acc465fc03040000b4203301",
+        "ordinal": 2,
+        "file_sha256": "e8d17bd0691e2da3f3c9fe4ec49f3108fb48b051ab58dddfcc49f963f0f230ca",
+        "reported_kind": "progress",
+        "reported_actor_type": "kirabridge"
+      },
+      {
+        "entry_id": "wf-faacbf6b0423c9dbf0ba68c34b0c5087",
+        "ordinal": 1,
+        "file_sha256": "e8d17bd0691e2da3f3c9fe4ec49f3108fb48b051ab58dddfcc49f963f0f230ca",
+        "reported_kind": "claimed",
+        "reported_actor_type": "kirabridge"
+      }
+    ],
+    "warnings": [],
+    "display": {
+      "limit": 20,
+      "tasks_omitted": 0,
+      "entries_omitted": 0,
+      "warnings_omitted": 0
+    },
+    "task_completion_proven": false,
+    "rights_inherited": false
+  },
+  "events": [
+    {
+      "event_id": "audit-3552-d692d5e8be61be7d226e2047bfe85837e2f1797e67d27d2c4455c847de347715",
+      "source_tool": "kirabridge",
+      "source_id": "kb-audit-ddec4b61be3197c8f1a5c43f95be59f3",
+      "segment_id": "segment-1",
+      "event_type": "task.accepted",
+      "producer_ordinal": 3552,
+      "timestamp": "2026-10-18T22:44:02.815191+00:00",
+      "binding": {
+        "bridge_task_id": "seven-stop-20261019-start",
+        "principal_ref": "46f210355e129dd6aa0663dc3643f5bb7121a9ff693fad1944c8458c93907818",
+        "request_hash": "03406b9a5fef04bc8716340cdde4e842316a2f1b7a30d2d18adc5d133daece47",
+        "task_id": "seven-stop-20261019-start"
+      },
+      "entry_id": "wf-faacbf6b0423c9dbf0ba68c34b0c5087",
+      "file_sha256": "e8d17bd0691e2da3f3c9fe4ec49f3108fb48b051ab58dddfcc49f963f0f230ca",
+      "record_sha256": "7fd3d2e1798a240f770352138b4c162fa90bf641d5700de7b45fa28e208da5ae",
+      "assertion_basis": "producer_report_only",
+      "identity_authenticated": false,
+      "effect_verified": false
+    },
+    {
+      "event_id": "audit-3554-c2927b4ea8edd3dd4cb7ac83ea221ad92334a5bd08f91be6cc0e1faa6c8c10ea",
+      "source_tool": "kirabridge",
+      "source_id": "kb-audit-ddec4b61be3197c8f1a5c43f95be59f3",
+      "segment_id": "segment-1",
+      "event_type": "task.running",
+      "producer_ordinal": 3554,
+      "timestamp": "2026-10-18T22:44:02.868115+00:00",
+      "binding": {
+        "bridge_task_id": "seven-stop-20261019-start",
+        "principal_ref": "46f210355e129dd6aa0663dc3643f5bb7121a9ff693fad1944c8458c93907818",
+        "request_hash": "03406b9a5fef04bc8716340cdde4e842316a2f1b7a30d2d18adc5d133daece47",
+        "task_id": "seven-stop-20261019-start"
+      },
+      "entry_id": "wf-fdd6eef6acc465fc03040000b4203301",
+      "file_sha256": "e8d17bd0691e2da3f3c9fe4ec49f3108fb48b051ab58dddfcc49f963f0f230ca",
+      "record_sha256": "f4f577cb2a70065400ab2a3851d9e89f2eb0c058e2da1997f5598658f76c9b90",
+      "assertion_basis": "producer_report_only",
+      "identity_authenticated": false,
+      "effect_verified": false
+    },
+    {
+      "event_id": "audit-3561-3518587e1a976c5d8fdf44bc108a86689900c3468c75efa19607f6b84377a55f",
+      "source_tool": "kirabridge",
+      "source_id": "kb-audit-ddec4b61be3197c8f1a5c43f95be59f3",
+      "segment_id": "segment-1",
+      "event_type": "handoff.bound",
+      "producer_ordinal": 3561,
+      "timestamp": "2026-10-18T22:44:02.994434+00:00",
+      "binding": {
+        "bridge_task_id": "seven-stop-20261019-start",
+        "handoff_id": "1984a8bc16c9",
+        "handoff_revision": 1,
+        "original_task_id": "a39d1e7e1a9a:task",
+        "principal_ref": "46f210355e129dd6aa0663dc3643f5bb7121a9ff693fad1944c8458c93907818",
+        "run_id": "04501986-7bba-4bd6-a339-d71901a98c70",
+        "source_hash": "7dac3ebdbf3dc29990202e8774dd3a67a2c8090a1fdd48a90242ef982e69fc20",
+        "task_id": "a39d1e7e1a9a:task"
+      },
+      "entry_id": "wf-27c4842a6150cc34ec9cb6b9875749ae",
+      "file_sha256": "e8d17bd0691e2da3f3c9fe4ec49f3108fb48b051ab58dddfcc49f963f0f230ca",
+      "record_sha256": "68c0fa2143077c981dd0a91c1b182758f3121a869731aee1bb6c760078175c75",
+      "assertion_basis": "producer_report_only",
+      "identity_authenticated": false,
+      "effect_verified": false
+    },
+    {
+      "event_id": "audit-3565-e2a63f945db4d8507eee6207aba4c32072dea27e123905b55abfed5a1c102a32",
+      "source_tool": "kirabridge",
+      "source_id": "kb-audit-ddec4b61be3197c8f1a5c43f95be59f3",
+      "segment_id": "segment-1",
+      "event_type": "task.started",
+      "producer_ordinal": 3565,
+      "timestamp": "2026-10-18T22:44:04.615713+00:00",
+      "binding": {
+        "bridge_task_id": "seven-stop-20261019-start",
+        "handoff_id": "1984a8bc16c9",
+        "handoff_revision": 1,
+        "original_task_id": "a39d1e7e1a9a:task",
+        "principal_ref": "46f210355e129dd6aa0663dc3643f5bb7121a9ff693fad1944c8458c93907818",
+        "run_id": "04501986-7bba-4bd6-a339-d71901a98c70",
+        "source_hash": "7dac3ebdbf3dc29990202e8774dd3a67a2c8090a1fdd48a90242ef982e69fc20",
+        "task_id": "a39d1e7e1a9a:task"
+      },
+      "entry_id": "wf-e1d3f4ba5cd27ad53bbe0ae2f8c92d7b",
+      "file_sha256": "e8d17bd0691e2da3f3c9fe4ec49f3108fb48b051ab58dddfcc49f963f0f230ca",
+      "record_sha256": "d96efdea67ba711bbc581200ed0729f44f3f4484c7975a781bc8c0bbbaa0c1ee",
+      "assertion_basis": "producer_report_only",
+      "identity_authenticated": false,
+      "effect_verified": false
+    },
+    {
+      "event_id": "audit-3569-c89baa96b5a0e54c02f0df2e46083292ab77eb64e3f407095d7da705e93c5186",
+      "source_tool": "kirabridge",
+      "source_id": "kb-audit-ddec4b61be3197c8f1a5c43f95be59f3",
+      "segment_id": "segment-1",
+      "event_type": "task.question",
+      "producer_ordinal": 3569,
+      "timestamp": "2026-10-18T22:44:13.160080+00:00",
+      "binding": {
+        "bridge_task_id": "seven-stop-20261019-start",
+        "handoff_id": "1984a8bc16c9",
+        "handoff_revision": 1,
+        "original_task_id": "a39d1e7e1a9a:task",
+        "principal_ref": "46f210355e129dd6aa0663dc3643f5bb7121a9ff693fad1944c8458c93907818",
+        "reported_status": "waiting_question",
+        "run_id": "04501986-7bba-4bd6-a339-d71901a98c70",
+        "source_hash": "7dac3ebdbf3dc29990202e8774dd3a67a2c8090a1fdd48a90242ef982e69fc20",
+        "task_id": "a39d1e7e1a9a:task"
+      },
+      "entry_id": "wf-890de0fa5b7964af40b07c9086745ef8",
+      "file_sha256": "e8d17bd0691e2da3f3c9fe4ec49f3108fb48b051ab58dddfcc49f963f0f230ca",
+      "record_sha256": "b451b3b9f55696bcfffdaa863ef28cb5347b6e7b91353210f94f0530372f8dbb",
+      "assertion_basis": "producer_report_only",
+      "identity_authenticated": false,
+      "effect_verified": false
+    },
+    {
+      "event_id": "audit-3570-1e90021c82dd515c3e0c0069f1f0e40a1ae223f166ad84462cf7b890d1311511",
+      "source_tool": "kirabridge",
+      "source_id": "kb-audit-ddec4b61be3197c8f1a5c43f95be59f3",
+      "segment_id": "segment-1",
+      "event_type": "task.completed",
+      "producer_ordinal": 3570,
+      "timestamp": "2026-10-18T22:44:13.162479+00:00",
+      "binding": {
+        "bridge_task_id": "seven-stop-20261019-start",
+        "principal_ref": "46f210355e129dd6aa0663dc3643f5bb7121a9ff693fad1944c8458c93907818",
+        "request_hash": "03406b9a5fef04bc8716340cdde4e842316a2f1b7a30d2d18adc5d133daece47",
+        "task_id": "seven-stop-20261019-start"
+      },
+      "entry_id": "wf-ce6c70ab883a05336dd22503668d314c",
+      "file_sha256": "e8d17bd0691e2da3f3c9fe4ec49f3108fb48b051ab58dddfcc49f963f0f230ca",
+      "record_sha256": "cf5f08451ac5371b25334675a6e2a65fa33235efb2a6df877d37d7deb409fcd9",
+      "assertion_basis": "producer_report_only",
+      "identity_authenticated": false,
+      "effect_verified": false
+    },
+    {
+      "event_id": "audit-3576-bca261f81813907d205459d73b9af857f323a27ba1f622ff0cf0d220dd26e485",
+      "source_tool": "kirabridge",
+      "source_id": "kb-audit-ddec4b61be3197c8f1a5c43f95be59f3",
+      "segment_id": "segment-1",
+      "event_type": "task.accepted",
+      "producer_ordinal": 3576,
+      "timestamp": "2026-10-18T22:44:26.600703+00:00",
+      "binding": {
+        "bridge_task_id": "seven-stop-20261019-stop",
+        "principal_ref": "46f210355e129dd6aa0663dc3643f5bb7121a9ff693fad1944c8458c93907818",
+        "request_hash": "4f7ba27b58c9e5f7e26f56088a7bddf83ef73e71b21a939b270a0eef5889d786",
+        "task_id": "seven-stop-20261019-stop"
+      },
+      "entry_id": "wf-222a5dbad101d504e9d1ebaec20ca0d4",
+      "file_sha256": "e8d17bd0691e2da3f3c9fe4ec49f3108fb48b051ab58dddfcc49f963f0f230ca",
+      "record_sha256": "d4e0b8c2592b4e625aeb140326b4a00ae4eed9a13440fa8a7073a3ab37253a3b",
+      "assertion_basis": "producer_report_only",
+      "identity_authenticated": false,
+      "effect_verified": false
+    },
+    {
+      "event_id": "audit-3578-cf1465454fe87d9d9035dcc3778313a5e1b3adf1685e921616985de8aff3a241",
+      "source_tool": "kirabridge",
+      "source_id": "kb-audit-ddec4b61be3197c8f1a5c43f95be59f3",
+      "segment_id": "segment-1",
+      "event_type": "task.running",
+      "producer_ordinal": 3578,
+      "timestamp": "2026-10-18T22:44:26.632266+00:00",
+      "binding": {
+        "bridge_task_id": "seven-stop-20261019-stop",
+        "principal_ref": "46f210355e129dd6aa0663dc3643f5bb7121a9ff693fad1944c8458c93907818",
+        "request_hash": "4f7ba27b58c9e5f7e26f56088a7bddf83ef73e71b21a939b270a0eef5889d786",
+        "task_id": "seven-stop-20261019-stop"
+      },
+      "entry_id": "wf-232cddfa445fe300a89e18390e053072",
+      "file_sha256": "e8d17bd0691e2da3f3c9fe4ec49f3108fb48b051ab58dddfcc49f963f0f230ca",
+      "record_sha256": "be88b25067d22cde044eac430093c07aeef77118e6e67df326738a7503b0a059",
+      "assertion_basis": "producer_report_only",
+      "identity_authenticated": false,
+      "effect_verified": false
+    },
+    {
+      "event_id": "audit-3579-ef7c150f7d4e1e72ad0f538be3151fd827068dfe4641fe599bd5b154cca66751",
+      "source_tool": "kirabridge",
+      "source_id": "kb-audit-ddec4b61be3197c8f1a5c43f95be59f3",
+      "segment_id": "segment-1",
+      "event_type": "control.stop_requested",
+      "producer_ordinal": 3579,
+      "timestamp": "2026-10-18T22:44:26.633339+00:00",
+      "binding": {
+        "bridge_task_id": "seven-stop-20261019-stop",
+        "cost_kind": "unknown",
+        "principal_ref": "46f210355e129dd6aa0663dc3643f5bb7121a9ff693fad1944c8458c93907818",
+        "request_hash": "4f7ba27b58c9e5f7e26f56088a7bddf83ef73e71b21a939b270a0eef5889d786",
+        "stop_state": "unknown",
+        "task_id": "seven-stop-20261019-stop"
+      },
+      "entry_id": "wf-4587a9d54a8db1446bb3029f79a38fe7",
+      "file_sha256": "e8d17bd0691e2da3f3c9fe4ec49f3108fb48b051ab58dddfcc49f963f0f230ca",
+      "record_sha256": "621e4c904997d122e5f91dcb0e192c43117dcfde344099ef781d45a5a7224989",
+      "assertion_basis": "producer_report_only",
+      "identity_authenticated": false,
+      "effect_verified": false
+    },
+    {
+      "event_id": "audit-3582-671fec50ce6ebc03fa800a567aff01f59913ceadc00c7c6464663c2363025ef6",
+      "source_tool": "kirabridge",
+      "source_id": "kb-audit-ddec4b61be3197c8f1a5c43f95be59f3",
+      "segment_id": "segment-1",
+      "event_type": "control.stop_effective",
+      "producer_ordinal": 3582,
+      "timestamp": "2026-10-18T22:44:26.704565+00:00",
+      "binding": {
+        "barrier_seq": 4,
+        "bridge_task_id": "seven-stop-20261019-stop",
+        "control_ref": "e5991d2c2b2f4f3bb9eff653657342ff6515affea628dd35498738c2aa8ae667",
+        "cost_kind": "unknown",
+        "original_task_id": "a39d1e7e1a9a:task",
+        "principal_ref": "46f210355e129dd6aa0663dc3643f5bb7121a9ff693fad1944c8458c93907818",
+        "project_id": "kirabridge",
+        "request_hash": "4f7ba27b58c9e5f7e26f56088a7bddf83ef73e71b21a939b270a0eef5889d786",
+        "stop_state": "effective",
+        "task_id": "seven-stop-20261019-stop",
+        "workflow_id": "hw_a0f40872c8fb5e9e54783770e395ffeb11de3e5eee1438f1ac54c8e1d005b7a4"
+      },
+      "entry_id": "wf-d2663dea4fe715ab7fa7f59a36d7a403",
+      "file_sha256": "e8d17bd0691e2da3f3c9fe4ec49f3108fb48b051ab58dddfcc49f963f0f230ca",
+      "record_sha256": "39992144822c673b9827eaf850a6836c71c5f6e003238ae8d3e027bbeca98005",
+      "assertion_basis": "producer_report_only",
+      "identity_authenticated": false,
+      "effect_verified": false
+    },
+    {
+      "event_id": "audit-3583-35e57aec2b7f47eabfd72ede0f039a6de6736934c88a658e80ddcab0474ab2e8",
+      "source_tool": "kirabridge",
+      "source_id": "kb-audit-ddec4b61be3197c8f1a5c43f95be59f3",
+      "segment_id": "segment-1",
+      "event_type": "task.completed",
+      "producer_ordinal": 3583,
+      "timestamp": "2026-10-18T22:44:26.721241+00:00",
+      "binding": {
+        "bridge_task_id": "seven-stop-20261019-stop",
+        "principal_ref": "46f210355e129dd6aa0663dc3643f5bb7121a9ff693fad1944c8458c93907818",
+        "request_hash": "4f7ba27b58c9e5f7e26f56088a7bddf83ef73e71b21a939b270a0eef5889d786",
+        "task_id": "seven-stop-20261019-stop"
+      },
+      "entry_id": "wf-d1dd545e03b867739531bab8e87ab277",
+      "file_sha256": "e8d17bd0691e2da3f3c9fe4ec49f3108fb48b051ab58dddfcc49f963f0f230ca",
+      "record_sha256": "847df5181a94dfaecf9bca8c1519ee0db6c793055ed954ea42fc87ebf0399787",
+      "assertion_basis": "producer_report_only",
+      "identity_authenticated": false,
+      "effect_verified": false
+    },
+    {
+      "event_id": "audit-3597-043ca9915339f832eff139a4512828881319634a971c2b785a7b10fc8aed2311",
+      "source_tool": "kirabridge",
+      "source_id": "kb-audit-ddec4b61be3197c8f1a5c43f95be59f3",
+      "segment_id": "segment-1",
+      "event_type": "task.accepted",
+      "producer_ordinal": 3597,
+      "timestamp": "2026-10-18T22:45:00.687740+00:00",
+      "binding": {
+        "bridge_task_id": "seven-stop-20261019-blocked-start",
+        "principal_ref": "46f210355e129dd6aa0663dc3643f5bb7121a9ff693fad1944c8458c93907818",
+        "request_hash": "e10f05710dd01622e96fc650fa03d0de05a7ce13bc099a5e3deafaa2d40714db",
+        "task_id": "seven-stop-20261019-blocked-start"
+      },
+      "entry_id": "wf-6511d9612cd32e860f17027b94d9f160",
+      "file_sha256": "e8d17bd0691e2da3f3c9fe4ec49f3108fb48b051ab58dddfcc49f963f0f230ca",
+      "record_sha256": "a8f88737bb75ae88ad53c06f7343c77e6723d62b03a06f451578582319e3c18d",
+      "assertion_basis": "producer_report_only",
+      "identity_authenticated": false,
+      "effect_verified": false
+    },
+    {
+      "event_id": "audit-3599-d9627c3cc5928508022c6e813bda43d6afbf97e34b06d2355aac4b543fac5844",
+      "source_tool": "kirabridge",
+      "source_id": "kb-audit-ddec4b61be3197c8f1a5c43f95be59f3",
+      "segment_id": "segment-1",
+      "event_type": "task.running",
+      "producer_ordinal": 3599,
+      "timestamp": "2026-10-18T22:45:00.750351+00:00",
+      "binding": {
+        "bridge_task_id": "seven-stop-20261019-blocked-start",
+        "principal_ref": "46f210355e129dd6aa0663dc3643f5bb7121a9ff693fad1944c8458c93907818",
+        "request_hash": "e10f05710dd01622e96fc650fa03d0de05a7ce13bc099a5e3deafaa2d40714db",
+        "task_id": "seven-stop-20261019-blocked-start"
+      },
+      "entry_id": "wf-286930553e512ff84aa65346cd6be877",
+      "file_sha256": "e8d17bd0691e2da3f3c9fe4ec49f3108fb48b051ab58dddfcc49f963f0f230ca",
+      "record_sha256": "f5889735aba8de9741f8a67111ec3361b631a494090f1ad9d4ffc4aee3034ce7",
+      "assertion_basis": "producer_report_only",
+      "identity_authenticated": false,
+      "effect_verified": false
+    },
+    {
+      "event_id": "audit-3600-7764c246c467382ac87bafaf102734d7171b9ddcbbb22f7904c14175066768e8",
+      "source_tool": "kirabridge",
+      "source_id": "kb-audit-ddec4b61be3197c8f1a5c43f95be59f3",
+      "segment_id": "segment-1",
+      "event_type": "task.failed",
+      "producer_ordinal": 3600,
+      "timestamp": "2026-10-18T22:45:00.751596+00:00",
+      "binding": {
+        "bridge_task_id": "seven-stop-20261019-blocked-start",
+        "principal_ref": "46f210355e129dd6aa0663dc3643f5bb7121a9ff693fad1944c8458c93907818",
+        "request_hash": "e10f05710dd01622e96fc650fa03d0de05a7ce13bc099a5e3deafaa2d40714db",
+        "task_id": "seven-stop-20261019-blocked-start"
+      },
+      "entry_id": "wf-89878fb829e0c5995f38de9d1192b8d8",
+      "file_sha256": "e8d17bd0691e2da3f3c9fe4ec49f3108fb48b051ab58dddfcc49f963f0f230ca",
+      "record_sha256": "50fdc50137555ddd1fe7c8d9e60dc926ee7d37017a77b90e39346b6bad206c57",
+      "assertion_basis": "producer_report_only",
+      "identity_authenticated": false,
+      "effect_verified": false
+    }
+  ],
+  "read": {
+    "segments_seen": 1,
+    "records_seen": 14,
+    "duplicates_ignored": 0,
+    "events_omitted": 0,
+    "complete_selected_read": true,
+    "workflow_evidence_complete": false,
+    "coverage_of_all_activity": "UNBEKANNT"
+  },
+  "analysis": {
+    "schema_version": "agent-authority-workflow-findings-v1",
+    "assessment_scope": "producer_claim_consistency",
+    "findings": [
+      {
+        "finding_id": "finding-30327435bdc8d7ac3f5750056c2b122f",
+        "rule_id": "artifact_evidence",
+        "code": "workflow_result_artifact_missing",
+        "classification": "missing_evidence",
+        "severity": "unknown",
+        "entry_id": "wf-ce6c70ab883a05336dd22503668d314c",
+        "evidence_refs": [
+          {
+            "source_tool": "kirabridge",
+            "source_id": "kb-audit-ddec4b61be3197c8f1a5c43f95be59f3",
+            "event_id": "audit-3570-1e90021c82dd515c3e0c0069f1f0e40a1ae223f166ad84462cf7b890d1311511",
+            "entry_id": "wf-ce6c70ab883a05336dd22503668d314c",
+            "record_sha256": "cf5f08451ac5371b25334675a6e2a65fa33235efb2a6df877d37d7deb409fcd9",
+            "file_sha256": "e8d17bd0691e2da3f3c9fe4ec49f3108fb48b051ab58dddfcc49f963f0f230ca"
+          }
+        ],
+        "reported_scope": {
+          "task_id": "seven-stop-20261019-start",
+          "bridge_task_id": "seven-stop-20261019-start"
+        },
+        "assessment_scope": "producer_claim_consistency",
+        "fields": [
+          "artifact_ref"
+        ],
+        "identity_authenticated": false,
+        "actual_violation_verified": false
+      },
+      {
+        "finding_id": "finding-0377c52b2f2ec8de2246bd330436a073",
+        "rule_id": "artifact_evidence",
+        "code": "workflow_result_artifact_missing",
+        "classification": "missing_evidence",
+        "severity": "unknown",
+        "entry_id": "wf-d1dd545e03b867739531bab8e87ab277",
+        "evidence_refs": [
+          {
+            "source_tool": "kirabridge",
+            "source_id": "kb-audit-ddec4b61be3197c8f1a5c43f95be59f3",
+            "event_id": "audit-3583-35e57aec2b7f47eabfd72ede0f039a6de6736934c88a658e80ddcab0474ab2e8",
+            "entry_id": "wf-d1dd545e03b867739531bab8e87ab277",
+            "record_sha256": "847df5181a94dfaecf9bca8c1519ee0db6c793055ed954ea42fc87ebf0399787",
+            "file_sha256": "e8d17bd0691e2da3f3c9fe4ec49f3108fb48b051ab58dddfcc49f963f0f230ca"
+          }
+        ],
+        "reported_scope": {
+          "task_id": "seven-stop-20261019-stop",
+          "bridge_task_id": "seven-stop-20261019-stop"
+        },
+        "assessment_scope": "producer_claim_consistency",
+        "fields": [
+          "artifact_ref"
+        ],
+        "identity_authenticated": false,
+        "actual_violation_verified": false
+      }
+    ],
+    "counts": {
+      "missing_evidence": 2
+    },
+    "rule_results": {
+      "artifact_evidence": {
+        "reported_results": 2,
+        "missing_evidence": 2
+      }
+    },
+    "findings_omitted": 0,
+    "claims_examined": 14,
+    "selected_read_complete": false,
+    "coverage_of_all_activity": "UNBEKANNT",
+    "source_authenticated": false,
+    "actual_violation_verified": false,
+    "task_completion_proven": false,
+    "gate_authorization_proven": false
+  },
+  "warnings": [
+    {
+      "code": "workflow_sequence_gap",
+      "entry_id": null,
+      "classification": "missing_evidence"
+    },
+    {
+      "code": "workflow_prefix_unobserved",
+      "entry_id": "wf-faacbf6b0423c9dbf0ba68c34b0c5087",
+      "classification": "missing_evidence"
+    },
+    {
+      "code": "workflow_chain_gap",
+      "entry_id": "wf-fdd6eef6acc465fc03040000b4203301",
+      "classification": "missing_evidence"
+    },
+    {
+      "code": "workflow_chain_gap",
+      "entry_id": "wf-27c4842a6150cc34ec9cb6b9875749ae",
+      "classification": "missing_evidence"
+    },
+    {
+      "code": "workflow_chain_gap",
+      "entry_id": "wf-e1d3f4ba5cd27ad53bbe0ae2f8c92d7b",
+      "classification": "missing_evidence"
+    },
+    {
+      "code": "workflow_chain_gap",
+      "entry_id": "wf-890de0fa5b7964af40b07c9086745ef8",
+      "classification": "missing_evidence"
+    },
+    {
+      "code": "workflow_chain_gap",
+      "entry_id": "wf-222a5dbad101d504e9d1ebaec20ca0d4",
+      "classification": "missing_evidence"
+    },
+    {
+      "code": "workflow_chain_gap",
+      "entry_id": "wf-232cddfa445fe300a89e18390e053072",
+      "classification": "missing_evidence"
+    },
+    {
+      "code": "workflow_chain_gap",
+      "entry_id": "wf-d2663dea4fe715ab7fa7f59a36d7a403",
+      "classification": "missing_evidence"
+    },
+    {
+      "code": "workflow_chain_gap",
+      "entry_id": "wf-6511d9612cd32e860f17027b94d9f160",
+      "classification": "missing_evidence"
+    },
+    {
+      "code": "workflow_chain_gap",
+      "entry_id": "wf-286930553e512ff84aa65346cd6be877",
+      "classification": "missing_evidence"
+    }
+  ],
+  "warnings_omitted": 0,
+  "rights_granted": false,
+  "budget_released": false,
+  "stop_enforced": false,
+  "task_completion_proven": false
+}

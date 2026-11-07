@@ -1,0 +1,161 @@
+{
+  "request_id": "channel-042858aeda9a4799b45a547029d1424c",
+  "tested_commit": "71bfbb9316481996def5800390e0d8ebe63c3671",
+  "platform": "macOS-15.7.4-x86_64-i386-64bit",
+  "python": "3.11.15 (main, Mar  3 2026, 00:52:57) [Clang 17.0.0 (clang-1700.6.4.2)]",
+  "verify": {
+    "passed": 1782,
+    "skipped": 1,
+    "deselected": 1,
+    "pytest_seconds": 289.24,
+    "wrapper_seconds": 292.0885383769928,
+    "local_full_suite_runs": 1
+  },
+  "receiver_cases_passed": 32,
+  "ruff_exit_code": 0,
+  "format_exit_code": 0,
+  "binding": {
+    "pane_id": "terminal:3033:ttys001",
+    "expected_pid": 70676,
+    "agent_pid": 71896,
+    "ready_pattern": "(?m)^\\s*›(?: Ask Codex to do anything)?\\s*$",
+    "busy_pattern": "\\[stop\\]|esc to interrupt|Thinking…|Working…|Back to bottom|enter/esc latest",
+    "codex_thread_id": null,
+    "codex_rollout_path": null
+  },
+  "binding_changed": false,
+  "visible_request_marker_observed": true,
+  "builds_identical": true,
+  "artifact_sha256s": "a0b00f81dd8ebab613a7f7129fc5f9ae60887f42e71ebe79c94a29eae289dff8  KiraBridge-macos.tar.gz\nd9f584f33f7c5c10f001192a41ac9ae3a7616d7e0202c4afc72a5ecfc1dc1788  kirabridge-0.8.0rc17-py3-none-any.whl\nc1288bbeade1a220e7a5433d5b3fc217416223d8abaa2714f89080cacfb9674e  install-macos.sh\n48da2448b333135988a160d96cb6a3463499eecc182934310b518752299e8af5  KiraBridge-0.8.0rc17-Linux-x86_64.tar.gz\n3316d5eda60ac1fea355aa43d196feea3567384179b55ca88c8636c0322021ec  LICENSE\n",
+  "package": {
+    "download_command": "not exercised",
+    "os": "macOS-15.7.4-x86_64-i386-64bit",
+    "architecture": "x86_64",
+    "version": "0.8.0rc17",
+    "scope": "isolated real launchd label, config, port, runtime and data; no production paths",
+    "tested_command": "sh KiraBridge/install.sh --prefix /private/tmp/kb-pr49-review-20261029/accept-pr49-042858ae/install --config /private/tmp/kb-pr49-review-20261029/accept-pr49-042858ae/config/config.toml --launcher /private/tmp/kb-pr49-review-20261029/accept-pr49-042858ae/bin/kirabridge --plist /private/tmp/kb-pr49-review-20261029/accept-pr49-042858ae/service.plist --cache-dir /private/tmp/kb-pr49-review-20261029/accept-pr49-042858ae/cache --workspace /private/tmp/kb-pr49-review-20261029/accept-pr49-042858ae/workspace --test-label com.kirabridge.test.accept-pr49-042858ae",
+    "cwd": "/private/tmp/kb-pr49-review-20261029/accept-pr49-042858ae/extracted",
+    "checks": [
+      "pinned previous 0.8.0rc14 wheel starts under isolated launchd",
+      "built package upgrades 0.8.0rc14; authenticated version/status/start",
+      "config/credentials hashes, database row and user file preserved",
+      "daemon survives installer/terminal command exit",
+      "repeat install idempotent; same PID and no config rewrite",
+      "real launchctl kickstart restart and authenticated status",
+      "launchd KeepAlive automatically recovers a crashed daemon",
+      "real rollback restarts previous 0.8.0rc14 wheel and preserves secrets",
+      "fresh built-wheel installation starts actual isolated launchd service"
+    ],
+    "upgrade_only": false,
+    "hold_completion": false,
+    "previous_version": "0.8.0rc14",
+    "previous_commit": "c21d37ebdd42f03c85df1e89cd3c6969a6362e4c",
+    "previous_wheel_sha256": "c5d33839b70badf36371d1fef03ea3a4370e00165db4699647ccacfa3700fadd",
+    "remote_release_command": "not exercised in this run",
+    "passed": true,
+    "service_cleanup_bootout_returncode": 0,
+    "service_cleanup_absence_verified": true
+  },
+  "independent_cleanup": {
+    "label": "gui/501/com.kirabridge.test.accept-pr49-042858ae",
+    "returncode": 113
+  },
+  "production_runtime_before": {
+    "instance_id": "31849a4ff7c346f396b99e31d6fd807d",
+    "version": "0.8.0rc17",
+    "pid": 60636,
+    "started_at": "2026-10-29T05:14:06.133578+00:00",
+    "config_path": "/Users/landjunge/.config/kirabridge/config.toml",
+    "config_sha256": "52747b8353bef4cc162997c34c30d8e759ca0691725d902f313ce4653cf903c2",
+    "effective_config_sha256": "3709ee5e48b675813b9708c7b634d137ca3c2c2dc19fefd35a04b61f581cf641",
+    "source_tree_sha256": "4bb8e3b989a005568ed26a3b0cc1df4459c3cbfd22ca0e53177694455cbf7b8d",
+    "source_file_count": 120,
+    "source_package_path": "/Users/landjunge/KiraBridge-worktrees/managed-message-route-20261028/src/kirabridge",
+    "source_scope": "package Python files observed at startup; no remote attestation"
+  },
+  "production_runtime_after": {
+    "instance_id": "31849a4ff7c346f396b99e31d6fd807d",
+    "version": "0.8.0rc17",
+    "pid": 60636,
+    "started_at": "2026-10-29T05:14:06.133578+00:00",
+    "config_path": "/Users/landjunge/.config/kirabridge/config.toml",
+    "config_sha256": "52747b8353bef4cc162997c34c30d8e759ca0691725d902f313ce4653cf903c2",
+    "effective_config_sha256": "3709ee5e48b675813b9708c7b634d137ca3c2c2dc19fefd35a04b61f581cf641",
+    "source_tree_sha256": "4bb8e3b989a005568ed26a3b0cc1df4459c3cbfd22ca0e53177694455cbf7b8d",
+    "source_file_count": 120,
+    "source_package_path": "/Users/landjunge/KiraBridge-worktrees/managed-message-route-20261028/src/kirabridge",
+    "source_scope": "package Python files observed at startup; no remote attestation"
+  },
+  "preservation": {
+    "historical_messages_unchanged": true,
+    "messages": [
+      {
+        "id": "61ccf5a9-3f5c-46f4-8bb6-b5930e168a0d",
+        "delivered": 1793247801.993976,
+        "acknowledged": 1793247893.07252,
+        "state": "unknown",
+        "evidence": "{\"last_observation\":{\"agent_confirmed\":true,\"handoff_id\":\"channel-2924bd3d9ba84657900a79e53f0dc860\",\"state\":\"confirmed\"},\"reason\":\"receiver_restart\"}",
+        "reply_id": null
+      },
+      {
+        "id": "ed182f06-b5cc-4841-8b8c-5ef5829a137e",
+        "delivered": null,
+        "acknowledged": null,
+        "state": "blocked",
+        "evidence": "{\"reason\":\"conversation_run_limit\"}",
+        "reply_id": null
+      },
+      {
+        "id": "013a112e-b9fc-4271-b9ff-ebd19f279ac7",
+        "delivered": null,
+        "acknowledged": null,
+        "state": "blocked",
+        "evidence": "{\"reason\":\"conversation_run_limit\"}",
+        "reply_id": null
+      }
+    ],
+    "config_sha256": "52747b8353bef4cc162997c34c30d8e759ca0691725d902f313ce4653cf903c2",
+    "config_matches_original_runtime_sha": true
+  },
+  "test_tab_absent": true,
+  "original_agents_remaining": [
+    71896,
+    45186
+  ],
+  "backup": "/Users/landjunge/.local/share/kirabridge/backups/pr49-local-macos-20261029-042858ae",
+  "evidence_manifest": {
+    "package-acceptance.log": "cc693bca9a838c7c5a00e3819b854f9a2eb4936f0d9eef0584fa572d05a5ffbe",
+    "rebuild-SHA256SUMS": "7ca936b37a7ecd36c272438818fe12f9021f0c76b969eb6cf7f55f32c9318281",
+    "package-evidence.json": "d3750199f95d227c6455501322d5e4aed843217cfef7b768cd673fa1d1d782d3",
+    "package-acceptance.json": "d170c5ad055200b2da98778792391236f573f7288f9b41656e6c0a7c1072740a",
+    "candidate/install-macos.sh": "c1288bbeade1a220e7a5433d5b3fc217416223d8abaa2714f89080cacfb9674e",
+    "candidate/LICENSE": "3316d5eda60ac1fea355aa43d196feea3567384179b55ca88c8636c0322021ec",
+    "candidate/KiraBridge-0.8.0rc17-Linux-x86_64.tar.gz": "48da2448b333135988a160d96cb6a3463499eecc182934310b518752299e8af5",
+    "candidate/kirabridge-0.8.0rc17-py3-none-any.whl": "d9f584f33f7c5c10f001192a41ac9ae3a7616d7e0202c4afc72a5ecfc1dc1788",
+    "candidate/.gitignore": "684888c0ebb17f374298b65ee2807526c066094c701bcc7ebbe1c1095f494fc1",
+    "candidate/KiraBridge-macos.tar.gz": "a0b00f81dd8ebab613a7f7129fc5f9ae60887f42e71ebe79c94a29eae289dff8",
+    "candidate/install-macos.sh.sha256": "e005ee4989d03b412cc072fb350014f2c4647936d17f95c83202c7f9ba34a748",
+    "candidate/KiraBridge-macos.tar.gz.sha256": "63246b2f6c658fd6127f1968b91be6b86b835f71bb3ca01313da78f8d40ddbbb",
+    "candidate/SHA256SUMS": "7ca936b37a7ecd36c272438818fe12f9021f0c76b969eb6cf7f55f32c9318281",
+    "candidate/kirabridge-0.8.0rc17-py3-none-any.whl.sha256": "8a5921dc79779fa3547df77a37927af0e968a00f44ff003d057810eafe08e9e8",
+    "evidence/peer-export-manifest.json": "dc946f0e8fcf5ba01d2d3a3523968ff8de248d2ea6e024790c19c070a870fd75",
+    "evidence/preservation.json": "5a38a33d267192b3e5f27cba692feab8b72567f9ed8194b92c6cf3d8b354e48d",
+    "evidence/production-observations.json": "2818fcecb486203c45199ec503ba60c3ac8dd6931556950d43448be40027de8c",
+    "evidence/mac-verify-format.log": "c08cb44deef3bd5e6aceb013d76f19020ed4f70d4eea0e35334c33d2a0dc94ff",
+    "evidence/window-close.json": "1e00dd780c449c7ebdfef7eb760b625e22484d0e7fcf8cfdacbd3eced47920c1",
+    "evidence/mac-verify-pytest.log": "8afe7d6c748f0d554e9f0c90b2996eb93519044cf89f962c13a0b2f32c4407cd",
+    "evidence/package-independent-absence.json": "538ab7f2b8266e7f06203f0aec54cac012cea43baaf64617536a3c91f1ea703e",
+    "evidence/package-preflight.json": "776e0815be3a678c8aac175f8fd82fdd9ce6b795d149c179d268fd6244e43635",
+    "evidence/historical-before.json": "cc32598e5904f78c937b05f653cb9f66b61737a5f36b6a9bcbf6d486cd010375",
+    "evidence/mac-verify-result.json": "65b45cbb31e6b3ebe553548654425da0138631574141425cb8ed06e42eb5a5f0",
+    "evidence/mac-verify-ruff.log": "82b3e6a6c090a57601d22943bd23fca9218d1031dbe5a7b754092f9a156b4f18",
+    "evidence/mac-verify-junit.xml": "a82db26b52ce5fdda79603d496082d9bd6bbd82ea8f8cd53b973609b6c41eb98"
+  },
+  "limits": [
+    "Intel macOS15.7.4 only; no ARM/notarization acceptance",
+    "Local result does not override required GitHub macOS gates",
+    "No production restart/restore/config changes; no merge/release/deployment",
+    "Optional AA-reader skipped, Operatorboard test deselected",
+    "Initial peer extraction setup error occurred before tests and was corrected using dedicated Python3.11"
+  ]
+}

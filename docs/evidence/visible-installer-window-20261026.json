@@ -1,0 +1,15 @@
+{
+  "window_id": 54294,
+  "tab_index": 0,
+  "tty": "/dev/ttys008",
+  "passed": true,
+  "installation_performed": false,
+  "scope": "isolated read-only native visibility probe; reused one confirmed owned empty shell",
+  "verifier_sha256": "03ae1ba34174c04250f40108ebb2ad734a40222d6ca770b0c315967dd89fdd83",
+  "earlier_probe_failure": "root-owned normal login ancestor was initially rejected; original failed evidence retained",
+  "uid_boundary_rule": "own installer and shell identities verified; stop at ownership boundary; no grant from login parent",
+  "targeted_uid_boundary_cases_passed": 4,
+  "prior_visibility_cases_passed_before_uid_fix": 15,
+  "new_window_created_for_retry": false,
+  "cryptographic_agent_identity_claimed": false
+}

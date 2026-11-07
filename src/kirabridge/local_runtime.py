@@ -15,24 +15,13 @@ from pathlib import Path
 from kirabridge.bridge_core.config import Config, private_directory
 from kirabridge.bridge_core.models import BridgeError
 from kirabridge.mcp_gateway.client import MCPClientPool, Peer
+from kirabridge.private_files import private_json, write_private
 
 LABEL = "com.kirabridge.bridge"
 
 
 def default_config() -> Path:
     return Path.home() / ".config/kirabridge/config.toml"
-
-
-def private_json(path: Path) -> dict:
-    fd = os.open(path, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0))
-    with os.fdopen(fd, "r", encoding="utf-8") as source:
-        info = os.fstat(source.fileno())
-        if os.name == "posix" and (info.st_uid != os.getuid() or info.st_mode & 0o077):
-            raise BridgeError("unsafe_credentials", "Credentials must be owner-only")
-        raw = source.read(65537)
-        if len(raw) > 65536:
-            raise BridgeError("unsafe_credentials", "Credentials file exceeds limit")
-        return json.loads(raw)
 
 
 def token_for(config: Config, principal: str) -> str:
@@ -83,15 +72,7 @@ def connection_observer(config: Config, principal: str):
     return AuditObserver(config, principal, runtime_snapshot(config))
 
 
-def write_private(path: Path, text: str | bytes, *, mode: int = 0o600) -> None:
-    fd = os.open(path, os.O_CREAT | os.O_EXCL | os.O_WRONLY, mode)
-    with os.fdopen(fd, "wb") as output:
-        output.write(text.encode() if isinstance(text, str) else text)
-        output.flush()
-        os.fsync(output.fileno())
-
-
-def setup(workspace: str, destination: Path | None = None) -> dict:
+def setup(workspace: str, destination: Path | None = None, *, install_wrapper: bool = True) -> dict:
     destination = destination or default_config()
     private_directory(destination.parent)
     if destination.exists():
@@ -99,7 +80,11 @@ def setup(workspace: str, destination: Path | None = None) -> dict:
     root = Path(workspace).expanduser().absolute()
     root.mkdir(parents=True, exist_ok=True)
     root = root.resolve()
-    state = Path.home() / ".local/share/kirabridge"
+    state = (
+        Path.home() / ".local/share/kirabridge"
+        if destination == default_config()
+        else destination.parent / "state"
+    )
     private_directory(state)
     credential_path = destination.parent / "credentials.json"
     credentials = {name: secrets.token_urlsafe(48) for name in ("local", "codex", "grok")}
@@ -156,10 +141,11 @@ def setup(workspace: str, destination: Path | None = None) -> dict:
             )
     write_private(destination, content)
     command_path = Path.home() / ".local/bin/kirabridge"
-    command_path.parent.mkdir(parents=True, exist_ok=True)
     wrapper = f'#!/bin/sh\nexec {shlex.quote(sys.executable)} -m kirabridge.cli "$@"\n'
-    if not command_path.exists():
-        write_private(command_path, wrapper, mode=0o700)
+    if install_wrapper:
+        command_path.parent.mkdir(parents=True, exist_ok=True)
+        if not command_path.exists():
+            write_private(command_path, wrapper, mode=0o700)
     return {
         "config": str(destination),
         "workspace": str(root),
@@ -170,22 +156,21 @@ def setup(workspace: str, destination: Path | None = None) -> dict:
     }
 
 
-def install_service(config_path: Path) -> dict:
+def install_service(config_path: Path, *, command: str | None = None) -> dict:
     if sys.platform != "darwin":
         raise BridgeError("unsupported_platform", "Use the documented systemd unit on Linux")
     launch_dir = Path.home() / "Library/LaunchAgents"
     launch_dir.mkdir(parents=True, exist_ok=True)
     plist_path = launch_dir / f"{LABEL}.plist"
-    arguments = [
-        sys.executable,
-        "-m",
-        "kirabridge.cli",
+    arguments = ([command] if command else [sys.executable, "-m", "kirabridge.cli"]) + [
         "--config",
         str(config_path),
         "serve",
         "--transport",
         "http",
     ]
+    if command is not None:
+        arguments = [command, "serve", "--transport", "http"]
     if plist_path.exists():
         previous = plistlib.loads(plist_path.read_bytes())
         if previous.get("ProgramArguments") != arguments:

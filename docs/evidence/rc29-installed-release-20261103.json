@@ -1,0 +1,72 @@
+{
+  "version": "0.8.0rc29",
+  "source_commit": "279afccc693e2b8d3d7d1787828ad44679d1bba2",
+  "release_url": "https://github.com/landjunge/KiraBridge/releases/tag/v0.8.0rc29",
+  "assets_verified": 7,
+  "downloaded_installer_sha256": "31870192887f1802e28b6512558fcb8403232d9fda80045c32fc84a13ff041c1",
+  "download_verified": true,
+  "installer_exit_code": 0,
+  "installed_at_utc": "2026-11-03T01:27:27.187662+00:00",
+  "daemon": {
+    "pid": 56714,
+    "instance_id": "032377e6a8b043738187c88619ef084d",
+    "version": "0.8.0rc29",
+    "source_package_sha256": "667f2ace82d46fa615257f6959b6f0c030bee2de8d9f55406af3c8306d270f9c"
+  },
+  "python_files_equal_wheel_and_source": 164,
+  "native_files_hash_mode_verified": 3,
+  "native_binary_sha256": "a68a8d3348ad282f574ed91cd2f085628cc97e4816ecce24ae16ab6f876dde04",
+  "desktop_pin_verified": true,
+  "preservation": {
+    "snapshot_utc": "2026-11-03T01:29:41.103109+00:00",
+    "seven_config_hash_size_mode_equal": true,
+    "database_schema_equal": true,
+    "inventory_tables": 11,
+    "old_rows_unchanged": 15474,
+    "original_agent_identities_unchanged": [
+      1728,
+      1749,
+      1825,
+      35046
+    ],
+    "original_shell_unchanged": 34884,
+    "expected_service_replacements": {
+      "old_backend_pid": 47232,
+      "new_backend": {
+        "pid": 56714,
+        "ppid": 1,
+        "tty": "??",
+        "started_local": "Tue Nov 3 02:27:17 2026",
+        "executable_name": "Python"
+      },
+      "old_tunnel_pid": 47259,
+      "new_tunnel": {
+        "pid": 56742,
+        "ppid": 1,
+        "tty": "??",
+        "started_local": "Tue Nov 3 02:27:22 2026",
+        "executable_name": "tunnel-client"
+      },
+      "old_connector_pid": 47263,
+      "new_connector": {
+        "pid": 56745,
+        "ppid": 56742,
+        "started_local": "Tue Nov 3 02:27:23 2026",
+        "executable_name": "codex"
+      }
+    }
+  },
+  "owned_window_cleanup": {
+    "owned_window_closed": true,
+    "absence_verified_twice": true,
+    "separate_physical_window_verified_before_close": true,
+    "original_window_ids_preserved": [
+      1548,
+      1604
+    ]
+  },
+  "rollback_version": "0.8.0rc28",
+  "rollback_backup": "/Users/landjunge/.local/share/kirabridge/install/backups/20261103-022710-8909943e",
+  "local_intel_only": true,
+  "github_actions_used": false
+}

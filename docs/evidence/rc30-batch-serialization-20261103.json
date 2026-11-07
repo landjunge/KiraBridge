@@ -1,0 +1,271 @@
+{
+  "scope": "Controlled local normalized MCP serialization of eight distinct fixture task replies, 64 KiB text each. No warmup excluded. Actual tool reads and complete payload checked. No cloud, native, clipboard or user data. Size is re-encoded MCP envelopes, not network traffic.",
+  "before": {
+    "scope": "Controlled local normalized MCP replies: eight distinct fixture task IDs, each a 64-KiB text result. Full semantic payload checked. No warmup omitted; separate traced memory sample. These are not Cloud roundtrips.",
+    "results": [
+      {
+        "format": "full",
+        "samples": [
+          {
+            "wall_ms": 86.799803,
+            "cpu_ms": 82.67,
+            "outer_replies": 2,
+            "inner_reads": 9,
+            "encoded_bytes": 2107124
+          },
+          {
+            "wall_ms": 81.447277,
+            "cpu_ms": 76.99,
+            "outer_replies": 2,
+            "inner_reads": 9,
+            "encoded_bytes": 2107124
+          },
+          {
+            "wall_ms": 83.574905,
+            "cpu_ms": 76.583,
+            "outer_replies": 2,
+            "inner_reads": 9,
+            "encoded_bytes": 2107120
+          },
+          {
+            "wall_ms": 102.227017,
+            "cpu_ms": 82.626,
+            "outer_replies": 2,
+            "inner_reads": 9,
+            "encoded_bytes": 2107124
+          },
+          {
+            "wall_ms": 80.865654,
+            "cpu_ms": 76.457,
+            "outer_replies": 2,
+            "inner_reads": 9,
+            "encoded_bytes": 2107124
+          },
+          {
+            "wall_ms": 85.347579,
+            "cpu_ms": 81.137,
+            "outer_replies": 2,
+            "inner_reads": 9,
+            "encoded_bytes": 2107122
+          },
+          {
+            "wall_ms": 83.865432,
+            "cpu_ms": 76.922,
+            "outer_replies": 2,
+            "inner_reads": 9,
+            "encoded_bytes": 2107124
+          },
+          {
+            "wall_ms": 88.861903,
+            "cpu_ms": 81.479,
+            "outer_replies": 2,
+            "inner_reads": 9,
+            "encoded_bytes": 2107122
+          },
+          {
+            "wall_ms": 87.754852,
+            "cpu_ms": 80.618,
+            "outer_replies": 2,
+            "inner_reads": 9,
+            "encoded_bytes": 2107124
+          },
+          {
+            "wall_ms": 84.992128,
+            "cpu_ms": 80.912,
+            "outer_replies": 2,
+            "inner_reads": 9,
+            "encoded_bytes": 2107124
+          }
+        ],
+        "peak_bytes": 5821029,
+        "wall_ms": {
+          "n": 10,
+          "p50": 85.16985349999999,
+          "p95": 102.227017
+        },
+        "cpu_ms": {
+          "n": 10,
+          "p50": 80.765,
+          "p95": 82.67
+        }
+      }
+    ]
+  },
+  "after": {
+    "scope": "Controlled local normalized MCP replies: eight distinct fixture task IDs, each a 64-KiB text result. Full semantic payload checked. No warmup omitted; separate traced memory sample. These are not Cloud roundtrips.",
+    "results": [
+      {
+        "format": "full",
+        "samples": [
+          {
+            "wall_ms": 41.341528,
+            "cpu_ms": 40.855,
+            "outer_replies": 2,
+            "inner_reads": 9,
+            "encoded_bytes": 2107160
+          },
+          {
+            "wall_ms": 46.628455,
+            "cpu_ms": 41.337,
+            "outer_replies": 2,
+            "inner_reads": 9,
+            "encoded_bytes": 2107160
+          },
+          {
+            "wall_ms": 37.35013,
+            "cpu_ms": 36.992,
+            "outer_replies": 2,
+            "inner_reads": 9,
+            "encoded_bytes": 2107154
+          },
+          {
+            "wall_ms": 41.879374,
+            "cpu_ms": 40.555,
+            "outer_replies": 2,
+            "inner_reads": 9,
+            "encoded_bytes": 2107154
+          },
+          {
+            "wall_ms": 38.264553,
+            "cpu_ms": 37.748,
+            "outer_replies": 2,
+            "inner_reads": 9,
+            "encoded_bytes": 2107160
+          },
+          {
+            "wall_ms": 50.023823,
+            "cpu_ms": 42.322,
+            "outer_replies": 2,
+            "inner_reads": 9,
+            "encoded_bytes": 2107160
+          },
+          {
+            "wall_ms": 41.475105,
+            "cpu_ms": 37.794,
+            "outer_replies": 2,
+            "inner_reads": 9,
+            "encoded_bytes": 2107156
+          },
+          {
+            "wall_ms": 38.624828,
+            "cpu_ms": 38.108,
+            "outer_replies": 2,
+            "inner_reads": 9,
+            "encoded_bytes": 2107158
+          },
+          {
+            "wall_ms": 53.052754,
+            "cpu_ms": 48.219,
+            "outer_replies": 2,
+            "inner_reads": 9,
+            "encoded_bytes": 2107160
+          },
+          {
+            "wall_ms": 43.440291,
+            "cpu_ms": 38.705,
+            "outer_replies": 2,
+            "inner_reads": 9,
+            "encoded_bytes": 2107158
+          }
+        ],
+        "peak_bytes": 5094826,
+        "wall_ms": {
+          "n": 10,
+          "p50": 41.6772395,
+          "p95": 53.052754
+        },
+        "cpu_ms": {
+          "n": 10,
+          "p50": 39.629999999999995,
+          "p95": 48.219
+        }
+      },
+      {
+        "format": "structured",
+        "samples": [
+          {
+            "wall_ms": 30.691939,
+            "cpu_ms": 30.467,
+            "outer_replies": 1,
+            "inner_reads": 8,
+            "encoded_bytes": 1056489
+          },
+          {
+            "wall_ms": 32.861391,
+            "cpu_ms": 31.593,
+            "outer_replies": 1,
+            "inner_reads": 8,
+            "encoded_bytes": 1056491
+          },
+          {
+            "wall_ms": 35.354943,
+            "cpu_ms": 32.49,
+            "outer_replies": 1,
+            "inner_reads": 8,
+            "encoded_bytes": 1056491
+          },
+          {
+            "wall_ms": 33.69262,
+            "cpu_ms": 29.369,
+            "outer_replies": 1,
+            "inner_reads": 8,
+            "encoded_bytes": 1056483
+          },
+          {
+            "wall_ms": 30.267253,
+            "cpu_ms": 29.885,
+            "outer_replies": 1,
+            "inner_reads": 8,
+            "encoded_bytes": 1056493
+          },
+          {
+            "wall_ms": 29.562266,
+            "cpu_ms": 29.128,
+            "outer_replies": 1,
+            "inner_reads": 8,
+            "encoded_bytes": 1056491
+          },
+          {
+            "wall_ms": 34.341476,
+            "cpu_ms": 31.514,
+            "outer_replies": 1,
+            "inner_reads": 8,
+            "encoded_bytes": 1056493
+          },
+          {
+            "wall_ms": 34.503481,
+            "cpu_ms": 32.909,
+            "outer_replies": 1,
+            "inner_reads": 8,
+            "encoded_bytes": 1056493
+          },
+          {
+            "wall_ms": 31.432983,
+            "cpu_ms": 30.748,
+            "outer_replies": 1,
+            "inner_reads": 8,
+            "encoded_bytes": 1056487
+          },
+          {
+            "wall_ms": 31.720786,
+            "cpu_ms": 31.393,
+            "outer_replies": 1,
+            "inner_reads": 8,
+            "encoded_bytes": 1056487
+          }
+        ],
+        "peak_bytes": 2668789,
+        "wall_ms": {
+          "n": 10,
+          "p50": 32.2910885,
+          "p95": 35.354943
+        },
+        "cpu_ms": {
+          "n": 10,
+          "p50": 31.070500000000003,
+          "p95": 32.909
+        }
+      }
+    ]
+  }
+}

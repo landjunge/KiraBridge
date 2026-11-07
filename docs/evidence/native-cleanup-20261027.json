@@ -1,0 +1,39 @@
+{
+  "base": "1cc3d247",
+  "source_root": "/Users/landjunge/KiraBridge-release-20261024/.worktrees/native-reap-worker-20261027/src",
+  "python": "../rc17-braille-integration-20261026/.venv/bin/python",
+  "environment": "PYTHONPATH=\"$PWD/src\"",
+  "unique_passed": 14,
+  "results": {
+    "targeted.log": "6 passed (includes exactly one real created Python worker, max256KiB stdout, no private group; killpg forbidden)",
+    "cancel-mappings.log": "4 passed (cancellation+cleanup timeout, known lock/unknown desktop, absence refusal)",
+    "direct-worker-protocols.log": "2 passed, 2 failed incomplete fake Process missing wait()",
+    "fake-protocol-fixed.log": "2 previously failed fixtures fixed to include normal Process.wait(), 2 passed with required unraisable-warning error flag"
+  },
+  "commands": [
+    "-m pytest -q tests/test_worker_pipe_cleanup.py",
+    "-m pytest -q tests/test_worker_pipe_cleanup.py::test_caller_cancellation_wins_over_cleanup_timeout_without_claiming_reaped tests/test_worker_pipe_cleanup.py::test_desktop_cleanup_failure_preserves_known_lock_else_unknown tests/test_worker_pipe_cleanup.py::test_unconfirmed_pid_observation_cleanup_never_proves_absence",
+    "-m pytest -q tests/test_terminal_clipboard_integration.py::test_native_script_travels_on_stdin_not_process_arguments tests/test_terminal_clipboard_integration.py::test_repeated_cancellation_reaps_gui_before_clipboard_restore tests/test_mac_desktop.py::test_probe_cancellation_reaps_only_its_own_child tests/test_sessions.py::test_native_catalog_binds_window_tty_and_unambiguous_root_pid",
+    "-m pytest -q -W error::pytest.PytestUnraisableExceptionWarning tests/test_terminal_clipboard_integration.py::test_native_script_travels_on_stdin_not_process_arguments tests/test_sessions.py::test_native_catalog_binds_window_tty_and_unambiguous_root_pid"
+  ],
+  "checks": [
+    "ruff format changed files",
+    "ruff check changed files passed",
+    "git diff --check passed"
+  ],
+  "sha256": {
+    "src/kirabridge/platform_adapters/__init__.py": "828eda365cb65d782719ff8d80c0cd72dabd7f603dce5814d9b490572cbd5fb2",
+    "src/kirabridge/platform_adapters/desktop.py": "bffa8fe74d76e9589673b7fbed2a7ed2d694289cc96d49ba1aced1897c956bc4",
+    "src/kirabridge/platform_adapters/terminal_app.py": "94d88e76aacca0c9810ff62786437127ece23b890d0b6ecefbfc9d765da3d40f",
+    "src/kirabridge/platform_adapters/tmux.py": "88efa4e077e2e0cc28c66e54bb91c0e4901f2e7c6fe5322b3ed1d4a50fc9eff3",
+    "tests/test_worker_pipe_cleanup.py": "54908aa2bfa8da2cf0cf409eb816d4f695da97c1e4849d0c219ff6a7f369c48b",
+    "tests/test_sessions.py": "c72ba1f726fd0cbe1f27a7af10cf076b6e8904ddf5707b6e860c19577736edb1",
+    "tests/test_terminal_clipboard_integration.py": "6bbf87981dfc11a03190ea7c9670eb58640c8b2bc17b97e750acb8e4a8ca3853"
+  },
+  "production_or_gui_mutations": false,
+  "interpretation": "Confirms isolated paused-pipe cleanup mechanism; does not establish the current productive daemon await stack or successful native GUI acceptance.",
+  "integration_scope": "PID-only cleanup fix; not proof of productive blocked task cause or recovery",
+  "actual_productive_terminal_acceptance": "still blocked by existing once-only accepted probe",
+  "own_install_window_closed_absence_verified": true,
+  "original_foreign_busy_window_preserved": true
+}

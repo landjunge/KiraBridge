@@ -1,0 +1,295 @@
+{
+  "scope": "Read-only local HTTP MCP client using configured chatgpt principal, same identity as Apps route; persistent local connection, excludes host-tool and Voice/model orchestration. Existing credentials remain in memory only.",
+  "statistics": {
+    "bridge_health": {
+      "n": 10,
+      "total_ms": 372.490067,
+      "p50_ms": 22.5279695,
+      "p95_nearest_rank_ms": 74.864413
+    },
+    "clipboard_info": {
+      "n": 10,
+      "total_ms": 240.506798,
+      "p50_ms": 6.890928499999999,
+      "p95_nearest_rank_ms": 104.825941
+    },
+    "operation_catalog": {
+      "n": 10,
+      "total_ms": 2258.225894,
+      "p50_ms": 218.0254415,
+      "p95_nearest_rank_ms": 291.205936
+    }
+  },
+  "samples": [
+    {
+      "iteration": 0,
+      "tool": "bridge_health",
+      "elapsed_ms": 69.855752,
+      "error": false,
+      "principal": "chatgpt",
+      "version": "0.8.0rc27",
+      "serialized_result_bytes": 45685
+    },
+    {
+      "iteration": 0,
+      "tool": "clipboard_info",
+      "elapsed_ms": 6.309414,
+      "error": false,
+      "principal": null,
+      "version": null,
+      "serialized_result_bytes": 480
+    },
+    {
+      "iteration": 0,
+      "tool": "operation_catalog",
+      "elapsed_ms": 291.205936,
+      "error": false,
+      "principal": "chatgpt",
+      "version": "0.8.0rc27",
+      "serialized_result_bytes": 506973
+    },
+    {
+      "iteration": 1,
+      "tool": "bridge_health",
+      "elapsed_ms": 73.419362,
+      "error": false,
+      "principal": "chatgpt",
+      "version": "0.8.0rc27",
+      "serialized_result_bytes": 45685
+    },
+    {
+      "iteration": 1,
+      "tool": "clipboard_info",
+      "elapsed_ms": 17.921074,
+      "error": false,
+      "principal": null,
+      "version": null,
+      "serialized_result_bytes": 480
+    },
+    {
+      "iteration": 1,
+      "tool": "operation_catalog",
+      "elapsed_ms": 214.447033,
+      "error": false,
+      "principal": "chatgpt",
+      "version": "0.8.0rc27",
+      "serialized_result_bytes": 506973
+    },
+    {
+      "iteration": 2,
+      "tool": "bridge_health",
+      "elapsed_ms": 23.602598,
+      "error": false,
+      "principal": "chatgpt",
+      "version": "0.8.0rc27",
+      "serialized_result_bytes": 45685
+    },
+    {
+      "iteration": 2,
+      "tool": "clipboard_info",
+      "elapsed_ms": 8.500363,
+      "error": false,
+      "principal": null,
+      "version": null,
+      "serialized_result_bytes": 480
+    },
+    {
+      "iteration": 2,
+      "tool": "operation_catalog",
+      "elapsed_ms": 221.62189,
+      "error": false,
+      "principal": "chatgpt",
+      "version": "0.8.0rc27",
+      "serialized_result_bytes": 506973
+    },
+    {
+      "iteration": 3,
+      "tool": "bridge_health",
+      "elapsed_ms": 21.020183,
+      "error": false,
+      "principal": "chatgpt",
+      "version": "0.8.0rc27",
+      "serialized_result_bytes": 45685
+    },
+    {
+      "iteration": 3,
+      "tool": "clipboard_info",
+      "elapsed_ms": 5.881258,
+      "error": false,
+      "principal": null,
+      "version": null,
+      "serialized_result_bytes": 480
+    },
+    {
+      "iteration": 3,
+      "tool": "operation_catalog",
+      "elapsed_ms": 212.68911,
+      "error": false,
+      "principal": "chatgpt",
+      "version": "0.8.0rc27",
+      "serialized_result_bytes": 506973
+    },
+    {
+      "iteration": 4,
+      "tool": "bridge_health",
+      "elapsed_ms": 21.453341,
+      "error": false,
+      "principal": "chatgpt",
+      "version": "0.8.0rc27",
+      "serialized_result_bytes": 45685
+    },
+    {
+      "iteration": 4,
+      "tool": "clipboard_info",
+      "elapsed_ms": 5.963996,
+      "error": false,
+      "principal": null,
+      "version": null,
+      "serialized_result_bytes": 480
+    },
+    {
+      "iteration": 4,
+      "tool": "operation_catalog",
+      "elapsed_ms": 212.114136,
+      "error": false,
+      "principal": "chatgpt",
+      "version": "0.8.0rc27",
+      "serialized_result_bytes": 506973
+    },
+    {
+      "iteration": 5,
+      "tool": "bridge_health",
+      "elapsed_ms": 74.864413,
+      "error": false,
+      "principal": "chatgpt",
+      "version": "0.8.0rc27",
+      "serialized_result_bytes": 45685
+    },
+    {
+      "iteration": 5,
+      "tool": "clipboard_info",
+      "elapsed_ms": 71.016539,
+      "error": false,
+      "principal": null,
+      "version": null,
+      "serialized_result_bytes": 480
+    },
+    {
+      "iteration": 5,
+      "tool": "operation_catalog",
+      "elapsed_ms": 221.60385,
+      "error": false,
+      "principal": "chatgpt",
+      "version": "0.8.0rc27",
+      "serialized_result_bytes": 506973
+    },
+    {
+      "iteration": 6,
+      "tool": "bridge_health",
+      "elapsed_ms": 21.034072,
+      "error": false,
+      "principal": "chatgpt",
+      "version": "0.8.0rc27",
+      "serialized_result_bytes": 45685
+    },
+    {
+      "iteration": 6,
+      "tool": "clipboard_info",
+      "elapsed_ms": 6.929262,
+      "error": false,
+      "principal": null,
+      "version": null,
+      "serialized_result_bytes": 480
+    },
+    {
+      "iteration": 6,
+      "tool": "operation_catalog",
+      "elapsed_ms": 210.613592,
+      "error": false,
+      "principal": "chatgpt",
+      "version": "0.8.0rc27",
+      "serialized_result_bytes": 506973
+    },
+    {
+      "iteration": 7,
+      "tool": "bridge_health",
+      "elapsed_ms": 24.584392,
+      "error": false,
+      "principal": "chatgpt",
+      "version": "0.8.0rc27",
+      "serialized_result_bytes": 45685
+    },
+    {
+      "iteration": 7,
+      "tool": "clipboard_info",
+      "elapsed_ms": 6.306356,
+      "error": false,
+      "principal": null,
+      "version": null,
+      "serialized_result_bytes": 480
+    },
+    {
+      "iteration": 7,
+      "tool": "operation_catalog",
+      "elapsed_ms": 209.249084,
+      "error": false,
+      "principal": "chatgpt",
+      "version": "0.8.0rc27",
+      "serialized_result_bytes": 506973
+    },
+    {
+      "iteration": 8,
+      "tool": "bridge_health",
+      "elapsed_ms": 21.40869,
+      "error": false,
+      "principal": "chatgpt",
+      "version": "0.8.0rc27",
+      "serialized_result_bytes": 45685
+    },
+    {
+      "iteration": 8,
+      "tool": "clipboard_info",
+      "elapsed_ms": 6.852595,
+      "error": false,
+      "principal": null,
+      "version": null,
+      "serialized_result_bytes": 480
+    },
+    {
+      "iteration": 8,
+      "tool": "operation_catalog",
+      "elapsed_ms": 235.447286,
+      "error": false,
+      "principal": "chatgpt",
+      "version": "0.8.0rc27",
+      "serialized_result_bytes": 506973
+    },
+    {
+      "iteration": 9,
+      "tool": "bridge_health",
+      "elapsed_ms": 21.247264,
+      "error": false,
+      "principal": "chatgpt",
+      "version": "0.8.0rc27",
+      "serialized_result_bytes": 45685
+    },
+    {
+      "iteration": 9,
+      "tool": "clipboard_info",
+      "elapsed_ms": 104.825941,
+      "error": false,
+      "principal": null,
+      "version": null,
+      "serialized_result_bytes": 480
+    },
+    {
+      "iteration": 9,
+      "tool": "operation_catalog",
+      "elapsed_ms": 229.233977,
+      "error": false,
+      "principal": "chatgpt",
+      "version": "0.8.0rc27",
+      "serialized_result_bytes": 506973
+    }
+  ]
+}

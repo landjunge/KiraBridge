@@ -1,0 +1,270 @@
+{
+  "schema": "kirabridge-workflow-stop-acceptance-v1",
+  "scope": "Actual connected ChatGPT App, synthetic owned workflow; technical acceptance only",
+  "source_commit": "f731f65d6422b08c511220689e42200e28cf39ae",
+  "initial_source_commit": "7af39cd97b58054d6e7333cd3430d00f4b46c3f4",
+  "installed_commit": "1dee506d1a849380e7983aa806b737aedecbf39c",
+  "tollgate_source_commit": "53fc57cc2e082d022e65e5929cb2a1e186fba852",
+  "ci": [
+    "https://github.com/landjunge/KiraBridge/actions/runs/39173199790",
+    "https://github.com/landjunge/KiraBridge/actions/runs/39173697982"
+  ],
+  "tasks": [
+    {
+      "task_id": "seven-stop-20261019-mkdir",
+      "principal": "chatgpt",
+      "operation": "file.mkdir",
+      "state": "completed",
+      "attempt": 1,
+      "receipt": "ed733e34-5089-4f33-a15f-c46d64bc7050",
+      "accepted": 1792363402.211673,
+      "started": 1792363402.244098,
+      "finished": 1792363402.246711,
+      "error_code": null
+    },
+    {
+      "task_id": "seven-stop-20261019-create",
+      "principal": "chatgpt",
+      "operation": "threaddesk.manage",
+      "state": "completed",
+      "attempt": 1,
+      "receipt": "c39e0196-fb25-4203-adaf-b32400568fc8",
+      "accepted": 1792363403.690732,
+      "started": 1792363404.122858,
+      "finished": 1792363404.1320698,
+      "error_code": null
+    },
+    {
+      "task_id": "seven-stop-20261019-issue",
+      "principal": "chatgpt",
+      "operation": "handoff.issue",
+      "state": "completed",
+      "attempt": 1,
+      "receipt": "bcd562dc-f243-4f38-be32-ad2fd7f00547",
+      "accepted": 1792363425.777065,
+      "started": 1792363425.828512,
+      "finished": 1792363425.993707,
+      "error_code": null
+    },
+    {
+      "task_id": "seven-stop-20261019-start",
+      "principal": "chatgpt",
+      "operation": "handoff.start",
+      "state": "completed",
+      "attempt": 1,
+      "receipt": "04501986-7bba-4bd6-a339-d71901a98c70",
+      "accepted": 1792363442.815084,
+      "started": 1792363442.868039,
+      "finished": 1792363453.16203,
+      "error_code": null
+    },
+    {
+      "task_id": "seven-stop-20261019-stop",
+      "principal": "chatgpt",
+      "operation": "workflow.stop",
+      "state": "completed",
+      "attempt": 1,
+      "receipt": "9baeff7c-578a-4dab-be66-3951ffb7ae2e",
+      "accepted": 1792363466.600586,
+      "started": 1792363466.6321862,
+      "finished": 1792363466.721108,
+      "error_code": null
+    },
+    {
+      "task_id": "seven-stop-20261019-blocked-start",
+      "principal": "chatgpt",
+      "operation": "handoff.start",
+      "state": "failed",
+      "attempt": 1,
+      "receipt": "5118631d-5308-41fd-8daa-b9b5386f0ea8",
+      "accepted": 1792363500.6876101,
+      "started": 1792363500.750271,
+      "finished": 1792363500.751521,
+      "error_code": "workflow_stopped"
+    },
+    {
+      "task_id": "seven-stop-20261019-status-after-stop",
+      "principal": "chatgpt",
+      "operation": "handoff.status",
+      "state": "completed",
+      "attempt": 1,
+      "receipt": "6ae48bb6-d518-4cdc-90d7-df957d193737",
+      "accepted": 1792363535.846543,
+      "started": 1792363535.851137,
+      "finished": 1792363535.854918,
+      "error_code": null
+    },
+    {
+      "task_id": "seven-stop-20261019-observations",
+      "principal": "chatgpt",
+      "operation": "observations.read",
+      "state": "completed",
+      "attempt": 1,
+      "receipt": "cd2158bf-0a2a-400d-822b-cec2dc08cca3",
+      "accepted": 1792363636.2298849,
+      "started": 1792363636.2989812,
+      "finished": 1792363636.325731,
+      "error_code": null
+    },
+    {
+      "task_id": "seven-stop-20261019-blocked-answer",
+      "principal": "chatgpt",
+      "operation": "handoff.answer",
+      "state": "failed",
+      "attempt": 1,
+      "receipt": "c32c0d20-dfe8-40d8-ba79-899c2a3c122b",
+      "accepted": 1792363799.72941,
+      "started": 1792363799.775606,
+      "finished": 1792363799.792243,
+      "error_code": "workflow_stopped"
+    },
+    {
+      "task_id": "seven-stop-20261019-status-after-restart",
+      "principal": "chatgpt",
+      "operation": "handoff.status",
+      "state": "completed",
+      "attempt": 1,
+      "receipt": "f70a6322-90eb-4639-a0b0-04301455d937",
+      "accepted": 1792363823.0532238,
+      "started": 1792363823.1044679,
+      "finished": 1792363823.122327,
+      "error_code": null
+    },
+    {
+      "task_id": "seven-stop-20261019-files",
+      "principal": "chatgpt",
+      "operation": "file.list",
+      "state": "completed",
+      "attempt": 1,
+      "receipt": "8c3feb74-bae6-4494-a5d1-0cd78dde5973",
+      "accepted": 1792363852.4411929,
+      "started": 1792363852.474289,
+      "finished": 1792363852.492338,
+      "error_code": null
+    },
+    {
+      "task_id": "seven-stop-20261019-aa-report",
+      "principal": "chatgpt",
+      "operation": "file.read",
+      "state": "completed",
+      "attempt": 1,
+      "receipt": "c6427b10-298e-40be-87c7-428776a2de3d",
+      "accepted": 1792363936.520927,
+      "started": 1792363936.5546298,
+      "finished": 1792363936.572397,
+      "error_code": null
+    }
+  ],
+  "correlation": {
+    "thread_id": "a39d1e7e1a9a",
+    "original_task_id": "a39d1e7e1a9a:task",
+    "handoff_id": "1984a8bc16c9",
+    "revision": 1,
+    "binding_ref": "hw_a0f40872c8fb5e9e54783770e395ffeb11de3e5eee1438f1ac54c8e1d005b7a4",
+    "run_id": "04501986-7bba-4bd6-a339-d71901a98c70",
+    "session_id": "01a1512f-b4f0-75c0-af0e-f13f3a194608"
+  },
+  "barrier": {
+    "abort_confirmed": false,
+    "barrier_seq": 4,
+    "external_effect": "unknown",
+    "further_dispatch_blocked": true,
+    "status": "EFFECTIVE",
+    "stop_id": "acceptance-stop-20261019"
+  },
+  "checks": {
+    "real_codex_question": true,
+    "turn_count_after_restart": 1,
+    "blocked_new_start_code": "workflow_stopped",
+    "blocked_answer_code": "workflow_stopped",
+    "unchanged_binding_after_blocked_answer": true,
+    "synthetic_directory_empty": true,
+    "native_codex_denied": "forbidden",
+    "observations": {
+      "event_count": 14,
+      "stop_types": [
+        "control.stop_requested",
+        "control.stop_effective"
+      ],
+      "stop_runtime": [
+        "b097b8b91f04404cb4171a9718d08013",
+        "b097b8b91f04404cb4171a9718d08013"
+      ]
+    },
+    "neutral_report_read_from_actual_app": {
+      "state": "completed",
+      "bytes": 29875,
+      "truncated": false,
+      "schema": "agent-authority-workflow-report-v1",
+      "events": 14,
+      "role": "observer_only",
+      "identity": "UNBEKANNT",
+      "effect": "UNBEKANNT",
+      "stop_enforced": false,
+      "task_completion_proven": false
+    }
+  },
+  "runtime_before": {
+    "instance_id": "748efc8b8ee341f5858d915abb1fb131",
+    "version": "0.5.2",
+    "pid": 43967,
+    "started_at": "2026-10-18T19:29:38.814780+00:00",
+    "config_path": "/Users/landjunge/.config/kirabridge/config.toml",
+    "config_sha256": "04637ceeb2fdc4a645ba25d5ff4e8867b11068cd24eb991b7badd5b29e12405c",
+    "effective_config_sha256": "d4f9380268c72f90712e775c39de854cf74a097661c34b019a91b304e6d5f08f",
+    "source_tree_sha256": "1d994ab1e3257d0701d2786e4220fca1f3891c914ae115ee11c4d45ea449ae31",
+    "source_file_count": 37,
+    "source_package_path": "/Users/landjunge/KiraBridge/src/kirabridge",
+    "source_scope": "package Python files observed at startup; no remote attestation"
+  },
+  "runtime_initial_stop": {
+    "instance_id": "b097b8b91f04404cb4171a9718d08013",
+    "version": "0.5.2",
+    "pid": 67108,
+    "started_at": "2026-10-18T22:42:40.650911+00:00",
+    "config_path": "/Users/landjunge/.config/kirabridge/config.toml",
+    "config_sha256": "f0a8b0f5dc6554bc7d8f706b42d01e7ccde88866ec0c05a05c0bbc718b3cfa1b",
+    "effective_config_sha256": "63d3eb1f56ce5f696b78f359dad13cc8eb51bf31e8da2d533c18db90b7236afd",
+    "source_tree_sha256": "734e7a3a8c8d2cf5a83b6eaf06776ef1796c513f57435de236444247889ca826",
+    "source_file_count": 39,
+    "source_package_path": "/Users/landjunge/KiraBridge/src/kirabridge",
+    "source_scope": "package Python files observed at startup; no remote attestation"
+  },
+  "runtime_after_restart": {
+    "instance_id": "909ceb813e1f45f0bc492ba49299cb82",
+    "version": "0.5.2",
+    "pid": 68228,
+    "started_at": "2026-10-18T22:49:15.071202+00:00",
+    "config_path": "/Users/landjunge/.config/kirabridge/config.toml",
+    "config_sha256": "f0a8b0f5dc6554bc7d8f706b42d01e7ccde88866ec0c05a05c0bbc718b3cfa1b",
+    "effective_config_sha256": "63d3eb1f56ce5f696b78f359dad13cc8eb51bf31e8da2d533c18db90b7236afd",
+    "source_tree_sha256": "441216fe84a30f1228e3778d62656af96f42b2c37d4e440d8c131477f970387f",
+    "source_file_count": 39,
+    "source_package_path": "/Users/landjunge/KiraBridge/src/kirabridge",
+    "source_scope": "package Python files observed at startup; no remote attestation"
+  },
+  "preservation": {
+    "old_tasks": 396,
+    "restart_tasks": 409,
+    "bindings": 2,
+    "messages": 5,
+    "message_jobs": 4,
+    "previous_rows_unchanged": true,
+    "credentials_and_launchagents_preserved": true,
+    "config_mode": "0600",
+    "private_proof": "~/.local/share/kirabridge/workflow-control-20261019/"
+  },
+  "limits": [
+    "stop_only, cost unknown, hard_cost_cap=false",
+    "live stop occurred after question turn ended; live process item not_observed, no claimed live process termination",
+    "actual owned-process abort and in-flight spawn/journal races tested with bounded local dummy processes",
+    "separate operator profile, no multi-tenant or external identity attestation",
+    "no whole Mac reboot, only controlled service reload",
+    "native Codex principal and connected ChatGPT App remain separate",
+    "No Grok model or separate paid API-provider call; existing Codex CLI used once. No administrator-password approval",
+    "no new public release or Discussion, historical packages unchanged",
+    "AA is observer only; selected local reader/report path, no separate AA web service",
+    "technical checks are not overall project or user acceptance"
+  ],
+  "recorded_at": "2026-10-18T22:54:08.983779+00:00"
+}

@@ -1,3 +1,4 @@
+import hashlib
 import json
 import time
 from concurrent.futures import ThreadPoolExecutor
@@ -17,6 +18,7 @@ from kirabridge.team_manager.models import (
     TeamWorkClaim,
     TeamWorkComplete,
     TeamWorkCreate,
+    TeamWorkReprocess,
 )
 
 
@@ -497,6 +499,27 @@ def test_manual_authorization_cannot_be_laundered_through_automatic_assignee(dom
         operation()
 
 
+def test_explicit_full_team_permissions_override_legacy_manual_without_granting_access(domain):
+    for level in ("ask", "medium"):
+        domain.config.principals["local"].permission_level = level
+        with pytest.raises(BridgeError) as error:
+            domain.delegate("local", work(idempotency_key="nonautomatic-" + level))
+        assert error.value.code == "approval_required"
+    for name in ("local", "codex"):
+        domain.config.principals[name].permission_level = "full"
+        domain.config.principals[name].approval_mode = "manual"
+    shared = domain.delegate("local", work(idempotency_key="effective-full"))
+    assert domain.claim(shared["id"])
+    domain.config.principals["codex"].agents = []
+    blocked = domain.delegate("local", work(idempotency_key="missing-agent"))
+    assert domain.claim(blocked["id"]) is None
+    assert domain.work_get("local", "test-team", blocked["id"])["error"] == "team_worker_denied"
+    domain.config.principals["local"].capabilities.remove("team.write")
+    with pytest.raises(BridgeError) as error:
+        domain.delegate("local", work(idempotency_key="missing-capability"))
+    assert error.value.code == "forbidden"
+
+
 def test_disabled_calls_are_denied_but_private_tasks_remain_unaffected(domain):
     domain.config.team.enabled = False
     with pytest.raises(BridgeError, match="disabled"):
@@ -670,3 +693,177 @@ def test_manual_receipt_has_claimed_timestamp_without_execution_or_automatic_app
     domain.config.team.max_runs_per_hour = 1
     automatic = domain.delegate("codex", work(idempotency_key="after-human-receipt"))
     assert domain.claim(automatic["id"])
+
+
+def completed_for_reprocess(domain):
+    created = domain.delegate("grok", work())
+    claimed = domain.claim(created["id"])
+    text = 'NATIVE_ACTION_HEADER\n{"kirabridge_team":"1","result":"Native proof ä","actions":[]}'
+    native = core(domain, claimed, result={"success": True, "text": text, "final_message": text})
+    with domain.store.transaction():
+        domain.store.db.execute(
+            "UPDATE tasks SET result=?,evidence=?,started=?,finished=? WHERE id=?",
+            (canonical(native["result"]), canonical(native["evidence"]), 1, 2, native["id"]),
+        )
+    observed = domain.bind_task(created["id"], native)
+    expected_hash = hashlib.sha256(text.encode("utf-8")).hexdigest()
+    assert observed["evidence"]["core_result_sha256"] == expected_hash
+    finished = domain.finish(created["id"], text, {"actions": [], "model_turn_completed": True})
+    assert finished["evidence"]["core_result_sha256"] == expected_hash
+    request = TeamWorkReprocess(
+        team_id="test-team",
+        work_id=created["id"],
+        core_task_id=native["id"],
+        expected_result_sha256=expected_hash,
+        idempotency_key="reprocess-once",
+    )
+    return finished, native, request
+
+
+@pytest.mark.parametrize("principal", ["local", "chatgpt"])
+def test_owner_or_coordinator_can_reprocess_exact_existing_result_without_new_core_work(
+    domain, principal
+):
+    previous, native, request = completed_for_reprocess(domain)
+    before_tasks = [tuple(row) for row in domain.store.db.execute("SELECT * FROM tasks")]
+    before_events = [tuple(row) for row in domain.store.db.execute("SELECT * FROM events")]
+    reprocessed = domain.work_reprocess(principal, request)
+    assert reprocessed["state"] == "processing_result" and reprocessed["finished"] is None
+    assert reprocessed["started"] == previous["started"]
+    assert reprocessed["core_task_id"] == previous["core_task_id"]
+    assert reprocessed["result"] == previous["result"]
+    assert reprocessed["evidence"]["core_result_sha256"] == request.expected_result_sha256
+    assert domain.inflight()[0]["id"] == request.work_id
+    assert not domain.pending()
+    assert [tuple(row) for row in domain.store.db.execute("SELECT * FROM tasks")] == before_tasks
+    assert [tuple(row) for row in domain.store.db.execute("SELECT * FROM events")] == before_events
+    snapshot = dict(domain.store.db.execute("SELECT * FROM team_work_reprocess_history").fetchone())
+    assert snapshot["previous_result"] == previous["result"]
+    assert json.loads(snapshot["previous_evidence"]) == previous["evidence"]
+    assert snapshot["previous_state"] == "completed"
+    assert snapshot["previous_finished"] == previous["finished"]
+    assert "PRIVATE TASK ARGS" not in json.dumps(snapshot)
+    audit = " ".join(row[0] for row in domain.store.db.execute("SELECT metadata FROM audit"))
+    assert "Native proof" not in audit and "PRIVATE TASK ARGS" not in audit
+    assert domain.work_reprocess(principal, request) == reprocessed
+    assert (
+        dict(domain.store.db.execute("SELECT * FROM team_work_reprocess_history").fetchone())
+        == snapshot
+    )
+    assert verify(domain.store)["valid"]
+    domain.bind_task(request.work_id, native)
+    domain.finish(
+        request.work_id, "Processed result", {"actions": [{"type": "message", "id": "sent"}]}
+    )
+    # Retrying the accepted request returns its current result, without replaying actions.
+    assert domain.work_reprocess(principal, request)["result"] == "Processed result"
+    assert (
+        dict(domain.store.db.execute("SELECT * FROM team_work_reprocess_history").fetchone())
+        == snapshot
+    )
+
+
+@pytest.mark.parametrize(
+    "principal,code",
+    [("codex", "team_role_denied"), ("observer", "team_role_denied"), ("outsider", "not_found")],
+)
+def test_reprocess_requires_owner_or_coordinator_and_current_membership(domain, principal, code):
+    _, _, request = completed_for_reprocess(domain)
+    with pytest.raises(BridgeError) as error:
+        domain.work_reprocess(principal, request)
+    assert error.value.code == code
+    assert (
+        domain.store.db.execute("SELECT count(*) FROM team_work_reprocess_history").fetchone()[0]
+        == 0
+    )
+
+
+@pytest.mark.parametrize(
+    "change,code",
+    [
+        ("expected_hash", "team_result_conflict"),
+        ("core_id", "team_task_conflict"),
+        ("seal", "team_task_conflict"),
+        ("native_unknown", "team_reprocess_denied"),
+        ("native_failed", "team_reprocess_denied"),
+        ("missing_success", "team_reprocess_denied"),
+        ("missing_actions", "team_reprocess_denied"),
+        ("prior_action", "team_reprocess_denied"),
+        ("not_completed", "state_conflict"),
+        ("assignee_identity", "team_task_conflict"),
+    ],
+)
+def test_reprocess_rejects_changed_or_unproven_native_result_and_prior_actions(
+    domain, change, code
+):
+    _, _, request = completed_for_reprocess(domain)
+    if change == "expected_hash":
+        request = request.model_copy(update={"expected_result_sha256": "0" * 64})
+    elif change == "core_id":
+        request = request.model_copy(update={"core_task_id": "another-core"})
+    elif change == "seal":
+        domain.store.db.execute("UPDATE tasks SET request_hash='changed'")
+    elif change == "native_unknown":
+        domain.store.db.execute("UPDATE tasks SET state='unknown'")
+    elif change in {"native_failed", "missing_success"}:
+        native = domain.store.get(request.core_task_id)["result"]
+        if change == "missing_success":
+            native.pop("success")
+        else:
+            native["success"] = False
+        domain.store.db.execute("UPDATE tasks SET result=?", (canonical(native),))
+    elif change in {"missing_actions", "prior_action"}:
+        evidence = (
+            {}
+            if change == "missing_actions"
+            else {"actions": [{"type": "message", "id": "already-sent"}]}
+        )
+        domain.store.db.execute("UPDATE team_work SET evidence=?", (canonical(evidence),))
+    elif change == "not_completed":
+        domain.store.db.execute("UPDATE team_work SET state='unknown'")
+    elif change == "assignee_identity":
+        domain.store.db.execute("UPDATE tasks SET principal='grok'")
+    with pytest.raises(BridgeError) as error:
+        domain.work_reprocess("local", request)
+    assert error.value.code == code
+    assert (
+        domain.store.db.execute("SELECT count(*) FROM team_work_reprocess_history").fetchone()[0]
+        == 0
+    )
+
+
+def test_reprocess_idempotency_conflicts_and_second_distinct_request_cannot_reopen_again(domain):
+    _, native, request = completed_for_reprocess(domain)
+    domain.work_reprocess("local", request)
+    with pytest.raises(BridgeError) as error:
+        domain.work_reprocess(
+            "local", request.model_copy(update={"expected_result_sha256": "0" * 64})
+        )
+    assert error.value.code == "idempotency_conflict"
+    domain.bind_task(request.work_id, native)
+    domain.finish(request.work_id, "No actions", {"actions": []})
+    with pytest.raises(BridgeError) as error:
+        domain.work_reprocess("local", request.model_copy(update={"idempotency_key": "different"}))
+    assert error.value.code == "team_reprocess_conflict"
+    assert domain.store.db.execute("SELECT count(*) FROM tasks").fetchone()[0] == 1
+    assert (
+        domain.store.db.execute("SELECT count(*) FROM team_work_reprocess_history").fetchone()[0]
+        == 1
+    )
+
+
+def test_reprocess_rechecks_automatic_approval_and_assignee_roster(domain):
+    _, _, request = completed_for_reprocess(domain)
+    domain.config.principals["local"].approval_mode = "manual"
+    with pytest.raises(BridgeError) as error:
+        domain.work_reprocess("local", request)
+    assert error.value.code == "approval_required"
+    domain.config.principals["local"].approval_mode = "automatic"
+    domain.config.team.workers.pop("codex")
+    with pytest.raises(BridgeError) as error:
+        domain.work_reprocess("local", request)
+    assert error.value.code == "team_member_denied"
+    assert (
+        domain.store.db.execute("SELECT count(*) FROM team_work_reprocess_history").fetchone()[0]
+        == 0
+    )

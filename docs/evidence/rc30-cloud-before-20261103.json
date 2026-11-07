@@ -1,0 +1,327 @@
+{
+  "scope": "Actual Apps connector on installed RC29, eight mixed reads of own immutable 64/32-KiB fixtures plus health and clipboard metadata. Full format; 2-MiB response budget required a second RPC. Three complete groups, no warmup excluded. Results all validated as exact text and base64. Normalized wrapper UTF-8 bytes are not captured network bytes.",
+  "version": "0.8.0rc29",
+  "source_commit": "279afccc693e2b8d3d7d1787828ad44679d1bba2",
+  "calls": [
+    {
+      "tool": "task_get",
+      "arguments": {
+        "task_id": "rc30_read_fixture_36dc164015_0"
+      }
+    },
+    {
+      "tool": "task_get",
+      "arguments": {
+        "task_id": "rc30_read_fixture_36dc164015_1"
+      }
+    },
+    {
+      "tool": "task_get",
+      "arguments": {
+        "task_id": "rc30_read_fixture_36dc164015_2"
+      }
+    },
+    {
+      "tool": "task_get",
+      "arguments": {
+        "task_id": "rc30_read_fixture_36dc164015_3"
+      }
+    },
+    {
+      "tool": "read_query",
+      "arguments": {
+        "query": {
+          "operation": "file.read",
+          "path": "/private/tmp/kirabridge-rc30-f3v_w4pt/part-0.txt",
+          "max_bytes": 32768,
+          "offset": 32768
+        }
+      }
+    },
+    {
+      "tool": "read_query",
+      "arguments": {
+        "query": {
+          "operation": "file.read",
+          "path": "/private/tmp/kirabridge-rc30-f3v_w4pt/part-1.txt",
+          "max_bytes": 32768,
+          "offset": 32768
+        }
+      }
+    },
+    {
+      "tool": "bridge_health",
+      "arguments": {}
+    },
+    {
+      "tool": "clipboard_info",
+      "arguments": {}
+    }
+  ],
+  "rounds": [
+    {
+      "round": 0,
+      "total_ms": 22720,
+      "cloud_calls": 2,
+      "samples": [
+        {
+          "elapsed_ms": 11547,
+          "normalized_wrapper_utf8_bytes": 1851466,
+          "returned": 3,
+          "complete": false,
+          "omitted_index": 3,
+          "omitted_read_executed": true,
+          "result_format": "full"
+        },
+        {
+          "elapsed_ms": 11141,
+          "normalized_wrapper_utf8_bytes": 1324976,
+          "returned": 5,
+          "complete": true,
+          "result_format": "full"
+        }
+      ],
+      "checks": [
+        {
+          "index": 0,
+          "task_id": "rc30_read_fixture_36dc164015_0",
+          "bytes": 65536,
+          "text_and_base64_equal": true,
+          "sha256": "156c38442089c1323d3e3ba549a6ac24341c47e8b6367bec4740c9b8c865826e",
+          "state": "completed",
+          "child_daemon_ms": 10.815123
+        },
+        {
+          "index": 1,
+          "task_id": "rc30_read_fixture_36dc164015_1",
+          "bytes": 65536,
+          "text_and_base64_equal": true,
+          "sha256": "fee47b1f0d7685a226fd5f2b9dd8f525038bbb05fe9d89a5d75c249edac868e3",
+          "state": "completed",
+          "child_daemon_ms": 15.349396
+        },
+        {
+          "index": 2,
+          "task_id": "rc30_read_fixture_36dc164015_2",
+          "bytes": 65536,
+          "text_and_base64_equal": true,
+          "sha256": "b5b0b24ef14b848aa9fef2ae58fa73040e631e0915f28ec6095edf305528d202",
+          "state": "completed",
+          "child_daemon_ms": 11.012046
+        },
+        {
+          "index": 3,
+          "task_id": "rc30_read_fixture_36dc164015_3",
+          "bytes": 65536,
+          "text_and_base64_equal": true,
+          "sha256": "dcb3cceeb89595b15abac3233c5871a9dc8d5e4af56443c0c5085386c9b50439",
+          "state": "completed",
+          "child_daemon_ms": 10.008109
+        },
+        {
+          "index": 4,
+          "task_id": null,
+          "bytes": 32768,
+          "text_and_base64_equal": true,
+          "sha256": "5ff074ddad88b7fcb4339cb7a3e68341061792869e43673b2de8525a75476bd8",
+          "state": null,
+          "child_daemon_ms": 7.689037
+        },
+        {
+          "index": 5,
+          "task_id": null,
+          "bytes": 32768,
+          "text_and_base64_equal": true,
+          "sha256": "314a5163f130c25e1f962e1b0316d356d0702438df90c32c2d2dd16c84e551a8",
+          "state": null,
+          "child_daemon_ms": 8.693523
+        },
+        {
+          "index": 6,
+          "version": "0.8.0rc29",
+          "pid": 56714
+        },
+        {
+          "index": 7,
+          "clipboard_content_read": false
+        }
+      ]
+    },
+    {
+      "round": 1,
+      "total_ms": 21839,
+      "cloud_calls": 2,
+      "samples": [
+        {
+          "elapsed_ms": 12024,
+          "normalized_wrapper_utf8_bytes": 1851466,
+          "returned": 3,
+          "complete": false,
+          "omitted_index": 3,
+          "omitted_read_executed": true,
+          "result_format": "full"
+        },
+        {
+          "elapsed_ms": 9802,
+          "normalized_wrapper_utf8_bytes": 1324976,
+          "returned": 5,
+          "complete": true,
+          "result_format": "full"
+        }
+      ],
+      "checks": [
+        {
+          "index": 0,
+          "task_id": "rc30_read_fixture_36dc164015_0",
+          "bytes": 65536,
+          "text_and_base64_equal": true,
+          "sha256": "156c38442089c1323d3e3ba549a6ac24341c47e8b6367bec4740c9b8c865826e",
+          "state": "completed",
+          "child_daemon_ms": 10.459055
+        },
+        {
+          "index": 1,
+          "task_id": "rc30_read_fixture_36dc164015_1",
+          "bytes": 65536,
+          "text_and_base64_equal": true,
+          "sha256": "fee47b1f0d7685a226fd5f2b9dd8f525038bbb05fe9d89a5d75c249edac868e3",
+          "state": "completed",
+          "child_daemon_ms": 20.189932
+        },
+        {
+          "index": 2,
+          "task_id": "rc30_read_fixture_36dc164015_2",
+          "bytes": 65536,
+          "text_and_base64_equal": true,
+          "sha256": "b5b0b24ef14b848aa9fef2ae58fa73040e631e0915f28ec6095edf305528d202",
+          "state": "completed",
+          "child_daemon_ms": 10.057154
+        },
+        {
+          "index": 3,
+          "task_id": "rc30_read_fixture_36dc164015_3",
+          "bytes": 65536,
+          "text_and_base64_equal": true,
+          "sha256": "dcb3cceeb89595b15abac3233c5871a9dc8d5e4af56443c0c5085386c9b50439",
+          "state": "completed",
+          "child_daemon_ms": 15.749134
+        },
+        {
+          "index": 4,
+          "task_id": null,
+          "bytes": 32768,
+          "text_and_base64_equal": true,
+          "sha256": "5ff074ddad88b7fcb4339cb7a3e68341061792869e43673b2de8525a75476bd8",
+          "state": null,
+          "child_daemon_ms": 7.770782
+        },
+        {
+          "index": 5,
+          "task_id": null,
+          "bytes": 32768,
+          "text_and_base64_equal": true,
+          "sha256": "314a5163f130c25e1f962e1b0316d356d0702438df90c32c2d2dd16c84e551a8",
+          "state": null,
+          "child_daemon_ms": 7.581796
+        },
+        {
+          "index": 6,
+          "version": "0.8.0rc29",
+          "pid": 56714
+        },
+        {
+          "index": 7,
+          "clipboard_content_read": false
+        }
+      ]
+    },
+    {
+      "round": 2,
+      "total_ms": 22894,
+      "cloud_calls": 2,
+      "samples": [
+        {
+          "elapsed_ms": 13349,
+          "normalized_wrapper_utf8_bytes": 1851464,
+          "returned": 3,
+          "complete": false,
+          "omitted_index": 3,
+          "omitted_read_executed": true,
+          "result_format": "full"
+        },
+        {
+          "elapsed_ms": 9533,
+          "normalized_wrapper_utf8_bytes": 1324980,
+          "returned": 5,
+          "complete": true,
+          "result_format": "full"
+        }
+      ],
+      "checks": [
+        {
+          "index": 0,
+          "task_id": "rc30_read_fixture_36dc164015_0",
+          "bytes": 65536,
+          "text_and_base64_equal": true,
+          "sha256": "156c38442089c1323d3e3ba549a6ac24341c47e8b6367bec4740c9b8c865826e",
+          "state": "completed",
+          "child_daemon_ms": 10.950025
+        },
+        {
+          "index": 1,
+          "task_id": "rc30_read_fixture_36dc164015_1",
+          "bytes": 65536,
+          "text_and_base64_equal": true,
+          "sha256": "fee47b1f0d7685a226fd5f2b9dd8f525038bbb05fe9d89a5d75c249edac868e3",
+          "state": "completed",
+          "child_daemon_ms": 14.386003
+        },
+        {
+          "index": 2,
+          "task_id": "rc30_read_fixture_36dc164015_2",
+          "bytes": 65536,
+          "text_and_base64_equal": true,
+          "sha256": "b5b0b24ef14b848aa9fef2ae58fa73040e631e0915f28ec6095edf305528d202",
+          "state": "completed",
+          "child_daemon_ms": 10.62186
+        },
+        {
+          "index": 3,
+          "task_id": "rc30_read_fixture_36dc164015_3",
+          "bytes": 65536,
+          "text_and_base64_equal": true,
+          "sha256": "dcb3cceeb89595b15abac3233c5871a9dc8d5e4af56443c0c5085386c9b50439",
+          "state": "completed",
+          "child_daemon_ms": 10.863481
+        },
+        {
+          "index": 4,
+          "task_id": null,
+          "bytes": 32768,
+          "text_and_base64_equal": true,
+          "sha256": "5ff074ddad88b7fcb4339cb7a3e68341061792869e43673b2de8525a75476bd8",
+          "state": null,
+          "child_daemon_ms": 12.350784
+        },
+        {
+          "index": 5,
+          "task_id": null,
+          "bytes": 32768,
+          "text_and_base64_equal": true,
+          "sha256": "314a5163f130c25e1f962e1b0316d356d0702438df90c32c2d2dd16c84e551a8",
+          "state": null,
+          "child_daemon_ms": 7.654097
+        },
+        {
+          "index": 6,
+          "version": "0.8.0rc29",
+          "pid": 56714
+        },
+        {
+          "index": 7,
+          "clipboard_content_read": false
+        }
+      ]
+    }
+  ]
+}

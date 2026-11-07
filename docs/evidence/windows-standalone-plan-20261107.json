@@ -1,0 +1,48 @@
+{
+  "task_id": "KB-WIN-20261107-PLAN",
+  "source_commit": "e0cf160408b25588df94a6c631835ad4373acffc",
+  "overall_complete": false,
+  "standalone_installer_available": false,
+  "runtime_source": "Vorbereitetes Gast-CPython 3.14.10 (Python314) auf der vorhandenen Windows-VM 2B6EE828-02F0-42AE-B4FE-BE57C448F65E. scripts/windows_parity_package.py verlangt weiterhin ein schon vorhandenes Python >=3.11 und bündelt diese Laufzeit nicht. provenance.kind ist existing-python-plus-zip.",
+  "installer_builder": "Kein belegter Compiler und kein EXE/MSI-Builder. In scripts/windows_parity_package.py, src/kirabridge/windows_package.py und docs/WINDOWS-SETUP.md sind weder WiX, Inno Setup, NSIS, PyInstaller noch MSBuild genannt. Der einzige vorhandene Builder ist das deterministische Quell-ZIP: python -B scripts/windows_parity_package.py build --output dist/parity.zip. standalone_executable bleibt false.",
+  "next_step": "Auf genau der VM 2B6EE828-02F0-42AE-B4FE-BE57C448F65E zuerst einen tatsächlich vorhandenen Compiler oder Installer-Builder beobachten und belegen. Erst danach die vorhandene Python314-Laufzeit 3.14.10 zusammen mit dem Parity-ZIP in ein EXE oder MSI legen, das in ein neues explizites Root installiert, ExecutionPolicy, Dienst und Registry nicht ändert und root/data behält. Solange kein Compiler belegt ist, bleibt der Bauweg existing-python-plus-zip.",
+  "parent_task": "KB-WINDOWS-PARITY-VISIBLE-20261106-01",
+  "partial_evidence": {
+    "vm": "2B6EE828-02F0-42AE-B4FE-BE57C448F65E",
+    "python314": "Python 3.14.10",
+    "compiler_observed": false,
+    "standalone_executable": false,
+    "package_kind": "existing-python-plus-zip",
+    "version": "0.8.0rc40"
+  },
+  "current_build": {
+    "build": "python -B scripts/windows_parity_package.py build --output dist/parity.zip",
+    "build_from_export": "python -B scripts/windows_parity_package.py build --output dist/parity.zip --provenance-export provenance.json",
+    "install": "python -B scripts/windows_parity_package.py install --root <new-root> --payload <extracted-zip>",
+    "install_module": "kirabridge.windows_package.install",
+    "import": "python -P -B -c \"import sys; sys.path.insert(0, r'<release>/src'); import kirabridge; print(kirabridge.__file__)\"",
+    "constraints": [
+      "no ExecutionPolicy change",
+      "no service",
+      "no registry",
+      "no live macOS root",
+      "root/data kept",
+      "links and reparse points refused"
+    ]
+  },
+  "standalone_build_path": [
+    "Quell-ZIP auf source_commit mit scripts/windows_parity_package.py bauen. Das ZIP ist Provenienz plus Quellen, kein EXE und kein MSI.",
+    "Laufzeit aus dem Teilbeleg nehmen: die vorbereitete Python314-Installation 3.14.10 der VM 2B6EE828-02F0-42AE-B4FE-BE57C448F65E als mitzuliefernde CPython-Laufzeit kopieren. Ein Embeddable-Download und ein System-Python des Ziel-PCs sind nicht belegt.",
+    "EXE-Bootstrap oder MSI erst anlegen, wenn auf derselben VM ein Compiler belegt ist. Keiner der gelesenen Quellen belegt einen verfügbaren Compiler; es wird keiner angenommen.",
+    "Das Installationsabbild legt die gebündelte Python-3.14.10-Laufzeit und die Release-Dateien in ein neues explizites Root und folgt src/kirabridge/windows_package.py: Lock, Manifest, Rollback, data bleibt, ExecutionPolicy bleibt unverändert, kein Dienst, keine Registry.",
+    "Nutzerstart nach vorhandenem Bundle: docs/WINDOWS-SETUP.md erwartet den Doppelklick auf Einrichtung-starten.cmd. Diese CMD ist im heutigen Parity-Payload nicht enthalten.",
+    "Native VM-Abnahme und der Gesamtauftrag bleiben offen. Dieser Abschnitt erzeugt kein Installationsartefakt und startet keine neue VM."
+  ],
+  "sources_read": [
+    "Agents.md",
+    "scripts/windows_parity_package.py",
+    "src/kirabridge/windows_package.py",
+    "docs/WINDOWS-SETUP.md"
+  ],
+  "product_tests_run": false
+}

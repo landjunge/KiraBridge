@@ -1,0 +1,172 @@
+{
+  "schema": "kirabridge.windows-setup.native-acceptance.v1",
+  "version": "0.8.0rc37.dev1",
+  "source_commit": "0a2f7cb8cf84d47462a094917241950a152fe364",
+  "run_id": "59659bd42fea49cd84ef869cd088fcf1",
+  "payload_manifest_sha256": "6b34b75caac1348ec18fc2a2f43d3a513f1c0a28bc479cd65c0ac217f9c3f9af",
+  "environment": {
+    "os": "Windows 11",
+    "architecture": "AMD64",
+    "python": "3.14.10",
+    "tk": "9.0.4"
+  },
+  "scope": "Fresh local native acceptance; no ChatGPT account, cloud or Voice acceptance",
+  "release_status": "published_and_separately_installed",
+  "candidate": {
+    "python_modules": 179,
+    "wheel_sha256": "faa2d7cbad3f99881080b4291e94f2d77008e6d36642fbdcb56dd17b7dc11366",
+    "zip_bytes": 83879137,
+    "zip_sha256": "a21a214c77d21fec0e11a166147fc14dcb1d6dd88adc0fb2d45501ec8748772f",
+    "native_bundle_sha256": "c68bba16de5b945a11c147ee23fc8c5e11419568dfc5a723cc91bcec0fe385fa"
+  },
+  "phases": [
+    {
+      "phase": "core",
+      "exit_code": 0,
+      "raw_report_sha256": "b6bed9985324294d4dc568b1aff71014b0dfd58bc120f48a63d5a686e21f4b4c",
+      "reused": false,
+      "passed": true,
+      "native_tests": {
+        "failed": 0,
+        "passed": 4,
+        "skipped": 0
+      }
+    },
+    {
+      "phase": "keyboard",
+      "exit_code": 0,
+      "raw_report_sha256": "159e180e01b0ba84ef063a836082e459d0625b9cd9772b44368aaefb71d995b7",
+      "reused": false,
+      "passed": true,
+      "raw_artifact_sha256": "878267ab479930381e9c79fcd40121e6eb13d03cb0b2678776b9c980b39a76f3"
+    },
+    {
+      "phase": "mcp",
+      "exit_code": 0,
+      "raw_report_sha256": "bff637b6a26c7d34f8ceafdbac5c62d5b8f1d314e548095330e05a0e12893c00",
+      "reused": false,
+      "passed": true,
+      "raw_artifact_sha256": "1e3f5b7043415df1c6d6008061ddecc5387783282aa23b079622e91c555d9cf5"
+    },
+    {
+      "phase": "preview",
+      "exit_code": 0,
+      "raw_report_sha256": "a52a37c2adfacba0abf497587f497f20187a04bb45036fc0964d53e715d784cf",
+      "reused": false,
+      "passed": true,
+      "raw_artifact_sha256": "cd7f82f3f57f609d9ae1f70ae3cc63ef303d652ea59f2d4d9a15288a6c7dfb9c"
+    },
+    {
+      "phase": "shortcuts",
+      "exit_code": 0,
+      "raw_report_sha256": "d2d55f7f0e527b3a71fc3be767ec61427c92c81f045967dee14481844acb099a",
+      "reused": false,
+      "passed": true,
+      "raw_artifact_sha256": "605d4e5e449bedac6fa652683fc0c3ab9b643f3baa629d4e9448454f3e3c559b"
+    },
+    {
+      "phase": "windows",
+      "exit_code": 0,
+      "raw_report_sha256": "24d70e3212006c81ae9253869ce471be0f40d62ac35b770b6d7ea4e121b78a5f",
+      "reused": false,
+      "passed": true,
+      "raw_artifact_sha256": "d5378f4f199db41082d3412b5c1ae82276083fa2cd3765dd5a4a2f82c1cbbb74"
+    },
+    {
+      "phase": "setup",
+      "exit_code": 0,
+      "raw_report_sha256": "fd5a9e8dbb23abf582fa2ad09d514473d385c21876497cd5074dd63f0d45001a",
+      "reused": false,
+      "passed": true,
+      "raw_artifact_sha256": "d22f75ba226e455511689609803aefa286181cc64ed5e27cd12b605849646b09"
+    }
+  ],
+  "setup": {
+    "gui_native_smoke": true,
+    "consent_default_unchecked": true,
+    "runtime_key_field_masked": true,
+    "candidate_installed_package": true,
+    "fresh_venv_wheel_installation": true,
+    "authenticated_roundtrip_simulated": true,
+    "cloud_attested": false,
+    "simulation_does_not_mark_gui_complete": true,
+    "keyboard_events_requested": 0,
+    "window_actions_requested": 0,
+    "clipboard_used": false,
+    "account_access_attempted": false,
+    "automatic_retry": false,
+    "cleanup_zero_tasks_verified": true,
+    "independent_original_process_absent": true,
+    "protected_ports_unchanged": true,
+    "own_gui_closed": true
+  },
+  "bundled_client": {
+    "asset": "tunnel-client-v0.0.19-windows-amd64.zip",
+    "size": 29539887,
+    "sha256": "1d0ecc3a54f2a51e27a635ac155f40fbb95df58c52cdeddf6c75532cc0bbeb25",
+    "private_test_cache_written": true,
+    "network_download_required": false
+  },
+  "local_proof": {
+    "confirmed_at": "2026-11-04T20:04:30.962155+00:00",
+    "verified": false,
+    "local_test_verified": true,
+    "simulated": true,
+    "cloud_attested": false,
+    "desktop_effects_tested": false,
+    "permissions_tested": false
+  },
+  "official_client_checks": {
+    "passed": true,
+    "official_client_version": "0.0.19",
+    "profile_parser_passed": true,
+    "doctor_exit_code": 2,
+    "doctor_passed": false,
+    "doctor_checks": {
+      "health_listener": "PASS",
+      "mcp_server_reachable": "PASS",
+      "tunnel_id": "PASS",
+      "codex_plugin": "SKIP",
+      "oauth_metadata": "FAIL",
+      "mcp_target": "PASS",
+      "control_plane_api_key": "PASS",
+      "ui": "PASS",
+      "config_source": "PASS",
+      "profile_load": "PASS"
+    },
+    "local_oauth_diagnostic_limited": true,
+    "no_tunnel_runtime_started": true,
+    "no_account_contact_performed": true,
+    "account_access_verified": false,
+    "secrets_returned": false
+  },
+  "official_client_source_commit": "01d67bb4da0d8359b808b4761f8db171ab682cd7",
+  "existing_installations": {
+    "unchanged": true,
+    "protected_slots": [
+      {
+        "name": "dev2",
+        "port": 8765,
+        "module_count": 171
+      },
+      {
+        "name": "dev3",
+        "port": 8766,
+        "module_count": 173
+      },
+      {
+        "name": "rc33",
+        "port": 8767,
+        "module_count": 174
+      }
+    ],
+    "raw_preservation_report_sha256": "6fde00ef2d9ef64208a022228a9f6b737ed9dfc27a9fb11dccf6be654b4917ce"
+  },
+  "limits": [
+    "Local simulated round trip is not a completed ChatGPT setup",
+    "Full doctor did not pass: oauth_metadata FAIL; codex_plugin SKIP",
+    "No account permissions or cloud/Voice latency measured",
+    "Published download and retained setup UI installation are documented in the separate installed receipt"
+  ],
+  "installed_evidence": "windows-setup-installed-20261104.json"
+}

@@ -26,6 +26,7 @@ from mcp.server.stdio import stdio_server  # noqa: E402
 from mcp.shared.exceptions import MCPError  # noqa: E402
 from pydantic import ConfigDict  # noqa: E402
 
+from kirabridge import event_queue  # noqa: E402
 from kirabridge.bridge_core.config import load_config  # noqa: E402
 from kirabridge.event_push import (  # noqa: E402
     EventError,
@@ -190,6 +191,39 @@ async def make_server(
                 *listing["tools"],
                 RECEIPT_TOOL,
                 {
+                    "name": "event_queue_entries",
+                    "description": "Read own webhook delivery entries without secrets.",
+                    "inputSchema": {
+                        "type": "object",
+                        "properties": {
+                            "after": {"type": "integer", "minimum": 0, "default": 0},
+                            "limit": {
+                                "type": "integer",
+                                "minimum": 1,
+                                "maximum": 100,
+                                "default": 50,
+                            },
+                        },
+                        "additionalProperties": False,
+                    },
+                    "annotations": {"readOnlyHint": True},
+                },
+                {
+                    "name": "event_queue_control",
+                    "description": "Pause/restore own delivery; no task stop or unknown replay.",
+                    "inputSchema": {
+                        "type": "object",
+                        "properties": {
+                            "event_id": {"type": "string"},
+                            "revision": {"type": "string"},
+                            "action": {"type": "string", "enum": ["cancel", "restore", "clear"]},
+                        },
+                        "required": ["event_id", "revision", "action"],
+                        "additionalProperties": False,
+                    },
+                    "annotations": {"readOnlyHint": False, "destructiveHint": True},
+                },
+                {
                     "name": "completion_event_status",
                     "description": "Local event transport counts; does not attest chat delivery.",
                     "inputSchema": {
@@ -207,6 +241,27 @@ async def make_server(
 
     async def called(ctx, params):
         arguments = dict(params.arguments or {})
+        if params.name in {"event_queue_entries", "event_queue_control"}:
+            try:
+                value = (
+                    await event_queue.inspect_entries(push, **arguments)
+                    if params.name == "event_queue_entries"
+                    else event_queue.control(
+                        push, arguments["event_id"], arguments["revision"], arguments["action"]
+                    )
+                )
+            except EventError as exc:
+                return {
+                    "content": [{"type": "text", "text": exc.reason}],
+                    "isError": True,
+                    "resultType": "complete",
+                }
+            return {
+                "content": [{"type": "text", "text": json.dumps(value)}],
+                "structuredContent": value,
+                "isError": False,
+                "resultType": "complete",
+            }
         if params.name in {"completion_event_status", "completion_chat_receipt"}:
             value = (
                 push.status()

@@ -44,8 +44,10 @@ def fake_receiver(monkeypatch, bridge, processed):
 
     monkeypatch.setattr("kirabridge.message_manager.receiver.MCPClientPool", Pool)
     monkeypatch.setattr("kirabridge.message_manager.receiver.peer", lambda *args: None)
+    monkeypatch.setattr("kirabridge.message_manager.direct.MCPClientPool", Pool)
+    monkeypatch.setattr("kirabridge.message_manager.direct.peer", lambda *args: None)
 
-    async def process(pool, message, run_id):
+    async def process(pool, message, run_id, **kwargs):
         processed.append(message["id"])
 
     monkeypatch.setattr(bridge.message_receiver, "_process", process)
@@ -153,7 +155,7 @@ async def test_busy_wait_does_not_claim_insert_or_complete_then_dispatches_once(
     target = "codex" if sender == "grok" else "grok"
     transport["target"] = target
     transport["text"] = (
-        "Thinking…\nesc to interrupt\n› " if target == "codex" else "Thinking…\n╭\n│ ❯ │\n╰"
+        "Thinking…\nesc to interrupt\n› " if target == "codex" else "╭\nThinking…\n│ ❯ │\n╰"
     )
     bridge.config.visible_handoffs.bindings[target].busy_pattern = "Thinking…"
     sent = enqueue(bridge, sender, target)
@@ -357,7 +359,7 @@ async def test_waiting_reason_and_unclaimed_job_survive_reopen(visible, monkeypa
         reopened.store.close()
 
 
-async def test_real_http_wait_then_one_paste_return_and_authenticated_reply(
+async def test_real_http_refuses_busy_once_and_delivers_only_a_fresh_authorized_request(
     visible,
     http_bridge,
     config,
@@ -376,7 +378,7 @@ async def test_real_http_wait_then_one_paste_return_and_authenticated_reply(
         cwd=config.principals["grok"].roots[0], timeout=3
     )
     config.visible_handoffs.bindings["grok"].busy_pattern = "Thinking…"
-    transport["text"] = "Thinking…\n╭\n│ ❯ │\n╰"
+    transport["text"] = "╭\nThinking…\n│ ❯ │\n╰"
     await bridge.message_receiver.start()
     async with MCPClientPool() as clients:
         await clients.connect(Peer("caller", url=endpoint, token="chatgpt-" + "x" * 48))
@@ -397,15 +399,47 @@ async def test_real_http_wait_then_one_paste_return_and_authenticated_reply(
                 },
             )
         ).structuredContent
-        async with asyncio.timeout(5):
-            while not bridge.messages.get("chatgpt", sent["id"])["processing"]["evidence"].get(
-                "waiting_for_visible_target"
-            ):
-                await asyncio.sleep(0.02)
+        assert sent["error"]["code"] == "visible_target_working"
+        assert sent["processing"]["state"] == "failed"
+        assert sent["processing"]["claimed"] is None
         assert transport["calls"] == []
-        assert bridge.messages.get("chatgpt", sent["id"])["processing"]["state"] == "queued"
         transport["text"] = "╭\n│ ❯ │\n╰"
         bridge.messages.wake.set()
+        repeated = (
+            await clients.call(
+                "caller",
+                "message_send",
+                {
+                    "completion_target": "wait-real-http",
+                    "message": {
+                        "recipient": "grok",
+                        "conversation_id": "wait-http",
+                        "idempotency_key": "one-message",
+                        "kind": "work",
+                        "body": "Multiline instruction\nSecond line",
+                        "dispatch": True,
+                    },
+                },
+            )
+        ).structuredContent
+        assert repeated["id"] == sent["id"] and repeated["processing"]["state"] == "failed"
+        assert transport["calls"] == []
+        sent = (
+            await clients.call(
+                "caller",
+                "message_send",
+                {
+                    "message": {
+                        "recipient": "grok",
+                        "conversation_id": "fresh-http",
+                        "idempotency_key": "fresh-authorized-request",
+                        "kind": "work",
+                        "body": "A separate freshly authorized request",
+                        "dispatch": True,
+                    },
+                },
+            )
+        ).structuredContent
         async with asyncio.timeout(5):
             while bridge.messages.get("chatgpt", sent["id"])["processing"]["state"] != "completed":
                 await asyncio.sleep(0.02)

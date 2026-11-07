@@ -1,0 +1,56 @@
+{
+  "version": "0.8.0rc34",
+  "source_commit": "1a57394e8250679f7b1af7598d5fae4c41c66152",
+  "source_commits": [
+    "81443244ff9d683eb3c9b8903d5b94819d29e995",
+    "1a57394e8250679f7b1af7598d5fae4c41c66152"
+  ],
+  "release_url": "https://github.com/landjunge/KiraBridge/releases/tag/v0.8.0rc34",
+  "focused_test_cases": 317,
+  "independent_code_and_package_review": "passed",
+  "package_smoke": "passed",
+  "published_downloads": [
+    {
+      "asset": "KiraBridge-0.8.0rc34-Intel-Installer.zip",
+      "sha256": "0ce49ce82e98f8c4c8e981f1f98abcb587988ca0627b7dcbd3981f6dae642e07",
+      "bytes": 3614610
+    },
+    {
+      "asset": "KiraBridge-macos.tar.gz",
+      "sha256": "462bf79848188cd1f675553258465b990aa4da3cc5d6b94f7196221dbeef1092",
+      "bytes": 3033252
+    }
+  ],
+  "installation": {
+    "core_pid": 37967,
+    "instance_id": "93839d0cff304feead3d04f93b8159ff",
+    "source_tree_sha256": "3e2f8753c2eb63fa9eef71ab738a8b4743cb5c65caeeb647b5d3bdda1864ba82",
+    "dispatcher_active": true,
+    "installed_python_modules_verified": 174,
+    "native_app_pin_and_signature_verified": true,
+    "protected_process_identities_preserved": 11,
+    "config_credential_hashes_preserved": 4,
+    "backup": "/Users/landjunge/.local/share/kirabridge/install/backups/20261104-162427-c2a15014"
+  },
+  "postrestart_visible_input": {
+    "task_id": "footer_rc34_postrestart_input_20261104",
+    "state": "completed",
+    "exit_code": 0,
+    "output_marker": "KB_RC34_POST_RESTART_INPUT_OK",
+    "visible_window_confirmed": true,
+    "internal_total_seconds": 15.341871738433838,
+    "before_running_seconds": 11.70976996421814,
+    "latency_fully_resolved": false
+  },
+  "own_install_window_closed_and_absent": true,
+  "historical_unknown_tasks_replayed": false,
+  "windows_vm_or_worktrees_changed": false,
+  "cloud_ci_run": false,
+  "native_swift_sources_changed": false,
+  "open_limits": [
+    "generic keyboard_unsupported original fixture cause unavailable",
+    "native complete new-chat/restart matrix not performed",
+    "visible shell preparation remains costly in the measured postrestart task",
+    "Apps per-character cloud gaps require existing compatible sequence routing"
+  ]
+}

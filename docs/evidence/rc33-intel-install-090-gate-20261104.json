@@ -1,0 +1,121 @@
+{
+  "merge_status": {
+    "pr": 58,
+    "merged": true,
+    "package_and_tag_commit": "ce0687dd8831dae261bf285922a146bcf3aedc41",
+    "no_new_merge_performed": true
+  },
+  "rc33_intel_installation": {
+    "installed": true,
+    "started_utc": "2026-11-04T12:27:06.080558+00:00",
+    "finished_utc": "2026-11-04T12:27:39.010329+00:00",
+    "exit_code": 0,
+    "live_core_pid": 21571,
+    "live_core_instance": "0c145048b0b34e3f81ad4b157515ec40",
+    "source_commit": "ce0687dd8831dae261bf285922a146bcf3aedc41",
+    "version": "0.8.0rc33",
+    "independent_preservation_and_byte_checks": {
+      "all_configuration_files_preserved": true,
+      "table_schema_preserved": true,
+      "all_inventory_old_rows_preserved": true,
+      "all_protected_processes_preserved": true,
+      "python_modules_match": true,
+      "no_extra_python_modules": true,
+      "native_files_match": true,
+      "desktop_source_pin_matches": true
+    },
+    "rollback_backup": "/Users/landjunge/.local/share/kirabridge/install/backups/20261104-132711-8d912eff",
+    "preserved_rc30_release": "/Users/landjunge/.local/share/kirabridge/install/releases/0.8.0rc30-2d540ee05f94",
+    "separate_rc30_backup": "/Users/landjunge/.local/share/kirabridge/backups/rc33-intel-install-20261104T122400Z",
+    "own_install_window_closed": true
+  },
+  "rc33_functional_acceptance": {
+    "passed": false,
+    "actual_production_core_used": true,
+    "private_core_created": false,
+    "native_permissions": {
+      "accessibility_granted": true,
+      "post_events_granted": true,
+      "permission_requested": false
+    },
+    "fixture_launch": "completed",
+    "text_task": {
+      "id": "prod-accept-cbb3af3579a14cbeb00037368c2a8b72-text",
+      "operation": "keyboard.control",
+      "state": "unknown",
+      "accepted": true,
+      "started": true,
+      "attempt": 1,
+      "error": {
+        "code": "keyboard_unsupported"
+      },
+      "last_observation": {
+        "automatic_retry": false,
+        "evidence_type": "native_keyboard_commit_attempt",
+        "transfer_id": "44ee79243f1f3774e8a36c6ae3161566e7faf548b2db96d0de34f63af559498f"
+      },
+      "automatic_retry": false,
+      "safe_to_retry": false
+    },
+    "return": "not_executed",
+    "shortcut_command_a": "not_executed",
+    "window_controls": "not_executed",
+    "negative_stale_generation": "not_executed",
+    "receiver_snapshot_utc": "2026-11-04T12:40:41Z",
+    "receiver_snapshot_text_empty": true,
+    "receiver_snapshot_key_events": 0,
+    "definitive_zero_effect_or_completion_not_claimed": true,
+    "fixture_manually_terminated": false,
+    "fixture_template_has_600_second_lifetime_timer": true,
+    "exact_native_guard_not_established": true,
+    "diagnostic_observer_audit_budget_exhausted_observed": true,
+    "audit_quota_or_history_changed": false,
+    "fixture_lifecycle_after_stop": {
+      "observed_utc": "2026-11-04T12:47:51.926935+00:00",
+      "process_observation": {
+        "pid": 22540,
+        "state": "absent"
+      },
+      "manual_cleanup_or_kill_performed": false,
+      "fixture_template_600_second_timer": true,
+      "task_outcome_still_requires_original_unknown_record": true
+    }
+  },
+  "windows_status": {
+    "version": "0.8.0rc33",
+    "last_independent_guest_verification_utc": "2026-11-04T08:53:26.931703+00:00",
+    "last_verified_pid": 5956,
+    "port": 8767,
+    "last_verified_modules": 174,
+    "vm_observed_started_utc": "2026-11-04T12:12Z",
+    "current_guest_runtime_liveness_not_probed": true,
+    "guest_input_or_installation_this_run": false
+  },
+  "v090_builds": {
+    "started": false,
+    "reason": "User stop condition triggered by production native commit failure",
+    "source_version_changed": false,
+    "windows_package_created": false,
+    "intel_macos_package_created": false,
+    "release_or_tag_created": false
+  },
+  "v090_installations": {
+    "windows": false,
+    "intel_macos": false
+  },
+  "stop_respected": {
+    "no_keyboard_retry": true,
+    "no_followup_input": true,
+    "no_permission_escalation": true,
+    "no_product_code_fix": true,
+    "no_blind_rollback": true,
+    "no_fixture_kill_or_close": true,
+    "no_cloud_ci": true
+  },
+  "raw_proof_sha256": {
+    "evidence/rc33-live-installed-health.json": "ad63d1cd83a1055fb7446ef4564800441c65d2095630ec445f384872830663ac",
+    "rc33-production-functional-01/diagnosis-readonly/text-task.json": "a6095094df0b927f674afa09846e10a3386241f6e09d5c3624ead9826dfdfe0a",
+    "rc33-production-functional-01/diagnosis-readonly/receiver-after-unknown.json": "2d0f0abd88073bb7e73ae773ed117726a5b70aa7921389e5330cc4164beac47f",
+    "rc33-production-functional-01/diagnosis-readonly/DIAGNOSIS.md": "2d35b44a4a17d5965ddb52f7fee699f63b269fc22778c31d39f4c9c20f85c9a4"
+  }
+}

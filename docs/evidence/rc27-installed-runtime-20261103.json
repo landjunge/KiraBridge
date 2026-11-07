@@ -1,0 +1,63 @@
+{
+  "version": "0.8.0rc27",
+  "source_commit": "38223b16ed286aacf951f91890a6eafae6ea88f0",
+  "runtime": {
+    "pid": 43301,
+    "instance_id": "18daf8cbbee24f6e80849b686d6587f9",
+    "started_at": "2026-11-02T23:34:53.815539+00:00",
+    "source_package_path": "/Users/landjunge/.local/share/kirabridge/install/releases/0.8.0rc27-38223b16ed28/source/.venv/lib/python3.11/site-packages/kirabridge",
+    "source_tree_sha256": "3f1bc01f0452a03b56a2f5906eb063fce31a544686b70252f35998b72ce87f6c"
+  },
+  "dispatcher_active": true,
+  "accepting_new_work": true,
+  "live_read_samples": [
+    {
+      "tool": "bridge_health",
+      "i": 0,
+      "elapsed_ms": 103,
+      "version": "0.8.0rc27",
+      "terminal_freshness": "not_probed",
+      "operation_count": 3
+    },
+    {
+      "tool": "operation_catalog",
+      "i": 0,
+      "elapsed_ms": 334,
+      "version": "0.8.0rc27",
+      "terminal_freshness": "not_probed",
+      "operation_count": 90
+    },
+    {
+      "tool": "bridge_health",
+      "i": 1,
+      "elapsed_ms": 92,
+      "version": "0.8.0rc27",
+      "terminal_freshness": "not_probed",
+      "operation_count": 3
+    },
+    {
+      "tool": "operation_catalog",
+      "i": 1,
+      "elapsed_ms": 356,
+      "version": "0.8.0rc27",
+      "terminal_freshness": "not_probed",
+      "operation_count": 90
+    },
+    {
+      "tool": "bridge_health",
+      "i": 2,
+      "elapsed_ms": 121,
+      "version": "0.8.0rc27",
+      "terminal_freshness": "not_probed",
+      "operation_count": 3
+    },
+    {
+      "tool": "operation_catalog",
+      "i": 2,
+      "elapsed_ms": 335,
+      "version": "0.8.0rc27",
+      "terminal_freshness": "not_probed",
+      "operation_count": 90
+    }
+  ]
+}

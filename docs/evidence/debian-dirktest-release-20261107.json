@@ -1,0 +1,314 @@
+{
+  "task_id": "DEBIAN-DIRK-RELEASE-20261107",
+  "status": "published-native-accepted-download-verified",
+  "authorization": "User explicitly authorizes implementation, isolated existing Debian tests, regular review/CI/integration, GitHub push and verified Debian/Linux prerelease; no delegation or productive Mac/Windows changes.",
+  "source": {
+    "branch": "release/debian-dirktest-20261107",
+    "worktree": "/Users/landjunge/KiraBridge-worktrees/debian-release-codex-20261107",
+    "grok_base": "468a239",
+    "grok_implementation": "fee8af9d2dc0622c4da05bc4b6246913af35bd45",
+    "release_commit": "350d36854fc9dd37725d7c00a91b72cd1bd32b15",
+    "full_native_lifecycle_commit": "428271a806588d95e133ef2b7fa0544b8ff96264",
+    "equivalence": {
+      "result": "passed",
+      "native_full_tested_source": "428271a806588d95e133ef2b7fa0544b8ff96264",
+      "release_source": "350d36854fc9dd37725d7c00a91b72cd1bd32b15",
+      "all_runtime_installer_lock_guide_bytes_equal": true,
+      "changed_members": [
+        "SHA256SUMS",
+        "install.sh",
+        "release.json"
+      ],
+      "bootstrap_change": "source pin only",
+      "unchanged_members": 1270
+    }
+  },
+  "artifact": {
+    "name": "KiraBridge-0.8.0rc41-Linux-x86_64.tar.gz",
+    "sha256": "1b851236bd603fcfaf5984c075be08b52b81b9cdbc4b93ff08d1001ae3a9d41f",
+    "build_command": "uv run python scripts/build_release.py --target linux-server --out dist/debian-final-guarded",
+    "original_grok_sha256": "3d7cb9b869fe1d85ef00f8dbd356ec9e41c54a8c8ae190fa4f6d8b41caf504c4",
+    "reproducibility": {
+      "result": "passed",
+      "source_commit": "350d36854fc9dd37725d7c00a91b72cd1bd32b15",
+      "all_output_files_byte_equal": true,
+      "outputs": {
+        "LICENSE": "3316d5eda60ac1fea355aa43d196feea3567384179b55ca88c8636c0322021ec",
+        "KiraBridge-0.8.0rc41-Linux-x86_64.tar.gz": "1b851236bd603fcfaf5984c075be08b52b81b9cdbc4b93ff08d1001ae3a9d41f",
+        "KiraBridge-0.8.0rc41-Linux-x86_64.tar.gz.sha256": "c810a876e47adcd38dded5856110e8162a2ae73bf5f2d4ce77f6a37d4ef791c4",
+        "SHA256SUMS": "fe35c5f324183270f89f504afd3b846d677b7d8ae750b5fd54f56572e8504d99"
+      }
+    }
+  },
+  "native": {
+    "identity": {
+      "os_release": "PRETTY_NAME=\"Debian GNU/Linux 13 (trixie)\"\nNAME=\"Debian GNU/Linux\"\nVERSION_ID=\"13\"\nVERSION=\"13 (trixie)\"\nVERSION_CODENAME=trixie\nDEBIAN_VERSION_FULL=13.6\nID=debian\nHOME_URL=\"https://www.debian.org/\"\nSUPPORT_URL=\"https://www.debian.org/support\"\nBUG_REPORT_URL=\"https://bugs.debian.org/\"\n",
+      "machine": "x86_64",
+      "kernel": "6.12.101+deb13-amd64",
+      "uid": 1000,
+      "harness_python": "3.13.5 (main, Jul 15 2026, 20:25:40) [GCC 14.2.0]",
+      "harness_sha256": "bb9bcf6c873d56dfb24e1652b6a05e9b2808e96279420365d325bb266d8ad8c6",
+      "root": "/home/daniel/kb-debian-dirktest-20261107-systemd%dirk",
+      "systemd": "systemd 257 (257.13-1~deb13u1)"
+    },
+    "host_python": {
+      "python": "/usr/bin/python3",
+      "version": "3.13.5 (main, Jul 15 2026, 20:25:40) [GCC 14.2.0]",
+      "kirabridge_installed": false
+    },
+    "runtime": {
+      "executable": "/home/daniel/kb-debian-dirktest-20261107-systemd%dirk/candidate-runtime/.venv/bin/python3",
+      "python": "3.11.15 (main, Apr  7 2026, 20:48:58) [Clang 22.1.1 ]",
+      "package": "/home/daniel/kb-debian-dirktest-20261107-systemd%dirk/candidate-runtime/src/kirabridge/__init__.py",
+      "version": "0.8.0rc41",
+      "dependencies": {
+        "mcp": "1.30.0",
+        "httpx": "0.28.1",
+        "uvicorn": "0.54.0",
+        "pydantic": "2.14.1",
+        "cryptography": "48.0.1"
+      }
+    },
+    "full_lifecycle_tests": 10,
+    "extra_native_tests": 3,
+    "exact_release_archive_tests": 5,
+    "full_lifecycle_result": "passed",
+    "extra_result": "passed",
+    "exact_archive_result": "passed",
+    "rollback_preserves_disabled_unit": true,
+    "preserved": [
+      "configuration",
+      "credentials",
+      "0600 modes",
+      "user note",
+      "pre-update UNKNOWN",
+      "post-update UNKNOWN"
+    ],
+    "scope": "Isolated owned test data/paths and one named user unit only; existing production system services unchanged. All owned units stopped/disabled/removed with independent absence/port checks. Linger=no, existing ~/.cache and ~/.local modes0775 retained.",
+    "environment": "Native Debian13.6 x86_64, not macOS mocks or Ubuntu container acceptance. Parent Python3.13.5 without installed KiraBridge; package CPython3.11.15. PYTHONPATH/PYTHONHOME/VIRTUAL_ENV removed for harness subprocesses; interpreter -I and imported source paths/hash verified.",
+    "previous_baseline": "Unchanged verified RC40 payload prepared with locked uv and activated with fixed installer; original RC40 Ubuntu-only/bootstrap interpreter defects are not claimed accepted.",
+    "independent_cleanup": "MainPID=0\nLoadState=not-found\nActiveState=inactive\nindependent_port_unbound=true; foreign_fixture_absent=true\nLinger=no\ndrwxrwxr-x 4 daniel daniel 4096 Oct 25 20:21 /home/daniel/.cache\ndrwxrwxr-x 3 daniel daniel 4096 Oct 25 20:21 /home/daniel/.local\n",
+    "final_delivery_independent_cleanup": {
+      "unit_absent": true,
+      "systemd": "MainPID=0\nLoadState=not-found\nActiveState=inactive\n",
+      "port_unbound": true
+    },
+    "legacy_native_tests": 6,
+    "environment_native_tests": 5,
+    "failed_unit_cleanup_tests": 1,
+    "total_at_full_native_pin": 25,
+    "total_additional_at_release_pin": 5,
+    "environment_isolation": {
+      "wrapper_sha256": "0242579b9d80c1f367d9b3609b6de5309a1fa4bc7246aad875045e28420aeb71",
+      "fixture_path": "/home/daniel/.config/kirabridge/secrets.env",
+      "existing_user_data_overwritten": false,
+      "status": "passed",
+      "foreign_global_token_not_imported": true,
+      "selected_environment_loaded": true,
+      "source_commit": "350d36854fc9dd37725d7c00a91b72cd1bd32b15",
+      "foreign_credential_values_logged": false,
+      "owned_global_fixture_removed": true
+    },
+    "credential_leak_check": {
+      "evidence": "Native wrappers check real synthetic foreign credential values against their own logs; output contains no credential values.",
+      "foreign_credential_values_logged": false
+    }
+  },
+  "review": {
+    "pr": "https://github.com/landjunge/KiraBridge/pull/72",
+    "kind": "Existing automated GitHub Codex review, coordinator independent read-only ownership-race review and local review; all10 threads resolved independently read back. No human approval claim.",
+    "resolved_findings": 10,
+    "findings": [
+      "systemd config argument escaping",
+      "selected service mode in recovery record",
+      "standalone system Python execution",
+      "restore previous unit enablement",
+      "failed cleanup must mark JSON/JUnit failed",
+      "earlier managed unit compatibility",
+      "foreign global environment-token import",
+      "intervening unit edit ownership race",
+      "resume last non-cleanup failed baseline",
+      "KeyboardInterrupt must not record cleanup pass"
+    ],
+    "negative_cleanup_test": "tests/test_linux_acceptance_evidence.py"
+  },
+  "ci": {
+    "run_id": 42374701083,
+    "url": "https://github.com/landjunge/KiraBridge/actions/runs/42374701083",
+    "source_commit": "350d36854fc9dd37725d7c00a91b72cd1bd32b15",
+    "status": "success",
+    "python": [
+      "3.11",
+      "3.13"
+    ],
+    "per_python": {
+      "legacy_passed": 5009,
+      "legacy_skipped": 254,
+      "subtests_passed": 4,
+      "remote_passed": 29,
+      "remote_skipped": 0
+    },
+    "ruff_check": "passed",
+    "ruff_format": "passed",
+    "uv_build": "passed",
+    "required_checks_bypassed": false,
+    "duplicate_push_run": {
+      "id": 42374696881,
+      "conclusion": "cancelled",
+      "steps": 0,
+      "reason": "same-branch workflow concurrency superseded push by pull_request event",
+      "counted_as_pass": false
+    },
+    "runner_scope": "Linux self-hosted runners; workflow matrix labels do not establish native Ubuntu acceptance"
+  },
+  "release": {
+    "tag": "linux-v0.8.0rc41",
+    "prerelease": true,
+    "draft": false,
+    "status": "published",
+    "id": "RE_kwDOVNhuIs4aFRR5",
+    "published_at": "2026-11-07T13:19:39Z",
+    "url": "https://github.com/landjunge/KiraBridge/releases/tag/linux-v0.8.0rc41",
+    "download_url": "https://github.com/landjunge/KiraBridge/releases/download/linux-v0.8.0rc41/KiraBridge-0.8.0rc41-Linux-x86_64.tar.gz",
+    "download_verified": true,
+    "actual_download": {
+      "result": "passed",
+      "verified_at": "2026-11-07T13:20:58.490730+00:00",
+      "method": "gh release download from published private GitHub release into new empty directory; byte comparison of all40 assets, outer SHA256SUMS, tar members and every manifest/inner checksum",
+      "release_url": "https://github.com/landjunge/KiraBridge/releases/tag/linux-v0.8.0rc41",
+      "tag": "linux-v0.8.0rc41",
+      "tag_commit": "350d36854fc9dd37725d7c00a91b72cd1bd32b15",
+      "source_commit": "350d36854fc9dd37725d7c00a91b72cd1bd32b15",
+      "download_url": "https://github.com/landjunge/KiraBridge/releases/download/linux-v0.8.0rc41/KiraBridge-0.8.0rc41-Linux-x86_64.tar.gz",
+      "sha256": "1b851236bd603fcfaf5984c075be08b52b81b9cdbc4b93ff08d1001ae3a9d41f",
+      "all_published_assets_byte_equal": true,
+      "published_asset_count": 40,
+      "archive_members": 1273,
+      "manifest_files_verified": 1271,
+      "archive_safe_regular_files_only": true,
+      "all_inner_sha256_verified": true,
+      "download_access": "authenticated operator GitHub account; Dirk account access not impersonated"
+    },
+    "initial_asset_count": 40,
+    "report_addendum": "Final download report necessarily published separately after initial assets; original assets remain unchanged."
+  },
+  "failures_preserved": [
+    "Initial native install refused group-writable existing ~/.cache; private installer cache fixed without changing rights.",
+    "Original RC40 installer refused normal uv venv symlinks; baseline activation switched to fixed installer.",
+    "Initial mock rollback fixture missed new daemon-reload; corrected focused test passed.",
+    "Earlier CI stopped at builder formatting; fixed.",
+    "Expired synthetic routing evidence caused existing CI failures; test clock bound to fixture NOW,73 targeted tests passed.",
+    "Cancelled/interrupted GitHub runs are not counted as passes.",
+    "Native source2d51 special %/$ path failed systemd ExecStart and EnvironmentFile syntax; fixed and real selected-environment/foreign-token/path acceptance passed428 and exact350.",
+    "Earlier candidate builds/CI cancellations are superseded, never published or counted as final pass."
+  ],
+  "limits": [
+    "Debian13.6 x86_64 native acceptance; Debian12/ARM not accepted.",
+    "Ubuntu24.04 accepted by installer, no native Ubuntu systemd claim.",
+    "Online bootstrap requires GitHub/PyPI, hash-pinned uv0.11.6, CPython3.11.15 and locked dependencies; not fully offline.",
+    "Running user systemd manager required; no automatic linger/OS permission/firewall changes.",
+    "No macOS GUI/Terminal.app/native keyboard/desktop parity; optional clipboard helpers.",
+    "Remote HTTPS, actual ChatGPT/account connection and operator unattended-session setup remain separate.",
+    "Private GitHub access needed; Dirk account access not impersonated or changed.",
+    "No productive Mac installation, Windows changes or original Library queue execution."
+  ],
+  "evidence_sha256": {
+    "docs/evidence/debian-actual-download-20261107.json": "c0a434c09545ee6978952290799e89a67caa374a062f864cba36ec66d010d0a1",
+    "docs/evidence/debian-ci-350.json": "d3cdc874c72a900c710fe55d153da5080a4e118bfd5d0c0cc52c0069db89fd25",
+    "docs/evidence/debian-dirktest-byte-provenance-20261107.json": "ccb05f59509de083e16f4c773c25157a09b233eb66327ac58add00f3f6b5c97d",
+    "docs/evidence/debian-dirktest-ci350-20261107.log.gz": "fc9d7f8bce0571f2d814cfec19e68a8073493eba583fbdf2b150a93be45e3157",
+    "docs/evidence/debian-dirktest-delivery-20261107.json": "fb8b979745f3106ac1b06ca6cf5a6f04c3b0b0c74d7e650755d3518aff4109ad",
+    "docs/evidence/debian-dirktest-delivery-20261107.log.gz": "d94b0ed667a0fcdcb4b6c80cc2583453c839c065678acf0b4cbaf7f3ffc66d64",
+    "docs/evidence/debian-dirktest-delivery-junit-20261107.xml": "4bf84bf7d388ab3235af285d7b61ed836d1a36c002992d31a8b30b487d5e1054",
+    "docs/evidence/debian-dirktest-environment-20261107.log.gz": "42b74274d4d92eba0246ae16ccd1586a0cae248ba5ca52621a7a22a6d49c3b87",
+    "docs/evidence/debian-dirktest-extra-native-20261107.json": "0b0a0468b9b2aeea56b18301ae52e863e3b2a0a186fe5ca126a9f9733300b321",
+    "docs/evidence/debian-dirktest-extra-native-20261107.log.gz": "114fdecfcd62d058ca85a0cb8807b05c77c0d47ef3ceaf26163fd99f0fd7fdbb",
+    "docs/evidence/debian-dirktest-extra-native-junit-20261107.xml": "cf874bbfb32d7d2df85e963abbac0a79b065b4efbd584a984e0857845a29c7ee",
+    "docs/evidence/debian-dirktest-failed-install-20261107.json": "3c344f10bbcca65aad524b14d4e722b84ac81e8e3bd3182ee7cce98b54bfcbd5",
+    "docs/evidence/debian-dirktest-failed-install-20261107.log.gz": "45dd201eb5a70c62429cc2976231aa73789aac7e49de066cbfac7f4cf053551d",
+    "docs/evidence/debian-dirktest-failed-install-junit-20261107.xml": "de8a72201124d79bf67ebaff27d8d0dd3773cec037c2ab23d292821e0f5a567a",
+    "docs/evidence/debian-dirktest-failed-systemd-20261107.log.gz": "1717092bfa58b2752ec81d012efa32870e7ac52426abc8ba1932a2b99b3f497e",
+    "docs/evidence/debian-dirktest-failed-systemd-evidence.json": "f0f344f20f74847c2a727c794cee2bfcd9f6375ef6864b47e575b1517cf0a70a",
+    "docs/evidence/debian-dirktest-failed-systemd-journal-20261107.log.gz": "65eefa683d3e01f956862353a6ae86aaea8e22f40ad3f6d966d3955cf5d39faa",
+    "docs/evidence/debian-dirktest-failed-systemd-junit.xml": "9115eb990653bcce750272f4d96b99609559e5fdc5f5a8c2a7d129855a258470",
+    "docs/evidence/debian-dirktest-legacy-20261107.log.gz": "cd257f8340c512a9d95a4c81e97dafd1c5f9dcc0dbc880451dcbe07e12d8f4b0",
+    "docs/evidence/debian-dirktest-native-20261107.json": "e32ee21b081c7c93d16ccaaac577afc90a649f2370139cafc62b6e562172b38b",
+    "docs/evidence/debian-dirktest-native-20261107.log.gz": "33b5f5e70a1b2883e410d8b6fbe6cad416c4da6d162454f1e0d246dc0b3a5a3c",
+    "docs/evidence/debian-dirktest-native-junit-20261107.xml": "b0d184ff8726456ba9306f05f22e7ffa489d8dfc8da614826c950fe3290445d7",
+    "docs/evidence/debian-dirktest-review-20261107.json": "f39ffd3dfb00343a81603b24958af52679f203e0e48f09ae564feb91f6e244e3",
+    "docs/evidence/debian-native-environment-junit.xml": "93970abe34a8a5afaa6081cb86e1ccabc1e5b0b405a9fb9c69abea5a13db84ec",
+    "docs/evidence/debian-native-environment.json": "1a01655c962483cc1552f04728ea26c8af690935996063649d850bdd602a3d8f",
+    "docs/evidence/debian-native-failed-cleanup-junit.xml": "b2e8f3383072ededae2b55e525e3fc56713cef306573f4c2d4158b6e8610e327",
+    "docs/evidence/debian-native-failed-cleanup.json": "3535199c61b490808d8e83ab207f5081cc30b548daffcb8eb0e043571bc1bf14",
+    "docs/evidence/debian-native-legacy-junit.xml": "2676e6f6c1608fd4ab3c883635096c22aca8b65a097bcb6ac2e8ab1cdb82c008",
+    "docs/evidence/debian-native-legacy.json": "99aa5878c0c60704a4021449d365a14ff58f23046c4bd2879c353e1c62a67a35",
+    "docs/evidence/debian-reproducibility.json": "1d7b961f15289c26f68133431ad35f2e1705d4bfd701f2b2fd7ff7042fa8229a",
+    "docs/evidence/debian-runtime-provenance.json": "937f10d4213c0ea1fb45869b1c0aa6382563c7eb7386c034252fa8b0d5fb8ff1"
+  },
+  "work_memory": {
+    "thread_id": "188ce4729a62",
+    "last_confirmed_revision": 955,
+    "native_milestone_operation_id": "debian-dirktest-native-20261107-03",
+    "instance": "codex-debian-release-20261107",
+    "published_operation_id": "debian-dirktest-published-20261107-06",
+    "published_write_state": "unknown; task td-dynamic-87c4d57a529f7c6b23f36fa2386829ed654e54580486dd64ac7ec27c9c0d3e70; independent board read rev955 marker absent; no replay",
+    "earlier_repo_operation_state": "unknown; td-dynamic-b61aa7b1b7507d496ab96c4dbf12ee1da9477662adc7a25d7f35d4e7515cf46f; no replay",
+    "report_board": "80aa29e4699a"
+  },
+  "integration": {
+    "main_documentation_base": "8b338b6",
+    "runtime_diff_from_release_source": "none; source350 is ancestor of main2bbf6d9; normal gh pr merge --merge --match-head-commit, no admin/force bypass",
+    "readme_worker_pr": "https://github.com/landjunge/KiraBridge/pull/71",
+    "readme_worker_source": "4657705eecdd2b03760b6a7b9464e6b0610ffd79",
+    "merge_commit": "2bbf6d9dc628cdf95e5591df7968f761f938883c",
+    "merged_at": "2026-11-07T13:18:30Z"
+  },
+  "compressed_verbatim_logs": {
+    "docs/evidence/debian-dirktest-native-20261107.log.gz": {
+      "uncompressed_sha256": "d90a770e4f4fa36cc8e3b9ffed57f86cd1637e58ac8c9ab77452a38a5d5db2c7",
+      "reason": "verbatim command output, including terminal whitespace"
+    },
+    "docs/evidence/debian-dirktest-delivery-20261107.log.gz": {
+      "uncompressed_sha256": "4f32ab0ff58f88b8cdf82a647457401685dad34ac0e7f02e953a16665cc6367a",
+      "reason": "verbatim command output, including terminal whitespace"
+    },
+    "docs/evidence/debian-dirktest-failed-install-20261107.log.gz": {
+      "uncompressed_sha256": "620fe08950716180d6cda49a49d83ecdaa26f7c4ce6051bd4150d45d60261768",
+      "reason": "verbatim command output, including terminal whitespace"
+    },
+    "docs/evidence/debian-dirktest-extra-native-20261107.log.gz": {
+      "uncompressed_sha256": "c9f12d61c30fb2d4e84b761dba93f8c960bc4104800bae6d530d2ecf33856437",
+      "reason": "verbatim command output, including terminal whitespace"
+    },
+    "docs/evidence/debian-dirktest-legacy-20261107.log.gz": {
+      "uncompressed_sha256": "7bcdfcc3b5dcb63ce283de47cef383a29d9a8d756bf9589b3aa64719ef4151dc",
+      "reason": "verbatim command output, including terminal whitespace"
+    },
+    "docs/evidence/debian-dirktest-environment-20261107.log.gz": {
+      "uncompressed_sha256": "7f0bcf88cc7347f0dbd71e7215a02ead3825aaab54a947a441a26ae9ab88baff",
+      "reason": "verbatim command output, including terminal whitespace"
+    },
+    "docs/evidence/debian-dirktest-ci350-20261107.log.gz": {
+      "uncompressed_sha256": "786984879ae250ac6f55f6da9819833625392e62f14c7fdad39076111376712c",
+      "reason": "verbatim command output, including terminal whitespace"
+    },
+    "docs/evidence/debian-dirktest-failed-systemd-20261107.log.gz": {
+      "uncompressed_sha256": "710468170246319ae03b32e77a70ed2e8ba2521ac562167828cf793d1f25113c",
+      "reason": "verbatim command output, including terminal whitespace"
+    },
+    "docs/evidence/debian-dirktest-failed-systemd-journal-20261107.log.gz": {
+      "uncompressed_sha256": "20992cf169192a040352f25e80743c5e51d7b2e5373bc6dd796f9dbab000559f",
+      "reason": "verbatim command output, including terminal whitespace"
+    }
+  },
+  "user_addendum": {
+    "repository": "https://github.com/landjunge/threaddesk-server",
+    "visibility": "PRIVATE",
+    "independently_verified_by": "gh repo view + gh API main + PR1 readback",
+    "main_commit": "1f993b1dfad2f655d2181dd56d87f38b9901596a",
+    "pr": "https://github.com/landjunge/threaddesk-server/pull/1",
+    "source_delivery": "Existing separate ThreadDesk server worker integrated its own delivery. No duplicate source extraction/implementation by this KiraBridge worker.",
+    "worker_report": "https://github.com/landjunge/threaddesk-server/blob/1f993b1dfad2f655d2181dd56d87f38b9901596a/docs/evidence/server-sync-vserver-20261107.json",
+    "native_claims": "Owned by separate ThreadDesk worker, read not independently rerun here."
+  }
+}

@@ -89,7 +89,9 @@ def test_account_setup_keeps_literal_key_out_of_commands_and_policy(tmp_path, mo
         )
 
     monkeypatch.setattr("kirabridge.chatgpt_setup.subprocess.run", run)
-    result = configure_tunnel(config, path, "tunnel_testonly12345678", key, "fake-client")
+    result = configure_tunnel(
+        config, path, "tunnel_testonly12345678", key, str(tmp_path / "fake-client")
+    )
     assert result["connected"]
     assert key not in json.dumps(calls)
     assert key not in path.read_text()

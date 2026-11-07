@@ -4,7 +4,7 @@ Status: **nicht veröffentlicht**. Nutzerentscheidung18.10.2026: erst nach
 fertiger Release-Vorbereitung und ausdrücklicher Veröffentlichungsfreigabe.
 Discussions wurden dafür nicht aktiviert. Ziel ausschließlich `landjunge/landjunge`;
 vor späterer Veröffentlichung vorhandene Threads und Kategorien prüfen.
-KiraBridge bleibt privat; Lizenz und Veröffentlichungsumfang offen.
+KiraBridge bleibt privat; Lizenz inzwischen auf main übernommen; Veröffentlichungsumfang noch offen.
 
 Titel: KiraBridge: Vibe Coding with ChatGPT, Codex and Grok — feedback welcome
 
@@ -19,7 +19,7 @@ Berechtigungen am selben Projekt arbeiten. Weitere CLI-Anbindungen sind geplant.
 
 Die öffentliche Veröffentlichung und die Projektseite
 `kirabridge.netzwerkpunkt.de` werden vorbereitet. Derzeit gibt es keine öffentlich
-verfügbare Installation und noch keine endgültige Lizenzentscheidung.
+verfügbare Installation und die individuelle Netzwerkpunkt Personal Use License 1.0 ist im privaten Projekt hinterlegt.
 
 Mich interessiert eure Erfahrung:
 
@@ -39,7 +39,7 @@ permissions. More CLI integrations are planned.
 
 A public release and the project website at `kirabridge.netzwerkpunkt.de` are
 being prepared. There is currently no publicly available installation, and a
-final license has not been decided.
+custom Netzwerkpunkt Personal Use License 1.0 is recorded in the private project.
 
 I'd like to hear about your experience:
 

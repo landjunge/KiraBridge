@@ -112,7 +112,7 @@ async def test_existing_terminal_handles_are_visible_without_reading_or_claiming
         "busy": True,
     }
 
-    async def catalog(principal):
+    async def catalog(principal, *, transport=None):
         assert principal == "local"
         return {"status": "available", "sessions": [target]}
 
@@ -267,3 +267,19 @@ def test_permissions_reports_explicit_full_terminal_fields_without_granting_them
     other = status.permissions_snapshot(bridge, "other")
     assert not other["allow_any_executable"]
     assert other["effective_terminal_roots"] == config.principals["other"].roots
+
+
+@pytest.mark.parametrize(
+    "level,legacy,required", [("full", "manual", False), ("ask", "automatic", True)]
+)
+def test_policy_inspection_approval_uses_effective_operation_decision(
+    bridge, config, level, legacy, required
+):
+    policy = config.principals["local"]
+    policy.permission_level = level
+    policy.approval_mode = legacy
+    snapshot = status.permissions_snapshot(bridge, "local")
+    assert snapshot["approval_mode"] == legacy
+    assert snapshot["approval_required"] is required
+    assert snapshot["permission_decision"]["operation"] == "policy.inspect"
+    assert snapshot["permission_decision"]["approval_required"] is required

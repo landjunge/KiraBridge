@@ -1,0 +1,12 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Bounded source-bound review verdict",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "verdict": {"type": "string", "enum": ["pass", "fail"]},
+    "source_sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "summary": {"type": "string", "maxLength": 2000}
+  },
+  "required": ["verdict", "source_sha256", "summary"]
+}

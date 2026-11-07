@@ -123,6 +123,31 @@ class OutputHistory:
                 self.prune()
             return self.reference(row)
 
+    def captured_text(self, principal, kind, source_key, sha256):
+        """Return one unexpired capture for this principal and pane, or None.
+
+        A cursor from another pane or principal does not reveal that capture.
+        """
+        if not isinstance(sha256, str) or not sha256:
+            return None
+        row = self.store.db.execute(
+            "SELECT payload,expires,created FROM output_snapshots WHERE principal=? AND kind=? "
+            "AND source_key=? AND sha256=?",
+            (principal, kind, source_key, sha256),
+        ).fetchone()
+        if (
+            row is None
+            or row["expires"] <= time.time()
+            or row["created"] <= (time.time() - self.config.retention_seconds)
+        ):
+            return None
+        try:
+            payload = json.loads(bytes(row["payload"]))
+        except (json.JSONDecodeError, TypeError, ValueError):
+            return None
+        text = payload.get("text") if isinstance(payload, dict) else None
+        return text if isinstance(text, str) else None
+
     def read(self, principal, reference):
         row = self.store.db.execute(
             "SELECT * FROM output_snapshots WHERE id=? AND principal=?",
@@ -141,6 +166,29 @@ class OutputHistory:
         ):
             return None, "integrity_mismatch"
         return json.loads(raw), "available"
+
+    def captured_input_view(self, principal, pane_id, expected_pid, cursor):
+        """Resolve an intact, complete observation owned by this exact reader and pane."""
+        row = self.store.db.execute(
+            "SELECT * FROM output_snapshots WHERE principal=? AND kind='session_capture' "
+            "AND source_key=? AND sha256=?",
+            (principal, f"{pane_id}:{expected_pid}", cursor),
+        ).fetchone()
+        if row is not None and not row["truncated"] and row["bytes"] == row["original_bytes"]:
+            try:
+                payload, status = self.read(principal, self.reference(row))
+            except (json.JSONDecodeError, UnicodeDecodeError, TypeError, ValueError):
+                payload, status = None, "integrity_mismatch"
+            if (
+                status == "available"
+                and isinstance(payload, dict)
+                and set(payload) == {"text"}
+                and isinstance(payload["text"], str)
+            ):
+                return payload["text"]
+        raise BridgeError(
+            "visible_capture_unavailable", "Read this exact terminal again before sending Return"
+        )
 
     def observe_terminal(self, principal, result):
         reference = self.capture(

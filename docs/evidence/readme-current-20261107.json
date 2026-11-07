@@ -1,0 +1,1335 @@
+{
+  "schema": "kirabridge.readme-current.v1",
+  "task_id": "KB-README-CURRENT-CODEX-20261107",
+  "instance": "codex-current-readme-20261107",
+  "recorded_at": "2026-11-07T13:48:10.379928+00:00",
+  "status": "verified_delivery_snapshot_before_final_documentation_PR",
+  "scope": {
+    "written_files": [
+      "README.md",
+      "README.de.md",
+      "docs/DEVELOPERS.md",
+      "docs/DEVELOPERS.de.md",
+      "docs/INSTALL-EN.md",
+      "docs/INSTALL-DE.md",
+      "docs/evidence/readme-current-20261107.json"
+    ],
+    "excluded": [
+      "product code",
+      "design assets",
+      "platform builds and VM tests",
+      "service or credentials changes",
+      "release/tag/deployment/installation"
+    ],
+    "integrated_existing_source_files": [
+      "tests/test_capability_routing.py from reviewed canonical server commit0eb0804; original assigned worktree test file not changed"
+    ]
+  },
+  "session": {
+    "thread_id": "01a1b598-5c1f-7b63-bc92-b96141bf38a6",
+    "model": "gpt-6.1-sol",
+    "effort": "high",
+    "proof": "native turn_context model, effort and collaboration_mode.settings.reasoning_effort; no global defaults changed"
+  },
+  "repository": {
+    "origin": "https://github.com/landjunge/KiraBridge.git",
+    "private": true,
+    "worktree": "/Users/landjunge/KiraBridge-worktrees/current-readme-codex-20261107",
+    "branch": "docs/current-repository-readme-20261107",
+    "baseline": "d12838ae97c7efcc053c45c3bc9fba5e78f5fe5d",
+    "remote_main_observed": "d12838ae97c7efcc053c45c3bc9fba5e78f5fe5d",
+    "remote_verification": "git ls-remote origin refs/heads/main and GitHub branches/main API before editing; refresh required before integration",
+    "source_version": "0.8.0rc40",
+    "version_sources": [
+      "pyproject.toml",
+      "uv.lock",
+      "src/kirabridge/__init__.py"
+    ],
+    "manifest_sha256": "3cc7c44f21085b00f44b6d6fbaa88f3fb01655b9cce7cdcf84a330c5efcc8e5e",
+    "lock_sha256": "5886e096d27acc803c7d25f2889ecd10387df7494b49ed11dc0a18998c550eb6",
+    "remote_main_before_integration": "d12838ae97c7efcc053c45c3bc9fba5e78f5fe5d",
+    "remote_main_before_integration_observed_at": "2026-11-07T10:54:19.747960+00:00",
+    "latest_reviewed_main": "2bbf6d9dc628cdf95e5591df7968f761f938883c",
+    "integrated_source_version": "0.8.0rc41",
+    "original_baseline_preserved": "d12838ae97c7efcc053c45c3bc9fba5e78f5fe5d"
+  },
+  "original_errors": [
+    {
+      "files": [
+        "README.md",
+        "README.de.md"
+      ],
+      "before": "Current RC40 installation linked only to PR61 source a5d381a, although current installed runtime and main are d12838a. Integrated coordinator/routing/return changes still called source candidates; November 6 integration checkpoint presented as current gates.",
+      "after": "Date/pin reviewed source and actual runtime; label the PR61 report and integration checkpoint as historical; integrated-source terminology without claiming provider/platform acceptance."
+    },
+    {
+      "files": [
+        "README.md",
+        "README.de.md"
+      ],
+      "before": "Windows setup preview called new, with seven native phases insufficiently scoped; no clear distinction from current Windows parity/standalone installer and Linux/Debian work.",
+      "after": "Scope native success to published rc37.dev1 preview; preserve its unsupported general file/process/terminal/service limits; ongoing worker work has no new accepted download here."
+    },
+    {
+      "files": [
+        "docs/DEVELOPERS.md",
+        "docs/DEVELOPERS.de.md"
+      ],
+      "before": "Contradictory current RC30 and newest download RC20, no clone/root/CLI quickstart, old operational source links, incomplete remote CI prerequisites.",
+      "after": "Separate RC36 artifact, RC40 baseline/runtime, Python >=3.11, uv/CLI/directories/dependencies and scoped tests; document remote-ci, separate fresh processes and all three exact external pins. Historical evidence remains pinned."
+    },
+    {
+      "files": [
+        "docs/INSTALL-EN.md",
+        "docs/INSTALL-DE.md"
+      ],
+      "before": "RC20 guide pointed at current README download while requiring absent top-level INSTALLIEREN-DE.txt/.command/manual app copying, app-only ZIP and SHA256SUMS-INTEL.",
+      "after": "Document actual RC36 Installer.app, bundled app/service update, prerequisites and SHA256SUMS; pin bootstrap RC36 and explicitly request desktop + visible Terminal; retain safety/recovery content and accurately scope RC36 tab-switch limitation."
+    }
+  ],
+  "published_releases": {
+    "source_api": "https://api.github.com/repos/landjunge/KiraBridge/releases?per_page=100",
+    "authentication": "existing gh authenticated repository access; no tokens logged",
+    "release_count": 31,
+    "published_stable_count": 0,
+    "latest_intel": {
+      "draft": false,
+      "id": 434149683,
+      "prerelease": true,
+      "published_at": "2026-11-04T16:10:56Z",
+      "tag_name": "v0.8.0rc36",
+      "target_commitish": "d4aebdd89a206045731f2692a3f363fddaa15ee0",
+      "assets": [
+        {
+          "browser_download_url": "https://github.com/landjunge/KiraBridge/releases/download/v0.8.0rc36/install-macos.sh",
+          "digest": "sha256:7f1deda87b455fec29bb04819c881638eaa07299997618a7666e4bd88c02a73e",
+          "id": 710087026,
+          "name": "install-macos.sh",
+          "size": 586
+        },
+        {
+          "browser_download_url": "https://github.com/landjunge/KiraBridge/releases/download/v0.8.0rc36/install-macos.sh.sha256",
+          "digest": "sha256:b0cca70d74038e242c43a79118a6156972823bf0ac9fecb136003421c4cb08ef",
+          "id": 710087260,
+          "name": "install-macos.sh.sha256",
+          "size": 83
+        },
+        {
+          "browser_download_url": "https://github.com/landjunge/KiraBridge/releases/download/v0.8.0rc36/KiraBridge-0.8.0rc36-Intel-Installer.zip",
+          "digest": "sha256:35540760776e065a4c0cfddf95ca6f8fe5e2d90d2f9e58489ea4d04edd212dca",
+          "id": 710086898,
+          "name": "KiraBridge-0.8.0rc36-Intel-Installer.zip",
+          "size": 3623180
+        },
+        {
+          "browser_download_url": "https://github.com/landjunge/KiraBridge/releases/download/v0.8.0rc36/SHA256SUMS",
+          "digest": "sha256:03c8ea877859a05c7060c4282a2bec2454dfa0ef7c1639150cb43378b9b1bb6a",
+          "id": 710087328,
+          "name": "SHA256SUMS",
+          "size": 458
+        }
+      ]
+    },
+    "windows_setup_preview": {
+      "draft": false,
+      "id": 434403271,
+      "prerelease": true,
+      "published_at": "2026-11-04T20:36:17Z",
+      "tag_name": "windows-v0.8.0rc37.dev1",
+      "target_commitish": "0a2f7cb8cf84d47462a094917241950a152fe364",
+      "assets": [
+        {
+          "browser_download_url": "https://github.com/landjunge/KiraBridge/releases/download/windows-v0.8.0rc37.dev1/KiraBridge-0.8.0rc37.dev1-Windows-Dev-Kit.zip",
+          "digest": "sha256:a21a214c77d21fec0e11a166147fc14dcb1d6dd88adc0fb2d45501ec8748772f",
+          "id": 710784018,
+          "name": "KiraBridge-0.8.0rc37.dev1-Windows-Dev-Kit.zip",
+          "size": 83879137
+        },
+        {
+          "browser_download_url": "https://github.com/landjunge/KiraBridge/releases/download/windows-v0.8.0rc37.dev1/package.json",
+          "digest": "sha256:1c6b0f0d479a26d2892ed3a7f79c55a6c7577ce53c8f5344a66653f3359bf61a",
+          "id": 710784044,
+          "name": "package.json",
+          "size": 1600
+        },
+        {
+          "browser_download_url": "https://github.com/landjunge/KiraBridge/releases/download/windows-v0.8.0rc37.dev1/SHA256SUMS",
+          "digest": "sha256:be8840a21f0a7f4acea6871c67be61a0edb680c6ee1d571da8da7ddd2dd8f9bb",
+          "id": 710784015,
+          "name": "SHA256SUMS",
+          "size": 354
+        }
+      ]
+    },
+    "draft_tags": [
+      "v0.8.0rc17",
+      "v0.8.0rc16",
+      "v0.8.0rc15",
+      "v0.6.0rc2"
+    ],
+    "tag_refs": {
+      "v0.8.0rc36": "d4aebdd89a206045731f2692a3f363fddaa15ee0",
+      "windows-v0.8.0rc37.dev1": "0a2f7cb8cf84d47462a094917241950a152fe364"
+    },
+    "tag_ref_verification": "GitHub git/ref/tags endpoint returned commit type and same full source SHA; tag/target_commitish alone is not artifact proof",
+    "linux_limit": "Current Linux RC41 is published and independently downloaded/hash/source/native-proof verified; only its stated Debian13.6 acceptance is claimed. Ubuntu, productive installation and platform parity remain separate.",
+    "historical_initial_snapshot": {
+      "release_count": 30,
+      "linux_limit": "Only published Linux named artifacts observed in older 0.7.0rc1/rc2 releases. These do not establish acceptance of the ongoing current Linux/Debian server; no current Linux download promoted.",
+      "scope": "Original pre-server-release query retained; superseded by the current final_verified_server_delivery and current index below."
+    },
+    "index_refreshed_at": "2026-11-07T13:37:32.516595+00:00",
+    "latest_linux": {
+      "tag": "linux-v0.8.0rc41",
+      "published_at": "2026-11-07T13:19:39Z",
+      "package_source": "350d36854fc9dd37725d7c00a91b72cd1bd32b15",
+      "archive": {
+        "name": "KiraBridge-0.8.0rc41-Linux-x86_64.tar.gz",
+        "bytes": 4039076,
+        "sha256": "1b851236bd603fcfaf5984c075be08b52b81b9cdbc4b93ff08d1001ae3a9d41f"
+      },
+      "release_url": "https://github.com/landjunge/KiraBridge/releases/tag/linux-v0.8.0rc41"
+    },
+    "windows_current_limit": "No new published Windows standalone40 binary release observed in current authenticated release index; older setup37preview is a separate artifact."
+  },
+  "artifact_verification": {
+    "intel_installer": {
+      "bytes": 3623180,
+      "sha256": "35540760776e065a4c0cfddf95ca6f8fe5e2d90d2f9e58489ea4d04edd212dca",
+      "downloaded_with": "gh release download v0.8.0rc36 -R landjunge/KiraBridge",
+      "matches_github_digest": true,
+      "matches_release_SHA256SUMS": true,
+      "installer_package_metadata": {
+        "architecture": "x86_64",
+        "runtime_archive_sha256": "7e9033a5851fda1b9f2991df7c4f7f1b991eda321916cb3781311787f47927dc",
+        "schema": "kirabridge.installer-app.v1",
+        "source_commit": "d4aebdd89a206045731f2692a3f363fddaa15ee0",
+        "version": "0.8.0rc36"
+      },
+      "embedded_release_metadata": {
+        "version": "0.8.0rc36",
+        "commit": "d4aebdd89a206045731f2692a3f363fddaa15ee0",
+        "source_commit": "d4aebdd89a206045731f2692a3f363fddaa15ee0",
+        "platforms": [
+          "Darwin-x86_64"
+        ],
+        "runtime": "Python 3.11, uv 0.11.6; dependencies from hash-locked uv.lock",
+        "apple_signed": false,
+        "native_app": {
+          "schema": "kirabridge.native-app.v1",
+          "path": "native/KiraBridge.app",
+          "protocol": 1,
+          "source_commit": "d4aebdd89a206045731f2692a3f363fddaa15ee0",
+          "binary_sha256": "c9c8bf0dde67d2efe0402fd36400400187c740bcbd9e8a5c906629eae3130515",
+          "signing": "ad-hoc",
+          "architecture": "x86_64"
+        }
+      },
+      "archive_entrypoint": "KiraBridge-Installer.app",
+      "inspected_without_executing_installer": true
+    },
+    "intel_checksums": {
+      "bytes": 458,
+      "sha256": "03c8ea877859a05c7060c4282a2bec2454dfa0ef7c1639150cb43378b9b1bb6a"
+    },
+    "bootstrap": {
+      "bytes": 586,
+      "sha256": "7f1deda87b455fec29bb04819c881638eaa07299997618a7666e4bd88c02a73e",
+      "checksum_file_check": "passed",
+      "pinned_archive_sha256": "7e9033a5851fda1b9f2991df7c4f7f1b991eda321916cb3781311787f47927dc",
+      "syntax_check": "sh -n passed; script was not executed"
+    },
+    "windows_package_metadata": {
+      "acceptance_reexecuted_by_builder": false,
+      "acceptance_scope": "Existing matching native guest reports; not remote attestation",
+      "architecture": "Windows x86_64",
+      "component_provenance_reuse": false,
+      "mac_production_installation_changed": false,
+      "name": "KiraBridge Windows Dev Kit",
+      "native_guest_phases": [
+        "core",
+        "keyboard",
+        "mcp",
+        "preview",
+        "shortcuts",
+        "windows",
+        "setup"
+      ],
+      "native_proofs_sha256": "c68bba16de5b945a11c147ee23fc8c5e11419568dfc5a723cc91bcec0fe385fa",
+      "offline_wheels": 38,
+      "payload_files": 42,
+      "payload_manifest_sha256": "6b34b75caac1348ec18fc2a2f43d3a513f1c0a28bc479cd65c0ac217f9c3f9af",
+      "python_version": "3.14.10",
+      "source_commit": "0a2f7cb8cf84d47462a094917241950a152fe364",
+      "supported_preview": [
+        "Authenticated local MCP HTTP/stdio",
+        "Guarded native keyboard tasks and sequences",
+        "Explicit Ctrl/Alt/Shift/Windows shortcuts with owned modifier release",
+        "Pinned native window listing, activation, geometry and window-state actions",
+        "Regular pinned window close requests without force termination",
+        "Fresh target identity and durable no-replay receipts",
+        "German graphical setup assistant with explicit desktop scope and response-code test",
+        "Pinned official Windows tunnel client included for offline preparation"
+      ],
+      "unsupported_preview": [
+        "Full Windows desktop GUI",
+        "General file/process/terminal tools",
+        "Windows service installation",
+        "External ChatGPT cloud latency acceptance"
+      ],
+      "version": "0.8.0rc37.dev1",
+      "windows_os_iso_included": false
+    },
+    "windows_metadata_digest": {
+      "bytes": 1600,
+      "sha256": "1c6b0f0d479a26d2892ed3a7f79c55a6c7577ce53c8f5344a66653f3359bf61a"
+    },
+    "windows_limit": "Only package.json and SHA256SUMS were downloaded in this task; full 83,879,137-byte Windows ZIP/native-acceptance report was not redownloaded or executed. Historical native phases/installation are sourced to existing dated report, not repeated here."
+  },
+  "installed_mac": {
+    "observed_at_scope": "2026-11-07 10:50:34 UTC",
+    "read_only_live_runtime": {
+      "instance_id": "dda345815e4c4e47b14cd323ee31b6ba",
+      "version": "0.8.0rc40",
+      "pid": 37117,
+      "started_at": "2026-11-06T19:58:37.818663+00:00",
+      "source_tree_sha256": "2f96d09b66627164337f49f831df862cff7b4b62c1ec39b413d95c9388087d2f",
+      "source_file_count": 214,
+      "source_package_path": "/Users/landjunge/.local/share/kirabridge/install/releases/0.8.0rc40-d12838ae97c7/source/.venv/lib/python3.11/site-packages/kirabridge",
+      "source_scope": "package Python files observed at startup; no remote attestation"
+    },
+    "host": {
+      "platform": "darwin",
+      "os_version": "15.7.4",
+      "os_build": "24G517",
+      "architecture": "x86_64"
+    },
+    "installer_receipt": "~/.local/share/kirabridge/install/current.json",
+    "installer_receipt_version": "0.8.0rc40",
+    "installer_receipt_source": "d12838ae97c7efcc053c45c3bc9fba5e78f5fe5d",
+    "package_source_comparison": {
+      "source_commit": "d12838ae97c7efcc053c45c3bc9fba5e78f5fe5d",
+      "installed_python_files_compared": 214,
+      "mismatches": [],
+      "scope": "read-only installed package bytes against exact Git source, no installation or native action"
+    },
+    "previous_installation_report": "docs/RC40-PR61-SHIM-INSTALL-20261106.md describes a5d381ae61146850ab83f332a032679d4d5896cf, not current d12838a",
+    "prior_native_acceptance": "~/.local/state/mac-audit-integration-20261106.json, recorded 2026-11-06T21:07:38.740990+00:00, status completed_authorized_bounded_macos_scope",
+    "current_task_native_acceptance_reexecuted": false,
+    "installed_source_main_CI": {
+      "id": 42281574448,
+      "head_sha": "d12838ae97c7efcc053c45c3bc9fba5e78f5fe5d",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/landjunge/KiraBridge/actions/runs/42281574448",
+      "verification": "fresh GitHub actions/runs API"
+    }
+  },
+  "developer_sources": {
+    "python_requirement": ">=3.11",
+    "uv_workflow_pin": "0.11.6",
+    "entrypoint": "kirabridge.cli:main",
+    "ci_pins": {
+      "legacy_threaddesk": "770bbc9f0c0a02699cc93cad47d2e2c3782f7080",
+      "remote_threaddesk_m4": "a0dd4c39478b031e0e31d335c2a15435dfbc52eb",
+      "tollgate": "53fc57cc2e082d022e65e5929cb2a1e186fba852"
+    },
+    "source_files": [
+      "pyproject.toml",
+      "uv.lock",
+      "src/kirabridge/cli.py",
+      ".github/workflows/ci.yml",
+      "scripts/ci_remote_tests.py",
+      "installer/install.py"
+    ]
+  },
+  "checks": {
+    "shell_syntax": {
+      "command": "sh -n on documentation sh blocks plus downloaded RC36 bootstrap/embedded install.sh",
+      "result": "passed; no install command executed"
+    },
+    "initial_checker_findings": "First in-progress link check found the not-yet-written evidence file and overly strict duplicate-count comparison between translations. Final check uses semantic target/pin sets; DE macOS-contract reference aligned. This was not a product test failure.",
+    "local_products_tests": "Initially none for documentation. After mandatory CI failure, exactly one affected existing test rerun for diagnosis: test_every_preflight_reads_live_thread, 1 failed in0.66s, same RoutingError. No whole suite or platform build repeated locally.",
+    "temporary_probe_failure": "Initial read-only installed byte comparison used system python3 (older than project minimum); str.removeprefix raised AttributeError. Corrected helper interpreter to Python 3.11 and reran only the comparison.",
+    "git_diff_check": {
+      "command": "git diff --check",
+      "result": "passed"
+    },
+    "documentation_static_after_ci_status_note": {
+      "status": "passed",
+      "counts": {
+        "links_and_assets": 54,
+        "local_links_and_assets": 40,
+        "external_references": 14,
+        "pinned_git_links": 10,
+        "shell_syntax_blocks": 4
+      },
+      "issues": [],
+      "files": [
+        {
+          "path": "docs/DEVELOPERS.md",
+          "sha256": "bfad9552079402eef8a718421ffde398da64294c6a15fa30c835eae78bd55df1"
+        },
+        {
+          "path": "docs/DEVELOPERS.de.md",
+          "sha256": "438df1450d6a3601ebf9915b60f385beb692552b4f55b237233e5e9fec2c8d7b"
+        }
+      ],
+      "scope": "local targets/anchors, pinned Git blobs, HTML image sources, fence/whitespace and shell syntax, DE/EN source/version/GitHub-link parity, unchanged README artwork"
+    },
+    "focused_failure_diagnosis": {
+      "command": "UV_CACHE_DIR=/tmp/kb-readme-uv-cache UV_PYTHON_DOWNLOADS=never uv run --locked pytest -q tests/test_capability_routing.py::test_every_preflight_reads_live_thread --tb=short -W error::pytest.PytestUnraisableExceptionWarning",
+      "cwd": "/Users/landjunge/KiraBridge-worktrees/current-readme-codex-20261107",
+      "python": "checkout .venv Python3.11.15; kirabridge imports from this checkout src",
+      "exit_code": 1,
+      "result": "1 failed in0.66s",
+      "error": "RoutingError: Evidence expired, stale, or future-dated; refresh before delegation",
+      "causal_sources": [
+        "tests/test_capability_routing.py:71-83 fixes checked/verified at2026-11-05T20:00Z and expires at2026-11-06T20:00Z",
+        "tests/test_capability_routing.py:210-211 calls before_delegation without controlled clock",
+        "src/kirabridge/capability_routing/hook.py:43-45 calls select without now",
+        "src/kirabridge/capability_routing/router.py:180-181 uses actual datetime.now(timezone.utc); lines164-167 correctly reject expired evidence"
+      ],
+      "independent_confirmation": "Native read-only reviewer confirmed the source chain and unchanged src/tests/scripts/workflows/manifests.",
+      "additional_python313_errors": "Observed PytestUnraisableExceptionWarning from Faulty stream objects and two errors; their causal explanation remains unresolved, not silently attributed to expiry.",
+      "documentation_code_change_check": "git diff --name-only baseline..77c3aae -- src tests scripts .github pyproject.toml uv.lock returned empty",
+      "required_followup": "Routing fixture owner must make positive fixtures clock-controlled while retaining expiry/rights guards; separately investigate Python3.13 unraisable cleanup and rerun affected checks, then required PR CI. These test/product files are outside this documentation-only write scope."
+    },
+    "documentation_static_after_extension": {
+      "status": "passed",
+      "counts": {
+        "links_and_assets": 132,
+        "local_links_and_assets": 98,
+        "external_references": 34,
+        "pinned_git_links": 10,
+        "shell_syntax_blocks": 4
+      },
+      "issues": [],
+      "files": [
+        {
+          "path": "README.md",
+          "sha256": "37e03f5ffc270ed68e0885160f9d193da697842664e48bdca85a3d8d9f2a8603"
+        },
+        {
+          "path": "README.de.md",
+          "sha256": "d5aa8cff5a1d643b96b24d5fdd21532288915027a470cc74c378174fa831c70b"
+        },
+        {
+          "path": "docs/DEVELOPERS.md",
+          "sha256": "8fe04d3d43def0dcb8d7d29572c94b192dd8ed128db838eab54711934fd47355"
+        },
+        {
+          "path": "docs/DEVELOPERS.de.md",
+          "sha256": "ce9a495c1945b9ea185590a3aada7f642b94ec1ca095396cc52e33778e1d5e69"
+        }
+      ],
+      "scope": "local targets/anchors, pinned Git blobs, HTML image sources, fence/whitespace and shell syntax, DE/EN source/version/GitHub-link parity, unchanged README artwork"
+    },
+    "historical_RC40_environment": {
+      "command": "UV_CACHE_DIR=/tmp/kb-readme-uv-cache UV_PYTHON_DOWNLOADS=never uv sync --locked --dev --python /usr/local/bin/python3.11",
+      "result": "passed",
+      "python": "CPython 3.11.15",
+      "packages_installed": 37,
+      "source_import": "/Users/landjunge/KiraBridge-worktrees/current-readme-codex-20261107/src/kirabridge/__init__.py",
+      "scope": "fresh checkout-local editable development environment; no service start/platform artifact build"
+    },
+    "historical_RC40_cli_examples": [
+      {
+        "command": "uv run --locked kirabridge --version",
+        "result": "kirabridge 0.8.0rc40",
+        "exit_code": 0
+      },
+      {
+        "command": "uv run --locked kirabridge --help",
+        "result": "passed; supported subcommands displayed, no service connection",
+        "exit_code": 0
+      }
+    ],
+    "historical_initial_documentation_static": {
+      "status": "passed",
+      "counts": {
+        "links_and_assets": 155,
+        "local_links_and_assets": 117,
+        "external_references": 38,
+        "pinned_git_links": 16,
+        "shell_syntax_blocks": 8
+      },
+      "issues": [],
+      "files": [
+        {
+          "path": "README.md",
+          "sha256": "e6ca3149bc3bfce3ae9f61a45a63f217d38fee5c7ca80993db91f002135da5c0"
+        },
+        {
+          "path": "README.de.md",
+          "sha256": "b7accbd84f768f3985fba782f05b50ca394c5f0d5b33803609568ea82e7a6a3f"
+        },
+        {
+          "path": "docs/DEVELOPERS.md",
+          "sha256": "e778ed80c528d95cd42e41b265bbfd9b1fce50de491b3c16b6e9744c54fb50ce"
+        },
+        {
+          "path": "docs/DEVELOPERS.de.md",
+          "sha256": "2721f03b7f7f5b4046a1f5ce09c5a76f8c82987735f778c2c5140cb1166f5343"
+        },
+        {
+          "path": "docs/INSTALL-EN.md",
+          "sha256": "8f6e9d0ac64bea1385015f8050b818ea80b232ef906fcbbfe76da941c4f46fa6"
+        },
+        {
+          "path": "docs/INSTALL-DE.md",
+          "sha256": "0b3113b7f5af0f11642322ba83faf6a004431a539c00df41d7f2d8760b842d96"
+        }
+      ],
+      "scope": "local targets/anchors, pinned Git blobs, HTML image sources, fence/whitespace and shell syntax, DE/EN source/version/GitHub-link parity, unchanged README artwork"
+    },
+    "initial_failed_PR71_CI": {
+      "run_id": 42365946670,
+      "url": "https://github.com/landjunge/KiraBridge/actions/runs/42365946670",
+      "attempt": 1,
+      "head_sha": "77c3aae9f0e05b7b7f987c3582e1e8a4dc342d1b",
+      "tested_synthetic_merge": "46edd57dcf438d84f98a28c6a70d946a17fcf201",
+      "synthetic_merge_parents": [
+        "d12838ae97c7efcc053c45c3bc9fba5e78f5fe5d",
+        "77c3aae9f0e05b7b7f987c3582e1e8a4dc342d1b"
+      ],
+      "conclusion": "failure",
+      "lanes": {
+        "311": {
+          "job_id": 128383981892,
+          "summary": [
+            "20 failed, 4966 passed, 254 skipped, 4 subtests passed in 650.81s (0:10:50)"
+          ],
+          "failed_nodes": [
+            "tests/test_capability_routing.py::test_every_preflight_reads_live_thread",
+            "tests/test_capability_routing.py::test_changed_authentication_does_not_enable_api_billing",
+            "tests/test_capability_routing.py::test_dry_run_no_process_no_receipt",
+            "tests/test_capability_routing.py::test_double_dispatch_refused_even_after_success",
+            "tests/test_capability_routing.py::test_lost_final_receipt_does_not_claim_no_model_started",
+            "tests/test_capability_routing.py::test_timeout_is_unknown_no_retry",
+            "tests/test_capability_routing.py::test_transport_diagnostic_real_timeout_preserves_partial_output",
+            "tests/test_capability_routing.py::test_transport_diagnostic_timeout_runner_does_not_leak_argv",
+            "tests/test_capability_routing.py::test_transport_diagnostic_known_exit_survives_capture_io_failure",
+            "tests/test_capability_routing.py::test_transport_diagnostic_partial_capture_bounded_and_private",
+            "tests/test_capability_routing.py::test_transport_diagnostic_existing_capture_is_not_workspace_denial",
+            "tests/test_capability_routing.py::test_transport_diagnostic_success_and_invalid_metadata_remain_transport_success",
+            "tests/test_capability_routing.py::test_transport_stream_io_failures_keep_native_zero_unknown_and_lease[stdin-write]",
+            "tests/test_capability_routing.py::test_transport_stream_io_failures_keep_native_zero_unknown_and_lease[stdin-flush]",
+            "tests/test_capability_routing.py::test_transport_stream_io_failures_keep_native_zero_unknown_and_lease[stdin-close]",
+            "tests/test_capability_routing.py::test_transport_stream_io_failures_keep_native_zero_unknown_and_lease[stdout-close]",
+            "tests/test_capability_routing.py::test_transport_stream_io_failures_keep_native_zero_unknown_and_lease[stderr-close]",
+            "tests/test_capability_routing.py::test_revision_change_prevents_spawn",
+            "tests/test_capability_routing.py::test_managed_adapter_keeps_config_immutable",
+            "tests/test_capability_routing.py::test_unknown_writer_keeps_root_lease_and_blocks_subdirectory"
+          ],
+          "raw_log_path": "/tmp/kb-readme-ci-311.log",
+          "raw_log_bytes": 323483,
+          "raw_log_sha256": "bf1ea9729210aeb613bda2a796a6ca68c435fcd23d63ce2561e31c11fa0282b8"
+        },
+        "313": {
+          "job_id": 128383982028,
+          "summary": [
+            "21 failed, 4965 passed, 254 skipped, 2 errors, 4 subtests passed in 645.77s (0:10:45)"
+          ],
+          "failed_nodes": [
+            "tests/test_capability_routing.py::test_every_preflight_reads_live_thread",
+            "tests/test_capability_routing.py::test_changed_authentication_does_not_enable_api_billing",
+            "tests/test_capability_routing.py::test_dry_run_no_process_no_receipt",
+            "tests/test_capability_routing.py::test_double_dispatch_refused_even_after_success",
+            "tests/test_capability_routing.py::test_lost_final_receipt_does_not_claim_no_model_started",
+            "tests/test_capability_routing.py::test_timeout_is_unknown_no_retry",
+            "tests/test_capability_routing.py::test_transport_diagnostic_real_timeout_preserves_partial_output",
+            "tests/test_capability_routing.py::test_transport_diagnostic_timeout_runner_does_not_leak_argv",
+            "tests/test_capability_routing.py::test_transport_diagnostic_known_exit_survives_capture_io_failure",
+            "tests/test_capability_routing.py::test_transport_diagnostic_partial_capture_bounded_and_private",
+            "tests/test_capability_routing.py::test_transport_diagnostic_existing_capture_is_not_workspace_denial",
+            "tests/test_capability_routing.py::test_transport_diagnostic_success_and_invalid_metadata_remain_transport_success",
+            "tests/test_capability_routing.py::test_transport_stream_io_failures_keep_native_zero_unknown_and_lease[stdin-write]",
+            "tests/test_capability_routing.py::test_transport_stream_io_failures_keep_native_zero_unknown_and_lease[stdin-flush]",
+            "tests/test_capability_routing.py::test_transport_stream_io_failures_keep_native_zero_unknown_and_lease[stdin-close]",
+            "tests/test_capability_routing.py::test_transport_stream_io_failures_keep_native_zero_unknown_and_lease[stdout-close]",
+            "tests/test_capability_routing.py::test_transport_stream_io_failures_keep_native_zero_unknown_and_lease[stderr-close]",
+            "tests/test_capability_routing.py::test_revision_change_prevents_spawn",
+            "tests/test_capability_routing.py::test_managed_adapter_keeps_config_immutable",
+            "tests/test_capability_routing.py::test_unknown_writer_keeps_root_lease_and_blocks_subdirectory",
+            "tests/test_cli_message_returns.py::test_cli_explicit_followup_work_runs_once_and_auto_result_never_kicks_requester"
+          ],
+          "raw_log_path": "/tmp/kb-readme-ci-313.log",
+          "raw_log_bytes": 347355,
+          "raw_log_sha256": "08e692b64a13683f395b7763464b39f26d0f4e70e7d3748c2fc31d98a0daca8e"
+        }
+      },
+      "successful_steps": "Both lanes: fresh locked dependencies, Ruff check, Ruff format, all three source checkouts.",
+      "not_executed": "Remote R2/R3 no-skip lane and uv build skipped after legacy failure; not accepted.",
+      "superseded_push_run": {
+        "run_id": 42365913153,
+        "conclusion": "cancelled",
+        "reason": "existing branch concurrency when PR opened; not a pass"
+      },
+      "logs_retrieval": "gh run view --log-failed could not write /Users/landjunge/.cache/gh cache; raw logs then read through authorized actions/jobs/{id}/logs API into /tmp, hashes above; no rerun to obtain logs",
+      "scope": "Historical actual initial failure, superseded for integration by repaired required PR71 CI42368125598; failure details retained verbatim."
+    },
+    "environment": {
+      "result": "passed",
+      "source_checkout": "/tmp/kb-readme-integration-20261107",
+      "main": "2bbf6d9dc628cdf95e5591df7968f761f938883c",
+      "python": "3.11.15",
+      "uv": "0.11.6",
+      "command": "uv sync --locked --dev --python /usr/local/bin/python3.11",
+      "packages_installed": 37,
+      "scope": "new checkout-local dev environment only; no productive installation/service"
+    },
+    "cli_examples": [
+      {
+        "command": "uv run --locked kirabridge --version",
+        "result": "kirabridge 0.8.0rc41",
+        "exit_code": 0
+      },
+      {
+        "command": "uv run --locked kirabridge --help",
+        "result": "actual application help; no service start",
+        "exit_code": 0
+      }
+    ],
+    "documentation_static": {
+      "status": "passed",
+      "counts": {
+        "links_and_assets": 152,
+        "local_links_and_assets": 106,
+        "external_references": 46,
+        "shell_syntax_blocks": 6,
+        "pinned_git_links": 10
+      },
+      "issues": [],
+      "files": [
+        {
+          "path": "README.md",
+          "sha256": "94142cb4a0b7769e2c530f6e2fa07483f69bf21e285cc3fd932d9c033d9bfb98"
+        },
+        {
+          "path": "README.de.md",
+          "sha256": "e262b68b9542ea65ce094411698b6cfdeb33a2380488f0bfee738dff2b552ce7"
+        },
+        {
+          "path": "docs/DEVELOPERS.md",
+          "sha256": "bb54d8296f28ec7fcbc8c25876c1bca21f13a654e85b2e3a09eeda7ae49381e2"
+        },
+        {
+          "path": "docs/DEVELOPERS.de.md",
+          "sha256": "ad35082a14457e468ace3f40d1059b31eb4efde393a6058e283ba674a851c5d6"
+        }
+      ],
+      "scope": "local targets/anchors, pinned Git blobs, HTML image sources, fence/whitespace and shell syntax, DE/EN source/version/GitHub-link parity, unchanged README artwork"
+    },
+    "required_PR_CI": {
+      "completed_documentation_PR71": {
+        "head": "4657705eecdd2b03760b6a7b9464e6b0610ffd79",
+        "run_id": 42368125598,
+        "conclusion": "success",
+        "main_run_id": 42369144147,
+        "main_conclusion": "success"
+      },
+      "completed_server_PR72": {
+        "pr": "https://github.com/landjunge/KiraBridge/pull/72",
+        "head": "350d36854fc9dd37725d7c00a91b72cd1bd32b15",
+        "merge": "2bbf6d9dc628cdf95e5591df7968f761f938883c",
+        "required_ci": "https://github.com/landjunge/KiraBridge/actions/runs/42374701083",
+        "conclusion": "success"
+      },
+      "current_documentation_followup": {
+        "pr": "https://github.com/landjunge/KiraBridge/pull/76",
+        "remote_head_before_this_merge": "928f532978e92492256431e0137df04210374f69",
+        "queued_run_at_snapshot": 42378130702,
+        "state": "queued, not passed; upcoming source merge push will require current actual checks",
+        "final_receipts": "PR76/checks and final coordinator handoff"
+      }
+    },
+    "scope_chronology": "Current fields describe the152-reference merged-server followup andRC41 CLI. historical_* and initial_failed_* retain earlier actual outcomes; no cancelled/failed attempt is a pass.",
+    "documentation_static_server_before_owner_merge": {
+      "status": "passed",
+      "counts": {
+        "links_and_assets": 146,
+        "local_links_and_assets": 102,
+        "external_references": 44,
+        "pinned_git_links": 10,
+        "shell_syntax_blocks": 4
+      },
+      "issues": [],
+      "files": [
+        {
+          "path": "README.md",
+          "sha256": "d532fd93ff7e8286f8cd301f80f882c419b3eac566fbf61511d4f91dd8c511c3"
+        },
+        {
+          "path": "README.de.md",
+          "sha256": "b0fe5b9a39ac51791fa554348cc7d41e435b2653b63954fdc6f955c19a83fea8"
+        },
+        {
+          "path": "docs/DEVELOPERS.md",
+          "sha256": "bb54d8296f28ec7fcbc8c25876c1bca21f13a654e85b2e3a09eeda7ae49381e2"
+        },
+        {
+          "path": "docs/DEVELOPERS.de.md",
+          "sha256": "ad35082a14457e468ace3f40d1059b31eb4efde393a6058e283ba674a851c5d6"
+        }
+      ],
+      "scope": "local targets/anchors, pinned Git blobs, HTML image sources, fence/whitespace and shell syntax, DE/EN source/version/GitHub-link parity, unchanged README artwork"
+    }
+  },
+  "independent_review": {
+    "agent": "/root/developer_docs_audit",
+    "mode": "native read-only agent, inherited model/effort",
+    "initial_findings": "Confirmed stale developer/install versions, missing CLI/root quickstart and M4 source environment, old operational pins, no dedicated existing Markdown/link test; no files changed. Main worker reviewed these before editing.",
+    "final_review": {
+      "status": "passed_no_P1_P2_findings",
+      "baseline": "d12838ae97c7efcc053c45c3bc9fba5e78f5fe5d",
+      "paths": [
+        "README.md",
+        "README.de.md",
+        "docs/DEVELOPERS.md",
+        "docs/DEVELOPERS.de.md",
+        "docs/INSTALL-EN.md",
+        "docs/INSTALL-DE.md",
+        "docs/evidence/readme-current-20261107.json"
+      ],
+      "scope": "read-only diff, facts, translation parity, original artwork, CLI/manifest/CI commands and documentation scope; no product/native tests repeated",
+      "reviewer_message": "RC36 download, RC40 source/runtime and ongoing platform work correctly separated; remaining PR/CI/channel limits explicitly documented."
+    },
+    "server_followup_review": {
+      "reviewer": "native independent developer_docs_audit",
+      "result": "passed after narrow re-review of corrected evidence chronology; no remaining P1/P2 in the five-doc server snapshot",
+      "mode": "read-only, no tests rerun"
+    }
+  },
+  "websites": {
+    "referenced_project_site": "https://kirabridge.netzwerkpunkt.de/",
+    "reference_source": "docs/DISCUSSION-DRAFT.md (explicitly unpublished plan), docs/PROJECT-NAMING.md",
+    "web_tool_result": "URL is not accessible via this tool",
+    "curl_result": "curl: (60) SSL: no alternative certificate subject name matches target host name 'kirabridge.netzwerkpunkt.de'",
+    "followup": "Website owner must configure a matching TLS certificate and review version/download status when an actual website source/deployment is supplied. No live content inferred, no new website link promoted and no deployment performed.",
+    "visuals": "Original README picture/light/dark icons, dimensions, colors and language switches preserved; no new screenshot required for factual text updates."
+  },
+  "ci_before_push": {
+    "workflows_read": [
+      ".github/workflows/ci.yml",
+      ".github/workflows/macos-package.yml",
+      ".github/workflows/release-candidate.yml"
+    ],
+    "automatic_push_pr_jobs": "Verify, existing self-hosted kirabridge Linux runners, Python 3.11 and 3.13, 20-minute timeout; normal lint/tests/build. Concurrency may replace a same-branch push run with the PR run.",
+    "manual_only": "hosted macOS Verify all, macOS package acceptance and release candidate; none dispatched",
+    "runner_api_observation": "two existing online Linux X64 Debian runners, kirabridge label, idle at observation",
+    "cost_scope": "No new hosted platform build or paid API selected; existing normal repository CI within authorized integration. No zero-cost promise for existing resources.",
+    "branch_api": "main protected=false, required_status_checks empty in branch response",
+    "protection_rulesets_limit": "Dedicated protection and rulesets endpoints returned HTTP403: Upgrade to GitHub Pro or make this repository public to enable this feature. No unobserved rule is asserted absent; normal PR mergeability and actual checks must be honored.",
+    "workflow_changes": false,
+    "check_bypass": false
+  },
+  "coordination": {
+    "board": "188ce4729a62",
+    "observed_revision": 927,
+    "board_read": "succeeded; existing content preserved, no competing work board created",
+    "append_operation_id": "kb-readme-current-start-20261107-01",
+    "append_result": "MCP tool call requires approval, but approval policy is never",
+    "append_saved": false,
+    "design_worker_thread": "01a1b585-1a6b-7603-a309-cee5a18777b2",
+    "design_coordination_result": "send_message_to_thread rejected: MCP tool call requires approval, but approval policy is never; no agreement claimed. README artwork unchanged; fresh remote/diff check required before integration.",
+    "bigplan_report": {
+      "instance": "codex-current-readme-20261107",
+      "report_id": "kb-readme-start-01",
+      "result": "PermissionError: [Errno 1] Operation not permitted: '.management.lock'; threaddesk.core.errors.InvalidState: management_control_path",
+      "saved": false
+    },
+    "local_checkpoint": "/tmp/codex-current-readme-20261107.json; standalone reports remain unsynchronized until authorized channel is available",
+    "append_reconciliation": {
+      "operation_id": "kb-readme-current-start-20261107-01",
+      "found": false,
+      "result": null,
+      "proof": "independent td_thread_operation_status read after tool approval rejection; no retry"
+    },
+    "design_read_only_observation": "Existing design thread read without input; latest visible message concerned source header cache/language and 4AllPass offline icons. No successful coordination message or README ownership acknowledgement claimed; this change preserves artwork and main README content outside factual scope."
+  },
+  "integration": {
+    "state": "PR71_integrated_final_server_delivery_documentation_followup_ready",
+    "authorized": "User explicitly authorizes branch push, PR, required checks/review and regular merge; no release/tag/deployment",
+    "primary_worktree_git_blockers": [
+      "git fetch origin main: cannot open .../FETCH_HEAD: Operation not permitted",
+      "git add: Unable to create .../index.lock: Operation not permitted"
+    ],
+    "method": "Temporary local clone of the same repository within /tmp for normal commit/push/PR. Original protected Git metadata is not modified; its local branch synchronization must be reported separately.",
+    "final_proof_location": "Regular final PR check/merge receipts plus coordinator handoff; no extra evidence-only CI loop to self-record the resulting commit SHA.",
+    "temporary_clone": "/tmp/kb-readme-integration-20261107",
+    "review_comment": "https://github.com/landjunge/KiraBridge/pull/71#issuecomment-6705905320",
+    "remote_main_last_observed": "2bbf6d9dc628cdf95e5591df7968f761f938883c",
+    "blocker": "No source/runtime blocker for documented accepted Mac/server deliveries. Final documentation PR must pass its actual required CI. Windows source/native/publication gates, Audit and deferred installed-native design work are recorded separately.",
+    "local_sync_limit": "Original worktree branch/index remains at d12838a due protected metadata; its seven docs are the initial integrated PR71 snapshot. Temporary same-repository clone carries current followup changes and will be clean after normal commit/push; no original metadata or foreign worktree was modified.",
+    "initial_documentation_commit": "77c3aae9f0e05b7b7f987c3582e1e8a4dc342d1b",
+    "completed_original_PR": "https://github.com/landjunge/KiraBridge/pull/71",
+    "remote_main_observed_at": "2026-11-07T13:37:32.516595+00:00",
+    "historical_first_followup_note": "This followup only records actual CI failure and updates developer status. A normal push necessarily triggers existing Verify again; no workflow change, skip marker, manual full-suite rerun or successful replacement status is used. Its later result must be read from PR71.",
+    "final_report_update": "This snapshot now records actual completed PR71/Main verification and accepted/published Linux350 delivery. Final documentation followup remains subject to its own actual CI/review/regular merge; resulting commit/PR receipt is external to avoid an evidence-only self-recording CI loop.",
+    "followup_branch": "docs/current-deliveries-final-20261107",
+    "followup_snapshot_phase": "PR76 already exists. This snapshot includes the owned working merge of completed ownerPR75 before its commit/push. Resulting final head/checks/merge must be read from PR76/handoff; no future pass predeclared.",
+    "followup_PR": "https://github.com/landjunge/KiraBridge/pull/76",
+    "initial_followup_remote_head": "928f532978e92492256431e0137df04210374f69"
+  },
+  "remaining_limits": [
+    "This is a factual delivery snapshot before the final documentation PR. Its future required CI/merge is not predeclared passed. PR73 remains Draft/deferred; later browser proof is distinct from native installed acceptance, and cancelled initial check is not passed.",
+    "Current Windows standalone source fixes f1dbce2 await exact new native package/current CI/main receipts; full macOS parity and a newly published Windows binary are not inferred. Linux350/RC41 is already accepted and published; productive deployment is a separate user-assigned Luna task. Audit remains incomplete and design PR73 remains deferred.",
+    "Apple Silicon and other OS/native/provider acceptance not performed here.",
+    "Website TLS/content could not be verified.",
+    "ThreadDesk/report/design messaging writes blocked by current tool/sandbox permissions; no save/readback claimed.",
+    "No mandatory CI/review status may be claimed passed before its actual completed result."
+  ],
+  "user_extension_20261107": {
+    "scope": "Push/integrate actually finished and checked KiraBridge source deliveries; document Windows once completed and server function/status/limits; no extra release/tag/deployment by this worker. Preserve worker ownership and do not take unverified WIP.",
+    "canonical_clock_reuse": {
+      "source_commit": "0eb0804294ed1896d4628f66c5a236d8fb1d8743",
+      "source_pr": 72,
+      "source_blob": "27d59fd7e4b1b5e73aa86c42c80d85f14a0c531e",
+      "file": "tests/test_capability_routing.py",
+      "delta_from_main": "14 added fixture lines only",
+      "prior_equivalent_verified_fix": "e0cf160408b25588df94a6c631835ad4373acffc, PR70, Verify42312193430 both lanes SUCCESS",
+      "independent_review": "Exact canonical14-line payload approved; production guard, negative expiry cases and real process timeout clocks unchanged. One canonical fixture prevents a duplicate at server integration.",
+      "local_check": {
+        "source_commit": "0eb0804294ed1896d4628f66c5a236d8fb1d8743",
+        "source_test_blob": "27d59fd7e4b1b5e73aa86c42c80d85f14a0c531e",
+        "source_test_sha256": "847516c3dd2ae7adb13ba7aec7f9d8a5fb9b8424e7bb5ee4a41ea034ae430364",
+        "argv": [
+          "/Users/landjunge/KiraBridge-worktrees/current-readme-codex-20261107/.venv/bin/python",
+          "-m",
+          "pytest",
+          "-q",
+          "tests/test_capability_routing.py",
+          "tests/test_cli_message_returns.py",
+          "--tb=short",
+          "-W",
+          "error::pytest.PytestUnraisableExceptionWarning",
+          "--junitxml=/tmp/kb-readme-routing-clock-junit.xml"
+        ],
+        "cwd": "/tmp/kb-readme-integration-20261107",
+        "PYTHONPATH": "/tmp/kb-readme-integration-20261107/src",
+        "imports": [
+          "/Users/landjunge/KiraBridge-worktrees/current-readme-codex-20261107/.venv/bin/python",
+          "/tmp/kb-readme-integration-20261107/src/kirabridge/__init__.py",
+          "/tmp/kb-readme-integration-20261107/src/kirabridge/capability_routing/router.py"
+        ],
+        "started_at": "2026-11-07T11:19:50.356626+00:00",
+        "elapsed_seconds": 35.26083544595167,
+        "exit_code": 1,
+        "log": "/tmp/kb-readme-routing-clock-tests.log",
+        "log_sha256": "a91aa5771f9f97f473834554639c27e56976206ec7d83c73c7c252c533690eee",
+        "junit": "/tmp/kb-readme-routing-clock-junit.xml"
+      },
+      "local_result": {
+        "routing_tests": 73,
+        "routing_passed": 73,
+        "related_CLI_tests": 8,
+        "related_CLI_passed": 6,
+        "related_CLI_failed": 2,
+        "CLI_failure_observed": "Both synthetic message_jobs preserve unknown/error process_cleanup_unknown. /bin/ps is refused by this worker sandbox; existing cleanup guard requires process-session census. No guard bypass or fake pass.",
+        "CLI_cause_scope": "Permission constraint consistent with unchanged platform_adapters process census; no broader source failure cause asserted.",
+        "repeat_policy": "No repeated whole suite or platform acceptance. Required Linux3.11/3.13 CI remains necessary for integrated source."
+      },
+      "static_checks": "Ruff check and format of sole reused test file passed"
+    },
+    "worker_delivery_snapshot": {
+      "observed_board_revision": 934,
+      "server": {
+        "worker_thread": "01a1b5a5-608c-7210-91d6-a4dc0da2af68",
+        "task": "DEBIAN-DIRK-RELEASE-20261107",
+        "pr": 72,
+        "last_local_commit_observed": "d62fc87",
+        "previous_reviewed_source": "0eb0804294ed1896d4628f66c5a236d8fb1d8743",
+        "ownership": "Exclusive server code/native acceptance/release remains assigned worker; no server product files edited here.",
+        "native_state": "Worker reports installation/update/rollback partial successes; final package tests with special path and service-none still in progress. No final acceptance/release/download proof accepted here.",
+        "supported_source_scope": "Debian13/Ubuntu24.04 x86_64; online pinned runtime; systemd-user or service none; loopback authenticated HTTP MCP, health, install/update/rollback/data and UNKNOWN preservation.",
+        "limits": "No macOS GUI/Terminal.app/native keys. Optional clipboard dependencies. No automatic admin/linger/firewall/publicHTTPS or account linking.",
+        "download": "Not verified/published by this task; intended linux-v0.8.0rc41 is not offered as a ready link."
+      },
+      "windows": {
+        "source_worktree": "/Users/landjunge/KiraBridge-worktrees/windows-installer-verified-20261107",
+        "head": "0a4d84b6c83b7d89208a9803ba43ce4995266d83",
+        "state": "Uncommitted source WIP; standalone EXE/MSI not built or natively installed/updated/rolled back; guest-agent repair is a separate bounded success.",
+        "action": "Do not push/merge as finished Windows parity or offer new download."
+      },
+      "audit": {
+        "worker_thread": "01a1b572-4567-7fb0-bf46-831b2013dd97",
+        "repair_complete": false,
+        "handoff_confirmed": false,
+        "state": "Analysis and3baseline tests only in Codex worktree. Grok32-test uncommitted archive diff is not accepted complete lossless repair.",
+        "action": "No duplicate audit implementation and no unverified audit WIP integration."
+      },
+      "design": {
+        "worker_thread": "01a1b585-1a6b-7603-a309-cee5a18777b2",
+        "kirabridge_commit": "d9b433d922258b7ace610d809776dfa47cb317fa",
+        "state": "Source committed/reviewed; targeted console15 and header1 checks passed. Browser engines aborted before DOM; screenshots/native UI acceptance remain open.",
+        "bundle_sha256": "214a16f54c989486f34a5292a94e0ce83d05a588c40610ab4cff3a25ef10ac8a",
+        "action": "Finished checked source may be pushed as explicitly scoped source candidate after source integration review; no visual/native/full delivery acceptance claimed."
+      }
+    },
+    "coordination": {
+      "board_append_operation": "kb-readme-current-resume-20261107-01",
+      "board_append_result": "MCP approval policy never; independently reconciled foundfalse",
+      "message_note_key": "kb-readme-resume-shared-clock-20261107-01",
+      "message_note_result": "MCP approval policy never; no delivery claimed",
+      "native_queue_attempts": "Coordinator and server passive notes failed before queue admission: state_5.sqlite/memories_1.sqlite unable to open database file. No resume or new worker start.",
+      "successful_channel": "GitHub PR comments used for concrete cross-PR coordination; exact receipt recorded separately."
+    }
+  },
+  "final_verified_server_delivery": {
+    "observed_at": "2026-11-07T13:22:06.569808+00:00",
+    "release_url": "https://github.com/landjunge/KiraBridge/releases/tag/linux-v0.8.0rc41",
+    "published_at": "2026-11-07T13:19:39Z",
+    "release_id": 437589113,
+    "tag": "linux-v0.8.0rc41",
+    "version": "0.8.0rc41",
+    "package_source": "350d36854fc9dd37725d7c00a91b72cd1bd32b15",
+    "main": "2bbf6d9dc628cdf95e5591df7968f761f938883c",
+    "published": true,
+    "download_verified": true,
+    "archive": {
+      "name": "KiraBridge-0.8.0rc41-Linux-x86_64.tar.gz",
+      "bytes": 4039076,
+      "sha256": "1b851236bd603fcfaf5984c075be08b52b81b9cdbc4b93ff08d1001ae3a9d41f"
+    },
+    "verified_assets": [
+      {
+        "name": "KiraBridge-0.8.0rc41-Linux-x86_64.tar.gz",
+        "bytes": 4039076,
+        "sha256": "1b851236bd603fcfaf5984c075be08b52b81b9cdbc4b93ff08d1001ae3a9d41f",
+        "api_asset_id": 720765599
+      },
+      {
+        "name": "KiraBridge-0.8.0rc41-Linux-x86_64.tar.gz.sha256",
+        "bytes": 107,
+        "sha256": "c810a876e47adcd38dded5856110e8162a2ae73bf5f2d4ce77f6a37d4ef791c4",
+        "api_asset_id": 720765600
+      },
+      {
+        "name": "SHA256SUMS",
+        "bytes": 3697,
+        "sha256": "385baf547dee658de27f4ebbf2f0caff40fa92daf9d75d3fa12267be2d2ae9b8",
+        "api_asset_id": 720765721
+      },
+      {
+        "name": "debian-ci-350.json",
+        "bytes": 172,
+        "sha256": "d3cdc874c72a900c710fe55d153da5080a4e118bfd5d0c0cc52c0069db89fd25",
+        "api_asset_id": 720765720
+      },
+      {
+        "name": "debian-delivery-evidence.json",
+        "bytes": 2928,
+        "sha256": "fb8b979745f3106ac1b06ca6cf5a6f04c3b0b0c74d7e650755d3518aff4109ad",
+        "api_asset_id": 720765933
+      },
+      {
+        "name": "debian-delivery-junit.xml",
+        "bytes": 365,
+        "sha256": "4bf84bf7d388ab3235af285d7b61ed836d1a36c002992d31a8b30b487d5e1054",
+        "api_asset_id": 720765945
+      },
+      {
+        "name": "debian-native-environment-junit.xml",
+        "bytes": 364,
+        "sha256": "93970abe34a8a5afaa6081cb86e1ccabc1e5b0b405a9fb9c69abea5a13db84ec",
+        "api_asset_id": 720766261
+      },
+      {
+        "name": "debian-native-environment.json",
+        "bytes": 2909,
+        "sha256": "1a01655c962483cc1552f04728ea26c8af690935996063649d850bdd602a3d8f",
+        "api_asset_id": 720766290
+      },
+      {
+        "name": "debian-native-extra-junit.xml",
+        "bytes": 259,
+        "sha256": "cf874bbfb32d7d2df85e963abbac0a79b065b4efbd584a984e0857845a29c7ee",
+        "api_asset_id": 720766299
+      },
+      {
+        "name": "debian-native-extra.json",
+        "bytes": 419,
+        "sha256": "0b0a0468b9b2aeea56b18301ae52e863e3b2a0a186fe5ca126a9f9733300b321",
+        "api_asset_id": 720766317
+      },
+      {
+        "name": "debian-native-legacy-junit.xml",
+        "bytes": 448,
+        "sha256": "2676e6f6c1608fd4ab3c883635096c22aca8b65a097bcb6ac2e8ab1cdb82c008",
+        "api_asset_id": 720766359
+      },
+      {
+        "name": "debian-native-legacy.json",
+        "bytes": 2975,
+        "sha256": "99aa5878c0c60704a4021449d365a14ff58f23046c4bd2879c353e1c62a67a35",
+        "api_asset_id": 720766412
+      },
+      {
+        "name": "debian-native-lifecycle-junit.xml",
+        "bytes": 635,
+        "sha256": "b0d184ff8726456ba9306f05f22e7ffa489d8dfc8da614826c950fe3290445d7",
+        "api_asset_id": 720766421
+      },
+      {
+        "name": "debian-native-lifecycle.json",
+        "bytes": 13320,
+        "sha256": "e32ee21b081c7c93d16ccaaac577afc90a649f2370139cafc62b6e562172b38b",
+        "api_asset_id": 720766467
+      },
+      {
+        "name": "debian-reproducibility.json",
+        "bytes": 554,
+        "sha256": "1d7b961f15289c26f68133431ad35f2e1705d4bfd701f2b2fd7ff7042fa8229a",
+        "api_asset_id": 720766469
+      },
+      {
+        "name": "debian-review-final.json",
+        "bytes": 9363,
+        "sha256": "f39ffd3dfb00343a81603b24958af52679f203e0e48f09ae564feb91f6e244e3",
+        "api_asset_id": 720766478
+      },
+      {
+        "name": "debian-review-resolved.json",
+        "bytes": 10073,
+        "sha256": "731df5790eec1c1ec31639ca155b8defe3c18f67ef04b53216fe3ded12732f5a",
+        "api_asset_id": 720766558
+      },
+      {
+        "name": "debian-runtime-provenance.json",
+        "bytes": 435,
+        "sha256": "937f10d4213c0ea1fb45869b1c0aa6382563c7eb7386c034252fa8b0d5fb8ff1",
+        "api_asset_id": 720766552
+      },
+      {
+        "name": "debian-source-equivalence.json",
+        "bytes": 373,
+        "sha256": "ccb05f59509de083e16f4c773c25157a09b233eb66327ac58add00f3f6b5c97d",
+        "api_asset_id": 720766579
+      }
+    ],
+    "embedded_manifest_files_verified": 1271,
+    "package_python_files_byte_equal_current_main": 214,
+    "native_junit_by_file_not_added_as_unique_cases": {
+      "debian-delivery-junit.xml": {
+        "tests": 5,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "debian-native-environment-junit.xml": {
+        "tests": 5,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "debian-native-extra-junit.xml": {
+        "tests": 3,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "debian-native-legacy-junit.xml": {
+        "tests": 6,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "debian-native-lifecycle-junit.xml": {
+        "tests": 10,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      }
+    },
+    "full_native_source_equivalence": {
+      "result": "passed",
+      "native_full_tested_source": "428271a806588d95e133ef2b7fa0544b8ff96264",
+      "release_source": "350d36854fc9dd37725d7c00a91b72cd1bd32b15",
+      "all_runtime_installer_lock_guide_bytes_equal": true,
+      "changed_members": [
+        "SHA256SUMS",
+        "install.sh",
+        "release.json"
+      ],
+      "bootstrap_change": "source pin only",
+      "unchanged_members": 1270
+    },
+    "final_native_delivery": {
+      "result": "passed",
+      "steps": [
+        {
+          "name": "final-package-integrity",
+          "result": "passed",
+          "detail": {
+            "files": 1271,
+            "all_sha256_match": true
+          }
+        },
+        {
+          "name": "final-package-install",
+          "result": "passed",
+          "detail": ""
+        },
+        {
+          "name": "final-package-mcp-health-auth-source-pin",
+          "result": "passed",
+          "detail": {
+            "version": "0.8.0rc41",
+            "runtime": {
+              "instance_id": "a77cf2ba8e134b80af409918ded2db86",
+              "version": "0.8.0rc41",
+              "pid": 1529948,
+              "started_at": "2026-11-07T13:00:12.170218+00:00",
+              "config_path": "/home/daniel/kb-debian-dirktest-20261107-delivery-final%$dirk/config/config.toml",
+              "config_sha256": "736024abc78bb1706b0123f8542eea66928a146c591164ebd91486927edddde7",
+              "effective_config_sha256": "eeefcff8b9644aa76a3c821cc8fe19ace4f61346dba438b89c27cb160e8b1ee0",
+              "source_tree_sha256": "e759610739ba65abc13668ebea9ce7b76321f5c84305b0d04de0d2959b91d561",
+              "source_file_count": 214,
+              "source_package_path": "/home/daniel/kb-debian-dirktest-20261107-delivery-final%$dirk/candidate-runtime/src/kirabridge",
+              "source_scope": "package Python files observed at startup; no remote attestation"
+            },
+            "server": {
+              "role": "linux-server",
+              "gui_parity": false,
+              "mcp_http": "available",
+              "authentication": "bearer",
+              "health": "bridge_health",
+              "service_manager": "systemd-user",
+              "desktop_gui": "unavailable",
+              "macos_terminal_app": "unavailable",
+              "native_keyboard": "unavailable",
+              "clipboard": "unavailable",
+              "clipboard_required_for_server": false
+            },
+            "missing_bearer": 401,
+            "wrong_bearer": 401
+          }
+        },
+        {
+          "name": "final-package-standalone-rollback",
+          "result": "passed",
+          "detail": ""
+        },
+        {
+          "name": "cleanup",
+          "result": "passed",
+          "detail": null
+        }
+      ],
+      "archive_sha256": "1b851236bd603fcfaf5984c075be08b52b81b9cdbc4b93ff08d1001ae3a9d41f",
+      "harness_sha256": "6b10a4fd1a5b3dfba282a010358e98e6ca24ca4cb28fb228ca09469fd65c842a",
+      "delivery_smoke_sha256": "446659b94c3daeccd28ab81ddfa4c2f031f9e43a44129c597efbb7a82761aad4",
+      "source_commit": "350d36854fc9dd37725d7c00a91b72cd1bd32b15",
+      "version": "0.8.0rc41",
+      "artifacts": {
+        "KiraBridge-0.8.0rc41-Linux-x86_64-final-delivery.tar.gz": {
+          "source_commit": "350d36854fc9dd37725d7c00a91b72cd1bd32b15",
+          "sha256": "1b851236bd603fcfaf5984c075be08b52b81b9cdbc4b93ff08d1001ae3a9d41f"
+        }
+      },
+      "selected_environment_loaded": true,
+      "cleanup": {
+        "unit_absent": true,
+        "systemd": "MainPID=0\nLoadState=not-found\nActiveState=inactive\n",
+        "port_unbound": true
+      },
+      "log_sha256": "4f32ab0ff58f88b8cdf82a647457401685dad34ac0e7f02e953a16665cc6367a"
+    },
+    "integration": {
+      "pr": "https://github.com/landjunge/KiraBridge/pull/72",
+      "head": "350d36854fc9dd37725d7c00a91b72cd1bd32b15",
+      "merge": "2bbf6d9dc628cdf95e5591df7968f761f938883c",
+      "required_ci": "https://github.com/landjunge/KiraBridge/actions/runs/42374701083",
+      "conclusion": "success"
+    },
+    "limits": [
+      "Download/hash/manifest/source verification only; no installation or native rerun by README worker.",
+      "Native full lifecycle source428271a plus runtime/installer equivalence to350d368 and exact final350 native smoke.",
+      "Release SHA256SUMS was extended with native evidence after reproducibility output; only archive reproducibility is reused.",
+      "Ubuntu native acceptance and productive VServer deployment are separate; no Mac/Windows parity inferred."
+    ]
+  },
+  "completed_source_integrations": {
+    "README_PR71": {
+      "head": "4657705eecdd2b03760b6a7b9464e6b0610ffd79",
+      "main": "8b338b66752fb9d65a4c05959c04cf2505412ed2",
+      "required_ci": 42368125598,
+      "conclusion": "success",
+      "summary": {
+        "311": {
+          "summary": [
+            "4986 passed, 254 skipped, 4 subtests passed in 611.33s (0:10:11)",
+            "29 passed, 1 warning in 74.41s (0:01:14)",
+            "Successfully built dist/kirabridge-0.8.0rc40.tar.gz",
+            "Successfully built dist/kirabridge-0.8.0rc40-py3-none-any.whl"
+          ],
+          "raw_log": "/tmp/kb-readme-ci-repaired-311.log",
+          "raw_log_sha256": "de820d14c6d6ef6a5480e5491a282e552004f36ae9d7d806c28f74f553c0e427"
+        },
+        "313": {
+          "summary": [
+            "4986 passed, 254 skipped, 4 subtests passed in 604.79s (0:10:04)",
+            "29 passed, 1 warning in 74.44s (0:01:14)",
+            "Successfully built dist/kirabridge-0.8.0rc40.tar.gz",
+            "Successfully built dist/kirabridge-0.8.0rc40-py3-none-any.whl"
+          ],
+          "raw_log": "/tmp/kb-readme-ci-repaired-313.log",
+          "raw_log_sha256": "ca43fa92c4af9e8e62a7dfbfd3e9d163eaf68adf2765e8b387cbf6075d5cecbf"
+        }
+      }
+    },
+    "main_after_PR71": {
+      "ci": 42369144147,
+      "conclusion": "success"
+    },
+    "server_PR72": {
+      "pr": "https://github.com/landjunge/KiraBridge/pull/72",
+      "head": "350d36854fc9dd37725d7c00a91b72cd1bd32b15",
+      "merge": "2bbf6d9dc628cdf95e5591df7968f761f938883c",
+      "required_ci": "https://github.com/landjunge/KiraBridge/actions/runs/42374701083",
+      "conclusion": "success"
+    },
+    "design_source_PR73": {
+      "url": "https://github.com/landjunge/KiraBridge/pull/73",
+      "draft": true,
+      "source": "d9b433d922258b7ace610d809776dfa47cb317fa",
+      "code_unchanged": true,
+      "review": "independent source/integration review no P1/P2; candidate only",
+      "native_visual_acceptance": "Later browser acceptance supersedes the historical pre-DOM failure; installed native runtime and foreign productive connections remain unaccepted.",
+      "initial_queued_ci": {
+        "id": 42369286553,
+        "conclusion": "cancelled",
+        "reason": "defer draft check to final shared baseline; not a pass"
+      },
+      "main_integration": "not performed; canonical revision950 explicitly defers design merge despite later source/browser delivery",
+      "operator_status": "deferred per canonical project priority revision948; no further design CI or merge",
+      "first_pushed_by_readme_worker": "567d349d6e54e36e771774819334895061954d12",
+      "latest_observed_remote_head": "46beafc0c004231d40ce953d6a72556e688d017a",
+      "latest_source_owner_evidence": {
+        "implementation": "24b0c6faccf9da53f5e5132a0a5e5dd820878aae",
+        "browser": {
+          "checks": 28,
+          "screenshots": 29,
+          "status": "owner-reported passed actual loopback/auth/isolated dispatcher/browser acceptance; no installed native runtime acceptance"
+        },
+        "evidence": "docs/evidence/kb-design-adapt-kirabridge-20261107.json on PR73"
+      },
+      "later_owner_ci": {
+        "id": 42373332553,
+        "status": "success both required lanes at46be; started by separate source owner, not README worker"
+      },
+      "coordination_comment": "https://github.com/landjunge/KiraBridge/pull/73#issuecomment-6707225946"
+    },
+    "server_release_tag_verify": {
+      "run": 42376443797,
+      "head": "350d36854fc9dd37725d7c00a91b72cd1bd32b15",
+      "conclusion": "success",
+      "scope": "actual automatic tag Verify, observed completed13:43:17UTC; not triggered by README worker"
+    }
+  },
+  "runtime_recheck": {
+    "observed_at": "2026-11-07T13:11:00Z",
+    "version": "0.8.0rc40",
+    "source": "d12838ae97c7efcc053c45c3bc9fba5e78f5fe5d",
+    "pid": 37117,
+    "instance_id": "dda345815e4c4e47b14cd323ee31b6ba",
+    "method": "read-only bridge_health and agent_status; same existing process/install path; no installation by README worker"
+  },
+  "followup_documentation_checks": {
+    "observed_at": "2026-11-07T13:25:03.514053+00:00",
+    "stage": "server-current after native/source/actual GitHub download proof; Windows correction still in progress",
+    "scoped_markdown": {
+      "status": "passed",
+      "counts": {
+        "links_and_assets": 152,
+        "local_links_and_assets": 106,
+        "external_references": 46,
+        "shell_syntax_blocks": 6,
+        "pinned_git_links": 10
+      },
+      "issues": [],
+      "files": [
+        {
+          "path": "README.md",
+          "sha256": "94142cb4a0b7769e2c530f6e2fa07483f69bf21e285cc3fd932d9c033d9bfb98"
+        },
+        {
+          "path": "README.de.md",
+          "sha256": "e262b68b9542ea65ce094411698b6cfdeb33a2380488f0bfee738dff2b552ce7"
+        },
+        {
+          "path": "docs/DEVELOPERS.md",
+          "sha256": "bb54d8296f28ec7fcbc8c25876c1bca21f13a654e85b2e3a09eeda7ae49381e2"
+        },
+        {
+          "path": "docs/DEVELOPERS.de.md",
+          "sha256": "ad35082a14457e468ace3f40d1059b31eb4efde393a6058e283ba674a851c5d6"
+        }
+      ],
+      "scope": "local targets/anchors, pinned Git blobs, HTML image sources, fence/whitespace and shell syntax, DE/EN source/version/GitHub-link parity, unchanged README artwork"
+    },
+    "git_diff_check": "passed",
+    "developer_entrypoint": {
+      "source": "main2bbf6d9/server350d368",
+      "environment": "fresh own temporary checkout .venv; Python3.11.15; existing uv0.11.6; lockeddev dependencies; no installed runtime change",
+      "commands": [
+        {
+          "command": "uv sync --locked --dev --python /usr/local/bin/python3.11",
+          "exit": 0,
+          "result": "37 packages installed; editable kirabridge0.8.0rc41"
+        },
+        {
+          "command": "uv run --locked kirabridge --version",
+          "exit": 0,
+          "stdout": "kirabridge 0.8.0rc41"
+        },
+        {
+          "command": "uv run --locked kirabridge --help",
+          "exit": 0,
+          "result": "application help, no service started"
+        }
+      ],
+      "setup_path_failure_preserved": "Initial helper tried nonexistent original .venv/bin/uv (exit127); actual PATH /usr/local/bin/uv used successfully. This was not a product/README command failure."
+    }
+  },
+  "owner_server_documentation_delivery": {
+    "pr": "https://github.com/landjunge/KiraBridge/pull/75",
+    "commit": "daf17d2d217d8e0dd021b11a8aa59e12b4cafdf4",
+    "import": "normal merge into owned PR76 branch, pending its actual final checks/integration",
+    "non_README_files_byte_equal_to_owner": [
+      "docs/RELEASE-0.8.0rc41.md",
+      "docs/evidence/debian-actual-download-20261107.json",
+      "docs/evidence/debian-ci-350.json",
+      "docs/evidence/debian-dirktest-byte-provenance-20261107.json",
+      "docs/evidence/debian-dirktest-ci350-20261107.log.gz",
+      "docs/evidence/debian-dirktest-delivery-20261107.json",
+      "docs/evidence/debian-dirktest-delivery-20261107.log.gz",
+      "docs/evidence/debian-dirktest-delivery-junit-20261107.xml",
+      "docs/evidence/debian-dirktest-environment-20261107.log.gz",
+      "docs/evidence/debian-dirktest-extra-native-20261107.json",
+      "docs/evidence/debian-dirktest-extra-native-20261107.log.gz",
+      "docs/evidence/debian-dirktest-failed-systemd-20261107.log.gz",
+      "docs/evidence/debian-dirktest-failed-systemd-evidence.json",
+      "docs/evidence/debian-dirktest-failed-systemd-journal-20261107.log.gz",
+      "docs/evidence/debian-dirktest-failed-systemd-junit.xml",
+      "docs/evidence/debian-dirktest-legacy-20261107.log.gz",
+      "docs/evidence/debian-dirktest-native-20261107.json",
+      "docs/evidence/debian-dirktest-native-20261107.log.gz",
+      "docs/evidence/debian-dirktest-native-junit-20261107.xml",
+      "docs/evidence/debian-dirktest-release-20261107.json",
+      "docs/evidence/debian-dirktest-review-20261107.json",
+      "docs/evidence/debian-native-environment-junit.xml",
+      "docs/evidence/debian-native-environment.json",
+      "docs/evidence/debian-native-failed-cleanup-junit.xml",
+      "docs/evidence/debian-native-failed-cleanup.json",
+      "docs/evidence/debian-native-legacy-junit.xml",
+      "docs/evidence/debian-native-legacy.json",
+      "docs/evidence/debian-reproducibility.json",
+      "docs/evidence/debian-runtime-provenance.json"
+    ],
+    "README_resolution": "Preserve current source/main/download distinctions, one consolidated server section, both owner install/update/rollback examples and native-evidence plus per-archive checksum links; original artwork/language switches retained. No owner evidence bytes edited.",
+    "coordination_comment": "https://github.com/landjunge/KiraBridge/pull/75#issuecomment-6707710425",
+    "independent_merge_review": "passed; no P1/P2; archive root/checksum/EN language flag/DE default/update+rollback targets and original artwork/language switch verified read-only"
+  }
+}

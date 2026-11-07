@@ -25,7 +25,7 @@ async def test_invalid_selector_has_one_error_before_any_terminal_probe(
     config.principals["local"].permission_level = "full"
     calls = []
 
-    async def catalog(principal):
+    async def catalog(principal, *, transport=None):
         calls.append("catalog")
         return {"sessions": [], "status": "available"}
 

@@ -1,0 +1,12 @@
+{
+  "platform": "macOS-15.7.4-x86_64-i386-64bit",
+  "old_runtime": "actual previously installed published RC14 wheel",
+  "production_modified": false,
+  "activation_attempted": false,
+  "checks": [
+    "real RC14 runtime rejected while delivery holds exist; no switch",
+    "queue-aware development runtime accepted; source test, no installed package claim",
+    "hold preserved; neither database restoration nor service stop occurred"
+  ],
+  "passed": true
+}

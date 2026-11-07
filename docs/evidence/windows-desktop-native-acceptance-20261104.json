@@ -1,0 +1,4252 @@
+{
+  "phases": [
+    {
+      "exit_code": 0,
+      "manifest_sha256": "ad93d6dd980a0dbc64e6b1ca2598d73d19f6c9b4523291085e025ace0f091d00",
+      "original_manifest_sha256": "ad93d6dd980a0dbc64e6b1ca2598d73d19f6c9b4523291085e025ace0f091d00",
+      "phase": "core",
+      "process_id": 264,
+      "raw_report_sha256": "b4893ca05ba06aa85b39376e7a6934cc9b46aaaf3dbd84340561b32fe39b3792",
+      "reused": false,
+      "run_id": "ddb5056cc7ef4ea595714e5ffcc348f4",
+      "source_commit": "271605a5049255b007ea903a28bdfe40c51cf7f7",
+      "test_counts": {
+        "failed": 0,
+        "passed": 4,
+        "skipped": 0
+      }
+    },
+    {
+      "artifact": {
+        "case_attempts": [
+          {
+            "input_attempt_hooks": 8,
+            "input_attempted": true,
+            "inserted_events": 18,
+            "name": "us-eight-physical-keys",
+            "native_calls_acknowledged": 8,
+            "receiver_observation": {
+              "event_count_exact": true,
+              "expected_event_count": 18,
+              "expected_events": [
+                [
+                  "down",
+                  16
+                ],
+                [
+                  "down",
+                  83
+                ],
+                [
+                  "up",
+                  83
+                ],
+                [
+                  "up",
+                  16
+                ],
+                [
+                  "down",
+                  84
+                ],
+                [
+                  "up",
+                  84
+                ],
+                [
+                  "down",
+                  69
+                ],
+                [
+                  "up",
+                  69
+                ],
+                [
+                  "down",
+                  82
+                ],
+                [
+                  "up",
+                  82
+                ],
+                [
+                  "down",
+                  78
+                ],
+                [
+                  "up",
+                  78
+                ],
+                [
+                  "down",
+                  32
+                ],
+                [
+                  "up",
+                  32
+                ],
+                [
+                  "down",
+                  65
+                ],
+                [
+                  "up",
+                  65
+                ],
+                [
+                  "down",
+                  77
+                ],
+                [
+                  "up",
+                  77
+                ]
+              ],
+              "expected_text": "Stern am",
+              "extended_flags_exact": null,
+              "key_order_exact": true,
+              "observed_text": "Stern am",
+              "received_events": [
+                {
+                  "at_monotonic_ns": 32797293195922,
+                  "extended": false,
+                  "kind": "down",
+                  "scan": 42,
+                  "tag": 257054303501454,
+                  "vk": 16
+                },
+                {
+                  "at_monotonic_ns": 32797295708812,
+                  "extended": false,
+                  "kind": "down",
+                  "scan": 31,
+                  "tag": 257054303501454,
+                  "vk": 83
+                },
+                {
+                  "at_monotonic_ns": 32797299696749,
+                  "extended": false,
+                  "kind": "up",
+                  "scan": 31,
+                  "tag": 257054303501454,
+                  "vk": 83
+                },
+                {
+                  "at_monotonic_ns": 32797311735988,
+                  "extended": false,
+                  "kind": "up",
+                  "scan": 42,
+                  "tag": 257054303501454,
+                  "vk": 16
+                },
+                {
+                  "at_monotonic_ns": 32797326891825,
+                  "extended": false,
+                  "kind": "down",
+                  "scan": 20,
+                  "tag": 257054303501454,
+                  "vk": 84
+                },
+                {
+                  "at_monotonic_ns": 32797338260868,
+                  "extended": false,
+                  "kind": "up",
+                  "scan": 20,
+                  "tag": 257054303501454,
+                  "vk": 84
+                },
+                {
+                  "at_monotonic_ns": 32797339729770,
+                  "extended": false,
+                  "kind": "down",
+                  "scan": 18,
+                  "tag": 257054303501454,
+                  "vk": 69
+                },
+                {
+                  "at_monotonic_ns": 32797348502952,
+                  "extended": false,
+                  "kind": "up",
+                  "scan": 18,
+                  "tag": 257054303501454,
+                  "vk": 69
+                },
+                {
+                  "at_monotonic_ns": 32797350540920,
+                  "extended": false,
+                  "kind": "down",
+                  "scan": 19,
+                  "tag": 257054303501454,
+                  "vk": 82
+                },
+                {
+                  "at_monotonic_ns": 32797357679816,
+                  "extended": false,
+                  "kind": "up",
+                  "scan": 19,
+                  "tag": 257054303501454,
+                  "vk": 82
+                },
+                {
+                  "at_monotonic_ns": 32797363626941,
+                  "extended": false,
+                  "kind": "down",
+                  "scan": 49,
+                  "tag": 257054303501454,
+                  "vk": 78
+                },
+                {
+                  "at_monotonic_ns": 32797377466968,
+                  "extended": false,
+                  "kind": "up",
+                  "scan": 49,
+                  "tag": 257054303501454,
+                  "vk": 78
+                },
+                {
+                  "at_monotonic_ns": 32797379309940,
+                  "extended": false,
+                  "kind": "down",
+                  "scan": 57,
+                  "tag": 257054303501454,
+                  "vk": 32
+                },
+                {
+                  "at_monotonic_ns": 32797384429864,
+                  "extended": false,
+                  "kind": "up",
+                  "scan": 57,
+                  "tag": 257054303501454,
+                  "vk": 32
+                },
+                {
+                  "at_monotonic_ns": 32797390827884,
+                  "extended": false,
+                  "kind": "down",
+                  "scan": 30,
+                  "tag": 257054303501454,
+                  "vk": 65
+                },
+                {
+                  "at_monotonic_ns": 32797395835783,
+                  "extended": false,
+                  "kind": "up",
+                  "scan": 30,
+                  "tag": 257054303501454,
+                  "vk": 65
+                },
+                {
+                  "at_monotonic_ns": 32797407648737,
+                  "extended": false,
+                  "kind": "down",
+                  "scan": 50,
+                  "tag": 257054303501454,
+                  "vk": 77
+                },
+                {
+                  "at_monotonic_ns": 32797420288891,
+                  "extended": false,
+                  "kind": "up",
+                  "scan": 50,
+                  "tag": 257054303501454,
+                  "vk": 77
+                }
+              ],
+              "require_extended": false,
+              "text_before": "",
+              "text_exact": true
+            },
+            "state": "inserted"
+          },
+          {
+            "input_attempt_hooks": 2,
+            "input_attempted": true,
+            "inserted_events": 4,
+            "name": "us-layout-yz",
+            "native_calls_acknowledged": 2,
+            "receiver_observation": {
+              "event_count_exact": true,
+              "expected_event_count": 4,
+              "expected_events": [
+                [
+                  "down",
+                  89
+                ],
+                [
+                  "up",
+                  89
+                ],
+                [
+                  "down",
+                  90
+                ],
+                [
+                  "up",
+                  90
+                ]
+              ],
+              "expected_text": "Stern amyz",
+              "extended_flags_exact": null,
+              "key_order_exact": true,
+              "observed_text": "Stern amyz",
+              "received_events": [
+                {
+                  "at_monotonic_ns": 32797489669776,
+                  "extended": false,
+                  "kind": "down",
+                  "scan": 21,
+                  "tag": 150841549928498,
+                  "vk": 89
+                },
+                {
+                  "at_monotonic_ns": 32797508311810,
+                  "extended": false,
+                  "kind": "up",
+                  "scan": 21,
+                  "tag": 150841549928498,
+                  "vk": 89
+                },
+                {
+                  "at_monotonic_ns": 32797522179774,
+                  "extended": false,
+                  "kind": "down",
+                  "scan": 44,
+                  "tag": 150841549928498,
+                  "vk": 90
+                },
+                {
+                  "at_monotonic_ns": 32797557170813,
+                  "extended": false,
+                  "kind": "up",
+                  "scan": 44,
+                  "tag": 150841549928498,
+                  "vk": 90
+                }
+              ],
+              "require_extended": false,
+              "text_before": "Stern am",
+              "text_exact": true
+            },
+            "state": "inserted"
+          },
+          {
+            "input_attempt_hooks": 3,
+            "input_attempted": true,
+            "inserted_events": 6,
+            "name": "german-layout-yz-umlaut",
+            "native_calls_acknowledged": 3,
+            "receiver_observation": {
+              "event_count_exact": true,
+              "expected_event_count": 6,
+              "expected_events": [
+                [
+                  "down",
+                  89
+                ],
+                [
+                  "up",
+                  89
+                ],
+                [
+                  "down",
+                  90
+                ],
+                [
+                  "up",
+                  90
+                ],
+                [
+                  "down",
+                  222
+                ],
+                [
+                  "up",
+                  222
+                ]
+              ],
+              "expected_text": "Stern amyzyz\u00e4",
+              "extended_flags_exact": null,
+              "key_order_exact": true,
+              "observed_text": "Stern amyzyz\u00e4",
+              "received_events": [
+                {
+                  "at_monotonic_ns": 32797687922906,
+                  "extended": false,
+                  "kind": "down",
+                  "scan": 44,
+                  "tag": 248783526402373,
+                  "vk": 89
+                },
+                {
+                  "at_monotonic_ns": 32797696606970,
+                  "extended": false,
+                  "kind": "up",
+                  "scan": 44,
+                  "tag": 248783526402373,
+                  "vk": 89
+                },
+                {
+                  "at_monotonic_ns": 32797725274860,
+                  "extended": false,
+                  "kind": "down",
+                  "scan": 21,
+                  "tag": 248783526402373,
+                  "vk": 90
+                },
+                {
+                  "at_monotonic_ns": 32797744772869,
+                  "extended": false,
+                  "kind": "up",
+                  "scan": 21,
+                  "tag": 248783526402373,
+                  "vk": 90
+                },
+                {
+                  "at_monotonic_ns": 32797766943843,
+                  "extended": false,
+                  "kind": "down",
+                  "scan": 40,
+                  "tag": 248783526402373,
+                  "vk": 222
+                },
+                {
+                  "at_monotonic_ns": 32797776416835,
+                  "extended": false,
+                  "kind": "up",
+                  "scan": 40,
+                  "tag": 248783526402373,
+                  "vk": 222
+                }
+              ],
+              "require_extended": false,
+              "text_before": "Stern amyz",
+              "text_exact": true
+            },
+            "state": "inserted"
+          },
+          {
+            "input_attempt_hooks": 1,
+            "input_attempted": true,
+            "inserted_events": 6,
+            "name": "german-altgr",
+            "native_calls_acknowledged": 1,
+            "receiver_observation": {
+              "event_count_exact": true,
+              "expected_event_count": 6,
+              "expected_events": [
+                [
+                  "down",
+                  17
+                ],
+                [
+                  "down",
+                  18
+                ],
+                [
+                  "down",
+                  81
+                ],
+                [
+                  "up",
+                  81
+                ],
+                [
+                  "up",
+                  18
+                ],
+                [
+                  "up",
+                  17
+                ]
+              ],
+              "expected_text": "Stern amyzyz\u00e4@",
+              "extended_flags_exact": null,
+              "key_order_exact": true,
+              "observed_text": "Stern amyzyz\u00e4@",
+              "received_events": [
+                {
+                  "at_monotonic_ns": 32797834410798,
+                  "extended": false,
+                  "kind": "down",
+                  "scan": 29,
+                  "tag": 17534429169304,
+                  "vk": 17
+                },
+                {
+                  "at_monotonic_ns": 32797841344919,
+                  "extended": false,
+                  "kind": "down",
+                  "scan": 56,
+                  "tag": 17534429169304,
+                  "vk": 18
+                },
+                {
+                  "at_monotonic_ns": 32797843334837,
+                  "extended": false,
+                  "kind": "down",
+                  "scan": 16,
+                  "tag": 17534429169304,
+                  "vk": 81
+                },
+                {
+                  "at_monotonic_ns": 32797844576894,
+                  "extended": false,
+                  "kind": "up",
+                  "scan": 16,
+                  "tag": 17534429169304,
+                  "vk": 81
+                },
+                {
+                  "at_monotonic_ns": 32797845894939,
+                  "extended": false,
+                  "kind": "up",
+                  "scan": 56,
+                  "tag": 17534429169304,
+                  "vk": 18
+                },
+                {
+                  "at_monotonic_ns": 32797854070000,
+                  "extended": false,
+                  "kind": "up",
+                  "scan": 29,
+                  "tag": 17534429169304,
+                  "vk": 17
+                }
+              ],
+              "require_extended": false,
+              "text_before": "Stern amyzyz\u00e4",
+              "text_exact": true
+            },
+            "state": "inserted"
+          },
+          {
+            "input_attempt_hooks": 2,
+            "input_attempted": true,
+            "inserted_events": 6,
+            "name": "explicit-unicode",
+            "native_calls_acknowledged": 2,
+            "receiver_observation": {
+              "event_count_exact": true,
+              "expected_event_count": 6,
+              "expected_events": [
+                [
+                  "down",
+                  231
+                ],
+                [
+                  "up",
+                  231
+                ],
+                [
+                  "down",
+                  231
+                ],
+                [
+                  "up",
+                  231
+                ],
+                [
+                  "down",
+                  231
+                ],
+                [
+                  "up",
+                  231
+                ]
+              ],
+              "expected_text": "Stern amyzyz\u00e4@\u20ac\ud83d\ude00",
+              "extended_flags_exact": null,
+              "key_order_exact": true,
+              "observed_text": "Stern amyzyz\u00e4@\u20ac\ud83d\ude00",
+              "received_events": [
+                {
+                  "at_monotonic_ns": 32797890287732,
+                  "extended": false,
+                  "kind": "down",
+                  "scan": 0,
+                  "tag": 224037072616048,
+                  "vk": 231
+                },
+                {
+                  "at_monotonic_ns": 32797892479910,
+                  "extended": false,
+                  "kind": "up",
+                  "scan": 0,
+                  "tag": 224037072616048,
+                  "vk": 231
+                },
+                {
+                  "at_monotonic_ns": 32797904036965,
+                  "extended": false,
+                  "kind": "down",
+                  "scan": 0,
+                  "tag": 224037072616048,
+                  "vk": 231
+                },
+                {
+                  "at_monotonic_ns": 32797906579746,
+                  "extended": false,
+                  "kind": "up",
+                  "scan": 0,
+                  "tag": 224037072616048,
+                  "vk": 231
+                },
+                {
+                  "at_monotonic_ns": 32797913839887,
+                  "extended": false,
+                  "kind": "down",
+                  "scan": 0,
+                  "tag": 224037072616048,
+                  "vk": 231
+                },
+                {
+                  "at_monotonic_ns": 32797918041818,
+                  "extended": false,
+                  "kind": "up",
+                  "scan": 0,
+                  "tag": 224037072616048,
+                  "vk": 231
+                }
+              ],
+              "require_extended": false,
+              "text_before": "Stern amyzyz\u00e4@",
+              "text_exact": true
+            },
+            "state": "inserted"
+          },
+          {
+            "input_attempt_hooks": 1,
+            "input_attempted": true,
+            "inserted_events": 2,
+            "name": "return",
+            "native_calls_acknowledged": 1,
+            "receiver_observation": {
+              "event_count_exact": true,
+              "expected_event_count": 2,
+              "expected_events": [
+                [
+                  "down",
+                  13
+                ],
+                [
+                  "up",
+                  13
+                ]
+              ],
+              "expected_text": "Stern amyzyz\u00e4@\u20ac\ud83d\ude00\n",
+              "extended_flags_exact": null,
+              "key_order_exact": true,
+              "observed_text": "Stern amyzyz\u00e4@\u20ac\ud83d\ude00\n",
+              "received_events": [
+                {
+                  "at_monotonic_ns": 32797958490813,
+                  "extended": false,
+                  "kind": "down",
+                  "scan": 28,
+                  "tag": 186281872117275,
+                  "vk": 13
+                },
+                {
+                  "at_monotonic_ns": 32797964292947,
+                  "extended": false,
+                  "kind": "up",
+                  "scan": 28,
+                  "tag": 186281872117275,
+                  "vk": 13
+                }
+              ],
+              "require_extended": false,
+              "text_before": "Stern amyzyz\u00e4@\u20ac\ud83d\ude00",
+              "text_exact": true
+            },
+            "state": "inserted"
+          },
+          {
+            "input_attempt_hooks": 1,
+            "input_attempted": true,
+            "inserted_events": 2,
+            "name": "backspace",
+            "native_calls_acknowledged": 1,
+            "receiver_observation": {
+              "event_count_exact": true,
+              "expected_event_count": 2,
+              "expected_events": [
+                [
+                  "down",
+                  8
+                ],
+                [
+                  "up",
+                  8
+                ]
+              ],
+              "expected_text": "Stern amyzyz\u00e4@\u20ac\ud83d\ude00",
+              "extended_flags_exact": null,
+              "key_order_exact": true,
+              "observed_text": "Stern amyzyz\u00e4@\u20ac\ud83d\ude00",
+              "received_events": [
+                {
+                  "at_monotonic_ns": 32798008532928,
+                  "extended": false,
+                  "kind": "down",
+                  "scan": 14,
+                  "tag": 7964223053468,
+                  "vk": 8
+                },
+                {
+                  "at_monotonic_ns": 32798010240966,
+                  "extended": false,
+                  "kind": "up",
+                  "scan": 14,
+                  "tag": 7964223053468,
+                  "vk": 8
+                }
+              ],
+              "require_extended": false,
+              "text_before": "Stern amyzyz\u00e4@\u20ac\ud83d\ude00\n",
+              "text_exact": true
+            },
+            "state": "inserted"
+          },
+          {
+            "input_attempt_hooks": 1,
+            "input_attempted": true,
+            "inserted_events": 2,
+            "name": "extended-arrow",
+            "native_calls_acknowledged": 1,
+            "receiver_observation": {
+              "event_count_exact": true,
+              "expected_event_count": 2,
+              "expected_events": [
+                [
+                  "down",
+                  39
+                ],
+                [
+                  "up",
+                  39
+                ]
+              ],
+              "expected_text": "Stern amyzyz\u00e4@\u20ac\ud83d\ude00",
+              "extended_flags_exact": true,
+              "key_order_exact": true,
+              "observed_text": "Stern amyzyz\u00e4@\u20ac\ud83d\ude00",
+              "received_events": [
+                {
+                  "at_monotonic_ns": 32798040901846,
+                  "extended": true,
+                  "kind": "down",
+                  "scan": 77,
+                  "tag": 39855666757560,
+                  "vk": 39
+                },
+                {
+                  "at_monotonic_ns": 32798045579815,
+                  "extended": true,
+                  "kind": "up",
+                  "scan": 77,
+                  "tag": 39855666757560,
+                  "vk": 39
+                }
+              ],
+              "require_extended": true,
+              "text_before": "Stern amyzyz\u00e4@\u20ac\ud83d\ude00",
+              "text_exact": true
+            },
+            "state": "inserted"
+          },
+          {
+            "input_attempt_hooks": 1,
+            "input_attempted": true,
+            "inserted_events": 2,
+            "name": "function-key",
+            "native_calls_acknowledged": 1,
+            "receiver_observation": {
+              "event_count_exact": true,
+              "expected_event_count": 2,
+              "expected_events": [
+                [
+                  "down",
+                  113
+                ],
+                [
+                  "up",
+                  113
+                ]
+              ],
+              "expected_text": "Stern amyzyz\u00e4@\u20ac\ud83d\ude00",
+              "extended_flags_exact": null,
+              "key_order_exact": true,
+              "observed_text": "Stern amyzyz\u00e4@\u20ac\ud83d\ude00",
+              "received_events": [
+                {
+                  "at_monotonic_ns": 32798079871883,
+                  "extended": false,
+                  "kind": "down",
+                  "scan": 60,
+                  "tag": 109903469107264,
+                  "vk": 113
+                },
+                {
+                  "at_monotonic_ns": 32798081715972,
+                  "extended": false,
+                  "kind": "up",
+                  "scan": 60,
+                  "tag": 109903469107264,
+                  "vk": 113
+                }
+              ],
+              "require_extended": false,
+              "text_before": "Stern amyzyz\u00e4@\u20ac\ud83d\ude00",
+              "text_exact": true
+            },
+            "state": "inserted"
+          }
+        ],
+        "cases": [
+          {
+            "completed_keys": 8,
+            "elapsed_ms": 169.845888,
+            "input_attempt_hooks": 8,
+            "input_attempted": true,
+            "inserted_events": 18,
+            "key_order_exact": true,
+            "name": "us-eight-physical-keys",
+            "physical_key_events": true,
+            "received_events": [
+              {
+                "at_monotonic_ns": 32797293195922,
+                "extended": false,
+                "kind": "down",
+                "scan": 42,
+                "tag": 257054303501454,
+                "vk": 16
+              },
+              {
+                "at_monotonic_ns": 32797295708812,
+                "extended": false,
+                "kind": "down",
+                "scan": 31,
+                "tag": 257054303501454,
+                "vk": 83
+              },
+              {
+                "at_monotonic_ns": 32797299696749,
+                "extended": false,
+                "kind": "up",
+                "scan": 31,
+                "tag": 257054303501454,
+                "vk": 83
+              },
+              {
+                "at_monotonic_ns": 32797311735988,
+                "extended": false,
+                "kind": "up",
+                "scan": 42,
+                "tag": 257054303501454,
+                "vk": 16
+              },
+              {
+                "at_monotonic_ns": 32797326891825,
+                "extended": false,
+                "kind": "down",
+                "scan": 20,
+                "tag": 257054303501454,
+                "vk": 84
+              },
+              {
+                "at_monotonic_ns": 32797338260868,
+                "extended": false,
+                "kind": "up",
+                "scan": 20,
+                "tag": 257054303501454,
+                "vk": 84
+              },
+              {
+                "at_monotonic_ns": 32797339729770,
+                "extended": false,
+                "kind": "down",
+                "scan": 18,
+                "tag": 257054303501454,
+                "vk": 69
+              },
+              {
+                "at_monotonic_ns": 32797348502952,
+                "extended": false,
+                "kind": "up",
+                "scan": 18,
+                "tag": 257054303501454,
+                "vk": 69
+              },
+              {
+                "at_monotonic_ns": 32797350540920,
+                "extended": false,
+                "kind": "down",
+                "scan": 19,
+                "tag": 257054303501454,
+                "vk": 82
+              },
+              {
+                "at_monotonic_ns": 32797357679816,
+                "extended": false,
+                "kind": "up",
+                "scan": 19,
+                "tag": 257054303501454,
+                "vk": 82
+              },
+              {
+                "at_monotonic_ns": 32797363626941,
+                "extended": false,
+                "kind": "down",
+                "scan": 49,
+                "tag": 257054303501454,
+                "vk": 78
+              },
+              {
+                "at_monotonic_ns": 32797377466968,
+                "extended": false,
+                "kind": "up",
+                "scan": 49,
+                "tag": 257054303501454,
+                "vk": 78
+              },
+              {
+                "at_monotonic_ns": 32797379309940,
+                "extended": false,
+                "kind": "down",
+                "scan": 57,
+                "tag": 257054303501454,
+                "vk": 32
+              },
+              {
+                "at_monotonic_ns": 32797384429864,
+                "extended": false,
+                "kind": "up",
+                "scan": 57,
+                "tag": 257054303501454,
+                "vk": 32
+              },
+              {
+                "at_monotonic_ns": 32797390827884,
+                "extended": false,
+                "kind": "down",
+                "scan": 30,
+                "tag": 257054303501454,
+                "vk": 65
+              },
+              {
+                "at_monotonic_ns": 32797395835783,
+                "extended": false,
+                "kind": "up",
+                "scan": 30,
+                "tag": 257054303501454,
+                "vk": 65
+              },
+              {
+                "at_monotonic_ns": 32797407648737,
+                "extended": false,
+                "kind": "down",
+                "scan": 50,
+                "tag": 257054303501454,
+                "vk": 77
+              },
+              {
+                "at_monotonic_ns": 32797420288891,
+                "extended": false,
+                "kind": "up",
+                "scan": 50,
+                "tag": 257054303501454,
+                "vk": 77
+              }
+            ],
+            "target": {
+              "hwnd": "2163436",
+              "keyboard_layout": "67699721",
+              "pid": 12056,
+              "process_created_100ns": "134382449320730549",
+              "thread_id": 12432
+            },
+            "text_exact": true
+          },
+          {
+            "completed_keys": 2,
+            "elapsed_ms": 129.294925,
+            "input_attempt_hooks": 2,
+            "input_attempted": true,
+            "inserted_events": 4,
+            "key_order_exact": true,
+            "name": "us-layout-yz",
+            "physical_key_events": true,
+            "received_events": [
+              {
+                "at_monotonic_ns": 32797489669776,
+                "extended": false,
+                "kind": "down",
+                "scan": 21,
+                "tag": 150841549928498,
+                "vk": 89
+              },
+              {
+                "at_monotonic_ns": 32797508311810,
+                "extended": false,
+                "kind": "up",
+                "scan": 21,
+                "tag": 150841549928498,
+                "vk": 89
+              },
+              {
+                "at_monotonic_ns": 32797522179774,
+                "extended": false,
+                "kind": "down",
+                "scan": 44,
+                "tag": 150841549928498,
+                "vk": 90
+              },
+              {
+                "at_monotonic_ns": 32797557170813,
+                "extended": false,
+                "kind": "up",
+                "scan": 44,
+                "tag": 150841549928498,
+                "vk": 90
+              }
+            ],
+            "target": {
+              "hwnd": "2163436",
+              "keyboard_layout": "67699721",
+              "pid": 12056,
+              "process_created_100ns": "134382449320730549",
+              "thread_id": 12432
+            },
+            "text_exact": true
+          },
+          {
+            "completed_keys": 3,
+            "elapsed_ms": 167.802053,
+            "input_attempt_hooks": 3,
+            "input_attempted": true,
+            "inserted_events": 6,
+            "key_order_exact": true,
+            "name": "german-layout-yz-umlaut",
+            "physical_key_events": true,
+            "received_events": [
+              {
+                "at_monotonic_ns": 32797687922906,
+                "extended": false,
+                "kind": "down",
+                "scan": 44,
+                "tag": 248783526402373,
+                "vk": 89
+              },
+              {
+                "at_monotonic_ns": 32797696606970,
+                "extended": false,
+                "kind": "up",
+                "scan": 44,
+                "tag": 248783526402373,
+                "vk": 89
+              },
+              {
+                "at_monotonic_ns": 32797725274860,
+                "extended": false,
+                "kind": "down",
+                "scan": 21,
+                "tag": 248783526402373,
+                "vk": 90
+              },
+              {
+                "at_monotonic_ns": 32797744772869,
+                "extended": false,
+                "kind": "up",
+                "scan": 21,
+                "tag": 248783526402373,
+                "vk": 90
+              },
+              {
+                "at_monotonic_ns": 32797766943843,
+                "extended": false,
+                "kind": "down",
+                "scan": 40,
+                "tag": 248783526402373,
+                "vk": 222
+              },
+              {
+                "at_monotonic_ns": 32797776416835,
+                "extended": false,
+                "kind": "up",
+                "scan": 40,
+                "tag": 248783526402373,
+                "vk": 222
+              }
+            ],
+            "target": {
+              "hwnd": "2163436",
+              "keyboard_layout": "67568647",
+              "pid": 12056,
+              "process_created_100ns": "134382449320730549",
+              "thread_id": 12432
+            },
+            "text_exact": true
+          },
+          {
+            "completed_keys": 1,
+            "elapsed_ms": 57.665988,
+            "input_attempt_hooks": 1,
+            "input_attempted": true,
+            "inserted_events": 6,
+            "key_order_exact": true,
+            "name": "german-altgr",
+            "physical_key_events": true,
+            "received_events": [
+              {
+                "at_monotonic_ns": 32797834410798,
+                "extended": false,
+                "kind": "down",
+                "scan": 29,
+                "tag": 17534429169304,
+                "vk": 17
+              },
+              {
+                "at_monotonic_ns": 32797841344919,
+                "extended": false,
+                "kind": "down",
+                "scan": 56,
+                "tag": 17534429169304,
+                "vk": 18
+              },
+              {
+                "at_monotonic_ns": 32797843334837,
+                "extended": false,
+                "kind": "down",
+                "scan": 16,
+                "tag": 17534429169304,
+                "vk": 81
+              },
+              {
+                "at_monotonic_ns": 32797844576894,
+                "extended": false,
+                "kind": "up",
+                "scan": 16,
+                "tag": 17534429169304,
+                "vk": 81
+              },
+              {
+                "at_monotonic_ns": 32797845894939,
+                "extended": false,
+                "kind": "up",
+                "scan": 56,
+                "tag": 17534429169304,
+                "vk": 18
+              },
+              {
+                "at_monotonic_ns": 32797854070000,
+                "extended": false,
+                "kind": "up",
+                "scan": 29,
+                "tag": 17534429169304,
+                "vk": 17
+              }
+            ],
+            "target": {
+              "hwnd": "2163436",
+              "keyboard_layout": "67568647",
+              "pid": 12056,
+              "process_created_100ns": "134382449320730549",
+              "thread_id": 12432
+            },
+            "text_exact": true
+          },
+          {
+            "completed_keys": 2,
+            "elapsed_ms": 67.223069,
+            "input_attempt_hooks": 2,
+            "input_attempted": true,
+            "inserted_events": 6,
+            "key_order_exact": true,
+            "name": "explicit-unicode",
+            "physical_key_events": false,
+            "received_events": [
+              {
+                "at_monotonic_ns": 32797890287732,
+                "extended": false,
+                "kind": "down",
+                "scan": 0,
+                "tag": 224037072616048,
+                "vk": 231
+              },
+              {
+                "at_monotonic_ns": 32797892479910,
+                "extended": false,
+                "kind": "up",
+                "scan": 0,
+                "tag": 224037072616048,
+                "vk": 231
+              },
+              {
+                "at_monotonic_ns": 32797904036965,
+                "extended": false,
+                "kind": "down",
+                "scan": 0,
+                "tag": 224037072616048,
+                "vk": 231
+              },
+              {
+                "at_monotonic_ns": 32797906579746,
+                "extended": false,
+                "kind": "up",
+                "scan": 0,
+                "tag": 224037072616048,
+                "vk": 231
+              },
+              {
+                "at_monotonic_ns": 32797913839887,
+                "extended": false,
+                "kind": "down",
+                "scan": 0,
+                "tag": 224037072616048,
+                "vk": 231
+              },
+              {
+                "at_monotonic_ns": 32797918041818,
+                "extended": false,
+                "kind": "up",
+                "scan": 0,
+                "tag": 224037072616048,
+                "vk": 231
+              }
+            ],
+            "target": {
+              "hwnd": "2163436",
+              "keyboard_layout": "67568647",
+              "pid": 12056,
+              "process_created_100ns": "134382449320730549",
+              "thread_id": 12432
+            },
+            "text_exact": true
+          },
+          {
+            "completed_keys": 1,
+            "elapsed_ms": 48.149137,
+            "input_attempt_hooks": 1,
+            "input_attempted": true,
+            "inserted_events": 2,
+            "key_order_exact": true,
+            "name": "return",
+            "physical_key_events": true,
+            "received_events": [
+              {
+                "at_monotonic_ns": 32797958490813,
+                "extended": false,
+                "kind": "down",
+                "scan": 28,
+                "tag": 186281872117275,
+                "vk": 13
+              },
+              {
+                "at_monotonic_ns": 32797964292947,
+                "extended": false,
+                "kind": "up",
+                "scan": 28,
+                "tag": 186281872117275,
+                "vk": 13
+              }
+            ],
+            "target": {
+              "hwnd": "2163436",
+              "keyboard_layout": "67568647",
+              "pid": 12056,
+              "process_created_100ns": "134382449320730549",
+              "thread_id": 12432
+            },
+            "text_exact": true
+          },
+          {
+            "completed_keys": 1,
+            "elapsed_ms": 30.27396,
+            "input_attempt_hooks": 1,
+            "input_attempted": true,
+            "inserted_events": 2,
+            "key_order_exact": true,
+            "name": "backspace",
+            "physical_key_events": true,
+            "received_events": [
+              {
+                "at_monotonic_ns": 32798008532928,
+                "extended": false,
+                "kind": "down",
+                "scan": 14,
+                "tag": 7964223053468,
+                "vk": 8
+              },
+              {
+                "at_monotonic_ns": 32798010240966,
+                "extended": false,
+                "kind": "up",
+                "scan": 14,
+                "tag": 7964223053468,
+                "vk": 8
+              }
+            ],
+            "target": {
+              "hwnd": "2163436",
+              "keyboard_layout": "67568647",
+              "pid": 12056,
+              "process_created_100ns": "134382449320730549",
+              "thread_id": 12432
+            },
+            "text_exact": true
+          },
+          {
+            "completed_keys": 1,
+            "elapsed_ms": 46.091054,
+            "input_attempt_hooks": 1,
+            "input_attempted": true,
+            "inserted_events": 2,
+            "key_order_exact": true,
+            "name": "extended-arrow",
+            "physical_key_events": true,
+            "received_events": [
+              {
+                "at_monotonic_ns": 32798040901846,
+                "extended": true,
+                "kind": "down",
+                "scan": 77,
+                "tag": 39855666757560,
+                "vk": 39
+              },
+              {
+                "at_monotonic_ns": 32798045579815,
+                "extended": true,
+                "kind": "up",
+                "scan": 77,
+                "tag": 39855666757560,
+                "vk": 39
+              }
+            ],
+            "target": {
+              "hwnd": "2163436",
+              "keyboard_layout": "67568647",
+              "pid": 12056,
+              "process_created_100ns": "134382449320730549",
+              "thread_id": 12432
+            },
+            "text_exact": true
+          },
+          {
+            "completed_keys": 1,
+            "elapsed_ms": 20.671901,
+            "input_attempt_hooks": 1,
+            "input_attempted": true,
+            "inserted_events": 2,
+            "key_order_exact": true,
+            "name": "function-key",
+            "physical_key_events": true,
+            "received_events": [
+              {
+                "at_monotonic_ns": 32798079871883,
+                "extended": false,
+                "kind": "down",
+                "scan": 60,
+                "tag": 109903469107264,
+                "vk": 113
+              },
+              {
+                "at_monotonic_ns": 32798081715972,
+                "extended": false,
+                "kind": "up",
+                "scan": 60,
+                "tag": 109903469107264,
+                "vk": 113
+              }
+            ],
+            "target": {
+              "hwnd": "2163436",
+              "keyboard_layout": "67568647",
+              "pid": 12056,
+              "process_created_100ns": "134382449320730549",
+              "thread_id": 12432
+            },
+            "text_exact": true
+          }
+        ],
+        "clipboard_used": false,
+        "foreground_readiness": {
+          "elapsed_ms": 123.827,
+          "foreground_hwnd": "2163436",
+          "foreground_pid": 12056,
+          "foreground_ready": true,
+          "hwnd": "2163436",
+          "input_attempted": false,
+          "phase": "ready",
+          "pid": 12056,
+          "setup_mouse": {
+            "application_processing_confirmed": false,
+            "automatic_retry": false,
+            "coordinate_space": "physical_screen_pixels",
+            "foreground_confirmed": true,
+            "inserted_events": 3,
+            "native_calls": 1,
+            "planned_events": [
+              {
+                "dx": 41831,
+                "dy": 24179,
+                "flags": 49153,
+                "tag": 265748195784917
+              },
+              {
+                "dx": 0,
+                "dy": 0,
+                "flags": 2,
+                "tag": 265748195784917
+              },
+              {
+                "dx": 0,
+                "dy": 0,
+                "flags": 4,
+                "tag": 265748195784917
+              }
+            ],
+            "point": [
+              510,
+              221
+            ],
+            "scope": "Fixture readiness only; not keyboard input or tested window activation",
+            "setup_mouse_attempted": true,
+            "state": "inserted_foreground_pending",
+            "target": {
+              "class_name": "KiraBridgeKeyboardFixture_12056",
+              "hwnd": "2163436",
+              "minimized": false,
+              "pid": 12056,
+              "thread_id": 12432,
+              "topmost": true,
+              "visible": true
+            },
+            "virtual_screen": [
+              0,
+              0,
+              800,
+              600
+            ],
+            "win32_error": 0
+          },
+          "setup_mouse_attempted": true,
+          "timeout_seconds": 120,
+          "window_created": true,
+          "window_owner_pid": 12056
+        },
+        "host_mac_input": false,
+        "input_attempt_hooks": 20,
+        "input_attempt_scope": "Before-send hook; conservatively before last target check",
+        "input_attempted": true,
+        "passed": true,
+        "platform": "nt",
+        "scope": "Real SendInput and receiver WM_KEY/WM_CHAR inside Windows guest",
+        "setup_mouse": {
+          "application_processing_confirmed": false,
+          "automatic_retry": false,
+          "coordinate_space": "physical_screen_pixels",
+          "foreground_confirmed": true,
+          "inserted_events": 3,
+          "native_calls": 1,
+          "planned_events": [
+            {
+              "dx": 41831,
+              "dy": 24179,
+              "flags": 49153,
+              "tag": 265748195784917
+            },
+            {
+              "dx": 0,
+              "dy": 0,
+              "flags": 2,
+              "tag": 265748195784917
+            },
+            {
+              "dx": 0,
+              "dy": 0,
+              "flags": 4,
+              "tag": 265748195784917
+            }
+          ],
+          "point": [
+            510,
+            221
+          ],
+          "scope": "Fixture readiness only; not keyboard input or tested window activation",
+          "setup_mouse_attempted": true,
+          "state": "inserted_foreground_pending",
+          "target": {
+            "class_name": "KiraBridgeKeyboardFixture_12056",
+            "hwnd": "2163436",
+            "minimized": false,
+            "pid": 12056,
+            "thread_id": 12432,
+            "topmost": true,
+            "visible": true
+          },
+          "virtual_screen": [
+            0,
+            0,
+            800,
+            600
+          ],
+          "win32_error": 0
+        },
+        "setup_mouse_attempted": true
+      },
+      "exit_code": 0,
+      "manifest_sha256": "ad93d6dd980a0dbc64e6b1ca2598d73d19f6c9b4523291085e025ace0f091d00",
+      "original_manifest_sha256": "ad93d6dd980a0dbc64e6b1ca2598d73d19f6c9b4523291085e025ace0f091d00",
+      "phase": "keyboard",
+      "process_id": 12056,
+      "raw_artifact_sha256": "89028c4ea24e93b0066cf7a7749709f64107ac761361238073883f7c988d2564",
+      "raw_report_sha256": "062f8fab5848a869035be1fc87a019a1ff686c82c69100f4692c54a248fb69b7",
+      "reused": false,
+      "run_id": "ddb5056cc7ef4ea595714e5ffcc348f4",
+      "source_commit": "271605a5049255b007ea903a28bdfe40c51cf7f7"
+    },
+    {
+      "artifact": {
+        "automatic_input_retry": false,
+        "case_attempts": [
+          {
+            "input_attempt_hooks": 8,
+            "input_attempted": true,
+            "inserted_events": 18,
+            "name": "windows.keyboard.sequence",
+            "native_calls_acknowledged": 8,
+            "state": "inserted"
+          }
+        ],
+        "clipboard_used": false,
+        "connect_initialize_catalog_ms": 44.754012,
+        "endpoint_scope": "Ephemeral localhost port, inside guest only",
+        "external_chatgpt_cloud_measured": false,
+        "foreground_readiness": {
+          "elapsed_ms": 195.074,
+          "foreground_hwnd": "197338",
+          "foreground_pid": 6460,
+          "foreground_ready": true,
+          "hwnd": "197338",
+          "input_attempted": false,
+          "phase": "ready",
+          "pid": 6460,
+          "setup_mouse": {
+            "application_processing_confirmed": false,
+            "automatic_retry": false,
+            "coordinate_space": "physical_screen_pixels",
+            "foreground_confirmed": true,
+            "inserted_events": 3,
+            "native_calls": 1,
+            "planned_events": [
+              {
+                "dx": 41831,
+                "dy": 24179,
+                "flags": 49153,
+                "tag": 31229493841216
+              },
+              {
+                "dx": 0,
+                "dy": 0,
+                "flags": 2,
+                "tag": 31229493841216
+              },
+              {
+                "dx": 0,
+                "dy": 0,
+                "flags": 4,
+                "tag": 31229493841216
+              }
+            ],
+            "point": [
+              510,
+              221
+            ],
+            "scope": "Fixture readiness only; not keyboard input or tested window activation",
+            "setup_mouse_attempted": true,
+            "state": "inserted_foreground_pending",
+            "target": {
+              "class_name": "KiraBridgeKeyboardFixture_6460",
+              "hwnd": "197338",
+              "minimized": false,
+              "pid": 6460,
+              "thread_id": 12772,
+              "topmost": true,
+              "visible": true
+            },
+            "virtual_screen": [
+              0,
+              0,
+              800,
+              600
+            ],
+            "win32_error": 0
+          },
+          "setup_mouse_attempted": true,
+          "timeout_seconds": 120,
+          "window_created": true,
+          "window_owner_pid": 6460
+        },
+        "host_mac_input": false,
+        "http_requests_by_method": {
+          "GET": 1,
+          "POST": 14
+        },
+        "input_attempt_hooks": 8,
+        "input_attempt_scope": "Before-send hook; conservatively before last target check",
+        "input_attempted": true,
+        "isolated_state_dir": "[redacted path or endpoint]",
+        "passed": true,
+        "permission_revocation_control": {
+          "additional_receiver_events": 0,
+          "error_code": "forbidden",
+          "persisted_tasks": 0,
+          "task_id": "win_mcp_revoked_2d6c240582b352ce"
+        },
+        "physical_sequence_latency_quantiles": {
+          "n": 1,
+          "p50_p95_reported": false,
+          "reason": "One physical sequence; no repeated input merely to manufacture percentiles"
+        },
+        "production_credentials_used": false,
+        "read_only_health_latency": {
+          "n": 5,
+          "p50_ms": 21.510834,
+          "p95_ms": 85.344925,
+          "p95_scope": "Nearest rank; n=5 means sample maximum, not a tail forecast",
+          "warmup_omitted": false
+        },
+        "receiver_ack": {
+          "down_up_order_exact": true,
+          "event_count": 18,
+          "events": [
+            {
+              "at_monotonic_ns": 32806762135969,
+              "extended": false,
+              "kind": "down",
+              "scan": 42,
+              "tag": 65397768170320,
+              "vk": 16
+            },
+            {
+              "at_monotonic_ns": 32806764924871,
+              "extended": false,
+              "kind": "down",
+              "scan": 31,
+              "tag": 65397768170320,
+              "vk": 83
+            },
+            {
+              "at_monotonic_ns": 32806774635882,
+              "extended": false,
+              "kind": "up",
+              "scan": 31,
+              "tag": 65397768170320,
+              "vk": 83
+            },
+            {
+              "at_monotonic_ns": 32806780115908,
+              "extended": false,
+              "kind": "up",
+              "scan": 42,
+              "tag": 65397768170320,
+              "vk": 16
+            },
+            {
+              "at_monotonic_ns": 32806788168887,
+              "extended": false,
+              "kind": "down",
+              "scan": 20,
+              "tag": 65397768170320,
+              "vk": 84
+            },
+            {
+              "at_monotonic_ns": 32806798512939,
+              "extended": false,
+              "kind": "up",
+              "scan": 20,
+              "tag": 65397768170320,
+              "vk": 84
+            },
+            {
+              "at_monotonic_ns": 32806800917993,
+              "extended": false,
+              "kind": "down",
+              "scan": 18,
+              "tag": 65397768170320,
+              "vk": 69
+            },
+            {
+              "at_monotonic_ns": 32806810369753,
+              "extended": false,
+              "kind": "up",
+              "scan": 18,
+              "tag": 65397768170320,
+              "vk": 69
+            },
+            {
+              "at_monotonic_ns": 32806817196878,
+              "extended": false,
+              "kind": "down",
+              "scan": 19,
+              "tag": 65397768170320,
+              "vk": 82
+            },
+            {
+              "at_monotonic_ns": 32806830040968,
+              "extended": false,
+              "kind": "up",
+              "scan": 19,
+              "tag": 65397768170320,
+              "vk": 82
+            },
+            {
+              "at_monotonic_ns": 32806833078785,
+              "extended": false,
+              "kind": "down",
+              "scan": 49,
+              "tag": 65397768170320,
+              "vk": 78
+            },
+            {
+              "at_monotonic_ns": 32806840926989,
+              "extended": false,
+              "kind": "up",
+              "scan": 49,
+              "tag": 65397768170320,
+              "vk": 78
+            },
+            {
+              "at_monotonic_ns": 32806846563739,
+              "extended": false,
+              "kind": "down",
+              "scan": 57,
+              "tag": 65397768170320,
+              "vk": 32
+            },
+            {
+              "at_monotonic_ns": 32806859051918,
+              "extended": false,
+              "kind": "up",
+              "scan": 57,
+              "tag": 65397768170320,
+              "vk": 32
+            },
+            {
+              "at_monotonic_ns": 32806860855779,
+              "extended": false,
+              "kind": "down",
+              "scan": 30,
+              "tag": 65397768170320,
+              "vk": 65
+            },
+            {
+              "at_monotonic_ns": 32806864484731,
+              "extended": false,
+              "kind": "up",
+              "scan": 30,
+              "tag": 65397768170320,
+              "vk": 65
+            },
+            {
+              "at_monotonic_ns": 32806865717849,
+              "extended": false,
+              "kind": "down",
+              "scan": 50,
+              "tag": 65397768170320,
+              "vk": 77
+            },
+            {
+              "at_monotonic_ns": 32806868265938,
+              "extended": false,
+              "kind": "up",
+              "scan": 50,
+              "tag": 65397768170320,
+              "vk": 77
+            }
+          ],
+          "text": "Stern am",
+          "text_exact": true
+        },
+        "runtime_version": "0.8.0rc31.dev3",
+        "same_completed_task_idempotence": {
+          "additional_receiver_events": 0,
+          "additional_task_transitions": 0,
+          "result_exact": true,
+          "task_id": "win_mcp_sequence_2d6c240582b352ce"
+        },
+        "scope": "Real guest localhost authenticated MCP -> persistent task -> Win32 -> receiver",
+        "sequence_task": {
+          "error_code": null,
+          "id": "win_mcp_sequence_2d6c240582b352ce",
+          "result": {
+            "automatic_retry": false,
+            "completed_keys": 8,
+            "event_tag": 65397768170320,
+            "inserted_events": 18,
+            "native_calls": 8,
+            "physical_key_events": true,
+            "provider": "windows.sendinput.v1",
+            "receiver_processing_confirmed": false,
+            "requested_keys": 8,
+            "scope": "SendInput insertion; not application acknowledgement or physical hardware",
+            "target": {
+              "hwnd": "197338",
+              "keyboard_layout": "67699721",
+              "pid": 6460,
+              "process_created_100ns": "134382449383027648",
+              "thread_id": 12772
+            }
+          },
+          "state": "completed"
+        },
+        "setup_mouse": {
+          "application_processing_confirmed": false,
+          "automatic_retry": false,
+          "coordinate_space": "physical_screen_pixels",
+          "foreground_confirmed": true,
+          "inserted_events": 3,
+          "native_calls": 1,
+          "planned_events": [
+            {
+              "dx": 41831,
+              "dy": 24179,
+              "flags": 49153,
+              "tag": 31229493841216
+            },
+            {
+              "dx": 0,
+              "dy": 0,
+              "flags": 2,
+              "tag": 31229493841216
+            },
+            {
+              "dx": 0,
+              "dy": 0,
+              "flags": 4,
+              "tag": 31229493841216
+            }
+          ],
+          "point": [
+            510,
+            221
+          ],
+          "scope": "Fixture readiness only; not keyboard input or tested window activation",
+          "setup_mouse_attempted": true,
+          "state": "inserted_foreground_pending",
+          "target": {
+            "class_name": "KiraBridgeKeyboardFixture_6460",
+            "hwnd": "197338",
+            "minimized": false,
+            "pid": 6460,
+            "thread_id": 12772,
+            "topmost": true,
+            "visible": true
+          },
+          "virtual_screen": [
+            0,
+            0,
+            800,
+            600
+          ],
+          "win32_error": 0
+        },
+        "setup_mouse_attempted": true,
+        "stale_target_control": {
+          "additional_receiver_events": 0,
+          "error_code": "windows_target_changed",
+          "state": "failed",
+          "state_scope": "No receiver input; conservative unknown is never replayed",
+          "task_id": "win_mcp_stale_target_2d6c240582b352ce"
+        },
+        "state_retained_for_original_task_reconciliation": true,
+        "tool_call_attempts": 11,
+        "tool_samples": [
+          {
+            "completed": true,
+            "elapsed_ms": 85.344925,
+            "error_code": null,
+            "label": "health_read_only",
+            "task_state": null,
+            "tool": "bridge_health"
+          },
+          {
+            "completed": true,
+            "elapsed_ms": 21.510834,
+            "error_code": null,
+            "label": "health_read_only",
+            "task_state": null,
+            "tool": "bridge_health"
+          },
+          {
+            "completed": true,
+            "elapsed_ms": 21.649958,
+            "error_code": null,
+            "label": "health_read_only",
+            "task_state": null,
+            "tool": "bridge_health"
+          },
+          {
+            "completed": true,
+            "elapsed_ms": 18.371888,
+            "error_code": null,
+            "label": "health_read_only",
+            "task_state": null,
+            "tool": "bridge_health"
+          },
+          {
+            "completed": true,
+            "elapsed_ms": 21.181184,
+            "error_code": null,
+            "label": "health_read_only",
+            "task_state": null,
+            "tool": "bridge_health"
+          },
+          {
+            "completed": true,
+            "elapsed_ms": 67.692123,
+            "error_code": null,
+            "label": "inspect_foreground",
+            "task_state": "completed",
+            "tool": "task_request"
+          },
+          {
+            "completed": true,
+            "elapsed_ms": 153.981022,
+            "error_code": null,
+            "label": "eight_real_keys",
+            "task_state": "completed",
+            "tool": "task_request"
+          },
+          {
+            "completed": true,
+            "elapsed_ms": 38.206811,
+            "error_code": null,
+            "label": "completed_readback",
+            "task_state": "completed",
+            "tool": "task_get"
+          },
+          {
+            "completed": true,
+            "elapsed_ms": 36.346798,
+            "error_code": null,
+            "label": "same_completed_id",
+            "task_state": "completed",
+            "tool": "task_request"
+          },
+          {
+            "completed": true,
+            "elapsed_ms": 36.117998,
+            "error_code": "windows_target_changed",
+            "label": "stale_target_negative",
+            "task_state": "failed",
+            "tool": "task_request"
+          },
+          {
+            "completed": true,
+            "elapsed_ms": 19.869844,
+            "error_code": "forbidden",
+            "label": "permission_revoked_negative",
+            "task_state": null,
+            "tool": "task_request"
+          }
+        ],
+        "total_mcp_phase_ms": 2390.405205,
+        "unauthenticated_http_status": 401
+      },
+      "exit_code": 0,
+      "manifest_sha256": "ad93d6dd980a0dbc64e6b1ca2598d73d19f6c9b4523291085e025ace0f091d00",
+      "original_manifest_sha256": "ad93d6dd980a0dbc64e6b1ca2598d73d19f6c9b4523291085e025ace0f091d00",
+      "phase": "mcp",
+      "process_id": 6460,
+      "raw_artifact_sha256": "a43eac0c9f8e8fe4174dd613a5926b38c6b9d62446776007017de41463e83416",
+      "raw_report_sha256": "7081793b93802f27a7cb43edba326b6c3e5db2e06bdf447fe379b939cfa5b3bc",
+      "reused": false,
+      "run_id": "ddb5056cc7ef4ea595714e5ffcc348f4",
+      "source_commit": "271605a5049255b007ea903a28bdfe40c51cf7f7"
+    },
+    {
+      "artifact": {
+        "cloud_latency_measured": false,
+        "credential_schema_verified": true,
+        "exact_preview_capabilities": [
+          "bridge.health",
+          "task.cancel",
+          "task.read",
+          "windows.keyboard.inspect",
+          "windows.keyboard.sequence",
+          "windows.keyboard.shortcut",
+          "windows.window.control",
+          "windows.window.list"
+        ],
+        "exit_code": 3,
+        "expected_version": "0.8.0rc31.dev3",
+        "independent_original_process_absent": true,
+        "keyboard_events_requested": 0,
+        "owned_process": {
+          "created_100ns": "134382449510285466",
+          "pid": 13092,
+          "running": true
+        },
+        "owned_process_started": true,
+        "owned_state_has_zero_tasks_before_stop": true,
+        "passed": true,
+        "private_log": "[redacted path or endpoint]",
+        "production_credentials_used": false,
+        "runtime_pid": 13092,
+        "runtime_version": "0.8.0rc31.dev3",
+        "scope": "Owned Windows preview child, real local authenticated MCP reads only",
+        "service_installed": false,
+        "stage": "completed",
+        "state_dir": "[redacted path or endpoint]",
+        "state_retained": true,
+        "stop_method": "CTRL_BREAK requested for exact owned process group",
+        "tool_samples": [
+          {
+            "elapsed_ms": 80.697966,
+            "tool": "bridge_health"
+          },
+          {
+            "elapsed_ms": 44.294177,
+            "tool": "operation_catalog"
+          },
+          {
+            "elapsed_ms": 18.714949,
+            "tool": "task_list"
+          }
+        ],
+        "total_ms": 6119.390035,
+        "unauthenticated_http_status": 401,
+        "windows_operations_available": [
+          "windows.keyboard.inspect",
+          "windows.keyboard.sequence",
+          "windows.keyboard.shortcut",
+          "windows.window.list",
+          "windows.window.control"
+        ]
+      },
+      "exit_code": 0,
+      "manifest_sha256": "ad93d6dd980a0dbc64e6b1ca2598d73d19f6c9b4523291085e025ace0f091d00",
+      "original_manifest_sha256": "ad93d6dd980a0dbc64e6b1ca2598d73d19f6c9b4523291085e025ace0f091d00",
+      "phase": "preview",
+      "process_id": 9836,
+      "raw_artifact_sha256": "3c7ebfd0c4c6433e7e99500c16a7adab4e2b2d36a313c9e67b4dcf651e88447a",
+      "raw_report_sha256": "59c4668dbdafd6d6057bf30f6db8301913a6da75e426c47c11105534334179c4",
+      "reused": false,
+      "run_id": "ddb5056cc7ef4ea595714e5ffcc348f4",
+      "source_commit": "271605a5049255b007ea903a28bdfe40c51cf7f7"
+    },
+    {
+      "artifact": {
+        "automatic_retry": false,
+        "case_attempts": [
+          {
+            "input_attempt_hooks": 1,
+            "input_attempted": true,
+            "inserted_events": 4,
+            "name": "ctrl-a",
+            "native_calls_acknowledged": 1,
+            "state": "inserted"
+          },
+          {
+            "input_attempt_hooks": 1,
+            "input_attempted": true,
+            "inserted_events": 4,
+            "name": "ctrl-s",
+            "native_calls_acknowledged": 1,
+            "state": "inserted"
+          },
+          {
+            "input_attempt_hooks": 1,
+            "input_attempted": true,
+            "inserted_events": 4,
+            "name": "shift-tab",
+            "native_calls_acknowledged": 1,
+            "state": "inserted"
+          },
+          {
+            "input_attempt_hooks": 1,
+            "input_attempted": true,
+            "inserted_events": 4,
+            "name": "alt-f2",
+            "native_calls_acknowledged": 1,
+            "state": "inserted"
+          },
+          {
+            "error_type": "BridgeError",
+            "input_attempt_hooks": 0,
+            "input_attempted": false,
+            "inserted_events": null,
+            "name": "held-modifier-negative-control",
+            "native_calls_acknowledged": null,
+            "state": "failed"
+          }
+        ],
+        "cases": [
+          {
+            "elapsed_ms": 127.085147,
+            "expected_events": [
+              [
+                "down",
+                17
+              ],
+              [
+                "down",
+                65
+              ],
+              [
+                "up",
+                65
+              ],
+              [
+                "up",
+                17
+              ]
+            ],
+            "name": "ctrl-a",
+            "native_calls": [
+              {
+                "elapsed_ms": 0.859047,
+                "events": [
+                  {
+                    "flags": 8,
+                    "scan_code": 29,
+                    "tag": 189941911408295,
+                    "virtual_key": 162
+                  },
+                  {
+                    "flags": 8,
+                    "scan_code": 30,
+                    "tag": 189941911408295,
+                    "virtual_key": 65
+                  },
+                  {
+                    "flags": 10,
+                    "scan_code": 30,
+                    "tag": 189941911408295,
+                    "virtual_key": 65
+                  },
+                  {
+                    "flags": 10,
+                    "scan_code": 29,
+                    "tag": 189941911408295,
+                    "virtual_key": 162
+                  }
+                ],
+                "inserted_events": 4,
+                "name": "ctrl-a",
+                "win32_error": 0
+              }
+            ],
+            "native_result": {
+              "automatic_retry": false,
+              "completed_keys": 1,
+              "event_tag": 189941911408295,
+              "inserted_events": 4,
+              "native_calls": 1,
+              "physical_key_events": true,
+              "receiver_processing_confirmed": false,
+              "requested_keys": 1,
+              "scope": "SendInput insertion; not application acknowledgement or physical hardware",
+              "target": {
+                "hwnd": "525020",
+                "keyboard_layout": "67699721",
+                "pid": 9708,
+                "process_created_100ns": "134382449582858987",
+                "thread_id": 8356
+              }
+            },
+            "passed": true,
+            "receiver_actions": [
+              {
+                "name": "ctrl-a",
+                "tag": 189941911408295
+              }
+            ],
+            "receiver_events": [
+              {
+                "alt_context": false,
+                "at_monotonic_ns": 32823035405896,
+                "extended": false,
+                "kind": "down",
+                "message": 256,
+                "queue_modifiers": [
+                  "control"
+                ],
+                "scan": 29,
+                "system_key": false,
+                "tag": 189941911408295,
+                "vk": 17
+              },
+              {
+                "alt_context": false,
+                "at_monotonic_ns": 32823036999953,
+                "extended": false,
+                "kind": "down",
+                "message": 256,
+                "queue_modifiers": [
+                  "control"
+                ],
+                "scan": 30,
+                "system_key": false,
+                "tag": 189941911408295,
+                "vk": 65
+              },
+              {
+                "alt_context": false,
+                "at_monotonic_ns": 32823038911928,
+                "extended": false,
+                "kind": "up",
+                "message": 257,
+                "queue_modifiers": [
+                  "control"
+                ],
+                "scan": 30,
+                "system_key": false,
+                "tag": 189941911408295,
+                "vk": 65
+              },
+              {
+                "alt_context": false,
+                "at_monotonic_ns": 32823039721808,
+                "extended": false,
+                "kind": "up",
+                "message": 257,
+                "queue_modifiers": [],
+                "scan": 29,
+                "system_key": false,
+                "tag": 189941911408295,
+                "vk": 17
+              }
+            ],
+            "target": {
+              "hwnd": "525020",
+              "keyboard_layout": "67699721",
+              "pid": 9708,
+              "process_created_100ns": "134382449582858987",
+              "thread_id": 8356
+            }
+          },
+          {
+            "elapsed_ms": 91.947999,
+            "expected_events": [
+              [
+                "down",
+                17
+              ],
+              [
+                "down",
+                83
+              ],
+              [
+                "up",
+                83
+              ],
+              [
+                "up",
+                17
+              ]
+            ],
+            "name": "ctrl-s",
+            "native_calls": [
+              {
+                "elapsed_ms": 1.421969,
+                "events": [
+                  {
+                    "flags": 8,
+                    "scan_code": 29,
+                    "tag": 44970785578837,
+                    "virtual_key": 162
+                  },
+                  {
+                    "flags": 8,
+                    "scan_code": 31,
+                    "tag": 44970785578837,
+                    "virtual_key": 83
+                  },
+                  {
+                    "flags": 10,
+                    "scan_code": 31,
+                    "tag": 44970785578837,
+                    "virtual_key": 83
+                  },
+                  {
+                    "flags": 10,
+                    "scan_code": 29,
+                    "tag": 44970785578837,
+                    "virtual_key": 162
+                  }
+                ],
+                "inserted_events": 4,
+                "name": "ctrl-s",
+                "win32_error": 0
+              }
+            ],
+            "native_result": {
+              "automatic_retry": false,
+              "completed_keys": 1,
+              "event_tag": 44970785578837,
+              "inserted_events": 4,
+              "native_calls": 1,
+              "physical_key_events": true,
+              "receiver_processing_confirmed": false,
+              "requested_keys": 1,
+              "scope": "SendInput insertion; not application acknowledgement or physical hardware",
+              "target": {
+                "hwnd": "525020",
+                "keyboard_layout": "67699721",
+                "pid": 9708,
+                "process_created_100ns": "134382449582858987",
+                "thread_id": 8356
+              }
+            },
+            "passed": true,
+            "receiver_actions": [
+              {
+                "name": "ctrl-s",
+                "tag": 44970785578837
+              }
+            ],
+            "receiver_events": [
+              {
+                "alt_context": false,
+                "at_monotonic_ns": 32823168375869,
+                "extended": false,
+                "kind": "down",
+                "message": 256,
+                "queue_modifiers": [
+                  "control"
+                ],
+                "scan": 29,
+                "system_key": false,
+                "tag": 44970785578837,
+                "vk": 17
+              },
+              {
+                "alt_context": false,
+                "at_monotonic_ns": 32823169185748,
+                "extended": false,
+                "kind": "down",
+                "message": 256,
+                "queue_modifiers": [
+                  "control"
+                ],
+                "scan": 31,
+                "system_key": false,
+                "tag": 44970785578837,
+                "vk": 83
+              },
+              {
+                "alt_context": false,
+                "at_monotonic_ns": 32823169920758,
+                "extended": false,
+                "kind": "up",
+                "message": 257,
+                "queue_modifiers": [
+                  "control"
+                ],
+                "scan": 31,
+                "system_key": false,
+                "tag": 44970785578837,
+                "vk": 83
+              },
+              {
+                "alt_context": false,
+                "at_monotonic_ns": 32823170966980,
+                "extended": false,
+                "kind": "up",
+                "message": 257,
+                "queue_modifiers": [],
+                "scan": 29,
+                "system_key": false,
+                "tag": 44970785578837,
+                "vk": 17
+              }
+            ],
+            "target": {
+              "hwnd": "525020",
+              "keyboard_layout": "67699721",
+              "pid": 9708,
+              "process_created_100ns": "134382449582858987",
+              "thread_id": 8356
+            }
+          },
+          {
+            "elapsed_ms": 104.399023,
+            "expected_events": [
+              [
+                "down",
+                16
+              ],
+              [
+                "down",
+                9
+              ],
+              [
+                "up",
+                9
+              ],
+              [
+                "up",
+                16
+              ]
+            ],
+            "name": "shift-tab",
+            "native_calls": [
+              {
+                "elapsed_ms": 1.490972,
+                "events": [
+                  {
+                    "flags": 8,
+                    "scan_code": 42,
+                    "tag": 79472079750693,
+                    "virtual_key": 160
+                  },
+                  {
+                    "flags": 8,
+                    "scan_code": 15,
+                    "tag": 79472079750693,
+                    "virtual_key": 9
+                  },
+                  {
+                    "flags": 10,
+                    "scan_code": 15,
+                    "tag": 79472079750693,
+                    "virtual_key": 9
+                  },
+                  {
+                    "flags": 10,
+                    "scan_code": 42,
+                    "tag": 79472079750693,
+                    "virtual_key": 160
+                  }
+                ],
+                "inserted_events": 4,
+                "name": "shift-tab",
+                "win32_error": 0
+              }
+            ],
+            "native_result": {
+              "automatic_retry": false,
+              "completed_keys": 1,
+              "event_tag": 79472079750693,
+              "inserted_events": 4,
+              "native_calls": 1,
+              "physical_key_events": true,
+              "receiver_processing_confirmed": false,
+              "requested_keys": 1,
+              "scope": "SendInput insertion; not application acknowledgement or physical hardware",
+              "target": {
+                "hwnd": "525020",
+                "keyboard_layout": "67699721",
+                "pid": 9708,
+                "process_created_100ns": "134382449582858987",
+                "thread_id": 8356
+              }
+            },
+            "passed": true,
+            "receiver_actions": [
+              {
+                "name": "shift-tab",
+                "tag": 79472079750693
+              }
+            ],
+            "receiver_events": [
+              {
+                "alt_context": false,
+                "at_monotonic_ns": 32823309865918,
+                "extended": false,
+                "kind": "down",
+                "message": 256,
+                "queue_modifiers": [
+                  "shift"
+                ],
+                "scan": 42,
+                "system_key": false,
+                "tag": 79472079750693,
+                "vk": 16
+              },
+              {
+                "alt_context": false,
+                "at_monotonic_ns": 32823322484002,
+                "extended": false,
+                "kind": "down",
+                "message": 256,
+                "queue_modifiers": [
+                  "shift"
+                ],
+                "scan": 15,
+                "system_key": false,
+                "tag": 79472079750693,
+                "vk": 9
+              },
+              {
+                "alt_context": false,
+                "at_monotonic_ns": 32823323892841,
+                "extended": false,
+                "kind": "up",
+                "message": 257,
+                "queue_modifiers": [
+                  "shift"
+                ],
+                "scan": 15,
+                "system_key": false,
+                "tag": 79472079750693,
+                "vk": 9
+              },
+              {
+                "alt_context": false,
+                "at_monotonic_ns": 32823325722961,
+                "extended": false,
+                "kind": "up",
+                "message": 257,
+                "queue_modifiers": [],
+                "scan": 42,
+                "system_key": false,
+                "tag": 79472079750693,
+                "vk": 16
+              }
+            ],
+            "target": {
+              "hwnd": "525020",
+              "keyboard_layout": "67699721",
+              "pid": 9708,
+              "process_created_100ns": "134382449582858987",
+              "thread_id": 8356
+            }
+          },
+          {
+            "elapsed_ms": 60.035004,
+            "expected_events": [
+              [
+                "down",
+                18
+              ],
+              [
+                "down",
+                113
+              ],
+              [
+                "up",
+                113
+              ],
+              [
+                "up",
+                18
+              ]
+            ],
+            "name": "alt-f2",
+            "native_calls": [
+              {
+                "elapsed_ms": 2.863772,
+                "events": [
+                  {
+                    "flags": 8,
+                    "scan_code": 56,
+                    "tag": 176403726842547,
+                    "virtual_key": 164
+                  },
+                  {
+                    "flags": 8,
+                    "scan_code": 60,
+                    "tag": 176403726842547,
+                    "virtual_key": 113
+                  },
+                  {
+                    "flags": 10,
+                    "scan_code": 60,
+                    "tag": 176403726842547,
+                    "virtual_key": 113
+                  },
+                  {
+                    "flags": 10,
+                    "scan_code": 56,
+                    "tag": 176403726842547,
+                    "virtual_key": 164
+                  }
+                ],
+                "inserted_events": 4,
+                "name": "alt-f2",
+                "win32_error": 0
+              }
+            ],
+            "native_result": {
+              "automatic_retry": false,
+              "completed_keys": 1,
+              "event_tag": 176403726842547,
+              "inserted_events": 4,
+              "native_calls": 1,
+              "physical_key_events": true,
+              "receiver_processing_confirmed": false,
+              "requested_keys": 1,
+              "scope": "SendInput insertion; not application acknowledgement or physical hardware",
+              "target": {
+                "hwnd": "525020",
+                "keyboard_layout": "67699721",
+                "pid": 9708,
+                "process_created_100ns": "134382449582858987",
+                "thread_id": 8356
+              }
+            },
+            "passed": true,
+            "receiver_actions": [
+              {
+                "name": "alt-f2",
+                "tag": 176403726842547
+              }
+            ],
+            "receiver_events": [
+              {
+                "alt_context": true,
+                "at_monotonic_ns": 32823416126909,
+                "extended": false,
+                "kind": "down",
+                "message": 260,
+                "queue_modifiers": [
+                  "alt"
+                ],
+                "scan": 56,
+                "system_key": true,
+                "tag": 176403726842547,
+                "vk": 18
+              },
+              {
+                "alt_context": true,
+                "at_monotonic_ns": 32823420881983,
+                "extended": false,
+                "kind": "down",
+                "message": 260,
+                "queue_modifiers": [
+                  "alt"
+                ],
+                "scan": 60,
+                "system_key": true,
+                "tag": 176403726842547,
+                "vk": 113
+              },
+              {
+                "alt_context": true,
+                "at_monotonic_ns": 32823424360917,
+                "extended": false,
+                "kind": "up",
+                "message": 261,
+                "queue_modifiers": [
+                  "alt"
+                ],
+                "scan": 60,
+                "system_key": true,
+                "tag": 176403726842547,
+                "vk": 113
+              },
+              {
+                "alt_context": false,
+                "at_monotonic_ns": 32823425296790,
+                "extended": false,
+                "kind": "up",
+                "message": 257,
+                "queue_modifiers": [],
+                "scan": 56,
+                "system_key": false,
+                "tag": 176403726842547,
+                "vk": 18
+              }
+            ],
+            "target": {
+              "hwnd": "525020",
+              "keyboard_layout": "67699721",
+              "pid": 9708,
+              "process_created_100ns": "134382449582858987",
+              "thread_id": 8356
+            }
+          }
+        ],
+        "clipboard_used": false,
+        "desktop_global_windows_shortcuts_executed": false,
+        "elapsed_including_foreground_wait_ms": 853.417962,
+        "fixture_window_closed": true,
+        "foreground_readiness": {
+          "elapsed_ms": 140.729,
+          "foreground_hwnd": "525020",
+          "foreground_pid": 9708,
+          "foreground_ready": true,
+          "hwnd": "525020",
+          "input_attempted": false,
+          "phase": "ready",
+          "pid": 9708,
+          "setup_mouse": {
+            "application_processing_confirmed": false,
+            "automatic_retry": false,
+            "coordinate_space": "physical_screen_pixels",
+            "foreground_confirmed": true,
+            "inserted_events": 3,
+            "native_calls": 1,
+            "planned_events": [
+              {
+                "dx": 41831,
+                "dy": 24179,
+                "flags": 49153,
+                "tag": 201440211734688
+              },
+              {
+                "dx": 0,
+                "dy": 0,
+                "flags": 2,
+                "tag": 201440211734688
+              },
+              {
+                "dx": 0,
+                "dy": 0,
+                "flags": 4,
+                "tag": 201440211734688
+              }
+            ],
+            "point": [
+              510,
+              221
+            ],
+            "scope": "Fixture readiness only; not keyboard input or tested window activation",
+            "setup_mouse_attempted": true,
+            "state": "inserted_foreground_pending",
+            "target": {
+              "class_name": "KiraBridgeKeyboardFixture_9708",
+              "hwnd": "525020",
+              "minimized": false,
+              "pid": 9708,
+              "thread_id": 8356,
+              "topmost": true,
+              "visible": true
+            },
+            "virtual_screen": [
+              0,
+              0,
+              800,
+              600
+            ],
+            "win32_error": 0
+          },
+          "setup_mouse_attempted": true,
+          "timeout_seconds": 120,
+          "window_created": true,
+          "window_owner_pid": 9708
+        },
+        "held_modifier_control": {
+          "error_code": "windows_modifiers_busy",
+          "evidence": "Injected held-modifier guard observation; no held key synthesized",
+          "input_attempted": false,
+          "native_calls": 0,
+          "passed": true,
+          "receiver_added_events": 0
+        },
+        "host_mac_input": false,
+        "input_attempt_hooks": 4,
+        "input_attempt_scope": "Before-send hook; conservatively before last target check",
+        "input_attempted": true,
+        "native_calls": [
+          {
+            "elapsed_ms": 0.859047,
+            "events": [
+              {
+                "flags": 8,
+                "scan_code": 29,
+                "tag": 189941911408295,
+                "virtual_key": 162
+              },
+              {
+                "flags": 8,
+                "scan_code": 30,
+                "tag": 189941911408295,
+                "virtual_key": 65
+              },
+              {
+                "flags": 10,
+                "scan_code": 30,
+                "tag": 189941911408295,
+                "virtual_key": 65
+              },
+              {
+                "flags": 10,
+                "scan_code": 29,
+                "tag": 189941911408295,
+                "virtual_key": 162
+              }
+            ],
+            "inserted_events": 4,
+            "name": "ctrl-a",
+            "win32_error": 0
+          },
+          {
+            "elapsed_ms": 1.421969,
+            "events": [
+              {
+                "flags": 8,
+                "scan_code": 29,
+                "tag": 44970785578837,
+                "virtual_key": 162
+              },
+              {
+                "flags": 8,
+                "scan_code": 31,
+                "tag": 44970785578837,
+                "virtual_key": 83
+              },
+              {
+                "flags": 10,
+                "scan_code": 31,
+                "tag": 44970785578837,
+                "virtual_key": 83
+              },
+              {
+                "flags": 10,
+                "scan_code": 29,
+                "tag": 44970785578837,
+                "virtual_key": 162
+              }
+            ],
+            "inserted_events": 4,
+            "name": "ctrl-s",
+            "win32_error": 0
+          },
+          {
+            "elapsed_ms": 1.490972,
+            "events": [
+              {
+                "flags": 8,
+                "scan_code": 42,
+                "tag": 79472079750693,
+                "virtual_key": 160
+              },
+              {
+                "flags": 8,
+                "scan_code": 15,
+                "tag": 79472079750693,
+                "virtual_key": 9
+              },
+              {
+                "flags": 10,
+                "scan_code": 15,
+                "tag": 79472079750693,
+                "virtual_key": 9
+              },
+              {
+                "flags": 10,
+                "scan_code": 42,
+                "tag": 79472079750693,
+                "virtual_key": 160
+              }
+            ],
+            "inserted_events": 4,
+            "name": "shift-tab",
+            "win32_error": 0
+          },
+          {
+            "elapsed_ms": 2.863772,
+            "events": [
+              {
+                "flags": 8,
+                "scan_code": 56,
+                "tag": 176403726842547,
+                "virtual_key": 164
+              },
+              {
+                "flags": 8,
+                "scan_code": 60,
+                "tag": 176403726842547,
+                "virtual_key": 113
+              },
+              {
+                "flags": 10,
+                "scan_code": 60,
+                "tag": 176403726842547,
+                "virtual_key": 113
+              },
+              {
+                "flags": 10,
+                "scan_code": 56,
+                "tag": 176403726842547,
+                "virtual_key": 164
+              }
+            ],
+            "inserted_events": 4,
+            "name": "alt-f2",
+            "win32_error": 0
+          }
+        ],
+        "passed": true,
+        "scope": "Real Windows SendInput shortcuts consumed only by owned receiver",
+        "setup_mouse": {
+          "application_processing_confirmed": false,
+          "automatic_retry": false,
+          "coordinate_space": "physical_screen_pixels",
+          "foreground_confirmed": true,
+          "inserted_events": 3,
+          "native_calls": 1,
+          "planned_events": [
+            {
+              "dx": 41831,
+              "dy": 24179,
+              "flags": 49153,
+              "tag": 201440211734688
+            },
+            {
+              "dx": 0,
+              "dy": 0,
+              "flags": 2,
+              "tag": 201440211734688
+            },
+            {
+              "dx": 0,
+              "dy": 0,
+              "flags": 4,
+              "tag": 201440211734688
+            }
+          ],
+          "point": [
+            510,
+            221
+          ],
+          "scope": "Fixture readiness only; not keyboard input or tested window activation",
+          "setup_mouse_attempted": true,
+          "state": "inserted_foreground_pending",
+          "target": {
+            "class_name": "KiraBridgeKeyboardFixture_9708",
+            "hwnd": "525020",
+            "minimized": false,
+            "pid": 9708,
+            "thread_id": 8356,
+            "topmost": true,
+            "visible": true
+          },
+          "virtual_screen": [
+            0,
+            0,
+            800,
+            600
+          ],
+          "win32_error": 0
+        },
+        "setup_mouse_attempted": true,
+        "timing": {
+          "count": 4,
+          "p50_ms": 98.17351099999999,
+          "p95_ms": 127.085147,
+          "percentile_method": "nearest rank; four distinct shortcuts, no repeated physical input",
+          "total_ms": 383.467173
+        },
+        "uncertain_input_replayed": false,
+        "windows_modifier_native_acceptance": "Not executed; native encoder covered by injected unit test"
+      },
+      "exit_code": 0,
+      "manifest_sha256": "ad93d6dd980a0dbc64e6b1ca2598d73d19f6c9b4523291085e025ace0f091d00",
+      "original_manifest_sha256": "ad93d6dd980a0dbc64e6b1ca2598d73d19f6c9b4523291085e025ace0f091d00",
+      "phase": "shortcuts",
+      "process_id": 9708,
+      "raw_artifact_sha256": "1c06eb1f58185767c409ac47757bebb7e7e0feac2a9ee2633577b36bca2f3fd6",
+      "raw_report_sha256": "dc0363b4fd14411c6ce821b24f287c86608b70a900c32cffc5b227472470465e",
+      "reused": false,
+      "run_id": "ddb5056cc7ef4ea595714e5ffcc348f4",
+      "source_commit": "271605a5049255b007ea903a28bdfe40c51cf7f7"
+    },
+    {
+      "artifact": {
+        "automatic_effect_retry": false,
+        "cases": [
+          {
+            "after": {
+              "coordinate_space": "physical_screen_pixels",
+              "exists": true,
+              "foreground": true,
+              "maximized": false,
+              "minimized": false,
+              "placement_show_command": 1,
+              "rect": {
+                "height": 320,
+                "width": 640,
+                "x": 40,
+                "y": 40
+              },
+              "target": {
+                "hwnd": "393950",
+                "pid": "10104",
+                "process_created_100ns": "134382449634949646",
+                "thread_id": "5584"
+              },
+              "visible": true
+            },
+            "backend_observed": true,
+            "before": {
+              "coordinate_space": "physical_screen_pixels",
+              "exists": true,
+              "foreground": true,
+              "maximized": false,
+              "minimized": false,
+              "placement_show_command": 1,
+              "rect": {
+                "height": 340,
+                "width": 660,
+                "x": 100,
+                "y": 100
+              },
+              "target": {
+                "hwnd": "393950",
+                "pid": "10104",
+                "process_created_100ns": "134382449634949646",
+                "thread_id": "5584"
+              },
+              "visible": true
+            },
+            "independent_os_readback": true,
+            "name": "move_resize",
+            "task_id": "win_window_651f3b30e5bfae74_move_resize"
+          },
+          {
+            "after": {
+              "coordinate_space": "physical_screen_pixels",
+              "exists": true,
+              "foreground": true,
+              "maximized": true,
+              "minimized": false,
+              "placement_show_command": 3,
+              "rect": {
+                "height": 568,
+                "width": 816,
+                "x": -8,
+                "y": -8
+              },
+              "target": {
+                "hwnd": "393950",
+                "pid": "10104",
+                "process_created_100ns": "134382449634949646",
+                "thread_id": "5584"
+              },
+              "visible": true
+            },
+            "backend_observed": true,
+            "before": {
+              "coordinate_space": "physical_screen_pixels",
+              "exists": true,
+              "foreground": true,
+              "maximized": false,
+              "minimized": false,
+              "placement_show_command": 1,
+              "rect": {
+                "height": 320,
+                "width": 640,
+                "x": 40,
+                "y": 40
+              },
+              "target": {
+                "hwnd": "393950",
+                "pid": "10104",
+                "process_created_100ns": "134382449634949646",
+                "thread_id": "5584"
+              },
+              "visible": true
+            },
+            "independent_os_readback": true,
+            "name": "maximize",
+            "task_id": "win_window_651f3b30e5bfae74_maximize"
+          },
+          {
+            "after": {
+              "coordinate_space": "physical_screen_pixels",
+              "exists": true,
+              "foreground": true,
+              "maximized": false,
+              "minimized": false,
+              "placement_show_command": 1,
+              "rect": {
+                "height": 320,
+                "width": 640,
+                "x": 40,
+                "y": 40
+              },
+              "target": {
+                "hwnd": "393950",
+                "pid": "10104",
+                "process_created_100ns": "134382449634949646",
+                "thread_id": "5584"
+              },
+              "visible": true
+            },
+            "backend_observed": true,
+            "before": {
+              "coordinate_space": "physical_screen_pixels",
+              "exists": true,
+              "foreground": true,
+              "maximized": true,
+              "minimized": false,
+              "placement_show_command": 3,
+              "rect": {
+                "height": 568,
+                "width": 816,
+                "x": -8,
+                "y": -8
+              },
+              "target": {
+                "hwnd": "393950",
+                "pid": "10104",
+                "process_created_100ns": "134382449634949646",
+                "thread_id": "5584"
+              },
+              "visible": true
+            },
+            "independent_os_readback": true,
+            "name": "restore_from_maximized",
+            "task_id": "win_window_651f3b30e5bfae74_restore_from_maximized"
+          },
+          {
+            "after": {
+              "coordinate_space": "physical_screen_pixels",
+              "exists": true,
+              "foreground": false,
+              "maximized": false,
+              "minimized": true,
+              "placement_show_command": 2,
+              "rect": {
+                "height": 28,
+                "width": 160,
+                "x": -32000,
+                "y": -32000
+              },
+              "target": {
+                "hwnd": "393950",
+                "pid": "10104",
+                "process_created_100ns": "134382449634949646",
+                "thread_id": "5584"
+              },
+              "visible": true
+            },
+            "backend_observed": false,
+            "before": {
+              "coordinate_space": "physical_screen_pixels",
+              "exists": true,
+              "foreground": true,
+              "maximized": false,
+              "minimized": false,
+              "placement_show_command": 1,
+              "rect": {
+                "height": 320,
+                "width": 640,
+                "x": 40,
+                "y": 40
+              },
+              "target": {
+                "hwnd": "393950",
+                "pid": "10104",
+                "process_created_100ns": "134382449634949646",
+                "thread_id": "5584"
+              },
+              "visible": true
+            },
+            "independent_os_readback": true,
+            "name": "minimize",
+            "task_id": "win_window_651f3b30e5bfae74_minimize"
+          },
+          {
+            "after": {
+              "coordinate_space": "physical_screen_pixels",
+              "exists": true,
+              "foreground": true,
+              "maximized": false,
+              "minimized": false,
+              "placement_show_command": 1,
+              "rect": {
+                "height": 320,
+                "width": 640,
+                "x": 40,
+                "y": 40
+              },
+              "target": {
+                "hwnd": "393950",
+                "pid": "10104",
+                "process_created_100ns": "134382449634949646",
+                "thread_id": "5584"
+              },
+              "visible": true
+            },
+            "backend_observed": true,
+            "before": {
+              "coordinate_space": "physical_screen_pixels",
+              "exists": true,
+              "foreground": false,
+              "maximized": false,
+              "minimized": true,
+              "placement_show_command": 2,
+              "rect": {
+                "height": 28,
+                "width": 160,
+                "x": -32000,
+                "y": -32000
+              },
+              "target": {
+                "hwnd": "393950",
+                "pid": "10104",
+                "process_created_100ns": "134382449634949646",
+                "thread_id": "5584"
+              },
+              "visible": true
+            },
+            "independent_os_readback": true,
+            "name": "restore_from_minimized",
+            "task_id": "win_window_651f3b30e5bfae74_restore_from_minimized"
+          },
+          {
+            "after": {
+              "coordinate_space": "physical_screen_pixels",
+              "exists": true,
+              "foreground": true,
+              "maximized": false,
+              "minimized": false,
+              "placement_show_command": 1,
+              "rect": {
+                "height": 320,
+                "width": 640,
+                "x": 40,
+                "y": 40
+              },
+              "target": {
+                "hwnd": "393950",
+                "pid": "10104",
+                "process_created_100ns": "134382449634949646",
+                "thread_id": "5584"
+              },
+              "visible": true
+            },
+            "backend_observed": true,
+            "before": {
+              "coordinate_space": "physical_screen_pixels",
+              "exists": true,
+              "foreground": false,
+              "maximized": false,
+              "minimized": false,
+              "placement_show_command": 1,
+              "rect": {
+                "height": 320,
+                "width": 640,
+                "x": 40,
+                "y": 40
+              },
+              "target": {
+                "hwnd": "393950",
+                "pid": "10104",
+                "process_created_100ns": "134382449634949646",
+                "thread_id": "5584"
+              },
+              "visible": true
+            },
+            "independent_os_readback": true,
+            "name": "activate_from_owned_auxiliary",
+            "task_id": "win_window_651f3b30e5bfae74_activate_from_owned_auxiliary"
+          },
+          {
+            "after": {
+              "exists": false,
+              "hwnd": "393950"
+            },
+            "backend_observed": false,
+            "before": {
+              "coordinate_space": "physical_screen_pixels",
+              "exists": true,
+              "foreground": true,
+              "maximized": false,
+              "minimized": false,
+              "placement_show_command": 1,
+              "rect": {
+                "height": 320,
+                "width": 640,
+                "x": 40,
+                "y": 40
+              },
+              "target": {
+                "hwnd": "393950",
+                "pid": "10104",
+                "process_created_100ns": "134382449634949646",
+                "thread_id": "5584"
+              },
+              "visible": true
+            },
+            "independent_os_readback": true,
+            "name": "close_wm_close",
+            "task_id": "win_window_651f3b30e5bfae74_close_wm_close"
+          }
+        ],
+        "cleanup_original_windows_absent": true,
+        "clipboard_used": false,
+        "effect_attempted": true,
+        "fixture_setup_scope": "Only own HWND creation/show/normal initial activation, auxiliary activation/WM_CLOSE and final cleanup; separate from backend effect attempts",
+        "forbidden_control": {
+          "before_effect_hooks": 0,
+          "effect_attempted": false,
+          "error_code": "forbidden",
+          "independent_main_unchanged": true,
+          "persisted_tasks": 0,
+          "task_id": "win_window_651f3b30e5bfae74_forbidden"
+        },
+        "foreground_readiness": {
+          "elapsed_ms": 163.0,
+          "foreground_hwnd": "393950",
+          "foreground_pid": 10104,
+          "foreground_ready": true,
+          "hwnd": "393950",
+          "input_attempted": false,
+          "phase": "ready",
+          "pid": 10104,
+          "setup_mouse": {
+            "application_processing_confirmed": false,
+            "automatic_retry": false,
+            "coordinate_space": "physical_screen_pixels",
+            "foreground_confirmed": true,
+            "inserted_events": 3,
+            "native_calls": 1,
+            "planned_events": [
+              {
+                "dx": 35269,
+                "dy": 30743,
+                "flags": 49153,
+                "tag": 4642741495193
+              },
+              {
+                "dx": 0,
+                "dy": 0,
+                "flags": 2,
+                "tag": 4642741495193
+              },
+              {
+                "dx": 0,
+                "dy": 0,
+                "flags": 4,
+                "tag": 4642741495193
+              }
+            ],
+            "point": [
+              430,
+              281
+            ],
+            "scope": "Fixture readiness only; not keyboard input or tested window activation",
+            "setup_mouse_attempted": true,
+            "state": "inserted_foreground_pending",
+            "target": {
+              "class_name": "KiraBridgeWindowFixture_10104",
+              "hwnd": "393950",
+              "minimized": false,
+              "pid": 10104,
+              "thread_id": 5584,
+              "topmost": true,
+              "visible": true
+            },
+            "virtual_screen": [
+              0,
+              0,
+              800,
+              600
+            ],
+            "win32_error": 0
+          },
+          "setup_mouse_attempted": true,
+          "timeout_seconds": 120,
+          "window_created": true,
+          "window_owner_pid": 10104
+        },
+        "host_mac_input": false,
+        "initial_independent_state": {
+          "coordinate_space": "physical_screen_pixels",
+          "exists": true,
+          "foreground": true,
+          "maximized": false,
+          "minimized": false,
+          "placement_show_command": 1,
+          "rect": {
+            "height": 340,
+            "width": 660,
+            "x": 100,
+            "y": 100
+          },
+          "target": {
+            "hwnd": "393950",
+            "pid": "10104",
+            "process_created_100ns": "134382449634949646",
+            "thread_id": "5584"
+          },
+          "visible": true
+        },
+        "isolated_state_dir": "[redacted path or endpoint]",
+        "keyboard_events_received": 0,
+        "keyboard_events_requested": 0,
+        "original_main_window_absent": true,
+        "passed": true,
+        "platform": "nt",
+        "production_credentials_used": false,
+        "scope": "Owned Windows HWNDs through real authenticated local MCP and independent Win32 reads",
+        "setup_mouse": {
+          "application_processing_confirmed": false,
+          "automatic_retry": false,
+          "coordinate_space": "physical_screen_pixels",
+          "foreground_confirmed": true,
+          "inserted_events": 3,
+          "native_calls": 1,
+          "planned_events": [
+            {
+              "dx": 35269,
+              "dy": 30743,
+              "flags": 49153,
+              "tag": 4642741495193
+            },
+            {
+              "dx": 0,
+              "dy": 0,
+              "flags": 2,
+              "tag": 4642741495193
+            },
+            {
+              "dx": 0,
+              "dy": 0,
+              "flags": 4,
+              "tag": 4642741495193
+            }
+          ],
+          "point": [
+            430,
+            281
+          ],
+          "scope": "Fixture readiness only; not keyboard input or tested window activation",
+          "setup_mouse_attempted": true,
+          "state": "inserted_foreground_pending",
+          "target": {
+            "class_name": "KiraBridgeWindowFixture_10104",
+            "hwnd": "393950",
+            "minimized": false,
+            "pid": 10104,
+            "thread_id": 5584,
+            "topmost": true,
+            "visible": true
+          },
+          "virtual_screen": [
+            0,
+            0,
+            800,
+            600
+          ],
+          "win32_error": 0
+        },
+        "setup_mouse_attempted": true,
+        "stale_target_control": {
+          "before_effect_hooks": 0,
+          "effect_attempted": false,
+          "error_code": "windows_target_changed",
+          "independent_main_unchanged": true,
+          "task_id": "win_window_651f3b30e5bfae74_stale_auxiliary"
+        },
+        "task_requests": [
+          {
+            "before_effect_hooks": 0,
+            "control_backend_entered": false,
+            "effect_attempted": false,
+            "elapsed_ms": 135.317198,
+            "error_code": null,
+            "label": "list_main",
+            "native_request_accepted": null,
+            "operation": "windows.window.list",
+            "state": "submitting_once",
+            "task_id": "win_window_651f3b30e5bfae74_list_main",
+            "task_state": "completed"
+          },
+          {
+            "before_effect_hooks": 1,
+            "control_backend_entered": true,
+            "effect_attempted": true,
+            "elapsed_ms": 71.250955,
+            "error_code": null,
+            "label": "move_resize",
+            "native_backend_result": {
+              "action": "move_resize",
+              "automatic_retry": false,
+              "coordinate_space": "physical_screen_pixels",
+              "effect_attempted": true,
+              "native_error": 0,
+              "observed": true,
+              "observed_state": {
+                "class_name": "KiraBridgeWindowFixture_10104",
+                "foreground": true,
+                "maximized": false,
+                "minimized": false,
+                "rect": {
+                  "height": 320,
+                  "width": 640,
+                  "x": 40,
+                  "y": 40
+                },
+                "target": {
+                  "hwnd": "393950",
+                  "pid": "10104",
+                  "process_created_100ns": "134382449634949646",
+                  "thread_id": "5584"
+                },
+                "title": "",
+                "title_omitted_for_same_process": true,
+                "visible": true
+              },
+              "outcome": "observed",
+              "provider": "windows.windows.v1",
+              "request_accepted": true,
+              "scope": "Single request and immediate readback; no application acknowledgement",
+              "target": {
+                "hwnd": "393950",
+                "pid": "10104",
+                "process_created_100ns": "134382449634949646",
+                "thread_id": "5584"
+              }
+            },
+            "native_request_accepted": true,
+            "operation": "windows.window.control",
+            "state": "independently_observed",
+            "task_id": "win_window_651f3b30e5bfae74_move_resize",
+            "task_state": "completed"
+          },
+          {
+            "before_effect_hooks": 1,
+            "control_backend_entered": true,
+            "effect_attempted": true,
+            "elapsed_ms": 83.850043,
+            "error_code": null,
+            "label": "maximize",
+            "native_backend_result": {
+              "action": "maximize",
+              "automatic_retry": false,
+              "coordinate_space": "physical_screen_pixels",
+              "effect_attempted": true,
+              "native_error": 0,
+              "observed": true,
+              "observed_state": {
+                "class_name": "KiraBridgeWindowFixture_10104",
+                "foreground": true,
+                "maximized": true,
+                "minimized": false,
+                "rect": {
+                  "height": 568,
+                  "width": 816,
+                  "x": -8,
+                  "y": -8
+                },
+                "target": {
+                  "hwnd": "393950",
+                  "pid": "10104",
+                  "process_created_100ns": "134382449634949646",
+                  "thread_id": "5584"
+                },
+                "title": "",
+                "title_omitted_for_same_process": true,
+                "visible": true
+              },
+              "outcome": "observed",
+              "provider": "windows.windows.v1",
+              "request_accepted": true,
+              "scope": "Single request and immediate readback; no application acknowledgement",
+              "target": {
+                "hwnd": "393950",
+                "pid": "10104",
+                "process_created_100ns": "134382449634949646",
+                "thread_id": "5584"
+              }
+            },
+            "native_request_accepted": true,
+            "operation": "windows.window.control",
+            "state": "independently_observed",
+            "task_id": "win_window_651f3b30e5bfae74_maximize",
+            "task_state": "completed"
+          },
+          {
+            "before_effect_hooks": 1,
+            "control_backend_entered": true,
+            "effect_attempted": true,
+            "elapsed_ms": 142.485986,
+            "error_code": null,
+            "label": "restore_from_maximized",
+            "native_backend_result": {
+              "action": "restore",
+              "automatic_retry": false,
+              "coordinate_space": "physical_screen_pixels",
+              "effect_attempted": true,
+              "native_error": 0,
+              "observed": true,
+              "observed_state": {
+                "class_name": "KiraBridgeWindowFixture_10104",
+                "foreground": true,
+                "maximized": false,
+                "minimized": false,
+                "rect": {
+                  "height": 320,
+                  "width": 640,
+                  "x": 40,
+                  "y": 40
+                },
+                "target": {
+                  "hwnd": "393950",
+                  "pid": "10104",
+                  "process_created_100ns": "134382449634949646",
+                  "thread_id": "5584"
+                },
+                "title": "",
+                "title_omitted_for_same_process": true,
+                "visible": true
+              },
+              "outcome": "observed",
+              "provider": "windows.windows.v1",
+              "request_accepted": true,
+              "scope": "Single request and immediate readback; no application acknowledgement",
+              "target": {
+                "hwnd": "393950",
+                "pid": "10104",
+                "process_created_100ns": "134382449634949646",
+                "thread_id": "5584"
+              }
+            },
+            "native_request_accepted": true,
+            "operation": "windows.window.control",
+            "state": "independently_observed",
+            "task_id": "win_window_651f3b30e5bfae74_restore_from_maximized",
+            "task_state": "completed"
+          },
+          {
+            "before_effect_hooks": 1,
+            "control_backend_entered": true,
+            "effect_attempted": true,
+            "elapsed_ms": 102.909169,
+            "error_code": null,
+            "label": "minimize",
+            "native_backend_result": {
+              "action": "minimize",
+              "automatic_retry": false,
+              "coordinate_space": "physical_screen_pixels",
+              "effect_attempted": true,
+              "native_error": 0,
+              "observed": false,
+              "observed_state": {
+                "class_name": "KiraBridgeWindowFixture_10104",
+                "foreground": true,
+                "maximized": false,
+                "minimized": false,
+                "rect": {
+                  "height": 320,
+                  "width": 640,
+                  "x": 40,
+                  "y": 40
+                },
+                "target": {
+                  "hwnd": "393950",
+                  "pid": "10104",
+                  "process_created_100ns": "134382449634949646",
+                  "thread_id": "5584"
+                },
+                "title": "",
+                "title_omitted_for_same_process": true,
+                "visible": true
+              },
+              "outcome": "requested",
+              "provider": "windows.windows.v1",
+              "request_accepted": true,
+              "scope": "Single request and immediate readback; no application acknowledgement",
+              "target": {
+                "hwnd": "393950",
+                "pid": "10104",
+                "process_created_100ns": "134382449634949646",
+                "thread_id": "5584"
+              }
+            },
+            "native_request_accepted": true,
+            "operation": "windows.window.control",
+            "state": "independently_observed",
+            "task_id": "win_window_651f3b30e5bfae74_minimize",
+            "task_state": "completed"
+          },
+          {
+            "before_effect_hooks": 0,
+            "control_backend_entered": false,
+            "effect_attempted": false,
+            "elapsed_ms": 293.340075,
+            "error_code": null,
+            "label": "list_minimized",
+            "native_request_accepted": null,
+            "operation": "windows.window.list",
+            "state": "submitting_once",
+            "task_id": "win_window_651f3b30e5bfae74_list_minimized",
+            "task_state": "completed"
+          },
+          {
+            "before_effect_hooks": 1,
+            "control_backend_entered": true,
+            "effect_attempted": true,
+            "elapsed_ms": 233.251991,
+            "error_code": null,
+            "label": "restore_from_minimized",
+            "native_backend_result": {
+              "action": "restore",
+              "automatic_retry": false,
+              "coordinate_space": "physical_screen_pixels",
+              "effect_attempted": true,
+              "native_error": 0,
+              "observed": true,
+              "observed_state": {
+                "class_name": "KiraBridgeWindowFixture_10104",
+                "foreground": false,
+                "maximized": false,
+                "minimized": false,
+                "rect": {
+                  "height": 28,
+                  "width": 160,
+                  "x": -32000,
+                  "y": -32000
+                },
+                "target": {
+                  "hwnd": "393950",
+                  "pid": "10104",
+                  "process_created_100ns": "134382449634949646",
+                  "thread_id": "5584"
+                },
+                "title": "",
+                "title_omitted_for_same_process": true,
+                "visible": true
+              },
+              "outcome": "observed",
+              "provider": "windows.windows.v1",
+              "request_accepted": true,
+              "scope": "Single request and immediate readback; no application acknowledgement",
+              "target": {
+                "hwnd": "393950",
+                "pid": "10104",
+                "process_created_100ns": "134382449634949646",
+                "thread_id": "5584"
+              }
+            },
+            "native_request_accepted": true,
+            "operation": "windows.window.control",
+            "state": "independently_observed",
+            "task_id": "win_window_651f3b30e5bfae74_restore_from_minimized",
+            "task_state": "completed"
+          },
+          {
+            "before_effect_hooks": 0,
+            "control_backend_entered": false,
+            "effect_attempted": false,
+            "elapsed_ms": 197.485994,
+            "error_code": null,
+            "label": "list_auxiliary",
+            "native_request_accepted": null,
+            "operation": "windows.window.list",
+            "state": "submitting_once",
+            "task_id": "win_window_651f3b30e5bfae74_list_auxiliary",
+            "task_state": "completed"
+          },
+          {
+            "before_effect_hooks": 1,
+            "control_backend_entered": true,
+            "effect_attempted": true,
+            "elapsed_ms": 178.336074,
+            "error_code": null,
+            "label": "activate_from_owned_auxiliary",
+            "native_backend_result": {
+              "action": "activate",
+              "automatic_retry": false,
+              "coordinate_space": "physical_screen_pixels",
+              "effect_attempted": true,
+              "native_error": 0,
+              "observed": true,
+              "observed_state": {
+                "class_name": "KiraBridgeWindowFixture_10104",
+                "foreground": true,
+                "maximized": false,
+                "minimized": false,
+                "rect": {
+                  "height": 320,
+                  "width": 640,
+                  "x": 40,
+                  "y": 40
+                },
+                "target": {
+                  "hwnd": "393950",
+                  "pid": "10104",
+                  "process_created_100ns": "134382449634949646",
+                  "thread_id": "5584"
+                },
+                "title": "",
+                "title_omitted_for_same_process": true,
+                "visible": true
+              },
+              "outcome": "observed",
+              "provider": "windows.windows.v1",
+              "request_accepted": true,
+              "scope": "Single request and immediate readback; no application acknowledgement",
+              "target": {
+                "hwnd": "393950",
+                "pid": "10104",
+                "process_created_100ns": "134382449634949646",
+                "thread_id": "5584"
+              }
+            },
+            "native_request_accepted": true,
+            "operation": "windows.window.control",
+            "state": "independently_observed",
+            "task_id": "win_window_651f3b30e5bfae74_activate_from_owned_auxiliary",
+            "task_state": "completed"
+          },
+          {
+            "before_effect_hooks": 0,
+            "control_backend_entered": false,
+            "effect_attempted": false,
+            "elapsed_ms": 65.720923,
+            "error_code": "windows_target_changed",
+            "label": "stale_auxiliary",
+            "native_request_accepted": null,
+            "operation": "windows.window.control",
+            "state": "manager_inspect_refused_before_control",
+            "task_id": "win_window_651f3b30e5bfae74_stale_auxiliary",
+            "task_state": "failed"
+          },
+          {
+            "before_effect_hooks": 0,
+            "control_backend_entered": false,
+            "effect_attempted": false,
+            "elapsed_ms": 28.556981,
+            "error_code": "forbidden",
+            "label": "forbidden",
+            "native_request_accepted": null,
+            "operation": "windows.window.control",
+            "state": "forbidden_not_admitted",
+            "task_id": "win_window_651f3b30e5bfae74_forbidden",
+            "task_state": null
+          },
+          {
+            "before_effect_hooks": 1,
+            "control_backend_entered": true,
+            "effect_attempted": true,
+            "elapsed_ms": 268.857913,
+            "error_code": null,
+            "label": "close_wm_close",
+            "native_backend_result": {
+              "action": "close",
+              "application_processing_confirmed": false,
+              "automatic_retry": false,
+              "coordinate_space": "physical_screen_pixels",
+              "effect_attempted": true,
+              "native_error": 0,
+              "observed": false,
+              "observed_state": null,
+              "outcome": "requested",
+              "provider": "windows.windows.v1",
+              "request_accepted": true,
+              "scope": "WM_CLOSE accepted; completion requires independent observation",
+              "target": {
+                "hwnd": "393950",
+                "pid": "10104",
+                "process_created_100ns": "134382449634949646",
+                "thread_id": "5584"
+              }
+            },
+            "native_request_accepted": true,
+            "operation": "windows.window.control",
+            "state": "independently_observed",
+            "task_id": "win_window_651f3b30e5bfae74_close_wm_close",
+            "task_state": "completed"
+          }
+        ],
+        "unauthenticated_http_status": 401,
+        "window_effect_attempts": [
+          {
+            "before_effect_hooks": 1,
+            "control_backend_entered": true,
+            "effect_attempted": true,
+            "elapsed_ms": 71.250955,
+            "error_code": null,
+            "label": "move_resize",
+            "native_backend_result": {
+              "action": "move_resize",
+              "automatic_retry": false,
+              "coordinate_space": "physical_screen_pixels",
+              "effect_attempted": true,
+              "native_error": 0,
+              "observed": true,
+              "observed_state": {
+                "class_name": "KiraBridgeWindowFixture_10104",
+                "foreground": true,
+                "maximized": false,
+                "minimized": false,
+                "rect": {
+                  "height": 320,
+                  "width": 640,
+                  "x": 40,
+                  "y": 40
+                },
+                "target": {
+                  "hwnd": "393950",
+                  "pid": "10104",
+                  "process_created_100ns": "134382449634949646",
+                  "thread_id": "5584"
+                },
+                "title": "",
+                "title_omitted_for_same_process": true,
+                "visible": true
+              },
+              "outcome": "observed",
+              "provider": "windows.windows.v1",
+              "request_accepted": true,
+              "scope": "Single request and immediate readback; no application acknowledgement",
+              "target": {
+                "hwnd": "393950",
+                "pid": "10104",
+                "process_created_100ns": "134382449634949646",
+                "thread_id": "5584"
+              }
+            },
+            "native_request_accepted": true,
+            "operation": "windows.window.control",
+            "state": "independently_observed",
+            "task_id": "win_window_651f3b30e5bfae74_move_resize",
+            "task_state": "completed"
+          },
+          {
+            "before_effect_hooks": 1,
+            "control_backend_entered": true,
+            "effect_attempted": true,
+            "elapsed_ms": 83.850043,
+            "error_code": null,
+            "label": "maximize",
+            "native_backend_result": {
+              "action": "maximize",
+              "automatic_retry": false,
+              "coordinate_space": "physical_screen_pixels",
+              "effect_attempted": true,
+              "native_error": 0,
+              "observed": true,
+              "observed_state": {
+                "class_name": "KiraBridgeWindowFixture_10104",
+                "foreground": true,
+                "maximized": true,
+                "minimized": false,
+                "rect": {
+                  "height": 568,
+                  "width": 816,
+                  "x": -8,
+                  "y": -8
+                },
+                "target": {
+                  "hwnd": "393950",
+                  "pid": "10104",
+                  "process_created_100ns": "134382449634949646",
+                  "thread_id": "5584"
+                },
+                "title": "",
+                "title_omitted_for_same_process": true,
+                "visible": true
+              },
+              "outcome": "observed",
+              "provider": "windows.windows.v1",
+              "request_accepted": true,
+              "scope": "Single request and immediate readback; no application acknowledgement",
+              "target": {
+                "hwnd": "393950",
+                "pid": "10104",
+                "process_created_100ns": "134382449634949646",
+                "thread_id": "5584"
+              }
+            },
+            "native_request_accepted": true,
+            "operation": "windows.window.control",
+            "state": "independently_observed",
+            "task_id": "win_window_651f3b30e5bfae74_maximize",
+            "task_state": "completed"
+          },
+          {
+            "before_effect_hooks": 1,
+            "control_backend_entered": true,
+            "effect_attempted": true,
+            "elapsed_ms": 142.485986,
+            "error_code": null,
+            "label": "restore_from_maximized",
+            "native_backend_result": {
+              "action": "restore",
+              "automatic_retry": false,
+              "coordinate_space": "physical_screen_pixels",
+              "effect_attempted": true,
+              "native_error": 0,
+              "observed": true,
+              "observed_state": {
+                "class_name": "KiraBridgeWindowFixture_10104",
+                "foreground": true,
+                "maximized": false,
+                "minimized": false,
+                "rect": {
+                  "height": 320,
+                  "width": 640,
+                  "x": 40,
+                  "y": 40
+                },
+                "target": {
+                  "hwnd": "393950",
+                  "pid": "10104",
+                  "process_created_100ns": "134382449634949646",
+                  "thread_id": "5584"
+                },
+                "title": "",
+                "title_omitted_for_same_process": true,
+                "visible": true
+              },
+              "outcome": "observed",
+              "provider": "windows.windows.v1",
+              "request_accepted": true,
+              "scope": "Single request and immediate readback; no application acknowledgement",
+              "target": {
+                "hwnd": "393950",
+                "pid": "10104",
+                "process_created_100ns": "134382449634949646",
+                "thread_id": "5584"
+              }
+            },
+            "native_request_accepted": true,
+            "operation": "windows.window.control",
+            "state": "independently_observed",
+            "task_id": "win_window_651f3b30e5bfae74_restore_from_maximized",
+            "task_state": "completed"
+          },
+          {
+            "before_effect_hooks": 1,
+            "control_backend_entered": true,
+            "effect_attempted": true,
+            "elapsed_ms": 102.909169,
+            "error_code": null,
+            "label": "minimize",
+            "native_backend_result": {
+              "action": "minimize",
+              "automatic_retry": false,
+              "coordinate_space": "physical_screen_pixels",
+              "effect_attempted": true,
+              "native_error": 0,
+              "observed": false,
+              "observed_state": {
+                "class_name": "KiraBridgeWindowFixture_10104",
+                "foreground": true,
+                "maximized": false,
+                "minimized": false,
+                "rect": {
+                  "height": 320,
+                  "width": 640,
+                  "x": 40,
+                  "y": 40
+                },
+                "target": {
+                  "hwnd": "393950",
+                  "pid": "10104",
+                  "process_created_100ns": "134382449634949646",
+                  "thread_id": "5584"
+                },
+                "title": "",
+                "title_omitted_for_same_process": true,
+                "visible": true
+              },
+              "outcome": "requested",
+              "provider": "windows.windows.v1",
+              "request_accepted": true,
+              "scope": "Single request and immediate readback; no application acknowledgement",
+              "target": {
+                "hwnd": "393950",
+                "pid": "10104",
+                "process_created_100ns": "134382449634949646",
+                "thread_id": "5584"
+              }
+            },
+            "native_request_accepted": true,
+            "operation": "windows.window.control",
+            "state": "independently_observed",
+            "task_id": "win_window_651f3b30e5bfae74_minimize",
+            "task_state": "completed"
+          },
+          {
+            "before_effect_hooks": 1,
+            "control_backend_entered": true,
+            "effect_attempted": true,
+            "elapsed_ms": 233.251991,
+            "error_code": null,
+            "label": "restore_from_minimized",
+            "native_backend_result": {
+              "action": "restore",
+              "automatic_retry": false,
+              "coordinate_space": "physical_screen_pixels",
+              "effect_attempted": true,
+              "native_error": 0,
+              "observed": true,
+              "observed_state": {
+                "class_name": "KiraBridgeWindowFixture_10104",
+                "foreground": false,
+                "maximized": false,
+                "minimized": false,
+                "rect": {
+                  "height": 28,
+                  "width": 160,
+                  "x": -32000,
+                  "y": -32000
+                },
+                "target": {
+                  "hwnd": "393950",
+                  "pid": "10104",
+                  "process_created_100ns": "134382449634949646",
+                  "thread_id": "5584"
+                },
+                "title": "",
+                "title_omitted_for_same_process": true,
+                "visible": true
+              },
+              "outcome": "observed",
+              "provider": "windows.windows.v1",
+              "request_accepted": true,
+              "scope": "Single request and immediate readback; no application acknowledgement",
+              "target": {
+                "hwnd": "393950",
+                "pid": "10104",
+                "process_created_100ns": "134382449634949646",
+                "thread_id": "5584"
+              }
+            },
+            "native_request_accepted": true,
+            "operation": "windows.window.control",
+            "state": "independently_observed",
+            "task_id": "win_window_651f3b30e5bfae74_restore_from_minimized",
+            "task_state": "completed"
+          },
+          {
+            "before_effect_hooks": 1,
+            "control_backend_entered": true,
+            "effect_attempted": true,
+            "elapsed_ms": 178.336074,
+            "error_code": null,
+            "label": "activate_from_owned_auxiliary",
+            "native_backend_result": {
+              "action": "activate",
+              "automatic_retry": false,
+              "coordinate_space": "physical_screen_pixels",
+              "effect_attempted": true,
+              "native_error": 0,
+              "observed": true,
+              "observed_state": {
+                "class_name": "KiraBridgeWindowFixture_10104",
+                "foreground": true,
+                "maximized": false,
+                "minimized": false,
+                "rect": {
+                  "height": 320,
+                  "width": 640,
+                  "x": 40,
+                  "y": 40
+                },
+                "target": {
+                  "hwnd": "393950",
+                  "pid": "10104",
+                  "process_created_100ns": "134382449634949646",
+                  "thread_id": "5584"
+                },
+                "title": "",
+                "title_omitted_for_same_process": true,
+                "visible": true
+              },
+              "outcome": "observed",
+              "provider": "windows.windows.v1",
+              "request_accepted": true,
+              "scope": "Single request and immediate readback; no application acknowledgement",
+              "target": {
+                "hwnd": "393950",
+                "pid": "10104",
+                "process_created_100ns": "134382449634949646",
+                "thread_id": "5584"
+              }
+            },
+            "native_request_accepted": true,
+            "operation": "windows.window.control",
+            "state": "independently_observed",
+            "task_id": "win_window_651f3b30e5bfae74_activate_from_owned_auxiliary",
+            "task_state": "completed"
+          },
+          {
+            "before_effect_hooks": 0,
+            "control_backend_entered": false,
+            "effect_attempted": false,
+            "elapsed_ms": 65.720923,
+            "error_code": "windows_target_changed",
+            "label": "stale_auxiliary",
+            "native_request_accepted": null,
+            "operation": "windows.window.control",
+            "state": "manager_inspect_refused_before_control",
+            "task_id": "win_window_651f3b30e5bfae74_stale_auxiliary",
+            "task_state": "failed"
+          },
+          {
+            "before_effect_hooks": 0,
+            "control_backend_entered": false,
+            "effect_attempted": false,
+            "elapsed_ms": 28.556981,
+            "error_code": "forbidden",
+            "label": "forbidden",
+            "native_request_accepted": null,
+            "operation": "windows.window.control",
+            "state": "forbidden_not_admitted",
+            "task_id": "win_window_651f3b30e5bfae74_forbidden",
+            "task_state": null
+          },
+          {
+            "before_effect_hooks": 1,
+            "control_backend_entered": true,
+            "effect_attempted": true,
+            "elapsed_ms": 268.857913,
+            "error_code": null,
+            "label": "close_wm_close",
+            "native_backend_result": {
+              "action": "close",
+              "application_processing_confirmed": false,
+              "automatic_retry": false,
+              "coordinate_space": "physical_screen_pixels",
+              "effect_attempted": true,
+              "native_error": 0,
+              "observed": false,
+              "observed_state": null,
+              "outcome": "requested",
+              "provider": "windows.windows.v1",
+              "request_accepted": true,
+              "scope": "WM_CLOSE accepted; completion requires independent observation",
+              "target": {
+                "hwnd": "393950",
+                "pid": "10104",
+                "process_created_100ns": "134382449634949646",
+                "thread_id": "5584"
+              }
+            },
+            "native_request_accepted": true,
+            "operation": "windows.window.control",
+            "state": "independently_observed",
+            "task_id": "win_window_651f3b30e5bfae74_close_wm_close",
+            "task_state": "completed"
+          }
+        ],
+        "wm_close_receiver_ack": [
+          {
+            "at_monotonic_ns": 32833712880827,
+            "hwnd": "1442550",
+            "message": 16
+          },
+          {
+            "at_monotonic_ns": 32833993567897,
+            "hwnd": "393950",
+            "message": 16
+          }
+        ]
+      },
+      "exit_code": 0,
+      "manifest_sha256": "ad93d6dd980a0dbc64e6b1ca2598d73d19f6c9b4523291085e025ace0f091d00",
+      "original_manifest_sha256": "ad93d6dd980a0dbc64e6b1ca2598d73d19f6c9b4523291085e025ace0f091d00",
+      "phase": "windows",
+      "process_id": 10104,
+      "raw_artifact_sha256": "2a6bc9130c8d1f307528737654555eedb615507fc394400a8165ba4f0fcf3cc1",
+      "raw_report_sha256": "8bbfa97b31f548414816faf831dbdc8d56e3411cc844248188c3a1fb0a938b76",
+      "reused": false,
+      "run_id": "ddb5056cc7ef4ea595714e5ffcc348f4",
+      "source_commit": "271605a5049255b007ea903a28bdfe40c51cf7f7"
+    }
+  ],
+  "run_id": "ddb5056cc7ef4ea595714e5ffcc348f4"
+}

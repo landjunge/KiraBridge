@@ -3,11 +3,13 @@ from __future__ import annotations
 import asyncio
 import time
 import uuid
+from pathlib import Path
 from typing import Awaitable, Callable
 
 from kirabridge.bridge_core.config import Config
 from kirabridge.bridge_core.models import (
     BridgeError,
+    NativeFailureEvidence,
     State,
     TaskRequest,
     UncertainExecution,
@@ -43,6 +45,9 @@ class TaskManager:
         from kirabridge.session_input_policy import SessionInputPolicy
 
         self.input_policy = SessionInputPolicy(config, store, security)
+        from kirabridge.task_manager.direct import NativeAdmission
+
+        self.native = NativeAdmission(self)
 
     def enqueue(
         self,
@@ -75,7 +80,7 @@ class TaskManager:
             raise BridgeError("payload_limit", "Task exceeds configured byte limit")
         with self.store.transaction():
             existing = self.store.db.execute(
-                "SELECT id,request_hash FROM tasks WHERE principal=? AND idem=?",
+                "SELECT id,request_hash,state FROM tasks WHERE principal=? AND idem=?",
                 (principal, request.idempotency_key),
             ).fetchone()
             if existing:
@@ -92,12 +97,19 @@ class TaskManager:
                     raise BridgeError(
                         "completion_route_conflict", "Original return target is fixed"
                     )
-                if approval and self.input_policy.waiting(existing["id"]):
+                if approval and existing["state"] == State.CREATED:
                     self.store.assert_accepting()
                     if request.task_id != existing["id"]:
-                        raise BridgeError("review_conflict", "Use the original buffered task ID")
-                    self.input_policy.release(principal, request, approval)
+                        raise BridgeError("review_conflict", "Use the original pending task ID")
+                    if self.input_policy.waiting(existing["id"]):
+                        self.input_policy.release(principal, request, approval)
+                    else:
+                        # A prepared non-input task already owns its immutable
+                        # request and queue slot. Consume the operator's exact
+                        # grant atomically with the existing approval transition.
+                        self.security.consume(principal, request, approval)
                     self._approve_in_transaction(existing["id"], "daniel_token")
+                    self.native.submit(existing["id"])
                     self.wake.set()
                 return self.store.get(existing["id"], principal)
             self.store.assert_accepting(
@@ -133,7 +145,9 @@ class TaskManager:
                     if depth >= 32:
                         raise BridgeError("delegation_limit", "Delegation chain exceeds 32 tasks")
                     parent = self.store.get(parent["parent_id"], principal)
-            if request.operation == "session.open":
+            if request.operation == "session.open" and request.arguments.get(
+                "window_authorization"
+            ):
                 from kirabridge.session_manager import SessionOpen
 
                 self.security.consume_window(
@@ -199,6 +213,8 @@ class TaskManager:
                     },
                 )
         self.wake.set()
+        if not pending:
+            self.native.submit(request.task_id)
         return self.store.get(request.task_id, principal)
 
     def approve(
@@ -229,6 +245,7 @@ class TaskManager:
                 token = self.security.grant_in_transaction(task["principal"], request)
                 self.input_policy.release(task["principal"], request, token, source=source)
             self._approve_in_transaction(task_id, source)
+        self.native.submit(task_id)
         self.wake.set()
         return self.store.get(task_id)
 
@@ -267,6 +284,7 @@ class TaskManager:
         self.lock.acquire()
         try:
             self.store.recover()
+            self.native.start()
             self.workers = [
                 asyncio.create_task(self._worker("normal")) for _ in range(self.config.concurrency)
             ]
@@ -281,6 +299,7 @@ class TaskManager:
             raise
 
     async def stop(self) -> None:
+        await self.native.stop()
         for worker in self.workers:
             worker.cancel()
         await asyncio.gather(*self.workers, return_exceptions=True)
@@ -296,13 +315,72 @@ class TaskManager:
                 (time.time() + self.config.lease_seconds, task_id, self.owner),
             )
 
+    def managed_workers(self):
+        """Only fixed operator-configured team workers may use the managed lane."""
+        if not self.config.team.enabled:
+            return ()
+        return tuple(
+            name
+            for name, worker in self.config.team.workers.items()
+            if worker.agent and worker.execution_scope == "separate_managed_session"
+        )
+
+    def native_principals(self):
+        """Keep the canonical route and configured aliases out of the replay queue."""
+        from kirabridge.permissions import direct_terminal_required
+
+        return tuple(
+            name
+            for name in sorted(set(self.config.principals) | {"chatgpt"})
+            if direct_terminal_required(self.config, name)
+        )
+
+    def is_sealed_managed_task(self, task):
+        if (
+            task.get("operation") != "agent.execute"
+            or task.get("principal") not in self.managed_workers()
+        ):
+            return False
+        worker = self.config.team.workers[task["principal"]]
+        args = task.get("args", {})
+        timeout = args.get("timeout", 300)
+        if (
+            args.get("agent") != worker.agent
+            or args.get("local_tools", False)
+            or not isinstance(args.get("cwd"), str)
+            or Path(args["cwd"]).expanduser().absolute() != Path(worker.cwd).expanduser().absolute()
+            or type(timeout) not in {int, float}
+            or timeout > worker.timeout
+        ):
+            return False
+        if not self.store.db.execute(
+            "SELECT 1 FROM sqlite_master WHERE type='table' AND name='team_work'"
+        ).fetchone():
+            return False
+        return (
+            self.store.db.execute(
+                "SELECT 1 FROM team_work w JOIN tasks t ON t.id=w.core_task_id "
+                "WHERE t.id=? AND w.assignee=t.principal AND w.core_request_hash=t.request_hash "
+                "AND w.core_request_hash IS NOT NULL",
+                (task["id"],),
+            ).fetchone()
+            is not None
+        )
+
     async def _worker(self, lane: str) -> None:
         while True:
             self.wake.clear()
             self.input_policy.expire()
             if self.maintenance:
                 self.maintenance()
-            task = self.store.claim(self.owner, self.config.lease_seconds, lane)
+            task = self.store.claim(
+                self.owner,
+                self.config.lease_seconds,
+                lane,
+                native_visible=self.config.visible_handoffs.enabled,
+                managed_workers=self.managed_workers(),
+                native_principals=self.native_principals(),
+            )
             if task is None:
                 try:
                     await asyncio.wait_for(self.wake.wait(), 2.0)
@@ -321,6 +399,7 @@ class TaskManager:
             nonlocal observed_effect
             observed_effect = mutating
             self.store.transition(task["id"], State.RUNNING, evidence, owner=self.owner)
+            self.native.observe(task["id"], evidence)
 
         async def progress(evidence):
             nonlocal observed_effect, progress_count
@@ -344,6 +423,7 @@ class TaskManager:
                     task["id"],
                     {"evidence_hash": digest(evidence)},
                 )
+            self.native.observe(task["id"], evidence)
 
         try:
             # Revalidate policy at dispatch time (config or grants may have changed).
@@ -382,14 +462,18 @@ class TaskManager:
                 owner=self.owner,
             )
         except asyncio.CancelledError:
+            expired = task["id"] in self.native.expired
             self.store.transition(
                 task["id"],
-                State.UNKNOWN,
+                State.FAILED if expired and not observed_effect else State.UNKNOWN,
                 {
-                    "reason": "dispatcher_shutdown",
+                    "reason": "native_admission_timeout" if expired else "dispatcher_shutdown",
                     "side_effect_possible": observed_effect,
+                    "automatic_retry": False,
+                    **({"terminal_input_attempted": False} if not observed_effect else {}),
                     "last_observation": self.store.get(task["id"])["evidence"],
                 },
+                error={"code": "native_admission_timeout"} if expired else None,
                 owner=self.owner,
             )
             raise
@@ -401,13 +485,23 @@ class TaskManager:
             )
             # Exception text from subprocesses, HTTP and validation may include secrets.
             code = exc.code if isinstance(exc, BridgeError) else "execution_error"
+            native_failure = getattr(exc, "native_failure", None)
             self.store.transition(
                 task["id"],
                 state,
                 {
                     "exception_type": type(exc).__name__,
                     "provider_error": getattr(exc, "provider_error", None),
-                    "safe_to_retry": state == State.FAILED and not observed_effect,
+                    "safe_to_retry": state == State.FAILED
+                    and not observed_effect
+                    and not self.native.native(task),
+                    "automatic_retry": False,
+                    **(
+                        {"native_failure": native_failure.model_dump()}
+                        if isinstance(native_failure, NativeFailureEvidence)
+                        else {}
+                    ),
+                    **({"terminal_input_attempted": False} if not observed_effect else {}),
                     "last_observation": self.store.get(task["id"])["evidence"],
                 },
                 error={"code": code},
@@ -416,6 +510,10 @@ class TaskManager:
         finally:
             heartbeat.cancel()
             await asyncio.gather(heartbeat, return_exceptions=True)
+
+    async def wait_delivery(self, task_id: str) -> dict:
+        """Observe the original native attempt; never release historical work."""
+        return await self.native.wait(task_id)
 
     def cancel_queued(self, principal: str, task_id: str) -> dict:
         self.security.principal(principal, "task.cancel")

@@ -1,0 +1,75 @@
+{
+  "modules": 93,
+  "edges": 343,
+  "cycles": [
+    [
+      "kirabridge.permissions",
+      "kirabridge.session_input_policy"
+    ],
+    [
+      "kirabridge.message_manager",
+      "kirabridge.voice_message_policy"
+    ],
+    [
+      "kirabridge.bridge_core.bridge",
+      "kirabridge.diagnostics",
+      "kirabridge.grok_connector",
+      "kirabridge.grok_connector.gateway",
+      "kirabridge.grok_connector.runtime",
+      "kirabridge.local_runtime",
+      "kirabridge.message_manager.receiver",
+      "kirabridge.operations_service",
+      "kirabridge.platform_adapters.terminal_app",
+      "kirabridge.readiness",
+      "kirabridge.security_manager",
+      "kirabridge.session_manager",
+      "kirabridge.task_manager.manager",
+      "kirabridge.team_manager.dispatcher",
+      "kirabridge.terminal_queries",
+      "kirabridge.visible_handoff",
+      "kirabridge.visible_terminal"
+    ],
+    [
+      "kirabridge.approval_console",
+      "kirabridge.control_center"
+    ]
+  ],
+  "composition_dependencies": [
+    "kirabridge",
+    "kirabridge.admin_manager",
+    "kirabridge.agent_manager",
+    "kirabridge.bridge_core.config",
+    "kirabridge.bridge_core.models",
+    "kirabridge.clipboard_manager",
+    "kirabridge.completion_manager",
+    "kirabridge.configured_workflow",
+    "kirabridge.development_status",
+    "kirabridge.diagnostics",
+    "kirabridge.discovery",
+    "kirabridge.filesystem_manager",
+    "kirabridge.handoff_manager",
+    "kirabridge.image_manager",
+    "kirabridge.message_manager",
+    "kirabridge.message_manager.receiver",
+    "kirabridge.observation_export",
+    "kirabridge.operations_service",
+    "kirabridge.output_history",
+    "kirabridge.permissions",
+    "kirabridge.process_manager",
+    "kirabridge.readiness",
+    "kirabridge.security_manager",
+    "kirabridge.session_manager",
+    "kirabridge.session_ports",
+    "kirabridge.task_manager.manager",
+    "kirabridge.task_manager.store",
+    "kirabridge.team_manager",
+    "kirabridge.team_manager.dispatcher",
+    "kirabridge.terminal_access",
+    "kirabridge.terminal_manager",
+    "kirabridge.terminal_queries",
+    "kirabridge.threaddesk_manager",
+    "kirabridge.visible_handoff",
+    "kirabridge.visible_terminal",
+    "kirabridge.workflow_control_adapter"
+  ]
+}

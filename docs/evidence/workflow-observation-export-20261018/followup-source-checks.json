@@ -1,0 +1,16 @@
+{
+  "observed_at": "2026-10-18T19:10:29.838491+00:00",
+  "original_probe_commit": "b4fb0c865c46622653344501068a03f3c21a85bc",
+  "additional_checks": {
+    "cli_help_data_stdout": "1 passed; no help prose or absolute script path on stdout",
+    "filtered_gap_snapshot_boundary": "1 passed; no empty endless has_more"
+  },
+  "source_sha256": {
+    "src/kirabridge/observation_export.py": "87120da68cd789126f11a208e728b0a21c83406e22091863569753f618b35350",
+    "scripts/export_workflow_observations.py": "2dda9ec1d455c96e516d7f7b6205ae9b6efe891b93e2bdb6592cd158cd258393",
+    "tests/test_observation_export.py": "e297ccbadea1dc71914dda290647686cc239a3a80343952bbd634efec143fef2"
+  },
+  "production_runtime_or_data_used": false,
+  "mandatory_private_aa_dependency_added": false,
+  "note": "Original standalone output/probe hashes preserved. Follow-up only tightens data-only help output and exhaustion detection at an explicit snapshot boundary."
+}

@@ -202,7 +202,7 @@ async def test_chatgpt_submission_contract_is_unchanged(http_bridge, config, mon
         result = (
             await clients.call("chatgpt", "task_request", {"request": value.model_dump()})
         ).structuredContent
-    assert result["state"] == "queued"
+    assert result["state"] == "completed"
     assert "conversation_return" not in result
 
 

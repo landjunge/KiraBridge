@@ -1,0 +1,16 @@
+{
+  "code_commit": "7dff6f21d4bfe61da50b82092446b2e12eb50f59",
+  "source_tree_sha256": "e790665737fa910d99730f6f2a0a7ca5dec9511beebb3e1832d5a7e6e19077db",
+  "python_files_byte_equal_to_real_test_source": 132,
+  "manifest_files_verified": 414,
+  "checksums_verified": true,
+  "bundle": "/Users/landjunge/.local/share/kirabridge/backups/macos-implementation-20261031T121031Z/candidate-build/KiraBridge-macos.tar.gz",
+  "bundle_sha256": "ac2f1d4575044516528373ba5bf2073660840a46e6097eb0162d98b9b2f55e7f",
+  "wheel": "/Users/landjunge/.local/share/kirabridge/backups/macos-implementation-20261031T121031Z/candidate-build/kirabridge-0.8.0rc20-py3-none-any.whl",
+  "wheel_sha256": "bd2c603fcdf0f71ee23607d767242951d25c7db1b291b67a87bf0e25b080b45b",
+  "build_offline": true,
+  "installed": false,
+  "signed": false,
+  "published": false,
+  "bootstrap_note": "Use reviewed local bundle installer only after authorization; generated GitHub download bootstrap references previously published rc20 and is not the local candidate deployment route."
+}

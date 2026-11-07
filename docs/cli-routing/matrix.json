@@ -1,0 +1,324 @@
+{
+  "schema_version": "bigplan.cli-matrix.v1",
+  "checked_at": "2026-11-05T21:49:13.289077+00:00",
+  "expires_at": "2026-11-12T21:49:13.289077+00:00",
+  "clis": [
+    {
+      "id": "codex",
+      "installed_version": "codex-cli 0.166.0",
+      "capabilities": [
+        "headless",
+        "coding",
+        "mcp",
+        "sessions",
+        "skills",
+        "image_input",
+        "subagents"
+      ],
+      "models": [
+        {
+          "id": "gpt-6-luna",
+          "provider": "openai",
+          "efforts": [
+            "low",
+            "medium",
+            "high",
+            "xhigh",
+            "max"
+          ],
+          "fit": {
+            "routine": 5,
+            "implementation": 2,
+            "debug": 1,
+            "architecture": 1,
+            "security": 1,
+            "review": 2,
+            "research": 3
+          },
+          "cost_rank": 0,
+          "context_tokens": null,
+          "evidence": "Local Codex models_cache fetched 2026-11-05T21:41:01.277944Z; official model selection; policy fit/cost ranks"
+        },
+        {
+          "id": "gpt-6.1-terra",
+          "provider": "openai",
+          "efforts": [
+            "low",
+            "medium",
+            "high",
+            "xhigh",
+            "max",
+            "ultra"
+          ],
+          "fit": {
+            "routine": 4,
+            "implementation": 3,
+            "debug": 2,
+            "architecture": 2,
+            "security": 1,
+            "review": 3,
+            "research": 4
+          },
+          "cost_rank": 1,
+          "context_tokens": null,
+          "evidence": "Local Codex models_cache fetched 2026-11-05T21:41:01.277944Z; official model selection; policy fit/cost ranks"
+        },
+        {
+          "id": "gpt-6.1-sol",
+          "provider": "openai",
+          "efforts": [
+            "low",
+            "medium",
+            "high",
+            "xhigh",
+            "max",
+            "ultra"
+          ],
+          "fit": {
+            "routine": 4,
+            "implementation": 5,
+            "debug": 5,
+            "architecture": 4,
+            "security": 4,
+            "review": 5,
+            "research": 4
+          },
+          "cost_rank": 2,
+          "context_tokens": 500000,
+          "evidence": "Local Codex models_cache fetched 2026-11-05T21:41:01.277944Z; official model selection; policy fit/cost ranks"
+        },
+        {
+          "id": "gpt-6-astra",
+          "provider": "openai",
+          "efforts": [
+            "low",
+            "medium",
+            "high",
+            "xhigh",
+            "max",
+            "ultra"
+          ],
+          "fit": {
+            "routine": 3,
+            "implementation": 5,
+            "debug": 5,
+            "architecture": 5,
+            "security": 5,
+            "review": 5,
+            "research": 5
+          },
+          "cost_rank": 4,
+          "context_tokens": null,
+          "evidence": "Local Codex models_cache fetched 2026-11-05T21:41:01.277944Z; official model selection; policy fit/cost ranks"
+        }
+      ],
+      "documented_models": [
+        "gpt-6.1-sol",
+        "gpt-6-astra",
+        "gpt-6.1-terra",
+        "gpt-6-sol",
+        "gpt-6-luna",
+        "gpt-5.6-sol",
+        "gpt-5.6-terra",
+        "gpt-5.6-luna"
+      ],
+      "sources": [
+        "https://learn.chatgpt.com/docs/models?surface=cli",
+        "https://learn.chatgpt.com/docs/developer-commands?surface=cli",
+        "https://learn.chatgpt.com/docs/hooks"
+      ],
+      "limitations": "Cached model inventory is an availability observation, not quota or execution proof. Ultra uses subagents and is excluded from automatic routing. Older GPT-5.4/5.5 subscription retirements matter. Context known here only for Sol. Native hooks require trust; controlled launcher calls preflight unconditionally."
+    },
+    {
+      "id": "grok",
+      "installed_version": "grok 1.0.77 (50ca579fa996) [alpha]",
+      "capabilities": [
+        "headless",
+        "coding",
+        "mcp",
+        "sessions",
+        "skills",
+        "image_input",
+        "subagents"
+      ],
+      "models": [
+        {
+          "id": "grok-4.7",
+          "provider": "xai",
+          "efforts": [
+            "low",
+            "medium",
+            "high",
+            "xhigh"
+          ],
+          "fit": {
+            "routine": 4,
+            "implementation": 5,
+            "debug": 5,
+            "architecture": 5,
+            "security": 5,
+            "review": 5,
+            "research": 5
+          },
+          "cost_rank": 3,
+          "context_tokens": null,
+          "evidence": "grok models observation and official grok-4.7 reasoning efforts; ranks are policy"
+        }
+      ],
+      "documented_models": [
+        "grok-4.7-build-fast",
+        "grok-4.7",
+        "grok-4.6",
+        "grok-4.5"
+      ],
+      "sources": [
+        "https://docs.x.ai/build/cli/reference",
+        "https://docs.x.ai/build/features/hooks",
+        "https://docs.x.ai/developers/models/grok-4.7",
+        "https://docs.x.ai/build/features/mcp-servers"
+      ],
+      "limitations": "Authenticated model list observed, default build-fast; only grok-4.7 has verified per-model effort evidence, so fast/4.6/4.5 stay non-routable pending effort verification. API 500k context is not asserted as effective CLI context. --effort supported; SKILL frontmatter cannot switch model. MCP must be denied separately from builtin tools."
+    },
+    {
+      "id": "claude",
+      "installed_version": "2.1.236 (Claude Code)",
+      "capabilities": [
+        "headless",
+        "coding",
+        "mcp",
+        "sessions",
+        "skills",
+        "image_input",
+        "subagents"
+      ],
+      "models": [],
+      "documented_models": [
+        "claude-fable-5-1",
+        "claude-fable-5",
+        "claude-opus-5-5",
+        "claude-sonnet-5-5",
+        "claude-haiku-5-5"
+      ],
+      "sources": [
+        "https://code.claude.com/docs/en/model-config",
+        "https://code.claude.com/docs/en/hooks"
+      ],
+      "limitations": "Current documentation aliases are newer than installed 2.1.236: installed Anthropic alias history implies Opus5/Sonnet5/Fable5/Haiku4.5. Model-specific efforts and env overrides require verification. Login/model entitlement unverified. PreToolUse supports input replacement."
+    },
+    {
+      "id": "opencode",
+      "installed_version": "1.4.4",
+      "capabilities": [
+        "headless",
+        "coding",
+        "mcp",
+        "sessions",
+        "skills",
+        "image_input"
+      ],
+      "models": [],
+      "documented_models": [
+        "opencode/gpt-6.1-sol",
+        "anthropic/claude-sonnet-5-5"
+      ],
+      "sources": [
+        "https://opencode.ai/docs/models/",
+        "https://opencode.ai/docs/cli/",
+        "https://opencode.ai/docs/plugins/"
+      ],
+      "limitations": "Installed v1.4.4 uses --model provider/model plus --variant; v2 #variant syntax is not applied. Catalog/provider credentials location-specific; no account availability proved. tool.execute.before plugin hook; skills are guidance."
+    },
+    {
+      "id": "gemini",
+      "installed_version": "0.37.2",
+      "capabilities": [
+        "headless",
+        "coding",
+        "mcp",
+        "sessions",
+        "skills",
+        "subagents"
+      ],
+      "models": [],
+      "documented_models": [
+        "gemini-3.8-flash",
+        "gemini-3.5-flash",
+        "gemini-3.5-flash-lite",
+        "gemini-3.1-pro-preview",
+        "gemini-3.1-flash-lite"
+      ],
+      "sources": [
+        "https://geminicli.com/docs/reference/configuration/",
+        "https://geminicli.com/docs/cli/model/",
+        "https://geminicli.com/docs/hooks/reference/"
+      ],
+      "limitations": "Installed0.37.2 vs current docs0.64: new catalog names not proven accessible. --model does not govern subagents. No generic --effort; thinkingConfig uses model-specific thinkingLevel or thinkingBudget. BeforeModel can change request model/config; BeforeTool separate. Access unverified."
+    },
+    {
+      "id": "copilot",
+      "installed_version": "GitHub Copilot CLI 1.0.67.",
+      "capabilities": [
+        "headless",
+        "coding",
+        "mcp",
+        "sessions",
+        "skills",
+        "image_input"
+      ],
+      "models": [],
+      "documented_models": [
+        "claude-sonnet-5.5",
+        "claude-opus-5.5",
+        "claude-haiku-5.5",
+        "gpt-6.1-sol",
+        "gpt-6.1-terra",
+        "gpt-6-astra",
+        "gpt-6-luna",
+        "gpt-5.3-codex",
+        "gemini-3.8-flash"
+      ],
+      "sources": [
+        "https://docs.github.com/en/copilot/reference/copilot-cli-reference/cli-command-reference",
+        "https://docs.github.com/en/copilot/reference/hooks-reference"
+      ],
+      "limitations": "Installed help --effort/--reasoning-effort includes none/low/medium/high/xhigh/max; per-model support still unknown. Model catalog is plan/policy dependent. preToolUse uses permissionDecision, not Claude updatedInput. Access/credits unverified."
+    },
+    {
+      "id": "cursor",
+      "installed_version": "2026.08.11-e8db854",
+      "capabilities": [
+        "headless",
+        "coding",
+        "mcp",
+        "sessions",
+        "skills",
+        "image_input",
+        "subagents"
+      ],
+      "models": [],
+      "documented_models": [],
+      "sources": [
+        "https://cursor.com/docs/cli/reference/parameters",
+        "https://cursor.com/docs/hooks",
+        "https://cursor.com/docs/sdk/typescript"
+      ],
+      "limitations": "Account model list required; avoid fixed catalog claims. Installed help supports bracket model parameters including effort, no separate --effort. Generic hooks/CLI coverage must be version-tested; failClosed required when relying on failures to block. Access unverified."
+    },
+    {
+      "id": "aider",
+      "installed_version": null,
+      "capabilities": [
+        "headless",
+        "coding"
+      ],
+      "models": [],
+      "documented_models": [],
+      "sources": [
+        "https://aider.chat/docs/config/options.html",
+        "https://aider.chat/docs/config/reasoning.html",
+        "https://aider.chat/docs/scripting.html"
+      ],
+      "limitations": "Not installed on PATH. Provider/model metadata controls --reasoning-effort and --thinking-tokens; unsupported settings can be ignored with warning. Scripting via --message-file. Automatic commits need explicit disabling for delegated work. No native generic delegation hook verified; wrapper required."
+    }
+  ]
+}

@@ -1,0 +1,109 @@
+{
+  "desktop_launcher": {
+    "name": "KiraBridge Windows Desktop Test.cmd",
+    "sha256": "47eba8e2e586c0c365f05d3b5b7968e4919b6800b988435a31aace5df7428c2f"
+  },
+  "isolation": {
+    "clipboard_used": false,
+    "credentials_rotation_requested": false,
+    "dev2_all_module_bytes_unchanged": true,
+    "dev2_credential_bytes_unchanged": true,
+    "dev2_listener": {
+      "address": "127.0.0.1",
+      "count": 1,
+      "pid": 11720,
+      "port": 8765
+    },
+    "dev2_module_count": 171,
+    "dev2_process": {
+      "created_100ns": "134382301975786026",
+      "pid": 11720
+    },
+    "input_attempted": false,
+    "new_private_state": true,
+    "new_separate_venv": true,
+    "old_desktop_launcher_bytes_unchanged": true,
+    "os_rights_changed": false,
+    "processes_stopped": false,
+    "state_absent_before_start": true,
+    "state_directory_lease_held": true,
+    "windows_service_installed": false
+  },
+  "passed": true,
+  "provenance": {
+    "guest_final_verifier_receipt_sha256_reported_by_parent": "659ce34b8eff5f31d6233c1f8408f871558ae18f954655eaa23a0c8e152baa41",
+    "native_acceptance_sha256": "d4417de8e29c9efce66073284b0b72f8c08eceead8904977a5a2bfe37be9002f",
+    "parent_report_sha256": "076266a1c0422a81a6ea9e5446421935d27ef01e5d6097a55edf8d1287432d8b",
+    "snapshot_scope": "The uploaded verifier snapshot and final guest receipt are distinct serialized evidence; parent independently confirms runtime after verifier exit",
+    "uploaded_verifier_snapshot_sha256": "29d3abefa86d8884a3a02e229d8b6b03df65a8346ea4190e95744b661ccbfb9e",
+    "verifier_source_sha256": "5e6e8dced26d040cc1f25fcdf66de1f8cccee4bf01c2819f68c42108928cd472"
+  },
+  "readback": {
+    "console_left_running_at_verifier_readback": true,
+    "parent_at_utc": "2026-11-04T06:23:50.3781590Z",
+    "verified_after_verifier_and_redirector_exit": true,
+    "verifier_at_utc": "2026-11-04T06:23:47.716954+00:00",
+    "verifier_redirector_exit_code": 0
+  },
+  "release": {
+    "all_asset_github_digests_and_local_bytes_match": true,
+    "asset_count": 5,
+    "asset_sha256": "e35710e4fa9ad903a2412e9885897cb1dbf1ebb0f77fe8b18570b841afd757a3",
+    "authenticated": true,
+    "bytes": 64297668,
+    "manifest_sha256": "ad93d6dd980a0dbc64e6b1ca2598d73d19f6c9b4523291085e025ace0f091d00",
+    "published_download_verified": true,
+    "raw_download_proof_sha256": "90dd98d5bb41603572993a10b4ddad85fb91530e6f1049b5424353e026837fe1",
+    "release_url": "https://github.com/landjunge/KiraBridge/releases/tag/windows-v0.8.0rc31.dev3",
+    "source_commit": "271605a5049255b007ea903a28bdfe40c51cf7f7",
+    "wheel_sha256": "43374ac3a535de967a966bd0a852c4996e634f0bf631130ca55326d987876f41"
+  },
+  "runtime": {
+    "all_installed_modules_equal_published_wheel": true,
+    "capabilities": [
+      "bridge.health",
+      "task.cancel",
+      "task.read",
+      "windows.keyboard.inspect",
+      "windows.keyboard.sequence",
+      "windows.keyboard.shortcut",
+      "windows.window.control",
+      "windows.window.list"
+    ],
+    "created_100ns": "134382470213253467",
+    "instance_id": "232ff387192b4b7089e8f64f6cd23e0f",
+    "listener": {
+      "address": "127.0.0.1",
+      "count": 1,
+      "pid": 7516,
+      "port": 8766
+    },
+    "module_count": 173,
+    "pid": 7516,
+    "source_commit": "271605a5049255b007ea903a28bdfe40c51cf7f7",
+    "source_overlay_absent": true,
+    "source_tree_sha256": "309064bdca787d12141ff8e091ab0be67823fe780c71f169b60576cca14495c9",
+    "started_at_utc": "2026-11-04T06:23:46.486780+00:00",
+    "task_count": 0,
+    "unauthenticated_http_status": 401,
+    "venv_bytecode_writes_disabled": true,
+    "wheel_sha256": "43374ac3a535de967a966bd0a852c4996e634f0bf631130ca55326d987876f41",
+    "windows_operations": [
+      "windows.keyboard.inspect",
+      "windows.keyboard.sequence",
+      "windows.keyboard.shortcut",
+      "windows.window.list",
+      "windows.window.control"
+    ]
+  },
+  "schema": "kirabridge.windows-desktop-installed.public.v1",
+  "scope": "Observed dev3 installation and post-verifier readback; no future-liveness or cloud-latency assertion",
+  "version": "0.8.0rc31.dev3",
+  "visual_observation": {
+    "image_bytes": 965516,
+    "image_retained_privately": true,
+    "image_sha256": "78609787ee2e40f8014f881381f22bc74a937a8f9b51f9b3959c5cf98e5b0f7e",
+    "observed_by": "Root",
+    "scope": "Existing private guest frame reviewed; no image published"
+  }
+}
