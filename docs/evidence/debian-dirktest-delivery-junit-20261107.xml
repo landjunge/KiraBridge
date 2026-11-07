@@ -1,0 +1,1 @@
+<testsuite name="final-delivery-package" tests="5" failures="0"><testcase name="final-package-integrity" time="0.066" /><testcase name="final-package-install" time="9.94" /><testcase name="final-package-mcp-health-auth-source-pin" time="1.078" /><testcase name="final-package-standalone-rollback" time="0.688" /><testcase name="cleanup" time="0.162" /></testsuite>

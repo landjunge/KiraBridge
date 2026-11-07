@@ -1,0 +1,167 @@
+{
+  "task_id": "DEBIAN-DIRK-RELEASE-20261107",
+  "status": "native-accepted-ci-pending-not-published",
+  "authorization": "User explicitly authorizes implementation, isolated existing Debian tests, regular review/CI/integration, GitHub push and verified Debian/Linux prerelease; no delegation or productive Mac/Windows changes.",
+  "source": {
+    "branch": "release/debian-dirktest-20261107",
+    "worktree": "/Users/landjunge/KiraBridge-worktrees/debian-release-codex-20261107",
+    "grok_base": "468a239",
+    "grok_implementation": "fee8af9d2dc0622c4da05bc4b6246913af35bd45",
+    "release_commit": "08ee2806c67b151733194520eed8775c4b480444",
+    "full_native_lifecycle_commit": "d62fc8798f47e73f7adc9c5ac7f77d13a8897e7b",
+    "equivalence": "All runtime/installer/lock/docs bytes equal. Only install.sh source pin and release.json/SHA256SUMS metadata differ; exact final archive independently installed/health/auth/source-pin/rolled back natively."
+  },
+  "artifact": {
+    "name": "KiraBridge-0.8.0rc41-Linux-x86_64.tar.gz",
+    "sha256": "73be73c5ea63d31ee9be300ca0d503cab27118bf7bc5411af0423cf499d8a9ef",
+    "build_command": "uv run python scripts/build_release.py --target linux-server --out dist/debian-final-04",
+    "original_grok_sha256": "3d7cb9b869fe1d85ef00f8dbd356ec9e41c54a8c8ae190fa4f6d8b41caf504c4"
+  },
+  "native": {
+    "identity": {
+      "os_release": "PRETTY_NAME=\"Debian GNU/Linux 13 (trixie)\"\nNAME=\"Debian GNU/Linux\"\nVERSION_ID=\"13\"\nVERSION=\"13 (trixie)\"\nVERSION_CODENAME=trixie\nDEBIAN_VERSION_FULL=13.6\nID=debian\nHOME_URL=\"https://www.debian.org/\"\nSUPPORT_URL=\"https://www.debian.org/support\"\nBUG_REPORT_URL=\"https://bugs.debian.org/\"\n",
+      "machine": "x86_64",
+      "kernel": "6.12.101+deb13-amd64",
+      "uid": 1000,
+      "harness_python": "3.13.5 (main, Jul 15 2026, 20:25:40) [GCC 14.2.0]",
+      "harness_sha256": "79c8c02da3ea83d1c20cfd0e31e003fd84d64b111a804b667f1fc3e86e8c7060",
+      "root": "/home/daniel/kb-debian-dirktest-20261107-d62%dirk",
+      "systemd": "systemd 257 (257.13-1~deb13u1)"
+    },
+    "host_python": {
+      "python": "/usr/bin/python3",
+      "version": "3.13.5 (main, Jul 15 2026, 20:25:40) [GCC 14.2.0]",
+      "kirabridge_installed": false
+    },
+    "runtime": {
+      "executable": "/home/daniel/kb-debian-dirktest-20261107-d62%dirk/candidate-runtime/.venv/bin/python3",
+      "python": "3.11.15 (main, Apr  7 2026, 20:48:58) [Clang 22.1.1 ]",
+      "package": "/home/daniel/kb-debian-dirktest-20261107-d62%dirk/candidate-runtime/src/kirabridge/__init__.py",
+      "version": "0.8.0rc41",
+      "dependencies": {
+        "mcp": "1.30.0",
+        "httpx": "0.28.1",
+        "uvicorn": "0.54.0",
+        "pydantic": "2.14.1",
+        "cryptography": "48.0.1"
+      }
+    },
+    "full_lifecycle_tests": 9,
+    "extra_native_tests": 3,
+    "exact_release_archive_tests": 5,
+    "full_lifecycle_result": "passed",
+    "extra_result": "passed",
+    "exact_archive_result": "passed",
+    "rollback_preserves_disabled_unit": true,
+    "preserved": [
+      "configuration",
+      "credentials",
+      "0600 modes",
+      "user note",
+      "pre-update UNKNOWN",
+      "post-update UNKNOWN"
+    ],
+    "scope": "Isolated owned test data/paths and one named user unit only; existing production system services unchanged. All owned units stopped/disabled/removed with independent absence/port checks. Linger=no, existing ~/.cache and ~/.local modes0775 retained.",
+    "environment": "Native Debian13.6 x86_64, not macOS mocks or Ubuntu container acceptance. Parent Python3.13.5 without installed KiraBridge; package CPython3.11.15. PYTHONPATH/PYTHONHOME/VIRTUAL_ENV removed for harness subprocesses; interpreter -I and imported source paths/hash verified.",
+    "previous_baseline": "Unchanged verified RC40 payload prepared with locked uv and activated with fixed installer; original RC40 Ubuntu-only/bootstrap interpreter defects are not claimed accepted.",
+    "credential_leak_check": {
+      "owned_test_credentials_checked": true,
+      "evidence_files_checked": 24,
+      "credential_values_in_evidence_files": 0
+    },
+    "independent_cleanup": "MainPID=0\nLoadState=not-found\nActiveState=inactive\nindependent_port_unbound=true\nLinger=no\ndrwxrwxr-x 4 daniel daniel 4096 Oct 25 20:21 /home/daniel/.cache\ndrwxrwxr-x 3 daniel daniel 4096 Oct 25 20:21 /home/daniel/.local\n",
+    "final_delivery_independent_cleanup": "MainPID=0\nLoadState=not-found\nActiveState=inactive\nindependent_delivery_port_unbound=true\n"
+  },
+  "review": {
+    "pr": "https://github.com/landjunge/KiraBridge/pull/72",
+    "kind": "Existing automated GitHub Codex review plus local review of Grok implementation; no human approval claim.",
+    "resolved_findings": 5,
+    "findings": [
+      "systemd config argument escaping",
+      "selected service mode in recovery record",
+      "standalone system Python execution",
+      "restore previous unit enablement",
+      "failed cleanup must mark JSON/JUnit failed"
+    ],
+    "negative_cleanup_test": "tests/test_linux_acceptance_evidence.py"
+  },
+  "ci": {
+    "run_id": 42368173569,
+    "url": "https://github.com/landjunge/KiraBridge/actions/runs/42368173569",
+    "status": "main-documentation-integration-recheck-pending",
+    "required_checks_bypassed": false,
+    "previous_source_run": 42368173569
+  },
+  "release": {
+    "tag": "linux-v0.8.0rc41",
+    "prerelease": true,
+    "status": "not-created",
+    "url": null,
+    "download_url": null,
+    "download_verified": false
+  },
+  "failures_preserved": [
+    "Initial native install refused group-writable existing ~/.cache; private installer cache fixed without changing rights.",
+    "Original RC40 installer refused normal uv venv symlinks; baseline activation switched to fixed installer.",
+    "Initial mock rollback fixture missed new daemon-reload; corrected focused test passed.",
+    "Earlier CI stopped at builder formatting; fixed.",
+    "Expired synthetic routing evidence caused existing CI failures; test clock bound to fixture NOW,73 targeted tests passed.",
+    "Cancelled/interrupted GitHub runs are not counted as passes."
+  ],
+  "limits": [
+    "Debian13.6 x86_64 native acceptance; Debian12/ARM not accepted.",
+    "Ubuntu24.04 accepted by installer, no native Ubuntu systemd claim.",
+    "Online bootstrap requires GitHub/PyPI, hash-pinned uv0.11.6, CPython3.11.15 and locked dependencies; not fully offline.",
+    "Running user systemd manager required; no automatic linger/OS permission/firewall changes.",
+    "No macOS GUI/Terminal.app/native keyboard/desktop parity; optional clipboard helpers.",
+    "Remote HTTPS, actual ChatGPT/account connection and operator unattended-session setup remain separate.",
+    "Private GitHub access needed; Dirk account access not impersonated or changed.",
+    "No productive Mac installation, Windows changes or original Library queue execution."
+  ],
+  "evidence_sha256": {
+    "docs/evidence/debian-dirktest-native-20261107.json": "9f88de3ee504b479c480e5563bb0631e0d9823db3d70e2b8c055c605ee7fa896",
+    "docs/evidence/debian-dirktest-native-junit-20261107.xml": "0adf03fcf0ba1f93c1cbcba856a1924e7c6c2850b4be6c9001683573588233a1",
+    "docs/evidence/debian-dirktest-extra-native-20261107.json": "48257adbc025cbacf56dbbebe8d448f4fecb808a10696e834313b96cc72bf43c",
+    "docs/evidence/debian-dirktest-extra-native-junit-20261107.xml": "cf874bbfb32d7d2df85e963abbac0a79b065b4efbd584a984e0857845a29c7ee",
+    "docs/evidence/debian-dirktest-delivery-20261107.json": "6ee7783ea1a8824a4b99bb15ef8afee6a56914a38d7dfba74999ce3ff97256e7",
+    "docs/evidence/debian-dirktest-delivery-junit-20261107.xml": "290a33a938eae13fb77c5e4ef33de8c9c5a1cd456d46477671879c3e43efb4f1",
+    "docs/evidence/debian-dirktest-byte-provenance-20261107.json": "39ccae1fb84d27666e7a3613b2b01149be7b1cc3b48044a2533fa08718a94f69",
+    "docs/evidence/debian-dirktest-review-20261107.json": "09df6255d4d0e54c32143d7bc1472530d5ee04d3a6fb5e1a66a75e57d68180d5",
+    "docs/evidence/debian-dirktest-failed-install-20261107.json": "3c344f10bbcca65aad524b14d4e722b84ac81e8e3bd3182ee7cce98b54bfcbd5",
+    "docs/evidence/debian-dirktest-failed-install-junit-20261107.xml": "de8a72201124d79bf67ebaff27d8d0dd3773cec037c2ab23d292821e0f5a567a",
+    "docs/evidence/debian-dirktest-native-20261107.log.gz": "edc9cbe051770e855b3748939269740eae24bfd8496ef180ce663cf13ffa7808",
+    "docs/evidence/debian-dirktest-delivery-20261107.log.gz": "01eb6a3c0c483dd5ff1cc822d79dcac719a1af59e51a894ab30c3858b144ee1f",
+    "docs/evidence/debian-dirktest-failed-install-20261107.log.gz": "45dd201eb5a70c62429cc2976231aa73789aac7e49de066cbfac7f4cf053551d",
+    "docs/evidence/debian-dirktest-extra-native-20261107.log.gz": "26f35887074930bf1d9f34fa96deb329ae14e6510765a597749f05d33a514e1c"
+  },
+  "work_memory": {
+    "thread_id": "188ce4729a62",
+    "last_confirmed_revision": 935,
+    "native_milestone_operation_id": "debian-dirktest-native-20261107-03",
+    "instance": "codex-debian-release-20261107"
+  },
+  "integration": {
+    "main_documentation_base": "8b338b6",
+    "runtime_diff_from_release_source": "none; git diff08ee280 across src/installer/release-install.sh/pyproject.toml/uv.lock is empty",
+    "readme_worker_pr": "https://github.com/landjunge/KiraBridge/pull/71",
+    "readme_worker_source": "4657705eecdd2b03760b6a7b9464e6b0610ffd79"
+  },
+  "compressed_verbatim_logs": {
+    "docs/evidence/debian-dirktest-native-20261107.log.gz": {
+      "uncompressed_sha256": "e8f23992b8502bc98c29430cea934e260385769eac4e347cff41cda85ef71013",
+      "reason": "verbatim command output, including terminal whitespace"
+    },
+    "docs/evidence/debian-dirktest-delivery-20261107.log.gz": {
+      "uncompressed_sha256": "2243f1171641333a6c7e1ebcb5e776a3a2dda2d40dc0696b0e76739dc21ef668",
+      "reason": "verbatim command output, including terminal whitespace"
+    },
+    "docs/evidence/debian-dirktest-failed-install-20261107.log.gz": {
+      "uncompressed_sha256": "620fe08950716180d6cda49a49d83ecdaa26f7c4ce6051bd4150d45d60261768",
+      "reason": "verbatim command output, including terminal whitespace"
+    },
+    "docs/evidence/debian-dirktest-extra-native-20261107.log.gz": {
+      "uncompressed_sha256": "b08eff09d2e74d2ab4337867bf97a762d67e933dd71d834eb69d70555b4fa592",
+      "reason": "verbatim command output, including terminal whitespace"
+    }
+  }
+}

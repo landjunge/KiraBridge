@@ -1,0 +1,1 @@
+<testsuite name="native-package-review-regressions" tests="3" failures="0"><testcase name="package-service-none-install" /><testcase name="package-service-none-rollback-preserves-data" /><testcase name="tampered-package-rejected-before-runtime" /></testsuite>

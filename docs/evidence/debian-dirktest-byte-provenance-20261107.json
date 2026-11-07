@@ -1,0 +1,12 @@
+{
+  "previous_native_tested_source": "d62fc8798f47e73f7adc9c5ac7f77d13a8897e7b",
+  "release_source": "08ee2806c67b151733194520eed8775c4b480444",
+  "changed_archive_members": [
+    "SHA256SUMS",
+    "install.sh",
+    "release.json"
+  ],
+  "bootstrap_diff": "only source pin and short source pin",
+  "all_runtime_installer_lock_docs_bytes_identical": true,
+  "unchanged_members": 1238
+}

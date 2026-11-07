@@ -489,17 +489,19 @@ async def execute(args) -> None:
         elif args.command == "doctor":
             from kirabridge.platform_adapters import current_platform
 
-            emit(
-                {
-                    "python": sys.version.split()[0],
-                    "platform": current_platform().name,
-                    "database": "ok",
-                    "schema": 2,
-                    "audit": verify(bridge.store),
-                    "agents": bridge.agents.inventory(list(config.agents)),
-                    "chatgpt_integration": "unverified",
-                }
-            )
+            host = current_platform()
+            report = {
+                "python": sys.version.split()[0],
+                "platform": host.name,
+                "database": "ok",
+                "schema": 2,
+                "audit": verify(bridge.store),
+                "agents": bridge.agents.inventory(list(config.agents)),
+                "chatgpt_integration": "unverified",
+            }
+            if host.name == "linux":
+                report["server"] = host.server_facts()
+            emit(report)
     finally:
         # __aexit__ also closes; sqlite close is idempotent.
         bridge.store.close()

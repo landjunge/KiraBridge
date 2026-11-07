@@ -1,0 +1,70 @@
+{
+  "id": "KB-LINUX-SERVER-GROK-20261107",
+  "product": "KiraBridge",
+  "role": "linux-server",
+  "worktree": "/Users/landjunge/KiraBridge-worktrees/grok-linux-server-20261107",
+  "branch": "feat/grok-linux-server-20261107",
+  "base": "d12838ae97c7efcc053c45c3bc9fba5e78f5fe5d",
+  "implementation_commit": "fee8af9d2dc0622c4da05bc4b6246913af35bd45",
+  "diff_against_base": "11 files changed, 986 insertions(+), 105 deletions(-)",
+  "import": {
+    "cwd": "/Users/landjunge/KiraBridge-worktrees/grok-linux-server-20261107",
+    "PYTHONPATH": "/Users/landjunge/KiraBridge-worktrees/grok-linux-server-20261107/src",
+    "executable": "/Users/landjunge/KiraBridge-worktrees/current-mac-20261106/.venv/bin/python",
+    "kirabridge_file": "/Users/landjunge/KiraBridge-worktrees/grok-linux-server-20261107/src/kirabridge/__init__.py"
+  },
+  "tests": {
+    "command": "PYTHONPATH=/Users/landjunge/KiraBridge-worktrees/grok-linux-server-20261107/src /Users/landjunge/KiraBridge-worktrees/current-mac-20261106/.venv/bin/python -m pytest tests/test_linux_server.py tests/test_installation.py::test_linux_unit_is_user_only_quoted_and_conflicts_preserved tests/test_platforms.py tests/test_installer.py tests/test_installer_source_readiness.py tests/test_release_package_contract.py --junitxml=/tmp/kb-linux-server-20261107-junit.xml -q",
+    "cwd": "/Users/landjunge/KiraBridge-worktrees/grok-linux-server-20261107",
+    "exit_code": 0,
+    "pytest_summary": "51 passed, 2 subtests passed in 2.16s",
+    "junit": {
+      "path": "docs/evidence/linux-server-grok-20261107-junit.xml",
+      "tests": 53,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "time_seconds": "2.155"
+    },
+    "related_routing_command": "PYTHONPATH=/Users/landjunge/KiraBridge-worktrees/grok-linux-server-20261107/src /Users/landjunge/KiraBridge-worktrees/current-mac-20261106/.venv/bin/python -m pytest tests/test_routing_and_auth_safety.py tests/test_windows_keyboard_manager.py::test_windows_platform_status_reports_only_real_preview_operations -q",
+    "related_routing_exit_code": 0,
+    "related_routing_summary": "12 passed in 0.84s",
+    "ruff_exit_code": 0,
+    "install_sh_syntax_exit_code": 0
+  },
+  "artifact": {
+    "path": "/Users/landjunge/KiraBridge-worktrees/grok-linux-server-20261107/dist/linux-server-20261107/KiraBridge-0.8.0rc40-Linux-x86_64.tar.gz",
+    "sha256": "3d7cb9b869fe1d85ef00f8dbd356ec9e41c54a8c8ae190fa4f6d8b41caf504c4",
+    "outer_sha256sums_exit_code": 0,
+    "inner_sha256sums_exit_code": 0,
+    "version": "0.8.0rc40",
+    "source_commit": "fee8af9d2dc0622c4da05bc4b6246913af35bd45",
+    "platform": "Linux-x86_64",
+    "role": "linux-server",
+    "service": "systemd-user",
+    "desktop_gui": "unavailable",
+    "gui_parity": false,
+    "members_in_manifest": 1233,
+    "guides": [
+      "docs/INSTALL-LINUX-SERVER.de.md",
+      "docs/INSTALL-LINUX-SERVER.md"
+    ]
+  },
+  "service_install_rollback_on_macos": {
+    "native_systemd": "not-run",
+    "unit_tests": "systemctl --user was mocked. The tests covered stop, daemon-reload, enable --now, restart, rejection of a foreign unit, update, and rollback. Rollback restored the previous unit. Configuration, credentials, a user note and UNKNOWN task rows stayed in the live database; the backup copy did not replace them."
+  },
+  "native_linux": {
+    "result": "not-run",
+    "linux_pass": false,
+    "reason": "No running local Linux VM was available. limactl list reported no instance. Colima profile default was Stopped, x86_64, and was not started: the Windows installer is active and this assignment forbids a simultaneous heavy VM build. The netcup host was not used; remote installation is outside this assignment. macOS tests do not count as Linux acceptance.",
+    "package_host_check": "install.sh accepts Ubuntu 24.04 x86_64 only."
+  },
+  "not_done": [
+    "push",
+    "release",
+    "production Mac service change",
+    "Windows installer and Windows VM",
+    "native Linux install, service start, restart and rollback"
+  ]
+}

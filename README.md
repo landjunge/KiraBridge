@@ -46,6 +46,14 @@ Windows feature parity and a standalone installer remain development work. The p
 file, process or terminal tools, or Windows service installation. No new package
 for those ongoing projects or published RC40 download is offered here.
 
+
+**Debian/Linux server test package:** [RC41 prerelease](https://github.com/landjunge/KiraBridge/releases/tag/linux-v0.8.0rc41),
+with a user-level systemd installer for Debian 13 / Ubuntu 24.04 x86_64.
+HTTP MCP, bearer authentication, health, update and rollback are its scope;
+macOS GUI and native keyboard are unavailable. This is an online installer.
+[Install/update guide and native evidence](docs/INSTALL-LINUX-SERVER.md).
+Repository access is required; release evidence states the accepted native host.
+
 ## What KiraBridge helps you do
 
 - **Work on local projects:** let your connected AI read project files and logs,
@@ -167,5 +175,5 @@ Published downloads and the separate Windows 11 installation were verified.
 
 The shared header with five original icons is implemented and locally reviewed.
 The [design record](docs/FIVE-TOOL-DESIGN-20261107.md) describes status/version
-boundaries and pending browser/native acceptance. This source delivery does not
-establish a new download or installed runtime.
+boundaries and passed browser checks; the installed native app remains unverified.
+This source delivery does not establish a new download or installed runtime.

@@ -46,6 +46,14 @@ enthält keine allgemeinen Datei-, Prozess- oder Terminaltools und keine
 Windows-Dienstinstallation. Hier wird kein neues Paket dieser laufenden Projekte
 und kein veröffentlichter RC40-Download angeboten.
 
+**Debian/Linux-Server-Testpaket:** [RC41-Prerelease](https://github.com/landjunge/KiraBridge/releases/tag/linux-v0.8.0rc41)
+mit systemd-Benutzerinstaller für Debian 13 / Ubuntu 24.04 x86_64.
+Umfang: HTTP-MCP, Bearer-Authentifizierung, Health, Update und Rollback;
+macOS-GUI und native Tastatur sind nicht verfügbar. Das ist ein Onlineinstaller.
+[Installations-/Updateanleitung und native Nachweise](docs/INSTALL-LINUX-SERVER.de.md).
+Repositoryzugriff ist nötig; die Releasebelege nennen den nativ geprüften Host.
+
+
 ## Wobei KiraBridge dir hilft
 
 - **An lokalen Projekten arbeiten:** Lass deine verbundene KI Projektdateien und
@@ -170,5 +178,5 @@ dev2 bleibt als Rückfallmöglichkeit erhalten.
 
 Der gemeinsame Header mit fünf Originalicons ist implementiert und lokal geprüft.
 Der [Designnachweis](docs/FIVE-TOOL-DESIGN-20261107.md) beschreibt Status-/Versionsgrenzen
-und die offene Browser-/native Abnahme. Diese Quelllieferung belegt keinen neuen
-Download oder installierten Laufzeitstand.
+und die bestandene Browserprüfung; die installierte native App bleibt ungeprüft.
+Diese Quelllieferung belegt keinen neuen Download oder installierten Laufzeitstand.
