@@ -251,31 +251,7 @@ class TerminalAppTransport:
                         "visible_absence_unproven", "PID observation cleanup unconfirmed"
                     ) from None
 
-    @timed_async("terminal_catalog")
-    async def catalog(self):
-        if sys.platform != "darwin":
-            return []
-        rows = await self.native("""const app = Application("Terminal");
-    JSON.stringify(app.running() ? app.windows().flatMap(w => {
-     const b = w.bounds();
-     return w.tabs().map((t, i) => ({
-      window_id:w.id(), index:w.index(), frontmost:w.frontmost(),
-      bounds:{x:b.x, y:b.y, width:b.width, height:b.height},
-      script_tab_count:w.tabs().length, tab_index_in_script_window:i+1,
-      tty:t.tty(), busy:t.busy(), selected:t.selected()
-     }));
-    }) : []);""")
-        rows = attach_visual_windows(rows if isinstance(rows, list) else [])
-        tty_counts = Counter(row.get("tty") for row in rows)
-        shared = {tty for tty, count in tty_counts.items() if count > 1}
-        if shared:
-            ended = await self.ended_windows(
-                [int(row["window_id"]) for row in rows if row.get("tty") in shared]
-            )
-            for row in rows:
-                if int(row.get("window_id") or 0) in ended:
-                    row["ended"] = True
-            rows = attach_visual_windows(rows)
+    async def _ps_catalog(self):
         with timed("ps_catalog"):
             child = await asyncio.create_subprocess_exec(
                 "/bin/ps",
@@ -291,7 +267,46 @@ class TerminalAppTransport:
                 raise _process_observation_timeout("native_process_catalog") from None
             finally:
                 await reap_process(child, process_group=False)
-        processes = _parse_process_catalog(output, child.returncode)
+        return output, child.returncode
+
+    @timed_async("terminal_catalog")
+    async def catalog(self):
+        if sys.platform != "darwin":
+            return []
+        # The process list is independent of the Terminal.app window/tab query below;
+        # run both concurrently instead of paying their latency one after the other.
+        ps_task = asyncio.create_task(self._ps_catalog())
+        try:
+            rows = await self.native("""const app = Application("Terminal");
+    JSON.stringify(app.running() ? app.windows().flatMap(w => {
+     const b = w.bounds();
+     return w.tabs().map((t, i) => ({
+      window_id:w.id(), index:w.index(), frontmost:w.frontmost(),
+      bounds:{x:b.x, y:b.y, width:b.width, height:b.height},
+      script_tab_count:w.tabs().length, tab_index_in_script_window:i+1,
+      tty:t.tty(), busy:t.busy(), selected:t.selected()
+     }));
+    }) : []);""")
+            rows = attach_visual_windows(rows if isinstance(rows, list) else [])
+            tty_counts = Counter(row.get("tty") for row in rows)
+            shared = {tty for tty, count in tty_counts.items() if count > 1}
+            if shared:
+                ended = await self.ended_windows(
+                    [int(row["window_id"]) for row in rows if row.get("tty") in shared]
+                )
+                for row in rows:
+                    if int(row.get("window_id") or 0) in ended:
+                        row["ended"] = True
+                rows = attach_visual_windows(rows)
+            output, ps_returncode = await ps_task
+        except BaseException:
+            ps_task.cancel()
+            try:
+                await ps_task
+            except BaseException:
+                pass
+            raise
+        processes = _parse_process_catalog(output, ps_returncode)
         processes_by_tty = {}
         for owner, pid, parent, tty, comm in processes:
             processes_by_tty.setdefault(tty, []).append((int(owner), int(pid), int(parent), comm))
