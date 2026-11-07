@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import sys
 from pathlib import Path
 from typing import Any
 
@@ -393,7 +394,7 @@ class Bridge:
         from kirabridge.permissions import automatic_for, permission_summary
         from kirabridge.terminal_access import terminal_access
 
-        return {
+        result = {
             "name": "KiraBridge",
             "discovery": snapshot(self, principal),
             "version": __version__,
@@ -451,6 +452,11 @@ class Bridge:
             "autonext": self.autonext.inspect(),
             "message_receiver_scope": "bridge_dispatcher_for_configured_receivers",
         }
+        if sys.platform.startswith("linux"):
+            from kirabridge.platform_adapters import LinuxAdapter
+
+            result["server"] = LinuxAdapter().server_facts()
+        return result
 
     def task(self, principal: str, task_id: str) -> dict:
         self.security.principal(principal, "task.read")
@@ -558,6 +564,26 @@ class Bridge:
                     "public file-root tools",
                     "managed process execution",
                     "agent terminal automation",
+                ],
+            }
+        if self.macos.host_platform != "darwin":
+            from kirabridge.platform_adapters import LinuxAdapter
+
+            facts = LinuxAdapter().server_facts()
+            return {
+                "schema_version": 1,
+                "provider_id": "linux.server.systemd-user",
+                "platform": self.macos.host_platform,
+                "server": facts,
+                "operations": [],
+                "interactive_desktop_observed": False,
+                "gui_parity": False,
+                "scope": "Linux server MCP, authentication and health; no desktop session",
+                "unsupported_features": [
+                    "macOS GUI and Terminal.app",
+                    "native keyboard and system keys",
+                    "desktop session control",
+                    "full clipboard and GUI parity",
                 ],
             }
         # Explicit no-prompt checks run only for status, never tools/list.

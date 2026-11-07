@@ -1,0 +1,41 @@
+{
+  "schema": "kirabridge.native-linux-acceptance.v1",
+  "steps": [
+    {
+      "name": "fresh-package-install",
+      "result": "failed",
+      "error": "sh: exit 1; see log"
+    }
+  ],
+  "identity": {
+    "os_release": "PRETTY_NAME=\"Debian GNU/Linux 13 (trixie)\"\nNAME=\"Debian GNU/Linux\"\nVERSION_ID=\"13\"\nVERSION=\"13 (trixie)\"\nVERSION_CODENAME=trixie\nDEBIAN_VERSION_FULL=13.6\nID=debian\nHOME_URL=\"https://www.debian.org/\"\nSUPPORT_URL=\"https://www.debian.org/support\"\nBUG_REPORT_URL=\"https://bugs.debian.org/\"\n",
+    "machine": "x86_64",
+    "kernel": "6.12.101+deb13-amd64",
+    "uid": 1000,
+    "harness_python": "3.13.5 (main, Jul 15 2026, 20:25:40) [GCC 14.2.0]",
+    "harness_sha256": "aba3cd35c7bd1e231156bce58a35f8dea1fecef8ce0a16816fc0888d48191275",
+    "root": "/home/daniel/kb-debian-dirktest-20261107-run01",
+    "systemd": "systemd 257 (257.13-1~deb13u1)"
+  },
+  "artifacts": {
+    "KiraBridge-0.8.0rc41-Linux-x86_64.tar.gz": {
+      "sha256": "9d08a1ef3373a22a54179f88bf956b44da0cdf4f37e583de34210eea8686e440",
+      "source_commit": "e4136fef4804660d31308986f3c6fe3d2888d801",
+      "version": "0.8.0rc41",
+      "manifest_files": 1239
+    },
+    "KiraBridge-0.8.0rc40-Linux-x86_64.tar.gz": {
+      "sha256": "3d7cb9b869fe1d85ef00f8dbd356ec9e41c54a8c8ae190fa4f6d8b41caf504c4",
+      "source_commit": "fee8af9d2dc0622c4da05bc4b6246913af35bd45",
+      "version": "0.8.0rc40",
+      "manifest_files": 1233
+    }
+  },
+  "result": "failed",
+  "cleanup": {
+    "unit_absent": true,
+    "systemd": "MainPID=0\nLoadState=not-found\nActiveState=inactive\n",
+    "port_unbound": true
+  },
+  "log_sha256": "620fe08950716180d6cda49a49d83ecdaa26f7c4ce6051bd4150d45d60261768"
+}

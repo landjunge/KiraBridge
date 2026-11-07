@@ -354,7 +354,29 @@ def idle_guard(config):
 
 
 def python(release):
+    """Prefer the macOS bundle venv, then a Linux source-tree venv."""
+    for relative in (
+        "source/.venv/bin/python",
+        "source/.venv/bin/python3",
+        ".venv/bin/python",
+        ".venv/bin/python3",
+    ):
+        candidate = release / relative
+        # uv venv executables normally link to its managed Python installation.
+        # Package import containment is verified separately by release_source().
+        if candidate.is_file():
+            return candidate
     return release / "source/.venv/bin/python"
+
+
+def release_venv(release):
+    for relative in ("source/.venv", ".venv"):
+        candidate = release / relative
+        if candidate.is_symlink():
+            raise RuntimeError("Target runtime imports a package outside its release")
+        if candidate.is_dir():
+            return candidate.resolve(strict=True)
+    raise RuntimeError("Target runtime imports a package outside its release")
 
 
 def cli(release, config, *args, timeout=30):
@@ -628,7 +650,55 @@ def prepare_bundle(args):
     return destination
 
 
+def adopt_release(args):
+    """Use a runtime already prepared by install.sh. Do not download or rebuild it."""
+    supplied = args.release_root.expanduser()
+    if supplied.is_symlink():
+        raise RuntimeError("Symlink release root refused")
+    root = supplied.resolve()
+    runtime = python(root)
+    if not runtime.is_file():
+        raise RuntimeError("Prepared release runtime is missing")
+    pin_path = root / ".kirabridge-source"
+    if not pin_path.is_file() or pin_path.is_symlink():
+        raise RuntimeError("Release source pin missing")
+    ref = pin_path.read_text().strip()
+    if not re.fullmatch(r"[a-f0-9]{40}", ref):
+        raise RuntimeError("Invalid release source pin")
+    version = (
+        run(
+            [str(runtime), "-I", "-c", "import kirabridge;print(kirabridge.__version__)"],
+            capture=True,
+        )
+        .decode()
+        .strip()
+    )
+    if not re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+(?:(?:a|b|rc)[0-9]+)?", version):
+        raise RuntimeError("Unsupported release version")
+    manifest = {
+        "version": version,
+        "commit": ref,
+        "source_commit": ref,
+        "role": "linux-server",
+        "service": "systemd-user",
+        "desktop_gui": "unavailable",
+        "gui_parity": False,
+    }
+    manifest_path = root / "release.json"
+    if manifest_path.exists():
+        if manifest_path.is_symlink():
+            raise RuntimeError("Symlink release manifest refused")
+        saved = json.loads(manifest_path.read_text())
+        if saved.get("commit", ref) != ref or saved.get("version", version) != version:
+            raise RuntimeError("Existing release identity differs; preserved")
+    else:
+        jwrite(manifest_path, manifest)
+    return root
+
+
 def prepare(args):
+    if getattr(args, "release_root", None):
+        return adopt_release(args)
     if getattr(args, "bundle", None):
         return prepare_bundle(args)
     ref = args.ref
@@ -773,7 +843,7 @@ def fresh_config(args, release):
     text = (
         f"data_dir = {json.dumps(str(data))}\n"
         f"credentials_file = {json.dumps(str(credentials))}\n"
-        'host = "127.0.0.1"\nport = 8765\nallow_remote = false\n'
+        'host = "127.0.0.1"\n' + f"port = {getattr(args, 'port', 8765)}\nallow_remote = false\n"
     )
     full = args.full_access
     workspace = getattr(args, "workspace", Path.home() / "workspace/KiraBridge").resolve()
@@ -818,9 +888,64 @@ def fresh_config(args, release):
     )
 
 
+def _systemctl(args, *command, timeout=20):
+    return subprocess.run(
+        ["systemctl", "--user", *command],
+        capture_output=True,
+        text=True,
+        timeout=timeout,
+        check=False,
+    )
+
+
+def _systemd_fields(text):
+    fields = {}
+    for line in text.splitlines():
+        if "=" in line:
+            key, value = line.split("=", 1)
+            fields[key] = value
+    return fields
+
+
+def systemd_argument(value):
+    # This installer also runs under a system Python without KiraBridge installed.
+    escaped = (
+        str(value).replace("\\", "\\\\").replace('"', '\\"').replace("%", "%%").replace("$", "$$")
+    )
+    return '"' + escaped + '"'
+
+
+def systemd_unit(release, argv):
+    # Reuse the shared renderer inside the verified target runtime.
+    return run(
+        [
+            python(release),
+            "-I",
+            "-c",
+            "import json,sys;from kirabridge.installation import render_linux_unit;"
+            "print(render_linux_unit(json.loads(sys.argv[1])),end='')",
+            json.dumps(argv),
+        ],
+        capture=True,
+    )
+
+
 def loaded(args):
     if args.service == "none":
         return False
+    if args.service == "systemd-user":
+        shown = _systemctl(
+            args, "show", "-p", "FragmentPath", "-p", "ActiveState", "--", args.plist.name
+        )
+        if shown.returncode:
+            return False
+        fields = _systemd_fields(shown.stdout)
+        fragment = fields.get("FragmentPath", "")
+        if not fragment:
+            return False
+        if Path(fragment) != args.plist:
+            raise RuntimeError("Loaded service comes from another unit; preserved")
+        return fields.get("ActiveState") == "active"
     result = subprocess.run(
         ["launchctl", "print", f"gui/{os.getuid()}/{LABEL}"],
         capture_output=True,
@@ -836,11 +961,33 @@ def loaded(args):
 
 
 def stop_service(args):
+    if args.service == "systemd-user":
+        if loaded(args):
+            result = _systemctl(args, "stop", "--", args.plist.name, timeout=20)
+            if result.returncode:
+                detail = result.stderr.strip() or result.stdout.strip()
+                raise RuntimeError(
+                    "systemctl stop failed; no sudo or linger change made: " + detail[:300]
+                )
+        return
     if loaded(args):
         run(["launchctl", "bootout", f"gui/{os.getuid()}/{LABEL}"], capture=True, timeout=20)
 
 
 def start_service(args):
+    if args.service == "systemd-user":
+        if not args.plist.exists():
+            return
+        reloaded = _systemctl(args, "daemon-reload", timeout=20)
+        if reloaded.returncode:
+            raise RuntimeError("systemctl daemon-reload failed; no sudo or linger change made")
+        result = _systemctl(args, "enable", "--now", "--", args.plist.name, timeout=20)
+        if result.returncode:
+            detail = result.stderr.strip() or result.stdout.strip()
+            raise RuntimeError(
+                "systemctl enable failed; no sudo or linger change made: " + detail[:300]
+            )
+        return
     if args.service != "none" and args.plist.exists():
         command = ["launchctl", "bootstrap", f"gui/{os.getuid()}", str(args.plist)]
         # Bootstrap exit code 5 is a generic Input/output error (EIO), not
@@ -868,6 +1015,25 @@ def start_service(args):
             time.sleep(min(1, max(0, deadline - time.monotonic())))
 
 
+def restart_service(args):
+    """Reload the user unit and restart it. Does not use sudo or linger."""
+    if args.service != "systemd-user":
+        stop_service(args)
+        start_service(args)
+        return
+    if not args.plist.exists():
+        return
+    reloaded = _systemctl(args, "daemon-reload", timeout=20)
+    if reloaded.returncode:
+        raise RuntimeError("systemctl daemon-reload failed; no sudo or linger change made")
+    result = _systemctl(args, "restart", "--", args.plist.name, timeout=20)
+    if result.returncode:
+        detail = result.stderr.strip() or result.stdout.strip()
+        raise RuntimeError(
+            "systemctl restart failed; no sudo or linger change made: " + detail[:300]
+        )
+
+
 SOURCE_FIELDS = ("source_package_path", "source_tree_sha256", "source_file_count")
 
 
@@ -889,7 +1055,12 @@ def release_source(release):
             )
         )
     ).resolve(strict=True)
-    if not package.is_relative_to((release / "source/.venv").resolve(strict=True)):
+    allowed = [release_venv(release)]
+    for extra in ("src/kirabridge", "source/src/kirabridge"):
+        candidate = release / extra
+        if candidate.is_dir() and not candidate.is_symlink():
+            allowed.append(candidate.resolve(strict=True))
+    if not any(package == base or package.is_relative_to(base) for base in allowed):
         raise RuntimeError("Target runtime imports a package outside its release")
     manifest = {str(p.relative_to(package)): sha(p) for p in sorted(package.rglob("*.py"))}
     if not manifest:
@@ -934,6 +1105,17 @@ def wait_health(args, release, version, *, expected_source=None):
 
 def validate_service_owner(args):
     if args.service == "none" or not args.plist.exists():
+        return
+    if args.service == "systemd-user":
+        text = args.plist.read_text()
+        if (
+            systemd_argument(args.config) not in text
+            or '"serve"' not in text
+            or "kirabridge" not in text
+        ):
+            raise RuntimeError(
+                "Existing service is not the expected KiraBridge config; left untouched"
+            )
         return
     previous = plistlib.loads(args.plist.read_bytes())
     argv = previous.get("ProgramArguments", [])
@@ -1076,6 +1258,21 @@ def activate(args, release):
     if credentials:
         snapshot_file(credentials, backup, "credentials.before.json")
     was_loaded = loaded(args)
+    systemd_enabled_before = None
+    if args.service == "systemd-user":
+        systemd_enabled_before = _systemctl(
+            args, "is-enabled", "--", args.plist.name
+        ).stdout.strip()
+        if systemd_enabled_before not in {
+            "",
+            "enabled",
+            "enabled-runtime",
+            "disabled",
+            "static",
+            "indirect",
+            "not-found",
+        }:
+            raise RuntimeError("Unsupported existing user-unit enablement; preserved")
     previous_health = None
     if args.service != "none":
         try:
@@ -1086,12 +1283,14 @@ def activate(args, release):
         if previous_health and not was_loaded:
             raise RuntimeError("Backend runs outside expected launchd service; no switch")
     before = {
+        **manifest,
         "previous": old,
         "release": str(release),
         "backup": str(backup),
         "had_wrapper": had_wrapper,
         "had_plist": had_plist,
         "was_loaded": was_loaded,
+        "systemd_enabled_before": systemd_enabled_before,
         "previous_version": (previous_health or {}).get("version"),
         "previous_source": {
             key: (previous_health or {}).get("runtime", {}).get(key) for key in SOURCE_FIELDS
@@ -1100,7 +1299,6 @@ def activate(args, release):
         "launcher": str(args.launcher),
         "plist": str(args.plist),
         "service": args.service,
-        **manifest,
     }
     jwrite(backup / "transaction.json", before)
     if getattr(args, "desktop", False):
@@ -1136,7 +1334,24 @@ def activate(args, release):
                 + ' "$@"\n'
             )
             atomic(args.launcher, wrapper, 0o700)
-            if args.service != "none":
+            if args.service == "systemd-user":
+                atomic(
+                    args.plist,
+                    systemd_unit(
+                        release,
+                        [
+                            str(python(release)),
+                            "-m",
+                            "kirabridge.cli",
+                            "--config",
+                            str(args.config),
+                            "serve",
+                            "--transport",
+                            "http",
+                        ],
+                    ),
+                )
+            elif args.service != "none":
                 plist = (
                     plistlib.loads((backup / "service.before.plist").read_bytes())
                     if had_plist
@@ -1227,6 +1442,10 @@ def rollback(args, *, _compensating=False):
             require_visible_terminal(args)
         if not active.get("rollback_core_restored"):
             stop_service(args)
+            if args.service == "systemd-user" and not active["had_plist"]:
+                result = _systemctl(args, "disable", "--", args.plist.name)
+                if result.returncode:
+                    raise RuntimeError("Cannot disable owned new user unit; recovery retained")
             for path, flag, name in [
                 (args.launcher, "had_wrapper", "launcher.before"),
                 (args.plist, "had_plist", "service.before.plist"),
@@ -1248,8 +1467,21 @@ def rollback(args, *, _compensating=False):
                 )
                 jwrite(backup / "transaction.json", active)
                 jwrite(current, active)
+    if args.service == "systemd-user":
+        if _systemctl(args, "daemon-reload").returncode:
+            raise RuntimeError("Cannot reload user manager after rollback; recovery retained")
     if active["was_loaded"] and (not core_already_restored or not loaded(args)):
         start_service(args)
+    if args.service == "systemd-user" and active["had_plist"]:
+        previous_enablement = active.get("systemd_enabled_before")
+        if previous_enablement in {"disabled", "static", "indirect", "enabled-runtime"}:
+            if _systemctl(args, "disable", "--", args.plist.name).returncode:
+                raise RuntimeError("Cannot restore prior disabled user unit; recovery retained")
+            if (
+                previous_enablement == "enabled-runtime"
+                and _systemctl(args, "enable", "--runtime", "--", args.plist.name).returncode
+            ):
+                raise RuntimeError("Cannot restore prior runtime enablement; recovery retained")
     if active.get("desktop"):
         desktop_module(args).restore(types.SimpleNamespace(**globals()), active, current)
     if active["was_loaded"] and active.get("previous_version"):
@@ -1300,7 +1532,13 @@ def _main():
     parser.add_argument("--language", choices=("de", "en"), default="de")
     parser.add_argument("--motion", choices=("auto", "full", "reduced"), default="auto")
     parser.add_argument("--bundle", type=Path, help="Verified extracted release bundle")
+    parser.add_argument(
+        "--release-root",
+        type=Path,
+        help="Already prepared Linux source runtime; skips download and uv sync",
+    )
     parser.add_argument("--workspace", type=Path, default=Path.home() / "workspace/KiraBridge")
+    parser.add_argument("--port", type=int, default=8765, help="Fresh config only; loopback port")
     parser.add_argument(
         "--prefix", type=Path, default=Path.home() / ".local/share/kirabridge/install"
     )
@@ -1308,13 +1546,15 @@ def _main():
         "--config", type=Path, default=Path.home() / ".config/kirabridge/config.toml"
     )
     parser.add_argument("--launcher", type=Path, default=Path.home() / ".local/bin/kirabridge")
-    parser.add_argument(
-        "--plist", type=Path, default=Path.home() / "Library/LaunchAgents" / f"{LABEL}.plist"
-    )
+    parser.add_argument("--plist", type=Path)
     parser.add_argument(
         "--service",
-        choices=["launchd", "none"],
-        default="launchd" if sys.platform == "darwin" else "none",
+        choices=["launchd", "systemd-user", "none"],
+        default="launchd"
+        if sys.platform == "darwin"
+        else "systemd-user"
+        if sys.platform.startswith("linux") and shutil.which("systemctl")
+        else "none",
     )
     parser.add_argument(
         "--cache-dir", type=Path, default=Path.home() / ".cache/kirabridge-installer"
@@ -1338,6 +1578,16 @@ def _main():
         help="Upgrade the matched desktop app, console and linked ChatGPT service transactionally",
     )
     args = parser.parse_args()
+    if not 1 <= args.port <= 65535:
+        parser.error("--port must be between 1 and 65535")
+    if args.service == "systemd-user" and args.require_visible_terminal:
+        parser.error("Linux server installation does not use a macOS Terminal window")
+    if args.plist is None:
+        args.plist = (
+            Path.home() / ".config/systemd/user/kirabridge.service"
+            if args.service == "systemd-user"
+            else Path.home() / "Library/LaunchAgents" / f"{LABEL}.plist"
+        )
     if args.desktop and (sys.platform != "darwin" or not args.bundle or args.test_label):
         parser.error("--desktop requires a native macOS bundle and the standard user service")
     if args.desktop and args.action == "install" and not args.require_visible_terminal:
@@ -1355,8 +1605,10 @@ def _main():
         if args.action not in {"install", "rollback"}:
             parser.error("Visible-terminal verification applies to install or rollback")
         require_visible_terminal(args)
-    for name in ("repo", "prefix", "config", "launcher", "plist", "cache_dir"):
-        setattr(args, name, getattr(args, name).expanduser().absolute())
+    for name in ("repo", "prefix", "config", "launcher", "plist", "cache_dir", "release_root"):
+        value = getattr(args, name)
+        if value is not None:
+            setattr(args, name, value.expanduser().absolute())
     if sys.version_info < (3, 11):
         parser.error("Python 3.11+ is required")
 

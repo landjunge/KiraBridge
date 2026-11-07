@@ -181,6 +181,68 @@ def test_builder_emits_license_asset_and_matching_manifest_for_host(tmp_path, mo
             assert "installer/visible_terminal.py" in pin["files"]
 
 
+def test_explicit_linux_server_target_skips_wheel_and_macos_bundle(tmp_path, monkeypatch):
+    module = script("build_release")
+    monkeypatch.setattr(module.sys, "platform", "darwin")
+    monkeypatch.chdir(tmp_path)
+    inputs = {
+        "LICENSE": LICENSE,
+        "pyproject.toml": f'[project]\nversion = "{VERSION}"\nlicense = "{EXPRESSION}"\n'.encode(),
+        "uv.lock": b"version = 1\n",
+        "installer/install.py": b"# installer\n",
+        "installer/presentation.py": b"# presentation\n",
+        "src/kirabridge/terminal_design.py": b"# design\n",
+        "src/kirabridge/install_ui.py": b"# ui\n",
+        "scripts/release-install.sh": b"# @PLATFORM@ @SOURCE@\n",
+        f"docs/RELEASE-{VERSION}.md": b"Fixture\n",
+        "docs/INSTALL-LINUX-SERVER.de.md": b"de\n",
+        "docs/INSTALL-LINUX-SERVER.md": b"en\n",
+    }
+    for name, data in inputs.items():
+        path = tmp_path / name
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(data)
+
+    def git(*args):
+        if args == ("status", "--porcelain"):
+            return ""
+        if args == ("rev-parse", "HEAD"):
+            return COMMIT
+        if args == ("ls-files",):
+            return "\n".join(inputs)
+        raise AssertionError(args)
+
+    def fake_uv(*args, **kwargs):
+        raise AssertionError("linux-server target must not build a wheel")
+
+    monkeypatch.setattr(module, "git", git)
+    monkeypatch.setattr(module.subprocess, "run", fake_uv)
+    monkeypatch.setattr(
+        module.subprocess,
+        "check_output",
+        lambda argv: inputs[argv[-1].split(":", 1)[1]],
+    )
+    output = tmp_path / "server-out"
+    module.build(output, target="linux-server")
+    archive = output / f"KiraBridge-{VERSION}-Linux-x86_64.tar.gz"
+    assert archive.is_file()
+    assert not (output / "KiraBridge-macos.tar.gz").exists()
+    sidecar = (output / (archive.name + ".sha256")).read_text().split()[0]
+    assert sidecar == hashlib.sha256(archive.read_bytes()).hexdigest()
+    with tarfile.open(archive) as packed:
+        pin = json.load(
+            packed.extractfile(next(item for item in packed if item.name.endswith("/release.json")))
+        )
+        names = {item.name.split("/", 1)[1] for item in packed.getmembers()}
+    assert pin["role"] == "linux-server"
+    assert pin["gui_parity"] is False
+    assert pin["service"] == "systemd-user"
+    assert "installer/install.py" in names
+    assert "INSTALL-DE.md" in names
+    assert "INSTALL-EN.md" in names
+    assert pin["files"]["installer/install.py"] == hashlib.sha256(b"# installer\n").hexdigest()
+
+
 def rewrite_archive(artifacts, change):
     path = next(artifacts.glob("*.tar.gz"))
     with tarfile.open(path) as archive:
