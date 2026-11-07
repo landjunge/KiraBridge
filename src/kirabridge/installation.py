@@ -97,6 +97,15 @@ def render_linux_unit(argv):
     """
     if not argv:
         raise BridgeError("service_install", "Linux server command is empty")
+    environment = ""
+    if "--config" in argv:
+        index = argv.index("--config") + 1
+        if index >= len(argv):
+            raise BridgeError("service_install", "Linux server config argument is missing")
+        path = str(Path(argv[index]).expanduser().absolute().parent / "secrets.env")
+        # EnvironmentFile expands % specifiers, not ExecStart's $ variables.
+        escaped = path.replace("\\", "\\\\").replace('"', '\\"').replace("%", "%%")
+        environment = 'EnvironmentFile="-' + escaped + '"\n'
     return (
         "[Unit]\n"
         "Description=KiraBridge private MCP bridge\n"
@@ -105,8 +114,10 @@ def render_linux_unit(argv):
         "[Service]\n"
         "Type=simple\n"
         "UMask=0077\n"
-        "EnvironmentFile=-%h/.config/kirabridge/secrets.env\n"
-        "ExecStart=" + " ".join(quote_systemd(part) for part in argv) + "\n"
+        + environment
+        + "ExecStart="
+        + " ".join(quote_systemd(part) for part in argv)
+        + "\n"
         "Restart=on-failure\n"
         "RestartSec=3\n"
         "TimeoutStopSec=15\n"
@@ -143,7 +154,10 @@ def linux_service(config_path, command, *, unit_path=None):
         info = unit.stat()
         if info.st_uid != os.getuid() or info.st_mode & 0o077:
             raise BridgeError("service_conflict", "Previous managed unit must remain owner-only")
-        replace_private(unit, body)
+        # The stable launcher already selects the updated runtime. Keep the
+        # exact legacy definition rather than racing another writer's unit edit.
+    if previous is not None and (unit.is_symlink() or unit.read_text() != previous):
+        raise BridgeError("service_conflict", "Existing user service changed; it was preserved")
     if not unit.exists():
         write_private(unit, body)
     for argv in (

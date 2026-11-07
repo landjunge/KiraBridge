@@ -309,7 +309,7 @@ def test_linux_unit_is_user_only_quoted_and_conflicts_preserved(tmp_path, monkey
 
 
 def test_linux_update_migrates_only_exact_previous_generated_unit(tmp_path, monkeypatch):
-    from kirabridge.installation import legacy_linux_unit, render_linux_unit
+    from kirabridge.installation import legacy_linux_unit
 
     monkeypatch.setattr("kirabridge.installation.shutil.which", lambda n: "/bin/systemctl")
     calls = []
@@ -336,7 +336,7 @@ def test_linux_update_migrates_only_exact_previous_generated_unit(tmp_path, monk
     assert unit.read_text() == old and unit.stat().st_mode & 0o777 == 0o644
     unit.chmod(0o600)
     linux_service(config, command, unit_path=unit)
-    assert unit.read_text() == render_linux_unit(args)
+    assert unit.read_text() == old
     assert calls[-1][-1] == unit.name
     linux_service(config, command, unit_path=unit)
     changed = old.replace("RestartSec=3", "RestartSec=9")
@@ -345,6 +345,32 @@ def test_linux_update_migrates_only_exact_previous_generated_unit(tmp_path, monk
     with pytest.raises(BridgeError, match="Existing user service differs"):
         linux_service(config, command, unit_path=unit)
     assert unit.read_text() == changed and calls == []
+
+
+def test_linux_legacy_intervening_edit_is_preserved_without_service_commands(tmp_path, monkeypatch):
+    import kirabridge.installation as installation
+
+    unit = tmp_path / "test.service"
+    config = tmp_path / "config.toml"
+    command = "/private/bin/kirabridge"
+    argv = [command, "--config", str(config), "serve", "--transport", "http"]
+    legacy = installation.legacy_linux_unit(argv)
+    unit.write_text(legacy)
+    unit.chmod(0o600)
+    foreign = "[Service]\nExecStart=/foreign/command\n"
+
+    def intervening_edit(args):
+        unit.write_text(foreign)
+        return legacy
+
+    monkeypatch.setattr(installation.shutil, "which", lambda name: "/bin/systemctl")
+    monkeypatch.setattr(installation, "legacy_linux_unit", intervening_edit)
+    monkeypatch.setattr(
+        installation.subprocess, "run", lambda *a, **kw: pytest.fail("foreign service action")
+    )
+    with pytest.raises(BridgeError, match="changed; it was preserved"):
+        linux_service(config, command, unit_path=unit)
+    assert unit.read_text() == foreign
 
 
 @pytest.mark.parametrize("valid", [True, False])

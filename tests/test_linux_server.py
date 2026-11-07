@@ -94,10 +94,21 @@ def test_linux_unit_quotes_server_command_and_keeps_secrets_optional():
         ["/opt/kirabridge/.venv/bin/python", "-m", "kirabridge.cli", "--config", config, "serve"]
     )
     assert quote_systemd(config) in body
-    assert "EnvironmentFile=-%h/.config/kirabridge/secrets.env\n" in body
+    assert 'EnvironmentFile="-/srv/kira bridge/secrets.env"\n' in body
     assert "NoNewPrivileges=true\n" in body
     assert "TimeoutStopSec=15\n" in body
     assert "WantedBy=default.target\n" in body
+
+
+def test_linux_unit_environment_is_scoped_to_selected_config(tmp_path):
+    config = tmp_path / 'other %$" installation/config.toml'
+    body = render_linux_unit(["python", "--config", str(config), "serve"])
+    expected = str(config.parent / "secrets.env").replace('"', '\\"').replace("%", "%%")
+    assert 'EnvironmentFile="-' + expected + '"\n' in body
+    assert "$$" not in next(
+        line for line in body.splitlines() if line.startswith("EnvironmentFile=")
+    )
+    assert "%h/.config/kirabridge/secrets.env" not in body
 
 
 def test_fresh_server_config_uses_isolated_port_and_preserves_existing(tmp_path, monkeypatch):

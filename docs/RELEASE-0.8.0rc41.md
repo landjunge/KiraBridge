@@ -12,6 +12,9 @@ DEBIAN-DIRK-RELEASE-20261107. Separate Linux x86_64 prerelease
   source identity checks, update and rollback reuse the Grok implementation.
   Config, credentials, permission policy, live task data and UNKNOWN states
   are preserved. Rollback does not restore an old database over newer data.
+- Exact older guided-install units remain unchanged and compatible through
+  their stable launcher. Intervening edits and foreign definitions are preserved.
+  Optional environment files are scoped to the selected configuration.
 - Native Debian acceptance, JUnit, artifact checksum and the actual GitHub
   download comparison are release gates recorded in the evidence assets.
   Earlier macOS mocks are not counted as native Debian acceptance.

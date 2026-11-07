@@ -64,7 +64,9 @@ systemctl --user status kirabridge.service
 systemctl --user restart kirabridge.service
 ```
 
-The unit follows `examples/kirabridge.service`. `secrets.env` is optional.
+The unit follows `examples/kirabridge.service`. The optional `secrets.env` is
+looked up beside the selected config file; an isolated installation does not
+import another installation's default environment file.
 If that file is missing, the service still starts. The installer does not
 enable linger and does not install a system-wide unit.
 
