@@ -128,10 +128,12 @@ Linux runners for Python 3.11/3.13; hosted macOS and package workflows require m
 selection. [CI selection, costs and platform limits](CI-COST-GATES-20261106.md).
 
 
-The November 7 [PR71 verification](https://github.com/landjunge/KiraBridge/actions/runs/42365946670)
-is blocked by expired routing-test fixtures; Python 3.13 also reports unresolved
-unraisable-exception errors. The fixtures and production freshness guard are
-unchanged by this documentation task. [Diagnosis and exact failed results](evidence/readme-current-20261107.json).
+The initial November 7 [PR71 verification](https://github.com/landjunge/KiraBridge/actions/runs/42365946670)
+failed on expired routing-test fixtures, with additional Python 3.13 errors.
+The existing, independently reviewed fixed test clock from the server branch is
+now reused; production freshness checks and real process timeouts are unchanged.
+[Current PR checks](https://github.com/landjunge/KiraBridge/pull/71/checks) remain
+the integration gate. [Original failures, focused checks and source pins](evidence/readme-current-20261107.json).
 
 Full integration reproduction needs `uv sync --locked --dev --group remote-ci`
 and the exact external checkouts below. CI uses `scripts/ci_remote_tests.py`

@@ -41,8 +41,7 @@ Der veröffentlichte Intel-Download oben bleibt RC36 bei `d4aebdd`.
 Der [frühere PR61-Installationsbericht](docs/RC40-PR61-SHIM-INSTALL-20261106.md)
 beschreibt den vorherigen RC40-Quellstand `a5d381a`.
 
-Windows-Funktionsgleichstand und eigenständiger Installer sowie der
-Linux-/Debian-Server bleiben Entwicklungsarbeit. Die veröffentlichte Windows-Vorschau
+Windows-Funktionsgleichstand und eigenständiger Installer bleiben Entwicklungsarbeit. Die veröffentlichte Windows-Vorschau
 enthält keine allgemeinen Datei-, Prozess- oder Terminaltools und keine
 Windows-Dienstinstallation. Hier wird kein neues Paket dieser laufenden Projekte
 und kein veröffentlichter RC40-Download angeboten.
@@ -82,6 +81,22 @@ Richte ihre Terminalsitzung in KiraBridge als Ziel ein.
 Diese Vorabversion hat bekannte Einschränkungen bei der Terminalbedienung; die App
 ist nicht von Apple notarisiert. Der [RC36-Nachweis](docs/TERMINAL-MINIMIZED-RC36-20261104.md)
 beschreibt das veröffentlichte Paket; siehe [Installation, Prüfung und Hilfe](docs/INSTALL-DE.md).
+
+
+## Linux-/Debian-Server
+
+Der separate [Serverquellstand in PR72](https://github.com/landjunge/KiraBridge/pull/72)
+bietet einen privaten HTTP-MCP-Dienst auf Loopback mit Bearer-Authentifizierung
+und Healthprüfung sowie Installation, Update und Rollback über `systemd --user`.
+Zielplattformen sind Debian 13 und Ubuntu 24.04 x86_64. Der Onlineinstaller benötigt
+einen laufenden Benutzermanager; die Laufzeit über Logout/Neustart folgt der Sitzungspolitik
+des Hosts. Linger, Administratorrechte, Firewall und öffentliches HTTPS werden nicht eingerichtet.
+
+Der Server läuft ohne macOS-GUI, Terminal.app oder native Tastatursteuerung.
+Zwischenablage ist optional (`wl-clipboard`/`xclip`). ChatGPT-/Kontoverknüpfung und
+Fernzugriff benötigen eigene Konfiguration. Finale native Paketabnahme,
+Mainintegration und veröffentlichter Serverdownload stehen noch aus;
+[Lieferbelege und aktuelle Grenzen](docs/evidence/readme-current-20261107.json).
 
 ## Tastenfolgen und weniger Cloudaufrufe
 

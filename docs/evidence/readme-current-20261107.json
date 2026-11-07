@@ -2,8 +2,8 @@
   "schema": "kirabridge.readme-current.v1",
   "task_id": "KB-README-CURRENT-CODEX-20261107",
   "instance": "codex-current-readme-20261107",
-  "recorded_at": "2026-11-07T11:11:02.236861+00:00",
-  "status": "documentation_ready_PR71_merge_blocked_by_existing_time_dependent_test_fixtures",
+  "recorded_at": "2026-11-07T11:24:36.076765+00:00",
+  "status": "user_extension_verified_source_integration_in_progress",
   "scope": {
     "written_files": [
       "README.md",
@@ -20,6 +20,9 @@
       "platform builds and VM tests",
       "service or credentials changes",
       "release/tag/deployment/installation"
+    ],
+    "integrated_existing_source_files": [
+      "tests/test_capability_routing.py from reviewed canonical server commit0eb0804; original assigned worktree test file not changed"
     ]
   },
   "session": {
@@ -513,6 +516,36 @@
       "additional_python313_errors": "Observed PytestUnraisableExceptionWarning from Faulty stream objects and two errors; their causal explanation remains unresolved, not silently attributed to expiry.",
       "documentation_code_change_check": "git diff --name-only baseline..77c3aae -- src tests scripts .github pyproject.toml uv.lock returned empty",
       "required_followup": "Routing fixture owner must make positive fixtures clock-controlled while retaining expiry/rights guards; separately investigate Python3.13 unraisable cleanup and rerun affected checks, then required PR CI. These test/product files are outside this documentation-only write scope."
+    },
+    "documentation_static_after_extension": {
+      "status": "passed",
+      "counts": {
+        "links_and_assets": 132,
+        "local_links_and_assets": 98,
+        "external_references": 34,
+        "pinned_git_links": 10,
+        "shell_syntax_blocks": 4
+      },
+      "issues": [],
+      "files": [
+        {
+          "path": "README.md",
+          "sha256": "37e03f5ffc270ed68e0885160f9d193da697842664e48bdca85a3d8d9f2a8603"
+        },
+        {
+          "path": "README.de.md",
+          "sha256": "d5aa8cff5a1d643b96b24d5fdd21532288915027a470cc74c378174fa831c70b"
+        },
+        {
+          "path": "docs/DEVELOPERS.md",
+          "sha256": "8fe04d3d43def0dcb8d7d29572c94b192dd8ed128db838eab54711934fd47355"
+        },
+        {
+          "path": "docs/DEVELOPERS.de.md",
+          "sha256": "ce9a495c1945b9ea185590a3aada7f642b94ec1ca095396cc52e33778e1d5e69"
+        }
+      ],
+      "scope": "local targets/anchors, pinned Git blobs, HTML image sources, fence/whitespace and shell syntax, DE/EN source/version/GitHub-link parity, unchanged README artwork"
     }
   },
   "independent_review": {
@@ -583,7 +616,7 @@
     "design_read_only_observation": "Existing design thread read without input; latest visible message concerned source header cache/language and 4AllPass offline icons. No successful coordination message or README ownership acknowledgement claimed; this change preserves artwork and main README content outside factual scope."
   },
   "integration": {
-    "state": "PR71_open_not_merged_required_CI_failed",
+    "state": "canonical_shared_clock_source_reused_local_routing_passed_required_CI_pending",
     "authorized": "User explicitly authorizes branch push, PR, required checks/review and regular merge; no release/tag/deployment",
     "primary_worktree_git_blockers": [
       "git fetch origin main: cannot open .../FETCH_HEAD: Operation not permitted",
@@ -596,16 +629,112 @@
     "pr_url": "https://github.com/landjunge/KiraBridge/pull/71",
     "review_comment": "https://github.com/landjunge/KiraBridge/pull/71#issuecomment-6705905320",
     "remote_main_last_observed": "d12838ae97c7efcc053c45c3bc9fba5e78f5fe5d",
-    "blocker": "Existing routing test fixtures expired on2026-11-06T20:00Z; source/test changes are explicitly outside authorized write scope. Required CI is failed, no merge or check bypass.",
+    "blocker": "Original CI failure retained. Existing canonical source fix now integrated into own temporary branch; required CI and final server delivery still pending. Original worktree Git and coordination write limits remain.",
     "final_report_update": "This followup only records actual CI failure and updates developer status. A normal push necessarily triggers existing Verify again; no workflow change, skip marker, manual full-suite rerun or successful replacement status is used. Its later result must be read from PR71.",
     "local_sync_limit": "Original worktree branch/index still at d12838a due protected metadata; documentation files match supplied branch contents. Temporary integration clone clean after commit/push."
   },
   "remaining_limits": [
-    "Regular main integration NOT completed: PR71 blocked on actual failed required CI, with focused reproduction and separate fixture-owner followup. No success claimed for skipped remote/build steps.",
+    "Main integration still pending actual required checks. Canonical source test-clock fix reused under user extension; two related local CLI cleanup tests remain failed under process-census permission limits, never counted passed.",
     "Windows parity, standalone Windows installer and current Linux/Debian server remain separate active work; no worker code changed.",
     "Apple Silicon and other OS/native/provider acceptance not performed here.",
     "Website TLS/content could not be verified.",
     "ThreadDesk/report/design messaging writes blocked by current tool/sandbox permissions; no save/readback claimed.",
     "No mandatory CI/review status may be claimed passed before its actual completed result."
-  ]
+  ],
+  "user_extension_20261107": {
+    "scope": "Push/integrate actually finished and checked KiraBridge source deliveries; document Windows once completed and server function/status/limits; no extra release/tag/deployment by this worker. Preserve worker ownership and do not take unverified WIP.",
+    "canonical_clock_reuse": {
+      "source_commit": "0eb0804294ed1896d4628f66c5a236d8fb1d8743",
+      "source_pr": 72,
+      "source_blob": "27d59fd7e4b1b5e73aa86c42c80d85f14a0c531e",
+      "file": "tests/test_capability_routing.py",
+      "delta_from_main": "14 added fixture lines only",
+      "prior_equivalent_verified_fix": "e0cf160408b25588df94a6c631835ad4373acffc, PR70, Verify42312193430 both lanes SUCCESS",
+      "independent_review": "Exact canonical14-line payload approved; production guard, negative expiry cases and real process timeout clocks unchanged. One canonical fixture prevents a duplicate at server integration.",
+      "local_check": {
+        "source_commit": "0eb0804294ed1896d4628f66c5a236d8fb1d8743",
+        "source_test_blob": "27d59fd7e4b1b5e73aa86c42c80d85f14a0c531e",
+        "source_test_sha256": "847516c3dd2ae7adb13ba7aec7f9d8a5fb9b8424e7bb5ee4a41ea034ae430364",
+        "argv": [
+          "/Users/landjunge/KiraBridge-worktrees/current-readme-codex-20261107/.venv/bin/python",
+          "-m",
+          "pytest",
+          "-q",
+          "tests/test_capability_routing.py",
+          "tests/test_cli_message_returns.py",
+          "--tb=short",
+          "-W",
+          "error::pytest.PytestUnraisableExceptionWarning",
+          "--junitxml=/tmp/kb-readme-routing-clock-junit.xml"
+        ],
+        "cwd": "/tmp/kb-readme-integration-20261107",
+        "PYTHONPATH": "/tmp/kb-readme-integration-20261107/src",
+        "imports": [
+          "/Users/landjunge/KiraBridge-worktrees/current-readme-codex-20261107/.venv/bin/python",
+          "/tmp/kb-readme-integration-20261107/src/kirabridge/__init__.py",
+          "/tmp/kb-readme-integration-20261107/src/kirabridge/capability_routing/router.py"
+        ],
+        "started_at": "2026-11-07T11:19:50.356626+00:00",
+        "elapsed_seconds": 35.26083544595167,
+        "exit_code": 1,
+        "log": "/tmp/kb-readme-routing-clock-tests.log",
+        "log_sha256": "a91aa5771f9f97f473834554639c27e56976206ec7d83c73c7c252c533690eee",
+        "junit": "/tmp/kb-readme-routing-clock-junit.xml"
+      },
+      "local_result": {
+        "routing_tests": 73,
+        "routing_passed": 73,
+        "related_CLI_tests": 8,
+        "related_CLI_passed": 6,
+        "related_CLI_failed": 2,
+        "CLI_failure_observed": "Both synthetic message_jobs preserve unknown/error process_cleanup_unknown. /bin/ps is refused by this worker sandbox; existing cleanup guard requires process-session census. No guard bypass or fake pass.",
+        "CLI_cause_scope": "Permission constraint consistent with unchanged platform_adapters process census; no broader source failure cause asserted.",
+        "repeat_policy": "No repeated whole suite or platform acceptance. Required Linux3.11/3.13 CI remains necessary for integrated source."
+      },
+      "static_checks": "Ruff check and format of sole reused test file passed"
+    },
+    "worker_delivery_snapshot": {
+      "observed_board_revision": 934,
+      "server": {
+        "worker_thread": "01a1b5a5-608c-7210-91d6-a4dc0da2af68",
+        "task": "DEBIAN-DIRK-RELEASE-20261107",
+        "pr": 72,
+        "last_local_commit_observed": "d62fc87",
+        "previous_reviewed_source": "0eb0804294ed1896d4628f66c5a236d8fb1d8743",
+        "ownership": "Exclusive server code/native acceptance/release remains assigned worker; no server product files edited here.",
+        "native_state": "Worker reports installation/update/rollback partial successes; final package tests with special path and service-none still in progress. No final acceptance/release/download proof accepted here.",
+        "supported_source_scope": "Debian13/Ubuntu24.04 x86_64; online pinned runtime; systemd-user or service none; loopback authenticated HTTP MCP, health, install/update/rollback/data and UNKNOWN preservation.",
+        "limits": "No macOS GUI/Terminal.app/native keys. Optional clipboard dependencies. No automatic admin/linger/firewall/publicHTTPS or account linking.",
+        "download": "Not verified/published by this task; intended linux-v0.8.0rc41 is not offered as a ready link."
+      },
+      "windows": {
+        "source_worktree": "/Users/landjunge/KiraBridge-worktrees/windows-installer-verified-20261107",
+        "head": "0a4d84b6c83b7d89208a9803ba43ce4995266d83",
+        "state": "Uncommitted source WIP; standalone EXE/MSI not built or natively installed/updated/rolled back; guest-agent repair is a separate bounded success.",
+        "action": "Do not push/merge as finished Windows parity or offer new download."
+      },
+      "audit": {
+        "worker_thread": "01a1b572-4567-7fb0-bf46-831b2013dd97",
+        "repair_complete": false,
+        "handoff_confirmed": false,
+        "state": "Analysis and3baseline tests only in Codex worktree. Grok32-test uncommitted archive diff is not accepted complete lossless repair.",
+        "action": "No duplicate audit implementation and no unverified audit WIP integration."
+      },
+      "design": {
+        "worker_thread": "01a1b585-1a6b-7603-a309-cee5a18777b2",
+        "kirabridge_commit": "d9b433d922258b7ace610d809776dfa47cb317fa",
+        "state": "Source committed/reviewed; targeted console15 and header1 checks passed. Browser engines aborted before DOM; screenshots/native UI acceptance remain open.",
+        "bundle_sha256": "214a16f54c989486f34a5292a94e0ce83d05a588c40610ab4cff3a25ef10ac8a",
+        "action": "Finished checked source may be pushed as explicitly scoped source candidate after source integration review; no visual/native/full delivery acceptance claimed."
+      }
+    },
+    "coordination": {
+      "board_append_operation": "kb-readme-current-resume-20261107-01",
+      "board_append_result": "MCP approval policy never; independently reconciled foundfalse",
+      "message_note_key": "kb-readme-resume-shared-clock-20261107-01",
+      "message_note_result": "MCP approval policy never; no delivery claimed",
+      "native_queue_attempts": "Coordinator and server passive notes failed before queue admission: state_5.sqlite/memories_1.sqlite unable to open database file. No resume or new worker start.",
+      "successful_channel": "GitHub PR comments used for concrete cross-PR coordination; exact receipt recorded separately."
+    }
+  }
 }

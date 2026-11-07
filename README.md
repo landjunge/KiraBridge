@@ -42,8 +42,7 @@ The published Intel download above remains RC36 at `d4aebdd`.
 The [earlier PR61 installation report](docs/RC40-PR61-SHIM-INSTALL-20261106.md)
 describes the previous RC40 source `a5d381a`.
 
-Windows feature parity and a standalone installer, plus the Linux/Debian server,
-remain development work. The published Windows preview does not include general
+Windows feature parity and a standalone installer remain development work. The published Windows preview does not include general
 file, process or terminal tools, or Windows service installation. No new package
 for those ongoing projects or published RC40 download is offered here.
 
@@ -81,6 +80,22 @@ configure its terminal session as a target in KiraBridge.
 This preview has known terminal limitations, and the app is not Apple-notarized.
 See [RC36 fixes, checks and limits](docs/TERMINAL-MINIMIZED-RC36-20261104.md) for the current
 package; see [installation, verification and help](docs/INSTALL-EN.md).
+
+
+## Linux / Debian server
+
+The separate [server source in PR72](https://github.com/landjunge/KiraBridge/pull/72)
+provides a private loopback HTTP MCP service with bearer authentication and health
+checks, plus installation, update and rollback through `systemd --user`.
+Its target platforms are Debian 13 and Ubuntu 24.04 x86_64. The online installer
+needs a running user manager; logout/reboot lifetime follows the host's session policy.
+It does not configure linger, administrator rights, a firewall or public HTTPS.
+
+This is a headless server, with no macOS GUI, Terminal.app or native keyboard.
+Clipboard support is optional (`wl-clipboard`/`xclip`). ChatGPT/account linking and
+remote access need separate configuration. Final native package acceptance,
+main integration and a published server download are still pending;
+[delivery evidence and current limits](docs/evidence/readme-current-20261107.json).
 
 ## Keyboard sequences and fewer cloud calls
 

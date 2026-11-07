@@ -138,10 +138,12 @@ selbstgehosteten Linux-Runner für Python 3.11/3.13; gehostete macOS- und Paketp
 benötigen manuelle Auswahl. [CI-Auswahl, Kosten und Plattformgrenzen](CI-COST-GATES-20261106.md).
 
 
-Die [PR71-Prüfung vom 7. November](https://github.com/landjunge/KiraBridge/actions/runs/42365946670)
-ist durch abgelaufene Routing-Testfixtures blockiert; Python 3.13 meldet zusätzlich
-ungeklärte Unraisable-Exception-Fehler. Testfixtures und produktiver Frischeguard
-bleiben in diesem Dokumentationsauftrag unverändert. [Diagnose und exakte Fehlergebnisse](evidence/readme-current-20261107.json).
+Die erste [PR71-Prüfung vom 7. November](https://github.com/landjunge/KiraBridge/actions/runs/42365946670)
+scheiterte an abgelaufenen Routing-Testfixtures und zusätzlichen Python-3.13-Fehlern.
+Die vorhandene, unabhängig geprüfte feste Testuhr aus dem Serverbranch wird jetzt
+wiederverwendet; produktive Frischeprüfungen und echte Prozesszeitlimits bleiben erhalten.
+Die [aktuellen PR-Checks](https://github.com/landjunge/KiraBridge/pull/71/checks) sind
+weiterhin Integrationsgate. [Originalfehler, gezielte Prüfungen und Quellpins](evidence/readme-current-20261107.json).
 
 Vollständige Integrationsreproduktion benötigt `uv sync --locked --dev --group remote-ci`
 und die exakten externen Checkouts unten. CI verwendet `scripts/ci_remote_tests.py`
