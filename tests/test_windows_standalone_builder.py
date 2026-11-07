@@ -62,3 +62,48 @@ def test_native_export_hash_mismatch_produces_no_package(tmp_path):
     with pytest.raises(ValueError, match="SHA256 mismatch"):
         builder.build(tmp_path / "runtime", output, "1.0", export, "0" * 64, "a" * 40)
     assert not output.exists()
+
+
+@pytest.mark.parametrize("from_export,override", [(True, None), (False, None), (True, "explicit")])
+def test_default_version_comes_from_selected_source_not_checkout(
+    tmp_path, monkeypatch, from_export, override
+):
+    runtime = tmp_path / "runtime"
+    (runtime / "Lib/site-packages").mkdir(parents=True)
+    (runtime / "python.exe").write_bytes(b"MZ-python")
+    (runtime / "python314.dll").write_bytes(b"MZ-dll")
+    checkout = tmp_path / "checkout"
+    checkout.mkdir()
+    (checkout / "pyproject.toml").write_text('[project]\nversion = "dirty-checkout-version"\n')
+    monkeypatch.setattr(builder, "ROOT", checkout)
+    source = tmp_path / "selected.zip"
+    metadata = b'[project]\nversion = "0.7.0.export"\n'
+    with zipfile.ZipFile(source, "w") as zipped:
+        zipped.writestr("pyproject.toml", metadata)
+    raw = source.read_bytes()
+    digest = hashlib.sha256(raw).hexdigest()
+
+    def selected_git(args, **kwargs):
+        assert not from_export, "A verified export must not consult the builder checkout"
+        if args == ["git", "rev-parse", "HEAD"]:
+            return "a" * 40
+        assert args[:3] == ["git", "archive", "--format=zip"]
+        return raw
+
+    monkeypatch.setattr(builder.subprocess, "check_output", selected_git)
+    output = tmp_path / "package.zip"
+    result = builder.build(
+        runtime,
+        output,
+        override,
+        source if from_export else None,
+        digest if from_export else None,
+        "a" * 40 if from_export else None,
+    )
+    expected = override or "0.7.0.export"
+    assert result["version"] == expected
+    with zipfile.ZipFile(output) as zipped:
+        provenance = json.loads(zipped.read("provenance.json"))
+        assert provenance["version"] == expected
+        assert provenance["source_archive_sha256"] == digest
+        assert zipped.read("pyproject.toml") == metadata
