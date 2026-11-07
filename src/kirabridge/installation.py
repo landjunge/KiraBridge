@@ -117,20 +117,38 @@ def render_linux_unit(argv):
     )
 
 
-def linux_service(config_path, command):
+def legacy_linux_unit(argv):
+    """Exact pre-server unit, accepted only for the same config and command."""
+    return (
+        "[Unit]\nDescription=KiraBridge private MCP bridge\nAfter=network.target\n"
+        "[Service]\nType=simple\nUMask=0077\nExecStart="
+        + " ".join(quote_systemd(part) for part in argv)
+        + "\nRestart=on-failure\nRestartSec=3\n[Install]\nWantedBy=default.target\n"
+    )
+
+
+def linux_service(config_path, command, *, unit_path=None):
     if not shutil.which("systemctl"):
         raise BridgeError("service_manager_missing", "A user systemd session is required")
-    unit = Path.home() / ".config/systemd/user/kirabridge.service"
+    unit = unit_path or Path.home() / ".config/systemd/user/kirabridge.service"
     args = [command, "--config", str(config_path), "serve", "--transport", "http"]
     body = render_linux_unit(args)
     unit.parent.mkdir(parents=True, exist_ok=True)
-    if unit.exists() and unit.read_text() != body:
+    if unit.is_symlink():
+        raise BridgeError("service_conflict", "Existing user service symlink was preserved")
+    previous = unit.read_text() if unit.exists() else None
+    if previous is not None and previous not in {body, legacy_linux_unit(args)}:
         raise BridgeError("service_conflict", "Existing user service differs; it was preserved")
+    if previous is not None and previous != body:
+        info = unit.stat()
+        if info.st_uid != os.getuid() or info.st_mode & 0o077:
+            raise BridgeError("service_conflict", "Previous managed unit must remain owner-only")
+        replace_private(unit, body)
     if not unit.exists():
         write_private(unit, body)
     for argv in (
         ["systemctl", "--user", "daemon-reload"],
-        ["systemctl", "--user", "enable", "--now", "kirabridge.service"],
+        ["systemctl", "--user", "enable", "--now", unit.name],
     ):
         result = subprocess.run(argv, capture_output=True, timeout=20)
         if result.returncode:
