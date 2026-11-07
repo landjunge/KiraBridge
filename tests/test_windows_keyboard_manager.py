@@ -112,6 +112,7 @@ async def test_windows_platform_status_reports_only_real_preview_operations(brid
         "windows.keyboard.inspect",
         "windows.keyboard.sequence",
         "windows.keyboard.shortcut",
+        "windows.keyboard.text",
     }
     assert not result["interactive_desktop_observed"]
     assert "managed process execution" in result["unsupported_features"]

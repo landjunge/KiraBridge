@@ -1,0 +1,163 @@
+{
+  "task_id": "WIN-PARITY-GROK-20261106",
+  "phase": "correction",
+  "accepted_by_operator": false,
+  "instance_id": "win-parity-grok-20261106-correction-51831",
+  "implementer": "grok",
+  "finished_at": "2026-11-06T22:31:45Z",
+  "branch": "feat/windows-parity-grok-20261106",
+  "base_commit": "d2eac657ef9bc42a853731a659cded890ddfafea",
+  "implementation_commits": [
+    {
+      "commit": "37ea23911d20133b3ca80e6ecb65442f2d49dad5",
+      "subject": "fix: pin Windows parity runtime, bytes, and console results"
+    },
+    {
+      "commit": "522535b7583f95aeb5b82143c961714b3cf2dc5e",
+      "subject": "fix: install an extracted Windows payload without git"
+    }
+  ],
+  "package_commit": "522535b7583f95aeb5b82143c961714b3cf2dc5e",
+  "pushed": false,
+  "release_started": false,
+  "mac_production_install": false,
+  "vm_write": false,
+  "execution_policy_changed": false,
+  "subagents": false,
+  "preserved_initial_setup_evidence": {
+    "source": "docs/WINDOWS-NATIVE-PREFLIGHT-20261106.md",
+    "powershell": "5.1.26100.9711",
+    "execution_policy": "Restricted",
+    "raw_receipt_sha256": "b6a9e540aa5b2da28c4c37fcc00972f9ff5f4e9d68103fa9fb931ac9ce839b02",
+    "environment_receipt_sha256": "646914b4558cf5ab6b0937e2a203a7bd42fa8afab787256858bdb7f6ba46e4fd",
+    "guest_os": "Windows 11 Enterprise Evaluation 10.0.26300, 64-bit",
+    "guest_python": "3.14.10 AMD64, exit 0",
+    "dependency_versions": "37 required versions matched the manifest; no package install was done",
+    "prepared_interpreter_package": "KiraBridge 0.8.0rc31.dev2 is still importable from that interpreter and is not a running bridge",
+    "blocked_runner": "The fresh console was Restricted. The earlier request for a one-time override of the hash-checked PowerShell runner was not granted. This correction does not start that runner, does not use -EncodedCommand or Bypass, and does not add a new approval for ordinary Python.",
+    "not_a_failed_candidate_run": "The preflight document says the Restricted stop was not a failed Windows candidate check."
+  },
+  "tests": {
+    "interpreter": "/Users/landjunge/KiraBridge-worktrees/windows-parity-grok-20261106/.venv/bin/python",
+    "version": "3.14.4",
+    "ruff": "ruff check passed on the touched Python files",
+    "full_file_before_fixture_fix": {
+      "command": "PYTHONPATH=src .venv/bin/python -m pytest -q tests/test_windows_parity_20261106.py",
+      "result": "16 passed, 1 failed",
+      "failure": "The new late-result test used handoff id other01. The existing pattern requires 8 characters. That was a fixture error, not a product failure."
+    },
+    "late_result_after_fixture_fix": "1 passed in 0.21s",
+    "console_tests_after_read_error_branch": {
+      "tests": [
+        "test_owned_child_stops_at_the_output_limit_and_on_timeout",
+        "test_console_main_returns_unicode_from_the_same_session",
+        "test_oem_bytes_round_trip_and_do_not_become_unknown",
+        "test_child_imports_the_pinned_runtime_not_an_older_package"
+      ],
+      "result": "4 passed in 2.29s"
+    },
+    "extracted_payload_without_git": "1 passed in 0.76s",
+    "not_rerun": "The whole file was not run again after the last edits. windows_package.py was unchanged after the 16 passed results. The console read path was rerun. The extracted-payload test was run after the harness change."
+  },
+  "harness": {
+    "command": "PYTHONPATH=src .venv/bin/python -B scripts/accept_windows_parity.py",
+    "commit": "522535b7583f95aeb5b82143c961714b3cf2dc5e",
+    "exit_code": 0,
+    "platform": "darwin",
+    "windows_vm_tested_by_this_process": false,
+    "native_visible": null,
+    "package": {
+      "provenance_commit": "522535b7583f95aeb5b82143c961714b3cf2dc5e",
+      "provenance_verified": true,
+      "installed_import": "0.8.0rc40-522535b7583f/src/kirabridge/__init__.py",
+      "first_marker": "absent",
+      "second_marker": "two",
+      "rollback_marker": "absent",
+      "data": "behalten",
+      "standalone_executable": false
+    },
+    "full_windows_parity": false
+  },
+  "package": {
+    "kind": "deterministic source zip plus provenance, for the existing Python; not a standalone executable",
+    "path": "dist/KiraBridge-0.8.0rc40-windows-parity-20261106.zip",
+    "absolute_path": "/Users/landjunge/KiraBridge-worktrees/windows-parity-grok-20261106/dist/KiraBridge-0.8.0rc40-windows-parity-20261106.zip",
+    "sha256": "63f7648e25f69ab0dcb605049e8ec23f23e918b6fa6d2aae6d99859b7a5b4229",
+    "members": 228,
+    "inventory_files": 227,
+    "provenance_commit": "522535b7583f95aeb5b82143c961714b3cf2dc5e",
+    "provenance_dirty": false,
+    "rebuilt_twice_same_hash": true,
+    "gitignored": true,
+    "includes_license": true,
+    "includes_harness": [
+      "scripts/accept_windows_parity.py",
+      "scripts/accept_windows_keyboard.py",
+      "scripts/accept_windows_windows.py",
+      "tests/test_windows_parity_20261106.py"
+    ],
+    "rebuild_command": "python -B scripts/windows_parity_package.py build --output dist/KiraBridge-0.8.0rc40-windows-parity-20261106.zip",
+    "rebuild_from": "522535b7583f95aeb5b82143c961714b3cf2dc5e",
+    "note": "This result file is a later commit and is not inside the zip. Rebuilding at the result commit changes the provenance commit and the hash."
+  },
+  "corrections": [
+    "The visible child uses python -P and inserts the activated runtime before import. The result records import path and source sha256. A mismatched identity is not a completion.",
+    "Install, update, and rollback rehash release bytes, reject symlinks, reparse points, and hard links, compare the staged tree with the pinned manifest, and reject a previous id that is not one safe path segment. A package lock serializes the three operations. User data stays in root/data.",
+    "Duplicate detection and the single reservation happen under the desktop lock.",
+    "A late valid result.json is reconciled to the original argv and source identity without a new process. An invalid or different command is not replayed.",
+    "Child bytes are decoded as UTF-8, then OEM/ANSI, with sha256 and encoding stored. A decode mismatch does not become UNKNOWN. Each pipe keeps at most 65536 bytes. The owned child is terminated on that limit or on timeout.",
+    "The zip contains LICENSE and a provenance entry for the existing Python. Activation imports kirabridge from the release src. Update and rollback were checked with a distinguishable copy and preserved data. No exe or msi is claimed.",
+    "A --commit that differs from provenance.json is refused. The inventory is the file hash map inside that provenance."
+  ],
+  "not_run_by_this_harness": [
+    "native WM_CHAR into an owned window; run scripts/accept_windows_keyboard.py on the interactive guest",
+    "native owned-window foreground transition; run scripts/accept_windows_windows.py on the interactive guest",
+    "windows.app.launch CreateProcess of a GUI program",
+    "windows.app.focus of a real HWND",
+    "attachment to an existing Windows Terminal tab",
+    "Windows service installation",
+    "standalone exe or msi",
+    "ExecutionPolicy change; Restricted stays unchanged",
+    "full macOS terminal, clipboard, and voice parity"
+  ],
+  "codex_guest_instructions": {
+    "do_not": [
+      "Do not pass -ExecutionPolicy, Bypass, or -EncodedCommand.",
+      "Do not start scripts/windows_guest_runner.ps1 or replace it with another ps1.",
+      "Do not request or invent a new ExecutionPolicy approval. Ordinary python.exe is already the authorized path.",
+      "Do not replay historical UNKNOWN tasks.",
+      "Do not replace the existing preview, RC31, or other guest installations.",
+      "Do not treat the Mac harness exit 0 as a Windows pass."
+    ],
+    "prerequisites": [
+      "Use the existing visible console and the prepared Python 3.14.10.",
+      "Leave ExecutionPolicy Restricted.",
+      "Use a new directory under LOCALAPPDATA.",
+      "The prepared interpreter can still import KiraBridge 0.8.0rc31.dev2. The check must show the activated release path instead.",
+      "Keyboard and window harnesses need an interactive desktop. Each writes a new output file and must not be pointed at an old result.",
+      "If an import fails because a dependency is missing, install it with the existing Python from the already present RC33 Windows Dev Kit wheelhouse: pip --no-index --find-links <kit>\\wheels. Do not download a new interpreter and do not change policy."
+    ],
+    "build_from_checkout": "git checkout 522535b7583f95aeb5b82143c961714b3cf2dc5e && python -B scripts/windows_parity_package.py build --output dist/KiraBridge-0.8.0rc40-windows-parity-20261106.zip",
+    "expected_sha256": "63f7648e25f69ab0dcb605049e8ec23f23e918b6fa6d2aae6d99859b7a5b4229",
+    "install": "python -B scripts/windows_parity_package.py install --root %LOCALAPPDATA%\\KiraBridgeParity20261106\\install --payload <extracted directory>",
+    "import_check": "python -P -B -c \"import sys; sys.path.insert(0, r'<release>\\src'); import kirabridge; print(kirabridge.__file__)\"",
+    "visible_acceptance": "From the extracted directory, so provenance.json is present and git is not used: python -B scripts/accept_windows_parity.py --native-visible --root %LOCALAPPDATA%\\KiraBridgeParity20261106",
+    "keyboard_acceptance": "python -B scripts/accept_windows_keyboard.py --output %LOCALAPPDATA%\\KiraBridgeParity20261106\\keyboard.json",
+    "window_acceptance": "python -B scripts/accept_windows_windows.py --output %LOCALAPPDATA%\\KiraBridgeParity20261106\\windows.json",
+    "git_archive": "git archive 522535b7583f95aeb5b82143c961714b3cf2dc5e src/kirabridge scripts/accept_windows_keyboard.py scripts/accept_windows_windows.py LICENSE pyproject.toml",
+    "rollback": "python -B scripts/windows_parity_package.py rollback --root %LOCALAPPDATA%\\KiraBridgeParity20261106\\install",
+    "harness_layout": "Run the keyboard and window scripts from a directory whose parent contains src/kirabridge. Both scripts insert that src ahead of site-packages. A single-file archive is not enough."
+  },
+  "observed_cli": {
+    "attestation": "cli_argv_only_not_provider_attestation",
+    "grok_pid": 51831,
+    "argv_model": "grok-4.7",
+    "argv_effort": "high",
+    "note": "Model and effort are the argv of this local grok process. This file is not a provider attestation."
+  },
+  "whiteboard": {
+    "thread_id": "188ce4729a62",
+    "written": false,
+    "reason": "This process was started with --deny MCPTool. The board was not written."
+  }
+}

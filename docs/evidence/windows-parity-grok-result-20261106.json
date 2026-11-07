@@ -1,0 +1,96 @@
+{
+  "task_id": "WIN-PARITY-GROK-20261106",
+  "instance_id": "win-parity-grok-20261106-impl-49758",
+  "implementer": "grok",
+  "finished_at": "2026-11-06T22:13:55Z",
+  "base_commit": "d12838ae97c7efcc053c45c3bc9fba5e78f5fe5d",
+  "implementation_commit": "9477b070fa47187be7d7e5a802445ec9503f77b1",
+  "implementation_subject": "feat: add Windows text, app focus, and visible console handoff",
+  "branch": "feat/windows-parity-grok-20261106",
+  "pushed": false,
+  "release_started": false,
+  "mac_production_install": false,
+  "vm_write": false,
+  "execution_policy_changed": false,
+  "tests": {
+    "command": "PYTHONPATH=src .venv/bin/python -m pytest -q tests/test_windows_keyboard_manager.py tests/test_windows_parity_20261106.py",
+    "result": "32 passed in 0.66s",
+    "interpreter": "/Users/landjunge/KiraBridge-worktrees/windows-parity-grok-20261106/.venv/bin/python",
+    "version": "3.14.4 (main, Apr  7 2026, 20:52:06) [Clang 22.1.1 ]",
+    "import_path": "/Users/landjunge/KiraBridge-worktrees/windows-parity-grok-20261106/src/kirabridge/__init__.py",
+    "import_note": "PYTHONPATH=src put the worktree package ahead of the venv copy.",
+    "additional_python311": {
+      "interpreter": "/usr/local/bin/python3.11",
+      "version": "3.11.15",
+      "result": "tests/test_windows_parity_20261106.py: 8 passed. The bridge fixture in test_windows_keyboard_manager.py was not accepted on this interpreter because system pydantic reported Config/_Limits as undefined. That failure was not used as the acceptance result."
+    }
+  },
+  "harness": {
+    "command": "PYTHONPATH=src .venv/bin/python -B scripts/accept_windows_parity.py",
+    "exit_code": 0,
+    "platform": "darwin",
+    "windows_vm_tested_by_this_process": false,
+    "native_visible": null,
+    "portable": {
+      "unicode_strokes": 8,
+      "enter_is_named": true,
+      "preview_capabilities_unchanged": true,
+      "execution_policy_changed": false
+    },
+    "package_roundtrip": {
+      "installed": "0.8.0rc40-d12838ae97c7",
+      "restored": "0.8.0rc40-d12838ae97c7",
+      "data": "behalten",
+      "execution_policy_changed": false
+    }
+  },
+  "package": {
+    "kind": "deterministic source zip, not a Windows installer executable",
+    "path": "dist/KiraBridge-0.8.0rc40-windows-parity-20261106.zip",
+    "absolute_path": "/Users/landjunge/KiraBridge-worktrees/windows-parity-grok-20261106/dist/KiraBridge-0.8.0rc40-windows-parity-20261106.zip",
+    "sha256": "d04dc42eaa5025fd86c73d9da062aee1492b4397acdfcced756c5ead8091f345",
+    "members": 223,
+    "rebuilt_twice_same_hash": true,
+    "gitignored": true,
+    "rebuild_command": "python -B scripts/windows_parity_package.py build --output dist/KiraBridge-0.8.0rc40-windows-parity-20261106.zip",
+    "wheel": "No new py3-none-any wheel file was produced. The runtime venv has no hatchling module. A pure-Python wheel can be built on macOS or Windows when hatchling is available. A Windows .exe or .msi cannot be built on this Mac.",
+    "native_windows_only": "The shown-console CreateProcess path and Win32 application launch run only on win32. Their plans and the file-level install/update/rollback were executed on macOS. The zip itself is built on macOS."
+  },
+  "changes": [
+    "windows.keyboard.text sends bounded Unicode, including German text and emoji, as VK_PACKET batches. Enter and Tab are named keys. No clipboard and no macOS key codes.",
+    "windows.app.list groups visible top-level windows by process. windows.app.launch builds a shown CreateProcess plan and refuses CREATE_NO_WINDOW. windows.app.focus reuses the existing window activate path.",
+    "windows.console.handoff opens a new shown console and returns that session's result. A completed handoff id is not started again. windows.console.status reads the stored record.",
+    "windows_package.py installs, updates, and rolls back inside an explicit root, keeps root/data, and does not delete release bytes.",
+    "Preview capabilities were not expanded. PowerShell ExecutionPolicy is not read or set."
+  ],
+  "open_platform_gaps": [
+    "VM 2B6EE828-02F0-42AE-B4FE-BE57C448F65E was not freshly confirmed and was not written. The earlier guest-agent failure, UTM scripting, and German guest layout were not retested.",
+    "The earlier Restricted PowerShell stop still stands. This delivery does not override ExecutionPolicy, use -EncodedCommand, or start the guest bootstrap.",
+    "macOS keyboard.text still uses the staged 1 MiB helper. Windows text is capped at 4096 UTF-8 bytes and 512 strokes.",
+    "Existing Terminal.app sessions, terminal.execute, and agent terminal automation are still macOS-only. The Windows handoff opens a new console; it does not attach to an existing Windows Terminal tab.",
+    "windows.app.list does not include a process image path and does not list windowless processes.",
+    "Foreground activation can still be denied by Windows. That denial was not executed here.",
+    "With hold_seconds 0 the console process exits. A closed window is not visual proof. Codex must run --native-visible in the guest.",
+    "File-level rollback is not the Mac transactional desktop installer and does not install a Windows service.",
+    "The shared non-posix subprocess_options path still requires a Windows process-tree adapter. The new console spawner does not claim that cleanup parity.",
+    "Task completion_manager dedup was not changed. Console dedup is the handoff id record only."
+  ],
+  "codex_vm_instructions": {
+    "do_not": [
+      "Do not pass -ExecutionPolicy, Bypass, or -EncodedCommand.",
+      "Do not replay historical UNKNOWN tasks.",
+      "Do not replace the existing preview, rc31, or other guest installations.",
+      "Do not treat this Mac run as a Windows pass."
+    ],
+    "confirm_first": "Freshly confirm VM UUID 2B6EE828-02F0-42AE-B4FE-BE57C448F65E, guest agent, and German layout before any guest command.",
+    "build": "python -B scripts/windows_parity_package.py build --output dist/KiraBridge-0.8.0rc40-windows-parity-20261106.zip",
+    "expected_sha256": "d04dc42eaa5025fd86c73d9da062aee1492b4397acdfcced756c5ead8091f345",
+    "visible_acceptance": "From an already visible Windows console, using the prepared Python 3.14 and a new LOCALAPPDATA root: python -B scripts/accept_windows_parity.py --native-visible --root %LOCALAPPDATA%\\KiraBridgeParity20261106",
+    "rollback": "python -B scripts/windows_parity_package.py rollback --root %LOCALAPPDATA%\\KiraBridgeParity20261106\\install"
+  },
+  "whiteboard": {
+    "thread_id": "188ce4729a62",
+    "written": false,
+    "reason": "This process was started with --deny MCPTool. No ThreadDesk CLI was present in ~/.local/bin. The board was not written."
+  }
+}

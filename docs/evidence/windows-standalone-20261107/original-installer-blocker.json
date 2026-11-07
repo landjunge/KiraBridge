@@ -1,0 +1,83 @@
+{
+  "task_id": "KB-WIN-INSTALLER-VISIBLE-CONTINUE-20261107",
+  "thread": "188ce4729a62",
+  "result": "blocked_before_vm_install",
+  "standalone_executable": false,
+  "native_acceptance": false,
+  "source": {
+    "worktree": "/Users/landjunge/KiraBridge-worktrees/windows-installer-verified-20261107",
+    "branch": "fix/windows-installer-verified-20261107",
+    "commit": "0a4d84b6c83b7d89208a9803ba43ce4995266d83",
+    "commit_source": "gitdir HEAD ref, not a new commit",
+    "dirty_files": [
+      "src/kirabridge/windows_runtime.py",
+      "src/kirabridge/windows_package.py",
+      "scripts/windows_parity_package.py",
+      "tests/test_windows_parity_20261106.py",
+      "docs/evidence/windows-runtime-tests-20261107.xml"
+    ]
+  },
+  "runtime_test": {
+    "cwd": "/Users/landjunge/KiraBridge-worktrees/windows-installer-verified-20261107",
+    "PYTHONPATH": "src",
+    "command": "/Users/landjunge/KiraBridge/.venv/bin/python -m pytest -q tests/test_windows_runtime_20261107.py --junitxml=docs/evidence/windows-runtime-tests-20261107.xml",
+    "resolved_imports": {
+      "kirabridge.windows_runtime": "/Users/landjunge/KiraBridge-worktrees/windows-installer-verified-20261107/src/kirabridge/windows_runtime.py",
+      "kirabridge.windows_package": "/Users/landjunge/KiraBridge-worktrees/windows-installer-verified-20261107/src/kirabridge/windows_package.py"
+    },
+    "first_run": {
+      "passed": 13,
+      "failed": 1,
+      "failure": "test_rejects_directory_named_python_exe raised IsADirectoryError from _read_nofollow"
+    },
+    "after_fix": {
+      "passed": 14,
+      "junit": {
+        "tests": "14",
+        "failures": "0",
+        "errors": "0",
+        "skipped": "0",
+        "time": "0.099"
+      },
+      "junit_path": "docs/evidence/windows-runtime-tests-20261107.xml",
+      "junit_sha256": "a2eca84a52eb125036997590f291b566eddebf2595f8f3afffc83a39e5cc8060"
+    },
+    "fix": "validate_bundled_runtime now rejects a non-regular python.exe or DLL with PackageError before reading it"
+  },
+  "local_package_test": {
+    "command": "PYTHONPATH=src /Users/landjunge/KiraBridge/.venv/bin/python -m pytest -q tests/test_windows_parity_20261106.py::test_package_uninstall_keeps_data_and_removes_releases tests/test_windows_parity_20261106.py::test_package_update_and_rollback_keep_data_and_do_not_change_policy tests/test_windows_runtime_20261107.py",
+    "result": "16 passed in 0.35s",
+    "uninstall_vm": false
+  },
+  "installer": {
+    "path": null,
+    "sha256": null,
+    "bundled_runtime": null,
+    "reason": "No EXE or MSI was produced. The Windows Python 3.14.10 tree was not copied into an installer."
+  },
+  "vm": {
+    "uuid": "2B6EE828-02F0-42AE-B4FE-BE57C448F65E",
+    "name": "KiraBridge Windows Dev Fix1",
+    "utmctl_status": "started",
+    "guest_agent": "not running; utmctl ip-address returned OSStatus -2700",
+    "install_root": null,
+    "start_health": null,
+    "update": null,
+    "rollback": null,
+    "uninstall": null,
+    "input_diagnosis": [
+      "Default osascript AppleScript component fails with 'can't open default scripting component'. JavaScript OSA works.",
+      "Guest display was black until a UTM mouse click woke the Windows 11 desktop.",
+      "Scan codes for Win+R and Ctrl+Escape did not open a menu.",
+      "inputMouseClick at [22, 744] opened the Start menu once. The same coordinate later selected the desktop icon KiraBridge Windows Test.",
+      "inputKeystroke text powershell left no visible search text.",
+      "No PowerShell prompt was reached, so the existing 10.0.2.2 transfer was not started.",
+      "The prepared guest Python remains C:/Users/Kiradev/AppData/Local/KiraBridgeDev/Python314/python.exe and was not used as a bundled runtime."
+    ]
+  },
+  "not_done": [
+    "standalone EXE or MSI",
+    "bundled CPython proof",
+    "VM install, health, update, rollback and uninstall"
+  ]
+}

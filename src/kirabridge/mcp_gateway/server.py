@@ -33,7 +33,7 @@ def inline_task_timeout(operation: str) -> float:
     from kirabridge.desktop_input import DESKTOP_EFFECT_OPERATIONS
 
     if operation in DESKTOP_EFFECT_OPERATIONS or operation.startswith(
-        ("keyboard.", "windows.keyboard.", "windows.window.")
+        ("keyboard.", "windows.keyboard.", "windows.window.", "windows.app.", "windows.console.")
     ):
         return 13  # The existing desktop transaction has a twelve-second deadline.
     if operation in {"session.catalog", "session.read"}:

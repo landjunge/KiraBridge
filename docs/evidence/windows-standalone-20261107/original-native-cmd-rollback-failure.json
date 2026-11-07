@@ -1,0 +1,1270 @@
+{
+  "commands": [
+    {
+      "argv": [
+        "C:\\Windows\\System32\\cmd.exe",
+        "/d",
+        "/c",
+        "C:\\Users\\Kiradev\\kb-installer-final-r2-20261107\\package-a\\Install.cmd"
+      ],
+      "label": "install",
+      "returncode": 0,
+      "state": "finished",
+      "stderr": "",
+      "stdout": "{\"action\": \"install\", \"execution_policy_changed\": false, \"previous\": null, \"provenance_verified\": true, \"release\": \"0.8.0rc40.previous-77ac82a9fae3\"}\n"
+    },
+    {
+      "argv": [
+        "C:\\Windows\\System32\\cmd.exe",
+        "/d",
+        "/c",
+        "C:\\Users\\Kiradev\\kb-installer-final-r2-20261107\\profile with spaces\\KiraBridge\\KiraBridge.cmd",
+        "run",
+        "--help"
+      ],
+      "label": "installed_cli",
+      "returncode": 0,
+      "state": "finished",
+      "stderr": "",
+      "stdout": "usage: windows_standalone.py [-h] --root ROOT\n                             {install,update,rollback,uninstall,status,run}\n\nOffline Windows package entry point, using only its bundled CPython.\n\npositional arguments:\n  {install,update,rollback,uninstall,status,run}\n\noptions:\n  -h, --help            show this help message and exit\n  --root ROOT\n"
+    },
+    {
+      "argv": [
+        "C:\\Users\\Kiradev\\kb-installer-final-r2-20261107\\profile with spaces\\KiraBridge\\releases\\0.8.0rc40.previous-77ac82a9fae3\\runtime\\python.exe",
+        "-I",
+        "-B",
+        "C:\\Users\\Kiradev\\kb-installer-final-r2-20261107\\profile with spaces\\KiraBridge\\releases\\0.8.0rc40.previous-77ac82a9fae3\\scripts\\accept_windows_standalone.py",
+        "--root",
+        "C:\\Users\\Kiradev\\kb-installer-final-r2-20261107\\profile with spaces\\KiraBridge\\data",
+        "--output",
+        "C:\\Users\\Kiradev\\kb-installer-final-r2-20261107\\native-lifecycle-initial_health.json",
+        "--health-only"
+      ],
+      "label": "initial_health",
+      "returncode": 0,
+      "state": "finished",
+      "stderr": "",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "C:\\Windows\\System32\\cmd.exe",
+        "/d",
+        "/c",
+        "C:\\Users\\Kiradev\\kb-installer-final-r2-20261107\\package-b\\Update.cmd"
+      ],
+      "label": "update",
+      "returncode": 0,
+      "state": "finished",
+      "stderr": "",
+      "stdout": "{\"action\": \"update\", \"execution_policy_changed\": false, \"previous\": \"0.8.0rc40.previous-77ac82a9fae3\", \"provenance_verified\": true, \"release\": \"0.8.0rc40-77ac82a9fae3\"}\n"
+    },
+    {
+      "argv": [
+        "C:\\Users\\Kiradev\\kb-installer-final-r2-20261107\\profile with spaces\\KiraBridge\\releases\\0.8.0rc40-77ac82a9fae3\\runtime\\python.exe",
+        "-I",
+        "-B",
+        "C:\\Users\\Kiradev\\kb-installer-final-r2-20261107\\profile with spaces\\KiraBridge\\releases\\0.8.0rc40-77ac82a9fae3\\scripts\\accept_windows_standalone.py",
+        "--root",
+        "C:\\Users\\Kiradev\\kb-installer-final-r2-20261107\\profile with spaces\\KiraBridge\\data",
+        "--output",
+        "C:\\Users\\Kiradev\\kb-installer-final-r2-20261107\\native-lifecycle-updated_health.json",
+        "--health-only"
+      ],
+      "label": "updated_health",
+      "returncode": 0,
+      "state": "finished",
+      "stderr": "",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "C:\\Windows\\System32\\cmd.exe",
+        "/d",
+        "/c",
+        "C:\\Users\\Kiradev\\kb-installer-final-r2-20261107\\profile with spaces\\KiraBridge\\KiraBridge.cmd",
+        "rollback"
+      ],
+      "label": "rollback",
+      "returncode": 1,
+      "state": "finished",
+      "stderr": "Der Befehl \"root\" ist entweder falsch geschrieben oder\nkonnte nicht gefunden werden.\n",
+      "stdout": "{\"action\": \"rollback\", \"data_preserved\": true, \"execution_policy_changed\": false, \"previous\": \"0.8.0rc40-77ac82a9fae3\", \"release\": \"0.8.0rc40.previous-77ac82a9fae3\"}\n"
+    }
+  ],
+  "initial_health": {
+    "authenticated_health": {
+      "api_version": "1",
+      "approval_mode": "automatic",
+      "approval_required": false,
+      "approval_required_scope": "default execution; inspect each operation permission_decision",
+      "automatic_operations": [],
+      "autonext": {
+        "enabled": false,
+        "grant_id": null,
+        "reason": "not_started",
+        "scope": "continuation status; not project acceptance or provider quota proof",
+        "source": "explicit operator-pinned board entries only",
+        "state": "disabled"
+      },
+      "chatgpt_integration": "unverified",
+      "completion_channel": {
+        "ack_tool": "completion_ack",
+        "default_target": "default",
+        "mode": "durable_inbox_with_waiting_consumer",
+        "receive_tool": "completion_receive",
+        "unsolicited_chatgpt_wakeup": "unavailable_on_current_transport"
+      },
+      "desktop_last_observation": {
+        "observed_at": null,
+        "state": "not_probed"
+      },
+      "diagnostics_storage": {
+        "dropped_by_this_observer": 0,
+        "max_events_per_day": 2000,
+        "max_records": 20000,
+        "recording": "available",
+        "records": 1,
+        "retention": "existing audit preserved; bounded explicit export, no automatic deletion",
+        "today": 1
+      },
+      "discovery": {
+        "capabilities": [
+          "bridge.health",
+          "platform.status",
+          "task.read",
+          "windows.app.focus",
+          "windows.app.launch",
+          "windows.app.list",
+          "windows.console.handoff",
+          "windows.console.status",
+          "windows.keyboard.inspect",
+          "windows.keyboard.text",
+          "windows.window.control",
+          "windows.window.list"
+        ],
+        "direct_terminal": {
+          "hidden_fallback": false,
+          "legacy_terminal_execute_route": "managed_process",
+          "new_window_permission": {
+            "approval_required": false,
+            "authorized": false,
+            "automatic": false,
+            "buffer_enabled": false,
+            "buffer_required": false,
+            "config_file_sha256": null,
+            "config_revision": "10db87a02cb044c9515aa2a6cda789b99274eb2bbe750160713f7f8a82c17f4f",
+            "missing_capabilities": [
+              "session.open",
+              "terminal.execute"
+            ],
+            "operation": "session.open",
+            "permission_level": "medium",
+            "permission_revision": "389265c1a6740549b86b5024e148bb348a6a685015214120f46107eae22347f4",
+            "principal": "local",
+            "reason": "missing_capability",
+            "standing_exception": false
+          },
+          "operation": "terminal.visible",
+          "permission": {
+            "approval_required": false,
+            "authorized": false,
+            "automatic": false,
+            "buffer_enabled": false,
+            "buffer_required": false,
+            "config_file_sha256": null,
+            "config_revision": "10db87a02cb044c9515aa2a6cda789b99274eb2bbe750160713f7f8a82c17f4f",
+            "missing_capabilities": [
+              "session.input",
+              "session.inspect",
+              "terminal.execute"
+            ],
+            "operation": "terminal.visible",
+            "permission_level": "medium",
+            "permission_revision": "389265c1a6740549b86b5024e148bb348a6a685015214120f46107eae22347f4",
+            "principal": "local",
+            "reason": "missing_capability",
+            "standing_exception": false
+          },
+          "rule_scope": "ChatGPT direct KiraBridge terminal control; not internal Codex/Grok execution",
+          "selection": "confirmed idle visible shell; otherwise a separate visible window",
+          "threaddesk": "separate optional access path; never a direct-terminal substitute",
+          "tool": "terminal_control",
+          "window_authorization": "approved exact task or existing automatic grant; no second local-only token"
+        },
+        "file_transfer": {
+          "enabled": false,
+          "inspect_permission": {
+            "approval_required": false,
+            "authorized": false,
+            "automatic": false,
+            "buffer_enabled": false,
+            "buffer_required": false,
+            "config_file_sha256": null,
+            "config_revision": "10db87a02cb044c9515aa2a6cda789b99274eb2bbe750160713f7f8a82c17f4f",
+            "missing_capabilities": [
+              "files.inspect"
+            ],
+            "operation": "files.inventory",
+            "permission_level": "medium",
+            "permission_revision": "389265c1a6740549b86b5024e148bb348a6a685015214120f46107eae22347f4",
+            "principal": "local",
+            "reason": "missing_capability",
+            "standing_exception": false
+          },
+          "prepare_permission": {
+            "approval_required": false,
+            "authorized": false,
+            "automatic": false,
+            "buffer_enabled": false,
+            "buffer_required": false,
+            "config_file_sha256": null,
+            "config_revision": "10db87a02cb044c9515aa2a6cda789b99274eb2bbe750160713f7f8a82c17f4f",
+            "missing_capabilities": [
+              "files.prepare"
+            ],
+            "operation": "files.prepare",
+            "permission_level": "medium",
+            "permission_revision": "389265c1a6740549b86b5024e148bb348a6a685015214120f46107eae22347f4",
+            "principal": "local",
+            "reason": "missing_capability",
+            "standing_exception": false
+          },
+          "receiver_availability": "disabled",
+          "receiver_protocol": "threaddesk.library.receive.v1",
+          "source_access": "explicit host-selected file params or authorized exports; no Library-wide enumeration",
+          "success_condition": "stored plus validated durable receipt; transferred bytes alone are not import success",
+          "transfer_permission": {
+            "approval_required": false,
+            "authorized": false,
+            "automatic": false,
+            "buffer_enabled": false,
+            "buffer_required": false,
+            "config_file_sha256": null,
+            "config_revision": "10db87a02cb044c9515aa2a6cda789b99274eb2bbe750160713f7f8a82c17f4f",
+            "missing_capabilities": [
+              "files.transfer"
+            ],
+            "operation": "files.transfer",
+            "permission_level": "medium",
+            "permission_revision": "389265c1a6740549b86b5024e148bb348a6a685015214120f46107eae22347f4",
+            "principal": "local",
+            "reason": "missing_capability",
+            "standing_exception": false
+          }
+        },
+        "instance_id": "3fab0d4b695e415fa4fb8c7ebe4e6ab6",
+        "keyboard": {
+          "event_subscription_required": false,
+          "operation": "keyboard.control",
+          "os_permission_requested_automatically": false,
+          "permission": {
+            "approval_required": false,
+            "authorized": false,
+            "automatic": false,
+            "buffer_enabled": false,
+            "buffer_required": false,
+            "config_file_sha256": null,
+            "config_revision": "10db87a02cb044c9515aa2a6cda789b99274eb2bbe750160713f7f8a82c17f4f",
+            "missing_capabilities": [
+              "app.focus",
+              "apps.list",
+              "keyboard.execute",
+              "keyboard.inspect"
+            ],
+            "operation": "keyboard.control",
+            "permission_level": "medium",
+            "permission_revision": "389265c1a6740549b86b5024e148bb348a6a685015214120f46107eae22347f4",
+            "principal": "local",
+            "reason": "missing_capability",
+            "standing_exception": false
+          },
+          "profile_required": false,
+          "success_scope": "native posting evidence; application processing is not confirmed",
+          "target_inspection": "automatic before native input",
+          "target_selection": "application name, exact PID/start pair, or fresh foreground app",
+          "tool": "keyboard_control"
+        },
+        "permission_revision": "389265c1a6740549b86b5024e148bb348a6a685015214120f46107eae22347f4",
+        "platform": {
+          "authorization": "existing_principal_policy_and_target_guards",
+          "capabilities": {
+            "accessibility": {
+              "available": false,
+              "minimum_os": "12.0",
+              "permission_requested_automatically": false,
+              "permission_scope": "executing_native_app_worker; checked for every operation",
+              "provider_revision": null,
+              "reason": "unsupported_platform"
+            },
+            "apps": {
+              "available": false,
+              "minimum_os": "12.0",
+              "permission_requested_automatically": false,
+              "permission_scope": "executing_native_app_worker; checked for every operation",
+              "provider_revision": null,
+              "reason": "unsupported_platform"
+            },
+            "capture": {
+              "available": false,
+              "minimum_os": "14.0",
+              "permission_requested_automatically": false,
+              "permission_scope": "executing_native_app_worker; checked for every operation",
+              "provider_revision": null,
+              "reason": "unsupported_platform"
+            },
+            "clipboard": {
+              "available": false,
+              "minimum_os": "12.0",
+              "permission_scope": "not_checked_by_technical_probe",
+              "reason": "unsupported_platform"
+            },
+            "desktop_session": {
+              "available": false,
+              "minimum_os": "12.0",
+              "permission_scope": "not_checked_by_technical_probe",
+              "reason": "unsupported_platform",
+              "support": "ioreg_key_compatibility_heuristic"
+            },
+            "files": {
+              "available": false,
+              "minimum_os": "12.0",
+              "permission_scope": "not_checked_by_technical_probe",
+              "reason": "unsupported_platform"
+            },
+            "keyboard": {
+              "available": false,
+              "minimum_os": "12.0",
+              "permission_requested_automatically": false,
+              "permission_scope": "executing_native_app_worker; checked for every operation",
+              "provider_revision": null,
+              "reason": "unsupported_platform"
+            },
+            "notifications": {
+              "available": false,
+              "minimum_os": "12.0",
+              "permission_requested_automatically": false,
+              "permission_scope": "executing_native_app_worker; checked for every operation",
+              "provider_revision": null,
+              "reason": "unsupported_platform"
+            },
+            "preferences": {
+              "available": false,
+              "minimum_os": "12.0",
+              "permission_requested_automatically": false,
+              "permission_scope": "executing_native_app_worker; checked for every operation",
+              "provider_revision": null,
+              "reason": "unsupported_platform"
+            },
+            "processes": {
+              "available": false,
+              "minimum_os": "12.0",
+              "permission_scope": "not_checked_by_technical_probe",
+              "reason": "unsupported_platform"
+            },
+            "system": {
+              "available": false,
+              "minimum_os": "12.0",
+              "permission_requested_automatically": false,
+              "permission_scope": "executing_native_app_worker; checked for every operation",
+              "provider_revision": null,
+              "reason": "unsupported_platform"
+            },
+            "system_reports": {
+              "available": false,
+              "minimum_os": "12.0",
+              "permission_scope": "not_checked_by_technical_probe",
+              "reason": "unsupported_platform"
+            },
+            "terminal_app": {
+              "available": false,
+              "minimum_os": "12.0",
+              "permission_scope": "not_checked_by_technical_probe",
+              "reason": "unsupported_platform"
+            },
+            "windows": {
+              "available": false,
+              "minimum_os": "12.0",
+              "permission_requested_automatically": false,
+              "permission_scope": "executing_native_app_worker; checked for every operation",
+              "provider_revision": null,
+              "reason": "unsupported_platform"
+            }
+          },
+          "host": {
+            "architecture": "AMD64",
+            "os_build": "",
+            "os_version": "",
+            "platform": "win32",
+            "process": {
+              "executable": "C:\\Users\\Kiradev\\kb-installer-final-r2-20261107\\profile with spaces\\KiraBridge\\releases\\0.8.0rc40.previous-77ac82a9fae3\\runtime\\python.exe",
+              "pid": 4048
+            }
+          },
+          "permissions": [],
+          "provider_id": "macos.existing_native",
+          "provider_version": "1",
+          "revision": "3191a3044ece963212735edb9a9a28b10f9bff8f87cc1350593b595df7cad1b0",
+          "schema_version": 1
+        },
+        "principal": "local",
+        "refresh": {
+          "client_action": "Refresh tools/list and operation_catalog when revision changes; never replay writes",
+          "on": [
+            "connection",
+            "version",
+            "instance",
+            "permissions",
+            "terminal_session",
+            "platform"
+          ],
+          "tools_list": "explicit tools/list is fresh; stdio call schemas cached <=30s with epoch/notification invalidation"
+        },
+        "revision": "27c3929f36f4499ddef6bc7e787d0b0fadc1f205c39d76224949a464e5fc9375",
+        "terminal_observation": {
+          "freshness": "not_probed",
+          "permission_revision": "389265c1a6740549b86b5024e148bb348a6a685015214120f46107eae22347f4",
+          "sessions": [],
+          "status": "not_authorized",
+          "usable_for_input": false
+        },
+        "version": "0.8.0rc40"
+      },
+      "dispatcher_active": true,
+      "effective_approval_mode": "automatic",
+      "eve_instructions": "Eve \u00fcbermittelt ausschlie\u00dflich Daniels Diktat unver\u00e4ndert. Explizite Nutzerauftr\u00e4ge ohne zus\u00e4tzliches Sondertoken weitergeben; normale Berechtigungen bleiben erforderlich.",
+      "health_scope": "dispatcher and authentication; use bridge_readiness for prerequisites",
+      "identity": {
+        "name": "Daniel",
+        "role": "human"
+      },
+      "local_approval_url": "http://127.0.0.1:8766/",
+      "message_peers": [],
+      "message_receiver_active": false,
+      "message_receiver_scope": "bridge_dispatcher_for_configured_receivers",
+      "name": "KiraBridge",
+      "operations": {
+        "accepting_new_work": true,
+        "maintenance": null,
+        "protocol": 1
+      },
+      "output_history": {
+        "entries": 0,
+        "max_bytes": 16777216,
+        "max_entries": 256,
+        "max_item_bytes": 8388608,
+        "payload_bytes": 0,
+        "retention_seconds": 604800,
+        "scope": "new raw capture payloads; historical audit and business records preserved"
+      },
+      "permission_detail": {
+        "config_revision": "10db87a02cb044c9515aa2a6cda789b99274eb2bbe750160713f7f8a82c17f4f",
+        "exceptions": [],
+        "label": "Mittel",
+        "permission_revision": "389265c1a6740549b86b5024e148bb348a6a685015214120f46107eae22347f4"
+      },
+      "permission_label": "Mittel",
+      "permission_level": "medium",
+      "runtime": {
+        "config_path": null,
+        "config_sha256": null,
+        "effective_config_sha256": "10db87a02cb044c9515aa2a6cda789b99274eb2bbe750160713f7f8a82c17f4f",
+        "instance_id": "3fab0d4b695e415fa4fb8c7ebe4e6ab6",
+        "pid": 4048,
+        "source_file_count": 221,
+        "source_package_path": "C:\\Users\\Kiradev\\kb-installer-final-r2-20261107\\profile with spaces\\KiraBridge\\releases\\0.8.0rc40.previous-77ac82a9fae3\\src\\kirabridge",
+        "source_scope": "package Python files observed at startup; no remote attestation",
+        "source_tree_sha256": "a2ea2e3cb2ed9abd2bd8c8e545ef6b7a38c09cb1c2daf7134ea16277d7c8a71a",
+        "started_at": "2026-11-07T12:15:49.945753+00:00",
+        "version": "0.8.0rc40"
+      },
+      "session_input_policy": {
+        "enabled": false,
+        "principals": [],
+        "timeout_seconds": 60
+      },
+      "shared_conversation_id": "eve-kira-shared",
+      "task_submission": {
+        "events_subscription_required": false,
+        "legacy_connector_schema": "If a cached task_* connector requires completion_subscription, the root value empty string is accepted as no subscription; use fresh action_* schemas after metadata refresh.",
+        "preferred_tools": [
+          "action_request",
+          "action_submit"
+        ],
+        "result_tools": [
+          "task_get",
+          "task_events",
+          "read_query"
+        ]
+      },
+      "terminal_access": {
+        "additional_input_buffer_enabled": false,
+        "availability": "not_probed",
+        "cached_client_catalog_query": {
+          "operation": "session.catalog"
+        },
+        "cached_client_read_query": {
+          "expected_pid": "FROM_CATALOG",
+          "operation": "session.read",
+          "pane_id": "FROM_CATALOG"
+        },
+        "cached_client_task_operations": [
+          "session.catalog",
+          "session.read"
+        ],
+        "cached_client_task_tool": "task_request",
+        "catalog_decision": {
+          "approval_required": false,
+          "authorized": false,
+          "automatic": false,
+          "buffer_enabled": false,
+          "buffer_required": false,
+          "config_file_sha256": null,
+          "config_revision": "10db87a02cb044c9515aa2a6cda789b99274eb2bbe750160713f7f8a82c17f4f",
+          "missing_capabilities": [
+            "session.inspect"
+          ],
+          "operation": "session.catalog",
+          "permission_level": "medium",
+          "permission_revision": "389265c1a6740549b86b5024e148bb348a6a685015214120f46107eae22347f4",
+          "principal": "local",
+          "reason": "missing_capability",
+          "standing_exception": false
+        },
+        "catalog_tool": "session_catalog",
+        "description": "Terminalrechte sind nicht vollst\u00e4ndig erteilt.",
+        "direct_command_decision": {
+          "approval_required": false,
+          "authorized": false,
+          "automatic": false,
+          "buffer_enabled": false,
+          "buffer_required": false,
+          "config_file_sha256": null,
+          "config_revision": "10db87a02cb044c9515aa2a6cda789b99274eb2bbe750160713f7f8a82c17f4f",
+          "missing_capabilities": [
+            "session.input",
+            "session.inspect",
+            "terminal.execute"
+          ],
+          "operation": "terminal.visible",
+          "permission_level": "medium",
+          "permission_revision": "389265c1a6740549b86b5024e148bb348a6a685015214120f46107eae22347f4",
+          "principal": "local",
+          "reason": "missing_capability",
+          "standing_exception": false
+        },
+        "direct_command_operation": "terminal.visible",
+        "direct_command_tool": "terminal_control",
+        "discovery_allowed": false,
+        "grant_is_not_runtime_readiness": true,
+        "input_allowed": false,
+        "input_approval_required": false,
+        "input_decision": {
+          "approval_required": false,
+          "authorized": false,
+          "automatic": false,
+          "buffer_enabled": false,
+          "buffer_required": false,
+          "config_file_sha256": null,
+          "config_revision": "10db87a02cb044c9515aa2a6cda789b99274eb2bbe750160713f7f8a82c17f4f",
+          "missing_capabilities": [
+            "session.input",
+            "session.inspect",
+            "terminal.execute"
+          ],
+          "operation": "session.input",
+          "permission_level": "medium",
+          "permission_revision": "389265c1a6740549b86b5024e148bb348a6a685015214120f46107eae22347f4",
+          "principal": "local",
+          "reason": "missing_capability",
+          "standing_exception": false
+        },
+        "input_operation": "session.input",
+        "new_window_decision": {
+          "approval_required": false,
+          "authorized": false,
+          "automatic": false,
+          "buffer_enabled": false,
+          "buffer_required": false,
+          "config_file_sha256": null,
+          "config_revision": "10db87a02cb044c9515aa2a6cda789b99274eb2bbe750160713f7f8a82c17f4f",
+          "missing_capabilities": [
+            "session.open",
+            "terminal.execute"
+          ],
+          "operation": "session.open",
+          "permission_level": "medium",
+          "permission_revision": "389265c1a6740549b86b5024e148bb348a6a685015214120f46107eae22347f4",
+          "principal": "local",
+          "reason": "missing_capability",
+          "standing_exception": false
+        },
+        "policy_authorized": false,
+        "read_allowed": false,
+        "read_approval_required": false,
+        "read_decision": {
+          "approval_required": false,
+          "authorized": false,
+          "automatic": false,
+          "buffer_enabled": false,
+          "buffer_required": false,
+          "config_file_sha256": null,
+          "config_revision": "10db87a02cb044c9515aa2a6cda789b99274eb2bbe750160713f7f8a82c17f4f",
+          "missing_capabilities": [
+            "session.inspect"
+          ],
+          "operation": "session.read",
+          "permission_level": "medium",
+          "permission_revision": "389265c1a6740549b86b5024e148bb348a6a685015214120f46107eae22347f4",
+          "principal": "local",
+          "reason": "missing_capability",
+          "standing_exception": false
+        },
+        "read_tool": "session_read",
+        "runtime_requirements": [
+          "interactive macOS desktop",
+          "Terminal.app automation",
+          "fresh window/TTY/PID identity",
+          "confirmed empty shell input"
+        ],
+        "session_input_policy_meaning": "optional_confirmation_buffer_not_terminal_enable_switch"
+      },
+      "version": "0.8.0rc40",
+      "visible_handoffs": {
+        "bindings": {},
+        "enabled": true
+      },
+      "voice_message_gate": false,
+      "voice_messaging": {
+        "release_required": false,
+        "timeout_seconds": 60
+      }
+    },
+    "commands": [],
+    "imports": {
+      "httpx": "C:\\Users\\Kiradev\\kb-installer-final-r2-20261107\\profile with spaces\\KiraBridge\\releases\\0.8.0rc40.previous-77ac82a9fae3\\runtime\\Lib\\site-packages\\httpx\\__init__.py",
+      "kirabridge": "C:\\Users\\Kiradev\\kb-installer-final-r2-20261107\\profile with spaces\\KiraBridge\\releases\\0.8.0rc40.previous-77ac82a9fae3\\src\\kirabridge\\__init__.py",
+      "kirabridge.windows_package": "C:\\Users\\Kiradev\\kb-installer-final-r2-20261107\\profile with spaces\\KiraBridge\\releases\\0.8.0rc40.previous-77ac82a9fae3\\src\\kirabridge\\windows_package.py",
+      "mcp": "C:\\Users\\Kiradev\\kb-installer-final-r2-20261107\\profile with spaces\\KiraBridge\\releases\\0.8.0rc40.previous-77ac82a9fae3\\runtime\\Lib\\site-packages\\mcp\\__init__.py",
+      "uvicorn": "C:\\Users\\Kiradev\\kb-installer-final-r2-20261107\\profile with spaces\\KiraBridge\\releases\\0.8.0rc40.previous-77ac82a9fae3\\runtime\\Lib\\site-packages\\uvicorn\\__init__.py"
+    },
+    "isolated_child_import": "C:\\Users\\Kiradev\\kb-installer-final-r2-20261107\\profile with spaces\\KiraBridge\\releases\\0.8.0rc40.previous-77ac82a9fae3\\src\\kirabridge\\__init__.py",
+    "mcp_sessions": [
+      {
+        "endpoint": "http://127.0.0.1:51112/mcp",
+        "state_dir": "C:\\Users\\Kiradev\\kb-installer-final-r2-20261107\\profile with spaces\\KiraBridge\\data\\mcp-cb5434cdbbc8b433",
+        "unauthenticated_http_status": 401
+      }
+    ],
+    "passed": true,
+    "platform": "Windows-11-10.0.26300-SP0",
+    "python": "C:\\Users\\Kiradev\\kb-installer-final-r2-20261107\\profile with spaces\\KiraBridge\\releases\\0.8.0rc40.previous-77ac82a9fae3\\runtime\\python.exe",
+    "root": "C:\\Users\\Kiradev\\kb-installer-final-r2-20261107\\profile with spaces\\KiraBridge\\data"
+  },
+  "original_error": "Traceback (most recent call last):\n  File \"C:\\Users\\Kiradev\\kb-installer-final-r2-20261107\\package-a\\scripts\\accept_windows_standalone.py\", line 205, in main\n    run(\n    ~~~^\n        [\n        ^\n    ...<6 lines>...\n        \"rollback\",\n        ^^^^^^^^^^^\n    )\n    ^\n  File \"C:\\Users\\Kiradev\\kb-installer-final-r2-20261107\\package-a\\scripts\\accept_windows_standalone.py\", line 129, in run\n    assert result.returncode == 0, item\n           ^^^^^^^^^^^^^^^^^^^^^^\nAssertionError: {'label': 'rollback', 'argv': ['C:\\\\Windows\\\\System32\\\\cmd.exe', '/d', '/c', 'C:\\\\Users\\\\Kiradev\\\\kb-installer-final-r2-20261107\\\\profile with spaces\\\\KiraBridge\\\\KiraBridge.cmd', 'rollback'], 'state': 'finished', 'returncode': 1, 'stdout': '{\"action\": \"rollback\", \"data_preserved\": true, \"execution_policy_changed\": false, \"previous\": \"0.8.0rc40-77ac82a9fae3\", \"release\": \"0.8.0rc40.previous-77ac82a9fae3\"}\\n', 'stderr': 'Der Befehl \"root\" ist entweder falsch geschrieben oder\\nkonnte nicht gefunden werden.\\n'}\n",
+  "passed": false,
+  "platform": "Windows-11-10.0.26300-SP0",
+  "provenance": [
+    {
+      "commit": "77ac82a9fae3ca0a09fb203d06b9c8546acbe8ce",
+      "file_count": 4165,
+      "path": "C:\\Users\\Kiradev\\kb-installer-final-r2-20261107\\package-a\\provenance.json",
+      "runtime": {
+        "files": {
+          "python.exe": "d718435b892db4ad5b547d12fec61be7baa7faf7a58d857ea58053be24c7a000",
+          "python314.dll": "d8a06cc6ca3348925ea29e343e1c5c5895fe0bb433ff913e1cee44caf358aa6a"
+        },
+        "python_dll": "python314.dll"
+      },
+      "sha256": "2ca070df125f204f74b281228e04de9951a99442e6ba4ff41789f824cd7643eb",
+      "source_archive_sha256": "8712bbcf8a8756857d79cb89938726c8b7b24f67906e3952c92796885129e773",
+      "version": "0.8.0rc40.previous"
+    },
+    {
+      "commit": "77ac82a9fae3ca0a09fb203d06b9c8546acbe8ce",
+      "file_count": 4165,
+      "path": "C:\\Users\\Kiradev\\kb-installer-final-r2-20261107\\package-b\\provenance.json",
+      "runtime": {
+        "files": {
+          "python.exe": "d718435b892db4ad5b547d12fec61be7baa7faf7a58d857ea58053be24c7a000",
+          "python314.dll": "d8a06cc6ca3348925ea29e343e1c5c5895fe0bb433ff913e1cee44caf358aa6a"
+        },
+        "python_dll": "python314.dll"
+      },
+      "sha256": "1ad1c4b778f096ee5b593e7ac313d60b56477100c9745fc16df2e7e52b4ebc7c",
+      "source_archive_sha256": "8712bbcf8a8756857d79cb89938726c8b7b24f67906e3952c92796885129e773",
+      "version": "0.8.0rc40"
+    }
+  ],
+  "python": "C:\\Users\\Kiradev\\kb-installer-final-r2-20261107\\package-a\\runtime\\python.exe",
+  "root": "C:\\Users\\Kiradev\\kb-installer-final-r2-20261107\\profile with spaces\\KiraBridge",
+  "updated_health": {
+    "authenticated_health": {
+      "api_version": "1",
+      "approval_mode": "automatic",
+      "approval_required": false,
+      "approval_required_scope": "default execution; inspect each operation permission_decision",
+      "automatic_operations": [],
+      "autonext": {
+        "enabled": false,
+        "grant_id": null,
+        "reason": "not_started",
+        "scope": "continuation status; not project acceptance or provider quota proof",
+        "source": "explicit operator-pinned board entries only",
+        "state": "disabled"
+      },
+      "chatgpt_integration": "unverified",
+      "completion_channel": {
+        "ack_tool": "completion_ack",
+        "default_target": "default",
+        "mode": "durable_inbox_with_waiting_consumer",
+        "receive_tool": "completion_receive",
+        "unsolicited_chatgpt_wakeup": "unavailable_on_current_transport"
+      },
+      "desktop_last_observation": {
+        "observed_at": null,
+        "state": "not_probed"
+      },
+      "diagnostics_storage": {
+        "dropped_by_this_observer": 0,
+        "max_events_per_day": 2000,
+        "max_records": 20000,
+        "recording": "available",
+        "records": 1,
+        "retention": "existing audit preserved; bounded explicit export, no automatic deletion",
+        "today": 1
+      },
+      "discovery": {
+        "capabilities": [
+          "bridge.health",
+          "platform.status",
+          "task.read",
+          "windows.app.focus",
+          "windows.app.launch",
+          "windows.app.list",
+          "windows.console.handoff",
+          "windows.console.status",
+          "windows.keyboard.inspect",
+          "windows.keyboard.text",
+          "windows.window.control",
+          "windows.window.list"
+        ],
+        "direct_terminal": {
+          "hidden_fallback": false,
+          "legacy_terminal_execute_route": "managed_process",
+          "new_window_permission": {
+            "approval_required": false,
+            "authorized": false,
+            "automatic": false,
+            "buffer_enabled": false,
+            "buffer_required": false,
+            "config_file_sha256": null,
+            "config_revision": "f6e78de198833608833ecd14c3922802df5ab75249c946ee77ddb4b4c9583bc7",
+            "missing_capabilities": [
+              "session.open",
+              "terminal.execute"
+            ],
+            "operation": "session.open",
+            "permission_level": "medium",
+            "permission_revision": "389265c1a6740549b86b5024e148bb348a6a685015214120f46107eae22347f4",
+            "principal": "local",
+            "reason": "missing_capability",
+            "standing_exception": false
+          },
+          "operation": "terminal.visible",
+          "permission": {
+            "approval_required": false,
+            "authorized": false,
+            "automatic": false,
+            "buffer_enabled": false,
+            "buffer_required": false,
+            "config_file_sha256": null,
+            "config_revision": "f6e78de198833608833ecd14c3922802df5ab75249c946ee77ddb4b4c9583bc7",
+            "missing_capabilities": [
+              "session.input",
+              "session.inspect",
+              "terminal.execute"
+            ],
+            "operation": "terminal.visible",
+            "permission_level": "medium",
+            "permission_revision": "389265c1a6740549b86b5024e148bb348a6a685015214120f46107eae22347f4",
+            "principal": "local",
+            "reason": "missing_capability",
+            "standing_exception": false
+          },
+          "rule_scope": "ChatGPT direct KiraBridge terminal control; not internal Codex/Grok execution",
+          "selection": "confirmed idle visible shell; otherwise a separate visible window",
+          "threaddesk": "separate optional access path; never a direct-terminal substitute",
+          "tool": "terminal_control",
+          "window_authorization": "approved exact task or existing automatic grant; no second local-only token"
+        },
+        "file_transfer": {
+          "enabled": false,
+          "inspect_permission": {
+            "approval_required": false,
+            "authorized": false,
+            "automatic": false,
+            "buffer_enabled": false,
+            "buffer_required": false,
+            "config_file_sha256": null,
+            "config_revision": "f6e78de198833608833ecd14c3922802df5ab75249c946ee77ddb4b4c9583bc7",
+            "missing_capabilities": [
+              "files.inspect"
+            ],
+            "operation": "files.inventory",
+            "permission_level": "medium",
+            "permission_revision": "389265c1a6740549b86b5024e148bb348a6a685015214120f46107eae22347f4",
+            "principal": "local",
+            "reason": "missing_capability",
+            "standing_exception": false
+          },
+          "prepare_permission": {
+            "approval_required": false,
+            "authorized": false,
+            "automatic": false,
+            "buffer_enabled": false,
+            "buffer_required": false,
+            "config_file_sha256": null,
+            "config_revision": "f6e78de198833608833ecd14c3922802df5ab75249c946ee77ddb4b4c9583bc7",
+            "missing_capabilities": [
+              "files.prepare"
+            ],
+            "operation": "files.prepare",
+            "permission_level": "medium",
+            "permission_revision": "389265c1a6740549b86b5024e148bb348a6a685015214120f46107eae22347f4",
+            "principal": "local",
+            "reason": "missing_capability",
+            "standing_exception": false
+          },
+          "receiver_availability": "disabled",
+          "receiver_protocol": "threaddesk.library.receive.v1",
+          "source_access": "explicit host-selected file params or authorized exports; no Library-wide enumeration",
+          "success_condition": "stored plus validated durable receipt; transferred bytes alone are not import success",
+          "transfer_permission": {
+            "approval_required": false,
+            "authorized": false,
+            "automatic": false,
+            "buffer_enabled": false,
+            "buffer_required": false,
+            "config_file_sha256": null,
+            "config_revision": "f6e78de198833608833ecd14c3922802df5ab75249c946ee77ddb4b4c9583bc7",
+            "missing_capabilities": [
+              "files.transfer"
+            ],
+            "operation": "files.transfer",
+            "permission_level": "medium",
+            "permission_revision": "389265c1a6740549b86b5024e148bb348a6a685015214120f46107eae22347f4",
+            "principal": "local",
+            "reason": "missing_capability",
+            "standing_exception": false
+          }
+        },
+        "instance_id": "d694acdded544fa391d04ca4de8129ec",
+        "keyboard": {
+          "event_subscription_required": false,
+          "operation": "keyboard.control",
+          "os_permission_requested_automatically": false,
+          "permission": {
+            "approval_required": false,
+            "authorized": false,
+            "automatic": false,
+            "buffer_enabled": false,
+            "buffer_required": false,
+            "config_file_sha256": null,
+            "config_revision": "f6e78de198833608833ecd14c3922802df5ab75249c946ee77ddb4b4c9583bc7",
+            "missing_capabilities": [
+              "app.focus",
+              "apps.list",
+              "keyboard.execute",
+              "keyboard.inspect"
+            ],
+            "operation": "keyboard.control",
+            "permission_level": "medium",
+            "permission_revision": "389265c1a6740549b86b5024e148bb348a6a685015214120f46107eae22347f4",
+            "principal": "local",
+            "reason": "missing_capability",
+            "standing_exception": false
+          },
+          "profile_required": false,
+          "success_scope": "native posting evidence; application processing is not confirmed",
+          "target_inspection": "automatic before native input",
+          "target_selection": "application name, exact PID/start pair, or fresh foreground app",
+          "tool": "keyboard_control"
+        },
+        "permission_revision": "389265c1a6740549b86b5024e148bb348a6a685015214120f46107eae22347f4",
+        "platform": {
+          "authorization": "existing_principal_policy_and_target_guards",
+          "capabilities": {
+            "accessibility": {
+              "available": false,
+              "minimum_os": "12.0",
+              "permission_requested_automatically": false,
+              "permission_scope": "executing_native_app_worker; checked for every operation",
+              "provider_revision": null,
+              "reason": "unsupported_platform"
+            },
+            "apps": {
+              "available": false,
+              "minimum_os": "12.0",
+              "permission_requested_automatically": false,
+              "permission_scope": "executing_native_app_worker; checked for every operation",
+              "provider_revision": null,
+              "reason": "unsupported_platform"
+            },
+            "capture": {
+              "available": false,
+              "minimum_os": "14.0",
+              "permission_requested_automatically": false,
+              "permission_scope": "executing_native_app_worker; checked for every operation",
+              "provider_revision": null,
+              "reason": "unsupported_platform"
+            },
+            "clipboard": {
+              "available": false,
+              "minimum_os": "12.0",
+              "permission_scope": "not_checked_by_technical_probe",
+              "reason": "unsupported_platform"
+            },
+            "desktop_session": {
+              "available": false,
+              "minimum_os": "12.0",
+              "permission_scope": "not_checked_by_technical_probe",
+              "reason": "unsupported_platform",
+              "support": "ioreg_key_compatibility_heuristic"
+            },
+            "files": {
+              "available": false,
+              "minimum_os": "12.0",
+              "permission_scope": "not_checked_by_technical_probe",
+              "reason": "unsupported_platform"
+            },
+            "keyboard": {
+              "available": false,
+              "minimum_os": "12.0",
+              "permission_requested_automatically": false,
+              "permission_scope": "executing_native_app_worker; checked for every operation",
+              "provider_revision": null,
+              "reason": "unsupported_platform"
+            },
+            "notifications": {
+              "available": false,
+              "minimum_os": "12.0",
+              "permission_requested_automatically": false,
+              "permission_scope": "executing_native_app_worker; checked for every operation",
+              "provider_revision": null,
+              "reason": "unsupported_platform"
+            },
+            "preferences": {
+              "available": false,
+              "minimum_os": "12.0",
+              "permission_requested_automatically": false,
+              "permission_scope": "executing_native_app_worker; checked for every operation",
+              "provider_revision": null,
+              "reason": "unsupported_platform"
+            },
+            "processes": {
+              "available": false,
+              "minimum_os": "12.0",
+              "permission_scope": "not_checked_by_technical_probe",
+              "reason": "unsupported_platform"
+            },
+            "system": {
+              "available": false,
+              "minimum_os": "12.0",
+              "permission_requested_automatically": false,
+              "permission_scope": "executing_native_app_worker; checked for every operation",
+              "provider_revision": null,
+              "reason": "unsupported_platform"
+            },
+            "system_reports": {
+              "available": false,
+              "minimum_os": "12.0",
+              "permission_scope": "not_checked_by_technical_probe",
+              "reason": "unsupported_platform"
+            },
+            "terminal_app": {
+              "available": false,
+              "minimum_os": "12.0",
+              "permission_scope": "not_checked_by_technical_probe",
+              "reason": "unsupported_platform"
+            },
+            "windows": {
+              "available": false,
+              "minimum_os": "12.0",
+              "permission_requested_automatically": false,
+              "permission_scope": "executing_native_app_worker; checked for every operation",
+              "provider_revision": null,
+              "reason": "unsupported_platform"
+            }
+          },
+          "host": {
+            "architecture": "AMD64",
+            "os_build": "",
+            "os_version": "",
+            "platform": "win32",
+            "process": {
+              "executable": "C:\\Users\\Kiradev\\kb-installer-final-r2-20261107\\profile with spaces\\KiraBridge\\releases\\0.8.0rc40-77ac82a9fae3\\runtime\\python.exe",
+              "pid": 5252
+            }
+          },
+          "permissions": [],
+          "provider_id": "macos.existing_native",
+          "provider_version": "1",
+          "revision": "e9c1b10f7242ba42bfcea09cb3bf109939fd1227666f504aedc2ab00b01fe347",
+          "schema_version": 1
+        },
+        "principal": "local",
+        "refresh": {
+          "client_action": "Refresh tools/list and operation_catalog when revision changes; never replay writes",
+          "on": [
+            "connection",
+            "version",
+            "instance",
+            "permissions",
+            "terminal_session",
+            "platform"
+          ],
+          "tools_list": "explicit tools/list is fresh; stdio call schemas cached <=30s with epoch/notification invalidation"
+        },
+        "revision": "a139b2c6aa25ffcd73c2bd95891fdfae155e9564f3afc826cda588021885eb0b",
+        "terminal_observation": {
+          "freshness": "not_probed",
+          "permission_revision": "389265c1a6740549b86b5024e148bb348a6a685015214120f46107eae22347f4",
+          "sessions": [],
+          "status": "not_authorized",
+          "usable_for_input": false
+        },
+        "version": "0.8.0rc40"
+      },
+      "dispatcher_active": true,
+      "effective_approval_mode": "automatic",
+      "eve_instructions": "Eve \u00fcbermittelt ausschlie\u00dflich Daniels Diktat unver\u00e4ndert. Explizite Nutzerauftr\u00e4ge ohne zus\u00e4tzliches Sondertoken weitergeben; normale Berechtigungen bleiben erforderlich.",
+      "health_scope": "dispatcher and authentication; use bridge_readiness for prerequisites",
+      "identity": {
+        "name": "Daniel",
+        "role": "human"
+      },
+      "local_approval_url": "http://127.0.0.1:8766/",
+      "message_peers": [],
+      "message_receiver_active": false,
+      "message_receiver_scope": "bridge_dispatcher_for_configured_receivers",
+      "name": "KiraBridge",
+      "operations": {
+        "accepting_new_work": true,
+        "maintenance": null,
+        "protocol": 1
+      },
+      "output_history": {
+        "entries": 0,
+        "max_bytes": 16777216,
+        "max_entries": 256,
+        "max_item_bytes": 8388608,
+        "payload_bytes": 0,
+        "retention_seconds": 604800,
+        "scope": "new raw capture payloads; historical audit and business records preserved"
+      },
+      "permission_detail": {
+        "config_revision": "f6e78de198833608833ecd14c3922802df5ab75249c946ee77ddb4b4c9583bc7",
+        "exceptions": [],
+        "label": "Mittel",
+        "permission_revision": "389265c1a6740549b86b5024e148bb348a6a685015214120f46107eae22347f4"
+      },
+      "permission_label": "Mittel",
+      "permission_level": "medium",
+      "runtime": {
+        "config_path": null,
+        "config_sha256": null,
+        "effective_config_sha256": "f6e78de198833608833ecd14c3922802df5ab75249c946ee77ddb4b4c9583bc7",
+        "instance_id": "d694acdded544fa391d04ca4de8129ec",
+        "pid": 5252,
+        "source_file_count": 221,
+        "source_package_path": "C:\\Users\\Kiradev\\kb-installer-final-r2-20261107\\profile with spaces\\KiraBridge\\releases\\0.8.0rc40-77ac82a9fae3\\src\\kirabridge",
+        "source_scope": "package Python files observed at startup; no remote attestation",
+        "source_tree_sha256": "a2ea2e3cb2ed9abd2bd8c8e545ef6b7a38c09cb1c2daf7134ea16277d7c8a71a",
+        "started_at": "2026-11-07T12:18:50.408209+00:00",
+        "version": "0.8.0rc40"
+      },
+      "session_input_policy": {
+        "enabled": false,
+        "principals": [],
+        "timeout_seconds": 60
+      },
+      "shared_conversation_id": "eve-kira-shared",
+      "task_submission": {
+        "events_subscription_required": false,
+        "legacy_connector_schema": "If a cached task_* connector requires completion_subscription, the root value empty string is accepted as no subscription; use fresh action_* schemas after metadata refresh.",
+        "preferred_tools": [
+          "action_request",
+          "action_submit"
+        ],
+        "result_tools": [
+          "task_get",
+          "task_events",
+          "read_query"
+        ]
+      },
+      "terminal_access": {
+        "additional_input_buffer_enabled": false,
+        "availability": "not_probed",
+        "cached_client_catalog_query": {
+          "operation": "session.catalog"
+        },
+        "cached_client_read_query": {
+          "expected_pid": "FROM_CATALOG",
+          "operation": "session.read",
+          "pane_id": "FROM_CATALOG"
+        },
+        "cached_client_task_operations": [
+          "session.catalog",
+          "session.read"
+        ],
+        "cached_client_task_tool": "task_request",
+        "catalog_decision": {
+          "approval_required": false,
+          "authorized": false,
+          "automatic": false,
+          "buffer_enabled": false,
+          "buffer_required": false,
+          "config_file_sha256": null,
+          "config_revision": "f6e78de198833608833ecd14c3922802df5ab75249c946ee77ddb4b4c9583bc7",
+          "missing_capabilities": [
+            "session.inspect"
+          ],
+          "operation": "session.catalog",
+          "permission_level": "medium",
+          "permission_revision": "389265c1a6740549b86b5024e148bb348a6a685015214120f46107eae22347f4",
+          "principal": "local",
+          "reason": "missing_capability",
+          "standing_exception": false
+        },
+        "catalog_tool": "session_catalog",
+        "description": "Terminalrechte sind nicht vollst\u00e4ndig erteilt.",
+        "direct_command_decision": {
+          "approval_required": false,
+          "authorized": false,
+          "automatic": false,
+          "buffer_enabled": false,
+          "buffer_required": false,
+          "config_file_sha256": null,
+          "config_revision": "f6e78de198833608833ecd14c3922802df5ab75249c946ee77ddb4b4c9583bc7",
+          "missing_capabilities": [
+            "session.input",
+            "session.inspect",
+            "terminal.execute"
+          ],
+          "operation": "terminal.visible",
+          "permission_level": "medium",
+          "permission_revision": "389265c1a6740549b86b5024e148bb348a6a685015214120f46107eae22347f4",
+          "principal": "local",
+          "reason": "missing_capability",
+          "standing_exception": false
+        },
+        "direct_command_operation": "terminal.visible",
+        "direct_command_tool": "terminal_control",
+        "discovery_allowed": false,
+        "grant_is_not_runtime_readiness": true,
+        "input_allowed": false,
+        "input_approval_required": false,
+        "input_decision": {
+          "approval_required": false,
+          "authorized": false,
+          "automatic": false,
+          "buffer_enabled": false,
+          "buffer_required": false,
+          "config_file_sha256": null,
+          "config_revision": "f6e78de198833608833ecd14c3922802df5ab75249c946ee77ddb4b4c9583bc7",
+          "missing_capabilities": [
+            "session.input",
+            "session.inspect",
+            "terminal.execute"
+          ],
+          "operation": "session.input",
+          "permission_level": "medium",
+          "permission_revision": "389265c1a6740549b86b5024e148bb348a6a685015214120f46107eae22347f4",
+          "principal": "local",
+          "reason": "missing_capability",
+          "standing_exception": false
+        },
+        "input_operation": "session.input",
+        "new_window_decision": {
+          "approval_required": false,
+          "authorized": false,
+          "automatic": false,
+          "buffer_enabled": false,
+          "buffer_required": false,
+          "config_file_sha256": null,
+          "config_revision": "f6e78de198833608833ecd14c3922802df5ab75249c946ee77ddb4b4c9583bc7",
+          "missing_capabilities": [
+            "session.open",
+            "terminal.execute"
+          ],
+          "operation": "session.open",
+          "permission_level": "medium",
+          "permission_revision": "389265c1a6740549b86b5024e148bb348a6a685015214120f46107eae22347f4",
+          "principal": "local",
+          "reason": "missing_capability",
+          "standing_exception": false
+        },
+        "policy_authorized": false,
+        "read_allowed": false,
+        "read_approval_required": false,
+        "read_decision": {
+          "approval_required": false,
+          "authorized": false,
+          "automatic": false,
+          "buffer_enabled": false,
+          "buffer_required": false,
+          "config_file_sha256": null,
+          "config_revision": "f6e78de198833608833ecd14c3922802df5ab75249c946ee77ddb4b4c9583bc7",
+          "missing_capabilities": [
+            "session.inspect"
+          ],
+          "operation": "session.read",
+          "permission_level": "medium",
+          "permission_revision": "389265c1a6740549b86b5024e148bb348a6a685015214120f46107eae22347f4",
+          "principal": "local",
+          "reason": "missing_capability",
+          "standing_exception": false
+        },
+        "read_tool": "session_read",
+        "runtime_requirements": [
+          "interactive macOS desktop",
+          "Terminal.app automation",
+          "fresh window/TTY/PID identity",
+          "confirmed empty shell input"
+        ],
+        "session_input_policy_meaning": "optional_confirmation_buffer_not_terminal_enable_switch"
+      },
+      "version": "0.8.0rc40",
+      "visible_handoffs": {
+        "bindings": {},
+        "enabled": true
+      },
+      "voice_message_gate": false,
+      "voice_messaging": {
+        "release_required": false,
+        "timeout_seconds": 60
+      }
+    },
+    "commands": [],
+    "imports": {
+      "httpx": "C:\\Users\\Kiradev\\kb-installer-final-r2-20261107\\profile with spaces\\KiraBridge\\releases\\0.8.0rc40-77ac82a9fae3\\runtime\\Lib\\site-packages\\httpx\\__init__.py",
+      "kirabridge": "C:\\Users\\Kiradev\\kb-installer-final-r2-20261107\\profile with spaces\\KiraBridge\\releases\\0.8.0rc40-77ac82a9fae3\\src\\kirabridge\\__init__.py",
+      "kirabridge.windows_package": "C:\\Users\\Kiradev\\kb-installer-final-r2-20261107\\profile with spaces\\KiraBridge\\releases\\0.8.0rc40-77ac82a9fae3\\src\\kirabridge\\windows_package.py",
+      "mcp": "C:\\Users\\Kiradev\\kb-installer-final-r2-20261107\\profile with spaces\\KiraBridge\\releases\\0.8.0rc40-77ac82a9fae3\\runtime\\Lib\\site-packages\\mcp\\__init__.py",
+      "uvicorn": "C:\\Users\\Kiradev\\kb-installer-final-r2-20261107\\profile with spaces\\KiraBridge\\releases\\0.8.0rc40-77ac82a9fae3\\runtime\\Lib\\site-packages\\uvicorn\\__init__.py"
+    },
+    "isolated_child_import": "C:\\Users\\Kiradev\\kb-installer-final-r2-20261107\\profile with spaces\\KiraBridge\\releases\\0.8.0rc40-77ac82a9fae3\\src\\kirabridge\\__init__.py",
+    "mcp_sessions": [
+      {
+        "endpoint": "http://127.0.0.1:51120/mcp",
+        "state_dir": "C:\\Users\\Kiradev\\kb-installer-final-r2-20261107\\profile with spaces\\KiraBridge\\data\\mcp-04cc97d14558e0c3",
+        "unauthenticated_http_status": 401
+      }
+    ],
+    "passed": true,
+    "platform": "Windows-11-10.0.26300-SP0",
+    "python": "C:\\Users\\Kiradev\\kb-installer-final-r2-20261107\\profile with spaces\\KiraBridge\\releases\\0.8.0rc40-77ac82a9fae3\\runtime\\python.exe",
+    "root": "C:\\Users\\Kiradev\\kb-installer-final-r2-20261107\\profile with spaces\\KiraBridge\\data"
+  }
+}
