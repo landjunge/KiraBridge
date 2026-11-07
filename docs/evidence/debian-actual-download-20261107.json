@@ -1,0 +1,18 @@
+{
+  "result": "passed",
+  "verified_at": "2026-11-07T13:20:58.490730+00:00",
+  "method": "gh release download from published private GitHub release into new empty directory; byte comparison of all40 assets, outer SHA256SUMS, tar members and every manifest/inner checksum",
+  "release_url": "https://github.com/landjunge/KiraBridge/releases/tag/linux-v0.8.0rc41",
+  "tag": "linux-v0.8.0rc41",
+  "tag_commit": "350d36854fc9dd37725d7c00a91b72cd1bd32b15",
+  "source_commit": "350d36854fc9dd37725d7c00a91b72cd1bd32b15",
+  "download_url": "https://github.com/landjunge/KiraBridge/releases/download/linux-v0.8.0rc41/KiraBridge-0.8.0rc41-Linux-x86_64.tar.gz",
+  "sha256": "1b851236bd603fcfaf5984c075be08b52b81b9cdbc4b93ff08d1001ae3a9d41f",
+  "all_published_assets_byte_equal": true,
+  "published_asset_count": 40,
+  "archive_members": 1273,
+  "manifest_files_verified": 1271,
+  "archive_safe_regular_files_only": true,
+  "all_inner_sha256_verified": true,
+  "download_access": "authenticated operator GitHub account; Dirk account access not impersonated"
+}

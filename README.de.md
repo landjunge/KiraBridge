@@ -105,6 +105,22 @@ unterstütztes Ziel; eine neue native Ubuntu-Abnahme wird hier nicht behauptet.
 [Installation, Update und Rollback](docs/INSTALL-LINUX-SERVER.de.md) ·
 [Quell-, Abnahme- und Downloadbelege](docs/evidence/readme-current-20261107.json).
 
+[Finale native Releasebelege](docs/evidence/debian-dirktest-release-20261107.json).
+[Archiv-SHA-256](https://github.com/landjunge/KiraBridge/releases/download/linux-v0.8.0rc41/KiraBridge-0.8.0rc41-Linux-x86_64.tar.gz.sha256).
+
+```sh
+gh release download linux-v0.8.0rc41 -R landjunge/KiraBridge -p 'KiraBridge-0.8.0rc41-Linux-x86_64.tar.gz*'
+sha256sum -c KiraBridge-0.8.0rc41-Linux-x86_64.tar.gz.sha256
+tar -xzf KiraBridge-0.8.0rc41-Linux-x86_64.tar.gz
+cd KiraBridge-0.8.0rc41-Linux-x86_64
+sh install.sh --yes
+```
+
+Für ein Update das neue Release in ein frisches Verzeichnis laden, prüfen und dort
+`sh install.sh --yes` mit denselben Zielpfaden ausführen. Die bisherige Laufzeit für
+Rollback behalten; [explizite Pfade und Rollbackbefehle](docs/INSTALL-LINUX-SERVER.de.md)
+decken auch Hosts mit gemeinsam beschreibbaren übergeordneten Verzeichnissen ab.
+
 ## Tastenfolgen und weniger Cloudaufrufe
 
 `keyboard_sequence` führt bis zu 32 echte Key-down/Key-up-Paare ohne Zwischenablage

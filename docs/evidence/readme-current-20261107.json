@@ -2,7 +2,7 @@
   "schema": "kirabridge.readme-current.v1",
   "task_id": "KB-README-CURRENT-CODEX-20261107",
   "instance": "codex-current-readme-20261107",
-  "recorded_at": "2026-11-07T13:37:32.516595+00:00",
+  "recorded_at": "2026-11-07T13:48:10.379928+00:00",
   "status": "verified_delivery_snapshot_before_final_documentation_PR",
   "scope": {
     "written_files": [
@@ -594,21 +594,21 @@
     "documentation_static": {
       "status": "passed",
       "counts": {
-        "links_and_assets": 146,
-        "local_links_and_assets": 102,
-        "external_references": 44,
-        "pinned_git_links": 10,
-        "shell_syntax_blocks": 4
+        "links_and_assets": 152,
+        "local_links_and_assets": 106,
+        "external_references": 46,
+        "shell_syntax_blocks": 6,
+        "pinned_git_links": 10
       },
       "issues": [],
       "files": [
         {
           "path": "README.md",
-          "sha256": "d532fd93ff7e8286f8cd301f80f882c419b3eac566fbf61511d4f91dd8c511c3"
+          "sha256": "94142cb4a0b7769e2c530f6e2fa07483f69bf21e285cc3fd932d9c033d9bfb98"
         },
         {
           "path": "README.de.md",
-          "sha256": "b0fe5b9a39ac51791fa554348cc7d41e435b2653b63954fdc6f955c19a83fea8"
+          "sha256": "e262b68b9542ea65ce094411698b6cfdeb33a2380488f0bfee738dff2b552ce7"
         },
         {
           "path": "docs/DEVELOPERS.md",
@@ -636,9 +636,45 @@
         "required_ci": "https://github.com/landjunge/KiraBridge/actions/runs/42374701083",
         "conclusion": "success"
       },
-      "current_documentation_followup": "Not yet pushed or run at this snapshot; actual resulting PR/check/merge receipts will be in final handoff."
+      "current_documentation_followup": {
+        "pr": "https://github.com/landjunge/KiraBridge/pull/76",
+        "remote_head_before_this_merge": "928f532978e92492256431e0137df04210374f69",
+        "queued_run_at_snapshot": 42378130702,
+        "state": "queued, not passed; upcoming source merge push will require current actual checks",
+        "final_receipts": "PR76/checks and final coordinator handoff"
+      }
     },
-    "scope_chronology": "Current fields describe the146-reference server followup andRC41 CLI. historical_* and initial_failed_* fields retain earlier actual outcomes; no cancelled/failed attempt is a pass."
+    "scope_chronology": "Current fields describe the152-reference merged-server followup andRC41 CLI. historical_* and initial_failed_* retain earlier actual outcomes; no cancelled/failed attempt is a pass.",
+    "documentation_static_server_before_owner_merge": {
+      "status": "passed",
+      "counts": {
+        "links_and_assets": 146,
+        "local_links_and_assets": 102,
+        "external_references": 44,
+        "pinned_git_links": 10,
+        "shell_syntax_blocks": 4
+      },
+      "issues": [],
+      "files": [
+        {
+          "path": "README.md",
+          "sha256": "d532fd93ff7e8286f8cd301f80f882c419b3eac566fbf61511d4f91dd8c511c3"
+        },
+        {
+          "path": "README.de.md",
+          "sha256": "b0fe5b9a39ac51791fa554348cc7d41e435b2653b63954fdc6f955c19a83fea8"
+        },
+        {
+          "path": "docs/DEVELOPERS.md",
+          "sha256": "bb54d8296f28ec7fcbc8c25876c1bca21f13a654e85b2e3a09eeda7ae49381e2"
+        },
+        {
+          "path": "docs/DEVELOPERS.de.md",
+          "sha256": "ad35082a14457e468ace3f40d1059b31eb4efde393a6058e283ba674a851c5d6"
+        }
+      ],
+      "scope": "local targets/anchors, pinned Git blobs, HTML image sources, fence/whitespace and shell syntax, DE/EN source/version/GitHub-link parity, unchanged README artwork"
+    }
   },
   "independent_review": {
     "agent": "/root/developer_docs_audit",
@@ -732,7 +768,9 @@
     "historical_first_followup_note": "This followup only records actual CI failure and updates developer status. A normal push necessarily triggers existing Verify again; no workflow change, skip marker, manual full-suite rerun or successful replacement status is used. Its later result must be read from PR71.",
     "final_report_update": "This snapshot now records actual completed PR71/Main verification and accepted/published Linux350 delivery. Final documentation followup remains subject to its own actual CI/review/regular merge; resulting commit/PR receipt is external to avoid an evidence-only self-recording CI loop.",
     "followup_branch": "docs/current-deliveries-final-20261107",
-    "followup_snapshot_phase": "Before final followup commit/PR; later actual head, checks and merge are not predeclared passed."
+    "followup_snapshot_phase": "PR76 already exists. This snapshot includes the owned working merge of completed ownerPR75 before its commit/push. Resulting final head/checks/merge must be read from PR76/handoff; no future pass predeclared.",
+    "followup_PR": "https://github.com/landjunge/KiraBridge/pull/76",
+    "initial_followup_remote_head": "928f532978e92492256431e0137df04210374f69"
   },
   "remaining_limits": [
     "This is a factual delivery snapshot before the final documentation PR. Its future required CI/merge is not predeclared passed. PR73 remains Draft/deferred; later browser proof is distinct from native installed acceptance, and cancelled initial check is not passed.",
@@ -1182,6 +1220,12 @@
         "status": "success both required lanes at46be; started by separate source owner, not README worker"
       },
       "coordination_comment": "https://github.com/landjunge/KiraBridge/pull/73#issuecomment-6707225946"
+    },
+    "server_release_tag_verify": {
+      "run": 42376443797,
+      "head": "350d36854fc9dd37725d7c00a91b72cd1bd32b15",
+      "conclusion": "success",
+      "scope": "actual automatic tag Verify, observed completed13:43:17UTC; not triggered by README worker"
     }
   },
   "runtime_recheck": {
@@ -1198,21 +1242,21 @@
     "scoped_markdown": {
       "status": "passed",
       "counts": {
-        "links_and_assets": 146,
-        "local_links_and_assets": 102,
-        "external_references": 44,
-        "pinned_git_links": 10,
-        "shell_syntax_blocks": 4
+        "links_and_assets": 152,
+        "local_links_and_assets": 106,
+        "external_references": 46,
+        "shell_syntax_blocks": 6,
+        "pinned_git_links": 10
       },
       "issues": [],
       "files": [
         {
           "path": "README.md",
-          "sha256": "d532fd93ff7e8286f8cd301f80f882c419b3eac566fbf61511d4f91dd8c511c3"
+          "sha256": "94142cb4a0b7769e2c530f6e2fa07483f69bf21e285cc3fd932d9c033d9bfb98"
         },
         {
           "path": "README.de.md",
-          "sha256": "b0fe5b9a39ac51791fa554348cc7d41e435b2653b63954fdc6f955c19a83fea8"
+          "sha256": "e262b68b9542ea65ce094411698b6cfdeb33a2380488f0bfee738dff2b552ce7"
         },
         {
           "path": "docs/DEVELOPERS.md",
@@ -1248,5 +1292,44 @@
       ],
       "setup_path_failure_preserved": "Initial helper tried nonexistent original .venv/bin/uv (exit127); actual PATH /usr/local/bin/uv used successfully. This was not a product/README command failure."
     }
+  },
+  "owner_server_documentation_delivery": {
+    "pr": "https://github.com/landjunge/KiraBridge/pull/75",
+    "commit": "daf17d2d217d8e0dd021b11a8aa59e12b4cafdf4",
+    "import": "normal merge into owned PR76 branch, pending its actual final checks/integration",
+    "non_README_files_byte_equal_to_owner": [
+      "docs/RELEASE-0.8.0rc41.md",
+      "docs/evidence/debian-actual-download-20261107.json",
+      "docs/evidence/debian-ci-350.json",
+      "docs/evidence/debian-dirktest-byte-provenance-20261107.json",
+      "docs/evidence/debian-dirktest-ci350-20261107.log.gz",
+      "docs/evidence/debian-dirktest-delivery-20261107.json",
+      "docs/evidence/debian-dirktest-delivery-20261107.log.gz",
+      "docs/evidence/debian-dirktest-delivery-junit-20261107.xml",
+      "docs/evidence/debian-dirktest-environment-20261107.log.gz",
+      "docs/evidence/debian-dirktest-extra-native-20261107.json",
+      "docs/evidence/debian-dirktest-extra-native-20261107.log.gz",
+      "docs/evidence/debian-dirktest-failed-systemd-20261107.log.gz",
+      "docs/evidence/debian-dirktest-failed-systemd-evidence.json",
+      "docs/evidence/debian-dirktest-failed-systemd-journal-20261107.log.gz",
+      "docs/evidence/debian-dirktest-failed-systemd-junit.xml",
+      "docs/evidence/debian-dirktest-legacy-20261107.log.gz",
+      "docs/evidence/debian-dirktest-native-20261107.json",
+      "docs/evidence/debian-dirktest-native-20261107.log.gz",
+      "docs/evidence/debian-dirktest-native-junit-20261107.xml",
+      "docs/evidence/debian-dirktest-release-20261107.json",
+      "docs/evidence/debian-dirktest-review-20261107.json",
+      "docs/evidence/debian-native-environment-junit.xml",
+      "docs/evidence/debian-native-environment.json",
+      "docs/evidence/debian-native-failed-cleanup-junit.xml",
+      "docs/evidence/debian-native-failed-cleanup.json",
+      "docs/evidence/debian-native-legacy-junit.xml",
+      "docs/evidence/debian-native-legacy.json",
+      "docs/evidence/debian-reproducibility.json",
+      "docs/evidence/debian-runtime-provenance.json"
+    ],
+    "README_resolution": "Preserve current source/main/download distinctions, one consolidated server section, both owner install/update/rollback examples and native-evidence plus per-archive checksum links; original artwork/language switches retained. No owner evidence bytes edited.",
+    "coordination_comment": "https://github.com/landjunge/KiraBridge/pull/75#issuecomment-6707710425",
+    "independent_merge_review": "passed; no P1/P2; archive root/checksum/EN language flag/DE default/update+rollback targets and original artwork/language switch verified read-only"
   }
 }

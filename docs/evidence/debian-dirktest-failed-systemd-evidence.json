@@ -1,0 +1,35 @@
+{
+  "result": "failed",
+  "steps": [
+    {
+      "name": "final-package-integrity",
+      "result": "passed",
+      "detail": {
+        "files": 1271,
+        "all_sha256_match": true
+      }
+    },
+    {
+      "name": "final-package-install",
+      "result": "failed",
+      "error": "(1, 'sh')"
+    },
+    {
+      "name": "cleanup",
+      "result": "failed",
+      "error": ""
+    }
+  ],
+  "archive_sha256": "da310c6d272b6a0c4694f9a70c1e32270fe1717e8217bfdb66bd5c606723b73d",
+  "harness_sha256": "5d2d5f2f0a88dde5725685110a108c926d0df7d98b716f4d85da96afbbb30767",
+  "delivery_smoke_sha256": "446659b94c3daeccd28ab81ddfa4c2f031f9e43a44129c597efbb7a82761aad4",
+  "source_commit": "2d51aa7605b86339aacfb30520b5fb66c8dc0a72",
+  "version": "0.8.0rc41",
+  "artifacts": {
+    "KiraBridge-0.8.0rc41-Linux-x86_64-scoped.tar.gz": {
+      "source_commit": "2d51aa7605b86339aacfb30520b5fb66c8dc0a72",
+      "sha256": "da310c6d272b6a0c4694f9a70c1e32270fe1717e8217bfdb66bd5c606723b73d"
+    }
+  },
+  "log_sha256": "710468170246319ae03b32e77a70ed2e8ba2521ac562167828cf793d1f25113c"
+}

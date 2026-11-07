@@ -1,9 +1,9 @@
 {
   "result": "passed",
   "tests": 3,
-  "source_commit": "d62fc8798f47e73f7adc9c5ac7f77d13a8897e7b",
+  "source_commit": "428271a806588d95e133ef2b7fa0544b8ff96264",
   "harness_sha256": "9bec4afb3a50d993ca9f53c5bf9a390051eca3344d7c68d2345638c06fc79fc9",
-  "log_sha256": "b08eff09d2e74d2ab4337867bf97a762d67e933dd71d834eb69d70555b4fa592",
+  "log_sha256": "c9f12d61c30fb2d4e84b761dba93f8c960bc4104800bae6d530d2ecf33856437",
   "no_service_mode_recorded": true,
   "rollback_preserves_config_credentials": true,
   "tampered_package_rejected": true,
