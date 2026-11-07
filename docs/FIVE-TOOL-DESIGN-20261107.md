@@ -11,7 +11,7 @@ wiederverwendet und auf KiraBridge-Main `8b338b66752fb9d65a4c05959c04cf2505412ed
 in einen regulär registrierten lokalen Git-Worktree übernommen. Der erste
 Integrationscommit ist `2c191e95ee3c2f1d8884de45585375b96f552d20`; der aktuelle
 Implementierungspin steht im [Fortsetzungsnachweis](evidence/kb-design-adapt-kirabridge-20261107.json).
-Die Original-README-Dateien aus Main bleiben bytegleich. Debian-/Installer-,
+Die README-Dateien der ersten Lieferung blieben bytegleich zum damaligen Main. Debian-/Installer-,
 Server- und Auditbereiche wurden nicht angefasst.
 
 Alle fünf Produkte bleiben eigenständig. KiraBridge, ThreadDesk, 4AllPass,
@@ -76,12 +76,30 @@ und zwei nach der MIME-Aufräumung wiederholte Asset-/Designprüfungen bestehen.
 Die Screenshotprüfung umfasst Hauptansicht, Protokoll, Team und Connector.
 
 Offene Grenzen: keine Prüfung einer installierten nativen Desktop-App oder
-produktiver Fremdverbindungen, kein Push, Main-Merge, Release, Deployment oder
-produktiver Dienstwechsel. Browserbelege sind Quelllaufzeitbelege des lokalen
+produktiver Fremdverbindungen. Die aktuelle Fortsetzung autorisiert normale
+Push-/Mainintegration über PR73 nach Pflichtprüfungen. Release, Deployment und
+produktiver Dienstwechsel sind kein Teil dieser Designlieferung. Browserbelege sind Quelllaufzeitbelege des lokalen
 Kandidaten. Der bestehende Fünf-Tool-Gesamtnachweis im ThreadDesk-Arbeitsstand
 `docs/evidence/five-tool-design-20261107.json` bleibt historisch erhalten.
 Live-Board-Schreiben und Koordinatorzustellung werden getrennt mit tatsächlichem
 Ergebnis im Fortsetzungsbericht ausgewiesen.
+
+## PR73 · aktuelle Mainintegration
+
+Nach bestätigtem Debian-Merge und unabhängig heruntergeladenem, hashgeprüftem
+Linux-Download wurde Main `2bbf6d9` normal in den Designbranch übernommen.
+Integrationspin `8812662`: eigene Installer-/Server-/Dependencydifferenz gegen
+Main leer; sämtliche bisherigen UI-/Testquellen und Original-PNGs unverändert.
+Die READMEs erhalten den vollständigen Maintext und ergänzen nur den bestehenden
+Designabschnitt mit Browser-PASS und ausdrücklich ungeprüfter nativer App.
+
+Der gemeinsame RC41-Quellstand besteht erneut 47 gezielte UI-Prüfungen und
+28 echte Browserchecks mit 29 neuen Screenshots. Die tatsächlichen Importpfade,
+Laufzeitversion, Testaufrufe und Quellpins sind im
+[PR73-Integrationsnachweis](evidence/kb-design-pr73-integration-20261107.json)
+festgehalten. Alte RC40-Belege bleiben historisch erhalten. Die normalen finalen
+PR-Prüfungen und der tatsächliche Mainmerge werden am [PR73](https://github.com/landjunge/KiraBridge/pull/73)
+und im Koordinatorbericht belegt; keine Erfolgsaussage vor deren Abschluss.
 
 ## English
 
@@ -90,7 +108,7 @@ and normally imported into a registered local Git worktree based on current
 KiraBridge main `8b338b66752fb9d65a4c05959c04cf2505412ed2`. Initial integration
 commit: `2c191e95ee3c2f1d8884de45585375b96f552d20`. The final implementation pin
 is recorded in the [continuation evidence](evidence/kb-design-adapt-kirabridge-20261107.json).
-Both main README files are unchanged. Installer, server and audit code is outside
+The original delivery preserved both then-current main README files. Installer, server and audit code is outside
 this delivery.
 
 All five independent products keep their original identities and order in a
@@ -133,6 +151,24 @@ all five original icons, authenticated runtime version, unconfirmed peers,
 keyboard, focus, pointer actions and state transitions, with 29 hashed screenshots.
 The targeted 47 Python checks and two repeated asset/design checks pass.
 Installed native runtime and productive peer connections are not claimed.
-No push, main merge, release, deployment, app installation or production service
-switch is part of this local integration delivery. Live board writing and
+The current continuation authorizes normal PR73 push/main integration after
+required checks. Release, deployment, app installation and production service
+switch are outside this design delivery. Live board writing and
 coordinator notification are reported with their actual outcomes separately.
+
+## PR73 · current main integration
+
+After the Debian merge and an independent actual download/hash verification,
+accepted main `2bbf6d9` was normally merged into the design branch at `8812662`.
+There are no own installer/server/dependency changes against main. All existing
+UI/test hashes and original PNGs match the prior accepted implementation.
+Both READMEs keep the complete accepted main text and add only the existing
+design section, accurately separating passed browser checks from the unverified
+installed native app.
+
+The combined RC41 source passes 47 targeted UI checks and 28 real browser
+checks with 29 new screenshots. Import paths, actual source version, commands and
+pins are in the [PR73 integration evidence](evidence/kb-design-pr73-integration-20261107.json).
+Earlier RC40 evidence remains historical. Final regular PR checks and the actual
+merge are proved by [PR73](https://github.com/landjunge/KiraBridge/pull/73) and the
+coordinator handoff; success is not asserted before those steps finish.

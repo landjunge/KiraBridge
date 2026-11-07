@@ -545,5 +545,8 @@
       "path": "kb-design-adapt-kirabridge-20261107/ui-targeted.xml",
       "sha256": "8c8ee2a6178dd7b40cd0dca8c8be5d9b3a8cb80e3ab0a8d3e589e5e20fc0f664"
     }
-  ]
+  ],
+  "subsequentIntegrationEvidence": "kb-design-pr73-integration-20261107.json",
+  "historicalScopeCommit": "e753150d7c8e6bc5ed757be3ca0ba60175e942bf",
+  "historicalScopeClarification": "This earlier report records RC40 delivery. Later accepted Main changes and fresh RC41 tests/browser proof are recorded separately; no earlier result is silently reclassified."
 }

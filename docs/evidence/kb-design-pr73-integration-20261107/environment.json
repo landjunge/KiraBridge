@@ -1,0 +1,30 @@
+{
+  "cwd": "/Users/landjunge/threaddesk-worktrees/five-tool-design-codex-20261107/.runtime/kb-design-adapt-regular/worktree",
+  "python": "/Users/landjunge/KiraBridge/.venv/bin/python",
+  "pythonVersion": "3.11.15 (main, Mar  3 2026, 00:52:57) [Clang 17.0.0 (clang-1700.6.4.2)]",
+  "git": "881266210854d77c815fa543f92a64ef44c1f4c4",
+  "modulePaths": {
+    "kirabridge": "/Users/landjunge/threaddesk-worktrees/five-tool-design-codex-20261107/.runtime/kb-design-adapt-regular/worktree/src/kirabridge/__init__.py",
+    "kirabridge.approval_console": "/Users/landjunge/threaddesk-worktrees/five-tool-design-codex-20261107/.runtime/kb-design-adapt-regular/worktree/src/kirabridge/approval_console.py",
+    "kirabridge.bridge_core.bridge": "/Users/landjunge/threaddesk-worktrees/five-tool-design-codex-20261107/.runtime/kb-design-adapt-regular/worktree/src/kirabridge/bridge_core/bridge.py",
+    "kirabridge.team_console": "/Users/landjunge/threaddesk-worktrees/five-tool-design-codex-20261107/.runtime/kb-design-adapt-regular/worktree/src/kirabridge/team_console.py",
+    "kirabridge.grok_connector.console": "/Users/landjunge/threaddesk-worktrees/five-tool-design-codex-20261107/.runtime/kb-design-adapt-regular/worktree/src/kirabridge/grok_connector/console.py"
+  },
+  "sourceRuntimeVersion": "0.8.0rc41",
+  "installedDistributionMetadataVersion": "0.8.0rc11",
+  "dependencies": {
+    "pytest": "9.1.1",
+    "pytest-asyncio": "1.4.0",
+    "uvicorn": "0.54.0",
+    "starlette": "1.8.0",
+    "httpx": "0.28.1",
+    "mcp": "1.30.0",
+    "playwright": "1.64.0"
+  },
+  "environment": {
+    "PYTHONPATH": "src",
+    "PYTHONNOUSERSITE": "1",
+    "PYTHONDONTWRITEBYTECODE": "1"
+  },
+  "scope": "source runtime of candidate, no installed-app identity claim"
+}
