@@ -4,19 +4,26 @@
 
 ## Source and release
 
-Reviewed November 7, 2026: the repository baseline `d12838ae97c7efcc053c45c3bc9fba5e78f5fe5d`
-declares `0.8.0rc40` in `pyproject.toml`, `uv.lock` and the Python package.
-The installed Intel runtime reports that source pin. The newest published Intel
-download is still [RC36](https://github.com/landjunge/KiraBridge/releases/tag/v0.8.0rc36),
-source `d4aebdd89a206045731f2692a3f363fddaa15ee0`. Its authenticated installer
-download matches both GitHub's digest and `SHA256SUMS`.
+Reviewed November 7, 2026: the integrated repository declares `0.8.0rc41` in
+`pyproject.toml`, `uv.lock` and the Python package. Server implementation source
+`350d36854fc9dd37725d7c00a91b72cd1bd32b15` is bound to the published
+[linux-v0.8.0rc41](https://github.com/landjunge/KiraBridge/releases/tag/linux-v0.8.0rc41) Linux archive and native Debian acceptance.
+Reviewed main baseline: `2bbf6d9dc628cdf95e5591df7968f761f938883c`; the final documentation integration can advance
+that Git pin without changing the packaged runtime.
+
+The local Intel runtime remains `0.8.0rc40` at
+`d12838ae97c7efcc053c45c3bc9fba5e78f5fe5d`. The newest published Intel installer
+remains [RC36](https://github.com/landjunge/KiraBridge/releases/tag/v0.8.0rc36),
+source `d4aebdd89a206045731f2692a3f363fddaa15ee0`. Both that installer and the separate
+server archive were actually downloaded and hash-checked.
 [Verification, sources and remaining limits](evidence/readme-current-20261107.json).
 
-The separate [Windows setup preview](WINDOWS-SETUP-20261104.md) is `0.8.0rc37.dev1`;
-it does not establish feature parity or a Windows service installer. Current
-Windows/installer and Linux/Debian server work remains separate from those downloads.
-RC17, RC16 and RC15 remain drafts. Check release state, artifact source and the
-responding service independently; a version string alone does not identify a build.
+[Server installation/update/rollback](INSTALL-LINUX-SERVER.md) documents online
+prerequisites, systemd-user, loopback authentication, native Debian proof and limits.
+The separate [Windows setup preview](WINDOWS-SETUP-20261104.md) is still `0.8.0rc37.dev1`;
+it does not establish current feature parity or a standalone Windows installer.
+RC17, RC16 and RC15 remain drafts. Check source, artifact and responding service
+independently; a version string alone does not identify a build.
 
 ## Developer quickstart
 
@@ -132,8 +139,9 @@ The initial November 7 [PR71 verification](https://github.com/landjunge/KiraBrid
 failed on expired routing-test fixtures, with additional Python 3.13 errors.
 The existing, independently reviewed fixed test clock from the server branch is
 now reused; production freshness checks and real process timeouts are unchanged.
-[Current PR checks](https://github.com/landjunge/KiraBridge/pull/71/checks) remain
-the integration gate. [Original failures, focused checks and source pins](evidence/readme-current-20261107.json).
+[Repaired PR71 Verify](https://github.com/landjunge/KiraBridge/actions/runs/42368125598)
+and [its main run](https://github.com/landjunge/KiraBridge/actions/runs/42369144147)
+passed both required lanes. Subsequent delivery and documentation PRs require their own current checks. [Original failures, focused checks and source pins](evidence/readme-current-20261107.json).
 
 Full integration reproduction needs `uv sync --locked --dev --group remote-ci`
 and the exact external checkouts below. CI uses `scripts/ci_remote_tests.py`

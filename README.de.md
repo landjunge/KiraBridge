@@ -35,7 +35,7 @@ Alle sieben nativen Prüfphasen dieser begrenzten Entwicklungsvorschau bestanden
 ChatGPT-Verbindungstest mit deinem Konto bleiben bei dir.
 [Prüfstand und Grenzen](docs/WINDOWS-SETUP-20261104.md) · [Anleitung](docs/WINDOWS-SETUP.md).
 
-**Intel-Desktop-Quellstand geprüft am 7. November 2026: RC40 bei `d12838a`; die lokale Intel-Laufzeit meldet denselben Pin.**
+**Geprüfter Repository-Programmstand: Serverquelle 0.8.0rc41 bei `350d368`; die lokale Intel-Laufzeit bleibt RC40 bei `d12838a`.**
 Der veröffentlichte Intel-Download oben bleibt RC36 bei `d4aebdd`.
 [Release-, Artefakt- und Installationsquellnachweis](docs/evidence/readme-current-20261107.json).
 Der [frühere PR61-Installationsbericht](docs/RC40-PR61-SHIM-INSTALL-20261106.md)
@@ -45,18 +45,6 @@ Windows-Funktionsgleichstand und eigenständiger Installer bleiben Entwicklungsa
 enthält keine allgemeinen Datei-, Prozess- oder Terminaltools und keine
 Windows-Dienstinstallation. Hier wird kein neues Paket dieser laufenden Projekte
 und kein veröffentlichter RC40-Download angeboten.
-
-**Debian/Linux-Server-Testpaket:** [RC41-Prerelease](https://github.com/landjunge/KiraBridge/releases/tag/linux-v0.8.0rc41)
-mit systemd-Benutzerinstaller für Debian 13 / Ubuntu 24.04 x86_64.
-Umfang: HTTP-MCP, Bearer-Authentifizierung, Health, Update und Rollback;
-macOS-GUI und native Tastatur sind nicht verfügbar. Das ist ein Onlineinstaller.
-[Installations-/Updateanleitung und native Nachweise](docs/INSTALL-LINUX-SERVER.de.md).
-Repositoryzugriff ist nötig; die Releasebelege nennen den nativ geprüften Host.
-[Paket herunterladen](https://github.com/landjunge/KiraBridge/releases/download/linux-v0.8.0rc41/KiraBridge-0.8.0rc41-Linux-x86_64.tar.gz) ·
-[SHA-256](https://github.com/landjunge/KiraBridge/releases/download/linux-v0.8.0rc41/KiraBridge-0.8.0rc41-Linux-x86_64.tar.gz.sha256).
-Quelle `350d368`; die native Debian-13.6-Abnahme und der tatsächliche GitHub-Rückdownload
-stehen im [abschließenden Releasebeleg](docs/evidence/debian-dirktest-release-20261107.json).
-
 
 ## Wobei KiraBridge dir hilft
 
@@ -97,7 +85,7 @@ beschreibt das veröffentlichte Paket; siehe [Installation, Prüfung und Hilfe](
 
 ## Linux-/Debian-Server
 
-Der separate [Serverquellstand in PR72](https://github.com/landjunge/KiraBridge/pull/72)
+Die [in Main integrierte Serverimplementierung aus PR72](https://github.com/landjunge/KiraBridge/pull/72)
 bietet einen privaten HTTP-MCP-Dienst auf Loopback mit Bearer-Authentifizierung
 und Healthprüfung sowie Installation, Update und Rollback über `systemd --user`.
 Zielplattformen sind Debian 13 und Ubuntu 24.04 x86_64. Der Onlineinstaller benötigt
@@ -106,11 +94,19 @@ des Hosts. Linger, Administratorrechte, Firewall und öffentliches HTTPS werden 
 
 Der Server läuft ohne macOS-GUI, Terminal.app oder native Tastatursteuerung.
 Zwischenablage ist optional (`wl-clipboard`/`xclip`). ChatGPT-/Kontoverknüpfung und
-Fernzugriff benötigen eigene Konfiguration. Das RC41-Paket hat die native Debian-13.6-Abnahme
-bestanden, wurde durch PR72 in main integriert und mit gleicher Prüfsumme erneut von GitHub
-heruntergeladen. [Lieferbelege und aktuelle Grenzen](docs/evidence/debian-dirktest-release-20261107.json).
+Fernzugriff benötigen eigene Konfiguration.
 
-Installation als normaler Benutzer mit Repositoryzugriff:
+Das 0.8.0rc41-Archiv ist nativ auf Debian 13.6 x86_64 abgenommen und
+[im getrennten Serverrelease veröffentlicht](https://github.com/landjunge/KiraBridge/releases/tag/linux-v0.8.0rc41). Der echte Download
+stimmt mit GitHubs Digest und den Releaseprüfsummen überein. Ubuntu 24.04 ist ein
+unterstütztes Ziel; eine neue native Ubuntu-Abnahme wird hier nicht behauptet.
+[Linux-x86_64-Archiv](https://github.com/landjunge/KiraBridge/releases/download/linux-v0.8.0rc41/KiraBridge-0.8.0rc41-Linux-x86_64.tar.gz) ·
+[Prüfsummen](https://github.com/landjunge/KiraBridge/releases/download/linux-v0.8.0rc41/SHA256SUMS).
+[Installation, Update und Rollback](docs/INSTALL-LINUX-SERVER.de.md) ·
+[Quell-, Abnahme- und Downloadbelege](docs/evidence/readme-current-20261107.json).
+
+[Finale native Releasebelege](docs/evidence/debian-dirktest-release-20261107.json).
+[Archiv-SHA-256](https://github.com/landjunge/KiraBridge/releases/download/linux-v0.8.0rc41/KiraBridge-0.8.0rc41-Linux-x86_64.tar.gz.sha256).
 
 ```sh
 gh release download linux-v0.8.0rc41 -R landjunge/KiraBridge -p 'KiraBridge-0.8.0rc41-Linux-x86_64.tar.gz*'
