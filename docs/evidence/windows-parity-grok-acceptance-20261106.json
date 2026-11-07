@@ -1,0 +1,93 @@
+{
+  "task_id": "WIN-PARITY-GROK-20261106",
+  "accepted": true,
+  "accepted_at": "2026-11-06T22:02:59Z",
+  "implementer": "grok",
+  "instance_id": "win-parity-grok-20261106-impl-49758",
+  "role": "first_and_only_implementer",
+  "worktree": "/Users/landjunge/KiraBridge-worktrees/windows-parity-grok-20261106",
+  "base_commit": "d12838ae97c7efcc053c45c3bc9fba5e78f5fe5d",
+  "base_commit_short": "d12838a",
+  "base_subject": "Merge pull request #69 from landjunge/perf/mac-audit-20261106",
+  "working_tree_at_accept": "clean",
+  "scope": {
+    "goal": "Bring the existing Windows implementation functionally closer to the currently proven working macOS RC40 source at d12838ae97c7.",
+    "areas": [
+      "keyboard and Unicode text",
+      "app and window control",
+      "visible terminal handoff with result return",
+      "status and deduplicated completion",
+      "installation, update, and rollback"
+    ],
+    "method": "Native Windows implementations. Reuse existing adapters and harnesses. Do not repeat UNKNOWN. Do not invent approvals. Do not bypass an earlier explicit security-review stop.",
+    "delivery": [
+      "close identified source gaps in this worktree",
+      "run targeted relevant tests only",
+      "prepare a traceable Windows build/installer path with update/rollback and an E2E procedure",
+      "commit finished changes locally",
+      "write docs/evidence/windows-parity-grok-result-20261106.json"
+    ],
+    "out_of_scope": [
+      "sub-delegation",
+      "paid cloud builds",
+      "changes to global rights or security checks",
+      "VM write actions",
+      "Mac production installation",
+      "push",
+      "release",
+      "follow-up task invention",
+      "regular status questions to Codex"
+    ]
+  },
+  "first_step": "Write this acceptance file before longer analysis, after observing HEAD and the live CLI process line.",
+  "observed_cli": {
+    "attestation": "cli_argv_only_not_provider_attestation",
+    "observed_at": "2026-11-06T22:02:59Z",
+    "grok_pid": 49758,
+    "parent_pid": 25936,
+    "launcher_pid": 49746,
+    "launcher": "/usr/local/Cellar/python@3.11/3.11.15_1/Frameworks/Python.framework/Versions/3.11/Resources/Python.app/Contents/MacOS/Python /Users/landjunge/.local/state/windows-parity-grok-20261106/run.py",
+    "argv": [
+      "/Users/landjunge/.grok/bin/grok",
+      "--no-auto-update",
+      "--effort",
+      "high",
+      "--model",
+      "grok-4.7",
+      "--allow",
+      "Bash",
+      "--allow",
+      "Edit",
+      "--allow",
+      "Read",
+      "--no-subagents",
+      "--disable-web-search",
+      "--permission-mode",
+      "dontAsk",
+      "--deny",
+      "MCPTool",
+      "--deny",
+      "WebFetch",
+      "--deny",
+      "WebSearch",
+      "agent",
+      "--no-leader",
+      "stdio"
+    ],
+    "model": "grok-4.7",
+    "effort": "high",
+    "session_id": "01a1b2e2-b5c0-76b3-be11-8095b9c3c293",
+    "note": "Model and effort are the argv the local grok process was started with. This file does not claim a provider-side attestation."
+  },
+  "constraints_acknowledged": {
+    "no_subagents": true,
+    "no_paid_cloud_builds": true,
+    "no_global_rights_or_security_check_changes": true,
+    "no_vm_writes": true,
+    "no_mac_production_install": true,
+    "no_push": true,
+    "no_release": true,
+    "preserve_foreign_processes": true,
+    "vm_last_reported_uuid_not_reconfirmed": "2B6EE828-02F0-42AE-B4FE-BE57C448F65E"
+  }
+}

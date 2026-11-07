@@ -79,6 +79,8 @@ from kirabridge.task_manager.manager import TaskManager
 from kirabridge.task_manager.store import Store
 from kirabridge.terminal_manager import TerminalManager
 from kirabridge.visible_terminal import VisibleTerminal, VisibleTerminalInput
+from kirabridge.windows_apps import WINDOWS_APP_INPUTS, WindowsAppManager
+from kirabridge.windows_console import WINDOWS_CONSOLE_INPUTS, WindowsConsoleManager
 from kirabridge.windows_keyboard import WINDOWS_KEYBOARD_INPUTS, WindowsKeyboardManager
 from kirabridge.windows_windows import WINDOWS_WINDOW_INPUTS, WindowsWindowManager
 
@@ -86,6 +88,8 @@ INPUTS = {
     "autonext.control": AutoNextControl,
     **WINDOWS_KEYBOARD_INPUTS,
     **WINDOWS_WINDOW_INPUTS,
+    **WINDOWS_APP_INPUTS,
+    **WINDOWS_CONSOLE_INPUTS,
     **SYSTEM_INPUTS,
     **KEYBOARD_INPUTS,
     **CONTROL_INPUTS,
@@ -260,6 +264,10 @@ class Bridge:
         )
         self.windows_keyboard = WindowsKeyboardManager(self.security.authorize, self.desktop_input)
         self.windows_windows = WindowsWindowManager(self.security.authorize, self.desktop_input)
+        self.windows_apps = WindowsAppManager(self.security.authorize, self.desktop_input)
+        self.windows_console = WindowsConsoleManager(
+            self.security.authorize, self.desktop_input, config.state_path
+        )
         self.keyboard_profiles = KeyboardProfileManager(
             config.state_path, self.security.authorize, self.desktop_input
         )
@@ -327,6 +335,10 @@ class Bridge:
             raise BridgeError("unsupported_platform", "Windows keyboard requires Windows")
         if request.operation in WINDOWS_WINDOW_INPUTS and self.windows_windows.host != "win32":
             raise BridgeError("unsupported_platform", "Windows window tasks require Windows")
+        if request.operation in WINDOWS_APP_INPUTS and self.windows_apps.host != "win32":
+            raise BridgeError("unsupported_platform", "Windows application tasks require Windows")
+        if request.operation in WINDOWS_CONSOLE_INPUTS and self.windows_console.host != "win32":
+            raise BridgeError("unsupported_platform", "A visible Windows console requires Windows")
         model = INPUTS.get(request.operation)
         if not model:
             raise BridgeError("unknown_operation", "Operation is not supported")
@@ -549,6 +561,8 @@ class Bridge:
                         lambda op: decision(self.config, principal, op)
                     )
                     + self.windows_windows.catalog(lambda op: decision(self.config, principal, op))
+                    + self.windows_apps.catalog(lambda op: decision(self.config, principal, op))
+                    + self.windows_console.catalog(lambda op: decision(self.config, principal, op))
                     if row["available"] and row["policy"]["authorized"]
                 ],
                 "interactive_desktop_observed": False,
@@ -558,6 +572,8 @@ class Bridge:
                     "public file-root tools",
                     "managed process execution",
                     "agent terminal automation",
+                    "Terminal.app session transport",
+                    "keyboard.text staged 1 MiB mac helper",
                 ],
             }
         # Explicit no-prompt checks run only for status, never tools/list.
@@ -596,6 +612,10 @@ class Bridge:
             return await self.windows_keyboard.execute(task, args, running, progress)
         if operation in WINDOWS_WINDOW_INPUTS:
             return await self.windows_windows.execute(task, args, running, progress)
+        if operation in WINDOWS_APP_INPUTS:
+            return await self.windows_apps.execute(task, args, running, progress)
+        if operation in WINDOWS_CONSOLE_INPUTS:
+            return await self.windows_console.execute(task, args, running, progress)
         if operation == "platform.status":
             await running({"evidence_type": "platform_status_query"})
             return await self.platform_status(principal, check_helpers=args.check_helpers)

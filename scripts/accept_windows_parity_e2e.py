@@ -1,0 +1,756 @@
+#!/usr/bin/env python3
+"""Independent, guest-only native acceptance against one frozen source snapshot.
+
+Run from an already visible Windows console. --root and --output must be fresh.
+No retry, installer, policy change, hidden process, task replacement or process kill.
+An unresolved native effect preserves its owned fixture for operator reconciliation.
+"""
+
+from __future__ import annotations
+
+import argparse
+import asyncio
+import hashlib
+import importlib
+import importlib.util
+import json
+import os
+import secrets
+import socket
+import subprocess
+import sys
+import threading
+import time
+from pathlib import Path
+
+TERMINAL = {"completed", "failed", "unknown", "cancelled", "blocked", "withdrawn"}
+TEXT = "Größe € 😀\n" + "abcdefghij" * 4 + " Ende"
+MODULES = (
+    "kirabridge",
+    "kirabridge.bridge_core.bridge",
+    "kirabridge.windows_keyboard",
+    "kirabridge.windows_apps",
+    "kirabridge.windows_console",
+    "kirabridge.platform_adapters.windows.visible_console",
+)
+
+
+def require(condition, message):
+    if not condition:
+        raise RuntimeError(message)
+
+
+def write_json(path, value):
+    temporary = path.with_name(path.name + ".partial")
+    with temporary.open("x", encoding="utf-8") as stream:
+        json.dump(value, stream, ensure_ascii=True, indent=2)
+        stream.flush()
+        os.fsync(stream.fileno())
+    os.replace(temporary, path)
+
+
+def load_support(source, name):
+    path = source / "scripts" / (name + ".py")
+    spec = importlib.util.spec_from_file_location("independent_" + name, path)
+    require(spec is not None and spec.loader is not None, "Fixture support missing")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def fingerprint(source):
+    files = sorted((source / "src" / "kirabridge").rglob("*.py"))
+    files += sorted((source / "scripts").glob("accept_windows*.py"))
+    files += [source / "pyproject.toml"]
+    hashes = {}
+    for path in files:
+        require(path.is_file() and not path.is_symlink(), "Missing or linked source: " + str(path))
+        hashes[path.relative_to(source).as_posix()] = hashlib.sha256(path.read_bytes()).hexdigest()
+    require(len(hashes) > 10, "Source snapshot is incomplete")
+    digest = hashlib.sha256(json.dumps(hashes, sort_keys=True).encode()).hexdigest()
+    return {"sha256": digest, "files": hashes}
+
+
+def pin_source(source):
+    require((source / "src" / "kirabridge").is_dir(), "--source needs an extracted source tree")
+    sys.path[:0] = [str(source / "src"), str(source / "scripts")]
+    os.environ["PYTHONPATH"] = str(source / "src")
+    os.environ["PYTHONUTF8"] = "1"
+    os.environ["PYTHONIOENCODING"] = "utf-8"
+    os.environ["PYTHONDONTWRITEBYTECODE"] = "1"
+    loaded = {}
+    for name in MODULES:
+        module = importlib.import_module(name)
+        path = Path(module.__file__).resolve()
+        require(path.is_relative_to(source / "src"), "Old installed module imported: " + str(path))
+        loaded[name] = str(path)
+    return loaded
+
+
+def run_existing(args, report, persist, name):
+    output = args.root / (name + ".json")
+    item = {
+        "script": name,
+        "state": "starting_once",
+        "output": str(output),
+        "argv": [
+            sys.executable,
+            "-B",
+            str(args.source / "scripts" / (name + ".py")),
+            "--output",
+            str(output),
+        ],
+        "automatic_retry": False,
+    }
+    report["legacy_harnesses"].append(item)
+    persist()
+    # Inherit the confirmed visible operator console. The harness creates its own UI.
+    process = subprocess.Popen(item["argv"], cwd=args.source, env=dict(os.environ))
+    item.update(pid=process.pid, state="running")
+    persist()
+    try:
+        item["exit_code"] = process.wait(timeout=240)
+    except subprocess.TimeoutExpired:
+        item["state"] = "unknown_process_preserved_no_retry"
+        persist()
+        raise RuntimeError(name + " did not finish; preserve its original PID and report") from None
+    item["state"] = "returned"
+    if output.exists():
+        item["report"] = json.loads(output.read_text(encoding="utf-8"))
+    persist()
+    require(
+        item["exit_code"] == 0 and item.get("report", {}).get("passed") is True,
+        name + " failed or remains unresolved; subsequent effects are pending",
+    )
+    item["state"] = "passed"
+    persist()
+
+
+async def wait_until(predicate, timeout=8):
+    deadline = time.monotonic() + timeout
+    while True:
+        value = predicate()
+        if value:
+            return value
+        require(time.monotonic() < deadline, "Original effect was not observed; no retry")
+        await asyncio.sleep(0.025)
+
+
+class NativeMCP:
+    """Fresh authenticated local server, using the repository's proven MCP pattern."""
+
+    def __init__(self, args, report, persist):
+        self.args, self.report, self.persist = args, report, persist
+        self.counter = 0
+        self.nonce = secrets.token_hex(8)
+        self.environment_key = "KIRABRIDGE_INDEPENDENT_E2E_" + self.nonce.upper()
+        self.server = self.serving = self.bridge = self.clients = self.sock = None
+        self.entered_bridge = self.entered_clients = False
+
+    async def __aenter__(self):
+        import httpx
+        import uvicorn
+
+        from kirabridge.bridge_core.bridge import Bridge
+        from kirabridge.bridge_core.config import Config, PrincipalConfig
+        from kirabridge.mcp_gateway.client import MCPClientPool, Peer
+        from kirabridge.mcp_gateway.http import create_http_app
+
+        token = secrets.token_urlsafe(48)
+        require(self.environment_key not in os.environ, "Authentication variable collision")
+        os.environ[self.environment_key] = token
+        capabilities = [
+            "bridge.health",
+            "task.read",
+            "platform.status",
+            "windows.keyboard.inspect",
+            "windows.keyboard.text",
+            "windows.window.list",
+            "windows.window.control",
+            "windows.app.list",
+            "windows.app.launch",
+            "windows.app.focus",
+            "windows.console.handoff",
+            "windows.console.status",
+        ]
+        policy = PrincipalConfig(
+            approval_mode="automatic",
+            client_type="operator",
+            token_env=self.environment_key,
+            capabilities=capabilities,
+        )
+        state = self.args.root / ("mcp-" + self.nonce)
+        config = Config(data_dir=str(state), concurrency=1, principals={"local": policy})
+        self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        if hasattr(socket, "SO_EXCLUSIVEADDRUSE"):
+            self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_EXCLUSIVEADDRUSE, 1)
+        self.sock.bind(("127.0.0.1", 0))
+        self.sock.listen(64)
+        config.port = self.sock.getsockname()[1]
+        endpoint = f"http://127.0.0.1:{config.port}/mcp"
+        self.report.setdefault("mcp_sessions", []).append(
+            {"endpoint": endpoint, "state_dir": str(state)}
+        )
+        self.persist()
+        try:
+            self.bridge = Bridge(config)
+            await self.bridge.__aenter__()
+            self.entered_bridge = True
+            self.server = uvicorn.Server(
+                uvicorn.Config(create_http_app(self.bridge), log_level="critical", access_log=False)
+            )
+            self.serving = asyncio.create_task(self.server.serve(sockets=[self.sock]))
+            await wait_until(lambda: self.server.started or self.serving.done(), timeout=10)
+            require(self.server.started, "Owned server failed to start")
+            async with httpx.AsyncClient(trust_env=False) as client:
+                status = (await client.get(endpoint, timeout=3)).status_code
+            self.report["mcp_sessions"][-1]["unauthenticated_http_status"] = status
+            require(status == 401, "Unauthenticated MCP access was not rejected")
+            self.clients = MCPClientPool(call_timeout=20)
+            await self.clients.__aenter__()
+            self.entered_clients = True
+            await self.clients.connect(Peer("independent", url=endpoint, token=token))
+            return self
+        except BaseException:
+            await self.__aexit__(*sys.exc_info())
+            raise
+
+    async def __aexit__(self, *exc):
+        try:
+            if self.entered_clients:
+                await self.clients.__aexit__(*exc)
+        finally:
+            try:
+                if self.server is not None:
+                    self.server.should_exit = True
+                if self.serving is not None:
+                    await asyncio.wait_for(self.serving, timeout=10)
+            finally:
+                try:
+                    if self.entered_bridge:
+                        await self.bridge.__aexit__(*exc)
+                finally:
+                    if self.sock is not None:
+                        self.sock.close()
+                    os.environ.pop(self.environment_key, None)
+
+    async def call(self, tool, arguments):
+        reply = await self.clients.call("independent", tool, arguments)
+        require(
+            not reply.isError and isinstance(reply.structuredContent, dict),
+            "MCP error; reconcile original task ID, do not replace it",
+        )
+        return reply.structuredContent
+
+    async def submit(self, operation, arguments, label, *, effect=False):
+        self.counter += 1
+        task_id = f"independent_{self.nonce}_{self.counter}_{label}"
+        item = {
+            "task_id": task_id,
+            "operation": operation,
+            "arguments": arguments,
+            "effect": effect,
+            "state": "submitting_once",
+            "automatic_retry": False,
+            "independently_verified": not effect,
+        }
+        self.report["task_requests"].append(item)
+        self.persist()
+        task = await self.call(
+            "task_request",
+            {
+                "request": {
+                    "task_id": task_id,
+                    "idempotency_key": task_id,
+                    "operation": operation,
+                    "arguments": arguments,
+                }
+            },
+        )
+        deadline = time.monotonic() + 18
+        while task.get("state") not in TERMINAL and not task.get("error"):
+            require(time.monotonic() < deadline, "Original task remains unresolved: " + task_id)
+            await asyncio.sleep(0.03)
+            task = await self.call("task_get", {"task_id": task_id})
+        item.update(state=task.get("state"), task=task)
+        self.persist()
+        require(task.get("state") == "completed", "Task did not complete: " + task_id)
+        return task.get("result") or {}, item
+
+    def verified(self, item, evidence):
+        item.update(independently_verified=True, independent_evidence=evidence)
+        self.persist()
+
+
+def run_text(args, report, persist, keyboard, windows):
+    receiver = keyboard.Receiver()
+    receiver.input_case_name = "windows.keyboard.text"
+    probe = windows.NativeReadback()
+    outcome = {"state": "pending", "expected": TEXT}
+    report["new_cases"]["unicode_text"] = outcome
+    finished = threading.Event()
+
+    async def execute():
+        async with NativeMCP(args, report, persist) as mcp:
+            backend = mcp.bridge.windows_keyboard.require()
+            receiver.instrument_keyboard(backend, outcome, persist=persist)
+            target = backend.inspect_foreground().to_wire()
+            require(
+                int(target["pid"]) == os.getpid() and int(target["hwnd"]) == receiver.hwnd,
+                "Text target differs from exact owned fixture",
+            )
+            require(receiver.text() == "", "Owned receiver contains preexisting text")
+            result, item = await mcp.submit(
+                "windows.keyboard.text", {"target": target, "text": TEXT}, "unicode", effect=True
+            )
+            await wait_until(lambda: receiver.text() == TEXT)
+            observed = receiver.text()
+            require(
+                observed == TEXT and result.get("completed_keys") == len(TEXT),
+                "Unicode receiver/count mismatch",
+            )
+            require(
+                result.get("receiver_processing_confirmed") is False,
+                "Backend must distinguish insertion from application acknowledgement",
+            )
+            outcome.update(
+                state="passed",
+                actual=observed,
+                target=target,
+                result=result,
+                independent_receiver="WM_CHAR UTF-16 units",
+                strokes=len(TEXT),
+            )
+            mcp.verified(item, {"text": observed, "owned_pid": os.getpid()})
+
+    def worker():
+        try:
+            require(receiver.ready.wait(10), "Owned text fixture did not start")
+            receiver.wait_for_foreground(
+                timeout=45,
+                on_status=lambda event: (outcome.update(foreground_readiness=event), persist()),
+            )
+            asyncio.run(execute())
+        except Exception as error:
+            outcome.update(state="failed_or_unknown", error=f"{type(error).__name__}: {error}")
+        finally:
+            unresolved = any(
+                row["effect"] and not row["independently_verified"]
+                for row in report["task_requests"]
+            )
+            outcome["cleanup_withheld_for_unresolved_effect"] = unresolved
+            persist()
+            if receiver.hwnd and not unresolved:
+                before = probe.snapshot(receiver.hwnd)
+                require(
+                    before["exists"] and before["target"]["pid"] == str(os.getpid()),
+                    "Own text cleanup identity changed",
+                )
+                receiver.user.PostMessageW(receiver.hwnd, 0x8002, 0, 0)
+            finished.set()
+
+    thread = threading.Thread(target=worker, daemon=True)
+    thread.start()
+    receiver.run()
+    require(finished.wait(20), "Text worker has not stopped; preserve original process")
+    thread.join(timeout=1)
+    require(not receiver.error, "Receiver error: " + str(receiver.error))
+    outcome["original_window_absent"] = not probe.snapshot(receiver.hwnd)["exists"]
+    persist()
+    require(
+        outcome["state"] == "passed" and outcome["original_window_absent"],
+        "Text acceptance incomplete; later effects pending",
+    )
+
+
+def fixture_app(args):
+    """Child launched exclusively through windows.app.launch; never a replacement path."""
+    windows = load_support(args.source, "accept_windows_windows")
+    fixture, probe = windows.new_fixture(), windows.NativeReadback()
+
+    def worker():
+        try:
+            require(fixture.ready.wait(10), "App fixture startup timeout")
+            fixture.wait_for_foreground(
+                timeout=45, on_status=lambda event: write_json(args.root / "foreground.json", event)
+            )
+            auxiliary = fixture.create_auxiliary()
+            ready = {
+                "pid": os.getpid(),
+                "main": probe.snapshot(fixture.hwnd),
+                "auxiliary": probe.snapshot(auxiliary),
+                "source": str(args.source),
+            }
+            require(
+                ready["main"]["visible"] and ready["auxiliary"]["visible"],
+                "App fixture did not create shown windows",
+            )
+            write_json(args.output, ready)
+            # Parent verifies this PID/generation before writing a stop request.
+            while not (args.root / "stop.json").exists():
+                time.sleep(0.1)
+            request = json.loads((args.root / "stop.json").read_text(encoding="utf-8"))
+            require(
+                request.get("pid") == os.getpid()
+                and request.get("created") == ready["main"]["target"]["process_created_100ns"],
+                "Wrong cleanup owner",
+            )
+            for hwnd in (auxiliary, fixture.hwnd):
+                observed = probe.snapshot(hwnd)
+                require(
+                    observed["exists"] and observed["target"]["pid"] == str(os.getpid()),
+                    "App cleanup owner changed",
+                )
+                require(fixture.user.PostMessageW(hwnd, 0x0010, 0, 0), "Own WM_CLOSE refused")
+                deadline = time.monotonic() + 5
+                while probe.user.IsWindow(hwnd) and time.monotonic() < deadline:
+                    time.sleep(0.03)
+                require(not probe.user.IsWindow(hwnd), "Own window not absent after close")
+            write_json(args.root / "closed.json", {"original_windows_absent": True})
+        except Exception as error:
+            write_json(
+                args.root / "fixture-error.json",
+                {"error": f"{type(error).__name__}: {error}", "automatic_retry": False},
+            )
+            # Preserve uncertain owned UI; no guessed cleanup or process termination.
+
+    thread = threading.Thread(target=worker, daemon=True)
+    thread.start()
+    fixture.run()
+    thread.join(timeout=10)
+
+
+async def run_apps_console(args, report, persist, windows):
+    probe = windows.NativeReadback()
+    async with NativeMCP(args, report, persist) as mcp:
+        app = report["new_cases"]["applications"] = {"state": "starting"}
+        child_root = args.root / "owned-app"
+        child_root.mkdir()
+        ready_path = child_root / "ready.json"
+        child_args = [
+            str(Path(__file__).resolve()),
+            "--fixture-app",
+            "--source",
+            str(args.source),
+            "--root",
+            str(child_root),
+            "--output",
+            str(ready_path),
+        ]
+        launched, launch_item = await mcp.submit(
+            "windows.app.launch",
+            {"image": sys.executable, "argv": child_args, "console": False},
+            "app_launch",
+            effect=True,
+        )
+        await wait_until(
+            lambda: ready_path.exists() or (child_root / "fixture-error.json").exists(), 55
+        )
+        require(
+            ready_path.exists(),
+            "Owned launched fixture did not become ready; inspect fixture-error",
+        )
+        ready = json.loads(ready_path.read_text(encoding="utf-8"))
+        target = ready["main"]["target"]
+        pid, created = str(launched["pid"]), str(launched["process_created_100ns"])
+        require(
+            target["pid"] == pid and target["process_created_100ns"] == created,
+            "Launched process generation differs from independent fixture identity",
+        )
+        initial = probe.snapshot(int(target["hwnd"]))
+        require(
+            initial["target"] == target and initial["visible"],
+            "Launch window identity/visibility mismatch",
+        )
+        mcp.verified(launch_item, initial)
+        listed, _ = await mcp.submit("windows.app.list", {"limit": 64}, "app_list")
+        matches = [
+            row
+            for row in listed["apps"]
+            if row["pid"] == pid and row["process_created_100ns"] == created
+        ]
+        require(
+            len(matches) == 1 and target["hwnd"] in matches[0]["windows"],
+            "App list did not independently correlate launched process/window",
+        )
+        auxiliary = probe.snapshot(int(ready["auxiliary"]["target"]["hwnd"]))
+        require(
+            auxiliary["foreground"] and not initial["foreground"],
+            "No actual auxiliary-to-main foreground transition available; no bypass",
+        )
+        focused, focus_item = await mcp.submit(
+            "windows.app.focus",
+            {"pid": pid, "process_created_100ns": created, "hwnd": target["hwnd"]},
+            "app_focus",
+            effect=True,
+        )
+        after = await wait_until(
+            lambda: (
+                (state if state["foreground"] else None)
+                if (state := probe.snapshot(int(target["hwnd"])))
+                else None
+            )
+        )
+        require(after["target"] == target, "Focus target generation changed")
+        mcp.verified(focus_item, after)
+        app.update(
+            state="passed",
+            launched=launched,
+            ready=ready,
+            listed=matches,
+            focused=focused,
+            independent_after_focus=after,
+        )
+        write_json(child_root / "stop.json", {"pid": int(pid), "created": created})
+        await wait_until(lambda: (child_root / "closed.json").exists())
+        require(
+            not probe.snapshot(int(target["hwnd"]))["exists"]
+            and not probe.snapshot(int(ready["auxiliary"]["target"]["hwnd"]))["exists"],
+            "Owned app windows still exist",
+        )
+        app["cleanup_original_windows_absent"] = True
+        persist()
+
+        case = report["new_cases"]["console"] = {"state": "starting", "spawn_attempts": []}
+        from kirabridge.platform_adapters.windows.visible_console import Win32VisibleSpawner
+
+        native_spawner = Win32VisibleSpawner()
+        spawned_processes = []
+
+        class ObservedSpawner:
+            python = native_spawner.python
+
+            def start(self, plan):
+                attempt = {
+                    "state": "starting_once",
+                    "creation_flags": plan["creation_flags"],
+                    "hidden": plan.get("hidden"),
+                    "redirect_stdio": plan.get("redirect_stdio"),
+                }
+                case["spawn_attempts"].append(attempt)
+                persist()
+                spawned = native_spawner.start(plan)
+                if spawned.get("process") is not None:
+                    spawned_processes.append(spawned["process"])
+                attempt.update(state="spawned", pid=spawned["pid"])
+                persist()
+                return spawned
+
+        mcp.bridge.windows_console.spawner = ObservedSpawner()
+        child_script, marker = args.root / "console-fixture.py", args.root / "console-executed.json"
+        child_script.write_text(
+            "import ctypes,json,os,pathlib,sys\n"
+            "k=ctypes.WinDLL('kernel32'); u=ctypes.WinDLL('user32')\n"
+            "k.GetConsoleWindow.restype=ctypes.c_void_p\n"
+            "u.IsWindowVisible.argtypes=[ctypes.c_void_p]\n"
+            "h=k.GetConsoleWindow()\n"
+            "v={'text':'Größe € 😀','pid':os.getpid(),'console_hwnd':str(h or 0),"
+            "'console_visible':bool(u.IsWindowVisible(h))}\n"
+            "with pathlib.Path(sys.argv[1]).open('x',encoding='utf-8') as f: json.dump(v,f)\n"
+            "print(json.dumps(v,ensure_ascii=False),flush=True)\n",
+            encoding="utf-8",
+        )
+        handoff = "independent-" + mcp.nonce
+        arguments = {
+            "handoff_id": handoff,
+            "argv": [sys.executable, "-B", str(child_script), str(marker)],
+            "cwd": str(args.root),
+            "timeout_seconds": 8,
+            "hold_seconds": 5,
+            "output_encoding": "utf-8",
+        }
+        result, console_item = await mcp.submit(
+            "windows.console.handoff", arguments, "console", effect=True
+        )
+        marker_bytes = marker.read_bytes()
+        receipt = json.loads(marker_bytes)
+        require(
+            result.get("exit_code") == 0 and result.get("state") == "completed",
+            "Visible console did not complete successfully",
+        )
+        require(
+            json.loads(result["stdout"].strip()) == receipt and receipt["text"] == "Größe € 😀",
+            "Returned output differs from the actual console command's independent receipt",
+        )
+        require(
+            receipt["console_visible"] and receipt["console_hwnd"] != "0",
+            "Console HWND visibility is unproved; independent operator observation pending",
+        )
+        visible = probe.snapshot(int(receipt["console_hwnd"]))
+        require(
+            visible["exists"] and visible["visible"], "Console is no longer independently visible"
+        )
+        mcp.verified(console_item, {"receipt": receipt, "visible_window": visible})
+        status, _ = await mcp.submit(
+            "windows.console.status", {"handoff_id": handoff}, "console_status"
+        )
+        require(
+            status.get("state") == "completed" and status["record"]["stdout"] == result["stdout"],
+            "Status did not return the original completion/output",
+        )
+        duplicate, duplicate_item = await mcp.submit(
+            "windows.console.handoff", arguments, "console_dedup", effect=True
+        )
+        require(
+            duplicate.get("deduplicated") is True
+            and duplicate.get("spawned") is False
+            and len(case["spawn_attempts"]) == 1
+            and marker.read_bytes() == marker_bytes,
+            "Completed handoff was not deduplicated",
+        )
+        mcp.verified(duplicate_item, {"spawn_calls": 1, "original_marker_unchanged": True})
+        case.update(
+            state="passed",
+            result=result,
+            status=status,
+            duplicate=duplicate,
+            independent_command_receipt=receipt,
+            independent_visible_window=visible,
+        )
+        # The helper's specified hold ends normally; never close another console or kill a process.
+        require(
+            len(spawned_processes) == 1,
+            "Owned helper process handle unavailable for exit observation",
+        )
+        await wait_until(lambda: spawned_processes[0].poll() is not None, timeout=10)
+        case["owned_helper_exit_code"] = spawned_processes[0].returncode
+        require(case["owned_helper_exit_code"] == 0, "Owned helper exited unsuccessfully")
+        persist()
+        powershell = str(
+            Path(os.environ["SYSTEMROOT"])
+            / "System32"
+            / "WindowsPowerShell"
+            / "v1.0"
+            / "powershell.exe"
+        )
+        for label, page in (("ansi", 1252), ("oem", 850)):
+            encoding = "cp" + str(page)
+            command = (
+                "[Console]::OutputEncoding=[Text.Encoding]::GetEncoding("
+                + str(page)
+                + ");[Console]::Write('Größe')"
+            )
+            native_args = {
+                "handoff_id": handoff + "-" + label,
+                "argv": [powershell, "-NoLogo", "-NoProfile", "-Command", command],
+                "cwd": str(args.root),
+                "timeout_seconds": 8,
+                "hold_seconds": 0,
+                "output_encoding": encoding,
+            }
+            shell_result, shell_item = await mcp.submit(
+                "windows.console.handoff", native_args, "powershell_" + label, effect=True
+            )
+            require(
+                shell_result.get("exit_code") == 0 and shell_result.get("stdout") == "Größe",
+                "Native Windows PowerShell " + encoding + " output did not roundtrip",
+            )
+            mcp.verified(
+                shell_item,
+                {
+                    "expected": "Größe",
+                    "actual": shell_result["stdout"],
+                    "stdout_encoding": shell_result.get("stdout_encoding"),
+                },
+            )
+            report["new_cases"]["native_powershell_" + label] = {
+                "state": "passed",
+                "result": shell_result,
+                "policy_override_requested": False,
+            }
+            require(len(spawned_processes) >= 2, "Owned shell helper handle unavailable")
+            helper = spawned_processes[-1]
+            await wait_until(lambda helper=helper: helper.poll() is not None, timeout=10)
+            require(helper.returncode == 0, "Owned shell helper exited unsuccessfully")
+            persist()
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--source", required=True, type=Path)
+    parser.add_argument("--output", required=True, type=Path)
+    parser.add_argument("--root", required=True, type=Path)
+    parser.add_argument("--fixture-app", action="store_true", help=argparse.SUPPRESS)
+    args = parser.parse_args()
+    if sys.platform != "win32":
+        parser.error("Native Windows guest only; never run on the operator Mac")
+    args.source, args.root, args.output = (
+        value.resolve() for value in (args.source, args.root, args.output)
+    )
+    require(
+        not args.root.is_relative_to(args.source) and not args.source.is_relative_to(args.root),
+        "Source and isolated run root must be disjoint",
+    )
+    if args.fixture_app:
+        pin_source(args.source)
+        fixture_app(args)
+        return 0
+    require(sys.version_info[:3] == (3, 14, 10), "Use the prepared Python 3.14.10 interpreter")
+    require(
+        not args.output.exists(), "Output exists: reconcile the original run; never rerun effects"
+    )
+    require(not args.root.exists(), "Root exists: preserve and reconcile the original run")
+    args.root.mkdir(parents=True, exist_ok=False)
+    args.output.parent.mkdir(parents=True, exist_ok=True)
+    with args.output.open("x", encoding="utf-8") as stream:
+        stream.write('{"state":"reserved","passed":false,"automatic_retry":false}\n')
+        stream.flush()
+        os.fsync(stream.fileno())
+    report = {
+        "schema": "kirabridge.independent-windows-e2e.v1",
+        "state": "started",
+        "passed": False,
+        "automatic_retry": False,
+        "interpreter": sys.executable,
+        "python": sys.version,
+        "source": str(args.source),
+        "root": str(args.root),
+        "driver_sha256": hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
+        "legacy_harnesses": [],
+        "task_requests": [],
+        "new_cases": {},
+        "package_acceptance": {
+            "state": "pending_separate_harness",
+            "scope": "No install/update/rollback is performed",
+        },
+    }
+
+    def persist():
+        write_json(args.output, report)
+
+    try:
+        report["source_before"] = fingerprint(args.source)
+        report["imports"] = pin_source(args.source)
+        persist()
+        for name in ("accept_windows_keyboard", "accept_windows_windows"):
+            run_existing(args, report, persist, name)
+        keyboard = load_support(args.source, "accept_windows_keyboard")
+        windows = load_support(args.source, "accept_windows_windows")
+        run_text(args, report, persist, keyboard, windows)
+        asyncio.run(run_apps_console(args, report, persist, windows))
+        require(
+            fingerprint(args.source) == report["source_before"], "Source changed during acceptance"
+        )
+        report.update(state="passed_native_scope", passed=True, source_unchanged=True)
+    except Exception as error:
+        report.update(
+            state="failed_or_pending_reconciliation", error=f"{type(error).__name__}: {error}"
+        )
+    finally:
+        persist()
+        print(
+            json.dumps(
+                {
+                    "report": str(args.output),
+                    "state": report["state"],
+                    "passed": report["passed"],
+                    "automatic_retry": False,
+                }
+            ),
+            flush=True,
+        )
+    return 0 if report["passed"] else 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

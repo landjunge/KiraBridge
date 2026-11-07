@@ -1,0 +1,16 @@
+{
+  "at": "2026-11-06T22:52:36.706147+00:00",
+  "grok_implementation_commit": "57de232b33d4ddd8a85d7abb14e5dfd1e2d66f5d",
+  "grok_final_turn_stop_reason": "cancelled",
+  "grok_result_preserved": "windows-parity-grok-finalfix-result-20261106.json",
+  "independent_verification": {
+    "initial_targeted_pytest": "23 passed, 1 failed in 5.83s",
+    "failure": "test asserted substring old absent; macOS /var/folders contains old. Exact pinned import_path/source_sha256 assertions already passed.",
+    "fix": "Use resolved directory boundary relative to the older package. Product code unchanged.",
+    "targeted_rerun": "1 passed; only affected case rerun",
+    "ruff": "All checks passed"
+  },
+  "package": "Rebuild after committed test fix; preserve original 57de232 package separately",
+  "native_windows_acceptance": "pending; guest Python3.14.10 and Restricted verified, no package installed yet",
+  "live_mac_changed": false
+}
