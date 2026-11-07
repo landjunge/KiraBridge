@@ -210,9 +210,7 @@ def write_linux_server_bundle(output, commit, version, license_fields, presentat
     notes = Path(f"docs/RELEASE-{version}.md")
     if notes.is_file():
         linux_files["RELEASE-NOTES.md"] = notes.read_bytes()
-    listed = {
-        name: hashlib.sha256(data).hexdigest() for name, data in sorted(linux_files.items())
-    }
+    listed = {name: hashlib.sha256(data).hexdigest() for name, data in sorted(linux_files.items())}
     linux_files["release.json"] = (
         json.dumps(
             {
@@ -255,9 +253,7 @@ def write_linux_server_bundle(output, commit, version, license_fields, presentat
                 )
                 archive.addfile(item, io.BytesIO(data))
     digest = hashlib.sha256(linux_bundle.read_bytes()).hexdigest()
-    (output / (linux_bundle.name + ".sha256")).write_text(
-        digest + "  " + linux_bundle.name + "\n"
-    )
+    (output / (linux_bundle.name + ".sha256")).write_text(digest + "  " + linux_bundle.name + "\n")
     return linux_bundle
 
 
@@ -280,9 +276,7 @@ def build(output, *, target=None):
         # Explicit server artifact. The default macOS release still returns
         # before any Linux bytes are written.
         presentation = presentation_for(commit)
-        bundle = write_linux_server_bundle(
-            output, commit, version, license_fields, presentation
-        )
+        bundle = write_linux_server_bundle(output, commit, version, license_fields, presentation)
         (output / "SHA256SUMS").write_text(
             hashlib.sha256(bundle.read_bytes()).hexdigest()
             + "  "
@@ -424,9 +418,7 @@ exec python3.11 "$bundle/installer/install.py" install --bundle "$bundle" "$@"
         print(json.dumps({"version": version, "commit": commit, "bundle": str(bundle)}, indent=2))
         return
     # Preserve the existing Linux route for builds performed on Linux.
-    linux_bundle = write_linux_server_bundle(
-        output, commit, version, license_fields, presentation
-    )
+    linux_bundle = write_linux_server_bundle(output, commit, version, license_fields, presentation)
     (output / "SHA256SUMS").write_text(
         "".join(
             hashlib.sha256(p.read_bytes()).hexdigest() + "  " + p.name + "\n"
