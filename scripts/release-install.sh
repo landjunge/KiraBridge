@@ -131,6 +131,7 @@ exec "$install_dir/.venv/bin/python3" "$installer" install \
   --service "$service" \
   --language "$language" \
   --prefix "$prefix" \
+  --cache-dir "$prefix/cache" \
   --config "$config" \
   --launcher "$launcher" \
   --plist "$unit" \

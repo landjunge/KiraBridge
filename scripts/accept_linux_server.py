@@ -230,6 +230,8 @@ def main():
                 "systemd-user",
                 "--plist",
                 unit_path,
+                "--cache-dir",
+                root / "installer-cache",
                 *common[:-2],
             ],
             timeout=120,
