@@ -426,6 +426,22 @@ def cleanup(run, unit_path, config, unit, port, evidence):
             "MainPID",
         ]
     )
+    if "ActiveState=failed" in state:
+        run(["systemctl", "--user", "reset-failed", unit])
+        state = run(
+            [
+                "systemctl",
+                "--user",
+                "show",
+                unit,
+                "-p",
+                "LoadState",
+                "-p",
+                "ActiveState",
+                "-p",
+                "MainPID",
+            ]
+        )
     assert (
         "MainPID=0" in state and "ActiveState=inactive" in state and "LoadState=not-found" in state
     )

@@ -81,11 +81,11 @@ def idle_queue(config):
         store.close()
 
 
-def quote_systemd(value):
-    """Quote one ExecStart argument. systemd is not a shell and expands % and $."""
-    escaped = (
-        str(value).replace("\\", "\\\\").replace('"', '\\"').replace("%", "%%").replace("$", "$$")
-    )
+def quote_systemd(value, *, executable=False):
+    """Quote ExecStart words; only argument words expand $, executable paths do not."""
+    escaped = str(value).replace("\\", "\\\\").replace('"', '\\"').replace("%", "%%")
+    if not executable:
+        escaped = escaped.replace("$", "$$")
     return '"' + escaped + '"'
 
 
@@ -97,15 +97,16 @@ def render_linux_unit(argv):
     """
     if not argv:
         raise BridgeError("service_install", "Linux server command is empty")
+    if any(any(char in str(part) for char in ("\0", "\r", "\n")) for part in argv):
+        raise BridgeError("service_install", "Control characters in server command refused")
     environment = ""
     if "--config" in argv:
         index = argv.index("--config") + 1
         if index >= len(argv):
             raise BridgeError("service_install", "Linux server config argument is missing")
         path = str(Path(argv[index]).expanduser().absolute().parent / "secrets.env")
-        # EnvironmentFile expands % specifiers, not ExecStart's $ variables.
-        escaped = path.replace("\\", "\\\\").replace('"', '\\"').replace("%", "%%")
-        environment = 'EnvironmentFile="-' + escaped + '"\n'
+        # This directive takes a literal path, not an ExecStart-style word list.
+        environment = "EnvironmentFile=-" + path.replace("%", "%%") + "\n"
     return (
         "[Unit]\n"
         "Description=KiraBridge private MCP bridge\n"
@@ -116,7 +117,8 @@ def render_linux_unit(argv):
         "UMask=0077\n"
         + environment
         + "ExecStart="
-        + " ".join(quote_systemd(part) for part in argv)
+        + quote_systemd(argv[0], executable=True)
+        + (" " + " ".join(quote_systemd(part) for part in argv[1:]) if len(argv) > 1 else "")
         + "\n"
         "Restart=on-failure\n"
         "RestartSec=3\n"
