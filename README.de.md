@@ -7,6 +7,10 @@
 
 # KiraBridge
 
+<p align="center"><img src="assets/design/wordmarks/KiraBridge-dark.svg" alt="KiraBridge" width="312"></p>
+
+<p align="center"><a href="https://github.com/landjunge/KiraBridge/releases"><img alt="macOS Intel Releases" src="https://img.shields.io/badge/macOS%20Intel-Releases%20%2F%20RC-6060c0?style=flat-square"></a> &nbsp; <a href="https://github.com/landjunge/KiraBridge/releases"><img alt="Windows Vorschau" src="https://img.shields.io/badge/Windows-Preview-6060c0?style=flat-square"></a></p>
+
 **Du redest mit der KI. Die Arbeit landet auf deinem Rechner.**
 
 KiraBridge verbindet ChatGPT mit **Grok Build und Codex, die in Terminalfenstern
