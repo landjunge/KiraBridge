@@ -19,10 +19,14 @@ import json
 import re
 import subprocess
 import sys
+import tomllib
 import zipfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
+PROJECT_VERSION = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))["project"][
+    "version"
+]
 sys.path.insert(0, str(ROOT / "src"))
 
 from kirabridge.windows_package import PackageError, install, rollback, status, uninstall  # noqa: E402
@@ -83,7 +87,7 @@ def provenance_document(files: dict[str, bytes]) -> dict:
         "commit": observed["commit"],
         "commit_source": observed["commit_source"],
         "dirty": observed["dirty"],
-        "version": "0.8.0rc40",
+        "version": PROJECT_VERSION,
         "standalone_executable": False,
         "kind": "existing-python-plus-zip",
         "files": inventory,
@@ -228,13 +232,15 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--root", type=Path)
     parser.add_argument("--payload", type=Path)
     parser.add_argument("--provenance-export", type=Path)
-    parser.add_argument("--version", default="0.8.0rc40")
+    parser.add_argument("--version", default=PROJECT_VERSION)
     parser.add_argument("--commit", default="")
     args = parser.parse_args(argv)
     if args.provenance_export is not None and args.action != "build":
         raise SystemExit("--provenance-export is only valid for build")
     if args.action == "build":
-        output = args.output or Path("dist/KiraBridge-0.8.0rc40-windows-parity-20261106.zip")
+        output = args.output or Path(
+            f"dist/KiraBridge-{PROJECT_VERSION}-windows-parity-20261106.zip"
+        )
         print(build(output, provenance_export=args.provenance_export)["sha256"])
         return 0
     if args.root is None:

@@ -936,6 +936,11 @@ def test_parallel_install_waits_and_keeps_data(tmp_path):
 
 def test_zip_install_imports_the_activated_runtime_and_rejects_a_foreign_commit(tmp_path):
     import importlib.util
+    import tomllib
+
+    expected_version = tomllib.loads(
+        (Path(__file__).resolve().parents[1] / "pyproject.toml").read_text(encoding="utf-8")
+    )["project"]["version"]
 
     script = Path(__file__).resolve().parents[1] / "scripts" / "windows_parity_package.py"
     spec = importlib.util.spec_from_file_location("windows_parity_package", script)
@@ -956,8 +961,8 @@ def test_zip_install_imports_the_activated_runtime_and_rejects_a_foreign_commit(
     __import__("zipfile").ZipFile(output).extractall(extracted)
     root = tmp_path / "root"
     with pytest.raises(PackageError):
-        install(root, extracted, version="0.8.0rc40", commit="aaaaaaaaaaaa")
-    installed = install(root, extracted, version="0.8.0rc40", commit=built["commit"])
+        install(root, extracted, version=expected_version, commit="aaaaaaaaaaaa")
+    installed = install(root, extracted, version=expected_version, commit=built["commit"])
     assert installed["provenance_verified"] is True
     code = (
         "import sys\n"
@@ -980,7 +985,8 @@ def test_zip_install_imports_the_activated_runtime_and_rejects_a_foreign_commit(
     location, version = completed.stdout.splitlines()
     assert location.endswith(str(Path("src") / "kirabridge" / "__init__.py"))
     assert installed["release"] in location
-    assert version == "0.8.0rc40"
+    assert version == expected_version
+    assert module.PROJECT_VERSION == expected_version
     with pytest.raises(SystemExit):
         module.main(
             [

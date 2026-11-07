@@ -10,10 +10,14 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import tomllib
 import zipfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
+PROJECT_VERSION = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))["project"][
+    "version"
+]
 sys.path.insert(0, str(ROOT / "src"))
 from kirabridge.windows_package import _copy_regular_tree, _digest_tree  # noqa: E402
 from kirabridge.windows_runtime import validate_bundled_runtime  # noqa: E402
@@ -125,7 +129,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--runtime", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
-    parser.add_argument("--version", default="0.8.0rc40")
+    parser.add_argument("--version", default=PROJECT_VERSION)
     parser.add_argument("--source-export", type=Path)
     parser.add_argument("--source-sha256")
     parser.add_argument("--commit")
