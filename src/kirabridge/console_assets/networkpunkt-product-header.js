@@ -15,7 +15,14 @@ export function mountProductHeader(element, {selfId, locale = "de", selfRoute = 
   const dialog = doc.createElement("dialog"); dialog.className = "np-appbar-dialog";
   let returnFocus = null;
   dialog.addEventListener("keydown", event => event.stopPropagation());
-  dialog.addEventListener("close", () => returnFocus?.focus());
+  dialog.addEventListener("close", () => {
+    // Native modal close already restores focus synchronously. Its later close
+    // event must not steal focus back after the user has pressed Tab again.
+    if (dialog.open) return;
+    const target = returnFocus; returnFocus = null;
+    const active = doc.activeElement;
+    if (target?.isConnected && (active === doc.body || active === dialog || dialog.contains(active))) target.focus();
+  });
   doc.body.append(dialog);
   function missing(appId) {
     returnFocus = doc.activeElement;

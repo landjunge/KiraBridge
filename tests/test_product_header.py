@@ -1,8 +1,11 @@
 """Original header assets must load under the console's real CSP and MIME guard."""
+
 import hashlib
 import json
 from pathlib import Path
+
 import httpx
+
 from kirabridge.approval_console import ORIGIN, ApprovalConsole
 from kirabridge.operator_application import operator_application
 

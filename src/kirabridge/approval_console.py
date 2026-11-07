@@ -214,7 +214,8 @@ class ApprovalConsole:
 
     async def asset(self, request: Request):
         name = request.url.path.removeprefix("/")
-        media_type = "image/png" if name.endswith(".png") else "application/json" if name.endswith(".json") else "text/css" if name.endswith(".css") else "application/javascript"
+        media_types = {".png": "image/png", ".json": "application/json", ".css": "text/css"}
+        media_type = media_types.get(Path(name).suffix, "application/javascript")
         return Response((ASSETS / name).read_bytes(), media_type=media_type)
 
     async def tasks(self, request: Request):

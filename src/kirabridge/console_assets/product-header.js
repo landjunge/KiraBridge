@@ -4,13 +4,15 @@ import {mountProductHeader} from "./networkpunkt-product-header.js";
 let latest = null;
 const slot = document.querySelector("[data-product-header]");
 const eventSource = slot?.dataset.statusSource === "control-events";
+let locale = document.documentElement.lang;
+try { const saved = localStorage.getItem("kirabridge.locale"); if (["de","en"].includes(saved)) locale = saved; } catch { /* Existing cosmetic preference is optional. */ }
 function metadata(data) {
   const bridge = data?.bridge;
   if (!bridge || typeof bridge !== "object") return {state:"unknown"};
   return {state:bridge.error ? "error" : data.maintenance ? "busy" : bridge.dispatcher_active === true ? "confirmed" : bridge.dispatcher_active === false ? "disconnected" : "unknown",
     version:bridge.runtime?.version};
 }
-const header = slot ? mountProductHeader(slot, {selfId:"kirabridge", locale:document.documentElement.lang,
+const header = slot ? mountProductHeader(slot, {selfId:"kirabridge", locale,
   readSelf:async ({signal}) => {
     if (eventSource) return !latest || latest.age() >= 8000 ? {state:"unknown"} : metadata(latest.data);
     let token;
