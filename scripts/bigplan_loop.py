@@ -673,6 +673,9 @@ async def serve(path):
                         report_worker, profile, row
                     )
                     worker_reports[row["id"]] = (fingerprint, time.monotonic())
+                    # A stop signal queued from another thread may not have run yet when the
+                    # report thread returns; let it run before deciding to start another report.
+                    await asyncio.sleep(0)
                 done = [
                     r["task_id"]
                     for r in bridge.store.db.execute(
@@ -700,6 +703,7 @@ async def serve(path):
                     )
                     last_report = time.monotonic()
                     last_summary = summary
+                    await asyncio.sleep(0)  # let a pending stop signal run (see worker reports)
                 save(
                     cfg.state_path / "status.json",
                     {
