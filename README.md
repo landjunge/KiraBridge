@@ -13,7 +13,9 @@ KiraBridge connects ChatGPT to **Grok Build and Codex running in terminal window
 on your computer**. Discuss what you need in chat, pass the work to those terminal
 agents and follow their replies while choosing what they may access.
 
-**macOS · Intel — [0.8.0rc36](https://github.com/landjunge/KiraBridge/releases/tag/v0.8.0rc36) · November 4, 2026 · Preview**
+**Source and installed status (November 7, 2026):** Debian server source **0.8.0rc41** (`350d368`); Intel Mac installed runtime **0.8.0rc40** (`d12838a`). These are not published macOS download versions.
+
+**Published macOS Intel download:** [0.8.0rc36](https://github.com/landjunge/KiraBridge/releases/tag/v0.8.0rc36) · November 4, 2026 · Preview.
 
 ### [Download KiraBridge — app and installer](https://github.com/landjunge/KiraBridge/releases/download/v0.8.0rc36/KiraBridge-0.8.0rc36-Intel-Installer.zip)
 
@@ -36,8 +38,7 @@ ChatGPT connection test with your account remain yours to complete.
 [Evidence and limits](docs/WINDOWS-SETUP-20261104.md) ·
 [Setup guide, German](docs/WINDOWS-SETUP.md).
 
-**Reviewed repository implementation: 0.8.0rc41 server source `350d368`; the local Intel runtime remains RC40 at `d12838a`.**
-The published Intel download above remains RC36 at `d4aebdd`.
+The linked Intel download is RC36 (`d4aebdd`); the separate source and installed versions are listed in the opening status.
 [Release, artifact and installed-source evidence](docs/evidence/readme-current-20261107.json).
 The [earlier PR61 installation report](docs/RC40-PR61-SHIM-INSTALL-20261106.md)
 describes the previous RC40 source `a5d381a`.
