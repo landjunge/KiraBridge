@@ -72,7 +72,10 @@ def main():
         "root": str(args.root),
         "commands": [],
     }
-    persist = lambda: save(args.output, report)
+
+    def persist():
+        save(args.output, report)
+
     persist()
     try:
         if args.health_only:
