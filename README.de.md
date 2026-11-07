@@ -23,19 +23,28 @@ Arbeit an diese Terminalagenten weiter und verfolge ihre Antworten — mit den v
 Für die Downloads brauchst du ein GitHub-Konto mit Zugriff auf dieses private Repository.
 Dies ist eine Vorabversion; eine stabile Version gibt es noch nicht. RC36 ist für Intel-Macs verfügbar.
 
-Das separate RC33-Release enthält eine [Windows 11-Entwicklungsvorschau](https://github.com/landjunge/KiraBridge/releases/download/v0.8.0rc33/KiraBridge-0.8.0rc33-Windows-Dev-Kit.zip)
+Das frühere RC33-Release enthält eine [Windows 11-Entwicklungsvorschau](https://github.com/landjunge/KiraBridge/releases/download/v0.8.0rc33/KiraBridge-0.8.0rc33-Windows-Dev-Kit.zip)
 mit nativer Tastatur, Shortcuts und abgesicherter Fenstersteuerung. Es ist ein
 separates Entwicklungspaket; allgemeine Windows-Datei-, Prozess- und Terminaltools
 gehören nicht zu seinem Umfang. Siehe [RC33-Paketprüfung, Installationsstand und Grenzen](docs/RC33-DELIVERY-20261104.md).
 
-Der neue [Windows-Einrichtungsassistent 0.8.0rc37.dev1](https://github.com/landjunge/KiraBridge/releases/tag/windows-v0.8.0rc37.dev1)
-ist veröffentlicht; Download und getrennte Windows-Installation sind geprüft.
-Alle sieben nativen Prüfphasen bestanden. Entpacke das Paket und öffne
+Der veröffentlichte [Windows-Einrichtungsassistent 0.8.0rc37.dev1](https://github.com/landjunge/KiraBridge/releases/tag/windows-v0.8.0rc37.dev1)
+hat Belege für Download und getrennte Windows-Installation.
+Alle sieben nativen Prüfphasen dieser begrenzten Entwicklungsvorschau bestanden. Entpacke das Paket und öffne
 **Einrichtung-starten.cmd** für die vier Schritte. Kontoanmeldung und der echte
 ChatGPT-Verbindungstest mit deinem Konto bleiben bei dir.
 [Prüfstand und Grenzen](docs/WINDOWS-SETUP-20261104.md) · [Anleitung](docs/WINDOWS-SETUP.md).
 
-**Aktueller integrierter Quellstand und lokale Intel-Installation: RC40.** [Merge, CI, natives Paket, Installation und Livebelege](docs/RC40-PR61-SHIM-INSTALL-20261106.md). Der veröffentlichte Download oben bleibt RC36; ein öffentlicher RC40-Download wird nicht behauptet.
+**Quellstand geprüft am 7. November 2026: RC40 bei `d12838a`; die lokale Intel-Laufzeit meldet denselben Pin.**
+Der veröffentlichte Intel-Download oben bleibt RC36 bei `d4aebdd`.
+[Release-, Artefakt- und Installationsquellnachweis](docs/evidence/readme-current-20261107.json).
+Der [frühere PR61-Installationsbericht](docs/RC40-PR61-SHIM-INSTALL-20261106.md)
+beschreibt den vorherigen RC40-Quellstand `a5d381a`.
+
+Windows-Funktionsgleichstand und eigenständiger Installer bleiben Entwicklungsarbeit. Die veröffentlichte Windows-Vorschau
+enthält keine allgemeinen Datei-, Prozess- oder Terminaltools und keine
+Windows-Dienstinstallation. Hier wird kein neues Paket dieser laufenden Projekte
+und kein veröffentlichter RC40-Download angeboten.
 
 ## Wobei KiraBridge dir hilft
 
@@ -71,8 +80,23 @@ Richte ihre Terminalsitzung in KiraBridge als Ziel ein.
 
 Diese Vorabversion hat bekannte Einschränkungen bei der Terminalbedienung; die App
 ist nicht von Apple notarisiert. Der [RC36-Nachweis](docs/TERMINAL-MINIMIZED-RC36-20261104.md)
-beschreibt das aktuelle Paket; [frühere Installation und Hilfe](docs/INSTALL-DE.md)
-dokumentiert weiterhin RC20.
+beschreibt das veröffentlichte Paket; siehe [Installation, Prüfung und Hilfe](docs/INSTALL-DE.md).
+
+
+## Linux-/Debian-Server
+
+Der separate [Serverquellstand in PR72](https://github.com/landjunge/KiraBridge/pull/72)
+bietet einen privaten HTTP-MCP-Dienst auf Loopback mit Bearer-Authentifizierung
+und Healthprüfung sowie Installation, Update und Rollback über `systemd --user`.
+Zielplattformen sind Debian 13 und Ubuntu 24.04 x86_64. Der Onlineinstaller benötigt
+einen laufenden Benutzermanager; die Laufzeit über Logout/Neustart folgt der Sitzungspolitik
+des Hosts. Linger, Administratorrechte, Firewall und öffentliches HTTPS werden nicht eingerichtet.
+
+Der Server läuft ohne macOS-GUI, Terminal.app oder native Tastatursteuerung.
+Zwischenablage ist optional (`wl-clipboard`/`xclip`). ChatGPT-/Kontoverknüpfung und
+Fernzugriff benötigen eigene Konfiguration. Finale native Paketabnahme,
+Mainintegration und veröffentlichter Serverdownload stehen noch aus;
+[Lieferbelege und aktuelle Grenzen](docs/evidence/readme-current-20261107.json).
 
 ## Tastenfolgen und weniger Cloudaufrufe
 
@@ -110,7 +134,9 @@ Private, nicht geschäftliche Nutzung ist unter der
 [Netzwerkpunkt Personal Use License 1.0](LICENSE) kostenlos. Geschäftliche Nutzung
 benötigt eine gesonderte schriftliche Erlaubnis. Der deutsche Lizenztext ist maßgeblich.
 
-[Entwicklerdokumentation](docs/DEVELOPERS.de.md)
+[Entwicklerdokumentation](docs/DEVELOPERS.de.md): Python ab 3.11, gelockte
+uv-Umgebung, CLI-Einstieg, Quellverzeichnisse und gezielte Prüfungen. Ausgangspunkt
+ist ein Repositorycheckout; veröffentlichter Installer und Entwicklungsumgebung sind getrennt.
 
 Lokaler CLI-Modulkandidat: [Terminal-/Codex-/Grok-Grenzen und Prüfgrenzen](docs/plans/TERMINAL-CLI-MODULES-20261104.md).
 Dieses Entwicklungspaket ist vom veröffentlichten RC36-Download getrennt; die
@@ -120,15 +146,15 @@ Lokaler Big-Plan-Koordinatoradapter: [freigegebener Aufgaben-Loop, Codex/Grok-Pr
 
 Der [Supervisor mit bestehendem Nutzerauftrag](docs/COORDINATOR-CONTINUATION-20261106.md) führt zugeordnete ThreadDesk-Aufgaben ohne weitere Nutzerfreigabe fort. Er gleicht vorhandene Claims und Ergebnisse ab, überspringt erledigte Arbeit und hält unabhängige Aufgaben bei einem Einzelfehler weiter bearbeitbar.
 
-Der [aktuelle Quellenintegrationsstand](docs/BIGPLAN-INTEGRATION-STATUS-20261106.md) bündelt angenommene Pakete, gemeinsame Remote-/Absturztests und die noch offenen CI-/Auslieferungsgates. Frühere Paketberichte behalten ihre historischen Ergebnisse.
+Der [Integrationscheckpoint vom 6. November](docs/BIGPLAN-INTEGRATION-STATUS-20261106.md) bündelt angenommene Pakete, gemeinsame Remote-/Absturztests und die damals offenen Gates. Für geprüfte Quelle und installierten Pin gilt der [Abgleich vom 7. November](docs/evidence/readme-current-20261107.json); datierte Checkpoints behalten ihre historischen Ergebnisse.
 
-Der Koordinator-Quellkandidat unterstützt außerdem native Core-Aktivierung, den auf den Eigentümer begrenzten MCP-Aufruf `coordinator_status` und dauerhafte Angenommen-/Stoppmeldungen im vorhandenen Completion-Postfach. Nach erfolgreichem Review und Prüfungen setzt er gepinnte Aufgaben ohne Laden eines Skills fort. [Nativer Vertrag und Prüfnachweise](docs/COORDINATOR-NATIVE-20261106.md) beschreiben den Stand; Desktop- und Liveabnahme bleiben gesondert.
+Der integrierte Koordinatorquellstand unterstützt außerdem native Core-Aktivierung, den auf den Eigentümer begrenzten MCP-Aufruf `coordinator_status` und dauerhafte Angenommen-/Stoppmeldungen im vorhandenen Completion-Postfach. Nach erfolgreichem Review und Prüfungen setzt er gepinnte Aufgaben ohne Laden eines Skills fort. [Nativer Vertrag und Prüfnachweise](docs/COORDINATOR-NATIVE-20261106.md) beschreiben den Stand; Desktop- und Liveabnahme bleiben gesondert.
 
 Sein Status zeigt gespeicherte Warte-, Ausführungs- und Abnahmezeiten aus dem gebundenen Core und Receipt. Fehlende oder ungültige Zeitwerte bleiben unbekannt; das Lesen startet keine Arbeit.
 
-Der optionale [Quellkandidat für natives Worker-Routing](docs/COORDINATOR-NATIVE-ROUTING-20261106.md) verwendet die geprüfte CLI-Matrix für versiegelte Managed-Aufträge; sichtbare Sitzungen und das eigene strukturierte Grok-Reviewprotokoll bleiben erhalten. Angeforderte Modell-/Effortwerte und beobachtete Metadaten bleiben getrennt; lokale Fixturetests sind keine Provider- oder Deploymentabnahme.
+Das optionale [native Worker-Routing](docs/COORDINATOR-NATIVE-ROUTING-20261106.md) verwendet die geprüfte CLI-Matrix für versiegelte Managed-Aufträge; sichtbare Sitzungen und das eigene strukturierte Grok-Reviewprotokoll bleiben erhalten. Angeforderte Modell-/Effortwerte und beobachtete Metadaten bleiben getrennt; lokale Fixturetests sind keine Provider- oder Deploymentabnahme.
 
-[CLI-Rückgabefix und vorhandener Übergangsweg](docs/NATIVE-COMPLETION-RETURNS-20261106.md): Der Quellkandidat belässt Antworten/Ergebnisse im Postfach des anfragenden Clients. Bestehende Installationen können bereits `--inbox-only` verwenden; Completionquittungen benötigen keinen weiteren Agententurn.
+[CLI-Rückgabe und reine Postfachzustellung](docs/NATIVE-COMPLETION-RETURNS-20261106.md): Der integrierte Quellstand belässt Antworten/Ergebnisse im Postfach des anfragenden Clients. `--inbox-only` vermeidet Terminalzustellung; Completionquittungen benötigen keinen weiteren Agententurn.
 
 [Frühere Windows-Vorschau dev2](https://github.com/landjunge/KiraBridge/releases/tag/windows-v0.8.0rc31.dev2):
 Native Tastatur und lokales MCP haben die Abnahme in einer eigenen Windows 11-VM bestanden.
