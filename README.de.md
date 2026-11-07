@@ -9,11 +9,13 @@
 
 <p align="center"><picture><source media="(prefers-color-scheme: dark)" srcset="assets/design/wordmarks/KiraBridge-dark.svg"><img src="assets/design/wordmarks/KiraBridge-light.svg" alt="KiraBridge" width="312"></picture></p>
 
+<!-- AUTO-DOWNLOADS:START -->
 <p align="center">
   <a href="https://github.com/landjunge/KiraBridge/releases/tag/v0.8.0rc36"><img src="assets/readme/download-macos-intel.svg" alt="macOS Intel 0.8.0rc36" width="170"></a>
   &nbsp;
   <a href="https://github.com/landjunge/KiraBridge/releases/tag/windows-v0.8.0rc37.dev1"><img src="assets/readme/download-windows-preview.svg" alt="Windows Preview 0.8.0rc37.dev1" width="170"></a>
 </p>
+<!-- AUTO-DOWNLOADS:END -->
 
 **Du redest mit der KI. Die Arbeit landet auf deinem Rechner.**
 
