@@ -80,13 +80,30 @@ def record_step(evidence, suite, name, action):
         evidence["steps"].append({"name": name, "result": "passed", "detail": detail})
         print(name + ": PASS", flush=True)
         return detail
-    except Exception as exc:
+    except BaseException as exc:
         evidence["result"] = "failed"
-        ET.SubElement(case, "failure", message=str(exc))
+        ET.SubElement(case, "failure", message=str(exc) or type(exc).__name__)
         evidence["steps"].append({"name": name, "result": "failed", "error": str(exc)})
         raise
     finally:
         case.set("time", str(round(time.monotonic() - started, 3)))
+
+
+def validate_update_resume(prior):
+    """Resume only the failed baseline after confirmed successful cleanup."""
+    cleanup = prior.get("cleanup", {})
+    steps = [step for step in prior.get("steps", []) if step.get("name") != "cleanup"]
+    cleanup_steps = [step for step in prior.get("steps", []) if step.get("name") == "cleanup"]
+    if not (
+        prior.get("result") == "failed"
+        and cleanup.get("unit_absent")
+        and cleanup.get("port_unbound")
+        and steps
+        and steps[-1].get("name") == "previous-runtime-baseline"
+        and steps[-1].get("result") == "failed"
+        and all(step.get("result") == "passed" for step in cleanup_steps)
+    ):
+        raise RuntimeError("Only a failed baseline with confirmed cleanup can resume")
 
 
 def main():
@@ -104,8 +121,7 @@ def main():
     assert os.getuid() != 0 and not unit_path.exists()
     if args.resume_update:
         prior = json.loads((root / "evidence.json").read_text())
-        assert prior["result"] == "failed" and prior["cleanup"]["unit_absent"]
-        assert prior["steps"][-1]["name"] == "previous-runtime-baseline"
+        validate_update_resume(prior)
     else:
         assert not root.exists()
     assert root.is_relative_to(Path.home()) and root.name.startswith("kb-debian-dirktest-")
@@ -349,11 +365,11 @@ def main():
             },
         )
         evidence["result"] = "passed"
-    except Exception as exc:
+    except BaseException as exc:
         evidence["result"] = "failed"
         if not suite.findall(".//failure"):
             case = ET.SubElement(suite, "testcase", name="acceptance-invariant")
-            ET.SubElement(case, "failure", message=str(exc))
+            ET.SubElement(case, "failure", message=str(exc) or type(exc).__name__)
         raise
     finally:
         try:
