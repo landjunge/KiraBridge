@@ -1,18 +1,229 @@
+# ChatGPT anbinden und einen Auftrag bestätigen / Connect and confirm one task
+
+## Deutsch: den tatsächlichen Anschluss prüfen
+
+Für den aktuellen Download gilt die [README](../README.de.md): veröffentlicht ist
+RC20 vom 30. Oktober 2026, ein Intel-Prerelease. Der installierte Dienst und ein
+lokaler Quellcheckout können andere Stände haben; `kirabridge status` zeigt den
+antwortenden Dienst. Ältere RC17-/RC14-Berichte unten sind historische Belege.
+Bestehende gesunde Einrichtung nicht
+für einen Nachweis erneut durchlaufen oder zurücksetzen.
+
+Der veröffentlichte macOS-Dienst-Installer richtet die lokale Bridge ein.
+Die ChatGPT-Kontoverbindung wird separat mit `kirabridge chatgpt setup` eingerichtet.
+Bei einer bereits eingerichteten lokalen Bridge zeigen zunächst diese
+Befehle den vorhandenen Zustand; sie legen keine neuen Aufträge an:
+
+```sh
+kirabridge status
+kirabridge chatgpt status
+```
+
+Nur wenn die ChatGPT-Anbindung noch fehlt, den lokalen geführten Assistenten
+verwenden. Sprache und globale Optionen sind echte CLI-Argumente:
+
+```sh
+kirabridge chatgpt setup --language de
+# Andere bestehende Konfiguration: globale Optionen vor dem Unterbefehl
+kirabridge --config /absolute/private/config.toml chatgpt status
+```
+
+Der Assistent führt zu den offiziellen Kontoseiten. Die nötige Konto-/Workspace-
+Berechtigung und mögliche Kosten müssen im eigenen Zielkonto geklärt werden;
+keine Verfügbarkeit für jede ChatGPT-Oberfläche oder iPhone-Sprachsitzung wird
+behauptet. Er benötigt einen eingeschränkten **Tunnel-Runtime-Schlüssel**. Codex-
+Login und gewöhnlicher API-Schlüssel ersetzen diesen nicht. Verdeckte Eingabe nur
+im lokalen Terminal; keine Schlüssel in Chat, argv, Logs oder Screenshots.
+Der Schlüssel liegt getrennt mit Modus0600, die Tunnelverwaltung erhält eine
+`file:`-Referenz. Vorhandene Schlüssel/Policy bleiben erhalten; unvollständige
+Einrichtung wird mit nächstem Prüfschritt gemeldet statt überschrieben.
+
+Der Assistent übernimmt die bestehende lokale Policy für einen getrennten
+`chatgpt`-Zugang; er erzeugt keine allgemeinen Zusatzrechte. Neue lokale Einrichtung
+bleibt standardmäßig manuell. Ein bewusst automatisch freigegebenes Betreiberprofil
+ist eine andere Vertrauensentscheidung. Laufende/wartende Aufträge und Empfängerjobs
+werden vor einer erforderlichen Umstellung berücksichtigt. `kirabridge connect`
+ist der MCP-Stdio-Proxy zum lokalen Dienst: keine Banner, interaktiven Eingaben oder
+Diagnoselogs in dessen stdout einbauen. Der interaktive Assistent gehört ins lokale
+Terminal, nicht in den MCP-Datenstrom.
+
+### Ein erster harmloser Dateiabruf
+
+Eine bereits vorhandene, ausdrücklich erlaubte kleine Projektdatei auswählen.
+Die Beispielpfade müssen durch genau diesen Pfad ersetzt werden; nicht erst neue
+Dateien/Konten anlegen oder Rechte pauschal erweitern. Vorprüfung des eingerichteten
+ChatGPT-Principals, sofern dieser lokal tatsächlich so heißt:
+
+```sh
+kirabridge --principal chatgpt readiness --operation file.read --read-path /absolute/allowed/project/README.md
+```
+
+Anschließend **aus dem vorgesehenen Chat**, über dessen verbundene KiraBridge-App:
+
+1. `bridge_health` aufrufen. Geladene Version und Freigabemodus beachten;
+   der authentifizierte Principal steht in der verfügbaren Readiness-Antwort.
+2. `bridge_readiness` mit diesen Parametern aufrufen. Readiness liest keinen
+   Dateiinhalt und beweist noch keine Ausführung:
+
+   ```json
+   {
+     "operations": ["file.read"],
+     "read_paths": ["/absolute/allowed/project/README.md"]
+   }
+   ```
+
+3. Nach erfolgreicher Vorprüfung einmal `task_request` aufrufen. Eine freie stabile
+   Taskkennung wählen und für genau diese Anfrage beibehalten:
+
+   ```json
+   {
+     "request": {
+       "api_version": "1",
+       "task_id": "first-project-read-1",
+       "operation": "file.read",
+       "arguments": {
+         "path": "/absolute/allowed/project/README.md",
+         "max_bytes": 4096
+       },
+       "idempotency_key": "first-project-read-1"
+     }
+   }
+   ```
+
+4. Nur bei `approval_required=true` die zurückgegebene `local_approval_url` lokal
+   öffnen (`kirabridge approvals`) und genau diese Anfrage prüfen/freigeben.
+   Bei false Ergebnis direkt abfragen; keine unnötige Freigabe verlangen.
+5. `task_get` mit `{"task_id":"first-project-read-1"}` abfragen und tatsächlich
+   erhaltenen Dateiinhalt/Status prüfen. Empfang, Freigabe und queued sind kein
+   Abschlussnachweis. Fehler mit `task_diagnose` derselben Kennung untersuchen.
+
+Bei Abbruch/409/Timeout dieselbe Kennung zuerst abfragen. Unklaren Schreib-/Agenten-
+auftrag niemals durch einen neuen Task oder neue Idempotenzkennung wiederholen.
+Eine Wiederverbindung ist keine Wiederholungsfreigabe. Der echte ChatGPT-Dateibeleg
+`chatgpt-file-verification-20261018-1311` ist bereits bestanden (9117Bytes); ihn
+nicht erneut ausführen. Er belegt seinen damaligen Pfad/Principal, keine beliebigen
+Schreib-/Terminal-/Agentenrechte. [Bestehender Reparaturbeleg](REPAIR-PROJECT-ACCESS-20261018.md).
+
+Ein älterer App-Katalog kann `bridge_readiness` und `task_diagnose` noch nicht
+anbieten, obwohl der Dienst sie enthält. Dann die gezeigte lokale Readiness des
+konkreten Principals verwenden. `task_get` enthält bei Fehlern bereits die
+vorhandene Diagnose samt tatsächlichem Task-Preflight. Fehlende Toolnamen nicht
+als Taskoperationen erfinden; keine Aufträge zur Katalogaktualisierung wiederholen.
+Eine Aktualisierung des App-Katalogs ist vom laufenden Dienst getrennt.
+
+### Für den nächsten Ablauf nur dessen Fähigkeiten freigeben
+
+| Vorhaben | Tatsächliche Grenze und Anleitung |
+| --- | --- |
+| Codex entwickelt im Projekt | Betreiber setzt `agents.codex.sandbox_mode="workspace-write"` ausdrücklich; Standard `read-only`. Kein zusätzliches `ask`-Flag. Principal/CWD bleiben begrenzt, Kind-MCP bleibt aus. [Sicherheit](SECURITY.md). |
+| Grok verwendet lokale Werkzeuge | ACP braucht Betreiberoption `allow_local_tools`, Principalrecht `agent.local_tools` und Task-Opt-in `local_tools=true` zusammen. API-Textturns sind getrennt, keine universelle Kosten-/Stoppkontrolle. |
+| PNG-Entwurf ansehen | Eigene `file.image`-Capability, begrenzter Bildsnapshot über eigenen Task. Datei-Leserecht allein genügt nicht. [Bildweg](IMAGE-READ-20261018.md). |
+| ThreadDesk-Kontext oder Wissen | Fester Betreiberpeer, eigene `threaddesk.read`/`threaddesk.manage`/`threaddesk.knowledge`-Rechte je Operation und Revision. [Adapter](THREADDESK-ADAPTER-20261018.md), [Wissen](THREADDESK-KNOWLEDGE-20261018.md). |
+| Vorhandene Workflowbelege ansehen | `observations.read` plus `task.read`, nur ausgewählte eigene Tasks, begrenzte Metadaten. Kein Autoritäts-/Budgetnachweis. [Beobachtungsexport](WORKFLOW-OBSERVATION-EXPORT.md). |
+| Eigenen gebundenen Workflow stoppen | Optionales, standardmäßig deaktiviertes `stop_only`-Wiring; Kosten unbekannt, kein harter Dollarcap. Anfrage, dauerhafte Sperre, Prozessende und externe Restwirkung getrennt. [Betreiberanleitung](https://github.com/landjunge/KiraBridge/blob/307004e5b2e4285c19e8d7544bedf45b28297a0b/docs/WORKFLOW-CONTROL-CONFIGURATION.md). |
+
+Nativer Codex-MCP-Zugang, ChatGPT-App-Principal, verwalteter Agentenkindprozess und
+bestehende interaktive Sitzung sind verschiedene Kontexte. Ein engerer nativer
+Codex-Principal schränkt die ausdrücklich breiteren App-Rechte nicht nachträglich
+ein; diese sind ebenso wenig Voreinstellung für neue Nutzer. Kein Adapter übernimmt
+fremde interaktive Sitzungen. Änderungen benötigen die lokale Betreiberentscheidung;
+der Chat erteilt sich keine Rechte und aktiviert keine optionale Assembly.
+
+## English: connect, then confirm the actual task
+
+Use the [English installation guide](INSTALL-EN.md) to identify the package first.
+The current download is the published Intel preview RC20, dated October 30, 2026.
+The installed service and a local checkout may differ; `kirabridge status` reads the
+responding service. RC17/RC14 reports below are historical evidence.
+Do not reset a healthy configuration or use
+historical packages against newer settings. Inspect `kirabridge status` and
+`kirabridge chatgpt status`; only missing setup needs the interactive local command:
+
+```sh
+kirabridge chatgpt setup --language en
+```
+
+The published macOS service installer sets up the local bridge; connect the
+ChatGPT account separately with this guided command. Follow the official
+account pages yourself. A restricted tunnel runtime key is required, not a Codex
+login or ordinary API key. Enter it hidden locally, never in chat, process arguments
+or logs. Existing keys, data and permissions are retained; incomplete setup is
+reported instead of overwritten. The separate ChatGPT principal receives the
+existing local policy. New local setup defaults to manual approval; the operator
+Mac's broader automatic profile is not a general default. Account access, charges
+and availability in the actual chat surface remain account-specific, not guaranteed
+by a healthy tunnel. Keep `kirabridge connect` stdout exclusively for MCP.
+
+For one confirmed task, select a small existing authorized project file. Substitute
+its exact path in the CLI readiness and JSON examples above. Global CLI options
+`--config` and `--principal` precede the subcommand. From the **intended ChatGPT
+chat**, call `bridge_health`, then `bridge_readiness` for `file.read` and that path.
+Readiness checks prerequisites without reading contents. Submit the shown
+`task_request` once with a fresh stable task ID/key. When `approval_required=true`,
+review that exact request through its returned local approval URL (`kirabridge
+approvals` locally); otherwise poll directly. Use `task_get` with the same ID and
+check the actual returned contents and final status. A queue receipt is not execution.
+Use `task_diagnose` with that ID for failure evidence. After a disconnect or 409,
+inspect the existing task first; never replay an uncertain write/agent task under a
+new ID. The already confirmed ChatGPT read `chatgpt-file-verification-20261018-1311`
+(9117Bytes) is retained evidence, not a test to repeat.
+
+Older App catalogs may omit `bridge_readiness` and `task_diagnose` despite server
+support. Use the shown local readiness for the actual principal; failed-task
+`task_get` already includes its existing diagnosis and execution preflight.
+Do not invent task operations for missing tool names or replay work to refresh a
+catalog. App-catalog updates and service reloads are separate.
+
+Codex defaults to read-only; only the operator's explicit
+`agents.codex.sandbox_mode="workspace-write"` enables the managed adapter's write
+mode. Principal/CWD restrictions remain and child MCP stays disabled. Native Codex,
+ChatGPT App, managed children and existing interactive sessions are separate
+contexts. Grok ACP local tools require configuration, principal and task opt-ins
+together; its API text adapter does not gain local tools or universal cost control.
+PNG images, ThreadDesk knowledge and observation export each require their specific
+rights, as linked in the table. None enables another or proves imported context
+trusted. Optional [owned workflow control](https://github.com/landjunge/KiraBridge/blob/307004e5b2e4285c19e8d7544bedf45b28297a0b/docs/WORKFLOW-CONTROL-CONFIGURATION.md) is
+disabled by default and stop_only: cost unknown, no hard dollar cap. Stop intent,
+confirmed durable barrier, owned process exit and unknown external effects differ.
+Local status alone does not establish a successful call from a target ChatGPT account.
+
+## Historische Anschlussbelege / Historical connection evidence
+
+Die folgende unveränderte frühere Notiz enthält damalige Versionsangaben und damals
+noch offene Punkte. Diese sind **kein aktueller Auftrag zur Wiederholung** und keine
+Aussage, dass inzwischen dokumentierte Datei-/Bild-/Wissens-/Beobachtungsnachweise
+noch fehlen. Spätere Belege: [Projektsteuerung](PROJECT-CONTROL-20261018.md),
+[Bildabruf](IMAGE-READ-20261018.md), [Wissen](THREADDESK-KNOWLEDGE-20261018.md),
+[Beobachtungen](WORKFLOW-OBSERVATION-EXPORT.md). Die dort benannten Belegumfänge
+bleiben begrenzt; Quellstand ist kein Nachweis einer laufenden Aktivierung. Externe
+Dokumentationslinks im Archiv sind damalige Quellen, hier nicht neu abgefragt.
+
+The unchanged note below preserves historical version/status statements, including
+then-outstanding checks. These do not reopen completed checks. Follow the dated
+source/task evidence linked above; a source checkout is not proof of live activation.
+External documentation links are preserved historical references, not newly verified.
+
+<details>
+<summary>Archiv: Anschlussnotiz vom 17.–18.10.2026 / archived connection note</summary>
+
+Archivverweise auf hier fehlende Dateien sind als Text erhalten. / References to
+archive files absent from this checkout are retained as plain text.
+
 # ChatGPT-Anbindung: Tunnel aktiv, Statusabfrage zurückgemeldet
 
-**Aktueller Stand:** [Korrigierte Events-Anbindung erneut aktiviert; echter Empfang im ursprünglichen Chat weiterhin offen](MCP-SCHEMA-CACHE-20261019.md). Die nachfolgenden Betriebsstände sind historische Nachweise.
+**Aktueller Stand:** Korrigierte Events-Anbindung erneut aktiviert; echter Empfang im ursprünglichen Chat weiterhin offen (Archivverweis `MCP-SCHEMA-CACHE-20261019.md`, in diesem Checkout nicht enthalten). Die nachfolgenden Betriebsstände sind historische Nachweise.
 
-**Aktueller Vorrang:** [Events-Fassade zurückgerollt; ursprünglicher Anschluss wiederhergestellt](CHATGPT-EVENTS-RECOVERY-20261019.md).
+**Aktueller Vorrang:** Events-Fassade zurückgerollt; ursprünglicher Anschluss wiederhergestellt (Archivverweis `CHATGPT-EVENTS-RECOVERY-20261019.md`, in diesem Checkout nicht enthalten).
 Die nachfolgenden Aktivierungsangaben sind historisch. Vor erneuter Aktivierung
 müssen Pflicht-Subscription für normale Aufträge und Sender-Startbereitschaft
 korrigiert werden. Die App benötigt jetzt Refresh/Rescan der alten Werkzeugdefinition.
 
-**Produktionsaktivierung:** [Ereignissender und bestehender Tunnel sind aktiviert](CHATGPT-EVENTS-ACTIVATION-20261019.md).
+**Produktionsaktivierung:** Ereignissender und bestehender Tunnel sind aktiviert (Archivverweis `CHATGPT-EVENTS-ACTIVATION-20261019.md`, in diesem Checkout nicht enthalten).
 Die vorhandene App-Verbindung funktioniert weiter. Private Verbindung jetzt über
 chatgpt.com/plugins → KiraBridge → Refresh neu einlesen; echte Host-Subscription
 und Empfang im ursprünglichen Chat sind noch offen.
 
-**MCP-Events-Ausbau:** [Isolierter Adapter und konkrete Plattformschritte](CHATGPT-EVENTS-20261019.md).
+**MCP-Events-Ausbau:** Isolierter Adapter und konkrete Plattformschritte (Archivverweis `CHATGPT-EVENTS-20261019.md`, in diesem Checkout nicht enthalten).
 Offizieller Webhookweg verifiziert, vorhandene Tunnelbinary lokal mit MCP 2 geprüft.
 Noch kein echter ChatGPT-Callback und keine belegte Zustellung im ursprünglichen Chat.
 
@@ -86,3 +297,22 @@ Der Codex-Adapter basiert auf den dokumentierten JSONL-Ereignissen des nichtinte
 
 Grok Build dokumentiert ACP-Initialisierung, Sitzungsanlage und `session/prompt`; die API dokumentiert Streaming-Response-IDs und Abschlussgründe. [Grok Build Headless/ACP](https://docs.x.ai/build/cli/headless-scripting), [Grok Streaming](https://docs.x.ai/developers/model-capabilities/text/streaming)
 
+
+</details>
+
+
+## RC17: lightweight health and stale Apps schemas / Leichte Statusabfrage
+
+`bridge_health` reports actual runtime and grants without scanning Terminal windows.
+Its terminal observations are explicitly cached/not_probed; request
+`observe_terminals=true` or use `agent_inventory`/`operation_catalog` for a fresh
+observation. Cached data never authorizes input. / Die normale Statusabfrage belegt
+keine Terminal-Leseplätze; für frische Fenstererkennung ausdrücklich beobachten.
+
+Events are optional. If an already loaded Apps tool still requires the historical
+`completion_subscription` field, use `""`. Do not invent an Events subscription or
+request additional permissions. An actual Kira Whiteboard write and independent
+readback succeeded with this compatible route. Refresh the host's connector
+metadata when possible. / Events sind optional; alte Apps-Schemas können mit dem
+leeren Legacyfeld weiterarbeiten. Ein vorhandener Empfangsbeleg ersetzt weiterhin
+weder tatsächliche Ausführung noch unabhängige Speicherbestätigung.

@@ -1,98 +1,66 @@
-# KiraBridge 0.8.0rc10
+[Deutsch](README.de.md)
 
-Ein kompaktes Steuerfenster für Kira/ChatGPT, Grok und die angebundenen Agenten.
-Auf diesem Mac startet **KiraBridge.app** die Oberfläche. Prozesse, Terminals,
-Reparatur-Doktor und Rechte sind direkt erreichbar; nur das Protokoll hat ein
-separates Fenster. Die Steuerung bleibt erreichbar, wenn der Bridge-Dienst aus ist.
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="assets/design/icons/dark/KiraBridge-dark-256.png">
+  <img src="assets/design/icons/light/KiraBridge-light-256.png" alt="KiraBridge" width="160" height="160">
+</picture>
 
-- **Übersicht:** Kira und Grok eindeutig wählen; bestätigte und ungeprüfte Zugänge erkennen.
-- **Prozesse:** tatsächlichen Zustand prüfen, starten und neu verbinden.
-- **Terminals:** bestehende Terminal.app- und tmux-Sitzungen auswählen, lesen und bedienen.
-- **Doktor:** Verbindungen, geladene Einstellungen und Terminalzugriff prüfen und reparieren.
-- **Rechte:** genau **Voll erlaubt**, **Mittel** oder **Nur mit Erlaubnis**.
-- **Protokoll:** tatsächliche Nachrichten, Ausführung, Antworten und Fehler verfolgen.
+# KiraBridge
 
-Vorhandene Sitzungen und Zugangsdaten bleiben erhalten. Ein Neustart beendet
-keine beobachtete Nutzersitzung. Vollfreigaben werden genutzt; ein Wechsel der
-Freigabestufe löscht bereits erteilte Zugriffsrechte nicht. Mittel erlaubt
-Leseaufträge automatisch; Änderungen und Ausführung benötigen Freigabe.
-Nur mit Erlaubnis lässt neue Aufträge auf die Freigabe im selben Fenster warten.
+**Talk to your AI. Get the work done on your computer.**
 
-Browser, Handy, Text, Live und Sprache erreichen dieselben MCP-Werkzeuge und
-Rechte, sobald der jeweilige Anbieter den Werkzeugaufruf zulässt.
-`connection_check` bestätigt einen tatsächlich angekommenen Aufruf. Gerät und
-Modus sind Angaben des aufrufenden Clients. Die Oberfläche zeigt ungeprüfte
-Zugänge ausdrücklich als ungeprüft. Native Handy-, Live- und Sprachgespräche
-wurden hier nicht direkt abgenommen. Inaktive Chats werden durch eine
-Warteschlangennachricht nicht automatisch aufgeweckt.
+KiraBridge connects ChatGPT to **Grok Build and Codex running in terminal windows
+on your computer**. Discuss what you need in chat, pass the work to those terminal
+agents and follow their replies while choosing what they may access.
 
-[Reparaturursachen, tatsächliche Prüfungen und offene Punkte](docs/CONTROL-CENTER-0.8.0rc1.md).
+**macOS · Intel — [0.8.0rc20](https://github.com/landjunge/KiraBridge/releases/tag/v0.8.0rc20) · October 30, 2026 · Preview**
 
-## Aktueller Umbau
+### [Download KiraBridge — app and installer](https://github.com/landjunge/KiraBridge/releases/download/v0.8.0rc20/KiraBridge-0.8.0rc20-Intel-macOS.zip)
 
-Die [Etappenakte](docs/ARCHITECTURE-STAGES-20261020.md) trennt Quelländerungen,
-Aktivierung und praktische Prüfungen. Neue Aufträge von Kira und Eve benötigen
-kein `go-go-go`. Historische Puffer werden nicht automatisch zugestellt.
-Agentenübergaben verwenden verpflichtend persistierte bestehende sichtbare
-Fenster; fehlende oder geänderte Ziele blockieren ohne Hintergrundersatz.
-Einfügen, separates Return und authentifizierte Quittung bleiben getrennt.
-Neue Fenster benötigen eine konkrete Freigabe aus der lokalen Bedienung.
-Die sechs Architektur-Etappen sind auf diesem Mac aktiviert und gezielt geprüft.
-Der physische Handy-/Voice-Ablauf bleibt gesondert offen. Bei der letzten Prüfung
-war der vorhandene öffentliche Grok-Tunnel ausgefallen; Kiras tatsächlicher
-MCP-Rückweg und der lokale Eve-Rückweg wurden bestätigt.
+[App only, if the service is already installed](https://github.com/landjunge/KiraBridge/releases/download/v0.8.0rc20/KiraBridge-App-0.8.0rc20-Intel.zip)
+· [Checksums](https://github.com/landjunge/KiraBridge/releases/download/v0.8.0rc20/SHA256SUMS-INTEL)
+· [All releases](https://github.com/landjunge/KiraBridge/releases)
 
-Sichtbare Übergaben warten seit rc10 ungeclaimt auf ein freies bestehendes\nAgentenfenster. Alte unklare Eingaben werden nicht automatisch wiederholt.\n[Ursache, Reparatur und echter Codex-Test](docs/VISIBLE-HANDOFF-RECOVERY-20261020.md).\n\n## Starten und entwickeln
+Downloads require a GitHub account with access to this private repository.
+This is a preview; there is no stable release yet. RC20 is available for Intel Macs.
 
-Bestehende Installation öffnen:
+## What KiraBridge helps you do
 
-```sh
-kirabridge approvals
-```
+- **Work on local projects:** let your connected AI read project files and logs,
+  edit files or run commands within the access you have granted.
+- **Work with terminal agents:** send tasks to Grok Build and Codex in their
+  configured terminal sessions on your computer.
+- **Follow the work:** see requests, messages and results in the local control window.
+- **Choose the permissions:** decide which folders and actions are allowed and
+  when a task needs your approval.
 
-Aus einem Checkout einrichten:
+ThreadDesk and other integrations are optional. KiraBridge's core works independently.
 
-```sh
-uv sync --locked
-uv run kirabridge setup
-uv run kirabridge service install
-uv run python scripts/build_desktop_app.py  # macOS
-uv run kirabridge approvals
-```
+## Get started
 
-`setup` überschreibt keine vorhandene private Konfiguration. Die native App ist
-ein Begleitfenster zur lokalen Installation. Andere Systeme verwenden den Browser.
-Konfiguration und Zugangsdaten liegen getrennt unter `~/.config/kirabridge`.
+1. **Install the service.** Download and fully extract the app-and-installer ZIP.
+   Open `KiraBridge-Installieren.command` and follow the installer in Terminal.
+2. **Open the app.** Copy `KiraBridge.app` to the `Applications` folder in your
+   home folder (`~/Applications`; create it if needed), then open it. The app
+   uses the service installed in step 1.
+3. **Connect your chat.** Follow the [ChatGPT connection guide](docs/CHATGPT.md#english-connect-then-confirm-the-actual-task).
+   Start by asking it to read a small file from an allowed folder. Approve the
+   request if asked, then check the result in your chat.
 
-```sh
-uv run ruff check .
-uv run ruff format --check .
-uv run pytest -q -W error::pytest.PytestUnraisableExceptionWarning
-uv build
-```
+**Requirements:** Intel Mac, tested on macOS 15.7.4; Python 3.11 and uv 0.11.6
+already available in Terminal; internet access to download dependencies.
+Install with your regular user account. AI accounts and any provider charges are
+separate; the chat connection needs the corresponding account permissions.
+For terminal-agent tasks, install and sign in to Grok Build or Codex, then
+configure its terminal session as a target in KiraBridge.
 
-GitHub CI prüft macOS und Linux mit Python 3.11/3.13. Tests verwenden isolierte
-Dateien und Testprozesse; sie starten keine kostenpflichtigen Provideraufträge.
+This preview has known terminal limitations, and the app is not Apple-notarized.
+Read [installation and help](docs/INSTALL-EN.md) for setup, updates and known issues.
 
-## Schnittstellen und Nachweise
+## License
 
-MCP-Clients verbinden sich mit `kirabridge --principal NAME connect`. Der lokale
-Dispatcher besitzt die gemeinsame Warteschlange. Aufträge über `action_request`
-liefern zunächst ihren gespeicherten Zustand; `task_get`, `task_events` und der
-Abschlusskanal liefern die tatsächlichen Ausführungsbelege. `message_receive` und
-`message_ack` unterscheiden Zustellung und Quittierung von der Verarbeitung.
-`session_catalog` liefert konkrete Terminalziele; `session_read`, `session.input`
-und `session_open` lesen, bedienen oder öffnen sie unter der aktuellen Freigabe.
+Private, non-business use is free under the
+[Netzwerkpunkt Personal Use License 1.0](LICENSE). Business use requires separate
+written permission. The German license text governs.
 
-- [Grok-App-Verbindung](docs/GROK-APP-CONNECTOR.md)
-- [ChatGPT-Verbindung](docs/CHATGPT.md)
-- [Abschlussmeldungen und Rückgabe](docs/COMPLETION-CHANNEL-20261019.md)
-- [Architektur](docs/ARCHITECTURE.md)
-- [Betrieb und Wiederherstellung](docs/OPERATIONS.md)
-- [Agentennachrichten](docs/AGENT_CHANNEL.md)
-- [CLI-Anbieter](docs/providers/README.md)
-- [ThreadDesk-Anschluss](docs/THREADDESK-ADAPTER-20261018.md)
-
-Ältere datierte Abnahmeberichte dokumentieren ihren damaligen Stand.
-Aktuelle Rechte und Zustände zeigt die laufende Steuerung.
-Das Repository bleibt privat. Es gilt die [Lizenz](LICENSE).
+[Developer documentation](docs/DEVELOPERS.md)
