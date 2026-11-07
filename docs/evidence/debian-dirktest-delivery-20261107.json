@@ -1,0 +1,80 @@
+{
+  "result": "passed",
+  "steps": [
+    {
+      "name": "final-package-integrity",
+      "result": "passed",
+      "detail": {
+        "files": 1239,
+        "all_sha256_match": true
+      }
+    },
+    {
+      "name": "final-package-install",
+      "result": "passed",
+      "detail": ""
+    },
+    {
+      "name": "final-package-mcp-health-auth-source-pin",
+      "result": "passed",
+      "detail": {
+        "version": "0.8.0rc41",
+        "runtime": {
+          "instance_id": "0f5d01538eed420b926b9489d5f26429",
+          "version": "0.8.0rc41",
+          "pid": 1413592,
+          "started_at": "2026-11-07T11:28:17.287902+00:00",
+          "config_path": "/home/daniel/kb-debian-dirktest-20261107-delivery%dirk/config/config.toml",
+          "config_sha256": "a0bb373599f1ece680fb4e10446650b7dbcae5ed47e061fc644a4f715a1c6bb9",
+          "effective_config_sha256": "682563c570d1673e5f8a23de4df6a05a089e85419a73b66d7bb1d083cbb459a6",
+          "source_tree_sha256": "67e51942ec92ee68b663b53143b70f0ecd3f38e807ba54372e861766c06b3ada",
+          "source_file_count": 214,
+          "source_package_path": "/home/daniel/kb-debian-dirktest-20261107-delivery%dirk/candidate-runtime/src/kirabridge",
+          "source_scope": "package Python files observed at startup; no remote attestation"
+        },
+        "server": {
+          "role": "linux-server",
+          "gui_parity": false,
+          "mcp_http": "available",
+          "authentication": "bearer",
+          "health": "bridge_health",
+          "service_manager": "systemd-user",
+          "desktop_gui": "unavailable",
+          "macos_terminal_app": "unavailable",
+          "native_keyboard": "unavailable",
+          "clipboard": "unavailable",
+          "clipboard_required_for_server": false
+        },
+        "missing_bearer": 401,
+        "wrong_bearer": 401
+      }
+    },
+    {
+      "name": "final-package-standalone-rollback",
+      "result": "passed",
+      "detail": ""
+    },
+    {
+      "name": "cleanup",
+      "result": "passed",
+      "detail": null
+    }
+  ],
+  "archive_sha256": "73be73c5ea63d31ee9be300ca0d503cab27118bf7bc5411af0423cf499d8a9ef",
+  "harness_sha256": "5d2d5f2f0a88dde5725685110a108c926d0df7d98b716f4d85da96afbbb30767",
+  "delivery_smoke_sha256": "93263b060239b5c733bb883b62fadd596985a9331fc80a59e09d28b712225926",
+  "source_commit": "08ee2806c67b151733194520eed8775c4b480444",
+  "version": "0.8.0rc41",
+  "artifacts": {
+    "KiraBridge-0.8.0rc41-Linux-x86_64-release.tar.gz": {
+      "source_commit": "08ee2806c67b151733194520eed8775c4b480444",
+      "sha256": "73be73c5ea63d31ee9be300ca0d503cab27118bf7bc5411af0423cf499d8a9ef"
+    }
+  },
+  "cleanup": {
+    "unit_absent": true,
+    "systemd": "MainPID=0\nLoadState=not-found\nActiveState=inactive\n",
+    "port_unbound": true
+  },
+  "log_sha256": "2243f1171641333a6c7e1ebcb5e776a3a2dda2d40dc0696b0e76739dc21ef668"
+}
