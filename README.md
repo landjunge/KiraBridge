@@ -7,11 +7,19 @@
 
 # KiraBridge
 
+<p align="center">
+  <a href="https://github.com/landjunge/KiraBridge/releases"><img alt="Releases / RC" src="https://img.shields.io/badge/macOS%20Intel-Releases%20%2F%20RC-6060c0?style=flat-square"></a>
+  &nbsp;
+  <a href="https://github.com/landjunge/KiraBridge/releases"><img alt="Preview releases" src="https://img.shields.io/badge/Windows-Preview%20releases-6060c0?style=flat-square"></a>
+</p>
+
 **Talk to your AI. Get the work done on your computer.**
 
 KiraBridge connects ChatGPT to **Grok Build and Codex running in terminal windows
 on your computer**. Discuss what you need in chat, pass the work to those terminal
 agents and follow their replies while choosing what they may access.
+
+**Server edition:** KiraBridge also runs on Debian; server source and local macOS installation are tracked separately. A server source revision is not itself a published installer. / **Server-Version:** KiraBridge läuft auch auf Debian; Quellstand und veröffentlichte Downloads sind getrennt.
 
 **Source and installed status (November 7, 2026):** Debian server source **0.8.0rc41** (`350d368`); Intel Mac installed runtime **0.8.0rc40** (`d12838a`). These are not published macOS download versions.
 
