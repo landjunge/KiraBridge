@@ -29,7 +29,13 @@ PROJECT_VERSION = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="ut
 ]
 sys.path.insert(0, str(ROOT / "src"))
 
-from kirabridge.windows_package import PackageError, install, rollback, status, uninstall  # noqa: E402
+from kirabridge.windows_package import (  # noqa: E402
+    PackageError,
+    install,
+    rollback,
+    status,
+    uninstall,
+)
 
 LIVE_MARKERS = (
     Path.home() / ".local" / "share" / "kirabridge",
