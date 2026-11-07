@@ -1,0 +1,21 @@
+{
+  "test_command": ".venv/bin/pytest -q -W error::pytest.PytestUnraisableExceptionWarning",
+  "tests_passed": 184,
+  "seconds": 80.09,
+  "lint": "ruff check src scripts tests: passed",
+  "format": "ruff format --check src scripts tests: 74 files formatted",
+  "isolated_real_callbacks": 6,
+  "real_codex_session": "01a15179-2165-7523-9b6e-1a5fdaf602d6",
+  "installed_callback": "completion-task-2126",
+  "installed_task_id": "completion-installed-echo-20261019-01",
+  "installed_outcome": "success",
+  "activated_with_idle_write_barrier": true,
+  "existing_data_config_and_rights_preserved": true,
+  "real_grok_calls": 0,
+  "chatgpt_unsolicited_wakeup_verified": false,
+  "final_targeted_tests_passed": 69,
+  "final_targeted_seconds": 40.4,
+  "codex_process_abort_and_unknown_agent_outcome_distinguished": true,
+  "final_activation_evidence": "activation-2.json",
+  "final_activation_preserved_all_11_tables": true
+}

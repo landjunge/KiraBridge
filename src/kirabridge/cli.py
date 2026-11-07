@@ -489,15 +489,93 @@ async def execute(args) -> None:
         elif args.command == "doctor":
             from kirabridge.platform_adapters import current_platform
 
+            audit_result = verify(bridge.store)
+            agent_result = bridge.agents.inventory(list(config.agents))
+            from kirabridge.local_runtime import default_config
+
+            config_path = Path(args.config).expanduser() if args.config else default_config()
+            launcher_path = Path.home() / ".local/bin/kirabridge"
+            launcher_exists = launcher_path.is_file()
+            repair_action = None
+            if args.repair_launcher is not None:
+                from kirabridge.doctor_repair import repair_launcher_permissions
+
+                repair_action = repair_launcher_permissions(
+                    args.repair_launcher, approve=args.approve_repair
+                )
+                if repair_action.get("status") == "repaired" and args.repair_receipt is not None:
+                    from kirabridge.doctor_repair import save_repair_receipt
+
+                    repair_action["receipt"] = save_repair_receipt(
+                        args.repair_receipt, repair_action
+                    )
+            elif args.rollback_launcher is not None:
+                from kirabridge.doctor_repair import rollback_launcher_permissions
+
+                if args.repair_receipt is not None:
+                    from kirabridge.doctor_repair import rollback_from_receipt
+
+                    repair_action = rollback_from_receipt(
+                        args.rollback_launcher, args.repair_receipt, approve=args.approve_repair
+                    )
+                else:
+                    repair_action = rollback_launcher_permissions(
+                        args.rollback_launcher,
+                        expected_mode=args.expected_mode,
+                        original_mode=args.previous_mode,
+                        approve=args.approve_repair,
+                    )
             host = current_platform()
             report = {
                 "python": sys.version.split()[0],
                 "platform": host.name,
                 "database": "ok",
                 "schema": 2,
-                "audit": verify(bridge.store),
-                "agents": bridge.agents.inventory(list(config.agents)),
+                "audit": audit_result,
+                "agents": agent_result,
                 "chatgpt_integration": "unverified",
+                "checks": {
+                    "database": {"status": "OK", "detail": "Database opened"},
+                    "audit": {"status": "OK" if audit_result.get("valid") else "ERROR"},
+                    "config": {
+                        "status": "OK" if config_path.is_file() else "WARN",
+                        "detail": "Configuration path exists"
+                        if config_path.is_file()
+                        else "Configuration path missing",
+                    },
+                    "launcher": {
+                        "status": "OK"
+                        if launcher_exists and os.access(launcher_path, os.X_OK)
+                        else "WARN",
+                        "detail": "Launcher executable"
+                        if launcher_exists and os.access(launcher_path, os.X_OK)
+                        else "Launcher absent or not executable",
+                    },
+                    "runtime_version": {
+                        "status": "UNKNOWN",
+                        "detail": "Installed service version not attested by this local doctor",
+                    },
+                    "dispatcher": {"status": "UNKNOWN", "detail": "No live daemon probe performed"},
+                    "agents": {
+                        "status": "UNKNOWN",
+                        "detail": "Inventory is not a live connection test",
+                    },
+                    "chatgpt_integration": {"status": "UNKNOWN", "detail": "Not verified"},
+                },
+                "repair": repair_action if repair_action is not None else "not_performed",
+                "repair_plan": {
+                    "mode": "preview_only",
+                    "changes_applied": False,
+                    "steps": [
+                        "Review failing checks and identify the exact affected component",
+                        "Create and verify an owner-only backup before any change",
+                        "Require explicit approval for the exact repair action",
+                        "Verify the result and preserve rollback information",
+                    ],
+                    "message": "No automatic repairs are implemented; --repair is a safe preview",
+                }
+                if args.repair
+                else None,
             }
             if host.name == "linux":
                 report["server"] = host.server_facts()
@@ -543,7 +621,29 @@ def main() -> None:
     parser.add_argument("--version", action="version", version="%(prog)s " + __version__)
     parser.add_argument("--config", help="TOML policy file (or KIRABRIDGE_CONFIG)")
     parser.add_argument("--principal", default="local", help="Local CLI/stdio policy identity")
-    sub = parser.add_subparsers(dest="command", required=True)
+    parser.add_argument("--doctor", action="store_true", help="Run the existing doctor diagnostics")
+    parser.add_argument(
+        "--repair", action="store_true", help="Show a safe repair plan (no changes)"
+    )
+    parser.add_argument(
+        "--repair-launcher", type=Path, help="Explicit launcher path for controlled repair"
+    )
+    parser.add_argument(
+        "--approve-repair", action="store_true", help="Approve exact launcher permission repair"
+    )
+    parser.add_argument("--repair-receipt", type=Path, help="Owner-only repair receipt path")
+    parser.add_argument(
+        "--rollback-launcher", type=Path, help="Explicit launcher path for controlled rollback"
+    )
+    parser.add_argument(
+        "--previous-mode", type=lambda x: int(x, 8), help="Recorded original mode, octal"
+    )
+    parser.add_argument(
+        "--expected-mode", type=lambda x: int(x, 8), help="Mode expected after repair, octal"
+    )
+    # Not required: --doctor/--repair are a flag-based entry point without a subcommand;
+    # the fallback below defaults a missing command to "status".
+    sub = parser.add_subparsers(dest="command")
     install = sub.add_parser("install", help="Guided local installation; --check changes nothing")
     install.add_argument("--check", action="store_true", help="Read-only prerequisite check")
     install.add_argument("--language", choices=["de", "en"], default="de")
@@ -736,6 +836,37 @@ def main() -> None:
         "--evidence", required=True, help="Reviewed result reference; no credentials"
     )
     args = parser.parse_args()
+    if args.repair and not (args.doctor or args.command == "doctor"):
+        parser.error("--repair requires --doctor or the doctor subcommand")
+    if args.repair_launcher is not None and not args.repair:
+        parser.error("--repair-launcher requires --repair")
+    if args.repair_receipt is not None and not args.repair:
+        parser.error("--repair-receipt requires --repair")
+    if args.rollback_launcher is not None:
+        if not args.repair or args.repair_launcher is not None:
+            parser.error("--rollback-launcher requires --repair without --repair-launcher")
+        if args.repair_receipt is None and (
+            args.previous_mode is None or args.expected_mode is None
+        ):
+            parser.error("--rollback-launcher requires --repair-receipt or both mode arguments")
+        if args.repair_receipt is not None and (
+            args.previous_mode is not None or args.expected_mode is not None
+        ):
+            parser.error("receipt-based rollback cannot be combined with mode arguments")
+    if (
+        args.previous_mode is not None or args.expected_mode is not None
+    ) and args.rollback_launcher is None:
+        parser.error("mode arguments require --rollback-launcher")
+    if args.approve_repair and (
+        not args.repair or (args.repair_launcher is None and args.rollback_launcher is None)
+    ):
+        parser.error("--approve-repair requires --repair and an exact launcher target")
+    if args.doctor:
+        if args.command is not None:
+            parser.error("--doctor cannot be combined with a subcommand")
+        args.command = "doctor"
+    elif args.command is None:
+        args.command = "status"
     logging.basicConfig(level=logging.CRITICAL, stream=sys.stderr)
     try:
         asyncio.run(execute(args))

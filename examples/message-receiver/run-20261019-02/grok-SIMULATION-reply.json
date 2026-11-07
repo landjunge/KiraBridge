@@ -1,0 +1,20 @@
+{
+  "api_version": "1",
+  "seq": 2,
+  "id": "c573cf52-46f4-4a42-90e8-4a38fa0ccfdb",
+  "conversation_id": "receiver-grok-SIMULATION-20261019-01",
+  "position": 2,
+  "sender": "grok",
+  "recipient": "operator",
+  "kind": "answer",
+  "body": "KiraBridge-Test empfangen.",
+  "reply_to": "a2944bac-3585-4cff-8d55-e5c709653f7f",
+  "task_id": null,
+  "depth": 1,
+  "request_reply": false,
+  "created": 1792372665.894343,
+  "delivered": 1792372666.0704489,
+  "receipt": "83aaca3e-236c-465a-a58f-20a1a2256d4a",
+  "acknowledged": 1792372666.079359,
+  "processing": null
+}

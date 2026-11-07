@@ -1,0 +1,180 @@
+{
+  "host": "SIMULATION; no ChatGPT callback",
+  "chat_delivery": "NOT_VERIFIED",
+  "actual_chat_receipt": false,
+  "tunnel": "local in-memory control plane",
+  "tests": [
+    "unchanged task schemas; both normal submit tools without subscription",
+    "actual SDK2 server/discover + events/list + tools/list",
+    "persistent sender delivers AFTER frontend disconnect, BEFORE reconnect",
+    "disconnect during real terminal; same durable subscription on restart",
+    "fast real terminal completion",
+    "exitcode 7 propagated",
+    "bad subscription rejected BEFORE execution",
+    "duplicate submission no second task",
+    "unsubscribe idempotent",
+    "payload receipt explicitly does not prove chat UI"
+  ],
+  "tasks": [
+    {
+      "task_id": "events-fast",
+      "state": "completed",
+      "outcome": "success",
+      "subscription_id": "sub_3bb7809fb19618475e7c5206d4772bd8ab36a40e91174462e34d2c4e2d23b440",
+      "event_id": "evt_630aa34cdb420f9b46dcfff742fe69c0ea299ffbc650c3a5c1286a4d41020679",
+      "notice_id": "completion-task-15",
+      "transport_state": "webhook_accepted",
+      "event_sha256": "15759af4d027358c4d53e46eff1618deb13ccf72697a87b510f3f9637928544d",
+      "process_evidence": {
+        "evidence": {
+          "exit_code": 0,
+          "pid": 91630,
+          "terminated": false,
+          "timed_out": false
+        },
+        "exit_code": 0,
+        "output_bytes": 26,
+        "pid": 91630,
+        "stderr": "",
+        "stdout": "EVENTS_FAST_REAL_TERMINAL\n",
+        "success": true,
+        "terminated": false,
+        "timed_out": false,
+        "truncated": false
+      },
+      "receipt_scope": "authenticated_payload_possession",
+      "chat_ui_receipt_independently_verified": false
+    },
+    {
+      "task_id": "events-reconnect",
+      "state": "completed",
+      "outcome": "success",
+      "subscription_id": "sub_392be9b3b4a30423c24eba93ce158185eec31b337bd5123d16cd274af31a7c05",
+      "event_id": "evt_fddce618b3f54105aed1b42905465b74010e73c56f10050ec03a08d2edbd6023",
+      "notice_id": "completion-task-20",
+      "transport_state": "webhook_accepted",
+      "event_sha256": "52f6d26a52f8ec6d744354fe345a9eab036e6dd376578f706361fe75284ad410",
+      "process_evidence": {
+        "evidence": {
+          "exit_code": 0,
+          "pid": 91631,
+          "terminated": false,
+          "timed_out": false
+        },
+        "exit_code": 0,
+        "output_bytes": 17,
+        "pid": 91631,
+        "stderr": "",
+        "stdout": "EVENTS_RECONNECT\n",
+        "success": true,
+        "terminated": false,
+        "timed_out": false,
+        "truncated": false
+      },
+      "receipt_scope": "authenticated_payload_possession",
+      "chat_ui_receipt_independently_verified": false
+    },
+    {
+      "task_id": "events-failure",
+      "state": "failed",
+      "outcome": "error",
+      "subscription_id": "sub_054252dcb4500320af41e766a3ac8118c8279137840120b0c0ec60c6c4bd0bf1",
+      "event_id": "evt_3b99be5b8db779a02b7e18fe93e90fbea217869e71105b7e1612d2db2f9b6acd",
+      "notice_id": "completion-task-25",
+      "transport_state": "webhook_accepted",
+      "event_sha256": "633f95bd00085f8dc92ea0abc775e2fb7a013b26be74b2d51bc13684a4acca08",
+      "process_evidence": {
+        "evidence": {
+          "exit_code": 7,
+          "pid": 91641,
+          "terminated": false,
+          "timed_out": false
+        },
+        "exit_code": 7,
+        "output_bytes": 13,
+        "pid": 91641,
+        "stderr": "",
+        "stdout": "EVENTS_ERROR\n",
+        "success": false,
+        "terminated": false,
+        "timed_out": false,
+        "truncated": false
+      },
+      "receipt_scope": "authenticated_payload_possession",
+      "chat_ui_receipt_independently_verified": false
+    }
+  ],
+  "normal_tool_schemas_unchanged": true,
+  "normal_submissions_without_subscription": [
+    {
+      "method": "task_request",
+      "task_id": "no-subscription-task_request",
+      "state": "completed",
+      "stdout": "NORMAL_TASK_WITHOUT_SUBSCRIPTION\n",
+      "exit_code": 0,
+      "subscription_created": false
+    },
+    {
+      "method": "task_submit",
+      "task_id": "no-subscription-task_submit",
+      "state": "completed",
+      "stdout": "NORMAL_TASK_WITHOUT_SUBSCRIPTION\n",
+      "exit_code": 0,
+      "subscription_created": false
+    }
+  ],
+  "discovery": {
+    "protocol": "2026-07-28",
+    "capabilities": {
+      "tools": {
+        "listChanged": false
+      },
+      "events": {}
+    },
+    "events": [
+      "kirabridge.task.completed"
+    ]
+  },
+  "offline_delivery_timing": {
+    "frontend_closed_at": 1792374643.971217,
+    "task_finished_at": 1792374645.2782478,
+    "simulated_webhook_accepted_at": 1792374645.392927,
+    "reconnect_not_before": 1792374645.396462,
+    "ordering_verified": true
+  },
+  "methods": [
+    "server/discover",
+    "events/list",
+    "tools/list",
+    "tools/call",
+    "tools/call",
+    "events/subscribe",
+    "events/subscribe",
+    "tools/call",
+    "tools/call",
+    "tools/call",
+    "tools/call",
+    "events/unsubscribe",
+    "events/unsubscribe",
+    "events/subscribe",
+    "events/subscribe",
+    "tools/call",
+    "tools/call",
+    "server/discover",
+    "events/subscribe",
+    "tools/call",
+    "tools/call",
+    "events/unsubscribe",
+    "events/unsubscribe",
+    "events/subscribe",
+    "events/subscribe",
+    "tools/call",
+    "tools/call",
+    "tools/call",
+    "tools/call",
+    "events/unsubscribe",
+    "events/unsubscribe"
+  ],
+  "local_protocol_passed": true,
+  "elapsed_seconds": 6.058
+}

@@ -1,0 +1,19 @@
+Einmal einen neuen Chat öffnen und die vorhandene KiraBridge mit @ auswählen.
+Keine neue App, kein neuer Tunnel, kein neuer Schlüssel, keine alte Unterhaltung löschen.
+Nach dem bereits ausgeführten Refresh ist dies der noch fehlende dokumentierte Schritt.
+
+Dort senden:
+Teste den normalen KiraBridge-Auftragsweg: task_request mit
+Task-ID und Idempotenzschlüssel cache-fresh-chat-20261019-01,
+Operation file.list, arguments.path=/Users/landjunge/KiraBridge/examples/chat-events.
+Lasse completion_subscription vollständig weg; auch keinen leeren Wert übergeben.
+Prüfe das tatsächliche Ergebnis über task_get. Starte keinen Agenten.
+Berichte Annahme, Endstatus und ob der Fehler zum Pflichtfeld wieder erscheint.
+
+Erfolgskriterium: Der echte App-Aufruf ohne das Feld wird angenommen und abgeschlossen.
+Eine direkte lokale MCP-Prüfung und ein leerer Kompatibilitätswert zählen dafür nicht.
+Wenn derselbe Connectorfehler auch dort auftritt, ist der plattformseitige
+Connector-Katalog noch nicht aktualisiert; der neue Chat darf dann nicht als Erfolg gelten.
+
+Dies prüft den Schemawechsel. Es beweist keine Abschlusszustellung in der früheren
+ursprünglichen Unterhaltung und keine automatische Chat-Aufweckfunktion.

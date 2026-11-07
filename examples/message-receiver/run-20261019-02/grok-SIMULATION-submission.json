@@ -1,0 +1,30 @@
+{
+  "api_version": "1",
+  "seq": 1,
+  "id": "a2944bac-3585-4cff-8d55-e5c709653f7f",
+  "conversation_id": "receiver-grok-SIMULATION-20261019-01",
+  "position": 1,
+  "sender": "operator",
+  "recipient": "grok",
+  "kind": "question",
+  "body": "Antworte ausschließlich mit: KiraBridge-Test empfangen.",
+  "reply_to": null,
+  "task_id": null,
+  "depth": 0,
+  "request_reply": true,
+  "created": 1792372665.506198,
+  "delivered": null,
+  "receipt": null,
+  "acknowledged": null,
+  "processing": {
+    "message_id": "a2944bac-3585-4cff-8d55-e5c709653f7f",
+    "state": "queued",
+    "run_id": null,
+    "claimed": null,
+    "started": null,
+    "finished": null,
+    "reply_id": null,
+    "evidence": {},
+    "error": null
+  }
+}

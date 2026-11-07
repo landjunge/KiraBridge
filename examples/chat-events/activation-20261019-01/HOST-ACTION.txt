@@ -1,0 +1,33 @@
+Der lokale Produktionsanschluss ist aktiviert. Keine weitere lokale Simulation nötig.
+
+Erforderlicher Plattformschritt:
+1. https://chatgpt.com/plugins öffnen.
+2. Die bestehende private Verbindung KiraBridge öffnen.
+3. Refresh wählen. Wenn die Detailseite stattdessen Rescan MCP server anbietet, diesen benutzen.
+4. Auf der Detailseite das Ereignis kirabridge.task.completed prüfen.
+5. Im ursprünglichen auftraggebenden Chat Work/Cloud verwenden, sofern dort angeboten.
+   Keinen anderen Chat als Empfangsnachweis verwenden.
+6. Im ursprünglichen Chat diesen Auftrag geben:
+
+Abonniere kirabridge.task.completed für task_id chat-events-receipt-20261019-01
+in genau diesem Chat. Verwende die echte Host-Subscription und deren echte
+Callback-Verifikation. Warte mit der Einreichung, bis die Subscription aktiv ist.
+Falls callback_host_not_allowed erscheint, melde nur den Hostnamen zur lokalen
+Freischaltung; poste weder Callback-URL noch Signierschlüssel.
+Reiche dann den vorbereiteten kurzen terminal.execute-Auftrag über task_request
+mit dessen completion_subscription ein. Nach dem Ende des Assistententurns soll
+das echte Abschlussereignis eine schriftliche Meldung mit Task-ID, Endstatus,
+KIRABRIDGE_REAL_CHAT_RECEIPT_20261019_01 und Belegen in diesem Chat auslösen.
+Quittiere completion_chat_receipt nur mit dem tatsächlich empfangenen Event-Token.
+Kein Sprachausgabeauftrag. Kein neuer kostenpflichtiger Dienst, kein Grok-Aufruf.
+
+Vorbereiteter TaskRequest: final-task.request.json im selben Verzeichnis.
+Bis zu einer echten Subscription bleibt der Auftrag NICHT EINGEREICHT.
+
+Wenn Refresh/Rescan fehlt oder einen Fehler meldet:
+Den angezeigten UI-Fehler wörtlich zurückmelden. Keine neue App anlegen,
+keinen neuen Tunnel erstellen, keine Zugangsdaten ersetzen.
+
+Hintergrund und UI-Pfad:
+https://developers.openai.com/plugins/deploy/connect-chatgpt#refresh-metadata
+https://developers.openai.com/plugins/build/mcp-events#test-in-chatgpt

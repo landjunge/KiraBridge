@@ -1,0 +1,5 @@
+# Linux doctor credentials (deployment draft)
+
+This is a template, **not a deployed service**. A dedicated `kirabridge` service account and `/var/lib/kirabridge` must be provisioned by the operator. Use `systemd` `LoadCredential` for a 32-byte random key stored in a root-owned, non-world-readable source file. `CREDENTIALS_DIRECTORY` is provided by systemd at runtime. Do not put keys in command arguments, repository files, or environment variables. Ensure the service has only the required filesystem access. The sample service is for read-only Doctor diagnostics; it does not authorize unattended repair.
+
+`doctor_key_provider.load_systemd_credential()` validates and loads the runtime credential. **The existing Doctor receipt HMAC code has not yet been switched to this provider.** That migration requires a versioned receipt format, explicit key IDs, test coverage, and a rollback/migration plan. The macOS keychain adapter is not implemented here. Do not claim Linux deployment or production release.

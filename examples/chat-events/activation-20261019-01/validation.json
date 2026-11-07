@@ -1,0 +1,18 @@
+{
+  "activation_scope": "real existing native tunnel + production sender, no simulated callbacks",
+  "changed_script_checks": [
+    "ruff check passed",
+    "ruff format --check passed",
+    "py_compile passed",
+    "git diff --check passed"
+  ],
+  "full_suite_repeated": false,
+  "live_rollback_exercised": false,
+  "final_task_submitted": false,
+  "real_chat_processed": false,
+  "source_sha256": {
+    "scripts/activate_chat_events.py": "1236880b6dc13d0b66377215ba2a561ae08911a7ed718a1226db7c520da221ef",
+    "scripts/rollback_chat_events.py": "3f72593716772e86b057929515304b56d97ad83a99b2612728cfc766d2c1772a",
+    "scripts/probe_chat_events.py": "ddd3a48fc5fd1ea481a587cfc92a432587aca9d7b188dd85653ddc8f401c2267"
+  }
+}

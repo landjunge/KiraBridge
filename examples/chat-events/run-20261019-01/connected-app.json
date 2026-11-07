@@ -1,0 +1,88 @@
+{
+  "health": {
+    "content": [
+      {
+        "type": "text",
+        "text": "{\n  \"name\": \"KiraBridge\",\n  \"version\": \"0.5.2\",\n  \"api_version\": \"1\",\n  \"dispatcher_active\": true,\n  \"chatgpt_integration\": \"unverified\",\n  \"completion_channel\": {\n    \"receive_tool\": \"completion_receive\",\n    \"ack_tool\": \"completion_ack\",\n    \"default_target\": \"default\",\n    \"mode\": \"durable_inbox_with_waiting_consumer\",\n    \"unsolicited_chatgpt_wakeup\": \"unavailable_on_current_transport\"\n  },\n  \"local_approval_url\": \"http://127.0.0.1:8766/\",\n  \"approval_mode\": \"automatic\",\n  \"approval_required\": false,\n  \"health_scope\": \"dispatcher and authentication; use bridge_readiness for prerequisites\",\n  \"runtime\": {\n    \"instance_id\": \"e6496ac798c045d68b888787ca0b1296\",\n    \"version\": \"0.5.2\",\n    \"pid\": 80569,\n    \"started_at\": \"2026-10-19T00:17:30.988186+00:00\",\n    \"config_path\": \"/Users/landjunge/.config/kirabridge/config.toml\",\n    \"config_sha256\": \"f0a8b0f5dc6554bc7d8f706b42d01e7ccde88866ec0c05a05c0bbc718b3cfa1b\",\n    \"effective_config_sha256\": \"63d3eb1f56ce5f696b78f359dad13cc8eb51bf31e8da2d533c18db90b7236afd\",\n    \"source_tree_sha256\": \"d8846ef16e064d4a8fc00c8dfad4bb2458c251a52bf0a845441e2233bc36a525\",\n    \"source_file_count\": 43,\n    \"source_package_path\": \"/Users/landjunge/KiraBridge/src/kirabridge\",\n    \"source_scope\": \"package Python files observed at startup; no remote attestation\"\n  },\n  \"diagnostics_storage\": {\n    \"recording\": \"available\",\n    \"records\": 1605,\n    \"today\": 97,\n    \"max_records\": 20000,\n    \"max_events_per_day\": 2000,\n    \"dropped_by_this_observer\": 0,\n    \"retention\": \"existing audit preserved; bounded explicit export, no automatic deletion\"\n  },\n  \"message_peers\": [\n    \"codex\",\n    \"grok\"\n  ],\n  \"message_receiver_active\": true\n}"
+      }
+    ],
+    "structuredContent": {
+      "name": "KiraBridge",
+      "version": "0.5.2",
+      "api_version": "1",
+      "dispatcher_active": true,
+      "chatgpt_integration": "unverified",
+      "completion_channel": {
+        "receive_tool": "completion_receive",
+        "ack_tool": "completion_ack",
+        "default_target": "default",
+        "mode": "durable_inbox_with_waiting_consumer",
+        "unsolicited_chatgpt_wakeup": "unavailable_on_current_transport"
+      },
+      "local_approval_url": "http://127.0.0.1:8766/",
+      "approval_mode": "automatic",
+      "approval_required": false,
+      "health_scope": "dispatcher and authentication; use bridge_readiness for prerequisites",
+      "runtime": {
+        "instance_id": "e6496ac798c045d68b888787ca0b1296",
+        "version": "0.5.2",
+        "pid": 80569,
+        "started_at": "2026-10-19T00:17:30.988186+00:00",
+        "config_path": "/Users/landjunge/.config/kirabridge/config.toml",
+        "config_sha256": "f0a8b0f5dc6554bc7d8f706b42d01e7ccde88866ec0c05a05c0bbc718b3cfa1b",
+        "effective_config_sha256": "63d3eb1f56ce5f696b78f359dad13cc8eb51bf31e8da2d533c18db90b7236afd",
+        "source_tree_sha256": "d8846ef16e064d4a8fc00c8dfad4bb2458c251a52bf0a845441e2233bc36a525",
+        "source_file_count": 43,
+        "source_package_path": "/Users/landjunge/KiraBridge/src/kirabridge",
+        "source_scope": "package Python files observed at startup; no remote attestation"
+      },
+      "diagnostics_storage": {
+        "recording": "available",
+        "records": 1605,
+        "today": 97,
+        "max_records": 20000,
+        "max_events_per_day": 2000,
+        "dropped_by_this_observer": 0,
+        "retention": "existing audit preserved; bounded explicit export, no automatic deletion"
+      },
+      "message_peers": [
+        "codex",
+        "grok"
+      ],
+      "message_receiver_active": true
+    },
+    "isError": false
+  },
+  "permissions_read_only": {
+    "content": [
+      {
+        "type": "text",
+        "text": "Action completed."
+      }
+    ],
+    "structuredContent": {
+      "meta": null,
+      "content": [
+        {
+          "type": "text",
+          "text": "For KiraBridge: your default app permission is Allow low-risk actions. ChatGPT will automatically approve low-risk actions but may deny actions involving sensitive information. Learn more App-specific setting: Allow all actions. KiraBridge has a custom app-specific setting. ChatGPT won’t ask before reading or taking action. This comes with elevated risk. Learn more",
+          "annotations": null,
+          "meta": null
+        }
+      ],
+      "structuredContent": {
+        "app_id": "KiraBridge",
+        "app_name": "KiraBridge",
+        "status": "found",
+        "global_permission": "Allow low-risk actions",
+        "global_permission_description": "ChatGPT will automatically approve low-risk actions but may deny actions involving sensitive information. Learn more",
+        "app_permission": "Allow all actions",
+        "app_permission_description": "KiraBridge has a custom app-specific setting. ChatGPT won’t ask before reading or taking action. This comes with elevated risk. Learn more"
+      },
+      "isError": false
+    },
+    "isError": false
+  },
+  "events_subscription_received": false,
+  "chat_receipt_verified": false
+}

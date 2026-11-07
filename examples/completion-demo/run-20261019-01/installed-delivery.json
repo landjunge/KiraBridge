@@ -1,0 +1,37 @@
+{
+  "scope": "installed service; connected app submission; waiting consumer in active Codex terminal",
+  "chatgpt_unsolicited_wakeup_verified": false,
+  "notice": {
+    "id": "completion-task-2126",
+    "seq": 1,
+    "target": "default",
+    "receipt": "4bf7ce09-f9f0-4067-85ac-d7a3b21b64be",
+    "returned_at": 1792368868.05298,
+    "payload": {
+      "agent": null,
+      "attempt": 1,
+      "completion_basis": "recorded_execution_event",
+      "error_code": null,
+      "event_seq": 2126,
+      "evidence_refs": {
+        "task_events_after": 2125,
+        "task_get": "completion-installed-echo-20261019-01"
+      },
+      "execution_outcome_unknown": false,
+      "exit_code": 0,
+      "finished_at": 1792368868.029341,
+      "observed_at": 1792368868.029341,
+      "outcome": "success",
+      "parent_id": null,
+      "process_id": 80200,
+      "provider_error": null,
+      "quota_diagnosis": "not_established",
+      "session_id": null,
+      "source": "task",
+      "state": "completed",
+      "summary": "terminal.execute: success (exit 0). INSTALLED_COMPLETION_RETURN_CHANNEL_OK",
+      "task_id": "completion-installed-echo-20261019-01"
+    }
+  },
+  "consumer_acknowledged_at": 1792368868.106852
+}

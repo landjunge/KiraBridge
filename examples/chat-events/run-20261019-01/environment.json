@@ -1,0 +1,29 @@
+{
+  "date": "2026-10-19",
+  "production_activated": false,
+  "profile_sha256": "5980af9bc95f53d8a8f7158d0af99d10ee89aca410a9e655fd31f99715d6e07e",
+  "profile_matches_preparation": true,
+  "configured_main_command": [
+    "/Users/landjunge/.local/bin/kirabridge --principal chatgpt connect"
+  ],
+  "initialized_notification_shim": true,
+  "existing_tunnel_runtime": {
+    "connected": true,
+    "runtime_evidence": {
+      "healthy": true,
+      "process_running": true,
+      "ready": true
+    },
+    "chatgpt_tool_call": "unverified"
+  },
+  "callback_host_allowlist_prepared": [],
+  "host_subscription_received": false,
+  "same_chat_delivery_verified": false,
+  "platform_requirement": "host-initiated subscription in original Work/Cloud chat",
+  "official_sources": [
+    "https://developers.openai.com/plugins/build/mcp-events",
+    "https://developers.openai.com/api/docs/guides/secure-mcp-tunnels"
+  ],
+  "native_tunnel_version": "0.0.16+5f99daabd4aa4a77049e6d81d54a0d8c18335397 (git sha: 5f99daabd4aa4a77049e6d81d54a0d8c18335397)",
+  "adapter_sdk": "mcp==2.3.0 in isolated locked project; main environment unchanged"
+}

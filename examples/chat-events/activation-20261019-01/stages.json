@@ -1,0 +1,55 @@
+{
+  "at": 1792371059.965344,
+  "implemented": true,
+  "activated": true,
+  "sender_pid": 84409,
+  "bridge_pid_unchanged": 80569,
+  "native_pid": 84404,
+  "production_discovery_passed": true,
+  "real_app_health_passed": true,
+  "host_legacy_initialize_recognizes_server": "KiraBridge Chat Events",
+  "host_events_catalog_recognized": "NOT_YET_PROVEN",
+  "subscribed": false,
+  "webhook_delivered": false,
+  "chat_processed": false,
+  "real_subscription_count": 0,
+  "delivery_counts": {},
+  "operator_probe_observations": [
+    {
+      "seq": 1,
+      "at": 1792370993.648161,
+      "kind": "rpc_server_discover",
+      "reason": null
+    },
+    {
+      "seq": 2,
+      "at": 1792370993.650941,
+      "kind": "rpc_events_list",
+      "reason": null
+    }
+  ],
+  "operator_probe_warning": "These discovery observations originate from the explicitly labelled operator probe, not a claimed ChatGPT rescan.",
+  "pending_task": "chat-events-receipt-20261019-01",
+  "task_submitted": false,
+  "host_action": "https://chatgpt.com/plugins \u2192 existing KiraBridge \u2192 Refresh; then same original Work/Cloud chat subscribes",
+  "available_platform_tools": "permission read/update/search/suggest/uninstall; no rescan, no host events/subscribe or chat injection tool",
+  "callback_allowlist": [],
+  "simulated_callbacks_in_activation_phase": false,
+  "backup": "/Users/landjunge/.config/kirabridge/chat-events-prepared-20261019/activation-20261019-01",
+  "preserved_tables": [
+    "tasks",
+    "events",
+    "approvals",
+    "conversations",
+    "messages",
+    "message_jobs",
+    "message_events",
+    "handoff_bindings",
+    "message_completion_routes",
+    "completion_routes",
+    "completion_notices"
+  ],
+  "audit_prefix_unchanged": true,
+  "config_unchanged": true,
+  "last_checked_at": 1792371157.127041
+}

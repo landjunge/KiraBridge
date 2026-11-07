@@ -1,0 +1,65 @@
+{
+  "origin": "ACTUAL CONNECTED APP; REAL NEW TERMINAL TASK",
+  "compatibility_parameter": {
+    "completion_subscription": ""
+  },
+  "subscription_created": false,
+  "response": {
+    "content": [
+      {
+        "type": "text",
+        "text": "{\n  \"api_version\": \"1\",\n  \"id\": \"bridge-recovery-app-20261019-02\",\n  \"principal\": \"chatgpt\",\n  \"operation\": \"terminal.execute\",\n  \"args\": {\n    \"argv\": [\n      \"/Users/landjunge/KiraBridge/.venv/bin/python3\",\n      \"-c\",\n      \"print('KIRABRIDGE_RECOVERY_APP_OK')\"\n    ],\n    \"cwd\": \"/Users/landjunge/KiraBridge/examples/chat-events/final-receipt\",\n    \"timeout\": 5\n  },\n  \"agent\": null,\n  \"parent_id\": null,\n  \"state\": \"completed\",\n  \"created\": 1792373446.858739,\n  \"updated\": 1792373447.257727,\n  \"accepted\": 1792373446.876759,\n  \"started\": 1792373447.0945978,\n  \"finished\": 1792373447.257727,\n  \"receipt\": \"dced85f9-c5b6-4b47-b3a8-9f0f46577b94\",\n  \"evidence\": {\n    \"exit_code\": 0,\n    \"pid\": 89225,\n    \"terminated\": false,\n    \"timed_out\": false\n  },\n  \"result\": {\n    \"evidence\": {\n      \"exit_code\": 0,\n      \"pid\": 89225,\n      \"terminated\": false,\n      \"timed_out\": false\n    },\n    \"exit_code\": 0,\n    \"output_bytes\": 27,\n    \"pid\": 89225,\n    \"stderr\": \"\",\n    \"stdout\": \"KIRABRIDGE_RECOVERY_APP_OK\\n\",\n    \"success\": true,\n    \"terminated\": false,\n    \"timed_out\": false,\n    \"truncated\": false\n  },\n  \"error\": null,\n  \"attempt\": 1\n}"
+      }
+    ],
+    "structuredContent": {
+      "api_version": "1",
+      "id": "bridge-recovery-app-20261019-02",
+      "principal": "chatgpt",
+      "operation": "terminal.execute",
+      "args": {
+        "argv": [
+          "/Users/landjunge/KiraBridge/.venv/bin/python3",
+          "-c",
+          "print('KIRABRIDGE_RECOVERY_APP_OK')"
+        ],
+        "cwd": "/Users/landjunge/KiraBridge/examples/chat-events/final-receipt",
+        "timeout": 5
+      },
+      "agent": null,
+      "parent_id": null,
+      "state": "completed",
+      "created": 1792373446.858739,
+      "updated": 1792373447.257727,
+      "accepted": 1792373446.876759,
+      "started": 1792373447.0945978,
+      "finished": 1792373447.257727,
+      "receipt": "dced85f9-c5b6-4b47-b3a8-9f0f46577b94",
+      "evidence": {
+        "exit_code": 0,
+        "pid": 89225,
+        "terminated": false,
+        "timed_out": false
+      },
+      "result": {
+        "evidence": {
+          "exit_code": 0,
+          "pid": 89225,
+          "terminated": false,
+          "timed_out": false
+        },
+        "exit_code": 0,
+        "output_bytes": 27,
+        "pid": 89225,
+        "stderr": "",
+        "stdout": "KIRABRIDGE_RECOVERY_APP_OK\n",
+        "success": true,
+        "terminated": false,
+        "timed_out": false,
+        "truncated": false
+      },
+      "error": null,
+      "attempt": 1
+    },
+    "isError": false
+  }
+}
