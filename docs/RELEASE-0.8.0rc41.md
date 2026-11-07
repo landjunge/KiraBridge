@@ -3,6 +3,19 @@
 DEBIAN-DIRK-RELEASE-20261107. Separate Linux x86_64 prerelease
 `linux-v0.8.0rc41`; the macOS desktop download remains separate.
 
+Published November 7, 2026: [release and evidence assets](https://github.com/landjunge/KiraBridge/releases/tag/linux-v0.8.0rc41).
+Source `350d36854fc9dd37725d7c00a91b72cd1bd32b15`, integrated by
+[PR72](https://github.com/landjunge/KiraBridge/pull/72) as `2bbf6d9`.
+Archive SHA-256: `1b851236bd603fcfaf5984c075be08b52b81b9cdbc4b93ff08d1001ae3a9d41f`.
+All 40 initial release assets were actually downloaded again from GitHub and compared
+byte for byte; all 1,271 manifest file digests passed. [Final delivery report](evidence/debian-dirktest-release-20261107.json).
+
+Native Debian 13.6/systemd 257 acceptance: 25 cases on source `428271a`, with identical
+runtime, installer, lock and guide bytes in the final archive; five additional native
+cases directly accepted the exact `350d368` archive. CI [42374701083](https://github.com/landjunge/KiraBridge/actions/runs/42374701083)
+passed on Python 3.11 and 3.13 (each 5,009 passed, 254 skipped, four subtests;
+29 remote tests with zero skips). Skips are not native acceptance.
+
 - Debian 13 host support added to the existing user-level installer; Ubuntu
   24.04 remains accepted. Explicit isolated destination paths and fresh-config
   port selection are supported.

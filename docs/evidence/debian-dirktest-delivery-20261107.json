@@ -5,7 +5,7 @@
       "name": "final-package-integrity",
       "result": "passed",
       "detail": {
-        "files": 1239,
+        "files": 1271,
         "all_sha256_match": true
       }
     },
@@ -20,16 +20,16 @@
       "detail": {
         "version": "0.8.0rc41",
         "runtime": {
-          "instance_id": "0f5d01538eed420b926b9489d5f26429",
+          "instance_id": "a77cf2ba8e134b80af409918ded2db86",
           "version": "0.8.0rc41",
-          "pid": 1413592,
-          "started_at": "2026-11-07T11:28:17.287902+00:00",
-          "config_path": "/home/daniel/kb-debian-dirktest-20261107-delivery%dirk/config/config.toml",
-          "config_sha256": "a0bb373599f1ece680fb4e10446650b7dbcae5ed47e061fc644a4f715a1c6bb9",
-          "effective_config_sha256": "682563c570d1673e5f8a23de4df6a05a089e85419a73b66d7bb1d083cbb459a6",
-          "source_tree_sha256": "67e51942ec92ee68b663b53143b70f0ecd3f38e807ba54372e861766c06b3ada",
+          "pid": 1529948,
+          "started_at": "2026-11-07T13:00:12.170218+00:00",
+          "config_path": "/home/daniel/kb-debian-dirktest-20261107-delivery-final%$dirk/config/config.toml",
+          "config_sha256": "736024abc78bb1706b0123f8542eea66928a146c591164ebd91486927edddde7",
+          "effective_config_sha256": "eeefcff8b9644aa76a3c821cc8fe19ace4f61346dba438b89c27cb160e8b1ee0",
+          "source_tree_sha256": "e759610739ba65abc13668ebea9ce7b76321f5c84305b0d04de0d2959b91d561",
           "source_file_count": 214,
-          "source_package_path": "/home/daniel/kb-debian-dirktest-20261107-delivery%dirk/candidate-runtime/src/kirabridge",
+          "source_package_path": "/home/daniel/kb-debian-dirktest-20261107-delivery-final%$dirk/candidate-runtime/src/kirabridge",
           "source_scope": "package Python files observed at startup; no remote attestation"
         },
         "server": {
@@ -60,21 +60,22 @@
       "detail": null
     }
   ],
-  "archive_sha256": "73be73c5ea63d31ee9be300ca0d503cab27118bf7bc5411af0423cf499d8a9ef",
-  "harness_sha256": "5d2d5f2f0a88dde5725685110a108c926d0df7d98b716f4d85da96afbbb30767",
-  "delivery_smoke_sha256": "93263b060239b5c733bb883b62fadd596985a9331fc80a59e09d28b712225926",
-  "source_commit": "08ee2806c67b151733194520eed8775c4b480444",
+  "archive_sha256": "1b851236bd603fcfaf5984c075be08b52b81b9cdbc4b93ff08d1001ae3a9d41f",
+  "harness_sha256": "6b10a4fd1a5b3dfba282a010358e98e6ca24ca4cb28fb228ca09469fd65c842a",
+  "delivery_smoke_sha256": "446659b94c3daeccd28ab81ddfa4c2f031f9e43a44129c597efbb7a82761aad4",
+  "source_commit": "350d36854fc9dd37725d7c00a91b72cd1bd32b15",
   "version": "0.8.0rc41",
   "artifacts": {
-    "KiraBridge-0.8.0rc41-Linux-x86_64-release.tar.gz": {
-      "source_commit": "08ee2806c67b151733194520eed8775c4b480444",
-      "sha256": "73be73c5ea63d31ee9be300ca0d503cab27118bf7bc5411af0423cf499d8a9ef"
+    "KiraBridge-0.8.0rc41-Linux-x86_64-final-delivery.tar.gz": {
+      "source_commit": "350d36854fc9dd37725d7c00a91b72cd1bd32b15",
+      "sha256": "1b851236bd603fcfaf5984c075be08b52b81b9cdbc4b93ff08d1001ae3a9d41f"
     }
   },
+  "selected_environment_loaded": true,
   "cleanup": {
     "unit_absent": true,
     "systemd": "MainPID=0\nLoadState=not-found\nActiveState=inactive\n",
     "port_unbound": true
   },
-  "log_sha256": "2243f1171641333a6c7e1ebcb5e776a3a2dda2d40dc0696b0e76739dc21ef668"
+  "log_sha256": "4f32ab0ff58f88b8cdf82a647457401685dad34ac0e7f02e953a16665cc6367a"
 }

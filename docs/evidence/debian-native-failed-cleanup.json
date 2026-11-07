@@ -1,0 +1,107 @@
+{
+  "result": "passed",
+  "utility_sha256": "daae16b19dd4c325158fc2aaa6c25b57168e7a167c926f6f18c98f1de9d2396e",
+  "steps": [
+    {
+      "name": "cleanup-clears-only-owned-failed-unit",
+      "result": "passed",
+      "detail": null
+    }
+  ],
+  "harness_sha256": "bb9bcf6c873d56dfb24e1652b6a05e9b2808e96279420365d325bb266d8ad8c6",
+  "cleanup": {
+    "unit_absent": true,
+    "systemd": "MainPID=0\nLoadState=not-found\nActiveState=inactive\n",
+    "port_unbound": true
+  },
+  "commands": [
+    {
+      "argv": [
+        "systemctl",
+        "--user",
+        "daemon-reload"
+      ],
+      "returncode": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "systemctl",
+        "--user",
+        "show",
+        "kirabridge-debian-dirktest-20261107.service",
+        "-p",
+        "ActiveState"
+      ],
+      "returncode": 0,
+      "stdout": "ActiveState=failed\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "systemctl",
+        "--user",
+        "daemon-reload"
+      ],
+      "returncode": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "systemctl",
+        "--user",
+        "daemon-reload"
+      ],
+      "returncode": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "systemctl",
+        "--user",
+        "show",
+        "kirabridge-debian-dirktest-20261107.service",
+        "-p",
+        "LoadState",
+        "-p",
+        "ActiveState",
+        "-p",
+        "MainPID"
+      ],
+      "returncode": 0,
+      "stdout": "MainPID=0\nLoadState=not-found\nActiveState=failed\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "systemctl",
+        "--user",
+        "reset-failed",
+        "kirabridge-debian-dirktest-20261107.service"
+      ],
+      "returncode": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "systemctl",
+        "--user",
+        "show",
+        "kirabridge-debian-dirktest-20261107.service",
+        "-p",
+        "LoadState",
+        "-p",
+        "ActiveState",
+        "-p",
+        "MainPID"
+      ],
+      "returncode": 0,
+      "stdout": "MainPID=0\nLoadState=not-found\nActiveState=inactive\n",
+      "stderr": ""
+    }
+  ]
+}
