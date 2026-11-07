@@ -36,15 +36,17 @@ ChatGPT connection test with your account remain yours to complete.
 [Evidence and limits](docs/WINDOWS-SETUP-20261104.md) ·
 [Setup guide, German](docs/WINDOWS-SETUP.md).
 
-**Reviewed repository implementation: 0.8.0rc41 server source `350d368`; the local Intel runtime remains RC40 at `d12838a`.**
+**Reviewed repository implementation: 0.8.0rc41 at `a81cd1052e2a472eeae4ac388cb8c89e10af4c1d`.**
+This tip includes the integrated Windows standalone source and is newer than the published Linux package source `350d368`.
+The installed Intel package, read again on 2026-11-07 from its `release.json` and package version, remains 0.8.0rc40 at `d12838a`.
 The published Intel download above remains RC36 at `d4aebdd`.
 [Release, artifact and installed-source evidence](docs/evidence/readme-current-20261107.json).
 The [earlier PR61 installation report](docs/RC40-PR61-SHIM-INSTALL-20261106.md)
 describes the previous RC40 source `a5d381a`.
 
-Windows feature parity and a standalone installer remain development work. The published Windows preview does not include general
-file, process or terminal tools, or Windows service installation. No new package
-for those ongoing projects or published RC40 download is offered here.
+The standalone installer source is integrated ([Windows standalone package](docs/WINDOWS-STANDALONE-20261107.md)); no standalone ZIP or newer Windows package is published.
+Windows feature parity with the Intel app remains open. The published Windows preview does not include general
+file, process or terminal tools, or Windows service installation. No published RC40 download is offered here.
 
 
 ## What KiraBridge helps you do

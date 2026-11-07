@@ -35,16 +35,18 @@ Alle sieben nativen Prüfphasen dieser begrenzten Entwicklungsvorschau bestanden
 ChatGPT-Verbindungstest mit deinem Konto bleiben bei dir.
 [Prüfstand und Grenzen](docs/WINDOWS-SETUP-20261104.md) · [Anleitung](docs/WINDOWS-SETUP.md).
 
-**Geprüfter Repository-Programmstand: Serverquelle 0.8.0rc41 bei `350d368`; die lokale Intel-Laufzeit bleibt RC40 bei `d12838a`.**
+**Geprüfter Repository-Programmstand: 0.8.0rc41 bei `a81cd1052e2a472eeae4ac388cb8c89e10af4c1d`.**
+Dieser Stand enthält die integrierte Windows-Standalone-Quelle und ist neuer als die veröffentlichte Linux-Paketquelle `350d368`.
+Die installierte Intel-Laufzeit, am 2026-11-07 erneut aus `release.json` und der Paketversion gelesen, bleibt 0.8.0rc40 bei `d12838a`.
 Der veröffentlichte Intel-Download oben bleibt RC36 bei `d4aebdd`.
 [Release-, Artefakt- und Installationsquellnachweis](docs/evidence/readme-current-20261107.json).
 Der [frühere PR61-Installationsbericht](docs/RC40-PR61-SHIM-INSTALL-20261106.md)
 beschreibt den vorherigen RC40-Quellstand `a5d381a`.
 
-Windows-Funktionsgleichstand und eigenständiger Installer bleiben Entwicklungsarbeit. Die veröffentlichte Windows-Vorschau
+Die Standalone-Installer-Quelle ist integriert ([eigenständiges Windowspaket](docs/WINDOWS-STANDALONE-20261107.md)); ein Standalone-ZIP oder neueres Windowspaket ist nicht veröffentlicht.
+Der Windows-Funktionsgleichstand mit der Intel-App bleibt offen. Die veröffentlichte Windows-Vorschau
 enthält keine allgemeinen Datei-, Prozess- oder Terminaltools und keine
-Windows-Dienstinstallation. Hier wird kein neues Paket dieser laufenden Projekte
-und kein veröffentlichter RC40-Download angeboten.
+Windows-Dienstinstallation. Hier wird kein veröffentlichter RC40-Download angeboten.
 
 ## Wobei KiraBridge dir hilft
 

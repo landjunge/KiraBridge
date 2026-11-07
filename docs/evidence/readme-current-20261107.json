@@ -1,11 +1,16 @@
 {
   "schema": "kirabridge.readme-current.v1",
-  "task_id": "KB-README-CURRENT-CODEX-20261107",
-  "instance": "codex-current-readme-20261107",
-  "recorded_at": "2026-11-07T13:48:10.379928+00:00",
-  "status": "verified_delivery_snapshot_before_final_documentation_PR",
+  "task_id": "KB-README-CURRENT-GROK-20261107",
+  "instance": "grok-readme-current-20261107",
+  "recorded_at": "2026-11-07T17:16:45.303146+00:00",
+  "status": "verified_readme_pin_20261107",
   "scope": {
     "written_files": [
+      "README.md",
+      "README.de.md",
+      "docs/evidence/readme-current-20261107.json"
+    ],
+    "prior_snapshot_written_files": [
       "README.md",
       "README.de.md",
       "docs/DEVELOPERS.md",
@@ -29,29 +34,31 @@
     "thread_id": "01a1b598-5c1f-7b63-bc92-b96141bf38a6",
     "model": "gpt-6.1-sol",
     "effort": "high",
-    "proof": "native turn_context model, effort and collaboration_mode.settings.reasoning_effort; no global defaults changed"
+    "proof": "native turn_context model, effort and collaboration_mode.settings.reasoning_effort; no global defaults changed",
+    "applies_to": "prior Codex snapshot, not the 2026-11-07 Grok readme pin"
   },
   "repository": {
     "origin": "https://github.com/landjunge/KiraBridge.git",
     "private": true,
-    "worktree": "/Users/landjunge/KiraBridge-worktrees/current-readme-codex-20261107",
-    "branch": "docs/current-repository-readme-20261107",
-    "baseline": "d12838ae97c7efcc053c45c3bc9fba5e78f5fe5d",
-    "remote_main_observed": "d12838ae97c7efcc053c45c3bc9fba5e78f5fe5d",
-    "remote_verification": "git ls-remote origin refs/heads/main and GitHub branches/main API before editing; refresh required before integration",
-    "source_version": "0.8.0rc40",
+    "worktree": "/Users/landjunge/KiraBridge-worktrees/readme-current-grok-20261107",
+    "branch": "docs/readme-current-20261107",
+    "baseline": "a81cd1052e2a472eeae4ac388cb8c89e10af4c1d",
+    "remote_main_observed": "a81cd1052e2a472eeae4ac388cb8c89e10af4c1d",
+    "remote_verification": "git fetch origin; git rev-parse origin/main on 2026-11-07 before this documentation edit",
+    "source_version": "0.8.0rc41",
     "version_sources": [
       "pyproject.toml",
-      "uv.lock",
       "src/kirabridge/__init__.py"
     ],
     "manifest_sha256": "3cc7c44f21085b00f44b6d6fbaa88f3fb01655b9cce7cdcf84a330c5efcc8e5e",
     "lock_sha256": "5886e096d27acc803c7d25f2889ecd10387df7494b49ed11dc0a18998c550eb6",
     "remote_main_before_integration": "d12838ae97c7efcc053c45c3bc9fba5e78f5fe5d",
     "remote_main_before_integration_observed_at": "2026-11-07T10:54:19.747960+00:00",
-    "latest_reviewed_main": "2bbf6d9dc628cdf95e5591df7968f761f938883c",
+    "latest_reviewed_main": "a81cd1052e2a472eeae4ac388cb8c89e10af4c1d",
     "integrated_source_version": "0.8.0rc41",
-    "original_baseline_preserved": "d12838ae97c7efcc053c45c3bc9fba5e78f5fe5d"
+    "original_baseline_preserved": "d12838ae97c7efcc053c45c3bc9fba5e78f5fe5d",
+    "previous_snapshot_source_version": "0.8.0rc40",
+    "previous_snapshot_baseline": "d12838ae97c7efcc053c45c3bc9fba5e78f5fe5d"
   },
   "original_errors": [
     {
@@ -172,13 +179,13 @@
       "windows-v0.8.0rc37.dev1": "0a2f7cb8cf84d47462a094917241950a152fe364"
     },
     "tag_ref_verification": "GitHub git/ref/tags endpoint returned commit type and same full source SHA; tag/target_commitish alone is not artifact proof",
-    "linux_limit": "Current Linux RC41 is published and independently downloaded/hash/source/native-proof verified; only its stated Debian13.6 acceptance is claimed. Ubuntu, productive installation and platform parity remain separate.",
+    "linux_limit": "linux-v0.8.0rc41 still exists, published 2026-11-07T13:19:39Z from 350d368. This check confirmed the release and asset names through the GitHub API and did not download the archive again.",
     "historical_initial_snapshot": {
       "release_count": 30,
       "linux_limit": "Only published Linux named artifacts observed in older 0.7.0rc1/rc2 releases. These do not establish acceptance of the ongoing current Linux/Debian server; no current Linux download promoted.",
       "scope": "Original pre-server-release query retained; superseded by the current final_verified_server_delivery and current index below."
     },
-    "index_refreshed_at": "2026-11-07T13:37:32.516595+00:00",
+    "index_refreshed_at": "2026-11-07T17:16:45.303146+00:00",
     "latest_linux": {
       "tag": "linux-v0.8.0rc41",
       "published_at": "2026-11-07T13:19:39Z",
@@ -190,7 +197,7 @@
       },
       "release_url": "https://github.com/landjunge/KiraBridge/releases/tag/linux-v0.8.0rc41"
     },
-    "windows_current_limit": "No new published Windows standalone40 binary release observed in current authenticated release index; older setup37preview is a separate artifact."
+    "windows_current_limit": "Release index rechecked 2026-11-07. Newest published Windows release remains windows-v0.8.0rc37.dev1. No standalone ZIP asset is published. Integrated standalone source at a81cd10 is repository source only."
   },
   "artifact_verification": {
     "intel_installer": {
@@ -774,7 +781,7 @@
   },
   "remaining_limits": [
     "This is a factual delivery snapshot before the final documentation PR. Its future required CI/merge is not predeclared passed. PR73 remains Draft/deferred; later browser proof is distinct from native installed acceptance, and cancelled initial check is not passed.",
-    "Current Windows standalone source fixes f1dbce2 await exact new native package/current CI/main receipts; full macOS parity and a newly published Windows binary are not inferred. Linux350/RC41 is already accepted and published; productive deployment is a separate user-assigned Luna task. Audit remains incomplete and design PR73 remains deferred.",
+    "Windows standalone source is integrated at a81cd1052e2a472eeae4ac388cb8c89e10af4c1d. No new Windows standalone ZIP or installer is published. Linux linux-v0.8.0rc41 remains the published Debian package from 350d368. Productive deployment, macOS parity and website TLS remain separate.",
     "Apple Silicon and other OS/native/provider acceptance not performed here.",
     "Website TLS/content could not be verified.",
     "ThreadDesk/report/design messaging writes blocked by current tool/sandbox permissions; no save/readback claimed.",
@@ -1331,5 +1338,107 @@
     "README_resolution": "Preserve current source/main/download distinctions, one consolidated server section, both owner install/update/rollback examples and native-evidence plus per-archive checksum links; original artwork/language switches retained. No owner evidence bytes edited.",
     "coordination_comment": "https://github.com/landjunge/KiraBridge/pull/75#issuecomment-6707710425",
     "independent_merge_review": "passed; no P1/P2; archive root/checksum/EN language flag/DE default/update+rollback targets and original artwork/language switch verified read-only"
+  },
+  "prior_snapshot": {
+    "status": "verified_delivery_snapshot_before_final_documentation_PR",
+    "recorded_at": "2026-11-07T13:48:10.379928+00:00",
+    "source_version": "0.8.0rc40",
+    "baseline": "d12838ae97c7efcc053c45c3bc9fba5e78f5fe5d",
+    "note": "Earlier Codex snapshot retained below. current_pin supersedes its source, runtime and published-release claims."
+  },
+  "current_pin": {
+    "schema": "kirabridge.readme-current-pin.v1",
+    "recorded_at": "2026-11-07T17:16:45.303146+00:00",
+    "commands": [
+      "git fetch origin",
+      "git rev-parse origin/main",
+      "git show origin/main:pyproject.toml",
+      "git show origin/main:src/kirabridge/__init__.py",
+      "gh release list -R landjunge/KiraBridge --limit 40",
+      "gh release view v0.8.0rc36 -R landjunge/KiraBridge",
+      "gh release view windows-v0.8.0rc37.dev1 -R landjunge/KiraBridge",
+      "gh release view linux-v0.8.0rc41 -R landjunge/KiraBridge",
+      "gh api repos/landjunge/KiraBridge/releases?per_page=100 asset names only",
+      "read installed release.json version/commit and package __init__.py __version__"
+    ],
+    "downloads_not_fetched": "No release ZIP or tar.gz was downloaded. Asset digests below are GitHub API digest fields, not newly computed local hashes.",
+    "source": {
+      "commit": "a81cd1052e2a472eeae4ac388cb8c89e10af4c1d",
+      "subject": "Merge pull request #74 from landjunge/fix/windows-standalone-integrated-20261107",
+      "version": "0.8.0rc41",
+      "pyproject_version": "0.8.0rc41",
+      "package_version": "0.8.0rc41",
+      "pyproject_sha256": "8539d476d2184132d080bb1f685ae70274fc047479e1bb13c40fecc45d380359",
+      "init_sha256": "67098769a43f03cac45369505d07a3ec45d34a6af68688ec78ffa5381801d5b0",
+      "commits_after_linux_package_source_350d368": 40,
+      "windows_standalone_source_integrated": true,
+      "windows_standalone_doc": "docs/WINDOWS-STANDALONE-20261107.md",
+      "windows_standalone_builder": "scripts/build_windows_standalone.py",
+      "published_windows_standalone_zip": false
+    },
+    "published": {
+      "latest_intel": {
+        "tag": "v0.8.0rc36",
+        "name": "KiraBridge 0.8.0rc36 · Reliable creation with minimized Terminal windows",
+        "draft": false,
+        "prerelease": true,
+        "published_at": "2026-11-04T16:10:56Z",
+        "target_commitish": "d4aebdd89a206045731f2692a3f363fddaa15ee0",
+        "primary_asset": "KiraBridge-0.8.0rc36-Intel-Installer.zip",
+        "primary_asset_api_digest": "sha256:35540760776e065a4c0cfddf95ca6f8fe5e2d90d2f9e58489ea4d04edd212dca",
+        "checksum_asset": "SHA256SUMS"
+      },
+      "latest_windows": {
+        "tag": "windows-v0.8.0rc37.dev1",
+        "name": "KiraBridge Windows – Einrichtungsassistent 0.8.0rc37.dev1",
+        "draft": false,
+        "prerelease": true,
+        "published_at": "2026-11-04T20:36:17Z",
+        "target_commitish": "0a2f7cb8cf84d47462a094917241950a152fe364",
+        "primary_asset": "KiraBridge-0.8.0rc37.dev1-Windows-Dev-Kit.zip",
+        "primary_asset_api_digest": "sha256:a21a214c77d21fec0e11a166147fc14dcb1d6dd88adc0fb2d45501ec8748772f",
+        "standalone_zip_published": false,
+        "older_unrelated_windows_setup": {
+          "tag": "v0.8.0rc33",
+          "asset": "KiraBridge-0.8.0rc33-Windows-x64-Setup.exe",
+          "note": "Older published setup executable. Not the integrated standalone source at a81cd10."
+        }
+      },
+      "latest_linux": {
+        "tag": "linux-v0.8.0rc41",
+        "name": "KiraBridge Debian/Linux RC41 · Dirk test release",
+        "draft": false,
+        "prerelease": true,
+        "published_at": "2026-11-07T13:19:39Z",
+        "target_commitish": "350d36854fc9dd37725d7c00a91b72cd1bd32b15",
+        "release_exists": true,
+        "archive": "KiraBridge-0.8.0rc41-Linux-x86_64.tar.gz",
+        "archive_api_digest": "sha256:1b851236bd603fcfaf5984c075be08b52b81b9cdbc4b93ff08d1001ae3a9d41f",
+        "checksum_asset": "SHA256SUMS",
+        "archive_sha256_asset": "KiraBridge-0.8.0rc41-Linux-x86_64.tar.gz.sha256"
+      }
+    },
+    "installed_intel_runtime": {
+      "rechecked": true,
+      "updated_by_this_task": false,
+      "version": "0.8.0rc40",
+      "commit": "d12838ae97c7efcc053c45c3bc9fba5e78f5fe5d",
+      "receipt": "~/.local/share/kirabridge/install/current.json",
+      "receipt_top_level_version": "0.8.0rc40",
+      "receipt_top_level_commit": "d12838ae97c7efcc053c45c3bc9fba5e78f5fe5d",
+      "release_json": "~/.local/share/kirabridge/install/releases/0.8.0rc40-d12838ae97c7/release.json",
+      "release_json_version": "0.8.0rc40",
+      "release_json_source_commit": "d12838ae97c7efcc053c45c3bc9fba5e78f5fe5d",
+      "package_init": "~/.local/share/kirabridge/install/releases/0.8.0rc40-d12838ae97c7/source/.venv/lib/python3.11/site-packages/kirabridge/__init__.py",
+      "package_version": "0.8.0rc40"
+    },
+    "website": {
+      "url": "https://kirabridge.netzwerkpunkt.de/",
+      "checked_at": "2026-11-07T17:16:45.303146+00:00",
+      "https_result": "TLS certificate subject does not match kirabridge.netzwerkpunkt.de",
+      "http_result": "301",
+      "deployed": false,
+      "followup": "Certificate name and any public version or download text remain an open website follow-up. No deployment was performed."
+    }
   }
 }
