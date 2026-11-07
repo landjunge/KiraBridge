@@ -8,6 +8,7 @@ import time
 
 from kirabridge.bridge_core.models import BridgeError
 from kirabridge.platform_adapters import reap_process
+from kirabridge.timing import timed_async
 
 DESKTOP_MESSAGES = {
     "desktop_locked": "Der Mac ist gesperrt. Bitte die bestehende Benutzersitzung entsperren. "
@@ -39,6 +40,7 @@ class MacDesktop:
     def __init__(self):
         self.last = {"state": "not_probed", "observed_at": None}
 
+    @timed_async("ioreg_probe")
     async def probe(self):
         if sys.platform != "darwin":
             self.last = {"state": "not_applicable", "observed_at": time.time()}

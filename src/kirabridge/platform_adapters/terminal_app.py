@@ -15,6 +15,7 @@ from kirabridge.bridge_core.models import BridgeError, UncertainExecution
 from kirabridge.platform_adapters import reap_process
 from kirabridge.platform_adapters.clipboard_lease import clipboard_lease
 from kirabridge.platform_adapters.desktop import MacDesktop
+from kirabridge.timing import timed, timed_async
 
 
 def _process_observation_timeout(phase):
@@ -140,6 +141,7 @@ class TerminalAppTransport:
     def available(self):
         return sys.platform == "darwin"
 
+    @timed_async("terminal_native")
     async def native(self, source, *, mutation=False):
         if sys.platform != "darwin":
             raise BridgeError("session_transport_unavailable", "Terminal.app requires macOS")
@@ -249,6 +251,7 @@ class TerminalAppTransport:
                         "visible_absence_unproven", "PID observation cleanup unconfirmed"
                     ) from None
 
+    @timed_async("terminal_catalog")
     async def catalog(self):
         if sys.platform != "darwin":
             return []
@@ -273,20 +276,21 @@ class TerminalAppTransport:
                 if int(row.get("window_id") or 0) in ended:
                     row["ended"] = True
             rows = attach_visual_windows(rows)
-        child = await asyncio.create_subprocess_exec(
-            "/bin/ps",
-            "-axo",
-            "uid=,pid=,ppid=,tty=,comm=",
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.DEVNULL,
-        )
-        try:
-            async with asyncio.timeout(3):
-                output, _ = await child.communicate()
-        except TimeoutError:
-            raise _process_observation_timeout("native_process_catalog") from None
-        finally:
-            await reap_process(child, process_group=False)
+        with timed("ps_catalog"):
+            child = await asyncio.create_subprocess_exec(
+                "/bin/ps",
+                "-axo",
+                "uid=,pid=,ppid=,tty=,comm=",
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.DEVNULL,
+            )
+            try:
+                async with asyncio.timeout(3):
+                    output, _ = await child.communicate()
+            except TimeoutError:
+                raise _process_observation_timeout("native_process_catalog") from None
+            finally:
+                await reap_process(child, process_group=False)
         processes = _parse_process_catalog(output, child.returncode)
         processes_by_tty = {}
         for owner, pid, parent, tty, comm in processes:

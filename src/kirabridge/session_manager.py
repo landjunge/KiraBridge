@@ -20,6 +20,7 @@ from kirabridge.platform_adapters.terminal_app import TerminalAppTransport
 from kirabridge.platform_adapters.tmux import TmuxTransport
 from kirabridge.session_ports import SessionPorts, SessionTransport, TerminalAppPort
 from kirabridge.terminal_manager import check_executable
+from kirabridge.timing import timed_async
 
 
 class SessionReference(Input):
@@ -130,6 +131,7 @@ class SessionManager:
     def transport(self, pane_id):
         return self.terminal_app if pane_id.startswith("terminal:") else self.tmux
 
+    @timed_async("session_catalog")
     async def catalog(self, principal, *, transport=None):
         """Discover both transports, or observe only an explicitly selected one."""
         self.authorization.principal(principal, "session.inspect")
@@ -661,6 +663,7 @@ class SessionManager:
             ),
         }
 
+    @timed_async("session_selected")
     async def selected(self, principal, pane_id, expected_pid):
         transport = "terminal_app" if pane_id.startswith("terminal:") else "tmux"
         catalog = await self.catalog(principal, transport=transport)
