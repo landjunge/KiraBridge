@@ -840,7 +840,7 @@ def fresh_config(args, release):
     text = (
         f"data_dir = {json.dumps(str(data))}\n"
         f"credentials_file = {json.dumps(str(credentials))}\n"
-        'host = "127.0.0.1"\nport = 8765\nallow_remote = false\n'
+        'host = "127.0.0.1"\n' + f"port = {getattr(args, 'port', 8765)}\nallow_remote = false\n"
     )
     full = args.full_access
     workspace = getattr(args, "workspace", Path.home() / "workspace/KiraBridge").resolve()
@@ -1397,6 +1397,10 @@ def rollback(args, *, _compensating=False):
             require_visible_terminal(args)
         if not active.get("rollback_core_restored"):
             stop_service(args)
+            if args.service == "systemd-user" and not active["had_plist"]:
+                result = _systemctl(args, "disable", "--", args.plist.name)
+                if result.returncode:
+                    raise RuntimeError("Cannot disable owned new user unit; recovery retained")
             for path, flag, name in [
                 (args.launcher, "had_wrapper", "launcher.before"),
                 (args.plist, "had_plist", "service.before.plist"),
@@ -1418,6 +1422,9 @@ def rollback(args, *, _compensating=False):
                 )
                 jwrite(backup / "transaction.json", active)
                 jwrite(current, active)
+    if args.service == "systemd-user":
+        if _systemctl(args, "daemon-reload").returncode:
+            raise RuntimeError("Cannot reload user manager after rollback; recovery retained")
     if active["was_loaded"] and (not core_already_restored or not loaded(args)):
         start_service(args)
     if active.get("desktop"):
@@ -1476,6 +1483,7 @@ def _main():
         help="Already prepared Linux source runtime; skips download and uv sync",
     )
     parser.add_argument("--workspace", type=Path, default=Path.home() / "workspace/KiraBridge")
+    parser.add_argument("--port", type=int, default=8765, help="Fresh config only; loopback port")
     parser.add_argument(
         "--prefix", type=Path, default=Path.home() / ".local/share/kirabridge/install"
     )
@@ -1515,6 +1523,8 @@ def _main():
         help="Upgrade the matched desktop app, console and linked ChatGPT service transactionally",
     )
     args = parser.parse_args()
+    if not 1 <= args.port <= 65535:
+        parser.error("--port must be between 1 and 65535")
     if args.service == "systemd-user" and args.require_visible_terminal:
         parser.error("Linux server installation does not use a macOS Terminal window")
     if args.plist is None:

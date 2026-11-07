@@ -38,6 +38,14 @@ ChatGPT connection test with your account remain yours to complete.
 
 **Current integrated source and local Intel installation: RC40.** [Merge, CI, native package, installation and live evidence](docs/RC40-PR61-SHIM-INSTALL-20261106.md). The published download above remains RC36; no public RC40 download is claimed.
 
+
+**Debian/Linux server test package:** [RC41 prerelease](https://github.com/landjunge/KiraBridge/releases/tag/linux-v0.8.0rc41),
+with a user-level systemd installer for Debian 13 / Ubuntu 24.04 x86_64.
+HTTP MCP, bearer authentication, health, update and rollback are its scope;
+macOS GUI and native keyboard are unavailable. This is an online installer.
+[Install/update guide and native evidence](docs/INSTALL-LINUX-SERVER.md).
+Repository access is required; release evidence states the accepted native host.
+
 ## What KiraBridge helps you do
 
 - **Work on local projects:** let your connected AI read project files and logs,

@@ -40,6 +40,27 @@ def test_linux_unit_quotes_server_command_and_keeps_secrets_optional():
     assert "WantedBy=default.target\n" in body
 
 
+def test_fresh_server_config_uses_isolated_port_and_preserves_existing(tmp_path, monkeypatch):
+    installer = installer_module()
+    monkeypatch.setattr(installer, "run", lambda *a, **k: b"[]")
+    args = SimpleNamespace(
+        config=tmp_path / "config/config.toml",
+        prefix=tmp_path / "install",
+        workspace=tmp_path / "workspace",
+        full_access=False,
+        port=18765,
+    )
+    installer.fresh_config(args, tmp_path / "release")
+    original = args.config.read_bytes()
+    assert b"port = 18765\n" in original
+    credentials = args.config.parent / "credentials.json"
+    credentials_before = credentials.read_bytes()
+    args.port = 28765
+    installer.fresh_config(args, tmp_path / "another-release")
+    assert args.config.read_bytes() == original
+    assert credentials.read_bytes() == credentials_before
+
+
 def test_linux_server_facts_do_not_claim_desktop(monkeypatch):
     monkeypatch.delenv("WAYLAND_DISPLAY", raising=False)
 
@@ -153,9 +174,7 @@ def test_update_and_rollback_keep_config_credentials_and_unknowns(tmp_path, monk
     old_unit = unit.read_bytes()
     release = prefix / "releases/new"
     release.mkdir(parents=True)
-    (release / "release.json").write_text(
-        json.dumps({"version": "0.8.0rc40", "commit": "b" * 40})
-    )
+    (release / "release.json").write_text(json.dumps({"version": "0.8.0rc40", "commit": "b" * 40}))
     args = SimpleNamespace(
         prefix=prefix,
         config=config,
@@ -165,9 +184,7 @@ def test_update_and_rollback_keep_config_credentials_and_unknowns(tmp_path, monk
         full_access=False,
     )
     monkeypatch.setattr(installer, "loaded", lambda args: True)
-    monkeypatch.setattr(
-        installer, "cli", lambda *a, **k: {"version": "0.8.0rc39", "runtime": {}}
-    )
+    monkeypatch.setattr(installer, "cli", lambda *a, **k: {"version": "0.8.0rc39", "runtime": {}})
     monkeypatch.setattr(
         installer,
         "wait_health",
@@ -175,12 +192,20 @@ def test_update_and_rollback_keep_config_credentials_and_unknowns(tmp_path, monk
     )
     monkeypatch.setattr(installer, "stop_service", lambda args: None)
     monkeypatch.setattr(installer, "start_service", lambda args: None)
+    systemd_calls = []
+
+    def systemctl(args, *command, **kwargs):
+        systemd_calls.append(command)
+        return CompletedProcess(command, 0, stdout="", stderr="")
+
+    monkeypatch.setattr(installer, "_systemctl", systemctl)
     installer.activate(args, release)
     assert "NoNewPrivileges=true" in unit.read_text()
     assert str(config) in unit.read_text()
     with sqlite3.connect(database) as db:
         db.execute("insert into tasks values ('later', 'unknown', 'after-switch')")
     installer.rollback(args)
+    assert systemd_calls == [("daemon-reload",)]
     assert unit.read_bytes() == old_unit
     assert config.read_bytes() == before_config
     assert credentials.read_bytes() == before_credentials
