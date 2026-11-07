@@ -13,7 +13,9 @@ KiraBridge verbindet ChatGPT mit **Grok Build und Codex, die in Terminalfenstern
 auf deinem Computer laufen**. Besprich im Chat, was du erledigen möchtest, gib die
 Arbeit an diese Terminalagenten weiter und verfolge ihre Antworten — mit den von dir erlaubten Zugriffen.
 
-**macOS · Intel — [0.8.0rc36](https://github.com/landjunge/KiraBridge/releases/tag/v0.8.0rc36) · 4. November 2026 · Vorabversion**
+**Entwicklungs- und Installationsstand (7. November 2026):** Debian-Serverquelle **0.8.0rc41** (`350d368`); auf dem Intel-Mac installierte Laufzeit **0.8.0rc40** (`d12838a`). Diese Stände sind nicht mit einem veröffentlichten macOS-Download gleichzusetzen.
+
+**Veröffentlichter macOS-Intel-Download:** [0.8.0rc36](https://github.com/landjunge/KiraBridge/releases/tag/v0.8.0rc36) · 4. November 2026 · Vorabversion.
 
 ### [KiraBridge herunterladen — App und Installer](https://github.com/landjunge/KiraBridge/releases/download/v0.8.0rc36/KiraBridge-0.8.0rc36-Intel-Installer.zip)
 
@@ -35,8 +37,7 @@ Alle sieben nativen Prüfphasen dieser begrenzten Entwicklungsvorschau bestanden
 ChatGPT-Verbindungstest mit deinem Konto bleiben bei dir.
 [Prüfstand und Grenzen](docs/WINDOWS-SETUP-20261104.md) · [Anleitung](docs/WINDOWS-SETUP.md).
 
-**Geprüfter Repository-Programmstand: Serverquelle 0.8.0rc41 bei `350d368`; die lokale Intel-Laufzeit bleibt RC40 bei `d12838a`.**
-Der veröffentlichte Intel-Download oben bleibt RC36 bei `d4aebdd`.
+Der oben verlinkte Intel-Download basiert auf RC36 (`d4aebdd`); die getrennten Quell- und Installationsstände stehen in der Übersicht am Anfang.
 [Release-, Artefakt- und Installationsquellnachweis](docs/evidence/readme-current-20261107.json).
 Der [frühere PR61-Installationsbericht](docs/RC40-PR61-SHIM-INSTALL-20261106.md)
 beschreibt den vorherigen RC40-Quellstand `a5d381a`.
