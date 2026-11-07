@@ -1,0 +1,6 @@
+{
+  "passed": true,
+  "username": "KIRABRI-350OGKG$",
+  "scope": "All 23 selected installer tests including fixtures requiring symlink creation; existing SYSTEM token only; no OS rights changed",
+  "returncode": 0
+}

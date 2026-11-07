@@ -1,0 +1,369 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="4" skipped="0" tests="42" time="12.371" timestamp="2026-11-07T12:52:25.024748+01:00" hostname="KIRABRI-350OGKG"><testcase classname="tests.test_windows_standalone" name="test_installed_launcher_tracks_update_rollback_and_data" time="0.375" /><testcase classname="tests.test_windows_standalone" name="test_modified_payload_never_installs" time="0.056" /><testcase classname="tests.test_windows_standalone" name="test_installed_runtime_cannot_delete_itself" time="0.148" /><testcase classname="tests.test_windows_runtime_20261107" name="test_valid_runtime_returns_sha256_for_exe_and_matching_dll" time="0.061" /><testcase classname="tests.test_windows_runtime_20261107" name="test_rejects_missing_python_exe" time="0.006" /><testcase classname="tests.test_windows_runtime_20261107" name="test_rejects_missing_python_dll" time="0.010" /><testcase classname="tests.test_windows_runtime_20261107" name="test_rejects_stable_abi_dll_without_versioned_dll" time="0.010" /><testcase classname="tests.test_windows_runtime_20261107" name="test_rejects_empty_python_exe" time="0.012" /><testcase classname="tests.test_windows_runtime_20261107" name="test_rejects_empty_python_dll" time="0.014" /><testcase classname="tests.test_windows_runtime_20261107" name="test_rejects_symlink_python_exe" time="0.007" /><testcase classname="tests.test_windows_runtime_20261107" name="test_rejects_symlink_python_dll" time="0.012" /><testcase classname="tests.test_windows_runtime_20261107" name="test_rejects_symlink_runtime_root" time="0.007" /><testcase classname="tests.test_windows_runtime_20261107" name="test_rejects_parent_segment_in_root" time="0.005" /><testcase classname="tests.test_windows_runtime_20261107" name="test_rejects_hardlinked_python_exe" time="0.006" /><testcase classname="tests.test_windows_runtime_20261107" name="test_rejects_two_python_dlls" time="0.051" /><testcase classname="tests.test_windows_runtime_20261107" name="test_rejects_directory_named_python_exe" time="0.008" /><testcase classname="tests.test_windows_runtime_20261107" name="test_rejects_file_as_runtime_root" time="0.008" /><testcase classname="tests.test_windows_parity_20261106" name="test_unicode_text_is_packet_text_and_enter_not_a_layout_or_clipboard_plan" time="0.003" /><testcase classname="tests.test_windows_parity_20261106" name="test_preview_capabilities_stay_closed" time="0.001" /><testcase classname="tests.test_windows_parity_20261106" name="test_text_manager_sends_batches_without_replay_after_a_partial_batch" time="0.012" /><testcase classname="tests.test_windows_parity_20261106" name="test_launch_is_shown_and_focus_reuses_one_window" time="0.006" /><testcase classname="tests.test_windows_parity_20261106" name="test_visible_environment_drops_credentials_and_forbidden_console_tokens" time="0.003" /><testcase classname="tests.test_windows_parity_20261106" name="test_console_main_returns_unicode_from_the_same_session" time="0.126" /><testcase classname="tests.test_windows_parity_20261106" name="test_completed_console_handoff_is_not_started_again" time="0.055" /><testcase classname="tests.test_windows_parity_20261106" name="test_package_update_and_rollback_keep_data_and_do_not_change_policy" time="0.155" /><testcase classname="tests.test_windows_parity_20261106" name="test_package_uninstall_keeps_data_and_removes_releases" time="0.058" /><testcase classname="tests.test_windows_parity_20261106" name="test_two_waiters_reserve_one_console_under_the_desktop_lock" time="0.103" /><testcase classname="tests.test_windows_parity_20261106" name="test_late_result_reconciles_once_without_a_new_start" time="0.088" /><testcase classname="tests.test_windows_parity_20261106" name="test_inconsistent_receipt_stays_open_without_a_new_start" time="0.405" /><testcase classname="tests.test_windows_parity_20261106" name="test_oem_bytes_round_trip_and_do_not_become_unknown" time="0.164"><failure message="AssertionError: assert ('cp850', 'cp1252') == ()&#10;  &#10;  Left contains 2 more items, first extra item: 'cp850'&#10;  Use -v to get more diff">tmp_path = WindowsPath('C:/Windows/Temp/pytest-of-KIRABRI-350OGKG$/pytest-0/test_oem_bytes_round_trip_and_0')
+monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x0000021C03B05EF0&gt;
+
+    def test_oem_bytes_round_trip_and_do_not_become_unknown(tmp_path, monkeypatch):
+        payload = "Größe".encode("cp850")
+        monkeypatch.setattr(
+            "kirabridge.platform_adapters.windows.visible_console.legacy_code_pages",
+            lambda: ("cp850",),
+        )
+        decoded = decode_console_bytes(payload)
+        assert decoded["encoding"] == "cp850"
+        assert decoded["text"] == "Größe"
+        assert decoded["text"].encode("cp850") == payload
+        result = tmp_path / "oem.json"
+        code = console_main(
+            [
+                "--",
+                *_identity_argv(),
+                "handoff01",
+                str(result),
+                "0",
+                "8",
+                str(tmp_path),
+                sys.executable,
+                "-c",
+                "import sys; sys.stdout.buffer.write(" + repr(payload) + ")",
+            ]
+        )
+        body = json.loads(result.read_text(encoding="utf-8"))
+        assert code == 0
+        assert body["state"] == "completed"
+        assert body["stdout"] == "Größe"
+        assert body["stdout_encoding"] == "cp850"
+        assert body["stdout_sha256"] == hashlib.sha256(payload).hexdigest()
+        assert body["stdout_decoded_strict"] is True
+        assert body["stdout_ambiguous"] is False
+        assert body["exit_code"] == 0 and type(body["exit_code"]) is int
+&gt;       assert legacy_code_pages() == ()
+E       AssertionError: assert ('cp850', 'cp1252') == ()
+E         
+E         Left contains 2 more items, first extra item: 'cp850'
+E         Use -v to get more diff
+
+C:\Users\Kiradev\kb-installer-finish-20261107\source\tests\test_windows_parity_20261106.py:554: AssertionError</failure></testcase><testcase classname="tests.test_windows_parity_20261106" name="test_cp1252_and_cp850_need_an_explicit_output_encoding" time="0.001" /><testcase classname="tests.test_windows_parity_20261106" name="test_selected_encoding_and_ambiguous_pages_reach_the_visible_result" time="0.421" /><testcase classname="tests.test_windows_parity_20261106" name="test_handoff_plan_passes_output_encoding_to_the_visible_console" time="0.005" /><testcase classname="tests.test_windows_parity_20261106" name="test_invalid_utf8_keeps_byte_evidence" time="0.127" /><testcase classname="tests.test_windows_parity_20261106" name="test_owned_child_stops_at_the_output_limit_and_on_timeout" time="0.097"><failure message="OSError: [WinError 87] Falscher Parameter">tmp_path = WindowsPath('C:/Windows/Temp/pytest-of-KIRABRI-350OGKG$/pytest-0/test_owned_child_stops_at_the_0')
+
+    def test_owned_child_stops_at_the_output_limit_and_on_timeout(tmp_path):
+        limited = tmp_path / "limited.json"
+        code = console_main(
+            [
+                "--",
+                *_identity_argv(),
+                "handoff01",
+                str(limited),
+                "0",
+                "8",
+                str(tmp_path),
+                sys.executable,
+                "-c",
+                "import sys; sys.stdout.buffer.write(b'X'*200000)",
+            ]
+        )
+        body = json.loads(limited.read_text(encoding="utf-8"))
+        assert code == 1
+        assert body["state"] == "truncated"
+        assert body["stdout_byte_length"] == 65536
+        assert len(body["stdout"]) == 65536
+        with pytest.raises(ProcessLookupError):
+&gt;           os.kill(body["child_pid"], 0)
+E           OSError: [WinError 87] Falscher Parameter
+
+C:\Users\Kiradev\kb-installer-finish-20261107\source\tests\test_windows_parity_20261106.py:758: OSError</failure></testcase><testcase classname="tests.test_windows_parity_20261106" name="test_child_imports_the_pinned_runtime_not_an_older_package" time="1.353" /><testcase classname="tests.test_windows_parity_20261106" name="test_package_rejects_links_tampering_and_foreign_rollback" time="0.138" /><testcase classname="tests.test_windows_parity_20261106" name="test_parallel_install_waits_and_keeps_data" time="0.759" /><testcase classname="tests.test_windows_parity_20261106" name="test_zip_install_imports_the_activated_runtime_and_rejects_a_foreign_commit" time="3.343"><failure message="FileNotFoundError: [WinError 2] Das System kann die angegebene Datei nicht finden">tmp_path = WindowsPath('C:/Windows/Temp/pytest-of-KIRABRI-350OGKG$/pytest-0/test_zip_install_imports_the_a0')
+
+    def test_zip_install_imports_the_activated_runtime_and_rejects_a_foreign_commit(tmp_path):
+        import importlib.util
+    
+        script = Path(__file__).resolve().parents[1] / "scripts" / "windows_parity_package.py"
+        spec = importlib.util.spec_from_file_location("windows_parity_package", script)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        output = tmp_path / "parity.zip"
+&gt;       built = module.build(output)
+                ^^^^^^^^^^^^^^^^^^^^
+
+C:\Users\Kiradev\kb-installer-finish-20261107\source\tests\test_windows_parity_20261106.py:945: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+C:\Users\Kiradev\kb-installer-finish-20261107\source\scripts\windows_parity_package.py:186: in build
+    document = provenance_document(members)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+C:\Users\Kiradev\kb-installer-finish-20261107\source\scripts\windows_parity_package.py:80: in provenance_document
+    observed = git_provenance()
+               ^^^^^^^^^^^^^^^^
+C:\Users\Kiradev\kb-installer-finish-20261107\source\scripts\windows_parity_package.py:72: in git_provenance
+    commit = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip()
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+C:\Users\Kiradev\AppData\Local\KiraBridgeDev\Python314\Lib\subprocess.py:473: in check_output
+    return run(*popenargs, stdout=PIPE, timeout=timeout, check=True,
+C:\Users\Kiradev\AppData\Local\KiraBridgeDev\Python314\Lib\subprocess.py:555: in run
+    with Popen(*popenargs, **kwargs) as process:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+C:\Users\Kiradev\AppData\Local\KiraBridgeDev\Python314\Lib\subprocess.py:1039: in __init__
+    self._execute_child(args, executable, preexec_fn, close_fds,
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+self = &lt;Popen: returncode: None args: ['git', 'rev-parse', 'HEAD']&gt;
+args = 'git rev-parse HEAD', executable = None, preexec_fn = None
+close_fds = False, pass_fds = ()
+cwd = 'C:\\Users\\Kiradev\\kb-installer-finish-20261107\\source', env = None
+startupinfo = &lt;subprocess.STARTUPINFO object at 0x0000021C03A85950&gt;
+creationflags = 0, shell = False, p2cread = Handle(688), p2cwrite = -1
+c2pread = 11, c2pwrite = Handle(668), errread = -1, errwrite = Handle(608)
+unused_restore_signals = True, unused_gid = None, unused_gids = None
+unused_uid = None, unused_umask = -1, unused_start_new_session = False
+unused_process_group = -1
+
+    def _execute_child(self, args, executable, preexec_fn, close_fds,
+                       pass_fds, cwd, env,
+                       startupinfo, creationflags, shell,
+                       p2cread, p2cwrite,
+                       c2pread, c2pwrite,
+                       errread, errwrite,
+                       unused_restore_signals,
+                       unused_gid, unused_gids, unused_uid,
+                       unused_umask,
+                       unused_start_new_session, unused_process_group):
+        """Execute program (MS Windows version)"""
+    
+        assert not pass_fds, "pass_fds not supported on Windows."
+    
+        if isinstance(args, str):
+            pass
+        elif isinstance(args, bytes):
+            if shell:
+                raise TypeError('bytes args is not allowed on Windows')
+            args = list2cmdline([args])
+        elif isinstance(args, os.PathLike):
+            if shell:
+                raise TypeError('path-like args is not allowed when '
+                                'shell is true')
+            args = list2cmdline([args])
+        else:
+            args = list2cmdline(args)
+    
+        if executable is not None:
+            executable = os.fsdecode(executable)
+    
+        # Process startup details
+        if startupinfo is None:
+            startupinfo = STARTUPINFO()
+        else:
+            # bpo-34044: Copy STARTUPINFO since it is modified above,
+            # so the caller can reuse it multiple times.
+            startupinfo = startupinfo.copy()
+    
+        use_std_handles = -1 not in (p2cread, c2pwrite, errwrite)
+        if use_std_handles:
+            startupinfo.dwFlags |= _winapi.STARTF_USESTDHANDLES
+            startupinfo.hStdInput = p2cread
+            startupinfo.hStdOutput = c2pwrite
+            startupinfo.hStdError = errwrite
+    
+        attribute_list = startupinfo.lpAttributeList
+        have_handle_list = bool(attribute_list and
+                                "handle_list" in attribute_list and
+                                attribute_list["handle_list"])
+    
+        # If we were given an handle_list or need to create one
+        if have_handle_list or (use_std_handles and close_fds):
+            if attribute_list is None:
+                attribute_list = startupinfo.lpAttributeList = {}
+            handle_list = attribute_list["handle_list"] = \
+                list(attribute_list.get("handle_list", []))
+    
+            if use_std_handles:
+                handle_list += [int(p2cread), int(c2pwrite), int(errwrite)]
+    
+            handle_list[:] = self._filter_handle_list(handle_list)
+    
+            if handle_list:
+                if not close_fds:
+                    warnings.warn("startupinfo.lpAttributeList['handle_list'] "
+                                  "overriding close_fds", RuntimeWarning)
+    
+                # When using the handle_list we always request to inherit
+                # handles but the only handles that will be inherited are
+                # the ones in the handle_list
+                close_fds = False
+    
+        if shell:
+            startupinfo.dwFlags |= _winapi.STARTF_USESHOWWINDOW
+            startupinfo.wShowWindow = _winapi.SW_HIDE
+            if not executable:
+                # gh-101283: without a fully-qualified path, before Windows
+                # checks the system directories, it first looks in the
+                # application directory, and also the current directory if
+                # NeedCurrentDirectoryForExePathW(ExeName) is true, so try
+                # to avoid executing unqualified "cmd.exe".
+                comspec = os.environ.get('ComSpec')
+                if not comspec:
+                    system_root = os.environ.get('SystemRoot', '')
+                    comspec = os.path.join(system_root, 'System32', 'cmd.exe')
+                    if not os.path.isabs(comspec):
+                        raise FileNotFoundError('shell not found: neither %ComSpec% nor %SystemRoot% is set')
+                if os.path.isabs(comspec):
+                    executable = comspec
+            else:
+                comspec = executable
+    
+            args = '{} /c "{}"'.format (comspec, args)
+    
+        if cwd is not None:
+            cwd = os.fsdecode(cwd)
+    
+        sys.audit("subprocess.Popen", executable, args, cwd, env)
+    
+        # Start the process
+        try:
+&gt;           hp, ht, pid, tid = _winapi.CreateProcess(executable, args,
+                                     # no special security
+                                     None, None,
+                                     int(not close_fds),
+                                     creationflags,
+                                     env,
+                                     cwd,
+                                     startupinfo)
+E                                    FileNotFoundError: [WinError 2] Das System kann die angegebene Datei nicht finden
+
+C:\Users\Kiradev\AppData\Local\KiraBridgeDev\Python314\Lib\subprocess.py:1553: FileNotFoundError</failure></testcase><testcase classname="tests.test_windows_parity_20261106" name="test_extracted_payload_roundtrip_does_not_call_git" time="0.903" /><testcase classname="tests.test_windows_parity_20261106" name="test_validated_export_rebuilds_without_git_and_refuses_changes" time="0.998" /><testcase classname="tests.test_windows_parity_20261106" name="test_repository_provenance_still_uses_git_rev_parse" time="0.009"><failure message="FileNotFoundError: [WinError 2] Das System kann die angegebene Datei nicht finden">def test_repository_provenance_still_uses_git_rev_parse():
+        module = _parity_package_module()
+&gt;       observed = module.git_provenance()
+                   ^^^^^^^^^^^^^^^^^^^^^^^
+
+C:\Users\Kiradev\kb-installer-finish-20261107\source\tests\test_windows_parity_20261106.py:1111: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+C:\Users\Kiradev\kb-installer-finish-20261107\source\scripts\windows_parity_package.py:72: in git_provenance
+    commit = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip()
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+C:\Users\Kiradev\AppData\Local\KiraBridgeDev\Python314\Lib\subprocess.py:473: in check_output
+    return run(*popenargs, stdout=PIPE, timeout=timeout, check=True,
+C:\Users\Kiradev\AppData\Local\KiraBridgeDev\Python314\Lib\subprocess.py:555: in run
+    with Popen(*popenargs, **kwargs) as process:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+C:\Users\Kiradev\AppData\Local\KiraBridgeDev\Python314\Lib\subprocess.py:1039: in __init__
+    self._execute_child(args, executable, preexec_fn, close_fds,
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+self = &lt;Popen: returncode: None args: ['git', 'rev-parse', 'HEAD']&gt;
+args = 'git rev-parse HEAD', executable = None, preexec_fn = None
+close_fds = False, pass_fds = ()
+cwd = 'C:\\Users\\Kiradev\\kb-installer-finish-20261107\\source', env = None
+startupinfo = &lt;subprocess.STARTUPINFO object at 0x0000021C03B06190&gt;
+creationflags = 0, shell = False, p2cread = Handle(712), p2cwrite = -1
+c2pread = 11, c2pwrite = Handle(704), errread = -1, errwrite = Handle(608)
+unused_restore_signals = True, unused_gid = None, unused_gids = None
+unused_uid = None, unused_umask = -1, unused_start_new_session = False
+unused_process_group = -1
+
+    def _execute_child(self, args, executable, preexec_fn, close_fds,
+                       pass_fds, cwd, env,
+                       startupinfo, creationflags, shell,
+                       p2cread, p2cwrite,
+                       c2pread, c2pwrite,
+                       errread, errwrite,
+                       unused_restore_signals,
+                       unused_gid, unused_gids, unused_uid,
+                       unused_umask,
+                       unused_start_new_session, unused_process_group):
+        """Execute program (MS Windows version)"""
+    
+        assert not pass_fds, "pass_fds not supported on Windows."
+    
+        if isinstance(args, str):
+            pass
+        elif isinstance(args, bytes):
+            if shell:
+                raise TypeError('bytes args is not allowed on Windows')
+            args = list2cmdline([args])
+        elif isinstance(args, os.PathLike):
+            if shell:
+                raise TypeError('path-like args is not allowed when '
+                                'shell is true')
+            args = list2cmdline([args])
+        else:
+            args = list2cmdline(args)
+    
+        if executable is not None:
+            executable = os.fsdecode(executable)
+    
+        # Process startup details
+        if startupinfo is None:
+            startupinfo = STARTUPINFO()
+        else:
+            # bpo-34044: Copy STARTUPINFO since it is modified above,
+            # so the caller can reuse it multiple times.
+            startupinfo = startupinfo.copy()
+    
+        use_std_handles = -1 not in (p2cread, c2pwrite, errwrite)
+        if use_std_handles:
+            startupinfo.dwFlags |= _winapi.STARTF_USESTDHANDLES
+            startupinfo.hStdInput = p2cread
+            startupinfo.hStdOutput = c2pwrite
+            startupinfo.hStdError = errwrite
+    
+        attribute_list = startupinfo.lpAttributeList
+        have_handle_list = bool(attribute_list and
+                                "handle_list" in attribute_list and
+                                attribute_list["handle_list"])
+    
+        # If we were given an handle_list or need to create one
+        if have_handle_list or (use_std_handles and close_fds):
+            if attribute_list is None:
+                attribute_list = startupinfo.lpAttributeList = {}
+            handle_list = attribute_list["handle_list"] = \
+                list(attribute_list.get("handle_list", []))
+    
+            if use_std_handles:
+                handle_list += [int(p2cread), int(c2pwrite), int(errwrite)]
+    
+            handle_list[:] = self._filter_handle_list(handle_list)
+    
+            if handle_list:
+                if not close_fds:
+                    warnings.warn("startupinfo.lpAttributeList['handle_list'] "
+                                  "overriding close_fds", RuntimeWarning)
+    
+                # When using the handle_list we always request to inherit
+                # handles but the only handles that will be inherited are
+                # the ones in the handle_list
+                close_fds = False
+    
+        if shell:
+            startupinfo.dwFlags |= _winapi.STARTF_USESHOWWINDOW
+            startupinfo.wShowWindow = _winapi.SW_HIDE
+            if not executable:
+                # gh-101283: without a fully-qualified path, before Windows
+                # checks the system directories, it first looks in the
+                # application directory, and also the current directory if
+                # NeedCurrentDirectoryForExePathW(ExeName) is true, so try
+                # to avoid executing unqualified "cmd.exe".
+                comspec = os.environ.get('ComSpec')
+                if not comspec:
+                    system_root = os.environ.get('SystemRoot', '')
+                    comspec = os.path.join(system_root, 'System32', 'cmd.exe')
+                    if not os.path.isabs(comspec):
+                        raise FileNotFoundError('shell not found: neither %ComSpec% nor %SystemRoot% is set')
+                if os.path.isabs(comspec):
+                    executable = comspec
+            else:
+                comspec = executable
+    
+            args = '{} /c "{}"'.format (comspec, args)
+    
+        if cwd is not None:
+            cwd = os.fsdecode(cwd)
+    
+        sys.audit("subprocess.Popen", executable, args, cwd, env)
+    
+        # Start the process
+        try:
+&gt;           hp, ht, pid, tid = _winapi.CreateProcess(executable, args,
+                                     # no special security
+                                     None, None,
+                                     int(not close_fds),
+                                     creationflags,
+                                     env,
+                                     cwd,
+                                     startupinfo)
+E                                    FileNotFoundError: [WinError 2] Das System kann die angegebene Datei nicht finden
+
+C:\Users\Kiradev\AppData\Local\KiraBridgeDev\Python314\Lib\subprocess.py:1553: FileNotFoundError</failure></testcase></testsuite></testsuites>
