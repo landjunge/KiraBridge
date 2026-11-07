@@ -574,7 +574,7 @@ def run_owned_command(
                 _terminate_owned(process, job)
         finally:
             if job is not None:
-                job.close()
+                job.close(keep_completed_descendants=finished and state == "completed")
             if process is not None:
                 # No reader thread owns a BufferedReader lock during close.
                 for stream in (process.stdout, process.stderr):

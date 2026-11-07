@@ -133,7 +133,17 @@ class WindowsChildJob:
         if not self.kernel.TerminateJobObject(self.handle, 1):
             raise ctypes.WinError(ctypes.get_last_error())
 
-    def close(self):
+    def close(self, *, keep_completed_descendants=False):
         if self.handle:
-            self.kernel.CloseHandle(self.handle)
-            self.handle = None
+            try:
+                if keep_completed_descendants:
+                    # A completed command may explicitly detach a background
+                    # app with all inherited pipes closed. Preserve that effect.
+                    limits = _ExtendedLimits()
+                    if not self.kernel.SetInformationJobObject(
+                        self.handle, 9, ctypes.byref(limits), ctypes.sizeof(limits)
+                    ):
+                        raise ctypes.WinError(ctypes.get_last_error())
+            finally:
+                self.kernel.CloseHandle(self.handle)
+                self.handle = None

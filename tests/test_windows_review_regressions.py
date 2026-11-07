@@ -152,3 +152,60 @@ async def test_cancelled_console_wait_preserves_unknown_and_reconciles_once(tmp_
     )
     assert status["state"] == "completed" and status["record"]["reconciled"]
     assert spawner.calls == 1
+
+
+def test_explicitly_detached_background_child_survives_completed_command(tmp_path):
+    import json
+    import signal
+
+    parent = (
+        "import json,subprocess,sys\n"
+        "child=subprocess.Popen([sys.executable,'-B','-c','import time;time.sleep(12)'],"
+        "stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)\n"
+        "if sys.platform=='win32':\n"
+        " from kirabridge.windows_setup_runtime import process_identity\n"
+        " record=process_identity(child.pid)\n"
+        "else: record={'pid':child.pid}\n"
+        "print(json.dumps(record),flush=True)\n"
+    )
+    env = dict(os.environ, PYTHONPATH=str(Path(__file__).parents[1] / "src"))
+    result = run_owned_command(
+        [sys.executable, "-B", "-c", parent], cwd=str(tmp_path), env=env, timeout=3, limit=65536
+    )
+    assert result["state"] == "completed" and result["exit_code"] == 0, result
+    record = json.loads(result["stdout"])
+    if sys.platform == "win32":
+        import ctypes
+
+        kernel = ctypes.WinDLL("kernel32", use_last_error=True)
+        kernel.OpenProcess.argtypes = [ctypes.c_uint32, ctypes.c_int, ctypes.c_uint32]
+        kernel.OpenProcess.restype = ctypes.c_void_p
+        kernel.GetProcessTimes.argtypes = [ctypes.c_void_p] + [ctypes.POINTER(ctypes.c_uint64)] * 4
+        kernel.GetProcessTimes.restype = ctypes.c_int
+        kernel.WaitForSingleObject.argtypes = [ctypes.c_void_p, ctypes.c_uint32]
+        kernel.WaitForSingleObject.restype = ctypes.c_uint32
+        kernel.TerminateProcess.argtypes = [ctypes.c_void_p, ctypes.c_uint32]
+        kernel.TerminateProcess.restype = ctypes.c_int
+        kernel.CloseHandle.argtypes = [ctypes.c_void_p]
+        handle = kernel.OpenProcess(0x101001, False, record["pid"])
+        assert handle, "A completed command killed its explicitly detached child"
+        matched = False
+        try:
+            values = [ctypes.c_uint64() for _ in range(4)]
+            assert kernel.GetProcessTimes(handle, *(ctypes.byref(v) for v in values))
+            matched = str(values[0].value) == record["created_100ns"]
+            assert matched, "Owned background process identity changed"
+            assert kernel.WaitForSingleObject(handle, 0) == 258
+        finally:
+            if matched:
+                kernel.TerminateProcess(handle, 1)
+                kernel.WaitForSingleObject(handle, 1000)
+            kernel.CloseHandle(handle)
+    else:
+        try:
+            os.kill(record["pid"], 0)
+        finally:
+            try:
+                os.killpg(result["child_pid"], signal.SIGKILL)
+            except ProcessLookupError:
+                pass
