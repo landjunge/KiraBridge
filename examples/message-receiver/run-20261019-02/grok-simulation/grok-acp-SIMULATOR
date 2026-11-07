@@ -1,0 +1,17 @@
+#!/Users/landjunge/KiraBridge/.venv/bin/python
+import json,sys
+for line in sys.stdin:
+ msg=json.loads(line);method=msg.get('method')
+ if method=='initialize': result={'protocolVersion':1,'authMethods':[{'id':'cached_token'}]}
+ elif method=='authenticate':result={}
+ elif method=='session/new':result={'sessionId':'SIMULATION-grok-receiver-20261019-01'}
+ elif method=='session/prompt':
+  text=json.dumps(msg,ensure_ascii=False)
+  assert 'Antworte ausschließlich mit: KiraBridge-Test empfangen.' in text
+  params={'sessionId':'SIMULATION-grok-receiver-20261019-01','update':{
+   'sessionUpdate':'agent_message_chunk',
+   'content':{'type':'text','text':'KiraBridge-Test empfangen.'}}}
+  print(json.dumps({'jsonrpc':'2.0','method':'session/update','params':params}),flush=True)
+  result={'stopReason':'end_turn'}
+ else:continue
+ print(json.dumps({'jsonrpc':'2.0','id':msg['id'],'result':result}),flush=True)

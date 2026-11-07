@@ -1,0 +1,31 @@
+{
+  "activated": true,
+  "idle": {
+    "active_tasks": 0,
+    "active_receiver_jobs": 0,
+    "guard": "BEGIN IMMEDIATE; no new task/message writes during switch"
+  },
+  "config_unchanged": true,
+  "audit_prefix_unchanged": true,
+  "preserved_tables": [
+    "tasks",
+    "events",
+    "approvals",
+    "conversations",
+    "messages",
+    "message_jobs",
+    "message_events",
+    "handoff_bindings",
+    "message_completion_routes",
+    "completion_routes",
+    "completion_notices"
+  ],
+  "tunnel_healthy": true,
+  "tunnel_ready": true,
+  "old_native_pid": 88318,
+  "new_native_pid": 91512,
+  "host_recognized": false,
+  "subscribed": false,
+  "webhook_delivered": false,
+  "chat_processed": false
+}

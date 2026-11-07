@@ -1,0 +1,23 @@
+{
+  "installed_receiver_jobs_since_test_submission": [
+    {
+      "message_id": "6a818b91-b158-4f51-a43b-43656d10540c",
+      "recipient": "codex",
+      "state": "completed"
+    }
+  ],
+  "new_real_grok_jobs": 0,
+  "configuration_sha256": "f0a8b0f5dc6554bc7d8f706b42d01e7ccde88866ec0c05a05c0bbc718b3cfa1b",
+  "configuration_unchanged_since_activation": true,
+  "codex_real_completed": true,
+  "grok_simulator_completed": true,
+  "installed_real_grok_invoked": false,
+  "requested_full_installed_bidirectional_acceptance": "NOT_COMPLETE",
+  "checks": [
+    "same message IDs across queue/delivery/ack/processing events",
+    "exact actual answer",
+    "Codex exit_code=0 + turn_completed; simulated Grok ACP stop_reason=end_turn",
+    "Grok simulator reply received + acknowledged",
+    "no production configuration change"
+  ]
+}

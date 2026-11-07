@@ -1,0 +1,85 @@
+{
+  "events": [
+    {
+      "seq": 1,
+      "message_id": "a2944bac-3585-4cff-8d55-e5c709653f7f",
+      "at": 1792372665.506334,
+      "kind": "message.queued",
+      "evidence": {
+        "automatic_dispatch": true,
+        "content_sha256": "a945d5144fe258bdee96910b3784c1689c08f0a00b2b869ff3792720525c904e",
+        "conversation_id": "receiver-grok-SIMULATION-20261019-01",
+        "position": 1,
+        "recipient": "grok"
+      }
+    },
+    {
+      "seq": 2,
+      "message_id": "a2944bac-3585-4cff-8d55-e5c709653f7f",
+      "at": 1792372665.531028,
+      "kind": "message.processing_claimed",
+      "evidence": {
+        "run_id": "channel-b9e0d99fb5444acba4a9c2dffc683012",
+        "session_scope": "separate_managed_session"
+      }
+    },
+    {
+      "seq": 3,
+      "message_id": "a2944bac-3585-4cff-8d55-e5c709653f7f",
+      "at": 1792372665.54754,
+      "kind": "message.delivered",
+      "evidence": {
+        "receipt": "964119fc-e07f-4156-8d64-c88c6705768f"
+      }
+    },
+    {
+      "seq": 4,
+      "message_id": "a2944bac-3585-4cff-8d55-e5c709653f7f",
+      "at": 1792372665.723565,
+      "kind": "message.agent_progress",
+      "evidence": {
+        "evidence_sha256": "6dc944cc9765adaca75f33df4ea4a93f1b9bf1f001a2af7d4323c22eaba1d2e2",
+        "run_id": "channel-b9e0d99fb5444acba4a9c2dffc683012"
+      }
+    },
+    {
+      "seq": 5,
+      "message_id": "a2944bac-3585-4cff-8d55-e5c709653f7f",
+      "at": 1792372665.883955,
+      "kind": "message.agent_progress",
+      "evidence": {
+        "evidence_sha256": "d328d491a945eec80d5de23f73754c38456f6053ed6802f311a18d608d8f51bf",
+        "run_id": "channel-b9e0d99fb5444acba4a9c2dffc683012"
+      }
+    },
+    {
+      "seq": 6,
+      "message_id": "a2944bac-3585-4cff-8d55-e5c709653f7f",
+      "at": 1792372665.885773,
+      "kind": "message.agent_progress",
+      "evidence": {
+        "evidence_sha256": "50f28b20337a925cfb861fab94e26707aabfddc1a8feab5f6b47b8041f4a73bc",
+        "run_id": "channel-b9e0d99fb5444acba4a9c2dffc683012"
+      }
+    },
+    {
+      "seq": 8,
+      "message_id": "a2944bac-3585-4cff-8d55-e5c709653f7f",
+      "at": 1792372665.902803,
+      "kind": "message.acknowledged",
+      "evidence": {
+        "receipt": "964119fc-e07f-4156-8d64-c88c6705768f"
+      }
+    },
+    {
+      "seq": 9,
+      "message_id": "a2944bac-3585-4cff-8d55-e5c709653f7f",
+      "at": 1792372665.907403,
+      "kind": "message.processing_completed",
+      "evidence": {
+        "error": null,
+        "evidence_sha256": "54617d412d8197f7917a3c98a518121e71a6b9098d9b6cba8fc1c1c7bef05f13"
+      }
+    }
+  ]
+}

@@ -1,0 +1,10 @@
+{
+  "subscriptions": 0,
+  "deliveries": 0,
+  "receipts": 0,
+  "observations": {
+    "request_rejected": 1,
+    "rpc_events_list": 2,
+    "rpc_server_discover": 2
+  }
+}

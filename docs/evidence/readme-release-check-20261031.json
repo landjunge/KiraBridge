@@ -1,0 +1,236 @@
+{
+  "checked_on": "2026-10-31",
+  "repository": "landjunge/KiraBridge",
+  "visibility": "private",
+  "default_branch": "main",
+  "documentation_base": "307004e",
+  "release_source": "da1bdaed019c31aa11bb28a39ef8bead7e73c1d4",
+  "release_inventory": [
+    {
+      "tag": "v0.8.0rc17",
+      "draft": true,
+      "prerelease": true,
+      "published_at": null
+    },
+    {
+      "tag": "v0.8.0rc16",
+      "draft": true,
+      "prerelease": true,
+      "published_at": null
+    },
+    {
+      "tag": "v0.8.0rc15",
+      "draft": true,
+      "prerelease": true,
+      "published_at": null
+    },
+    {
+      "tag": "v0.6.0rc2",
+      "draft": true,
+      "prerelease": true,
+      "published_at": null
+    },
+    {
+      "tag": "v0.8.0rc20",
+      "draft": false,
+      "prerelease": true,
+      "published_at": "2026-10-30T21:23:04Z"
+    },
+    {
+      "tag": "v0.8.0rc18",
+      "draft": false,
+      "prerelease": true,
+      "published_at": "2026-10-29T22:20:00Z"
+    },
+    {
+      "tag": "v0.8.0rc14",
+      "draft": false,
+      "prerelease": true,
+      "published_at": "2026-10-22T20:54:20Z"
+    },
+    {
+      "tag": "v0.8.0rc12",
+      "draft": false,
+      "prerelease": true,
+      "published_at": "2026-10-20T15:19:42Z"
+    },
+    {
+      "tag": "v0.8.0rc1",
+      "draft": false,
+      "prerelease": true,
+      "published_at": "2026-10-19T17:59:08Z"
+    },
+    {
+      "tag": "v0.7.0rc2",
+      "draft": false,
+      "prerelease": true,
+      "published_at": "2026-10-19T15:23:41Z"
+    },
+    {
+      "tag": "v0.7.0rc1",
+      "draft": false,
+      "prerelease": true,
+      "published_at": "2026-10-19T10:10:12Z"
+    }
+  ],
+  "latest_published": {
+    "tag": "v0.8.0rc20",
+    "url": "https://github.com/landjunge/KiraBridge/releases/tag/v0.8.0rc20",
+    "published_at": "2026-10-30T21:23:04Z",
+    "prerelease": true,
+    "assets": [
+      {
+        "name": "BUILD-VERIFICATION-INTEL.json",
+        "state": "uploaded",
+        "size": 423,
+        "sha256": "685a8a42e797b5ff3173c313fb6bb83eac2eb1bb0d29beefb275eff03c45d721",
+        "url": "https://github.com/landjunge/KiraBridge/releases/download/v0.8.0rc20/BUILD-VERIFICATION-INTEL.json",
+        "download_sha256_matches": true
+      },
+      {
+        "name": "install-macos.sh",
+        "state": "uploaded",
+        "size": 585,
+        "sha256": "0cf815dfdbadaa6dfc63e700a1c2bfcb94545c3b30050b1e8ec6e0c39243d619",
+        "url": "https://github.com/landjunge/KiraBridge/releases/download/v0.8.0rc20/install-macos.sh",
+        "download_sha256_matches": true
+      },
+      {
+        "name": "install-macos.sh.sha256",
+        "state": "uploaded",
+        "size": 83,
+        "sha256": "70b35526378b616211a58489186501e183d5c903ebdb725015c47692db7c8e3e",
+        "url": "https://github.com/landjunge/KiraBridge/releases/download/v0.8.0rc20/install-macos.sh.sha256",
+        "download_sha256_matches": true
+      },
+      {
+        "name": "INSTALLIEREN-RC20-INTEL.txt",
+        "state": "uploaded",
+        "size": 1674,
+        "sha256": "c5ec25c15c19346b28776062897f0191ebc20326f924df964c0ee3c4ec2d06cc",
+        "url": "https://github.com/landjunge/KiraBridge/releases/download/v0.8.0rc20/INSTALLIEREN-RC20-INTEL.txt",
+        "download_sha256_matches": true
+      },
+      {
+        "name": "KiraBridge-0.8.0rc20-Intel-macOS.zip",
+        "state": "uploaded",
+        "size": 2115067,
+        "sha256": "6b1a83c4cd300d74a345fb5abca8697c2a791597400171a187581ea6a34c0608",
+        "url": "https://github.com/landjunge/KiraBridge/releases/download/v0.8.0rc20/KiraBridge-0.8.0rc20-Intel-macOS.zip",
+        "download_sha256_matches": true
+      },
+      {
+        "name": "KiraBridge-0.8.0rc20-Intel-macOS.zip.sha256",
+        "state": "uploaded",
+        "size": 103,
+        "sha256": "dca43588f1e6ae936382ab35f6750702d12dba4beec9f7e0c88e0a3008964c87",
+        "url": "https://github.com/landjunge/KiraBridge/releases/download/v0.8.0rc20/KiraBridge-0.8.0rc20-Intel-macOS.zip.sha256",
+        "download_sha256_matches": true
+      },
+      {
+        "name": "kirabridge-0.8.0rc20-py3-none-any.whl",
+        "state": "uploaded",
+        "size": 438569,
+        "sha256": "259bb1adb5ef5e702c4a71a785193b4f583dacb06a9f64d4c7e6b419b3817371",
+        "url": "https://github.com/landjunge/KiraBridge/releases/download/v0.8.0rc20/kirabridge-0.8.0rc20-py3-none-any.whl",
+        "download_sha256_matches": true
+      },
+      {
+        "name": "kirabridge-0.8.0rc20-py3-none-any.whl.sha256",
+        "state": "uploaded",
+        "size": 104,
+        "sha256": "5ac44268af482444b9aa28dc0eba734f56d7ae3fc1b4ce561d5057482bcd4e30",
+        "url": "https://github.com/landjunge/KiraBridge/releases/download/v0.8.0rc20/kirabridge-0.8.0rc20-py3-none-any.whl.sha256",
+        "download_sha256_matches": true
+      },
+      {
+        "name": "KiraBridge-App-0.8.0rc20-Intel.zip",
+        "state": "uploaded",
+        "size": 22412,
+        "sha256": "a2c4c426882819380891cadfb8697f9e9fa4eb5ec82942664804c3da2a1874af",
+        "url": "https://github.com/landjunge/KiraBridge/releases/download/v0.8.0rc20/KiraBridge-App-0.8.0rc20-Intel.zip",
+        "download_sha256_matches": true
+      },
+      {
+        "name": "KiraBridge-App-0.8.0rc20-Intel.zip.sha256",
+        "state": "uploaded",
+        "size": 101,
+        "sha256": "8d8ff885180894d98c6de05072d20ca36a463489c910387a4910fdc4d16dbe21",
+        "url": "https://github.com/landjunge/KiraBridge/releases/download/v0.8.0rc20/KiraBridge-App-0.8.0rc20-Intel.zip.sha256",
+        "download_sha256_matches": true
+      },
+      {
+        "name": "KiraBridge-macos.tar.gz",
+        "state": "uploaded",
+        "size": 1807819,
+        "sha256": "9afe13793328b746349e28f570e4e03c52cb5af6cb62fdc6d15893fd4ff2ae2e",
+        "url": "https://github.com/landjunge/KiraBridge/releases/download/v0.8.0rc20/KiraBridge-macos.tar.gz",
+        "download_sha256_matches": true
+      },
+      {
+        "name": "KiraBridge-macos.tar.gz.sha256",
+        "state": "uploaded",
+        "size": 90,
+        "sha256": "fd5516fcbfbd783a3a1f42385e8e10c4c1fd5eba645e76eb802993984e8fdec4",
+        "url": "https://github.com/landjunge/KiraBridge/releases/download/v0.8.0rc20/KiraBridge-macos.tar.gz.sha256",
+        "download_sha256_matches": true
+      },
+      {
+        "name": "PACKAGE-ACCEPTANCE-INTEL.json",
+        "state": "uploaded",
+        "size": 1569,
+        "sha256": "6d4f390f52ce31c020bc0e186665eb6507bee7816ac387c5346a018f919288b2",
+        "url": "https://github.com/landjunge/KiraBridge/releases/download/v0.8.0rc20/PACKAGE-ACCEPTANCE-INTEL.json",
+        "download_sha256_matches": true
+      },
+      {
+        "name": "SHA256SUMS-INTEL",
+        "state": "uploaded",
+        "size": 1283,
+        "sha256": "bd9ae36a5209783352d86ed96e3af59777f87e934de79427f710d58306f4d2c4",
+        "url": "https://github.com/landjunge/KiraBridge/releases/download/v0.8.0rc20/SHA256SUMS-INTEL",
+        "download_sha256_matches": true
+      }
+    ]
+  },
+  "verification_scope": "Authenticated GitHub metadata and actual asset downloads; no installation, runtime activation or product tests performed for this documentation change.",
+  "local_verification": {
+    "assets_downloaded_and_matching_api_sha256": 14,
+    "release_checksum_entries_passed": 13,
+    "zip_runtime_manifest_files_passed": 394,
+    "zip_python_files_matching_release_git_source": 122,
+    "wheel_python_files_matching_release_git_source": 122,
+    "runtime_manifest_commit": "da1bdaed019c31aa11bb28a39ef8bead7e73c1d4",
+    "native_binary_architecture": "x86_64"
+  },
+  "documentation_validation": {
+    "markdown_files_checked": 8,
+    "link_and_image_references_checked": 120,
+    "broken_relative_links": 0,
+    "version_pinned_document_targets_verified_in_git": 11,
+    "readme_external_targets_equal": true,
+    "readme_markdown_render_checks": {
+      "README.md": {
+        "start_steps": 3,
+        "logo": true,
+        "download_heading": true
+      },
+      "README.de.md": {
+        "start_steps": 3,
+        "logo": true,
+        "download_heading": true
+      }
+    },
+    "whitespace_check": "git diff --check passed",
+    "product_tests_rerun": false
+  },
+  "documentation_delivery": {
+    "checkout": "/Users/landjunge/KiraBridge",
+    "branch": "fix/visible-busy-idle-20261021",
+    "source_commit": "dfbae48",
+    "upstream_main": "307004e5b2e4285c19e8d7544bedf45b28297a0b",
+    "existing_application_changes_preserved": true,
+    "push": false,
+    "publication": false
+  }
+}

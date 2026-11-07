@@ -1,0 +1,39 @@
+{
+  "id": "completion-installed-echo-20261019-01",
+  "principal": "chatgpt",
+  "idem": "completion-installed-echo-20261019-01",
+  "operation": "terminal.execute",
+  "args": {
+    "argv": [
+      "/bin/echo",
+      "INSTALLED_COMPLETION_RETURN_CHANNEL_OK"
+    ],
+    "cwd": "/Users/landjunge/KiraBridge/examples/completion-demo/run-20261019-01/workspace",
+    "max_output": 4096,
+    "timeout": 5
+  },
+  "agent": null,
+  "parent_id": null,
+  "state": "queued",
+  "created": 1792368867.717686,
+  "updated": 1792368867.717686,
+  "accepted": null,
+  "started": null,
+  "finished": null,
+  "receipt": null,
+  "evidence": {},
+  "result": null,
+  "error": null,
+  "lease_owner": null,
+  "lease_until": null,
+  "attempt": 1,
+  "local_approval_url": "http://127.0.0.1:8766/",
+  "approval_required": false,
+  "approval_mode": "automatic",
+  "completion_channel": {
+    "target": "default",
+    "receive_tool": "completion_receive",
+    "ack_tool": "completion_ack",
+    "assistant_wakeup": "not_provided_by_current_transport"
+  }
+}

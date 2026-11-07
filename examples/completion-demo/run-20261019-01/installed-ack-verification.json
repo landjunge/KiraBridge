@@ -1,0 +1,13 @@
+{
+  "scope": "read-only verification of exact known installed smoke notice",
+  "notice": {
+    "id": "completion-task-2126",
+    "source_id": "completion-installed-echo-20261019-01",
+    "principal": "chatgpt",
+    "receipt": "4bf7ce09-f9f0-4067-85ac-d7a3b21b64be",
+    "delivered": 1792368868.05298,
+    "acknowledged": 1792368868.086024
+  },
+  "matches_callback_id_and_receipt": true,
+  "acknowledged": true
+}

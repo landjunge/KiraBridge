@@ -1,0 +1,85 @@
+{
+  "events": [
+    {
+      "seq": 34,
+      "message_id": "6a818b91-b158-4f51-a43b-43656d10540c",
+      "at": 1792372655.0822558,
+      "kind": "message.queued",
+      "evidence": {
+        "automatic_dispatch": true,
+        "content_sha256": "a945d5144fe258bdee96910b3784c1689c08f0a00b2b869ff3792720525c904e",
+        "conversation_id": "receiver-codex-20261019-01",
+        "position": 1,
+        "recipient": "codex"
+      }
+    },
+    {
+      "seq": 35,
+      "message_id": "6a818b91-b158-4f51-a43b-43656d10540c",
+      "at": 1792372655.153468,
+      "kind": "message.processing_claimed",
+      "evidence": {
+        "run_id": "channel-28ae556392cc4121944337ce2f34e3dc",
+        "session_scope": "separate_managed_session"
+      }
+    },
+    {
+      "seq": 36,
+      "message_id": "6a818b91-b158-4f51-a43b-43656d10540c",
+      "at": 1792372655.1776068,
+      "kind": "message.delivered",
+      "evidence": {
+        "receipt": "db6cf6d8-c829-43f5-8f87-03c4b5f0edae"
+      }
+    },
+    {
+      "seq": 37,
+      "message_id": "6a818b91-b158-4f51-a43b-43656d10540c",
+      "at": 1792372655.4149492,
+      "kind": "message.agent_progress",
+      "evidence": {
+        "evidence_sha256": "917a11c7c3407c3ddf8b0a7416317759d66f5aa3be297b6910760ed6d9a426fd",
+        "run_id": "channel-28ae556392cc4121944337ce2f34e3dc"
+      }
+    },
+    {
+      "seq": 38,
+      "message_id": "6a818b91-b158-4f51-a43b-43656d10540c",
+      "at": 1792372656.305141,
+      "kind": "message.agent_progress",
+      "evidence": {
+        "evidence_sha256": "0a1f587ad26324e4ac6f4facd6c67a708094ba8b7eda2376c749ca63a374f6fb",
+        "run_id": "channel-28ae556392cc4121944337ce2f34e3dc"
+      }
+    },
+    {
+      "seq": 39,
+      "message_id": "6a818b91-b158-4f51-a43b-43656d10540c",
+      "at": 1792372657.295309,
+      "kind": "message.agent_progress",
+      "evidence": {
+        "evidence_sha256": "8886448e357d2511c8962a5fe06557b99abda1d1e3aedc9fe69cd785944023a2",
+        "run_id": "channel-28ae556392cc4121944337ce2f34e3dc"
+      }
+    },
+    {
+      "seq": 40,
+      "message_id": "6a818b91-b158-4f51-a43b-43656d10540c",
+      "at": 1792372665.099382,
+      "kind": "message.acknowledged",
+      "evidence": {
+        "receipt": "db6cf6d8-c829-43f5-8f87-03c4b5f0edae"
+      }
+    },
+    {
+      "seq": 41,
+      "message_id": "6a818b91-b158-4f51-a43b-43656d10540c",
+      "at": 1792372665.1047082,
+      "kind": "message.processing_completed",
+      "evidence": {
+        "error": null,
+        "evidence_sha256": "03c2b2b4b252bcf420923578e1ca0b62dbc1811df11a1056d666abcd63cd5344"
+      }
+    }
+  ]
+}

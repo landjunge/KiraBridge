@@ -1,0 +1,80 @@
+{
+  "$defs": {
+    "TaskRequest": {
+      "additionalProperties": false,
+      "properties": {
+        "api_version": {
+          "default": "1",
+          "title": "Api Version",
+          "type": "string"
+        },
+        "task_id": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[a-zA-Z0-9_-]+$",
+          "title": "Task Id",
+          "type": "string"
+        },
+        "operation": {
+          "maxLength": 80,
+          "minLength": 1,
+          "title": "Operation",
+          "type": "string"
+        },
+        "arguments": {
+          "additionalProperties": true,
+          "title": "Arguments",
+          "type": "object"
+        },
+        "idempotency_key": {
+          "maxLength": 128,
+          "minLength": 1,
+          "title": "Idempotency Key",
+          "type": "string"
+        },
+        "parent_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Parent Id"
+        }
+      },
+      "required": [
+        "task_id",
+        "operation",
+        "arguments",
+        "idempotency_key"
+      ],
+      "title": "TaskRequest",
+      "type": "object"
+    }
+  },
+  "properties": {
+    "request": {
+      "$ref": "#/$defs/TaskRequest"
+    },
+    "completion_target": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Completion Target"
+    }
+  },
+  "required": [
+    "request"
+  ],
+  "title": "task_requestArguments",
+  "type": "object"
+}

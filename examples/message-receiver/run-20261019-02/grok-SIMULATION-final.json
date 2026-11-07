@@ -1,0 +1,41 @@
+{
+  "api_version": "1",
+  "seq": 1,
+  "id": "a2944bac-3585-4cff-8d55-e5c709653f7f",
+  "conversation_id": "receiver-grok-SIMULATION-20261019-01",
+  "position": 1,
+  "sender": "operator",
+  "recipient": "grok",
+  "kind": "question",
+  "body": "Antworte ausschließlich mit: KiraBridge-Test empfangen.",
+  "reply_to": null,
+  "task_id": null,
+  "depth": 0,
+  "request_reply": true,
+  "created": 1792372665.506198,
+  "delivered": 1792372665.54751,
+  "receipt": "964119fc-e07f-4156-8d64-c88c6705768f",
+  "acknowledged": 1792372665.902751,
+  "processing": {
+    "message_id": "a2944bac-3585-4cff-8d55-e5c709653f7f",
+    "state": "completed",
+    "run_id": "channel-b9e0d99fb5444acba4a9c2dffc683012",
+    "claimed": 1792372665.530993,
+    "started": 1792372665.885377,
+    "finished": 1792372665.907265,
+    "reply_id": "c573cf52-46f4-4a42-90e8-4a38fa0ccfdb",
+    "evidence": {
+      "adapter": "grok_acp",
+      "agent": "grok",
+      "local_tools": false,
+      "response_preview": "KiraBridge-Test empfangen.",
+      "response_sha256": "26f2361a5ac3d05f6b9601afead2fd7f45913ff7098dee10d26cace87dde3159",
+      "response_truncated": false,
+      "run_id": "channel-b9e0d99fb5444acba4a9c2dffc683012",
+      "session_id": "SIMULATION-grok-receiver-20261019-01",
+      "session_scope": "separate_managed_session",
+      "stop_reason": "end_turn"
+    },
+    "error": null
+  }
+}

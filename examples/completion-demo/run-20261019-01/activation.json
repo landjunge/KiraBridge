@@ -1,0 +1,114 @@
+{
+  "scope": "idle reload of exact owned KiraBridge launchd service; no agent termination",
+  "old_runtime": {
+    "instance_id": "74e26c460e464de697be4920106f6189",
+    "version": "0.5.2",
+    "pid": 70273,
+    "started_at": "2026-10-18T23:03:58.865234+00:00",
+    "config_path": "/Users/landjunge/.config/kirabridge/config.toml",
+    "config_sha256": "f0a8b0f5dc6554bc7d8f706b42d01e7ccde88866ec0c05a05c0bbc718b3cfa1b",
+    "effective_config_sha256": "63d3eb1f56ce5f696b78f359dad13cc8eb51bf31e8da2d533c18db90b7236afd",
+    "source_tree_sha256": "250ad1efc3b00c755d680ff141bc0c5ae99ef5c413aa2abb489c3cd40ad7b559",
+    "source_file_count": 39,
+    "source_package_path": "/Users/landjunge/KiraBridge/src/kirabridge",
+    "source_scope": "package Python files observed at startup; no remote attestation"
+  },
+  "label": "gui/501/com.kirabridge.bridge",
+  "tested_suite": "184 passed",
+  "no_grok_dispatch": true,
+  "locked_idle_check": {
+    "active_or_pending_tasks": 0,
+    "queued_or_running_receiver_jobs": 0
+  },
+  "before": {
+    "tasks": {
+      "count": 427,
+      "sha256": "b6a671065b22ec76358d797d8b57b9d8981e1bb539b787d7465552f77e98db0a"
+    },
+    "events": {
+      "count": 2121,
+      "sha256": "67a97aeb857d97376200da47d9927e5b9bcae3574fae369ea7ef3e3d582e8931"
+    },
+    "approvals": {
+      "count": 7,
+      "sha256": "0467fe4440a2dc2b8c0df88ce83512964dc283b02217d73ee66e233570dd18ef"
+    },
+    "conversations": {
+      "count": 4,
+      "sha256": "30482724834819cbe719bad74f7d71b87bb8f335a1813b732a64d0bbdcf7b5f6"
+    },
+    "messages": {
+      "count": 5,
+      "sha256": "665941f38c0e878f92b1bf24055cd2d727b3b6ea87fbd92dfe3987b715509da3"
+    },
+    "message_jobs": {
+      "count": 4,
+      "sha256": "b37d95b8dc7f477f9dd96c95f668d33d1c76d9e1d2dccd9a04c1ee8707abe1f7"
+    },
+    "message_events": {
+      "count": 33,
+      "sha256": "36dc75552442669279c1ea5335297faf4e4e8422e75a72fed1acb95579d0e88f"
+    },
+    "handoff_bindings": {
+      "count": 2,
+      "sha256": "33a7280f20c0bcc07ed6bbe997f97c80ee6b9fbccc6590dea8760c9b12f4256a"
+    }
+  },
+  "old_audit_last_seq": 3933,
+  "old_audit_prefix_sha256": "cb4a2d7db4e8ae9193b1820c9dc33a46e2393862b19982b76cac42efc9ff340a",
+  "signal": "SIGTERM to exact launchd service, while dispatch writes were locked",
+  "old_pid_exited": true,
+  "after": {
+    "tasks": {
+      "count": 427,
+      "sha256": "b6a671065b22ec76358d797d8b57b9d8981e1bb539b787d7465552f77e98db0a"
+    },
+    "events": {
+      "count": 2121,
+      "sha256": "67a97aeb857d97376200da47d9927e5b9bcae3574fae369ea7ef3e3d582e8931"
+    },
+    "approvals": {
+      "count": 7,
+      "sha256": "0467fe4440a2dc2b8c0df88ce83512964dc283b02217d73ee66e233570dd18ef"
+    },
+    "conversations": {
+      "count": 4,
+      "sha256": "30482724834819cbe719bad74f7d71b87bb8f335a1813b732a64d0bbdcf7b5f6"
+    },
+    "messages": {
+      "count": 5,
+      "sha256": "665941f38c0e878f92b1bf24055cd2d727b3b6ea87fbd92dfe3987b715509da3"
+    },
+    "message_jobs": {
+      "count": 4,
+      "sha256": "b37d95b8dc7f477f9dd96c95f668d33d1c76d9e1d2dccd9a04c1ee8707abe1f7"
+    },
+    "message_events": {
+      "count": 33,
+      "sha256": "36dc75552442669279c1ea5335297faf4e4e8422e75a72fed1acb95579d0e88f"
+    },
+    "handoff_bindings": {
+      "count": 2,
+      "sha256": "33a7280f20c0bcc07ed6bbe997f97c80ee6b9fbccc6590dea8760c9b12f4256a"
+    }
+  },
+  "data_preserved": true,
+  "audit_prefix_preserved": true,
+  "same_config": true,
+  "same_effective_policy": true,
+  "new_runtime": {
+    "instance_id": "8789ff893a0c4cb3a7368c35a8f61626",
+    "version": "0.5.2",
+    "pid": 80060,
+    "started_at": "2026-10-19T00:13:13.279880+00:00",
+    "config_path": "/Users/landjunge/.config/kirabridge/config.toml",
+    "config_sha256": "f0a8b0f5dc6554bc7d8f706b42d01e7ccde88866ec0c05a05c0bbc718b3cfa1b",
+    "effective_config_sha256": "63d3eb1f56ce5f696b78f359dad13cc8eb51bf31e8da2d533c18db90b7236afd",
+    "source_tree_sha256": "cfb12ea19f14fb1d1e0f741addbfe345407353151a4c383145a96ac7dab01df4",
+    "source_file_count": 43,
+    "source_package_path": "/Users/landjunge/KiraBridge/src/kirabridge",
+    "source_scope": "package Python files observed at startup; no remote attestation"
+  },
+  "completion_tools_available": true,
+  "activated": true
+}
