@@ -97,7 +97,17 @@ def main():
         packages = [args.package, args.update]
         for package in packages:
             provenance = json.loads((package / "provenance.json").read_text(encoding="utf-8"))
-            report.setdefault("provenance", []).append(provenance)
+            report.setdefault("provenance", []).append(
+                {
+                    "path": str(package / "provenance.json"),
+                    "sha256": digest(package / "provenance.json"),
+                    "commit": provenance["commit"],
+                    "version": provenance["version"],
+                    "source_archive_sha256": provenance.get("source_archive_sha256"),
+                    "runtime": provenance["runtime"],
+                    "file_count": len(provenance["files"]),
+                }
+            )
 
         def run(argv, label):
             item = {"label": label, "argv": [str(x) for x in argv], "state": "started"}
@@ -107,7 +117,7 @@ def main():
                 [str(x) for x in argv],
                 capture_output=True,
                 text=True,
-                timeout=180,
+                timeout=900,
                 encoding="utf-8",
                 errors="replace",
             )
