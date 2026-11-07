@@ -36,7 +36,7 @@ ChatGPT connection test with your account remain yours to complete.
 [Evidence and limits](docs/WINDOWS-SETUP-20261104.md) ·
 [Setup guide, German](docs/WINDOWS-SETUP.md).
 
-**Source reviewed on November 7, 2026: RC40 at `d12838a`; the local Intel runtime reports the same pin.**
+**Reviewed repository implementation: 0.8.0rc41 server source `350d368`; the local Intel runtime remains RC40 at `d12838a`.**
 The published Intel download above remains RC36 at `d4aebdd`.
 [Release, artifact and installed-source evidence](docs/evidence/readme-current-20261107.json).
 The [earlier PR61 installation report](docs/RC40-PR61-SHIM-INSTALL-20261106.md)
@@ -46,13 +46,6 @@ Windows feature parity and a standalone installer remain development work. The p
 file, process or terminal tools, or Windows service installation. No new package
 for those ongoing projects or published RC40 download is offered here.
 
-
-**Debian/Linux server test package:** [RC41 prerelease](https://github.com/landjunge/KiraBridge/releases/tag/linux-v0.8.0rc41),
-with a user-level systemd installer for Debian 13 / Ubuntu 24.04 x86_64.
-HTTP MCP, bearer authentication, health, update and rollback are its scope;
-macOS GUI and native keyboard are unavailable. This is an online installer.
-[Install/update guide and native evidence](docs/INSTALL-LINUX-SERVER.md).
-Repository access is required; release evidence states the accepted native host.
 
 ## What KiraBridge helps you do
 
@@ -92,7 +85,7 @@ package; see [installation, verification and help](docs/INSTALL-EN.md).
 
 ## Linux / Debian server
 
-The separate [server source in PR72](https://github.com/landjunge/KiraBridge/pull/72)
+The [integrated server implementation in PR72](https://github.com/landjunge/KiraBridge/pull/72)
 provides a private loopback HTTP MCP service with bearer authentication and health
 checks, plus installation, update and rollback through `systemd --user`.
 Its target platforms are Debian 13 and Ubuntu 24.04 x86_64. The online installer
@@ -101,9 +94,16 @@ It does not configure linger, administrator rights, a firewall or public HTTPS.
 
 This is a headless server, with no macOS GUI, Terminal.app or native keyboard.
 Clipboard support is optional (`wl-clipboard`/`xclip`). ChatGPT/account linking and
-remote access need separate configuration. Final native package acceptance,
-main integration and a published server download are still pending;
-[delivery evidence and current limits](docs/evidence/readme-current-20261107.json).
+remote access need separate configuration.
+
+The 0.8.0rc41 archive is natively accepted on Debian 13.6 x86_64 and
+[published in its separate server release](https://github.com/landjunge/KiraBridge/releases/tag/linux-v0.8.0rc41). The downloaded
+archive matches GitHub's digest and the release checksums. Ubuntu 24.04 is a
+supported target; no new native Ubuntu acceptance is claimed here.
+[Linux x86_64 archive](https://github.com/landjunge/KiraBridge/releases/download/linux-v0.8.0rc41/KiraBridge-0.8.0rc41-Linux-x86_64.tar.gz) ·
+[Checksums](https://github.com/landjunge/KiraBridge/releases/download/linux-v0.8.0rc41/SHA256SUMS).
+[Install/update/rollback guide](docs/INSTALL-LINUX-SERVER.md) ·
+[Source, native and download evidence](docs/evidence/readme-current-20261107.json).
 
 ## Keyboard sequences and fewer cloud calls
 
