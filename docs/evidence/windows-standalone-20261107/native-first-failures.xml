@@ -37,7 +37,7 @@ monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x0000021C03B05EF0&g
         assert body["exit_code"] == 0 and type(body["exit_code"]) is int
 &gt;       assert legacy_code_pages() == ()
 E       AssertionError: assert ('cp850', 'cp1252') == ()
-E         
+E
 E         Left contains 2 more items, first extra item: 'cp850'
 E         Use -v to get more diff
 
@@ -72,7 +72,7 @@ C:\Users\Kiradev\kb-installer-finish-20261107\source\tests\test_windows_parity_2
 
     def test_zip_install_imports_the_activated_runtime_and_rejects_a_foreign_commit(tmp_path):
         import importlib.util
-    
+
         script = Path(__file__).resolve().parents[1] / "scripts" / "windows_parity_package.py"
         spec = importlib.util.spec_from_file_location("windows_parity_package", script)
         module = importlib.util.module_from_spec(spec)
@@ -81,7 +81,7 @@ C:\Users\Kiradev\kb-installer-finish-20261107\source\tests\test_windows_parity_2
 &gt;       built = module.build(output)
                 ^^^^^^^^^^^^^^^^^^^^
 
-C:\Users\Kiradev\kb-installer-finish-20261107\source\tests\test_windows_parity_20261106.py:945: 
+C:\Users\Kiradev\kb-installer-finish-20261107\source\tests\test_windows_parity_20261106.py:945:
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
 C:\Users\Kiradev\kb-installer-finish-20261107\source\scripts\windows_parity_package.py:186: in build
     document = provenance_document(members)
@@ -123,9 +123,9 @@ unused_process_group = -1
                        unused_umask,
                        unused_start_new_session, unused_process_group):
         """Execute program (MS Windows version)"""
-    
+
         assert not pass_fds, "pass_fds not supported on Windows."
-    
+
         if isinstance(args, str):
             pass
         elif isinstance(args, bytes):
@@ -139,10 +139,10 @@ unused_process_group = -1
             args = list2cmdline([args])
         else:
             args = list2cmdline(args)
-    
+
         if executable is not None:
             executable = os.fsdecode(executable)
-    
+
         # Process startup details
         if startupinfo is None:
             startupinfo = STARTUPINFO()
@@ -150,41 +150,41 @@ unused_process_group = -1
             # bpo-34044: Copy STARTUPINFO since it is modified above,
             # so the caller can reuse it multiple times.
             startupinfo = startupinfo.copy()
-    
+
         use_std_handles = -1 not in (p2cread, c2pwrite, errwrite)
         if use_std_handles:
             startupinfo.dwFlags |= _winapi.STARTF_USESTDHANDLES
             startupinfo.hStdInput = p2cread
             startupinfo.hStdOutput = c2pwrite
             startupinfo.hStdError = errwrite
-    
+
         attribute_list = startupinfo.lpAttributeList
         have_handle_list = bool(attribute_list and
                                 "handle_list" in attribute_list and
                                 attribute_list["handle_list"])
-    
+
         # If we were given an handle_list or need to create one
         if have_handle_list or (use_std_handles and close_fds):
             if attribute_list is None:
                 attribute_list = startupinfo.lpAttributeList = {}
             handle_list = attribute_list["handle_list"] = \
                 list(attribute_list.get("handle_list", []))
-    
+
             if use_std_handles:
                 handle_list += [int(p2cread), int(c2pwrite), int(errwrite)]
-    
+
             handle_list[:] = self._filter_handle_list(handle_list)
-    
+
             if handle_list:
                 if not close_fds:
                     warnings.warn("startupinfo.lpAttributeList['handle_list'] "
                                   "overriding close_fds", RuntimeWarning)
-    
+
                 # When using the handle_list we always request to inherit
                 # handles but the only handles that will be inherited are
                 # the ones in the handle_list
                 close_fds = False
-    
+
         if shell:
             startupinfo.dwFlags |= _winapi.STARTF_USESHOWWINDOW
             startupinfo.wShowWindow = _winapi.SW_HIDE
@@ -204,14 +204,14 @@ unused_process_group = -1
                     executable = comspec
             else:
                 comspec = executable
-    
+
             args = '{} /c "{}"'.format (comspec, args)
-    
+
         if cwd is not None:
             cwd = os.fsdecode(cwd)
-    
+
         sys.audit("subprocess.Popen", executable, args, cwd, env)
-    
+
         # Start the process
         try:
 &gt;           hp, ht, pid, tid = _winapi.CreateProcess(executable, args,
@@ -229,7 +229,7 @@ C:\Users\Kiradev\AppData\Local\KiraBridgeDev\Python314\Lib\subprocess.py:1553: F
 &gt;       observed = module.git_provenance()
                    ^^^^^^^^^^^^^^^^^^^^^^^
 
-C:\Users\Kiradev\kb-installer-finish-20261107\source\tests\test_windows_parity_20261106.py:1111: 
+C:\Users\Kiradev\kb-installer-finish-20261107\source\tests\test_windows_parity_20261106.py:1111:
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
 C:\Users\Kiradev\kb-installer-finish-20261107\source\scripts\windows_parity_package.py:72: in git_provenance
     commit = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip()
@@ -265,9 +265,9 @@ unused_process_group = -1
                        unused_umask,
                        unused_start_new_session, unused_process_group):
         """Execute program (MS Windows version)"""
-    
+
         assert not pass_fds, "pass_fds not supported on Windows."
-    
+
         if isinstance(args, str):
             pass
         elif isinstance(args, bytes):
@@ -281,10 +281,10 @@ unused_process_group = -1
             args = list2cmdline([args])
         else:
             args = list2cmdline(args)
-    
+
         if executable is not None:
             executable = os.fsdecode(executable)
-    
+
         # Process startup details
         if startupinfo is None:
             startupinfo = STARTUPINFO()
@@ -292,41 +292,41 @@ unused_process_group = -1
             # bpo-34044: Copy STARTUPINFO since it is modified above,
             # so the caller can reuse it multiple times.
             startupinfo = startupinfo.copy()
-    
+
         use_std_handles = -1 not in (p2cread, c2pwrite, errwrite)
         if use_std_handles:
             startupinfo.dwFlags |= _winapi.STARTF_USESTDHANDLES
             startupinfo.hStdInput = p2cread
             startupinfo.hStdOutput = c2pwrite
             startupinfo.hStdError = errwrite
-    
+
         attribute_list = startupinfo.lpAttributeList
         have_handle_list = bool(attribute_list and
                                 "handle_list" in attribute_list and
                                 attribute_list["handle_list"])
-    
+
         # If we were given an handle_list or need to create one
         if have_handle_list or (use_std_handles and close_fds):
             if attribute_list is None:
                 attribute_list = startupinfo.lpAttributeList = {}
             handle_list = attribute_list["handle_list"] = \
                 list(attribute_list.get("handle_list", []))
-    
+
             if use_std_handles:
                 handle_list += [int(p2cread), int(c2pwrite), int(errwrite)]
-    
+
             handle_list[:] = self._filter_handle_list(handle_list)
-    
+
             if handle_list:
                 if not close_fds:
                     warnings.warn("startupinfo.lpAttributeList['handle_list'] "
                                   "overriding close_fds", RuntimeWarning)
-    
+
                 # When using the handle_list we always request to inherit
                 # handles but the only handles that will be inherited are
                 # the ones in the handle_list
                 close_fds = False
-    
+
         if shell:
             startupinfo.dwFlags |= _winapi.STARTF_USESHOWWINDOW
             startupinfo.wShowWindow = _winapi.SW_HIDE
@@ -346,14 +346,14 @@ unused_process_group = -1
                     executable = comspec
             else:
                 comspec = executable
-    
+
             args = '{} /c "{}"'.format (comspec, args)
-    
+
         if cwd is not None:
             cwd = os.fsdecode(cwd)
-    
+
         sys.audit("subprocess.Popen", executable, args, cwd, env)
-    
+
         # Start the process
         try:
 &gt;           hp, ht, pid, tid = _winapi.CreateProcess(executable, args,

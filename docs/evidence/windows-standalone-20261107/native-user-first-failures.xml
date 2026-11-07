@@ -16,10 +16,10 @@ monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x0000023EF0EC3DF0&g
             archive.writestr("src/kirabridge/__init__.py", "CURRENT_APPLICATION")
             archive.writestr("scripts/windows_standalone.py", "CURRENT_ENTRY")
         expected = hashlib.sha256(export.read_bytes()).hexdigest()
-    
+
         def no_git(*args, **kwargs):
             pytest.fail("A validated native export must not call git")
-    
+
         monkeypatch.setattr(builder.subprocess, "check_output", no_git)
         output = tmp_path / "standalone.zip"
         result = builder.build(runtime, output, "1.0", export, expected, "a" * 40)
@@ -31,7 +31,7 @@ monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x0000023EF0EC3DF0&g
             assert archive.read("runtime/Lib/site-packages/dependency.py") == b"retained"
 &gt;           assert archive.read("runtime/Lib/site-packages/kirabridge-source.pth") == b"../../../src\n"
 E           AssertionError: assert b'../../../src\r\n' == b'../../../src\n'
-E             
+E
 E             At index 12 diff: b'\r' != b'\n'
 E             Use -v to get more diff
 
@@ -44,7 +44,7 @@ kb-installer-final-20261107\source\tests\test_windows_standalone_builder.py:45: 
         outside.write_bytes(b"MZ-secret")
 &gt;       (root / "python.exe").symlink_to(outside)
 
-kb-installer-final-20261107\source\tests\test_windows_runtime_20261107.py:72: 
+kb-installer-final-20261107\source\tests\test_windows_runtime_20261107.py:72:
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
 
 self = WindowsPath('C:/Users/Kiradev/AppData/Local/Temp/pytest-of-Kiradev/pytest-0/test_rejects_symlink_python_ex0/runtime/python.exe')
@@ -69,7 +69,7 @@ AppData\Local\KiraBridgeDev\Python314\Lib\pathlib\__init__.py:1213: OSError</fai
         outside.write_bytes(b"MZ-secret-dll")
 &gt;       (root / "python314.dll").symlink_to(outside)
 
-kb-installer-final-20261107\source\tests\test_windows_runtime_20261107.py:84: 
+kb-installer-final-20261107\source\tests\test_windows_runtime_20261107.py:84:
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
 
 self = WindowsPath('C:/Users/Kiradev/AppData/Local/Temp/pytest-of-Kiradev/pytest-0/test_rejects_symlink_python_dl0/runtime/python314.dll')
@@ -91,7 +91,7 @@ AppData\Local\KiraBridgeDev\Python314\Lib\pathlib\__init__.py:1213: OSError</fai
         link = tmp_path / "link"
 &gt;       link.symlink_to(real, target_is_directory=True)
 
-kb-installer-final-20261107\source\tests\test_windows_runtime_20261107.py:92: 
+kb-installer-final-20261107\source\tests\test_windows_runtime_20261107.py:92:
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
 
 self = WindowsPath('C:/Users/Kiradev/AppData/Local/Temp/pytest-of-Kiradev/pytest-0/test_rejects_symlink_runtime_r0/link')
@@ -117,7 +117,7 @@ AppData\Local\KiraBridgeDev\Python314\Lib\pathlib\__init__.py:1213: OSError</fai
         (outside / "secret.txt").write_text("secret", encoding="utf-8")
 &gt;       (payload / "linked").symlink_to(outside, target_is_directory=True)
 
-kb-installer-final-20261107\source\tests\test_windows_parity_20261106.py:839: 
+kb-installer-final-20261107\source\tests\test_windows_parity_20261106.py:839:
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
 
 self = WindowsPath('C:/Users/Kiradev/AppData/Local/Temp/pytest-of-Kiradev/pytest-0/test_package_rejects_links_tam0/payload/linked')
