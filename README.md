@@ -36,7 +36,7 @@ ChatGPT connection test with your account remain yours to complete.
 [Evidence and limits](docs/WINDOWS-SETUP-20261104.md) ·
 [Setup guide, German](docs/WINDOWS-SETUP.md).
 
-**Source reviewed on November 7, 2026: RC40 at `d12838a`; the local Intel runtime reports the same pin.**
+**Intel desktop source reviewed on November 7, 2026: RC40 at `d12838a`; the local Intel runtime reports the same pin.**
 The published Intel download above remains RC36 at `d4aebdd`.
 [Release, artifact and installed-source evidence](docs/evidence/readme-current-20261107.json).
 The [earlier PR61 installation report](docs/RC40-PR61-SHIM-INSTALL-20261106.md)
@@ -45,6 +45,18 @@ describes the previous RC40 source `a5d381a`.
 Windows feature parity and a standalone installer remain development work. The published Windows preview does not include general
 file, process or terminal tools, or Windows service installation. No new package
 for those ongoing projects or published RC40 download is offered here.
+
+
+**Debian/Linux server test package:** [RC41 prerelease](https://github.com/landjunge/KiraBridge/releases/tag/linux-v0.8.0rc41),
+with a user-level systemd installer for Debian 13 / Ubuntu 24.04 x86_64.
+HTTP MCP, bearer authentication, health, update and rollback are its scope;
+macOS GUI and native keyboard are unavailable. This is an online installer.
+[Install/update guide and native evidence](docs/INSTALL-LINUX-SERVER.md).
+Repository access is required; release evidence states the accepted native host.
+[Download archive](https://github.com/landjunge/KiraBridge/releases/download/linux-v0.8.0rc41/KiraBridge-0.8.0rc41-Linux-x86_64.tar.gz) ·
+[SHA-256](https://github.com/landjunge/KiraBridge/releases/download/linux-v0.8.0rc41/KiraBridge-0.8.0rc41-Linux-x86_64.tar.gz.sha256).
+Source `350d368`; native Debian 13.6 acceptance and the actual GitHub download comparison
+are recorded in the [final release evidence](docs/evidence/debian-dirktest-release-20261107.json).
 
 ## What KiraBridge helps you do
 
@@ -93,9 +105,24 @@ It does not configure linger, administrator rights, a firewall or public HTTPS.
 
 This is a headless server, with no macOS GUI, Terminal.app or native keyboard.
 Clipboard support is optional (`wl-clipboard`/`xclip`). ChatGPT/account linking and
-remote access need separate configuration. Final native package acceptance,
-main integration and a published server download are still pending;
-[delivery evidence and current limits](docs/evidence/readme-current-20261107.json).
+remote access need separate configuration. The RC41 package passed native Debian 13.6
+acceptance, was integrated in main through PR72 and was downloaded again from GitHub
+with matching checksums. [Delivery evidence and current limits](docs/evidence/debian-dirktest-release-20261107.json).
+
+As a normal user with repository access, install with:
+
+```sh
+gh release download linux-v0.8.0rc41 -R landjunge/KiraBridge -p 'KiraBridge-0.8.0rc41-Linux-x86_64.tar.gz*'
+sha256sum -c KiraBridge-0.8.0rc41-Linux-x86_64.tar.gz.sha256
+tar -xzf KiraBridge-0.8.0rc41-Linux-x86_64.tar.gz
+cd KiraBridge-0.8.0rc41-Linux-x86_64
+sh install.sh --yes --language en
+```
+
+To update, download and verify the new release in a fresh directory, then run its
+`sh install.sh --yes --language en` with the same destinations. Keep the previous
+runtime for rollback; [explicit paths and rollback commands](docs/INSTALL-LINUX-SERVER.md)
+also cover hosts with shared parent directories.
 
 ## Keyboard sequences and fewer cloud calls
 

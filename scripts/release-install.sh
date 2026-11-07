@@ -4,16 +4,37 @@ set -eu
 umask 077
 language=de
 prepare_only=false
+assume_yes=false
+service=systemd-user
 install_dir="${HOME}/.local/share/kirabridge/releases/@VERSION@-@SOURCE_SHORT@"
+prefix="${XDG_DATA_HOME:-$HOME/.local/share}/kirabridge/install"
+config="${XDG_CONFIG_HOME:-$HOME/.config}/kirabridge/config.toml"
+launcher="${HOME}/.local/bin/kirabridge"
+unit="${HOME}/.config/systemd/user/kirabridge.service"
+workspace="${HOME}/workspace/KiraBridge"
+port=8765
 while [ "$#" -gt 0 ]; do
+  case "$1" in
+    --language|--service|--install-dir|--prefix|--config|--launcher|--unit|--workspace|--port)
+      [ "$#" -ge 2 ] || { printf 'Missing value for %s\n' "$1" >&2; exit 1; } ;;
+  esac
   case "$1" in
     --language) language="$2"; shift 2 ;;
     --prepare-only) prepare_only=true; shift ;;
+    --yes) assume_yes=true; shift ;;
+    --service) service="$2"; shift 2 ;;
     --install-dir) install_dir="$2"; shift 2 ;;
-    *) printf '%s\n' 'Usage: sh install.sh [--language de|en] [--prepare-only] [--install-dir PATH]' >&2; exit 1 ;;
+    --prefix) prefix="$2"; shift 2 ;;
+    --config) config="$2"; shift 2 ;;
+    --launcher) launcher="$2"; shift 2 ;;
+    --unit) unit="$2"; shift 2 ;;
+    --workspace) workspace="$2"; shift 2 ;;
+    --port) port="$2"; shift 2 ;;
+    *) printf '%s\n' 'Usage: sh install.sh [--language de|en] [--prepare-only] [--yes] [--service systemd-user|none] [--install-dir PATH] [--prefix PATH] [--config PATH] [--launcher PATH] [--unit PATH] [--workspace PATH] [--port NUMBER]' >&2; exit 1 ;;
   esac
 done
 case "$language" in de|en) ;; *) exit 1 ;; esac
+case "$service" in systemd-user|none) ;; *) exit 1 ;; esac
 say() { if [ "$language" = de ]; then printf '%s\n' "$1" >&2; else printf '%s\n' "$2" >&2; fi; }
 fail() { say "$1" "$2"; exit 1; }
 [ "$(id -u)" != 0 ] || fail 'Bitte als normaler Benutzer starten, ohne sudo.' 'Run as your normal user, without sudo.'
@@ -22,7 +43,17 @@ platform="$(uname -s)-$(uname -m)"
 [ "$platform" = '@PLATFORM@' ] || fail 'Dieses Paket passt nicht zum Rechner. Passendes Release-Paket wählen.' 'This package does not match your computer. Choose the matching release package.'
 case "$platform" in
   Darwin-x86_64|Darwin-arm64) case "$(sw_vers -productVersion)" in 15.*) ;; *) fail 'RC geprüft auf macOS 15.' 'RC tested on macOS 15.' ;; esac ;;
-  Linux-x86_64) [ -f /etc/os-release ] && grep -q '^ID=ubuntu$' /etc/os-release && grep -q '^VERSION_ID="24.04"$' /etc/os-release || fail 'RC geprüft auf Ubuntu 24.04 x86_64.' 'RC tested on Ubuntu 24.04 x86_64.' ;;
+  Linux-x86_64)
+    [ -r /etc/os-release ] || fail 'Distribution nicht erkennbar.' 'Cannot identify distribution.'
+    distro=$(sed -n 's/^ID=//p' /etc/os-release | tr -d '"')
+    distro_version=$(sed -n 's/^VERSION_ID=//p' /etc/os-release | tr -d '"')
+    case "$distro:$distro_version" in
+      debian:13|ubuntu:24.04) ;;
+      *) fail 'Dieses Testpaket unterstützt Debian 13 und Ubuntu 24.04 x86_64.' 'This test package supports Debian 13 and Ubuntu 24.04 x86_64.' ;;
+    esac
+    if [ "$prepare_only" != true ] && [ "$service" = systemd-user ]; then
+      command -v systemctl >/dev/null 2>&1 && systemctl --user show-environment >/dev/null 2>&1 || fail 'Kein systemd-Benutzermanager. In einer Benutzersitzung starten oder --service none wählen. Linger wird nicht verändert.' 'No systemd user manager. Run in a user session or choose --service none. Linger is not changed.'
+    fi ;;
   *) exit 1 ;;
 esac
 say '=== KiraBridge · @VERSION@ ===' '=== KiraBridge · @VERSION@ ==='
@@ -46,9 +77,11 @@ if command -v python3 >/dev/null 2>&1; then
   fi
 fi
 say 'Laufzeit wird nur für deinen Benutzer installiert. Netzwerkdownloads von GitHub/PyPI und ggf. Python sind erforderlich. Keine Administratorrechte; vorhandene Zugänge bleiben erhalten.' 'Runtime is installed for your user only. Network downloads from GitHub/PyPI and possibly Python are needed. No administrator rights; existing credentials are preserved.'
-say 'Fortfahren? [j/N]' 'Continue? [y/N]'
-IFS= read -r answer || exit 1
-case "$answer" in j|J|ja|y|Y|yes) ;; *) exit 0 ;; esac
+if [ "$assume_yes" != true ]; then
+  say 'Fortfahren? [j/N]' 'Continue? [y/N]'
+  IFS= read -r answer || exit 1
+  case "$answer" in j|J|ja|y|Y|yes) ;; *) exit 0 ;; esac
+fi
 case "$install_dir" in /*) ;; *) fail 'Installationspfad muss absolut sein.' 'Installation path must be absolute.' ;; esac
 [ ! -L "$install_dir" ] || fail 'Symbolischer Installationspfad abgelehnt.' 'Symlink installation path rejected.'
 mkdir -p "$(dirname "$install_dir")"
@@ -85,4 +118,22 @@ if [ "$prepare_only" = true ]; then
   say 'Vorbereitung fertig. Kein Dienst und keine Kontoeinrichtung verändert.' 'Preparation complete. No service or account configuration changed.'
   exit 0
 fi
-exec "$install_dir/.venv/bin/python3" -m kirabridge.cli install --language "$language" --release-root "$install_dir"
+installer="$bundle/installer/install.py"
+[ -f "$installer" ] || fail 'Installer fehlt im Paket.' 'Package installer is missing.'
+# exec does not run EXIT traps. Release the bootstrap lock before handing off;
+# the Python installer has its own destination lock for the activation transaction.
+rm -rf "$scratch"
+rmdir "$lock"
+trap - EXIT HUP INT TERM
+say 'Benutzerinstallation wird ohne sudo eingerichtet. Desktop-Funktionen bleiben auf diesem Server nicht verfügbar.' 'The user installation is configured without sudo. Desktop features stay unavailable on this server.'
+exec "$install_dir/.venv/bin/python3" "$installer" install \
+  --release-root "$install_dir" \
+  --service "$service" \
+  --language "$language" \
+  --prefix "$prefix" \
+  --cache-dir "$prefix/cache" \
+  --config "$config" \
+  --launcher "$launcher" \
+  --plist "$unit" \
+  --port "$port" \
+  --workspace "$workspace"

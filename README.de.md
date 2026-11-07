@@ -35,7 +35,7 @@ Alle sieben nativen Prüfphasen dieser begrenzten Entwicklungsvorschau bestanden
 ChatGPT-Verbindungstest mit deinem Konto bleiben bei dir.
 [Prüfstand und Grenzen](docs/WINDOWS-SETUP-20261104.md) · [Anleitung](docs/WINDOWS-SETUP.md).
 
-**Quellstand geprüft am 7. November 2026: RC40 bei `d12838a`; die lokale Intel-Laufzeit meldet denselben Pin.**
+**Intel-Desktop-Quellstand geprüft am 7. November 2026: RC40 bei `d12838a`; die lokale Intel-Laufzeit meldet denselben Pin.**
 Der veröffentlichte Intel-Download oben bleibt RC36 bei `d4aebdd`.
 [Release-, Artefakt- und Installationsquellnachweis](docs/evidence/readme-current-20261107.json).
 Der [frühere PR61-Installationsbericht](docs/RC40-PR61-SHIM-INSTALL-20261106.md)
@@ -45,6 +45,18 @@ Windows-Funktionsgleichstand und eigenständiger Installer bleiben Entwicklungsa
 enthält keine allgemeinen Datei-, Prozess- oder Terminaltools und keine
 Windows-Dienstinstallation. Hier wird kein neues Paket dieser laufenden Projekte
 und kein veröffentlichter RC40-Download angeboten.
+
+**Debian/Linux-Server-Testpaket:** [RC41-Prerelease](https://github.com/landjunge/KiraBridge/releases/tag/linux-v0.8.0rc41)
+mit systemd-Benutzerinstaller für Debian 13 / Ubuntu 24.04 x86_64.
+Umfang: HTTP-MCP, Bearer-Authentifizierung, Health, Update und Rollback;
+macOS-GUI und native Tastatur sind nicht verfügbar. Das ist ein Onlineinstaller.
+[Installations-/Updateanleitung und native Nachweise](docs/INSTALL-LINUX-SERVER.de.md).
+Repositoryzugriff ist nötig; die Releasebelege nennen den nativ geprüften Host.
+[Paket herunterladen](https://github.com/landjunge/KiraBridge/releases/download/linux-v0.8.0rc41/KiraBridge-0.8.0rc41-Linux-x86_64.tar.gz) ·
+[SHA-256](https://github.com/landjunge/KiraBridge/releases/download/linux-v0.8.0rc41/KiraBridge-0.8.0rc41-Linux-x86_64.tar.gz.sha256).
+Quelle `350d368`; die native Debian-13.6-Abnahme und der tatsächliche GitHub-Rückdownload
+stehen im [abschließenden Releasebeleg](docs/evidence/debian-dirktest-release-20261107.json).
+
 
 ## Wobei KiraBridge dir hilft
 
@@ -94,9 +106,24 @@ des Hosts. Linger, Administratorrechte, Firewall und öffentliches HTTPS werden 
 
 Der Server läuft ohne macOS-GUI, Terminal.app oder native Tastatursteuerung.
 Zwischenablage ist optional (`wl-clipboard`/`xclip`). ChatGPT-/Kontoverknüpfung und
-Fernzugriff benötigen eigene Konfiguration. Finale native Paketabnahme,
-Mainintegration und veröffentlichter Serverdownload stehen noch aus;
-[Lieferbelege und aktuelle Grenzen](docs/evidence/readme-current-20261107.json).
+Fernzugriff benötigen eigene Konfiguration. Das RC41-Paket hat die native Debian-13.6-Abnahme
+bestanden, wurde durch PR72 in main integriert und mit gleicher Prüfsumme erneut von GitHub
+heruntergeladen. [Lieferbelege und aktuelle Grenzen](docs/evidence/debian-dirktest-release-20261107.json).
+
+Installation als normaler Benutzer mit Repositoryzugriff:
+
+```sh
+gh release download linux-v0.8.0rc41 -R landjunge/KiraBridge -p 'KiraBridge-0.8.0rc41-Linux-x86_64.tar.gz*'
+sha256sum -c KiraBridge-0.8.0rc41-Linux-x86_64.tar.gz.sha256
+tar -xzf KiraBridge-0.8.0rc41-Linux-x86_64.tar.gz
+cd KiraBridge-0.8.0rc41-Linux-x86_64
+sh install.sh --yes
+```
+
+Für ein Update das neue Release in ein frisches Verzeichnis laden, prüfen und dort
+`sh install.sh --yes` mit denselben Zielpfaden ausführen. Die bisherige Laufzeit für
+Rollback behalten; [explizite Pfade und Rollbackbefehle](docs/INSTALL-LINUX-SERVER.de.md)
+decken auch Hosts mit gemeinsam beschreibbaren übergeordneten Verzeichnissen ab.
 
 ## Tastenfolgen und weniger Cloudaufrufe
 

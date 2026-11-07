@@ -1,0 +1,1 @@
+<testsuite name="native-failed-unit-cleanup" tests="1" failures="0"><testcase name="cleanup-clears-only-owned-failed-unit" time="0.216" /></testsuite>
