@@ -57,9 +57,11 @@ if not links:
     print("No verified platform-specific release assets; keeping existing links unchanged.")
     raise SystemExit(0)
 block='<p align="center">\n  '+'\n  &nbsp;\n  '.join(links)+'\n</p>'
-src=readme.read_text(encoding="utf-8")
-if start not in src or end not in src:
-    raise SystemExit("Missing README AUTO-DOWNLOADS markers")
-src = src[:src.index(start)+len(start)]+'\n'+block+'\n'+src[src.index(end):]
-readme.write_text(src, encoding="utf-8")
+for page in [Path("README.md"), Path("README.de.md")]:
+    if not page.exists(): continue
+    src=page.read_text(encoding="utf-8")
+    if start not in src or end not in src:
+        raise SystemExit(f"Missing AUTO-DOWNLOADS markers in {page}")
+    src = src[:src.index(start)+len(start)]+'\n'+block+'\n'+src[src.index(end):]
+    page.write_text(src, encoding="utf-8")
 print(f"Updated {len(links)} verified platform buttons for {repo}")
