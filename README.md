@@ -7,6 +7,8 @@
 
 # KiraBridge
 
+<p align="center"><img src="assets/design/wordmarks/KiraBridge-dark.svg" alt="KiraBridge" width="312"></p>
+
 <p align="center">
   <a href="https://github.com/landjunge/KiraBridge/releases"><img alt="Releases / RC" src="https://img.shields.io/badge/macOS%20Intel-Releases%20%2F%20RC-6060c0?style=flat-square"></a>
   &nbsp;
