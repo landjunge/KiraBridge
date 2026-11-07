@@ -37,11 +37,21 @@ def console_state(raw, uid):
 
 
 class MacDesktop:
+    # Lock/active state changes on user action, not within a single polling burst;
+    # a short cache avoids re-spawning ioreg on every rapid catalog() call.
+    cache_seconds = 1.0
+
     def __init__(self):
         self.last = {"state": "not_probed", "observed_at": None}
 
     @timed_async("ioreg_probe")
     async def probe(self):
+        cached = self.last
+        if (
+            cached.get("observed_at") is not None
+            and time.time() - cached["observed_at"] < self.cache_seconds
+        ):
+            return cached
         if sys.platform != "darwin":
             self.last = {"state": "not_applicable", "observed_at": time.time()}
             return self.last
