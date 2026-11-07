@@ -23,20 +23,29 @@ agents and follow their replies while choosing what they may access.
 Downloads require a GitHub account with access to this private repository.
 This is a preview; there is no stable release yet. RC36 is available for Intel Macs.
 
-The separate RC33 release includes a [Windows 11 development preview](https://github.com/landjunge/KiraBridge/releases/download/v0.8.0rc33/KiraBridge-0.8.0rc33-Windows-Dev-Kit.zip)
+The earlier RC33 release includes a [Windows 11 development preview](https://github.com/landjunge/KiraBridge/releases/download/v0.8.0rc33/KiraBridge-0.8.0rc33-Windows-Dev-Kit.zip)
 with native keyboard, shortcuts and guarded window control. It is a separate
 development kit; general Windows file, process and terminal tools remain outside
 its scope. See [RC33 package checks, installation status and limits](docs/RC33-DELIVERY-20261104.md).
 
-The new [Windows setup wizard 0.8.0rc37.dev1](https://github.com/landjunge/KiraBridge/releases/tag/windows-v0.8.0rc37.dev1)
-is published; its download and separate Windows installation are verified.
-All seven native phases passed. Extract the package and open
+The published [Windows setup wizard 0.8.0rc37.dev1](https://github.com/landjunge/KiraBridge/releases/tag/windows-v0.8.0rc37.dev1)
+has verified download and separate Windows installation evidence.
+All seven native phases for that limited development preview passed. Extract the package and open
 **Einrichtung-starten.cmd** for four guided steps. Account sign-in and a real
 ChatGPT connection test with your account remain yours to complete.
 [Evidence and limits](docs/WINDOWS-SETUP-20261104.md) ·
 [Setup guide, German](docs/WINDOWS-SETUP.md).
 
-**Current integrated source and local Intel installation: RC40.** [Merge, CI, native package, installation and live evidence](docs/RC40-PR61-SHIM-INSTALL-20261106.md). The published download above remains RC36; no public RC40 download is claimed.
+**Source reviewed on November 7, 2026: RC40 at `d12838a`; the local Intel runtime reports the same pin.**
+The published Intel download above remains RC36 at `d4aebdd`.
+[Release, artifact and installed-source evidence](docs/evidence/readme-current-20261107.json).
+The [earlier PR61 installation report](docs/RC40-PR61-SHIM-INSTALL-20261106.md)
+describes the previous RC40 source `a5d381a`.
+
+Windows feature parity and a standalone installer, plus the Linux/Debian server,
+remain development work. The published Windows preview does not include general
+file, process or terminal tools, or Windows service installation. No new package
+for those ongoing projects or published RC40 download is offered here.
 
 ## What KiraBridge helps you do
 
@@ -71,7 +80,7 @@ configure its terminal session as a target in KiraBridge.
 
 This preview has known terminal limitations, and the app is not Apple-notarized.
 See [RC36 fixes, checks and limits](docs/TERMINAL-MINIMIZED-RC36-20261104.md) for the current
-package and [earlier installation and help](docs/INSTALL-EN.md) for the RC20 guide.
+package; see [installation, verification and help](docs/INSTALL-EN.md).
 
 ## Keyboard sequences and fewer cloud calls
 
@@ -108,7 +117,9 @@ Private, non-business use is free under the
 [Netzwerkpunkt Personal Use License 1.0](LICENSE). Business use requires separate
 written permission. The German license text governs.
 
-[Developer documentation](docs/DEVELOPERS.md)
+[Developer documentation](docs/DEVELOPERS.md): Python 3.11 or later, the locked uv
+environment, CLI quickstart, source directories and scoped checks. Start from a
+repository checkout; the published installer and development environment are separate.
 
 Local CLI-module candidate: [Terminal/Codex/Grok adapter boundaries and test limits](docs/plans/TERMINAL-CLI-MODULES-20261104.md).
 This development package is separate from the published RC36 download and still
@@ -118,15 +129,15 @@ Local Big Plan coordinator adapter: [approved-task loop, Codex/Grok review and a
 
 The [standing-mandate supervisor](docs/COORDINATOR-CONTINUATION-20261106.md) continues coordinator-assigned ThreadDesk tasks without another user approval. It reconciles existing claims and results, skips completed work and keeps task-local problems separate from independent work.
 
-[Current source integration status](docs/BIGPLAN-INTEGRATION-STATUS-20261106.md) records accepted packages, the combined remote/crash tests and remaining CI/deployment gates. Earlier package checkpoints retain their historical results.
+[The November 6 integration checkpoint](docs/BIGPLAN-INTEGRATION-STATUS-20261106.md) records accepted packages, combined remote/crash tests and the gates open at that time. Use the [November 7 verification](docs/evidence/readme-current-20261107.json) for the reviewed source and installed pin; dated checkpoints retain their historical results.
 
-The coordinator source candidate also supports native Core activation, owner-scoped MCP `coordinator_status` and durable accepted/stopped notices through the existing completion inbox. It follows pinned tasks after successful review and checks without loading a skill. See [native coordinator contract and validation](docs/COORDINATOR-NATIVE-20261106.md); desktop and live deployment acceptance remain separate.
+The integrated coordinator source also supports native Core activation, owner-scoped MCP `coordinator_status` and durable accepted/stopped notices through the existing completion inbox. It follows pinned tasks after successful review and checks without loading a skill. See [native coordinator contract and validation](docs/COORDINATOR-NATIVE-20261106.md); desktop and live deployment acceptance remain separate.
 
 Its status projects recorded queue, execution and acceptance times from the bound Core and receipt. Missing or invalid timestamps remain unknown; reading the projection starts no work.
 
-The optional [native worker routing candidate](docs/COORDINATOR-NATIVE-ROUTING-20261106.md) reuses the verified CLI matrix for sealed managed tasks, preserving visible sessions and the separate structured Grok review protocol. Requested model/effort and observed metadata remain distinct; local fixture tests do not establish provider or deployment acceptance.
+The optional [native worker routing](docs/COORDINATOR-NATIVE-ROUTING-20261106.md) reuses the verified CLI matrix for sealed managed tasks, preserving visible sessions and the separate structured Grok review protocol. Requested model/effort and observed metadata remain distinct; local fixture tests do not establish provider or deployment acceptance.
 
-[CLI return-message fix and existing workaround](docs/NATIVE-COMPLETION-RETURNS-20261106.md): the source candidate keeps answers/results in the requesting client's inbox. Existing installations can already use `--inbox-only`; completion acknowledgements do not require another agent turn.
+[CLI return-message behavior and inbox-only delivery](docs/NATIVE-COMPLETION-RETURNS-20261106.md): the integrated source keeps answers/results in the requesting client's inbox. `--inbox-only` avoids terminal dispatch; completion acknowledgements do not require another agent turn.
 
 [Earlier Windows preview dev2](https://github.com/landjunge/KiraBridge/releases/tag/windows-v0.8.0rc31.dev2):
 native keyboard and local MCP acceptance passed in a dedicated Windows 11 VM.

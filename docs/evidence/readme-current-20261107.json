@@ -1,0 +1,478 @@
+{
+  "schema": "kirabridge.readme-current.v1",
+  "task_id": "KB-README-CURRENT-CODEX-20261107",
+  "instance": "codex-current-readme-20261107",
+  "recorded_at": "2026-11-07T10:54:19.747960+00:00",
+  "status": "local_documentation_checks_and_independent_review_passed_ready_for_PR",
+  "scope": {
+    "written_files": [
+      "README.md",
+      "README.de.md",
+      "docs/DEVELOPERS.md",
+      "docs/DEVELOPERS.de.md",
+      "docs/INSTALL-EN.md",
+      "docs/INSTALL-DE.md",
+      "docs/evidence/readme-current-20261107.json"
+    ],
+    "excluded": [
+      "product code",
+      "design assets",
+      "platform builds and VM tests",
+      "service or credentials changes",
+      "release/tag/deployment/installation"
+    ]
+  },
+  "session": {
+    "thread_id": "01a1b598-5c1f-7b63-bc92-b96141bf38a6",
+    "model": "gpt-6.1-sol",
+    "effort": "high",
+    "proof": "native turn_context model, effort and collaboration_mode.settings.reasoning_effort; no global defaults changed"
+  },
+  "repository": {
+    "origin": "https://github.com/landjunge/KiraBridge.git",
+    "private": true,
+    "worktree": "/Users/landjunge/KiraBridge-worktrees/current-readme-codex-20261107",
+    "branch": "docs/current-repository-readme-20261107",
+    "baseline": "d12838ae97c7efcc053c45c3bc9fba5e78f5fe5d",
+    "remote_main_observed": "d12838ae97c7efcc053c45c3bc9fba5e78f5fe5d",
+    "remote_verification": "git ls-remote origin refs/heads/main and GitHub branches/main API before editing; refresh required before integration",
+    "source_version": "0.8.0rc40",
+    "version_sources": [
+      "pyproject.toml",
+      "uv.lock",
+      "src/kirabridge/__init__.py"
+    ],
+    "manifest_sha256": "3cc7c44f21085b00f44b6d6fbaa88f3fb01655b9cce7cdcf84a330c5efcc8e5e",
+    "lock_sha256": "5886e096d27acc803c7d25f2889ecd10387df7494b49ed11dc0a18998c550eb6",
+    "remote_main_before_integration": "d12838ae97c7efcc053c45c3bc9fba5e78f5fe5d",
+    "remote_main_before_integration_observed_at": "2026-11-07T10:54:19.747960+00:00"
+  },
+  "original_errors": [
+    {
+      "files": [
+        "README.md",
+        "README.de.md"
+      ],
+      "before": "Current RC40 installation linked only to PR61 source a5d381a, although current installed runtime and main are d12838a. Integrated coordinator/routing/return changes still called source candidates; November 6 integration checkpoint presented as current gates.",
+      "after": "Date/pin reviewed source and actual runtime; label the PR61 report and integration checkpoint as historical; integrated-source terminology without claiming provider/platform acceptance."
+    },
+    {
+      "files": [
+        "README.md",
+        "README.de.md"
+      ],
+      "before": "Windows setup preview called new, with seven native phases insufficiently scoped; no clear distinction from current Windows parity/standalone installer and Linux/Debian work.",
+      "after": "Scope native success to published rc37.dev1 preview; preserve its unsupported general file/process/terminal/service limits; ongoing worker work has no new accepted download here."
+    },
+    {
+      "files": [
+        "docs/DEVELOPERS.md",
+        "docs/DEVELOPERS.de.md"
+      ],
+      "before": "Contradictory current RC30 and newest download RC20, no clone/root/CLI quickstart, old operational source links, incomplete remote CI prerequisites.",
+      "after": "Separate RC36 artifact, RC40 baseline/runtime, Python >=3.11, uv/CLI/directories/dependencies and scoped tests; document remote-ci, separate fresh processes and all three exact external pins. Historical evidence remains pinned."
+    },
+    {
+      "files": [
+        "docs/INSTALL-EN.md",
+        "docs/INSTALL-DE.md"
+      ],
+      "before": "RC20 guide pointed at current README download while requiring absent top-level INSTALLIEREN-DE.txt/.command/manual app copying, app-only ZIP and SHA256SUMS-INTEL.",
+      "after": "Document actual RC36 Installer.app, bundled app/service update, prerequisites and SHA256SUMS; pin bootstrap RC36 and explicitly request desktop + visible Terminal; retain safety/recovery content and accurately scope RC36 tab-switch limitation."
+    }
+  ],
+  "published_releases": {
+    "source_api": "https://api.github.com/repos/landjunge/KiraBridge/releases?per_page=100",
+    "authentication": "existing gh authenticated repository access; no tokens logged",
+    "release_count": 30,
+    "published_stable_count": 0,
+    "latest_intel": {
+      "draft": false,
+      "id": 434149683,
+      "prerelease": true,
+      "published_at": "2026-11-04T16:10:56Z",
+      "tag_name": "v0.8.0rc36",
+      "target_commitish": "d4aebdd89a206045731f2692a3f363fddaa15ee0",
+      "assets": [
+        {
+          "browser_download_url": "https://github.com/landjunge/KiraBridge/releases/download/v0.8.0rc36/install-macos.sh",
+          "digest": "sha256:7f1deda87b455fec29bb04819c881638eaa07299997618a7666e4bd88c02a73e",
+          "id": 710087026,
+          "name": "install-macos.sh",
+          "size": 586
+        },
+        {
+          "browser_download_url": "https://github.com/landjunge/KiraBridge/releases/download/v0.8.0rc36/install-macos.sh.sha256",
+          "digest": "sha256:b0cca70d74038e242c43a79118a6156972823bf0ac9fecb136003421c4cb08ef",
+          "id": 710087260,
+          "name": "install-macos.sh.sha256",
+          "size": 83
+        },
+        {
+          "browser_download_url": "https://github.com/landjunge/KiraBridge/releases/download/v0.8.0rc36/KiraBridge-0.8.0rc36-Intel-Installer.zip",
+          "digest": "sha256:35540760776e065a4c0cfddf95ca6f8fe5e2d90d2f9e58489ea4d04edd212dca",
+          "id": 710086898,
+          "name": "KiraBridge-0.8.0rc36-Intel-Installer.zip",
+          "size": 3623180
+        },
+        {
+          "browser_download_url": "https://github.com/landjunge/KiraBridge/releases/download/v0.8.0rc36/SHA256SUMS",
+          "digest": "sha256:03c8ea877859a05c7060c4282a2bec2454dfa0ef7c1639150cb43378b9b1bb6a",
+          "id": 710087328,
+          "name": "SHA256SUMS",
+          "size": 458
+        }
+      ]
+    },
+    "windows_setup_preview": {
+      "draft": false,
+      "id": 434403271,
+      "prerelease": true,
+      "published_at": "2026-11-04T20:36:17Z",
+      "tag_name": "windows-v0.8.0rc37.dev1",
+      "target_commitish": "0a2f7cb8cf84d47462a094917241950a152fe364",
+      "assets": [
+        {
+          "browser_download_url": "https://github.com/landjunge/KiraBridge/releases/download/windows-v0.8.0rc37.dev1/KiraBridge-0.8.0rc37.dev1-Windows-Dev-Kit.zip",
+          "digest": "sha256:a21a214c77d21fec0e11a166147fc14dcb1d6dd88adc0fb2d45501ec8748772f",
+          "id": 710784018,
+          "name": "KiraBridge-0.8.0rc37.dev1-Windows-Dev-Kit.zip",
+          "size": 83879137
+        },
+        {
+          "browser_download_url": "https://github.com/landjunge/KiraBridge/releases/download/windows-v0.8.0rc37.dev1/package.json",
+          "digest": "sha256:1c6b0f0d479a26d2892ed3a7f79c55a6c7577ce53c8f5344a66653f3359bf61a",
+          "id": 710784044,
+          "name": "package.json",
+          "size": 1600
+        },
+        {
+          "browser_download_url": "https://github.com/landjunge/KiraBridge/releases/download/windows-v0.8.0rc37.dev1/SHA256SUMS",
+          "digest": "sha256:be8840a21f0a7f4acea6871c67be61a0edb680c6ee1d571da8da7ddd2dd8f9bb",
+          "id": 710784015,
+          "name": "SHA256SUMS",
+          "size": 354
+        }
+      ]
+    },
+    "draft_tags": [
+      "v0.8.0rc17",
+      "v0.8.0rc16",
+      "v0.8.0rc15",
+      "v0.6.0rc2"
+    ],
+    "tag_refs": {
+      "v0.8.0rc36": "d4aebdd89a206045731f2692a3f363fddaa15ee0",
+      "windows-v0.8.0rc37.dev1": "0a2f7cb8cf84d47462a094917241950a152fe364"
+    },
+    "tag_ref_verification": "GitHub git/ref/tags endpoint returned commit type and same full source SHA; tag/target_commitish alone is not artifact proof",
+    "linux_limit": "Only published Linux named artifacts observed in older 0.7.0rc1/rc2 releases. These do not establish acceptance of the ongoing current Linux/Debian server; no current Linux download promoted."
+  },
+  "artifact_verification": {
+    "intel_installer": {
+      "bytes": 3623180,
+      "sha256": "35540760776e065a4c0cfddf95ca6f8fe5e2d90d2f9e58489ea4d04edd212dca",
+      "downloaded_with": "gh release download v0.8.0rc36 -R landjunge/KiraBridge",
+      "matches_github_digest": true,
+      "matches_release_SHA256SUMS": true,
+      "installer_package_metadata": {
+        "architecture": "x86_64",
+        "runtime_archive_sha256": "7e9033a5851fda1b9f2991df7c4f7f1b991eda321916cb3781311787f47927dc",
+        "schema": "kirabridge.installer-app.v1",
+        "source_commit": "d4aebdd89a206045731f2692a3f363fddaa15ee0",
+        "version": "0.8.0rc36"
+      },
+      "embedded_release_metadata": {
+        "version": "0.8.0rc36",
+        "commit": "d4aebdd89a206045731f2692a3f363fddaa15ee0",
+        "source_commit": "d4aebdd89a206045731f2692a3f363fddaa15ee0",
+        "platforms": [
+          "Darwin-x86_64"
+        ],
+        "runtime": "Python 3.11, uv 0.11.6; dependencies from hash-locked uv.lock",
+        "apple_signed": false,
+        "native_app": {
+          "schema": "kirabridge.native-app.v1",
+          "path": "native/KiraBridge.app",
+          "protocol": 1,
+          "source_commit": "d4aebdd89a206045731f2692a3f363fddaa15ee0",
+          "binary_sha256": "c9c8bf0dde67d2efe0402fd36400400187c740bcbd9e8a5c906629eae3130515",
+          "signing": "ad-hoc",
+          "architecture": "x86_64"
+        }
+      },
+      "archive_entrypoint": "KiraBridge-Installer.app",
+      "inspected_without_executing_installer": true
+    },
+    "intel_checksums": {
+      "bytes": 458,
+      "sha256": "03c8ea877859a05c7060c4282a2bec2454dfa0ef7c1639150cb43378b9b1bb6a"
+    },
+    "bootstrap": {
+      "bytes": 586,
+      "sha256": "7f1deda87b455fec29bb04819c881638eaa07299997618a7666e4bd88c02a73e",
+      "checksum_file_check": "passed",
+      "pinned_archive_sha256": "7e9033a5851fda1b9f2991df7c4f7f1b991eda321916cb3781311787f47927dc",
+      "syntax_check": "sh -n passed; script was not executed"
+    },
+    "windows_package_metadata": {
+      "acceptance_reexecuted_by_builder": false,
+      "acceptance_scope": "Existing matching native guest reports; not remote attestation",
+      "architecture": "Windows x86_64",
+      "component_provenance_reuse": false,
+      "mac_production_installation_changed": false,
+      "name": "KiraBridge Windows Dev Kit",
+      "native_guest_phases": [
+        "core",
+        "keyboard",
+        "mcp",
+        "preview",
+        "shortcuts",
+        "windows",
+        "setup"
+      ],
+      "native_proofs_sha256": "c68bba16de5b945a11c147ee23fc8c5e11419568dfc5a723cc91bcec0fe385fa",
+      "offline_wheels": 38,
+      "payload_files": 42,
+      "payload_manifest_sha256": "6b34b75caac1348ec18fc2a2f43d3a513f1c0a28bc479cd65c0ac217f9c3f9af",
+      "python_version": "3.14.10",
+      "source_commit": "0a2f7cb8cf84d47462a094917241950a152fe364",
+      "supported_preview": [
+        "Authenticated local MCP HTTP/stdio",
+        "Guarded native keyboard tasks and sequences",
+        "Explicit Ctrl/Alt/Shift/Windows shortcuts with owned modifier release",
+        "Pinned native window listing, activation, geometry and window-state actions",
+        "Regular pinned window close requests without force termination",
+        "Fresh target identity and durable no-replay receipts",
+        "German graphical setup assistant with explicit desktop scope and response-code test",
+        "Pinned official Windows tunnel client included for offline preparation"
+      ],
+      "unsupported_preview": [
+        "Full Windows desktop GUI",
+        "General file/process/terminal tools",
+        "Windows service installation",
+        "External ChatGPT cloud latency acceptance"
+      ],
+      "version": "0.8.0rc37.dev1",
+      "windows_os_iso_included": false
+    },
+    "windows_metadata_digest": {
+      "bytes": 1600,
+      "sha256": "1c6b0f0d479a26d2892ed3a7f79c55a6c7577ce53c8f5344a66653f3359bf61a"
+    },
+    "windows_limit": "Only package.json and SHA256SUMS were downloaded in this task; full 83,879,137-byte Windows ZIP/native-acceptance report was not redownloaded or executed. Historical native phases/installation are sourced to existing dated report, not repeated here."
+  },
+  "installed_mac": {
+    "observed_at_scope": "2026-11-07 10:50:34 UTC",
+    "read_only_live_runtime": {
+      "instance_id": "dda345815e4c4e47b14cd323ee31b6ba",
+      "version": "0.8.0rc40",
+      "pid": 37117,
+      "started_at": "2026-11-06T19:58:37.818663+00:00",
+      "source_tree_sha256": "2f96d09b66627164337f49f831df862cff7b4b62c1ec39b413d95c9388087d2f",
+      "source_file_count": 214,
+      "source_package_path": "/Users/landjunge/.local/share/kirabridge/install/releases/0.8.0rc40-d12838ae97c7/source/.venv/lib/python3.11/site-packages/kirabridge",
+      "source_scope": "package Python files observed at startup; no remote attestation"
+    },
+    "host": {
+      "platform": "darwin",
+      "os_version": "15.7.4",
+      "os_build": "24G517",
+      "architecture": "x86_64"
+    },
+    "installer_receipt": "~/.local/share/kirabridge/install/current.json",
+    "installer_receipt_version": "0.8.0rc40",
+    "installer_receipt_source": "d12838ae97c7efcc053c45c3bc9fba5e78f5fe5d",
+    "package_source_comparison": {
+      "source_commit": "d12838ae97c7efcc053c45c3bc9fba5e78f5fe5d",
+      "installed_python_files_compared": 214,
+      "mismatches": [],
+      "scope": "read-only installed package bytes against exact Git source, no installation or native action"
+    },
+    "previous_installation_report": "docs/RC40-PR61-SHIM-INSTALL-20261106.md describes a5d381ae61146850ab83f332a032679d4d5896cf, not current d12838a",
+    "prior_native_acceptance": "~/.local/state/mac-audit-integration-20261106.json, recorded 2026-11-06T21:07:38.740990+00:00, status completed_authorized_bounded_macos_scope",
+    "current_task_native_acceptance_reexecuted": false,
+    "installed_source_main_CI": {
+      "id": 42281574448,
+      "head_sha": "d12838ae97c7efcc053c45c3bc9fba5e78f5fe5d",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/landjunge/KiraBridge/actions/runs/42281574448",
+      "verification": "fresh GitHub actions/runs API"
+    }
+  },
+  "developer_sources": {
+    "python_requirement": ">=3.11",
+    "uv_workflow_pin": "0.11.6",
+    "entrypoint": "kirabridge.cli:main",
+    "ci_pins": {
+      "legacy_threaddesk": "770bbc9f0c0a02699cc93cad47d2e2c3782f7080",
+      "remote_threaddesk_m4": "a0dd4c39478b031e0e31d335c2a15435dfbc52eb",
+      "tollgate": "53fc57cc2e082d022e65e5929cb2a1e186fba852"
+    },
+    "source_files": [
+      "pyproject.toml",
+      "uv.lock",
+      "src/kirabridge/cli.py",
+      ".github/workflows/ci.yml",
+      "scripts/ci_remote_tests.py",
+      "installer/install.py"
+    ]
+  },
+  "checks": {
+    "environment": {
+      "command": "UV_CACHE_DIR=/tmp/kb-readme-uv-cache UV_PYTHON_DOWNLOADS=never uv sync --locked --dev --python /usr/local/bin/python3.11",
+      "result": "passed",
+      "python": "CPython 3.11.15",
+      "packages_installed": 37,
+      "source_import": "/Users/landjunge/KiraBridge-worktrees/current-readme-codex-20261107/src/kirabridge/__init__.py",
+      "scope": "fresh checkout-local editable development environment; no service start/platform artifact build"
+    },
+    "cli_examples": [
+      {
+        "command": "uv run --locked kirabridge --version",
+        "result": "kirabridge 0.8.0rc40",
+        "exit_code": 0
+      },
+      {
+        "command": "uv run --locked kirabridge --help",
+        "result": "passed; supported subcommands displayed, no service connection",
+        "exit_code": 0
+      }
+    ],
+    "shell_syntax": {
+      "command": "sh -n on documentation sh blocks plus downloaded RC36 bootstrap/embedded install.sh",
+      "result": "passed; no install command executed"
+    },
+    "initial_checker_findings": "First in-progress link check found the not-yet-written evidence file and overly strict duplicate-count comparison between translations. Final check uses semantic target/pin sets; DE macOS-contract reference aligned. This was not a product test failure.",
+    "local_products_tests": "not run: documentation-only; required Verify CI remains an integration gate",
+    "temporary_probe_failure": "Initial read-only installed byte comparison used system python3 (older than project minimum); str.removeprefix raised AttributeError. Corrected helper interpreter to Python 3.11 and reran only the comparison.",
+    "documentation_static": {
+      "status": "passed",
+      "counts": {
+        "links_and_assets": 155,
+        "local_links_and_assets": 117,
+        "external_references": 38,
+        "pinned_git_links": 16,
+        "shell_syntax_blocks": 8
+      },
+      "issues": [],
+      "files": [
+        {
+          "path": "README.md",
+          "sha256": "e6ca3149bc3bfce3ae9f61a45a63f217d38fee5c7ca80993db91f002135da5c0"
+        },
+        {
+          "path": "README.de.md",
+          "sha256": "b7accbd84f768f3985fba782f05b50ca394c5f0d5b33803609568ea82e7a6a3f"
+        },
+        {
+          "path": "docs/DEVELOPERS.md",
+          "sha256": "e778ed80c528d95cd42e41b265bbfd9b1fce50de491b3c16b6e9744c54fb50ce"
+        },
+        {
+          "path": "docs/DEVELOPERS.de.md",
+          "sha256": "2721f03b7f7f5b4046a1f5ce09c5a76f8c82987735f778c2c5140cb1166f5343"
+        },
+        {
+          "path": "docs/INSTALL-EN.md",
+          "sha256": "8f6e9d0ac64bea1385015f8050b818ea80b232ef906fcbbfe76da941c4f46fa6"
+        },
+        {
+          "path": "docs/INSTALL-DE.md",
+          "sha256": "0b3113b7f5af0f11642322ba83faf6a004431a539c00df41d7f2d8760b842d96"
+        }
+      ],
+      "scope": "local targets/anchors, pinned Git blobs, HTML image sources, fence/whitespace and shell syntax, DE/EN source/version/GitHub-link parity, unchanged README artwork"
+    },
+    "git_diff_check": {
+      "command": "git diff --check",
+      "result": "passed"
+    }
+  },
+  "independent_review": {
+    "agent": "/root/developer_docs_audit",
+    "mode": "native read-only agent, inherited model/effort",
+    "initial_findings": "Confirmed stale developer/install versions, missing CLI/root quickstart and M4 source environment, old operational pins, no dedicated existing Markdown/link test; no files changed. Main worker reviewed these before editing.",
+    "final_review": {
+      "status": "passed_no_P1_P2_findings",
+      "baseline": "d12838ae97c7efcc053c45c3bc9fba5e78f5fe5d",
+      "paths": [
+        "README.md",
+        "README.de.md",
+        "docs/DEVELOPERS.md",
+        "docs/DEVELOPERS.de.md",
+        "docs/INSTALL-EN.md",
+        "docs/INSTALL-DE.md",
+        "docs/evidence/readme-current-20261107.json"
+      ],
+      "scope": "read-only diff, facts, translation parity, original artwork, CLI/manifest/CI commands and documentation scope; no product/native tests repeated",
+      "reviewer_message": "RC36 download, RC40 source/runtime and ongoing platform work correctly separated; remaining PR/CI/channel limits explicitly documented."
+    }
+  },
+  "websites": {
+    "referenced_project_site": "https://kirabridge.netzwerkpunkt.de/",
+    "reference_source": "docs/DISCUSSION-DRAFT.md (explicitly unpublished plan), docs/PROJECT-NAMING.md",
+    "web_tool_result": "URL is not accessible via this tool",
+    "curl_result": "curl: (60) SSL: no alternative certificate subject name matches target host name 'kirabridge.netzwerkpunkt.de'",
+    "followup": "Website owner must configure a matching TLS certificate and review version/download status when an actual website source/deployment is supplied. No live content inferred, no new website link promoted and no deployment performed.",
+    "visuals": "Original README picture/light/dark icons, dimensions, colors and language switches preserved; no new screenshot required for factual text updates."
+  },
+  "ci_before_push": {
+    "workflows_read": [
+      ".github/workflows/ci.yml",
+      ".github/workflows/macos-package.yml",
+      ".github/workflows/release-candidate.yml"
+    ],
+    "automatic_push_pr_jobs": "Verify, existing self-hosted kirabridge Linux runners, Python 3.11 and 3.13, 20-minute timeout; normal lint/tests/build. Concurrency may replace a same-branch push run with the PR run.",
+    "manual_only": "hosted macOS Verify all, macOS package acceptance and release candidate; none dispatched",
+    "runner_api_observation": "two existing online Linux X64 Debian runners, kirabridge label, idle at observation",
+    "cost_scope": "No new hosted platform build or paid API selected; existing normal repository CI within authorized integration. No zero-cost promise for existing resources.",
+    "branch_api": "main protected=false, required_status_checks empty in branch response",
+    "protection_rulesets_limit": "Dedicated protection and rulesets endpoints returned HTTP403: Upgrade to GitHub Pro or make this repository public to enable this feature. No unobserved rule is asserted absent; normal PR mergeability and actual checks must be honored.",
+    "workflow_changes": false,
+    "check_bypass": false
+  },
+  "coordination": {
+    "board": "188ce4729a62",
+    "observed_revision": 927,
+    "board_read": "succeeded; existing content preserved, no competing work board created",
+    "append_operation_id": "kb-readme-current-start-20261107-01",
+    "append_result": "MCP tool call requires approval, but approval policy is never",
+    "append_saved": false,
+    "design_worker_thread": "01a1b585-1a6b-7603-a309-cee5a18777b2",
+    "design_coordination_result": "send_message_to_thread rejected: MCP tool call requires approval, but approval policy is never; no agreement claimed. README artwork unchanged; fresh remote/diff check required before integration.",
+    "bigplan_report": {
+      "instance": "codex-current-readme-20261107",
+      "report_id": "kb-readme-start-01",
+      "result": "PermissionError: [Errno 1] Operation not permitted: '.management.lock'; threaddesk.core.errors.InvalidState: management_control_path",
+      "saved": false
+    },
+    "local_checkpoint": "/tmp/codex-current-readme-20261107.json; standalone reports remain unsynchronized until authorized channel is available",
+    "append_reconciliation": {
+      "operation_id": "kb-readme-current-start-20261107-01",
+      "found": false,
+      "result": null,
+      "proof": "independent td_thread_operation_status read after tool approval rejection; no retry"
+    },
+    "design_read_only_observation": "Existing design thread read without input; latest visible message concerned source header cache/language and 4AllPass offline icons. No successful coordination message or README ownership acknowledgement claimed; this change preserves artwork and main README content outside factual scope."
+  },
+  "integration": {
+    "state": "ready_for_branch_push_PR_and_required_checks",
+    "authorized": "User explicitly authorizes branch push, PR, required checks/review and regular merge; no release/tag/deployment",
+    "primary_worktree_git_blockers": [
+      "git fetch origin main: cannot open .../FETCH_HEAD: Operation not permitted",
+      "git add: Unable to create .../index.lock: Operation not permitted"
+    ],
+    "method": "Temporary local clone of the same repository within /tmp for normal commit/push/PR. Original protected Git metadata is not modified; its local branch synchronization must be reported separately.",
+    "final_proof_location": "PR check/review/merge records and final coordinator handoff; avoid another mandatory whole-CI cycle solely to self-record its own resulting commit SHA.",
+    "temporary_clone": "/tmp/kb-readme-integration-20261107"
+  },
+  "remaining_limits": [
+    "Windows parity, standalone Windows installer and current Linux/Debian server remain separate active work; no worker code changed.",
+    "Apple Silicon and other OS/native/provider acceptance not performed here.",
+    "Website TLS/content could not be verified.",
+    "ThreadDesk/report/design messaging writes blocked by current tool/sandbox permissions; no save/readback claimed.",
+    "No mandatory CI/review status may be claimed passed before its actual completed result."
+  ]
+}

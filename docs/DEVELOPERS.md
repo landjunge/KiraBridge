@@ -1,23 +1,48 @@
 [Deutsch](DEVELOPERS.de.md) · [README](../README.md)
 
-Current status: [RC30, published and installed](RC30-HOTPATHS-20261103.md),
-source pin `2d540ee05f945efdd2330b46a1a65a4b94bcb482`. Dated release claims
-in the retained guide below describe RC20.
-
 # KiraBridge: development and operations
 
 ## Source and release
 
-The newest published download is the Intel preview
-[0.8.0rc20, dated October 30, 2026](https://github.com/landjunge/KiraBridge/releases/tag/v0.8.0rc20),
-source pin `da1bdaed019c31aa11bb28a39ef8bead7e73c1d4`. The READMEs describe that published download. A working branch and the installed
-service can have different source versions. This documentation update does not
-integrate unpublished application changes.
-[Verification report and claim evidence](README-REVIEW-20261031.md).
+Reviewed November 7, 2026: the repository baseline `d12838ae97c7efcc053c45c3bc9fba5e78f5fe5d`
+declares `0.8.0rc40` in `pyproject.toml`, `uv.lock` and the Python package.
+The installed Intel runtime reports that source pin. The newest published Intel
+download is still [RC36](https://github.com/landjunge/KiraBridge/releases/tag/v0.8.0rc36),
+source `d4aebdd89a206045731f2692a3f363fddaa15ee0`. Its authenticated installer
+download matches both GitHub's digest and `SHA256SUMS`.
+[Verification, sources and remaining limits](evidence/readme-current-20261107.json).
 
-RC18 remains an older published preview. RC17, RC16 and RC15 are drafts, with
-historical evidence retained. Check the GitHub release, artifact source pin and
-responding installed service independently.
+The separate [Windows setup preview](WINDOWS-SETUP-20261104.md) is `0.8.0rc37.dev1`;
+it does not establish feature parity or a Windows service installer. Current
+Windows/installer and Linux/Debian server work remains separate from those downloads.
+RC17, RC16 and RC15 remain drafts. Check release state, artifact source and the
+responding service independently; a version string alone does not identify a build.
+
+## Developer quickstart
+
+Use Git, Python **3.11 or later** (`requires-python`), and uv; CI pins uv **0.11.6**.
+Cloning this private repository requires GitHub access. In a separate checkout:
+
+```sh
+git clone https://github.com/landjunge/KiraBridge.git
+cd KiraBridge
+uv sync --locked --dev
+uv run --locked kirabridge --version
+uv run --locked kirabridge --help
+```
+
+The last two commands print version/help without configuring or starting a service.
+`uv sync` creates this checkout's `.venv`; it does not update an installed KiraBridge.
+Runtime dependencies are MCP, HTTPX and Uvicorn, plus Cryptography on Intel macOS.
+The dev group adds pytest, pytest-asyncio and Ruff. Exact resolutions are in `uv.lock`.
+
+| Directory | Purpose |
+| --- | --- |
+| `src/kirabridge/` | Python core, CLI, MCP gateway, managers and platform adapters |
+| `tests/` | Unit, contract and integration checks |
+| `installer/` | Versioned installation, update and rollback |
+| `scripts/` | Packaging, native acceptance and CI helpers |
+| `docs/`, `examples/`, `integrations/` | Contracts, examples and optional integrations |
 
 ## Architecture and interfaces
 
@@ -26,11 +51,11 @@ in SQLite. Separate managers own files, processes, agents, visible sessions and
 permissions.
 
 - [Architecture](ARCHITECTURE.md) and [development plan](DEVELOPMENT_PLAN.md)
-- [Complete file/log reads](https://github.com/landjunge/KiraBridge/blob/307004e5b2e4285c19e8d7544bedf45b28297a0b/docs/READ-FULL-FILES.md) and [file transfer](https://github.com/landjunge/KiraBridge/blob/307004e5b2e4285c19e8d7544bedf45b28297a0b/docs/FILE-TRANSFER.md)
-- [Queue contract](https://github.com/landjunge/KiraBridge/blob/307004e5b2e4285c19e8d7544bedf45b28297a0b/docs/QUEUE-MANAGEMENT.md) and [direct admission](https://github.com/landjunge/KiraBridge/blob/307004e5b2e4285c19e8d7544bedf45b28297a0b/docs/QUEUE-DIRECT-ADMISSION-20261029.md)
-- [Optional ThreadDesk integration](https://github.com/landjunge/KiraBridge/blob/307004e5b2e4285c19e8d7544bedf45b28297a0b/docs/DYNAMIC-THREADDESK-PROXY.md)
+- [Complete file/log reads](READ-FULL-FILES.md) and [file transfer](FILE-TRANSFER.md)
+- [Queue contract](QUEUE-MANAGEMENT.md) and [direct admission](QUEUE-DIRECT-ADMISSION-20261029.md)
+- [Optional ThreadDesk integration](DYNAMIC-THREADDESK-PROXY.md)
 - [Bounded Whiteboard continuation](plans/BIGPLAN-AUTONEXT-20261104.md): operator-pinned READY tasks, acceptance receipts and activation gates; disabled by default.
-- [RC20 changes at the published source pin](https://github.com/landjunge/KiraBridge/blob/v0.8.0rc20/docs/RELEASE-0.8.0rc20.md)
+- [Published RC36 changes](https://github.com/landjunge/KiraBridge/blob/v0.8.0rc36/docs/RELEASE-0.8.0rc36.md)
 
 These detailed documents contain dated operational observations. Their old version
 statements do not replace current release or service evidence.
@@ -71,7 +96,7 @@ and Git. Installation does not grant additional OS permissions.
 | Installer reports `BUSY` | Let actual work finish; do not bypass guards. |
 | Start or rollback times out | Read logs, health and the responding version before claiming success. |
 
-[Repair evidence](https://github.com/landjunge/KiraBridge/blob/307004e5b2e4285c19e8d7544bedf45b28297a0b/docs/QUEUE-DIRECT-ADMISSION-20261029.md) · [Intel report](https://github.com/landjunge/KiraBridge/blob/307004e5b2e4285c19e8d7544bedf45b28297a0b/docs/INTEL-RELEASE-20261029.md)
+[Repair evidence](QUEUE-DIRECT-ADMISSION-20261029.md) · [Intel report](https://github.com/landjunge/KiraBridge/blob/307004e5b2e4285c19e8d7544bedf45b28297a0b/docs/INTEL-RELEASE-20261029.md)
 
 ## Tests and builds
 
@@ -85,24 +110,40 @@ performs real installation, upgrade, start, idempotency, restart, KeepAlive,
 rollback and fresh-install checks under a separate test label. It is not a dry run:
 never give it production paths, and independently confirm cleanup afterwards.
 
-Source checks follow `pyproject.toml`, `uv.lock` and [the CI workflow](../.github/workflows/ci.yml):
+For a code change, synchronize the locked dev environment, then run Ruff and
+only the relevant existing test files (replace the path with the affected test):
 
 ```sh
 uv sync --locked --dev
-uv run ruff check .
-uv run ruff format --check .
-uv run pytest -q -W error::pytest.PytestUnraisableExceptionWarning
-uv build
+uv run --locked ruff check .
+uv run --locked ruff format --check .
+uv run --locked pytest -q tests/test_cli_support.py -W error::pytest.PytestUnraisableExceptionWarning
 ```
 
-Run only tests needed for the change. Integration cases need the workflow's pinned
-external sources through `KIRABRIDGE_TEST_THREADDESK_SOURCE` and
-`KIRABRIDGE_TEST_TOLLGATE_SOURCE`. Missing optional sources do not establish an
-integration pass. Documentation validation needs no productive service.
+Documentation-only changes need scoped link, Markdown, translation and example
+checks; they do not require a product build or a local whole-suite run.
+The [Verify workflow](../.github/workflows/ci.yml) still performs its required
+lint, tests and `uv build` on push/PR. Automatic jobs use the existing self-hosted
+Linux runners for Python 3.11/3.13; hosted macOS and package workflows require manual
+selection. [CI selection, costs and platform limits](CI-COST-GATES-20261106.md).
+
+Full integration reproduction needs `uv sync --locked --dev --group remote-ci`
+and the exact external checkouts below. CI uses `scripts/ci_remote_tests.py`
+in separate fresh legacy and remote processes, binding imports, pins and results:
+
+| Lane | Sources and environment |
+| --- | --- |
+| Legacy | ThreadDesk `770bbc9f0c0a02699cc93cad47d2e2c3782f7080`, `KIRABRIDGE_TEST_THREADDESK_SOURCE=<checkout>/src`; TollGate `53fc57cc2e082d022e65e5929cb2a1e186fba852`, `KIRABRIDGE_TEST_TOLLGATE_SOURCE=<checkout>` |
+| Remote R2/R3 | ThreadDesk M4 `a0dd4c39478b031e0e31d335c2a15435dfbc52eb`; both `KIRABRIDGE_TEST_THREADDESK_SOURCE` and `KIRABRIDGE_TEST_REMOTE_THREADDESK_SOURCE` point to its `src/`; no legacy TD/TollGate imports |
+
+See the workflow's exact `PYTHONPATH`, temporary/report directories and helper
+arguments, plus the [remote CI pin gate](REMOTE-CI-PIN-GATE-20261106.md).
+Missing optional sources or skipped checks do not establish integration acceptance.
+Documentation validation needs no productive service.
 
 ## Operation, updates and recovery
 
-The [installation guide](INSTALL-EN.md) and [macOS contract](https://github.com/landjunge/KiraBridge/blob/307004e5b2e4285c19e8d7544bedf45b28297a0b/docs/INSTALL-MACOS.md)
+The [installation guide](INSTALL-EN.md) and [macOS contract](INSTALL-MACOS.md)
 contain status, log and rollback commands. The launchd user service survives closing
 the app, Terminal or browser. Default data, runtimes, backups and logs live under
 `~/.local/share/kirabridge/`, with the versioned installation under `install/`.
@@ -116,5 +157,5 @@ same release detect corruption but do not replace an independent publisher signa
 
 Historical evidence: [RC18 publication and installation](https://github.com/landjunge/KiraBridge/blob/307004e5b2e4285c19e8d7544bedf45b28297a0b/docs/RC18-PUBLISH-INSTALL-20261029.md),
 [Intel report](https://github.com/landjunge/KiraBridge/blob/307004e5b2e4285c19e8d7544bedf45b28297a0b/docs/INTEL-RELEASE-20261029.md), [RC14 rollback](https://github.com/landjunge/KiraBridge/blob/307004e5b2e4285c19e8d7544bedf45b28297a0b/docs/RC14-ROLLBACK-20261026.md).
-RC20 publication does not establish ARM, macOS 26, hosted macOS CI or every
+RC36 publication does not establish ARM, macOS 26, hosted macOS CI or every
 ChatGPT Live/Voice workflow.
