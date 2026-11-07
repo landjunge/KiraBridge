@@ -70,7 +70,13 @@ export function mountProductHeader(element, {selfId, locale = "de", selfRoute = 
   const visibility = () => { active?.abort(); active = null; if (!doc.hidden) refresh(); };
   doc.addEventListener("visibilitychange", visibility);
   const interval = win.setInterval(refresh, 4000); refresh();
+  const languageObserver = new win.MutationObserver(() => {
+    language = doc.documentElement.lang === "en" ? "en" : "de";
+    bar.setLocale(language);
+    if (dialog.open) dialog.close();
+  });
+  languageObserver.observe(doc.documentElement, {attributes:true, attributeFilter:["lang"]});
   const api = Object.freeze({bar, refresh, setLocale(value) { language = value === "en" ? "en" : "de"; bar.setLocale(language); if (dialog.open) dialog.close(); },
-    destroy() { if (stopped) return; stopped = true; hosts.delete(element); active?.abort(); win.clearInterval(interval); doc.removeEventListener("visibilitychange", visibility); bar.destroy(); dialog.remove(); }});
+    destroy() { if (stopped) return; stopped = true; hosts.delete(element); active?.abort(); win.clearInterval(interval); languageObserver.disconnect(); doc.removeEventListener("visibilitychange", visibility); bar.destroy(); dialog.remove(); }});
   hosts.set(element, api); return api;
 }
