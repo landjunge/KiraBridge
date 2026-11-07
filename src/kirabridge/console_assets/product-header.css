@@ -1,0 +1,8 @@
+:root{color-scheme:dark;--np-canvas:#000;--np-text:#edf0f4;--np-muted:#afb6c1;--np-surface:#1a1c20;--np-hover:#25282e;--np-divider:#353940;--np-control-border:#808996;--np-focus:#edf0f4;--np-action:#edf0f4;--np-action-text:#121316;--muted:#afb6c1;--line:#353940;--panel:#1a1c20;--accent:#edf0f4;background:#000;color:#edf0f4}body{background:#000}.app-shell{grid-template-rows:auto 36px minmax(0,1fr) 28px}.topbar,.console-header{flex-wrap:wrap;gap:12px}.topbar .brand{order:-1;min-width:170px}.topbar .np-appbar-host{flex:none}.process-panel,.main-panel{border-radius:0;background:#1a1c20}.notice{border-radius:0;background:#1a1c20;color:#edf0f4}button{border-radius:0;background:#1a1c20;border-color:#808996}a{color:#edf0f4}@media(max-width:760px){.topbar .np-appbar-host{order:1;flex-basis:100%}.app-shell{padding:12px;height:auto;min-height:100dvh}.workspace{min-height:600px}}
+
+/* Shared header on the team, connector and protocol views as well as the control centre. */
+.console-header .np-appbar-host,.protocol-toolbar .np-appbar-host{flex:none}
+.protocol-toolbar{flex-wrap:wrap;gap:12px}
+@media(max-width:760px){.console-header .np-appbar-host,.protocol-toolbar .np-appbar-host{flex-basis:100%;order:1}}
+
+.topbar,.console-header,.protocol-toolbar{position:sticky;top:0;z-index:30;background:#000}
