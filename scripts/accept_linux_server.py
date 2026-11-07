@@ -387,7 +387,11 @@ def cleanup(run, unit_path, config, unit, port, evidence):
     # Only this exact owned test unit; leave all test data/evidence for review.
     if unit_path.exists():
         escaped = (
-            str(config).replace("\\", "\\\\").replace('"', '\\"').replace("%", "%%").replace("$", "$$")
+            str(config)
+            .replace("\\", "\\\\")
+            .replace('"', '\\"')
+            .replace("%", "%%")
+            .replace("$", "$$")
         )
         assert '"' + escaped + '"' in unit_path.read_text()
         run(["systemctl", "--user", "disable", "--now", unit])
