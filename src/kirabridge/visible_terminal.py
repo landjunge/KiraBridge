@@ -17,6 +17,7 @@ from kirabridge.platform_adapters.shell_prompt import empty_shell_prompt
 from kirabridge.private_files import private_json, write_private
 from kirabridge.session_manager import SessionOpen, SessionReference
 from kirabridge.terminal_manager import check_executable
+from kirabridge.timing import timed
 
 
 class VisibleTerminalInput(TerminalInput):
@@ -158,30 +159,35 @@ class VisibleTerminal:
                 pane_id=opened["pane_id"], expected_pid=opened["expected_pid"]
             )
             # A newly created shell must finish startup before its first command.
-            for _ in range(40):
-                catalog = await bridge.sessions.catalog(principal)
-                matches = [
-                    candidate
-                    for candidate in catalog["sessions"]
-                    if candidate["pane_id"] == opened["pane_id"]
-                    and candidate.get("tty") == opened.get("tty")
-                ]
-                if len(matches) == 1:
-                    row = matches[0]
-                    reference = SessionReference(
-                        pane_id=row["pane_id"], expected_pid=row["expected_pid"]
+            with timed("visible_shell_wait") as wait_fields:
+                for attempt in range(1, 41):
+                    wait_fields["attempts"] = attempt
+                    catalog = await bridge.sessions.catalog(principal)
+                    matches = [
+                        candidate
+                        for candidate in catalog["sessions"]
+                        if candidate["pane_id"] == opened["pane_id"]
+                        and candidate.get("tty") == opened.get("tty")
+                    ]
+                    if len(matches) == 1:
+                        row = matches[0]
+                        reference = SessionReference(
+                            pane_id=row["pane_id"], expected_pid=row["expected_pid"]
+                        )
+                        try:
+                            if await self.suitable(principal, row):
+                                break
+                        except BridgeError as exc:
+                            if exc.code not in {
+                                "session_selection_changed",
+                                "visible_input_unknown",
+                            }:
+                                raise
+                    await asyncio.sleep(0.1)
+                else:
+                    raise BridgeError(
+                        "visible_shell_not_ready", "New window has no confirmed empty prompt"
                     )
-                    try:
-                        if await self.suitable(principal, row):
-                            break
-                    except BridgeError as exc:
-                        if exc.code not in {"session_selection_changed", "visible_input_unknown"}:
-                            raise
-                await asyncio.sleep(0.1)
-            else:
-                raise BridgeError(
-                    "visible_shell_not_ready", "New window has no confirmed empty prompt"
-                )
         root = bridge.config.state_path / "visible-commands"
         from kirabridge.bridge_core.config import private_directory
 
