@@ -11,6 +11,7 @@ from __future__ import annotations
 import hashlib
 import os
 import re
+import stat
 from pathlib import Path
 
 from kirabridge.windows_package import (
@@ -39,10 +40,15 @@ def _require_file(root: Path, name: str) -> str:
         _reject_special(path)
     except FileNotFoundError:
         raise PackageError(f"Bundled runtime is missing {name}") from None
+    if not stat.S_ISREG(path.lstat().st_mode):
+        raise PackageError(f"Bundled runtime file is not a regular file: {name}")
     resolved = _inside(root, path)
     if resolved.relative_to(root.resolve()).as_posix() != name:
         raise PackageError("Refusing a traversal path in the bundled runtime")
-    data = _read_nofollow(path)
+    try:
+        data = _read_nofollow(path)
+    except IsADirectoryError:
+        raise PackageError(f"Bundled runtime file is not a regular file: {name}") from None
     if not data:
         raise PackageError(f"Bundled runtime file is empty: {name}")
     return hashlib.sha256(data).hexdigest()

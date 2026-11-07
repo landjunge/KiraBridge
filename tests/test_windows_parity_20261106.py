@@ -38,7 +38,7 @@ from kirabridge.windows_console import (
     WindowsConsoleStatusInput,
 )
 from kirabridge.windows_keyboard import WindowsKeyboardManager, WindowsTextInput
-from kirabridge.windows_package import PackageError, install, rollback, status
+from kirabridge.windows_package import PackageError, install, rollback, status, uninstall
 from kirabridge.windows_preview import CAPABILITIES
 
 TARGET = WindowTarget(100, 400, 132000000000000003, 401, 0x04070407)
@@ -333,6 +333,26 @@ def test_package_update_and_rollback_keep_data_and_do_not_change_policy(tmp_path
     assert (root / "data" / "keep.txt").read_text(encoding="utf-8") == "behalten"
     assert (root / "releases" / updated["release"]).is_dir()
     assert status(root)["execution_policy_changed"] is False
+
+
+def test_package_uninstall_keeps_data_and_removes_releases(tmp_path):
+    payload = tmp_path / "payload"
+    payload.mkdir()
+    (payload / "app.py").write_text("print('one')\n", encoding="utf-8")
+    root = tmp_path / "root"
+    installed = install(root, payload, version="0.8.0rc40", commit="d12838ae97c7")
+    (root / "data" / "keep.txt").write_text("behalten", encoding="utf-8")
+    removed = uninstall(root)
+    assert removed["action"] == "uninstall"
+    assert removed["data_preserved"] is True
+    assert removed["execution_policy_changed"] is False
+    assert removed["removed"] == [installed["release"]]
+    assert (root / "data" / "keep.txt").read_text(encoding="utf-8") == "behalten"
+    assert not (root / "current.json").exists()
+    assert not (root / "releases" / installed["release"]).exists()
+    assert status(root)["installed"] is False
+    with pytest.raises(PackageError, match="existing installation"):
+        uninstall(root)
 
 
 def _manager(tmp_path, spawner):

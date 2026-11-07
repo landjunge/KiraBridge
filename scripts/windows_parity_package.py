@@ -25,7 +25,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
-from kirabridge.windows_package import PackageError, install, rollback, status  # noqa: E402
+from kirabridge.windows_package import PackageError, install, rollback, status, uninstall  # noqa: E402
 
 LIVE_MARKERS = (
     Path.home() / ".local" / "share" / "kirabridge",
@@ -221,7 +221,7 @@ def main(argv: list[str] | None = None) -> int:
     argv = list(sys.argv[1:] if argv is None else argv)
     refuse_policy(argv)
     parser = argparse.ArgumentParser()
-    parser.add_argument("action", choices=("build", "install", "update", "rollback", "status"))
+    parser.add_argument("action", choices=("build", "install", "update", "rollback", "uninstall", "status"))
     parser.add_argument("--output", type=Path)
     parser.add_argument("--root", type=Path)
     parser.add_argument("--payload", type=Path)
@@ -243,6 +243,12 @@ def main(argv: list[str] | None = None) -> int:
         return 0
     if args.action == "rollback":
         print(rollback(root))
+        return 0
+    if args.action == "uninstall":
+        try:
+            print(uninstall(root))
+        except PackageError as error:
+            raise SystemExit(str(error)) from error
         return 0
     if args.payload is None:
         raise SystemExit("install and update require --payload")

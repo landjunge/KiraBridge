@@ -381,3 +381,46 @@ def rollback(root: Path) -> dict:
             "data_preserved": (root / "data").is_dir(),
             "execution_policy_changed": False,
         }
+
+
+def uninstall(root: Path) -> dict:
+    """Remove release directories and current.json. Keep root/data.
+
+    No service, registry or execution-policy change. Unexpected release
+    entries are left in place and reported as an error instead of deleted.
+    """
+    root = Path(root)
+    if root.is_symlink() or _is_link_or_reparse(root):
+        raise PackageError("Refusing a linked package root")
+    with package_lock(root):
+        root = _inside(root, root)
+        current = _read_current(root)
+        if current is None:
+            raise PackageError("Uninstall requires an existing installation")
+        releases = root / "releases"
+        if _is_link_or_reparse(releases) or not releases.is_dir():
+            raise PackageError("Refusing a release path that is not a real directory")
+        removed = []
+        for child in sorted(releases.iterdir(), key=lambda item: item.name):
+            if _is_link_or_reparse(child):
+                raise PackageError("Refusing a linked release path")
+            if child.is_dir() and (
+                _RELEASE_ID.fullmatch(child.name) or child.name.endswith(".partial")
+            ):
+                if child.name.endswith(".partial"):
+                    raise PackageError("A partial release exists and was not removed")
+                shutil.rmtree(child)
+                removed.append(child.name)
+                continue
+            raise PackageError("Refusing to uninstall around an unexpected release entry")
+        current_path = root / "current.json"
+        if _is_link_or_reparse(current_path) or not current_path.is_file():
+            raise PackageError("Refusing a current.json that is not a regular file")
+        current_path.unlink()
+        return {
+            "action": "uninstall",
+            "removed": removed,
+            "previous": current.get("release"),
+            "data_preserved": (root / "data").is_dir(),
+            "execution_policy_changed": False,
+        }
