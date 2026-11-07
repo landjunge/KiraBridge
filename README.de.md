@@ -7,7 +7,7 @@
 
 # KiraBridge
 
-<p align="center"><img src="assets/design/wordmarks/KiraBridge-dark.svg" alt="KiraBridge" width="312"></p>
+<p align="center"><picture><source media="(prefers-color-scheme: dark)" srcset="assets/design/wordmarks/KiraBridge-dark.svg"><img src="assets/design/wordmarks/KiraBridge-light.svg" alt="KiraBridge" width="312"></picture></p>
 
 <p align="center">
   <a href="https://github.com/landjunge/KiraBridge/releases/tag/v0.8.0rc36"><img src="assets/readme/download-macos-intel.svg" alt="macOS Intel 0.8.0rc36" width="170"></a>
