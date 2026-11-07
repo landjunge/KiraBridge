@@ -78,3 +78,20 @@ def test_installed_runtime_cannot_delete_itself(tmp_path, monkeypatch):
         invoke(monkeypatch, root, installed, "uninstall")
     assert (installed / "runtime/python.exe").exists()
     assert manager.status(root)["installed"]
+
+
+@pytest.mark.parametrize("application_args", [["--help"], ["setup", "--help"]])
+def test_run_forwards_application_help_and_propagates_no_bytecode(
+    tmp_path, monkeypatch, application_args
+):
+    root = tmp_path / "install"
+    source = payload(tmp_path / "source", "1.0")
+    invoke(monkeypatch, root, source, "install")
+    calls = []
+    monkeypatch.setattr(manager.subprocess, "call", lambda argv: calls.append(argv) or 0)
+    monkeypatch.setenv("PYTHONDONTWRITEBYTECODE", "")
+    monkeypatch.setattr(manager, "PAYLOAD", source)
+    monkeypatch.setattr(sys, "argv", ["manager", "--root", str(root), "run", *application_args])
+    assert manager.main() == 0
+    assert calls[0][-len(application_args) :] == application_args
+    assert manager.os.environ["PYTHONDONTWRITEBYTECODE"] == "1"

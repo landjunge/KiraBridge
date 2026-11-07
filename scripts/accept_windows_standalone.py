@@ -10,6 +10,7 @@ import importlib.util
 import json
 import os
 import platform
+import secrets
 import subprocess
 import sys
 import traceback
@@ -63,6 +64,46 @@ async def health(root, report, persist):
         reply = await client.call("bridge_health", {})
         assert "error" not in reply, reply
         report["authenticated_health"] = reply
+        from kirabridge.agent_manager.full_access import bridge_server
+        from kirabridge.mcp_gateway.client import MCPClientPool, Peer
+        from kirabridge.platform_adapters.windows.visible_console import visible_environment
+
+        nonce = secrets.token_hex(8)
+        environment_key = client.environment_key
+        config = root / ("stdio-" + nonce + ".toml")
+        config.write_text(
+            "data_dir = "
+            + json.dumps(str(root / ("stdio-state-" + nonce)))
+            + "\n"
+            + "port = "
+            + str(client.bridge.config.port)
+            + "\n"
+            '[principals.local]\ncapabilities = ["bridge.health", "task.read"]\n'
+            'approval_mode = "automatic"\nclient_type = "operator"\n'
+            'token_env = "' + environment_key + '"\n',
+            encoding="utf-8",
+        )
+        server = bridge_server(str(config), "local")
+        assert server["args"][:2] == ["-B", "-m"]
+        environment = visible_environment()
+        environment.pop("PYTHONDONTWRITEBYTECODE", None)  # Test the generated -B itself.
+        environment[environment_key] = os.environ[environment_key]
+        async with MCPClientPool(call_timeout=20) as clients:
+            await clients.connect(
+                Peer(
+                    "agent-child",
+                    command=server["command"],
+                    args=tuple(server["args"]),
+                    env=environment,
+                    cwd=str(ROOT),
+                )
+            )
+            response = await clients.call("agent-child", "bridge_health", {})
+            assert not response.isError and "error" not in response.structuredContent
+            report["full_access_child_health"] = response.structuredContent
+    manifest = json.loads((ROOT / "manifest.json").read_text(encoding="utf-8"))
+    windows_package._verify_release_bytes(ROOT, manifest["files"])
+    report["release_inventory_unchanged_after_agent_child"] = True
     report["passed"] = True
 
 
@@ -127,6 +168,7 @@ def main():
             item["state"] = "finished"
             persist()
             assert (result.returncode == 0) == expect_success, item
+            return result
 
         def manage(package, action):
             if args.root.name == "KiraBridge" and action in {"install", "update", "uninstall"}:
@@ -199,9 +241,9 @@ def main():
                 "/c",
                 args.root / "KiraBridge.cmd",
                 "run",
-                "--help",
+                "--version",
             ],
-            "installed_cli",
+            "initial_version",
         )
         installed_health("initial_health")
         manage(args.update, "update")
@@ -210,7 +252,33 @@ def main():
         assert data.read_bytes() == b"created after initial installation"
         data.write_bytes(b"new user data after update must survive rollback")
         expected = digest(data)
+        cli_help = run(
+            [
+                "C:\\Windows\\System32\\cmd.exe",
+                "/d",
+                "/c",
+                args.root / "KiraBridge.cmd",
+                "run",
+                "--help",
+            ],
+            "installed_cli",
+        )
+        assert "KiraBridge private desktop bridge" in cli_help.stdout
+        subcommand_help = run(
+            [
+                "C:\\Windows\\System32\\cmd.exe",
+                "/d",
+                "/c",
+                args.root / "KiraBridge.cmd",
+                "run",
+                "setup",
+                "--help",
+            ],
+            "installed_subcommand_help",
+        )
+        assert "--workspace" in subcommand_help.stdout
         installed_health("updated_health")
+        assert report["updated_health"]["release_inventory_unchanged_after_agent_child"]
         run(
             [
                 "C:\\Windows\\System32\\cmd.exe",

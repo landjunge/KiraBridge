@@ -16,7 +16,6 @@ import os
 import signal
 import subprocess
 import sys
-import threading
 import time
 from pathlib import Path
 
@@ -76,6 +75,7 @@ def visible_environment(source: dict[str, str] | None = None) -> dict[str, str]:
     env = {key: source[key] for key in ENV_ALLOW if key in source and source[key]}
     env["PYTHONUTF8"] = "1"
     env["PYTHONIOENCODING"] = "utf-8"
+    env["PYTHONDONTWRITEBYTECODE"] = "1"
     return env
 
 
@@ -427,33 +427,62 @@ def _read_limited(stream, limit: int) -> tuple[bytes, bool]:
     return b"".join(chunks), bool(extra)
 
 
-def _terminate_owned(process: subprocess.Popen) -> None:
-    if process.poll() is not None:
-        return
-    if os.name == "nt":
-        process.terminate()
-    else:
+def _terminate_owned(process: subprocess.Popen, job=None) -> None:
+    if job is not None:
         try:
-            os.killpg(process.pid, signal.SIGTERM)
-        except ProcessLookupError:
-            return
-    try:
-        process.wait(timeout=1)
-    except subprocess.TimeoutExpired:
-        if os.name == "nt":
+            job.terminate()
+        finally:
+            # Assignment itself may fail while this exact child is suspended.
+            if process.poll() is None:
+                process.kill()
+    elif os.name == "nt":
+        if process.poll() is None:
             process.kill()
-        else:
-            try:
-                os.killpg(process.pid, signal.SIGKILL)
-            except ProcessLookupError:
-                return
-        process.wait(timeout=1)
+    else:
+        # The leader may already have exited while a descendant keeps a pipe.
+        try:
+            os.killpg(process.pid, signal.SIGKILL)
+        except ProcessLookupError:
+            pass
+    process.wait(timeout=1)
+
+
+def _pipe_chunk(stream, remaining: int):
+    """Read currently available bytes; never wait for an inherited writer."""
+    if os.name == "nt":
+        import ctypes
+        import msvcrt
+
+        kernel = ctypes.WinDLL("kernel32", use_last_error=True)
+        kernel.PeekNamedPipe.argtypes = [
+            ctypes.c_void_p,
+            ctypes.c_void_p,
+            ctypes.c_uint32,
+            ctypes.c_void_p,
+            ctypes.POINTER(ctypes.c_uint32),
+            ctypes.c_void_p,
+        ]
+        kernel.PeekNamedPipe.restype = ctypes.c_int
+        available = ctypes.c_uint32()
+        handle = msvcrt.get_osfhandle(stream.fileno())
+        if not kernel.PeekNamedPipe(handle, None, 0, None, ctypes.byref(available), None):
+            error = ctypes.get_last_error()
+            if error in (109, 232):  # broken pipe / no remaining pipe data
+                return b""
+            raise ctypes.WinError(error)
+        if not available.value:
+            return None
+        return os.read(stream.fileno(), min(available.value, 4096, remaining + 1))
+    try:
+        return os.read(stream.fileno(), min(4096, remaining + 1))
+    except BlockingIOError:
+        return None
 
 
 def run_owned_command(
     command, *, cwd: str, env: dict[str, str], timeout: float, limit: int
 ) -> dict:
-    """Read at most `limit` bytes from each pipe, then stop the owned child."""
+    """Bound execution and pipe draining by one deadline, including descendants."""
     popen = {
         "cwd": cwd,
         "env": env,
@@ -461,68 +490,96 @@ def run_owned_command(
         "stdout": subprocess.PIPE,
         "stderr": subprocess.PIPE,
     }
-    if os.name == "nt":
-        popen["creationflags"] = subprocess.CREATE_NEW_PROCESS_GROUP
-    else:
-        popen["start_new_session"] = True
-    process = subprocess.Popen(list(command), **popen)
-    boxes: dict[str, dict] = {"stdout": {}, "stderr": {}}
-    overflow = threading.Event()
+    job = None
+    process = None
+    finished = False
+    try:
+        if os.name == "nt":
+            from kirabridge.platform_adapters.windows.owned_job import WindowsChildJob
 
-    def pump(stream, slot: str) -> None:
-        error = None
+            job = WindowsChildJob()
+            popen["creationflags"] = subprocess.CREATE_NEW_PROCESS_GROUP | 0x4
+        else:
+            popen["start_new_session"] = True
+        process = subprocess.Popen(list(command), **popen)
+        if job is not None:
+            job.assign_and_resume(process)
+        streams = {"stdout": process.stdout, "stderr": process.stderr}
+        if os.name != "nt":
+            for stream in streams.values():
+                os.set_blocking(stream.fileno(), False)
+        boxes = {
+            name: {"data": bytearray(), "eof": False, "overflow": False, "error": None}
+            for name in streams
+        }
+        deadline = time.monotonic() + timeout
+        draining_until = None
+        timed_out = False
+        while True:
+            received = False
+            for name, stream in streams.items():
+                box = boxes[name]
+                if box["eof"] or box["overflow"]:
+                    continue
+                try:
+                    chunk = _pipe_chunk(stream, limit - len(box["data"]))
+                except OSError as error:
+                    box.update(eof=True, error=type(error).__name__)
+                    continue
+                if chunk is None:
+                    continue
+                if not chunk:
+                    box["eof"] = True
+                    continue
+                received = True
+                remaining = limit - len(box["data"])
+                box["data"].extend(chunk[:remaining])
+                box["overflow"] = len(chunk) > remaining
+            done = process.poll() is not None
+            pipes_done = all(box["eof"] or box["overflow"] for box in boxes.values())
+            if done and pipes_done:
+                break
+            now = time.monotonic()
+            overflow = any(box["overflow"] for box in boxes.values())
+            if draining_until is None and (overflow or now >= deadline):
+                timed_out = not overflow
+                _terminate_owned(process, job)
+                draining_until = time.monotonic() + 0.25
+            if draining_until is not None and time.monotonic() >= draining_until:
+                break
+            if not received:
+                time.sleep(0.01)
+        code = process.wait(timeout=1)
+        read_error = any(box["error"] for box in boxes.values())
+        if any(box["overflow"] for box in boxes.values()):
+            state, exit_code = "truncated", code
+        elif timed_out:
+            state, exit_code = "timeout", None
+        elif read_error:
+            state, exit_code = "failed", code
+        else:
+            state, exit_code = "completed", code
+        finished = True
+        return {
+            "state": state,
+            "exit_code": exit_code,
+            "stdout": bytes(boxes["stdout"]["data"]),
+            "stderr": bytes(boxes["stderr"]["data"]),
+            "child_pid": process.pid,
+            "owned_job": job is not None,
+        }
+    finally:
         try:
-            data, hit = _read_limited(stream, limit)
-        except Exception as exc:
-            data, hit, error = b"", False, type(exc).__name__
-        boxes[slot]["data"] = data
-        boxes[slot]["overflow"] = hit
-        boxes[slot]["error"] = error
-        if hit:
-            overflow.set()
-
-    threads = [
-        threading.Thread(target=pump, args=(process.stdout, "stdout")),
-        threading.Thread(target=pump, args=(process.stderr, "stderr")),
-    ]
-    for thread in threads:
-        thread.start()
-    timed_out = False
-    deadline = time.monotonic() + timeout
-    while process.poll() is None and not overflow.is_set():
-        if time.monotonic() >= deadline:
-            timed_out = True
-            _terminate_owned(process)
-            break
-        time.sleep(0.02)
-    if overflow.is_set():
-        _terminate_owned(process)
-    for thread in threads:
-        thread.join(timeout=5)
-    if process.poll() is None:
-        _terminate_owned(process)
-    for stream in (process.stdout, process.stderr):
-        if stream is not None:
-            stream.close()
-    code = process.wait(timeout=2)
-    stdout = boxes["stdout"].get("data", b"")
-    stderr = boxes["stderr"].get("data", b"")
-    read_error = boxes["stdout"].get("error") or boxes["stderr"].get("error")
-    if boxes["stdout"].get("overflow") or boxes["stderr"].get("overflow"):
-        state, exit_code = "truncated", code
-    elif timed_out:
-        state, exit_code = "timeout", None
-    elif read_error:
-        state, exit_code = "failed", code
-    else:
-        state, exit_code = "completed", code
-    return {
-        "state": state,
-        "exit_code": exit_code,
-        "stdout": stdout,
-        "stderr": stderr,
-        "child_pid": process.pid,
-    }
+            if process is not None and not finished:
+                _terminate_owned(process, job)
+        finally:
+            if job is not None:
+                job.close()
+            if process is not None:
+                # No reader thread owns a BufferedReader lock during close.
+                for stream in (process.stdout, process.stderr):
+                    if stream is not None:
+                        stream.close()
 
 
 def _parse_console_argv(argv: list[str]):

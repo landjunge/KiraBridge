@@ -44,7 +44,11 @@ def main() -> int:
     parser.add_argument(
         "action", choices=("install", "update", "rollback", "uninstall", "status", "run")
     )
-    args, rest = parser.parse_known_args()
+    parser.add_argument("arguments", nargs=argparse.REMAINDER)
+    args = parser.parse_args()
+    rest = args.arguments
+    if args.action != "run" and rest:
+        parser.error("Only run accepts application arguments")
     root = args.root.absolute()
     if args.action in {"install", "update"}:
         validate_bundled_runtime(PAYLOAD / "runtime")
@@ -78,6 +82,7 @@ def main() -> int:
         code = (
             "import sys;sys.path.insert(0,sys.argv.pop(1));from kirabridge.cli import main;main()"
         )
+        os.environ["PYTHONDONTWRITEBYTECODE"] = "1"
         return subprocess.call(
             [
                 str(release / "runtime" / "python.exe"),

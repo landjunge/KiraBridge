@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 import os
 import sys
@@ -262,11 +263,19 @@ class WindowsConsoleManager:
                     self.spawner = Win32VisibleSpawner()
                 spawned = self.spawner.start(plan)
                 try:
-                    result = wait_result(result_path, args.timeout_seconds + 2)
+                    result = await asyncio.to_thread(
+                        wait_result, result_path, args.timeout_seconds + 2
+                    )
                 except UncertainExecution:
                     result = self._load_result(args.handoff_id)
                     if result is None:
                         raise
+            except asyncio.CancelledError:
+                _atomic_json(
+                    record_path,
+                    {**self._read(args.handoff_id), "state": "unknown", "automatic_retry": False},
+                )
+                raise
             except UncertainExecution:
                 _atomic_json(
                     record_path,
