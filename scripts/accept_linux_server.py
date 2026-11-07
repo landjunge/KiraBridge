@@ -72,6 +72,23 @@ print(json.dumps({"marker": name, "state": "unknown", "foreign_principal": "not_
 """
 
 
+def record_step(evidence, suite, name, action):
+    started = time.monotonic()
+    case = ET.SubElement(suite, "testcase", name=name)
+    try:
+        detail = action()
+        evidence["steps"].append({"name": name, "result": "passed", "detail": detail})
+        print(name + ": PASS", flush=True)
+        return detail
+    except Exception as exc:
+        evidence["result"] = "failed"
+        ET.SubElement(case, "failure", message=str(exc))
+        evidence["steps"].append({"name": name, "result": "failed", "error": str(exc)})
+        raise
+    finally:
+        case.set("time", str(round(time.monotonic() - started, 3)))
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--candidate", type=Path, required=True)
@@ -142,20 +159,7 @@ def main():
         return result.stdout
 
     def step(name, action):
-        started = time.monotonic()
-        case = ET.SubElement(suite, "testcase", name=name)
-        try:
-            detail = action()
-            evidence["steps"].append({"name": name, "result": "passed", "detail": detail})
-            print(name + ": PASS", flush=True)
-            return detail
-        except Exception as exc:
-            evidence["result"] = "failed"
-            ET.SubElement(case, "failure", message=str(exc))
-            evidence["steps"].append({"name": name, "result": "failed", "error": str(exc)})
-            raise
-        finally:
-            case.set("time", str(round(time.monotonic() - started, 3)))
+        return record_step(evidence, suite, name, action)
 
     config = root / "config/config.toml"
     prefix = root / "install"
@@ -345,12 +349,15 @@ def main():
             },
         )
         evidence["result"] = "passed"
-    except Exception:
+    except Exception as exc:
         evidence["result"] = "failed"
+        if not suite.findall(".//failure"):
+            case = ET.SubElement(suite, "testcase", name="acceptance-invariant")
+            ET.SubElement(case, "failure", message=str(exc))
         raise
     finally:
         try:
-            cleanup(run, unit_path, config, unit, args.port, evidence)
+            step("cleanup", lambda: cleanup(run, unit_path, config, unit, args.port, evidence))
         finally:
             log.close()
             evidence["log_sha256"] = sha(log_path)
