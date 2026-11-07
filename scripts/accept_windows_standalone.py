@@ -8,6 +8,7 @@ import asyncio
 import hashlib
 import importlib.util
 import json
+import os
 import platform
 import subprocess
 import sys
@@ -109,7 +110,7 @@ def main():
                 }
             )
 
-        def run(argv, label):
+        def run(argv, label, env=None):
             item = {"label": label, "argv": [str(x) for x in argv], "state": "started"}
             report["commands"].append(item)
             persist()
@@ -120,6 +121,7 @@ def main():
                 timeout=900,
                 encoding="utf-8",
                 errors="replace",
+                env=env,
             )
             item.update(returncode=result.returncode, stdout=result.stdout, stderr=result.stderr)
             item["state"] = "finished"
@@ -127,6 +129,19 @@ def main():
             assert result.returncode == 0, item
 
         def manage(package, action):
+            if args.root.name == "KiraBridge" and action in {"install", "update", "uninstall"}:
+                env = dict(os.environ, LOCALAPPDATA=str(args.root.parent))
+                run(
+                    [
+                        "C:\\Windows\\System32\\cmd.exe",
+                        "/d",
+                        "/c",
+                        package / (action.capitalize() + ".cmd"),
+                    ],
+                    action,
+                    env=env,
+                )
+                return
             run(
                 [
                     "C:\\Windows\\System32\\cmd.exe",
@@ -187,7 +202,16 @@ def main():
         data.write_bytes(b"new user data after update must survive rollback")
         expected = digest(data)
         installed_health("updated_health")
-        manage(args.update, "rollback")
+        run(
+            [
+                "C:\\Windows\\System32\\cmd.exe",
+                "/d",
+                "/c",
+                args.root / "KiraBridge.cmd",
+                "rollback",
+            ],
+            "rollback",
+        )
         reverted = json.loads((args.root / "current.json").read_text())
         assert reverted["release"] == initial["release"]
         assert digest(data) == expected
