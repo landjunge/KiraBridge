@@ -60,7 +60,7 @@ def build(
                 path.name.startswith("kirabridge-") and path.name.endswith(".dist-info")
             ):
                 shutil.rmtree(path)
-        (site / "kirabridge-source.pth").write_text("../../../src\n", encoding="utf-8")
+        (site / "kirabridge-source.pth").write_bytes(b"../../../src\n")
         # Runtime bytecode can embed machine paths and is regenerated nowhere (-B).
         for path in (payload / "runtime").rglob("__pycache__"):
             shutil.rmtree(path)
