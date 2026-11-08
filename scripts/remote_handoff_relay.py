@@ -188,6 +188,10 @@ class Relay:
             return
         handoff = issued["handoff"]
         agent = AGENT_TARGETS.get(handoff.get("target_system"), settings.get("agent", "codex"))
+        team = (settings.get("team_agents") or {}).get(agent)
+        if team:
+            await self.deliver_team(project, item, handoff, agent, team)
+            return
         request = {
             "api_version": "1",
             "task_id": f"remote-{handoff_id}",
@@ -238,8 +242,90 @@ class Relay:
         )
         log.info("handoff %s queued as %s for approval", handoff_id, request["task_id"])
 
+    async def deliver_team(
+        self, project: str, item: dict, handoff: dict, agent: str, team: dict
+    ) -> None:
+        """Opt-in route: the handoff becomes team work for a fixed managed worker.
+
+        The worker's own operator-configured folder is used, never the project folder,
+        so only projects that explicitly name this route reach that worker.
+        """
+        handoff_id = item["handoff_id"]
+        key = f"remote-{handoff_id}"
+        title = str(handoff.get("task") or handoff.get("title") or handoff_id)
+        work_request = {
+            "team_id": team["team_id"],
+            "assignee": agent,
+            "title": title[:256],
+            "body": build_prompt(handoff, team["cwd"]),
+            "idempotency_key": key,
+        }
+        request = {
+            "api_version": "1",
+            "task_id": key,
+            "idempotency_key": key,
+            "operation": "team.work_create",
+            "arguments": work_request,
+        }
+        marker = self.marker(project, handoff_id, request, item["content_hash"])
+        if item.get("remote_delivery") not in (None, marker):
+            log.warning("handoff %s is reserved by another device; skipped", handoff_id)
+            return
+        if item.get("remote_delivery") is None:
+            await self.td.handoff(project, "reserve_handoff_delivery", marker)
+            check = await self.td.handoff(project, "get_issued_handoff", {"handoff_id": handoff_id})
+            if (check.get("issued") or {}).get("remote_delivery") != marker:
+                raise RuntimeError(f"reservation of {handoff_id} could not be read back")
+        # The same idempotency key returns the existing work instead of a second one.
+        work = await self.kb.call("team_work_create", {"request": work_request})
+        work_id = work.get("id")
+        if not isinstance(work_id, str) or not work_id.startswith("tw-"):
+            raise RuntimeError(f"no team work receipt for {handoff_id}: {work.get('error')}")
+        self.state[handoff_id] = {
+            "project": project,
+            "kind": "team",
+            "team_id": team["team_id"],
+            "task_id": work_id,
+            "agent": agent,
+            "status": "submitted",
+            "submitted_at": time.time(),
+        }
+        self.save()
+        await self.td.whiteboard(
+            project,
+            "progress",
+            f"remote-accepted-{handoff_id}",
+            f"Auftrag „{title}“ ist auf dem Mac angekommen ({agent}) und läuft als "
+            f"Team-Arbeit {work_id} in {team['cwd']}.",
+        )
+        log.info("handoff %s submitted as team work %s", handoff_id, work_id)
+
+    async def team_work(self, entry: dict) -> dict:
+        value = await self.kb.call(
+            "team_work_get", {"team_id": entry["team_id"], "work_id": entry["task_id"]}
+        )
+        if (value.get("error") or {}).get("code") == "not_found":
+            return {"state": "unknown", "error": {"code": "missing_local_team_work"}}
+        if value.get("id") != entry["task_id"]:
+            raise RuntimeError(f"team_work_get returned no exact receipt for {entry['task_id']}")
+        result, error = value.get("result"), value.get("error")
+        if isinstance(result, str):
+            result = {"reply": result}
+        if not result and not error:
+            # Team work carries no agent text on failure; report the observed evidence.
+            evidence = value.get("evidence") or {}
+            error = {
+                "code": f"core_task_{evidence.get('core_state') or value.get('state')}",
+                "core_task_id": evidence.get("core_task_id"),
+                "native_evidence": evidence.get("native_evidence"),
+            }
+        return {"state": value.get("state"), "result": result, "error": error}
+
     async def report(self, handoff_id: str, entry: dict) -> None:
-        task = await self.kb.task(entry["task_id"])
+        if entry.get("kind") == "team":
+            task = await self.team_work(entry)
+        else:
+            task = await self.kb.task(entry["task_id"])
         if task is None:
             log.warning("task %s is missing locally; reported as unknown", entry["task_id"])
             task = {"state": "unknown", "error": {"code": "missing_local_task"}}

@@ -85,6 +85,21 @@ lokaler Bestätigung).
      zeigen.
   Ist der Task beendet, schreibt das Relay das Ergebnis als `result` oder
   `problem` ins Whiteboard. Doppelte Einträge verhindert `external_key`.
+- **Team-Weg (Opt-in je Projekt):** Nennt ein Projekt in `remote-relay.json`
+  unter `team_agents` den Zielagenten (derzeit nur `d0c0cb9edc3d` → `claude`,
+  Team `kirabridge-team`, Ordner `~/KiraBridge-Workspace`), wird der Handoff
+  statt eines freigabepflichtigen `agent.execute` zu genau einer Team-Arbeit
+  (`team_work_create`, Idempotenzschlüssel `remote-<handoff_id>`). Der Prompt
+  nennt den Ordner des Workers, nie den Projektordner. Reservierung und
+  Rücklesen wie oben; eine eigene, schon vorhandene Reservierung wird nicht
+  erneut gesetzt. Das Ergebnis liest das Relay mit `team_work_get` und schreibt
+  es wie oben ins Whiteboard; ohne Agententext meldet es den beobachteten
+  Kernzustand (`core_task_<zustand>`). Diese Änderung lief bisher nur als
+  unversionierte Kopie unter `~/.local/share/kirabridge/remote-relay/`; sie ist
+  jetzt byte-gleich in `scripts/remote_handoff_relay.py` übernommen
+  (SHA-256 `f43e9f03…`) und mit `tests/test_remote_handoff_relay_script.py`
+  belegt. Live beobachtet: Handoff `2af8f1db4ee1` → `tw-e4849a88…`, gemeldet
+  `completed`.
 - **Konfiguration** `~/.config/kirabridge/remote-relay.json` (0600). Sie enthält
   die Projektzuordnung und den Zeitpunkt `since`. Handoffs von vor der
   Einrichtung werden nie aufgegriffen. Den ThreadDesk-Zugang liest das Relay aus
@@ -142,6 +157,73 @@ lautet: im Testordner eine Datei anlegen.
 - Aufträge vom Handy anlegen. Das geht über ChatGPT, KiraBridge Server und
   `td_issue_handoff`, sobald der Tunnel läuft.
 - Die Laufbindung (`bind_handoff_run`) und die strikte Return-Inbox.
+
+## Blocker `com.kirabridge.chat-events` (Exit 1)
+
+Gemeldet vom Claude-Agent-Thread `315b2543b087` als „Antwortzustellung endet
+mit Exit 1“. Diagnose am 8. November 2026, nur lesend; der installierte Job
+wurde nicht gestartet, gestoppt oder geändert.
+
+**Befund**
+
+- `launchctl print gui/501/com.kirabridge.chat-events`: `state = not running`,
+  `runs = 3`, `last exit code = 1`, `KeepAlive = false`, `RunAtLoad = true`.
+  Plist vom 19. Oktober: `integrations/chat-events/.venv/bin/python
+  integrations/chat-events/serve.py --config ~/.config/kirabridge/config.toml
+  --principal chatgpt --state …/chat-events-prepared-20261019/event-state
+  --sender-only`, `WorkingDirectory=/Users/landjunge/KiraBridge`.
+- `sender.stderr.log` (zuletzt geschrieben am 7. November, 16:28): zweimal
+  `httpx.ConnectError` beim Start (Bridge noch nicht erreichbar), danach
+  achtmal `ValidationError` in `load_config`: `threaddesk.dynamic_read_proxy`,
+  `threaddesk.dynamic_tool_proxy` und `file_transfer` sind `extra_forbidden`.
+- **Ursache:** `serve.py` lädt `kirabridge` absichtlich aus
+  `<Checkout>/src` neben sich (`sys.path.insert(0, parents[2] / "src")`). Der Job
+  zeigt auf den Haupt-Worktree `/Users/landjunge/KiraBridge`, dessen Branch
+  sich mit der Entwicklung ständig ändert. `config.toml` schreibt dagegen die
+  installierte Version. War dort ein älterer Stand ausgecheckt (laut Traceback
+  `load_config` in Zeile 371, heute Zeile 456), kannte dessen `Config` die neuen
+  Schlüssel nicht und beendete sich mit Exit 1. Mit `KeepAlive = false` bleibt
+  der Job dann bis zum nächsten Login tot; das gilt auch für den
+  `ConnectError`-Fall beim Start.
+- **Heute:** Mit dem derzeitigen Haupt-Checkout (`af96756`) und mit diesem
+  Branch validiert dieselbe `config.toml` (nur geparst, nichts gestartet).
+  Ob der Job jetzt starten würde, ist **UNKNOWN**, weil er nicht neu gestartet
+  werden durfte.
+- **Nicht auf dem Claude-Weg:** Der Sender bedient nur den Principal
+  `chatgpt` (ChatGPT-Events-Push). Seine Datenbank (Kopie gelesen) hat
+  0 Abos und 0 Zustellungen, letzte Beobachtung am 19. Oktober. Das Relay
+  `com.kirabridge.remote-relay` nutzt `chat-events` nicht; es schreibt
+  Ergebnisse selbst ins Whiteboard (`reported (completed)` für `2af8f1db4ee1`).
+  Durch den Exit 1 ist also keine Antwort verloren gegangen. Unversioniert war
+  tatsächlich der Team-Weg des Relays; er ist jetzt versioniert (siehe oben).
+
+**Zur Aktivierung nötig (Owner-Entscheidung, nicht ausgeführt)**
+
+Variante A, empfohlen solange ChatGPT-Events nicht abgenommen sind: den Job
+abschalten, damit er nicht mehr als Fehler erscheint.
+
+```sh
+launchctl bootout gui/$(id -u)/com.kirabridge.chat-events
+mv ~/Library/LaunchAgents/com.kirabridge.chat-events.plist \
+   ~/Library/LaunchAgents/com.kirabridge.chat-events.plist.disabled-20261108
+```
+
+Variante B, falls der Sender laufen soll: ihn an einen festen Quellstand
+binden statt an den Entwicklungs-Checkout.
+
+```sh
+SRC=$HOME/.local/share/kirabridge/chat-events-src
+git -C /Users/landjunge/KiraBridge worktree add --detach "$SRC" <Commit der installierten Version>
+uv sync --project "$SRC/integrations/chat-events" --locked
+# Plist: beide Pfade in ProgramArguments und WorkingDirectory auf $SRC umstellen,
+# zusätzlich KeepAlive = {SuccessfulExit = false} und ThrottleInterval = 30.
+launchctl bootout gui/$(id -u)/com.kirabridge.chat-events
+launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.kirabridge.chat-events.plist
+launchctl print gui/$(id -u)/com.kirabridge.chat-events | grep -E 'state|last exit'
+```
+
+Bei jedem Update der installierten Version muss `$SRC` auf denselben Commit
+nachgezogen werden, sonst entsteht dieselbe Abweichung erneut.
 
 ## Quellen
 
