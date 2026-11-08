@@ -53,29 +53,73 @@ gesichert als `public.conf.bak.*-before-handoff`. Über das Internet geprüft:
 Der Server kann damit Aufträge annehmen, speichern und für genau einen
 Zustellversuch reservieren, auch während der Mac aus ist. Er führt nichts aus.
 
-**Mac-Hälfte ist noch nicht in Betrieb.** Grund ist kein Konfigurationsschalter,
-es fehlen echte Bausteine:
+**Auflisten:** `serve_handoff.py` ergänzt das nur lesende Werkzeug
+`list_issued_handoffs`. Es liefert höchstens 100 Handoffs des angemeldeten
+Users und Projekts mit Reservierungs- und Bindungsstatus. Ohne dieses Werkzeug
+könnte der Mac neue Aufträge nicht finden. Unbekannte Argumente werden mit 400
+abgelehnt.
 
-- `RemoteRelay` und `HttpHandoffPeer` existieren in `main` nur als Bibliothek
-  mit Tests. Kein Dienst und kein CLI-Befehl startet sie.
-- Es gibt keinen produktiven Grant-Resolver, kein Pairing und keinen Widerruf.
-  `deliver()` braucht eine vorhandene Core-Freigabe (`NativeGrant`). Wer diese
-  Freigabe ausstellt, ist eine Sicherheitsentscheidung, die der Big Plan
-  ausdrücklich dem Nutzer vorbehält (BP-REMOTE-03).
-- Laut BP-REMOTE-02 kann die installierte sichtbare Agentenroute auf dem Mac
-  einen strukturierten `handoff_reply`-Start noch nicht ausführen.
-- `HttpHandoffPeer` pinnt genau ein Leaf-Zertifikat. Der Server nutzt ein
-  automatisch erneuertes ZeroSSL-/ACME-Zertifikat, gültig bis 1. Februar 2027.
-  Nach jeder Erneuerung muss der Pin nachgezogen werden, sonst lehnt der Mac
-  die Verbindung ab.
+**Mac-Hälfte ist in Betrieb** (vom Nutzer so beauftragt: jeder Auftrag nur mit
+lokaler Bestätigung).
 
-**Vorschlag für die Mac-Hälfte:** Ein Relay-Dienst auf dem Mac baut ausgehend
-HTTPS zum Server auf, liest neue freigegebene Handoffs und legt sie im lokalen
-KiraBridge als Aufträge mit lokaler Freigabe an. Dafür wird `task_request` mit
-`approval_required` genutzt, kein remote ausgestellter Grant. Nichts läuft ohne
-die lokale Bestätigung. Ergebnisse gehen über die vorhandene Return-Inbox zurück
-in denselben Thread. Diesen Dienst und die Freigaberegel muss der Nutzer vor dem
-Bau bestätigen.
+- **Eigener Zugang `remote`** in der Mac-KiraBridge mit
+  `approval_mode = "manual"`. Er darf nur `agent.execute`, `task.read`,
+  `task.cancel` und `bridge.health`, nur mit den Agenten codex, claude und grok
+  und nur in den sechs Projektordnern plus `~/remote-relay-test`. Die Bestätigung
+  wird damit von KiraBridge selbst erzwungen und hängt nicht am Relay. Alle
+  anderen Zugänge auf dem Mac stehen auf `automatic`/`full` und werden deshalb
+  nicht genutzt. Sicherungen: `config.toml.bak.20261108-013125-remote-principal`
+  und `credentials.json.bak.…`.
+- **Relay** `scripts/remote_handoff_relay.py`, installiert als launchd-Dienst
+  `com.kirabridge.remote-relay`. `run.sh` sucht die Python-Umgebung der jeweils
+  installierten KiraBridge-Version über `~/.local/bin/kirabridge`. Das Relay
+  baut nur ausgehende Verbindungen auf und fragt alle 60 Sekunden. Für jeden neuen
+  Handoff eines zugeordneten Projekts geht es so vor:
+  1. Prüfen, ob der lokale Task `remote-<handoff_id>` schon existiert.
+  2. Den Handoff auf dem Server mit `reserve_handoff_delivery` reservieren und
+     die Reservierung zurücklesen.
+  3. `task_request` mit `agent.execute` stellen. Der Prompt wird aus Aufgabe,
+     Beschreibung, Notizen und Abnahmekriterien gebaut und als nicht
+     vertrauenswürdiger Kontext markiert.
+  4. Einen Whiteboard-Eintrag `progress` schreiben und eine macOS-Mitteilung
+     zeigen.
+  Ist der Task beendet, schreibt das Relay das Ergebnis als `result` oder
+  `problem` ins Whiteboard. Doppelte Einträge verhindert `external_key`.
+- **Konfiguration** `~/.config/kirabridge/remote-relay.json` (0600). Sie enthält
+  die Projektzuordnung und den Zeitpunkt `since`. Handoffs von vor der
+  Einrichtung werden nie aufgegriffen. Den ThreadDesk-Zugang liest das Relay aus
+  `~/.config/kirabridge/remote-relay-td.token` (0600). Zustand:
+  `~/.local/state/kirabridge-remote-relay/state.json`, Log:
+  `~/Library/Logs/kirabridge-remote-relay.log`.
+- **TLS:** Das Server-Zertifikat wird normal über die CA und den Hostnamen
+  geprüft, nicht gepinnt. Ein Pin würde bei jeder automatischen Erneuerung
+  brechen.
+
+**Bewusst anders als `RemoteRelay` aus BP-REMOTE-02:** Ein remote ausgestellter
+`NativeGrant` und ein Pairing werden nicht gebraucht, weil die lokale
+Bestätigung die Freigabe ist. Der Mac-Core wird nicht auf eine Handoff-Quelle
+auf dem Server umgestellt, lokale Handoff-Abläufe bleiben unverändert. Die
+Rückgabe läuft über das Whiteboard statt über `import_return`. Die strikte
+Return-Inbox verlangt einen gebundenen Lauf, und diese Laufbindung bleibt
+offen.
+
+**Geprüft am 8. November 2026** mit dem Testprojekt „Remote-Auftrag Test“
+(`d0c0cb9edc3d`) und dem Handoff `b195c74ba6ec` mit Ziel codex. Der Auftrag
+lautet: im Testordner eine Datei anlegen.
+
+- Die Reservierung durch `mac-relay` ist auf dem Server gespeichert.
+- Der lokale Task `remote-b195c74ba6ec` hat den Zustand `created`, Principal
+  `remote`. Er wartet auf Freigabe, gestartet ist nichts.
+- Im Whiteboard steht genau ein `progress`-Eintrag.
+- Ein zweiter Durchlauf erzeugt nichts doppelt.
+- Der launchd-Dienst läuft.
+
+**Noch offen:**
+- Lokale Freigabe dieses Testauftrags unter <http://127.0.0.1:8766/> und der
+  `result`-Eintrag danach. Freigeben muss der Nutzer selbst.
+- Aufträge vom Handy anlegen. Das geht über ChatGPT, KiraBridge Server und
+  `td_issue_handoff`, sobald der Tunnel läuft.
+- Die Laufbindung (`bind_handoff_run`) und die strikte Return-Inbox.
 
 ## Quellen
 
