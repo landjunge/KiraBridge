@@ -164,9 +164,12 @@ def test_receipt_rejects_replaced_target_and_wrong_path():
         other.write_text("original")
         other.chmod(0o700)
         assert rollback_from_receipt(other, receipt, approve=True)["status"] == "target_mismatch"
-        path.unlink()
-        path.write_text("original")
-        path.chmod(0o700)
+        # Create the replacement while the original still exists, so it cannot reuse the
+        # freed inode number (Linux filesystems do that after unlink + create).
+        replacement = Path(directory) / "replacement"
+        replacement.write_text("original")
+        replacement.chmod(0o700)
+        os.replace(replacement, path)
         assert rollback_from_receipt(path, receipt, approve=True)["status"] == "target_mismatch"
 
 

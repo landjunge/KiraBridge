@@ -11,10 +11,26 @@ from kirabridge.bridge_core.models import BridgeError, UncertainExecution
 from kirabridge.terminal_manager import TerminalManager, minimal_environment
 
 
+def login_identity() -> dict[str, str]:
+    """USER/LOGNAME of the account this process runs as, derived from its uid.
+
+    Agent CLIs such as Claude Code look up their stored login in the macOS keychain by
+    this account name. The value never comes from the inherited environment.
+    """
+    try:
+        import pwd
+
+        name = pwd.getpwuid(os.getuid()).pw_name
+    except (ImportError, AttributeError, KeyError):
+        return {}
+    return {"USER": name, "LOGNAME": name} if name else {}
+
+
 def cli_environment(config, terminal: TerminalManager | None = None) -> dict[str, str]:
     """Forward only a deliberately selected credential variable to its CLI."""
     env = terminal.environment.copy() if terminal else minimal_environment()
     env.setdefault("HOME", str(Path.home()))
+    env.update(login_identity())
     paths = env["PATH"].split(os.pathsep)
     if config.executable and Path(config.executable).is_absolute():
         directory = str(Path(config.executable).parent)
@@ -29,6 +45,8 @@ def cli_environment(config, terminal: TerminalManager | None = None) -> dict[str
     forbidden = {
         "PATH",
         "HOME",
+        "USER",
+        "LOGNAME",
         "PYTHONPATH",
         "PYTHONHOME",
         "NODE_OPTIONS",
