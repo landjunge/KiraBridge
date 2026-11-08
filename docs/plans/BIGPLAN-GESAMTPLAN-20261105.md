@@ -1,3 +1,4 @@
+> **Kanonischer Plan seit 08.11.2026:** [Bauplan v2](BIGPLAN-BAUPLAN-20261108.md) (Nachtrag N1 regelt Entscheidungskennungen und Agentenlage).
 > Historischer Quellenstand aus `21d2e2cad8e9930931b02031addfc25d819a9ed3`,
 > bei der Integration am 06.11.2026 bewahrt. Aktueller Quellen-, Prüf- und
 > Installationsstand: [RC40-Integrationsnachweis](../RC40-INTEGRATION-INSTALL-20261106.md).
