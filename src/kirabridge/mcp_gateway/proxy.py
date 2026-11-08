@@ -236,16 +236,34 @@ async def connect_stdio(config, principal):
                     except Exception:
                         downstream.discard(session)
 
+        dynamic_problem = {}
+
+        def dynamic_unavailable(code, message, diagnostic=None):
+            dynamic_problem.clear()
+            dynamic_problem.update(code=code, message=message, diagnostic=diagnostic)
+            return {}
+
         async def dynamic_catalog():
             """Only the configured peer can advertise new read tools; failures stay isolated."""
             try:
                 result = await connection.call_tool("threaddesk_dynamic_catalog", {})
                 data = result.structuredContent
+                if isinstance(data, dict) and isinstance(data.get("error"), dict):
+                    error = data["error"]
+                    return dynamic_unavailable(
+                        str(error.get("code") or "threaddesk_catalog_failed"),
+                        str(error.get("message") or "ThreadDesk catalog could not be read"),
+                        data.get("diagnostic"),
+                    )
                 if result.isError or not isinstance(data, dict):
-                    return {}
+                    return dynamic_unavailable(
+                        "threaddesk_catalog_failed", "ThreadDesk catalog could not be read"
+                    )
                 entries = data.get("tools")
                 if not isinstance(entries, list) or len(entries) > 256:
-                    return {}
+                    return dynamic_unavailable(
+                        "threaddesk_catalog_failed", "ThreadDesk catalog was not usable"
+                    )
                 names = {}
                 for item in entries:
                     if not isinstance(item, dict):
@@ -262,10 +280,15 @@ async def connect_stdio(config, principal):
                         and isinstance(schema, dict)
                     ):
                         names["td_" + name] = item
+                dynamic_problem.clear()
                 return names
-            except Exception:
+            except Exception as exc:
                 # A missing/offline optional ThreadDesk cannot break core Bridge tools.
-                return {}
+                return dynamic_unavailable(
+                    "threaddesk_catalog_failed",
+                    f"ThreadDesk catalog read failed: {type(exc).__name__}"
+                    + (f": {exc}" if str(exc) else " (no detail)"),
+                )
 
         @server.list_tools()
         async def list_tools():
@@ -317,6 +340,19 @@ async def connect_stdio(config, principal):
                     # Re-list to reject stale tool names and changes after discovery.
                     discovered = await dynamic_catalog()
                     item = discovered.get(name)
+                    if item is None and dynamic_problem:
+                        # Say why the catalog is missing instead of claiming the tool is denied.
+                        unavailable = BridgeError(
+                            "threaddesk_catalog_unavailable",
+                            dynamic_problem["message"],
+                        )
+                        unavailable.diagnostic = {
+                            **(dynamic_problem["diagnostic"] or {}),
+                            "cause_code": dynamic_problem["code"],
+                            "cause": dynamic_problem["message"],
+                            "automatic_retry": False,
+                        }
+                        raise unavailable
                     if item is None:
                         raise BridgeError("threaddesk_tool_denied", "Dynamic tool is unavailable")
                     result = await connection.call_tool(

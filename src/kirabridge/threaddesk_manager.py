@@ -6,7 +6,11 @@ import asyncio
 import json
 import os
 import re
+import time
 from pathlib import Path
+
+from mcp.shared.exceptions import McpError
+from mcp.types import CONNECTION_CLOSED
 
 from kirabridge.bridge_core.config import Config
 from kirabridge.bridge_core.models import (
@@ -18,7 +22,7 @@ from kirabridge.bridge_core.models import (
     digest,
 )
 from kirabridge.filesystem_manager import PathScope
-from kirabridge.mcp_gateway.client import MCPClientPool, Peer
+from kirabridge.mcp_gateway.client import TRANSPORT_CLOSED, MCPClientPool, Peer
 from kirabridge.threaddesk_contract import safe_peer_error, validate_management
 
 READ_KEYS = {
@@ -31,6 +35,11 @@ READ_KEYS = {
     "whiteboard_list": {"id", "offset", "limit", "include_content"},
     "whiteboard_get": {"id", "entry_id"},
 }
+# Reconnect pacing after a failed or replaced peer: the first rebuild is immediate, then
+# 1, 2, 4 ... seconds, never more than RECONNECT_MAX_SECONDS between attempts.
+RECONNECT_MAX_SECONDS = 60.0
+# The pool enforces its own deadline first; this only backstops a stuck pool call.
+CATALOG_BACKSTOP_SECONDS = 0.5
 ERROR_CODES = {
     "validation_error",
     "invalid_state",
@@ -63,7 +72,13 @@ class ThreadDeskManager:
         self.pool = MCPClientPool(
             max_connections=1, call_timeout=self.settings.timeout, observer=observer
         )
+        # `lock` serializes executions. `catalog_lock` serializes discovery only, so a
+        # hanging call never blocks catalog reads. `connect_lock` makes (re)connect single-flight.
         self.lock = asyncio.Lock()
+        self.catalog_lock = asyncio.Lock()
+        self.connect_lock = asyncio.Lock()
+        self.failures = 0
+        self.retry_at = 0.0
         self.observer_factory = observer_factory
         self.available_tools: set[str] = set()
         self.tool_schemas: dict[str, dict] = {}
@@ -129,14 +144,81 @@ class ThreadDeskManager:
             values["operation_id"] = self.operation_id(principal, value)
         return values
 
-    async def refresh_catalog(self):
+    def peer_failure(self, code, message, *, reset, cause=None):
+        """Clear, counted diagnosis. Only connection and catalog are rebuilt, never a call."""
+        self.failures += 1
+        delay = (
+            0.0 if self.failures == 1 else min(RECONNECT_MAX_SECONDS, 2.0 ** (self.failures - 2))
+        )
+        self.retry_at = time.monotonic() + delay
+        return self.diagnose(
+            BridgeError(code, message),
+            peer_reset=reset,
+            cause=cause,
+            consecutive_failures=self.failures,
+            retry_after_seconds=delay,
+        )
+
+    def diagnose(self, error, **fields):
+        pool_error = self.pool.failure(
+            "threaddesk", error.code, str(error), operation="threaddesk.peer"
+        )
+        diagnostic = getattr(error, "diagnostic", pool_error.diagnostic)
+        diagnostic.update(
+            tool_dispatch="no",
+            automatic_retry=False,
+            guidance="Only the ThreadDesk connection and catalog are rebuilt, with backoff. "
+            "No tool call is repeated; read the original task before repeating anything "
+            "with an uncertain outcome.",
+            **fields,
+        )
+        error.diagnostic = diagnostic
+        return error
+
+    def note_success(self):
+        self.failures, self.retry_at = 0, 0.0
+
+    async def read_catalog(self):
+        """Fresh peer catalog; a hung or closed peer is replaced and reported clearly."""
         try:
-            async with asyncio.timeout(self.settings.timeout):
-                catalog = await self.pool.list_tools("threaddesk")
+            async with asyncio.timeout(self.settings.timeout + CATALOG_BACKSTOP_SECONDS):
+                return await self.pool.list_tools("threaddesk")
         except TimeoutError:
-            raise BridgeError(
-                "threaddesk_catalog_timeout", "Peer catalog exceeded configured timeout"
+            await self.pool.disconnect("threaddesk")  # Idempotent; kills the unresponsive peer.
+            raise self.peer_failure(
+                "threaddesk_catalog_timeout",
+                "Peer catalog exceeded configured timeout; the unresponsive peer was replaced",
+                reset=True,
+                cause="peer_unresponsive",
             ) from None
+        except (McpError, *TRANSPORT_CLOSED) as exc:
+            if isinstance(exc, McpError) and exc.error.code != CONNECTION_CLOSED:
+                raise self.diagnose(
+                    BridgeError(
+                        "threaddesk_peer_error", "ThreadDesk peer rejected the catalog read"
+                    ),
+                    peer_reset=False,
+                    cause=f"mcp_error_{exc.error.code}",
+                ) from None
+            await self.pool.disconnect("threaddesk")
+            raise self.peer_failure(
+                "threaddesk_peer_disconnected",
+                "ThreadDesk peer connection was closed; the connection will be rebuilt",
+                reset=True,
+                cause="peer_connection_closed",
+            ) from None
+        except BridgeError as exc:
+            if exc.code == "peer_disconnected":
+                raise self.peer_failure(
+                    "threaddesk_peer_disconnected",
+                    "ThreadDesk peer is not connected",
+                    reset=True,
+                    cause="peer_disconnected",
+                ) from None
+            raise
+
+    async def refresh_catalog(self):
+        catalog = await self.read_catalog()
         self.tool_schemas = {item.name: item.inputSchema for item in catalog}
         self.available_tools = set(self.tool_schemas)
 
@@ -144,34 +226,61 @@ class ThreadDeskManager:
         self.check_configuration()
         if "threaddesk" in self.pool.sessions:
             return
-        await self.pool.disconnect("threaddesk")
-        env = {
-            "THREADDESK_HOME": self.settings.workspace,
-            "THREADDESK_STORAGE": self.settings.storage,
-        }
-        if self.settings.source_root:
-            env["PYTHONPATH"] = self.settings.source_root
-        try:
-            await self.pool.connect(
-                Peer(
-                    "threaddesk",
-                    command=self.settings.command,
-                    args=tuple(self.settings.args),
-                    env=env,
-                    cwd=self.settings.workspace,
+        async with self.connect_lock:
+            if "threaddesk" in self.pool.sessions:
+                return
+            wait = self.retry_at - time.monotonic()
+            if wait > 0:
+                raise self.diagnose(
+                    BridgeError(
+                        "threaddesk_reconnect_backoff",
+                        f"ThreadDesk reconnect is paced after failures; retry in {wait:.0f}s",
+                    ),
+                    peer_reset=False,
+                    cause="reconnect_backoff",
+                    consecutive_failures=self.failures,
+                    retry_after_seconds=round(wait, 1),
                 )
-            )
-            await self.refresh_catalog()
-            if not {"list_threads", "get_thread", "thread_manage"}.issubset(self.available_tools):
-                await self.pool.disconnect("threaddesk")
-                raise BridgeError("threaddesk_version", "Peer lacks the required Fachvertrag")
-        except BridgeError:
-            raise
-        except Exception:
             await self.pool.disconnect("threaddesk")
-            raise BridgeError(
-                "threaddesk_unavailable", "ThreadDesk initialization failed"
-            ) from None
+            env = {
+                "THREADDESK_HOME": self.settings.workspace,
+                "THREADDESK_STORAGE": self.settings.storage,
+            }
+            if self.settings.source_root:
+                env["PYTHONPATH"] = self.settings.source_root
+            try:
+                await self.pool.connect(
+                    Peer(
+                        "threaddesk",
+                        command=self.settings.command,
+                        args=tuple(self.settings.args),
+                        env=env,
+                        cwd=self.settings.workspace,
+                    )
+                )
+                await self.refresh_catalog()
+                if not {"list_threads", "get_thread", "thread_manage"}.issubset(
+                    self.available_tools
+                ):
+                    await self.pool.disconnect("threaddesk")
+                    raise BridgeError("threaddesk_version", "Peer lacks the required Fachvertrag")
+            except BridgeError as exc:
+                await self.pool.disconnect("threaddesk")
+                known = getattr(exc, "diagnostic", {})
+                if exc.code != "threaddesk_version" and "consecutive_failures" not in known:
+                    counted = self.peer_failure(
+                        exc.code, str(exc), reset=True, cause="peer_connect_failed"
+                    )
+                    exc.diagnostic = {**known, **counted.diagnostic}
+                raise
+            except Exception:
+                await self.pool.disconnect("threaddesk")
+                raise self.peer_failure(
+                    "threaddesk_unavailable",
+                    "ThreadDesk initialization failed",
+                    reset=True,
+                    cause="peer_initialization_failed",
+                ) from None
 
     def decode(self, result, *, mutation: bool, expected: dict | None = None):
         def invalid(code):
@@ -251,6 +360,7 @@ class ThreadDeskManager:
             # A connected peer can change its catalog without reconnecting.
             # Refresh before rejecting cached names or sending any declared operation.
             await self.refresh_catalog()
+            self.note_success()
             if tool not in self.available_tools:
                 raise BridgeError("threaddesk_version", "Peer lacks the declared operation")
             if isinstance(args, ThreadDeskManageInput):
