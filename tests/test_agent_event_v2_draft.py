@@ -10,9 +10,10 @@ from jsonschema.validators import validator_for
 
 from kirabridge.mcp_gateway.schema_validation import SchemaValidatorCache
 
-SCHEMA = json.loads(
-    (Path(__file__).resolve().parents[1] / "docs/contracts/agent-event-v2.draft.schema.json").read_text()
+SCHEMA_PATH = (
+    Path(__file__).resolve().parents[1] / "docs/contracts/agent-event-v2.draft.schema.json"
 )
+SCHEMA = json.loads(SCHEMA_PATH.read_text())
 
 
 def validate(event):
