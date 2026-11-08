@@ -1,0 +1,19 @@
+[Unit]
+Description=KiraBridge Doctor (example, not installed)
+After=network.target
+
+[Service]
+Type=oneshot
+User=kirabridge
+Group=kirabridge
+WorkingDirectory=/opt/kirabridge
+ExecStart=/opt/kirabridge/venv/bin/kirabridge --doctor
+LoadCredential=doctor-hmac-key:/etc/kirabridge/doctor-hmac-key
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+ReadWritePaths=/var/lib/kirabridge
+
+[Install]
+WantedBy=multi-user.target

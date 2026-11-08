@@ -1,0 +1,23 @@
+{
+  "scope": "Read-only inspection after first runner failure; no retry of the original task",
+  "tasks": [
+    {
+      "id": "codex-initial",
+      "state": "unknown",
+      "started": null,
+      "finished": null,
+      "evidence": {
+        "last_observation": {
+          "receipt_id": "5019eb77-6a21-4d1f-9dd6-b4371d12acf2",
+          "receiver": "kirabridge.dispatcher",
+          "worker": "8bdfe1e5-8a6b-4ac7-9c7e-a991667fb36f"
+        },
+        "reason": "dispatcher_shutdown",
+        "side_effect_possible": false
+      },
+      "error": null,
+      "result": null
+    }
+  ],
+  "explanation": "error:null misclassified as an MCP rejection; shutdown before model dispatch; stored evidence side_effect_possible=false. Separate fresh run 02 succeeded after correction."
+}

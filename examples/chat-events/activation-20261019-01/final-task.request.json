@@ -1,0 +1,14 @@
+{
+  "task_id": "chat-events-receipt-20261019-01",
+  "idempotency_key": "chat-events-receipt-20261019-01",
+  "operation": "terminal.execute",
+  "arguments": {
+    "argv": [
+      "/Users/landjunge/KiraBridge/.venv/bin/python3",
+      "-c",
+      "print('KIRABRIDGE_REAL_CHAT_RECEIPT_20261019_01')"
+    ],
+    "cwd": "/Users/landjunge/KiraBridge/examples/chat-events/final-receipt",
+    "timeout": 5
+  }
+}

@@ -1,0 +1,30 @@
+{
+  "api_version": "1",
+  "seq": 6,
+  "id": "6a818b91-b158-4f51-a43b-43656d10540c",
+  "conversation_id": "receiver-codex-20261019-01",
+  "position": 1,
+  "sender": "grok",
+  "recipient": "codex",
+  "kind": "question",
+  "body": "Antworte ausschließlich mit: KiraBridge-Test empfangen.",
+  "reply_to": null,
+  "task_id": null,
+  "depth": 0,
+  "request_reply": false,
+  "created": 1792372655.08208,
+  "delivered": null,
+  "receipt": null,
+  "acknowledged": null,
+  "processing": {
+    "message_id": "6a818b91-b158-4f51-a43b-43656d10540c",
+    "state": "queued",
+    "run_id": null,
+    "claimed": null,
+    "started": null,
+    "finished": null,
+    "reply_id": null,
+    "evidence": {},
+    "error": null
+  }
+}

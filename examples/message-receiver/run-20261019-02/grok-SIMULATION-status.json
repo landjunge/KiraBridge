@@ -1,0 +1,22 @@
+{
+  "api_version": "1",
+  "principal": "grok",
+  "peers": [
+    "operator"
+  ],
+  "approval_mode": "automatic",
+  "receiver_configured": true,
+  "receiver_active": true,
+  "session_scope": "separate_managed_session",
+  "existing_session_attached": false,
+  "jobs": {},
+  "limits": {
+    "max_body_bytes": 16384,
+    "max_pending_per_recipient": 100,
+    "max_total": 10000,
+    "max_conversation_messages": 16,
+    "max_reply_depth": 8,
+    "max_runs_per_conversation": 4,
+    "max_runs_per_hour": 24
+  }
+}

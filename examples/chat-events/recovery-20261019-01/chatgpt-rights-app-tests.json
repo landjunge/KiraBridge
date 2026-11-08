@@ -1,0 +1,77 @@
+{
+  "origin": "ACTUAL CONNECTED APP; OWN NEW DISPOSABLE FILE OUTSIDE PREVIOUS PROJECT ROOTS",
+  "write": {
+    "content": [
+      {
+        "type": "text",
+        "text": "{\n  \"api_version\": \"1\",\n  \"id\": \"chatgpt-rights-write-20261019-01\",\n  \"principal\": \"chatgpt\",\n  \"operation\": \"file.write\",\n  \"args\": {\n    \"overwrite\": false,\n    \"path\": \"/private/var/folders/v1/z7b9nf2s7879dvxxbzy7bqv00000gn/T/kirabridge-chatgpt-rights-l8_ks96y/probe.txt\",\n    \"text\": \"KIRABRIDGE_CHATGPT_RIGHTS_OK\\n\"\n  },\n  \"agent\": null,\n  \"parent_id\": null,\n  \"state\": \"completed\",\n  \"created\": 1792373836.112917,\n  \"updated\": 1792373836.2121851,\n  \"accepted\": 1792373836.1302028,\n  \"started\": 1792373836.1782331,\n  \"finished\": 1792373836.2121851,\n  \"receipt\": \"c7329135-4c77-4452-af5f-da24b98be89a\",\n  \"evidence\": {\n    \"operation_returned\": true\n  },\n  \"result\": {\n    \"content_sha256\": \"4cd9a59886f774da59e53284e50c4c898e6f02ac04a7a6acc63bb2241f313329\",\n    \"written_bytes\": 29\n  },\n  \"error\": null,\n  \"attempt\": 1\n}"
+      }
+    ],
+    "structuredContent": {
+      "api_version": "1",
+      "id": "chatgpt-rights-write-20261019-01",
+      "principal": "chatgpt",
+      "operation": "file.write",
+      "args": {
+        "overwrite": false,
+        "path": "/private/var/folders/v1/z7b9nf2s7879dvxxbzy7bqv00000gn/T/kirabridge-chatgpt-rights-l8_ks96y/probe.txt",
+        "text": "KIRABRIDGE_CHATGPT_RIGHTS_OK\n"
+      },
+      "agent": null,
+      "parent_id": null,
+      "state": "completed",
+      "created": 1792373836.112917,
+      "updated": 1792373836.2121851,
+      "accepted": 1792373836.1302028,
+      "started": 1792373836.1782331,
+      "finished": 1792373836.2121851,
+      "receipt": "c7329135-4c77-4452-af5f-da24b98be89a",
+      "evidence": {
+        "operation_returned": true
+      },
+      "result": {
+        "content_sha256": "4cd9a59886f774da59e53284e50c4c898e6f02ac04a7a6acc63bb2241f313329",
+        "written_bytes": 29
+      },
+      "error": null,
+      "attempt": 1
+    },
+    "isError": false
+  },
+  "delete": {
+    "content": [
+      {
+        "type": "text",
+        "text": "{\n  \"api_version\": \"1\",\n  \"id\": \"chatgpt-rights-delete-20261019-01\",\n  \"principal\": \"chatgpt\",\n  \"operation\": \"file.delete\",\n  \"args\": {\n    \"path\": \"/private/var/folders/v1/z7b9nf2s7879dvxxbzy7bqv00000gn/T/kirabridge-chatgpt-rights-l8_ks96y/probe.txt\"\n  },\n  \"agent\": null,\n  \"parent_id\": null,\n  \"state\": \"completed\",\n  \"created\": 1792373857.420068,\n  \"updated\": 1792373857.517409,\n  \"accepted\": 1792373857.453624,\n  \"started\": 1792373857.5009239,\n  \"finished\": 1792373857.517409,\n  \"receipt\": \"76b606c7-fa1d-4b24-83b9-d97d9a3ce65e\",\n  \"evidence\": {\n    \"operation_returned\": true\n  },\n  \"result\": {\n    \"deleted\": true\n  },\n  \"error\": null,\n  \"attempt\": 1\n}"
+      }
+    ],
+    "structuredContent": {
+      "api_version": "1",
+      "id": "chatgpt-rights-delete-20261019-01",
+      "principal": "chatgpt",
+      "operation": "file.delete",
+      "args": {
+        "path": "/private/var/folders/v1/z7b9nf2s7879dvxxbzy7bqv00000gn/T/kirabridge-chatgpt-rights-l8_ks96y/probe.txt"
+      },
+      "agent": null,
+      "parent_id": null,
+      "state": "completed",
+      "created": 1792373857.420068,
+      "updated": 1792373857.517409,
+      "accepted": 1792373857.453624,
+      "started": 1792373857.5009239,
+      "finished": 1792373857.517409,
+      "receipt": "76b606c7-fa1d-4b24-83b9-d97d9a3ce65e",
+      "evidence": {
+        "operation_returned": true
+      },
+      "result": {
+        "deleted": true
+      },
+      "error": null,
+      "attempt": 1
+    },
+    "isError": false
+  },
+  "grok_invoked": false
+}

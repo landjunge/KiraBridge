@@ -173,13 +173,15 @@ class SetupUI:
             else:
                 width = max(1, min(120, shutil.get_terminal_size((80, 24)).columns))
             motion = self.motion if self.exclusive_output and self._window_size else "reduced"
-            options = self.design.options_for(self.stream, width=width, motion=motion)
+            # Designs offering a compact wordmark use it; older pinned designs keep theirs.
+            compact = {"compact": True} if hasattr(self.design, "compact_rows") else {}
+            options = self.design.options_for(self.stream, width=width, motion=motion, **compact)
             # Never move into scrollback: only animate a frame fitting entirely
             # inside the current viewport, with a spare line below our own area.
             capacity = max(1, self._window_size.lines - 2) if self._window_size else 1
             if self.design.static_banner(options).count("\n") > capacity:
                 options = self.design.options_for(
-                    self.stream, width=min(width, 29), motion="reduced"
+                    self.stream, width=min(width, 29), motion="reduced", **compact
                 )
             self._redraw = bool(
                 options.motion and self.exclusive_output and self._window_size is not None
@@ -267,7 +269,148 @@ class SetupUI:
 
     def error(self, de, en=None):
         self.cancel()
+        if self._phase_number or self._headed:
+            self._emit([("\n", "")])
+            self._line("✗", "x", "err", self.text(de, en or de), bold=True)
+            return
         self.say(de, en)
+
+    # Structured installer output. Plain text without colors whenever the stream is
+    # not an interactive color terminal (NO_COLOR, TERM=dumb, pipes and log files).
+
+    _phase_number = 0
+    _headed = False
+    GUTTER = 5
+
+    def _palette(self):
+        try:
+            tty = self.stream.isatty()
+        except (AttributeError, OSError, ValueError):
+            tty = False
+        term = os.environ.get("TERM", "")
+        if not tty or "NO_COLOR" in os.environ or term in {"", "dumb"}:
+            return None
+        truecolor = os.environ.get("COLORTERM", "").lower() in {"truecolor", "24bit"}
+        return {
+            "accent": "\x1b[38;2;240;109;176m" if truecolor else "\x1b[38;5;205m",
+            "ok": "\x1b[38;2;94;196;140m" if truecolor else "\x1b[32m",
+            "warn": "\x1b[38;2;232;178;76m" if truecolor else "\x1b[33m",
+            "err": "\x1b[38;2;236;94;94m" if truecolor else "\x1b[31m",
+            "dim": "\x1b[2m",
+            "bold": "\x1b[1m",
+            "reset": "\x1b[0m",
+        }
+
+    def _unicode(self):
+        try:
+            "✓✗·─".encode(getattr(self.stream, "encoding", None) or "ascii")
+            return True
+        except (UnicodeError, LookupError):
+            return False
+
+    def _width(self):
+        return max(40, min(88, shutil.get_terminal_size((80, 24)).columns))
+
+    def _paint(self, role, value, *, bold=False):
+        palette = self._palette()
+        if palette is None or not value:
+            return value
+        prefix = (palette["bold"] if bold else "") + (palette.get(role, "") if role else "")
+        return prefix + value + palette["reset"] if prefix else value
+
+    def _emit(self, pieces):
+        self.cancel()
+        self._priority_prefix()
+        print("".join(text for text, _ in pieces), file=self.stream, end="", flush=True)
+
+    def _wrapped(self, value, indent, width=None):
+        width = max(20, (width or self._width()) - indent)
+        # Paths and versions must stay intact: never split at their hyphens.
+        return textwrap.wrap(
+            value, width=width, break_on_hyphens=False, break_long_words=False
+        ) or [""]
+
+    def _detail_lines(self, detail, indent):
+        """One line if it fits; otherwise each " · " part on its own line."""
+        width = max(20, self._width() - indent)
+        if len(detail) <= width:
+            return [detail]
+        lines = []
+        for part in detail.split(" · "):
+            lines += self._wrapped(part, indent)
+        return lines
+
+    def _line(self, glyph, ascii_glyph, role, value, *, detail=None, hint=None, bold=False):
+        mark = glyph if self._unicode() else ascii_glyph
+        indent = self.GUTTER if self._phase_number else 2
+        body = self._wrapped(value, indent + 2)
+        lines = [
+            " " * indent
+            + self._paint(role, mark, bold=True)
+            + " "
+            + self._paint(None, body[0], bold=bold)
+        ]
+        lines += [" " * (indent + 2) + self._paint(None, part, bold=bold) for part in body[1:]]
+        if detail:
+            lines += [
+                " " * (indent + 2) + self._paint("dim", part)
+                for part in self._detail_lines(str(detail), indent + 2)
+            ]
+        if hint:
+            arrow = "→" if self._unicode() else "->"
+            parts = self._wrapped(str(hint), indent + 2 + len(arrow) + 1)
+            lines.append(" " * (indent + 2) + self._paint("accent", arrow) + " " + parts[0])
+            lines += [" " * (indent + 3 + len(arrow)) + part for part in parts[1:]]
+        self._emit([("\n".join(lines) + "\n", "")])
+
+    def _rule(self):
+        line = ("─" if self._unicode() else "-") * (self._width() - 4)
+        return "  " + self._paint("dim", line) + "\n"
+
+    def heading(self, title_de, title_en=None, meta=""):
+        """Title row under the wordmark: action left, version/source right, then a rule."""
+        self._headed = True
+        title = self.text(title_de, title_en or title_de)
+        gap = max(2, self._width() - 4 - len(title) - len(meta))
+        row = "  " + self._paint("accent", title, bold=True)
+        if meta:
+            row += " " * gap + self._paint("dim", meta)
+        self._emit([("\n" + row + "\n" + self._rule(), "")])
+
+    def phase(self, de, en=None):
+        """Next numbered phase; numbering is owned by this presenter."""
+        self._phase_number += 1
+        number = self._paint("accent", str(self._phase_number), bold=True)
+        title = self._paint(None, self.text(de, en or de), bold=True)
+        self._emit([("\n  " + number + "  " + title + "\n", "")])
+
+    def ok(self, de, en=None, *, detail=None, hint=None):
+        self._line("✓", "+", "ok", self.text(de, en or de), detail=detail, hint=hint)
+
+    def note(self, de, en=None, *, detail=None, hint=None):
+        self._line("·", "-", "dim", self.text(de, en or de), detail=detail, hint=hint)
+
+    def warn(self, de, en=None, *, detail=None, hint=None):
+        self._line("!", "!", "warn", self.text(de, en or de), detail=detail, hint=hint)
+
+    def fail(self, de, en=None, *, detail=None, hint=None):
+        self._line("✗", "x", "err", self.text(de, en or de), detail=detail, hint=hint)
+
+    def summary(self, de, en=None, *, rows=(), success=True):
+        """Final result: one headline and aligned label/value rows."""
+        self._phase_number = 0
+        title = self.text(de, en or de)
+        mark = ("✓" if success else "!") if self._unicode() else ("+" if success else "!")
+        role = "ok" if success else "warn"
+        out = ["\n" + self._rule(), "  " + self._paint(role, mark + " " + title, bold=True) + "\n"]
+        labels = [self.text(*label) if isinstance(label, tuple) else label for label, _ in rows]
+        pad = max((len(label) for label in labels), default=0) + 3
+        for label, (_, value) in zip(labels, rows, strict=True):
+            parts = self._wrapped(str(value), 4 + pad)
+            out.append("    " + self._paint("dim", label.ljust(pad)) + parts[0] + "\n")
+            out += ["    " + " " * pad + part + "\n" for part in parts[1:]]
+        out.append("\n")
+        self._emit([("".join(out), "")])
 
     def prompt(self, de, en, default=""):
         return self.ask(de, en, default)

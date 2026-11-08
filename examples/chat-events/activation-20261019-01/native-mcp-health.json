@@ -1,0 +1,37 @@
+{
+  "schema_version": 1,
+  "snapshot_at": "2026-10-19T00:52:37.12459Z",
+  "component": "mcp",
+  "status": "ok",
+  "state": "initialized",
+  "observed_at": "2026-10-19T00:48:32.465872Z",
+  "limited": false,
+  "details": {
+    "channel": "main",
+    "transport": "stdio",
+    "child_state": "running",
+    "child_generation": "886245c0340ee0d462d2db7441965c84",
+    "initialize_epoch": 1,
+    "evidence": "same_child",
+    "initialize": {
+      "ok": true,
+      "identity_complete": true,
+      "limited": false,
+      "observed_at": "2026-10-19T00:48:32.465872Z",
+      "protocol_version": "2025-11-25",
+      "server_name": "KiraBridge Chat Events",
+      "server_version": "0.0.1",
+      "capability_names": [
+        "tools"
+      ]
+    },
+    "tools_list": {
+      "ok": false,
+      "tool_names": [],
+      "retained_count": 0,
+      "complete": false,
+      "partial": false,
+      "limited": false
+    }
+  }
+}

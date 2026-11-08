@@ -110,6 +110,89 @@ def say(message):
         print(message, file=sys.stderr, flush=True)
 
 
+PLAIN_MARKS = {"phase": "==", "ok": "OK", "note": "--", "warn": "!!", "fail": "XX"}
+
+
+def short(path):
+    """Display form only: the home directory as ~, everything else unchanged."""
+    text, home = str(path), str(Path.home())
+    return "~" + text[len(home) :] if text == home or text.startswith(home + os.sep) else text
+
+
+def report(kind, message, *, detail=None, hint=None):
+    """Structured status line; plain text when the presenter is absent or older."""
+    method = getattr(PRESENTER, kind, None) if PRESENTER is not None else None
+    if callable(method):
+        if kind == "phase":
+            method(message)
+        elif hint:
+            method(message, detail=detail, hint=hint)
+        else:
+            method(message, detail=detail)
+        return
+    text = f"{PLAIN_MARKS.get(kind, '--')} {message}" + (f" ({detail})" if detail else "")
+    say(text + (f"\n   -> {hint}" if hint else ""))
+
+
+DOCTOR_KINDS = {"ok": "ok", "warn": "warn", "fail": "fail", "info": "note"}
+
+
+def final_check(args, release):
+    """Read-only live doctor of the activated release; it never changes the result."""
+    report("phase", "Abschlussprüfung")
+    try:
+        live = cli(release, args.config, "doctor", "--live", "--json", timeout=60)["live"]
+        sections = live["sections"]
+    except Exception as exc:  # noqa: BLE001 - shown, the installation stays complete
+        report("note", "Abschlussprüfung nicht möglich", detail=str(exc)[:240])
+        return
+    for section in sections:
+        entries = [e for e in section.get("items", []) if e.get("status") != "info"]
+        problems = [e for e in entries if e.get("status") != "ok"]
+        if not problems:
+            count = len(entries)
+            report("ok", section.get("title", "?"), detail=f"{count} Prüfungen in Ordnung")
+            continue
+        for entry in problems:
+            report(
+                DOCTOR_KINDS.get(entry.get("status"), "note"),
+                f"{section.get('title', '?')}: {entry.get('label', '?')}",
+                detail=entry.get("detail") or None,
+                hint=entry.get("hint") or None,
+            )
+
+
+def report_summary(title, rows, *, success=True):
+    method = getattr(PRESENTER, "summary", None) if PRESENTER is not None else None
+    if callable(method):
+        method(title, rows=rows, success=success)
+        return
+    say(title + "".join(f"\n   {label}: {value}" for label, value in rows))
+
+
+def report_heading(args):
+    """Wordmark, then the action with version and source of what is being installed."""
+    titles = {
+        "install": "Installation",
+        "prepare": "Vorbereitung",
+        "rollback": "Rückweg",
+    }
+    title = "KiraBridge · " + titles.get(args.action, args.action)
+    meta = ""
+    try:
+        manifest = json.loads((Path(args.bundle) / "release.json").read_text())
+        meta = f"{manifest['version']} · {manifest['commit'][:7]}"
+    except (TypeError, OSError, ValueError, KeyError):
+        if getattr(args, "ref", None):
+            meta = args.ref[:7]
+    if PRESENTER is not None and callable(getattr(PRESENTER, "heading", None)):
+        PRESENTER.begin()
+        PRESENTER.finish()
+        PRESENTER.heading(title, meta=meta)
+        return
+    say(title + (f"  {meta}" if meta else ""))
+
+
 def presentation_error(message):
     if PRESENTER is not None:
         PRESENTER.error(message)
@@ -346,7 +429,11 @@ def idle_guard(config):
                 f"BUSY: {tasks} tasks, {jobs} receiver jobs, {team_work} team jobs. "
                 "Nothing switched."
             )
-        say("Leerlauf unter Schreibsperre: 0 aktive Tasks, 0 Empfängerjobs.")
+        report(
+            "ok",
+            "Keine laufende Arbeit",
+            detail="Unter Schreibsperre geprüft: 0 Aufträge, 0 Empfängerjobs",
+        )
         yield db
     finally:
         db.rollback()
@@ -555,6 +642,7 @@ def copy_native(root, destination, contract):
 
 
 def prepare_bundle(args):
+    report("phase", "Paket prüfen")
     bundle = args.bundle.resolve()
     manifest = json.loads((bundle / "release.json").read_text())
     ref, version = manifest["commit"], manifest["version"]
@@ -579,6 +667,11 @@ def prepare_bundle(args):
         raise RuntimeError("Bundle wheel must be a checksum-pinned member")
     wheel = bundle_member(bundle, wheel_name)
     native = native_contract(bundle, manifest, ref, version)
+    report(
+        "ok",
+        "Prüfsummen stimmen",
+        detail=f"{len(manifest['files'])} Dateien · Version {version} · Quelle {ref[:12]}",
+    )
     releases = args.prefix / "releases"
     private_dir(releases)
     destination = releases / (version + "-" + ref[:12])
@@ -592,6 +685,7 @@ def prepare_bundle(args):
             if any(saved.get(key) != value for key, value in native.items()):
                 raise RuntimeError("Existing native release identity differs; preserved")
             native_contract(destination, saved, ref, version)
+        report("ok", "Diese Version ist bereits vorbereitet", detail=short(destination))
         return destination
     uv = shutil.which("uv")
     if not uv or run([uv, "--version"], capture=True).decode().split()[:2] != ["uv", "0.11.6"]:
@@ -613,6 +707,7 @@ def prepare_bundle(args):
                 "--no-dev",
                 "--no-install-project",
                 "--no-build",
+                "--quiet",
                 "--python",
                 sys.executable,
                 "--cache-dir",
@@ -624,6 +719,7 @@ def prepare_bundle(args):
                 uv,
                 "pip",
                 "install",
+                "--quiet",
                 "--python",
                 python(destination),
                 "--no-deps",
@@ -647,6 +743,11 @@ def prepare_bundle(args):
     except BaseException:
         shutil.rmtree(destination)
         raise
+    report(
+        "ok",
+        "Laufzeit eingerichtet",
+        detail=f"{short(destination)} · bisherige Installation unverändert",
+    )
     return destination
 
 
@@ -741,13 +842,18 @@ def prepare(args):
         manifest = json.loads((destination / "release.json").read_text())
         if manifest["commit"] != ref or cli_version(destination) != version:
             raise RuntimeError("Existing release identity differs")
-        say(f"Bereits vorbereitet: {version} @ {ref}")
+        report("ok", "Diese Version ist bereits vorbereitet", detail=f"{version} · {ref[:12]}")
         return destination
     stage = releases / (".preparing-" + uuid.uuid4().hex)
     private_dir(stage)
     source = stage / "source"
     source.mkdir(mode=0o700)
-    say(f"Bereite {version} aus Git-Commit {ref} vor; Arbeitskopie wird nicht kopiert.")
+    report("phase", "Paket vorbereiten")
+    report(
+        "note",
+        f"Version {version} aus Git-Commit {ref[:12]}",
+        detail="Exakter Commit, die Arbeitskopie wird nicht kopiert",
+    )
     archive = run(["git", "-C", args.repo, "archive", "--format=tar", ref], capture=True)
     with tarfile.open(fileobj=io.BytesIO(archive)) as tar:
         tar.extractall(source, filter="data")
@@ -797,7 +903,11 @@ def prepare(args):
     )
     atomic(destination / "release.json", (stage / "release.json").read_bytes())
     shutil.rmtree(stage)
-    say(f"Versionspaket geprüft: {version}; bisherige Installation unverändert.")
+    report(
+        "ok",
+        f"Versionspaket {version} geprüft",
+        detail="Bisherige Installation unverändert",
+    )
     return destination
 
 
@@ -882,9 +992,10 @@ def fresh_config(args, release):
     )
     jwrite(credentials, tokens)
     atomic(args.config, text)
-    say(
-        "Neue lokale Konfiguration erstellt; Zugangsdaten nicht ausgegeben. "
-        "ChatGPT-Kontoverbindung separat erforderlich."
+    report(
+        "ok",
+        "Neue lokale Konfiguration erstellt",
+        detail="Zugangsdaten werden nicht angezeigt · ChatGPT-Konto separat verbinden",
     )
 
 
@@ -1244,7 +1355,10 @@ def activate(args, release):
             if not loaded(args):
                 start_service(args)
             wait_health(args, release, manifest["version"])
-        say("Diese Version ist bereits aktiviert und geprüft.")
+        report_summary(
+            f"KiraBridge {manifest['version']} ist bereits aktiv",
+            [("Quellstand", manifest["commit"][:12]), ("Status", "Aktiviert und geprüft")],
+        )
         return
     backup = args.prefix / "backups" / (time.strftime("%Y%m%d-%H%M%S") + "-" + uuid.uuid4().hex[:8])
     private_dir(backup)
@@ -1306,7 +1420,12 @@ def activate(args, release):
             types.SimpleNamespace(**globals()), args, release, old, backup
         )
         jwrite(backup / "transaction.json", before)
-    say(f"Rückweg gesichert: {backup}. Konfiguration und Zugangsdaten bleiben erhalten.")
+    report("phase", "Sichern und umschalten")
+    report(
+        "ok",
+        "Rückweg gesichert",
+        detail=f"{short(backup)} · Konfiguration und Zugangsdaten bleiben erhalten",
+    )
     try:
         with idle_guard(args.config):
             require_queue_compatibility(args.config, release)
@@ -1389,21 +1508,36 @@ def activate(args, release):
         start_service(args)
         if args.service != "none":
             health = wait_health(args, release, manifest["version"])
-            say(f"Dienst gestartet: Version {health['version']}, PID {health['runtime']['pid']}.")
+            report(
+                "ok",
+                "Dienst läuft",
+                detail=f"Version {health['version']} · PID {health['runtime']['pid']}",
+            )
         if before.get("desktop"):
             desktop_module(args).activate(
                 types.SimpleNamespace(**globals()), args, release, before, current
             )
+            report("ok", "Desktop-App, Konsole und ChatGPT-Dienst aktualisiert")
     except Exception:
         if current.exists() and json.loads(current.read_text()).get("backup") == str(backup):
-            say("Umschaltung fehlgeschlagen. Rückweg wird unter erneuter Leerlaufprüfung versucht.")
+            report(
+                "warn",
+                "Umschaltung fehlgeschlagen",
+                detail="Der Rückweg wird unter erneuter Leerlaufprüfung versucht",
+            )
             rollback(args, _compensating=True)
         raise
     assert args.config.read_bytes() == config_before, "Configuration changed"
     assert not credentials or sha(credentials) == credential_hash, "Credentials changed"
-    say(
-        f"INSTALLIERT: {manifest['version']} @ {manifest['commit']}. "
-        "Rechte und Zugangsdaten erhalten."
+    if args.service != "none":
+        final_check(args, release)
+    report_summary(
+        f"KiraBridge {manifest['version']} ist installiert",
+        [
+            ("Quellstand", manifest["commit"][:12]),
+            ("Erhalten", "Konfiguration, Zugangsdaten und Rechte"),
+            ("Rückweg", short(backup)),
+        ],
     )
 
 
@@ -1412,6 +1546,7 @@ def rollback(args, *, _compensating=False):
     # after a failed switch must not prevent this guarded compensation.
     if not _compensating:
         require_visible_terminal(args)
+    report("phase", "Vorherige Version wiederherstellen")
     current = args.prefix / "current.json"
     if not current.exists():
         raise RuntimeError("No activated version/recovery record")
@@ -1503,9 +1638,13 @@ def rollback(args, *, _compensating=False):
         jwrite(current, active["previous"])
     else:
         current.unlink()
-    say(
-        "ZURÜCKGEROLLT: vorheriger Launcher/Dienst wiederhergestellt. "
-        "Konfiguration, Zugangsdaten und neue Ergebnisdaten bleiben erhalten."
+    report_summary(
+        "Vorherige Version wiederhergestellt",
+        [
+            ("Wiederhergestellt", "Launcher und Dienst"),
+            ("Erhalten", "Konfiguration, Zugangsdaten und neue Ergebnisdaten"),
+        ],
+        success=False,
     )
 
 
@@ -1623,7 +1762,7 @@ def _main():
             language=args.language,
             motion=args.motion,
         )
-        say("KiraBridge · Installation/Update")
+        report_heading(args)
     for path in (args.config, args.launcher, args.plist, args.prefix, args.cache_dir):
         validate_destination(path, private=path == args.config)
     private_dir(args.prefix)

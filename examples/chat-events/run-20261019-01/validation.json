@@ -1,0 +1,34 @@
+{
+  "full_suite": {
+    "passed": 211,
+    "elapsed_seconds": 81.7
+  },
+  "new_event_tests": {
+    "passed": 26,
+    "elapsed_seconds": 0.47
+  },
+  "lint": "ruff check passed",
+  "format": "81 files formatted",
+  "diff_whitespace": "git diff --check passed",
+  "native_protocol_evidence": "evidence.json",
+  "real_chat_receipt_verified": false,
+  "production_activation": false,
+  "paid_model_calls_in_this_phase": 0,
+  "preservation": {
+    "existing_main_dependency_files_unchanged": true,
+    "production_profile_hash_matches_preparation": true,
+    "no_process_restart": true,
+    "no_agent_delegation": true,
+    "no_permission_changes": true
+  },
+  "source_sha256": {
+    "src/kirabridge/event_push.py": "2f6f9dab5c1b0d92d94ad4e489ae567f052e301de6c85faf7e6c241f92c0a58f",
+    "integrations/chat-events/serve.py": "ad57c4e1cff956b4b78fdc4805b7e011cf8b9b2f1e1de90ea1a15f02fb322da4",
+    "integrations/chat-events/check_protocol.py": "6083508f1cf25e6d17e52056d158f3c2b25d0e4cac53ad3b26ad153c41cce8bc",
+    "integrations/chat-events/prepare.py": "04d54781b8334bfe6ee2b66b4b67887b08a645554943b30a07d3141cc15a54d3",
+    "integrations/chat-events/pyproject.toml": "16bc24004d29d743f8d7d2f0f568862eec2be35c36479f6dab5642d5238a2dcc",
+    "integrations/chat-events/uv.lock": "a9a7adf8dc684510278140c26c1f4f2a6fb90ab75b05e15efae443bd037672b5",
+    "scripts/accept_chat_events.py": "6ea825c2770ab9323c996eb76009202a7fb6b93665f621ee418a1790baa23755",
+    "tests/test_event_push.py": "c13c88c3e08fbcc8fdaf69a01e11dc2f070b1267b0b2b864e50115f0b22ecc79"
+  }
+}

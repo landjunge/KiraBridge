@@ -254,3 +254,29 @@ def test_preview_interrupted_colored_write_resets_without_more_graphics(error, s
     with pytest.raises(error):
         module.emit_frame(Interrupted(), "\033[38;2;240;109;176m⣿", styled=True)
     assert written[-1] == "\033[0m\n" and len(written) == 2
+
+
+@pytest.mark.parametrize("width", [30, 60, 80, 120, 160])
+def test_compact_header_is_only_the_left_aligned_wordmark(width):
+    rows = design.compact_rows(width)
+    full = design.render(min(width, design.COMPACT_MAX_WIDTH))
+    assert len(rows) <= 5 and len(rows) < len(full)
+    assert all(len(row) <= width for row in rows)
+    if width >= 64:
+        assert all(char == "⠀" for row in rows for char, _ in row[: design.COMPACT_INDENT])
+    assert any(char != "⠀" for row in rows for char, _ in row[design.COMPACT_INDENT :][:1]) or (
+        width < 64
+    )
+    compact = design.options_for(
+        Stream(), width=width, env={"TERM": "xterm-256color"}, compact=True
+    )
+    assert compact.compact and design.static_banner(compact).count("\n") == len(rows)
+    # The full PR34 banner keeps its word and bridge for every other caller.
+    banner = design.static_banner(compact._replace(compact=False))
+    assert banner.count("\n") == len(design.render(width))
+
+
+def test_compact_header_falls_back_to_plain_name_without_unicode():
+    settings = design.options_for(Stream(encoding="ascii"), width=80, env={}, compact=True)
+    assert design.static_banner(settings) == "KiraBridge\n"
+    assert design.AnimationController(settings).finish() == "KiraBridge\n"

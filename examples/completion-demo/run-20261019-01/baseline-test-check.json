@@ -1,0 +1,8 @@
+{
+  "baseline_commit": "13f1cb1",
+  "scope": "HEAD extracted to owned temporary directory; isolated PYTHONPATH; no working tree changes discarded",
+  "test": "tests/test_development_status.py::test_permissions_snapshot_is_explicit_whitelist_and_checks_disk_drift",
+  "baseline_exit_code": 1,
+  "baseline_failure": "Expected whitelist omitted pre-existing local_tools_available=false",
+  "fix": "Expected existing false field added; implementation unchanged"
+}

@@ -1,23 +1,36 @@
-[Deutsch](README.de.md)
+<!-- readme-header-v1: Kopf nach ThreadDesk docs/contracts/readme-header-v1.md. Nicht von Hand umgestalten; scripts/readme_header.py apply/check verwenden. -->
 
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="assets/design/icons/dark/KiraBridge-dark-256.png">
-  <img src="assets/design/icons/light/KiraBridge-light-256.png" alt="KiraBridge" width="160" height="160">
-</picture>
+**English** · [Deutsch](README.de.md)
 
-# KiraBridge
+<p align="center">
+  <img src="assets/readme/normalized/KiraBridge-large.svg" alt="KiraBridge" width="256" height="256">
+</p>
+
+<p align="center">
+  <a href="https://github.com/landjunge/threaddesk#readme" title="ThreadDesk"><img src="assets/readme/normalized/ThreadDesk-small.svg" alt="ThreadDesk" width="48" height="48"></a>
+  &nbsp;
+  <a href="https://github.com/landjunge/4AllPass#readme" title="4AllPass"><img src="assets/readme/normalized/4AllPass-small.svg" alt="4AllPass" width="48" height="48"></a>
+  &nbsp;
+  <a href="https://github.com/landjunge/tollgate#readme" title="TollGate"><img src="assets/readme/normalized/TollGate-small.svg" alt="TollGate" width="48" height="48"></a>
+  &nbsp;
+  <a href="https://github.com/landjunge/agent-authority-lab#readme" title="Agent Authority"><img src="assets/readme/normalized/Agent-Authority-small.svg" alt="Agent Authority" width="48" height="48"></a>
+  &nbsp;
+  <a href="https://github.com/landjunge/blockdesign#readme" title="BlockDesign"><img src="assets/readme/normalized/BlockDesign-small.svg" alt="BlockDesign" width="48" height="48"></a>
+</p>
 
 <p align="center"><picture><source media="(prefers-color-scheme: dark)" srcset="assets/design/wordmarks/KiraBridge-dark.svg"><img src="assets/design/wordmarks/KiraBridge-light.svg" alt="KiraBridge" width="312"></picture></p>
 
 <!-- AUTO-DOWNLOADS:START -->
 <p align="center">
-  <a href="https://github.com/landjunge/KiraBridge/releases/tag/v0.8.0rc36"><img src="assets/readme/download-macos-intel.svg" alt="macOS Intel 0.8.0rc36" width="170"></a>
+  <a href="https://github.com/landjunge/KiraBridge/releases/download/v0.8.0rc36/KiraBridge-0.8.0rc36-Intel-Installer.zip" title="KiraBridge-0.8.0rc36-Intel-Installer.zip herunterladen / download"><img src="assets/readme/download-macos-intel.svg" alt="Download macOS Intel 0.8.0rc36" width="190" height="52"></a>
   &nbsp;
-  <a href="https://github.com/landjunge/KiraBridge/releases/tag/windows-v0.8.0rc37.dev1"><img src="assets/readme/download-windows-preview.svg" alt="Windows Preview 0.8.0rc37.dev1" width="170"></a>
+  <a href="https://github.com/landjunge/KiraBridge/releases/download/windows-v0.8.0rc37.dev1/KiraBridge-0.8.0rc37.dev1-Windows-Dev-Kit.zip" title="KiraBridge-0.8.0rc37.dev1-Windows-Dev-Kit.zip herunterladen / download"><img src="assets/readme/download-windows.svg" alt="Download Windows 0.8.0rc37.dev1" width="190" height="52"></a>
+  &nbsp;
+  <a href="https://github.com/landjunge/KiraBridge/releases/download/linux-v0.8.0rc41/KiraBridge-0.8.0rc41-Linux-x86_64.tar.gz" title="KiraBridge-0.8.0rc41-Linux-x86_64.tar.gz herunterladen / download"><img src="assets/readme/download-linux.svg" alt="Download Linux 0.8.0rc41" width="190" height="52"></a>
 </p>
 <!-- AUTO-DOWNLOADS:END -->
 
-**Talk to your AI. Get the work done on your computer.**
+<p align="center"><strong>Talk to your AI. Get the work done on your computer.</strong></p>
 
 KiraBridge connects ChatGPT to **Grok Build and Codex running in terminal windows
 on your computer**. Discuss what you need in chat, pass the work to those terminal

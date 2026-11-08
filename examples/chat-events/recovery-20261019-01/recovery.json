@@ -1,0 +1,21 @@
+{
+  "rolled_back": true,
+  "profile_matches_original": true,
+  "server_requires_completion_subscription": false,
+  "local_real_terminal_test_passed": true,
+  "actual_connected_app_health_passed_after_reconnect": true,
+  "actual_app_task_submission": "PASSED WITH EMPTY LEGACY COMPATIBILITY FIELD AFTER USER REFRESH",
+  "required_user_action": "No repeated refresh requested; legacy empty-field compatibility works, connector schema cache remains unresolved",
+  "events_sender_disabled": true,
+  "sender_start_error": "httpx.ConnectError: All connection attempts failed",
+  "chat_push_verified": false,
+  "configuration_sha256": "f0a8b0f5dc6554bc7d8f706b42d01e7ccde88866ec0c05a05c0bbc718b3cfa1b",
+  "actual_app_task_id": "bridge-recovery-app-20261019-02",
+  "actual_app_task_exit_code": 0,
+  "actual_app_task_stdout": "KIRABRIDGE_RECOVERY_APP_OK",
+  "cached_schema_without_compatibility_field": "STILL REJECTED BEFORE SERVER",
+  "compatibility_field": {
+    "completion_subscription": ""
+  },
+  "subscription_created": false
+}

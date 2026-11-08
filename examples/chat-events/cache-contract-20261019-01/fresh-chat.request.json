@@ -1,0 +1,10 @@
+{
+  "request": {
+    "task_id": "cache-fresh-chat-20261019-01",
+    "idempotency_key": "cache-fresh-chat-20261019-01",
+    "operation": "file.list",
+    "arguments": {
+      "path": "/Users/landjunge/KiraBridge/examples/chat-events"
+    }
+  }
+}

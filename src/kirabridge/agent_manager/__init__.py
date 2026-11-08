@@ -10,6 +10,7 @@ from typing import Protocol
 import httpx
 
 from kirabridge.agent_manager.claude import ClaudeCodeAdapter
+from kirabridge.agent_manager.cli_support import login_identity
 from kirabridge.agent_manager.copilot import CopilotCLIAdapter
 from kirabridge.agent_manager.gemini import GeminiAdapter
 from kirabridge.agent_manager.grok_structured import GrokStructuredAdapter
@@ -54,6 +55,7 @@ class AgentAdapter(Protocol):
 def agent_environment(config: AgentConfig, terminal: TerminalManager | None = None) -> dict:
     env = terminal.environment.copy() if terminal else minimal_environment()
     env["HOME"] = str(Path.home())
+    env.update(login_identity())
     for key in (config.api_key_env, "CODEX_API_KEY"):
         if key in os.environ:
             env[key] = os.environ[key]

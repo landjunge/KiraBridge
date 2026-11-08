@@ -1,0 +1,28 @@
+{
+  "scope": "chatgpt policy plus reciprocal chatgpt peer edges only",
+  "old_pid": 87177,
+  "new_pid": 89984,
+  "active_tasks_at_change": 0,
+  "active_receiver_jobs_at_change": 0,
+  "file_delete_enabled": true,
+  "file_roots": [
+    "/"
+  ],
+  "read_roots": [
+    "/"
+  ],
+  "allow_any_executable": true,
+  "approval_mode": "automatic",
+  "reciprocal_message_peers": [
+    "codex",
+    "grok"
+  ],
+  "other_config_unchanged": true,
+  "os_privileges_changed": false,
+  "agents_invoked": false,
+  "config_before_sha256": "f7ef22cd513d810c6c348ba4b528f9eaf3d07505ea684b73f300f6395b718bb2",
+  "config_after_sha256": "88700b87487de5f4b73291b7745a066393f3c167eb6db5558bcafff216cf17d9",
+  "backup": "/Users/landjunge/.config/kirabridge/rights-chatgpt-20261019-01",
+  "actual_app_create_and_delete_passed": true,
+  "missing_operation_capabilities": []
+}

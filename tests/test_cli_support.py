@@ -44,7 +44,25 @@ def test_selected_auth_only_and_operator_home(monkeypatch, tmp_path):
     assert "UNRELATED_TEST_SECRET" not in env and "NODE_OPTIONS" not in env
 
 
-@pytest.mark.parametrize("key", ["NODE_OPTIONS", "HOME", "PATH", "bad-key", "A\x00B"])
+@pytest.mark.skipif(not hasattr(os, "getuid"), reason="POSIX account identity")
+def test_agent_cli_gets_account_name_from_uid_not_environment(monkeypatch):
+    import pwd
+
+    from kirabridge.agent_manager import agent_environment
+
+    monkeypatch.setenv("USER", "injected-user")
+    monkeypatch.setenv("LOGNAME", "injected-user")
+    name = pwd.getpwuid(os.getuid()).pw_name
+    for env in (
+        cli_environment(AgentConfig(kind="claude_code")),
+        agent_environment(AgentConfig(kind="codex")),
+    ):
+        assert env["USER"] == env["LOGNAME"] == name
+
+
+@pytest.mark.parametrize(
+    "key", ["NODE_OPTIONS", "HOME", "PATH", "USER", "LOGNAME", "bad-key", "A\x00B"]
+)
 def test_runtime_injection_is_not_a_credential_name(key):
     with pytest.raises(BridgeError, match="dedicated credential"):
         cli_environment(AgentConfig(kind="opencode", api_key_env=key))

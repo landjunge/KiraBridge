@@ -406,3 +406,64 @@ def test_launchctl_bootstrap_command_runtime_consumes_deadline(
     assert attempts == ([(0.0, 20)] if timeout_failure else [(0.0, 20), (21.0, 9.0)])
     assert elapsed[0] == (20 if timeout_failure else 30)
     assert all(start < 30 and 0 < budget <= min(20, 30 - start) for start, budget in attempts)
+
+
+def test_status_lines_fall_back_to_plain_text_without_presenter(installer, capsys, monkeypatch):
+    monkeypatch.setattr(installer, "PRESENTER", None)
+    monkeypatch.setattr(installer.Path, "home", classmethod(lambda cls: Path("/Users/example")))
+    installer.report("phase", "Paket prüfen")
+    installer.report("ok", "Rückweg gesichert", detail=installer.short("/Users/example/b/1"))
+    installer.report_summary("KiraBridge 1.0 ist installiert", [("Quellstand", "abc")])
+    assert capsys.readouterr().err == (
+        "== Paket prüfen\n"
+        "OK Rückweg gesichert (~/b/1)\n"
+        "KiraBridge 1.0 ist installiert\n   Quellstand: abc\n"
+    )
+    assert installer.short("/Users/examplefoo/x") == "/Users/examplefoo/x"
+
+
+def test_final_check_is_compact_and_never_fails_the_installation(installer, capsys, monkeypatch):
+    monkeypatch.setattr(installer, "PRESENTER", None)
+    live = {
+        "sections": [
+            {
+                "title": "KiraBridge",
+                "items": [
+                    {"status": "ok", "label": "Dienst läuft", "detail": "", "hint": ""},
+                    {"status": "info", "label": "Version", "detail": "1.0", "hint": ""},
+                ],
+            },
+            {
+                "title": "Dienste",
+                "items": [
+                    {
+                        "status": "warn",
+                        "label": "Antwortzustellung",
+                        "detail": "aus",
+                        "hint": "Start",
+                    }
+                ],
+            },
+        ]
+    }
+    calls = []
+
+    def fake_cli(release, config, *argv, timeout=30):
+        calls.append(argv)
+        return {"live": live}
+
+    monkeypatch.setattr(installer, "cli", fake_cli)
+    installer.final_check(SimpleNamespace(config="c"), "r")
+    assert calls == [("doctor", "--live", "--json")]
+    assert capsys.readouterr().err == (
+        "== Abschlussprüfung\n"
+        "OK KiraBridge (1 Prüfungen in Ordnung)\n"
+        "!! Dienste: Antwortzustellung (aus)\n   -> Start\n"
+    )
+
+    def broken(*args, **kwargs):
+        raise RuntimeError("daemon unreachable")
+
+    monkeypatch.setattr(installer, "cli", broken)
+    installer.final_check(SimpleNamespace(config="c"), "r")
+    assert "-- Abschlussprüfung nicht möglich (daemon unreachable)" in capsys.readouterr().err

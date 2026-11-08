@@ -1,0 +1,35 @@
+{
+  "events": [
+    {
+      "seq": 7,
+      "message_id": "c573cf52-46f4-4a42-90e8-4a38fa0ccfdb",
+      "at": 1792372665.8943958,
+      "kind": "message.queued",
+      "evidence": {
+        "automatic_dispatch": false,
+        "content_sha256": "26f2361a5ac3d05f6b9601afead2fd7f45913ff7098dee10d26cace87dde3159",
+        "conversation_id": "receiver-grok-SIMULATION-20261019-01",
+        "position": 2,
+        "recipient": "operator"
+      }
+    },
+    {
+      "seq": 10,
+      "message_id": "c573cf52-46f4-4a42-90e8-4a38fa0ccfdb",
+      "at": 1792372666.070465,
+      "kind": "message.delivered",
+      "evidence": {
+        "receipt": "83aaca3e-236c-465a-a58f-20a1a2256d4a"
+      }
+    },
+    {
+      "seq": 11,
+      "message_id": "c573cf52-46f4-4a42-90e8-4a38fa0ccfdb",
+      "at": 1792372666.079376,
+      "kind": "message.acknowledged",
+      "evidence": {
+        "receipt": "83aaca3e-236c-465a-a58f-20a1a2256d4a"
+      }
+    }
+  ]
+}
