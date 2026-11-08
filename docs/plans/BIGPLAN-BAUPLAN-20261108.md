@@ -304,3 +304,38 @@ Codex und Grok fallen als Autoren und Reviewer aus. Das ändert Abschnitt 6 so:
 Nicht gestartet, weil Freigabe oder Zuständigkeit fehlt: BP-OPS-02 (W6), BP-SEC-01 (a)
 Server-Rollout (E1), BP-WINDOWS-02 Versand an Dirk (E5), BP-AUTO-01 (wartet auf RC42),
 alle Releases mit Außenwirkung.
+
+### N2 · 08.11.2026 – W6 entschieden: VServer-Zuständigkeit
+
+**Entscheidung des Nutzers (08.11.2026):** „W6 übernimmst du auch.“ Damit ist die
+Claude-Organisatorsitzung ab sofort **alleinige Ownerin und einzige Schreiberin** des
+VServers `netcup` (Root-Zugang `netcup`, Nutzer `daniel` über `netcup-daniel`).
+Sie folgt auf die beiden Codex-Sitzungen „Luna“ (Installationsschreiber RC41) und
+Serverowner 11907. Deren beidseitige Übergabe kam nicht mehr zustande; beide
+Sitzungen stehen nicht mehr zur Verfügung (Nutzervorgabe N1: nur Claude).
+
+Grundlage der Übernahme:
+
+- Übergabemappe `~/.local/state/vserver-production-handoff-20261107/handoff-readonly.md`,
+  SHA256 `ebcfaa71edf73cbeda83e475489eb4977f73fc9543b24a585ce6325b50c27b33`, frisch gelesen.
+- Lesende Prüfung am 08.11., 18:05 MEZ: auf dem Server läuft kein Codex-, Grok- oder
+  Luna-Prozess. Es gibt also keinen zweiten aktiven Schreiber.
+- Die Bedingung „erst nach Windows-Abschluss“ aus `VSERVER-PRODUCTION-GATE-WINDOWS-PENDING-20261107`
+  ist erfüllt: PR #74 ist gemergt (`a81cd10`), das Gate WINDOWS-FERTIG ist im Board belegt.
+
+Regeln für den Betrieb ab jetzt:
+
+1. G5 gilt weiter. Entwicklungs-Teilagenten arbeiten nicht auf dem Produktivhost. Sie
+   dürfen dort nur lesen. Produktive Änderungen macht allein die Ownerin, nur aus
+   Repo-Pins, mit Sicherung vorher, Rückweg und Readback danach.
+2. Vor der ersten produktiven Änderung liegt das Inventar aus BP-OPS-01 vor.
+3. Offene Owneraufgaben aus der Mappe: Zugangspfad `credentials.json` gegen `secrets.env`
+   abgleichen; Qualität der Sicherung `20261107-151533-486c1abc` prüfen; Testordner
+   `kb-debian-dirktest-*` sichern und erst dann entfernen.
+
+Damit freigegeben: BP-OPS-02, BP-DEBIAN-02 (Tunnel), BP-PAIR-01 und das Konzept für
+BP-SANDBOX-01. Weiter getrennt freizugeben ist der Neu-Rollout des 4AllPass-Servers (E1),
+weil er Nutzerkonten betrifft.
+
+**Korrektur zu Abschnitt 2:** Die installierte Mac-CLI läuft aus
+`0.8.0rc41-c81430b88738`, nicht aus RC40. Gilt bis zum Ist-Stand-Register (BP-TRUTH-01).
