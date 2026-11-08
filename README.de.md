@@ -1,3 +1,5 @@
+<!-- readme-header-v1: Kopf nach ThreadDesk docs/contracts/readme-header-v1.md. Nicht von Hand umgestalten; scripts/readme_header.py apply/check verwenden. -->
+
 [English](README.md) · **Deutsch**
 
 <p align="center">
