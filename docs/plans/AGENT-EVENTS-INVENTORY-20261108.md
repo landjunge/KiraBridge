@@ -170,7 +170,7 @@ Entwurfsregeln:
 
 `chain.hop` ∈ `phone`, `threaddesk_server`, `kirabridge_server`, `mac_bridge`,
 `agent`, `return` mit `hop_seq` 0 bis 5. Eine durchgehende `trace_id` muss
-der erste Hop erzeugen und alle weiteren übernehmen (Entscheidung offen, E1).
+der erste Hop erzeugen und alle weiteren übernehmen (Entscheidung offen, AA02-E1).
 Bis dahin korreliert nur `task.original_task_id`/`task.handoff_id`.
 
 ### 5.2 Mapping je Quelle
@@ -181,7 +181,7 @@ Bis dahin korreliert nur `task.original_task_id`/`task.handoff_id`.
 | `event_id` | `event_id` | `wb-`+`id` (12hex) | `audit-<seq>-<hash>` (wie Export) |
 | `timestamp` | `timestamp` | `created_at` | `at` → ISO UTC |
 | `timing.clock` | `producer` | `server` | `device` |
-| `trace_id` | `trace_id` (=`workflow_id`) | UNKNOWN, bis E1 entschieden | UNKNOWN, bis E1 (MCP-Timing `trace_id` nur lokal) |
+| `trace_id` | `trace_id` (=`workflow_id`) | UNKNOWN, bis AA02-E1 entschieden | UNKNOWN, bis AA02-E1 (MCP-Timing `trace_id` nur lokal) |
 | `source_tool` / `source_id` | `agent-authority-lab` | `threaddesk` / Serverinstanz | `kirabridge` / Bridge-Instanz |
 | `event_type` | `authority.*` | `entry_type`: `task`→`handoff.created`, `claimed`→`task.accepted`, `progress`→`task.running`, `result`→`return.received`, `decision`→`return.reviewed`, `problem`→`task.failed`, `question`→`task.question` | `task.transition.to`→`task.*`, `handoff.*` (Tabelle in `observation_export.HANDOFF_TYPES`), `workflow.stop`→`control.*` |
 | `actor.*` | `actor.agent_id`, `role` | `actor`→`actor_claim`, `actor_type`, `actor_id`→`agent_id`; Servernutzer→`principal_ref` | `principal`→`principal_ref` (Digest), `tasks.agent`→`agent_id` |
@@ -219,12 +219,12 @@ vorhandenen `SchemaValidatorCache` ohne Netzzugriff.
 
 ## 7. Offene Entscheidungen
 
-- **E1** Wer erzeugt die End-zu-End-`trace_id`? Vorschlag: TD-Server beim Handoff, KB übernimmt sie in `task.metadata`.
-- **E2** Sender oder Abruf? Vorschlag: Abruf (Leser liest Exportdatei), wie G9.9-E4.
-- **E3** Wird der KB-Export `observation_export.py` auf v2 gehoben oder bleibt er beim Workflowformat? Vorschlag: Mapping-Schicht im Leser, Export unverändert.
-- **E4** Soll `event_hash` in v2 für TD-Einträge berechnet werden? Dann gleicher Kanon wie Lab (`sort_keys`, ASCII).
-- **E5** Aufbewahrung und Datenschutz für den Flugschreiber (Plan 9.6).
-- **E6** Aufnahme von `blockdesigner` und `kirabridge` in das v1-Schema in ThreadDesk: nur, wenn ThreadDesk den Import erweitern soll.
+- **AA02-E1** Wer erzeugt die End-zu-End-`trace_id`? Vorschlag: TD-Server beim Handoff, KB übernimmt sie in `task.metadata`.
+- **AA02-E2** Sender oder Abruf? Vorschlag: Abruf (Leser liest Exportdatei), wie G9.9-E4.
+- **AA02-E3** Wird der KB-Export `observation_export.py` auf v2 gehoben oder bleibt er beim Workflowformat? Vorschlag: Mapping-Schicht im Leser, Export unverändert.
+- **AA02-E4** Soll `event_hash` in v2 für TD-Einträge berechnet werden? Dann gleicher Kanon wie Lab (`sort_keys`, ASCII).
+- **AA02-E5** Aufbewahrung und Datenschutz für den Flugschreiber (Plan 9.6).
+- **AA02-E6** Aufnahme von `blockdesigner` und `kirabridge` in das v1-Schema in ThreadDesk: nur, wenn ThreadDesk den Import erweitern soll.
 
 ## 8. Nicht Teil dieser Phase
 
