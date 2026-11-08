@@ -401,3 +401,12 @@ def test_ascii_only_stream_uses_ascii_marks(monkeypatch):
     ui.phase("Paket")
     ui.ok("Fertig")
     assert "     + Fertig\n" in stream.getvalue()
+
+
+def test_fail_and_hint_lines(monkeypatch):
+    monkeypatch.delenv("NO_COLOR", raising=False)
+    stream = Console(tty=False)
+    ui = SetupUI("de", stream, design=design(motion=False))
+    ui.phase("Dienste")
+    ui.fail("Kaputt", detail="Exit 1", hint="In der Konsole starten")
+    assert "     ✗ Kaputt\n       Exit 1\n       → In der Konsole starten\n" in stream.getvalue()

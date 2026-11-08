@@ -340,7 +340,7 @@ class SetupUI:
             lines += self._wrapped(part, indent)
         return lines
 
-    def _line(self, glyph, ascii_glyph, role, value, *, detail=None, bold=False):
+    def _line(self, glyph, ascii_glyph, role, value, *, detail=None, hint=None, bold=False):
         mark = glyph if self._unicode() else ascii_glyph
         indent = self.GUTTER if self._phase_number else 2
         body = self._wrapped(value, indent + 2)
@@ -356,6 +356,11 @@ class SetupUI:
                 " " * (indent + 2) + self._paint("dim", part)
                 for part in self._detail_lines(str(detail), indent + 2)
             ]
+        if hint:
+            arrow = "→" if self._unicode() else "->"
+            parts = self._wrapped(str(hint), indent + 2 + len(arrow) + 1)
+            lines.append(" " * (indent + 2) + self._paint("accent", arrow) + " " + parts[0])
+            lines += [" " * (indent + 3 + len(arrow)) + part for part in parts[1:]]
         self._emit([("\n".join(lines) + "\n", "")])
 
     def _rule(self):
@@ -379,14 +384,17 @@ class SetupUI:
         title = self._paint(None, self.text(de, en or de), bold=True)
         self._emit([("\n  " + number + "  " + title + "\n", "")])
 
-    def ok(self, de, en=None, *, detail=None):
-        self._line("✓", "+", "ok", self.text(de, en or de), detail=detail)
+    def ok(self, de, en=None, *, detail=None, hint=None):
+        self._line("✓", "+", "ok", self.text(de, en or de), detail=detail, hint=hint)
 
-    def note(self, de, en=None, *, detail=None):
-        self._line("·", "-", "dim", self.text(de, en or de), detail=detail)
+    def note(self, de, en=None, *, detail=None, hint=None):
+        self._line("·", "-", "dim", self.text(de, en or de), detail=detail, hint=hint)
 
-    def warn(self, de, en=None, *, detail=None):
-        self._line("!", "!", "warn", self.text(de, en or de), detail=detail)
+    def warn(self, de, en=None, *, detail=None, hint=None):
+        self._line("!", "!", "warn", self.text(de, en or de), detail=detail, hint=hint)
+
+    def fail(self, de, en=None, *, detail=None, hint=None):
+        self._line("✗", "x", "err", self.text(de, en or de), detail=detail, hint=hint)
 
     def summary(self, de, en=None, *, rows=(), success=True):
         """Final result: one headline and aligned label/value rows."""

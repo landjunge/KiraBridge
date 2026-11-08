@@ -110,7 +110,7 @@ def say(message):
         print(message, file=sys.stderr, flush=True)
 
 
-PLAIN_MARKS = {"phase": "==", "ok": "OK", "note": "--", "warn": "!!"}
+PLAIN_MARKS = {"phase": "==", "ok": "OK", "note": "--", "warn": "!!", "fail": "XX"}
 
 
 def short(path):
@@ -119,17 +119,47 @@ def short(path):
     return "~" + text[len(home) :] if text == home or text.startswith(home + os.sep) else text
 
 
-def report(kind, message, *, detail=None):
+def report(kind, message, *, detail=None, hint=None):
     """Structured status line; plain text when the presenter is absent or older."""
     method = getattr(PRESENTER, kind, None) if PRESENTER is not None else None
     if callable(method):
         if kind == "phase":
             method(message)
+        elif hint:
+            method(message, detail=detail, hint=hint)
         else:
             method(message, detail=detail)
         return
     text = f"{PLAIN_MARKS.get(kind, '--')} {message}" + (f" ({detail})" if detail else "")
-    say(text)
+    say(text + (f"\n   -> {hint}" if hint else ""))
+
+
+DOCTOR_KINDS = {"ok": "ok", "warn": "warn", "fail": "fail", "info": "note"}
+
+
+def final_check(args, release):
+    """Read-only live doctor of the activated release; it never changes the result."""
+    report("phase", "Abschlussprüfung")
+    try:
+        live = cli(release, args.config, "doctor", "--live", "--json", timeout=60)["live"]
+        sections = live["sections"]
+    except Exception as exc:  # noqa: BLE001 - shown, the installation stays complete
+        report("note", "Abschlussprüfung nicht möglich", detail=str(exc)[:240])
+        return
+    for section in sections:
+        entries = [e for e in section.get("items", []) if e.get("status") != "info"]
+        problems = [e for e in entries if e.get("status") != "ok"]
+        if not problems:
+            count = len(entries)
+            report("ok", section.get("title", "?"), detail=f"{count} Prüfungen in Ordnung")
+            continue
+        for entry in problems:
+            report(
+                DOCTOR_KINDS.get(entry.get("status"), "note"),
+                f"{section.get('title', '?')}: {entry.get('label', '?')}",
+                detail=entry.get("detail") or None,
+                hint=entry.get("hint") or None,
+            )
 
 
 def report_summary(title, rows, *, success=True):
@@ -1499,6 +1529,8 @@ def activate(args, release):
         raise
     assert args.config.read_bytes() == config_before, "Configuration changed"
     assert not credentials or sha(credentials) == credential_hash, "Credentials changed"
+    if args.service != "none":
+        final_check(args, release)
     report_summary(
         f"KiraBridge {manifest['version']} ist installiert",
         [
