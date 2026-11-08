@@ -2,6 +2,13 @@
 > bei der Integration am 06.11.2026 bewahrt. Aktueller Quellen-, Prüf- und
 > Installationsstand: [RC40-Integrationsnachweis](../RC40-INTEGRATION-INSTALL-20261106.md).
 > Datierte Plan- und Gateangaben sind keine neue Auftrags- oder Berechtigungsquelle.
+>
+> **Fortschreibung 08.11.2026 (Claude, Nutzerauftrag „Big Plan anhand der
+> verknüpften ThreadDesk-Threads überarbeiten“):** Abschnitte 1–8 bleiben
+> wörtlich erhalten; neu sind Abschnitt 9 sowie je ein Verweis am Ende von
+> Abschnitt 5 und 8. Ausgangsstand gesichert in
+> [BIGPLAN-GESAMTPLAN-20261105-BACKUP-VOR-CLAUDE-20261108.md](BIGPLAN-GESAMTPLAN-20261105-BACKUP-VOR-CLAUDE-20261108.md)
+> (Commit `83d71d2`).
 
 # BIG PLAN: Gesamtentwicklungsplan und koordinierter Einstieg
 
@@ -269,6 +276,10 @@ vollständiger TollGate-Anschluss sind keine Voraussetzung für den ersten
 geheimnisfreien Abo-Auftrag; ihre späteren Verträge werden von Beginn an vorgesehen.
 Agent Authority kann Metadaten bereits parallel beobachten.
 
+Neue Pakete und Planpositionen vom 07./08.11.2026 stehen im
+[Paketregister der Fortschreibung](#95-ergänzendes-paketregister); das
+Register oben gilt unverändert weiter.
+
 ## 6. Zusammenarbeit und AutoNext
 
 Codex hält den technischen Integrationsplan und prüft Partnerergebnisse. Grok
@@ -392,3 +403,284 @@ Der bestehende Windows-Paritätsauftrag bleibt seiner ursprünglichen Zuständig
 zugeordnet. Ocean bleibt beim freigegebenen Planumfang. Produktive Dienste, neue
 Kostenwege, zusätzliche Konten, Main-Merges oder öffentliche Releases werden
 hierdurch nicht gestartet. Aktueller Commit und Übergabe stehen in ThreadDesk.
+
+Ergänzter Einstieg nach dem Stand vom 08.11.2026: [Abschnitt 9.8](#98-nächster-einstieg-ergänzung-zu-abschnitt-8).
+
+## 9. Fortschreibung 08.11.2026: verknüpfte ThreadDesk-Threads
+
+Quelle ist der ThreadDesk-Bestand, den KiraBridge für die Koordination nutzt
+(Operator-Arbeitsbereich, gelesen am 08.11.2026 gegen 17:20 MEZ). Verknüpfungen
+wurden auf drei Wegen gesucht: das Feld `related_thread_ids` der Threads,
+Thread-IDs im Text und die Kennzeichnung „Big Plan“ in Titel oder Notizen.
+Echte Graphkanten zwischen diesen Threads gibt es in diesem Bestand noch nicht;
+die einzige vorhandene Relation stammt aus der synthetischen Abnahme vom 18.10.
+
+Übernahmestatus nach dem Vorschlag aus `450d3dc1c6d2`:
+
+- **übernommen**: als Grundsatz oder Planposition in diesen Plan aufgenommen.
+  Das ist **keine** Umsetzungsfreigabe; jedes Paket braucht weiterhin seinen
+  eigenen freigegebenen Scope.
+- **vorgemerkt**: gelesen, gegen den Bestand geprüft, als spätere Position
+  geführt, ohne Planpaket.
+- **verlinkt**: nur als Quelle genannt.
+- **archiviert**: in dieser Fortschreibung nichts. Kein Thread wurde verschoben,
+  geändert oder gelöscht.
+
+### 9.1 Gefundene Verknüpfungen
+
+| Thread | Titel | Art der Verknüpfung | Verwendet für |
+|---|---|---|---|
+| `450d3dc1c6d2` | ThreadDesk · Wissensgraph und Brainstorming-Konsolidierung | Ausgangspunkt; `related_thread_ids` → `1deb9d17dd28`, `188ce4729a62`, `482f593429ad`, `a6fe31f58501`, `c2d4c7bc985a`; nennt diesen Auftrag wörtlich | Übernahmestatus, Big-Plan-Hauptknoten, Konsolidierung, Papierkorb-Archiv |
+| `1deb9d17dd28` | Brainstorming · Werkzeugfamilie, Graph & Produktarchitektur · 08.11.2026 | `related_thread_ids` → `482f593429ad`, `c2d4c7bc985a`, `188ce4729a62`, `a6fe31f58501`; Ursprung von `450d3dc1c6d2` | Grundsätze G1–G4, Graph, Agentenereignisse, Flugschreiber, Produktperspektive |
+| `482f593429ad` | KiraBridge und ThreadDesk – gemeinsame Koordination | `related_thread_ids` → `188ce4729a62`, `c2d4c7bc985a`; Querverweise auf `1deb9d17dd28` und `450d3dc1c6d2` | Beschlüsse 07./08.11.: Reihenfolge, Sandbox, Agent Integration, Budget-Koordination |
+| `188ce4729a62` | ThreadDesk und KiraBridge – Wechselentwicklung durch Codex | Von allen obigen verlinkt; verweist auf `c9a396be4081` | Lieferstand 07.11., `BIGPLAN-ABGLEICH-20261107`, CLI-Discovery, 3D-Graph |
+| `c2d4c7bc985a` | ThreadDesk Server & Sync | `related_thread_ids` → `188ce4729a62`, `482f593429ad` | VServer-Stand des ThreadDesk Servers |
+| `a6fe31f58501` | ThreadDesk – Quellen & Masterfassungen | Ziel von `450d3dc1c6d2` und `1deb9d17dd28` | Quellengrenzen; keine neuen Planinhalte |
+| `c9a396be4081` | Big Plan · KI-/CLI-Fähigkeitsmatrix und intelligente Delegation | Titel „Big Plan ·“; vom Arbeitsboard verlinkt | Grundlage für BP-CLI-02 und BP-COORD-02 |
+| `a17c937b7553` | Big Plan · Gemeinsame Produkt-Icons und Designsystem | Titel „Big Plan ·“ | BP-LAUNCHER-01 |
+| `455dad75c60f` | KiraBridge – OpenAI-Zulassung | Text: „Beschluss 08.11.2026 – nun als letzter Meilenstein im Big Plan“ | BP-OPENAI-99 |
+| `3e706958488c` | Big Plan · Agentenübersicht · Kira | Titel; sammelt 78 Berichtsthreads „Big Plan · Bericht · …“ | Nur aktueller Agentenstand (9.2); Berichte nicht einzeln ausgewertet |
+| `dc200bb01137`, `138fb6baeff2`, `911bb6f922e2` | Agent Authority, TollGate, 4AllPass (Produktthreads) | Marker `BIGPLAN-ABGLEICH-20261107` | Nachweisgrenzen unverändert; keine neuen Inhalte |
+
+Gesehen, aber ohne Big-Plan-Bezug und deshalb nicht übernommen:
+`597fd5fcb040` (KiraBridge – Sichtbarkeit, Community und schrittweise
+Veröffentlichung), siehe 9.6.
+
+### 9.2 Stand seit dem 06.11.2026
+
+Am 08.11. gegen GitHub geprüft:
+
+- **Debian/Linux:** PR #72 gemergt (`2bbf6d9`), Release `linux-v0.8.0rc41`
+  veröffentlicht (Pre-Release, 07.11., Quelle `350d368`). Laut Arbeitsboard ist
+  das Debian-Abschlussgate erfüllt.
+- **Windows:** PR #74 gemergt (`a81cd10`, 07.11.). Laut Arbeitsboard ist das
+  WINDOWS-FERTIG-Gate erfüllt. Ein Windows-Release neuer als `windows-v0.8.0rc37.dev1`
+  gibt es auf GitHub nicht. BP-WINDOWS-02 (Dirk-Kit, Versand) bleibt offen.
+- **Terminalkatalog:** PR #83 gemergt (`0a70bdb`). **Live-Doctor und
+  Installer-Endprüfung:** PR #91 gemergt (`c81430b`).
+- **ThreadDesk Server:** privates Repository `landjunge/threaddesk-server` mit
+  Branch `main` vorhanden.
+
+Nur berichtet, hier nicht geprüft:
+
+- ThreadDesk Server läuft laut Grok nur auf Loopback auf dem bestehenden VServer
+  (8766/8446). PASS gemeldet für Auth, Sync, Konflikte, Resume, Nutzertrennung und
+  Backup/Restore. Offen: öffentlicher DNS-Name, grafischer Browser, neues
+  Desktop-Paket, KiraBridge-Livekopplung, Handoff-HTTP, eigener `/health`-Pfad.
+- KiraBridge-Userunit RC41 auf `127.0.0.1:8765` auf dem VServer. Die Übergabe
+  der Zuständigkeit zwischen dem Installationsschreiber und dem Serverowner ist
+  offen (`VSERVER-OWNER-RECONCILIATION-20261107`). Bis dahin keine weiteren
+  produktiven Änderungen.
+- Claude-Agent (`315b2543b087`): RC41 @ `c81430b` installiert, Strecke
+  Server → Relay → Claude → ThreadDesk mit Schreib-/Lesetest OK. **Blocker:**
+  Antwortzustellung `com.kirabridge.chat-events` endet mit Exit 1; das
+  Relay-Skript ist nicht versioniert.
+
+**Priorität:** `BIGPLAN-ABGLEICH-20261107` setzte „Windows zuerst“ und erklärte
+die frühere Folge „Debian vor Windows“ für überholt. Das Koordinationsboard hält
+ebenfalls am 07.11. diese verbindliche Reihenfolge fest: (1) macOS-Terminal,
+MCP und Tastatur end-to-end stabilisieren, (2) Debian-RC41-Servertunnel
+unabhängig vom Mac abnehmen (Mac-KiraBridge aus, iPhone → Debian), vorher
+Groks Serverzustand sichern und mit Git vergleichen, (3) modularen Kern,
+OS-/Serveradapter und spätere Mehrnutzerfähigkeit architektonisch
+berücksichtigen. Seit dem Windows-Merge widersprechen sich beide Angaben nicht
+mehr. Für den nächsten Schritt gilt die Reihenfolge des Koordinationsboards.
+
+### 9.3 Übernommene Architekturgrundsätze
+
+Diese Grundsätze ergänzen Abschnitt 3; sie ersetzen dort nichts.
+
+- **G1 – Drei Stufen** (vom Nutzer am 08.11. ausdrücklich befürwortet, `1deb9d17dd28`):
+  (1) *jetzt notwendig*: zuverlässige Tastatur-/Terminalsteuerung,
+  CLI-Erkennung, sichere Werkzeugübergaben; (2) *heute vorbereiten, später bauen*:
+  strukturierte Agentenereignisse, Schnittstellen für Agent Authority,
+  gemeinsame Graphansichten, Server-/Mehrnutzererweiterung; (3) *optional*:
+  3D-Graph, zusätzliche Effekte. Festes Prüfkriterium für jede neue Funktion:
+  Welche späteren Erweiterungen müssen Datenmodell und Schnittstellen heute
+  berücksichtigen, ohne dass wir sie heute bauen?
+- **G2 – Festigen vor Ausbauen** (`1deb9d17dd28`): Bestehende Wege zuerst
+  schneller, stabiler, sicherer und effizienter machen. Ablauf: Ist-Zustand
+  beobachten, Engpässe messen, gezielt optimieren, erneut testen und vergleichen.
+  Paralleles Bearbeiten, Revisionen und Rechte in ThreadDesk gezielt auf
+  Robustheit prüfen.
+- **G3 – Eigenständige Werkzeuge, modulare Integration** (`1deb9d17dd28`,
+  deckungsgleich mit 3.1): Jedes der fünf Produkte bleibt allein nutzbar.
+  Agent Authority liefert belastbare Ereignisse und Evidenz und bleibt strikt
+  lesend. ThreadDesk ist die optionale visuelle Kommandozentrale, die
+  Graphschicht ein wiederverwendbares Modul.
+- **G4 – Offline-first, Server optional** (`1deb9d17dd28`): Lokal auf einer
+  Maschine voll nutzbar; Serveranbindung optional. Der vorhandene Debian-VServer
+  ist Test- und Referenzumgebung für Sync, Netzwerk, Rechte und Teamfähigkeit.
+  Kein Anbieter-Lock-in: später auch bei anderen Providern und selbst gehostet
+  betreibbar. Erst messen, dann skalieren. Mehrnutzer- und Mandantentrennung sind
+  Stufe 2.
+- **G5 – Keine Agenten auf dem Produktivhost** (Beschluss 08.11., `482f593429ad`):
+  Entwicklungsagenten arbeiten nur in abgeschotteten, begrenzten Umgebungen,
+  nie direkt in den produktiven KiraBridge-/ThreadDesk-Diensten oder deren Daten.
+  Produktive Übernahmen bleiben menschlich freigegeben.
+
+### 9.4 Neue Planpositionen aus den Threads
+
+**Übernommen aus Beschlüssen und verbindlichen Anforderungen:**
+
+1. **KI-CLI-Discovery und dynamische Befehlsfreigabe** (hohe Priorität, 07.11.,
+   `188ce4729a62`). Pro erkannter CLI die tatsächlich verfügbaren Befehle samt
+   Parametern, Schema, Version, Rechten und Erreichbarkeit erfassen und im
+   Werkzeugkatalog für Kira/ChatGPT anbieten. Offizielle maschinenlesbare
+   Discovery bevorzugen, sonst versionsgebundene Adapter; nie beliebige
+   Help-Texte ausführen. „registriert“, „verfügbar“ und „erfolgreich ausgeführt“
+   getrennt ausweisen. Stufen: Bestandsabgleich → sichere Discovery mit Schemas
+   und Policy → automatische Publikation und End-to-End-Tests. Grobschätzung
+   laut Board 2–5 Entwicklungstage, nach Ist-Analyse neu schätzen.
+2. **Kontingent- und kostenbewusste Multi-Agenten-Koordination** als zentraler
+   Meilenstein (Nutzerentscheidung 08.11., `482f593429ad`). Ein austauschbarer
+   Koordinator bekommt von KiraBridge Fähigkeiten und Status, von TollGate
+   Restkontingente, Resets und Limits, von ThreadDesk Kontext und Handoffs.
+   Er teilt zulässige Aufgaben zu und verteilt bei Limitwechsel um, ohne den
+   Arbeitsstand zu verlieren. Pro Modell und CLI-/Providerweg braucht er ein
+   aktuelles Fähigkeits- und Konfigurationsprofil; dafür wird die vorhandene
+   CLI-Matrix `c9a396be4081` wiederverwendet. TollGate stoppt vor dem Limit hart
+   oder lehnt neue Aufträge ab; ist das nicht verlässlich messbar, wird kein
+   harter Deckel behauptet. Das 50-USD/Tag-Beispiel mit DeepSeek über OpenCode
+   ist nur Illustration, keine Budgetfreigabe.
+3. **Private Remote-Entwicklungs- und Agenten-Sandbox auf dem VServer**
+   (Beschluss 08.11., `482f593429ad`). Isolierte Linux-Container mit getrennten
+   unprivilegierten Nutzern, Netz-, Dateisystem- und Ressourcenlimits, ohne
+   Docker-Socket, Host-Mounts und Produktiv-Secrets. Code fließt über separate
+   GitHub-Branches; am iMac wird abgeglichen und die macOS-Version gebaut.
+   Keine zweite Codebasis. Windows-VM auf dem VServer nur optional und nur mit
+   KVM-Unterstützung, nicht Teil der ersten Phase. Die Hostgröße (laut Nutzer
+   etwa 8 Kerne, 16 GB) ist technisch noch nicht verifiziert.
+4. **Gemeinsamer App-Launcher als eigenständiges Header-Modul** (verbindliche
+   Anforderung 08.11., `a17c937b7553`). Fünf Produkticons; Klick startet die
+   lokal installierte App oder fokussiert eine laufende Instanz. Fehlt die App,
+   wird klar „nicht installiert“ angezeigt. Eine gemeinsame Kernlogik,
+   Plattformadapter für macOS/Windows/Linux, je App nur eine schlanke
+   UI-Anbindung. Pro Icon eine dezente Serverstatuslampe aus echten,
+   zeitlich begrenzten Health-Prüfungen (grün/gelb/rot/grau). Designleitlinie:
+   ThreadDesk-Dark als Vorlage, statt weißer Rahmen dezente Konturen in der
+   Markenfarbe, nur die freigegebenen Original-Icons. Hinweis: Der bereits
+   gemergte README-Kopf `readme-header-v1` ist ein separater Baustein und
+   ersetzt diesen Launcher nicht.
+5. **OpenAI-Zulassung als letzter Meilenstein** (Beschluss 08.11., `455dad75c60f`).
+   Erst nach Fertigstellung und nachgewiesener Produktabnahme: Bestandsaufnahme
+   und Tests auf macOS/Linux/Windows, Sicherheitsabnahme, Minimalrechte statt
+   Entwickler-Vollzugriff, MCP-End-to-End-Abnahme, Produkt-/Datenschutz-/
+   Supportunterlagen, aktuelle Einreichungsregeln. Keine Bewerbung vorher.
+6. **Abnahme des Servertunnels ohne Mac** (Reihenfolge 07.11., `482f593429ad`):
+   als zusätzliches Kriterium für BP-REMOTE-03 – Mac-KiraBridge aus,
+   iPhone → Debian, Serverzustand vorher gesichert und mit Git verglichen.
+
+**Übernommen als Planposition, Status Idee (Umsetzung nicht freigegeben):**
+
+7. **ThreadDesk Agent Integration** (`482f593429ad`). ThreadDesk als gemeinsames
+   Projektgedächtnis und Übergabestelle für Kira und alle unterstützten CLIs.
+   Ein gemeinsamer ThreadDesk-MCP-/API-Kern; pro CLI nur schlanke Skills und
+   Hooks, die bei Aufgabenende, Übergabe oder größeren Änderungen einen belegten
+   Checkpoint an den zugeordneten Thread schreiben. Nutzerpräzisierung: Es werden
+   **keine neuen CLI-Adapter** gebaut; die vorhandenen werden wiederverwendet.
+8. **2D-Graph verbessern und Big-Plan-Hauptknoten** (`1deb9d17dd28`,
+   `450d3dc1c6d2`). Den vorhandenen Graphen verbessern statt verwerfen.
+   Gemeinsames Graph-Datenmodell, Ansichten für Threads/Projekte/Dokumente,
+   Agent-Authority-Delegationen und Systemzusammenhänge. Fokus, Filter,
+   Nachbarn hervorheben, Irrelevantes ausblenden. Ein zentraler Big-Plan-Knoten
+   besitzt Brainstorming-, Architektur-, Projekt- und Agent-Authority-Knoten als
+   verlinkte Quellen.
+9. **Konsolidierung des Wissensbestands durch Codex** (vorgemerkter Prüfauftrag
+   mit Nutzerzustimmung, `1deb9d17dd28`). Erst lesende Bestandsaufnahme aller
+   Threads, Knoten, Verknüpfungen und Berichte. Dann alte Brainstormings
+   destillieren, mit Herkunft in aktuelle Wissensstände überführen und
+   offene Fragen erhalten. Vollständig eingearbeitete Originale dürfen danach in
+   den **reversiblen** Papierkorb, mit nachvollziehbarer Liste; endgültig gelöscht
+   wird nichts. Vor Verschieben: Ziel sichern, Vollständigkeit prüfen,
+   Nutzerfreigabe einholen.
+10. **Papierkorb-Archiv** (vom Nutzer als umzusetzende Idee gewünscht,
+    `1deb9d17dd28`, `450d3dc1c6d2`). Vor endgültiger Entfernung aus dem Papierkorb
+    eine verifizierte Archivkopie mit Original-ID, Zeitstempel, Verknüpfungen und
+    Wiederherstellungsweg anlegen. Im Konzept zu klären: Format, Prüfsummen,
+    Speicherbedarf, Verschlüsselung, Aufbewahrung, bewusstes endgültiges Löschen
+    und Datenschutz. Das Archiv ersetzt kein unabhängiges Backup. Zuerst
+    technisches Konzept, Umsetzung separat auslösen. Baut auf der bestehenden
+    Papierkorbregel (stabile IDs, endgültige Löschung nur auf ausdrücklichen
+    Auftrag) auf.
+11. **Strukturiertes Agentenereignismodell** (G1 Stufe 2, `1deb9d17dd28`).
+    Ereignisse mit Akteur, Auftrag, Delegation, Berechtigung, Zeitstempel,
+    Ergebnis und Evidenz. Erst prüfen, welche Ereignisse Agent Authority und
+    KiraBridge heute schon liefern. Gemeinsame Grundlage für BP-AA-01, den
+    Graphen und einen späteren Zeitverlauf (9.6).
+
+### 9.5 Ergänzendes Paketregister
+
+Wie Abschnitt 5: Planregister, **keine Queue und keine READY-Freigabe**.
+
+| Paket | Ergebnis und Abnahmekriterium | Abhängigkeit / Status |
+|---|---|---|
+| BP-CLI-02 Discovery und dynamische Befehle | Je CLI: installiert, konfiguriert, aktiviert, erreichbar, getestet; Befehle mit Schema und Policy im aktualisierbaren Katalog; realer Test je Fähigkeit. | Hohe Priorität. Baut auf BP-CLI-01 und `c9a396be4081` auf. Laufende Windows-/Debianarbeit nicht unterbrechen. Phase 1 klärt W2. |
+| BP-COORD-02 Budgetbewusste Koordination | Koordinator teilt im freigegebenen Rahmen zu und verteilt bei Limitwechsel um; Arbeitsstand bleibt erhalten; harter Stopp vor Limit oder ausgewiesene Messlücke. | Zentraler Meilenstein. Benötigt BP-CLI-02, BP-TG-01, CLI-Profile; W3 vor Start klären. |
+| BP-SANDBOX-01 Agenten-Sandbox VServer | Isolierte Container, Limits, keine Produktivsecrets, Branch-/Artefakttransfer, menschliche Übernahme; Hostressourcen und KVM vorher gemessen. | Beschluss 08.11. Konzept zuerst; keine Einrichtung ohne Auftrag. Erst nach geklärter VServer-Zuständigkeit (9.2). |
+| BP-LAUNCHER-01 App-Launcher und Serverstatus | Ein Modul, drei Plattformadapter, fünf Apps; Start/Fokus/„nicht installiert“ und Statuslampen aus echten Health-Prüfungen; Fehlerfälle getestet. | Verbindliche Anforderung 08.11.; Codestand noch nicht geprüft. Designleitlinie gilt für kommende Builds. |
+| BP-TD-AGENT-01 ThreadDesk Agent Integration | Gemeinsamer MCP-/API-Kern, Skills/Hooks je CLI, belegte Checkpoints mit Deduplizierung und Rechtegrenzen; keine neuen Adapter. | Idee. Erst vorhandene ThreadDesk-Funktionen und CLI-Hooks inventarisieren. |
+| BP-TD-GRAPH-01 Graph 2D und Hauptknoten | Fokus/Filter/Nachbarn, gemeinsames Datenmodell, Big-Plan-Hauptknoten mit echten Kanten. | Idee. Graphregel „Dateiaktivität getrennt erfassen“ aus ThreadDesk `AGENTS.md` bleibt bestehen. |
+| BP-TD-KONSOL-01 Wissenskonsolidierung | Lesende Bestandsaufnahme, Destillat mit Herkunft, Status je Ideenknoten, Liste verschobener Originale; nur reversibler Papierkorb. | Vorgemerkter Codex-Auftrag. Verschieben nur mit Nutzerfreigabe. |
+| BP-TD-ARCHIV-01 Papierkorb-Archiv | Technisches Konzept mit Format, Prüfsummen, Wiederherstellung, Löschregeln; danach separat Umsetzung. | Idee, vom Nutzer gewünscht. Vor BP-TD-KONSOL-01-Verschiebungen sinnvoll. |
+| BP-AA-02 Agentenereignismodell | Inventar vorhandener Ereignisse; stabiles Schema für Akteur/Auftrag/Delegation/Berechtigung/Zeit/Evidenz. | G1 Stufe 2. Ergänzt BP-AA-01; Agent Authority bleibt lesend. |
+| BP-OPENAI-99 OpenAI-Zulassung | Sechs Punkte aus 9.4 Nr. 5 belegt. | Letzter Meilenstein; erst nach Produktabnahme. |
+
+### 9.6 Für später vorgemerkt (nicht übernommen)
+
+- **3D-Graph** (Konzept 07.11., `188ce4729a62`): umschaltbare Modi
+  ThreadDesk / Agent Authority / korreliert, Drehen, Zoomen, Entfalten,
+  später Sprachsteuerung. G1 Stufe 3, gleiche Datenbasis wie BP-TD-GRAPH-01,
+  2D bleibt erhalten. Erst Architektur und Prototyp, kein Designumbau jetzt.
+  „Sternexplosion“-Darstellung und weitere Effekte ebenfalls Stufe 3.
+- **Flugschreiber / Zeitverlauf mit Zeitregler** (`1deb9d17dd28`): Datenbasis
+  über BP-AA-02 vorbereiten; Visualisierung, Datenumfang, Aufbewahrung,
+  Datenschutz und Performance später klären.
+- **Mehrnutzer, Teams, Mandanten** (`1deb9d17dd28`): nur architektonisch
+  berücksichtigen (G1/G4).
+- **Gemeinsamer Produktkern mit Modulen für private und geschäftliche Nutzung,
+  modulare Vermarktung**: nicht entschieden.
+- **Nutzerzeugnis für die Produktbeschreibung** (`1deb9d17dd28`): als echte
+  Nutzerperspektive aufbewahrt, kein Nachweis von Konfliktfreiheit. Vor externer
+  Nutzung mit Funktionsumfang und Einwilligung abgleichen.
+- **Sichtbarkeit und Community** (`597fd5fcb040`): eigener strategischer
+  Beschluss vom 07.11. ohne Big-Plan-Bezug; bleibt dort.
+
+### 9.7 Widersprüche und offene Entscheidungen
+
+- **W1 Freigabevermerke:** `1deb9d17dd28` und `450d3dc1c6d2` sagen „nicht
+  automatisch in den Big Plan übernehmen; Nutzer entscheidet“. Diese Fortschreibung
+  beruht auf dem ausdrücklichen Nutzerauftrag dazu. Trotzdem gilt: „übernommen“
+  heißt Planposition, nicht Umsetzungsauftrag. Kira oder Nutzer können jede
+  Position auf „vorgemerkt“ zurückstufen.
+- **W2 Anzahl der CLIs:** Am 04.11. wurden acht CLIs fest eingeplant. Das
+  Arbeitsboard spricht am 07.11. von „neun ursprünglich geplanten CLI-Zielen“;
+  die neunte wird in keinem verknüpften Thread genannt. Der Code registriert
+  sieben Adaptertypen, darunter `grok_api`, der keine CLI ist. Klärt BP-CLI-02 Phase 1.
+- **W3 Automatik und Freigabe:** Die Budget-Koordination soll „ohne jedes Mal
+  nachzufragen“ zuteilen. Abschnitt 6 erweitert AutoNext erst nach konkreter
+  Freigabe-, Scope-, Budget- und Gerätebindung. Vorschlag: Der Koordinator
+  entscheidet frei **innerhalb** eines freigegebenen Rahmens; den Rahmen selbst
+  geben Kira oder Nutzer frei. Bestätigung offen.
+- **W4 Agent Authority:** Das Brainstorming nennt „Berechtigungen“. Gemeint ist
+  die beobachtete Berechtigung, keine erteilende Rolle. Der Beschluss vom 05.11.
+  (strikt lesend) bleibt unverändert.
+- **W5 Graphkanten:** Die Verknüpfungen liegen heute nur als Threadfeld vor, nicht
+  als Graphkanten. Der Big-Plan-Hauptknoten (BP-TD-GRAPH-01) braucht eins von
+  beidem: die Graphansicht liest `related_thread_ids`, oder die Links werden zu
+  echten Kanten. Entscheidung offen.
+- **W6 VServer-Zuständigkeit:** Sandbox und weitere Serverpakete hängen an der
+  offenen Owner-Übergabe aus 9.2.
+
+### 9.8 Nächster Einstieg (Ergänzung zu Abschnitt 8)
+
+Durch diese Fortschreibung wurde nichts gestartet: keine Agenten, keine
+Installationen, keine Threadänderungen, keine Kostenwege. Vorschlag für die
+Reihenfolge nach G1/G2 und der Reihenfolge vom 07.11.; Kira oder Nutzer entscheiden:
+
+1. macOS-Stabilität sowie BP-REMOTE-03 mit Tunnelabnahme ohne Mac; dazu gehört
+   der gemeldete Blocker `com.kirabridge.chat-events` (Exit 1).
+2. BP-CLI-02 Phase 1 (Bestandsabgleich). Das ist die Voraussetzung für BP-COORD-02.
+3. BP-TD-KONSOL-01 nur als lesende Bestandsaufnahme. Das birgt wenig Risiko und
+   liefert die Grundlage für BP-TD-GRAPH-01 und BP-TD-ARCHIV-01.
+4. Alle übrigen Positionen aus 9.5 warten auf ihre eigene Freigabe.
