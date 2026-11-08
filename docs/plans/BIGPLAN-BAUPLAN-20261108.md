@@ -261,4 +261,81 @@ In Stufe 0 und 1 können L1, L2, L3 und L4 gleichzeitig arbeiten.
 
 ## Nachträge
 
-_(noch keine)_
+### N1 · 08.11.2026 – Plan-Governance, Entscheidungsnamen, Agentenlage
+
+**Kanonischer Einstieg.** Dieser Bauplan ist der kanonische Plan (BP-PLAN-01).
+`BIGPLAN-GESAMTPLAN-20261105.md` Abschnitt 9 (verknüpfte ThreadDesk-Threads,
+Pakete BP-CLI-02, BP-COORD-02, BP-SANDBOX-01, BP-LAUNCHER-01, BP-TD-*, BP-AA-02,
+BP-OPENAI-99) gilt als Teil dieses Plans. Beide Dateien werden nur durch datierte
+Nachträge fortgeschrieben.
+
+**Kollision der Entscheidungskennungen.** Abschnitt 7 hier und Gesamtplan 9.9
+verwenden beide „E1 …“, meinen aber verschiedene Fragen. Ab jetzt gilt:
+
+| Kennung | Bedeutung | Stand 08.11. |
+|---|---|---|
+| **E1–E5** (dieser Plan, Abschnitt 7) | 4AllPass-RC2/RC3 und Server-Rollout · Ort des ThreadDesk-Servers · Agent-Authority-Name · TollGate-Betriebsort · Dirks Zugang | **offen**, Vorschläge in Abschnitt 7 |
+| **G9.9-E1 … G9.9-E6** (Gesamtplan 9.9) | Übernahmen gelten · acht CLIs · Automatik nur im freigegebenen Rahmen · AA strikt lesend · Graph liest erst vorhandene Links · Reihenfolge | **entschieden** |
+| **W6** (Gesamtplan 9.7) | VServer-Zuständigkeit | **offen**; bis dahin keine produktiven Serveränderungen (G5) |
+
+**Agentenlage ab 08.11.2026 (Nutzervorgabe).** Es steht nur Claude zur Verfügung.
+Codex und Grok fallen als Autoren und Reviewer aus. Das ändert Abschnitt 6 so:
+
+- Jede Lane wird von einem eigenen Claude-Teilagenten in einem eigenen Worktree
+  bearbeitet. Weiterhin gilt: ein Schreiber je Worktree.
+- „Review durch einen anderen Agenten als den Autor“ wird durch die
+  Claude-Organisatorsitzung erfüllt, die nicht selbst geschrieben hat.
+  Das ist eine schwächere Unabhängigkeit als ein Review durch einen anderen Anbieter
+  und wird im jeweiligen PR so benannt.
+- Parallele Arbeit ist ausdrücklich erwünscht.
+
+**Gestartete Lanes (Organisator Claude, 08.11.2026 abends).** Reihenfolge nach G9.9-E6:
+
+| Lane | Paket | Umfang dieses Laufs |
+|---|---|---|
+| L1/L2 | BP-DEBIAN-02 (Teil) | PR #85 CI reparieren; Blocker `com.kirabridge.chat-events` diagnostizieren und versionieren. Kein Servereingriff. |
+| L2 | BP-KB-REL-42 | RC42 aus `main` bauen, isoliert abnehmen. Mac-Installation nur, wenn alle Gates grün sind. |
+| L2 | BP-CLI-02 Phase 1 | Bestandsabgleich der acht CLIs, nur lesend, ohne Modellkosten. |
+| L1 | BP-OPS-01 | Server-Inventar `ops/netcup.json` plus Prüfskript, nur lesend. |
+| L1 | BP-SEC-01 (b) | 4AllPass: Hinweis zu RC2 in der README, Release-Text als Datei. Die Release-Bearbeitung entscheidet der Nutzer. |
+| L4 | BP-TD-KONSOL-01 | Lesende Bestandsaufnahme der Threads, Vorarbeit für BP-TD-GRAPH-01. |
+| L4/L6 | BP-TD-REL-01 (Vorbereitung), BP-PLAN-01 (ThreadDesk) | README-Version und Handoff-Text, AGENTS-Verweis, historische Pläne markieren, 0.2-Notizen. |
+
+Nicht gestartet, weil Freigabe oder Zuständigkeit fehlt: BP-OPS-02 (W6), BP-SEC-01 (a)
+Server-Rollout (E1), BP-WINDOWS-02 Versand an Dirk (E5), BP-AUTO-01 (wartet auf RC42),
+alle Releases mit Außenwirkung.
+
+### N2 · 08.11.2026 – W6 entschieden: VServer-Zuständigkeit
+
+**Entscheidung des Nutzers (08.11.2026):** „W6 übernimmst du auch.“ Damit ist die
+Claude-Organisatorsitzung ab sofort **alleinige Ownerin und einzige Schreiberin** des
+VServers `netcup` (Root-Zugang `netcup`, Nutzer `daniel` über `netcup-daniel`).
+Sie folgt auf die beiden Codex-Sitzungen „Luna“ (Installationsschreiber RC41) und
+Serverowner 11907. Deren beidseitige Übergabe kam nicht mehr zustande; beide
+Sitzungen stehen nicht mehr zur Verfügung (Nutzervorgabe N1: nur Claude).
+
+Grundlage der Übernahme:
+
+- Übergabemappe `~/.local/state/vserver-production-handoff-20261107/handoff-readonly.md`,
+  SHA256 `ebcfaa71edf73cbeda83e475489eb4977f73fc9543b24a585ce6325b50c27b33`, frisch gelesen.
+- Lesende Prüfung am 08.11., 18:05 MEZ: auf dem Server läuft kein Codex-, Grok- oder
+  Luna-Prozess. Es gibt also keinen zweiten aktiven Schreiber.
+- Die Bedingung „erst nach Windows-Abschluss“ aus `VSERVER-PRODUCTION-GATE-WINDOWS-PENDING-20261107`
+  ist erfüllt: PR #74 ist gemergt (`a81cd10`), das Gate WINDOWS-FERTIG ist im Board belegt.
+
+Regeln für den Betrieb ab jetzt:
+
+1. G5 gilt weiter. Entwicklungs-Teilagenten arbeiten nicht auf dem Produktivhost. Sie
+   dürfen dort nur lesen. Produktive Änderungen macht allein die Ownerin, nur aus
+   Repo-Pins, mit Sicherung vorher, Rückweg und Readback danach.
+2. Vor der ersten produktiven Änderung liegt das Inventar aus BP-OPS-01 vor.
+3. Offene Owneraufgaben aus der Mappe: Zugangspfad `credentials.json` gegen `secrets.env`
+   abgleichen; Qualität der Sicherung `20261107-151533-486c1abc` prüfen; Testordner
+   `kb-debian-dirktest-*` sichern und erst dann entfernen.
+
+Damit freigegeben: BP-OPS-02, BP-DEBIAN-02 (Tunnel), BP-PAIR-01 und das Konzept für
+BP-SANDBOX-01. Weiter getrennt freizugeben ist der Neu-Rollout des 4AllPass-Servers (E1),
+weil er Nutzerkonten betrifft.
+
+**Korrektur zu Abschnitt 2:** Die installierte Mac-CLI läuft aus
+`0.8.0rc41-c81430b88738`, nicht aus RC40. Gilt bis zum Ist-Stand-Register (BP-TRUTH-01).

@@ -1,3 +1,4 @@
+> **Kanonischer Plan seit 08.11.2026:** [Bauplan v2](BIGPLAN-BAUPLAN-20261108.md) (Nachtrag N1 regelt Entscheidungskennungen und Agentenlage).
 > Historischer Quellenstand aus `21d2e2cad8e9930931b02031addfc25d819a9ed3`,
 > bei der Integration am 06.11.2026 bewahrt. Aktueller Quellen-, Prüf- und
 > Installationsstand: [RC40-Integrationsnachweis](../RC40-INTEGRATION-INSTALL-20261106.md).
@@ -672,6 +673,8 @@ Wie Abschnitt 5: Planregister, **keine Queue und keine READY-Freigabe**.
 - **W6 VServer-Zuständigkeit:** Sandbox und weitere Serverpakete hängen an der
   offenen Owner-Übergabe aus 9.2.
 
+Entscheidungen zu W1–W5 und zur Reihenfolge aus 9.8: [Abschnitt 9.9](#99-entscheidungen-vom-08112026).
+
 ### 9.8 Nächster Einstieg (Ergänzung zu Abschnitt 8)
 
 Durch diese Fortschreibung wurde nichts gestartet: keine Agenten, keine
@@ -684,3 +687,53 @@ Reihenfolge nach G1/G2 und der Reihenfolge vom 07.11.; Kira oder Nutzer entschei
 3. BP-TD-KONSOL-01 nur als lesende Bestandsaufnahme. Das birgt wenig Risiko und
    liefert die Grundlage für BP-TD-GRAPH-01 und BP-TD-ARCHIV-01.
 4. Alle übrigen Positionen aus 9.5 warten auf ihre eigene Freigabe.
+
+### 9.9 Entscheidungen vom 08.11.2026
+
+Der Nutzer hat die offenen Entscheidungen aus 9.7 und die Reihenfolge aus 9.8
+am 08.11.2026 an Claude übergeben („übernimm das bitte“). Claude hat sie so
+entschieden. Kira oder Nutzer können jede davon jederzeit ändern. Die Texte in
+9.7 und 9.8 bleiben als Herleitung stehen.
+
+- **E1 zu W1 – Übernahmen gelten.** Die in 9.3–9.5 als „übernommen“ geführten
+  Grundsätze und Positionen sind bestätigter Teil des Big Plans. Weiterhin gilt:
+  Planposition ist kein Umsetzungsauftrag, jedes Paket braucht seinen eigenen
+  freigegebenen Scope. Die Vermerke „noch nicht übernehmen“ in `1deb9d17dd28` und
+  `450d3dc1c6d2` sind damit für die übernommenen Punkte erledigt; die Threads
+  selbst bleiben unverändert.
+- **E2 zu W2 – Acht CLIs bleiben verbindlich.** Maßgeblich ist der Beschluss vom
+  04.11.: Codex, Grok Build, Claude Code, OpenCode, Gemini CLI, GitHub Copilot CLI,
+  Cursor CLI und Aider. Eine neunte CLI wird nicht erfunden. Die „neun“ aus dem
+  Board vom 07.11. sind wahrscheinlich die acht CLIs plus der Adaptertyp
+  `grok_api`, der keine CLI ist; belegt ist das nicht. BP-CLI-02 Phase 1 führt
+  `grok_api` als API-Weg getrennt. Benennt der Nutzer eine neunte CLI, kommt sie
+  als eigenes nachrangiges Adapterpaket dazu.
+- **E3 zu W3 – Automatik nur im freigegebenen Rahmen.** Der Koordinator aus
+  BP-COORD-02 teilt Aufgaben zu, wechselt CLI, Modell oder Provider und verteilt
+  bei Limitwechseln um, ohne einzeln nachzufragen. Das gilt nur innerhalb eines
+  freigegebenen Rahmens. Der Rahmen nennt mindestens: Aufgabenscope, erlaubte
+  CLI-/Modell-/Providerwege, Budget je Weg und Tag, Zielgeräte und Laufzeit.
+  Diesen Rahmen geben Kira oder Nutzer frei, ebenso jede Erweiterung. Abschnitt 6
+  bleibt damit gültig: Der Rahmen ist die dort verlangte konkrete Freigabe-,
+  Scope-, Budget- und Gerätebindung. Was außerhalb liegt oder unklar ist (UNKNOWN,
+  fehlende Budgetmessung), führt zu Stopp und Rückfrage, nicht zu einem Ersatzweg.
+- **E4 zu W4 – Agent Authority bleibt strikt lesend.** Der Beschluss vom 05.11.
+  gilt. „Berechtigungen“ im Brainstorming meint beobachtete Berechtigungen.
+- **E5 zu W5 – Graph liest erst die vorhandenen Links.** BP-TD-GRAPH-01 zeigt
+  `related_thread_ids` und `parent_thread_id` zunächst als abgeleitete Kanten an.
+  Gründe: Die Daten existieren schon. Es braucht keine Migration. Der Papierkorb
+  (`services/trash.py`) behandelt diese Felder bereits als Beziehungen. Und es
+  passt zu G2 (Festigen vor Ausbauen). Abgeleitete Kanten werden in der Ansicht
+  als solche gekennzeichnet. Ob sie später zu echten Graphkanten werden,
+  entscheidet die lesende Bestandsaufnahme von BP-TD-KONSOL-01. Dafür werden keine
+  vorhandenen Daten umgeschrieben oder gelöscht. Stand der Prüfung am 08.11.: Der
+  ThreadDesk-Graphcode auf `main` liest `related_thread_ids` noch nicht.
+- **W6 bleibt offen.** Die Übergabe der VServer-Zuständigkeit betrifft einen
+  laufenden Produktivdienst und zwei beteiligte Agenten. Sie braucht die
+  ausstehende beidseitige Übergabe mit Belegen und ist keine Planentscheidung.
+  BP-SANDBOX-01 startet erst danach.
+- **E6 – Reihenfolge.** Die Reihenfolge aus 9.8 gilt: (1) macOS-Stabilität und
+  BP-REMOTE-03 mit Tunnelabnahme ohne Mac, einschließlich des Blockers
+  `com.kirabridge.chat-events`; (2) BP-CLI-02 Phase 1; (3) BP-TD-KONSOL-01 nur
+  lesend; (4) alles Weitere nach eigener Freigabe. Damit ist nichts gestartet.
+  Jeder Schritt braucht weiterhin seinen eigenen Auftrag.
