@@ -32,8 +32,50 @@ auch wenn der Mac ausgeschaltet ist.
 2. **Tunnel auf dem Server starten:** `ssh -t netcup-daniel ~/.local/bin/kirabridge-tunnel-setup`. Die Ausführung des heruntergeladenen Programms war für die automatische Sitzung gesperrt.
 3. **ChatGPT verbinden:** In ChatGPT unter Plugins bzw. Connectors einen eigenen MCP-Server hinzufügen, Connection: **Tunnel**, die neue Tunnel-ID, ohne zusätzliche Authentifizierung. Danach `bridge_health` und `td_list_threads` aufrufen.
 4. **Mac-aus-Abnahme:** Den Mac ausschalten und vom Handy aus prüfen, ob ThreadDesk im Browser und der ChatGPT-Connector „KiraBridge Server“ antworten. Diese Prüfung ist bisher nicht erfolgt. Belegt ist nur, dass keine Serverkomponente den Mac braucht.
-5. **Auftragsweg (Handoff):** Ist auf dem Server noch nicht eingeschaltet. Bis dahin werden Aufträge für den Mac nicht über den Server zugestellt.
+5. **Auftragsweg auf der Mac-Seite:** siehe nächster Abschnitt.
 6. **Mac-Desktop:** In ThreadDesk unter „Server und Abgleich“ die neue Adresse `https://v2202608211799501333.goodsrv.de:8443` eintragen.
+
+## Auftragsweg (Handoff)
+
+**Server-Hälfte ist eingeschaltet.** Der Dienst startet jetzt über
+`serve_handoff.py`, also `create_app(..., handoff_rpc=True)` mit denselben
+Parametern wie `threaddesk-server serve`. Die vorherige Drop-in-Datei ist
+gesichert als `public.conf.bak.*-before-handoff`. Über das Internet geprüft:
+
+- `GET /api/projects/{pid}/handoff` mit Bearer-Token liefert 200 und das Format
+  `threaddesk.handoff-http.v1` mit `executes_agents=false`.
+- `POST get_issued_handoff` mit Bearer-Token liefert eine ordentliche Antwort
+  (`found=false` für eine unbekannte ID).
+- Ohne Token kommt 401. Mit einer Browser-Sitzung ohne CSRF-Token wird
+  `csrf_required` abgelehnt. `review_return` und `answer_handoff_question`
+  werden mit 403 gesperrt, wie vorgesehen.
+
+Der Server kann damit Aufträge annehmen, speichern und für genau einen
+Zustellversuch reservieren, auch während der Mac aus ist. Er führt nichts aus.
+
+**Mac-Hälfte ist noch nicht in Betrieb.** Grund ist kein Konfigurationsschalter,
+es fehlen echte Bausteine:
+
+- `RemoteRelay` und `HttpHandoffPeer` existieren in `main` nur als Bibliothek
+  mit Tests. Kein Dienst und kein CLI-Befehl startet sie.
+- Es gibt keinen produktiven Grant-Resolver, kein Pairing und keinen Widerruf.
+  `deliver()` braucht eine vorhandene Core-Freigabe (`NativeGrant`). Wer diese
+  Freigabe ausstellt, ist eine Sicherheitsentscheidung, die der Big Plan
+  ausdrücklich dem Nutzer vorbehält (BP-REMOTE-03).
+- Laut BP-REMOTE-02 kann die installierte sichtbare Agentenroute auf dem Mac
+  einen strukturierten `handoff_reply`-Start noch nicht ausführen.
+- `HttpHandoffPeer` pinnt genau ein Leaf-Zertifikat. Der Server nutzt ein
+  automatisch erneuertes ZeroSSL-/ACME-Zertifikat, gültig bis 1. Februar 2027.
+  Nach jeder Erneuerung muss der Pin nachgezogen werden, sonst lehnt der Mac
+  die Verbindung ab.
+
+**Vorschlag für die Mac-Hälfte:** Ein Relay-Dienst auf dem Mac baut ausgehend
+HTTPS zum Server auf, liest neue freigegebene Handoffs und legt sie im lokalen
+KiraBridge als Aufträge mit lokaler Freigabe an. Dafür wird `task_request` mit
+`approval_required` genutzt, kein remote ausgestellter Grant. Nichts läuft ohne
+die lokale Bestätigung. Ergebnisse gehen über die vorhandene Return-Inbox zurück
+in denselben Thread. Diesen Dienst und die Freigaberegel muss der Nutzer vor dem
+Bau bestätigen.
 
 ## Quellen
 
