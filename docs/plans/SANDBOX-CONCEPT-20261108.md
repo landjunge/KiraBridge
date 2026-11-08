@@ -2,7 +2,7 @@
 
 Stand: 08.11.2026. Lane L1. **Nur Konzept.** Auf dem Server wurde nur gelesen.
 Nichts installiert, nichts gestartet, nichts geschrieben. Keine Secrets erfasst.
-Bezug: gesamtplan 9.3 G5, 9.4 Nr. 3, 9.5 BP-SANDBOX-01; Bauplan Nachtrag N2.
+Bezug: Gesamtplan 9.3 G5, 9.4 Nr. 3, 9.5 BP-SANDBOX-01; Bauplan Nachtrag N2.
 
 ## 1. Gemessene Hostressourcen (`netcup`, nur lesend)
 
