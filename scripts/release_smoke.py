@@ -221,16 +221,24 @@ def smoke(artifacts: Path):
         base = [python, "-m", "kirabridge.cli", "--config", str(config)]
         check = json.loads(run([*base, "install", "--check"]).stdout)
         assert check["changes"] is False and check["chatgpt_call"] == "unverified"
+        # Kept inside the temporary folder so a failed start explains itself.
+        dispatcher_log = folder / "dispatcher.stderr.log"
+        log_stream = dispatcher_log.open("wb")
         process = subprocess.Popen(
             [*base, "serve", "--transport", "http"],
             stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
+            stderr=log_stream,
         )
+        log_stream.close()
         try:
             health = None
             for _ in range(30):
                 if process.poll() is not None:
-                    raise RuntimeError("Isolated dispatcher exited before readiness")
+                    tail = dispatcher_log.read_bytes()[-4000:].decode("utf-8", "replace")
+                    raise RuntimeError(
+                        f"Isolated dispatcher exited before readiness (exit {process.returncode})"
+                        + (":\n" + tail if tail.strip() else "; no error output")
+                    )
                 reply = subprocess.run([*base, "status"], capture_output=True, text=True, timeout=7)
                 if reply.returncode == 0:
                     health = json.loads(reply.stdout)
