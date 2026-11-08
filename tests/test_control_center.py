@@ -366,3 +366,38 @@ async def test_reconnect_keeps_existing_gateway_and_url(bridge, monkeypatch):
     result = await control.service_action("grok_app", "restart", "reconnect")
     assert result["state"] == "reconnected" and result["gateway_preserved"]
     assert reloaded == [True]
+
+
+def test_status_snapshot_names_the_installed_release_for_the_footer(tmp_path):
+    import json as _json
+
+    import kirabridge
+    from kirabridge import operator_control
+
+    identity = operator_control.release_identity()
+    assert identity["version"] == kirabridge.__version__
+    # A development checkout has no installed release commit.
+    assert identity["source_commit"] is None
+
+    from kirabridge.platform_adapters.macos import system_identity
+
+    release = tmp_path / "0.0.0-abc"
+    package = release / "source/.venv/lib/python3.11/site-packages/kirabridge"
+    package.mkdir(parents=True)
+    (release / "release.json").write_text(_json.dumps({"source_commit": "a" * 40}))
+    assert system_identity.installed_source_commit(package) == "a" * 40
+
+
+def test_control_center_footer_shows_a_small_version_tag():
+    from pathlib import Path as _Path
+
+    assets = _Path(__file__).parents[1] / "src/kirabridge/console_assets"
+    html = (assets / "center.html").read_text()
+    script = (assets / "center.js").read_text()
+    css = (assets / "center.css").read_text()
+    assert '<span id="footer-version" class="version-tag" hidden></span>' in html
+    assert script.startswith('"use strict";') and "renderVersion(data);" in script
+    assert ".version-tag{" in css
+    # On small screens only the hint is hidden; the version stays visible.
+    assert ".app-footer .footer-hint{display:none}" in css
+    assert ".app-footer>span:last-child{display:none}" not in css
