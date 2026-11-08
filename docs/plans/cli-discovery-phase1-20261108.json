@@ -1,0 +1,690 @@
+{
+  "schema": "kirabridge.cli-discovery-phase1.v1",
+  "package": "BP-CLI-02 Phase 1 (Discovery, Gesamtplan 9.5)",
+  "decision": "G9.9-E2: acht CLIs verbindlich, grok_api getrennt als API-Weg",
+  "host": {
+    "model": "Intel Mac",
+    "arch": "x86_64",
+    "os": "macOS 15.7.4 (24G517)"
+  },
+  "observed": "2026-11-08T17:55:00+01:00/2026-11-08T18:15:00+01:00",
+  "base_commit": "405797c98d37a5a0ad7558fe6c067de24675ba78",
+  "rules": {
+    "model_calls": 0,
+    "logins_started": 0,
+    "runtime_changed": false,
+    "secrets_recorded": false,
+    "side_effects": [
+      "grok models hat das gespeicherte Grok-OIDC-Token erneuert (auth.json neu geschrieben)"
+    ]
+  },
+  "status_terms": {
+    "registered": "Adapterart im Code registriert (AgentManager bzw. AdapterRegistry)",
+    "available": "Binary vorhanden und Zugang fuer die konfigurierte Route belegt",
+    "executed_successfully": "Beleg im Repo fuer einen erfolgreichen echten Lauf; sonst UNKNOWN oder no"
+  },
+  "code_registry": {
+    "agent_manager_kinds": [
+      "codex",
+      "grok_api",
+      "grok_acp",
+      "grok_structured",
+      "opencode",
+      "gemini_cli",
+      "claude_code",
+      "copilot_cli"
+    ],
+    "agent_manager_file": "src/kirabridge/agent_manager/__init__.py",
+    "cli_adapters_registry": [
+      "codex",
+      "grok"
+    ],
+    "cli_adapters_file": "src/kirabridge/cli_adapters/__init__.py",
+    "capability_router_cli_literal": [
+      "codex",
+      "grok",
+      "claude",
+      "opencode",
+      "gemini",
+      "copilot",
+      "cursor",
+      "aider"
+    ],
+    "capability_router_file": "src/kirabridge/capability_routing/router.py",
+    "native_routing_kinds": {
+      "codex": "codex",
+      "grok_acp": "grok",
+      "grok_structured": "grok"
+    }
+  },
+  "clis": [
+    {
+      "id": "codex",
+      "name": "Codex",
+      "category": "cli",
+      "installed": true,
+      "path": "/Users/landjunge/.local/bin/codex",
+      "resolved": "/Users/landjunge/.codex/packages/standalone/releases/0.167.0-x86_64-apple-darwin/bin/codex",
+      "version": "codex-cli 0.167.0",
+      "version_matrix_20261105": "codex-cli 0.166.0",
+      "kirabridge_config": {
+        "agent": "codex",
+        "kind": "codex",
+        "executable": "/Users/landjunge/.local/bin/codex",
+        "sandbox_mode": "danger-full-access",
+        "bridge_tools": true,
+        "visible_binding": true,
+        "team_worker": true
+      },
+      "cli_config": {
+        "mcp_servers": [
+          "kirabridge"
+        ],
+        "file": "~/.codex/config.toml"
+      },
+      "logged_in": "yes",
+      "login_evidence": "codex login status: 'Logged in using ChatGPT'",
+      "discovery": {
+        "machine_readable": true,
+        "items": [
+          "codex exec --json (JSONL events)",
+          "codex app-server generate-json-schema (experimental, protocol JSON Schema)",
+          "codex app-server generate-ts (experimental)",
+          "codex mcp (MCP client config)",
+          "codex doctor"
+        ],
+        "json_help": false
+      },
+      "provider": {
+        "kinds": [
+          "codex"
+        ],
+        "file": "src/kirabridge/agent_manager/__init__.py",
+        "class": "CodexAdapter"
+      },
+      "ui_adapter": {
+        "name": "codex",
+        "files": [
+          "src/kirabridge/cli_adapters/codex.py",
+          "src/kirabridge/cli_adapters/codex_menus.py",
+          "src/kirabridge/cli_adapters/codex_return.py",
+          "src/kirabridge/cli_adapters/codex_slash.py",
+          "src/kirabridge/cli_adapters/codex_echo.py"
+        ]
+      },
+      "tests": [
+        "tests/test_full_access.py",
+        "tests/test_cli_adapter_contract.py",
+        "tests/test_codex_*.py",
+        "tests/test_codex_copy_activity_footer.py",
+        "tests/test_rc39_activity_shortcuts.py",
+        "tests/test_capability_routing.py",
+        "tests/test_native_capability_routing.py"
+      ],
+      "status": {
+        "registered": true,
+        "available": true,
+        "executed_successfully": "yes_historical",
+        "executed_evidence": "Gesamtplan Abschnitt 4: reale Intel-Handoff-/Antwort-/AutoNext-Belege; nicht neu fuer 0.167.0 belegt"
+      },
+      "gaps": [
+        "Version 0.167.0 weicht von Matrix (0.166.0, laeuft 12.11. ab) ab",
+        "Grenzen fuer neue Verbindung, Tab/Fokus, Remoteauftrag nicht gepinnt",
+        "Bauplan N1: Codex steht als Autor/Reviewer derzeit nicht zur Verfuegung (Nutzervorgabe, nicht technisch)"
+      ]
+    },
+    {
+      "id": "grok",
+      "name": "Grok Build",
+      "category": "cli",
+      "installed": true,
+      "path": "/Users/landjunge/.grok/bin/grok",
+      "resolved": "/Users/landjunge/.grok/downloads/grok-1.0.78-macos-x86_64",
+      "version": "grok 1.0.78 (c40aa475b3fe)",
+      "version_matrix_20261105": "grok 1.0.77 (50ca579fa996) [alpha]",
+      "kirabridge_config": {
+        "agent": "grok",
+        "kind": "grok_acp",
+        "executable": "/Users/landjunge/.local/bin/grok",
+        "executable_resolves_to": "/Users/landjunge/.grok/downloads/grok-1.0.78-macos-x86_64",
+        "sandbox_mode": "read-only",
+        "bridge_tools": true,
+        "visible_binding": true,
+        "team_worker": true,
+        "grok_connector_service": "com.kirabridge.grok-app"
+      },
+      "cli_config": {
+        "mcp_servers": [
+          "kirabridge"
+        ],
+        "file": "~/.grok/config.toml"
+      },
+      "logged_in": "UNKNOWN",
+      "login_evidence": "grok --no-auto-update models meldet 'You are not authenticated'; gleichzeitig liegt ein gespeicherter OIDC-Login in ~/.grok/auth.json, dessen Ablaufzeit beim selben Aufruf erneuert wurde. Widerspruechlich, daher UNKNOWN.",
+      "discovery": {
+        "machine_readable": true,
+        "items": [
+          "--output-format json|streaming-json|streaming-messages-json",
+          "--json-schema (strukturierte Ausgabe)",
+          "grok models",
+          "grok inspect",
+          "grok mcp",
+          "grok agent stdio (ACP, von grok_acp genutzt)",
+          "grok usage"
+        ],
+        "json_help": false
+      },
+      "provider": {
+        "kinds": [
+          "grok_acp",
+          "grok_structured"
+        ],
+        "files": [
+          "src/kirabridge/agent_manager/__init__.py (GrokACPAdapter)",
+          "src/kirabridge/agent_manager/grok_structured.py"
+        ]
+      },
+      "ui_adapter": {
+        "name": "grok",
+        "files": [
+          "src/kirabridge/cli_adapters/grok.py",
+          "src/kirabridge/cli_adapters/grok_echo.py"
+        ]
+      },
+      "tests": [
+        "tests/test_grok_structured.py",
+        "tests/test_grok_protocol_probe.py",
+        "tests/test_grok_single_row_paste.py",
+        "tests/test_agents.py",
+        "tests/test_autonext_coordinator.py",
+        "tests/test_capability_routing.py",
+        "tests/test_native_capability_routing.py"
+      ],
+      "status": {
+        "registered": true,
+        "available": "UNKNOWN",
+        "executed_successfully": "yes_historical",
+        "executed_evidence": "Gesamtplan Abschnitt 4 (sichtbarer High-Partner); docs/cli-routing/evidence/grok-live-receipt.json (05.11.)"
+      },
+      "gaps": [
+        "Anmeldestatus widerspruechlich",
+        "Lange/umbrochene Texte, Fokus, Placeholder als Faehigkeitsgrenzen offen",
+        "PATH: 'agent' zeigt auf Grok (~/.grok/bin/agent), nicht auf Cursor",
+        "Bauplan N1: Grok steht als Autor/Reviewer derzeit nicht zur Verfuegung (Nutzervorgabe)"
+      ]
+    },
+    {
+      "id": "claude",
+      "name": "Claude Code",
+      "category": "cli",
+      "installed": true,
+      "path": "/Users/landjunge/.local/bin/claude",
+      "resolved": "/Users/landjunge/.local/share/claude/versions/2.1.319",
+      "version": "2.1.319 (Claude Code)",
+      "second_install": {
+        "path": "/usr/local/bin/claude",
+        "resolved": "/usr/local/Caskroom/claude-code/2.1.236/claude",
+        "version": "2.1.236 (Claude Code)",
+        "used_by_kirabridge": true
+      },
+      "version_matrix_20261105": "2.1.236 (Claude Code)",
+      "kirabridge_config": {
+        "agent": "claude",
+        "kind": "claude_code",
+        "executable": "/usr/local/bin/claude",
+        "sandbox_mode": "read-only",
+        "bridge_tools": true,
+        "allow_local_tools": true,
+        "visible_binding": false,
+        "team_worker": true,
+        "team_execution_scope": "separate_managed_session",
+        "team_cwd": "/Users/landjunge/KiraBridge-Workspace"
+      },
+      "cli_config": {
+        "mcp_servers_global": [],
+        "file": "~/.claude.json"
+      },
+      "logged_in": "yes",
+      "login_evidence": "claude auth status --json, beide Installationen: loggedIn=true, authMethod=claude.ai, apiProvider=firstParty, subscriptionType=pro",
+      "discovery": {
+        "machine_readable": true,
+        "items": [
+          "--print --output-format json|stream-json",
+          "--input-format stream-json",
+          "--json-schema",
+          "claude auth status --json",
+          "claude mcp",
+          "--agents <json>"
+        ],
+        "json_help": false
+      },
+      "provider": {
+        "kinds": [
+          "claude_code"
+        ],
+        "files": [
+          "src/kirabridge/agent_manager/claude.py (text only, safe mode)",
+          "src/kirabridge/agent_manager/full_access.py (bypassPermissions + KiraBridge-MCP)"
+        ]
+      },
+      "ui_adapter": null,
+      "tests": [
+        "tests/test_claude_adapter.py",
+        "tests/test_cli_provider_integration.py",
+        "tests/test_cli_support.py",
+        "tests/test_full_access.py"
+      ],
+      "status": {
+        "registered": true,
+        "available": true,
+        "executed_successfully": "UNKNOWN",
+        "executed_evidence": "19.10.: loggedIn=false (docs/providers/CLI-PROVIDERS-ACCEPTANCE-20261019.md). 47ea958 (08.11.) behebt 'Not logged in' bei verwalteten Laeufen (USER/LOGNAME). Kein Erfolgsbeleg im Repo."
+      },
+      "gaps": [
+        "Zwei Installationen; KiraBridge nutzt die alte 2.1.236, PATH die 2.1.319",
+        "Kein UI-Adapter in cli_adapters (sichtbare Semantik fehlt)",
+        "Kein belegter erfolgreicher Lauf, weder text-only noch full-access",
+        "Ob der laufende Dienst den Fix 47ea958 enthaelt: UNKNOWN"
+      ]
+    },
+    {
+      "id": "opencode",
+      "name": "OpenCode",
+      "category": "cli",
+      "installed": true,
+      "path": "/usr/local/bin/opencode",
+      "resolved": "/usr/local/Cellar/opencode/1.4.4/bin/opencode",
+      "version": "1.4.4",
+      "version_matrix_20261105": "1.4.4",
+      "kirabridge_config": {
+        "agent": "opencode",
+        "kind": "opencode",
+        "executable": "/usr/local/bin/opencode",
+        "model": "ollama/kirabridge-team:latest",
+        "base_url": "http://127.0.0.1:11434/v1",
+        "sandbox_mode": "read-only",
+        "bridge_tools": true,
+        "team_worker": true
+      },
+      "cli_config": {
+        "file": "~/.config/opencode/opencode.jsonc",
+        "mcp_servers": [],
+        "stored_provider_credentials": [
+          "OpenCode Zen",
+          "DeepSeek",
+          "OpenRouter",
+          "MiniMax",
+          "Nvidia"
+        ],
+        "local_ollama_running": true
+      },
+      "logged_in": "not_required_for_configured_route",
+      "login_evidence": "KiraBridge-Route nutzt lokales Ollama (laeuft, Modell kirabridge-team:latest vorhanden). opencode auth list zeigt 5 gespeicherte API-Zugaenge (kostenpflichtig, nicht genutzt).",
+      "discovery": {
+        "machine_readable": true,
+        "items": [
+          "opencode run --format json",
+          "opencode models",
+          "opencode acp",
+          "opencode mcp",
+          "opencode serve (headless HTTP-Server)",
+          "opencode export (JSON)"
+        ],
+        "json_help": false
+      },
+      "provider": {
+        "kinds": [
+          "opencode"
+        ],
+        "files": [
+          "src/kirabridge/agent_manager/opencode.py",
+          "src/kirabridge/agent_manager/full_access.py"
+        ]
+      },
+      "ui_adapter": null,
+      "tests": [
+        "tests/test_opencode_adapter.py",
+        "tests/test_cli_provider_integration.py",
+        "tests/test_cli_support.py",
+        "tests/test_full_access.py",
+        "tests/test_team_gateway.py"
+      ],
+      "status": {
+        "registered": true,
+        "available": true,
+        "executed_successfully": "yes_historical",
+        "executed_evidence": "19.10.: Auftrag cli-opencode-mcp-20261019-01, exakte Antwort, Exit 0, lokales Modell kirabridge-text:latest. Heutiges Modell kirabridge-team nicht neu belegt."
+      },
+      "gaps": [
+        "Werkzeug- und Fortsetzungsgrenzen nicht getrennt belegt",
+        "Gespeicherte Cloud-Zugaenge sind Kostenwege; duerfen nicht implizit gewaehlt werden",
+        "Kein UI-Adapter"
+      ]
+    },
+    {
+      "id": "gemini",
+      "name": "Gemini CLI",
+      "category": "cli",
+      "installed": true,
+      "path": "/usr/local/bin/gemini",
+      "resolved": "/usr/local/Cellar/gemini-cli/0.37.2/libexec/lib/node_modules/@google/gemini-cli/bundle/gemini.js",
+      "version": "0.37.2",
+      "version_matrix_20261105": "0.37.2",
+      "kirabridge_config": {
+        "agent": "gemini",
+        "kind": "gemini_cli",
+        "executable": "/usr/local/bin/gemini",
+        "sandbox_mode": "read-only",
+        "bridge_tools": true,
+        "team_worker": true
+      },
+      "cli_config": {
+        "oauth_creds_present": true,
+        "settings_json_present": false
+      },
+      "logged_in": "UNKNOWN",
+      "login_evidence": "0.37.2 hat keinen lokalen Statusbefehl. OAuth-Datei vorhanden, settings.json fehlt. 19.10.: IneligibleTierError, Google bedient den persoenlichen Login nicht mehr.",
+      "discovery": {
+        "machine_readable": true,
+        "items": [
+          "-o json|stream-json",
+          "--acp",
+          "gemini mcp",
+          "gemini extensions",
+          "gemini skills",
+          "gemini hooks"
+        ],
+        "json_help": false
+      },
+      "provider": {
+        "kinds": [
+          "gemini_cli"
+        ],
+        "files": [
+          "src/kirabridge/agent_manager/gemini.py",
+          "src/kirabridge/agent_manager/full_access.py"
+        ]
+      },
+      "ui_adapter": null,
+      "tests": [
+        "tests/test_gemini_adapter.py",
+        "tests/test_cli_provider_integration.py",
+        "tests/test_cli_support.py",
+        "tests/test_full_access.py"
+      ],
+      "status": {
+        "registered": true,
+        "available": "UNKNOWN",
+        "executed_successfully": "no",
+        "executed_evidence": "19.10.: ein Auftrag ohne bestaetigten Abschluss (unknown), danach IneligibleTierError"
+      },
+      "gaps": [
+        "Kontobedingte Sperre; kein kostenpflichtiger API-Ersatz freigegeben",
+        "Lokale 0.37.2 deutlich aelter als Doku 0.64"
+      ]
+    },
+    {
+      "id": "copilot",
+      "name": "GitHub Copilot CLI",
+      "category": "cli",
+      "installed": true,
+      "path": "/usr/local/bin/copilot",
+      "resolved": "/usr/local/Caskroom/copilot-cli@prerelease/1.0.66-1/copilot",
+      "version": "GitHub Copilot CLI 1.0.67",
+      "version_matrix_20261105": "GitHub Copilot CLI 1.0.67",
+      "kirabridge_config": {
+        "agent": "copilot",
+        "kind": "copilot_cli",
+        "executable": "/usr/local/bin/copilot",
+        "sandbox_mode": "read-only",
+        "bridge_tools": true,
+        "team_worker": true
+      },
+      "cli_config": {
+        "own_login_recorded": false,
+        "mcp_config_present": false,
+        "gh_cli_logged_in": true,
+        "gh_token_has_copilot_scope": true
+      },
+      "logged_in": "UNKNOWN",
+      "login_evidence": "~/.copilot/config.json enthaelt nur firstLaunchAt (keine eigene Anmeldung). gh ist angemeldet (Scope copilot). Ob Copilot CLI diesen Weg nutzt und ein Abo besteht, ist ohne Lauf nicht belegt.",
+      "discovery": {
+        "machine_readable": true,
+        "items": [
+          "--output-format json",
+          "--acp",
+          "copilot mcp",
+          "copilot help config|environment|permissions"
+        ],
+        "json_help": false
+      },
+      "provider": {
+        "kinds": [
+          "copilot_cli"
+        ],
+        "files": [
+          "src/kirabridge/agent_manager/copilot.py",
+          "src/kirabridge/agent_manager/full_access.py"
+        ]
+      },
+      "ui_adapter": null,
+      "tests": [
+        "tests/test_copilot_adapter.py",
+        "tests/test_cli_provider_integration.py",
+        "tests/test_cli_support.py",
+        "tests/test_full_access.py"
+      ],
+      "status": {
+        "registered": true,
+        "available": "UNKNOWN",
+        "executed_successfully": "no",
+        "executed_evidence": "19.10.: isAuthenticated=false, null Prompts"
+      },
+      "gaps": [
+        "Caskroom-Ordner 1.0.66-1 meldet 1.0.67 (Selbstupdate)",
+        "Token-Weg fuer das isolierte Profil nicht festgelegt"
+      ]
+    },
+    {
+      "id": "cursor",
+      "name": "Cursor CLI",
+      "category": "cli",
+      "installed": true,
+      "path": "/Users/landjunge/.local/bin/cursor-agent",
+      "resolved": "/Users/landjunge/.local/share/cursor-agent/versions/2026.08.11-e8db854/cursor-agent",
+      "version": "2026.08.11-e8db854",
+      "version_matrix_20261105": "2026.08.11-e8db854",
+      "kirabridge_config": null,
+      "cli_config": {
+        "files": [
+          "~/.cursor/cli-config.json",
+          "~/.cursor/mcp.json"
+        ],
+        "mcp_servers": [
+          "open_mcp_google"
+        ]
+      },
+      "logged_in": "yes",
+      "login_evidence": "cursor-agent status: 'Logged in (unable to fetch user details)'",
+      "discovery": {
+        "machine_readable": true,
+        "items": [
+          "--print --output-format json|stream-json",
+          "--list-models / cursor-agent models",
+          "cursor-agent mcp",
+          "cursor-agent create-chat",
+          "cursor-agent about"
+        ],
+        "json_help": false
+      },
+      "provider": null,
+      "ui_adapter": null,
+      "tests": [
+        "tests/test_capability_routing.py (nur Matrix-Eintrag)"
+      ],
+      "status": {
+        "registered": false,
+        "available": true,
+        "executed_successfully": "no",
+        "executed_evidence": "keiner"
+      },
+      "gaps": [
+        "Kein Provider, kein UI-Adapter, kein Konfigeintrag",
+        "Nur im Router-Literal capability_routing/router.py",
+        "PATH: 'agent' zeigt auf Grok; Adapter muss den expliziten Pfad cursor-agent nutzen"
+      ]
+    },
+    {
+      "id": "aider",
+      "name": "Aider",
+      "category": "cli",
+      "installed": false,
+      "path": null,
+      "resolved": null,
+      "version": null,
+      "version_matrix_20261105": null,
+      "kirabridge_config": null,
+      "cli_config": null,
+      "logged_in": "not_applicable",
+      "login_evidence": "nicht installiert (PATH, pipx, uv tools, Python-Modul geprueft)",
+      "discovery": {
+        "machine_readable": false,
+        "items": [],
+        "json_help": false
+      },
+      "provider": null,
+      "ui_adapter": null,
+      "tests": [
+        "tests/test_capability_routing.py (nur Matrix-Eintrag)"
+      ],
+      "status": {
+        "registered": false,
+        "available": false,
+        "executed_successfully": "no",
+        "executed_evidence": "keiner"
+      },
+      "gaps": [
+        "Installation braucht Freigabe",
+        "Wrapper statt nativem Hook",
+        "Automatische Commits abschalten"
+      ]
+    }
+  ],
+  "api_routes": [
+    {
+      "id": "grok_api",
+      "name": "Grok API (xAI HTTP)",
+      "category": "api_route_not_cli",
+      "endpoint": "https://api.x.ai/v1/chat/completions",
+      "kirabridge_config": null,
+      "credential_env": "XAI_API_KEY",
+      "credential_env_set_in_probe_shell": false,
+      "credential_env_daemon": "UNKNOWN",
+      "logged_in": "not_applicable",
+      "provider": {
+        "kinds": [
+          "grok_api"
+        ],
+        "file": "src/kirabridge/agent_manager/__init__.py",
+        "class": "GrokAPIAdapter"
+      },
+      "ui_adapter": null,
+      "tests": [
+        "tests/test_agents.py (Fake-Server)",
+        "tests/test_cli_support.py",
+        "tests/test_completions.py"
+      ],
+      "status": {
+        "registered": true,
+        "available": false,
+        "executed_successfully": "UNKNOWN",
+        "executed_evidence": "kein Beleg im Repo; nicht getestet, weil API-Kosten"
+      },
+      "gaps": [
+        "Kein Agent mit kind=grok_api konfiguriert",
+        "Kostenweg; braucht ausdrueckliche Budgetfreigabe"
+      ]
+    }
+  ],
+  "local_test_run": {
+    "files": [
+      "test_claude_adapter",
+      "test_cli_provider_integration",
+      "test_opencode_adapter",
+      "test_gemini_adapter",
+      "test_copilot_adapter",
+      "test_grok_structured",
+      "test_full_access",
+      "test_cli_adapter_contract",
+      "test_capability_routing",
+      "test_native_capability_routing"
+    ],
+    "runs": [
+      {
+        "passed": 202,
+        "failed": 11
+      },
+      {
+        "passed": 201,
+        "failed": 12
+      }
+    ],
+    "note": "Wechselnde Fehlschlaege mit process_cleanup_unknown ('Owned process session cannot be confirmed') bei Load Average 80-120. test_grok_structured isoliert 10/10 bestanden. Umgebungsbedingt, massgeblich ist CI."
+  },
+  "next_packages": [
+    {
+      "order": 1,
+      "id": "BP-CLI-01",
+      "wave": 1,
+      "cli": "claude",
+      "estimate_days": "1.5-2.5"
+    },
+    {
+      "order": 2,
+      "id": "BP-CLI-02-DISC-2",
+      "wave": null,
+      "cli": "all",
+      "estimate_days": "1.5-2"
+    },
+    {
+      "order": 3,
+      "id": "BP-CLI-02",
+      "wave": 2,
+      "cli": "cursor",
+      "estimate_days": "1.5-2"
+    },
+    {
+      "order": 4,
+      "id": "BP-CLI-02",
+      "wave": 2,
+      "cli": "gemini",
+      "estimate_days": "0.5 (blockiert)"
+    },
+    {
+      "order": 5,
+      "id": "BP-CLI-03",
+      "wave": 3,
+      "cli": "opencode,copilot",
+      "estimate_days": "1-1.5"
+    },
+    {
+      "order": 6,
+      "id": "BP-CLI-03",
+      "wave": 3,
+      "cli": "aider",
+      "estimate_days": "1.5-2"
+    },
+    {
+      "order": 7,
+      "id": "BP-CLI-02-DISC-3",
+      "wave": null,
+      "cli": "all",
+      "estimate_days": "1-1.5"
+    }
+  ],
+  "estimate": {
+    "discovery_total_days": "3.5-5",
+    "all_adapter_waves_plus_discovery_days": "8.5-12.5",
+    "previous_board_estimate_days": "2-5"
+  }
+}
