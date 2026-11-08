@@ -1,0 +1,288 @@
+{
+  "format": "kirabridge.ops-inventory.v1",
+  "package": "BP-OPS-01",
+  "observed_at": "2026-11-08T16:59:45Z",
+  "observed_by": "Lane L1 (Claude), nur lesende Befehle; Abgleich: scripts/ops_inventory_check.py",
+  "secrets_policy": "Keine Werte. Umgebungsvariablen und Geheimnisdateien nur nach Name bzw. Pfad.",
+  "host": {
+    "owner": "Organisatorin, alleinige VServer-Ownerin (W6 entschieden, KB PR #97, Bauplan N2)",
+    "ssh_alias": "netcup",
+    "ssh_login_user": "root",
+    "service_user": "daniel",
+    "hostname": "v2202608211799501333",
+    "fqdn": "v2202608211799501333.goodsrv.de",
+    "os": "Debian 13.6",
+    "arch": "x86_64",
+    "ipv4": "152.53.110.140",
+    "ipv6": "2a0a:4cc0:80:3e62:78ae:46ff:fe45:c10d",
+    "users": [
+      {"name": "daniel", "uid": 1000, "linger": true, "role": "ThreadDesk-Server, KiraBridge-Server, Testordner"},
+      {"name": "github-runner", "uid": 1001, "role": "zwei Actions-Runner fuer landjunge/KiraBridge"},
+      {"name": "aa-browser", "role": "Agent Authority Browser"},
+      {"name": "ki-hilfezentrum", "role": "KI-Hilfezentrum (eigenes Projekt ausserhalb der fuenf Produkte)"}
+    ]
+  },
+  "systemd_system": [
+    {
+      "unit": "threaddesk-server.service",
+      "active_state": "active",
+      "sub_state": "running",
+      "unit_file_state": "enabled",
+      "user": "daniel",
+      "started_at": "2026-11-08T01:30:34+01:00",
+      "exec": "/home/daniel/.local/share/threaddesk-server-20261107/venv/bin/python /home/daniel/.local/share/threaddesk-server-20261107/serve_handoff.py <data> 172.18.0.1 8766 https://v2202608211799501333.goodsrv.de:8443 172.18.0.0/16",
+      "exec_source": "Drop-in /etc/systemd/system/threaddesk-server.service.d/public.conf ersetzt ExecStart der Unit (die Unit selbst nennt noch 127.0.0.1:8766 und public-origin https://127.0.0.1:8446)",
+      "product": "ThreadDesk Server & Sync",
+      "owner_guess": "landjunge/threaddesk-server, Lane L1 (BP-OPS-02)",
+      "notes": "Startet NICHT den Repo-Einstieg 'threaddesk-server serve', sondern das ungeversionierte Wrapper-Skript serve_handoff.py (W02)."
+    },
+    {
+      "unit": "threaddesk-server-tls.service",
+      "active_state": "inactive",
+      "sub_state": "dead",
+      "unit_file_state": "disabled",
+      "user": "daniel",
+      "stopped_at": "2026-11-08T00:37:01+01:00",
+      "exec": "checkout/packaging/server/loopback_tls_proxy.py --listen-host 127.0.0.1 --listen-port 8446 --backend http://127.0.0.1:8766",
+      "product": "ThreadDesk Server & Sync",
+      "owner_guess": "landjunge/threaddesk-server, Lane L1 (BP-OPS-02)",
+      "notes": "Gestoppt und deaktiviert. Backend-Ziel 127.0.0.1:8766 existiert ohnehin nicht mehr (Bindung 172.18.0.1)."
+    },
+    {
+      "unit": "agent-authority-browser.service",
+      "active_state": "active",
+      "sub_state": "running",
+      "unit_file_state": "enabled",
+      "user": "aa-browser",
+      "started_at": "2026-10-18T11:37:42+02:00",
+      "exec": "/opt/agent-authority-browser/runtime/bin/python -m gunicorn --bind unix:/run/agent-authority-browser/browser.sock ... agent_authority.browser_wsgi:create_app()",
+      "release": "/opt/agent-authority-browser/releases/account-4da5fa818b7b590711d5",
+      "env_names": ["PYTHONDONTWRITEBYTECODE", "PYTHONPATH", "AA_BROWSER_ORIGIN", "AA_BROWSER_PREFIX", "AA_BROWSER_STATE", "AA_BROWSER_PROXY_TOKEN_FILE", "AA_BROWSER_PROXY_TRANSPORT", "AA_HELP_PEER_URL", "AA_HELP_SERVICE_KEY_FILE", "AA_HELP_BRIDGE_KEY_FILE"],
+      "product": "Agent Authority",
+      "owner_guess": "landjunge/agent-authority-lab, Lane L5"
+    },
+    {
+      "unit": "ki-hilfezentrum.service",
+      "active_state": "active",
+      "sub_state": "running",
+      "unit_file_state": "enabled",
+      "user": "ki-hilfezentrum",
+      "started_at": "2026-10-18T11:37:39+02:00",
+      "exec": "/opt/ki-hilfezentrum-releases/601de6bbd521f0a4e783d394b5d231720c3ea808/runtime/bin/gunicorn --bind 172.18.0.1:8787 --bind unix:/run/ki-hilfezentrum/authority.sock ... app:app",
+      "working_directory": "/opt/ki-hilfezentrum -> /opt/ki-hilfezentrum-releases/66bf2c4a204b54a0d35aa8415161d1b30a7c50bb/source",
+      "environment_files": ["/etc/ki-hilfezentrum.env", "/etc/ki-hilfezentrum/scout-operators.env"],
+      "product": "KI-Hilfezentrum (ausserhalb der fuenf Produkte)",
+      "owner_guess": "eigenes Projekt, nicht Big Plan",
+      "notes": "Runtime aus Release 601de6bb, Quellcode (WorkingDirectory) aus Release 66bf2c4a."
+    },
+    {
+      "unit": "kh-runtime-coordinator.service",
+      "active_state": "active",
+      "sub_state": "running",
+      "unit_file_state": "enabled",
+      "user": "ki-hilfezentrum",
+      "started_at": "2026-10-18T11:37:39+02:00",
+      "exec": "/opt/ki-hilfezentrum-releases/601de6bb.../runtime/bin/python -B /opt/ki-hilfezentrum/runtime_coordinator.py --port 8796",
+      "environment_files": ["/etc/kh-runtime-coordinator.env"],
+      "product": "KI-Hilfezentrum (ausserhalb der fuenf Produkte)",
+      "owner_guess": "eigenes Projekt, nicht Big Plan"
+    },
+    {
+      "unit": "actions.runner.landjunge-KiraBridge.netcup-debian-kirabridge.service",
+      "active_state": "active",
+      "sub_state": "running",
+      "unit_file_state": "enabled",
+      "user": "github-runner",
+      "started_at": "2026-10-25T11:53:58+01:00",
+      "product": "KiraBridge CI",
+      "owner_guess": "landjunge/KiraBridge"
+    },
+    {
+      "unit": "actions.runner.landjunge-KiraBridge.netcup-debian-kirabridge-2.service",
+      "active_state": "active",
+      "sub_state": "running",
+      "unit_file_state": "enabled",
+      "user": "github-runner",
+      "started_at": "2026-10-25T12:14:57+01:00",
+      "product": "KiraBridge CI",
+      "owner_guess": "landjunge/KiraBridge"
+    },
+    {"unit": "docker.service", "active_state": "active", "sub_state": "running", "unit_file_state": "enabled", "product": "Betriebssystem", "owner_guess": "Host"},
+    {"unit": "containerd.service", "active_state": "active", "sub_state": "running", "unit_file_state": "enabled", "product": "Betriebssystem", "owner_guess": "Host"},
+    {"unit": "fail2ban.service", "active_state": "active", "sub_state": "running", "unit_file_state": "enabled", "product": "Betriebssystem", "owner_guess": "Host"},
+    {"unit": "ssh.service", "active_state": "active", "sub_state": "running", "unit_file_state": "enabled", "product": "Betriebssystem", "owner_guess": "Host"},
+    {"unit": "cron.service", "active_state": "active", "sub_state": "running", "unit_file_state": "enabled", "product": "Betriebssystem", "owner_guess": "Host", "notes": "root-crontab: acme.sh --cron (Zertifikate)"},
+    {"unit": "unattended-upgrades.service", "active_state": "active", "sub_state": "running", "unit_file_state": "enabled", "product": "Betriebssystem", "owner_guess": "Host"},
+    {"unit": "qemu-guest-agent.service", "active_state": "active", "sub_state": "running", "product": "Betriebssystem", "owner_guess": "netcup"},
+    {"unit": "dbus.service", "active_state": "active", "sub_state": "running", "product": "Betriebssystem", "owner_guess": "Host"},
+    {"unit": "getty@tty1.service", "active_state": "active", "sub_state": "running", "product": "Betriebssystem", "owner_guess": "Host"},
+    {"unit": "systemd-journald.service", "active_state": "active", "sub_state": "running", "product": "Betriebssystem", "owner_guess": "Host"},
+    {"unit": "systemd-journald@kh-aa.service", "active_state": "active", "sub_state": "running", "product": "KI-Hilfezentrum / Agent Authority (Log-Namespace kh-aa)", "owner_guess": "eigenes Projekt"},
+    {"unit": "systemd-logind.service", "active_state": "active", "sub_state": "running", "product": "Betriebssystem", "owner_guess": "Host"},
+    {"unit": "systemd-timesyncd.service", "active_state": "active", "sub_state": "running", "product": "Betriebssystem", "owner_guess": "Host"},
+    {"unit": "systemd-udevd.service", "active_state": "active", "sub_state": "running", "product": "Betriebssystem", "owner_guess": "Host"},
+    {"unit": "user@0.service", "active_state": "active", "sub_state": "running", "product": "Betriebssystem", "owner_guess": "Host"},
+    {"unit": "user@1000.service", "active_state": "active", "sub_state": "running", "product": "Benutzer daniel (Linger)", "owner_guess": "Host", "notes": "Traeger von kirabridge.service (systemd --user)"}
+  ],
+  "systemd_timers": [
+    {"timer": "kh-privacy-maintenance.timer", "product": "KI-Hilfezentrum", "schedule": "stuendlich"},
+    {"timer": "kh-deletion-journal-backup.timer", "product": "KI-Hilfezentrum", "schedule": "minuetlich"},
+    {"timer": "ki-hilfezentrum-monitor.timer", "product": "KI-Hilfezentrum", "schedule": "wenige Minuten"},
+    {"timer": "ki-hilfezentrum-github-scout.timer", "product": "KI-Hilfezentrum", "schedule": "taeglich"},
+    {"timer": "apt-daily.timer / apt-daily-upgrade.timer / logrotate / dpkg-db-backup / fstrim / e2scrub_all / systemd-tmpfiles-clean", "product": "Betriebssystem"}
+  ],
+  "systemd_user": [
+    {
+      "user": "daniel",
+      "unit": "kirabridge.service",
+      "active_state": "active",
+      "sub_state": "running",
+      "unit_file_state": "enabled",
+      "started_at": "2026-11-08T01:02:53+01:00",
+      "exec": "/home/daniel/.config/kirabridge/releases/0.8.0rc41-350d36854fc9/.venv/bin/python -m kirabridge.cli --config /home/daniel/.config/kirabridge/config.toml serve --transport http",
+      "release": "0.8.0rc41, Commit 350d36854fc9",
+      "environment_files": ["/home/daniel/.config/kirabridge/secrets.env (optional)"],
+      "product": "KiraBridge Server",
+      "owner_guess": "landjunge/KiraBridge, Lane L1 (BP-DEBIAN-02)"
+    }
+  ],
+  "listeners": [
+    {"address": "0.0.0.0", "port": 22, "process": "sshd", "exposure": "oeffentlich", "product": "Host"},
+    {"address": "[::]", "port": 22, "process": "sshd", "exposure": "oeffentlich", "product": "Host"},
+    {"address": "0.0.0.0", "port": 80, "process": "docker-proxy", "exposure": "oeffentlich", "product": "Caddy (4allpass-caddy-1)"},
+    {"address": "[::]", "port": 80, "process": "docker-proxy", "exposure": "oeffentlich", "product": "Caddy (4allpass-caddy-1)"},
+    {"address": "0.0.0.0", "port": 443, "process": "docker-proxy", "exposure": "oeffentlich", "product": "Caddy (4allpass-caddy-1)"},
+    {"address": "[::]", "port": 443, "process": "docker-proxy", "exposure": "oeffentlich", "product": "Caddy (4allpass-caddy-1)"},
+    {"address": "0.0.0.0", "port": 8443, "process": "docker-proxy", "exposure": "oeffentlich (Docker-Portfreigabe umgeht ufw; ufw nennt 8443 nicht)", "product": "Caddy -> ThreadDesk Server"},
+    {"address": "[::]", "port": 8443, "process": "docker-proxy", "exposure": "oeffentlich (Docker-Portfreigabe umgeht ufw)", "product": "Caddy -> ThreadDesk Server"},
+    {"address": "172.18.0.1", "port": 8766, "process": "python", "exposure": "Docker-Bridge 4allpass_internal; ufw erlaubt nur 172.18.0.5 (Caddy)", "product": "ThreadDesk Server (serve_handoff.py)"},
+    {"address": "172.18.0.1", "port": 8787, "process": "gunicorn", "exposure": "Docker-Bridge; ufw erlaubt nur 172.18.0.5 (Caddy)", "product": "KI-Hilfezentrum"},
+    {"address": "127.0.0.1", "port": 8765, "process": "python", "exposure": "nur Loopback", "product": "KiraBridge Server (RC41)"},
+    {"address": "127.0.0.1", "port": 8796, "process": "python", "exposure": "nur Loopback", "product": "kh-runtime-coordinator"}
+  ],
+  "listener_ignore_loopback_from_port": 32768,
+  "listener_ignore_reason": "Kurzlebige Loopback-Ports ab 32768 (Linux-Ephemeral-Bereich) stammen von CI-Jobs der Actions-Runner (z. B. bigplan_loop.py-Tests) und werden nicht als Abweichung gemeldet.",
+  "listeners_absent": [
+    {"address": "127.0.0.1", "port": 8446, "reason": "threaddesk-server-tls.service gestoppt/deaktiviert seit 2026-11-08 00:37 (W03, W04)"},
+    {"address": "127.0.0.1", "port": 8766, "reason": "ThreadDesk Server bindet 172.18.0.1 statt Loopback (W04)"}
+  ],
+  "unix_sockets": [
+    {"path": "/run/agent-authority-browser/browser.sock", "process": "agent-authority-browser (gunicorn)", "exposed_via": "Bind-Mount /opt/4allpass/sites/.aa-transport -> Caddy /sites/.aa-transport/browser.sock"},
+    {"path": "/run/ki-hilfezentrum/authority.sock", "process": "ki-hilfezentrum (gunicorn)", "consumer": "agent-authority-browser (AA_HELP_PEER_URL)"}
+  ],
+  "firewall": {
+    "ufw": "aktiv",
+    "allow": ["22/tcp", "80/tcp", "443/tcp", "172.18.0.1 8787/tcp von 172.18.0.5", "172.18.0.1 8766/tcp von 172.18.0.5"],
+    "notes": "8443 fehlt in ufw, ist aber ueber die Docker-Portfreigabe oeffentlich erreichbar (Docker schreibt eigene iptables-Regeln)."
+  },
+  "docker": {
+    "compose_project": "4allpass",
+    "compose_file": "/opt/4allpass/docker-compose.yml",
+    "env_file": "/opt/4allpass/.env",
+    "env_names": ["POSTGRES_DB", "POSTGRES_USER", "POSTGRES_PASSWORD", "FOURALLPASS_DEBUG", "FOURALLPASS_DATABASE_URL", "FOURALLPASS_SESSION_BACKEND", "FOURALLPASS_SESSION_SECRET", "FOURALLPASS_CORS_ORIGINS", "FOURALLPASS_ENVIRONMENT", "FOURALLPASS_WEBAUTHN_RP_ID", "FOURALLPASS_REDIS_URL"],
+    "build_source": {"path": "/opt/4allpass/src", "git_commit": "6da2fbc1c1b29295e33769903834442a3c1580c9", "commit_date": "2026-08-19T03:36:29+02:00"},
+    "networks": [
+      {"name": "4allpass_internal", "subnet": "172.18.0.0/16", "gateway": "172.18.0.1"},
+      {"name": "bridge", "subnet": "172.17.0.0/16", "gateway": "172.17.0.1"}
+    ],
+    "containers": [
+      {"name": "4allpass-caddy-1", "compose_service": "caddy", "image": "caddy:2-alpine", "image_id": "sha256:5f5c8640aae01df9654968d946d8f1a56c497f1dd5c5cda4cf95ab7c14d58648", "image_created": "2026-06-22T22:09:05+02:00", "container_created": "2026-11-08T00:38:15+01:00", "state": "running", "ip": "172.18.0.5", "product": "gemeinsamer Ingress (alle oeffentlichen Routen)", "owner_guess": "4AllPass-Compose, faktisch Lane L1 (X2)"},
+      {"name": "4allpass-web-1", "compose_service": "web", "image": "4allpass-web", "image_id": "sha256:1058c968cd81f482140b642bf7b4f923b8424567dae4218acf72d5c9715c443b", "image_created": "2026-08-19T04:35:39+02:00", "container_created": "2026-08-19T04:35:42+02:00", "state": "running", "ip": "172.18.0.3", "product": "4AllPass PWA", "owner_guess": "landjunge/4AllPass"},
+      {"name": "4allpass-backend-1", "compose_service": "backend", "image": "4allpass-backend", "image_id": "sha256:d8a510bda753989533104ae72f76a9f4b7555bb5ee8b1624b00af987b85d96a2", "image_created": "2026-08-19T04:35:36+02:00", "container_created": "2026-08-19T05:44:50+02:00", "state": "running", "ip": "172.18.0.4", "product": "4AllPass Sync-Backend", "owner_guess": "landjunge/4AllPass (BP-SEC-01)"},
+      {"name": "4allpass-postgres-1", "compose_service": "postgres", "image": "postgres:16-alpine", "image_id": "sha256:cf78e76683b9ca8c5733cbbdce6c9262b45b6767934dd0a95e671f9a0fc20685", "image_created": "2026-08-13T21:18:09+02:00", "container_created": "2026-08-19T05:44:49+02:00", "state": "running", "ip": "172.18.0.6", "volume": "4allpass_fourallpass-postgres-data", "product": "4AllPass Datenbank", "owner_guess": "landjunge/4AllPass", "notes": "Erhaelt per env_file auch FOURALLPASS_SESSION_SECRET (nur Name erfasst)."},
+      {"name": "4allpass-redis-1", "compose_service": "redis", "image": "redis:7-alpine", "image_id": "sha256:e7723ff73d963f5cc6d9c4643ea3d989527a402a319239054e9472a7fb9219a2", "image_created": "2026-07-26T06:42:13+02:00", "container_created": "2026-08-19T04:35:42+02:00", "state": "running", "ip": "172.18.0.2", "product": "4AllPass Sessions", "owner_guess": "landjunge/4AllPass"}
+    ],
+    "unused_images": [{"image": "ubuntu:24.04", "image_id": "sha256:68ee22004a9109b44973313b02ff7b1de250f1de0f5ecb628d73f579aaff33ac", "image_created": "2026-10-02T10:10:55+02:00"}]
+  },
+  "caddy": {
+    "container": "4allpass-caddy-1",
+    "config_path": "/opt/4allpass/Caddyfile",
+    "config_sha256": "841f3c1767d79d67735847c571aafa288dc5b2b8165d653e7060c0cf974920dc",
+    "auto_https": "off (Zertifikate aus /opt/4allpass/tls, Erneuerung per acme.sh in root-crontab)",
+    "routes": [
+      {"site": ":80", "upstreams": ["file:/acme-www", "redir:https://{host}{uri}"], "product": "ACME-Challenge und HTTPS-Umleitung"},
+      {"site": "pass.netzwerkpunkt.de, 4allpass.netzwerkpunkt.de", "upstreams": ["web:8080"], "product": "4AllPass", "notes": "DNS zeigt NICHT auf diesen Host (185.243.11.43 / 2a03:4000:2c:7a9:19:4076:0:4). Hier nur selbstsigniertes Zertifikat, gueltig bis 2026-11-17."},
+      {"site": "tollgate.netzwerkpunkt.de", "upstreams": ["file:/sites/tollgate"], "product": "TollGate (statische Seite)", "notes": "DNS zeigt NICHT auf diesen Host; die oeffentliche Seite liefert ein nginx anderswo. Hier selbstsigniert, gueltig bis 2026-11-17."},
+      {"site": "v2202608211799501333.goodsrv.de", "upstreams": ["redir:/agent-authority/", "unix//sites/.aa-transport/browser.sock", "172.18.0.1:8787", "redir:https://netzwerkpunkt.de/"], "product": "Agent Authority (/agent-authority/*), KI-Hilfezentrum (/ki-hilfezentrum/*), sonst Umleitung", "notes": "Upstream Agent Authority erhaelt einen Proxy-Header mit Geheimwert direkt im Caddyfile (Wert nicht erfasst)."},
+      {"site": ":443", "upstreams": ["redir:https://netzwerkpunkt.de/"], "product": "Fallback"},
+      {"site": "v2202608211799501333.goodsrv.de:8443", "upstreams": ["172.18.0.1:8766"], "product": "ThreadDesk Server & Sync", "notes": "Seit 2026-11-08 00:38 (Container neu erstellt). Kopie des Blocks in /opt/4allpass/threaddesk-8443.caddy."}
+    ],
+    "backups": ["/opt/4allpass/Caddyfile.bak.20260909-105726", "/opt/4allpass/Caddyfile.bak.20261108-003734-threaddesk", "/opt/4allpass/docker-compose.yml.bak.20261108-003734-threaddesk"],
+    "tls": {"default_cert": "/opt/4allpass/tls/fullchain.pem (CN v2202608211799501333.goodsrv.de, gueltig bis 2027-02-01)"}
+  },
+  "paths": [
+    {"path": "/home/daniel/.local/share/threaddesk-server-20261107", "product": "ThreadDesk Server", "content": "venv (threaddesk 0.2.0 aus checkout, nicht editierbar), data, checkout (kein Git, INSTALLED-COMMIT 2a703696), serve_handoff.py (+ .bak.v1), tls, secrets, alt (Testnutzer alice/bob), backups, restore-1, acceptance"},
+    {"path": "/home/daniel/.local/share/threaddesk-server-20261107/serve_handoff.py", "product": "ThreadDesk Server", "sha256": "bb76d00ecd7e04faae1f65f98a8130131722eec677d639b98f83ea94aa110494", "mtime": "2026-11-08T01:30:32+01:00", "in_repo": false},
+    {"path": "/home/daniel/.local/bin/td-http-relay.py", "product": "ThreadDesk Sync-Relay (Gegenstueck zum Mac-Relay)", "notes": "Ruft https://127.0.0.1:8446 auf (lauscht nicht)."},
+    {"path": "/home/daniel/.local/bin/td-tls-relay.py", "product": "ThreadDesk Sync-Relay (aelter)"},
+    {"path": "/home/daniel/.local/bin/kirabridge-tunnel-setup", "product": "KiraBridge Tunnel (BP-DEBIAN-02)"},
+    {"path": "/home/daniel/.local/share/tunnel-client/v0.0.16", "product": "KiraBridge Tunnel (BP-DEBIAN-02)", "notes": "Heruntergeladen 2026-11-08 00:59, laeuft nicht."},
+    {"path": "/home/daniel/.config/kirabridge", "product": "KiraBridge Server", "content": "config.toml, credentials.json, releases/0.8.0rc41-350d36854fc9, install, workspace, bin"},
+    {"path": "/home/daniel/.local/share/kirabridge/releases/0.8.0rc41-350d36854fc9", "product": "KiraBridge Server"},
+    {"path": "/home/daniel/.local/share/threaddesk-kirabridge-profile", "product": "ThreadDesk/KiraBridge-Profil"},
+    {"path": "/home/daniel/.local/share/threaddesk-sync-roots", "product": "ThreadDesk Sync"},
+    {"path": "/home/daniel/.threaddesk", "product": "ThreadDesk lokale Daten des Nutzers daniel"},
+    {"path": "/home/daniel/.config/kb-td-vserver-install-luna-20261107", "product": "Installationsrest KiraBridge/ThreadDesk"},
+    {"path": "/opt/4allpass", "product": "4AllPass Compose + gemeinsamer Caddy", "content": "Caddyfile, docker-compose.yml, .env, src (Git 6da2fbc), tls, sites (tollgate, .aa-transport), acme-www, bin (issue-subdomain-certs.sh, threaddesk-go-live.sh)"},
+    {"path": "/opt/agent-authority-browser", "product": "Agent Authority", "content": "current -> releases/account-4da5fa818b7b590711d5, runtime, evidence"},
+    {"path": "/opt/aa-private", "product": "Agent Authority (privat)"},
+    {"path": "/opt/ki-hilfezentrum", "product": "KI-Hilfezentrum", "content": "Symlink auf /opt/ki-hilfezentrum-releases/66bf2c4a.../source"},
+    {"path": "/opt/ki-hilfezentrum-releases", "product": "KI-Hilfezentrum", "content": "23 Releases"},
+    {"path": "/opt/ki-hilfezentrum-before-20261017-dauerbetrieb", "product": "KI-Hilfezentrum (Altstand)"},
+    {"path": "/opt/ki-helper-runtime", "product": "KI-Hilfezentrum"},
+    {"path": "/opt/actions-runner", "product": "KiraBridge CI", "content": "_work 1.9G"},
+    {"path": "/opt/actions-runner-2", "product": "KiraBridge CI", "content": "_work 1.9G"}
+  ],
+  "tracked_files": [
+    {"path": "/home/daniel/.local/share/threaddesk-server-20261107/serve_handoff.py", "sha256": "bb76d00ecd7e04faae1f65f98a8130131722eec677d639b98f83ea94aa110494"},
+    {"path": "/home/daniel/.local/share/threaddesk-server-20261107/checkout/INSTALLED-COMMIT", "sha256": "537c802f2212de4fd3bd1102f7be6e272d158f583dfa761d77c68b03eae9d0f6"},
+    {"path": "/etc/systemd/system/threaddesk-server.service", "sha256": "aa8dab7f2341e55cc39ba0bc19f7450e1b6b170eb5af10c132f2b90e9181db27"},
+    {"path": "/etc/systemd/system/threaddesk-server.service.d/public.conf", "sha256": "b3a89fb0a76a9c860e0e6cac5103f67451180fc23fc538b1db8c271f7611a509"},
+    {"path": "/etc/systemd/system/threaddesk-server-tls.service", "sha256": "972434445121945c43433325b82b4803ea8a06973224a2e500f786c65eeedc0f"},
+    {"path": "/home/daniel/.config/systemd/user/kirabridge.service", "sha256": "cd5c62b60479a3c6fed24e7c84ab581bbe19ffa2b9965ae6389f306386f555af"},
+    {"path": "/home/daniel/.local/bin/td-http-relay.py", "sha256": "8576056497b22b1e71cd9f9da2196820d667e157a52b9463faa4ad6a22696c4d"},
+    {"path": "/opt/4allpass/Caddyfile", "sha256": "841f3c1767d79d67735847c571aafa288dc5b2b8165d653e7060c0cf974920dc"},
+    {"path": "/opt/4allpass/docker-compose.yml", "sha256": "995b846026c1eca7a65fdf21f19a64575284e66c6a6f20745dd314575e2f2a2b"}
+  ],
+  "runners": [
+    {"name": "netcup-debian-kirabridge", "path": "/opt/actions-runner", "bin": "/opt/actions-runner/bin.2.338.2", "repo": "https://github.com/landjunge/KiraBridge", "pool": "Default", "unit": "actions.runner.landjunge-KiraBridge.netcup-debian-kirabridge.service", "user": "github-runner"},
+    {"name": "netcup-debian-kirabridge-2", "path": "/opt/actions-runner-2", "bin": "/opt/actions-runner-2/bin.2.338.2", "repo": "https://github.com/landjunge/KiraBridge", "pool": "Default", "unit": "actions.runner.landjunge-KiraBridge.netcup-debian-kirabridge-2.service", "user": "github-runner"}
+  ],
+  "disk": {
+    "root_alert_percent": 80,
+    "filesystems": [
+      {"mount": "/", "device": "/dev/vda4", "size": "314G", "used": "19G", "use_percent": 7},
+      {"mount": "/boot", "device": "/dev/vda3", "size": "944M", "used": "135M", "use_percent": 16},
+      {"mount": "/boot/efi", "device": "/dev/vda2", "size": "241M", "used": "512", "use_percent": 1}
+    ],
+    "large_consumers": {"journald": "701.8M", "docker_images": "1.09G", "docker_build_cache": "1.19G (757M freigebbar)", "actions_runner_work": "2 x 1.9G", "test_folders_total": "~1.6G"}
+  },
+  "test_folders": [
+    {"name": "kb-debian-dirktest-20261107-040%dirk", "size": "190M", "note": "Name enthaelt '%' (fehlerhafte Expansion)"},
+    {"name": "kb-debian-dirktest-20261107-d62%dirk", "size": "160M", "note": "Name enthaelt '%'"},
+    {"name": "kb-debian-dirktest-20261107-delivery%dirk", "size": "36M", "note": "Name enthaelt '%'"},
+    {"name": "kb-debian-dirktest-20261107-delivery-final%$dirk", "size": "36M", "note": "Name enthaelt '%$'"},
+    {"name": "kb-debian-dirktest-20261107-failed-cleanup", "size": "12K"},
+    {"name": "kb-debian-dirktest-20261107-failed-cleanup-final", "size": "12K"},
+    {"name": "kb-debian-dirktest-20261107-final%dirk", "size": "160M", "note": "Name enthaelt '%'"},
+    {"name": "kb-debian-dirktest-20261107-run01", "size": "41M"},
+    {"name": "kb-debian-dirktest-20261107-run02", "size": "144M"},
+    {"name": "kb-debian-dirktest-20261107-safe-env%$dirk", "size": "36M", "note": "Name enthaelt '%$'"},
+    {"name": "kb-debian-dirktest-20261107-scoped%dirk", "size": "160M", "note": "Name enthaelt '%'"},
+    {"name": "kb-debian-dirktest-20261107-scoped-env%$dirk", "size": "37M", "note": "Name enthaelt '%$'"},
+    {"name": "kb-debian-dirktest-20261107-systemd%dirk", "size": "160M", "note": "Name enthaelt '%'"},
+    {"name": "kb-debian-dirktest-input-20261107", "size": "39M"},
+    {"name": "kirabridge-smoke-4064755.lruo1vvs", "size": "59M"},
+    {"name": "kirabridge-verify-20261025.Wtz3KZ4P", "size": "118M"}
+  ],
+  "test_folders_policy": "Nur aufgelistet (Basis /home/daniel). Sichern und Entfernen ist ein eigener, freizugebender Schritt von BP-OPS-01; danach diese Liste leeren.",
+  "external_dependents": [
+    {
+      "client": "Intel-Mac launchd com.landjunge.threaddesk-sync-relay",
+      "script": "~/.config/threaddesk-sync/http-relay.py (sha256 4daca372ef29f2ae5cf4f5e598b72d7931f4979d27dd839989282d42f0d61bb6)",
+      "listens": "127.0.0.1:18446",
+      "path": "ssh netcup-daniel python3 /home/daniel/.local/bin/td-http-relay.py -> https://127.0.0.1:8446",
+      "state": "laeuft, Ziel lauscht nicht (W03)"
+    }
+  ]
+}
