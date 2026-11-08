@@ -6,7 +6,7 @@ from typing import Literal
 
 from pydantic import Field
 
-from kirabridge.bridge_core.models import Input
+from kirabridge.bridge_core.models import DelegationSelection, Input
 
 Role = Literal["coordinator", "worker", "reviewer", "observer"]
 
@@ -37,7 +37,7 @@ class TeamMessageSend(Input):
     idempotency_key: str = Field(min_length=1, max_length=128)
 
 
-class TeamWorkCreate(Input):
+class TeamWorkCreate(DelegationSelection):
     team_id: str = Field(min_length=1, max_length=128)
     assignee: str = Field(min_length=1, max_length=80, pattern=r"^[a-z][a-z0-9_-]*$")
     title: str = Field(min_length=1, max_length=256)

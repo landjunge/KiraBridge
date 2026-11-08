@@ -10,6 +10,7 @@ from __future__ import annotations
 import asyncio
 import os
 import sys
+import time
 from pathlib import Path
 
 from .router import RoutingError, fingerprint
@@ -150,8 +151,38 @@ class RoutedAdapter:
 
             before_spawn()
             kwargs = {**kwargs, "before_spawn": before_spawn}
+        start_observation = None
+
+        async def observe_spawn(evidence, callback):
+            nonlocal start_observation
+            if (
+                start_observation is None
+                and type(evidence.get("pid")) is int
+                and evidence["pid"] > 0
+                and (
+                    evidence.get("evidence_type") == "local_process_spawned"
+                    or evidence.get("event") == "process_spawned"
+                )
+            ):
+                start_observation = {
+                    "scope": "local_adapter_configuration_and_process_only",
+                    "spawn_observed": True,
+                    "pid": evidence["pid"],
+                    "observed_at": time.time(),
+                    "confirmed_parameters": decision["selected_parameters"],
+                    "matches_selection": True,
+                }
+                await progress({"routing_start_observation": start_observation})
+            await callback(evidence)
+
+        async def observed_running(evidence):
+            await observe_spawn(evidence, running)
+
+        async def observed_progress(evidence):
+            await observe_spawn(evidence, progress)
+
         result = await self.adapter.execute(
-            task, args, selected, roots, running, progress, **kwargs
+            task, args, selected, roots, observed_running, observed_progress, **kwargs
         )
         if self.authorize is not None:
             native = result.get("evidence", {})
@@ -169,7 +200,14 @@ class RoutedAdapter:
             }
             observed = {**decision, **observation}
             await progress({"routing_decision": observed})
-            result = {**result, "evidence": {**native, "routing_decision": observed}}
+            result = {
+                **result,
+                "evidence": {
+                    **native,
+                    "routing_decision": observed,
+                    "routing_start_observation": start_observation,
+                },
+            }
         return result
 
 

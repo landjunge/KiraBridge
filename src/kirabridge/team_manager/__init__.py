@@ -51,7 +51,7 @@ CREATE TABLE IF NOT EXISTS team_work (
  title TEXT NOT NULL, body TEXT NOT NULL, parent_id TEXT REFERENCES team_work(id),
  root_id TEXT NOT NULL, depth INTEGER NOT NULL, state TEXT NOT NULL,
  core_task_id TEXT UNIQUE, core_request_hash TEXT, result TEXT,
- evidence TEXT NOT NULL DEFAULT '{}', error TEXT,
+ evidence TEXT NOT NULL DEFAULT '{}', error TEXT, model TEXT, effort TEXT,
  created REAL NOT NULL, claimed REAL, started REAL, finished REAL
 );
 CREATE INDEX IF NOT EXISTS team_work_order ON team_work(team_id,seq);
@@ -166,6 +166,9 @@ class TeamManager:
             columns = {row["name"] for row in self.store.db.execute("PRAGMA table_info(team_work)")}
             if "core_request_hash" not in columns:
                 self.store.db.execute("ALTER TABLE team_work ADD COLUMN core_request_hash TEXT")
+            for field in ("model", "effort"):
+                if field not in columns:
+                    self.store.db.execute(f"ALTER TABLE team_work ADD COLUMN {field} TEXT")
 
     def _principal(self, principal, capability):
         if not self.config.team.enabled:
@@ -524,6 +527,9 @@ class TeamManager:
         result = dict(row)
         result["evidence"] = json.loads(result["evidence"])
         result.pop("core_request_hash")
+        for field in ("model", "effort"):
+            if result[field] is None:
+                result.pop(field)
         return result
 
     def delegate(self, principal, request: TeamWorkCreate):
@@ -536,6 +542,16 @@ class TeamManager:
             prior = self._previous(principal, request.team_id, "work", request)
             if prior:
                 return self._work(prior)
+            if request.model is not None or request.effort is not None:
+                worker = self.config.team.workers[request.assignee]
+                if (
+                    self.config.team.routing is None
+                    or worker.routing is None
+                    or worker.execution_scope != "separate_managed_session"
+                ):
+                    raise BridgeError(
+                        "agent_selection_unsupported", "Assignee has no managed routing policy"
+                    )
             self.store.assert_accepting()
             work_id = "tw-" + uuid.uuid4().hex
             root_id, depth = work_id, 0
@@ -574,7 +590,7 @@ class TeamManager:
             )
             self.store.db.execute(
                 "INSERT INTO team_work(id,team_id,assigned_by,assignee,title,body,parent_id,"
-                "root_id,depth,state,created) VALUES(?,?,?,?,?,?,?,?,?,?,?)",
+                "root_id,depth,state,created,model,effort) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)",
                 (
                     work_id,
                     request.team_id,
@@ -587,6 +603,8 @@ class TeamManager:
                     depth,
                     state,
                     time.time(),
+                    request.model,
+                    request.effort,
                 ),
             )
             self._remember(principal, request.team_id, "work", request, work_id)
@@ -1001,6 +1019,7 @@ class TeamManager:
             != Path(worker.cwd).expanduser().absolute()
             or not isinstance(args.get("timeout"), int | float)
             or args["timeout"] > worker.timeout
+            or any(args.get(field) != work.get(field) for field in ("model", "effort"))
         ):
             raise BridgeError(
                 "team_task_conflict", "Linked task does not match the fixed worker scope"
@@ -1015,6 +1034,10 @@ class TeamManager:
                 raise BridgeError(
                     "team_task_conflict", "Request does not match the reserved team task"
                 )
+            if any(
+                request.arguments.get(field) != work.get(field) for field in ("model", "effort")
+            ):
+                raise BridgeError("team_task_conflict", "Task selection differs from assignment")
             request_hash = digest(request.model_dump())
             previous = self.store.db.execute(
                 "SELECT core_request_hash FROM team_work WHERE id=?", (work_id,)

@@ -116,8 +116,8 @@ class WorkerRouting(Record):
     """Trusted local worker policy; never populated from a prompt or board."""
 
     workload: Work
-    effort: str
-    model: str | None = None
+    effort: str | None = None
+    model: str | None = Field(default=None, pattern=r"^[A-Za-z0-9][A-Za-z0-9_./:+-]{0,160}$")
     min_effort: str | None = None
     independent_of_provider: str | None = None
 
@@ -146,7 +146,9 @@ class Task(Record):
     minimum_context_tokens: int = Field(default=0, ge=0)
     min_effort: str | None = None
     explicit_cli: CLI | None = None
-    explicit_model: str | None = None
+    explicit_model: str | None = Field(
+        default=None, pattern=r"^[A-Za-z0-9][A-Za-z0-9_./:+-]{0,160}$"
+    )
     explicit_effort: str | None = None
     independent_of_provider: str | None = None
     read_only: bool = True
@@ -184,10 +186,15 @@ def select(matrix: Matrix, runtime: Runtime, task: Task, *, now=None) -> dict:
     for effort in (task.min_effort, task.explicit_effort):
         if effort is not None and effort not in EFFORTS:
             raise RoutingError("Unknown requested effort")
-    minimum = max(EFFORTS[MINIMUM[task.workload]], EFFORTS.get(task.min_effort, 0))
+    if task.explicit_effort == "ultra":
+        raise RoutingError("Requested ultra is unsupported by the restricted no-subagents route")
+    minimum = max(
+        EFFORTS[MINIMUM[task.workload]] if task.explicit_effort is None else 0,
+        EFFORTS.get(task.min_effort, 0),
+    )
     if task.explicit_effort and EFFORTS[task.explicit_effort] < minimum:
         raise RoutingError("Requested effort is below the task's declared minimum")
-    if task.explicit_cli and task.explicit_cli not in task.allowed_clis:
+    if task.explicit_cli is not None and task.explicit_cli not in task.allowed_clis:
         raise RoutingError("Explicit CLI is outside this task's authorized candidates")
     if not task.read_only and not runtime.allow_write:
         raise RoutingError("Runtime does not grant writing")
@@ -213,7 +220,7 @@ def select(matrix: Matrix, runtime: Runtime, task: Task, *, now=None) -> dict:
             continue
         for model in cli.models:
             if model.id not in access.models or (
-                task.explicit_model and model.id != task.explicit_model
+                task.explicit_model is not None and model.id != task.explicit_model
             ):
                 continue
             if model.provider == task.independent_of_provider:
@@ -224,7 +231,7 @@ def select(matrix: Matrix, runtime: Runtime, task: Task, *, now=None) -> dict:
             ):
                 continue
             fit = model.fit.get(task.workload, 0)
-            if fit < (2 if task.workload == "routine" else 4):
+            if task.explicit_model is None and fit < (2 if task.workload == "routine" else 4):
                 continue
             efforts = [e for e in model.efforts if EFFORTS[e] >= minimum and e != "ultra"]
             if task.explicit_effort:
@@ -257,7 +264,8 @@ def select(matrix: Matrix, runtime: Runtime, task: Task, *, now=None) -> dict:
         "selected_at": now.isoformat(),
         "effective_model": "unverified",
         "effective_effort": "unverified",
-        "coordinator": "codex",
+        "coordinator": "calling_instance",
+        "selected_parameters": {"cli": cli, "model": model, "effort": effort},
         "reason": (
             f"{task.workload}; capabilities/access/version checked; minimum effort {minimum}; "
             "suitability then cost rank; Codex budget preferred"

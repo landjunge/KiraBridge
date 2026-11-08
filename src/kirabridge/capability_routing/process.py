@@ -9,6 +9,7 @@ from types import SimpleNamespace
 def run_bounded(argv, *, input, cwd, timeout, env):
     started = time.monotonic()
     process = None
+    spawned_at = None
     buffers = [bytearray(), bytearray()]
     truncated = [False, False]
     seen = [0, 0]
@@ -24,6 +25,7 @@ def run_bounded(argv, *, input, cwd, timeout, env):
                 "stage": stage,
                 "spawn_observed": process is not None,
                 "pid": getattr(process, "pid", None),
+                "spawned_at": spawned_at,
                 "native_exit_code": getattr(process, "returncode", None),
                 "elapsed_seconds": time.monotonic() - started,
                 "timeout_seconds": timeout,
@@ -60,6 +62,7 @@ def run_bounded(argv, *, input, cwd, timeout, env):
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
         )
+        spawned_at = time.time()
     except OSError as exc:
         fail(exc, "spawn")
 

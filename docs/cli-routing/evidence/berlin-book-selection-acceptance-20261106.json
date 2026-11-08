@@ -1,0 +1,92 @@
+{
+  "schema": "bigplan.berlin-book-selection-acceptance.v1",
+  "task_id": "BP-DELEGATION-MODEL-SELECTION",
+  "synthetic_manuscript": true,
+  "matrix_thread": "c9a396be4081",
+  "matrix_revision": 5,
+  "source_fixture_sha256": "ee7c993cb6f0b9851b840eb6f10c450679930ae092fa01013094defc0c00a7bd",
+  "cases": [
+    {
+      "phase": "format",
+      "task_id": "BP-DELEGATION-MODEL-SELECTION-BERLIN-FORMAT-20261106-01",
+      "choice": "automatic",
+      "selected_parameters": {
+        "cli": "codex",
+        "model": "gpt-6-luna",
+        "effort": "low"
+      },
+      "confirmed_start": {
+        "scope": "local_cli_arguments_and_process_only",
+        "spawn_observed": true,
+        "pid": 10723,
+        "spawned_at": 1793980470.6168761,
+        "confirmed_parameters": {
+          "cli": "codex",
+          "model": "gpt-6-luna",
+          "effort": "low"
+        },
+        "matches_selection": true
+      },
+      "native_exit_code": 0,
+      "elapsed_seconds": 12.77269231597893,
+      "effective_model": "unverified",
+      "effective_model_status": "unverified",
+      "effective_effort": "unverified",
+      "reported_model_ids": [],
+      "model_matches_requested_id": null,
+      "validation": {
+        "exact_expected_markdown": true,
+        "native_turn_completed": true
+      },
+      "stdout_sha256": "65f5824efd66adb82f79fac1e74c464b97de330eade0a1112384519b42a7e73b",
+      "receipt_sha256": "6903494e94f2666a067e5c52cdccf4a8582b7b602892966e9283691ab94655f1"
+    },
+    {
+      "phase": "sources",
+      "task_id": "BP-DELEGATION-MODEL-SELECTION-BERLIN-SOURCES-20261106-01",
+      "choice": "explicit_effort_high_and_provider_independence",
+      "selected_parameters": {
+        "cli": "grok",
+        "model": "grok-4.7",
+        "effort": "high"
+      },
+      "confirmed_start": {
+        "scope": "local_cli_arguments_and_process_only",
+        "spawn_observed": true,
+        "pid": 11013,
+        "spawned_at": 1793980557.371504,
+        "confirmed_parameters": {
+          "cli": "grok",
+          "model": "grok-4.7",
+          "effort": "high"
+        },
+        "matches_selection": true
+      },
+      "native_exit_code": 0,
+      "elapsed_seconds": 34.8789681129856,
+      "effective_model": "grok-4.7-build",
+      "effective_model_status": "cli_reported",
+      "effective_effort": "unverified",
+      "reported_model_ids": [
+        "grok-4.7-build"
+      ],
+      "model_matches_requested_id": false,
+      "validation": {
+        "claims_correct": 4,
+        "claims_total": 4,
+        "native_turn_completed": true,
+        "statuses": {
+          "C1": "supported",
+          "C2": "contradicted",
+          "C3": "unsupported",
+          "C4": "supported"
+        }
+      },
+      "stdout_sha256": "36014da99970ef0ba21f4a02d8b7a10c24cd999f879a4276b275c8ff286b82cc",
+      "receipt_sha256": "49088a2b4cc6af929b2833d1dcabba0eb1f43a84baa0cd9f008236826d86c31e"
+    }
+  ],
+  "initial_grok_auth_preflight": "blocked before admission/model start; fresh independent auth/model probe passed; original task then admitted once; no fallback",
+  "scope": "source candidate plus two own controlled CLI processes; production service/supervisor unchanged",
+  "passed": true
+}

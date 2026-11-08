@@ -28,11 +28,15 @@ seine lokalen Anforderungen, zum Beispiel diesen Schemaausschnitt:
 {"workload":"review","effort":"xhigh","independent_of_provider":"openai"}
 ```
 
-`workload` und `effort` sind ausdrücklich erforderlich. Optional sind `model`
-und `min_effort`. Fehlt `model`, bleibt ein vorhandenes `AgentConfig.model` eine
-explizite Anforderung; nur sonst entscheidet die Matrix innerhalb des festen
-CLI-Providers. Auswahl, Effortunterstützung und Zugang müssen tatsächlich passen.
-Diese Angaben kommen nicht aus einer Modellantwort, Planprosa oder READY-Zeichenkette.
+Aktueller Auswahlvertrag: [Projektrollen-Masterprompt](cli-routing/PROJECT-ROLE-MASTERPROMPT.md).
+`workload` ist erforderlich; `model`, `effort` und `min_effort` sind optional.
+Explizite `model`-/`effort`-Felder des versiegelten Auftrags haben Vorrang vor dem
+Workerprofil. Ungesetzte Felder werden innerhalb der gebundenen CLI automatisch
+gewählt. `AgentConfig.model` wird bei gerouteter Ausführung nicht mehr als impliziter
+Pin geerbt; ein bewusst gewünschter alter Pin gehört in `worker.routing.model`.
+Das ist eine Änderung gegenüber dem ursprünglichen C2-Vertrag. Laufende Profile
+werden nicht migriert. Auswahl, Effortunterstützung und Zugang müssen tatsächlich
+passen. Diese Angaben kommen nicht aus einer Modellantwort oder Planprosa.
 Das installierte anfängliche Router-Leseprofil wird dadurch nicht erweitert.
 
 Der Worker muss bereits `execution_scope=separate_managed_session` besitzen.
@@ -85,7 +89,10 @@ heimlichen Austausch eines laufenden Managers.
 
 Vorhandene Progress-, Task- und Completionbelege enthalten `routing_decision`
 beziehungsweise eine begrenzte `routing`-Projektion. `model`/`effort` bezeichnen
-die Anforderung. Effektive Werte bleiben ohne Beleg `unverified`. Erkannte native
+die Anforderung. `routing_start_observation` im Task-/Resultatbeleg erfasst davon
+getrennt den beobachteten lokalen Prozessstart und die gebundene Adapterkonfiguration.
+Das bestätigt keinen providerseitigen effektiven Wert. Effektive Werte bleiben ohne
+Beleg `unverified`. Erkannte native
 Grok-`modelUsage`-Metadaten werden ausdrücklich als `cli_reported` gespeichert;
 eine abweichende ID wird nicht zu einer bewiesenen Aliasgleichheit. Modelltext
 selbst kann diese Angaben nicht erzeugen. Completiondaten enthalten keine Prompts,

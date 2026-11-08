@@ -26,6 +26,7 @@ def main():
     payload += sorted((source / "skills/cli-model-router").rglob("*.md"))
     payload += sorted((source / "skills/cli-model-router").rglob("*.yaml"))
     payload += [source / "docs/cli-routing/RESEARCH.md", source / "docs/cli-routing/matrix.json"]
+    payload += [source / "docs/cli-routing/PROJECT-ROLE-MASTERPROMPT.md"]
     hashes = {
         str(p.relative_to(source)): hashlib.sha256(p.read_bytes()).hexdigest() for p in payload
     }
