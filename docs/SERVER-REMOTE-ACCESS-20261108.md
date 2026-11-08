@@ -95,6 +95,26 @@ lokaler Bestätigung).
   geprüft, nicht gepinnt. Ein Pin würde bei jeder automatischen Erneuerung
   brechen.
 
+**Ausführung in der sichtbaren Codex-Sitzung** (vom Nutzer so gewählt).
+Auf dem Mac ist `visible_handoffs.enabled = true`. Deshalb tippt KiraBridge ein
+freigegebenes `agent.execute` in ein offenes Codex- bzw. Grok-Terminal.
+`remote` hat dafür zusätzlich `session.inspect`, `session.input` und
+`terminal.execute`; `terminal_roots` sind ausdrücklich die Projektordner. Jeder
+Auftrag bleibt freigabepflichtig. Die konfigurierte Bindung vom 20. Oktober war
+veraltet. KiraBridge erneuert sie selbst, wenn genau eine eindeutige laufende
+Sitzung desselben Agenten existiert. Der Prompt nennt den Arbeitsordner
+ausdrücklich, weil die sichtbare Sitzung woanders stehen kann.
+
+**Freigabeseite:** Ohne Anmeldung zeigte die Seite „Zustand nicht erreichbar“.
+Tatsächlich hatte der Dienst mit 401 geantwortet. Die Seite zeigt jetzt „Nicht
+angemeldet“ und nennt `kirabridge approvals`. Die Änderung steckt in
+`console_assets/center.js` und ist auch in die installierte RC40 eingespielt;
+die Sicherung liegt unter `center.js.bak.20261108-unauthorized-message`. Der
+erste Test `remote-b195c74ba6ec` wurde über die Konsolen-API freigegeben und
+endete mit `forbidden`, weil die Sitzungsrechte fehlten. Das Relay hat den
+Fehlschlag korrekt als `problem` ins Whiteboard gemeldet. Der zweite Test
+`remote-205ceb2bdd4b` wartet auf die Freigabe durch den Nutzer.
+
 **Bewusst anders als `RemoteRelay` aus BP-REMOTE-02:** Ein remote ausgestellter
 `NativeGrant` und ein Pairing werden nicht gebraucht, weil die lokale
 Bestätigung die Freigabe ist. Der Mac-Core wird nicht auf eine Handoff-Quelle
