@@ -12,6 +12,7 @@ import shlex
 import time
 from pathlib import Path
 
+import kirabridge
 from kirabridge.bridge_core.models import BridgeError
 from kirabridge.operator_actions import action_identity
 from kirabridge.permissions import LEVELS, level_for, permission_summary
@@ -36,6 +37,20 @@ NAMES = {
     "console": "Steuerfenster",
 }
 INPUT_TERMINAL_STATES = {"completed", "failed", "cancelled", "unknown", "blocked", "rejected"}
+
+
+def release_identity():
+    """Version and source commit of this console's own installed release, for display.
+
+    A development checkout or an unreadable manifest reports no commit.
+    """
+    try:
+        from kirabridge.platform_adapters.macos.system_identity import installed_source_commit
+
+        commit = installed_source_commit(Path(kirabridge.__file__).parent)
+    except Exception:
+        commit = None
+    return {"version": kirabridge.__version__, "source_commit": commit or None}
 
 
 class OperatorControl:
@@ -207,6 +222,7 @@ class OperatorControl:
             "observed_at": time.time(),
             "services": cards,
             "bridge": health,
+            "release": release_identity(),
             "maintenance": self.maintenance(),
             "permission_levels": levels,
             "permission_choices": LEVELS,

@@ -128,6 +128,24 @@ def render(width: int) -> list[list[tuple[str, tuple[int, int, int]]]]:
     return rows
 
 
+COMPACT_MAX_WIDTH = 88  # Keeps the wordmark at scale 2 or less: five Braille rows.
+COMPACT_INDENT = 2
+
+
+def compact_rows(width: int) -> list[list[tuple[str, tuple[int, int, int]]]]:
+    """Only the KiraBridge wordmark of the shared geometry, left-aligned, no bridge."""
+    if type(width) is not int or not 30 <= width <= MAX_WIDTH:
+        raise ValueError("Braille canvas width must be between 30 and 160")
+    size = min(width, COMPACT_MAX_WIDTH)
+    scale = next(s for s in (4, 3, 2, 1) if (59 * s + 1) // 2 <= size)
+    rows = render(size)[: -(-9 * scale // 4)]
+    used = [x for row in rows for x, (char, _) in enumerate(row) if char != "⠀"]
+    first, last = min(used), max(used)
+    blank = ("⠀", PINK)
+    indent = [blank] * COMPACT_INDENT if width >= last - first + 1 + COMPACT_INDENT else []
+    return [indent + row[first : last + 1] for row in rows]
+
+
 def plain(rows) -> str:
     return "\n".join("".join(char for char, _ in row) for row in rows) + "\n"
 
@@ -201,9 +219,10 @@ class RenderOptions(NamedTuple):
     unicode: bool
     color: str
     motion: bool
+    compact: bool = False
 
 
-def options_for(stream, *, width=None, env=None, color="auto", motion="reduced"):
+def options_for(stream, *, width=None, env=None, color="auto", motion="reduced", compact=False):
     """Inspect caller-owned capabilities, without emitting output or changing env.
 
     Unknown capabilities fail to plain/static output. Even explicit color cannot
@@ -243,14 +262,18 @@ def options_for(stream, *, width=None, env=None, color="auto", motion="reduced")
     animated = interactive and palette != "never" and requested == "full"
     if env.get("KIRABRIDGE_MOTION") == "reduced":
         animated = False
-    return RenderOptions(width, unicode_ok, palette, animated)
+    return RenderOptions(width, unicode_ok, palette, animated, bool(compact))
+
+
+def _rows_for(options):
+    return compact_rows(options.width) if options.compact else render(options.width)
 
 
 def static_banner(options):
     """Return one complete final banner, without any protocol/state side effects."""
     if not options.unicode:
-        return fallback(options.width)
-    return terminal(render(options.width), options.color)
+        return "KiraBridge\n" if options.compact else fallback(options.width)
+    return terminal(_rows_for(options), options.color)
 
 
 def frame_rows(rows, *, reveal=1.0, pulse=None):
@@ -304,10 +327,8 @@ class AnimationController:
         self._last = -1
         self._done = False
         self._bytes = 0
-        self._rows = render(options.width) if options.unicode else None
-        self._static = (
-            terminal(self._rows, options.color) if self._rows else fallback(options.width)
-        )
+        self._rows = _rows_for(options) if options.unicode else None
+        self._static = static_banner(options)
         if len(self._static.encode("utf-8")) > MAX_FRAME_BYTES:
             raise ValueError("Static banner exceeds frame budget")
 

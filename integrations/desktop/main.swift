@@ -198,6 +198,15 @@ import Cocoa
 import WebKit
 
 final class KiraBridgeApp: NSObject, NSApplicationDelegate, WKUIDelegate, WKNavigationDelegate {
+    /// The full release version (for example 0.8.0rc41); the bundle short version is numeric only.
+    @objc func showAbout(_ sender: Any?) {
+        let release = Bundle.main.object(forInfoDictionaryKey: "KiraBridgeVersion") as? String
+        var options: [NSApplication.AboutPanelOptionKey: Any] = [.version: ""]
+        if let release { options[.applicationVersion] = release }
+        NSApp.activate(ignoringOtherApps: true)
+        NSApp.orderFrontStandardAboutPanel(options: options)
+    }
+
     var windows: [NSWindow] = []
     var mainView: WKWebView!
     var bootstrapInProgress = false
@@ -211,6 +220,10 @@ final class KiraBridgeApp: NSObject, NSApplicationDelegate, WKUIDelegate, WKNavi
         let item = NSMenuItem()
         menu.addItem(item)
         let applicationMenu = NSMenu()
+        let about = NSMenuItem(title: "Über KiraBridge", action: #selector(showAbout(_:)), keyEquivalent: "")
+        about.target = self
+        applicationMenu.addItem(about)
+        applicationMenu.addItem(NSMenuItem.separator())
         applicationMenu.addItem(withTitle: "KiraBridge beenden", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
         item.submenu = applicationMenu
         NSApp.mainMenu = menu

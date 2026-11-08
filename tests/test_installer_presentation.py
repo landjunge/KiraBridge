@@ -260,8 +260,12 @@ def test_pinned_real_renderer_works_through_early_bundle_presenter(
     assert stream.getvalue() != first
     clock[0] = 0.6
     ui.tick()
-    final = ui.design.static_banner(ui.design.options_for(stream, width=79, motion="auto"))
+    # The installer header is the compact wordmark of the same pinned design.
+    final = ui.design.static_banner(
+        ui.design.options_for(stream, width=79, motion="auto", compact=True)
+    )
     assert stream.getvalue().endswith(final)
+    assert "⣿" in final and final.count("\n") == 5
     ui.say("Echte Prüfung")
     after = stream.getvalue()
     ui.tick()
@@ -323,3 +327,77 @@ def test_unknown_stderr_viewport_disables_redraw_instead_of_using_stdout_size(mo
     ui.tick()
     assert stream.getvalue() == "FULL KiraBridge\n"
     assert "\x1b" not in stream.getvalue()
+
+
+class Console(io.StringIO):
+    encoding = "utf-8"
+
+    def __init__(self, tty):
+        super().__init__()
+        self.tty = tty
+
+    def isatty(self):
+        return self.tty
+
+
+def structured(ui):
+    ui.heading("KiraBridge · Installation", meta="0.8.0rc42 · 3f9c2a1")
+    ui.phase("Paket prüfen")
+    ui.ok("Prüfsummen stimmen", detail="241 Dateien · Version 0.8.0rc42")
+    ui.ok(
+        "Laufzeit eingerichtet",
+        detail="~/.local/share/kirabridge/install/releases/0.8.0rc42-3f9c2a1b7d40"
+        " · bisherige Installation unverändert",
+    )
+    ui.warn("Umschaltung fehlgeschlagen")
+    ui.summary("KiraBridge 0.8.0rc42 ist installiert", rows=[("Quellstand", "3f9c2a1b7d40")])
+    ui.error("FEHLER: Beispiel")
+
+
+def test_structured_output_is_plain_without_a_color_terminal(monkeypatch):
+    monkeypatch.setenv("TERM", "xterm-256color")
+    monkeypatch.delenv("NO_COLOR", raising=False)
+    stream = Console(tty=False)
+    structured(SetupUI("de", stream, design=design(motion=False)))
+    text = stream.getvalue()
+    assert "\x1b" not in text
+    assert "\n  1  Paket prüfen\n" in text
+    assert "     ✓ Prüfsummen stimmen\n       241 Dateien · Version 0.8.0rc42\n" in text
+    # A path is never split at its hyphens; long details put each part on its own line.
+    assert "       ~/.local/share/kirabridge/install/releases/0.8.0rc42-3f9c2a1b7d40\n" in text
+    assert "       bisherige Installation unverändert\n" in text
+    assert "     ! Umschaltung fehlgeschlagen\n" in text
+    assert "  ✓ KiraBridge 0.8.0rc42 ist installiert\n    Quellstand   3f9c2a1b7d40\n" in text
+    assert text.rstrip().endswith("✗ FEHLER: Beispiel")
+
+
+@pytest.mark.parametrize("variable", ["NO_COLOR", "TERM"])
+def test_structured_output_honours_no_color_and_dumb_terminals(monkeypatch, variable):
+    monkeypatch.setenv("TERM", "dumb" if variable == "TERM" else "xterm-256color")
+    if variable == "NO_COLOR":
+        monkeypatch.setenv("NO_COLOR", "1")
+    stream = Console(tty=True)
+    structured(SetupUI("de", stream, design=design(motion=False)))
+    assert "\x1b" not in stream.getvalue()
+
+
+def test_structured_output_is_colored_on_an_interactive_terminal(monkeypatch):
+    monkeypatch.setenv("TERM", "xterm-256color")
+    monkeypatch.setenv("COLORTERM", "truecolor")
+    monkeypatch.delenv("NO_COLOR", raising=False)
+    stream = Console(tty=True)
+    structured(SetupUI("de", stream, design=design(motion=False)))
+    text = stream.getvalue()
+    assert "\x1b[1m\x1b[38;2;240;109;176m1\x1b[0m" in text  # phase number in brand pink
+    assert "\x1b[38;2;94;196;140m✓\x1b[0m" in text
+    assert text.count("\x1b[0m") >= text.count("\x1b[1m")
+
+
+def test_ascii_only_stream_uses_ascii_marks(monkeypatch):
+    monkeypatch.delenv("NO_COLOR", raising=False)
+    stream = Console(tty=False)
+    stream.encoding = "ascii"
+    ui = SetupUI("de", stream, design=design(motion=False))
+    ui.phase("Paket")
+    ui.ok("Fertig")
+    assert "     + Fertig\n" in stream.getvalue()
