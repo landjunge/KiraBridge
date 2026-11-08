@@ -1,0 +1,835 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://kirabridge.netzwerkpunkt.de/contracts/agent-event-v2.draft.schema.json",
+  "title": "Agent Event v2 (ENTWURF, BP-AA-02)",
+  "description": "Abwaertskompatible Obermenge des Authority Event Envelope v1. Ein gueltiges v1-Ereignis (schema_version \"1\") bleibt unveraendert gueltig. v2 (schema_version \"2\") ergaenzt Auftrag, Delegation, Berechtigung, Ergebnis, Evidenz, Zeit und Kettenposition. Nur Beschreibung; Agent Authority liest und entscheidet nichts (G9.9-E4). Gueltigkeit gegen dieses Schema ist weder Authentifizierung noch Freigabe. Keine Geheimnisse, Prompts oder Inhalte.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "event_id",
+    "timestamp",
+    "source_tool",
+    "event_type"
+  ],
+  "properties": {
+    "schema_version": {
+      "enum": [
+        "1",
+        "2"
+      ]
+    },
+    "event_id": {
+      "type": "string",
+      "minLength": 8
+    },
+    "timestamp": {
+      "type": "string",
+      "minLength": 10,
+      "description": "ISO 8601 mit Zeitzone. Zeit des Erzeugers; siehe timing.clock."
+    },
+    "trace_id": {
+      "type": "string",
+      "minLength": 8
+    },
+    "span_id": {
+      "type": "string",
+      "minLength": 4
+    },
+    "parent_span_id": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "workflow_id": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "project_id": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "source_tool": {
+      "enum": [
+        "gnom-hub-v1",
+        "agent-authority-lab",
+        "tollgate",
+        "4allpass",
+        "threaddesk",
+        "kirabridge",
+        "blockdesigner"
+      ],
+      "description": "v1-Werte plus kirabridge, blockdesigner (beide v2; im Lab-Workflowformat bereits vorhanden)."
+    },
+    "source_id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,255}$",
+      "description": "Segment/Instanz des Erzeugers (z. B. Auditlog-Instanz). Optional."
+    },
+    "event_type": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)+$",
+      "description": "v1-Typen (21, siehe v1-Schema) bleiben gueltig. v2 darf zusaetzlich Typen des Lab-Workflowformats (task.*, handoff.*, return.*, dispatch.*, control.*, access.*, job.*, budget.reserved/settled/unknown) verwenden. Unbekannte Typen liest ein Verbraucher als UNKNOWN, nicht als Fehler."
+    },
+    "actor": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "agent_id": {
+          "type": "string"
+        },
+        "workload_id": {
+          "type": "string"
+        },
+        "role": {
+          "type": "string"
+        },
+        "actor_type": {
+          "enum": [
+            "human",
+            "agent",
+            "system",
+            "service",
+            "unknown"
+          ]
+        },
+        "principal_ref": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,255}$",
+          "description": "Digest/Referenz, nie ein Klarname oder Token."
+        },
+        "device_ref": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,255}$"
+        },
+        "actor_claim": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,255}$",
+          "description": "Vom Erzeuger behauptete Identitaet, nicht geprueft."
+        }
+      }
+    },
+    "action": {
+      "type": "string"
+    },
+    "resource": {
+      "type": "string"
+    },
+    "capability_id": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "decision": {
+      "enum": [
+        "ALLOW",
+        "DENY",
+        "FREEZE",
+        null
+      ]
+    },
+    "reason_code": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "budget_ref": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "data_labels": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "result_ref": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "previous_event_hash": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "event_hash": {
+      "type": "string",
+      "minLength": 16
+    },
+    "task": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "task_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,255}$"
+        },
+        "original_task_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,255}$"
+        },
+        "bridge_task_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,255}$"
+        },
+        "parent_task_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,255}$"
+        },
+        "subtask_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,255}$"
+        },
+        "run_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,255}$"
+        },
+        "attempt_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,255}$"
+        },
+        "thread_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,255}$"
+        },
+        "handoff_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,255}$"
+        },
+        "return_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,255}$"
+        },
+        "session_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,255}$"
+        },
+        "handoff_revision": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "task_revision": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "request_hash": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "source_hash": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      },
+      "description": "Auftragsbindung. original_task_id und bridge_task_id bleiben getrennt."
+    },
+    "delegation": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "enum": [
+            "handoff",
+            "team_delegation",
+            "subtask",
+            "remote_dispatch",
+            "return"
+          ]
+        },
+        "from_ref": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,255}$"
+        },
+        "to_ref": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,255}$"
+        },
+        "binding_event_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,255}$"
+        },
+        "scope_ref": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,255}$"
+        }
+      },
+      "required": [
+        "kind",
+        "from_ref",
+        "to_ref"
+      ],
+      "description": "Wer hat wem was uebergeben. Nur Referenzen."
+    },
+    "permission": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "decision": {
+          "enum": [
+            "ALLOW",
+            "DENY",
+            "FREEZE",
+            "PENDING",
+            "UNKNOWN"
+          ]
+        },
+        "capability_id": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,255}$"
+        },
+        "grant_ref": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,255}$"
+        },
+        "approval_ref": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,255}$"
+        },
+        "policy_ref": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,255}$"
+        },
+        "operator_scope": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,255}$"
+        },
+        "reason_code": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "decided_by": {
+          "enum": [
+            "policy",
+            "operator",
+            "none",
+            "unknown"
+          ]
+        }
+      },
+      "required": [
+        "decision"
+      ],
+      "description": "Berechtigung. Meldung des Erzeugers, kein Beobachterurteil."
+    },
+    "result": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "status": {
+          "enum": [
+            "accepted",
+            "started",
+            "running",
+            "waiting_question",
+            "turn_completed",
+            "completed",
+            "failed",
+            "cancelled",
+            "blocked",
+            "delivered_unverified",
+            "checked",
+            "accepted_by_user",
+            "unknown"
+          ]
+        },
+        "error_code": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "result_ref": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,255}$"
+        },
+        "result_hash": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "cost_kind": {
+          "enum": [
+            "estimated",
+            "evidenced_final",
+            "no_final_cost",
+            "unknown"
+          ]
+        },
+        "spent_microusd": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "status"
+      ]
+    },
+    "evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "basis": {
+          "enum": [
+            "audit_hash_chain",
+            "receipt",
+            "saved_state_only",
+            "producer_report",
+            "signed",
+            "none",
+            "unknown"
+          ]
+        },
+        "refs": {
+          "type": "array",
+          "maxItems": 16,
+          "items": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,255}$"
+          }
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "ordinal": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9223372036854775807
+        },
+        "receipt_kind": {
+          "enum": [
+            "core_event",
+            "execution_receipt",
+            "acceptance_receipt",
+            "display_receipt",
+            "handoff_ledger",
+            "sync_receipt",
+            "none"
+          ]
+        }
+      },
+      "required": [
+        "basis"
+      ],
+      "description": "Womit das Ereignis belegt ist. saved_state_only = gespeichert, nicht angezeigt/ausgefuehrt."
+    },
+    "timing": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "clock": {
+          "enum": [
+            "producer",
+            "server",
+            "device",
+            "unknown"
+          ]
+        },
+        "observed_at": {
+          "type": "string",
+          "minLength": 10
+        },
+        "duration_ms": {
+          "type": "number",
+          "minimum": 0
+        },
+        "started_unix_ns": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "clock"
+      ],
+      "description": "Zeitquelle. Keine Subtraktion ueber Uhren hinweg."
+    },
+    "chain": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "hop": {
+          "enum": [
+            "phone",
+            "threaddesk_server",
+            "kirabridge_server",
+            "mac_bridge",
+            "agent",
+            "return"
+          ]
+        },
+        "hop_seq": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 5
+        }
+      },
+      "required": [
+        "hop"
+      ],
+      "description": "Position in der Remote-Kette Handy, ThreadDesk-Server, KiraBridge-Server, Mac, Agent, Rueckgabe."
+    },
+    "assertion": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "basis": {
+          "const": "producer_report_only"
+        },
+        "identity_authenticated": {
+          "type": "boolean"
+        },
+        "effect_verified": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "basis",
+        "identity_authenticated",
+        "effect_verified"
+      ],
+      "description": "Ehrlichkeitsblock, wie im Lab-Workflowformat."
+    },
+    "unknown_fields": {
+      "type": "array",
+      "maxItems": 32,
+      "items": {
+        "enum": [
+          "actor",
+          "task",
+          "delegation",
+          "permission",
+          "timestamp",
+          "result",
+          "evidence",
+          "chain"
+        ]
+      },
+      "description": "Ausdruecklich UNBEKANNTE Dimensionen. Fehlen ist nicht Verneinung."
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "schema_version": {
+            "const": "1"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "trace_id",
+          "span_id",
+          "event_hash"
+        ],
+        "properties": {
+          "event_type": {
+            "enum": [
+              "work.started",
+              "agent.invoked",
+              "delegation.created",
+              "tool.intent",
+              "tool.result",
+              "work.finished",
+              "authority.requested",
+              "authority.allowed",
+              "authority.denied",
+              "authority.freeze",
+              "authority.unfreeze",
+              "budget.checked",
+              "budget.charged",
+              "loop.detected",
+              "request.blocked",
+              "consumer.frozen",
+              "capability.granted",
+              "capability.denied",
+              "capability.revoked",
+              "graph.imported",
+              "incident.opened"
+            ]
+          },
+          "source_tool": {
+            "enum": [
+              "gnom-hub-v1",
+              "agent-authority-lab",
+              "tollgate",
+              "4allpass",
+              "threaddesk"
+            ]
+          },
+          "actor": {
+            "not": {
+              "anyOf": [
+                {
+                  "required": [
+                    "actor_type"
+                  ]
+                },
+                {
+                  "required": [
+                    "principal_ref"
+                  ]
+                },
+                {
+                  "required": [
+                    "device_ref"
+                  ]
+                },
+                {
+                  "required": [
+                    "actor_claim"
+                  ]
+                }
+              ]
+            }
+          }
+        },
+        "not": {
+          "anyOf": [
+            {
+              "required": [
+                "task"
+              ]
+            },
+            {
+              "required": [
+                "delegation"
+              ]
+            },
+            {
+              "required": [
+                "permission"
+              ]
+            },
+            {
+              "required": [
+                "result"
+              ]
+            },
+            {
+              "required": [
+                "evidence"
+              ]
+            },
+            {
+              "required": [
+                "timing"
+              ]
+            },
+            {
+              "required": [
+                "chain"
+              ]
+            },
+            {
+              "required": [
+                "assertion"
+              ]
+            },
+            {
+              "required": [
+                "unknown_fields"
+              ]
+            },
+            {
+              "required": [
+                "source_id"
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "schema_version": {
+            "const": "2"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "trace_id",
+          "assertion",
+          "evidence"
+        ]
+      }
+    }
+  ],
+  "examples": [
+    {
+      "schema_version": "2",
+      "event_id": "td-wb-000001",
+      "timestamp": "2026-11-08T10:00:00Z",
+      "trace_id": "tr-synth-0001",
+      "span_id": "s-0001",
+      "workflow_id": "wf-synth-1",
+      "project_id": "proj-synth",
+      "source_tool": "threaddesk",
+      "source_id": "td-server-synth",
+      "event_type": "handoff.created",
+      "actor": {
+        "actor_type": "human",
+        "principal_ref": "principal-synth-user",
+        "device_ref": "dev-phone-synth"
+      },
+      "task": {
+        "original_task_id": "thread-synth:task-1",
+        "thread_id": "thread-synth",
+        "handoff_id": "hnd-synth-1",
+        "handoff_revision": 1,
+        "source_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      },
+      "delegation": {
+        "kind": "remote_dispatch",
+        "from_ref": "principal-synth-user",
+        "to_ref": "dev-mac-synth"
+      },
+      "permission": {
+        "decision": "UNKNOWN",
+        "decided_by": "unknown"
+      },
+      "evidence": {
+        "basis": "saved_state_only",
+        "receipt_kind": "handoff_ledger",
+        "ordinal": 7,
+        "refs": [
+          "wb-entry-synth-7"
+        ]
+      },
+      "timing": {
+        "clock": "server"
+      },
+      "chain": {
+        "hop": "threaddesk_server",
+        "hop_seq": 1
+      },
+      "assertion": {
+        "basis": "producer_report_only",
+        "identity_authenticated": false,
+        "effect_verified": false
+      },
+      "unknown_fields": [
+        "permission",
+        "result"
+      ]
+    },
+    {
+      "schema_version": "2",
+      "event_id": "audit-42-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "timestamp": "2026-11-08T10:00:30+00:00",
+      "trace_id": "tr-synth-0001",
+      "span_id": "s-0004",
+      "parent_span_id": "s-0003",
+      "workflow_id": "wf-synth-1",
+      "project_id": "proj-synth",
+      "source_tool": "kirabridge",
+      "source_id": "kb-mac-synth",
+      "event_type": "task.completed",
+      "action": "agent.execute",
+      "actor": {
+        "actor_type": "agent",
+        "agent_id": "codex",
+        "principal_ref": "principal-synth-bridge"
+      },
+      "task": {
+        "task_id": "team-work-synth",
+        "bridge_task_id": "team-work-synth",
+        "original_task_id": "thread-synth:task-1",
+        "run_id": "run-synth-1",
+        "handoff_id": "hnd-synth-1",
+        "request_hash": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+      },
+      "permission": {
+        "decision": "ALLOW",
+        "approval_ref": "appr-synth-1",
+        "decided_by": "operator",
+        "reason_code": null
+      },
+      "result": {
+        "status": "turn_completed",
+        "error_code": null,
+        "result_ref": "res-synth-1",
+        "cost_kind": "unknown"
+      },
+      "evidence": {
+        "basis": "audit_hash_chain",
+        "receipt_kind": "core_event",
+        "ordinal": 42,
+        "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      },
+      "timing": {
+        "clock": "device",
+        "observed_at": "2026-11-08T10:00:31+00:00",
+        "duration_ms": 29800.5
+      },
+      "chain": {
+        "hop": "agent",
+        "hop_seq": 4
+      },
+      "previous_event_hash": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "event_hash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "assertion": {
+        "basis": "producer_report_only",
+        "identity_authenticated": false,
+        "effect_verified": false
+      }
+    },
+    {
+      "schema_version": "1",
+      "event_id": "lab-ev-0001",
+      "timestamp": "2026-11-08T10:01:00Z",
+      "trace_id": "wf-lab-synth",
+      "span_id": "ab12cd34",
+      "workflow_id": "wf-lab-synth",
+      "project_id": "agent-authority-lab",
+      "source_tool": "agent-authority-lab",
+      "event_type": "authority.denied",
+      "actor": {
+        "agent_id": "synth-agent",
+        "role": "lab-agent"
+      },
+      "action": "external.send",
+      "resource": "res:synth",
+      "decision": "DENY",
+      "reason_code": "SYNTH_REASON",
+      "previous_event_hash": null,
+      "data_labels": [
+        "PUBLIC"
+      ],
+      "event_hash": "531da8442507efb083ae89594f088856c3a9c77ad82fd29d8bf01dc1799ad9bf"
+    }
+  ]
+}
