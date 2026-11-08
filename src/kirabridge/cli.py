@@ -579,7 +579,26 @@ async def execute(args) -> None:
             }
             if host.name == "linux":
                 report["server"] = host.server_facts()
-            emit(report)
+            human = sys.stdout.isatty() and not getattr(args, "json", False)
+            if human or getattr(args, "live", False):
+                from kirabridge import doctor_view
+
+                report["live"] = await doctor_view.live_checks(
+                    config,
+                    args.principal,
+                    config_path=config_path,
+                    audit=audit_result,
+                    agents=agent_result,
+                )
+            if human:
+                from kirabridge import doctor_view, terminal_design
+                from kirabridge.install_ui import SetupUI
+
+                doctor_view.render(
+                    report["live"], SetupUI("de", sys.stdout, design=terminal_design)
+                )
+            else:
+                emit(report)
     finally:
         # __aexit__ also closes; sqlite close is idempotent.
         bridge.store.close()
@@ -828,7 +847,16 @@ def main() -> None:
     audit.add_argument("--limit", type=int, default=500)
     diagnose = sub.add_parser("diagnose", help="Compact own task diagnostic without raw arguments")
     diagnose.add_argument("task_id")
-    sub.add_parser("doctor")
+    doctor = sub.add_parser(
+        "doctor",
+        help="Check KiraBridge; a readable live view in a terminal, JSON otherwise",
+    )
+    doctor.add_argument(
+        "--live",
+        action="store_true",
+        help="Include read-only live checks (daemon, services, ThreadDesk, relay) in the JSON",
+    )
+    doctor.add_argument("--json", action="store_true", help="Always print JSON, also in a terminal")
     reconcile = sub.add_parser("reconcile")
     reconcile.add_argument("task_id")
     reconcile.add_argument("--state", choices=["completed", "failed", "cancelled"], required=True)
