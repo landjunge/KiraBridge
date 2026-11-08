@@ -233,7 +233,8 @@ class Relay:
             f"Bestätigung. Task {request['task_id']}.",
         )
         notify(
-            "KiraBridge: Auftrag wartet", f"{title} – bitte unter http://127.0.0.1:8766/ bestätigen"
+            "KiraBridge: Auftrag wartet",
+            f"{title} – im Terminal „kirabridge approvals“ öffnen und bestätigen",
         )
         log.info("handoff %s queued as %s for approval", handoff_id, request["task_id"])
 

@@ -115,7 +115,9 @@ lautet: im Testordner eine Datei anlegen.
 - Der launchd-Dienst läuft.
 
 **Noch offen:**
-- Lokale Freigabe dieses Testauftrags unter <http://127.0.0.1:8766/> und der
+- Lokale Freigabe dieses Testauftrags über `kirabridge approvals` (öffnet die
+  Freigabeseite mit Einmal-Login; die bloße Adresse 127.0.0.1:8766 verlangt eine
+  Anmeldung) und der
   `result`-Eintrag danach. Freigeben muss der Nutzer selbst.
 - Aufträge vom Handy anlegen. Das geht über ChatGPT, KiraBridge Server und
   `td_issue_handoff`, sobald der Tunnel läuft.
