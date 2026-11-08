@@ -29,3 +29,5 @@ examples/review-demo/run-*/state/
 examples/review-demo/automatic-*/state/
 # Completion acceptance owns isolated runtime state.
 examples/completion-demo/run-*/state/
+
+.claude/settings.local.json
