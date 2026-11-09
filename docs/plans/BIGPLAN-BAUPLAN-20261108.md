@@ -1,3 +1,5 @@
+> **Nicht maßgeblich. Maßgeblich ist ThreadDesk-Thread `188ce4729a62` (Nutzerbeschluss 09.11.2026). Diese Datei ist Archiv bzw. technischer Spiegel.**
+
 # Big Plan · Bauplan v2
 
 Stand: 08.11.2026, 13:00 Uhr (Berlin). Überarbeitung des gesamten Big Plans.
@@ -379,3 +381,20 @@ Token, Modellkosten und Nutzungslimits.
   kleineren Modell, Sicherheit, Installation und Review auf dem stärkeren.
 - Berichte sind kurz: Ergebnis, Pins, Belege, Offenes. Keine Wiederholung bekannter Stände.
 - Wird ein Limit knapp, startet keine neue Lane. Laufende Lanes werden nur abgeschlossen.
+
+### N5 · 09.11.2026 – Governance: ThreadDesk ist die einzige maßgebliche Quelle
+
+**Nutzerbeschluss (09.11.2026, verbindlich):** „ThreadDesk ist ab sofort die einzige maßgebliche Quelle für den Big Plan und das zentrale Projektgedächtnis. GitHub dient ausschließlich der technischen Entwicklung und Umsetzung. Die ChatGPT-Bibliothek bleibt als Backup erhalten.“ Dazu die Korrektur des Nutzers: „Der Big Plan war immer in ThreadDesk.“
+
+**Maßgeblicher Ort:** ThreadDesk-Thread `188ce4729a62` (Notizabschnitte „BIG PLAN …“ und Whiteboard) samt verknüpften Plan-Threads. Es gibt keinen zweiten Plan-Thread. Der Inhalt dieser Datei und von Gesamtplan Abschnitt 9 wurde dort am 09.11.2026 unverändert als Abschnitt „BIG PLAN – RÜCKFÜHRUNG AUS GITHUB, 09.11.2026“ ergänzt, zusammen mit der Abweichungs- und Doppelungsliste und dem Paketstatus.
+
+**Herkunft dieser Datei:** Bauplan v2, die Nachträge N1–N4 und Gesamtplan Abschnitt 9 stammen von Claude und haben die Doppelung zu ThreadDesk erzeugt. Sie sind ab jetzt Archiv bzw. technischer Spiegel. Aussagen in dieser Datei, die sie als „kanonisch“ bezeichnen (X5, BP-PLAN-01, N1 „Kanonischer Einstieg“) und Gesamtplan 9.12 („GitHub Masterfassung“) sind damit überholt.
+
+**Governance:**
+
+1. Planänderungen entstehen nur in ThreadDesk, mit Datum, Quelle, Status und Verantwortlichkeit.
+2. GitHub-Plandateien werden nicht als führende Kopie bearbeitet. Neue Plan-Dateien tragen den Hinweis „Nicht maßgeblich. Maßgeblich ist ThreadDesk-Thread `188ce4729a62` (Nutzerbeschluss 09.11.2026). Diese Datei ist Archiv bzw. technischer Spiegel.“
+3. Die ChatGPT-Bibliothek bleibt als Backup unverändert.
+4. Bei Widerspruch gilt der neueste belegte Nutzerbeschluss; Unklares wird als „offen – Nutzer“ geführt, nicht selbst entschieden.
+5. Nichts wird eigenmächtig gelöscht.
+6. Das Skript `scripts/plan_notice_check.py` im ThreadDesk-Repo meldet Plan-Dateien ohne den Hinweis.

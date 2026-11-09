@@ -1,3 +1,5 @@
+> **Nicht maßgeblich. Maßgeblich ist ThreadDesk-Thread `188ce4729a62` (Nutzerbeschluss 09.11.2026). Diese Datei ist Archiv bzw. technischer Spiegel.**
+
 > **Kanonischer Plan seit 08.11.2026:** [Bauplan v2](BIGPLAN-BAUPLAN-20261108.md) (Nachtrag N1 regelt Entscheidungskennungen und Agentenlage).
 > Historischer Quellenstand aus `21d2e2cad8e9930931b02031addfc25d819a9ed3`,
 > bei der Integration am 06.11.2026 bewahrt. Aktueller Quellen-, Prüf- und

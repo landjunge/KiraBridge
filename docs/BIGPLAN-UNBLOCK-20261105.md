@@ -1,3 +1,5 @@
+> **Nicht maßgeblich. Maßgeblich ist ThreadDesk-Thread `188ce4729a62` (Nutzerbeschluss 09.11.2026). Diese Datei ist Archiv bzw. technischer Spiegel.**
+
 # BIG PLAN: technische Blockaden gezielt lösen
 
 Fortsetzung von BIGPLAN-AUTONEXT-20261104-V1 nach ausdrücklichem Nutzerauftrag
