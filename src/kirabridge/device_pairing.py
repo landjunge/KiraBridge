@@ -97,8 +97,8 @@ class DevicePairing:
         record["revoked"] = True
         self._save(data)
 
-    def authorize(self, device_ref, workspace_ref, key=None):
-        """Raise unless the device is paired, current, in scope and (if given) key-correct."""
+    def authorize(self, device_ref, workspace_ref, key):
+        """Raise unless the device is paired, current, in scope and key-correct."""
         record = self._load()["devices"].get(device_ref)
         if record is None:
             raise BridgeError("device_not_paired", "Device is not paired")
@@ -108,6 +108,6 @@ class DevicePairing:
             raise BridgeError("device_expired", "Device pairing expired")
         if record["workspace_ref"] != workspace_ref:
             raise BridgeError("device_scope", "Workspace is outside the paired scope")
-        if key is not None and not hmac.compare_digest(record["key_sha256"], _hash(key)):
+        if not isinstance(key, str) or not hmac.compare_digest(record["key_sha256"], _hash(key)):
             raise BridgeError("device_key_invalid", "Device key does not match")
         return record

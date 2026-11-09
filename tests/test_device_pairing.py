@@ -53,8 +53,10 @@ def test_wrong_device_scope_key_and_unpaired(pairing):
         reg.authorize("home-mac", "ws2", key)
     with pytest.raises(BridgeError, match="does not match"):
         reg.authorize("home-mac", "ws1", "wrong")
+    with pytest.raises(BridgeError, match="does not match"):
+        reg.authorize("home-mac", "ws1", None)
     with pytest.raises(BridgeError, match="not paired"):
-        reg.authorize("other-mac", "ws1")
+        reg.authorize("other-mac", "ws1", "x")
 
 
 def test_expired_pairing_approval_and_device(pairing):
@@ -73,30 +75,36 @@ def test_expired_pairing_approval_and_device(pairing):
     not os.environ.get("KIRABRIDGE_TEST_REMOTE_THREADDESK_SOURCE"),
     reason="pinned ThreadDesk source",
 )
-async def test_relay_executes_only_for_paired_device_and_never_after_revoke(
-    remote,
-    pairing,
-    tmp_path,  # noqa: F811
+async def test_relay_executes_only_for_paired_device_with_key_and_never_after_revoke(
+    remote, pairing, tmp_path
 ):
     reg, _ = pairing
     envelope = await intent(remote)
     b = remote.binding
-    async with relay(remote, pairing=reg) as coordinator:
-        with pytest.raises(BridgeError, match="not paired"):
-            await coordinator.deliver(envelope)
-    assert not remote.counter.exists()
-    reg.complete(reg.begin(b.device_ref, "other-ws"), b.device_ref)
-    async with relay(remote, pairing=reg) as coordinator:
-        with pytest.raises(BridgeError, match="scope"):
-            await coordinator.deliver(envelope)
-    reg.complete(reg.begin(b.device_ref, b.workspace_ref), b.device_ref)
+
+    def none():
+        assert not remote.counter.exists()
+        assert remote.bridge.store.db.execute("SELECT count(*) FROM tasks").fetchone()[0] == 0
+
+    async def refused(match, **kw):
+        async with relay(remote, pairing=reg, **kw) as coordinator:
+            with pytest.raises(BridgeError, match=match):
+                await coordinator.deliver(envelope)
+        none()
+
+    await refused("not paired", device_key="k")
+    key = reg.complete(reg.begin(b.device_ref, b.workspace_ref), b.device_ref)
+    await refused("does not match")  # no key
+    await refused("does not match", device_key="wrong")
+    keyfile = tmp_path / "device.key"
+    keyfile.write_text(key)
+    keyfile.chmod(0o644)
+    await refused("0600", device_key=str(keyfile))
     reg.revoke(b.device_ref)
-    async with relay(remote, pairing=reg) as coordinator:
-        with pytest.raises(BridgeError, match="revoked"):
-            await coordinator.deliver(envelope)
-    assert not remote.counter.exists()
-    assert remote.bridge.store.db.execute("SELECT count(*) FROM tasks").fetchone()[0] == 0
-    reg.complete(reg.begin(b.device_ref, b.workspace_ref), b.device_ref)
-    async with relay(remote, pairing=reg) as coordinator:
+    await refused("revoked", device_key=key)
+    key = reg.complete(reg.begin(b.device_ref, b.workspace_ref), b.device_ref)
+    keyfile.write_text(key)
+    keyfile.chmod(0o600)
+    async with relay(remote, pairing=reg, device_key=str(keyfile)) as coordinator:
         task = await coordinator.deliver(envelope)
     assert task["id"] == envelope["request"]["task_id"]

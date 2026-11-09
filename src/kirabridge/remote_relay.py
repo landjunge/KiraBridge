@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 import time
 from dataclasses import dataclass, field
 from importlib.resources import files
@@ -64,6 +65,7 @@ class RemoteRelay:
         *,
         clock=time.time,
         pairing=None,
+        device_key=None,
     ):
         if (
             not device_peer.url
@@ -83,6 +85,7 @@ class RemoteRelay:
             raise BridgeError("remote_device_config", "Device certificate identity differs")
         self.source, self.peer, self.binding = source, device_peer, binding
         self.resolve_grant, self.clock, self.pairing = resolve_grant, clock, pairing
+        self._device_key = device_key  # str, zero-arg provider or 0600 file path; never logged
         self.pool = MCPClientPool(call_timeout=25)
         self.validator = SchemaValidatorCache()
         self.schema = json.loads(
@@ -185,7 +188,25 @@ class RemoteRelay:
     def _authorize_device(self):
         # Optional revocable device key: gates execution only; reconcile stays read-only.
         if self.pairing is not None:
-            self.pairing.authorize(self.binding.device_ref, self.binding.workspace_ref)
+            self.pairing.authorize(
+                self.binding.device_ref, self.binding.workspace_ref, self._load_device_key()
+            )
+
+    def _load_device_key(self):
+        source = self._device_key
+        if callable(source):
+            return source()
+        if isinstance(source, (str, os.PathLike)) and not isinstance(source, str):
+            source = os.fspath(source)
+        if isinstance(source, str) and os.path.isabs(source):
+            try:
+                if os.stat(source).st_mode & 0o077:
+                    raise BridgeError("device_key_invalid", "Device key file must be 0600")
+                with open(source) as handle:
+                    return handle.read().strip()
+            except OSError:
+                return None
+        return source
 
     async def reconcile(self, envelope):
         envelope = self._snapshot(envelope)

@@ -240,6 +240,7 @@ dieser Vertrag erteilt keinen zweiten Windows- oder Ocean-Implementierungsauftra
 Umgesetzt in `src/kirabridge/device_pairing.py`, angebunden an das bestehende
 `RemoteRelay` (optionaler Parameter `pairing`). Keine zweite Queue, kein neuer Dispatcher.
 
+- Das Relay legt den Geräteschlüssel aus einer lokalen Quelle vor (Datei 0600, Provider oder String); ohne oder mit falschem Schlüssel keine Ausführung.
 - Bedienerseite `begin(device_ref, workspace_ref)`: Einmalcode (max. 15 min), an genau
   ein Gerät und einen Scope gebunden. `complete(code, device_ref)` liefert den
   Geräteschlüssel einmalig; gespeichert wird nur dessen SHA-256 (Datei 0600, atomar).
