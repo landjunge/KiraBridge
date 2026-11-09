@@ -129,7 +129,7 @@ Sie bleibt auf GitHub `test/remote-project-verify-20261106-r2` bei21d2e2c und
 `feat/bigplan-windows-parity-20261105` bei ce50405 sowie als geprüftes lokales
 Gitbundle erhalten. Nativeevents9cc005c ist patchäquivalent bereits enthalten.
 
-Die zuvor nur in jener Linie stehenden [Gesamtplanung](plans/BIGPLAN-GESAMTPLAN-20261105.md),
+Die zuvor nur in jener Linie stehenden Gesamtplanung (heute im ThreadDesk-Master `6b5b73b9de36`),
 [Architekturquelle](plans/sources/BIGPLAN-ARCHITEKTUR-REMOTE-BESCHLUSS-20261105.md),
 [Oceanplanung](plans/OCEAN-MCP-ADAPTER-20261105.md) und Windows-Kandidatenbelege
 werden als datierte historische Quellen übernommen; ihre alten Gates erteilen

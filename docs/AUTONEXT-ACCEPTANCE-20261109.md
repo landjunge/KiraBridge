@@ -1,6 +1,6 @@
 # BP-AUTO-01 · AutoNext-Abnahme 09.11.2026
 
-Paket BP-AUTO-01 aus dem [Bauplan](plans/BIGPLAN-BAUPLAN-20261108.md), Stufe 2, Nachträge N1–N4.
+Paket BP-AUTO-01 aus dem Big Plan (ThreadDesk-Master `6b5b73b9de36`, Status im Board `188ce4729a62`).
 Nutzerfreigabe vom 09.11.2026: „Ja, mit 2 Testkarten“. RC43 ist installiert (`f9e6ec8`).
 
 **Ergebnis: Teilabnahme.** Gestoppt vor dem ersten Modelllauf. Es wurden keine Testkarten

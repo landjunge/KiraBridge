@@ -7,7 +7,7 @@
     "default_branch": "main"
   },
   "observed_at": "2026-11-09T06:54:45Z",
-  "plan": "BIGPLAN-BAUPLAN-20261108",
+  "plan": "threaddesk:6b5b73b9de36",
   "main_pin": {
     "commit": "5da9d858a2dcc78743ad84d3d4434384cc16f1b6",
     "committed_at": "2026-11-09T04:53:16Z"

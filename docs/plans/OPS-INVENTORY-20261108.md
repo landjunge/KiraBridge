@@ -1,7 +1,7 @@
 # Server-Inventar netcup · Kurzbericht
 
 Stand: 08.11.2026, Beobachtung ab 16:59:45 UTC. Paket **BP-OPS-01** (nur lesend) und
-Vorbereitung **BP-TRUTH-01**, Lane L1. Bezug: `BIGPLAN-BAUPLAN-20261108.md`, Abschnitte 2, 3,
+Vorbereitung **BP-TRUTH-01**, Lane L1. Bezug: Big Plan im ThreadDesk-Master `6b5b73b9de36` (früherer GitHub-Bauplan, gelöscht 09.11.), Abschnitte 2, 3,
 4.2 und 5 Stufe 0.
 
 **Ablage: nur privat.** Der Bericht enthält Serveradressen und offene Sicherheitsbefunde.
