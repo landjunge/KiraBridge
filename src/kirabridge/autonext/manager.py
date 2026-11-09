@@ -211,7 +211,7 @@ class AutoNextManager:
             not worker
             or worker.agent != "codex"
             or not agent
-            or agent.kind not in {"codex", "claude_worker"}
+            or agent.kind not in {"codex", "claude_code"}
         ):
             raise BridgeError("autonext_worker_unavailable", "Fixed worker is unavailable")
         path = Path(card.cwd)
@@ -245,7 +245,7 @@ class AutoNextManager:
     def _budget(self):
         cfg, now = self.settings, time.time()
         agent = self.bridge.config.agents.get("codex")
-        claude = bool(agent and agent.kind == "claude_worker")
+        claude = bool(agent and agent.kind == "claude_code")
         if (
             cfg.budget_state != "available"
             or not cfg.budget_source_ref

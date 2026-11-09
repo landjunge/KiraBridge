@@ -114,8 +114,8 @@ class CoordinatedAutoNext(AutoNextManager):
             or not verifier_agent
             or verifier_agent.kind
             != (
-                "claude_verify"
-                if self.bridge.config.agents["codex"].kind == "claude_worker"
+                "claude_code"
+                if self.bridge.config.agents["codex"].kind == "claude_code"
                 else "codex"
             )
             or verifier_agent.sandbox_mode != "read-only"
@@ -336,7 +336,7 @@ class CoordinatedAutoNext(AutoNextManager):
                 work["assignee"] == "grok"
                 and self.bridge.config.agents["grok"].kind == "grok_structured"
             )
-            or self.bridge.config.agents[work["assignee"]].kind == "claude_verify"
+            or self.bridge.config.agents[work["assignee"]].kind == "claude_code"
             else "Return one JSON object with kirabridge_team string 1, actions [], and result as "
             "a JSON string with exactly verdict (pass or fail), source_sha256 copied from context, "
             "and summary (short text). "

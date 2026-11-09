@@ -80,12 +80,9 @@ class LoopProfile(BaseModel):
     @model_validator(mode="after")
     def claude_profile(self):
         if self.coordinator_cli == "claude" and (
-            not self.claude
-            or not Path(self.claude).is_absolute()
-            or self.routing is not None
-            or self.worker_routing
+            not self.claude or not Path(self.claude).is_absolute()
         ):
-            raise ValueError("Claude coordinator needs an absolute executable and no routing")
+            raise ValueError("Claude coordinator needs an absolute executable")
         return self
 
 
@@ -263,17 +260,22 @@ def agent_profiles(profile):
     schema = str(
         Path(__file__).resolve().parents[1] / "src/kirabridge/autonext/team_turn.schema.json"
     )
+    verdict_schema = str(
+        Path(__file__).resolve().parents[1] / "src/kirabridge/autonext/review_verdict.schema.json"
+    )
     if claude:
         main = {
             "codex": {
-                "kind": "claude_worker",
+                "kind": "claude_code",
                 "executable": profile["claude"],
+                "output_schema": schema,
                 "sandbox_mode": profile.get("sandbox", "read-only"),
                 "api_key_env": "ANTHROPIC_API_KEY",
             },
             "codex_verify": {
-                "kind": "claude_verify",
+                "kind": "claude_code",
                 "executable": profile["claude"],
+                "output_schema": verdict_schema,
                 "sandbox_mode": "read-only",
                 "api_key_env": "ANTHROPIC_API_KEY",
             },

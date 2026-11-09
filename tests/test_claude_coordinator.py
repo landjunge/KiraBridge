@@ -14,7 +14,7 @@ from test_autonext import scenario, until  # noqa: F401
 from test_autonext_coordinator import configure as configure_codex
 from test_mcp import http_bridge  # noqa: F401
 
-from kirabridge.agent_manager.claude_headless import ClaudeHeadlessAdapter
+from kirabridge.agent_manager.claude import ClaudeCodeAdapter
 from kirabridge.autonext.budget import FailClosedBudgetGate
 from kirabridge.autonext.coordinator import CoordinatedAutoNext
 from kirabridge.bridge_core.config import AgentConfig
@@ -29,6 +29,7 @@ loop = importlib.util.module_from_spec(spec)
 sys.modules[spec.name] = loop
 spec.loader.exec_module(loop)
 
+SCHEMAS = Path(__file__).parents[1] / "src/kirabridge/autonext"
 SESSION = "b76c50c8-a8e8-4224-bb00-d18836589bce"
 WORKSPACE = str(Path(__file__).resolve().parent)
 SHA = "a" * 64
@@ -92,8 +93,10 @@ class Gate:
 async def run(role, events, *, sandbox="read-only", terminal=None, gate=None, **config):
     terminal = terminal or Terminal(events)
     cfg = AgentConfig(
-        kind="claude_verify" if role == "verifier" else "claude_worker",
+        kind="claude_code",
         executable="/usr/local/bin/claude",
+        output_schema=str(SCHEMAS / ("review_verdict" if role == "verifier" else "team_turn"))
+        + ".schema.json",
         api_key_env="ANTHROPIC_API_KEY",
         sandbox_mode=sandbox,
         **config,
@@ -104,7 +107,7 @@ async def run(role, events, *, sandbox="read-only", terminal=None, gate=None, **
         progress.append(value)
 
     gate = gate or Gate()
-    result = await ClaudeHeadlessAdapter(terminal, role, lambda: gate).execute(
+    result = await ClaudeCodeAdapter(terminal, lambda: gate).execute(
         {"id": "t1", "principal": "codex_verify"},
         AgentInput(agent="x", prompt='KiraBridge team turn\n{"a":"@b"}', cwd=WORKSPACE),
         cfg,
@@ -339,10 +342,11 @@ def test_default_profile_keeps_codex_agents(tmp_path):
 def test_claude_profile_selects_worker_and_read_only_verifier(tmp_path):
     profile = base_profile(tmp_path, coordinator_cli="claude", claude="/usr/local/bin/claude")
     agents = loop.agent_profiles(profile)
-    assert agents["codex"]["kind"] == "claude_worker"
+    assert agents["codex"]["kind"] == "claude_code"
     assert agents["codex_verify"] == {
-        "kind": "claude_verify",
+        "kind": "claude_code",
         "executable": "/usr/local/bin/claude",
+        "output_schema": str(SCHEMAS / "review_verdict.schema.json"),
         "sandbox_mode": "read-only",
         "api_key_env": "ANTHROPIC_API_KEY",
     }
@@ -390,12 +394,13 @@ def configure_claude(s, tmp_path, monkeypatch, mode, gate=None):
     directory = tmp_path / "claude-cli"
     directory.mkdir()
     exe = fake_cli(directory, CLAUDE.replace("__MODE__", mode).replace("__LOG__", str(log)))
-    for name, kind, sandbox in (
-        ("codex", "claude_worker", "read-only"),
-        ("codex_verify", "claude_verify", "read-only"),
-    ):
+    for name, schema in (("codex", "team_turn"), ("codex_verify", "review_verdict")):
         config.agents[name] = AgentConfig(
-            kind=kind, executable=exe, api_key_env="ANTHROPIC_API_KEY", sandbox_mode=sandbox
+            kind="claude_code",
+            executable=exe,
+            output_schema=str(SCHEMAS / (schema + ".schema.json")),
+            api_key_env="ANTHROPIC_API_KEY",
+            sandbox_mode="read-only",
         )
     s["bridge"].agents.budget_gate = gate or Gate()
     s["bridge"].autonext = CoordinatedAutoNext(s["bridge"])
@@ -473,7 +478,7 @@ async def test_chain_without_bound_budget_authority_never_spawns(scenario, tmp_p
 def test_claude_grant_still_rejects_api_key_route(scenario, monkeypatch):  # noqa: F811
     s = scenario
     s["config"].agents["codex"] = AgentConfig(
-        kind="claude_worker", executable=sys.executable, api_key_env="ANTHROPIC_API_KEY"
+        kind="claude_code", executable=sys.executable, api_key_env="ANTHROPIC_API_KEY"
     )
     manager = CoordinatedAutoNext(s["bridge"])
     s["grant"]([])
@@ -481,3 +486,29 @@ def test_claude_grant_still_rejects_api_key_route(scenario, monkeypatch):  # noq
     monkeypatch.setenv("ANTHROPIC_API_KEY", "k")
     with pytest.raises(BridgeError):
         manager._budget()
+
+
+def test_default_claude_code_path_and_routing_hook_are_unchanged():
+    from kirabridge.bridge_core.config import Config
+    from kirabridge.capability_routing.integration import RoutedAdapter, new_routed_manager
+
+    manager = new_routed_manager(
+        Config(principals={}), None, None, None, managed_only=True, authorize=lambda *a: None
+    )
+    adapter = manager.adapters["claude_code"]
+    assert isinstance(adapter, RoutedAdapter) and adapter.cli == "claude" and adapter.optional
+    assert isinstance(adapter.adapter, ClaudeCodeAdapter)
+
+
+async def test_without_schema_the_existing_text_only_path_is_used(monkeypatch):
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    adapter = ClaudeCodeAdapter(Terminal([]))
+    with pytest.raises(BridgeError, match="schema"):
+        await adapter.execute(
+            {"id": "t", "principal": "p"},
+            AgentInput(agent="x", prompt="p", cwd=WORKSPACE),
+            AgentConfig(kind="claude_code", executable="/c", output_schema="/tmp/other.json"),
+            [WORKSPACE],
+            lambda v: None,
+            lambda v: None,
+        )

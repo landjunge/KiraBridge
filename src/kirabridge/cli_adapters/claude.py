@@ -1,6 +1,6 @@
 """Claude Code as the third CLI module on the shared adapter core (BP-CLI-01).
 
-Only headless semantics exist (see agent_manager.claude_headless). No visible-terminal
+Only headless semantics exist (see agent_manager.claude). No visible-terminal
 input, return or navigation capability is claimed, so every such query stays unknown.
 `probe` reads version and login state without any model request or cost.
 """

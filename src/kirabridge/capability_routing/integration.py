@@ -198,7 +198,15 @@ def new_routed_manager(
             raise RoutingError("Managed routing requires live sealed-task authorization")
         # Keep the complete legacy adapter inventory and the manager's visible
         # branch. The trusted profile builder rejects an unsupported routed worker.
-        for kind, cli in (("codex", "codex"), ("grok_acp", "grok"), ("grok_structured", "grok")):
+        # Claude Code joins the existing matrix path: without a routing profile its optional
+        # wrapper passes through unchanged; a routed Claude turn fails closed in effort_shim
+        # until access evidence and an adapter test provide a verified effort injection.
+        for kind, cli in (
+            ("codex", "codex"),
+            ("grok_acp", "grok"),
+            ("grok_structured", "grok"),
+            ("claude_code", "claude"),
+        ):
             manager.adapters[kind] = adapter_type(
                 manager.adapters[kind], cli, guard, profiles, authorize=authorize, optional=True
             )

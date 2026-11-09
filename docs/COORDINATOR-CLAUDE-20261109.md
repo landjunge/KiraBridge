@@ -9,12 +9,15 @@ Nutzerbeschluss vom 09.11.2026 (ThreadDesk-Board `188ce4729a62`, Eintrag `416bbd
 | `coordinator_cli` | `codex` (Standard) oder `claude` |
 | `claude` | absoluter Pfad der `claude`-Datei (Pflicht bei `claude`) |
 
-Bei `claude` ist `routing`/`worker_routing` nicht erlaubt. Die Rollennamen `codex` (Worker-Slot) und `codex_verify` (Verifier-Slot) bleiben als Identitäten erhalten; ihre Agenten sind `claude_worker` und `claude_verify`. Grok-Review bleibt optional. Neue Felder erfordern wie alle Profilfelder einen ausdrücklichen Neustart des eigenen Dienstes.
+Die Rollennamen `codex` (Worker-Slot) und `codex_verify` (Verifier-Slot) bleiben als Identitäten erhalten; beide Agenten nutzen den vorhandenen Adapter `claude_code`. Grok-Review bleibt optional. Neue Felder erfordern wie alle Profilfelder einen ausdrücklichen Neustart des eigenen Dienstes.
 
 ## Adapter
 
+Kein neuer Adapter: der vorhandene `claude_code` (`agent_manager/claude.py`) wird erweitert. Ohne `output_schema` bleibt sein Textpfad unverändert. Nur ein ausdrücklich gesetztes, gepacktes AutoNext-Schema (`team_turn` = Worker, `review_verdict` = Verifier) wählt den Koordinatorturn; die Rolle folgt allein daraus.
+
 - `cli_adapters/claude.py`: drittes CLI-Modul (ohne Sichtterminal-Fähigkeiten) und `probe`: `claude --version` und `claude auth status --json`, kein Modellaufruf, keine Kosten, nur nicht identifizierende Felder.
-- `agent_manager/claude_headless.py`: `claude -p` mit `stream-json`, `--json-schema` (Worker: `team_turn.schema.json`, Verifier: `review_verdict.schema.json`), festem Arbeitsordner, Zeitlimit, `--safe-mode`, leeren Einstellungsquellen/MCP, ohne Sitzungspersistenz. API-Schlüssel/Token werden vor dem Start abgelehnt. Nur `structured_output` zählt; Fließtext ist kein Urteil.
+- Koordinatorturn: `claude -p` mit `stream-json`, `--json-schema`, festem Arbeitsordner, Zeitlimit, `--safe-mode`, leeren Einstellungsquellen/MCP, ohne Sitzungspersistenz. API-Schlüssel/Token werden vor dem Start abgelehnt. Nur `structured_output` zählt.
+- Routing: `integration.new_routed_manager(managed_only=True)` umhüllt `claude_code` wie Codex/Grok (optional, ohne Profil unverändert). Ein geroutetes Claude-Turn scheitert in `effort_shim` geschlossen, bis Zugangsnachweis und Adaptertest eine verifizierte Effort-Injektion liefern. Kein eigener Router.
 
 ## Schreibschutz des Verifiers
 
