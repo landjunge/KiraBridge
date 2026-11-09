@@ -1,7 +1,7 @@
 # Remote-Auftrag v1: Vertrag vor dem ersten Vertikalschnitt
 
 `BIGPLAN-REMOTE-CONTRACT-20261105-V1` / BP-REMOTE-01, 05.11.2026.
-Quelle: bestätigter [Gesamtplan](../plans/BIGPLAN-GESAMTPLAN-20261105.md),
+Quelle: bestätigter Big Plan (ThreadDesk-Master `6b5b73b9de36`),
 vollständiger Nutzerbeschluss und Auftrag „weiter im Plan“.
 Codex/root ist einziger Schreiber auf `feat/remote-task-contract-20261105`,
 Basis `648bb1c72cd37c89012c53031a1867b1fd1bbcc5`.

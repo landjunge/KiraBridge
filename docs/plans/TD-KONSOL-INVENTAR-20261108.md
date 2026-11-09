@@ -1,7 +1,7 @@
 # BP-TD-KONSOL-01 · Lesende Bestandsaufnahme des ThreadDesk-Wissensbestands
 
 Stand: 08.11.2026, Dateistand 22:33 UTC (23:33 MEZ). Paket BP-TD-KONSOL-01, Lane L4.
-Grundlage: Gesamtplan `docs/plans/BIGPLAN-GESAMTPLAN-20261105.md` auf `origin/main` (`b99c9ca`),
+Grundlage: früherer GitHub-Gesamtplan (gelöscht 09.11., Inhalt im ThreadDesk-Master `6b5b73b9de36` bzw. Board) auf `origin/main` (`b99c9ca`),
 Abschnitte 9.4 Nr. 8–10 und 9.5, dazu Entscheidung E5 aus 9.9 (PR #94, Branch
 `docs/bigplan-decisions-20261108`, noch nicht gemergt).
 Maschinenlesbarer Anhang: [`TD-KONSOL-INVENTAR-20261108.json`](TD-KONSOL-INVENTAR-20261108.json).
