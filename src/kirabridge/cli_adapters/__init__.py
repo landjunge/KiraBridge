@@ -79,10 +79,11 @@ _default = None
 def default_registry():
     global _default
     if _default is None:
+        from .claude import ClaudeCodeAdapter
         from .codex import CodexAdapter
         from .grok import GrokBuildAdapter
 
-        _default = AdapterRegistry([CodexAdapter(), GrokBuildAdapter()])
+        _default = AdapterRegistry([CodexAdapter(), GrokBuildAdapter(), ClaudeCodeAdapter()])
     return _default
 
 

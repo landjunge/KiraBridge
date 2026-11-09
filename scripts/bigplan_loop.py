@@ -17,7 +17,7 @@ from pathlib import Path
 from typing import Annotated, Literal
 
 import uvicorn
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from kirabridge.autonext.continuation import (
     ContinuationPolicy,
@@ -32,6 +32,7 @@ from kirabridge.autonext.models import ApprovedCard, AutoNextConfig
 from kirabridge.bridge_core.bridge import Bridge
 from kirabridge.bridge_core.config import Config
 from kirabridge.capability_routing.router import NativeRoutingSettings, WorkerRouting
+from kirabridge.cli_adapters.claude import quota_evidence
 from kirabridge.coordinator_reporting import run_status_report
 from kirabridge.mcp_gateway.http import create_http_app
 from kirabridge.team_manager.models import (
@@ -65,9 +66,28 @@ class LoopProfile(BaseModel):
         default_factory=dict
     )
     quota_events: list[str] = Field(default_factory=list, max_length=16)
+    # Opt-in role selection. "codex" (default) leaves every existing route unchanged.
+    # "claude" runs worker and verifier as separate Claude Code headless turns; the
+    # verifier is technically read-only. Claude usage is not queryable, so the grant
+    # needs the user's explicit acknowledgement of an unknown quota.
+    coordinator_cli: Literal["codex", "claude"] = "codex"
+    claude: str | None = None
+    claude_quota_unknown_acknowledged: bool = False
+
     worker_timeouts: dict[
         Literal["codex", "grok", "codex_verify"], Annotated[float, Field(gt=0, le=300)]
     ] = Field(default_factory=dict)
+
+    @model_validator(mode="after")
+    def claude_profile(self):
+        if self.coordinator_cli == "claude" and (
+            not self.claude
+            or not Path(self.claude).is_absolute()
+            or self.routing is not None
+            or self.worker_routing
+        ):
+            raise ValueError("Claude coordinator needs an absolute executable and no routing")
+        return self
 
 
 def load_profile(path):
@@ -222,6 +242,72 @@ async def quota(codex, events=None):
             await process.wait()
 
 
+def claude_mode(profile):
+    return profile.get("coordinator_cli") == "claude"
+
+
+async def grant_quota(profile):
+    """Quota evidence for a new grant. Claude usage is never estimated."""
+    if claude_mode(profile):
+        if profile.get("claude_quota_unknown_acknowledged") is not True:
+            raise RuntimeError(
+                "Claude usage is not queryable (unknown); the profile needs the user's "
+                "explicit claude_quota_unknown_acknowledged"
+            )
+        return await asyncio.to_thread(quota_evidence, profile["claude"])
+    if profile.get("quota_events"):
+        return await quota(profile["codex"], profile["quota_events"])
+    return await quota(profile["codex"])
+
+
+def agent_profiles(profile):
+    claude = profile.get("coordinator_cli") == "claude"
+    schema = str(
+        Path(__file__).resolve().parents[1] / "src/kirabridge/autonext/team_turn.schema.json"
+    )
+    if claude:
+        main = {
+            "codex": {
+                "kind": "claude_worker",
+                "executable": profile["claude"],
+                "sandbox_mode": profile.get("sandbox", "read-only"),
+                "api_key_env": "ANTHROPIC_API_KEY",
+            },
+            "codex_verify": {
+                "kind": "claude_verify",
+                "executable": profile["claude"],
+                "sandbox_mode": "read-only",
+                "api_key_env": "ANTHROPIC_API_KEY",
+            },
+        }
+    else:
+        main = {
+            "codex": {
+                "kind": "codex",
+                "executable": profile["codex"],
+                "output_schema": schema,
+                "sandbox_mode": profile.get("sandbox", "read-only"),
+                "api_key_env": "CODEX_API_KEY",
+            },
+            "codex_verify": {
+                "kind": "codex",
+                "executable": profile["codex"],
+                "output_schema": schema,
+                "sandbox_mode": "read-only",
+                "api_key_env": "CODEX_API_KEY",
+            },
+        }
+    return {
+        **main,
+        "grok": {
+            "kind": "grok_structured",
+            "executable": profile["grok"],
+            "sandbox_mode": "read-only",
+            "api_key_env": "XAI_API_KEY",
+        },
+    }
+
+
 def configuration(profile):
     root = str(Path(profile["cwd"]).resolve(strict=True))
     roots = [root]
@@ -280,34 +366,7 @@ def configuration(profile):
                     },
                 },
             },
-            "agents": {
-                "codex": {
-                    "kind": "codex",
-                    "executable": profile["codex"],
-                    "output_schema": str(
-                        Path(__file__).resolve().parents[1]
-                        / "src/kirabridge/autonext/team_turn.schema.json"
-                    ),
-                    "sandbox_mode": profile.get("sandbox", "read-only"),
-                    "api_key_env": "CODEX_API_KEY",
-                },
-                "codex_verify": {
-                    "kind": "codex",
-                    "executable": profile["codex"],
-                    "output_schema": str(
-                        Path(__file__).resolve().parents[1]
-                        / "src/kirabridge/autonext/team_turn.schema.json"
-                    ),
-                    "sandbox_mode": "read-only",
-                    "api_key_env": "CODEX_API_KEY",
-                },
-                "grok": {
-                    "kind": "grok_structured",
-                    "executable": profile["grok"],
-                    "sandbox_mode": "read-only",
-                    "api_key_env": "XAI_API_KEY",
-                },
-            },
+            "agents": agent_profiles(profile),
             "threaddesk": {
                 "enabled": True,
                 "workspace": profile["workspace"],
@@ -489,11 +548,7 @@ async def advance(bridge, profile, team, anchor, active_revision):
                 intake["resource_stop"] = failure
                 return active_revision, intake
             try:
-                observation = (
-                    await quota(profile["codex"], profile["quota_events"])
-                    if profile.get("quota_events")
-                    else await quota(profile["codex"])
-                )
+                observation = await grant_quota(profile)
             except (TimeoutError, RuntimeError, OSError, ValueError) as error:
                 if intake is None:
                     raise
@@ -520,11 +575,15 @@ async def advance(bridge, profile, team, anchor, active_revision):
                 cards=pins,
                 max_tasks=len(pins),
                 lease_seconds=900,
-                budget_state="available",
+                budget_state="user_acknowledged_unknown" if claude_mode(profile) else "available",
                 budget_observed_at=observation["observed_at"],
                 budget_valid_until=observation["observed_at"] + 3500,
                 budget_source_ref=observation["source"],
-                billing_evidence_ref="Cached ChatGPT subscription; API keys absent",
+                billing_evidence_ref=(
+                    "Claude subscription login (claude.ai); API keys absent"
+                    if claude_mode(profile)
+                    else "Cached ChatGPT subscription; API keys absent"
+                ),
                 completion_target=profile.get("completion_target"),
             )
             save(cache, grant.model_dump())
@@ -835,7 +894,7 @@ def main():
         adopt(args.profile, args.entry_id)
     elif args.action == "quota":
         profile = load_profile(args.profile)
-        print(json.dumps(asyncio.run(quota(profile["codex"], profile.get("quota_events")))))
+        print(json.dumps(asyncio.run(grant_quota(profile))))
     else:
         profile = load_profile(args.profile)
         print((Path(profile["state_dir"]) / "status.json").read_text())

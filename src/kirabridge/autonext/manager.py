@@ -207,8 +207,13 @@ class AutoNextManager:
             raise BridgeError("autonext_identity_changed", "Team revision changed")
         worker = cfg.team.workers.get("codex")
         agent = cfg.agents.get("codex")
-        if not worker or worker.agent != "codex" or not agent or agent.kind != "codex":
-            raise BridgeError("autonext_worker_unavailable", "Fixed Codex worker is unavailable")
+        if (
+            not worker
+            or worker.agent != "codex"
+            or not agent
+            or agent.kind not in {"codex", "claude_worker"}
+        ):
+            raise BridgeError("autonext_worker_unavailable", "Fixed worker is unavailable")
         path = Path(card.cwd)
         if not path.is_absolute() or path.is_symlink() or path.resolve(strict=True) != path:
             raise BridgeError("autonext_identity_changed", "Task worktree identity is ambiguous")
@@ -239,15 +244,20 @@ class AutoNextManager:
 
     def _budget(self):
         cfg, now = self.settings, time.time()
+        agent = self.bridge.config.agents.get("codex")
+        claude = bool(agent and agent.kind == "claude_worker")
         if (
-            cfg.budget_state != "available"
+            cfg.budget_state != ("user_acknowledged_unknown" if claude else "available")
             or not cfg.budget_source_ref
             or not 0 < cfg.budget_observed_at <= now + 2
             or not now < cfg.budget_valid_until <= cfg.budget_observed_at + 3600
         ):
             raise BridgeError("autonext_budget_stop", "Budget availability is unknown or expired")
-        agent = self.bridge.config.agents.get("codex")
-        keys = {"OPENAI_API_KEY", "CODEX_API_KEY", agent.api_key_env if agent else ""}
+        keys = (
+            {"ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN"}
+            if claude
+            else {"OPENAI_API_KEY", "CODEX_API_KEY"}
+        ) | {agent.api_key_env if agent else ""}
         from kirabridge.agent_manager import agent_environment
 
         effective = agent_environment(agent, self.bridge.terminal) if agent else {}

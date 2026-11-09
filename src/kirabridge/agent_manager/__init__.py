@@ -10,6 +10,7 @@ from typing import Protocol
 import httpx
 
 from kirabridge.agent_manager.claude import ClaudeCodeAdapter
+from kirabridge.agent_manager.claude_headless import ClaudeHeadlessAdapter
 from kirabridge.agent_manager.cli_support import login_identity
 from kirabridge.agent_manager.copilot import CopilotCLIAdapter
 from kirabridge.agent_manager.gemini import GeminiAdapter
@@ -540,6 +541,8 @@ class AgentManager:
             "opencode": OpenCodeAdapter(terminal),
             "gemini_cli": GeminiAdapter(terminal),
             "claude_code": ClaudeCodeAdapter(terminal),
+            "claude_worker": ClaudeHeadlessAdapter(terminal, "worker"),
+            "claude_verify": ClaudeHeadlessAdapter(terminal, "verifier"),
             "copilot_cli": CopilotCLIAdapter(terminal),
         }
 

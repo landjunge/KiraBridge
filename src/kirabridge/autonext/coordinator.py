@@ -112,7 +112,12 @@ class CoordinatedAutoNext(AutoNextManager):
             not verifier
             or verifier.agent != "codex_verify"
             or not verifier_agent
-            or verifier_agent.kind != "codex"
+            or verifier_agent.kind
+            != (
+                "claude_verify"
+                if self.bridge.config.agents["codex"].kind == "claude_worker"
+                else "codex"
+            )
             or verifier_agent.sandbox_mode != "read-only"
             or verifier_agent.bridge_tools
             or verifier_agent.allow_local_tools
@@ -327,8 +332,11 @@ class CoordinatedAutoNext(AutoNextManager):
         protocol = (
             "Return the CLI-schema verdict object with exactly verdict (pass or fail), "
             "source_sha256 copied from context, and summary (short text). "
-            if work["assignee"] == "grok"
-            and self.bridge.config.agents["grok"].kind == "grok_structured"
+            if (
+                work["assignee"] == "grok"
+                and self.bridge.config.agents["grok"].kind == "grok_structured"
+            )
+            or self.bridge.config.agents[work["assignee"]].kind == "claude_verify"
             else "Return one JSON object with kirabridge_team string 1, actions [], and result as "
             "a JSON string with exactly verdict (pass or fail), source_sha256 copied from context, "
             "and summary (short text). "
