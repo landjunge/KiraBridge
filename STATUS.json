@@ -1,0 +1,236 @@
+{
+  "schema": "status-v1",
+  "product": "KiraBridge",
+  "repo": {
+    "name": "landjunge/KiraBridge",
+    "visibility": "private",
+    "default_branch": "main"
+  },
+  "observed_at": "2026-11-09T06:54:45Z",
+  "plan": "BIGPLAN-BAUPLAN-20261108",
+  "main_pin": {
+    "commit": "5da9d858a2dcc78743ad84d3d4434384cc16f1b6",
+    "committed_at": "2026-11-09T04:53:16Z"
+  },
+  "source_version": "0.8.0rc43",
+  "releases": [
+    {
+      "tag": "linux-v0.8.0rc41",
+      "draft": false,
+      "prerelease": true,
+      "published_at": "2026-11-07T13:19:39Z",
+      "assets": [
+        "INSTALL-LINUX-SERVER.de.md",
+        "INSTALL-LINUX-SERVER.md",
+        "KiraBridge-0.8.0rc41-Linux-x86_64.tar.gz",
+        "KiraBridge-0.8.0rc41-Linux-x86_64.tar.gz.sha256",
+        "LICENSE",
+        "RELEASE-0.8.0rc41.md",
+        "SHA256SUMS",
+        "accept_linux_server.py",
+        "debian-actual-download-20261107.json",
+        "debian-actual-download-20261107.json.sha256",
+        "debian-ci-350.json",
+        "debian-ci-350.log",
+        "debian-delivery-environment.json",
+        "debian-delivery-evidence.json",
+        "debian-delivery-junit.xml",
+        "debian-delivery-smoke.py",
+        "debian-delivery.log",
+        "debian-dirktest-release-20261107.json",
+        "debian-dirktest-release-20261107.json.sha256",
+        "debian-env-isolation-wrapper.py",
+        "debian-environment-isolation.json",
+        "debian-extra-native-standalone.py",
+        "debian-failed-unit-cleanup.py",
+        "debian-final-integration-receipt.json",
+        "debian-final-integration-receipt.json.sha256",
+        "debian-independent-cleanup.log",
+        "debian-main-6ced819-ci-20261107.log.gz",
+        "debian-main-6ced819-ci-20261107.log.gz.sha256",
+        "debian-main-ci-completion-20261107.json",
+        "debian-main-ci-completion-20261107.json.sha256",
+        "debian-native-environment-junit.xml",
+        "debian-native-environment.json",
+        "debian-native-environment.log",
+        "debian-native-extra-junit.xml",
+        "debian-native-extra.json",
+        "debian-native-extra.log",
+        "debian-native-failed-cleanup-junit.xml",
+        "debian-native-failed-cleanup.json",
+        "debian-native-legacy-junit.xml",
+        "debian-native-legacy-migration.py",
+        "debian-native-legacy.json",
+        "debian-native-legacy.log",
+        "debian-native-lifecycle-junit.xml",
+        "debian-native-lifecycle.json",
+        "debian-native-lifecycle.log",
+        "debian-reproducibility.json",
+        "debian-review-final.json",
+        "debian-review-resolved.json",
+        "debian-runtime-provenance.json",
+        "debian-source-equivalence.json"
+      ]
+    },
+    {
+      "tag": "windows-v0.8.0rc37.dev1",
+      "draft": false,
+      "prerelease": true,
+      "published_at": "2026-11-04T20:36:17Z",
+      "assets": [
+        "KiraBridge-0.8.0rc37.dev1-Windows-Dev-Kit.zip",
+        "LICENSE",
+        "SHA256SUMS",
+        "native-acceptance.json",
+        "package.json"
+      ]
+    },
+    {
+      "tag": "v0.8.0rc36",
+      "draft": false,
+      "prerelease": true,
+      "published_at": "2026-11-04T16:10:56Z",
+      "assets": [
+        "KiraBridge-0.8.0rc36-Intel-Installer.zip",
+        "KiraBridge-0.8.0rc36-Intel-Installer.zip.sha256",
+        "KiraBridge-macos.tar.gz",
+        "KiraBridge-macos.tar.gz.sha256",
+        "LICENSE",
+        "SHA256SUMS",
+        "install-macos.sh",
+        "install-macos.sh.sha256",
+        "kirabridge-0.8.0rc36-py3-none-any.whl",
+        "kirabridge-0.8.0rc36-py3-none-any.whl.sha256"
+      ]
+    }
+  ],
+  "installed": {
+    "mac": {
+      "state": "installed",
+      "observed_at": "2026-11-09T06:54:45Z",
+      "entries": [
+        {
+          "kind": "app",
+          "path": "~/Applications/KiraBridge.app",
+          "version": "0.8.0rc43",
+          "version_key": "KiraBridgeVersion",
+          "source_commit": "f9e6ec8e86c9704dd9c13d390a781de270dcb93a",
+          "commit_key": "KiraBridgeSourceCommit",
+          "note": "native App, Info.plist; Installation wird von einer anderen Lane auf RC43 umgestellt"
+        },
+        {
+          "kind": "launcher",
+          "path": "~/.local/bin/kirabridge",
+          "version": "0.8.0rc41",
+          "source_commit": "c81430b88738",
+          "runtime_marker": "0.8.0rc41-c81430b88738",
+          "note": "CLI-Wrapper zeigt (Stand Beobachtung) noch auf RC41-c81430b88738; install/current.json nennt rc43 mit rollback_core_restored=true"
+        }
+      ]
+    },
+    "windows": "unknown",
+    "linux": "unknown"
+  },
+  "server": {
+    "source": "ops/netcup.json (KiraBridge, BP-OPS-01)",
+    "observed_at": "2026-11-08T16:59:45Z",
+    "components": [
+      {
+        "name": "kirabridge-server",
+        "unit": "kirabridge.service",
+        "state": "active",
+        "version": "0.8.0rc41",
+        "source_commit": "350d36854fc9",
+        "exposure": "nur Loopback (127.0.0.1:8765), kein oeffentlicher Weg"
+      }
+    ]
+  },
+  "open_packages": [
+    {
+      "id": "BP-KB-REL-42",
+      "title": "macOS-Stabilitaet, RC42/RC43 aus main bauen und installieren",
+      "status": "in-progress",
+      "note": "RC43 in der Mac-App beobachtet; Abnahme (Chat-Pfade, Messwerte) offen"
+    },
+    {
+      "id": "BP-DEBIAN-02",
+      "title": "Server-Tunnel, PR #85, Test mit ausgeschaltetem Mac",
+      "status": "in-progress"
+    },
+    {
+      "id": "BP-WINDOWS-02",
+      "title": "Windows-RC41 als Release, Zugang fuer Dirk",
+      "status": "open"
+    },
+    {
+      "id": "BP-WINDOWS-03",
+      "title": "Windows-Paritaet",
+      "status": "open"
+    },
+    {
+      "id": "BP-LINUX-01",
+      "title": "Linux-Faehigkeiten getrennt ausweisen",
+      "status": "open"
+    },
+    {
+      "id": "BP-CLI-01",
+      "title": "Welle 1: Claude Code",
+      "status": "open"
+    },
+    {
+      "id": "BP-CLI-02",
+      "title": "Welle 2: Gemini, Cursor",
+      "status": "open"
+    },
+    {
+      "id": "BP-CLI-03",
+      "title": "Welle 3: OpenCode, Copilot CLI, Aider",
+      "status": "open"
+    },
+    {
+      "id": "BP-PAIR-01",
+      "title": "Geraete-Pairing",
+      "status": "open"
+    },
+    {
+      "id": "BP-AUTO-01",
+      "title": "AutoNext einschalten",
+      "status": "open"
+    },
+    {
+      "id": "BP-REMOTE-03",
+      "title": "echte mobile Abnahme",
+      "status": "open"
+    },
+    {
+      "id": "BP-PUBLIC-01",
+      "title": "oeffentliches Schaufenster KiraBridge",
+      "status": "open"
+    },
+    {
+      "id": "BP-TRUTH-01",
+      "title": "Ist-Stand-Register (diese Datei)",
+      "status": "in-progress"
+    },
+    {
+      "id": "BP-DOC-01",
+      "title": "READMEs und Lizenzen, Angaben aus STATUS.json",
+      "status": "open"
+    },
+    {
+      "id": "BP-DESIGN-01",
+      "title": "gemeinsames Designsystem",
+      "status": "open"
+    },
+    {
+      "id": "BP-HYG-01",
+      "title": "Arbeitsstände und Worktrees aufräumen",
+      "status": "open"
+    }
+  ],
+  "notes": [
+    "W18: README nennt RC40 aus d12838a, Board RC40 aus a5d381a; gelesen wurde RC43 (App, f9e6ec8e86c9) und RC41-c81430b88738 (CLI-Wrapper). Beide Commits sind Vorfahren von main.",
+    "Veroeffentlicht ist nur: macOS Intel RC36, Linux RC41, Windows rc37.dev1; installierter Stand und Release weichen bewusst ab.",
+    "Status 'open' heisst: laut Bauplan offen, in diesem Register kein Abschlussbeleg."
+  ]
+}
