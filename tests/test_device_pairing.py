@@ -1,0 +1,101 @@
+import os
+
+import pytest
+
+from kirabridge.bridge_core.models import BridgeError
+from kirabridge.device_pairing import DevicePairing
+from test_remote_relay import intent, relay, remote  # noqa: F401
+
+
+class Clock:
+    def __init__(self):
+        self.now = 1000.0
+
+    def __call__(self):
+        return self.now
+
+
+@pytest.fixture
+def pairing(tmp_path):
+    clock = Clock()
+    return DevicePairing(tmp_path / "pairing.json", clock=clock), clock
+
+
+def test_pairing_issues_key_once_and_stores_only_hash(pairing, tmp_path):
+    reg, _ = pairing
+    code = reg.begin("home-mac", "ws1")
+    key = reg.complete(code, "home-mac")
+    assert reg.authorize("home-mac", "ws1", key)["workspace_ref"] == "ws1"
+    text = (tmp_path / "pairing.json").read_text()
+    assert key not in text and code not in text
+    with pytest.raises(BridgeError, match="pairing code"):
+        reg.complete(code, "home-mac")  # one-time
+
+
+def test_revocation_blocks_authorization(pairing):
+    reg, _ = pairing
+    key = reg.complete(reg.begin("home-mac", "ws1"), "home-mac")
+    reg.revoke("home-mac")
+    with pytest.raises(BridgeError, match="revoked"):
+        reg.authorize("home-mac", "ws1", key)
+
+
+def test_wrong_device_scope_key_and_unpaired(pairing):
+    reg, _ = pairing
+    code = reg.begin("home-mac", "ws1")
+    with pytest.raises(BridgeError, match="mismatched"):
+        reg.complete(code, "other-mac")
+    with pytest.raises(BridgeError, match="mismatched"):
+        reg.complete(code, "home-mac")  # wrong device burned the code
+    key = reg.complete(reg.begin("home-mac", "ws1"), "home-mac")
+    with pytest.raises(BridgeError, match="scope"):
+        reg.authorize("home-mac", "ws2", key)
+    with pytest.raises(BridgeError, match="does not match"):
+        reg.authorize("home-mac", "ws1", "wrong")
+    with pytest.raises(BridgeError, match="not paired"):
+        reg.authorize("other-mac", "ws1")
+
+
+def test_expired_pairing_approval_and_device(pairing):
+    reg, clock = pairing
+    code = reg.begin("home-mac", "ws1", code_ttl=60, device_ttl=100)
+    clock.now += 61
+    with pytest.raises(BridgeError, match="expired"):
+        reg.complete(code, "home-mac")
+    key = reg.complete(reg.begin("home-mac", "ws1", device_ttl=100), "home-mac")
+    clock.now += 101
+    with pytest.raises(BridgeError, match="expired"):
+        reg.authorize("home-mac", "ws1", key)
+
+
+@pytest.mark.skipif(
+    not os.environ.get("KIRABRIDGE_TEST_REMOTE_THREADDESK_SOURCE"),
+    reason="pinned ThreadDesk source",
+)
+async def test_relay_executes_only_for_paired_device_and_never_after_revoke(
+    remote,
+    pairing,
+    tmp_path,  # noqa: F811
+):
+    reg, _ = pairing
+    envelope = await intent(remote)
+    b = remote.binding
+    async with relay(remote, pairing=reg) as coordinator:
+        with pytest.raises(BridgeError, match="not paired"):
+            await coordinator.deliver(envelope)
+    assert not remote.counter.exists()
+    reg.complete(reg.begin(b.device_ref, "other-ws"), b.device_ref)
+    async with relay(remote, pairing=reg) as coordinator:
+        with pytest.raises(BridgeError, match="scope"):
+            await coordinator.deliver(envelope)
+    reg.complete(reg.begin(b.device_ref, b.workspace_ref), b.device_ref)
+    reg.revoke(b.device_ref)
+    async with relay(remote, pairing=reg) as coordinator:
+        with pytest.raises(BridgeError, match="revoked"):
+            await coordinator.deliver(envelope)
+    assert not remote.counter.exists()
+    assert remote.bridge.store.db.execute("SELECT count(*) FROM tasks").fetchone()[0] == 0
+    reg.complete(reg.begin(b.device_ref, b.workspace_ref), b.device_ref)
+    async with relay(remote, pairing=reg) as coordinator:
+        task = await coordinator.deliver(envelope)
+    assert task["id"] == envelope["request"]["task_id"]

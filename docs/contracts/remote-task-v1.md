@@ -234,3 +234,21 @@ Privater Checkpoint mit Quellhashes und Prüf-/Reviewbelegen:
 ThreadDesk führt knappe gesicherte und zurückgelesene Checkpoints im vorhandenen
 Koordinations-/Entwicklungsboard. Windows/Dirk bleibt parallel priorisiert;
 dieser Vertrag erteilt keinen zweiten Windows- oder Ocean-Implementierungsauftrag.
+
+## 6. Nachtrag BP-PAIR-01: Geräte-Pairing (09.11.2026)
+
+Umgesetzt in `src/kirabridge/device_pairing.py`, angebunden an das bestehende
+`RemoteRelay` (optionaler Parameter `pairing`). Keine zweite Queue, kein neuer Dispatcher.
+
+- Bedienerseite `begin(device_ref, workspace_ref)`: Einmalcode (max. 15 min), an genau
+  ein Gerät und einen Scope gebunden. `complete(code, device_ref)` liefert den
+  Geräteschlüssel einmalig; gespeichert wird nur dessen SHA-256 (Datei 0600, atomar).
+  Falsches Gerät verbraucht den Code; abgelaufene Freigabe wird abgewiesen.
+- `revoke(device_ref)` wirkt sofort. `authorize(device_ref, workspace_ref[, key])` prüft:
+  gekoppelt, nicht widerrufen, nicht abgelaufen, Scope passt, Schlüssel passt.
+- `RemoteRelay.deliver` prüft vor jeder Aufnahme und erneut unmittelbar vor `task_submit`.
+  Nach Widerruf, bei falschem Gerät oder falschem Scope: keine Ausführung. `reconcile`
+  bleibt lesend und wird nicht gesperrt (Belege vorhandener Tasks bleiben abfragbar).
+- Offen für die Liveabnahme: Serverseitige Anmeldung des Heimgeräts mit dem Schlüssel
+  über den Tunnel (BP-DEBIAN-02), Deploy auf den Server, Speicherort der Pairing-Datei.
+Tests: `tests/test_device_pairing.py` (Relay-Test braucht den gepinnten ThreadDesk-Quellstand).

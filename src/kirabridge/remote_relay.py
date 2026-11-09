@@ -56,7 +56,14 @@ def structured(result):
 
 class RemoteRelay:
     def __init__(
-        self, source, device_peer: Peer, binding: DeviceBinding, resolve_grant, *, clock=time.time
+        self,
+        source,
+        device_peer: Peer,
+        binding: DeviceBinding,
+        resolve_grant,
+        *,
+        clock=time.time,
+        pairing=None,
     ):
         if (
             not device_peer.url
@@ -75,7 +82,7 @@ class RemoteRelay:
         ):
             raise BridgeError("remote_device_config", "Device certificate identity differs")
         self.source, self.peer, self.binding = source, device_peer, binding
-        self.resolve_grant, self.clock = resolve_grant, clock
+        self.resolve_grant, self.clock, self.pairing = resolve_grant, clock, pairing
         self.pool = MCPClientPool(call_timeout=25)
         self.validator = SchemaValidatorCache()
         self.schema = json.loads(
@@ -175,6 +182,11 @@ class RemoteRelay:
             raise BridgeError("remote_task_conflict", "Existing Core identity or request differs")
         return task
 
+    def _authorize_device(self):
+        # Optional revocable device key: gates execution only; reconcile stays read-only.
+        if self.pairing is not None:
+            self.pairing.authorize(self.binding.device_ref, self.binding.workspace_ref)
+
     async def reconcile(self, envelope):
         envelope = self._snapshot(envelope)
         request, grant = await self._check(envelope)
@@ -186,6 +198,7 @@ class RemoteRelay:
         return task
 
     async def deliver(self, envelope):
+        self._authorize_device()
         envelope = self._snapshot(envelope)
         request, grant = await self._check(envelope)
         existing = await self._existing(request, grant)
@@ -200,6 +213,7 @@ class RemoteRelay:
             raise UncertainExecution(
                 "remote_delivery_unknown", "Existing dispatch marker; do not replay"
             )
+        self._authorize_device()
         if (
             self.resolve_grant(envelope["authorization"]["grant_ref"]) != grant
             or self.clock() >= envelope["expires_at"]
