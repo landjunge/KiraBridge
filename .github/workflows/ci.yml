@@ -1,7 +1,12 @@
 name: Verify
 on:
+  # Branch pushes are covered by their pull_request run; only main runs on push.
+  # Docs-only changes skip the full suite (own runners stay free).
   push:
+    branches: [main]
+    paths-ignore: ['docs/**', '**/*.md']
   pull_request:
+    paths-ignore: ['docs/**', '**/*.md']
   workflow_dispatch:
     inputs:
       scope:
