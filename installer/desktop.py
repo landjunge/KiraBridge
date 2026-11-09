@@ -10,6 +10,17 @@ import subprocess
 import time
 from pathlib import Path
 
+SENDER = "integrations/chat-events/serve.py"
+
+
+def release_argv(api, args, release, name, argv=None):
+    """Service command pinned to this release venv; chat-events keeps its own options."""
+    runtime = str(api.python(release))
+    if name == "chat-events":
+        return [runtime, str(release / "source" / SENDER), *argv[2:]]
+    command = {"approvals": ["approval-server"], "grok-app": ["grok-connector", "serve"]}
+    return [runtime, "-m", "kirabridge.cli", "--config", str(args.config), *command[name]]
+
 
 def files(root):
     result = {}
@@ -124,13 +135,13 @@ def snapshot(api, args, release, old, backup):
         "app_was_running": bool(app_processes(app)),
         "services": [],
     }
-    for name in ("approvals", "chatgpt"):
+    for name in ("approvals", "chatgpt", "grok-app", "chat-events"):
         label = "com.kirabridge." + name
         path = home / "Library/LaunchAgents" / (label + ".plist")
         api.validate_destination(path)
         exists = path.exists()
-        if name == "chatgpt" and not exists:
-            continue  # Never create an account/profile during an upgrade.
+        if name != "approvals" and not exists:
+            continue  # Never create an account/profile or optional service during an upgrade.
         definition = plistlib.loads(path.read_bytes()) if exists else None
         if definition:
             argv = definition.get("ProgramArguments")
@@ -144,10 +155,33 @@ def snapshot(api, args, release, old, backup):
                     not isinstance(argv, list)
                     or not argv
                     or argv[0] not in allowed
-                    or argv[1:]
-                    != ["-m", "kirabridge.cli", "--config", str(args.config), "approval-server"]
+                    or argv[1:] != release_argv(api, args, release, name)[1:]
                 ):
                     raise RuntimeError("Existing console service differs; preserved")
+            elif name != "chatgpt":
+                # Older setups ran these from a development checkout; any absolute
+                # interpreter is moved to the release venv, the command must match.
+                if (
+                    not isinstance(argv, list)
+                    or len(argv) < 2
+                    or not all(isinstance(value, str) for value in argv)
+                    or not argv[0].startswith("/")
+                    or (
+                        name == "grok-app"
+                        and argv[1:] != release_argv(api, args, release, name)[1:]
+                    )
+                    or (
+                        name == "chat-events"
+                        and (
+                            Path(argv[1]).parts[-3:] != Path(SENDER).parts
+                            or argv[2:4] != ["--config", str(args.config)]
+                            or "--sender-only" not in argv
+                        )
+                    )
+                ):
+                    raise RuntimeError(f"Existing {name} service differs; preserved")
+                if name == "chat-events" and not (release / "source" / SENDER).is_file():
+                    raise RuntimeError("Release lacks the completion sender; preserved")
             else:
                 api.run(
                     [
@@ -224,9 +258,9 @@ def activate(api, args, release, active, current):
         save(api, current, active)
         current_definition = plistlib.loads(path.read_bytes()) if path.exists() else None
         stop(api, row["label"], path=path, definition=current_definition)
-        if row["name"] == "approvals":
+        if row["name"] != "chatgpt":
             definition = (
-                plistlib.loads((backup / "approvals.before.plist").read_bytes())
+                plistlib.loads((backup / (row["name"] + ".before.plist")).read_bytes())
                 if row["existed"]
                 else {
                     "Label": row["label"],
@@ -241,14 +275,11 @@ def activate(api, args, release, active, current):
                     },
                 }
             )
-            definition["ProgramArguments"] = [
-                str(api.python(release)),
-                "-m",
-                "kirabridge.cli",
-                "--config",
-                str(args.config),
-                "approval-server",
-            ]
+            definition["ProgramArguments"] = release_argv(
+                api, args, release, row["name"], definition.get("ProgramArguments")
+            )
+            if "WorkingDirectory" in definition:
+                definition["WorkingDirectory"] = str(release / "source")
             api.atomic(path, plistlib.dumps(definition))
         else:
             definition = plistlib.loads(path.read_bytes())

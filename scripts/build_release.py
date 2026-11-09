@@ -303,6 +303,7 @@ def build(output, *, target=None):
             "pyproject.toml",
             "uv.lock",
             "LICENSE",
+            "integrations/chat-events/serve.py",  # Launchd sender runs from the release venv.
         }:
             member = name if name.startswith("docs/") else "payload/" + name
             files[member] = subprocess.check_output(["git", "show", f"{commit}:{name}"])

@@ -76,7 +76,9 @@ Logs: `~/.local/share/kirabridge/install/logs/`. Versioned runtimes/backups:
 `~/.config/kirabridge/`. The updater does not rewrite shell profiles or PATH.
 
 Use the retained package and transaction backup for
-`python3.11 KiraBridge/installer/install.py rollback`. Do not replace new results
+`python3.11 KiraBridge/installer/install.py rollback --bundle KiraBridge --require-visible-terminal`
+(the same package that was installed; without `--bundle` the desktop step aborts).
+Do not replace new results
 with an old database backup. A responding previous daemon proves recovery; a
 restored pointer or timeout does not. [Actual focused rollback evidence and
 original failure](https://github.com/landjunge/KiraBridge/blob/307004e5b2e4285c19e8d7544bedf45b28297a0b/docs/RC14-ROLLBACK-20261026.md).

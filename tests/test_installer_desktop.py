@@ -308,3 +308,154 @@ def test_partial_desktop_failure_keeps_core_recovery_record_until_resumed(monkey
     installer.rollback(args)
     assert core_actions == ["stop", "start"]
     assert json.loads(current.read_text()) == previous
+
+
+DEV = "/Users/operator/KiraBridge"
+
+
+def service_definitions(config):
+    return {
+        "grok-app": {
+            "Label": "com.kirabridge.grok-app",
+            "EnvironmentVariables": {"PATH": "/operator/bin"},
+            "KeepAlive": True,
+            "ProgramArguments": [
+                DEV + "/.venv/bin/python",
+                *["-m", "kirabridge.cli", "--config", str(config), "grok-connector", "serve"],
+            ],
+        },
+        "chat-events": {
+            "Label": "com.kirabridge.chat-events",
+            "KeepAlive": False,
+            "WorkingDirectory": DEV,
+            "ProgramArguments": [
+                DEV + "/integrations/chat-events/.venv/bin/python",
+                DEV + "/integrations/chat-events/serve.py",
+                *["--config", str(config), "--principal", "chatgpt"],
+                *["--state", "/operator/event-state", "--sender-only"],
+            ],
+        },
+    }
+
+
+@pytest.fixture
+def services(desktop, monkeypatch, tmp_path):
+    """Real installer file helpers; launchd, codesign and the app are simulated."""
+    spec = importlib.util.spec_from_file_location(
+        "installer_services_test", Path(__file__).parents[1] / "installer/install.py"
+    )
+    installer = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(installer)
+    monkeypatch.setattr(desktop.Path, "home", lambda: tmp_path)
+    config = tmp_path / "config.toml"
+    agents = tmp_path / "Library/LaunchAgents"
+    agents.mkdir(parents=True)
+    for name, definition in service_definitions(config).items():
+        (agents / f"com.kirabridge.{name}.plist").write_bytes(plistlib.dumps(definition))
+    log = []
+    monkeypatch.setattr(desktop, "job", lambda api, label, **kw: bool(kw.get("definition")))
+    monkeypatch.setattr(desktop, "stop", lambda api, label, **kw: log.append(("stop", label)))
+    monkeypatch.setattr(desktop, "start", lambda api, path: log.append(("start", path.name)))
+    monkeypatch.setattr(desktop, "app_processes", lambda app: [])
+    monkeypatch.setattr(desktop, "start_app", lambda api, app: [])
+
+    def release(name):
+        root = tmp_path / name
+        (root / "source/integrations/chat-events").mkdir(parents=True)
+        (root / "source/integrations/chat-events/serve.py").write_text("sender")
+        (root / "release.json").write_text(json.dumps({"native_app_required": True}))
+        return root
+
+    def copy_native(source, staged, active):
+        (staged / "native/KiraBridge.app").mkdir(parents=True)
+        (staged / "native/KiraBridge.app/binary").write_text(source.name)
+
+    def transaction(target, old=None):
+        backup = tmp_path / "backups" / target.name
+        backup.mkdir(parents=True)
+        if old:
+            app = tmp_path / "Applications/KiraBridge.app"
+            recorded = {"native/KiraBridge.app/" + k: v for k, v in desktop.files(app).items()}
+        state = desktop.snapshot(
+            api, args, target, {"release": str(old), "files": recorded} if old else None, backup
+        )
+        return {"backup": str(backup), "desktop": state}
+
+    args = SimpleNamespace(service="launchd", config=config)
+    api = SimpleNamespace(
+        **{
+            **vars(installer),
+            "validate_destination": lambda path: None,
+            "copy_native": copy_native,
+            "run": lambda argv, **kw: log.append(("run", Path(argv[0]).name)),
+        }
+    )
+    return SimpleNamespace(
+        api=api, args=args, agents=agents, log=log, release=release, transaction=transaction
+    )
+
+
+def plist(services, name):
+    return plistlib.loads((services.agents / f"com.kirabridge.{name}.plist").read_bytes())
+
+
+def test_install_moves_existing_services_to_release_venv_and_rollback_restores(desktop, services):
+    original = {
+        name: (services.agents / f"com.kirabridge.{name}.plist").read_bytes()
+        for name in ("grok-app", "chat-events")
+    }
+    release = services.release("rc44")
+    active = services.transaction(release)
+    assert [row["name"] for row in active["desktop"]["services"]] == [
+        "approvals",
+        "grok-app",
+        "chat-events",
+    ]
+    desktop.activate(services.api, services.args, release, active, release / "current.json")
+    runtime = str(release / "source/.venv/bin/python")
+    grok, events = plist(services, "grok-app"), plist(services, "chat-events")
+    config = str(services.args.config)
+    assert grok["ProgramArguments"] == [
+        *[runtime, "-m", "kirabridge.cli", "--config", config, "grok-connector", "serve"]
+    ]
+    assert grok["EnvironmentVariables"] == {"PATH": "/operator/bin"}
+    assert events["ProgramArguments"] == [
+        runtime,
+        str(release / "source/integrations/chat-events/serve.py"),
+        *service_definitions(config)["chat-events"]["ProgramArguments"][2:],
+    ]
+    assert events["WorkingDirectory"] == str(release / "source")
+    assert ("start", "com.kirabridge.chat-events.plist") in services.log
+    desktop.restore(services.api, active)
+    for name, data in original.items():
+        assert (services.agents / f"com.kirabridge.{name}.plist").read_bytes() == data
+
+
+def test_update_repins_services_from_previous_release(desktop, services):
+    first = services.release("rc44")
+    active = services.transaction(first)
+    desktop.activate(services.api, services.args, first, active, first / "current.json")
+    installed = plist(services, "chat-events")
+    second = services.release("rc45")
+    update = services.transaction(second, old=first)
+    desktop.activate(services.api, services.args, second, update, second / "current.json")
+    runtime = str(second / "source/.venv/bin/python")
+    assert plist(services, "grok-app")["ProgramArguments"][0] == runtime
+    assert plist(services, "chat-events")["ProgramArguments"][:2] == [
+        runtime,
+        str(second / "source/integrations/chat-events/serve.py"),
+    ]
+    desktop.restore(services.api, update)
+    assert plist(services, "chat-events") == installed
+
+
+def test_unexpected_or_missing_services_are_preserved(desktop, services):
+    path = services.agents / "com.kirabridge.grok-app.plist"
+    path.unlink()
+    events = services.agents / "com.kirabridge.chat-events.plist"
+    definition = plist(services, "chat-events")
+    definition["ProgramArguments"].remove("--sender-only")  # MCP-2 frontend, not the sender
+    events.write_bytes(plistlib.dumps(definition))
+    with pytest.raises(RuntimeError, match="chat-events service differs"):
+        services.transaction(services.release("rc44"))
+    assert not path.exists() and plistlib.loads(events.read_bytes()) == definition

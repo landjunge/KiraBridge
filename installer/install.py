@@ -1517,7 +1517,7 @@ def activate(args, release):
             desktop_module(args).activate(
                 types.SimpleNamespace(**globals()), args, release, before, current
             )
-            report("ok", "Desktop-App, Konsole und ChatGPT-Dienst aktualisiert")
+            report("ok", "Desktop-App, Konsole und Dienste aktualisiert")
     except Exception:
         if current.exists() and json.loads(current.read_text()).get("backup") == str(backup):
             report(
