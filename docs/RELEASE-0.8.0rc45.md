@@ -5,7 +5,7 @@ mit dem alten Stand `770bbc9` (TD-P15).
 
 Neu gegenüber RC44:
 
-- ThreadDesk-Pin auf TD_PIN_SHORT (v0.2.0 plus
+- ThreadDesk-Pin auf `aa940db` (v0.2.0 plus
   [ThreadDesk PR #111](https://github.com/landjunge/threaddesk/pull/111)). Er gilt für
   die CI-Legacy-Spur, `scripts/ci_remote_tests.py` und `scripts/install_cli_routing.py`.
   Das Paket liefert ThreadDesk nicht mit. Die Quelle liegt weiter unter
@@ -15,6 +15,8 @@ Neu gegenüber RC44:
   (`td_td_whiteboard__*`), Graph und Relationen (`td_td_graph__*`), Papierkorb
   (`td_td_trash__*`, Schreiben über `td_command_invoke`) und die Suche
   (`td_search_threads`).
+- `threaddesk.manage` mit `action=delete` lehnt ThreadDesk 0.2 ab
+  (`threaddesk_rejected`); Löschen geht nur über den Papierkorb (`trash.move`, `trash.purge`).
 - `td_get_thread` und `td_generate_prompt` liefern höchstens 100000 Zeichen und melden
   `truncated` und `next_offset`. Mit `max_chars` und `offset` kann Kira weiterblättern.
 

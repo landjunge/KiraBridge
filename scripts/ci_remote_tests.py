@@ -17,7 +17,7 @@ import uuid
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
-LEGACY_TD = "770bbc9f0c0a02699cc93cad47d2e2c3782f7080"
+LEGACY_TD = "aa940dbe8e58a4f3ea9322014c4d74a0ea606278"
 REMOTE_TD = "a0dd4c39478b031e0e31d335c2a15435dfbc52eb"
 TOLLGATE = "53fc57cc2e082d022e65e5929cb2a1e186fba852"
 REMOTE_MODULES = ("test_remote_relay", "test_remote_os_restart")
