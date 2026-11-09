@@ -737,3 +737,26 @@ entschieden. Kira oder Nutzer können jede davon jederzeit ändern. Die Texte in
   `com.kirabridge.chat-events`; (2) BP-CLI-02 Phase 1; (3) BP-TD-KONSOL-01 nur
   lesend; (4) alles Weitere nach eigener Freigabe. Damit ist nichts gestartet.
   Jeder Schritt braucht weiterhin seinen eigenen Auftrag.
+
+### 9.10 BP-DESIGN-01 · Einheitliches Produktdesign (Beschluss 09.11.2026)
+
+**Status:** verbindlich in den Bigplan aufgenommen; **Planposition, keine automatische Ausführungsfreigabe**. Die Fertigstellung ist noch nicht nachgewiesen. Bestehende priorisierte Stabilitätsaufträge und separat freizugebende Arbeitspakete bleiben unverändert.
+
+**Umfang und Ziel:** KiraBridge, ThreadDesk, 4AllPass, TollGate und Agent Authority erhalten eine gemeinsame, professionelle Designsprache, ohne ihre eigenständigen Funktionen, Produktidentitäten, Daten oder Sicherheitsgrenzen aufzugeben. **Alle fünf Anwendungen** gehören ausdrücklich zum Abnahmeumfang; insbesondere TollGate, 4AllPass und Agent Authority dürfen nicht zurückbleiben.
+
+**Verbindliche Gestaltungsregeln:**
+- ThreadDesk-Dark als gemeinsame Gestaltungsvorlage; jedes Produkt behält die eigene Markenfarbe und das bereits freigegebene Original-Icon.
+- Einheitliche Regeln für Navigation, Buttons, Dialoge, Tabellen, Statusanzeigen, Einstellungen, Abstände, Typografie, Zustände und Fehlermeldungen.
+- Wiederverwendung geeigneter UI-Komponenten und Design-Tokens statt fünffacher Neuentwicklung; Anpassung an die technischen Frameworks und Plattformen ohne erzwungenen Umbau.
+- Barrierefreiheit (insbesondere Tastaturbedienbarkeit, Kontrast, verständliche Zustände) und unterschiedliche Fenster- bzw. Bildschirmgrößen berücksichtigen.
+- Bestehende Funktionen, Daten, Rechte und sicherheitsrelevante Entscheidungen bleiben unverändert; Designangleichung darf keine Rückschritte verursachen.
+
+**Vorgehen und prüfbare Ergebnisse:**
+1. Ist-Inventar je Anwendung erstellen: aktuelle Oberflächen, Frameworks, bestehende Icons, Design-Tokens und Abweichungen; bereits Fertiges nicht erneut entwickeln.
+2. Gemeinsame Designrichtlinie samt Komponenten-/Token-Katalog und produktspezifischen Markenvarianten festhalten; Auswirkungen und Umsetzungsaufwand pro Produkt prüfen.
+3. Änderungen in getrennten, konfliktarmen Arbeitspaketen nach Abhängigkeiten parallel umsetzen; laufende Stabilisierung nicht unterbrechen, keine ungeprüften Branch-Merges.
+4. Jede Anwendung einzeln auf visuelle Konsistenz, Funktionen, Barrierefreiheit, relevante Plattformen und Fehlerzustände prüfen; Befunde und Abnahmen dokumentieren. **BP-DESIGN-01 ist erst abgeschlossen, wenn alle fünf geprüft und abgenommen sind.**
+
+**Schnittstelle zu BP-LAUNCHER-01:** Der eigenständige gemeinsame Header/App-Launcher (fünf freigegebene Icons, Start/Fokus/Nicht-installiert, echte Serverstatuslampen; siehe 9.4 und 9.5) bleibt ein separates Paket, verwendet aber dieselben Designrichtlinien. Der bereits gemergte README-Header ist kein Ersatz dafür.
+
+**Priorität und Grenzen:** Begleitend zur technischen Entwicklung planbar, aber kein Vorrang vor bestätigter macOS-/Remote-Stabilisierung oder bestehenden Freigabegrenzen. Für konkrete Änderungen an Produkt-Repositories, Installationen oder Releases sind separate Aufträge, Reviews und Abnahmen nötig.
