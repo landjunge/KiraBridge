@@ -37,3 +37,10 @@ The operator explicitly allows one new owned test window when needed. Keep at
 most one such additional window open, reuse it for the necessary test steps, and
 close that owned idle window afterwards with an independent absence check. Do
 not accumulate test windows or close unrelated windows or agent sessions.
+
+## Plan-Governance (Nutzerbeschluss 09.11.2026)
+
+- ThreadDesk ist die einzige maßgebliche Quelle für den Big Plan (Thread `188ce4729a62`). Planänderungen werden nur dort gemacht.
+- GitHub-Plandateien (`*PLAN*.md`, `*BAUPLAN*`, `*GESAMTPLAN*`) sind Archiv bzw. technischer Spiegel und werden nicht als führende Kopie bearbeitet.
+- Neue Plan-Dateien nur mit dem Kopfhinweis: „Nicht maßgeblich. Maßgeblich ist ThreadDesk-Thread `188ce4729a62` (Nutzerbeschluss 09.11.2026). Diese Datei ist Archiv bzw. technischer Spiegel.“
+- Die ChatGPT-Bibliothek bleibt als Backup unverändert. Nichts eigenmächtig löschen.

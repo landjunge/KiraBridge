@@ -1,3 +1,5 @@
+> **Nicht maßgeblich. Maßgeblich ist ThreadDesk-Thread `188ce4729a62` (Nutzerbeschluss 09.11.2026). Diese Datei ist Archiv bzw. technischer Spiegel.**
+
 > Historischer Integrationscheckpoint vor der neuen Quellenzusammenfuehrung.
 > Aktueller Merge-, CI- und tatsaechlicher Installationsstand:
 > [RC40-Integrationsnachweis](RC40-INTEGRATION-INSTALL-20261106.md).

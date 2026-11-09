@@ -1,3 +1,5 @@
+> **Nicht maßgeblich. Maßgeblich ist ThreadDesk-Thread `188ce4729a62` (Nutzerbeschluss 09.11.2026). Diese Datei ist Archiv bzw. technischer Spiegel.**
+
 # Big Plan · Codex-Koordinatorloop
 
 Nutzerauftrag vom 05.11.2026. Der lokale Codex-Koordinator nimmt nacheinander ausdrücklich freigegebene ThreadDesk-Karten an. Er nutzt vorhandenes AutoNext, TeamWork, versiegelte Core-Tasks, Claims, Worktree-Leases und Outbox. Die bisherige Codex/Grok-Übergabe bleibt erhalten. Es entsteht keine zweite Aufgabenqueue.

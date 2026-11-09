@@ -1,3 +1,5 @@
+> **Nicht maßgeblich. Maßgeblich ist ThreadDesk-Thread `188ce4729a62` (Nutzerbeschluss 09.11.2026). Diese Datei ist Archiv bzw. technischer Spiegel.**
+
 # Begrenzte automatische Fortsetzung aus dem vorhandenen Whiteboard
 
 Aktuelle Arbeitsgrundlage: gemeinsamer Big-Plan-Skill **1.2.0 vom 05.11.2026**.
