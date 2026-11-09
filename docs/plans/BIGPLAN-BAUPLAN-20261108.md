@@ -367,3 +367,15 @@ BP-AUTO-01 (Testkarten), BP-TD-REL-01 (Veröffentlichung 0.2) sowie E1 und E5.
 **Arbeitsregel ab 09.11.:** Keine Fensterflut. Teilagenten und Prüfungen arbeiten headless,
 ohne neue Terminal-, App- oder Browserfenster. Abnahmen mit sichtbaren Fenstern werden
 gebündelt und einzeln angekündigt.
+
+### N4 · 09.11.2026 – Dauerregel: sparsam arbeiten
+
+Nutzervorgabe (09.11.2026): Im Big Plan wird **immer sparsam** gearbeitet. Das gilt für
+Token, Modellkosten und Nutzungslimits.
+
+- Die Koordination liest gezielt: Board, kanonischen Plan und die betroffenen Dateien.
+  Sie liest keine ganzen Historien und keine Rohtranskripte.
+- Nur so viele Teilagenten wie nötig. Leichte Arbeit (Doku, Inventar) läuft auf einem
+  kleineren Modell, Sicherheit, Installation und Review auf dem stärkeren.
+- Berichte sind kurz: Ergebnis, Pins, Belege, Offenes. Keine Wiederholung bekannter Stände.
+- Wird ein Limit knapp, startet keine neue Lane. Laufende Lanes werden nur abgeschlossen.
