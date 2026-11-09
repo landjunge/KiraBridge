@@ -1,10 +1,11 @@
 import os
 
 import pytest
+from test_remote_relay import intent, relay
+from test_remote_relay import remote as remote  # noqa: F401
 
 from kirabridge.bridge_core.models import BridgeError
 from kirabridge.device_pairing import DevicePairing
-from test_remote_relay import intent, relay, remote  # noqa: F401
 
 
 class Clock:
