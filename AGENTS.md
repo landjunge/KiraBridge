@@ -42,5 +42,4 @@ not accumulate test windows or close unrelated windows or agent sessions.
 
 - ThreadDesk ist die einzige maßgebliche Quelle für den Big Plan (Master `6b5b73b9de36`, Status im Board `188ce4729a62`). Planänderungen werden nur dort gemacht.
 - In GitHub gibt es keine Big-Plan-Dateien, auch keine Spiegel oder Kopien. GitHub enthält nur technische Entwicklung und Umsetzung (Code, Tests, Install-/Release-Doku). Die früheren GitHub-Plandateien wurden am 09.11.2026 gelöscht; ihr Inhalt steht im ThreadDesk-Board (Rückführung R5a–R5c), die Git-Historie bleibt.
-- Die ChatGPT-Bibliothek ist nur Backup.
 - Die ChatGPT-Bibliothek bleibt als Backup unverändert. Nichts eigenmächtig löschen.
