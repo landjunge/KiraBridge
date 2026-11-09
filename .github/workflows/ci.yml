@@ -65,7 +65,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: landjunge/threaddesk
-          ref: 770bbc9f0c0a02699cc93cad47d2e2c3782f7080
+          ref: aa940dbe8e58a4f3ea9322014c4d74a0ea606278
           path: .ci-threaddesk
           persist-credentials: false
       - name: Check out fixed M4 ThreadDesk source for remote R2 and R3
@@ -82,7 +82,7 @@ jobs:
           ref: 53fc57cc2e082d022e65e5929cb2a1e186fba852
           path: .ci-tollgate
           persist-credentials: false
-      - name: Legacy tests in a fresh process bound to TD770
+      - name: Legacy tests in a fresh process bound to TD aa940db (v0.2.0 + PR #111)
         run: >-
           uv run --locked --group remote-ci python scripts/ci_remote_tests.py legacy
           --expected-kb "${{ github.sha }}" --td .ci-threaddesk --tollgate .ci-tollgate

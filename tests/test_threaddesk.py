@@ -268,8 +268,10 @@ async def test_real_threaddesk_roundtrip_and_reconnect(bridge, config, tmp_path)
                 "expected_revision": archived["revision"],
                 "data": {},
             },
+            expected="failed",
         )
-        assert deleted["deleted"]
+        # ThreadDesk 0.2 refuses the legacy permanent delete (trash.move/trash.purge instead).
+        assert deleted["error"]["code"] == "threaddesk_rejected"
         parent_archived = await call(
             "threaddesk.manage",
             {
@@ -287,8 +289,9 @@ async def test_real_threaddesk_roundtrip_and_reconnect(bridge, config, tmp_path)
                 "id": second["thread_id"],
                 "expected_revision": parent_archived["revision"],
             },
+            expected="failed",
         )
-        assert parent_deleted["deleted"]
+        assert parent_deleted["error"]["code"] == "threaddesk_rejected"
         config.principals["other"].capabilities.remove("threaddesk.manage")
         with pytest.raises(BridgeError):
             bridge.prepare(
