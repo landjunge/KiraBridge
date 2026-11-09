@@ -78,7 +78,9 @@ Logs: `~/.local/share/kirabridge/install/logs/`. Backups und Laufzeiten:
 `~/.config/kirabridge/`. Kein PATH- oder Shellprofil wird für diese Installation
 automatisch umgeschrieben.
 
-Rollback aus dem erhaltenen Paket: `python3.11 KiraBridge/installer/install.py rollback`.
+Rollback aus dem erhaltenen, zuletzt installierten Paket, im sichtbaren Terminal:
+`python3.11 KiraBridge/installer/install.py rollback --bundle KiraBridge --require-visible-terminal`.
+Ohne `--bundle` bricht der Desktop-Schritt ab.
 Vorhandene Guards und neue Daten bleiben erhalten; keine Datenbank unbesehen
 zurückspielen. Erst eine erfolgreich gelesene alte Dienstversion bestätigt den
 Rückweg. Ein Timeout oder nur zurückgesetzter Versionszeiger reicht nicht.

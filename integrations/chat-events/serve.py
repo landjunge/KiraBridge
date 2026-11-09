@@ -20,11 +20,6 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src"))
 
 import httpx  # noqa: E402
-from mcp import types  # noqa: E402
-from mcp.server import Server  # noqa: E402
-from mcp.server.stdio import stdio_server  # noqa: E402
-from mcp.shared.exceptions import MCPError  # noqa: E402
-from pydantic import ConfigDict  # noqa: E402
 
 from kirabridge import event_queue  # noqa: E402
 from kirabridge.bridge_core.config import load_config  # noqa: E402
@@ -35,10 +30,6 @@ from kirabridge.event_push import (  # noqa: E402
     WebhookSender,
     wait_backend_ready,
 )
-
-
-class Params(types.RequestParams):
-    model_config = ConfigDict(extra="allow")
 
 
 def credentials(config, principal):
@@ -118,9 +109,8 @@ RECEIPT_TOOL = {
 }
 
 
-async def make_server(
-    config, principal, state, allowed_hosts, *, sender=None, external_sender=False
-):
+def make_sender(config, principal, state, allowed_hosts, *, sender=None, external_sender=False):
+    """Persistent sender without the MCP-2 SDK, so it runs in the release venv."""
     if "task.read" not in config.principals[principal].capabilities:
         raise RuntimeError("existing_task_read_permission_required")
     journal = EventJournal(state)
@@ -181,6 +171,25 @@ async def make_server(
             journal.db.close()
             if lock_fd is not None:
                 os.close(lock_fd)
+
+    return push, backend, journal, lifespan
+
+
+async def make_server(
+    config, principal, state, allowed_hosts, *, sender=None, external_sender=False
+):
+    # The MCP-2 frontend needs the separate locked project in this directory.
+    from mcp import types
+    from mcp.server import Server
+    from mcp.shared.exceptions import MCPError
+    from pydantic import ConfigDict
+
+    class Params(types.RequestParams):
+        model_config = ConfigDict(extra="allow")
+
+    push, backend, journal, lifespan = make_sender(
+        config, principal, state, allowed_hosts, sender=sender, external_sender=external_sender
+    )
 
     async def listed(ctx, params):
         listing = await backend.rpc("tools/list", {})
@@ -341,6 +350,13 @@ async def make_server(
 
 async def main_async(args):
     config = load_config(str(args.config))
+    if args.sender_only:
+        *_, lifecycle = make_sender(config, args.principal, args.state, args.allow_callback_host)
+        async with lifecycle(None) as worker:
+            await worker
+        raise RuntimeError("completion_event_sender_stopped")
+    from mcp.server.stdio import stdio_server
+
     server, _, lifecycle = await make_server(
         config,
         args.principal,
@@ -348,10 +364,6 @@ async def main_async(args):
         args.allow_callback_host,
         external_sender=args.external_sender,
     )
-    if args.sender_only:
-        async with lifecycle(server) as worker:
-            await worker
-        raise RuntimeError("completion_event_sender_stopped")
     async with stdio_server() as (read, write):
         await server.run(read, write, server.create_initialization_options())
 
