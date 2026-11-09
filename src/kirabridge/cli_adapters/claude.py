@@ -102,12 +102,10 @@ def probe(executable, *, runner=_run, environ=None):
     return result
 
 
-def quota_evidence(executable, *, runner=_run, environ=None, now=None):
-    """Quota evidence for a grant. Never invents usage percentages.
+def login_evidence(executable, *, runner=_run, environ=None, now=None):
+    """Subscription login proof only (no budget, no usage figure).
 
-    A confirmed claude.ai subscription login yields `usage: unknown`; the grant then
-    needs an explicit user acknowledgement in the profile. No login or an API-key
-    route raises.
+    Budget belongs to TollGate (BP-TG-01). A missing login or an API-key route raises.
     """
     import time
 
@@ -118,8 +116,6 @@ def quota_evidence(executable, *, runner=_run, environ=None, now=None):
         raise RuntimeError("Claude subscription login is not confirmed")
     return {
         "observed_at": time.time() if now is None else now,
-        "source": "Claude Code auth status (login/plan only; usage unknown)",
-        "subscription_confirmed": True,
-        "usage": "unknown",
         "version": state["version"],
+        "subscription_confirmed": True,
     }

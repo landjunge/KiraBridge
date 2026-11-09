@@ -15,11 +15,12 @@ from test_autonext_coordinator import configure as configure_codex
 from test_mcp import http_bridge  # noqa: F401
 
 from kirabridge.agent_manager.claude_headless import ClaudeHeadlessAdapter
+from kirabridge.autonext.budget import FailClosedBudgetGate
 from kirabridge.autonext.coordinator import CoordinatedAutoNext
 from kirabridge.bridge_core.config import AgentConfig
 from kirabridge.bridge_core.models import AgentInput, BridgeError, UncertainExecution
 from kirabridge.cli_adapters import adapter_for
-from kirabridge.cli_adapters.claude import probe, quota_evidence
+from kirabridge.cli_adapters.claude import login_evidence, probe
 
 spec = importlib.util.spec_from_file_location(
     "loop_claude", Path(__file__).parents[1] / "scripts/bigplan_loop.py"
@@ -74,7 +75,21 @@ VERDICT = {"verdict": "pass", "source_sha256": SHA, "summary": "ok"}
 TURN = {"kirabridge_team": "1", "result": "DONE", "actions": []}
 
 
-async def run(role, events, *, sandbox="read-only", terminal=None, **config):
+class Gate:
+    ready = True
+
+    def __init__(self):
+        self.log = []
+
+    def reserve(self, request):
+        self.log.append(("reserve", request["role"]))
+        return {"id": 1}
+
+    def settle(self, reservation, outcome):
+        self.log.append(("settle", outcome))
+
+
+async def run(role, events, *, sandbox="read-only", terminal=None, gate=None, **config):
     terminal = terminal or Terminal(events)
     cfg = AgentConfig(
         kind="claude_verify" if role == "verifier" else "claude_worker",
@@ -88,7 +103,8 @@ async def run(role, events, *, sandbox="read-only", terminal=None, **config):
     async def record(value):
         progress.append(value)
 
-    result = await ClaudeHeadlessAdapter(terminal, role).execute(
+    gate = gate or Gate()
+    result = await ClaudeHeadlessAdapter(terminal, role, lambda: gate).execute(
         {"id": "t1", "principal": "codex_verify"},
         AgentInput(agent="x", prompt='KiraBridge team turn\n{"a":"@b"}', cwd=WORKSPACE),
         cfg,
@@ -222,10 +238,10 @@ def test_probe_reads_version_and_login_without_identity():
     assert "example.invalid" not in json.dumps(state)
 
 
-def test_quota_is_unknown_never_a_percentage():
-    evidence = quota_evidence("/c", runner=runner(status=LOGGED_IN), environ={"PATH": "/bin"})
-    assert evidence["usage"] == "unknown" and evidence["subscription_confirmed"] is True
-    assert not any("percent" in key for key in evidence)
+def test_login_evidence_carries_no_budget_or_usage_figure():
+    evidence = login_evidence("/c", runner=runner(status=LOGGED_IN), environ={"PATH": "/bin"})
+    assert evidence["subscription_confirmed"] is True
+    assert not any(k in evidence for k in ("usage", "percent", "budget"))
 
 
 @pytest.mark.parametrize(
@@ -239,22 +255,52 @@ def test_quota_is_unknown_never_a_percentage():
 )
 def test_missing_login_or_api_key_route_stops(status, environ):
     with pytest.raises(RuntimeError):
-        quota_evidence("/c", runner=runner(status=status), environ=environ)
+        login_evidence("/c", runner=runner(status=status), environ=environ)
 
 
-async def test_grant_needs_explicit_user_acknowledgement(monkeypatch):
-    profile = {
-        "coordinator_cli": "claude",
-        "claude": "/c",
-        "claude_quota_unknown_acknowledged": False,
-    }
-    with pytest.raises(RuntimeError, match="acknowledg"):
+async def test_claude_grant_fails_closed_until_a_budget_authority_is_bound(monkeypatch):
+    profile = {"coordinator_cli": "claude", "claude": "/c"}
+    with pytest.raises(RuntimeError, match="TollGate"):
         await loop.grant_quota(profile)
-    monkeypatch.setattr(loop, "quota_evidence", lambda exe: {"usage": "unknown", "exe": exe})
-    assert await loop.grant_quota({**profile, "claude_quota_unknown_acknowledged": True}) == {
-        "usage": "unknown",
-        "exe": "/c",
-    }
+    with pytest.raises(RuntimeError, match="TollGate"):
+        await loop.grant_quota(profile, FailClosedBudgetGate())
+    monkeypatch.setattr(loop, "login_evidence", lambda exe: {"exe": exe})
+    assert await loop.grant_quota(profile, Gate()) == {"exe": "/c"}
+
+
+async def test_reserve_before_turn_and_settle_after(monkeypatch):
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    gate = Gate()
+    await run("worker", stream(TURN), gate=gate)
+    assert gate.log == [("reserve", "worker"), ("settle", "completed")]
+    gate = Gate()
+    with pytest.raises(UncertainExecution):
+        await run("worker", stream(TURN), terminal=Terminal([], timed_out=True), gate=gate)
+    assert gate.log[-1] == ("settle", "unknown")
+    gate = Gate()
+    with pytest.raises(BridgeError):
+        await run("worker", stream(None, subtype="error_during_execution"), gate=gate)
+    assert gate.log[-1] == ("settle", "failed")
+
+
+async def test_default_gate_rejects_every_turn_before_spawn(monkeypatch):
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    terminal = Terminal(stream(TURN))
+    with pytest.raises(BridgeError) as error:
+        await run("worker", None, terminal=terminal, gate=FailClosedBudgetGate())
+    assert error.value.code == "autonext_budget_stop" and not terminal.calls
+
+
+async def test_settlement_failure_is_unknown_not_success(monkeypatch):
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+
+    class Broken(Gate):
+        def settle(self, reservation, outcome):
+            raise RuntimeError("down")
+
+    with pytest.raises(UncertainExecution) as error:
+        await run("worker", stream(TURN), gate=Broken())
+    assert error.value.code == "agent_budget_settlement"
 
 
 def test_cli_module_is_registered_but_claims_no_terminal_capability():
@@ -335,7 +381,7 @@ print(json.dumps({"type":"result","subtype":"success","is_error":False,"session_
 """
 
 
-def configure_claude(s, tmp_path, monkeypatch, mode):
+def configure_claude(s, tmp_path, monkeypatch, mode, gate=None):
     monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
     monkeypatch.delenv("ANTHROPIC_AUTH_TOKEN", raising=False)
     card = configure_codex(s, tmp_path, monkeypatch)
@@ -351,9 +397,7 @@ def configure_claude(s, tmp_path, monkeypatch, mode):
         config.agents[name] = AgentConfig(
             kind=kind, executable=exe, api_key_env="ANTHROPIC_API_KEY", sandbox_mode=sandbox
         )
-    config.autonext = config.autonext.model_copy(
-        update={"budget_state": "user_acknowledged_unknown"}
-    )
+    s["bridge"].agents.budget_gate = gate or Gate()
     s["bridge"].autonext = CoordinatedAutoNext(s["bridge"])
     return card, log
 
@@ -416,21 +460,24 @@ async def test_worker_timeout_stays_unknown_and_is_not_replayed(scenario, tmp_pa
     assert log.read_text().split() == ["work"]
 
 
-def test_claude_budget_requires_acknowledged_unknown_and_no_api_key(scenario, monkeypatch):  # noqa: F811
+async def test_chain_without_bound_budget_authority_never_spawns(scenario, tmp_path, monkeypatch):  # noqa: F811
     s = scenario
-    config = s["config"]
-    config.agents["codex"] = AgentConfig(
+    card, log = configure_claude(s, tmp_path, monkeypatch, "ok", gate=FailClosedBudgetGate())
+    bridge = s["bridge"]
+    await s["start"]()
+    await until(lambda: bridge.autonext.inspect()["state"] == "stopped")
+    assert bridge.autonext.receipt("codex", card["task_id"]) is None
+    assert not log.exists()
+
+
+def test_claude_grant_still_rejects_api_key_route(scenario, monkeypatch):  # noqa: F811
+    s = scenario
+    s["config"].agents["codex"] = AgentConfig(
         kind="claude_worker", executable=sys.executable, api_key_env="ANTHROPIC_API_KEY"
     )
     manager = CoordinatedAutoNext(s["bridge"])
     s["grant"]([])
-    with pytest.raises(BridgeError):  # "available" is not an acknowledged-unknown Claude grant
-        manager._budget()
-    config.autonext = config.autonext.model_copy(
-        update={"budget_state": "user_acknowledged_unknown"}
-    )
+    manager._budget()
     monkeypatch.setenv("ANTHROPIC_API_KEY", "k")
     with pytest.raises(BridgeError):
         manager._budget()
-    monkeypatch.delenv("ANTHROPIC_API_KEY")
-    manager._budget()

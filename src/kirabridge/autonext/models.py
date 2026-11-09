@@ -65,10 +65,7 @@ class AutoNextConfig(BaseModel):
     max_tasks: int = Field(default=2, ge=1, le=16)
     lease_seconds: float = Field(default=360, ge=5, le=900)
     # A bounded operator observation, never an invented subscription quota.
-    # `user_acknowledged_unknown` (Claude only): usage is not queryable; the user accepted that.
-    budget_state: Literal["unknown", "available", "exhausted", "user_acknowledged_unknown"] = (
-        "unknown"
-    )
+    budget_state: Literal["unknown", "available", "exhausted"] = "unknown"
     budget_observed_at: float = Field(default=0, ge=0)
     budget_valid_until: float = Field(default=0, ge=0)
     budget_source_ref: str = Field(default="", max_length=256)

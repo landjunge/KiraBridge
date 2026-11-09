@@ -247,7 +247,7 @@ class AutoNextManager:
         agent = self.bridge.config.agents.get("codex")
         claude = bool(agent and agent.kind == "claude_worker")
         if (
-            cfg.budget_state != ("user_acknowledged_unknown" if claude else "available")
+            cfg.budget_state != "available"
             or not cfg.budget_source_ref
             or not 0 < cfg.budget_observed_at <= now + 2
             or not now < cfg.budget_valid_until <= cfg.budget_observed_at + 3600

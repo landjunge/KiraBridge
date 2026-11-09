@@ -19,6 +19,7 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from kirabridge.agent_manager.cli_support import bind_session, cli_environment
 from kirabridge.agent_manager.grok_structured import ReviewVerdict, unique_object
+from kirabridge.autonext.budget import FailClosedBudgetGate
 from kirabridge.bridge_core.models import BridgeError, TerminalInput, UncertainExecution
 from kirabridge.filesystem_manager import PathScope
 
@@ -55,9 +56,11 @@ class TeamTurn(BaseModel):
 class ClaudeHeadlessAdapter:
     interface_version = "1"
 
-    def __init__(self, terminal, role: Literal["worker", "verifier"]):
+    def __init__(self, terminal, role: Literal["worker", "verifier"], budget=None):
         self.terminal = terminal
         self.role = role
+        # Callable returning the current BudgetGate; the default is fail-closed.
+        self.budget = budget or FailClosedBudgetGate
 
     def allowed_tools(self, config) -> tuple[str, ...]:
         if self.role == "worker" and config.sandbox_mode == "workspace-write":
@@ -161,17 +164,49 @@ class ClaudeHeadlessAdapter:
         # carries untrusted text, and @ is an equivalent JSON escape.
         head, sep, tail = args.prompt.partition("\n")
         prompt = head + sep + tail.replace("@", "\\u0040")
-        native = await self.terminal.execute(
-            task["id"],
-            task["principal"],
-            TerminalInput(argv=command, cwd=str(cwd), timeout=args.timeout, max_output=1048576),
-            roots,
-            [config.executable],
-            spawned,
-            env=env,
-            stdin=prompt.encode("utf-8"),
-            line_callback=event,
+        gate = self.budget()
+        reservation = gate.reserve(
+            {
+                "cli": "claude",
+                "role": self.role,
+                "agent": args.agent,
+                "task_id": task["id"],
+                "timeout_seconds": args.timeout,
+            }
         )
+        outcome, pending = "unknown", None
+        try:
+            native = await self.terminal.execute(
+                task["id"],
+                task["principal"],
+                TerminalInput(argv=command, cwd=str(cwd), timeout=args.timeout, max_output=1048576),
+                roots,
+                [config.executable],
+                spawned,
+                env=env,
+                stdin=prompt.encode("utf-8"),
+                line_callback=event,
+            )
+            if not (native["timed_out"] or native.get("terminated")) and result_event:
+                bad = (
+                    result_event.get("subtype") != "success"
+                    or result_event.get("is_error") is not False
+                    or native["exit_code"] != 0
+                )
+                outcome = "failed" if bad else "completed"
+        except BaseException as error:
+            pending = error
+            if isinstance(error, BridgeError) and not isinstance(error, UncertainExecution):
+                outcome = "failed"
+            raise
+        finally:
+            try:
+                gate.settle(reservation, outcome)
+            except Exception:
+                if pending is None:
+                    raise UncertainExecution(
+                        "agent_budget_settlement", "Budget settlement failed; outcome unknown"
+                    ) from None
         if native["timed_out"] or native.get("terminated"):
             raise UncertainExecution(
                 "agent_timeout", "Claude Code was interrupted; outcome is unknown"

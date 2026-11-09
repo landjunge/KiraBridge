@@ -533,6 +533,10 @@ class GrokACPAdapter:
 class AgentManager:
     def __init__(self, config: Config, terminal: TerminalManager):
         self.config = config
+        from kirabridge.autonext.budget import FailClosedBudgetGate
+
+        # Opt-in Claude turns reserve/settle here; replaced by the TollGate client (BP-TG-01).
+        self.budget_gate = FailClosedBudgetGate()
         self.adapters: dict[str, AgentAdapter] = {
             "codex": CodexAdapter(terminal, config),
             "grok_api": GrokAPIAdapter(),
@@ -541,8 +545,8 @@ class AgentManager:
             "opencode": OpenCodeAdapter(terminal),
             "gemini_cli": GeminiAdapter(terminal),
             "claude_code": ClaudeCodeAdapter(terminal),
-            "claude_worker": ClaudeHeadlessAdapter(terminal, "worker"),
-            "claude_verify": ClaudeHeadlessAdapter(terminal, "verifier"),
+            "claude_worker": ClaudeHeadlessAdapter(terminal, "worker", lambda: self.budget_gate),
+            "claude_verify": ClaudeHeadlessAdapter(terminal, "verifier", lambda: self.budget_gate),
             "copilot_cli": CopilotCLIAdapter(terminal),
         }
 

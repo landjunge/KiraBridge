@@ -32,7 +32,7 @@ from kirabridge.autonext.models import ApprovedCard, AutoNextConfig
 from kirabridge.bridge_core.bridge import Bridge
 from kirabridge.bridge_core.config import Config
 from kirabridge.capability_routing.router import NativeRoutingSettings, WorkerRouting
-from kirabridge.cli_adapters.claude import quota_evidence
+from kirabridge.cli_adapters.claude import login_evidence
 from kirabridge.coordinator_reporting import run_status_report
 from kirabridge.mcp_gateway.http import create_http_app
 from kirabridge.team_manager.models import (
@@ -68,11 +68,10 @@ class LoopProfile(BaseModel):
     quota_events: list[str] = Field(default_factory=list, max_length=16)
     # Opt-in role selection. "codex" (default) leaves every existing route unchanged.
     # "claude" runs worker and verifier as separate Claude Code headless turns; the
-    # verifier is technically read-only. Claude usage is not queryable, so the grant
-    # needs the user's explicit acknowledgement of an unknown quota.
+    # verifier is technically read-only. Budget is not decided here: every Claude turn
+    # reserves/settles through the budget gate (TollGate BP-TG-01, fail closed until bound).
     coordinator_cli: Literal["codex", "claude"] = "codex"
     claude: str | None = None
-    claude_quota_unknown_acknowledged: bool = False
 
     worker_timeouts: dict[
         Literal["codex", "grok", "codex_verify"], Annotated[float, Field(gt=0, le=300)]
@@ -246,15 +245,14 @@ def claude_mode(profile):
     return profile.get("coordinator_cli") == "claude"
 
 
-async def grant_quota(profile):
-    """Quota evidence for a new grant. Claude usage is never estimated."""
+async def grant_quota(profile, gate=None):
+    """Quota evidence for a new grant. Claude budget is TollGate's, never estimated here."""
     if claude_mode(profile):
-        if profile.get("claude_quota_unknown_acknowledged") is not True:
-            raise RuntimeError(
-                "Claude usage is not queryable (unknown); the profile needs the user's "
-                "explicit claude_quota_unknown_acknowledged"
-            )
-        return await asyncio.to_thread(quota_evidence, profile["claude"])
+        from kirabridge.autonext.budget import FailClosedBudgetGate
+
+        if not (gate or FailClosedBudgetGate()).ready:
+            raise RuntimeError("Claude budget authority (TollGate BP-TG-01) is not bound")
+        return await asyncio.to_thread(login_evidence, profile["claude"])
     if profile.get("quota_events"):
         return await quota(profile["codex"], profile["quota_events"])
     return await quota(profile["codex"])
@@ -548,7 +546,9 @@ async def advance(bridge, profile, team, anchor, active_revision):
                 intake["resource_stop"] = failure
                 return active_revision, intake
             try:
-                observation = await grant_quota(profile)
+                observation = await grant_quota(
+                    profile, getattr(bridge.agents, "budget_gate", None)
+                )
             except (TimeoutError, RuntimeError, OSError, ValueError) as error:
                 if intake is None:
                     raise
@@ -575,7 +575,7 @@ async def advance(bridge, profile, team, anchor, active_revision):
                 cards=pins,
                 max_tasks=len(pins),
                 lease_seconds=900,
-                budget_state="user_acknowledged_unknown" if claude_mode(profile) else "available",
+                budget_state="available",
                 budget_observed_at=observation["observed_at"],
                 budget_valid_until=observation["observed_at"] + 3500,
                 budget_source_ref=observation["source"],
