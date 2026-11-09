@@ -35,9 +35,12 @@ def bridge_fixture(monkeypatch, config, *, enabled=True, automatic=True):
     pool = MCPClientPool(call_timeout=2)
     manager = SimpleNamespace(
         lock=asyncio.Lock(),
+        catalog_lock=asyncio.Lock(),
         settings=SimpleNamespace(timeout=2, max_result_bytes=2048),
         connect=AsyncMock(),
         pool=pool,
+        read_catalog=lambda: pool.list_tools("threaddesk"),
+        note_success=lambda: None,
         decode=lambda response, mutation: (True, json.loads(response.content[0].text)),
     )
     pool.sessions = {"threaddesk": SimpleNamespace(list_tools=AsyncMock(return_value=listing))}
@@ -195,7 +198,7 @@ async def test_dynamic_reads_recheck_revocation_after_wait(
         bridge.threaddesk.pool.sessions["threaddesk"].list_tools.side_effect = revoked_listing
         pending = asyncio.create_task(invoke())
     else:
-        async with bridge.threaddesk.lock:
+        async with bridge.threaddesk.catalog_lock:  # Discovery lock, not the call lock.
             pending = asyncio.create_task(invoke())
             await asyncio.sleep(0)  # Let the request wait behind the existing lock owner.
             assert not pending.done()

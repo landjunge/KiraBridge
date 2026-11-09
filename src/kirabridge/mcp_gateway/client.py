@@ -10,6 +10,7 @@ from dataclasses import dataclass, field
 from urllib.parse import urlparse
 
 import httpx
+from anyio import BrokenResourceError, ClosedResourceError, EndOfStream
 from mcp import ClientSession, StdioServerParameters, types
 from mcp.client.stdio import stdio_client
 from mcp.client.streamable_http import streamable_http_client
@@ -17,6 +18,15 @@ from mcp.shared.exceptions import McpError
 
 from kirabridge.bridge_core.models import BridgeError, digest
 from kirabridge.mcp_gateway.schema_validation import SchemaValidatorCache
+
+# The SDK raises these (with an empty message) when the peer end of a stdio pipe is gone.
+TRANSPORT_CLOSED = (ClosedResourceError, BrokenResourceError, EndOfStream)
+
+
+def connection_closed_error():
+    return McpError(
+        types.ErrorData(code=types.CONNECTION_CLOSED, message="MCP peer connection closed")
+    )
 
 
 class ObservedClientSession(ClientSession):
@@ -279,11 +289,34 @@ class MCPClientPool:
             raise
 
     async def list_tools(self, peer_id):
-        """Fresh bounded pagination; catalogs never survive a connection generation."""
+        """Fresh bounded pagination; catalogs never survive a connection generation.
+
+        A peer that accepts the request but never answers, or whose pipe is gone, is
+        replaced (connection and process) so the next read starts clean. Only the
+        connection is rebuilt; no tool call is replayed.
+        """
         session = self.sessions.get(peer_id)
         owner = self.owners.get(peer_id)
         if session is None:
             raise self.failure(peer_id, "peer_disconnected", "MCP peer is not connected")
+        progress = {"requested": False}
+        try:
+            return await self._read_catalog(peer_id, session, owner, progress)
+        except TimeoutError:
+            if (
+                progress["requested"]
+                and self.owners.get(peer_id) is owner
+                and self.sessions.get(peer_id) is session
+            ):
+                self.notice(peer_id, "peer.unresponsive", error_code="peer_unresponsive")
+                await self.disconnect(peer_id)
+            raise
+        except TRANSPORT_CLOSED:
+            if self.owners.get(peer_id) is owner:
+                await self.disconnect(peer_id)
+            raise connection_closed_error() from None
+
+    async def _read_catalog(self, peer_id, session, owner, progress):
         async with (
             asyncio.timeout(self.call_timeout),
             self.catalog_locks.setdefault(peer_id, asyncio.Lock()),
@@ -297,6 +330,7 @@ class MCPClientPool:
             catalog_bytes = 2  # Compact JSON array brackets; commas count below.
             try:
                 for _ in range(8):
+                    progress["requested"] = True
                     page = await session.list_tools(cursor=cursor)
                     if self.sessions.get(peer_id) is not session:
                         raise self.failure(peer_id, "peer_disconnected", "MCP connection changed")
@@ -540,8 +574,8 @@ class MCPClientPool:
             if (
                 isinstance(exc, McpError)
                 and exc.error.code == types.CONNECTION_CLOSED
-                and self.owners.get(peer_id) is owner
-            ):
+                or isinstance(exc, TRANSPORT_CLOSED)
+            ) and self.owners.get(peer_id) is owner:
                 # SDK EOF does not end its owner's stop.wait(). Close only this
                 # proven dead connection; never replay the uncertain tool call.
                 await self.disconnect(peer_id)

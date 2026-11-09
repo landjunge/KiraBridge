@@ -162,6 +162,22 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
                 "error": {"code": "internal_error", "message": "Request could not be completed"}
             }
 
+    def dynamic_failure(exc: Exception):
+        """Never surface an empty error: name the failure and keep its diagnosis."""
+        if isinstance(exc, BridgeError):
+            result = {"error": {"code": exc.code, "message": str(exc)}}
+            if hasattr(exc, "diagnostic"):
+                result["diagnostic"] = exc.diagnostic
+            return result
+        return {
+            "error": {
+                "code": "threaddesk_peer_failure",
+                "message": f"ThreadDesk peer failed: {type(exc).__name__}"
+                + (f": {exc}" if str(exc) else " (no detail)"),
+            },
+            "diagnostic": {"automatic_retry": False, "tool_dispatch": "unknown"},
+        }
+
     read = ToolAnnotations(readOnlyHint=True, destructiveHint=False, openWorldHint=False)
 
     @server.tool(annotations=read)
@@ -455,8 +471,8 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
 
         try:
             return await catalog(bridge, identity(ctx))
-        except BridgeError as exc:
-            return {"error": {"code": exc.code, "message": str(exc)}}
+        except Exception as exc:
+            return dynamic_failure(exc)
 
     @server.tool(annotations=read)
     def whiteboard_read(
@@ -524,8 +540,8 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
 
         try:
             return await dynamic_call(bridge, identity(ctx), name, arguments, operation_id)
-        except BridgeError as exc:
-            return {"error": {"code": exc.code, "message": str(exc)}}
+        except Exception as exc:
+            return dynamic_failure(exc)
 
     @server.tool(annotations=read)
     async def operation_catalog(
