@@ -40,7 +40,7 @@ not accumulate test windows or close unrelated windows or agent sessions.
 
 ## Plan-Governance (Nutzerbeschluss 09.11.2026)
 
-- ThreadDesk ist die einzige maßgebliche Quelle für den Big Plan (Thread `188ce4729a62`). Planänderungen werden nur dort gemacht.
+- ThreadDesk ist die einzige maßgebliche Quelle für den Big Plan (Master `6b5b73b9de36`, Status im Board `188ce4729a62`). Planänderungen werden nur dort gemacht.
 - GitHub-Plandateien (`*PLAN*.md`, `*BAUPLAN*`, `*GESAMTPLAN*`) sind Archiv bzw. technischer Spiegel und werden nicht als führende Kopie bearbeitet.
-- Neue Plan-Dateien nur mit dem Kopfhinweis: „Nicht maßgeblich. Maßgeblich ist ThreadDesk-Thread `188ce4729a62` (Nutzerbeschluss 09.11.2026). Diese Datei ist Archiv bzw. technischer Spiegel.“
+- Neue Plan-Dateien nur mit dem Kopfhinweis: „Nicht maßgeblich. Maßgeblich ist ThreadDesk-Thread `6b5b73b9de36` (Master mit Etappen E01–E09; Status im Board `188ce4729a62`; Nutzerbeschluss 09.11.2026). Diese Datei ist Archiv bzw. technischer Spiegel.“
 - Die ChatGPT-Bibliothek bleibt als Backup unverändert. Nichts eigenmächtig löschen.

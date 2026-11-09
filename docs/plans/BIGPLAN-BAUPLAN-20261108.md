@@ -1,4 +1,4 @@
-> **Nicht maßgeblich. Maßgeblich ist ThreadDesk-Thread `188ce4729a62` (Nutzerbeschluss 09.11.2026). Diese Datei ist Archiv bzw. technischer Spiegel.**
+> **Nicht maßgeblich. Maßgeblich ist ThreadDesk-Thread `6b5b73b9de36` (Master mit Etappen E01–E09; Status im Board `188ce4729a62`; Nutzerbeschluss 09.11.2026). Diese Datei ist Archiv bzw. technischer Spiegel.**
 
 # Big Plan · Bauplan v2
 
@@ -393,8 +393,10 @@ Token, Modellkosten und Nutzungslimits.
 **Governance:**
 
 1. Planänderungen entstehen nur in ThreadDesk, mit Datum, Quelle, Status und Verantwortlichkeit.
-2. GitHub-Plandateien werden nicht als führende Kopie bearbeitet. Neue Plan-Dateien tragen den Hinweis „Nicht maßgeblich. Maßgeblich ist ThreadDesk-Thread `188ce4729a62` (Nutzerbeschluss 09.11.2026). Diese Datei ist Archiv bzw. technischer Spiegel.“
+2. GitHub-Plandateien werden nicht als führende Kopie bearbeitet. Neue Plan-Dateien tragen den Hinweis „Nicht maßgeblich. Maßgeblich ist ThreadDesk-Thread `6b5b73b9de36` (Master mit Etappen E01–E09; Status im Board `188ce4729a62`; Nutzerbeschluss 09.11.2026). Diese Datei ist Archiv bzw. technischer Spiegel.“
 3. Die ChatGPT-Bibliothek bleibt als Backup unverändert.
 4. Bei Widerspruch gilt der neueste belegte Nutzerbeschluss; Unklares wird als „offen – Nutzer“ geführt, nicht selbst entschieden.
 5. Nichts wird eigenmächtig gelöscht.
 6. Das Skript `scripts/plan_notice_check.py` im ThreadDesk-Repo meldet Plan-Dateien ohne den Hinweis.
+
+**Ergänzung zu N5 (09.11.2026, nach vollständiger Lektüre des Masters):** Maßgeblich ist der ThreadDesk-Master `6b5b73b9de36` („Gesamtplan ThreadDesk & 4AllPass“, Etappen E01–E09, Stabilitätsabnahme ST-01–ST-05). Planhierarchie: Master → Board `188ce4729a62` (Status, Belege, Entscheidungen, Rückführung aus GitHub) → Produktthreads. Die Zuordnung der Etappen E01–E09 und ST-01–ST-05 zu den BP-IDs dieser Datei steht im Board-Abschnitt „BIG PLAN – KORREKTUR ZUR RÜCKFÜHRUNG“. Es wurde nichts umbenannt. Die Hinweise in den GitHub-Plandateien verweisen auf den Master; der Status liegt im Board. Diese Datei stammt von Claude und ist nur Archiv bzw. technischer Spiegel.
