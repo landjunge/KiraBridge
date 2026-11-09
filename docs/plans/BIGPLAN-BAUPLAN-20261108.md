@@ -339,3 +339,31 @@ weil er Nutzerkonten betrifft.
 
 **Korrektur zu Abschnitt 2:** Die installierte Mac-CLI läuft aus
 `0.8.0rc41-c81430b88738`, nicht aus RC40. Gilt bis zum Ist-Stand-Register (BP-TRUTH-01).
+
+### N3 · 09.11.2026 – Kurzabgleich und Reihenfolge
+
+Organisator Claude, Nutzerauftrag „Big Plan kurz überarbeiten, dann abarbeiten“.
+Paketstatus mit Belegen steht im Board `188ce4729a62`. Hier nur, was die Reihenfolge ändert.
+
+**Abgeschlossen seit N1:** BP-OPS-01 (KB #98), BP-CLI-02 Phase 1 (KB #99),
+PR #85 Debian-Fernzugang gemergt, BP-SEC-01 (b) Hinweis und RC3-Entwurf (4AllPass #258),
+ThreadDesk-Doku für BP-TD-REL-01/BP-PLAN-01 (TD #105), Berichts-Dedupe (TD #106),
+TD-Peer-Recovery (KB #104). RC42 wird nicht installiert. Er ist durch RC43 (`eb2038d`) ersetzt.
+
+**Jetzt in Arbeit:**
+
+| Lane | Paket | Umfang |
+|---|---|---|
+| L2 | BP-KB-REL-42 | RC43 headless abnehmen und installieren. Die Chat-Abnahme mit sichtbaren Terminals bleibt ein eigener Schritt. |
+| L4 | BP-TRUTH-01 | `STATUS.json` je Produkt, Schema `status-v1`, Prüfskript in ThreadDesk |
+
+**Wartet auf Nutzerfreigabe:** BP-OPS-02 Phase B, also das Umschalten des
+ThreadDesk-Servers auf Release `7a456e2` (Phase A ist abgeschlossen). Außerdem
+BP-AUTO-01 (Testkarten), BP-TD-REL-01 (Veröffentlichung 0.2) sowie E1 und E5.
+
+**Danach auf dem kritischen Pfad:** BP-DEBIAN-02 Tunnelabnahme mit ausgeschaltetem Mac
+(nach OPS-02 B), dann BP-AUTO-01 (nach RC43), BP-PAIR-01 und BP-REMOTE-03.
+
+**Arbeitsregel ab 09.11.:** Keine Fensterflut. Teilagenten und Prüfungen arbeiten headless,
+ohne neue Terminal-, App- oder Browserfenster. Abnahmen mit sichtbaren Fenstern werden
+gebündelt und einzeln angekündigt.
