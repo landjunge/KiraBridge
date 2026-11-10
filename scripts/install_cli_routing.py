@@ -56,7 +56,7 @@ def main():
     else:
         current.symlink_to(release, target_is_directory=True)
     python = home / "KiraBridge/.venv/bin/python"
-    td_src = home / ".local/share/kirabridge/install/shared/threaddesk-aa940db/src"
+    td_src = home / ".local/share/kirabridge/install/shared/threaddesk-869a389/src"
     if not python.is_file() or not td_src.is_dir():
         raise RuntimeError("Verified local Python/ThreadDesk dependency is unavailable")
     import shlex

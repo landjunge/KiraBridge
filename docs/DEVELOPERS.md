@@ -149,7 +149,7 @@ in separate fresh legacy and remote processes, binding imports, pins and results
 
 | Lane | Sources and environment |
 | --- | --- |
-| Legacy | ThreadDesk `aa940dbe8e58a4f3ea9322014c4d74a0ea606278`, `KIRABRIDGE_TEST_THREADDESK_SOURCE=<checkout>/src`; TollGate `53fc57cc2e082d022e65e5929cb2a1e186fba852`, `KIRABRIDGE_TEST_TOLLGATE_SOURCE=<checkout>` |
+| Legacy | ThreadDesk `869a38970bace13c37d73654538b64efa1629da3`, `KIRABRIDGE_TEST_THREADDESK_SOURCE=<checkout>/src`; TollGate `53fc57cc2e082d022e65e5929cb2a1e186fba852`, `KIRABRIDGE_TEST_TOLLGATE_SOURCE=<checkout>` |
 | Remote R2/R3 | ThreadDesk M4 `a0dd4c39478b031e0e31d335c2a15435dfbc52eb`; both `KIRABRIDGE_TEST_THREADDESK_SOURCE` and `KIRABRIDGE_TEST_REMOTE_THREADDESK_SOURCE` point to its `src/`; no legacy TD/TollGate imports |
 
 See the workflow's exact `PYTHONPATH`, temporary/report directories and helper
