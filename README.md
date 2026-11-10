@@ -32,6 +32,8 @@
 
 <p align="center"><strong>Talk to your AI. Get the work done on your computer.</strong></p>
 
+**Part of the NetzwerkPunkt tool family:** KiraBridge connects ChatGPT to tools on your computer and is the central path for voice or chat control. The family includes **KiraBridge** (connection and control), **ThreadDesk** (projects and work history), **4AllPass** (accounts and credentials), **TollGate** (usage limits and budgets), and **Agent Authority** (observation and evidence only). Each tool also works in its own role. **Voice-driven integration across all five is the shared development goal:** existing connections and planned features are documented separately rather than presented as fully released.
+
 KiraBridge connects ChatGPT to terminal and local AI agents on your computer. Discuss what you need in chat or voice, pass work to authorized agents and follow their replies within the configured permissions. **Codex and Grok** are the documented visible-terminal paths. As of November 10, the local inventory additionally reports executable adapters for **Claude Code, OpenCode, Gemini CLI and Copilot**; presence of an adapter does **not** confirm sign-in, a ready terminal session or a successful end-to-end task.
 
 **Server edition:** KiraBridge also runs on Debian; server source and local macOS installation are tracked separately. A server source revision is not itself a published installer. / **Server-Version:** KiraBridge läuft auch auf Debian; Quellstand und veröffentlichte Downloads sind getrennt.
