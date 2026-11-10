@@ -84,6 +84,9 @@ und kein veröffentlichter RC40-Download angeboten.
   gemeldet, nie später ausgeführt. Große Ausgaben bleiben in der Datenbank kurz, das Protokoll vollständig.
 
 ThreadDesk und andere Integrationen sind optional. Der Kern von KiraBridge funktioniert eigenständig.
+Ist ThreadDesk eingerichtet, bringt das Paket die gepinnte ThreadDesk-Bibliothek mit. Der
+Installer stellt `[threaddesk]` `source_root` und `command` auf sie und auf das Python der
+Release um; der Rollback setzt beide Werte zurück. Andere Einstellungen bleiben unverändert.
 
 ## Loslegen
 

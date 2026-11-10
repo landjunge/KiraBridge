@@ -113,6 +113,8 @@ def test_builder_emits_license_asset_and_matching_manifest_for_host(tmp_path, mo
     # has its own signed-app fixture and must never invoke Swift here.
     monkeypatch.setattr(module.sys, "platform", host)
     monkeypatch.setattr(module, "native_payload", lambda *a: ({}, {}, {}))
+    library = {"threaddesk/pyproject.toml": b"[project]\n"}
+    monkeypatch.setattr(module, "threaddesk_library", lambda *a: ("b" * 40, library))
     monkeypatch.chdir(tmp_path)
     inputs = {
         "LICENSE": LICENSE,
@@ -168,6 +170,12 @@ def test_builder_emits_license_asset_and_matching_manifest_for_host(tmp_path, mo
         assert pin["license"] == EXPRESSION
         assert pin["license_sha256"] == hashlib.sha256(LICENSE).hexdigest()
         assert pin["source_commit"] == COMMIT
+        if path.name == "KiraBridge-macos.tar.gz":
+            assert pin["threaddesk"] == "b" * 40
+            assert (
+                pin["files"]["threaddesk/pyproject.toml"]
+                == hashlib.sha256(b"[project]\n").hexdigest()
+            )
         descriptor = pin["presentation"]
         assert descriptor["schema"] == "kirabridge.installer.presentation.v1"
         assert descriptor["palette"] == "#F06DB0"
@@ -312,3 +320,31 @@ def test_package_rejects_license_pin_and_archive_corruption_before_preparation(
     with pytest.raises((RuntimeError, AssertionError)):
         module.package_contract(artifacts, folder, "Linux-x86_64")
     assert not (tmp_path / "must-not-exist").exists()
+
+
+def test_builder_bundles_threaddesk_library_at_the_ci_pin(tmp_path, monkeypatch):
+    import subprocess
+
+    module = script("build_release")
+    repo = tmp_path / "threaddesk"
+    (repo / "src/threaddesk").mkdir(parents=True)
+    (repo / "src/threaddesk/__init__.py").write_text("")
+    (repo / "pyproject.toml").write_text("[project]\n")
+    (repo / "tests").mkdir()
+    (repo / "tests/test_x.py").write_text("")
+    env = {"GIT_CONFIG_GLOBAL": "/dev/null", "GIT_CONFIG_NOSYSTEM": "1", "HOME": str(tmp_path)}
+    for argv in (
+        ["init", "-q"],
+        ["add", "."],
+        ["-c", "user.name=t", "-c", "user.email=t@t", "commit", "-qm", "x"],
+    ):
+        subprocess.run(["git", "-C", str(repo), *argv], check=True, env=env)
+    pin = subprocess.check_output(["git", "-C", str(repo), "rev-parse", "HEAD"], text=True).strip()
+    monkeypatch.setattr(module, "git_blob", lambda c, n: f'LEGACY_TD = "{pin}"\n'.encode())
+    assert module.threaddesk_library(COMMIT, repo) == (
+        pin,
+        {"threaddesk/pyproject.toml": b"[project]\n", "threaddesk/src/threaddesk/__init__.py": b""},
+    )
+    monkeypatch.setattr(module, "git_blob", lambda c, n: b'LEGACY_TD = "' + b"c" * 40 + b'"\n')
+    with pytest.raises((SystemExit, subprocess.CalledProcessError)):
+        module.threaddesk_library(COMMIT, repo)

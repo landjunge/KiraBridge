@@ -87,6 +87,9 @@ for those ongoing projects or published RC40 download is offered here.
   never run later. Large outputs are kept short in the database, the audit trail stays complete.
 
 ThreadDesk and other integrations are optional. KiraBridge's core works independently.
+If ThreadDesk is configured, the package brings the pinned ThreadDesk library and the
+installer points `[threaddesk]` `source_root` and `command` at it and at the release's
+Python; rollback restores both values. Other settings stay unchanged.
 
 ## Get started
 

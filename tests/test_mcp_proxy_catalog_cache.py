@@ -152,3 +152,11 @@ async def test_real_http_permission_revocation_is_enforced_with_warm_schema(
         assert denied.structuredContent["error"]["code"] == "forbidden"
         listing.assert_awaited_once()
         assert bridge.store.db.execute("SELECT count(*) FROM tasks").fetchone()[0] == 1
+
+
+def test_dynamic_threaddesk_names_keep_one_td_prefix():
+    from kirabridge.mcp_gateway.proxy import dynamic_tool_name
+
+    assert dynamic_tool_name("search_threads") == "td_search_threads"
+    assert dynamic_tool_name("td_library_usearch") == "td_library_usearch"
+    assert dynamic_tool_name("td_whiteboard__entry") == "td_whiteboard__entry"
