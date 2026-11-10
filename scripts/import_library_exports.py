@@ -170,13 +170,20 @@ async def run(args):
                         and sha256_file(stored) == manifest["sha256"]
                     )
                     query = Path(entry["original_path"]).name
-                    raw = await bridge.threaddesk.pool.call(
-                        "threaddesk",
-                        "library_search",
-                        {"thread_id": entry["thread_id"], "query": query, "limit": 100},
-                    )
-                    ok, search = bridge.threaddesk.decode(raw, mutation=False)
-                    item["indexed"] = ok and value["receipt"]["artifact_id"] in json.dumps(search)
+                    # ThreadDesk rebuilds its index in the runtime (5 s tick), not per write.
+                    for _attempt in range(40):
+                        raw = await bridge.threaddesk.pool.call(
+                            "threaddesk",
+                            "library_search",
+                            {"thread_id": entry["thread_id"], "query": query, "limit": 100},
+                        )
+                        ok, search = bridge.threaddesk.decode(raw, mutation=False)
+                        item["indexed"] = ok and value["receipt"]["artifact_id"] in json.dumps(
+                            search
+                        )
+                        if item["indexed"]:
+                            break
+                        await asyncio.sleep(1)
                     if not item["readback"] or not item["indexed"]:
                         item["reason"] = "stored_but_readback_or_search_unconfirmed"
                     save(report_path, report)
