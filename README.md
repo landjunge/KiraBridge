@@ -30,11 +30,29 @@
 </p>
 <!-- AUTO-DOWNLOADS:END -->
 
-<p align="center"><strong>Talk to your AI. Get the work done on your computer.</strong></p>
+<p align="center"><strong>Talk to your AI. KiraBridge connects your voice to direct computer control.</strong></p>
 
-**Part of the NetzwerkPunkt tool family:** KiraBridge connects ChatGPT to tools on your computer and is the central path for voice or chat control. The family includes **KiraBridge** (connection and control), **ThreadDesk** (projects and work history), **4AllPass** (accounts and credentials), **TollGate** (usage limits and budgets), and **Agent Authority** (observation and evidence only). Each tool also works in its own role. **Voice-driven integration across all five is the shared development goal:** existing connections and planned features are documented separately rather than presented as fully released.
+## One tool family, one shared voice interface
 
-KiraBridge connects ChatGPT to terminal and local AI agents on your computer. Discuss what you need in chat or voice, pass work to authorized agents and follow their replies within the configured permissions. **Codex and Grok** are the documented visible-terminal paths. As of November 10, the local inventory additionally reports executable adapters for **Claude Code, OpenCode, Gemini CLI and Copilot**; presence of an adapter does **not** confirm sign-in, a ready terminal session or a successful end-to-end task.
+**KiraBridge is the central connection in the NetzwerkPunkt tool family.** It turns authorized requests from ChatGPT, through chat or voice, into actions on your own computer and connects the other tools. The family consists of **KiraBridge** for connectivity and direct control, **ThreadDesk** for projects, work history and tasks, **4AllPass** for credentials and keys, **TollGate** for usage limits and budgets, and **Agent Authority** for read-only observation and evidence. Each tool has its own role. Operating the whole family through natural language is our shared development goal. Existing integrations, work in progress and planned capabilities are clearly distinguished.
+
+## Directly control your computer
+
+**KiraBridge is more than a gateway to terminal AI agents.** Direct computer control is a core capability: open or focus applications, switch windows, enter text directly, write and edit notes, press individual keys and use keyboard shortcuts. Direct typing can work without relying on the clipboard. With the necessary permissions and a compatible interface, mouse, window and screen operations are also available. This allows an AI to interact with existing applications through their ordinary user interfaces, without requiring a custom AI integration for every app.
+
+For example, ask the AI to write down a note. It can open or select the notes app, bring the appropriate window forward and enter your words. Workflows can likewise combine shortcuts, text input and window changes. The goal is not merely to send a command, but to produce a visible action and verifiable result on your computer. Success depends on the application, the operating system's accessibility support, granted permissions and connection stability.
+
+## Making computer use more accessible
+
+**An important focus is people with disabilities, reduced mobility or difficulty using a mouse and keyboard.** Natural language should make everyday actions easier to initiate: launching an app, dictating a note, changing windows or completing a task. The aim is greater independence and fewer complicated physical interaction steps. Hands-free control can benefit many other users as well.
+
+This focus does not mean that KiraBridge already controls every application accessibly or flawlessly. Some functions have been implemented and tested; other workflows are still slow, incomplete or dependent on permissions and the local environment. We are continuously improving reliability, responsiveness, speed and feedback. Important operations still require human oversight and, where appropriate, confirmation.
+
+## AI agents and project workflows
+
+Alongside direct control, KiraBridge can pass work to **Codex and Grok** through configured visible terminal sessions and track their replies. As of November 10, the local inventory also reports executable adapters for **Claude Code, OpenCode, Gemini CLI and Copilot**. Finding an adapter does not prove sign-in, a ready session or a successful end-to-end task.
+
+ThreadDesk adds projects and work history to this workflow, while the other family tools are intended to work together through the shared voice interface. Each tool remains independent; integration plans are not presented as shipped functionality.
 
 **Server edition:** KiraBridge also runs on Debian; server source and local macOS installation are tracked separately. A server source revision is not itself a published installer. / **Server-Version:** KiraBridge läuft auch auf Debian; Quellstand und veröffentlichte Downloads sind getrennt.
 
