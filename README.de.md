@@ -32,11 +32,9 @@
 
 <p align="center"><strong>Du redest mit der KI. Die Arbeit landet auf deinem Rechner.</strong></p>
 
-KiraBridge verbindet ChatGPT mit **Grok Build und Codex, die in Terminalfenstern
-auf deinem Computer laufen**. Besprich im Chat, was du erledigen möchtest, gib die
-Arbeit an diese Terminalagenten weiter und verfolge ihre Antworten — mit den von dir erlaubten Zugriffen.
+KiraBridge verbindet ChatGPT mit lokalen KI-Agenten und Terminalwerkzeugen auf deinem Rechner. Du kannst Aufträge über Chat oder Sprache formulieren, berechtigt weitergeben und Rückmeldungen verfolgen. **Codex und Grok** sind die dokumentierten Wege über sichtbare Terminalfenster. Laut lokalem Inventar vom 10. November sind zusätzlich ausführbare Adapter für **Claude Code, OpenCode, Gemini CLI und Copilot** vorhanden. Ein erkannter Adapter beweist jedoch **weder eine gültige Anmeldung noch eine einsatzbereite Terminalsitzung oder einen erfolgreichen Ende-zu-Ende-Auftrag**.
 
-**Entwicklungs- und Installationsstand (7. November 2026):** Debian-Serverquelle **0.8.0rc41** (`350d368`); auf dem Intel-Mac installierte Laufzeit **0.8.0rc40** (`d12838a`). Diese Stände sind nicht mit einem veröffentlichten macOS-Download gleichzusetzen.
+**Verifizierter Laufzeitstand (10. November 2026):** Auf dem Intel-Mac läuft **KiraBridge 0.8.0rc45** (`0b1d937eef06`), direkt über den laufenden KiraBridge-Dienst geprüft. Das separat veröffentlichte Debian-/Linux-Archiv ist weiterhin **0.8.0rc41** (`350d368`). **Installierte Version, Quellstand und veröffentlichte Downloads sind unterschiedliche Nachweise.**
 
 **Veröffentlichter macOS-Intel-Download:** [0.8.0rc36](https://github.com/landjunge/KiraBridge/releases/tag/v0.8.0rc36) · 4. November 2026 · Vorabversion.
 
@@ -60,7 +58,7 @@ Alle sieben nativen Prüfphasen dieser begrenzten Entwicklungsvorschau bestanden
 ChatGPT-Verbindungstest mit deinem Konto bleiben bei dir.
 [Prüfstand und Grenzen](docs/WINDOWS-SETUP-20261104.md) · [Anleitung](docs/WINDOWS-SETUP.md).
 
-Der oben verlinkte Intel-Download basiert auf RC36 (`d4aebdd`); die getrennten Quell- und Installationsstände stehen in der Übersicht am Anfang.
+Der oben verlinkte, geprüfte veröffentlichte Intel-Download basiert auf RC36 (`d4aebdd`), **nicht** auf der lokal installierten RC45. Der verifizierte Laufzeitstand steht am Anfang; der unten verlinkte Prüfbericht vom 7. November ist älter als RC45.
 [Release-, Artefakt- und Installationsquellnachweis](docs/evidence/readme-current-20261107.json).
 Der [frühere PR61-Installationsbericht](docs/RC40-PR61-SHIM-INSTALL-20261106.md)
 beschreibt den vorherigen RC40-Quellstand `a5d381a`.
