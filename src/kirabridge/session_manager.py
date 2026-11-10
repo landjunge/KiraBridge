@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import re
 import shlex
+import sys
 import time
 from contextlib import asynccontextmanager, contextmanager
 from contextvars import ContextVar
@@ -16,6 +17,7 @@ from pydantic import Field, model_validator
 
 from kirabridge.bridge_core.models import BridgeError, Input, UncertainExecution, digest
 from kirabridge.filesystem_manager import PathScope
+from kirabridge.platform_adapters.linux.owned_terminal import LinuxOwnedTerminal
 from kirabridge.platform_adapters.terminal_app import TerminalAppTransport
 from kirabridge.platform_adapters.tmux import TmuxTransport
 from kirabridge.session_ports import SessionPorts, SessionTransport, TerminalAppPort
@@ -24,7 +26,7 @@ from kirabridge.timing import timed_async
 
 
 class SessionReference(Input):
-    pane_id: str = Field(pattern=r"^(%[0-9]+|terminal:[0-9]+:ttys[0-9]+)$")
+    pane_id: str = Field(pattern=r"^(%[0-9]+|terminal:[0-9]+:ttys[0-9]+|linux:[1-9][0-9]*)$")
     expected_pid: int = Field(gt=0)
 
 
@@ -101,6 +103,7 @@ class SessionManager:
         socket_name=None,
         terminal_app: TerminalAppPort | None = None,
         tmux: SessionTransport | None = None,
+        linux: LinuxOwnedTerminal | None = None,
     ):
         self.ports, self.socket_name = ports, socket_name
         self.authorization, self.input_release, self.audit = (
@@ -119,6 +122,7 @@ class SessionManager:
         self.tmux = (
             tmux if tmux is not None else TmuxTransport(ports.environment, socket_name=socket_name)
         )
+        self.linux = linux if linux is not None else LinuxOwnedTerminal()
         self.desktop = self.terminal_app.desktop
 
     def direct(self, principal):
@@ -129,14 +133,18 @@ class SessionManager:
         )
 
     def transport(self, pane_id):
+        if pane_id.startswith("linux:"):
+            return self.linux
         return self.terminal_app if pane_id.startswith("terminal:") else self.tmux
 
     @timed_async("session_catalog")
     async def catalog(self, principal, *, transport=None):
         """Discover both transports, or observe only an explicitly selected one."""
         self.authorization.principal(principal, "session.inspect")
-        if transport not in {None, "terminal_app", "tmux"}:
+        if transport not in {None, "terminal_app", "tmux", "linux"}:
             raise BridgeError("invalid_arguments", "Unknown session catalog transport")
+        if transport == "linux":
+            return await self._linux_catalog()
         native_rows, errors = [], {}
         if transport != "tmux" and self.terminal_app.available and self.socket_name is None:
             try:
@@ -187,8 +195,14 @@ class SessionManager:
                 truncated=transport != "tmux"
                 and getattr(self.terminal_app, "last_catalog_incomplete", False),
             )
+        linux_rows = []
+        if sys.platform.startswith("linux"):
+            try:
+                linux_rows = await self.linux.catalog()
+            except BridgeError as exc:
+                errors["linux"] = {"code": exc.code, "message": str(exc)}
         return self._catalog_result(
-            native_rows + rows,
+            native_rows + rows + linux_rows,
             transport="terminal_app_and_tmux" if native_rows else "tmux",
             status="available",
             errors=errors,
@@ -197,7 +211,28 @@ class SessionManager:
             and getattr(self.terminal_app, "last_catalog_incomplete", False),
         )
 
-    def _catalog_result(self, rows, *, transport, status, errors, truncated=False):
+    async def _linux_catalog(self):
+        try:
+            rows = await self.linux.catalog()
+        except BridgeError as exc:
+            return self._catalog_result(
+                [],
+                transport="linux",
+                status=exc.code,
+                errors={"linux": {"code": exc.code, "message": str(exc)}},
+                scope="Bridge-owned Linux PTY sessions; no user terminal attached",
+            )
+        return self._catalog_result(
+            rows,
+            transport="linux",
+            status="available",
+            errors={},
+            scope="Bridge-owned Linux PTY sessions; no user terminal attached",
+        )
+
+    def _catalog_result(
+        self, rows, *, transport, status, errors, truncated=False, scope=None
+    ):
         from kirabridge.platform_adapters.terminal_app import annotate_views
 
         sessions = annotate_views(self.describe(rows))
@@ -213,7 +248,8 @@ class SessionManager:
             "sessions": sessions,
             "transport_errors": errors,
             "truncated": truncated,
-            "scope": "Exact Terminal.app tabs and tmux panes; existing sessions preserved",
+            "scope": scope
+            or "Exact Terminal.app tabs and tmux panes; existing sessions preserved",
         }
 
     def describe(self, rows):
@@ -665,7 +701,12 @@ class SessionManager:
 
     @timed_async("session_selected")
     async def selected(self, principal, pane_id, expected_pid):
-        transport = "terminal_app" if pane_id.startswith("terminal:") else "tmux"
+        if pane_id.startswith("linux:"):
+            transport = "linux"
+        elif pane_id.startswith("terminal:"):
+            transport = "terminal_app"
+        else:
+            transport = "tmux"
         catalog = await self.catalog(principal, transport=transport)
         error = catalog.get("transport_errors", {}).get(transport, {})
         if error:
@@ -781,6 +822,32 @@ class SessionManager:
                 result["next_cursor"] = reference["sha256"]
             return result
 
+    async def _open_owned_linux(self, principal, task_id, cwd, argv):
+        try:
+            opened = await self.linux.open_shell(cwd)
+        except BaseException:
+            self.authorization.window_outcome(principal, task_id, "unknown")
+            raise
+        self.authorization.window_outcome(principal, task_id, "opened")
+        if not argv:
+            return opened
+        try:
+            await self.linux.send(
+                opened["pane_id"], shlex.join(argv), submit=True, require_idle=True
+            )
+        except Exception as cause:
+            error = UncertainExecution(
+                getattr(cause, "code", "session_open_unknown"),
+                "Owned shell opened; command outcome unconfirmed; never reopen or resend",
+            )
+            error.provider_error = {
+                "creation_receipt": {"pane_id": opened["pane_id"], "tty": opened["tty"]},
+                "automatic_retry": False,
+                "cause_code": getattr(cause, "code", type(cause).__name__),
+            }
+            raise error from cause
+        return {**opened, "command_submitted": True}
+
     async def open(self, principal, args, *, task_id=None, on_created=None):
         policy = self.authorization.principal(principal, "session.open")
         self.authorization.principal(principal, "terminal.execute")
@@ -811,6 +878,8 @@ class SessionManager:
             )
         async with self.lock:
             self.authorization.check_window(principal, task_id, args)
+            if sys.platform.startswith("linux"):
+                return await self._open_owned_linux(principal, task_id, cwd, argv)
             try:
                 result = await self.terminal_app.open(
                     command, on_created=on_created, principal=principal
