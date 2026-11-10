@@ -30,11 +30,29 @@
 </p>
 <!-- AUTO-DOWNLOADS:END -->
 
-<p align="center"><strong>Du redest mit der KI. Die Arbeit landet auf deinem Rechner.</strong></p>
+<p align="center"><strong>Du sprichst mit deiner KI. KiraBridge verbindet Sprache mit der Steuerung deines Computers.</strong></p>
 
-**Teil der NetzwerkPunkt-Werkzeugfamilie:** KiraBridge verbindet ChatGPT mit den Werkzeugen auf deinem Rechner und ist der zentrale Weg für die Bedienung per Sprache oder Chat. Zur Familie gehören **KiraBridge** (Verbindung und Steuerung), **ThreadDesk** (Projekte und Arbeitsstände), **4AllPass** (Zugänge und Schlüssel), **TollGate** (Nutzungsgrenzen und Budgets) und **Agent Authority** (ausschließlich Beobachtung und Nachweise). Die Werkzeuge bleiben eigenständig. **Die Verbindung aller fünf Werkzeuge über Sprache ist unser gemeinsames Ausbauziel:** Vorhandene Anbindungen und geplante Funktionen werden jeweils getrennt dokumentiert, nicht als schon vollständig fertig dargestellt.
+## Eine Werkzeugfamilie, eine gemeinsame Sprachsteuerung
 
-KiraBridge verbindet ChatGPT mit lokalen KI-Agenten und Terminalwerkzeugen auf deinem Rechner. Du kannst Aufträge über Chat oder Sprache formulieren, berechtigt weitergeben und Rückmeldungen verfolgen. **Codex und Grok** sind die dokumentierten Wege über sichtbare Terminalfenster. Laut lokalem Inventar vom 10. November sind zusätzlich ausführbare Adapter für **Claude Code, OpenCode, Gemini CLI und Copilot** vorhanden. Ein erkannter Adapter beweist jedoch **weder eine gültige Anmeldung noch eine einsatzbereite Terminalsitzung oder einen erfolgreichen Ende-zu-Ende-Auftrag**.
+**KiraBridge ist die zentrale Verbindung der NetzwerkPunkt-Werkzeugfamilie.** Sie übersetzt berechtigte Aufträge aus ChatGPT, per Chat oder Sprache, in Aktionen auf dem eigenen Computer und verbindet die weiteren Werkzeuge miteinander. Zur Familie gehören **KiraBridge** für Verbindung und direkte Steuerung, **ThreadDesk** für Projekte, Arbeitsstände und Aufgaben, **4AllPass** für Zugänge und Schlüssel, **TollGate** für Nutzungsgrenzen und Budgets sowie **Agent Authority** für ausschließlich lesende Beobachtung und Nachweise. Jedes Werkzeug erfüllt eine eigene Aufgabe. Die gemeinsame Bedienung der gesamten Familie über natürliche Sprache ist die Vision, an der wir arbeiten. Bestehende Verbindungen, laufende Entwicklung und geplante Funktionen werden dabei ausdrücklich unterschieden.
+
+## Den Computer direkt bedienen
+
+**KiraBridge ist mehr als eine Brücke zu KI-Agenten im Terminal.** Die Computersteuerung gehört zu ihren Kernfunktionen: Programme öffnen oder in den Vordergrund holen, zwischen Fenstern wechseln, Text unmittelbar eingeben, Notizen schreiben und bearbeiten, einzelne Tasten drücken und Tastenkombinationen (Shortcuts) ausführen. Die direkte Tasteneingabe kann ohne Umweg über die Zwischenablage erfolgen. Je nach freigegebenen Rechten und erreichbarer Oberfläche sind auch Maus-, Fenster- und Bildschirmfunktionen nutzbar. Damit kann die KI vorhandene Programme über deren normale Bedienoberfläche steuern, ohne dass für jede einzelne Anwendung erst eine besondere KI-Schnittstelle geschaffen werden muss.
+
+Ein praktisches Beispiel: Du sagst, dass du eine Notiz festhalten möchtest. Die KI kann die entsprechende Anwendung öffnen oder auswählen, das richtige Fenster aktivieren und deinen Text eingeben. Ebenso lassen sich Arbeitsabläufe mit Tastenkombinationen und Fensterwechseln verbinden. Entscheidend ist nicht nur, dass ein Befehl verschickt wird, sondern dass du am Computer eine sichtbare Aktion und ein überprüfbares Ergebnis bekommst. Welche Schritte gelingen, hängt von der aktuellen Anwendung, den Bedienungshilfen des Betriebssystems, den erteilten Berechtigungen und der Stabilität der Verbindung ab.
+
+## Computerbedienung zugänglicher machen
+
+**Ein wichtiges Entwicklungsziel sind Menschen mit Behinderungen, eingeschränkter Mobilität oder Schwierigkeiten bei der Bedienung von Maus und Tastatur.** Wer den Computer nicht gut mit den Händen bedienen kann, soll möglichst viele alltägliche Schritte durch natürliche Sprache anstoßen können: ein Programm aufrufen, eine Notiz diktieren, zwischen Fenstern wechseln oder eine Aufgabe erledigen. Dabei geht es um mehr Selbstständigkeit und weniger Abhängigkeit von komplizierten Bedienfolgen. Auch andere Menschen profitieren, etwa wenn die Hände gerade nicht frei sind.
+
+Diese Zielrichtung ist kein Versprechen, dass KiraBridge bereits jede Anwendung barrierefrei und fehlerfrei steuert. Einzelne Funktionen sind umgesetzt und getestet, andere Abläufe sind noch langsam, unvollständig oder abhängig von Berechtigungen und Umgebung. Wir optimieren die Bedienung, die Zuverlässigkeit, die Geschwindigkeit und die Rückmeldungen fortlaufend. Für wichtige Vorgänge bleiben Kontrolle und gegebenenfalls Bestätigung durch den Menschen notwendig.
+
+## Mit KI-Agenten und Projekten arbeiten
+
+Neben der direkten Computersteuerung kann KiraBridge Aufträge an **Codex und Grok** in eingerichteten, sichtbaren Terminalfenstern übergeben und deren Rückmeldungen verfolgen. Laut lokalem Inventar vom 10. November sind außerdem ausführbare Adapter für **Claude Code, OpenCode, Gemini CLI und Copilot** vorhanden. Ein erkannter Adapter ist noch kein Nachweis für Anmeldung, eine einsatzbereite Sitzung oder einen erfolgreichen Ende-zu-Ende-Auftrag.
+
+ThreadDesk ergänzt diesen Weg um Projekte und Arbeitsstände; weitere Werkzeuge der Familie sollen im gemeinsamen Sprachablauf zusammenwirken. Die Werkzeuge bleiben eigenständig, und ihre tatsächliche Integration wird nicht mit dem Entwicklungsziel verwechselt.
 
 **Verifizierter Laufzeitstand (10. November 2026):** Auf dem Intel-Mac läuft **KiraBridge 0.8.0rc45** (`0b1d937eef06`), direkt über den laufenden KiraBridge-Dienst geprüft. Das separat veröffentlichte Debian-/Linux-Archiv ist weiterhin **0.8.0rc41** (`350d368`). **Installierte Version, Quellstand und veröffentlichte Downloads sind unterschiedliche Nachweise.**
 
