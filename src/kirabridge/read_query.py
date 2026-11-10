@@ -31,7 +31,9 @@ class ReadQuery(Input):
     tail: bool = False
     encoding: Literal["utf-8", "base64"] = "utf-8"
     expected_identity: str | None = Field(default=None, pattern=r"^[a-f0-9]{64}$")
-    pane_id: str | None = Field(default=None, pattern=r"^(%[0-9]+|terminal:[0-9]+:ttys[0-9]+)$")
+    pane_id: str | None = Field(
+        default=None, pattern=r"^(%[0-9]+|terminal:[0-9]+:ttys[0-9]+|linux:[1-9][0-9]*)$"
+    )
     expected_pid: int | None = Field(default=None, gt=0)
     since: str = Field(default="", max_length=64, pattern=r"^$|[0-9a-f]{64}")
     check_helpers: bool = False

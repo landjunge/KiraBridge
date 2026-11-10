@@ -55,6 +55,7 @@ class LinuxAdapter:
             "desktop_gui": "unavailable",
             "macos_terminal_app": "unavailable",
             "native_keyboard": "unavailable",
+            "owned_pty": "bridge-owned",
             "clipboard": clipboard,
             "clipboard_required_for_server": False,
         }

@@ -158,6 +158,7 @@ def test_linux_server_facts_do_not_claim_desktop(monkeypatch):
     assert facts["desktop_gui"] == "unavailable"
     assert facts["macos_terminal_app"] == "unavailable"
     assert facts["native_keyboard"] == "unavailable"
+    assert facts["owned_pty"] == "bridge-owned"
     assert facts["mcp_http"] == "available"
     assert facts["authentication"] == "bearer"
     assert facts["service_manager"] == "systemd-user"
