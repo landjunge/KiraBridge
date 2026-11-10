@@ -937,6 +937,17 @@ class TeamManager:
             continuation = getattr(self.bridge, "autonext", None)
             if continuation is not None and not continuation.work_ready(work_id):
                 return None
+            if work["created"] <= time.time() - self.config.queue_stale_seconds and not (
+                continuation is not None
+                and self.store.db.execute(
+                    "SELECT 1 FROM autonext_items WHERE work_id=?", (work_id,)
+                ).fetchone()
+            ):
+                # AutoNext items are bound to their own grant and lease instead.
+                self._fail(
+                    work, "blocked", "stale_queue_expired", {"reason": "stale_queue_expired"}
+                )
+                return None
             try:
                 self._execution_allowed(work)
             except BridgeError as exc:

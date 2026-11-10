@@ -52,7 +52,7 @@ def test_full_optional_budget_preserves_core_audit_and_export_is_not_reset(bridg
         assert observer("connection", {"phase": "connect.started"})
     assert observer.status()["recording"] == "budget_exhausted"
     export_audit(bridge.store, tmp_path / "preserved.json", limit=10)
-    assert not observer("connection", {"phase": "connect.started"})
+    assert observer("connection", {"phase": "connect.started"}) and observer.archived == 1
     bridge.store.audit("rc39.regression.core", "local", None, {"preserved": True})
     assert verify(bridge.store)["valid"]
     assert verify(bridge.store)["records"] == 11

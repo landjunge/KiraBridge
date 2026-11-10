@@ -91,6 +91,7 @@ async def test_agent_status_is_capped_and_capability_gated(bridge, config, monke
         return {"status": "observed", "processes": [], "truncated": False}
 
     monkeypatch.setattr(status, "_observe_processes", observe)
+    config.max_waiting_tasks = 200  # listing bound, not the waiting-task cap
     for number in range(105):
         submit(bridge, request("clipboard.info", task_id=f"bounded-{number}"))
     result = await status.agent_status(bridge, "local")

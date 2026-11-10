@@ -124,7 +124,8 @@ def test_audit_budget_and_bounded_rotation_preserve_existing_chain(bridge, tmp_p
     observer = AuditObserver(bridge.config, "local", bridge.runtime, bridge.store)
     for _ in range(15):
         observer("connection", {"phase": "connect.started", "prompt": "DO_NOT_LOG"})
-    assert observer.status()["recording"] == "budget_exhausted" and observer.dropped == 5
+    assert observer.status()["recording"] == "budget_exhausted" and observer.dropped == 0
+    assert observer.archived == 5  # overflow archived with hash chain, not dropped
     assert verify(bridge.store)["records"] == 10
     first = export_audit(bridge.store, tmp_path / "audit-001.json", limit=3)
     second = export_audit(
@@ -145,8 +146,9 @@ def test_audit_budget_and_bounded_rotation_preserve_existing_chain(bridge, tmp_p
             operations=["file.read"],
         ),
     )
-    assert async_ready["requested_prerequisites_ready"] is False
-    assert async_ready["diagnostic"]["error_code"] == "diagnostic_recording_unavailable"
+    # A full hot budget no longer blocks preflight: the record goes to the archive.
+    assert async_ready["audit_recorded"] is True
+    assert async_ready["diagnostic"]["error_code"] != "diagnostic_recording_unavailable"
 
 
 async def test_actual_handshake_and_reconnect_trace_uses_existing_audit_chain(

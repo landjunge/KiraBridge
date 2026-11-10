@@ -82,6 +82,9 @@ for those ongoing projects or published RC40 download is offered here.
 - **Follow the work:** see requests, messages and results in the local control window.
 - **Choose the permissions:** decide which folders and actions are allowed and
   when a task needs your approval.
+- **No late surprises:** at most three tasks wait at a time; a fourth cancels the
+  oldest waiting one. Work that waited longer than an hour is stopped and reported,
+  never run later. Large outputs are kept short in the database, the audit trail stays complete.
 
 ThreadDesk and other integrations are optional. KiraBridge's core works independently.
 

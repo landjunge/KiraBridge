@@ -97,7 +97,12 @@ class NativeAdmission:
             return
         if not self.accepting:
             return  # Explicitly unadmitted; startup must not select this record.
-        task = manager.store.claim_exact(manager.owner, manager.config.lease_seconds, task_id)
+        task = manager.store.claim_exact(
+            manager.owner,
+            manager.config.lease_seconds,
+            task_id,
+            manager.config.queue_stale_seconds,
+        )
         if task is None:
             return
         event = self.events[task_id] = asyncio.Event()

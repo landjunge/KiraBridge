@@ -485,6 +485,65 @@ class Store:
         result.pop("principal", None)
         return result
 
+    def expire_stale(self, task_id: str, stale_seconds: float | None) -> bool:
+        """Block one never-started queued task whose last authorization is stale.
+
+        Never executes, retries or deletes; the submitter receives a completion
+        notice and must reconcile (for example with a fresh request).
+        """
+        if not stale_seconds:
+            return False
+        queued_at = self.db.execute(
+            "SELECT COALESCE((SELECT max(at) FROM events e WHERE e.task_id=t.id "
+            "AND e.state='queued'),t.created) FROM tasks t WHERE t.id=? AND t.state='queued' "
+            "AND t.started IS NULL",
+            (task_id,),
+        ).fetchone()
+        if queued_at is None or queued_at[0] > time.time() - stale_seconds:
+            return False
+        self.transition(
+            task_id,
+            State.BLOCKED,
+            {
+                "reason": "stale_queue_expired",
+                "queued_at": queued_at[0],
+                "stale_after_seconds": stale_seconds,
+                "execution_started": False,
+                "automatic_retry": False,
+                "next_step": "Reconcile: the work may already be done elsewhere; "
+                "submit a fresh request only if it is still needed.",
+            },
+            expected_states={State.QUEUED},
+        )
+        return True
+
+    def supersede_oldest_waiting(self, cap: int, newest_id: str) -> list[str]:
+        """Keep at most ``cap`` queued, never-started normal-lane tasks.
+
+        Call inside the transaction that queued ``newest_id``. Running, UNKNOWN and
+        finished work is never touched; a cancelled task can never start again.
+        """
+        selection, names = self.lane_selection("normal")
+        rows = self.db.execute(
+            "SELECT id FROM tasks WHERE state='queued' AND started IS NULL AND "
+            + selection
+            + " ORDER BY created,id",
+            names,
+        ).fetchall()
+        superseded = [r["id"] for r in rows if r["id"] != newest_id][: max(0, len(rows) - cap)]
+        for task_id in superseded:
+            evidence = {
+                "reason": "superseded_by_queue_cap",
+                "superseded_by": newest_id,
+                "max_waiting_tasks": cap,
+                "execution_started": False,
+                "automatic_retry": False,
+            }
+            self.transition(task_id, State.CANCELLED, evidence, expected_states={State.QUEUED})
+            row = self.db.execute("SELECT principal FROM tasks WHERE id=?", (task_id,)).fetchone()
+            self.audit("task.superseded_by_queue_cap", row["principal"], task_id, evidence)
+        return superseded
+
     def claim(
         self,
         owner: str,
@@ -494,6 +553,7 @@ class Store:
         native_visible=False,
         managed_workers=(),
         native_principals=("chatgpt",),
+        stale_seconds: float | None = None,
     ) -> dict | None:
         with self.transaction():
             selection, names = self.lane_selection(control)
@@ -525,11 +585,14 @@ class Store:
                     "json_extract(args,'$.pane_id') LIKE 'terminal:%'))"
                 )
                 names.append(canonical(native_principals))
-            row = self.db.execute(
-                "SELECT id,principal,created,operation FROM tasks WHERE state='queued' "
-                "AND " + selection + " ORDER BY created,id LIMIT 1",
-                names,
-            ).fetchone()
+            while True:
+                row = self.db.execute(
+                    "SELECT id,principal,created,operation FROM tasks WHERE state='queued' "
+                    "AND " + selection + " ORDER BY created,id LIMIT 1",
+                    names,
+                ).fetchone()
+                if row is None or not self.expire_stale(row["id"], stale_seconds):
+                    break
             if row is None:
                 return None
             if not self.can_claim(row["created"], task_id=row["id"], operation=row["operation"]):
@@ -548,7 +611,9 @@ class Store:
             self.audit("task.accepted", row["principal"], row["id"], {"receipt_id": receipt})
         return self.get(row["id"])
 
-    def claim_exact(self, owner: str, lease_seconds: float, task_id: str) -> dict | None:
+    def claim_exact(
+        self, owner: str, lease_seconds: float, task_id: str, stale_seconds: float | None = None
+    ) -> dict | None:
         """Accept one newly authorized ID, never select another queued record."""
         with self.transaction():
             row = self.db.execute(
@@ -567,6 +632,8 @@ class Store:
             if row is None or not self.can_claim(
                 row["created"], task_id=task_id, operation=row["operation"]
             ):
+                return None
+            if self.expire_stale(task_id, stale_seconds):
                 return None
             has_handoffs = self.db.execute(
                 "SELECT 1 FROM sqlite_master WHERE type='table' AND name='visible_handoffs'"
