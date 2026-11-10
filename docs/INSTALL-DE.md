@@ -61,6 +61,11 @@ Update: dieselbe versionierte Transaktion mit Backup, Leerlauf-, Ownership-,
 Integritäts- und Healthprüfungen. Vorhandene Konfiguration, Zugangsdaten,
 Berechtigungen, Whiteboards, Datenbank und Nutzerdateien erhalten. Keine Rechte
 ändern, keine unbekannten Jobs wiederholen und fremde Dienste nicht ersetzen.
+Ausnahme ab RC46: In einem vorhandenen `[threaddesk]`-Abschnitt (Start über
+`-m threaddesk.ui.mcp_stdio`) zeigen `source_root` und `command` danach auf die
+mitgelieferte Bibliothek `install/shared/threaddesk-<pin>/src` und das Python der
+Release. `rollback` setzt genau diese zwei Werte zurück, solange sie seitdem
+niemand geändert hat.
 
 Der launchd-Benutzerdienst läuft weiter, wenn Terminal oder Browser geschlossen
 werden. Die sichtbare Installation ist kein Fenster, das den Dienst am Leben hält.

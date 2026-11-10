@@ -60,6 +60,10 @@ Fresh installation creates user-owned state. The versioned updater preserves
 configuration, credentials, rights, Whiteboards, database and user files, checks
 idle/ownership/integrity, and keeps a recovery record. Busy work, foreign services
 and changed definitions stop activation. Unknown work is never blindly replayed.
+Exception from RC46: in an existing `[threaddesk]` section (started with
+`-m threaddesk.ui.mcp_stdio`), `source_root` and `command` then point at the bundled
+library `install/shared/threaddesk-<pin>/src` and the release's Python. `rollback`
+restores exactly these two values unless someone changed them since.
 
 The launchd user service continues when Terminal/browser windows close; login,
 logout, sleep and shutdown are distinct. Presentation does not own the daemon.

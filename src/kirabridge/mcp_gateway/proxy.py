@@ -140,6 +140,11 @@ class DaemonConnection:
         return tools
 
 
+def dynamic_tool_name(name):
+    """One "td_" namespace: ThreadDesk command tools already carry it (no td_td_*)."""
+    return name if name.startswith("td_") else "td_" + name
+
+
 def dynamic_input_schema(item):
     """Mutation envelopes keep the peer schema intact and cannot collide with its fields."""
     if not item.get("requires_operation_id", False):
@@ -279,7 +284,7 @@ async def connect_stdio(config, principal):
                         and len(name) <= 64
                         and isinstance(schema, dict)
                     ):
-                        names["td_" + name] = item
+                        names.setdefault(dynamic_tool_name(name), item)
                 dynamic_problem.clear()
                 return names
             except Exception as exc:

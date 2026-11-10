@@ -11,6 +11,7 @@ import json
 import os
 import platform
 import plistlib
+import re
 import stat
 import subprocess
 import sys
@@ -108,6 +109,30 @@ def native_payload(output, commit, version):
 
 def git_blob(commit, name):
     return subprocess.check_output(["git", "show", f"{commit}:{name}"])
+
+
+def threaddesk_library(commit, repo):
+    """ThreadDesk library at the repo's pin (the CI legacy lane), as `git archive` bytes."""
+    pin = re.search(
+        rb'^LEGACY_TD = "([0-9a-f]{40})"$', git_blob(commit, "scripts/ci_remote_tests.py"), re.M
+    )
+    if pin is None:
+        raise SystemExit("ThreadDesk pin missing in scripts/ci_remote_tests.py")
+    pin = pin[1].decode()
+    if git("-C", str(repo), "rev-parse", "--verify", pin + "^{commit}") != pin:
+        raise SystemExit(f"ThreadDesk {pin} not in {repo}")
+    archive = subprocess.check_output(
+        ["git", "-C", str(repo), "archive", "--format=tar", pin, "src", "pyproject.toml"]
+    )
+    files = {}
+    with tarfile.open(fileobj=io.BytesIO(archive)) as tar:
+        for item in tar:
+            if item.isdir():
+                continue
+            if not item.isfile():
+                raise SystemExit("ThreadDesk archive member type refused: " + item.name)
+            files["threaddesk/" + item.name] = tar.extractfile(item).read()
+    return pin, files
 
 
 def presentation_for(commit):
@@ -257,7 +282,7 @@ def write_linux_server_bundle(output, commit, version, license_fields, presentat
     return linux_bundle
 
 
-def build(output, *, target=None):
+def build(output, *, target=None, threaddesk_repo=None):
     if output.is_symlink() or (output.exists() and any(output.iterdir())):
         raise SystemExit("Use a new empty output directory; existing artifacts are preserved")
     if git("status", "--porcelain"):
@@ -307,6 +332,11 @@ def build(output, *, target=None):
         }:
             member = name if name.startswith("docs/") else "payload/" + name
             files[member] = subprocess.check_output(["git", "show", f"{commit}:{name}"])
+    threaddesk_pin = None
+    if sys.platform == "darwin":
+        # The installer places this under PREFIX/shared/threaddesk-<pin> and selects it.
+        threaddesk_pin, threaddesk_files = threaddesk_library(commit, threaddesk_repo)
+        files.update(threaddesk_files)
     for name in (
         "installer/install.py",
         "installer/desktop.py",
@@ -369,6 +399,8 @@ exec python3.11 "$bundle/installer/install.py" install --bundle "$bundle" "$@"
     }
     if native_app is not None:
         manifest.update(native_app=native_app, file_modes=file_modes)
+    if threaddesk_pin is not None:
+        manifest["threaddesk"] = threaddesk_pin
     files["release.json"] = (json.dumps(manifest, indent=2) + "\n").encode()
     bundle = bootstrap = None
     if sys.platform == "darwin":
@@ -439,5 +471,15 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--out", type=Path, required=True)
     parser.add_argument("--target", choices=("host", "linux-server"), default="host")
+    parser.add_argument(
+        "--threaddesk-repo",
+        type=Path,
+        default=Path.home() / "threaddesk",
+        help="ThreadDesk Git checkout containing the pinned commit (only Git objects are read)",
+    )
     args = parser.parse_args()
-    build(args.out.resolve(), target=None if args.target == "host" else args.target)
+    build(
+        args.out.resolve(),
+        target=None if args.target == "host" else args.target,
+        threaddesk_repo=args.threaddesk_repo.expanduser().resolve(),
+    )

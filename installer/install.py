@@ -672,6 +672,7 @@ def prepare_bundle(args):
         "Prüfsummen stimmen",
         detail=f"{len(manifest['files'])} Dateien · Version {version} · Quelle {ref[:12]}",
     )
+    library = threaddesk_library(args, bundle, manifest)
     releases = args.prefix / "releases"
     private_dir(releases)
     destination = releases / (version + "-" + ref[:12])
@@ -685,6 +686,8 @@ def prepare_bundle(args):
             if any(saved.get(key) != value for key, value in native.items()):
                 raise RuntimeError("Existing native release identity differs; preserved")
             native_contract(destination, saved, ref, version)
+        if saved.get("threaddesk") != library:
+            raise RuntimeError("Existing release ThreadDesk library differs; preserved")
         report("ok", "Diese Version ist bereits vorbereitet", detail=short(destination))
         return destination
     uv = shutil.which("uv")
@@ -738,6 +741,7 @@ def prepare_bundle(args):
                 "source_commit": ref,
                 "lock_sha256": sha(source / "uv.lock"),
                 **(native or {}),
+                **({"threaddesk": library} if library else {}),
             },
         )
     except BaseException:
@@ -919,6 +923,114 @@ def cli_version(release):
         .decode()
         .strip()
     )
+
+
+TD_KEYS = ("source_root", "command")
+
+
+def threaddesk_library(args, bundle, manifest):
+    """Place the checksum-pinned ThreadDesk library from the bundle in PREFIX/shared once."""
+    pin = manifest.get("threaddesk")
+    if pin is None:
+        return None
+    if not isinstance(pin, str) or not re.fullmatch("[a-f0-9]{40}", pin):
+        raise RuntimeError("Invalid bundled ThreadDesk pin")
+    members = {
+        name.removeprefix("threaddesk/"): name
+        for name in manifest["files"]
+        if name.startswith("threaddesk/")
+    }
+    if "pyproject.toml" not in members or "src/threaddesk/__init__.py" not in members:
+        raise RuntimeError("Bundled ThreadDesk library is incomplete")
+    shared = args.prefix / "shared"
+    private_dir(shared)
+    target = shared / ("threaddesk-" + pin[:7])
+    validate_destination(target)
+    if target.exists():
+        # Python may have added __pycache__; every other file must be the pinned bytes.
+        present = {
+            path.relative_to(target).as_posix()
+            for path in target.rglob("*")
+            if not path.is_dir() and "__pycache__" not in path.relative_to(target).parts
+        }
+        if present != set(members) or any(
+            (target / rel).is_symlink() or sha(target / rel) != manifest["files"][name]
+            for rel, name in members.items()
+        ):
+            raise RuntimeError("Existing ThreadDesk library differs from bundle; preserved")
+        report("ok", "ThreadDesk-Bibliothek vorhanden", detail=short(target))
+    else:
+        stage = shared / (".threaddesk-" + uuid.uuid4().hex)
+        try:
+            for rel, name in members.items():
+                out = stage / rel
+                out.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+                shutil.copyfile(bundle_member(bundle, name), out)
+                if sha(out) != manifest["files"][name]:
+                    raise RuntimeError("ThreadDesk library copy mismatch")
+            stage.rename(target)
+        finally:
+            shutil.rmtree(stage, ignore_errors=True)
+        report("ok", "ThreadDesk-Bibliothek bereitgestellt", detail=short(target))
+    return {"commit": pin, "source_root": str(target / "src")}
+
+
+def threaddesk_config(text, values):
+    """Replace only [threaddesk] source_root/command; None if the config does not fit."""
+    data = tomllib.loads(text)
+    section = data.get("threaddesk")
+    if (
+        not isinstance(section, dict)
+        or not isinstance(section.get("args"), list)
+        or section["args"][:2] != ["-m", "threaddesk.ui.mcp_stdio"]
+        or not all(isinstance(section.get(key), str) for key in values)
+    ):
+        return None
+    lines, table, done = text.splitlines(keepends=True), None, set()
+    for index, line in enumerate(lines):
+        header = re.match(r"\s*\[([^\[\]]+)\]\s*(?:#.*)?$", line)
+        if header:
+            table = header[1].strip()
+            continue
+        match = re.match(
+            r"(\s*(source_root|command)\s*=\s*)(\"(?:[^\"\\\n]|\\.)*\"|'[^'\n]*')", line
+        )
+        if table == "threaddesk" and match and match[2] in values:
+            # Only the string value changes; a trailing comment stays.
+            lines[index] = match[1] + json.dumps(values[match[2]]) + line[match.end() :]
+            done.add(match[2])
+    result = "".join(lines)
+    # Proof that nothing else changed: same parsed config apart from these two values.
+    if done != set(values) or tomllib.loads(result) != {
+        **data,
+        "threaddesk": {**section, **values},
+    }:
+        return None
+    return result
+
+
+def write_config(args, text):
+    atomic(args.config, text, args.config.stat().st_mode & 0o777, exact_mode=True)
+
+
+def restore_threaddesk_config(args, plan):
+    """Rollback: put back the two recorded values unless someone changed them since."""
+    text = args.config.read_text()
+    section = tomllib.loads(text).get("threaddesk") or {}
+    now = {key: section.get(key) for key in plan["previous"]}
+    if now == plan["previous"]:
+        return
+    if now != plan["installed"]:
+        report(
+            "warn",
+            "ThreadDesk-Konfiguration seit der Installation geändert",
+            detail="source_root/command bleiben wie vorgefunden",
+        )
+        return
+    restored = threaddesk_config(text, plan["previous"])
+    if restored is None:
+        raise RuntimeError("Cannot restore ThreadDesk configuration; recovery retained")
+    write_config(args, restored)
 
 
 def fresh_config(args, release):
@@ -1387,6 +1499,24 @@ def activate(args, release):
             "not-found",
         }:
             raise RuntimeError("Unsupported existing user-unit enablement; preserved")
+    config_after, threaddesk_plan = config_before, None
+    library = manifest.get("threaddesk")
+    if library:
+        values = {"source_root": library["source_root"], "command": str(python(release))}
+        updated = threaddesk_config(config_before.decode(), values)
+        if updated is None:
+            report(
+                "note",
+                "ThreadDesk-Konfiguration nicht umgestellt",
+                detail="Kein passender [threaddesk]-Abschnitt; bleibt unverändert",
+            )
+        elif updated.encode() != config_before:
+            section = tomllib.loads(config_before.decode())["threaddesk"]
+            threaddesk_plan = {
+                "previous": {key: section[key] for key in TD_KEYS},
+                "installed": values,
+            }
+            config_after = updated.encode()
     previous_health = None
     if args.service != "none":
         try:
@@ -1413,6 +1543,7 @@ def activate(args, release):
         "launcher": str(args.launcher),
         "plist": str(args.plist),
         "service": args.service,
+        **({"threaddesk_config": threaddesk_plan} if threaddesk_plan else {}),
     }
     jwrite(backup / "transaction.json", before)
     if getattr(args, "desktop", False):
@@ -1499,6 +1630,9 @@ def activate(args, release):
                 plist.setdefault("StandardOutPath", str(logs / "service.stdout.log"))
                 plist.setdefault("StandardErrorPath", str(logs / "service.stderr.log"))
                 atomic(args.plist, plistlib.dumps(plist))
+            if threaddesk_plan:
+                # Bundled library and this release's Python; only these two values change.
+                write_config(args, config_after)
             before["installed_wrapper_sha256"] = sha(args.launcher)
             if args.service != "none":
                 before["installed_plist_sha256"] = sha(args.plist)
@@ -1527,7 +1661,7 @@ def activate(args, release):
             )
             rollback(args, _compensating=True)
         raise
-    assert args.config.read_bytes() == config_before, "Configuration changed"
+    assert args.config.read_bytes() == config_after, "Configuration changed"
     assert not credentials or sha(credentials) == credential_hash, "Credentials changed"
     if args.service != "none":
         final_check(args, release)
@@ -1536,6 +1670,11 @@ def activate(args, release):
         [
             ("Quellstand", manifest["commit"][:12]),
             ("Erhalten", "Konfiguration, Zugangsdaten und Rechte"),
+            *(
+                [("ThreadDesk", Path(threaddesk_plan["installed"]["source_root"]).parent.name)]
+                if threaddesk_plan
+                else []
+            ),
             ("Rückweg", short(backup)),
         ],
     )
@@ -1592,6 +1731,8 @@ def rollback(args, *, _compensating=False):
                     atomic(path, saved.read_bytes(), saved.stat().st_mode & 0o777)
                 else:
                     path.unlink(missing_ok=True)
+            if active.get("threaddesk_config"):
+                restore_threaddesk_config(args, active["threaddesk_config"])
             if active.get("desktop"):
                 active["rollback_core_restored"] = True
                 active["restored_installed_wrapper_sha256"] = (
