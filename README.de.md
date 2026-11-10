@@ -32,6 +32,8 @@
 
 <p align="center"><strong>Du redest mit der KI. Die Arbeit landet auf deinem Rechner.</strong></p>
 
+**Teil der NetzwerkPunkt-Werkzeugfamilie:** KiraBridge verbindet ChatGPT mit den Werkzeugen auf deinem Rechner und ist der zentrale Weg für die Bedienung per Sprache oder Chat. Zur Familie gehören **KiraBridge** (Verbindung und Steuerung), **ThreadDesk** (Projekte und Arbeitsstände), **4AllPass** (Zugänge und Schlüssel), **TollGate** (Nutzungsgrenzen und Budgets) und **Agent Authority** (ausschließlich Beobachtung und Nachweise). Die Werkzeuge bleiben eigenständig. **Die Verbindung aller fünf Werkzeuge über Sprache ist unser gemeinsames Ausbauziel:** Vorhandene Anbindungen und geplante Funktionen werden jeweils getrennt dokumentiert, nicht als schon vollständig fertig dargestellt.
+
 KiraBridge verbindet ChatGPT mit lokalen KI-Agenten und Terminalwerkzeugen auf deinem Rechner. Du kannst Aufträge über Chat oder Sprache formulieren, berechtigt weitergeben und Rückmeldungen verfolgen. **Codex und Grok** sind die dokumentierten Wege über sichtbare Terminalfenster. Laut lokalem Inventar vom 10. November sind zusätzlich ausführbare Adapter für **Claude Code, OpenCode, Gemini CLI und Copilot** vorhanden. Ein erkannter Adapter beweist jedoch **weder eine gültige Anmeldung noch eine einsatzbereite Terminalsitzung oder einen erfolgreichen Ende-zu-Ende-Auftrag**.
 
 **Verifizierter Laufzeitstand (10. November 2026):** Auf dem Intel-Mac läuft **KiraBridge 0.8.0rc45** (`0b1d937eef06`), direkt über den laufenden KiraBridge-Dienst geprüft. Das separat veröffentlichte Debian-/Linux-Archiv ist weiterhin **0.8.0rc41** (`350d368`). **Installierte Version, Quellstand und veröffentlichte Downloads sind unterschiedliche Nachweise.**
