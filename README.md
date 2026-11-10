@@ -42,11 +42,13 @@
 
 For example, ask the AI to write down a note. It can open or select the notes app, bring the appropriate window forward and enter your words. Workflows can likewise combine shortcuts, text input and window changes. The goal is not merely to send a command, but to produce a visible action and verifiable result on your computer. Success depends on the application, the operating system's accessibility support, granted permissions and connection stability.
 
-## Making computer use more accessible
+## Voice control for everyone, with accessibility built in
 
-**An important focus is people with disabilities, reduced mobility or difficulty using a mouse and keyboard.** Natural language should make everyday actions easier to initiate: launching an app, dictating a note, changing windows or completing a task. The aim is greater independence and fewer complicated physical interaction steps. Hands-free control can benefit many other users as well.
+**KiraBridge's primary goal is to make computers, applications and AI tools operable through natural language.** Instead of memorizing complex sequences, describe the desired outcome: open an app, write a note, switch windows or task an AI agent. Voice-driven operation is designed for everyone, whether for everyday tasks, productive work, hands-free control or complex workflows.
 
-This focus does not mean that KiraBridge already controls every application accessibly or flawlessly. Some functions have been implemented and tested; other workflows are still slow, incomplete or dependent on permissions and the local environment. We are continuously improving reliability, responsiveness, speed and feedback. Important operations still require human oversight and, where appropriate, confirmation.
+**Accessibility is considered from the outset, but it is not the sole or primary product purpose.** People with disabilities, reduced mobility or difficulty using a mouse and keyboard can particularly benefit from spoken instructions and understandable feedback. Greater independence is a valuable additional benefit of general-purpose voice control. Clear responses, verifiable results and human oversight matter to all users.
+
+Development is ongoing: KiraBridge cannot yet reliably or fully control every application. Some capabilities have been implemented and tested; other workflows remain slow or depend on permissions and the environment. We keep improving usability, reliability, speed and feedback. Important operations may still require confirmation.
 
 ## AI agents and project workflows
 
