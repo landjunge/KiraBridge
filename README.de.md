@@ -42,11 +42,13 @@
 
 Ein praktisches Beispiel: Du sagst, dass du eine Notiz festhalten möchtest. Die KI kann die entsprechende Anwendung öffnen oder auswählen, das richtige Fenster aktivieren und deinen Text eingeben. Ebenso lassen sich Arbeitsabläufe mit Tastenkombinationen und Fensterwechseln verbinden. Entscheidend ist nicht nur, dass ein Befehl verschickt wird, sondern dass du am Computer eine sichtbare Aktion und ein überprüfbares Ergebnis bekommst. Welche Schritte gelingen, hängt von der aktuellen Anwendung, den Bedienungshilfen des Betriebssystems, den erteilten Berechtigungen und der Stabilität der Verbindung ab.
 
-## Computerbedienung zugänglicher machen
+## Sprachsteuerung für alle, Barrierefreiheit mitgedacht
 
-**Ein wichtiges Entwicklungsziel sind Menschen mit Behinderungen, eingeschränkter Mobilität oder Schwierigkeiten bei der Bedienung von Maus und Tastatur.** Wer den Computer nicht gut mit den Händen bedienen kann, soll möglichst viele alltägliche Schritte durch natürliche Sprache anstoßen können: ein Programm aufrufen, eine Notiz diktieren, zwischen Fenstern wechseln oder eine Aufgabe erledigen. Dabei geht es um mehr Selbstständigkeit und weniger Abhängigkeit von komplizierten Bedienfolgen. Auch andere Menschen profitieren, etwa wenn die Hände gerade nicht frei sind.
+**Das Hauptziel von KiraBridge ist, Computer, Anwendungen und KI-Werkzeuge mit natürlicher Sprache bedienen zu können.** Statt komplizierte Bedienfolgen zu lernen, beschreibst du, was geschehen soll: ein Programm öffnen, eine Notiz schreiben, Fenster wechseln oder einen KI-Agenten beauftragen. Diese Form der Steuerung richtet sich grundsätzlich an alle Menschen, ob für alltägliche Aufgaben, produktives Arbeiten, freihändige Bedienung oder komplexe Abläufe.
 
-Diese Zielrichtung ist kein Versprechen, dass KiraBridge bereits jede Anwendung barrierefrei und fehlerfrei steuert. Einzelne Funktionen sind umgesetzt und getestet, andere Abläufe sind noch langsam, unvollständig oder abhängig von Berechtigungen und Umgebung. Wir optimieren die Bedienung, die Zuverlässigkeit, die Geschwindigkeit und die Rückmeldungen fortlaufend. Für wichtige Vorgänge bleiben Kontrolle und gegebenenfalls Bestätigung durch den Menschen notwendig.
+**Barrierefreiheit denken wir von Anfang an mit, ohne sie zum alleinigen oder vorrangigen Produktzweck zu machen.** Menschen mit Behinderungen, eingeschränkter Mobilität oder Schwierigkeiten mit Maus und Tastatur können besonders davon profitieren, wenn sich Arbeitsschritte per Sprache auslösen und nachvollziehen lassen. Mehr Selbstständigkeit ist ein wichtiger zusätzlicher Nutzen der allgemeinen Sprachsteuerung. Verständliche Rückmeldungen, überprüfbare Ergebnisse und die Möglichkeit zur menschlichen Kontrolle helfen allen Nutzenden.
+
+Die Entwicklung ist nicht abgeschlossen: KiraBridge steuert noch nicht jede Anwendung zuverlässig oder vollständig. Einige Funktionen sind umgesetzt und getestet, andere Abläufe sind noch langsam oder hängen von Berechtigungen und Umgebung ab. Wir optimieren Bedienung, Zuverlässigkeit, Geschwindigkeit und Rückmeldungen fortlaufend. Wichtige Aktionen benötigen gegebenenfalls eine Bestätigung.
 
 ## Mit KI-Agenten und Projekten arbeiten
 
