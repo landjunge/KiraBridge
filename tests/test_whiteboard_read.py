@@ -1,4 +1,5 @@
 import json
+from contextlib import contextmanager
 from pathlib import Path
 
 import pytest
@@ -138,3 +139,49 @@ async def test_whiteboard_tools_are_in_the_catalog(bridge):
     tools = await server.list_tools()
     names = {tool.name for tool in tools}
     assert {"whiteboard_read", "whiteboard_append"} <= names
+
+
+def test_append_touches_thread_under_workspace_lock_not_inside_append_lock(tmp_path, monkeypatch):
+    import kirabridge.whiteboard_read as module
+
+    for folder in ("threads", "whiteboard"):
+        (tmp_path / folder).mkdir()
+    (tmp_path / "threads" / "t1.json").write_text(json.dumps({"id": "t1", "title": "T"}))
+    held, events = [], []
+    original = module._exclusive
+
+    @contextmanager
+    def tracked(path):
+        with original(path):
+            held.append(path.name)
+            try:
+                yield
+            finally:
+                held.remove(path.name)
+
+    def touch(path):
+        events.append(list(held))
+
+    monkeypatch.setattr(module, "_exclusive", tracked)
+    monkeypatch.setattr(module, "_touch_thread", touch)
+    first = append_whiteboard(
+        str(tmp_path),
+        "t1",
+        actor="a",
+        actor_type="claude",
+        entry_type="note",
+        content="one",
+        external_key="k1",
+    )
+    again = append_whiteboard(
+        str(tmp_path),
+        "t1",
+        actor="a",
+        actor_type="claude",
+        entry_type="note",
+        content="one",
+        external_key="k1",
+    )
+    assert first["appended"] and again["duplicate"] and again["id"] == first["id"]
+    # Same lock order as ThreadDesk; a duplicate never rewrites the thread.
+    assert events == [[".management.lock"]]
