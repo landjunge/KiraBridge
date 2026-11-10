@@ -143,17 +143,22 @@ def append_whiteboard(
     # Share ThreadDesk JsonStore's existing append lock. In particular a common
     # logical-task external_key must reserve exactly one coordinator across
     # independent Bridge stores, rather than racing two read/append sequences.
-    with _append_lock(board):
-        return _append_locked(
-            board, thread_path, thread_id, actor_name, chosen_actor_type, chosen_type, text, key
+    with _exclusive(board / ".append.lock"):
+        result = _append_locked(
+            board, thread_id, actor_name, chosen_actor_type, chosen_type, text, key
         )
+    if result["appended"]:
+        # The entry file is durable. Touch the thread only under ThreadDesk's
+        # workspace lock, never nested in the append lock (ThreadDesk takes
+        # workspace -> append), so a concurrent note save is never overwritten.
+        with _exclusive(root / ".management.lock"):
+            _touch_thread(thread_path)
+    return result
 
 
 @contextmanager
-def _append_lock(board):
-    fd = os.open(
-        board / ".append.lock", os.O_RDWR | os.O_CREAT | getattr(os, "O_NOFOLLOW", 0), 0o600
-    )
+def _exclusive(path):
+    fd = os.open(path, os.O_RDWR | os.O_CREAT | getattr(os, "O_NOFOLLOW", 0), 0o600)
     with os.fdopen(fd, "a+b") as lock:
         if os.name == "nt":
             import msvcrt
@@ -177,7 +182,7 @@ def _append_lock(board):
                 fcntl.flock(lock.fileno(), fcntl.LOCK_UN)
 
 
-def _append_locked(board, thread_path, thread_id, actor_name, actor_type, entry_type, text, key):
+def _append_locked(board, thread_id, actor_name, actor_type, entry_type, text, key):
     existing = _load_entries(board)
     if key:
         for current in existing:
@@ -209,7 +214,6 @@ def _append_locked(board, thread_path, thread_id, actor_name, actor_type, entry_
     }
     path = _inside(board, board / f"{entry_id}.json")
     _create_exclusive(path, stored)
-    _touch_thread(thread_path)
     return _confirmation(stored, duplicate=False)
 
 

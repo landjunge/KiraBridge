@@ -172,3 +172,77 @@ async def test_dispatcher_shutdown_after_remote_start_never_replays_on_restart(c
         assert same["task"]["state"] == "unknown" and same["task"]["attempt"] == 1
         pool.call.assert_not_awaited()
     assert effects == [{"id": "one"}]
+
+
+def manage_contract():
+    properties = {
+        name: {"type": kind}
+        for name, kind in (
+            ("operation_id", "string"),
+            ("action", "string"),
+            ("id", "string"),
+            ("expected_revision", "integer"),
+            ("data", "object"),
+        )
+    }
+    return [
+        SimpleNamespace(
+            name="thread_manage",
+            description="Synthetic peer contract",
+            annotations=SimpleNamespace(
+                readOnlyHint=False, destructiveHint=False, openWorldHint=False
+            ),
+            inputSchema={
+                "type": "object",
+                "additionalProperties": False,
+                "properties": properties,
+                "required": ["operation_id", "action", "expected_revision", "data"],
+            },
+        ),
+        SimpleNamespace(
+            name="thread_operation_status",
+            description="Synthetic peer contract",
+            annotations=SimpleNamespace(
+                readOnlyHint=True, destructiveHint=False, openWorldHint=False
+            ),
+            inputSchema={
+                "type": "object",
+                "additionalProperties": False,
+                "properties": {"operation_id": {"type": "string"}},
+                "required": ["operation_id"],
+            },
+        ),
+    ]
+
+
+@pytest.mark.parametrize("stored", [True, False])
+async def test_lost_thread_manage_reply_is_reconciled_by_operation_id_not_resent(config, stored):
+    configured(config)
+    effects, reads = [], []
+    arguments = {
+        "operation_id": "note-1",
+        "action": "set_note",
+        "id": "t1",
+        "expected_revision": 3,
+        "data": {"text": "x"},
+    }
+
+    async def peer(_, name, values, **kwargs):
+        if name == "thread_operation_status":
+            reads.append(values)
+            receipt = {"operation_id": "note-1", "thread_id": "t1", "revision": 4}
+            return result({"found": stored, "result": receipt if stored else None})
+        effects.append(values)
+        raise BridgeError("peer_unknown", "Synthetic late reply after the effect")
+
+    async with Bridge(config) as bridge:
+        fake_peer(bridge, manage_contract(), peer)
+        outcome = await call(bridge, "local", "thread_manage", arguments, "kb-note-1")
+    assert effects == [arguments]
+    assert reads == [{"operation_id": "note-1"}]
+    if stored:
+        assert outcome["success"] and outcome["task"]["state"] == "completed"
+        assert outcome["value"]["reconciled"] and outcome["value"]["receipt"]["revision"] == 4
+        assert outcome["effect_confirmed"] is True
+    else:
+        assert not outcome["success"] and outcome["task"]["state"] == "unknown"

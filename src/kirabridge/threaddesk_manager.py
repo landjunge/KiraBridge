@@ -418,7 +418,8 @@ class ThreadDeskManager:
 
         values = self.read_arguments(task["principal"], args)
         await running({"adapter": "threaddesk", "tool": args.tool, "local_files": True})
-        value = read_whiteboard(
+        value = await asyncio.to_thread(
+            read_whiteboard,
             str(self.settings.workspace),
             values.get("id"),
             values.get("entry_id") if args.tool == "whiteboard_get" else None,
@@ -442,7 +443,8 @@ class ThreadDeskManager:
         if not isinstance(thread_id, str):
             raise BridgeError("invalid_arguments", "An exact whiteboard thread id is required")
         await running({"adapter": "threaddesk", "tool": "whiteboard_append", "local_files": True})
-        value = append_whiteboard(
+        value = await asyncio.to_thread(
+            append_whiteboard,
             str(self.settings.workspace),
             thread_id,
             actor=str(data.get("actor") or ""),

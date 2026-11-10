@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from collections.abc import Callable
 from typing import Any, Literal
 
@@ -475,7 +476,7 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
             return dynamic_failure(exc)
 
     @server.tool(annotations=read)
-    def whiteboard_read(
+    async def whiteboard_read(
         ctx: Context, thread_id: str | None = None, entry_id: str | None = None
     ) -> dict[str, Any]:
         """Read one ThreadDesk whiteboard, or one entry, without switching threads.
@@ -493,10 +494,11 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
                 raise BridgeError("threaddesk_workspace", "Whiteboard workspace is not configured")
             return read_whiteboard(workspace, thread_id, entry_id)
 
-        return safe(action)
+        # Large boards take seconds to scan; never stall other calls on the loop.
+        return await asyncio.to_thread(safe, action)
 
     @server.tool(annotations=write)
-    def whiteboard_append(
+    async def whiteboard_append(
         thread_id: str,
         entry_type: str,
         content: str,
@@ -527,7 +529,7 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
                 external_key=external_key,
             )
 
-        return safe(action)
+        return await asyncio.to_thread(safe, action)
 
     @server.tool(
         annotations=ToolAnnotations(readOnlyHint=False, destructiveHint=True, openWorldHint=True)
