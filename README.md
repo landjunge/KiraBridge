@@ -240,3 +240,10 @@ native keyboard and local MCP acceptance passed in a dedicated Windows 11 VM.
 guest phases passed, including Ctrl/Alt/Shift shortcuts and guarded window control.
 Published downloads and the separate Windows 11 installation were verified.
 [Evidence and limits](docs/WINDOWS-DESKTOP-20261104.md); dev2 remains available for rollback.
+
+### Design source · November 7, 2026
+
+The shared header with five original icons is implemented and locally reviewed.
+The [design record](docs/FIVE-TOOL-DESIGN-20261107.md) describes status/version
+boundaries and passed browser checks; the installed native app remains unverified.
+This source delivery does not establish a new download or installed runtime.

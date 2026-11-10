@@ -1,0 +1,524 @@
+{
+  "schema": "kb-design-pr73-integration-evidence-v1",
+  "task": "KB-DESIGN-ADAPT-KIRABRIDGE-20261107",
+  "date": "2026-11-07",
+  "phase": "normal PR73 main integration after Debian publication/download gate",
+  "status": "main-based source implemented and fresh browser acceptance passed; final PR checks/merge recorded separately",
+  "reasoningEffort": "high, unchanged",
+  "pr": "https://github.com/landjunge/KiraBridge/pull/73",
+  "git": {
+    "baseMain": "2bbf6d9dc628cdf95e5591df7968f761f938883c",
+    "sourceImplementation": "881266210854d77c815fa543f92a64ef44c1f4c4",
+    "previousPR73Head": "46beafc0c004231d40ce953d6a72556e688d017a",
+    "previousBrowserAcceptedImplementation": "24b0c6faccf9da53f5e5132a0a5e5dd820878aae",
+    "reusedOriginalDesign": "d9b433d922258b7ace610d809776dfa47cb317fa",
+    "sourceTree": "138780bf3ab1b55571eecf6567a0e3ed1f128ea7",
+    "testTree": "19c331449063151e7ae8e0b9d3cd11dd4afcbfd1",
+    "regularWorktree": "/Users/landjunge/threaddesk-worktrees/five-tool-design-codex-20261107/.runtime/kb-design-adapt-regular/worktree",
+    "branch": "feat/design-adapt-kirabridge-20261107",
+    "mergeConflict": "none; latest Main adopted normally; narrow existing README design status corrected",
+    "finalEvidenceCommit": "this documentation-only commit, runtime trees identical to sourceImplementation",
+    "mergeProof": "PR73 timeline and final source pins/merge readback in own codex-five-tool-design-20261107/kirabridge-adapt handoff; no pre-merge success claim"
+  },
+  "debianGate": {
+    "satisfiedBeforeMainIntegration": true,
+    "pr72MergedMain": "2bbf6d9dc628cdf95e5591df7968f761f938883c",
+    "release": "https://github.com/landjunge/KiraBridge/releases/tag/linux-v0.8.0rc41",
+    "source": "350d36854fc9dd37725d7c00a91b72cd1bd32b15",
+    "actualDownloadSha256": "1b851236bd603fcfaf5984c075be08b52b81b9cdbc4b93ff08d1001ae3a9d41f",
+    "method": "independent actual4MB download matches sidecar and GitHub digest; archive source is merged ancestor; published native delivery proof passed",
+    "proof": "kb-design-pr73-integration-20261107/debian-download-gate.json",
+    "installerExecutedByDesignWorker": false
+  },
+  "sourceScope": {
+    "all24UIAndTestSourceHashesMatchPreviousAcceptedImplementation": true,
+    "ownInstallerServerDependencyDiffAgainstMain": "empty",
+    "upstreamRuntimeVersion": "0.8.0rc41",
+    "readmes": [
+      {
+        "path": "README.md",
+        "mainSha256": "104bc7df8ef4afd30a21bde2b1debdb539dabf81dff7e45ca38d8418b4691eab",
+        "preservedAsExactPrefix": true,
+        "candidateSha256": "aa5ef3d8182d1b697be9f9a699b87d40c133e925b690edee62124f5a191de232",
+        "scope": "existing design end section only; browser passed/native installed app unverified"
+      },
+      {
+        "path": "README.de.md",
+        "mainSha256": "670b1788dbcab1641cf7677fb63766289cd3512aa9c037cbe235702558582fd3",
+        "preservedAsExactPrefix": true,
+        "candidateSha256": "5e06899d4be9cb41d8ded30fe50bcd6c3e27ec094f33c70c68aef21a8f4fdde2",
+        "scope": "existing design end section only; browser passed/native installed app unverified"
+      }
+    ],
+    "readmeCoordination": "READMEworker9108 and coordinator notified; direct TUI rejected approval policy never; native queue failed before enqueue due memories_1.sqlite access. Correction strictly confined to already existing design end section; all accepted Main content byte-preserved."
+  },
+  "sourceFiles": [
+    {
+      "path": "src/kirabridge/approval_console.py",
+      "sha256": "455872c231cbf25673c5e0e0c08c8839bf99f2a1290482e2c97321c4c1ea84c9"
+    },
+    {
+      "path": "src/kirabridge/console_assets/center.html",
+      "sha256": "471c7569a91e8f0d9e7e304874ad59c09d75a185df935d4c93614fea734a64c0"
+    },
+    {
+      "path": "src/kirabridge/console_assets/center.js",
+      "sha256": "ed3e7417366f19293f0db890f8ea8f11f541187a7324fc03e302c3afc2416988"
+    },
+    {
+      "path": "src/kirabridge/console_assets/index.html",
+      "sha256": "ca0bbe98334fc4b9a2441c180983741160ca985c076379b869d458404fb8e346"
+    },
+    {
+      "path": "src/kirabridge/console_assets/networkpunkt-appbar-SHA256SUMS",
+      "sha256": "d41cc5ef49db1c6d4b04865f94ee2e884fbd878237882d7042a3ef0bf826cd9b"
+    },
+    {
+      "path": "src/kirabridge/console_assets/networkpunkt-appbar-assets.json",
+      "sha256": "ef529525531940e847fcc1ae2b33f2c98b150aefcfce5f5d96a9722732b7896a"
+    },
+    {
+      "path": "src/kirabridge/console_assets/networkpunkt-appbar-bundle.json",
+      "sha256": "1f7ed13ea5a6a9da2192620b2657a95e6cccead14ecf62bd45af419d2015b4c4"
+    },
+    {
+      "path": "src/kirabridge/console_assets/networkpunkt-appbar-catalog.js",
+      "sha256": "b4934d9f4f26a44c3658c5693c6d4646e91cd2fefbeff2cf4ca31cce26ad8845"
+    },
+    {
+      "path": "src/kirabridge/console_assets/networkpunkt-appbar-state.js",
+      "sha256": "b58576bcd8e5bc0265f1ea6de42ba49a772203facfc7149b9e2e6348803c9ff9"
+    },
+    {
+      "path": "src/kirabridge/console_assets/networkpunkt-appbar.css",
+      "sha256": "c3ab64479f7e46a54d3fbf1a6a6a7519fd2ea7bd5992d3a46cc8af99748ad5f8"
+    },
+    {
+      "path": "src/kirabridge/console_assets/networkpunkt-appbar.js",
+      "sha256": "510b0f0e5e9b5698ad8cae1f6b8baceb872c80ff2e2fef82945457cba95c3765"
+    },
+    {
+      "path": "src/kirabridge/console_assets/networkpunkt-product-header.js",
+      "sha256": "b9297d673905983303070a791a2ddff5d6a04fd9ad89faf11fd16feef911143b"
+    },
+    {
+      "path": "src/kirabridge/console_assets/np-appbar-4allpass-dark-256.png",
+      "sha256": "62019c4aab70164b092c9e6543e49aaa6f46a86400a0fd258bab7b81ead9406a"
+    },
+    {
+      "path": "src/kirabridge/console_assets/np-appbar-agent-authority-dark-256.png",
+      "sha256": "ddbde6d384d6e78bb727f5d68552c1f18c46db1535f885c91a11b8ac5da7bbe9"
+    },
+    {
+      "path": "src/kirabridge/console_assets/np-appbar-kirabridge-dark-256.png",
+      "sha256": "df48979210f0d2fda32ca1c704f818f8c57fa40cdcf8cc7f682616263f7a8f75"
+    },
+    {
+      "path": "src/kirabridge/console_assets/np-appbar-threaddesk-dark-256.png",
+      "sha256": "37acc1808d685b19a17ad6aa50919304877c44730afe3c105771508cb00e12a7"
+    },
+    {
+      "path": "src/kirabridge/console_assets/np-appbar-tollgate-dark-256.png",
+      "sha256": "98e90b668ed712361a05ae16efaa0768f6abd71e4bde40d9ece9ca59b018aed5"
+    },
+    {
+      "path": "src/kirabridge/console_assets/product-header.css",
+      "sha256": "d30946227f4ab926e54e130ec85e3a188c33e1a207f78071bdc513e0de207b4e"
+    },
+    {
+      "path": "src/kirabridge/console_assets/product-header.js",
+      "sha256": "969df02a4cbee45ad7abf04260708f07e2aee40c80679b035d661afbef2ec64d"
+    },
+    {
+      "path": "src/kirabridge/console_assets/protocol.html",
+      "sha256": "e7d2b83e5a64b41a8c4f922c80846ea92be48373027f2506ee5672f2ad6fbf1d"
+    },
+    {
+      "path": "src/kirabridge/grok_connector/console.py",
+      "sha256": "452835a0e288cd5a704d775b7dc27d4154285611138be0d8704854e9d8fc1dc8"
+    },
+    {
+      "path": "src/kirabridge/team_console.py",
+      "sha256": "2d9904a4e9501c8ad4f2463dfabe2c7796019ea544143d925934aebc29abd72a"
+    },
+    {
+      "path": "tests/product_header_browser_probe.py",
+      "sha256": "0d30784516f57b1fe451ffcadbf173b5eb4ecb9c31407a4dc7e2b4b9bcca9966"
+    },
+    {
+      "path": "tests/test_product_header.py",
+      "sha256": "c7dd9067ce1f0ae73c31dd312641e128da72abf3b0196566be639646fa980bb5"
+    }
+  ],
+  "originalAssets": [
+    {
+      "appId": "kirabridge",
+      "file": "np-appbar-kirabridge-dark-256.png",
+      "source": "assets/design/icons/dark/KiraBridge-dark-256.png",
+      "sourceRepository": "KiraBridge",
+      "sourcePin": "d12838ae97c7efcc053c45c3bc9fba5e78f5fe5d",
+      "sha256": "df48979210f0d2fda32ca1c704f818f8c57fa40cdcf8cc7f682616263f7a8f75",
+      "dimensions": [
+        256,
+        256
+      ],
+      "viewport": [
+        14,
+        26,
+        214,
+        204
+      ],
+      "derivation": "Original bytes unchanged; CSS viewport encloses original colored frame; no raster edit",
+      "color": "#fc63ad",
+      "colorSource": "kirabridge:assets/design/icons/dark/KiraBridge-dark-256.png#original-frame-color; dominant original colored-frame pixel, presentation accent only",
+      "originalLocalRepository": "/Users/landjunge/KiraBridge",
+      "originalSource": "assets/design/originals/KiraBridge-dark.png",
+      "originalSha256": "11ceabd0363001f95ec0e23e3940c8e62d20f40388a151348387f5b1c215fd3b"
+    },
+    {
+      "appId": "threaddesk",
+      "file": "np-appbar-threaddesk-dark-256.png",
+      "source": "assets/design/icons/dark/ThreadDesk-dark-256.png",
+      "sourceRepository": "threaddesk",
+      "sourcePin": "40fac387582700ce56c42b856dfe2405f942c012",
+      "sha256": "37acc1808d685b19a17ad6aa50919304877c44730afe3c105771508cb00e12a7",
+      "dimensions": [
+        256,
+        256
+      ],
+      "viewport": [
+        35,
+        40,
+        186,
+        176
+      ],
+      "derivation": "Original bytes unchanged; CSS viewport encloses original colored frame; no raster edit",
+      "color": "#b99cff",
+      "colorSource": "threaddesk:brand/README.md",
+      "originalLocalRepository": "/Users/landjunge/threaddesk",
+      "originalSource": "assets/design/originals/ThreadDesk-dark.png",
+      "originalSha256": "279f1890239390b11909227836ea2c1dc8e6f70ce1b19354b5dac29a81fc1b9e"
+    },
+    {
+      "appId": "4allpass",
+      "file": "np-appbar-4allpass-dark-256.png",
+      "source": "brand/ap4/dark/4allpass-dark-256.png",
+      "sourceRepository": "4AllPass",
+      "sourcePin": "0b66a2fda7fcc831762e732eb20084137fa6029d",
+      "sha256": "62019c4aab70164b092c9e6543e49aaa6f46a86400a0fd258bab7b81ead9406a",
+      "dimensions": [
+        256,
+        256
+      ],
+      "viewport": [
+        33,
+        38,
+        190,
+        180
+      ],
+      "derivation": "Original bytes unchanged; CSS viewport encloses original colored frame; no raster edit",
+      "color": "#6be4f2",
+      "colorSource": "4allpass:brand/ap4/dark/4allpass-dark-256.png#original-frame-color; dominant original colored-frame pixel, presentation accent only",
+      "originalLocalRepository": "/Users/landjunge/4AllPass",
+      "originalSource": "brand/ap4/4allpass-dark.png",
+      "originalSha256": "e34a5925bee7a35434145646c8fca497edc26eef015b3e88a40411e006bbb094"
+    },
+    {
+      "appId": "tollgate",
+      "file": "np-appbar-tollgate-dark-256.png",
+      "source": "assets/design/icons/dark/TollGate-dark-256.png",
+      "sourceRepository": "tollgate",
+      "sourcePin": "6676bcfc69f85e77fec6192bc51ad8f9c0b26740",
+      "sha256": "98e90b668ed712361a05ae16efaa0768f6abd71e4bde40d9ece9ca59b018aed5",
+      "dimensions": [
+        256,
+        256
+      ],
+      "viewport": [
+        35,
+        40,
+        186,
+        176
+      ],
+      "derivation": "Original bytes unchanged; CSS viewport encloses original colored frame; no raster edit",
+      "color": "#e77745",
+      "colorSource": "tollgate:brand/README.md",
+      "originalLocalRepository": "/Users/landjunge/tollgate",
+      "originalSource": "assets/design/originals/TollGate-dark.png",
+      "originalSha256": "80ee4d9a63f960e16a47504e2c2e46cd399eaf66997eb230e85deab82c249751"
+    },
+    {
+      "appId": "agent-authority",
+      "file": "np-appbar-agent-authority-dark-256.png",
+      "source": "assets/design/icons/dark/Agent-Authority-dark-256.png",
+      "sourceRepository": "agent-authority-lab",
+      "sourcePin": "75fb14e99a50b967b8624191f0178963c433fbd9",
+      "sha256": "ddbde6d384d6e78bb727f5d68552c1f18c46db1535f885c91a11b8ac5da7bbe9",
+      "dimensions": [
+        256,
+        256
+      ],
+      "viewport": [
+        14,
+        23,
+        219,
+        211
+      ],
+      "derivation": "Original bytes unchanged; CSS viewport encloses original colored frame; no raster edit",
+      "color": "#3b78fc",
+      "colorSource": "agent-authority:assets/design/icons/dark/Agent-Authority-dark-256.png#original-frame-color; dominant original colored-frame pixel, presentation accent only",
+      "originalLocalRepository": "/Users/landjunge/agent-authority-lab",
+      "originalSource": "assets/design/originals/Agent-Authority-dark.png",
+      "originalSha256": "eee8cb4c22f79db51730d1e674b8deaa39d1a1176a4030e13e2fb1dbe362cfff"
+    }
+  ],
+  "browserArtifact": "kb-design-adapt-kirabridge-20261107/compatible-browser-artifact.json",
+  "environment": "kb-design-pr73-integration-20261107/environment.json",
+  "tests": [
+    {
+      "type": "fresh targeted pytest after Main integration",
+      "passed": 47,
+      "failure": 0,
+      "error": 0,
+      "skip": 0,
+      "log": "kb-design-pr73-integration-20261107/ui-targeted.log",
+      "junit": "kb-design-pr73-integration-20261107/ui-targeted.xml",
+      "command": "PYTHONPATH=src PYTHONNOUSERSITE=1 PYTHONDONTWRITEBYTECODE=1 PYTEST_ADDOPTS= PYTEST_PLUGINS= /Users/landjunge/KiraBridge/.venv/bin/python -m pytest -q tests/test_product_header.py tests/test_console_design.py tests/test_control_center.py tests/test_team_console.py tests/test_grok_connector_console.py --junitxml=<task-evidence>/main-integration/ui-targeted.xml",
+      "pin": "881266210854d77c815fa543f92a64ef44c1f4c4"
+    },
+    {
+      "type": "earlier regular PR73 Verify",
+      "run": "https://github.com/landjunge/KiraBridge/actions/runs/42373332553",
+      "head": "46beafc0c004231d40ce953d6a72556e688d017a",
+      "base": "8b338b66752fb9d65a4c05959c04cf2505412ed2",
+      "result": "both3.11/3.13 success incl.remote/build; not substituted for final-head integration checks"
+    }
+  ],
+  "browser": {
+    "status": "passed",
+    "checks": 28,
+    "screenshots": 29,
+    "views": [
+      "/",
+      "/protocol",
+      "/team",
+      "/grok-connector"
+    ],
+    "widths": [
+      1280,
+      390,
+      320
+    ],
+    "systemPreferences": [
+      "dark",
+      "light"
+    ],
+    "headerLanguages": [
+      "de",
+      "en"
+    ],
+    "sourceVersion": "0.8.0rc41",
+    "engine": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/130.0.6723.31 Safari/537.36",
+    "evidence": "kb-design-pr73-integration-20261107/browser/browser-checks.json",
+    "sameUnchangedProbe": "tests/product_header_browser_probe.py",
+    "fixtureBoundary": "Real loopback HTTP/auth/UI/control handlers and actual isolated Bridge dispatcher. OS process inventory disabled. Only maintenance/error metadata is deliberately injected for presentation checks.",
+    "explicitInjections": [
+      "maintenance for busy presentation",
+      "bridge RPC failure for error presentation"
+    ],
+    "actualControlSource": "authenticated existing control handlers and real isolated dispatcher start/stop",
+    "peerAcceptance": false,
+    "ownMeaning": "local Bridge dispatcher, not external ChatGPT/Grok proof",
+    "ownClick": "actual existing main route/focus",
+    "foreignClick": "explicit missing-target dialogs; no fabricated peer targets",
+    "keyboard": "Tab,Enter,Space,Escape,modal focus return and subsequent Tab",
+    "scroll": "actual window scroll where content overflows; all five icons remain in viewport",
+    "pageErrors": [],
+    "productActionPosts": [],
+    "manualImagesViewed": [
+      "control-dark-1280.png",
+      "protocol-dark-390.png",
+      "team-light-320.png",
+      "connector-light-1280.png"
+    ],
+    "nativeInstalledRuntimeAccepted": false,
+    "productionServicesChanged": false
+  },
+  "independentReview": {
+    "source": "no blocker on8812662; no unique installer/server/dependency changes; source-review.md",
+    "browser": "no blocker; all29fresh screenshot hashes match,4samples actually viewed; independent-evidence-review.md"
+  },
+  "documentation": {
+    "guide": "docs/FIVE-TOOL-DESIGN-20261107.md",
+    "priorEvidencePreserved": "docs/evidence/kb-design-adapt-kirabridge-20261107.json",
+    "existingPlan": "E05/UI-01 continued; no new competing roadmap"
+  },
+  "remainingBoundaries": [
+    "installed native app unverified",
+    "four productive peer connections and launch targets unconfigured/unknown",
+    "shared-origin focus patch backport remains separate",
+    "board writes unavailable from this worker approval context; final payload retained for coordinator"
+  ],
+  "exclusions": [
+    "Windows installer changes",
+    "server repair",
+    "audit changes",
+    "release publication by design worker",
+    "productive service switch",
+    "app installation"
+  ],
+  "evidenceFiles": [
+    {
+      "path": "kb-design-pr73-integration-20261107/browser/browser-checks.json",
+      "sha256": "edb1d7820196e022273ba815db01106c056f6f6bf35280dc4d89bdb2a9f242ff"
+    },
+    {
+      "path": "kb-design-pr73-integration-20261107/browser/connector-dark-1280.png",
+      "sha256": "eedeb6f2a76515d8dafda9ce31fedad1eb3fa3e9df1b1744292e2c09a00d4ee2"
+    },
+    {
+      "path": "kb-design-pr73-integration-20261107/browser/connector-dark-320.png",
+      "sha256": "35f5240723bd18d76d0d3dbe4a5221bd9c0ffa16c24b8e3624a3b90f29cf85d9"
+    },
+    {
+      "path": "kb-design-pr73-integration-20261107/browser/connector-dark-390.png",
+      "sha256": "5a1724b53c1537359b0da2fa8ebdf3b2252c11ad2044966b3952052e7f7ffd2c"
+    },
+    {
+      "path": "kb-design-pr73-integration-20261107/browser/connector-light-1280.png",
+      "sha256": "eedeb6f2a76515d8dafda9ce31fedad1eb3fa3e9df1b1744292e2c09a00d4ee2"
+    },
+    {
+      "path": "kb-design-pr73-integration-20261107/browser/connector-light-320.png",
+      "sha256": "35f5240723bd18d76d0d3dbe4a5221bd9c0ffa16c24b8e3624a3b90f29cf85d9"
+    },
+    {
+      "path": "kb-design-pr73-integration-20261107/browser/connector-light-390.png",
+      "sha256": "5a1724b53c1537359b0da2fa8ebdf3b2252c11ad2044966b3952052e7f7ffd2c"
+    },
+    {
+      "path": "kb-design-pr73-integration-20261107/browser/control-dark-1280.png",
+      "sha256": "5907ad47559db0978e3b89f4e365da26f93f89d9128842ed1b7b4e06b7ead1d7"
+    },
+    {
+      "path": "kb-design-pr73-integration-20261107/browser/control-dark-320.png",
+      "sha256": "fe394e2bfc1d2fdf8f190a0e3c9071925aa3ca3fc0e8783f639952b84df06505"
+    },
+    {
+      "path": "kb-design-pr73-integration-20261107/browser/control-dark-390.png",
+      "sha256": "c230948de3df10009739a156c35f41fd32129ede0563b5b2ccf953be6fba515d"
+    },
+    {
+      "path": "kb-design-pr73-integration-20261107/browser/control-injected-transport-error.png",
+      "sha256": "5cd1db9502ca3556de6f2c25e1d61afd9021134299582ec25687cb9baf9a7cc6"
+    },
+    {
+      "path": "kb-design-pr73-integration-20261107/browser/control-light-1280.png",
+      "sha256": "6124482fa5514d15881343cbd9c51062f9069e31a3209347496fc4629643f968"
+    },
+    {
+      "path": "kb-design-pr73-integration-20261107/browser/control-light-320.png",
+      "sha256": "fe394e2bfc1d2fdf8f190a0e3c9071925aa3ca3fc0e8783f639952b84df06505"
+    },
+    {
+      "path": "kb-design-pr73-integration-20261107/browser/control-light-390.png",
+      "sha256": "3507c7ad7cc27f9fabb7c5a9184a2c081925b8ceb219d94b1027ad9e3c528c24"
+    },
+    {
+      "path": "kb-design-pr73-integration-20261107/browser/control-real-dispatcher-stopped.png",
+      "sha256": "546a5205d58ff3785649fb902c59a0d3919e83b10c49df19e0c3ac62e8e4eb40"
+    },
+    {
+      "path": "kb-design-pr73-integration-20261107/browser/control-session-removed-unknown.png",
+      "sha256": "5dbb828c083318b655d4da1f57e5bf51da94c3f76bf5098068729137a05eb063"
+    },
+    {
+      "path": "kb-design-pr73-integration-20261107/browser/control-synthetic-maintenance-presentation.png",
+      "sha256": "983e5f514cfb8bec970e94ce2e2b81ff5e0ed42a71922ade4b67c6ca3209576b"
+    },
+    {
+      "path": "kb-design-pr73-integration-20261107/browser/control-unauthenticated-1280.png",
+      "sha256": "03195f64b9c9116cbe1d19e9eae8080c1c9e7f90a963ccefa9066df61c794da6"
+    },
+    {
+      "path": "kb-design-pr73-integration-20261107/browser/protocol-dark-1280.png",
+      "sha256": "b917b6c37508bd740202700ed1f6e00672348b3af9249ee8c15f2f82e5e44724"
+    },
+    {
+      "path": "kb-design-pr73-integration-20261107/browser/protocol-dark-320.png",
+      "sha256": "27e3f17a9174705b7762bde06c261acc1e62fe27908c467f413690288947eb5a"
+    },
+    {
+      "path": "kb-design-pr73-integration-20261107/browser/protocol-dark-390.png",
+      "sha256": "8f7ed7706a2abfc0ccd21c6dc5ccc8047b416fbbe2c36ecdf3fe9abae4cb8578"
+    },
+    {
+      "path": "kb-design-pr73-integration-20261107/browser/protocol-light-1280.png",
+      "sha256": "f9f659b49be2c231087fdf3bb4e4b2bf20e7f6e460d2236df9fca6c3fb1d88e1"
+    },
+    {
+      "path": "kb-design-pr73-integration-20261107/browser/protocol-light-320.png",
+      "sha256": "27e3f17a9174705b7762bde06c261acc1e62fe27908c467f413690288947eb5a"
+    },
+    {
+      "path": "kb-design-pr73-integration-20261107/browser/protocol-light-390.png",
+      "sha256": "8f7ed7706a2abfc0ccd21c6dc5ccc8047b416fbbe2c36ecdf3fe9abae4cb8578"
+    },
+    {
+      "path": "kb-design-pr73-integration-20261107/browser/team-dark-1280.png",
+      "sha256": "d2c41f904bc9f57e199d2aa86f5208b099b8c01358de8f8621c14d0c008028e2"
+    },
+    {
+      "path": "kb-design-pr73-integration-20261107/browser/team-dark-320.png",
+      "sha256": "ac22c75039a4864a43bd680a48b4cbfa8fa5b131a13f7d5a40ef49bda9cdb822"
+    },
+    {
+      "path": "kb-design-pr73-integration-20261107/browser/team-dark-390.png",
+      "sha256": "456a1659f4b6fb102cd7080313fd0888a78bfb2a674e93187ece3e3f0bdc95f0"
+    },
+    {
+      "path": "kb-design-pr73-integration-20261107/browser/team-light-1280.png",
+      "sha256": "34e920190eee5d795e97a8fee7937ef09ddf8e3541928f1239b643e23756f0db"
+    },
+    {
+      "path": "kb-design-pr73-integration-20261107/browser/team-light-320.png",
+      "sha256": "1fe9767292e5fed145b14704f4457666b2d2c023c39005dbb04b2232b0a96f5b"
+    },
+    {
+      "path": "kb-design-pr73-integration-20261107/browser/team-light-390.png",
+      "sha256": "f6314fb3be06c84cfdf19f64dd35c2bbf0713ac95511d0ef5d3947d32dabaac1"
+    },
+    {
+      "path": "kb-design-pr73-integration-20261107/browser.log",
+      "sha256": "1330c9b5c547795e03ecc18c8748f7915d322c42cc3c182b540b607de2eb8ed8"
+    },
+    {
+      "path": "kb-design-pr73-integration-20261107/debian-download-gate.json",
+      "sha256": "71be943f39ce1dad4795fc4bc48fccc1d39a188b71dc0ac9db6176c82c3dad5a"
+    },
+    {
+      "path": "kb-design-pr73-integration-20261107/environment.json",
+      "sha256": "aa60d6b9b619d51e1e3b73e055c1f18bf31dbf7ea780e192e121654fc38646b8"
+    },
+    {
+      "path": "kb-design-pr73-integration-20261107/independent-evidence-review.md",
+      "sha256": "5fe2ebb1050b5ef9e6d42e01cb98a72d0c79c4a1e4e2edfef0ce908bfc29aaf5"
+    },
+    {
+      "path": "kb-design-pr73-integration-20261107/initial-pr73-verify.json",
+      "sha256": "c3c3c62cc1ddd4936a1b0a4df23c9548f6a166071705d612a0fec0ed2529fc44"
+    },
+    {
+      "path": "kb-design-pr73-integration-20261107/source-review.md",
+      "sha256": "61dec69ac091fd34e493455043f392e62f6430964a3304a287a0c5b0d753e706"
+    },
+    {
+      "path": "kb-design-pr73-integration-20261107/ui-targeted.log",
+      "sha256": "0a788c81f1f23ea0fa8c4d73984b2b8538e7b701f2aac689587692175e33e0b3"
+    },
+    {
+      "path": "kb-design-pr73-integration-20261107/ui-targeted.xml",
+      "sha256": "2cf3c7976c162c0f4a90696cac63cc5834775edb2e6355f4ce840c6510772249"
+    }
+  ]
+}

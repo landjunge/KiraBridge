@@ -74,6 +74,19 @@ class ApprovalConsole:
                 Route("/center.js", self.asset),
                 Route("/keyboard.js", self.asset),
                 Route("/center.css", self.asset),
+                Route("/networkpunkt-appbar.js", self.asset),
+                Route("/networkpunkt-appbar-state.js", self.asset),
+                Route("/networkpunkt-appbar-catalog.js", self.asset),
+                Route("/networkpunkt-appbar.css", self.asset),
+                Route("/networkpunkt-product-header.js", self.asset),
+                Route("/networkpunkt-appbar-assets.json", self.asset),
+                Route("/np-appbar-threaddesk-dark-256.png", self.asset),
+                Route("/np-appbar-tollgate-dark-256.png", self.asset),
+                Route("/np-appbar-agent-authority-dark-256.png", self.asset),
+                Route("/np-appbar-4allpass-dark-256.png", self.asset),
+                Route("/np-appbar-kirabridge-dark-256.png", self.asset),
+                Route("/product-header.js", self.asset),
+                Route("/product-header.css", self.asset),
                 Route("/protocol.js", self.asset),
                 Route("/api/tasks", self.tasks),
                 Route("/api/tasks/{task_id}", self.task),
@@ -124,7 +137,7 @@ class ApprovalConsole:
                     (
                         b"content-security-policy",
                         b"default-src 'none'; script-src 'self'; style-src 'self'; "
-                        b"connect-src 'self'; base-uri 'none'; form-action 'self'; "
+                        b"img-src 'self'; connect-src 'self'; base-uri 'none'; form-action 'self'; "
                         b"frame-ancestors 'none'",
                     ),
                 ]
@@ -201,8 +214,9 @@ class ApprovalConsole:
 
     async def asset(self, request: Request):
         name = request.url.path.removeprefix("/")
-        media_type = "text/css" if name.endswith(".css") else "application/javascript"
-        return Response((ASSETS / name).read_text(), media_type=media_type)
+        media_types = {".png": "image/png", ".json": "application/json", ".css": "text/css"}
+        media_type = media_types.get(Path(name).suffix, "application/javascript")
+        return Response((ASSETS / name).read_bytes(), media_type=media_type)
 
     async def tasks(self, request: Request):
         self.authenticate(request)

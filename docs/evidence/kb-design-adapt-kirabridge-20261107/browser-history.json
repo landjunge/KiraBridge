@@ -1,0 +1,31 @@
+{
+  "priorFailurePreserved": true,
+  "sequence": [
+    {
+      "stage": "existing156/147",
+      "result": "startup blocked by macOS registration / denied kern.hv_vmm_present query; no product DOM acceptance"
+    },
+    {
+      "stage": "whole Chromium130.app",
+      "result": "macOS application registration abort; standalone official headless shell selected"
+    },
+    {
+      "stage": "compatible standalone130 first real UI run",
+      "result": "native delayed close event stole later Tab focus; product fixed with local bundle1.1.1"
+    },
+    {
+      "stage": "browser-focus-fixed",
+      "result": "28checks/29screenshots passed"
+    },
+    {
+      "stage": "extended pointer round first run",
+      "result": "probe repeated same action inside documented600ms cooldown; probe timing corrected, product behavior unchanged"
+    },
+    {
+      "stage": "browser-final-02",
+      "result": "28checks/29screenshots passed; includes pointer every product, DE/EN labels, actual window scroll header visibility"
+    }
+  ],
+  "earlierRawEvidenceDirectory": "/Users/landjunge/threaddesk-worktrees/five-tool-design-codex-20261107/codex-five-tool-design-20261107/kirabridge-adapt",
+  "systemOrPermissionChanges": false
+}

@@ -1,0 +1,60 @@
+{
+  "task": "KB-DESIGN-ADAPT-KIRABRIDGE-20261107",
+  "observedAt": "2026-11-07T13:21:57.557730+00:00",
+  "method": "read-only actual release download, sidecar SHA256 and GitHub digest comparison; no installer invocation",
+  "url": "https://github.com/landjunge/KiraBridge/releases/download/linux-v0.8.0rc41/KiraBridge-0.8.0rc41-Linux-x86_64.tar.gz",
+  "assetId": "RA_kwDOVNhuIs4q9gKf",
+  "bytes": 4039076,
+  "sha256": "1b851236bd603fcfaf5984c075be08b52b81b9cdbc4b93ff08d1001ae3a9d41f",
+  "githubDigest": "sha256:1b851236bd603fcfaf5984c075be08b52b81b9cdbc4b93ff08d1001ae3a9d41f",
+  "sidecarMatches": true,
+  "releaseTag": "linux-v0.8.0rc41",
+  "publishedAt": "2026-11-07T13:19:39Z",
+  "draft": false,
+  "targetCommit": "350d36854fc9dd37725d7c00a91b72cd1bd32b15",
+  "archiveMetadata": {
+    "version": "0.8.0rc41",
+    "commit": "350d36854fc9dd37725d7c00a91b72cd1bd32b15",
+    "source_commit": "350d36854fc9dd37725d7c00a91b72cd1bd32b15",
+    "platform": "Linux-x86_64",
+    "role": "linux-server"
+  },
+  "inspector": {
+    "python": "/Users/landjunge/KiraBridge/.venv/bin/python",
+    "version": "3.11.15",
+    "initialCorrection": "default python3.8 cannot str.removeprefix; reran only inspection with existingKBvenv3.11; no download repetition"
+  },
+  "installationAttempted": false,
+  "releasePublicationByDesignWorker": false,
+  "nativePublishedProof": {
+    "url": "https://github.com/landjunge/KiraBridge/releases/download/linux-v0.8.0rc41/debian-delivery-evidence.json",
+    "result": "passed",
+    "source_commit": "350d36854fc9dd37725d7c00a91b72cd1bd32b15",
+    "archive_sha256": "1b851236bd603fcfaf5984c075be08b52b81b9cdbc4b93ff08d1001ae3a9d41f",
+    "steps": [
+      {
+        "name": "final-package-integrity",
+        "result": "passed"
+      },
+      {
+        "name": "final-package-install",
+        "result": "passed"
+      },
+      {
+        "name": "final-package-mcp-health-auth-source-pin",
+        "result": "passed"
+      },
+      {
+        "name": "final-package-standalone-rollback",
+        "result": "passed"
+      },
+      {
+        "name": "cleanup",
+        "result": "passed"
+      }
+    ]
+  },
+  "mergedMain": "2bbf6d9dc628cdf95e5591df7968f761f938883c",
+  "publishedSourceIsAncestorOfMain": true,
+  "requiredDebianDownloadGateSatisfied": true
+}
