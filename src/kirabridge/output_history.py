@@ -14,6 +14,12 @@ import uuid
 
 from kirabridge.bridge_core.models import BridgeError, canonical
 
+# Task results above this size keep small fields and evidence inline; large fields
+# move into the bounded, hash-referenced snapshot store (same codec as terminal output).
+LARGE_RESULT_BYTES = 16384
+LARGE_FIELD_BYTES = 2048
+INLINE_KEYS = {"evidence", "receipt", "content_sha256", "scope", "output_ref"}
+
 
 class OutputHistory:
     def __init__(self, config, store):
@@ -67,15 +73,19 @@ class OutputHistory:
                 "DELETE FROM output_snapshots WHERE expires<=? OR created<=?",
                 (now, now - self.config.retention_seconds),
             )
-            count, size = self.store.db.execute(
-                "SELECT count(*),COALESCE(sum(bytes),0) FROM output_snapshots"
-            ).fetchone()
-            while count > self.config.max_entries or size > self.config.max_bytes:
-                row = self.store.db.execute(
-                    "SELECT id,bytes FROM output_snapshots ORDER BY created,rowid LIMIT 1"
-                ).fetchone()
-                self.store.db.execute("DELETE FROM output_snapshots WHERE id=?", (row["id"],))
-                count, size = count - 1, size - row["bytes"]
+            # Each kind has its own budget: large task results never evict the
+            # terminal captures that visible input depends on.
+            for kind, count, size in self.store.db.execute(
+                "SELECT kind,count(*),COALESCE(sum(bytes),0) FROM output_snapshots GROUP BY kind"
+            ).fetchall():
+                while count > self.config.max_entries or size > self.config.max_bytes:
+                    row = self.store.db.execute(
+                        "SELECT id,bytes FROM output_snapshots WHERE kind=? "
+                        "ORDER BY created,rowid LIMIT 1",
+                        (kind,),
+                    ).fetchone()
+                    self.store.db.execute("DELETE FROM output_snapshots WHERE id=?", (row["id"],))
+                    count, size = count - 1, size - row["bytes"]
 
     def capture(self, principal, kind, source_key, payload, metadata, *, task_id=None):
         raw, original_bytes = self._bounded(payload, tail=kind == "session_capture")
@@ -110,7 +120,7 @@ class OutputHistory:
                 ).fetchone()
                 reference = self.reference(row)
                 self.store.audit(
-                    "terminal.output",
+                    "task.result_stored" if kind == "task_result" else "terminal.output",
                     principal,
                     task_id,
                     {
@@ -247,6 +257,32 @@ class OutputHistory:
                 {"operation": operation, "streams": list(payload)},
                 task_id=task["id"],
             )
+        elif (
+            isinstance(result, dict)
+            and "output_codec" not in result
+            and len(canonical(result).encode()) > LARGE_RESULT_BYTES
+        ):
+            payload = {
+                key: value
+                for key, value in result.items()
+                if key not in INLINE_KEYS
+                and not key.startswith("output_")
+                and len(canonical(value).encode()) > LARGE_FIELD_BYTES
+            }
+            budget = min(self.config.max_item_bytes, self.config.max_bytes)
+            if len(canonical(payload).encode()) > budget:
+                # Only text may be shortened (flagged truncated); others stay inline.
+                payload = {k: v for k, v in payload.items() if isinstance(v, str)}
+            if not payload:
+                return result
+            reference = self.capture(
+                task["principal"],
+                "task_result",
+                task["id"],
+                payload,
+                {"operation": operation, "fields": sorted(payload)},
+                task_id=task["id"],
+            )
         else:
             return result
         return {
@@ -299,7 +335,7 @@ class OutputHistory:
             ):
                 result = self.resolve_result(row["principal"], json.loads(row["result"]))
                 fields = result.get("output_fields", [])
-                size += sum(len(result.get(field, "").encode()) for field in fields)
+                size += sum(len(canonical(result.get(field, "")).encode()) for field in fields)
                 if size > self.config.max_bytes:
                     raise BridgeError(
                         "rollback_capacity", "Use a compatible release; export is too large"

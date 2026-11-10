@@ -19,7 +19,7 @@ async def test_full_diagnostic_budget_keeps_task_message_and_audit_evidence(brid
     observer = AuditObserver(config, "local", bridge.runtime, bridge.store)
     for _ in range(10):
         assert observer("connection", {"phase": "connect.started"})
-    assert not observer("connection", {"phase": "call.started"})
+    assert observer("connection", {"phase": "call.started"}) and observer.archived == 1
     assert observer.status()["recording"] == "budget_exhausted"
 
     value = request("file.list", {"path": config.principals["local"].roots[0]})

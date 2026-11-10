@@ -395,6 +395,12 @@ class Config(BaseModel):
     max_task_bytes: int = Field(default=2097152, ge=1024, le=8388608)
     output_history: OutputHistoryConfig = Field(default_factory=OutputHistoryConfig)
     lease_seconds: float = Field(default=30, ge=2, le=600)
+    # Queued, never-started work older than this (since its last explicit queueing or
+    # approval) is blocked and reported instead of being executed late.
+    queue_stale_seconds: float = Field(default=3600, ge=60, le=604800)
+    # At most this many queued, never-started normal-lane tasks; a newer one cancels
+    # the oldest waiting task (cancelled/superseded_by_queue_cap), never run later.
+    max_waiting_tasks: int = Field(default=3, ge=1, le=1000)
     host: str = "127.0.0.1"
     port: int = Field(default=8765, ge=1, le=65535)
     allow_remote: bool = False

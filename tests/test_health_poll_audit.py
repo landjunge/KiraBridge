@@ -47,7 +47,8 @@ async def test_stable_background_health_preserves_diagnostic_budget(bridge, conf
         await pool.call("daemon", "bridge_health", {}, routine_health=True)
     report = observer.status()
     assert report["recording"] == "available", report
-    assert report["today"] == 2 and observer.dropped == 0
+    # Successful routine polls go to the overflow archive, not the hot budget.
+    assert report["today"] == 0 and observer.dropped == 0 and observer.archived == 2
     assert verify(bridge.store)["valid"]
 
 

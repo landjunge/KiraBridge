@@ -2,12 +2,15 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
+import os
 import re
 import time
 from pathlib import Path
 
 from kirabridge.bridge_core.models import BridgeError, canonical, digest
+from kirabridge.read_tool_batch import READ_TOOLS as ROUTINE_READ_TOOLS
 from kirabridge.task_manager.store import Store
 
 RUNTIME_KEYS = (
@@ -44,6 +47,91 @@ FIELDS = {
 }
 
 
+# Successful polls of read tools (ROUTINE_READ_TOOLS) carry no task evidence. They
+# stay recorded, but in the overflow archive, so they cannot exhaust the hot budget.
+ARCHIVE = "diagnostic-archive.jsonl"
+ARCHIVE_SEGMENT_BYTES = 16 * 1024 * 1024
+ARCHIVE_SEGMENTS = 8  # rotated segments kept; each removal is anchored in the audit chain
+
+
+def _tail(path: Path):
+    """Last complete record of one segment; a torn final write is cut back."""
+    with open(path, "r+b") as handle:
+        size = handle.seek(0, os.SEEK_END)
+        handle.seek(max(0, size - 16384))
+        data = handle.read()
+        if data and not data.endswith(b"\n"):
+            cut = data.rfind(b"\n") + 1
+            handle.truncate(size - len(data) + cut)
+            data = data[:cut]
+    lines = data.splitlines()
+    return json.loads(lines[-1]) if lines else None
+
+
+def archive_segments(directory: Path) -> list[Path]:
+    rotated = sorted(directory.glob("diagnostic-archive.*.jsonl"))
+    current = directory / ARCHIVE
+    return rotated + ([current] if current.exists() else [])
+
+
+def append_archive(store, directory: Path, kind, principal, task_id, metadata) -> None:
+    """Overflow hash chain. Caller holds the SQLite write lock, which serializes
+    appends across processes; hot SQLite rows are never deleted or rewritten."""
+    current = directory / ARCHIVE
+    segments = archive_segments(directory)
+    last = next((r for r in (_tail(s) for s in reversed(segments)) if r), None)
+    record = {
+        "seq": last["seq"] + 1 if last else 1,
+        "at": time.time(),
+        "kind": kind,
+        "principal": principal,
+        "task_id": task_id,
+        "metadata": metadata,
+        "previous": last["hash"] if last else "0" * 64,
+    }
+    record["hash"] = digest(record)
+    line = (canonical(record) + "\n").encode()
+    if current.exists() and current.stat().st_size + len(line) > ARCHIVE_SEGMENT_BYTES:
+        rotated = directory / f"diagnostic-archive.{last['seq']:012d}.jsonl"
+        os.replace(current, rotated)
+        old = sorted(directory.glob("diagnostic-archive.*.jsonl"))[:-ARCHIVE_SEGMENTS]
+        store.audit(
+            "audit.diagnostic_archive_rotated",
+            "local",
+            None,
+            {
+                "segment": rotated.name,
+                "segment_sha256": hashlib.sha256(rotated.read_bytes()).hexdigest(),
+                "last_seq": last["seq"],
+                "last_hash": last["hash"],
+                "removed_segments": [x.name for x in old],
+            },
+        )
+        for path in old:
+            path.unlink()
+    flags = os.O_WRONLY | os.O_APPEND | os.O_CREAT | getattr(os, "O_NOFOLLOW", 0)
+    fd = os.open(current, flags, 0o600)
+    try:
+        os.write(fd, line)
+        os.fsync(fd)
+    finally:
+        os.close(fd)
+
+
+def verify_archive(directory: Path) -> dict:
+    previous, count, head = None, 0, None
+    for segment in archive_segments(directory):
+        for raw in segment.read_bytes().splitlines():
+            record = json.loads(raw)
+            stated = record.pop("hash")
+            if (previous is not None and record["previous"] != previous) or digest(
+                record
+            ) != stated:
+                return {"valid": False, "failed_sequence": record.get("seq")}
+            previous, count, head = stated, count + 1, record["seq"]
+    return {"valid": True, "records": count, "head_seq": head, "head": previous}
+
+
 def runtime_ref(runtime: dict) -> dict:
     return {k: runtime.get(k) for k in RUNTIME_KEYS}
 
@@ -64,7 +152,7 @@ class AuditObserver:
     def __init__(self, config, principal, runtime, store=None):
         self.config, self.principal, self.runtime = config, principal, runtime_ref(runtime)
         self.store, self.owned = store, store is None
-        self.dropped = 0
+        self.dropped = self.archived = 0
 
     def status(self) -> dict:
         policy = self.config.diagnostics
@@ -88,7 +176,9 @@ class AuditObserver:
             "max_records": policy.max_records,
             "max_events_per_day": policy.max_events_per_day,
             "dropped_by_this_observer": self.dropped,
-            "retention": "existing audit preserved; bounded explicit export, no automatic deletion",
+            "archived_by_this_observer": self.archived,
+            "overflow": ARCHIVE + " (hash chain, rotated segments)",
+            "retention": "existing audit preserved; overflow archived, bounded explicit export",
         }
 
     def __call__(self, kind: str, metadata: dict, task_id: str | None = None) -> bool:
@@ -114,11 +204,25 @@ class AuditObserver:
                 return False
             if self.store is None:
                 self.store = Store(self.config.state_path / "bridge.sqlite3")
+            routine = (
+                data.get("phase") in {"call.started", "call.returned"}
+                and data.get("tool") in ROUTINE_READ_TOOLS
+                and task_id is None
+                and "error_code" not in data
+            )
             with self.store.transaction():
-                if self.status()["recording"] != "available":
-                    self.dropped += 1
-                    return False
-                self.store.audit("diagnostic." + kind, self.principal, task_id, data)
+                if routine or self.status()["recording"] != "available":
+                    append_archive(
+                        self.store,
+                        self.config.state_path,
+                        "diagnostic." + kind,
+                        self.principal,
+                        task_id,
+                        data,
+                    )
+                    self.archived += 1
+                else:
+                    self.store.audit("diagnostic." + kind, self.principal, task_id, data)
             return True
         except Exception:
             # Logging failure must never turn a completed remote write into a retry.

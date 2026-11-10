@@ -200,6 +200,8 @@ class TaskManager:
                     "permission_decision": effective,
                 },
             )
+            if not pending and lane == "normal":
+                self.store.supersede_oldest_waiting(self.config.max_waiting_tasks, request.task_id)
             if automatic and not held:
                 self.store.audit(
                     "task.auto_approved",
@@ -277,6 +279,8 @@ class TaskManager:
                 ).fetchone()[0],
             },
         )
+        if OPERATIONS[task["operation"]].execution_class == "normal":
+            self.store.supersede_oldest_waiting(self.config.max_waiting_tasks, task_id)
 
     async def start(self) -> None:
         if self.workers:
@@ -380,6 +384,7 @@ class TaskManager:
                 native_visible=self.config.visible_handoffs.enabled,
                 managed_workers=self.managed_workers(),
                 native_principals=self.native_principals(),
+                stale_seconds=self.config.queue_stale_seconds,
             )
             if task is None:
                 try:

@@ -79,6 +79,9 @@ und kein veröffentlichter RC40-Download angeboten.
 - **Die Arbeit verfolgen:** Sieh Anfragen, Nachrichten und Ergebnisse im lokalen Steuerfenster.
 - **Den Zugriff bestimmen:** Lege fest, welche Ordner und Aktionen erlaubt sind
   und wann ein Auftrag deine Freigabe braucht.
+- **Keine späten Überraschungen:** Höchstens drei Aufträge warten gleichzeitig; ein vierter
+  storniert den ältesten wartenden. Was länger als eine Stunde wartet, wird gestoppt und
+  gemeldet, nie später ausgeführt. Große Ausgaben bleiben in der Datenbank kurz, das Protokoll vollständig.
 
 ThreadDesk und andere Integrationen sind optional. Der Kern von KiraBridge funktioniert eigenständig.
 

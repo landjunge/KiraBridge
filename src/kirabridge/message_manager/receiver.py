@@ -678,6 +678,10 @@ class MessageReceiver:
                         },
                     )
 
+            if row["created"] <= time.time() - self.bridge.config.queue_stale_seconds:
+                # Late delivery could duplicate work already done in the visible terminal.
+                blocked("stale_queue_expired")
+                return None
             count = self.bridge.store.db.execute(
                 "SELECT count(*) FROM message_jobs j JOIN messages m ON m.id=j.message_id "
                 "WHERE m.conversation_id=? AND j.claimed IS NOT NULL",
