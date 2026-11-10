@@ -442,6 +442,8 @@ def builder_fixture(tmp_path, monkeypatch, host):
     monkeypatch.setattr(module.subprocess, "check_output", check_output)
     monkeypatch.setattr(module.subprocess, "run", run)
     monkeypatch.setattr(module, "build_native_app", native_build)
+    # The ThreadDesk library has its own builder test; no real ThreadDesk checkout here.
+    monkeypatch.setattr(module, "threaddesk_library", lambda *a: ("b" * 40, {}))
     return module, builds
 
 
