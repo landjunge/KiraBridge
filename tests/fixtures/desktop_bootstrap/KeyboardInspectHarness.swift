@@ -641,7 +641,27 @@ struct KeyboardInspectHarness {
         })
         precondition(sawSubmit && SystemKeyboard.transfer == nil); stageChecks += 1
         SystemKeyboard.transfer = nil; SystemKeyboard.consumedTransfers = []; SystemBridgeRuntime.principal = ""
+        // Window-less app: only an observed empty AX window list counts; only Command chords pass.
+        var windowlessChecks = 0
+        let emptyWindows = [AnyObject]() as CFArray, oneWindow = [AXUIElementCreateSystemWide()] as CFArray
+        precondition(SystemKeyboard.windowlessApplication(focusedWindow: nil, windows: emptyWindows))
+        precondition(!SystemKeyboard.windowlessApplication(focusedWindow: nil, windows: nil))
+        precondition(!SystemKeyboard.windowlessApplication(focusedWindow: nil, windows: oneWindow))
+        precondition(!SystemKeyboard.windowlessApplication(focusedWindow: AXUIElementCreateSystemWide(), windows: emptyWindows))
+        precondition(!SystemKeyboard.windowlessApplication(focusedWindow: nil, windows: "AXWindow" as CFString))
+        windowlessChecks += 5
+        try SystemKeyboard.requireWindowlessShortcut(SystemKeyboard.windowlessMetadata, chord: true, modifiers: ["command"])
+        try SystemKeyboard.requireWindowlessShortcut(observed.metadata, chord: false, modifiers: [])
+        windowlessChecks += 2
+        for (chord, modifiers) in [(false, [String]()), (true, ["shift"]), (true, ["control", "option"])] {
+            do {
+                try SystemKeyboard.requireWindowlessShortcut(SystemKeyboard.windowlessMetadata, chord: chord, modifiers: modifiers)
+                fatalError("Window-less app accepted a non-Command key")
+            } catch let error as SystemBridgeFailure { precondition(error.code == "keyboard_unsupported" && !error.effectUnknown) }
+            windowlessChecks += 1
+        }
         let result: [String: Any] = ["checks": checks, "field": observed.metadata,
+                                   "windowless_checks": windowlessChecks,
                                    "key_checks": keyChecks, "named_key_codes": SystemKeyboard.namedKeys,
                                    "extended_key_checks": extendedKeyChecks,
                                    "fn_navigation_checks": fnNavigationChecks,

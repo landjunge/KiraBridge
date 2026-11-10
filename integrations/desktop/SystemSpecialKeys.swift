@@ -480,7 +480,11 @@ enum SystemSpecialKeys {
                 throw failure("System input frontmost application changed")
             }
             try SystemControl.axGranted()
-            if !initial.registered { _ = try SystemKeyboard.snapshot(target) }
+            if !initial.registered {
+                let names = modifierNames(initial.flags)
+                try SystemKeyboard.requireWindowlessShortcut(SystemKeyboard.snapshot(target).response["field"] as? [String: Any],
+                                                             chord: !names.isEmpty, modifiers: names)
+            }
             if initial.route == "quartz_hid", let applied = appliedEventFlags {
                 guard SystemKeyboard.observedCapsLock() == applied.contains(.maskAlphaShift) else {
                     throw failure("Caps Lock changed before system keyboard input")

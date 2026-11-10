@@ -62,6 +62,10 @@ enum SystemRequestFrames {
 func runSystemOperationMode() -> Never {
     let ownerPID = getppid()
     guard ownerPID > 1 else { exit(0) }
+    // The bundle has no LSUIElement (the console app needs its Dock icon). Without
+    // this, the first AppKit/HIToolbox call checks the worker in as a Foreground
+    // app that never finishes launching: a second, bouncing KiraBridge Dock icon.
+    _ = NSApplication.shared.setActivationPolicy(.accessory)
     let parentWatch = DispatchSource.makeTimerSource(queue: .global(qos: .utility))
     parentWatch.schedule(deadline: .now() + 1, repeating: 1)
     parentWatch.setEventHandler { if getppid() != ownerPID { exit(0) } }

@@ -161,3 +161,63 @@ async def test_selected_native_target_retains_concrete_desktop_error(
         await bridge.sessions.selected("local", "terminal:123:ttys001", 123)
     assert error.value.code == code
     assert (await bridge.sessions.selected("local", "%1", 100))["expected_pid"] == 100
+
+
+def wrangler(current, maximum=4):
+    return plistlib.dumps(
+        [{"IOPowerManagement": {"CurrentPowerState": current, "MaxPowerState": maximum}}]
+    )
+
+
+@pytest.mark.parametrize(
+    "raw,display,cause",
+    [
+        (wrangler(1), "asleep", "display_sleep_or_screensaver"),
+        (wrangler(3), "dimmed", "display_sleep_or_screensaver"),
+        (wrangler(4), "on", "screen_locked"),
+        (plistlib.dumps([]), "unknown", "unknown"),
+    ],
+)
+async def test_lock_with_sleeping_display_is_reported_as_display_sleep(
+    monkeypatch, raw, display, cause
+):
+    """RC45: loginwindow sets the CG lock when the display sleeps despite a password delay."""
+    monkeypatch.setattr(
+        "kirabridge.platform_adapters.desktop.sys", SimpleNamespace(platform="darwin")
+    )
+    locked = raw_users(
+        {
+            "kCGSSessionUserIDKey": 501,
+            "kCGSSessionOnConsoleKey": True,
+            "CGSSessionScreenIsLocked": True,
+        }
+    )
+    calls = []
+
+    class Child:
+        returncode = 0
+
+        def __init__(self, output):
+            self.output = output
+
+        async def communicate(self):
+            return self.output, b""
+
+        async def wait(self):
+            return 0
+
+    async def spawn(*argv, **kwargs):
+        calls.append(argv)
+        return Child(raw if "IODisplayWrangler" in argv else locked)
+
+    monkeypatch.setattr("kirabridge.platform_adapters.desktop.os.getuid", lambda: 501)
+    monkeypatch.setattr(
+        "kirabridge.platform_adapters.desktop.asyncio.create_subprocess_exec", spawn
+    )
+    desktop = MacDesktop()
+    with pytest.raises(BridgeError) as raised:
+        await desktop.require_interactive()
+    assert raised.value.code == "desktop_locked"  # gating unchanged: no input while shielded
+    assert desktop.last["display"] == display and desktop.last["lock_cause"] == cause
+    assert ("Bildschirm aus" in str(raised.value)) is (cause == "display_sleep_or_screensaver")
+    assert len(calls) == 2
