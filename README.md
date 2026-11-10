@@ -32,13 +32,11 @@
 
 <p align="center"><strong>Talk to your AI. Get the work done on your computer.</strong></p>
 
-KiraBridge connects ChatGPT to **Grok Build and Codex running in terminal windows
-on your computer**. Discuss what you need in chat, pass the work to those terminal
-agents and follow their replies while choosing what they may access.
+KiraBridge connects ChatGPT to terminal and local AI agents on your computer. Discuss what you need in chat or voice, pass work to authorized agents and follow their replies within the configured permissions. **Codex and Grok** are the documented visible-terminal paths. As of November 10, the local inventory additionally reports executable adapters for **Claude Code, OpenCode, Gemini CLI and Copilot**; presence of an adapter does **not** confirm sign-in, a ready terminal session or a successful end-to-end task.
 
 **Server edition:** KiraBridge also runs on Debian; server source and local macOS installation are tracked separately. A server source revision is not itself a published installer. / **Server-Version:** KiraBridge läuft auch auf Debian; Quellstand und veröffentlichte Downloads sind getrennt.
 
-**Source and installed status (November 7, 2026):** Debian server source **0.8.0rc41** (`350d368`); Intel Mac installed runtime **0.8.0rc40** (`d12838a`). These are not published macOS download versions.
+**Verified runtime status (November 10, 2026):** The Intel Mac is running **KiraBridge 0.8.0rc45** (`0b1d937eef06`), verified through the live KiraBridge daemon. The separately published Debian/Linux archive is still **0.8.0rc41** (`350d368`); this is a published server package, not the installed Mac build. **Installed, repository-source, and downloadable versions must not be conflated.**
 
 **Published macOS Intel download:** [0.8.0rc36](https://github.com/landjunge/KiraBridge/releases/tag/v0.8.0rc36) · November 4, 2026 · Preview.
 
@@ -63,7 +61,7 @@ ChatGPT connection test with your account remain yours to complete.
 [Evidence and limits](docs/WINDOWS-SETUP-20261104.md) ·
 [Setup guide, German](docs/WINDOWS-SETUP.md).
 
-The linked Intel download is RC36 (`d4aebdd`); the separate source and installed versions are listed in the opening status.
+The linked Intel download is the verified published RC36 (`d4aebdd`), **not** the newer locally installed RC45. The verified installed runtime is listed in the opening status. The historical November 7 evidence below predates RC45.
 [Release, artifact and installed-source evidence](docs/evidence/readme-current-20261107.json).
 The [earlier PR61 installation report](docs/RC40-PR61-SHIM-INSTALL-20261106.md)
 describes the previous RC40 source `a5d381a`.
