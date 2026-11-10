@@ -21,5 +21,19 @@ Neu gegenüber RC45:
   werden `td_whiteboard__*`, `td_graph__*`, `td_trash__*` und `td_library_usearch`.
   ThreadDesk vergibt `td_` für seine Befehlswerkzeuge bereits selbst; KiraBridge setzte
   es ein zweites Mal davor. `_u` steht weiter für einen Unterstrich im Befehlsnamen.
+- P0 ([PR #126](https://github.com/landjunge/KiraBridge/pull/126)): Diagnose-Überlauf geht
+  verlustfrei in `diagnostic-archive.jsonl` (Hash-Kette, im Audit verankert) statt verworfen zu
+  werden. Große Aufgabenergebnisse werden je Art begrenzt gespeichert. Wartende, nie gestartete
+  Arbeit wird nach `queue_stale_seconds` (Standard 3600) blockiert und gemeldet statt spät
+  ausgeführt. Höchstens `max_waiting_tasks` (Standard 3) warten; eine weitere Aufgabe bricht die
+  älteste wartende ab (`superseded_by_queue_cap`).
+- Neu: `python -m kirabridge.storage_compaction DB BACKUPDIR [--apply | --restore MANIFEST]`
+  verkleinert alte große Ergebnisse abgeschlossener Aufgaben mit Backup und Rückweg. Nur bei
+  gestopptem Dienst, nie automatisch; ohne `--apply` ist es ein Probelauf.
+- P2/P3 ([PR #127](https://github.com/landjunge/KiraBridge/pull/127), Änderungen an
+  `KiraBridge.app`): Befehlskürzel wie Cmd+N an Apps ohne Fenster, kein Dock-Hüpfen des
+  Hilfsprozesses mehr, sichtbare Eingabe an Claude (braucht die Bindung
+  `[visible_handoffs.bindings.claude]`), `session.close` lehnt Tabs mit laufendem Prozess ab
+  (`session_busy`), `desktop_locked` meldet `display` und `lock_cause`.
 
 Lokaler Intel-Build; kein öffentliches Release, kein Upload.
