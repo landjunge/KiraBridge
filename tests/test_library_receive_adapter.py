@@ -1,9 +1,11 @@
 """Real ThreadDesk stdio receiver, never the old disk-receiver contract fixture."""
 
+import asyncio
 import hashlib
 import json
 import os
 import sys
+import time
 from pathlib import Path
 
 import pytest
@@ -111,8 +113,14 @@ async def test_actual_receiver_text_binary_readback_index_receipt_restart(receiv
                 },
             ),
         ]:
-            raw = await bridge.threaddesk.pool.call("threaddesk", tool, args)
-            ok, value = bridge.threaddesk.decode(raw, mutation=False)
+            # ThreadDesk >= 869a389 rebuilds the index in its runtime (5 s tick), not per write.
+            deadline = time.monotonic() + 40
+            while True:
+                raw = await bridge.threaddesk.pool.call("threaddesk", tool, args)
+                ok, value = bridge.threaddesk.decode(raw, mutation=False)
+                if ok and rid in json.dumps(value) or time.monotonic() > deadline:
+                    break
+                await asyncio.sleep(1)
             assert ok, value
             assert rid in json.dumps(value), value
         duplicate = await task(bridge, "files.transfer", {"transfer_id": identifier}, "again")
