@@ -18,6 +18,34 @@ DESKTOP_MESSAGES = {
 }
 
 
+DISPLAY_LOCK_MESSAGE = (
+    "Bildschirm aus oder Bildschirmschoner: macOS zeigt die Sperre. Ob schon ein Passwort "
+    "nötig ist, hängt von der Einstellung ab; eine lokale Eingabe weckt den Mac. "
+    "Terminalprozesse bleiben erhalten; es wird kein Ersatzfenster gestartet."
+)
+LOCK_CAUSES = {
+    "asleep": "display_sleep_or_screensaver",
+    "dimmed": "display_sleep_or_screensaver",
+    "on": "screen_locked",
+}
+
+
+def display_state(raw):
+    """IODisplayWrangler power: max state is on, one below dimmed, lower asleep."""
+    rows = plistlib.loads(raw)
+    rows = rows if isinstance(rows, list) else [rows]
+    states = set()
+    for row in rows:
+        power = row.get("IOPowerManagement") if isinstance(row, dict) else None
+        current = power.get("CurrentPowerState") if isinstance(power, dict) else None
+        maximum = power.get("MaxPowerState") if isinstance(power, dict) else None
+        if type(current) is int and type(maximum) is int and maximum > 0:
+            states.add(
+                "on" if current >= maximum else "dimmed" if current == maximum - 1 else "asleep"
+            )
+    return states.pop() if len(states) == 1 else "unknown"
+
+
 def console_state(raw, uid):
     roots = plistlib.loads(raw)
     roots = roots if isinstance(roots, list) else [roots]
@@ -55,22 +83,38 @@ class MacDesktop:
         if sys.platform != "darwin":
             self.last = {"state": "not_applicable", "observed_at": time.time()}
             return self.last
+        state = await self._ioreg(
+            ("-n", "Root", "-d1", "-a"), lambda raw: console_state(raw, os.getuid())
+        )
+        self.last = {
+            "state": state,
+            "observed_at": time.time(),
+            "scope": "macOS console availability, not permission or agent readiness",
+        }
+        if state == "desktop_locked":
+            # macOS raises the lock shield when the screensaver starts or the display
+            # sleeps, even while its password delay still allows any local key to wake it.
+            display = await self._ioreg(
+                ("-r", "-d1", "-c", "IODisplayWrangler", "-a"), display_state
+            )
+            self.last["display"] = display
+            self.last["lock_cause"] = LOCK_CAUSES.get(display, "unknown")
+        return self.last
+
+    async def _ioreg(self, arguments, parse):
         child = None
         state = "unknown"
         try:
             child = await asyncio.create_subprocess_exec(
                 "/usr/sbin/ioreg",
-                "-n",
-                "Root",
-                "-d1",
-                "-a",
+                *arguments,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.DEVNULL,
             )
             async with asyncio.timeout(2):
                 raw, _ = await child.communicate()
             if child.returncode == 0 and len(raw) <= 1048576:
-                state = console_state(raw, os.getuid())
+                state = parse(raw)
         except (OSError, TimeoutError, ValueError, plistlib.InvalidFileException):
             pass  # An unavailable extra probe never removes an existing grant.
         finally:
@@ -80,14 +124,14 @@ class MacDesktop:
                 except BridgeError:
                     if state not in DESKTOP_MESSAGES:
                         state = "unknown"
-        self.last = {
-            "state": state,
-            "observed_at": time.time(),
-            "scope": "macOS console availability, not permission or agent readiness",
-        }
-        return self.last
+        return state
 
     async def require_interactive(self):
         state = await self.probe()
         if state["state"] in DESKTOP_MESSAGES:
-            raise BridgeError(state["state"], DESKTOP_MESSAGES[state["state"]])
+            message = (
+                DISPLAY_LOCK_MESSAGE
+                if state.get("lock_cause") == "display_sleep_or_screensaver"
+                else DESKTOP_MESSAGES[state["state"]]
+            )
+            raise BridgeError(state["state"], message)

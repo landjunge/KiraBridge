@@ -749,6 +749,8 @@ class TerminalAppTransport:
                 throw Error("Refusing to close a multi-tab Terminal window");
             const others = app.windows().filter(w => w.id() !== id).map(w => w.id());
             if (!others.length) throw Error("Refusing to close the only Terminal tab");
+            // A running process makes Terminal ask before closing; never leave that dialog.
+            if (tab.busy()) throw Error("Selected terminal is busy; no close dialog");
             targetWindow.close();
             delay(0.3);
             const left = app.windows().map(w => w.id());

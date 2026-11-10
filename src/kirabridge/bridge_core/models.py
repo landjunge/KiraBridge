@@ -20,6 +20,8 @@ class NativeFailureEvidence(BaseModel):
         "target_revalidation",
         "physical_key_validation",
         "keyboard_layout_validation",
+        "frontmost_check",
+        "focused_window_lookup",
         "unspecified",
     ]
     backend_effect_unknown: bool

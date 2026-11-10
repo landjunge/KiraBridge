@@ -44,6 +44,12 @@ def _failure_stage(operation, error):
             "Current input source/layout identity is invalid": "keyboard_layout_validation",
             "Current keyboard layout exceeds its bounded limit": "keyboard_layout_validation",
         },
+        ("keyboard.inspect", "keyboard_unsupported"): {
+            "Keyboard app is not frontmost": "frontmost_check",
+            "Exact focused window/field is unavailable": "focused_window_lookup",
+            "Focused keyboard window is unavailable": "focused_window_lookup",
+            "Focused field/window ownership is unavailable": "focused_window_lookup",
+        },
     }
     message = error.get("message")
     if not isinstance(message, str) or len(message) > 256:

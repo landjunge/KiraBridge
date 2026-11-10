@@ -186,6 +186,23 @@ enum SystemKeyboard {
         }
         return Context(field: nil, metadata: metadata)
     }
+    /// A frontmost app whose AX window list is observed as empty (TextEdit after its
+    /// last document closed) only receives menu key equivalents. A failed or
+    /// missing window list never counts as empty.
+    static func windowlessApplication(focusedWindow: CFTypeRef?, windows: CFTypeRef?) -> Bool {
+        guard focusedWindow == nil, let windows, CFGetTypeID(windows) == CFArrayGetTypeID() else { return false }
+        return CFArrayGetCount(unsafeBitCast(windows, to: CFArray.self)) == 0
+    }
+    static let windowlessScope = "application_without_windows"
+    static let windowlessMetadata: [String: Any] = ["role": "AXApplication", "subrole": NSNull(),
+        "focused": NSNull(), "enabled": NSNull(), "secure": NSNull(), "text_supported": false,
+        "focus_scope": windowlessScope]
+    /// Only Command shortcuts reach a window-less app; text and plain keys are refused.
+    static func requireWindowlessShortcut(_ field: [String: Any]?, chord: Bool, modifiers: [String]) throws {
+        guard field?["focus_scope"] as? String == windowlessScope else { return }
+        try require(chord && modifiers.contains("command"),
+                    "A window-less application accepts only Command shortcuts")
+    }
     static func requireField(_ field: Field?) throws -> Field {
         guard let field = field else {
             throw SystemControl.failure("keyboard_unsupported", "Exact readable text field metadata is unavailable")
@@ -314,32 +331,41 @@ enum SystemKeyboard {
         try SystemControl.axGranted()
         let root = AXUIElementCreateApplication(app.processIdentifier)
         try timeout(root)
-        func focused() throws -> (AXUIElement, AXUIElement) {
+        func focused() throws -> (AXUIElement, AXUIElement, Bool) {
             try require(app.isActive
                         && (SystemControl.attribute(root, kAXFrontmostAttribute) as? NSNumber)?.boolValue == true,
                         "Keyboard app is not frontmost")
-            guard let window = SystemControl.attribute(root, kAXFocusedWindowAttribute),
+            let focusedWindow = SystemControl.attribute(root, kAXFocusedWindowAttribute)
+            if windowlessApplication(focusedWindow: focusedWindow,
+                                     windows: SystemControl.attribute(root, kAXWindowsAttribute)) {
+                return (root, root, true)
+            }
+            guard let window = focusedWindow,
                   let element = SystemControl.attribute(root, kAXFocusedUIElementAttribute),
                   CFGetTypeID(window) == AXUIElementGetTypeID(),
                   CFGetTypeID(element) == AXUIElementGetTypeID() else {
                 throw SystemControl.failure("keyboard_unsupported", "Exact focused window/field is unavailable")
             }
-            return (unsafeBitCast(window, to: AXUIElement.self), unsafeBitCast(element, to: AXUIElement.self))
+            return (unsafeBitCast(window, to: AXUIElement.self), unsafeBitCast(element, to: AXUIElement.self), false)
         }
-        let (window, element) = try focused()
+        let (window, element, windowless) = try focused()
         for target in [window, element] {
             try timeout(target)
             try SystemControl.checkElementOwner(target, pid: app.processIdentifier)
         }
-        try require(SystemControl.string(window, kAXRoleAttribute) == "AXWindow"
-                    && (SystemControl.attribute(window, kAXMinimizedAttribute) as? NSNumber)?.boolValue == false,
-                    "Focused keyboard window is unavailable")
-        guard let ownerWindow = SystemControl.attribute(element, kAXWindowAttribute),
-              CFGetTypeID(ownerWindow) == AXUIElementGetTypeID(),
-              CFEqual(ownerWindow, window) else {
-            throw SystemControl.failure("keyboard_unsupported", "Focused field/window ownership is unavailable")
+        if !windowless {
+            try require(SystemControl.string(window, kAXRoleAttribute) == "AXWindow"
+                        && (SystemControl.attribute(window, kAXMinimizedAttribute) as? NSNumber)?.boolValue == false,
+                        "Focused keyboard window is unavailable")
+            guard let ownerWindow = SystemControl.attribute(element, kAXWindowAttribute),
+                  CFGetTypeID(ownerWindow) == AXUIElementGetTypeID(),
+                  CFEqual(ownerWindow, window) else {
+                throw SystemControl.failure("keyboard_unsupported", "Focused field/window ownership is unavailable")
+            }
         }
         func context() throws -> Context {
+            // The AX application itself: no field, value or text is ever observed.
+            if windowless { return Context(field: nil, metadata: windowlessMetadata) }
             let observedSubrole = try subrole(element)
             return try observeContext(prepare: {
                 try timeout(element)
@@ -355,9 +381,9 @@ enum SystemKeyboard {
         let before = try revision(application: application, window: windowToken,
                                   element: token, metadata: observed.metadata, layout: layout)
         _ = try SystemControl.target(args, mutating: true)
-        let (finalWindow, finalElement) = try focused()
+        let (finalWindow, finalElement, finalWindowless) = try focused()
         let finalContext = try context()
-        try require(CFEqual(finalWindow, window) && CFEqual(finalElement, element)
+        try require(finalWindowless == windowless && CFEqual(finalWindow, window) && CFEqual(finalElement, element)
                     && before == revision(application: SystemControl.appIdentity(app), window: windowToken,
                                           element: token, metadata: finalContext.metadata, layout: inputSource()),
                     "Keyboard focus, field, selection or layout changed during inspection")
@@ -690,6 +716,8 @@ enum SystemKeyboard {
             } else { appliedEventFlags = down.flags }
             return try postPair(validate: {
                 let current = try boundSnapshot(target, revision: index == 0)
+                try requireWindowlessShortcut(current.response["field"] as? [String: Any],
+                                              chord: chord, modifiers: modifiers)
                 if index == 0 {
                     firstWindow = current.window; firstElement = current.element
                 } else {

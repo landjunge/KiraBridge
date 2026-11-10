@@ -35,6 +35,13 @@ CASES = [
         False,
         "keyboard_layout_validation",
     ),
+    ("keyboard.inspect", "Keyboard app is not frontmost", False, "frontmost_check"),
+    (
+        "keyboard.inspect",
+        "Exact focused window/field is unavailable",
+        False,
+        "focused_window_lookup",
+    ),
 ]
 
 

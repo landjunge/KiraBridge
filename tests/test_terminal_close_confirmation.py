@@ -27,12 +27,14 @@ class TerminalCloseConfirmation(unittest.IsolatedAsyncioTestCase):
                     id: () => 101,
                     tabs: () => mode === 'multi_tab' ? [{}, {}] : [{}],
                     close: () => {
+                        if (mode === 'busy') throw Error('Unexpected close of busy tab');
                         if (mode === 'multi_tab')
                             throw Error('Unexpected close of multi-tab window');
                         if (mode === 'closed') ids = [202];
                         if (mode === 'foreign_removed') ids = [];
                     }
                 };
+                const tab = {busy: () => mode === 'busy'};
                 const delay = () => {};
             """.replace("MODE", json.dumps(mode))
             completed = await asyncio.to_thread(
@@ -74,3 +76,9 @@ class TerminalCloseConfirmation(unittest.IsolatedAsyncioTestCase):
             await self.close("multi_tab")
         self.assertIn("Refusing to close a multi-tab Terminal window", raised.exception.stderr)
         self.assertNotIn("Unexpected close of multi-tab window", raised.exception.stderr)
+
+    async def test_busy_tab_is_refused_before_terminal_dialog(self):
+        with self.assertRaises(subprocess.CalledProcessError) as raised:
+            await self.close("busy")
+        self.assertIn("Selected terminal is busy", raised.exception.stderr)
+        self.assertNotIn("Unexpected close of busy tab", raised.exception.stderr)
