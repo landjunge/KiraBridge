@@ -94,8 +94,8 @@ HTML = r"""<!doctype html>
 <link rel="stylesheet" href="/networkpunkt.css"><link rel="stylesheet" href="/style.css">
 <link rel="stylesheet" href="/grok-connector.css">
 <script src="/grok-connector.js" defer></script>
-</head><body class="np-ui np-scroll"><main class="console">
-<header class="console-header"><div><p class="np-meta" data-t="local">Auf diesem Mac · lokaler Zugang</p>
+<link rel="stylesheet" href="/networkpunkt-appbar.css"><link rel="stylesheet" href="/product-header.css"><script type="module" src="/product-header.js"></script></head><body class="np-ui np-scroll"><main class="console">
+<header class="console-header"><div class="np-appbar-host" data-product-header></div><div><p class="np-meta" data-t="local">Auf diesem Mac · lokaler Zugang</p>
 <h1>KiraBridge · Grok App</h1><p data-t="intro">Die Grok-App einmalig verbinden und ihren Zugang prüfen.</p></div>
 <nav class="np-actions"><a class="np-button" href="/" data-t="tasks">Aufträge</a>
 <a class="np-button" href="/team">Team</a>

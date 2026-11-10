@@ -1,0 +1,9 @@
+{
+  "task": "KB-DESIGN-ADAPT-KIRABRIDGE-20261107",
+  "thread": "188ce4729a62",
+  "action": "whiteboard_append",
+  "externalKey": "kb-design-adapt-20261107-browser-acceptance",
+  "written": false,
+  "reason": "MCP tool call requires approval, but approval policy is never",
+  "nextStep": "Coordinator may append the final local handoff to the existing board using its authorized context. No direct store mutation or permission bypass."
+}

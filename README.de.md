@@ -238,3 +238,10 @@ Gastprüfungen bestanden, einschließlich Ctrl-/Alt-/Shift-Kombinationen und
 abgesicherter Fenstersteuerung. Veröffentlichte Downloads und die getrennte
 Windows 11-Installation sind geprüft. [Belege und Grenzen](docs/WINDOWS-DESKTOP-20261104.md);
 dev2 bleibt als Rückfallmöglichkeit erhalten.
+
+### Designquellstand · 7. November 2026
+
+Der gemeinsame Header mit fünf Originalicons ist implementiert und lokal geprüft.
+Der [Designnachweis](docs/FIVE-TOOL-DESIGN-20261107.md) beschreibt Status-/Versionsgrenzen
+und die bestandene Browserprüfung; die installierte native App bleibt ungeprüft.
+Diese Quelllieferung belegt keinen neuen Download oder installierten Laufzeitstand.

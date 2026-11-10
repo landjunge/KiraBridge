@@ -1,0 +1,12 @@
+{
+  "metadataSource": "https://googlechromelabs.github.io/chrome-for-testing/known-good-versions-with-downloads.json",
+  "version": "130.0.6723.31",
+  "artifact": "https://storage.googleapis.com/chrome-for-testing-public/130.0.6723.31/mac-x64/chrome-headless-shell-mac-x64.zip",
+  "purpose": "Isolated compatibility test for existing Chromium130 renderer; no app/system installation; current156 requires denied kernel VM query",
+  "downloadBytes": "91364466",
+  "archiveSha256": "a7e73ac47ed2be7cfd61153c007314735673ec31c7618bd04ae77e9abccd7fe9",
+  "binary": "/Users/landjunge/threaddesk-worktrees/five-tool-design-codex-20261107/.runtime/kb-compatible-browser-130/chrome-headless-shell-mac-x64/chrome-headless-shell",
+  "binarySha256": "d276b97d1829df5037da72b7ccc998a4b990b73528c189a4ad24c77be7072b00",
+  "installedIntoSystem": false,
+  "actualVersion": "Google Chrome for Testing 130.0.6723.31"
+}

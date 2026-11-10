@@ -248,10 +248,10 @@ HTML = r"""<!doctype html>
   <link rel="stylesheet" href="/style.css">
   <link rel="stylesheet" href="/team.css">
   <script src="/team.js" defer></script>
-</head>
+<link rel="stylesheet" href="/networkpunkt-appbar.css"><link rel="stylesheet" href="/product-header.css"><script type="module" src="/product-header.js"></script></head>
 <body class="np-ui np-scroll">
 <main class="console">
-  <header class="console-header">
+  <header class="console-header"><div class="np-appbar-host" data-product-header></div>
     <div><p class="np-meta" data-t="local">Auf diesem Gerät · lokaler Zugang</p>
       <h1>KiraBridge · Team</h1><p data-t="intro">Zusammenarbeiten, delegieren und Ergebnisse prüfen.</p>
     </div>
