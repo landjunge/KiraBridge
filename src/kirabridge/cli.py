@@ -53,6 +53,54 @@ async def execute(args) -> None:
 
         emit(setup(args.workspace, Path(args.config) if args.config else None))
         return
+    if args.command == "completion":
+        from kirabridge.completion_handoff import (
+            CompletionInput,
+            claim_next,
+            record_completion,
+        )
+
+        workspace = args.workspace
+        if not workspace:
+            config = load_config(args.config)
+            workspace = config.threaddesk.workspace
+        if not workspace:
+            raise BridgeError("completion_workspace", "ThreadDesk workspace is not configured")
+        if args.action == "record":
+            record = CompletionInput(
+                board_id=args.board,
+                order_entry_id=args.order_entry,
+                task_id=args.task_id,
+                status=args.status,
+                summary=args.summary,
+                commit=args.sha,
+                pr_url=args.pr,
+                tests=args.tests,
+                session_id=args.session_id,
+                working_directory=args.working_directory,
+                actor=args.actor,
+            )
+            emit(
+                record_completion(
+                    workspace,
+                    record,
+                    claim_next=not args.no_handoff,
+                    dry_run=args.dry_run,
+                )
+            )
+        else:
+            emit(
+                claim_next(
+                    workspace,
+                    args.board,
+                    order_entry_id=args.order_entry,
+                    session_id=args.session_id,
+                    actor=args.actor,
+                    newest=args.newest,
+                    dry_run=args.dry_run,
+                )
+            )
+        return
     if args.command == "init":
         destination = Path(args.destination).expanduser().absolute()
         workspace = Path(args.workspace).expanduser().resolve(strict=True)
@@ -831,6 +879,42 @@ def main() -> None:
                 "--approve", action="store_true", help="Explicitly approve this exact request"
             )
             command.add_argument("--wait", type=float, default=3700)
+    completion = sub.add_parser(
+        "completion",
+        help="Record a task result in ThreadDesk and take the next released task",
+    )
+    completion_actions = completion.add_subparsers(dest="action", required=True)
+    for action in ("record", "next"):
+        command = completion_actions.add_parser(action)
+        command.add_argument("--workspace", help="ThreadDesk workspace; defaults to config")
+        command.add_argument("--board", required=True, help="Exact ThreadDesk board id")
+        command.add_argument(
+            "--order-entry",
+            required=action == "record",
+            help="Completed task entry id",
+        )
+        command.add_argument("--session-id", help="Existing task/session id to preserve")
+        command.add_argument("--actor", default="KiraBridge completion hook")
+        command.add_argument("--dry-run", action="store_true", help="Read and select only")
+        if action == "record":
+            command.add_argument("--task-id", required=True)
+            command.add_argument(
+                "--status", choices=["completed", "failed", "cancelled"], required=True
+            )
+            command.add_argument("--summary", required=True)
+            command.add_argument("--sha", help="Exact commit SHA")
+            command.add_argument("--pr", help="Pull request or review reference")
+            command.add_argument("--tests", help="Targeted test evidence")
+            command.add_argument("--working-directory")
+            command.add_argument(
+                "--no-handoff", action="store_true", help="Record only; take nothing"
+            )
+        else:
+            command.add_argument(
+                "--newest",
+                action="store_true",
+                help="Explicitly allow the newest task without an order entry",
+            )
     watch = sub.add_parser("watch", help="Receive/print own completions automatically, then ack")
     watch.add_argument("--target", default="default", help="Stable requesting assistant/session ID")
     watch.add_argument("--once", action="store_true")
