@@ -124,6 +124,7 @@ async def test_task_handoff_binds_one_session_and_reports_live_status(tmp_path):
 
     session_body = server.body("POST", "/session")
     assert session_body["title"] == "KiraBridge task-1"
+    assert session_body["model"] == {"providerID": "deepseek", "id": "deepseek-flash"}
     assert session_body["metadata"] == {"kirabridge_task_id": "task-1"}
     assert session_body["permission"] == [{"permission": "*", "pattern": "*", "action": "deny"}]
     prompt_body = server.body("POST", "/prompt_async")
