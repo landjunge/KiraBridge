@@ -1,11 +1,11 @@
 import asyncio
 
 import pytest
+from test_session_ports import manager_without_core
 
 from kirabridge.bridge_core.models import BridgeError
 from kirabridge.platform_adapters.linux.owned_terminal import LinuxOwnedTerminal
 from kirabridge.session_manager import SessionReference
-from test_session_ports import manager_without_core
 
 
 @pytest.fixture
