@@ -11,7 +11,7 @@ from test_mcp import http_bridge  # noqa: F401
 
 from kirabridge.audit_manager import verify
 from kirabridge.bridge_core.bridge import Bridge
-from kirabridge.bridge_core.config import AgentConfig, ReceiverConfig
+from kirabridge.bridge_core.config import AgentConfig, Config, ReceiverConfig
 from kirabridge.bridge_core.models import BridgeError
 from kirabridge.mcp_gateway.client import MCPClientPool, Peer
 from kirabridge.message_manager import MessageSend
@@ -43,6 +43,20 @@ def message(**changes):
             **changes,
         }
     )
+
+
+def test_messaging_defaults_fit_a_normal_multi_round_handover():
+    config = Config()
+    assert config.messaging.max_runs_per_conversation == 16
+    assert config.messaging.max_conversation_messages == 64
+    # Eight request/answer rounds need 16 stored messages and 8 receiver runs,
+    # leaving headroom for retries and revisions within the same handover.
+    assert 2 * 8 <= config.messaging.max_conversation_messages
+    assert 8 <= config.messaging.max_runs_per_conversation
+    # Identity guards and queue ceilings stay unchanged.
+    assert config.messaging.max_reply_depth == 8
+    assert config.messaging.max_pending_per_recipient == 100
+    assert config.messaging.max_runs_per_hour == 24
 
 
 def test_ordered_roundtrip_receipts_idempotency_and_ownership(channel, bridge):

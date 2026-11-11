@@ -682,17 +682,23 @@ class MessageReceiver:
                 # Late delivery could duplicate work already done in the visible terminal.
                 blocked("stale_queue_expired")
                 return None
+            # Both run ceilings are rolling one-hour windows that bound provider
+            # cost and queue growth. They are not identity, authentication or
+            # dedupe guards: those are enforced before this point and must never
+            # depend on these counters.
+            since = time.time() - 3600
             count = self.bridge.store.db.execute(
                 "SELECT count(*) FROM message_jobs j JOIN messages m ON m.id=j.message_id "
-                "WHERE m.conversation_id=? AND j.claimed IS NOT NULL",
-                (row["conversation_id"],),
+                "WHERE m.conversation_id=? AND j.claimed>?",
+                (row["conversation_id"], since),
             ).fetchone()[0]
             if count >= config.max_runs_per_conversation:
                 blocked("conversation_run_limit")
                 return None
             count = self.bridge.store.db.execute(
-                "SELECT count(*) FROM message_jobs WHERE claimed>?",
-                (time.time() - 3600,),
+                "SELECT count(*) FROM message_jobs j JOIN messages m ON m.id=j.message_id "
+                "WHERE m.recipient=? AND j.claimed>?",
+                (row["recipient"], since),
             ).fetchone()[0]
             if count >= config.max_runs_per_hour:
                 blocked("hourly_run_limit")

@@ -119,6 +119,80 @@ async def test_new_run_limit_rejection_stays_blocked_and_cannot_be_delivered_lat
     assert not direct.submit("chatgpt", sent["id"])
 
 
+def message_in(bridge, conversation, key, *, recipient="grok"):
+    return bridge.messages.send(
+        "chatgpt",
+        MessageSend(
+            recipient=recipient,
+            conversation_id=conversation,
+            idempotency_key=key,
+            body="A fresh request in an ongoing handover",
+            kind="work",
+            dispatch=True,
+        ),
+    )
+
+
+async def test_conversation_run_limit_is_a_rolling_hour(delivery):
+    bridge, _, _, _, _ = delivery
+    bridge.config.messaging.max_runs_per_conversation = 4
+    conversation = "rolling-window"
+    older_than_window = time.time() - 3601
+    for n in range(4):
+        sent = message_in(bridge, conversation, f"old-run-{n}")
+        assert bridge.message_receiver._claim(sent["id"])
+        bridge.store.db.execute(
+            "UPDATE message_jobs SET claimed=? WHERE message_id=?",
+            (older_than_window, sent["id"]),
+        )
+    fresh = message_in(bridge, conversation, "fresh-run")
+    assert bridge.message_receiver._claim(fresh["id"])
+    assert bridge.messages.get("chatgpt", fresh["id"])["processing"]["state"] == "running"
+
+
+async def test_hourly_run_limit_is_scoped_to_the_recipient(delivery):
+    bridge, _, _, _, _ = delivery
+    bridge.config.messaging.max_runs_per_hour = 1
+    busy = message_in(bridge, "busy-grok", "busy-grok", recipient="grok")
+    assert bridge.message_receiver._claim(busy["id"])
+    second = message_in(bridge, "busy-grok-2", "busy-grok-2", recipient="grok")
+    assert bridge.message_receiver._claim(second["id"]) is None
+    assert (
+        bridge.messages.get("chatgpt", second["id"])["processing"]["evidence"]["reason"]
+        == "hourly_run_limit"
+    )
+    other = message_in(bridge, "fresh-codex", "fresh-codex", recipient="codex")
+    assert bridge.message_receiver._claim(other["id"])
+
+
+async def test_default_limits_fit_an_eight_round_handover(delivery):
+    bridge, _, _, _, _ = delivery
+    assert bridge.config.messaging.max_runs_per_conversation == 16
+    assert bridge.config.messaging.max_conversation_messages == 64
+    conversation = "eight-rounds"
+    for n in range(8):
+        request = message_in(bridge, conversation, f"request-{n}")
+        assert bridge.message_receiver._claim(request["id"])
+        answer = bridge.messages.send(
+            "grok",
+            MessageSend(
+                recipient="chatgpt",
+                conversation_id=conversation,
+                idempotency_key=f"answer-{n}",
+                body="Round complete",
+                kind="answer",
+                reply_to=request["id"],
+            ),
+        )
+        assert answer["position"] == 2 * n + 2
+    assert (
+        bridge.store.db.execute(
+            "SELECT count(*) FROM messages WHERE conversation_id=?", (conversation,)
+        ).fetchone()[0]
+        == 16
+    )
+
+
 async def test_ready_target_gets_exactly_one_paste_return_and_authenticated_answer(delivery):
     bridge, transport, direct, connected, _ = delivery
     sent = new_message(bridge)
