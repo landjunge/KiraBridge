@@ -6,14 +6,30 @@
     "visibility": "private",
     "default_branch": "main"
   },
-  "observed_at": "2026-11-09T06:54:45Z",
+  "observed_at": "2026-11-11T21:45:45Z",
   "plan": "threaddesk:6b5b73b9de36",
   "main_pin": {
-    "commit": "5da9d858a2dcc78743ad84d3d4434384cc16f1b6",
-    "committed_at": "2026-11-09T04:53:16Z"
+    "commit": "186c0a36f7f5b1dc5d34da9d026fe80dd657c790",
+    "committed_at": "2026-11-11T20:24:34Z"
   },
-  "source_version": "0.8.0rc43",
+  "source_version": "0.8.0rc48",
   "releases": [
+    {
+      "tag": "v0.8.0rc48",
+      "draft": false,
+      "prerelease": true,
+      "published_at": "2026-11-11T20:19:45Z",
+      "assets": [
+        "install-macos.sh",
+        "install-macos.sh.sha256",
+        "kirabridge-0.8.0rc48-py3-none-any.whl",
+        "kirabridge-0.8.0rc48-py3-none-any.whl.sha256",
+        "KiraBridge-macos.tar.gz",
+        "KiraBridge-macos.tar.gz.sha256",
+        "LICENSE",
+        "SHA256SUMS"
+      ]
+    },
     {
       "tag": "linux-v0.8.0rc41",
       "draft": false,
@@ -107,24 +123,24 @@
   "installed": {
     "mac": {
       "state": "installed",
-      "observed_at": "2026-11-09T06:54:45Z",
+      "observed_at": "2026-11-11T21:45:45Z",
       "entries": [
         {
           "kind": "app",
           "path": "~/Applications/KiraBridge.app",
-          "version": "0.8.0rc43",
+          "version": "0.8.0rc48",
           "version_key": "KiraBridgeVersion",
-          "source_commit": "f9e6ec8e86c9704dd9c13d390a781de270dcb93a",
+          "source_commit": "48c635137b4b6e88c5a53da7b5644abcb12826d2",
           "commit_key": "KiraBridgeSourceCommit",
-          "note": "native App, Info.plist; Installation wird von einer anderen Lane auf RC43 umgestellt"
+          "note": "native App, Info.plist; codesign --verify --deep --strict bestanden"
         },
         {
           "kind": "launcher",
           "path": "~/.local/bin/kirabridge",
-          "version": "0.8.0rc41",
-          "source_commit": "c81430b88738",
-          "runtime_marker": "0.8.0rc41-c81430b88738",
-          "note": "CLI-Wrapper zeigt (Stand Beobachtung) noch auf RC41-c81430b88738; install/current.json nennt rc43 mit rollback_core_restored=true"
+          "version": "0.8.0rc48",
+          "source_commit": "48c635137b4b6e88c5a53da7b5644abcb12826d2",
+          "runtime_marker": "0.8.0rc48-48c635137b4b",
+          "note": "CLI-Wrapper zeigt auf releases/0.8.0rc48-48c635137b4b; Daemon rc48 verifiziert"
         }
       ]
     },
@@ -229,8 +245,8 @@
     }
   ],
   "notes": [
-    "W18: README nennt RC40 aus d12838a, Board RC40 aus a5d381a; gelesen wurde RC43 (App, f9e6ec8e86c9) und RC41-c81430b88738 (CLI-Wrapper). Beide Commits sind Vorfahren von main.",
-    "Veroeffentlicht ist nur: macOS Intel RC36, Linux RC41, Windows rc37.dev1; installierter Stand und Release weichen bewusst ab.",
-    "Status 'open' heisst: laut Bauplan offen, in diesem Register kein Abschlussbeleg."
+    "Installiert und verifiziert: macOS Intel 0.8.0rc48 (48c6351), live ueber Daemon und install/current.json geprueft; Release v0.8.0rc48 ist macOS-Pre-Release.",
+    "Veroeffentlicht: macOS Intel prepublish rc48; Linux bleibt RC41, Windows bleibt rc37.dev1. Kein rc48-Linux-Artefakt.",
+    "Isolierte accept_macos_release-Abnahme fuer rc48 ist noch offen; die Produktivinstallation wurde unabhaengig verifiziert."
   ]
 }
