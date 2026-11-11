@@ -160,6 +160,12 @@ class NativeAdmission:
             # it a confirmed paste/Return; the existing executor owns the result.
             self.status[task_id] = "input_attempted"
             event.set()
+        elif evidence.get("event") in {"session_created", "prompt_admitted"} and isinstance(
+            evidence.get("session_id"), str
+        ) and evidence["session_id"]:
+            # An agent session is admitted work. Stop the admission watchdog
+            # without claiming that the session has finished.
+            event.set()
 
     @staticmethod
     def _route_identity(task):
