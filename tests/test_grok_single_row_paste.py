@@ -75,7 +75,30 @@ async def test_actual_generated_echo_javascript_matches_whole_widget(after, expe
     assert json.loads(out) is expected
 
 
-@pytest.mark.parametrize("text", ["x" * 76, "first\nsecond", "ä message", " trailing "])
+def _wrapped(payload_rows):
+    width = 78
+    body = []
+    for index, row in enumerate(payload_rows):
+        prefix = " │ ❯ " if index == 0 else " │   "
+        body.append(prefix + row + " " * (width - len(prefix) - len(row) - 2) + "│ ")
+    return (
+        "Earlier response\n ╭" + "─" * 78 + "╮ \n"
+        + "\n".join(body)
+        + "\n ╰"
+        + "─" * 33
+        + " Grok 4.7 (xhigh) · always-approve ─╯ \n \n Ctrl+x:shortcuts\n"
+    )
+
+
+def test_multiline_box_payload_is_observed_only_inside_the_composer():
+    text = "first\nsecond"
+    after = _wrapped(["first", "second"])
+    assert insertion_observed(after, text, BEFORE)
+    quoted = BEFORE.replace("Earlier response", "first second")
+    assert insertion_observed(quoted, text, BEFORE) is False
+
+
+@pytest.mark.parametrize("text", [" trailing ", "lead ", "\x1b[31mred"])
 async def test_unverifiable_decorated_box_payload_refuses_before_paste(text):
     from kirabridge.bridge_core.models import BridgeError
 
@@ -87,3 +110,8 @@ async def test_unverifiable_decorated_box_payload_refuses_before_paste(text):
 
 async def test_exact_single_row_box_payload_passes_preflight():
     await GrokBuildAdapter().preflight_input(None, None, PAYLOAD, {"text": BEFORE})
+
+
+@pytest.mark.parametrize("text", ["x" * 76, "first\nsecond", "ä message"])
+async def test_longer_visible_payload_passes_preflight_when_the_box_is_empty(text):
+    await GrokBuildAdapter().preflight_input(None, None, text, {"text": BEFORE})

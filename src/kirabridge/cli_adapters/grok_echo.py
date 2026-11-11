@@ -7,9 +7,22 @@ from ._legacy_readiness import display_text, input_view
 
 
 def single_line_payload(text):
-    # Padding and payload edge spaces are visually indistinguishable. Wrapped,
-    # multiline and non-ASCII rendering need separate geometry-aware evidence.
+    # Padding and payload edge spaces are visually indistinguishable.
     return bool(text and text == text.strip(" ") and re.fullmatch(r"[ -~]+", text))
+
+
+def _compact(text):
+    return re.sub(r"[\s\u00a0]+", "", text)
+
+
+def verifiable_payload(text):
+    # Edge spaces remain ambiguous. Newlines and other visible characters can
+    # be proven from the composer cells alone.
+    return bool(
+        text
+        and text == text.strip(" ")
+        and not re.search(r"[\x00-\x08\x0b-\x1f\x7f]", text)
+    )
 
 
 def single_row_capacity(raw):
@@ -23,8 +36,33 @@ def single_row_capacity(raw):
     return len(match[1])
 
 
+def _box(view):
+    lines = view.splitlines()
+    if len(lines) < 3 or not re.fullmatch(r"╭─+╮ *", lines[0]):
+        return None
+    end = next((index for index, line in enumerate(lines) if index and re.match(r" *╰", line)), None)
+    if end is None or end < 2 or not re.fullmatch(r" *╰─+ .*─╯ *", lines[end]):
+        return None
+    return lines[: end + 1], lines[end + 1 :]
+
+
+def _composer_cells(box):
+    cells = []
+    for index, line in enumerate(box[1:-1]):
+        match = re.fullmatch(r" *│(.*)│ *", line)
+        if match is None:
+            return None
+        cell = match.group(1)
+        if index == 0:
+            if not re.match(r" *❯ ", cell):
+                return None
+            cell = re.sub(r"^ *❯ ", "", cell, count=1)
+        cells.append(cell)
+    return cells
+
+
 def insertion_observed(raw, text, before):
-    if not single_line_payload(text):
+    if not verifiable_payload(text):
         return False
     previous, old_controls = display_text(before)
     current, controls = display_text(raw)
@@ -35,20 +73,48 @@ def insertion_observed(raw, text, before):
     if len(lines) < 3 or not re.fullmatch(r"╭─+╮ *\n", lines[0]):
         return False
     match = re.fullmatch(r"( *│ *❯ )( *)│ *(\n)", lines[1])
-    if match is None or len(text) > len(match[2]):
+    if (
+        match is not None
+        and len(text) <= len(match[2])
+        and re.fullmatch(r" *╰[^\n]*╯ *(?:\n)?", lines[2])
+    ):
+        # Replace only the known empty body cells. The same title-bearing bottom
+        # border, shortcut rows, padding, and top border must remain byte-for-byte.
+        start = len(lines[0]) + match.start(2)
+        expected = old[:start] + text + old[start + len(text) :]
+        if new == expected:
+            return True
+    # Longer and multiline text is proven only from the composer cells. Text
+    # above the box, including older quoted work, does not count.
+    old_box, old_tail = _box(old) or (None, None)
+    new_box, new_tail = _box(new) or (None, None)
+    if old_box is None or new_box is None or old_tail != new_tail:
         return False
-    if not re.fullmatch(r" *╰[^\n]*╯ *(?:\n)?", lines[2]):
+    if old_box[0] != new_box[0] or old_box[-1] != new_box[-1]:
         return False
-    # Replace only the known empty body cells. The same title-bearing bottom
-    # border, shortcut rows, padding, and top border must remain byte-for-byte.
-    start = len(lines[0]) + match.start(2)
-    expected = old[:start] + text + old[start + len(text) :]
-    return new == expected
+    old_cells, new_cells = _composer_cells(old_box), _composer_cells(new_box)
+    if old_cells is None or new_cells is None or _compact("".join(old_cells)):
+        return False
+    return _compact("".join(new_cells)) == _compact(text)
 
 
 def paste_source(text):
-    if not single_line_payload(text):
+    if not verifiable_payload(text):
         return None
+    if not single_line_payload(text):
+        return (
+            "\nfunction observedPaste(before, after) {"
+            "const box=s=>{const i=s.lastIndexOf('╭'); if(i<0)return '';"
+            "const rows=s.slice(i).split('\\n');"
+            "const end=rows.findIndex((row,index)=>index&&/^ *╰/.test(row));"
+            "if(end<2)return '';"
+            "return rows.slice(1,end).map(row=>row.replace(/^ *│/,'').replace(/│ *$/,''))"
+            ".join('');};"
+            "const compact=s=>s.replace(/[\\s\\u00a0]/g,'');"
+            "const payload=compact(" + json.dumps(text) + ");"
+            "const old=compact(box(before)), current=compact(box(after));"
+            "return payload.length>0 && old.length===0 && current===payload;}\n"
+        )
     return (
         "\nfunction observedPaste(before, after) {"
         "const oldStart=before.lastIndexOf('╭'), newStart=after.lastIndexOf('╭');"
