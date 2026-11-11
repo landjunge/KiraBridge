@@ -22,8 +22,6 @@ from kirabridge.filesystem_manager import PathScope
 from kirabridge.platform_adapters import reap_process, spawn_process
 from kirabridge.terminal_manager import EvidenceCallback, TerminalManager, minimal_environment
 
-AGENT_TURN_CLEANUP_MARGIN = 5.0
-
 
 async def bounded_lines(response, limit=1048576):
     pending = bytearray()
@@ -664,7 +662,7 @@ class AgentManager:
             else {}
         )
         try:
-            async with asyncio.timeout(args.timeout + AGENT_TURN_CLEANUP_MARGIN):
+            async with asyncio.timeout(args.timeout):
                 if full_access and config.kind in {
                     "opencode",
                     "gemini_cli",
