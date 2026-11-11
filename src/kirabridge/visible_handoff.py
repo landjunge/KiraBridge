@@ -623,7 +623,10 @@ class VisibleHandoffs:
             return binding, None
         updated = replacement_binding(target, binding, sessions)
         if updated is None:
-            return binding, None
+            # The catalog is complete and the configured pane is proven gone;
+            # retain that snapshot even without a replacement so an orphaned
+            # reservation on this exact binding can be released.
+            return binding, sessions
         self.config.visible_handoffs.bindings[target] = updated
         save_refresh(self.config, target, binding, updated)
         self.store.audit(
@@ -648,13 +651,24 @@ class VisibleHandoffs:
             original = VisibleTerminalBinding.model_validate_json(row["binding"])
         except (ValueError, TypeError):
             return False
-        if not distinct_window_processes(original, binding):
+        same_binding = (
+            original.pane_id == binding.pane_id
+            and original.expected_pid == binding.expected_pid
+            and original.agent_pid == binding.agent_pid
+        )
+        if not same_binding and not distinct_window_processes(original, binding):
+            return False
+        if same_binding and observed_sessions is None:
+            # An own-binding absence proof needs a complete fresh catalog first;
+            # an incomplete or unavailable snapshot must not release it.
             return False
         if observed_sessions is not None and binding_still_present(original, observed_sessions):
             return False
         # A tty can be reused as soon as its old window closes. That name is not
         # the session identity. Only a full native window inventory plus absence
         # of both original PIDs may release the lock, never a missing catalog row.
+        # The exact configured binding may be that vanished window too; an
+        # existing window or either original PID keeps its lock.
         try:
             await self.sessions.prove_original_target_gone(principal, original.model_dump())
         except BridgeError:

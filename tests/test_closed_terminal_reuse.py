@@ -415,3 +415,62 @@ def test_refresh_chain_does_not_override_new_manual_binding(visible):
     bridge.config.visible_handoffs.bindings["codex"] = manual
     load_refresh(bridge.config)
     assert bridge.config.visible_handoffs.bindings["codex"] == manual_successor
+
+
+async def test_exact_binding_proven_gone_releases_its_own_unknown_reservation(visible, monkeypatch):
+    bridge, _ = visible
+    binding = bridge.config.visible_handoffs.bindings["codex"].model_copy(deep=True)
+    before, _ = retain_unknown(bridge, binding)
+
+    async def prove(principal, original):
+        assert original == binding.model_dump()
+        return {"original_pids_gone": True, "native_window_absent": True}
+
+    monkeypatch.setattr(bridge.sessions, "prove_original_target_gone", prove)
+    await bridge.visible_handoffs.reconcile_target_reservations(
+        "chatgpt", "codex", binding, observed_sessions=[]
+    )
+    assert original_history(bridge, "old-unknown") == before
+
+
+async def test_complete_catalog_without_replacement_releases_own_dead_reservation(
+    visible, monkeypatch
+):
+    bridge, _ = visible
+    binding = bridge.config.visible_handoffs.bindings["codex"].model_copy(deep=True)
+    before, _ = retain_unknown(bridge, binding)
+
+    async def selected(principal, pane, pid):
+        raise BridgeError("session_selection_changed", "Configured terminal is closed")
+
+    async def catalog(principal, *, transport=None):
+        return {"status": "available", "sessions": []}
+
+    async def prove(principal, original):
+        assert original == binding.model_dump()
+        return {"original_pids_gone": True, "native_window_absent": True}
+
+    monkeypatch.setattr(bridge.sessions, "selected", selected)
+    monkeypatch.setattr(bridge.sessions, "catalog", catalog)
+    monkeypatch.setattr(bridge.sessions, "prove_original_target_gone", prove)
+    with pytest.raises(BridgeError) as error:
+        await bridge.visible_handoffs.dispatch_ready("chatgpt", "codex")
+    assert error.value.code == "session_selection_changed"
+    assert original_history(bridge, "old-unknown") == before
+
+
+async def test_exact_binding_still_present_keeps_its_unknown_reservation(visible, monkeypatch):
+    bridge, _ = visible
+    binding = bridge.config.visible_handoffs.bindings["codex"].model_copy(deep=True)
+    before, _ = retain_unknown(bridge, binding)
+
+    async def prove(principal, original):
+        raise BridgeError("visible_absence_unproven", "Original window or PID still exists")
+
+    monkeypatch.setattr(bridge.sessions, "prove_original_target_gone", prove)
+    with pytest.raises(BridgeError) as error:
+        await bridge.visible_handoffs.reconcile_target_reservations(
+            "chatgpt", "codex", binding, observed_sessions=[]
+        )
+    assert error.value.code == "visible_target_busy"
+    assert original_history(bridge, "old-unknown") == before
