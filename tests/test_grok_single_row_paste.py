@@ -82,7 +82,9 @@ def _wrapped(payload_rows):
         prefix = " │ ❯ " if index == 0 else " │   "
         body.append(prefix + row + " " * (width - len(prefix) - len(row) - 2) + "│ ")
     return (
-        "Earlier response\n ╭" + "─" * 78 + "╮ \n"
+        "Earlier response\n ╭"
+        + "─" * 78
+        + "╮ \n"
         + "\n".join(body)
         + "\n ╰"
         + "─" * 33
@@ -115,3 +117,12 @@ async def test_exact_single_row_box_payload_passes_preflight():
 @pytest.mark.parametrize("text", ["x" * 76, "first\nsecond", "ä message"])
 async def test_longer_visible_payload_passes_preflight_when_the_box_is_empty(text):
     await GrokBuildAdapter().preflight_input(None, None, text, {"text": BEFORE})
+
+
+@pytest.mark.parametrize("text", [PAYLOAD, "First line\nSecond line"])
+async def test_unrecognized_box_does_not_block_existing_visible_input(text):
+    # Regression after PR143: every payload was refused before paste when the
+    # empty box lacked the decorated single-row form, so ordinary visible
+    # handoffs stopped at the input step. The exact post-paste observation
+    # remains the authority; an unread box is never itself accepted as proof.
+    await GrokBuildAdapter().preflight_input(None, None, text, {"text": "╭\n│ ❯ │\n╰"})
