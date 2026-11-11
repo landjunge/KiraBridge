@@ -517,33 +517,6 @@ class Store:
         )
         return True
 
-    def supersede_oldest_waiting(self, cap: int, newest_id: str) -> list[str]:
-        """Keep at most ``cap`` queued, never-started normal-lane tasks.
-
-        Call inside the transaction that queued ``newest_id``. Running, UNKNOWN and
-        finished work is never touched; a cancelled task can never start again.
-        """
-        selection, names = self.lane_selection("normal")
-        rows = self.db.execute(
-            "SELECT id FROM tasks WHERE state='queued' AND started IS NULL AND "
-            + selection
-            + " ORDER BY created,id",
-            names,
-        ).fetchall()
-        superseded = [r["id"] for r in rows if r["id"] != newest_id][: max(0, len(rows) - cap)]
-        for task_id in superseded:
-            evidence = {
-                "reason": "superseded_by_queue_cap",
-                "superseded_by": newest_id,
-                "max_waiting_tasks": cap,
-                "execution_started": False,
-                "automatic_retry": False,
-            }
-            self.transition(task_id, State.CANCELLED, evidence, expected_states={State.QUEUED})
-            row = self.db.execute("SELECT principal FROM tasks WHERE id=?", (task_id,)).fetchone()
-            self.audit("task.superseded_by_queue_cap", row["principal"], task_id, evidence)
-        return superseded
-
     def claim(
         self,
         owner: str,

@@ -5,12 +5,13 @@ import json
 import time
 from pathlib import Path
 
+import pytest
 from conftest import request, submit
 
 from kirabridge import diagnostics
 from kirabridge.audit_manager import verify
 from kirabridge.bridge_core.bridge import Bridge
-from kirabridge.bridge_core.models import canonical
+from kirabridge.bridge_core.models import BridgeError, canonical
 from kirabridge.diagnostics import AuditObserver, verify_archive
 from kirabridge.storage_compaction import compact, restore
 
@@ -110,33 +111,44 @@ async def test_undelivered_task_done_directly_is_never_executed_late(bridge, con
     assert Path(target).read_text() == "done directly"
 
 
-async def test_fourth_waiting_task_cancels_oldest_which_never_starts(bridge, config):
-    for index in range(4):
+async def test_waiting_cap_rejects_new_task_and_never_cancels_existing(bridge, config):
+    config.max_queued = 3
+    for index in range(3):
         submit(
             bridge,
             request(
                 "file.list", {"path": config.principals["local"].roots[0]}, task_id=f"q{index}"
             ),
         )
-    oldest = bridge.store.get("q0")
-    assert oldest["state"] == "cancelled"
-    assert oldest["evidence"]["reason"] == "superseded_by_queue_cap"
-    assert oldest["evidence"]["superseded_by"] == "q3"
+    with pytest.raises(BridgeError) as refused:
+        submit(
+            bridge,
+            request("file.list", {"path": config.principals["local"].roots[0]}, task_id="q-new"),
+        )
+    assert refused.value.code == "queue_full"
+    for index in range(3):
+        assert bridge.store.get(f"q{index}")["state"] == "queued"
+    assert (
+        bridge.store.db.execute("SELECT count(*) FROM tasks WHERE state='cancelled'").fetchone()[0]
+        == 0
+    )
     assert (
         bridge.store.db.execute(
-            "SELECT count(*) FROM audit WHERE kind='task.superseded_by_queue_cap' AND task_id='q0'"
+            "SELECT count(*) FROM audit WHERE kind='task.superseded_by_queue_cap'"
         ).fetchone()[0]
-        == 1
+        == 0
     )
+    assert bridge.store.db.execute("SELECT count(*) FROM tasks WHERE id='q-new'").fetchone()[0] == 0
     async with bridge:
-        for index in (1, 2, 3):
+        for index in range(3):
             assert (await bridge.tasks.wait("local", f"q{index}", 5))["state"] == "completed"
-        assert bridge.store.get("q0")["state"] == "cancelled" and started(bridge, "q0") == 0
-    again = Bridge(config)  # restart: no revival of cancelled work
+        assert all(started(bridge, f"q{index}") for index in range(3))
+    again = Bridge(config)  # restart: completed work is retained, not revived
     try:
         async with again:
             await asyncio.sleep(0.5)
-            assert again.store.get("q0")["state"] == "cancelled" and started(again, "q0") == 0
+            for index in range(3):
+                assert again.store.get(f"q{index}")["state"] == "completed"
             assert verify(again.store)["valid"]
     finally:
         again.store.close()
