@@ -50,7 +50,7 @@ class NativeAdmission:
                         self.manager.config.visible_handoffs.enabled,
                         self.after_event,
                         self.after_event,
-                        self.manager.config.max_queued,
+                        self.manager.config.max_native_active,
                     ),
                 ).fetchall()
                 for row in rows:
@@ -107,7 +107,7 @@ class NativeAdmission:
             return
         event = self.events[task_id] = asyncio.Event()
         target = self.target(task)
-        if target in self.targets or len(self.active) >= manager.config.max_queued:
+        if target in self.targets or len(self.active) >= manager.config.max_native_active:
             manager.store.transition(
                 task_id,
                 State.FAILED,

@@ -432,6 +432,8 @@ class Config(BaseModel):
     data_dir: str = str(Path.home() / ".local/share/kirabridge")
     concurrency: int = Field(default=2, ge=1, le=32)
     max_queued: int = Field(default=1000, ge=1, le=100000)
+    # Concurrent direct-native admissions; distinct from the persisted task queue.
+    max_native_active: int = Field(default=1000, ge=1, le=100000)
     max_control_queued: int = Field(default=32, ge=1, le=1000)
     max_read_queued: int = Field(default=32, ge=1, le=1000)
     read_concurrency: int = Field(default=2, ge=1, le=8)
@@ -441,8 +443,8 @@ class Config(BaseModel):
     # Queued, never-started work older than this (since its last explicit queueing or
     # approval) is blocked and reported instead of being executed late.
     queue_stale_seconds: float = Field(default=3600, ge=60, le=604800)
-    # At most this many queued, never-started normal-lane tasks; a newer one cancels
-    # the oldest waiting task (cancelled/superseded_by_queue_cap), never run later.
+    # Retired compatibility field. No waiting task is ever auto-cancelled; normal
+    # lane admission uses max_queued and rejects new work with queue_full.
     max_waiting_tasks: int = Field(default=3, ge=1, le=1000)
     host: str = "127.0.0.1"
     port: int = Field(default=8765, ge=1, le=65535)

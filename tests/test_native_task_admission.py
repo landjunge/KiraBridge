@@ -74,6 +74,33 @@ async def test_different_native_targets_execute_without_waiting_for_prior_reply(
         await bridge.tasks.stop()
 
 
+async def test_native_active_cap_rejects_new_distinct_target(bridge):
+    setup_native(bridge)
+    bridge.config.max_native_active = 1
+    entered = []
+    finish = asyncio.Event()
+
+    async def executor(task, running, progress):
+        entered.append(task["id"])
+        await running({"handoff_id": task["id"], "state": "sent"})
+        await finish.wait()
+        return {"success": True}
+
+    bridge.tasks.executor = executor
+    await bridge.tasks.start()
+    try:
+        first = enqueue(bridge, "cap-codex")
+        await bridge.tasks.wait_delivery(first["id"])
+        refused = enqueue(bridge, "cap-grok", "grok")
+        assert refused["state"] == State.FAILED
+        assert refused["error"]["code"] == "execution_busy"
+        assert refused["evidence"]["terminal_input_attempted"] is False
+        assert entered == [first["id"]]
+    finally:
+        finish.set()
+        await bridge.tasks.stop()
+
+
 async def test_historical_queued_native_is_not_claimed_on_start(bridge):
     setup_native(bridge)
     called = []
