@@ -1,5 +1,8 @@
+import asyncio
 import json
 import sys
+from types import SimpleNamespace
+from unittest.mock import AsyncMock
 
 import httpx
 import pytest
@@ -233,6 +236,37 @@ async def test_grok_transport_failure_is_never_retried(bridge, config, monkeypat
         assert final["state"] == "unknown"
         assert count == 1
         assert "sensitive" not in json.dumps(final["error"])
+
+
+async def test_outer_agent_timeout_leaves_cleanup_margin(tmp_path):
+    from kirabridge.agent_manager import AgentManager
+    from kirabridge.bridge_core.config import Config
+    from kirabridge.bridge_core.models import AgentInput
+    from kirabridge.terminal_manager import TerminalManager
+
+    manager = AgentManager(Config(), TerminalManager())
+    manager.config.visible_handoffs.enabled = False
+
+    class SlowAdapter:
+        interface_version = "1"
+
+        async def execute(self, task, args, config, roots, running, progress):
+            await asyncio.sleep(args.timeout + 0.05)
+            return {"success": True, "text": "adapter deadline won"}
+
+    manager.register("slow-cleanup", SlowAdapter())
+    manager.config.agents["slow"] = AgentConfig(kind="slow-cleanup")
+    principal = SimpleNamespace(
+        agents=["slow"], permission_level=None, roots=[str(tmp_path)], capabilities=[]
+    )
+    result = await manager.execute(
+        {"id": "task-1", "principal": "local"},
+        AgentInput(agent="slow", prompt="test", cwd=str(tmp_path), timeout=0.05),
+        principal,
+        AsyncMock(),
+        AsyncMock(),
+    )
+    assert result["text"] == "adapter deadline won"
 
 
 def test_extension_requires_version_and_unique_kind(bridge):

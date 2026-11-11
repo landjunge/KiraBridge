@@ -216,6 +216,38 @@ def test_timeout_survives_restart_and_cannot_be_revived(buffered, config, monkey
     assert not calls
 
 
+def test_expiry_uses_normal_transition_events_notice_and_audit(buffered, monkeypatch):
+    bridge, calls = buffered
+    task = value()
+    first = bridge.prepare("local", task)
+    import kirabridge.session_input_policy as module
+
+    monkeypatch.setattr(
+        module, "time", SimpleNamespace(time=lambda: first["input_buffer"]["expires"] + 1)
+    )
+    bridge.tasks.input_policy.expire()
+    result = bridge.task("local", task.task_id)
+    assert result["state"] == State.CANCELLED
+    events = bridge.events("local", task.task_id)["events"]
+    assert events[-1]["state"] == "cancelled"
+    assert events[-1]["evidence"] == {"reason": "input_buffer_expired"}
+    audit = [
+        row[0]
+        for row in bridge.store.db.execute(
+            "SELECT kind FROM audit WHERE task_id=? ORDER BY seq", (task.task_id,)
+        )
+    ]
+    assert audit.count("task.transition") == 1
+    assert "session.input.expired" in audit
+    assert (
+        bridge.store.db.execute(
+            "SELECT count(*) FROM completion_notices WHERE source_id=?", (task.task_id,)
+        ).fetchone()[0]
+        == 1
+    )
+    assert not calls
+
+
 def test_denied_input_cannot_be_revived_with_valid_token(buffered):
     bridge, calls = buffered
     task = value()

@@ -454,12 +454,23 @@ class TaskManager:
             else:
                 self.security.principal(task["principal"], task["operation"])
             result = await self.executor(task, running, progress)
-            state = State.COMPLETED if result.get("success", True) else State.FAILED
+            pending = result.get("session_handle_pending") is True
+            if pending:
+                state = State.UNKNOWN
+                evidence = {
+                    "reason": "session_handle_pending",
+                    "side_effect_possible": True,
+                    "automatic_retry": False,
+                }
+            else:
+                state = State.COMPLETED if result.get("success", True) else State.FAILED
+                evidence = result.get("evidence", {"operation_returned": True})
             self.store.transition(
                 task["id"],
                 state,
-                result.get("evidence", {"operation_returned": True}),
+                evidence,
                 result=result,
+                error={"code": "session_handle_pending"} if pending else None,
                 owner=self.owner,
             )
         except asyncio.CancelledError:

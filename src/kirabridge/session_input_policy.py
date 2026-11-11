@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import time
 
-from kirabridge.bridge_core.models import BridgeError, canonical
+from kirabridge.bridge_core.models import BridgeError, State
 
 SUFFIX = "go-go-go"
 
@@ -89,19 +89,11 @@ class SessionInputPolicy:
                     (row["task_id"],),
                 )
                 if row["state"] == "created":
-                    evidence = canonical({"reason": "input_buffer_expired"})
-                    self.store.db.execute(
-                        "UPDATE tasks SET state='cancelled',updated=?,finished=?,evidence=? "
-                        "WHERE id=?",
-                        (now, now, evidence, row["task_id"]),
+                    self.store.transition(
+                        row["task_id"],
+                        State.CANCELLED,
+                        {"reason": "input_buffer_expired"},
                     )
-                    event = self.store.db.execute(
-                        "INSERT INTO events(task_id,at,state,evidence) VALUES(?,?,'cancelled',?)",
-                        (row["task_id"], now, evidence),
-                    )
-                    from kirabridge.completion_manager import record_task_completion
-
-                    record_task_completion(self.store, row["task_id"], event.lastrowid)
                 self.store.audit(
                     "session.input.expired",
                     row["principal"],
