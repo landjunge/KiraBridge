@@ -59,13 +59,25 @@ class ReceiverConfig(BaseModel):
 
 
 class MessagingConfig(BaseModel):
+    """Storage and provider-cost ceilings for the authenticated message channel.
+
+    None of these values authenticate a peer, establish session identity or
+    replace dedupe. They only bound queue growth and repeated provider turns.
+    """
+
     model_config = ConfigDict(extra="forbid")
     max_body_bytes: int = Field(default=16384, ge=256, le=65536)
     max_pending_per_recipient: int = Field(default=100, ge=1, le=1000)
     max_total: int = Field(default=10000, ge=1, le=1000000)
-    max_conversation_messages: int = Field(default=16, ge=2, le=128)
+    # A normal multi-round handover needs roughly a dozen messages; these are
+    # storage/cost ceilings with headroom, not conversation identity limits.
+    max_conversation_messages: int = Field(default=64, ge=2, le=128)
     max_reply_depth: int = Field(default=8, ge=1, le=32)
-    max_runs_per_conversation: int = Field(default=4, ge=1, le=16)
+    # Rolling one-hour window per conversation. The field keeps its historical
+    # name but no longer counts a conversation's lifetime runs.
+    max_runs_per_conversation: int = Field(default=16, ge=1, le=16)
+    # Rolling one-hour window per recipient, so one busy agent cannot throttle
+    # deliveries addressed to a different agent.
     max_runs_per_hour: int = Field(default=24, ge=1, le=1000)
     # None keeps every message on the existing visible route. A cutoff admits
     # only messages created at or after that instant to the separate adapter.
