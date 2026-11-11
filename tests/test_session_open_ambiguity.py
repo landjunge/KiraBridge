@@ -67,7 +67,9 @@ def row(window=123, pid=345, **extra):
     ],
 )
 @pytest.mark.parametrize("with_command", [False, True])
-async def test_new_window_cannot_adopt_ambiguous_tty_view(tmp_path, rows, with_command):
+async def test_new_window_cannot_adopt_ambiguous_tty_view(
+    tmp_path, rows, with_command, native_session_platform
+):
     manager, native, authorization = manager_for_open(tmp_path, rows)
     args = SessionOpen(cwd=str(tmp_path), argv=[sys.executable] if with_command else [])
 
@@ -83,7 +85,7 @@ async def test_new_window_cannot_adopt_ambiguous_tty_view(tmp_path, rows, with_c
     authorization.window_outcome.assert_called_once_with("chatgpt", "new-window", "opened")
 
 
-async def test_unique_new_window_keeps_exact_handle_and_command(tmp_path):
+async def test_unique_new_window_keeps_exact_handle_and_command(tmp_path, native_session_platform):
     selected = row()
     manager, native, authorization = manager_for_open(tmp_path, [selected])
     args = SessionOpen(cwd=str(tmp_path), argv=[sys.executable])

@@ -77,7 +77,7 @@ async def test_real_http_initialization_and_fresh_catalog_agree_with_grants(
 
 
 async def test_window_request_uses_existing_full_grant_without_second_local_token(
-    bridge, config, monkeypatch
+    bridge, config, monkeypatch, native_session_platform
 ):
     config.principals["local"].permission_level = "full"
     config.principals["local"].capabilities.append("session.inspect")
@@ -110,7 +110,9 @@ async def test_window_request_uses_existing_full_grant_without_second_local_toke
     assert len(calls) == 1
 
 
-async def test_manual_window_task_waits_for_exact_operator_approval(bridge, config, monkeypatch):
+async def test_manual_window_task_waits_for_exact_operator_approval(
+    bridge, config, monkeypatch, native_session_platform
+):
     calls = []
 
     async def opened(command, *, on_created=None, principal):

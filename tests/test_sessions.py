@@ -181,6 +181,7 @@ async def test_native_open_checks_authority_and_quotes_command(
     bridge,
     config,
     monkeypatch,
+    native_session_platform,
     product,  # noqa: F811 -- synthetic fixture
 ):
     scene, leaf, events, receipt, created = product

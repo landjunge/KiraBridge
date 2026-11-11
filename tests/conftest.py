@@ -31,6 +31,12 @@ def config(tmp_path):
 
 
 @pytest.fixture
+def native_session_platform(monkeypatch):
+    """Keep native-terminal tests on their injected transport on every host."""
+    monkeypatch.setattr("kirabridge.session_manager.sys", SimpleNamespace(platform="darwin"))
+
+
+@pytest.fixture
 def bridge(config):
     instance = Bridge(config)
 

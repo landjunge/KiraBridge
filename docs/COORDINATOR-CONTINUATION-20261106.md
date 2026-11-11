@@ -151,3 +151,44 @@ Owner-, Grant- und Teamrechte bleiben maßgeblich. Dies ist ein weiterer geprüf
 Quellschritt; die lokale Supervisoraktivierung bleibt an ihren eigenen Pin
 gebunden. Evidenz: `~/.local/state/coordinator-continuation-20261106/`,
 ThreadDesk `188ce4729a62/9336dde91791` und der dort folgende Quellenabschluss.
+
+## Abschluss- und Übergabe-Hook (11.11.2026)
+
+`kirabridge completion` verbindet den tatsächlichen Abschluss eines Auftrags mit
+dem ThreadDesk-Whiteboard und der nächsten freigegebenen Aufgabe. Der Hook
+schreibt zuerst genau einen Ergebnis-Eintrag, liest ihn zur Bestätigung der
+dauerhaften Speicherung zurück und wählt erst danach die neueste freigegebene
+Aufgabe oberhalb des abgeschlossenen Eintrags. Es gibt keine zweite Queue, keine
+automatische Wiederaufnahme alter Einträge und keine Ausführung von Boardtext.
+
+```sh
+# Abschluss dokumentieren, Speicherung bestätigen, nächste Aufgabe übernehmen
+kirabridge completion record \
+  --workspace /Users/landjunge/.local/share/threaddesk/kirabridge-operator \
+  --board 188ce4729a62 --order-entry <task-entry-id> --task-id <logische-id> \
+  --status completed --summary "..." --sha <commit> --tests "..." \
+  --session-id <bestehende-sitzung>
+
+# Nur lesen und die Auswahl prüfen
+kirabridge completion record ... --dry-run
+kirabridge completion next --board 188ce4729a62 --newest --dry-run
+```
+
+Der Ergebnis-Eintrag enthält Status, Sitzungszuordnung, Commit, Review-Referenz,
+Testergebnis und Zusammenfassung; offensichtliche Zugangsdaten und
+Steuerzeichen werden abgewiesen. Ein zweiter Lauf mit identischen Angaben liefert
+denselben Eintrag. Die Übernahme schreibt einen `claimed`-Eintrag mit
+aufgabenbezogenem Schlüssel; parallele Hook-Läufe erzeugen höchstens einen
+Gewinner, Verlierer melden `already_claimed`. Nur `completed` führt zur
+Übernahme; `failed`/`cancelled` werden dokumentiert, ohne Folgearbeit zu starten.
+Ohne explizite `--order-entry` verlangt `next` das bewusste `--newest`, damit
+kein historischer Eintrag automatisch übernommen wird.
+
+Auszuführende `ReadyCard`-Einträge müssen `state = READY` tragen; `IDEA`, `HOLD`,
+`STALE`, `CANCELLED` und bereits durch `claimed`/`result` referenzierte Aufgaben
+werden übersprungen. Metadatenfelder (`task_id`, `handoff_id`, `run_id`) und
+Textverweise werden gemeinsam geprüft. Der zurückgegebene Boardtext ist
+ausdrücklich unvertrauenswürdig (`untrusted: true`) und wird vom Hook nicht
+ausgeführt. Fehlt eine Folgeaufgabe, meldet der Hook `idle` statt zu starten.
+Voraussetzung für die Nutzung ist ein Release, das diesen Befehl enthält; die
+Codeanwesenheit allein aktiviert keinen Dienst.

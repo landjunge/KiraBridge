@@ -167,7 +167,9 @@ async def test_product_cold_terminal_uses_one_returned_tty_without_adopting_rest
 
 
 @pytest.mark.parametrize("direct", [True, False])
-async def test_argv_for_all_principals_waits_for_full_binding_and_fresh_cwd(tmp_path, direct):
+async def test_argv_for_all_principals_waits_for_full_binding_and_fresh_cwd(
+    tmp_path, direct, native_session_platform
+):
     fixture = fixture_module("test_session_open_ambiguity")
     selected = fixture.row()
     manager, native, _ = fixture.manager_for_open(tmp_path, [selected])
