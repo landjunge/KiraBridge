@@ -62,10 +62,10 @@ class GrokBuildAdapter:
     async def preflight_input(self, sessions, binding, text, before):
         from kirabridge.bridge_core.models import BridgeError
 
-        from .grok_echo import single_line_payload, single_row_capacity
+        from .grok_echo import single_row_capacity, verifiable_payload
 
         capacity = single_row_capacity(before["text"])
-        if capacity is not None and (not single_line_payload(text) or len(text) > capacity):
+        if capacity is None or not verifiable_payload(text):
             error = BridgeError(
                 "visible_input_geometry_ambiguous",
                 "Grok's boxed renderer cannot verify this payload exactly; no text was pasted",
