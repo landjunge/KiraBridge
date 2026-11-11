@@ -58,7 +58,7 @@ ThreadDesk adds projects and work history to this workflow, while the other fami
 
 **Server edition:** KiraBridge also runs on Debian; server source and local macOS installation are tracked separately. A server source revision is not itself a published installer. / **Server-Version:** KiraBridge läuft auch auf Debian; Quellstand und veröffentlichte Downloads sind getrennt.
 
-**Verified runtime status (November 10, 2026):** The Intel Mac is running **KiraBridge 0.8.0rc45** (`0b1d937eef06`), verified through the live KiraBridge daemon. The separately published Debian/Linux archive is still **0.8.0rc41** (`350d368`); this is a published server package, not the installed Mac build. **Installed, repository-source, and downloadable versions must not be conflated.**
+**Verified runtime status (November 11, 2026):** The Intel Mac is running **KiraBridge 0.8.0rc48** (`48c635137b4b`), verified through the live KiraBridge daemon and the published macOS pre-release `v0.8.0rc48`. The separately published Debian/Linux archive is still **0.8.0rc41** (`350d368`); this is a published server package, not the installed Mac build. **Installed, repository-source, and downloadable versions must not be conflated.**
 
 **Published macOS Intel download:** [0.8.0rc36](https://github.com/landjunge/KiraBridge/releases/tag/v0.8.0rc36) · November 4, 2026 · Preview.
 
