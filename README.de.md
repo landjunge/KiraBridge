@@ -56,7 +56,7 @@ Neben der direkten Computersteuerung kann KiraBridge Aufträge an **Codex und Gr
 
 ThreadDesk ergänzt diesen Weg um Projekte und Arbeitsstände; weitere Werkzeuge der Familie sollen im gemeinsamen Sprachablauf zusammenwirken. Die Werkzeuge bleiben eigenständig, und ihre tatsächliche Integration wird nicht mit dem Entwicklungsziel verwechselt.
 
-**Verifizierter Laufzeitstand (10. November 2026):** Auf dem Intel-Mac läuft **KiraBridge 0.8.0rc45** (`0b1d937eef06`), direkt über den laufenden KiraBridge-Dienst geprüft. Das separat veröffentlichte Debian-/Linux-Archiv ist weiterhin **0.8.0rc41** (`350d368`). **Installierte Version, Quellstand und veröffentlichte Downloads sind unterschiedliche Nachweise.**
+**Verifizierter Laufzeitstand (11. November 2026):** Auf dem Intel-Mac läuft **KiraBridge 0.8.0rc48** (`48c635137b4b`), direkt über den laufenden KiraBridge-Dienst und das veröffentlichte macOS-Pre-Release `v0.8.0rc48` geprüft. Das separat veröffentlichte Debian-/Linux-Archiv ist weiterhin **0.8.0rc41** (`350d368`). **Installierte Version, Quellstand und veröffentlichte Downloads sind unterschiedliche Nachweise.**
 
 **Veröffentlichter macOS-Intel-Download:** [0.8.0rc36](https://github.com/landjunge/KiraBridge/releases/tag/v0.8.0rc36) · 4. November 2026 · Vorabversion.
 
