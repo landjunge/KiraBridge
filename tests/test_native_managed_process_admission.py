@@ -330,6 +330,27 @@ async def test_spawn_evidence_requires_exact_owned_fresh_managed_route(change):
     assert admission.status["owned"] == "admitting"
 
 
+async def test_agent_session_ends_admission_wait_without_claiming_completion():
+    admission = NativeAdmission(SimpleNamespace(owner="owner", store=SimpleNamespace(get=lambda _id: {})))
+    admission.timeout = 0.05
+    event = asyncio.Event()
+    admission.events["task"] = event
+    admission.status["task"] = "admitting"
+    execution = asyncio.create_task(asyncio.sleep(1))
+    watch = asyncio.create_task(admission._watch("task", event, execution))
+    admission.observe("task", {"event": "prompt_admitted", "session_id": "ses_1"})
+    await watch
+    assert event.is_set()
+    assert not execution.cancelled()
+    assert "task" not in admission.expired
+    assert admission.status["task"] == "admitting"
+    execution.cancel()
+    blank = asyncio.Event()
+    admission.events["blank"] = blank
+    admission.observe("blank", {"event": "session_created", "session_id": ""})
+    assert not blank.is_set()
+
+
 @pytest.mark.parametrize("value", [True, False, "true", 1, None])
 def test_background_route_matches_executor_strict_bool_validation(value):
     assert NativeAdmission._managed_background(
