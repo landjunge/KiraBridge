@@ -15,6 +15,7 @@ from kirabridge.agent_manager.copilot import CopilotCLIAdapter
 from kirabridge.agent_manager.gemini import GeminiAdapter
 from kirabridge.agent_manager.grok_structured import GrokStructuredAdapter
 from kirabridge.agent_manager.opencode import OpenCodeAdapter
+from kirabridge.agent_manager.opencode_http import OpenCodeHTTPAdapter
 from kirabridge.bridge_core.config import AgentConfig, Config
 from kirabridge.bridge_core.models import AgentInput, BridgeError, TerminalInput, UncertainExecution
 from kirabridge.filesystem_manager import PathScope
@@ -538,6 +539,7 @@ class AgentManager:
             "grok_acp": GrokACPAdapter(terminal, config),
             "grok_structured": GrokStructuredAdapter(terminal),
             "opencode": OpenCodeAdapter(terminal),
+            "opencode_http": OpenCodeHTTPAdapter(),
             "gemini_cli": GeminiAdapter(terminal),
             "claude_code": ClaudeCodeAdapter(terminal),
             "copilot_cli": CopilotCLIAdapter(terminal),
@@ -578,7 +580,8 @@ class AgentManager:
                             "supports_owned_resume": False,
                             "authentication_status": "unknown",
                         }
-                        if config.kind in {"opencode", "gemini_cli", "claude_code", "copilot_cli"}
+                        if config.kind
+                        in {"opencode", "opencode_http", "gemini_cli", "claude_code", "copilot_cli"}
                         else {}
                     ),
                     "executable_runnable": bool(
@@ -638,7 +641,7 @@ class AgentManager:
             and config.allow_local_tools
             and "agent.local_tools" in principal.capabilities
         )
-        if full_access and config.kind == "grok_acp":
+        if full_access and config.kind in {"grok_acp", "opencode_http"}:
             args = args.model_copy(update={"local_tools": True})
         if args.local_tools and (
             (config.kind != "grok_acp" and not full_access)

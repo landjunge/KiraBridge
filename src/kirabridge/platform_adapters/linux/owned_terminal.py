@@ -90,7 +90,8 @@ class LinuxOwnedTerminal:
     async def insert(self, pane_id, text):
         if not text or not _TEXT.fullmatch(text):
             raise BridgeError(
-                "invalid_arguments", "Owned terminal text must be one line without control characters"
+                "invalid_arguments",
+                "Owned terminal text must be one line without control characters",
             )
         self._write(self._get(pane_id), text.encode())
 
@@ -156,7 +157,9 @@ class LinuxOwnedTerminal:
         try:
             os.write(state.master, data)
         except OSError as exc:
-            raise BridgeError("session_transport_unavailable", "Owned terminal write failed") from exc
+            raise BridgeError(
+                "session_transport_unavailable", "Owned terminal write failed"
+            ) from exc
 
     async def _wait_prompt(self, state):
         deadline = time.monotonic() + 2

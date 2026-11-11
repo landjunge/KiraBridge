@@ -52,7 +52,7 @@ Development is ongoing: KiraBridge cannot yet reliably or fully control every ap
 
 ## AI agents and project workflows
 
-Alongside direct control, KiraBridge can pass work to **Codex and Grok** through configured visible terminal sessions and track their replies. As of November 10, the local inventory also reports executable adapters for **Claude Code, OpenCode, Gemini CLI and Copilot**. Finding an adapter does not prove sign-in, a ready session or a successful end-to-end task.
+Alongside direct control, KiraBridge can pass work to **Codex and Grok** through configured visible terminal sessions and track their replies. As of November 10, the local inventory also reports executable adapters for **Claude Code, OpenCode, Gemini CLI and Copilot**. OpenCode can additionally use its local HTTP API with Basic authentication from environment variables; that adapter creates one new session per task and reports status and results back. Finding an adapter does not prove sign-in, a ready session or a successful end-to-end task.
 
 ThreadDesk adds projects and work history to this workflow, while the other family tools are intended to work together through the shared voice interface. Each tool remains independent; integration plans are not presented as shipped functionality.
 

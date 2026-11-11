@@ -167,6 +167,57 @@ OpenAI-kompatiblen Provider, Loopback-Endpunkt, die Tokenlimits, deaktivierte
 Modelltools, `permission = {"*":"deny"}` und null externe Plugins. Dabei wurde
 kein Modellaufruf ausgelöst; dies ist ausdrücklich ein Konfigurationsnachweis.
 
+## HTTP-API-Profil (`opencode_http`)
+
+Stand: 11.11.2026. Ergänzend zum isolierten CLI-Profil gibt es den Adapter
+`opencode_http`. Er spricht die lokale OpenCode-HTTP-API an, statt für jeden
+Auftrag einen neuen CLI-Prozess zu starten. Voraussetzung ist ein vom Betreiber
+gestarteter OpenCode-Server auf Loopback (`opencode serve` oder die lokale App).
+
+```toml
+[agents.opencode_http]
+kind = "opencode_http"
+model = "deepseek/deepseek-flash"
+server_url = "http://127.0.0.1:58836"
+server_username_env = "OPENCODE_SERVER_USERNAME"
+server_password_env = "OPENCODE_SERVER_PASSWORD"
+allow_local_tools = false
+```
+
+Die Modell-ID muss dem laufenden Server entsprechen (Beispiel
+`deepseek/deepseek-flash`); der Name ist kein Verfügbarkeits- oder Kosten-Nachweis.
+`server_url` wird auf credentialfreies Loopback-HTTP(S) beschränkt; Pfad,
+Query, Fragment und URL-Zugangsdaten sind unzulässig. Benutzername und Kennwort
+werden nur über die genannten Umgebungsvariablen gelesen und als HTTP Basic Auth
+gesendet. Der Adapter protokolliert weder Zugangsdaten noch Provider- oder
+Antworttexte aus Fehlern. Fehlt eine Variable, schlägt der Auftrag mit
+`agent_config` fehl; HTTP 401/403 ergibt `agent_auth`.
+
+Der Port ist ein Sitzungswert der laufenden Installation und wird nicht fest
+verdrahtet. Der Adapter verwendet den vorhandenen OpenCode-Server und legt pro
+Auftrag genau eine neue Sitzung an (`title = "KiraBridge <task-id>"`, Metadaten
+`kirabridge_task_id`). Der Prompt geht über `POST /session/{id}/prompt_async`;
+der Status wird über `GET /session/status` und die abschließende Antwort über
+`GET /session/{id}/message` gelesen. Statuswechsel (`busy`, `retry`, `idle`)
+erscheinen als Fortschrittsereignisse, der belegte Arbeitsstart als
+`session_busy`. Die Sitzungs-ID steht in der Ergebnis-Evidenz; bestehende
+interaktive Sitzungen werden nicht übernommen oder verändert.
+
+Ohne ausdrückliche Vollfreigabe setzt der Adapter für die neue Sitzung
+`permission = [{"permission": "*", "pattern": "*", "action": "deny"}]`, also
+keine lokalen Werkzeuge. Bei vorhandener Vollfreigabe (`permission_level = full`,
+`bridge_tools`, `allow_local_tools`, Capability `agent.local_tools`) wird
+`local_tools` gesetzt und die Sitzung erbt die Betreiberrichtlinie des Servers.
+Eine Serverrichtlinie `ask` kann den Turn bis zum Zeitlimit blockieren; für
+diesen Adapter sind `deny` beziehungsweise `allow` vorgesehen.
+Ein erfolgreicher Turn verlangt eine abgeschlossene Assistentennachricht mit
+`finish = "stop"` und Text; fehlende Abschluss-Evidenz, Zeitlimit oder ein
+Sitzungswechsel bleiben `unknown`. Ein Turn beweist keinen Projektabschluss.
+
+Gezielte Tests mit einem lokalen HTTP-Mock prüfen Sitzungsanlage, Basic-Auth,
+Prompt-Übergabe, Statuswechsel, Fehlerkategorien, Zeitlimit und Pfadgrenzen;
+dabei entstehen keine Modell- oder API-Kosten.
+
 ## Offizielle Quellen
 
 - [CLI und JSON-Ausgabe](https://opencode.ai/docs/cli/)
