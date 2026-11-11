@@ -34,6 +34,7 @@ READ_OPERATIONS = frozenset(
         "process.list",
         "process.inspect",
         "agent.status",
+        "logs.live",
         "policy.inspect",
         "handoff.status",
         "handoff.inbox",

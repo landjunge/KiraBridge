@@ -424,6 +424,17 @@ class OutputHistoryConfig(BaseModel):
     retention_seconds: float = Field(default=604800, ge=60, le=31536000)
 
 
+class LiveLogsConfig(BaseModel):
+    """In-memory observation budgets; never a durable audit or replay source."""
+
+    model_config = ConfigDict(extra="forbid")
+    enabled: bool = True
+    max_sources: int = Field(default=64, ge=1, le=4096)
+    max_lines_per_source: int = Field(default=400, ge=10, le=10000)
+    max_bytes_per_source: int = Field(default=131072, ge=4096, le=8388608)
+    max_line_chars: int = Field(default=4096, ge=64, le=65536)
+
+
 class Config(BaseModel):
     model_config = ConfigDict(extra="forbid")
     _source_path: str | None = PrivateAttr(default=None)
@@ -439,6 +450,7 @@ class Config(BaseModel):
     read_concurrency: int = Field(default=2, ge=1, le=8)
     max_task_bytes: int = Field(default=2097152, ge=1024, le=8388608)
     output_history: OutputHistoryConfig = Field(default_factory=OutputHistoryConfig)
+    live_logs: LiveLogsConfig = Field(default_factory=LiveLogsConfig)
     lease_seconds: float = Field(default=30, ge=2, le=600)
     # Queued, never-started work older than this (since its last explicit queueing or
     # approval) is blocked and reported instead of being executed late.
