@@ -109,3 +109,17 @@ async def test_shell_focus_precedes_fresh_buffer_and_final_checks_never_reacquir
 
 def observed_identity():
     return "501 ttys004 Sun Nov 1 12:00:00 2026"
+
+
+def test_focus_acquire_uses_fixed_attempts_inside_the_mutation_budget():
+    source = TerminalAppTransport(asyncio.Lock()).native_focus("terminal:123:ttys004")
+    assert "for (let focusAttempt=0; focusAttempt<8; focusAttempt++)" in source
+    assert "if(focusAttempt===7) throw error;" in source
+    assert "delay(0.25);" in source
+    assert "Date.now()+2000" not in source
+    assert TerminalAppTransport.FOCUS_ATTEMPTS == 8
+    assert (
+        TerminalAppTransport.MUTATION_SCRIPT_TIMEOUT
+        > TerminalAppTransport.FOCUS_ATTEMPTS * TerminalAppTransport.FOCUS_POLL_DELAY
+    )
+    assert TerminalAppTransport.MUTATION_SCRIPT_TIMEOUT == 30

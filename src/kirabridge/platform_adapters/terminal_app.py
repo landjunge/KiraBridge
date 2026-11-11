@@ -131,6 +131,14 @@ def attach_visual_windows(rows: list[dict]) -> list[dict]:
 
 
 class TerminalAppTransport:
+    # One slow System Events check can take about a second when Terminal and
+    # another agent are both busy. Eight attempts stay inside the mutation
+    # budget; a two-second wall clock expired before those attempts finished.
+    FOCUS_ATTEMPTS = 8
+    FOCUS_POLL_DELAY = 0.25
+    MUTATION_SCRIPT_TIMEOUT = 30
+    READ_SCRIPT_TIMEOUT = 10
+
     def __init__(self, clipboard_lock, *, desktop=None, clipboard_owner=clipboard_lease):
         self.clipboard_lock = clipboard_lock
         self.desktop = desktop or MacDesktop()
@@ -159,7 +167,9 @@ class TerminalAppTransport:
             stderr=asyncio.subprocess.PIPE,
         )
         try:
-            async with asyncio.timeout(15 if mutation else 10):
+            async with asyncio.timeout(
+                self.MUTATION_SCRIPT_TIMEOUT if mutation else self.READ_SCRIPT_TIMEOUT
+            ):
                 stdout, stderr = await child.communicate(source.encode("utf-8"))
             if child.returncode:
                 detail = stderr.decode("utf-8", "replace")[:1024]
@@ -397,6 +407,8 @@ class TerminalAppTransport:
 
     def native_focus(self, pane_id):
         window, tty = pane_id.split(":")[1:]
+        attempts = int(TerminalAppTransport.FOCUS_ATTEMPTS)
+        last_attempt = attempts - 1
         return (
             self.native_target(pane_id)
             + f"""
@@ -423,14 +435,17 @@ class TerminalAppTransport:
     }}
 """
             + TerminalAppTransport.native_focus_check(pane_id)
-            + """
-    // Window activation is asynchronous. Acquire once with a bounded wait;
-    // later pre-input checks remain immediate and never reassert focus.
-    const focusDeadline=Date.now()+2000;
-    while(true) {
-     try { checkFocus(); break; }
-     catch(error) { if(Date.now()>=focusDeadline) throw error; delay(0.05); }
-    }"""
+            + f"""
+    // Window activation is asynchronous. Acquire once, with a fixed number of
+    // attempts, so a slow accessibility check cannot consume the whole wait
+    // before Terminal is front. Later pre-input checks stay immediate.
+    for (let focusAttempt=0; focusAttempt<{attempts}; focusAttempt++) {{
+     try {{ checkFocus(); break; }}
+     catch(error) {{
+      if(focusAttempt==={last_attempt}) throw error;
+      delay({TerminalAppTransport.FOCUS_POLL_DELAY});
+     }}
+    }}"""
         )
 
     @staticmethod
