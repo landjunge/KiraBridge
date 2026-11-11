@@ -28,7 +28,13 @@ SERVICES = (
     ("com.kirabridge.chat-events", "Antwortzustellung"),
 )
 RELAY_LABEL = "com.kirabridge.remote-relay"
-AGENT_NAMES = {"opencode": "OpenCode", "codex": "Codex", "grok": "Grok", "gemini": "Gemini"}
+AGENT_NAMES = {
+    "opencode": "OpenCode",
+    "opencode_http": "OpenCode HTTP",
+    "codex": "Codex",
+    "grok": "Grok",
+    "gemini": "Gemini",
+}
 CONSOLE_START = "In der Konsole unter Prozesse auf „Start“ klicken"
 CONSOLE_RESTART = "In der Konsole bei „KiraBridge“ auf „Neustart“ klicken"
 RELAY_SUCCESS = re.compile(
@@ -259,8 +265,12 @@ def agents_section(config, inventory):
     items = []
     for row in (inventory or {}).get("agents") or []:
         name = row.get("id", "?")
-        executable = getattr(config.agents.get(name), "executable", None) or ""
-        if row.get("executable_present") and row.get("executable_runnable"):
+        configured = config.agents.get(name)
+        executable = getattr(configured, "executable", None) or ""
+        if getattr(configured, "kind", None) == "opencode_http":
+            server = getattr(configured, "server_url", None) or "HTTP-Server"
+            items.append(item(OK, AGENT_NAMES.get(name, name.capitalize()), server))
+        elif row.get("executable_present") and row.get("executable_runnable"):
             items.append(item(OK, AGENT_NAMES.get(name, name.capitalize()), executable))
         elif row.get("executable_present"):
             items.append(

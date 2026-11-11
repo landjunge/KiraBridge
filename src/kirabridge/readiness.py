@@ -312,7 +312,7 @@ def task_preflight(bridge, task: dict) -> dict:
                 configured = bridge.config.agents.get(args["agent"])
                 if configured is None or configured.kind not in bridge.agents.adapters:
                     raise BridgeError("agent_unavailable", "Agent adapter is not configured")
-                if configured.kind != "grok_api":
+                if configured.kind not in {"grok_api", "opencode_http"}:
                     if not configured.executable:
                         raise BridgeError("agent_config", "Agent executable is not configured")
                     check_executable(configured.executable, [configured.executable])

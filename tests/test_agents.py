@@ -241,3 +241,52 @@ def test_extension_requires_version_and_unique_kind(bridge):
 
     with pytest.raises(BridgeError):
         bridge.agents.register("claude", BadAdapter())
+
+
+async def test_opencode_http_bypasses_the_visible_handoff_route(tmp_path):
+    from types import SimpleNamespace
+    from unittest.mock import AsyncMock
+
+    from kirabridge.agent_manager import AgentManager
+    from kirabridge.bridge_core.config import AgentConfig, Config
+    from kirabridge.bridge_core.models import AgentInput
+    from kirabridge.terminal_manager import TerminalManager
+
+    manager = AgentManager(Config(), TerminalManager())
+    manager.config.visible_handoffs.enabled = True
+
+    class Visible:
+        called = False
+
+        async def execute(self, *args, **kwargs):
+            self.called = True
+            raise AssertionError("visible route must not be used")
+
+    class HttpAdapter:
+        interface_version = "1"
+
+        async def execute(self, task, args, config, roots, running, progress):
+            return {"success": True, "text": "ok", "evidence": {"adapter": "opencode_http"}}
+
+    visible = Visible()
+    manager.visible_handoffs = visible
+    manager.adapters["opencode_http"] = HttpAdapter()
+    manager.config.agents["http"] = AgentConfig(
+        kind="opencode_http",
+        model="deepseek/deepseek-flash",
+        server_url="http://127.0.0.1:58836",
+        server_username_env="TEST_USER",
+        server_password_env="TEST_PASS",
+    )
+    principal = SimpleNamespace(
+        agents=["http"], permission_level=None, roots=[str(tmp_path)], capabilities=[]
+    )
+    result = await manager.execute(
+        {"id": "task-1", "principal": "local"},
+        AgentInput(agent="http", prompt="hello", cwd=str(tmp_path), timeout=1),
+        principal,
+        AsyncMock(),
+        AsyncMock(),
+    )
+    assert result["text"] == "ok"
+    assert visible.called is False

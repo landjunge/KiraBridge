@@ -317,3 +317,32 @@ def test_live_checks_report_an_unreachable_daemon_as_finding(monkeypatch, tmp_pa
     first = report["sections"][0]["items"][0]
     assert (first["status"], first["detail"]) == ("fail", "refused")
     assert report["counts"]["fail"] == 1
+
+
+def test_opencode_http_agent_is_reported_as_a_configured_server():
+    config = SimpleNamespace(
+        agents={
+            "opencode_http": SimpleNamespace(
+                kind="opencode_http",
+                server_url="http://127.0.0.1:58836",
+                executable=None,
+            )
+        }
+    )
+    section = doctor.agents_section(
+        config,
+        {
+            "agents": [
+                {
+                    "id": "opencode_http",
+                    "executable_present": False,
+                    "executable_runnable": False,
+                }
+            ]
+        },
+    )
+    assert statuses(section) == [
+        ("ok", "OpenCode HTTP"),
+        ("info", "Anmeldungen werden nicht getestet"),
+    ]
+    assert section["items"][0]["detail"] == "http://127.0.0.1:58836"
