@@ -65,7 +65,12 @@ class GrokBuildAdapter:
         from .grok_echo import single_row_capacity, verifiable_payload
 
         capacity = single_row_capacity(before["text"])
-        if capacity is None or not verifiable_payload(text):
+        # A readable box proves any verifiable payload, including long and
+        # multiline text. An unreadable box is not treated as proof: the exact
+        # post-paste observation still decides. Preflight must not become a new
+        # blanket refusal of every visible input just because one renderer's
+        # title border was not recognized.
+        if capacity is not None and not verifiable_payload(text):
             error = BridgeError(
                 "visible_input_geometry_ambiguous",
                 "Grok's boxed renderer cannot verify this payload exactly; no text was pasted",

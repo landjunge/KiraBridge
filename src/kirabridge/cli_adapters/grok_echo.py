@@ -19,9 +19,7 @@ def verifiable_payload(text):
     # Edge spaces remain ambiguous. Newlines and other visible characters can
     # be proven from the composer cells alone.
     return bool(
-        text
-        and text == text.strip(" ")
-        and not re.search(r"[\x00-\x08\x0b-\x1f\x7f]", text)
+        text and text == text.strip(" ") and not re.search(r"[\x00-\x08\x0b-\x1f\x7f]", text)
     )
 
 
@@ -40,7 +38,10 @@ def _box(view):
     lines = view.splitlines()
     if len(lines) < 3 or not re.fullmatch(r"╭─+╮ *", lines[0]):
         return None
-    end = next((index for index, line in enumerate(lines) if index and re.match(r" *╰", line)), None)
+    end = next(
+        (index for index, line in enumerate(lines) if index and re.match(r" *╰", line)),
+        None,
+    )
     if end is None or end < 2 or not re.fullmatch(r" *╰─+ .*─╯ *", lines[end]):
         return None
     return lines[: end + 1], lines[end + 1 :]
