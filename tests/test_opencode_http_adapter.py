@@ -135,7 +135,7 @@ async def test_task_handoff_binds_one_session_and_reports_live_status(tmp_path):
     assert server.requests[0].headers["authorization"] == "Basic " + expected
 
 
-async def test_full_access_does_not_impose_the_text_only_permission_rule(tmp_path):
+async def test_full_access_imposes_an_explicit_allow_rule(tmp_path):
     server = Server()
     result, _, _ = await execute(
         tmp_path,
@@ -144,7 +144,9 @@ async def test_full_access_does_not_impose_the_text_only_permission_rule(tmp_pat
         local_tools=True,
     )
     assert result["success"] and result["evidence"]["local_tools_enabled"]
-    assert "permission" not in server.body("POST", "/session")
+    assert server.body("POST", "/session")["permission"] == [
+        {"permission": "*", "pattern": "*", "action": "allow"}
+    ]
 
 
 async def test_missing_credentials_fail_without_exposing_values(tmp_path, monkeypatch):
