@@ -297,6 +297,8 @@ def test_cli_dry_run_and_record_only(tmp_path, monkeypatch, capsys):
             "completed",
             "--summary",
             "done",
+            "--pr-url",
+            "https://example.invalid/pr/1",
             "--no-handoff",
         ],
     )

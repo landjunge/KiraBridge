@@ -74,7 +74,7 @@ async def execute(args) -> None:
                 status=args.status,
                 summary=args.summary,
                 commit=args.sha,
-                pr_url=args.pr,
+                pr_url=args.pr_url,
                 tests=args.tests,
                 session_id=args.session_id,
                 working_directory=args.working_directory,
@@ -903,7 +903,7 @@ def main() -> None:
             )
             command.add_argument("--summary", required=True)
             command.add_argument("--sha", help="Exact commit SHA")
-            command.add_argument("--pr", help="Pull request or review reference")
+            command.add_argument("--pr-url", help="Pull request or review URL")
             command.add_argument("--tests", help="Targeted test evidence")
             command.add_argument("--working-directory")
             command.add_argument(
