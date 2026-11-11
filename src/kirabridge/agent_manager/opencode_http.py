@@ -185,7 +185,10 @@ class OpenCodeHTTPAdapter:
                 params={"directory": directory},
                 body={
                     "title": "KiraBridge " + str(task["id"]),
-                    "model": model,
+                    "model": {
+                        "providerID": model["providerID"],
+                        "id": model["modelID"],
+                    },
                     "metadata": {"kirabridge_task_id": str(task["id"])},
                     **(
                         {}
