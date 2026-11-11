@@ -331,7 +331,9 @@ async def test_spawn_evidence_requires_exact_owned_fresh_managed_route(change):
 
 
 async def test_agent_session_ends_admission_wait_without_claiming_completion():
-    admission = NativeAdmission(SimpleNamespace(owner="owner", store=SimpleNamespace(get=lambda _id: {})))
+    admission = NativeAdmission(
+        SimpleNamespace(owner="owner", store=SimpleNamespace(get=lambda _id: {}))
+    )
     admission.timeout = 0.05
     event = asyncio.Event()
     admission.events["task"] = event
