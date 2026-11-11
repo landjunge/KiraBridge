@@ -230,9 +230,7 @@ class SessionManager:
             scope="Bridge-owned Linux PTY sessions; no user terminal attached",
         )
 
-    def _catalog_result(
-        self, rows, *, transport, status, errors, truncated=False, scope=None
-    ):
+    def _catalog_result(self, rows, *, transport, status, errors, truncated=False, scope=None):
         from kirabridge.platform_adapters.terminal_app import annotate_views
 
         sessions = annotate_views(self.describe(rows))
@@ -248,8 +246,7 @@ class SessionManager:
             "sessions": sessions,
             "transport_errors": errors,
             "truncated": truncated,
-            "scope": scope
-            or "Exact Terminal.app tabs and tmux panes; existing sessions preserved",
+            "scope": scope or "Exact Terminal.app tabs and tmux panes; existing sessions preserved",
         }
 
     def describe(self, rows):

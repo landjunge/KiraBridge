@@ -153,12 +153,8 @@ class AgentConfig(BaseModel):
     base_url: str | None = Field(default=None, max_length=2048)
     local_output_tokens: int | None = Field(default=None, ge=128, le=2048)
     server_url: str | None = Field(default=None, max_length=2048)
-    server_username_env: str | None = Field(
-        default=None, pattern=r"^[A-Za-z_][A-Za-z0-9_]{0,127}$"
-    )
-    server_password_env: str | None = Field(
-        default=None, pattern=r"^[A-Za-z_][A-Za-z0-9_]{0,127}$"
-    )
+    server_username_env: str | None = Field(default=None, pattern=r"^[A-Za-z_][A-Za-z0-9_]{0,127}$")
+    server_password_env: str | None = Field(default=None, pattern=r"^[A-Za-z_][A-Za-z0-9_]{0,127}$")
 
     @model_validator(mode="after")
     def explicit_full_access(self):

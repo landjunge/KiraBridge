@@ -97,13 +97,9 @@ class OpenCodeHTTPAdapter:
             ) from None
         status = response.status_code
         if status in {401, 403}:
-            raise BridgeError(
-                "agent_auth", "OpenCode server rejected the configured credentials"
-            )
+            raise BridgeError("agent_auth", "OpenCode server rejected the configured credentials")
         if status == 404:
-            raise UncertainExecution(
-                "session_unknown", "OpenCode session is no longer available"
-            )
+            raise UncertainExecution("session_unknown", "OpenCode session is no longer available")
         if status in _FAILED_STATUS or status >= 500:
             # Status only: response bodies can contain provider or authorization details.
             raise UncertainExecution(
@@ -194,11 +190,7 @@ class OpenCodeHTTPAdapter:
                     **(
                         {}
                         if args.local_tools
-                        else {
-                            "permission": [
-                                {"permission": "*", "pattern": "*", "action": "deny"}
-                            ]
-                        }
+                        else {"permission": [{"permission": "*", "pattern": "*", "action": "deny"}]}
                     ),
                 },
             )
@@ -253,16 +245,12 @@ class OpenCodeHTTPAdapter:
                     )
                 await asyncio.sleep(min(self._poll_interval, remaining))
 
-            message, parts = self._last_assistant(
-                await self._messages(client, session, directory)
-            )
+            message, parts = self._last_assistant(await self._messages(client, session, directory))
 
         if message is None:
             raise UncertainExecution("agent_unconfirmed", "No OpenCode final response observed")
         if not _completed(message):
-            raise UncertainExecution(
-                "agent_unconfirmed", "No OpenCode turn completion evidence"
-            )
+            raise UncertainExecution("agent_unconfirmed", "No OpenCode turn completion evidence")
         failed = message.get("error") is not None
         provider_error = None
         if failed:
