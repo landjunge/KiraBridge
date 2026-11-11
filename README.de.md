@@ -52,7 +52,7 @@ Die Entwicklung ist nicht abgeschlossen: KiraBridge steuert noch nicht jede Anwe
 
 ## Mit KI-Agenten und Projekten arbeiten
 
-Neben der direkten Computersteuerung kann KiraBridge Aufträge an **Codex und Grok** in eingerichteten, sichtbaren Terminalfenstern übergeben und deren Rückmeldungen verfolgen. Laut lokalem Inventar vom 10. November sind außerdem ausführbare Adapter für **Claude Code, OpenCode, Gemini CLI und Copilot** vorhanden. Ein erkannter Adapter ist noch kein Nachweis für Anmeldung, eine einsatzbereite Sitzung oder einen erfolgreichen Ende-zu-Ende-Auftrag.
+Neben der direkten Computersteuerung kann KiraBridge Aufträge an **Codex und Grok** in eingerichteten, sichtbaren Terminalfenstern übergeben und deren Rückmeldungen verfolgen. Laut lokalem Inventar vom 10. November sind außerdem ausführbare Adapter für **Claude Code, OpenCode, Gemini CLI und Copilot** vorhanden. OpenCode kann zusätzlich seine lokale HTTP-API mit Basic-Authentifizierung aus Umgebungsvariablen nutzen; dieser Adapter legt pro Auftrag eine neue Sitzung an und meldet Status und Ergebnis zurück. Ein erkannter Adapter ist noch kein Nachweis für Anmeldung, eine einsatzbereite Sitzung oder einen erfolgreichen Ende-zu-Ende-Auftrag.
 
 ThreadDesk ergänzt diesen Weg um Projekte und Arbeitsstände; weitere Werkzeuge der Familie sollen im gemeinsamen Sprachablauf zusammenwirken. Die Werkzeuge bleiben eigenständig, und ihre tatsächliche Integration wird nicht mit dem Entwicklungsziel verwechselt.
 

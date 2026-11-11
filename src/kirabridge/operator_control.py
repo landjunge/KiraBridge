@@ -31,6 +31,7 @@ NAMES = {
     "codex": "Codex · Terminal",
     "grok": "Grok · Terminal",
     "opencode": "OpenCode",
+    "opencode_http": "OpenCode HTTP",
     "gemini": "Gemini",
     "claude": "Claude",
     "copilot": "Copilot",

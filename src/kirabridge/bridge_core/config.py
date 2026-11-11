@@ -152,6 +152,13 @@ class AgentConfig(BaseModel):
     allow_local_tools: bool = False
     base_url: str | None = Field(default=None, max_length=2048)
     local_output_tokens: int | None = Field(default=None, ge=128, le=2048)
+    server_url: str | None = Field(default=None, max_length=2048)
+    server_username_env: str | None = Field(
+        default=None, pattern=r"^[A-Za-z_][A-Za-z0-9_]{0,127}$"
+    )
+    server_password_env: str | None = Field(
+        default=None, pattern=r"^[A-Za-z_][A-Za-z0-9_]{0,127}$"
+    )
 
     @model_validator(mode="after")
     def explicit_full_access(self):
@@ -162,6 +169,12 @@ class AgentConfig(BaseModel):
     @model_validator(mode="before")
     @classmethod
     def cli_credential_defaults(cls, value):
+        if isinstance(value, dict) and value.get("kind") == "opencode_http":
+            return {
+                "server_username_env": "OPENCODE_SERVER_USERNAME",
+                "server_password_env": "OPENCODE_SERVER_PASSWORD",
+                **value,
+            }
         defaults = {
             "opencode": "OPENCODE_API_KEY",
             "gemini_cli": "GEMINI_API_KEY",
@@ -199,6 +212,40 @@ class AgentConfig(BaseModel):
             or any(char.isspace() or ord(char) < 32 for char in self.base_url)
         ):
             raise ValueError("Only a credential-free loopback OpenCode endpoint is supported")
+        return self
+
+    @model_validator(mode="after")
+    def opencode_server_endpoint(self):
+        if self.kind != "opencode_http":
+            if any(
+                value is not None
+                for value in (self.server_url, self.server_username_env, self.server_password_env)
+            ):
+                raise ValueError("OpenCode server fields require kind opencode_http")
+            return self
+        if not self.server_url:
+            raise ValueError("OpenCode HTTP requires a loopback server URL")
+        if not self.server_username_env or not self.server_password_env:
+            raise ValueError("OpenCode HTTP requires credential environment names")
+        if self.base_url is not None:
+            raise ValueError("OpenCode HTTP does not use the CLI provider base_url")
+        try:
+            url = urlsplit(self.server_url)
+            port = url.port
+        except ValueError:
+            raise ValueError("Invalid OpenCode server URL") from None
+        if (
+            url.scheme not in {"http", "https"}
+            or url.hostname not in {"127.0.0.1", "localhost", "::1"}
+            or url.username is not None
+            or url.password is not None
+            or url.query
+            or url.fragment
+            or url.path not in {"", "/"}
+            or (port is not None and not 1 <= port <= 65535)
+            or any(char.isspace() or ord(char) < 32 for char in self.server_url)
+        ):
+            raise ValueError("Only a credential-free loopback OpenCode server URL is supported")
         return self
 
 
