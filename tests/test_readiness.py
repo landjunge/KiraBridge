@@ -132,3 +132,30 @@ async def test_owned_stop_readiness_separates_abort_from_optional_durable_barrie
         assert denied["operation_checks"][0]["code"] == "forbidden"
         assert "owned_abort_available" not in denied["operation_checks"][0]
         assert bridge.store.db.execute("SELECT count(*) FROM tasks").fetchone()[0] == 0
+
+
+async def test_opencode_http_preflight_does_not_require_an_executable(bridge):
+    from kirabridge.bridge_core.config import AgentConfig
+    from kirabridge.readiness import task_preflight
+
+    bridge.config.agents["http"] = AgentConfig(
+        kind="opencode_http",
+        model="deepseek/deepseek-flash",
+        server_url="http://127.0.0.1:58836",
+    )
+    bridge.config.principals["local"].agents.append("http")
+    task = {
+        "id": "http-preflight",
+        "principal": "local",
+        "operation": "agent.execute",
+        "args": {
+            "agent": "http",
+            "prompt": "hello",
+            "cwd": bridge.config.principals["local"].roots[0],
+            "timeout": 5,
+        },
+    }
+    result = task_preflight(bridge, task)
+    agent_check = next(item for item in result["checks"] if item["kind"] == "agent")
+    assert agent_check["ok"] is True
+    assert result["ready"] is True
