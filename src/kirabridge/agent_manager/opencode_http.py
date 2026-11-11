@@ -190,11 +190,13 @@ class OpenCodeHTTPAdapter:
                         "id": model["modelID"],
                     },
                     "metadata": {"kirabridge_task_id": str(task["id"])},
-                    **(
-                        {}
-                        if args.local_tools
-                        else {"permission": [{"permission": "*", "pattern": "*", "action": "deny"}]}
-                    ),
+                    "permission": [
+                        {
+                            "permission": "*",
+                            "pattern": "*",
+                            "action": "allow" if args.local_tools else "deny",
+                        }
+                    ],
                 },
             )
             created = await self._json(response, "session")
