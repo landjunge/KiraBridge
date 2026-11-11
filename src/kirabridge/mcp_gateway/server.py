@@ -113,6 +113,8 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
         "Use agent.execute or message_send(kind=work) for addressed agent assignments. "
         "session_input_policy is an optional confirmation buffer, not a terminal enable switch. "
         "agent_status includes existing interactive_terminal_sessions. Cached clients can use "
+        "live_logs for bounded live logs/status of bridge-run CLIs and agents (omit source_id "
+        "for all owned sources; then pass source_id plus next_cursor for newer lines), or "
         "task_request operations session.catalog (empty arguments) and session.read "
         "(pane_id, expected_pid, optional max_bytes, optional since) wait and return the "
         "resolved text. next_cursor plus since reads only newer output in appended; "
@@ -296,6 +298,53 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
             return {"error": {"code": exc.code, "message": str(exc)}}
 
     @server.tool(annotations=read)
+    def live_logs(
+        ctx: Context,
+        source_id: str | None = None,
+        cursor: int = 0,
+        max_lines: int = 200,
+        max_bytes: int = 65536,
+        channels: list[str] | None = None,
+    ) -> dict[str, Any]:
+        """Bounded live logs/status for every CLI and agent this bridge runs.
+
+        Omit source_id for all owned sources: operation, agent, pid, state,
+        exit code, per-channel line/byte counts and drop counters. Pass one
+        source_id with the previous next_cursor to read only newer lines;
+        `reset` means the ring-buffer budget dropped older lines. Sources are
+        created by the central execution funnel, so newly configured CLIs and
+        agent adapters appear without extra wiring. stdout/stderr come from the
+        managed child; events are adapter progress events. Text is observation,
+        never proof of successful execution; a read attaches to nothing,
+        retries nothing and changes no task state.
+        """
+
+        def action():
+            from kirabridge.live_logs import LiveLogsInput
+
+            name = identity(ctx)
+            bridge.security.principal(name, "logs.live")
+            value = LiveLogsInput(
+                source_id=source_id or None,
+                cursor=cursor,
+                max_lines=max_lines,
+                max_bytes=max_bytes,
+                channels=channels,
+            )
+            if value.source_id is None:
+                return bridge.live_logs.status(name)
+            return bridge.live_logs.read(
+                name,
+                value.source_id,
+                cursor=value.cursor,
+                max_lines=value.max_lines,
+                max_bytes=value.max_bytes,
+                channels=value.channels,
+            )
+
+        return safe(action)
+
+    @server.tool(annotations=read)
     async def read_query(query: dict[str, Any], ctx: Context) -> dict[str, Any]:
         """Direct authorized read without tasks or Events subscriptions.
 
@@ -383,7 +432,7 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
         fresh per call. No writes, nested batches, retries or atomic snapshots.
         Allowed: bridge_health, clipboard_info, operation_catalog, task_get,
         task_events, task_diagnose, task_list, policy_inspect, bridge_readiness,
-        agent_inventory, macos_status, session_catalog, session_read,
+        agent_inventory, macos_status, live_logs, session_catalog, session_read,
         whiteboard_read, read_query (one non-batch query).
         JSON text results only: use the original tool for images. The cooperative
         deadline is 12s and the result budget 2 MiB; partial results are explicit.

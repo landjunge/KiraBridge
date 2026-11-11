@@ -36,6 +36,7 @@ READ_TOOLS = frozenset(
         "bridge_readiness",
         "agent_inventory",
         "macos_status",
+        "live_logs",
         "session_catalog",
         "session_read",
         "whiteboard_read",

@@ -50,6 +50,7 @@ from kirabridge.keyboard_control import CONTROL_INPUTS, KeyboardControl
 from kirabridge.keyboard_manager import KEYBOARD_INPUTS, KeyboardManager
 from kirabridge.keyboard_profile_manager import PROFILE_INPUTS, KeyboardProfileManager
 from kirabridge.keyboard_sequence import SEQUENCE_INPUTS, KeyboardSequence
+from kirabridge.live_logs import LiveLogHub, LiveLogsInput
 from kirabridge.message_manager import MessageManager
 from kirabridge.message_manager.receiver import MessageReceiver
 from kirabridge.permissions import (
@@ -144,6 +145,7 @@ INPUTS = {
     "observations.read": ObservationReadInput,
     "workflow.stop": WorkflowStopInput,
     "agent.status": EmptyInput,
+    "logs.live": LiveLogsInput,
     "policy.inspect": EmptyInput,
     "admin.execute": TerminalInput,
 }
@@ -199,7 +201,10 @@ class Bridge:
         self.outputs = OutputHistory(config.output_history, self.store)
         self.store.result_codec = self.outputs
         self.process_outputs = ProcessOutputStore(config.state_path / "process-output", self.store)
-        self.terminal = TerminalManager(config.terminal, output_store=self.process_outputs)
+        self.live_logs = LiveLogHub(config.live_logs)
+        self.terminal = TerminalManager(
+            config.terminal, output_store=self.process_outputs, live_logs=self.live_logs
+        )
         self.filesystem = FilesystemManager()
         self.images = ImageManager()
         self.clipboard = ClipboardManager()
@@ -520,15 +525,53 @@ class Bridge:
 
     async def execute(self, task: dict, running, progress) -> dict[str, Any]:
         operation = self.platform_operation(task["operation"], task["args"], task["principal"])
-        if operation is not None:
-            return await self.macos.execute(
-                operation,
-                lambda: self._execute_operation(task, running, progress),
-                revalidate=lambda: self.security.authorize(
-                    task["principal"], task["operation"], text=task["args"].get("text")
-                ),
-            )
-        return await self._execute_operation(task, running, progress)
+        if not self.live_logs.tracks(task["operation"]):
+            if operation is not None:
+                return await self.macos.execute(
+                    operation,
+                    lambda: self._execute_operation(task, running, progress),
+                    revalidate=lambda: self.security.authorize(
+                        task["principal"], task["operation"], text=task["args"].get("text")
+                    ),
+                )
+            return await self._execute_operation(task, running, progress)
+        arguments = task["args"] if isinstance(task["args"], dict) else {}
+        self.live_logs.open(
+            task["id"],
+            task["principal"],
+            operation=task["operation"],
+            agent=arguments.get("agent") if isinstance(arguments.get("agent"), str) else None,
+            transport=operation,
+            cwd=arguments.get("cwd") if isinstance(arguments.get("cwd"), str) else None,
+        )
+
+        async def running_observed(evidence):
+            self.live_logs.feed(task["id"], task["principal"], evidence)
+            await running(evidence)
+
+        async def progress_observed(evidence):
+            self.live_logs.feed(task["id"], task["principal"], evidence)
+            await progress(evidence)
+
+        try:
+            if operation is not None:
+                result = await self.macos.execute(
+                    operation,
+                    lambda: self._execute_operation(task, running_observed, progress_observed),
+                    revalidate=lambda: self.security.authorize(
+                        task["principal"], task["operation"], text=task["args"].get("text")
+                    ),
+                )
+            else:
+                result = await self._execute_operation(task, running_observed, progress_observed)
+        except BaseException as exc:
+            self.live_logs.close(task["id"], error=getattr(exc, "code", type(exc).__name__))
+            raise
+        self.live_logs.close(
+            task["id"],
+            exit_code=result.get("exit_code") if isinstance(result, dict) else None,
+        )
+        return result
 
     def platform_operation(self, operation, arguments=None, principal=None):
         """Select the existing native provider without changing tmux/portable routes."""
@@ -926,6 +969,18 @@ class Bridge:
             if operation == "policy.inspect":
                 return permissions_snapshot(self, principal)
             return await agent_status(self, principal)
+        if operation == "logs.live":
+            await running({"evidence_type": "live_log_read"})
+            if args.source_id is None:
+                return self.live_logs.status(principal)
+            return self.live_logs.read(
+                principal,
+                args.source_id,
+                cursor=args.cursor,
+                max_lines=args.max_lines,
+                max_bytes=args.max_bytes,
+                channels=args.channels,
+            )
         if operation.startswith("file."):
             scope.split(args.path)
             if operation == "file.move":
