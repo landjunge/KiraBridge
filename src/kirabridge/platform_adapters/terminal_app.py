@@ -407,6 +407,8 @@ class TerminalAppTransport:
 
     def native_focus(self, pane_id):
         window, tty = pane_id.split(":")[1:]
+        attempts = int(TerminalAppTransport.FOCUS_ATTEMPTS)
+        last_attempt = attempts - 1
         return (
             self.native_target(pane_id)
             + f"""
@@ -437,10 +439,10 @@ class TerminalAppTransport:
     // Window activation is asynchronous. Acquire once, with a fixed number of
     // attempts, so a slow accessibility check cannot consume the whole wait
     // before Terminal is front. Later pre-input checks stay immediate.
-    for (let focusAttempt=0; focusAttempt<{int(TerminalAppTransport.FOCUS_ATTEMPTS)}; focusAttempt++) {{
+    for (let focusAttempt=0; focusAttempt<{attempts}; focusAttempt++) {{
      try {{ checkFocus(); break; }}
      catch(error) {{
-      if(focusAttempt==={int(TerminalAppTransport.FOCUS_ATTEMPTS) - 1}) throw error;
+      if(focusAttempt==={last_attempt}) throw error;
       delay({TerminalAppTransport.FOCUS_POLL_DELAY});
      }}
     }}"""
