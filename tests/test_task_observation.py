@@ -365,18 +365,38 @@ async def test_grok_zero_remaining_budget_still_returns_pending_conversation(bri
     assert result["conversation_return"]["next_call"]["arguments"]["task_id"] == value.task_id
 
 
+@pytest.mark.parametrize("tool", ["task_request", "task_submit"])
 async def test_grok_submit_native_and_conversation_wait_share_one_response_budget(
     http_bridge,  # noqa: F811
     config,
     monkeypatch,
+    tool,
 ):
     bridge, endpoint = http_bridge
     config.principals["local"].approval_mode = "automatic"
     config.grok_connector.enabled = True
     config.grok_connector.principal = "local"
-    monkeypatch.setattr("kirabridge.task_observation.MAX_WAIT_SECONDS", 0.06)
+    # This is a server observation budget, not an HTTP/SDK/catalogue latency SLA.
+    # Check the exact remaining budget below instead of racing transport overhead.
+    response_budget = 0.5
+    monkeypatch.setattr("kirabridge.task_observation.MAX_WAIT_SECONDS", response_budget)
     release = asyncio.Event()
-    calls = []
+    calls, native_calls, observations, conversation_waits = [], [], [], []
+    from kirabridge.grok_connector.conversation import result_for_conversation as conversation
+
+    async def observed_submission(*args, **kwargs):
+        result = await observe_submitted_task(*args, **kwargs)
+        observations.append((kwargs["deadline"], asyncio.get_running_loop().time()))
+        return result
+
+    async def observed_conversation(*args, wait_seconds=None):
+        conversation_waits.append(wait_seconds)
+        return await conversation(*args, wait_seconds=wait_seconds)
+
+    monkeypatch.setattr("kirabridge.task_observation.observe_submitted_task", observed_submission)
+    monkeypatch.setattr(
+        "kirabridge.grok_connector.conversation.result_for_conversation", observed_conversation
+    )
 
     async def executor(task, started, progress):
         calls.append(task["id"])
@@ -385,6 +405,7 @@ async def test_grok_submit_native_and_conversation_wait_share_one_response_budge
         return {"text": "after observation"}
 
     async def native_wait(task_id):
+        native_calls.append(task_id)
         await asyncio.sleep(0.04)
         return bridge.store.get(task_id)
 
@@ -398,14 +419,24 @@ async def test_grok_submit_native_and_conversation_wait_share_one_response_budge
     try:
         async with MCPClientPool() as clients:
             await clients.connect(Peer("local", url=endpoint, token="local-test-" + "a" * 40))
-            async with asyncio.timeout(0.25):
+            # Safety watchdog only: first-call result validation may fetch the MCP
+            # catalogue. Its scheduling/transport time is outside the server budget.
+            async with asyncio.timeout(5):
                 result = (
-                    await clients.call("local", "task_request", {"request": value.model_dump()})
+                    await clients.call("local", tool, {"request": value.model_dump()})
                 ).structuredContent
+        assert len(observations) == len(conversation_waits) == 1
+        deadline, native_returned_at = observations[0]
+        remaining = conversation_waits[0]
+        assert remaining is not None and 0 <= remaining < response_budget
+        # The gateway computes this after the native observer returns. A renewed
+        # full budget (or the default conversation wait) must fail even on a fast host.
+        assert remaining <= max(0, deadline - native_returned_at)
         assert result["state"] == "running"
         assert result["conversation_return"]["continue_required"]
         assert not result["conversation_return"]["final"]
         assert calls == [value.task_id]
+        assert native_calls == [value.task_id]
     finally:
         release.set()
     assert (await bridge.tasks.wait("local", value.task_id, 2))["state"] == "completed"
