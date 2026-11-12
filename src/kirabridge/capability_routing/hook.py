@@ -190,3 +190,67 @@ class DelegationGuard:
                 "Configured worker differs from matrix decision; bind a matching per-run profile"
             )
         return decision
+
+    def validate_qwen_task(self, task, *, args, config, expected=None):
+        """Select for actual Qwen arguments; call again at the native effect boundary.
+
+        This receipt grants no Core execution, claim, tools, resume or retry. The
+        caller retains its original sealed Team/Core authority and before_spawn
+        lifecycle. A broad historical agent profile cannot widen this read task.
+        """
+        if (
+            task.execution_adapter != "qwen_acp"
+            or not task.read_only
+            or config.kind != "qwen_acp"
+            or config.qwen_auth_type != "qwen-subscription"
+            or config.model != task.explicit_model
+            or config.qwen_reasoning_effort != task.explicit_effort
+            or task.explicit_effort != "medium"
+            or args.prompt != task.prompt
+            or args.cwd != task.cwd
+            or args.timeout != task.timeout_seconds
+            or args.local_tools
+            or args.resume_session
+            or not set(args.mcp_operations) <= {"file.read", "file.list"}
+            or not set(args.mcp_operations) <= set(config.qwen_mcp_operations)
+            or not set(args.mcp_read_roots) <= set(config.qwen_mcp_read_roots)
+            or any(
+                g.tool != "read_queries" or g.tool not in config.qwen_mcp_tools
+                for g in args.mcp_grants
+            )
+        ):
+            raise RoutingError("Actual Qwen task exceeds the scoped read-only MEDIUM profile")
+        from .router import fingerprint
+
+        decision = self.validate_configured(
+            task, cli="qwen", model=config.model, effort=config.qwen_reasoning_effort
+        )
+        if Path(config.executable or "").resolve(strict=True) != Path(
+            decision["executable"]
+        ).resolve(strict=True):
+            raise RoutingError("Configured Qwen executable differs from the access evidence")
+        decision.update(
+            {
+                "agent_input_sha256": fingerprint(args),
+                "configured_agent_sha256": fingerprint(config),
+            }
+        )
+        if expected is not None and any(
+            decision[key] != expected.get(key)
+            for key in (
+                "task_id",
+                "cli",
+                "model",
+                "effort",
+                "expected_version",
+                "access_kind",
+                "matrix_sha256",
+                "runtime_sha256",
+                "task_sha256",
+                "thread_desk",
+                "agent_input_sha256",
+                "configured_agent_sha256",
+            )
+        ):
+            raise RoutingError("Scoped Qwen source, task or configuration changed before effect")
+        return decision

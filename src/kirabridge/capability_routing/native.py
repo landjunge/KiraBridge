@@ -155,6 +155,7 @@ class NativeRouting:
             min_effort=worker.routing.min_effort,
             independent_of_provider=worker.routing.independent_of_provider,
             read_only=read_only,
+            execution_adapter="qwen_acp" if agent.kind == "qwen_acp" else None,
         )
 
     def profile(self, task, args):
