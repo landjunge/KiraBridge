@@ -241,6 +241,9 @@ class Bridge:
                 readiness=lambda principal, result: self.visible_handoffs.observe_readiness(
                     principal, result
                 ),
+                agent_started=lambda principal, target, selected: (
+                    self.visible_handoffs.started_binding(principal, target, selected)
+                ),
             )
         )
         self.visible_terminal = VisibleTerminal(

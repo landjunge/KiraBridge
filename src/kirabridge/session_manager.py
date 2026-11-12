@@ -845,6 +845,76 @@ class SessionManager:
             raise error from cause
         return {**opened, "command_submitted": True}
 
+    def _started_agent(self, argv):
+        """Resolve a configured CLI only from the actual launch executable (argv[0])."""
+        if not argv:
+            return None
+        launch = Path(argv[0]).resolve()
+        agents, _ = self.agent_registry()
+        matches = [
+            name
+            for name, profile in agents.items()
+            if profile.executable and Path(profile.executable).resolve() == launch
+        ]
+        if len(matches) > 1:
+            raise BridgeError(
+                "visible_target_ambiguous", "Executable maps to multiple CLI profiles"
+            )
+        return matches[0] if matches else None
+
+    async def _confirm_started_agent(
+        self, tty, target, pane_id, expected_pid, previous_pids, deadline
+    ):
+        """Wait for the launched CLI process in the returned TTY; never resend argv."""
+        while time.monotonic() < deadline:
+            try:
+                sessions = await asyncio.wait_for(
+                    self.terminal_app.catalog(),
+                    timeout=max(0.001, deadline - time.monotonic()),
+                )
+            except TimeoutError:
+                return None, None
+            rows = [row for row in sessions if row.get("tty") == tty]
+            if len(rows) > 1 or any(row.get("identity_ambiguous") for row in rows):
+                raise BridgeError("visible_target_ambiguous", "Started CLI TTY is ambiguous")
+            if rows:
+                row = rows[0]
+                if row.get("pane_id") != pane_id or row.get("expected_pid") != expected_pid:
+                    raise BridgeError(
+                        "visible_target_changed",
+                        "New CLI appeared under a different window or shell PID",
+                    )
+                processes = [
+                    item for item in row.get("processes", []) if item.get("name") == target
+                ]
+                if len(processes) > 1:
+                    raise BridgeError(
+                        "visible_target_ambiguous", "Several CLI processes share the TTY"
+                    )
+                if processes:
+                    process = processes[0]
+                    by_pid = {
+                        item.get("pid"): item
+                        for item in row.get("processes", [])
+                        if type(item.get("pid")) is int
+                    }
+                    parent = process.get("ppid")
+                    seen = {process.get("pid")}
+                    while parent != expected_pid and parent in by_pid and parent not in seen:
+                        seen.add(parent)
+                        parent = by_pid[parent].get("ppid")
+                    if (
+                        row.get("pane_id", "").startswith("terminal:")
+                        and type(row.get("expected_pid")) is int
+                        and type(process.get("pid")) is int
+                        and process["pid"] > 0
+                        and process["pid"] not in previous_pids
+                        and parent == expected_pid
+                    ):
+                        return {**row, "agent_pid": process["pid"]}, process
+            await asyncio.sleep(min(0.1, max(0.0, deadline - time.monotonic())))
+        return None, None
+
     async def open(self, principal, args, *, task_id=None, on_created=None):
         policy = self.authorization.principal(principal, "session.open")
         self.authorization.principal(principal, "terminal.execute")
@@ -862,6 +932,8 @@ class SessionManager:
             )
         if any("\x00" in arg for arg in argv):
             raise BridgeError("invalid_arguments", "NUL in command")
+        launched_agent = self._started_agent(argv)
+        command_submitted = False
         command = "cd -- " + shlex.quote(cwd)
         if args.controlled_shell:
             if argv:
@@ -926,13 +998,99 @@ class SessionManager:
                                     result, principal=principal
                                 ),
                             )
-                        return {
+                            command_submitted = bool(argv)
+                            launch_deadline = time.monotonic() + 15
+                        opened_session = {
                             **selected,
                             "opened": True,
                             "agent_processed": False,
                             "creation_receipt": result,
                             "separate_window": result.get("separate_window", False),
+                            "lifecycle": {
+                                "window": "confirmed",
+                                "command": "submitted" if argv else "not_requested",
+                                "agent_process": "not_applicable",
+                                "input_readiness": "not_applicable",
+                                "binding": "not_applicable",
+                            },
                         }
+                        if launched_agent:
+                            started, process = await self._confirm_started_agent(
+                                result["tty"],
+                                launched_agent,
+                                selected["pane_id"],
+                                selected["expected_pid"],
+                                {
+                                    item.get("pid")
+                                    for item in selected.get("processes", [])
+                                    if type(item.get("pid")) is int
+                                },
+                                launch_deadline,
+                            )
+                            if started is None:
+                                error = UncertainExecution(
+                                    "session_open_pending",
+                                    "CLI command was submitted, but its process is not yet "
+                                    "confirmed; never resend",
+                                )
+                                error.provider_error = {
+                                    "creation_receipt": result,
+                                    "command_submitted": True,
+                                    "agent_process": "unknown",
+                                    "automatic_retry": False,
+                                }
+                                raise error
+                            binding_state = "unbound"
+                            if self.ports.agent_started:
+                                bound = await self.ports.agent_started(
+                                    principal, launched_agent, started
+                                )
+                                binding_state = bound.get("state", "unknown")
+                            readiness_state = "unknown"
+                            if self.readiness and binding_state in {"bound", "unchanged"}:
+                                ready_deadline = time.monotonic() + 30
+                                while time.monotonic() < ready_deadline:
+                                    try:
+                                        observed = await asyncio.wait_for(
+                                            self.read_observed(
+                                                principal,
+                                                started["pane_id"],
+                                                started["expected_pid"],
+                                            ),
+                                            timeout=max(0.001, ready_deadline - time.monotonic()),
+                                        )
+                                    except TimeoutError:
+                                        break
+                                    readiness = observed.get("input_readiness") or {}
+                                    readiness_state = (
+                                        "ready"
+                                        if readiness.get("ready")
+                                        else readiness.get("state", "unknown")
+                                    )
+                                    if readiness.get("ready") or readiness_state in {
+                                        "target_changed",
+                                        "binding_missing",
+                                    }:
+                                        break
+                                    await asyncio.sleep(
+                                        min(0.25, max(0, ready_deadline - time.monotonic()))
+                                    )
+                            opened_session = {
+                                **started,
+                                "opened": True,
+                                "agent_processed": False,
+                                "creation_receipt": result,
+                                "separate_window": result.get("separate_window", False),
+                                "lifecycle": {
+                                    "window": "confirmed",
+                                    "command": "submitted",
+                                    "agent_process": "started",
+                                    "agent_pid": process["pid"],
+                                    "binding": binding_state,
+                                    "input_readiness": readiness_state,
+                                },
+                            }
+                        return opened_session
                     await asyncio.sleep(0.05)
                 if argv:
                     raise UncertainExecution(
@@ -949,5 +1107,10 @@ class SessionManager:
                     "automatic_retry": False,
                     "cause_code": getattr(cause, "code", type(cause).__name__),
                     "cause_message": str(cause)[:512],
+                    "start_evidence": getattr(cause, "provider_error", {}),
+                    "command_submission": (
+                        "confirmed" if command_submitted else "unknown" if argv else "not_requested"
+                    ),
+                    "agent_start_target": launched_agent,
                 }
                 raise error from cause
