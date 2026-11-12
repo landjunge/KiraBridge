@@ -22,7 +22,7 @@ kind = "qwen_acp"
 executable = "/ABSOLUTE/PATH/TO/qwen"
 model = "qwen4.0-max-preview"
 qwen_auth_type = "qwen-subscription"
-qwen_reasoning_effort = "xhigh"
+qwen_reasoning_effort = "medium"
 bridge_tools = true
 allow_local_tools = false
 sandbox_mode = "read-only"
@@ -33,6 +33,18 @@ qwen_max_timeout = 1800
 qwen_max_session_turns = 256
 qwen_max_tool_calls = 512
 ```
+
+Die Beispiel-Denkstufe `medium` entspricht der aktuellen ausdrücklichen Nutzerwahl
+für neue Folgeaufträge (Qwen `qwen4.0-max-preview`/MEDIUM); das frühere `xhigh`
+bleibt historischer Prüfbeleg. Die Stufe wird erst zur Laufzeit über
+`session/set_config_option` gesetzt und nativ zurückgelesen; Profil- oder
+Inventory-Existenz ist kein Providerstart.
+
+The example effort `medium` reflects the current explicit user choice for new
+follow-up tasks (Qwen `qwen4.0-max-preview`/MEDIUM); the earlier `xhigh`
+confirmation remains historical evidence. The effort is applied at runtime via
+`session/set_config_option` with native readback; profile or inventory existence
+is not a provider start.
 
 Im **bestehenden** `[principals.<owner>]` muss `qwen` als Agent zugelassen sein.
 Erforderlich sind `agent.execute`, `bridge.health`, `task.read` sowie die schon
