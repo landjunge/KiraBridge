@@ -51,3 +51,54 @@ class SchemaValidatorCache:
         error = best_match(validator.iter_errors(instance))
         if error is not None:
             raise error
+
+
+def explicit_scalar_const_types(schema):
+    """Annotate an implied scalar const type for clients that default it to string.
+
+    Values and validation remain unchanged. Never coerce tool arguments, visit
+    instance data in const/default/examples, or relax the peer's native schema.
+    """
+    from copy import deepcopy
+
+    result = deepcopy(schema)
+
+    def visit(node):
+        if not isinstance(node, dict):
+            return
+        if "const" in node and "type" not in node:
+            kind = {
+                str: "string",
+                int: "integer",
+                float: "number",
+                bool: "boolean",
+                type(None): "null",
+            }.get(type(node["const"]))
+            if kind:
+                node["type"] = kind
+        for key in ("properties", "$defs", "definitions", "patternProperties", "dependentSchemas"):
+            for child in node.get(key, {}).values():
+                visit(child)
+        for key in (
+            "items",
+            "additionalProperties",
+            "unevaluatedProperties",
+            "contains",
+            "not",
+            "if",
+            "then",
+            "else",
+            "propertyNames",
+        ):
+            child = node.get(key)
+            if isinstance(child, list):
+                for entry in child:
+                    visit(entry)
+            else:
+                visit(child)
+        for key in ("allOf", "anyOf", "oneOf", "prefixItems"):
+            for child in node.get(key, []):
+                visit(child)
+
+    visit(result)
+    return result

@@ -11,7 +11,7 @@ from urllib.parse import urlsplit
 from pydantic import BaseModel, ConfigDict, Field, PrivateAttr, model_serializer, model_validator
 
 from kirabridge.autonext.models import AutoNextConfig
-from kirabridge.bridge_core.models import BridgeError
+from kirabridge.bridge_core.models import AgentToolGrant, BridgeError
 from kirabridge.capability_routing.router import NativeRoutingSettings, WorkerRouting
 
 _FULL_KEYBOARD_CAPABILITIES = frozenset(
@@ -97,12 +97,16 @@ class TeamWorkerConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
     agent: str | None = Field(default=None, pattern=r"^[a-z][a-z0-9_-]{0,40}$")
     cwd: str | None = Field(default=None, min_length=1, max_length=4096)
-    timeout: float = Field(default=120, gt=0, le=300)
+    timeout: float = Field(default=120, gt=0, le=3600)
     response_framing: Literal["strict_json", "work_reply_header"] = "strict_json"
     # Explicit per-worker route; never a fallback from a busy visible session.
     execution_scope: Literal["existing_visible_terminal", "separate_managed_session"] = (
         "existing_visible_terminal"
     )
+    local_tools: bool = False
+    mcp_grants: list[AgentToolGrant] = Field(default_factory=list, max_length=256)
+    mcp_read_roots: list[str] = Field(default_factory=list, max_length=512)
+    mcp_operations: list[str] = Field(default_factory=list, max_length=32)
     routing: WorkerRouting | None = None
 
     @model_serializer(mode="wrap")
@@ -110,6 +114,9 @@ class TeamWorkerConfig(BaseModel):
         value = handler(self)
         if self.routing is None:
             value.pop("routing", None)
+        for key in ("local_tools", "mcp_grants", "mcp_operations", "mcp_read_roots"):
+            if not getattr(self, key):
+                value.pop(key, None)
         return value
 
     @model_validator(mode="after")
@@ -157,6 +164,25 @@ class AgentConfig(BaseModel):
     kind: str
     executable: str | None = None
     model: str | None = None
+    qwen_mcp_tools: list[str] = Field(default_factory=list, max_length=32)
+    qwen_mcp_read_roots: list[str] = Field(default_factory=list, max_length=512)
+    qwen_mcp_operations: list[str] = Field(default_factory=list, max_length=32)
+    qwen_reasoning_effort: str | None = Field(default=None, max_length=32)
+    qwen_max_timeout: float = Field(default=300.0, ge=1, le=3600)
+    qwen_max_tool_calls: int = Field(default=32, ge=1, le=4096)
+    qwen_max_session_turns: int = Field(default=48, ge=1, le=2048)
+    qwen_auth_type: (
+        Literal[
+            "openai",
+            "openai-responses",
+            "anthropic",
+            "qwen-oauth",
+            "qwen-subscription",
+            "gemini",
+            "vertex-ai",
+        ]
+        | None
+    ) = None
     output_schema: str | None = Field(default=None, max_length=4096)
     api_key_env: str = "XAI_API_KEY"
     sandbox_mode: Literal["read-only", "workspace-write", "danger-full-access"] = "read-only"
@@ -168,8 +194,25 @@ class AgentConfig(BaseModel):
     server_username_env: str | None = Field(default=None, pattern=r"^[A-Za-z_][A-Za-z0-9_]{0,127}$")
     server_password_env: str | None = Field(default=None, pattern=r"^[A-Za-z_][A-Za-z0-9_]{0,127}$")
 
+    @model_serializer(mode="wrap")
+    def omit_foreign_qwen_defaults(self, handler):
+        value = handler(self)
+        if self.kind != "qwen_acp":
+            for key in list(value):
+                if key.startswith("qwen_"):
+                    value.pop(key)
+        return value
+
     @model_validator(mode="after")
     def explicit_full_access(self):
+        if (
+            self.qwen_auth_type is not None
+            or self.qwen_mcp_tools
+            or self.qwen_mcp_operations
+            or self.qwen_mcp_read_roots
+            or self.qwen_reasoning_effort is not None
+        ) and self.kind != "qwen_acp":
+            raise ValueError("Qwen authentication selection requires kind qwen_acp")
         if self.sandbox_mode == "danger-full-access" and not self.bridge_tools:
             raise ValueError("Full access requires the operator's explicit full bridge profile")
         return self
@@ -188,6 +231,7 @@ class AgentConfig(BaseModel):
                 **value,
             }
         defaults = {
+            "qwen_acp": "",
             "opencode": "OPENCODE_API_KEY",
             "gemini_cli": "GEMINI_API_KEY",
             "claude_code": "ANTHROPIC_API_KEY",

@@ -19,6 +19,7 @@ from kirabridge.agent_manager.opencode import OpenCodeAdapter
 from kirabridge.agent_manager.opencode_acp import OpenCodeACPAdapter
 from kirabridge.agent_manager.opencode_http import OpenCodeHTTPAdapter
 from kirabridge.agent_manager.opencode_http_v2 import OpenCodeHTTPV2Adapter
+from kirabridge.agent_manager.qwen_acp import QwenACPAdapter
 from kirabridge.bridge_core.config import AgentConfig, Config
 from kirabridge.bridge_core.models import AgentInput, BridgeError, TerminalInput, UncertainExecution
 from kirabridge.filesystem_manager import PathScope
@@ -537,6 +538,7 @@ class AgentManager:
             "codex": CodexAdapter(terminal, config),
             "grok_api": GrokAPIAdapter(),
             "grok_acp": GrokACPAdapter(terminal, config),
+            "qwen_acp": QwenACPAdapter(terminal, config),
             "grok_structured": GrokStructuredAdapter(terminal),
             "opencode": OpenCodeAdapter(terminal),
             "opencode_acp": OpenCodeACPAdapter(terminal),
@@ -584,6 +586,20 @@ class AgentManager:
                         }
                         if config.kind
                         in {"opencode", "opencode_http", "gemini_cli", "claude_code", "copilot_cli"}
+                        else {}
+                    ),
+                    **(
+                        {
+                            "execution_mode": "task_scoped_mcp"
+                            if config.bridge_tools
+                            else "isolated_text_only",
+                            "supports_local_tools": config.allow_local_tools
+                            and config.bridge_tools,
+                            "supports_owned_resume": True,
+                            "resume_scope": "sealed_idle_team_session",
+                            "mcp_tools": config.qwen_mcp_tools,
+                        }
+                        if config.kind == "qwen_acp"
                         else {}
                     ),
                     "executable_runnable": bool(
@@ -650,7 +666,7 @@ class AgentManager:
         if full_access and config.kind in {"grok_acp", "opencode_http", "opencode_http_v2"}:
             args = args.model_copy(update={"local_tools": True})
         if args.local_tools and (
-            (config.kind != "grok_acp" and not full_access)
+            (config.kind not in {"grok_acp", "qwen_acp"} and not full_access)
             or not config.allow_local_tools
             or "agent.local_tools" not in principal.capabilities
         ):
@@ -663,11 +679,17 @@ class AgentManager:
                 "agent_resume_unsupported", "A turn cannot resume two different sessions"
             )
         resume_session = args.resume_session
+        qwen_proof = None
         if resume_session is not None:
             if config.kind == "codex":
                 owned_resume_session = resume_session
             elif config.kind in {"grok_acp", "opencode_http", "opencode_http_v2"}:
                 pass
+            elif config.kind == "qwen_acp":
+                guard = getattr(self, "qwen_session_guard", None)
+                if not separate_managed or guard is None:
+                    raise BridgeError("team_task_required", "Qwen resume needs sealed team proof")
+                qwen_proof = guard(task, args)
             elif config.kind in {"opencode", "opencode_acp"}:
                 raise BridgeError(
                     "agent_resume_unsupported",
@@ -683,7 +705,7 @@ class AgentManager:
             raise BridgeError(
                 "agent_resume_unsupported", "Owned workflow continuation requires Codex"
             )
-        extra = {}
+        extra = {"owned_session_proof": qwen_proof} if qwen_proof else {}
         if owned_resume_session is not None or handoff_reply:
             extra.update(
                 {"owned_resume_session": owned_resume_session, "handoff_reply": handoff_reply}
@@ -694,6 +716,7 @@ class AgentManager:
             "opencode",
             "opencode_http",
             "opencode_http_v2",
+            "qwen_acp",
         }:
             extra["resume_session"] = resume_session
         try:

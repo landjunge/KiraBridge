@@ -19,7 +19,7 @@ EFFORTS = {
     "max": 5,
     "ultra": 6,
 }
-CLI = Literal["codex", "grok", "claude", "opencode", "gemini", "copilot", "cursor", "aider"]
+CLI = Literal["codex", "grok", "claude", "opencode", "gemini", "copilot", "cursor", "aider", "qwen"]
 Work = Literal[
     "routine", "implementation", "debug", "architecture", "security", "review", "research"
 ]

@@ -161,11 +161,11 @@ class NativeAdmission:
             self.status[task_id] = "input_attempted"
             event.set()
         elif (
-            evidence.get("event") in {"session_created", "prompt_admitted"}
+            evidence.get("event") in {"session_created", "session_loaded", "prompt_admitted"}
             and isinstance(evidence.get("session_id"), str)
             and evidence["session_id"]
         ):
-            # An agent session is admitted work. Stop the admission watchdog
+            # A native new/load acknowledgment admits the session. Stop the watchdog
             # without claiming that the session has finished.
             event.set()
 

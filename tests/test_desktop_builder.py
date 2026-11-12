@@ -53,6 +53,7 @@ def test_companion_metadata_binds_release_and_source(tmp_path, builder, monkeypa
         root / "integrations/desktop" / name
         for name in (
             "main.swift",
+            "FamilySwitchLogic.swift",
             "SystemBridge.swift",
             "SystemControl.swift",
             "SystemServices.swift",
@@ -65,6 +66,16 @@ def test_companion_metadata_binds_release_and_source(tmp_path, builder, monkeypa
     ]
     for source in sources:
         source.write_text("// isolated fixture: " + source.name + "\n")
+    icon_source = (
+        Path(__file__).resolve().parents[1] / "assets/design/icons/macos/KiraBridge-dark.icns"
+    )
+    icon_bytes = icon_source.read_bytes()
+    assert hashlib.sha256(icon_bytes).hexdigest() == (
+        "4afd22a0a76083b1e6ea820d010162558db7e9d79e518b42bbc29db6b263cdeb"
+    )
+    icon_fixture = root / "assets/design/icons/macos/KiraBridge-dark.icns"
+    icon_fixture.parent.mkdir(parents=True)
+    icon_fixture.write_bytes(icon_bytes)
     (root / "pyproject.toml").write_text('[project]\nversion = "0.8.0rc18"\n')
     monkeypatch.setattr(builder, "__file__", str(root / "scripts/build_desktop_app.py"))
     commit = "1" * 40
@@ -87,6 +98,8 @@ def test_companion_metadata_binds_release_and_source(tmp_path, builder, monkeypa
     assert info["CFBundleShortVersionString"] == "0.8.0"
     assert info["KiraBridgeVersion"] == "0.8.0rc18"
     assert info["KiraBridgeSourceCommit"] == commit
+    assert info["CFBundleIconFile"] == "KiraBridge"
+    assert (destination / "Contents/Resources/KiraBridge.icns").read_bytes() == icon_bytes
     assert (
         info["KiraBridgeCompanionSourceSHA256"]
         == hashlib.sha256(

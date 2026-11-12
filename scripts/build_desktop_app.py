@@ -30,6 +30,7 @@ def build(destination=None):
     source = root / "integrations/desktop/main.swift"
     native_sources = [
         source,
+        root / "integrations/desktop/FamilySwitchLogic.swift",
         root / "integrations/desktop/SystemBridge.swift",
         root / "integrations/desktop/SystemControl.swift",
         root / "integrations/desktop/SystemServices.swift",
@@ -84,8 +85,8 @@ def build(destination=None):
         timeout=180,
     )
     binary.chmod(0o755)
-    # Bundle the original macOS icon from the approved design package and verify
-    # the pinned bytes so a stray file is never signed into the companion.
+    # Bundle the original macOS icon from the approved design package; verify it
+    # against the pinned design checksum so a stray file is never signed in.
     icon_source = root / "assets" / "design" / "icons" / "macos" / "KiraBridge-dark.icns"
     icon_bytes = icon_source.read_bytes()
     if hashlib.sha256(icon_bytes).hexdigest() != (

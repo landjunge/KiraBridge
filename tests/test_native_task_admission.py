@@ -415,3 +415,27 @@ async def test_chatgpt_legacy_terminal_alias_does_not_occupy_normal_worker(bridg
     finally:
         finish.set()
         await bridge.tasks.stop()
+
+
+async def test_owned_session_load_ack_stops_admission_without_claiming_model_start(bridge):
+    setup_native(bridge)
+    bridge.tasks.native.timeout = 0.05
+    finish = asyncio.Event()
+
+    async def executor(task, running, progress):
+        await progress({"event": "session_loaded", "session_id": "owned-provider-session"})
+        await finish.wait()
+        return {"success": True, "scope": "agent_turn", "project_completion_verified": False}
+
+    bridge.tasks.executor = executor
+    await bridge.tasks.start()
+    try:
+        task = enqueue(bridge, "owned-load-ack")
+        observed = await bridge.tasks.wait_delivery(task["id"])
+        assert observed["state"] == State.ACCEPTED and observed.get("started") is None
+        await asyncio.sleep(0.08)  # Cross the admission deadline after the real load ACK.
+        assert task["id"] not in bridge.tasks.native.expired
+        assert bridge.store.get(task["id"])["state"] == State.ACCEPTED
+    finally:
+        finish.set()
+        await bridge.tasks.stop()

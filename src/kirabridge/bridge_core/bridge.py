@@ -320,6 +320,7 @@ class Bridge:
         from kirabridge.team_manager.dispatcher import TeamDispatcher
 
         self.teams = TeamManager(self)
+        self.agents.qwen_session_guard = self.teams.qwen_session_proof
         self.messages.voice_policy.teams = self.teams
         self.team_dispatcher = TeamDispatcher(self)
         from kirabridge.autonext.manager import AutoNextManager

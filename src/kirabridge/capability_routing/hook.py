@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import os
 import re
 import subprocess
@@ -53,6 +54,8 @@ def before_delegation(source, runtime, task, *, probe=True):
         raise RoutingError("Trusted runtime executable is unavailable")
     if probe:
         argv = [str(exe), "--version"]
+        if decision["cli"] == "qwen":
+            argv[1:1] = ["--bare", "--safe-mode"]
         if decision["cli"] == "grok":
             argv.insert(1, "--no-auto-update")
         result = subprocess.run(
@@ -73,6 +76,15 @@ def before_delegation(source, runtime, task, *, probe=True):
         ):
             raise RoutingError("Installed CLI version changed; reverify matrix/runtime")
         decision["observed_version"] = observed[0]
+        if decision["cli"] == "qwen" and decision["access_kind"] == "subscription":
+            try:
+                public = json.loads((Path.home() / ".qwen/settings.json").read_text())
+                selected = public.get("security", {}).get("auth", {}).get("selectedType")
+            except (OSError, ValueError):
+                raise RoutingError("Qwen subscription selection cannot be confirmed") from None
+            if selected != "qwen-subscription":
+                raise RoutingError("Qwen subscription selection changed; no account fallback")
+            decision["observed_auth_route"] = "qwen-subscription_selection_only"
         # A saved subscription observation must not silently become API billing
         # if somebody changed authentication while parallel work was running.
         if decision["access_kind"] == "subscription" and decision["cli"] in {"codex", "grok"}:

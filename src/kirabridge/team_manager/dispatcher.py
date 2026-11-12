@@ -251,8 +251,14 @@ class TeamDispatcher:
                     "prompt": prompt,
                     "cwd": worker.cwd,
                     "timeout": worker.timeout,
-                    "local_tools": False,
+                    "local_tools": worker.local_tools,
                 }
+                if worker.mcp_grants:
+                    arguments["mcp_grants"] = [grant.model_dump() for grant in worker.mcp_grants]
+                if worker.mcp_read_roots:
+                    arguments["mcp_read_roots"] = worker.mcp_read_roots
+                if worker.mcp_operations:
+                    arguments["mcp_operations"] = worker.mcp_operations
                 if claimed.get("resume_session"):
                     arguments["resume_session"] = claimed["resume_session"]
                 request = TaskRequest(
