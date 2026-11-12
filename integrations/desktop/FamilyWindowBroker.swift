@@ -45,6 +45,7 @@ protocol FamilyWindowPort: AnyObject {
     func destination(_ product: String) throws
     func screens() throws -> [FamilyRect]
     func launch(_ product: String, check: () throws -> Void) async throws -> FamilyIdentity
+    func reopen(_ app: FamilyIdentity, check: () throws -> Void) async throws
     func bounds(_ app: FamilyIdentity, _ window: FamilyWindow, _ rect: FamilyRect, check: () throws -> Void) throws
     func focus(_ app: FamilyIdentity, _ window: FamilyWindow, check: () throws -> Void) async throws
     func hide(_ app: FamilyIdentity, _ window: FamilyWindow, check: () throws -> Void) async throws
@@ -107,8 +108,8 @@ final class FamilyWindowBroker {
         // Before starting any app, refuse ambiguous/modal windows in existing
         // registered apps. Unregistered installations/helpers are never selected.
         for (product,app) in bound {
-            guard let w=try port.window(app) else { throw FamilyFailure("family_main_window_unavailable") }
-            windows[product]=w
+            if let w=try port.window(app) { windows[product]=w }
+            else if product != target { throw FamilyFailure("family_main_window_unavailable") }
         }
         displayFrames=try port.screens()
         let desired=try main.bounds.clamped(to:displayFrames)
@@ -117,9 +118,13 @@ final class FamilyWindowBroker {
         do {
             if bound[target]==nil {
                 try guardAll(); attempted=true
-                let app=try await port.launch(target,check:guardAll)
-                bound[target]=app
-                let deadline=ProcessInfo.processInfo.systemUptime+5
+                bound[target]=try await port.launch(target,check:guardAll)
+            } else if windows[target]==nil {
+                try guardAll(); attempted=true
+                try await port.reopen(bound[target]!,check:guardAll)
+            }
+            if windows[target]==nil {
+                let app=bound[target]!,deadline=ProcessInfo.processInfo.systemUptime+5
                 repeat {
                     try guardAll()
                     if let w=try port.window(app) { windows[target]=w; break }

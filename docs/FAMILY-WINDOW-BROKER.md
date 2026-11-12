@@ -74,8 +74,10 @@ instances/windows, sheets/modal dialogs and fullscreen fail closed. No title
 heuristic chooses between documents. An existing registered instance is reused;
 a missing target is launched once by its exact application URL with
 `createsNewApplicationInstance=false`. Waits only observe; unknown launch outcomes
-never issue another launch. An existing app with no accessible main window must
-be reopened normally before switching; the broker does not guess a new window.
+never issue another launch. If the existing instance has no accessible main
+window, one exact-URL Reopen is admitted; its callback must retain the original
+PID/start/path and produce one unambiguous main window. A replaced process or
+extra window is UNKNOWN, never silently adopted or closed.
 
 Bounds are the actual AX outer window rectangle in logical desktop points.
 NSScreen visibleFrame is converted from AppKit bottom-left coordinates to AX

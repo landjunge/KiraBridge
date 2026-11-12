@@ -222,6 +222,22 @@ final class FamilyNativePort: FamilyWindowPort {
         guard let exact=try identity(product),exact.pid==app.processIdentifier else { throw FamilyFailure("family_launch_unknown",unknown:true) }
         return exact
     }
+    func reopen(_ expected: FamilyIdentity, check: () throws -> Void) async throws {
+        try validate(expected);_=try registeredBundle(expected.product)
+        try check()
+        let configuration=NSWorkspace.OpenConfiguration()
+        configuration.activates=false;configuration.createsNewApplicationInstance=false
+        let app: NSRunningApplication=try await withCheckedThrowingContinuation { continuation in
+            NSWorkspace.shared.openApplication(at:URL(fileURLWithPath:expected.path),configuration:configuration) { app,_ in
+                if let app=app { continuation.resume(returning:app) }
+                else { continuation.resume(throwing:FamilyFailure("family_reopen_unknown",unknown:true)) }
+            }
+        }
+        // LaunchServices must return the original registered process. A changed
+        // PID/start or another installation is UNKNOWN, never silently adopted.
+        try validate(expected)
+        guard app.processIdentifier==expected.pid else { throw FamilyFailure("family_reopen_unknown",unknown:true) }
+    }
     func bounds(_ app: FamilyIdentity, _ window: FamilyWindow, _ rect: FamilyRect, check: () throws -> Void) throws {
         let e=try element(app,window)
         var size=CGSize(width:rect.width,height:rect.height),point=CGPoint(x:rect.x,y:rect.y)

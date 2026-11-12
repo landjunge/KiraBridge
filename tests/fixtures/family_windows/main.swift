@@ -52,6 +52,10 @@ final class Port: FamilyWindowPort {
         let a=make(product,FamilyWindowBroker.products.firstIndex(of:product)!)
         apps[product]=a;views[product]=FamilyWindow(token:product,bounds:FamilyRect(x:0,y:0,width:1000,height:780),visible:false);return a
     }
+    func reopen(_ app: FamilyIdentity,check: () throws -> Void) async throws {
+        try check();events.append("reopen:"+app.product)
+        views[app.product]=FamilyWindow(token:app.product,bounds:FamilyRect(x:0,y:0,width:1000,height:780),visible:false)
+    }
     func bounds(_ app: FamilyIdentity,_ w: FamilyWindow,_ r: FamilyRect,check: () throws -> Void) throws {
         try check();events.append("bounds:"+app.product)
         views[app.product]=FamilyWindow(token:w.token,bounds:r,visible:w.visible)
@@ -113,6 +117,11 @@ struct FamilyFixture {
         let launch=Port(),launchJournal=Journal();launch.apps.removeValue(forKey:"threaddesk");launch.views.removeValue(forKey:"threaddesk")
         _=try await FamilyWindowBroker(launch,launchJournal).switchTo("threaddesk",sourcePID:100,sourceStart:nil)
         try check(launch.events.filter { $0.hasPrefix("launch:") }.count==1,"one_launch")
+        let reopen=Port(),reopenJournal=Journal();let oldPID=reopen.apps["threaddesk"]!
+        reopen.views.removeValue(forKey:"threaddesk")
+        _=try await FamilyWindowBroker(reopen,reopenJournal).switchTo("threaddesk",sourcePID:100,sourceStart:nil)
+        try check(reopen.events.filter { $0.hasPrefix("reopen:") }.count==1,"one_reopen")
+        try check(!reopen.events.contains { $0.hasPrefix("launch:") } && reopen.apps["threaddesk"]==oldPID,"reopen_preserves_process")
         let input=FamilyRect(x:-1800,y:-10,width:1700,height:1000)
         let clamped=try input.clamped(to:[FamilyRect(x:-1600,y:0,width:1600,height:900),FamilyRect(x:0,y:24,width:1600,height:850)])
         try check(clamped==FamilyRect(x:-1600,y:0,width:1600,height:900),"negative_monitor_clamp")
