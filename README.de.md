@@ -22,7 +22,7 @@
 
 <!-- AUTO-DOWNLOADS:START -->
 <p align="center">
-  <a href="https://github.com/landjunge/KiraBridge/releases/download/v0.8.0rc36/KiraBridge-0.8.0rc36-Intel-Installer.zip" title="KiraBridge-0.8.0rc36-Intel-Installer.zip herunterladen / download"><img src="assets/readme/download-macos-intel.svg" alt="Download macOS Intel 0.8.0rc36" width="190" height="52"></a>
+  <a href="https://github.com/landjunge/KiraBridge/releases/download/v0.8.0rc49/KiraBridge-macos.tar.gz" title="KiraBridge-macos.tar.gz herunterladen / download"><img src="assets/readme/download-macos-intel.svg" alt="Download macOS Intel 0.8.0rc49" width="190" height="52"></a>
   &nbsp;
   <a href="https://github.com/landjunge/KiraBridge/releases/download/windows-v0.8.0rc37.dev1/KiraBridge-0.8.0rc37.dev1-Windows-Dev-Kit.zip" title="KiraBridge-0.8.0rc37.dev1-Windows-Dev-Kit.zip herunterladen / download"><img src="assets/readme/download-windows.svg" alt="Download Windows 0.8.0rc37.dev1" width="190" height="52"></a>
   &nbsp;
