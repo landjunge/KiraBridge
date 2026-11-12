@@ -282,7 +282,7 @@ def no_managed_profile(monkeypatch):
     )
 
 
-async def execute_acp(tmp_path, executable, *, timeout=3.0):
+async def execute_acp(tmp_path, executable, *, timeout=3.0, resume_session=None):
     running, progress = [], []
 
     async def on_running(value):
@@ -299,6 +299,7 @@ async def execute_acp(tmp_path, executable, *, timeout=3.0):
         [str(tmp_path)],
         on_running,
         on_progress,
+        resume_session=resume_session,
     )
     return result, running, progress
 
@@ -402,3 +403,220 @@ for line in sys.stdin:
     with pytest.raises(UncertainExecution) as caught:
         await execute_acp(tmp_path, acp_cli(tmp_path, body))
     assert caught.value.code == "agent_disconnected"
+
+
+async def test_session_load_replays_history_but_only_the_new_turn_is_kept(tmp_path):
+    body = (
+        "import json,sys\n"
+        + HANDSHAKE
+        + """
+for line in sys.stdin:
+    msg = json.loads(line)
+    result = handshake(msg)
+    if msg.get("method") == "session/load":
+        print(json.dumps({"jsonrpc": "2.0", "method": "session/update", "params": {
+            "sessionId": "s1",
+            "update": {"sessionUpdate": "agent_message_chunk",
+                       "content": {"type": "text", "text": "old history"}},
+        }}), flush=True)
+        result = {"loaded": True}
+    if msg.get("method") == "session/prompt":
+        print(json.dumps({"jsonrpc": "2.0", "method": "session/update", "params": {
+            "sessionId": "s1",
+            "update": {"sessionUpdate": "agent_message_chunk",
+                       "content": {"type": "text", "text": "new answer"}},
+        }}), flush=True)
+        result = {"stopReason": "end_turn"}
+    print(json.dumps({"jsonrpc": "2.0", "id": msg["id"], "result": result}), flush=True)
+"""
+    )
+    process = await spawn_server(tmp_path, body)
+    acp = client(process)
+    acp.start()
+    try:
+        await acp.request("initialize", {"protocolVersion": 1, "clientCapabilities": {}}, 3)
+        await acp.request("authenticate", {"methodId": "cached_token"}, 3)
+        acp.bind_session("s1")
+        loaded = await acp.request(
+            "session/load", {"sessionId": "s1", "cwd": str(tmp_path), "mcpServers": []}, 3
+        )
+        assert loaded["loaded"] is True and acp.text == "old history"
+        acp.reset_text()
+        await acp.request(
+            "session/prompt", {"sessionId": "s1", "prompt": [{"type": "text", "text": "hi"}]}, 3
+        )
+        assert acp.text == "new answer"
+    finally:
+        await acp.aclose()
+        await stop(process)
+
+
+async def test_unknown_vendor_notification_is_inert(tmp_path):
+    body = (
+        "import json,sys\n"
+        + HANDSHAKE
+        + """
+for line in sys.stdin:
+    msg = json.loads(line)
+    result = handshake(msg)
+    if msg.get("method") == "session/new":
+        print(json.dumps({"jsonrpc": "2.0", "method": "_vendor/progress",
+                          "params": {"note": "advisory"}}), flush=True)
+    print(json.dumps({"jsonrpc": "2.0", "id": msg["id"], "result": result}), flush=True)
+"""
+    )
+    process = await spawn_server(tmp_path, body)
+    acp = client(process)
+    acp.start()
+    try:
+        await acp.request("initialize", {"protocolVersion": 1, "clientCapabilities": {}}, 3)
+        new = await acp.request("session/new", {"cwd": str(tmp_path), "mcpServers": []}, 3)
+        assert new["sessionId"] == "s1"
+    finally:
+        await acp.aclose()
+        await stop(process)
+
+
+async def test_opencode_acp_adapter_resumes_the_exact_session(tmp_path):
+    body = (
+        HANDSHAKE
+        + """
+import json,sys
+for line in sys.stdin:
+    msg = json.loads(line)
+    result = handshake(msg)
+    if msg.get("method") == "session/load":
+        assert msg["params"]["sessionId"] == "saved-session"
+        print(json.dumps({"jsonrpc": "2.0", "method": "session/update", "params": {
+            "sessionId": "saved-session",
+            "update": {"sessionUpdate": "agent_message_chunk",
+                       "content": {"type": "text", "text": "history"}},
+        }}), flush=True)
+        result = {"loaded": True}
+    if msg.get("method") == "session/prompt":
+        assert msg["params"]["sessionId"] == "saved-session"
+        print(json.dumps({"jsonrpc": "2.0", "method": "session/update", "params": {
+            "sessionId": "saved-session",
+            "update": {"sessionUpdate": "agent_message_chunk",
+                       "content": {"type": "text", "text": "resumed answer"}},
+        }}), flush=True)
+        result = {"stopReason": "end_turn"}
+    print(json.dumps({"jsonrpc": "2.0", "id": msg["id"], "result": result}), flush=True)
+"""
+    )
+    result, _, progress = await execute_acp(
+        tmp_path, acp_cli(tmp_path, body), resume_session="saved-session"
+    )
+    assert result["success"] and result["text"] == "resumed answer"
+    assert result["evidence"]["session_id"] == "saved-session"
+    assert result["evidence"]["session_resumed"] is True
+    assert {
+        "agent": "opencode",
+        "session_id": "saved-session",
+        "event": "session_resumed",
+    } in progress
+
+
+async def test_non_json_stdout_noise_is_ignored_without_replaying_the_request(tmp_path):
+    body = (
+        "import json,sys\n"
+        + HANDSHAKE
+        + """
+for line in sys.stdin:
+    msg = json.loads(line)
+    result = handshake(msg)
+    if msg.get("method") == "session/new":
+        print("warning: vendor diagnostic on stdout", flush=True)
+        print(json.dumps({"jsonrpc": "2.0", "method": "_vendor/notice",
+                          "params": {"note": "advisory"}}), flush=True)
+    print(json.dumps({"jsonrpc": "2.0", "id": msg["id"], "result": result}), flush=True)
+"""
+    )
+    process = await spawn_server(tmp_path, body)
+    acp = client(process)
+    acp.start()
+    try:
+        await acp.request("initialize", {"protocolVersion": 1, "clientCapabilities": {}}, 3)
+        new = await acp.request("session/new", {"cwd": str(tmp_path), "mcpServers": []}, 3)
+        assert new["sessionId"] == "s1"
+    finally:
+        await acp.aclose()
+        await stop(process)
+
+
+async def test_advisory_malformed_update_does_not_kill_a_bound_prompt(tmp_path):
+    body = (
+        "import json,sys\n"
+        + HANDSHAKE
+        + """
+for line in sys.stdin:
+    msg = json.loads(line)
+    result = handshake(msg)
+    if msg.get("method") == "session/prompt":
+        print(json.dumps({"jsonrpc": "2.0", "method": "session/update",
+                          "params": "not-an-object"}), flush=True)
+        print(json.dumps({"jsonrpc": "2.0", "method": "session/update", "params": {
+            "sessionId": "s1",
+            "update": {"sessionUpdate": "agent_message_chunk",
+                       "content": {"type": "text", "text": "answer"}},
+        }}), flush=True)
+        result = {"stopReason": "end_turn"}
+    print(json.dumps({"jsonrpc": "2.0", "id": msg["id"], "result": result}), flush=True)
+"""
+    )
+    process = await spawn_server(tmp_path, body)
+    acp = client(process)
+    acp.start()
+    try:
+        await acp.request("initialize", {"protocolVersion": 1, "clientCapabilities": {}}, 3)
+        await acp.request("authenticate", {"methodId": "cached_token"}, 3)
+        new = await acp.request("session/new", {"cwd": str(tmp_path), "mcpServers": []}, 3)
+        acp.bind_session(new["sessionId"])
+        result = await acp.request(
+            "session/prompt", {"sessionId": "s1", "prompt": [{"type": "text", "text": "hi"}]}, 3
+        )
+        assert result["stopReason"] == "end_turn" and acp.text == "answer"
+    finally:
+        await acp.aclose()
+        await stop(process)
+
+
+async def test_session_load_does_not_repeat_the_one_time_running_activity(tmp_path):
+    body = (
+        "import json,sys\n"
+        + HANDSHAKE
+        + """
+for line in sys.stdin:
+    msg = json.loads(line)
+    result = handshake(msg)
+    if msg.get("method") == "session/load":
+        for _ in range(2):
+            print(json.dumps({"jsonrpc": "2.0", "method": "session/update", "params": {
+                "sessionId": "s1",
+                "update": {"sessionUpdate": "agent_thought_chunk",
+                           "content": {"type": "text", "text": "history"}},
+            }}), flush=True)
+        result = {"loaded": True}
+    print(json.dumps({"jsonrpc": "2.0", "id": msg["id"], "result": result}), flush=True)
+"""
+    )
+    process = await spawn_server(tmp_path, body)
+    acp = client(process)
+    acp.start()
+    activity = []
+
+    async def observed(kind):
+        activity.append(kind)
+
+    acp.on_activity = observed
+    try:
+        await acp.request("initialize", {"protocolVersion": 1, "clientCapabilities": {}}, 3)
+        acp.bind_session("s1")
+        await acp.request(
+            "session/load", {"sessionId": "s1", "cwd": str(tmp_path), "mcpServers": []}, 3
+        )
+        acp.reset_text()
+        assert activity == ["agent_thought_chunk"]
+    finally:
+        await acp.aclose()
+        await stop(process)

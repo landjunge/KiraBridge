@@ -15,6 +15,8 @@ from kirabridge.team_manager.models import (
     TeamCreate,
     TeamMessageSend,
     TeamRoleSet,
+    TeamSessionClear,
+    TeamSessionGet,
     TeamWorkClaim,
     TeamWorkComplete,
     TeamWorkCreate,
@@ -867,3 +869,67 @@ def test_reprocess_rechecks_automatic_approval_and_assignee_roster(domain):
         domain.store.db.execute("SELECT count(*) FROM team_work_reprocess_history").fetchone()[0]
         == 0
     )
+
+
+def session_request(**changes):
+    return TeamSessionGet(**{"team_id": "test-team", "member": None, **changes})
+
+
+def test_proven_worker_session_is_reused_only_for_managed_team_work(domain):
+    domain.config.team.workers["codex"].execution_scope = "separate_managed_session"
+    shared = domain.delegate("local", work())
+    assert domain.resume_session(shared) is None
+    domain.record_session(shared, {"session_id": "codex-session-1", "adapter": "codex"})
+    assert domain.resume_session(shared) == "codex-session-1"
+    read = domain.session("codex", session_request())
+    assert read["session"]["session_id"] == "codex-session-1"
+    assert read["session"]["agent"] == "codex"
+    assert read["session"]["state"] == "active"
+    domain.config.team.workers["codex"].execution_scope = "existing_visible_terminal"
+    assert domain.resume_session(shared) is None
+    domain.config.team.workers["codex"].execution_scope = "separate_managed_session"
+    domain.config.team.workers["codex"].cwd = "/tmp/other"
+    assert domain.resume_session(shared) is None
+
+
+def test_session_read_and_clear_are_role_scoped_and_idempotent(domain):
+    domain.config.team.workers["codex"].execution_scope = "separate_managed_session"
+    shared = domain.delegate("local", work())
+    domain.record_session(shared, {"session_id": "codex-session-2"})
+    with pytest.raises(BridgeError) as error:
+        domain.session("observer", session_request(member="codex"))
+    assert error.value.code == "team_role_denied"
+    assert (
+        domain.session("chatgpt", session_request(member="*"))["sessions"][0]["session_id"]
+        == "codex-session-2"
+    )
+    first = domain.clear_session(
+        "codex",
+        TeamSessionClear(team_id="test-team", idempotency_key="clear-codex"),
+    )
+    assert first["cleared"] is True
+    second = domain.clear_session(
+        "codex",
+        TeamSessionClear(team_id="test-team", idempotency_key="clear-codex"),
+    )
+    assert second == {"cleared": False, "idempotent": True, "member": "codex"}
+    assert domain.session("codex", session_request())["session"] is None
+    with pytest.raises(BridgeError) as error:
+        domain.clear_session(
+            "observer",
+            TeamSessionClear(team_id="test-team", member="codex", idempotency_key="clear-other"),
+        )
+    assert error.value.code == "team_role_denied"
+
+
+def test_resumed_session_identity_cannot_be_silently_replaced(domain):
+    domain.config.team.workers["codex"].execution_scope = "separate_managed_session"
+    shared = domain.delegate("local", work())
+    domain.record_session(shared, {"session_id": "codex-session-3"})
+    resumed = {**shared, "resume_session": "codex-session-3", "state": "dispatching"}
+    domain.record_session(resumed, {"session_id": "different-session"})
+    assert domain.session("codex", session_request())["session"]["session_id"] == "codex-session-3"
+    completed = {**shared, "resume_session": None, "state": "completed"}
+    domain.record_session(completed, {"session_id": "codex-session-4"})
+    assert domain.session("codex", session_request())["session"]["session_id"] == "codex-session-4"
+    assert domain.session("codex", session_request())["session"]["state"] == "idle"

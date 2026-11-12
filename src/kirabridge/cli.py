@@ -193,6 +193,8 @@ async def execute(args) -> None:
             "complete": "team_work_complete",
             "reprocess": "team_work_reprocess",
             "events": "team_events",
+            "session": "team_session_get",
+            "session-clear": "team_session_clear",
         }[action]
         arguments = {} if action == "list" else {"team_id": args.team_id}
         if action == "create":
@@ -223,9 +225,21 @@ async def execute(args) -> None:
                 arguments.update(
                     core_task_id=args.core_task, expected_result_sha256=args.result_sha256
                 )
+        elif action in {"session", "session-clear"}:
+            if args.member:
+                arguments["member"] = args.member
         elif action == "work" and args.work_id:
             arguments["work_id"] = args.work_id
-        writes = action in {"create", "role", "send", "assign", "claim", "complete", "reprocess"}
+        writes = action in {
+            "create",
+            "role",
+            "send",
+            "assign",
+            "claim",
+            "complete",
+            "reprocess",
+            "session-clear",
+        }
         if writes:
             arguments["idempotency_key"] = args.key or "cli-" + uuid.uuid4().hex
             arguments = {"request": arguments}
@@ -737,6 +751,14 @@ def main() -> None:
     actions.add_parser("list")
     for action in ("show", "inbox", "events"):
         actions.add_parser(action).add_argument("team_id")
+    for action in ("session", "session-clear"):
+        command = actions.add_parser(action)
+        command.add_argument("team_id")
+        command.add_argument(
+            "member",
+            nargs="?",
+            help="Member name; omit for the authenticated identity or use * to list all",
+        )
     work = actions.add_parser("work")
     work.add_argument("team_id")
     work.add_argument("--work-id")
@@ -787,6 +809,7 @@ def main() -> None:
         assign,
         actions.choices["claim"],
         actions.choices["complete"],
+        actions.choices["session-clear"],
     ):
         command.add_argument(
             "--key", help="Reuse this key for exactly the same operation; never blindly repeat work"

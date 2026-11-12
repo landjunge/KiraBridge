@@ -163,6 +163,14 @@ class AgentInput(Input):
     prompt: str = Field(min_length=1, max_length=262144)
     cwd: str
     timeout: float = Field(default=300.0, gt=0, le=3600)
+    # Only a sealed team assignment may carry a provider session id. Direct
+    # agent requests keep creating a fresh process/session.
+    resume_session: str | None = Field(
+        default=None,
+        min_length=1,
+        max_length=256,
+        pattern=r"^[A-Za-z0-9][A-Za-z0-9._:-]{0,255}$",
+    )
 
 
 class ThreadDeskDynamicInput(Input):

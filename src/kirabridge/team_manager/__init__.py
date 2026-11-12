@@ -17,6 +17,8 @@ from kirabridge.team_manager.models import (
     TeamCreate,
     TeamMessageSend,
     TeamRoleSet,
+    TeamSessionClear,
+    TeamSessionGet,
     TeamWorkClaim,
     TeamWorkComplete,
     TeamWorkCreate,
@@ -50,9 +52,16 @@ CREATE TABLE IF NOT EXISTS team_work (
  team_id TEXT NOT NULL REFERENCES teams(id), assigned_by TEXT NOT NULL, assignee TEXT NOT NULL,
  title TEXT NOT NULL, body TEXT NOT NULL, parent_id TEXT REFERENCES team_work(id),
  root_id TEXT NOT NULL, depth INTEGER NOT NULL, state TEXT NOT NULL,
- core_task_id TEXT UNIQUE, core_request_hash TEXT, result TEXT,
+ core_task_id TEXT UNIQUE, core_request_hash TEXT, resume_session TEXT, result TEXT,
  evidence TEXT NOT NULL DEFAULT '{}', error TEXT,
  created REAL NOT NULL, claimed REAL, started REAL, finished REAL
+);
+CREATE TABLE IF NOT EXISTS team_sessions (
+ team_id TEXT NOT NULL REFERENCES teams(id), principal TEXT NOT NULL,
+ agent TEXT NOT NULL, adapter TEXT NOT NULL, session_id TEXT NOT NULL,
+ cwd TEXT NOT NULL, state TEXT NOT NULL, work_id TEXT,
+ created REAL NOT NULL, updated REAL NOT NULL,
+ PRIMARY KEY(team_id,principal)
 );
 CREATE INDEX IF NOT EXISTS team_work_order ON team_work(team_id,seq);
 CREATE INDEX IF NOT EXISTS team_work_roots ON team_work(root_id);
@@ -76,6 +85,7 @@ WRITERS = {"coordinator", "worker", "reviewer"}
 ROLES = WRITERS | {"observer"}
 NAME = re.compile(r"^[a-z][a-z0-9_-]{0,79}$")
 ERROR = re.compile(r"^[a-z][a-z0-9_]{0,79}$")
+SESSION = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]{0,255}$")
 
 
 def _bounded_text(text, limit):
@@ -114,9 +124,11 @@ def _native_evidence(value):
     allowed = {
         "kind",
         "event",
+        "adapter",
         "session_id",
         "thread_id",
         "sessionId",
+        "stop_reason",
         "pid",
         "exit_code",
         "state",
@@ -166,6 +178,8 @@ class TeamManager:
             columns = {row["name"] for row in self.store.db.execute("PRAGMA table_info(team_work)")}
             if "core_request_hash" not in columns:
                 self.store.db.execute("ALTER TABLE team_work ADD COLUMN core_request_hash TEXT")
+            if "resume_session" not in columns:
+                self.store.db.execute("ALTER TABLE team_work ADD COLUMN resume_session TEXT")
 
     def _principal(self, principal, capability):
         if not self.config.team.enabled:
@@ -266,13 +280,174 @@ class TeamManager:
                 "execution": "automatic"
                 if self.config.team.workers.get(row["principal"])
                 and self.config.team.workers[row["principal"]].agent
+                and self.config.team.workers[row["principal"]].cwd
                 else "manual",
+                "execution_scope": (
+                    self.config.team.workers[row["principal"]].execution_scope
+                    if self.config.team.workers.get(row["principal"])
+                    else None
+                ),
             }
             for row in self.store.db.execute(
                 "SELECT * FROM team_members WHERE team_id=? ORDER BY principal", (team_id,)
             )
         }
         return result
+
+    def _session_row(self, team_id, principal):
+        row = self.store.db.execute(
+            "SELECT * FROM team_sessions WHERE team_id=? AND principal=?",
+            (team_id, principal),
+        ).fetchone()
+        return dict(row) if row else None
+
+    @staticmethod
+    def _session_view(row):
+        if row is None:
+            return None
+        return {
+            key: row[key]
+            for key in (
+                "team_id",
+                "principal",
+                "agent",
+                "adapter",
+                "session_id",
+                "cwd",
+                "state",
+                "work_id",
+                "created",
+                "updated",
+            )
+        }
+
+    def session(self, principal, request: TeamSessionGet):
+        team = self._team(principal, request.team_id)
+        if request.member == "*":
+            if principal not in {team["owner"], team["coordinator"]}:
+                raise BridgeError(
+                    "team_role_denied", "Only the owner or coordinator may list all sessions"
+                )
+            rows = self.store.db.execute(
+                "SELECT * FROM team_sessions WHERE team_id=? ORDER BY principal",
+                (request.team_id,),
+            ).fetchall()
+            return {"sessions": [self._session_view(dict(row)) for row in rows]}
+        member = request.member or principal
+        if member != principal:
+            if principal not in {team["owner"], team["coordinator"]}:
+                raise BridgeError(
+                    "team_role_denied", "Only the owner or coordinator may read another session"
+                )
+        self._member(request.team_id, member)
+        return {"session": self._session_view(self._session_row(request.team_id, member))}
+
+    def clear_session(self, principal, request: TeamSessionClear):
+        self._automatic(principal)
+        with self.store.transaction():
+            team = self._team(principal, request.team_id, "team.write", write=True)
+            member = request.member or principal
+            if member != principal and principal not in {team["owner"], team["coordinator"]}:
+                raise BridgeError(
+                    "team_role_denied", "Only the owner or coordinator may clear another session"
+                )
+            self._member(request.team_id, member)
+            prior = self._previous(principal, request.team_id, "session_clear", request)
+            if prior:
+                return {"cleared": False, "idempotent": True, "member": member}
+            self.store.db.execute(
+                "DELETE FROM team_sessions WHERE team_id=? AND principal=?",
+                (request.team_id, member),
+            )
+            self._remember(principal, request.team_id, "session_clear", request, request.team_id)
+            self._event(
+                request.team_id,
+                principal,
+                "team.session_cleared",
+                member=member,
+            )
+        return {"cleared": True, "idempotent": False, "member": member}
+
+    def resume_session(self, work):
+        """Return a proven idle/active provider session for this exact worker."""
+        continuation = getattr(self.bridge, "autonext", None)
+        if continuation is not None and continuation.owns(work["id"]):
+            # AutoNext owns its coordinator/verifier lifecycle and supplies its
+            # own turn contract; ordinary team follow-ups use the session store.
+            return None
+        worker = self.config.team.workers.get(work["assignee"])
+        if (
+            worker is None
+            or not worker.agent
+            or not worker.cwd
+            or worker.execution_scope != "separate_managed_session"
+        ):
+            return None
+        row = self._session_row(work["team_id"], work["assignee"])
+        if row is None or row["agent"] != worker.agent or row["cwd"] != worker.cwd:
+            return None
+        if row["state"] not in {"active", "idle"}:
+            return None
+        return row["session_id"]
+
+    def record_session(self, work, native):
+        """Remember a provider session only from bounded native turn evidence."""
+        if not isinstance(native, dict):
+            return
+        session_id = native.get("session_id")
+        if not isinstance(session_id, str) or not SESSION.fullmatch(session_id):
+            return
+        worker = self.config.team.workers.get(work["assignee"])
+        if worker is None or not worker.agent or not worker.cwd:
+            return
+        adapter = native.get("adapter")
+        if not isinstance(adapter, str) or not ERROR.fullmatch(adapter):
+            adapter = worker.agent
+        state = "idle" if work["state"] in {"processing_result", "completed"} else "active"
+        existing = self._session_row(work["team_id"], work["assignee"])
+        if existing is not None and existing["session_id"] != session_id:
+            if work.get("resume_session"):
+                # A requested resume must keep its exact identity. The adapter
+                # fails such a turn closed; never silently replace the binding.
+                return
+            if work["state"] not in {"processing_result", "completed"}:
+                return
+        now = time.time()
+        self.store.db.execute(
+            "INSERT INTO team_sessions(team_id,principal,agent,adapter,session_id,cwd,state,"
+            "work_id,created,updated) VALUES(?,?,?,?,?,?,?,?,?,?) "
+            "ON CONFLICT(team_id,principal) DO UPDATE SET agent=excluded.agent,"
+            "adapter=excluded.adapter,session_id=excluded.session_id,cwd=excluded.cwd,"
+            "state=excluded.state,work_id=excluded.work_id,updated=excluded.updated",
+            (
+                work["team_id"],
+                work["assignee"],
+                worker.agent,
+                adapter,
+                session_id,
+                worker.cwd,
+                state,
+                work["id"],
+                existing["created"] if existing else now,
+                now,
+            ),
+        )
+        if (
+            existing is None
+            or existing["session_id"] != session_id
+            or existing["state"] != state
+            or existing["work_id"] != work["id"]
+        ):
+            self._event(
+                work["team_id"],
+                work["assignee"],
+                "team.session_recorded",
+                work["id"],
+                agent=worker.agent,
+                adapter=adapter,
+                session_id_sha256=digest(session_id),
+                session_resumed=bool(work.get("resume_session")),
+            )
 
     def create(self, principal, request: TeamCreate):
         self._automatic(principal, "team.manage")
@@ -961,9 +1136,11 @@ class TeamManager:
                 self._fail(work, "blocked", "team_rate_limit", {"reason": "hourly_turn_limit"})
                 return None
             core_id = "team-" + work["id"]
+            resume_session = self.resume_session(work)
             self.store.db.execute(
-                "UPDATE team_work SET state='dispatching',core_task_id=?,claimed=? WHERE id=?",
-                (core_id, time.time(), work_id),
+                "UPDATE team_work SET state='dispatching',core_task_id=?,claimed=?,"
+                "resume_session=? WHERE id=?",
+                (core_id, time.time(), resume_session, work_id),
             )
             self._event(
                 work["team_id"],
@@ -971,6 +1148,7 @@ class TeamManager:
                 "team.work_dispatching",
                 work_id,
                 core_task_id=core_id,
+                session_resumed=bool(resume_session),
                 session_scope="existing_visible_terminal"
                 if self.config.visible_handoffs.enabled
                 and self.config.team.workers[work["assignee"]].execution_scope
@@ -994,6 +1172,11 @@ class TeamManager:
             "SELECT id FROM team_work WHERE core_task_id=?", (core_task.get("id"),)
         ).fetchone()
         if row is None:
+            if core_task.get("args", {}).get("resume_session") is not None:
+                raise BridgeError(
+                    "team_task_required",
+                    "Provider session resumption is restricted to sealed team work",
+                )
             policy = self.config.principals.get(core_task.get("principal"))
             if policy and policy.team_only_execution:
                 raise BridgeError(
@@ -1016,6 +1199,20 @@ class TeamManager:
             raise BridgeError(
                 "team_task_conflict", "Linked task does not match the fixed worker scope"
             )
+        resume_session = args.get("resume_session")
+        if resume_session is not None:
+            stored = self._session_row(work["team_id"], work["assignee"])
+            if (
+                not isinstance(resume_session, str)
+                or work.get("resume_session") != resume_session
+                or stored is None
+                or stored["session_id"] != resume_session
+                or stored["agent"] != worker.agent
+                or stored["cwd"] != worker.cwd
+            ):
+                raise BridgeError(
+                    "team_task_conflict", "Linked task does not match the proven worker session"
+                )
         self._check_sealed(work)
 
     def seal_request(self, work_id, request: TaskRequest):
@@ -1136,6 +1333,7 @@ class TeamManager:
                     core_task_id=core_task["id"],
                     evidence_sha256=digest(evidence),
                 )
+            self.record_session({**work, "state": shared_state}, evidence["native_evidence"])
         return self._work(work_id)
 
     def finish(self, work_id, result, evidence):

@@ -246,17 +246,20 @@ class TeamDispatcher:
                 claimed = self.teams.claim(work["id"])
                 if not claimed:
                     return
+                arguments = {
+                    "agent": worker.agent,
+                    "prompt": prompt,
+                    "cwd": worker.cwd,
+                    "timeout": worker.timeout,
+                    "local_tools": False,
+                }
+                if claimed.get("resume_session"):
+                    arguments["resume_session"] = claimed["resume_session"]
                 request = TaskRequest(
                     task_id=claimed["core_task_id"],
                     idempotency_key=claimed["core_task_id"],
                     operation="agent.execute",
-                    arguments={
-                        "agent": worker.agent,
-                        "prompt": prompt,
-                        "cwd": worker.cwd,
-                        "timeout": worker.timeout,
-                        "local_tools": False,
-                    },
+                    arguments=arguments,
                 )
                 # Seal the exact generated request before even looking up its
                 # predictable ID. An attacker-controlled preexisting core task
@@ -292,7 +295,9 @@ class TeamDispatcher:
             if shared["state"] in _CORE_TERMINAL:
                 return
             if core["state"] == "completed":
-                await self._complete(pool, work, core)
+                # Keep the dispatcher's stable identity and overlay the freshly
+                # observed native evidence (including the provider session id).
+                await self._complete(pool, {**work, **shared}, core)
                 return
             if core["state"] in _CORE_TERMINAL:
                 return
@@ -455,9 +460,18 @@ class TeamDispatcher:
                 },
             )
             return
+        observed_native = work.get("evidence", {}) if isinstance(work, dict) else {}
+        nested_native = (
+            observed_native.get("native_evidence", {}) if isinstance(observed_native, dict) else {}
+        )
+        session_id = observed_native.get("session_id") or nested_native.get("session_id")
         evidence = {
             "core_task_id": core["id"],
             "core_result_sha256": core_result_hash,
+            "session_id": session_id,
+            "session_resumed": bool(work.get("resume_session"))
+            if isinstance(work, dict)
+            else False,
             "model_turn_completed": True,
             "session_scope": "existing_visible_terminal"
             if self.bridge.config.visible_handoffs.enabled
