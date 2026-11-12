@@ -36,6 +36,8 @@ def build(destination=None):
         root / "integrations/desktop/SystemKeyboard.swift",
         root / "integrations/desktop/SystemShortcuts.swift",
         root / "integrations/desktop/SystemSpecialKeys.swift",
+        root / "integrations/desktop/FamilyWindowBroker.swift",
+        root / "integrations/desktop/FamilyWindowNative.swift",
     ]
     binary = bundle / "Contents/MacOS/KiraBridge"
     binary.parent.mkdir(parents=True, exist_ok=True)
@@ -45,6 +47,8 @@ def build(destination=None):
             "swiftc",
             "-swift-version",
             "5",
+            "-D",
+            "FAMILY_WINDOW_BROKER",
             "-target",
             f"{platform.machine()}-apple-macosx12.0",
             "-O",
@@ -99,6 +103,7 @@ def build(destination=None):
                 ).hexdigest(),
                 "KiraBridgeSystemProtocol": 1,
                 "KiraBridgeKeyboardProtocol": 1,
+                "KiraBridgeFamilyWindowProtocol": 1,
                 "CFBundlePackageType": "APPL",
                 "NSHighResolutionCapable": True,
                 "LSMinimumSystemVersion": "12.0",
