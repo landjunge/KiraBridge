@@ -1,5 +1,7 @@
 """Grok Build's existing boxed composer; no Codex menu or navigation fallback."""
 
+import re
+
 from . import _legacy_readiness as legacy
 from .contract import Capabilities
 
@@ -21,12 +23,62 @@ class GrokBuildAdapter:
         }
 
     def return_readiness(self, raw, binding, protocol=None):
+        text, controls = legacy.display_text(raw)
+        view = legacy.input_view(self.name, text)
+        if controls or not view:
+            return {
+                "target": self.name,
+                "ready": False,
+                "state": "unknown",
+                "reason": "unsupported_return_frame",
+                "allowed_actions": [],
+            }
+        state = legacy.grok_input_state(view)
+        if state is None:
+            return {
+                "target": self.name,
+                "ready": False,
+                "state": "unknown",
+                "reason": "unrecognized_grok_composer",
+                "allowed_actions": [],
+            }
+        if state:
+            return {
+                "target": self.name,
+                "ready": False,
+                "state": "unknown",
+                "reason": "empty_grok_composer",
+                "allowed_actions": [],
+            }
+        raw_prelude = text[: text.rfind("╭")].splitlines() if "╭" in text else []
+        status = next((line for line in reversed(raw_prelude) if line.strip()), "")
+        current = status + "\n" + view
+        busy_pattern = getattr(binding, "busy_pattern", "") if binding else ""
+        if busy_pattern and re.search(busy_pattern, current, re.I):
+            return {
+                "target": self.name,
+                "ready": False,
+                "state": "working",
+                "reason": "visible_grok_activity",
+                "allowed_actions": [],
+            }
+        if re.search(r"Back to bottom|enter/esc latest", current, re.I):
+            return {
+                "target": self.name,
+                "ready": False,
+                "state": "scrolled",
+                "reason": "current_scroll_controls",
+                "allowed_actions": [],
+            }
+        # Only an observed, current nonempty composer authorizes one Return.
+        # The caller binds this decision to the exact captured screen.
         return {
             "target": self.name,
-            "ready": False,
-            "state": "unknown",
-            "reason": "unsupported_return_frame",
-            "allowed_actions": [],
+            "ready": True,
+            "state": "ready",
+            "reason": "current_nonempty_composer",
+            "input_empty": False,
+            "allowed_actions": ["return"],
         }
 
     def insertion_observed(self, raw, text, before, **options):

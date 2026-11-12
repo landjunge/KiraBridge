@@ -1198,3 +1198,63 @@ async def test_reply_to_closed_original_requester_never_opens_another_window(
     )
     assert result["scope"] == "visible_input_delivery" and not result["agent_confirmed"]
     assert transport["calls"] == ["insert", "return"]
+
+
+def grok_composer(content):
+    width = 55
+    row = " │ ❯ " + content + " " * (width - len(content)) + "│ "
+    return (
+        " ╭"
+        + "─" * 56
+        + "╮ \n"
+        + row
+        + "\n ╰"
+        + "─" * 19
+        + " Grok 4.7 (medium) · always-approve ─╯ \n"
+        + " \n Ctrl+x:shortcuts\n"
+    )
+
+
+async def test_grok_placeholder_handoff_pastes_returns_once_and_releases_the_field(
+    visible, monkeypatch
+):
+    bridge, transport = visible
+    empty = grok_composer("Build anything")
+    inserted = grok_composer("Only this exact body")
+    transport.update(text=empty, target="grok", calls=[])
+
+    async def read(*args):
+        return {"text": transport["text"]}
+
+    async def insert(principal, args, *, before_transport=None):
+        assert before_transport is not None
+        await before_transport()
+        transport["calls"].append("insert")
+        transport["text"] = inserted
+
+    async def press_return(principal, pane, pid, *, expected_screen=None):
+        assert expected_screen == inserted
+        transport["calls"].append("return")
+        # Grok paints the empty placeholder again after the field is cleared.
+        transport["text"] = empty
+
+    monkeypatch.setattr(bridge.sessions, "read", read)
+    monkeypatch.setattr(bridge.sessions, "insert", insert)
+    monkeypatch.setattr(bridge.sessions, "press_return", press_return)
+    result = await bridge.visible_handoffs.execute(
+        {"id": "grok-placeholder-once", "principal": "chatgpt"},
+        AgentInput(
+            agent="grok",
+            prompt="Only this exact body",
+            cwd="/tmp",
+            wait_for_reply=False,
+        ),
+        callback,
+        callback,
+    )
+    assert result["scope"] == "visible_input_delivery"
+    assert result["return_sent"] and result["evidence"]["input_field_cleared"]
+    # The placeholder is empty: neither a second paste nor a second Return.
+    assert transport["calls"] == ["insert", "return"]
+    status = bridge.visible_handoffs.status("chatgpt", "grok-placeholder-once")
+    assert status["state"] == "sent"

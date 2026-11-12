@@ -821,7 +821,10 @@ class VisibleHandoffs:
         deadline = time.monotonic() + RETURN_OBSERVATION_TIMEOUT
         while time.monotonic() < deadline:
             view = await self.check_target(principal, target, binding)
-            if re.search(binding.ready_pattern, self.input_view(target, view["text"])):
+            # The empty composer may be a rendered placeholder ("Build
+            # anything", "Ask anything..."), which no bare ready pattern
+            # recognizes. The adapter owns the clear/empty semantics.
+            if assess(target, view["text"], binding).get("input_empty"):
                 break
             await asyncio.sleep(0.1)
         else:

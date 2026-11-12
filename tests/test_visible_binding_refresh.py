@@ -11,6 +11,7 @@ from test_visible_handoff import callback, visible  # noqa: F401
 from kirabridge.bridge_core.bridge import Bridge
 from kirabridge.bridge_core.config import VisibleTerminalBinding
 from kirabridge.bridge_core.models import AgentInput, BridgeError, canonical
+from kirabridge.cli_adapters import adapter_for
 from kirabridge.message_manager import MessageSend
 from kirabridge.visible_binding import overlay_path, save_refresh
 from kirabridge.visible_readiness import assess
@@ -23,6 +24,14 @@ IDLE = "Alte Zeile Thinking… [stop]\nDie Antwort ist fertig.\n╭\n│ ❯ │
 LIVE_STATUS = "Die Antwort ist fertig.\n⠋ Running [stop]\n╭\n│ ❯ │\n╰"
 BUSY = "╭\nThinking… [stop]\n│ ❯ │\n╰"
 NONEMPTY = "╭\n│ ❯ schon getippt │\n╰"
+REAL_EMPTY = (
+    " ╭────────────────────────────────────────────────────────╮ \n"
+    " │ ❯ Build anything                                       │ \n"
+    " ╰─────────────────── Grok 4.7 (medium) · always-approve ─╯ \n"
+    " \n Ctrl+x:shortcuts\n"
+)
+REAL_TYPED = REAL_EMPTY.replace("Build anything", "Bitte nicht überschreiben")
+REAL_UNKNOWN = "╭\n│ kein Eingabefeld\n╰"
 
 
 def new_session():
@@ -95,6 +104,35 @@ def test_historical_grok_activity_is_not_current_work_and_composer_text_still_bl
     assert assess("grok", "Back to bottom\nFertig.\n╭\n│ ❯ │\n╰", binding)["state"] == "ready"
     assert assess("grok", "Fertig.\nBack to bottom\n╭\n│ ❯ │\n╰", binding)["state"] == "scrolled"
     assert assess("grok", "╭\n│ ❯ │\nBack to bottom\n╰", binding)["state"] == "scrolled"
+
+
+def test_real_grok_placeholder_is_an_empty_composer_but_typed_text_blocks():
+    binding = SimpleBinding()
+    empty = assess("grok", REAL_EMPTY, binding)
+    assert empty["state"] == "ready" and empty["input_empty"]
+    typed = assess("grok", REAL_TYPED, binding)
+    assert typed["state"] == "input_not_empty" and not typed["input_empty"]
+    assert typed["reason"] == "existing_input_must_not_be_overwritten"
+
+
+def test_unrecognized_grok_box_is_unknown_not_existing_input():
+    result = assess("grok", REAL_UNKNOWN, SimpleBinding())
+    assert result["state"] == "unknown" and not result["input_empty"]
+    assert result["reason"] == "unrecognized_grok_composer"
+
+
+def test_observed_grok_return_is_allowed_only_for_a_current_draft():
+    adapter = adapter_for("grok")
+    empty = adapter.return_readiness(REAL_EMPTY, SimpleBinding())
+    assert not empty["ready"] and empty["reason"] == "empty_grok_composer"
+    typed = adapter.return_readiness(REAL_TYPED, SimpleBinding())
+    assert typed["ready"] and typed["reason"] == "current_nonempty_composer"
+    assert not adapter.return_readiness(REAL_UNKNOWN, SimpleBinding())["ready"]
+    busy = adapter.return_readiness(
+        "Thinking… esc to interrupt\n" + REAL_TYPED,
+        SimpleBinding(),
+    )
+    assert busy["state"] == "working"
 
 
 async def test_dead_binding_refreshes_to_the_only_live_grok_and_survives_reopen(
