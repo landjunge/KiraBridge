@@ -410,7 +410,15 @@ async def execute(args) -> None:
         if args.command == "connect":
             from kirabridge.mcp_gateway.proxy import connect_stdio
 
-            await connect_stdio(config, args.principal)
+            task_policy = None
+            if args.agent_task_policy:
+                from kirabridge.mcp_gateway.agent_policy import AgentTaskPolicy
+
+                task_policy = AgentTaskPolicy.load(args.agent_task_policy, args.principal)
+                config.data_dir = str(
+                    Path(args.agent_task_policy).resolve().parent / "connect-state"
+                )
+            await connect_stdio(config, args.principal, task_policy=task_policy)
         elif args.command == "service":
             if args.action == "install":
                 emit(
@@ -841,7 +849,8 @@ def main() -> None:
     readiness.add_argument("--executable", action="append", default=[])
     readiness.add_argument("--operation", action="append", default=[])
     readiness.add_argument("--workflow-id")
-    sub.add_parser("connect", help="Forward MCP stdio to the authenticated local daemon")
+    connect = sub.add_parser("connect", help="Forward MCP stdio to the authenticated local daemon")
+    connect.add_argument("--agent-task-policy", help="Owner-only task restriction file")
     message = sub.add_parser("message", help="Authenticated addressed agent messaging")
     message_actions = message.add_subparsers(dest="action", required=True)
     send = message_actions.add_parser("send")

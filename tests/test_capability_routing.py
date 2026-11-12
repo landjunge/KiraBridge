@@ -926,7 +926,11 @@ def test_new_manager_has_no_unrouted_provider_bypass():
 
     config = SimpleNamespace(visible_handoffs=SimpleNamespace(enabled=False))
     manager = new_routed_manager(config, None, None, None)
-    assert set(manager.adapters) == {"codex", "grok_acp"}
+    assert set(manager.adapters) == {"codex", "grok_acp", "qwen_acp"}
+    from kirabridge.capability_routing.integration import RoutedAdapter
+
+    assert all(isinstance(adapter, RoutedAdapter) for adapter in manager.adapters.values())
+    assert manager.adapters["qwen_acp"].cli == "qwen"
 
 
 def test_unknown_writer_keeps_root_lease_and_blocks_subdirectory(setup, tmp_path):

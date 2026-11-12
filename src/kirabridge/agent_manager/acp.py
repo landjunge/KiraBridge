@@ -77,6 +77,12 @@ class ACPClient:
         """
         self._text = BoundedText(self._text.max_bytes)
 
+    def begin_turn(self) -> None:
+        """Start a new Core turn after verified history replay; replay is not execution."""
+        self._text = BoundedText(self._text.max_bytes)
+        self._seen_chunks.clear()
+        self._started = False
+
     # -- transport -----------------------------------------------------------
 
     async def send(self, message: dict) -> None:
@@ -231,7 +237,14 @@ class ACPClient:
             raise UncertainExecution("agent_identity", "Unexpected ACP response id")
         future, method = entry
         if "error" in message:
-            future.set_exception(UncertainExecution("agent_rpc", "ACP server returned an error"))
+            error = UncertainExecution("agent_rpc", "ACP server returned an error")
+            code = message["error"].get("code") if isinstance(message["error"], dict) else None
+            error.provider_error = {
+                "adapter": "acp",
+                "rpc_method": method,
+                "rpc_code": code if type(code) is int else None,
+            }
+            future.set_exception(error)
             return
         result = message.get("result", {})
         # Bind the session atomically when its own response is processed, so an
