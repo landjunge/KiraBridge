@@ -235,6 +235,11 @@ final class FamilyNativePort: FamilyWindowPort {
         _=try registeredBundle(product)
         guard try identity(product)==nil else { throw FamilyFailure("family_roster_changed") }
         try check()
+        let scope=try await FamilyPathScope.authorize(target:product,path:paths[product]!,policyPath:policyPath,
+            policySHA:policySHA,registrySHA:FamilyFiles.hash(registryData))
+        try check()
+        _=try registeredBundle(product)
+        try FamilyPathScope.revalidate(scope,path:paths[product]!)
         let configuration=NSWorkspace.OpenConfiguration()
         configuration.activates=false;configuration.createsNewApplicationInstance=false
         let app: NSRunningApplication=try await withCheckedThrowingContinuation { continuation in
@@ -254,6 +259,12 @@ final class FamilyNativePort: FamilyWindowPort {
         // not permission to create or silently adopt a fresh document/window.
         let retained=try Self.retainedMainID(retainedWindowIDs(expected))
         try check()
+        let scope=try await FamilyPathScope.authorize(target:expected.product,path:expected.path,policyPath:policyPath,
+            policySHA:policySHA,registrySHA:FamilyFiles.hash(registryData))
+        try check()
+        try validate(expected)
+        try Self.checkRetainedMain(retained,retainedWindowIDs(expected))
+        try FamilyPathScope.revalidate(scope,path:expected.path)
         let configuration=NSWorkspace.OpenConfiguration()
         configuration.activates=false;configuration.createsNewApplicationInstance=false
         let app: NSRunningApplication=try await withCheckedThrowingContinuation { continuation in
@@ -412,5 +423,75 @@ enum FamilyWindowNative {
             // Remaining decoding/filesystem errors occurred during preflight.
             throw SystemBridge.fail("family_preflight_failed","Family preflight failed",unknown:false)
         }
+    }
+}
+
+/// Reuse the installed Python PathScope implementation at each URL-open effect.
+/// No TOML/root approximation, Store, arbitrary script or browser-supplied path.
+@MainActor
+enum FamilyPathScope {
+    struct Proof { let device: String; let inode: String }
+    static func validate(_ data: Data, target: String, path: String, policySHA: String,
+                         registrySHA: String) throws -> Proof {
+        guard let value=(try? JSONSerialization.jsonObject(with:data)) as? [String:Any],
+              (try? SystemBridge.bool(value,"success"))==true,value["error"]==nil,
+              value["execution_outcome_unknown"] as? Bool != true,
+              value["target"] as? String==target,value["app_path"] as? String==path,
+              value["policy_sha256"] as? String==policySHA,
+              value["registry_sha256"] as? String==registrySHA,
+              let device=value["directory_device"] as? String,
+              let inode=value["directory_inode"] as? String else { throw FamilyFailure("family_path_denied") }
+        return Proof(device:device,inode:inode)
+    }
+    static func revalidate(_ proof: Proof, path: String) throws {
+        _=try FamilyFiles.canonical(path)
+        var value=stat()
+        guard lstat(path,&value)==0,(value.st_mode&S_IFMT)==S_IFDIR,
+              String(value.st_dev)==proof.device,String(value.st_ino)==proof.inode else {
+            throw FamilyFailure("family_path_changed")
+        }
+    }
+    static func authorize(target: String, path: String, policyPath: String,
+                          policySHA: String, registrySHA: String) async throws -> Proof {
+        let executable=NSHomeDirectory()+"/.local/bin/kirabridge"
+        let args=["--config",policyPath,"--principal","local","family","path-check",target]
+        let data=try await Task.detached(priority:.userInitiated) {
+            try run(executable:executable,arguments:args)
+        }.value
+        return try validate(data,target:target,path:path,policySHA:policySHA,registrySHA:registrySHA)
+    }
+    nonisolated static func run(executable: String,arguments: [String]) throws -> Data {
+        let process=Process(),output=Pipe()
+        process.executableURL=URL(fileURLWithPath:executable);process.arguments=arguments
+        process.standardInput=FileHandle.nullDevice;process.standardOutput=output
+        process.standardError=FileHandle.nullDevice
+        try process.run()
+        try output.fileHandleForWriting.close()
+        defer { try? output.fileHandleForReading.close() }
+        let deadline=ProcessInfo.processInfo.systemUptime+5
+        while process.isRunning && ProcessInfo.processInfo.systemUptime<deadline { usleep(10_000) }
+        if process.isRunning {
+            // This is only our own read-only path validator, never a GUI app or
+            // the persistent native helper. No window effect has been admitted.
+            process.terminate();usleep(50_000)
+            if process.isRunning { Darwin.kill(process.processIdentifier,SIGKILL) }
+            process.waitUntilExit()
+            throw FamilyFailure("family_path_check_unavailable")
+        }
+        process.waitUntilExit()
+        // A descendant retaining stdout must not hold the broker open. The
+        // completed validator's receipt is bounded; partial output fails closed.
+        let fd=output.fileHandleForReading.fileDescriptor
+        guard fcntl(fd,F_SETFL,O_NONBLOCK)==0 else { throw FamilyFailure("family_path_check_unavailable") }
+        var data=Data(),buffer=[UInt8](repeating:0,count:4096)
+        while data.count<=65536 {
+            let count=Darwin.read(fd,&buffer,buffer.count)
+            if count>0 { data.append(contentsOf:buffer.prefix(count));continue }
+            if count==0 || errno==EAGAIN { break }
+            if errno==EINTR { continue }
+            throw FamilyFailure("family_path_check_unavailable")
+        }
+        guard process.terminationStatus==0,data.count<=65536 else { throw FamilyFailure("family_path_denied") }
+        return data
     }
 }

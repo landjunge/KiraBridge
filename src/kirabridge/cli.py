@@ -738,6 +738,8 @@ def main() -> None:
     family = sub.add_parser("family", help="Fixed native five-product window adapter; no Store")
     family_actions = family.add_subparsers(dest="action", required=True)
     family_actions.add_parser("registration", help="Print disabled registration; no writes")
+    family_path = family_actions.add_parser("path-check", help="Read-only native path scope check")
+    family_path.add_argument("target")
     for action in ("switch", "inspect"):
         command = family_actions.add_parser(action)
         command.add_argument("target")

@@ -22,15 +22,22 @@ from kirabridge.bridge_core.models import BridgeError, UncertainExecution
 @pytest.fixture
 def policy(tmp_path, monkeypatch):
     monkeypatch.setenv("HOME", str(tmp_path))
+    apps = tmp_path / "Applications"
+    apps.mkdir()
+    for product in family.PRODUCTS:
+        (apps / (product + ".app")).mkdir()
     path = tmp_path / "policy.toml"
     path.write_text(
         "data_dir = " + json.dumps(str(tmp_path / "never-created")) + "\n"
         '[principals.local]\npermission_level="full"\n'
+        "roots=" + json.dumps([str(apps)]) + "\n"
         'capabilities=["windows.focus","accessibility.set","apps.launch"]\n'
     )
     path.chmod(0o600)
     profile = family.registration_template(load_config(str(path)), "local")
     profile["enabled"] = True
+    for product, entry in profile["apps"].items():
+        entry["path"] = str(apps / (product + ".app"))
     registry = family.registry_path()
     registry.parent.mkdir(parents=True)
     registry.write_text(json.dumps(profile))
@@ -134,6 +141,75 @@ async def test_denied_policy_and_changed_policy_prevent_dispatch(policy, monkeyp
     with pytest.raises(BridgeError):
         await family.execute_family(args(policy), transport=native)
     assert native.calls == [] and native.closed
+
+
+@pytest.mark.parametrize("action", ["switch", "path-check"])
+@pytest.mark.parametrize("restriction", ["empty", "unrelated", "state", "read_only"])
+@pytest.mark.asyncio
+async def test_registration_never_broadens_path_scope(policy, monkeypatch, restriction, action):
+    monkeypatch.setattr(family.sys, "platform", "darwin")
+    path, profile = policy
+    apps = path.parent / "Applications"
+    original = path.read_text()
+    if restriction == "state":
+        original = original.replace(str(path.parent / "never-created"), str(apps))
+    else:
+        roots = [] if restriction != "unrelated" else [str(path.parent / "elsewhere")]
+        original = original.replace(
+            "roots=" + json.dumps([str(apps)]), "roots=" + json.dumps(roots)
+        )
+        if restriction == "read_only":
+            original += "read_roots=" + json.dumps([str(apps)]) + "\n"
+    path.write_text(original)
+    # The registration matches the CURRENT fully automatic capability grants;
+    # refusal must be PathScope, rather than a stale policy or disabled profile.
+    profile["policy"] = family.policy_snapshot(load_config(str(path)), "local")
+    family.registry_path().write_text(json.dumps(profile))
+    native = Transport()
+    with pytest.raises(BridgeError) as exc:
+        await family.execute_family(args(policy, action), transport=native)
+    assert exc.value.code == "path_denied"
+    assert not native.calls
+
+
+@pytest.mark.asyncio
+async def test_scope_is_rechecked_before_dispatch_without_following_symlinks(policy, monkeypatch):
+    monkeypatch.setattr(family.sys, "platform", "darwin")
+    target = Path(policy[1]["apps"]["threaddesk"]["path"])
+
+    def replace():
+        retained = target.with_suffix(".retained")
+        target.rename(retained)
+        target.symlink_to(retained, target_is_directory=True)
+
+    native = Transport(mutate=replace)
+    with pytest.raises(BridgeError) as exc:
+        await family.execute_family(args(policy), transport=native)
+    assert exc.value.code == "path_denied"
+    assert not native.calls and native.closed
+
+
+@pytest.mark.asyncio
+async def test_path_check_returns_fresh_descriptor_proof_without_store(policy, monkeypatch, capsys):
+    def forbidden(*a, **kw):
+        pytest.fail("Path proof must not initialize Bridge/Store/native transport")
+
+    monkeypatch.setattr(cli, "Bridge", forbidden)
+    monkeypatch.setattr(sqlite3, "connect", forbidden)
+    monkeypatch.setattr(family, "NativeSystemTransport", forbidden)
+    await cli.execute(args(policy, "path-check"))
+    value = json.loads(capsys.readouterr().out)
+    target = Path(policy[1]["apps"]["threaddesk"]["path"])
+    assert value == {
+        "success": True,
+        "target": "threaddesk",
+        "app_path": str(target),
+        "policy_sha256": policy[1]["policy"]["sha256"],
+        "registry_sha256": family.hashlib.sha256(family.registry_path().read_bytes()).hexdigest(),
+        "directory_device": str(target.stat().st_dev),
+        "directory_inode": str(target.stat().st_ino),
+    }
+    assert not (policy[0].parent / "never-created").exists()
 
 
 @pytest.mark.asyncio
@@ -245,7 +321,8 @@ def test_intel_native_fixture_without_product_window_effects(tmp_path):
     assert "effects_on_real_windows=0" in result.stdout
 
 
-def test_fresh_cli_process_never_opens_sqlite(policy):
+@pytest.mark.parametrize("action", ["registration", "path-check"])
+def test_fresh_cli_process_never_opens_sqlite(policy, action):
     root = Path(__file__).resolve().parents[1]
     code = """import sqlite3,sys
 
@@ -253,11 +330,12 @@ def forbidden(*a,**kw):
     raise RuntimeError('unexpected SQLite initialization')
 sqlite3.connect=forbidden
 from kirabridge.cli import main
-sys.argv=['kirabridge','--config',sys.argv[1],'--principal','local','family','registration']
+sys.argv=['kirabridge','--config',sys.argv[1],'--principal','local','family',sys.argv[2]]
+if sys.argv[-1]=='path-check': sys.argv.append('threaddesk')
 main()
 """
     result = subprocess.run(
-        [sys.executable, "-c", code, str(policy[0])],
+        [sys.executable, "-c", code, str(policy[0]), action],
         cwd=root,
         env={**os.environ, "PYTHONPATH": str(root / "src")},
         capture_output=True,
@@ -265,7 +343,11 @@ main()
         timeout=15,
     )
     assert result.returncode == 0, result.stderr
-    assert json.loads(result.stdout)["enabled"] is False
+    value = json.loads(result.stdout)
+    if action == "registration":
+        assert value["enabled"] is False
+    else:
+        assert value["success"] is True and value["target"] == "threaddesk"
 
 
 @pytest.mark.parametrize("mode", [0o644, 0o620])

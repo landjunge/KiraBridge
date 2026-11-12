@@ -259,6 +259,8 @@ This source delivery does not establish a new download or installed runtime.
 The fixed five-icon hosts can call `kirabridge --principal local family switch
 TARGET --source-pid OWN_NATIVE_PID`. The macOS broker reuses the installed native
 system helper and existing policy, without initializing the task database. It
+preserves allowed `roots` and state-directory exclusions before Launch/Reopen;
+registration and automatic capability grants cannot broaden path access. It
 checks registered installation/PID/start/UID and caller ancestry, transfers actual
 outer window bounds, confirms target focus, then hides only other registered
 family windows. Processes and UI state remain; 4AllPass lock policy is unchanged.

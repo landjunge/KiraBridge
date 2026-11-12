@@ -151,6 +151,38 @@ struct FamilyFixture {
         try check(!FamilyNativePort.processMatches(record(100,1),observedExecutable:"/foreign/main",expectedExecutable:source.executable),"foreign_path_refused")
         let directory=FileManager.default.temporaryDirectory.resolvingSymlinksInPath().appendingPathComponent(UUID().uuidString).path
         defer { try? FileManager.default.removeItem(atPath:directory) }
+        try FileManager.default.createDirectory(atPath:directory,withIntermediateDirectories:true,
+            attributes:[.posixPermissions:0o700])
+        let scopedPath=directory+"/Scoped.app"
+        try FileManager.default.createDirectory(atPath:scopedPath,withIntermediateDirectories:false)
+        var scoped=stat();try check(lstat(scopedPath,&scoped)==0,"scope_directory")
+        let scopeReceipt: [String:Any]=["success":true,"target":"threaddesk","app_path":scopedPath,
+            "policy_sha256":"policy","registry_sha256":"registry",
+            "directory_device":String(scoped.st_dev),"directory_inode":String(scoped.st_ino)]
+        func proof(_ value: [String:Any]) throws -> FamilyPathScope.Proof {
+            try FamilyPathScope.validate(JSONSerialization.data(withJSONObject:value),target:"threaddesk",
+                path:scopedPath,policySHA:"policy",registrySHA:"registry")
+        }
+        let granted=try proof(scopeReceipt)
+        try FamilyPathScope.revalidate(granted,path:scopedPath)
+        for change: [String:Any] in [["success":1],["success":false],["target":"4allpass"],
+            ["app_path":"/foreign.app"],["policy_sha256":"stale"],["registry_sha256":"stale"],
+            ["error":["code":"path_denied"]],["execution_outcome_unknown":true],["directory_inode":1]] {
+            do {
+                _=try proof(scopeReceipt.merging(change) { _,new in new })
+                throw FamilyFailure("fixture_scope_receipt_accepted")
+            } catch let e as FamilyFailure { try check(e.code=="family_path_denied","scope_receipt_bound") }
+        }
+        try FileManager.default.moveItem(atPath:scopedPath,toPath:scopedPath+".retained")
+        try FileManager.default.createDirectory(atPath:scopedPath,withIntermediateDirectories:false)
+        do { try FamilyPathScope.revalidate(granted,path:scopedPath);throw FamilyFailure("fixture_scope_replacement_accepted") }
+        catch let e as FamilyFailure { try check(e.code=="family_path_changed","scope_directory_replacement") }
+        let output=try await Task.detached { try FamilyPathScope.run(executable:"/bin/echo",arguments:["scope-fixture"]) }.value
+        try check(String(decoding:output,as:UTF8.self)=="scope-fixture\n","scope_child_receipt")
+        do {
+            _=try await Task.detached { try FamilyPathScope.run(executable:"/usr/bin/false",arguments:[]) }.value
+            throw FamilyFailure("fixture_scope_child_failure_accepted")
+        } catch let e as FamilyFailure { try check(e.code=="family_path_denied","scope_child_failed_closed") }
         var first: FamilyNativeJournal?=try FamilyNativeJournal(directory:directory)
         _=try first!.begin(source:source,target:"threaddesk")
         do { _=try FamilyNativeJournal(directory:directory);throw FamilyFailure("fixture_concurrent_lock") }
@@ -169,6 +201,6 @@ struct FamilyFixture {
         }
         let own=try SystemServices.kernelRecord(getpid());try check(own.uid==getuid(),"real_readonly_uid")
         let data=try JSONSerialization.data(withJSONObject:result,options:[.sortedKeys]);print(String(decoding:data,as:UTF8.self))
-        print("family identity/foreign PID/missing/modal/focus/race/geometry/order/serialization passed; effects_on_real_windows=0")
+        print("family identity/foreign PID/missing/modal/focus/race/geometry/order/serialization/PathScope passed; effects_on_real_windows=0")
     }
 }

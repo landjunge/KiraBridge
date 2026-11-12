@@ -19,7 +19,8 @@ from pydantic import BaseModel, ConfigDict, Field, StrictInt
 
 from kirabridge.bridge_core.config import load_config
 from kirabridge.bridge_core.models import BridgeError, UncertainExecution
-from kirabridge.permissions import decision
+from kirabridge.filesystem_manager import PathScope
+from kirabridge.permissions import decision, state_exclusions
 from kirabridge.platform_adapters.macos.system_identity import installed_native_contract
 from kirabridge.platform_adapters.macos.system_transport import NativeSystemTransport, _private_file
 
@@ -112,6 +113,31 @@ def validate_registry(value, expected_policy):
             raise BridgeError("family_registry_invalid", "Invalid fixed product registration")
 
 
+def authorize_registered_path(config, principal: str, registry: dict, target: str) -> dict:
+    """Exactly Bridge.apps.launch's directory gate, including state exclusions.
+
+    The native host repeats this through the installed CLI at the effect boundary;
+    a registration/capability/permission level never substitutes for a root grant.
+    """
+    policy = config.principals[principal]
+    path = registry["apps"][target]["path"]
+    scope = PathScope(policy.roots, excluded=state_exclusions(config, policy))
+    with scope.directory(path) as descriptor:
+        directory = os.fstat(descriptor)
+    raw, _ = _private_file(registry_path(), 65536)
+    if json.loads(raw) != registry:
+        raise BridgeError("family_policy_changed", "Registration changed during scope check")
+    return {
+        "success": True,
+        "target": target,
+        "app_path": path,
+        "policy_sha256": config._source_sha256,
+        "registry_sha256": hashlib.sha256(raw).hexdigest(),
+        "directory_device": str(directory.st_dev),
+        "directory_inode": str(directory.st_ino),
+    }
+
+
 def validate_receipt(value, target):
     if not isinstance(value, dict):
         raise UncertainExecution("family_receipt_unknown", "Native effect receipt is incomplete")
@@ -137,12 +163,18 @@ def validate_receipt(value, target):
 
 async def execute_family(args, *, transport=None):
     """Only a pinned installed native app is a production backend; never swift/shell."""
-    if args.action != "registration" and sys.platform != "darwin":
+    if args.action not in {"registration", "path-check"} and sys.platform != "darwin":
         raise BridgeError("family_unsupported", "Native family windows require macOS")
     config = load_config(args.config)
     snapshot = policy_snapshot(config, args.principal)
     if args.action == "registration":
         return registration_template(config, args.principal)
+    admitted_registry = read_registry()
+    validate_registry(admitted_registry, snapshot)
+    if args.action == "path-check":
+        if args.target not in PRODUCTS:
+            raise BridgeError("family_target_invalid", "Unknown family product")
+        return authorize_registered_path(config, args.principal, admitted_registry, args.target)
     try:
         source_pid = int(args.source_pid)
     except (TypeError, ValueError):
@@ -152,8 +184,8 @@ async def execute_family(args, *, transport=None):
     request = FamilyRequest(
         target=args.target, source_pid=source_pid, source_start=args.source_start
     )
-    admitted_registry = read_registry()
-    validate_registry(admitted_registry, snapshot)
+    if args.action == "switch":
+        authorize_registered_path(config, args.principal, admitted_registry, request.target)
     if transport is None:
         contract = installed_native_contract(__file__)
         if not contract.get("expected_commit"):
@@ -174,13 +206,16 @@ async def execute_family(args, *, transport=None):
             )
 
     def revalidate():
+        current = load_config(args.config)
         if (
-            policy_snapshot(load_config(args.config), args.principal) != snapshot
+            policy_snapshot(current, args.principal) != snapshot
             or read_registry() != admitted_registry
         ):
             raise BridgeError(
                 "family_policy_changed", "Registration/policy changed before dispatch"
             )
+        if args.action == "switch":
+            authorize_registered_path(current, args.principal, admitted_registry, request.target)
 
     try:
         value = await transport.request(

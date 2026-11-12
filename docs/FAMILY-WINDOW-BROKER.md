@@ -53,6 +53,25 @@ requires the same approved policy bytes and registration before **each** effect.
 Policy/registry changes invalidate admission rather than retaining stale grants.
 No OS permission request or chmod of an existing policy/app is performed.
 
+Registration also preserves `apps.launch`'s existing `PathScope.directory` gate:
+the registered target must be inside the principal's **roots**, with the existing
+`state_exclusions` applied. Empty/unrelated roots, read-roots alone, excluded
+state directories and symlink traversal do not authorize Launch or Reopen, even
+with `permission_level="full"` and all three automatic capability grants. Neither
+registration nor this broker changes those grants or their existing exceptions.
+
+Python checks the target at switch admission and again before native dispatch.
+Immediately before each native Launch/Reopen, the helper directly executes the
+fixed installed `~/.local/bin/kirabridge --config POLICY --principal local family
+path-check TARGET`, without a shell. This internal read-only subcommand reuses the
+same PathScope implementation without Bridge/Store/SQLite. A bounded five-second
+check returns the policy hash, registration hash, exact target/path and opened
+directory's device/inode. Native code binds all fields to its frozen admission,
+rechecks caller/roster/policy after the await and checks canonical directory
+identity before opening the URL. Missing/outdated CLI, denial or changed evidence
+admits no URL-open effect. This adds no registration-schema field or host-ABI
+requirement, and prints no configuration contents.
+
 Only the pinned native payload in the installed release manifest is used, with
 its source commit and binary SHA-256 checked by existing NativeSystemTransport.
 A source checkout, arbitrary global UI app or generic script is not a production
