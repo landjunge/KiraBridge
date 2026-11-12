@@ -131,7 +131,9 @@ class OpenCodeAdapter:
     def __init__(self, terminal):
         self.terminal = terminal
 
-    async def execute(self, task, args, config, roots, running, progress) -> dict:
+    async def execute(
+        self, task, args, config, roots, running, progress, *, resume_session=None
+    ) -> dict:
         if not config.executable:
             raise BridgeError("agent_config", "OpenCode executable must be configured explicitly")
         if not config.model or not re.fullmatch(
@@ -218,6 +220,8 @@ class OpenCodeAdapter:
             "--title",
             "KiraBridge " + task["id"],
         ]
+        if resume_session is not None:
+            command += ["--session", resume_session]
         with (
             PathScope(roots).directory(args.cwd),
             _isolated_environment(config, self.terminal) as (env, workspace, temporary_root),
@@ -252,6 +256,7 @@ class OpenCodeAdapter:
                 "agent": args.agent,
                 "adapter": "opencode",
                 "session_id": session,
+                "session_resumed": resume_session is not None,
                 "exit_code": result["exit_code"],
                 "turn_completed": completed,
                 "turn_failed": failed,

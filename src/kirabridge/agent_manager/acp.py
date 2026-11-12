@@ -68,6 +68,15 @@ class ACPClient:
         self._session_id = bind_session(self._session_id, identifier)
         return self._session_id
 
+    def reset_text(self) -> None:
+        """Drop replayed history after session/load so only the new turn is kept.
+
+        Keep the one-time activity/running flag: a replayed thought chunk has
+        already marked the task running, and a second running transition would
+        be rejected by the task store.
+        """
+        self._text = BoundedText(self._text.max_bytes)
+
     # -- transport -----------------------------------------------------------
 
     async def send(self, message: dict) -> None:
@@ -90,6 +99,10 @@ class ACPClient:
             return await asyncio.wait_for(future, timeout)
         except asyncio.TimeoutError:
             raise UncertainExecution("agent_interrupted", "ACP request timed out") from None
+        except UncertainExecution as exc:
+            if getattr(exc, "provider_error", None) is None:
+                exc.provider_error = {"adapter": "acp", "reason": str(exc)[:160]}
+            raise
         finally:
             self._response_events.pop(identifier, None)
 
@@ -133,9 +146,12 @@ class ACPClient:
         try:
             message = json.loads(line)
         except ValueError:
-            raise UncertainExecution("agent_protocol", "Invalid ACP JSON") from None
+            # Some live ACP servers still print a diagnostic line to stdout
+            # around session load/prompt. It is not a protocol message and
+            # never authorizes a replay; the request keeps its own timeout.
+            return
         if not isinstance(message, dict):
-            raise UncertainExecution("agent_protocol", "Malformed ACP message")
+            return
         method = message.get("method")
         identifier = message.get("id")
         if isinstance(method, str):
@@ -160,8 +176,9 @@ class ACPClient:
             else:
                 await self.send({"jsonrpc": "2.0", "id": identifier, "result": result})
             return
-        # Unknown notification: never replayed, never silently ignored.
-        raise UncertainExecution("agent_protocol", "Unexpected ACP notification: " + method)
+        # JSON-RPC notifications are advisory. Vendor extensions may arrive
+        # before/after a session is bound; they never authorize a replay.
+        return
 
     async def _send_error(self, identifier, code: int, message: str) -> None:
         await self.send(
@@ -169,15 +186,18 @@ class ACPClient:
         )
 
     async def _handle_update(self, params) -> None:
+        # History replay around session/load may include advisory shapes that
+        # carry no turn text. They are ignored; a bound session mismatch still
+        # fails closed so one provider identity can never feed another session.
         if not isinstance(params, dict):
-            raise UncertainExecution("agent_protocol", "Invalid ACP session update")
+            return
         if self._session_id is None:
-            raise UncertainExecution("agent_identity", "ACP update before session negotiation")
+            return
         if params.get("sessionId") != self._session_id:
             raise UncertainExecution("agent_identity", "Unexpected ACP session update")
         update = params.get("update", {})
         if not isinstance(update, dict):
-            raise UncertainExecution("agent_protocol", "Invalid ACP update body")
+            return
         kind = update.get("sessionUpdate")
         if kind in _MESSAGE_KINDS:
             if not self._started:
@@ -229,6 +249,9 @@ class ACPClient:
     def _fail_pending(self, exc: UncertainExecution) -> None:
         if self._failure is None:
             self._failure = exc
+        if getattr(exc, "provider_error", None) is None:
+            # Controlled adapter message only, never raw provider output.
+            exc.provider_error = {"adapter": "acp", "reason": str(exc)[:160]}
         while self._response_events:
             _, entry = self._response_events.popitem()
             future = entry[0]

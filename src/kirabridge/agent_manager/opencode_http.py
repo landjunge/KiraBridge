@@ -157,7 +157,9 @@ class OpenCodeHTTPAdapter:
                 return info, [part for part in parts or [] if isinstance(part, dict)]
         return None, []
 
-    async def execute(self, task, args, config, roots, running, progress, **extra) -> dict:
+    async def execute(
+        self, task, args, config, roots, running, progress, *, resume_session=None, **extra
+    ) -> dict:
         if not config.server_url:
             raise BridgeError("agent_config", "OpenCode HTTP requires a configured server URL")
         model = _model(config)
@@ -178,32 +180,50 @@ class OpenCodeHTTPAdapter:
             follow_redirects=False,
             transport=self._transport,
         ) as client:
-            response = await self._request(
-                client,
-                "POST",
-                "/session",
-                params={"directory": directory},
-                body={
-                    "title": "KiraBridge " + str(task["id"]),
-                    "model": {
-                        "providerID": model["providerID"],
-                        "id": model["modelID"],
+            if resume_session is not None:
+                session = bind_session(session, resume_session)
+                # Verify the exact session still exists in this directory before
+                # any prompt is admitted; a 404 is unknown, never a silent retry.
+                await self._request(
+                    client,
+                    "GET",
+                    f"/session/{session}",
+                    params={"directory": directory},
+                )
+                await progress(
+                    {"agent": args.agent, "session_id": session, "event": "session_resumed"}
+                )
+            else:
+                response = await self._request(
+                    client,
+                    "POST",
+                    "/session",
+                    params={"directory": directory},
+                    body={
+                        "title": "KiraBridge " + str(task["id"]),
+                        "model": {
+                            "providerID": model["providerID"],
+                            "id": model["modelID"],
+                        },
+                        "metadata": {"kirabridge_task_id": str(task["id"])},
+                        "permission": [
+                            {
+                                "permission": "*",
+                                "pattern": "*",
+                                "action": "allow" if args.local_tools else "deny",
+                            }
+                        ],
                     },
-                    "metadata": {"kirabridge_task_id": str(task["id"])},
-                    "permission": [
-                        {
-                            "permission": "*",
-                            "pattern": "*",
-                            "action": "allow" if args.local_tools else "deny",
-                        }
-                    ],
-                },
-            )
-            created = await self._json(response, "session")
-            if not isinstance(created, dict):
-                raise UncertainExecution("provider_protocol", "OpenCode session is not an object")
-            session = bind_session(session, created.get("id"))
-            await progress({"agent": args.agent, "session_id": session, "event": "session_created"})
+                )
+                created = await self._json(response, "session")
+                if not isinstance(created, dict):
+                    raise UncertainExecution(
+                        "provider_protocol", "OpenCode session is not an object"
+                    )
+                session = bind_session(session, created.get("id"))
+                await progress(
+                    {"agent": args.agent, "session_id": session, "event": "session_created"}
+                )
 
             await self._request(
                 client,
@@ -289,6 +309,7 @@ class OpenCodeHTTPAdapter:
                 "agent": args.agent,
                 "adapter": "opencode_http",
                 "session_id": session,
+                "session_resumed": resume_session is not None,
                 "session_directory": directory,
                 "model": config.model,
                 "status_events": statuses,

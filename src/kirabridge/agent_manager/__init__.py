@@ -344,7 +344,16 @@ class GrokACPAdapter:
         self.bridge_config = bridge_config
 
     async def execute(
-        self, task, args, config, roots, running, progress, *, before_spawn=None
+        self,
+        task,
+        args,
+        config,
+        roots,
+        running,
+        progress,
+        *,
+        before_spawn=None,
+        resume_session=None,
     ) -> dict:
         if not config.executable:
             raise BridgeError("agent_config", "Grok executable must be configured explicitly")
@@ -456,13 +465,25 @@ class GrokACPAdapter:
 
                     spec = bridge_server(self.bridge_config._source_path, args.agent)
                     servers = [{"name": "kirabridge", **spec, "env": []}]
-                new = await client.request(
-                    "session/new", {"cwd": args.cwd, "mcpServers": servers}, args.timeout
-                )
-                session = client.bind_session(new.get("sessionId"))
-                await progress(
-                    {"agent": args.agent, "session_id": session, "event": "session_created"}
-                )
+                if resume_session is not None:
+                    session = client.bind_session(resume_session)
+                    await client.request(
+                        "session/load",
+                        {"sessionId": session, "cwd": args.cwd, "mcpServers": servers},
+                        args.timeout,
+                    )
+                    client.reset_text()
+                    await progress(
+                        {"agent": args.agent, "session_id": session, "event": "session_resumed"}
+                    )
+                else:
+                    new = await client.request(
+                        "session/new", {"cwd": args.cwd, "mcpServers": servers}, args.timeout
+                    )
+                    session = client.bind_session(new.get("sessionId"))
+                    await progress(
+                        {"agent": args.agent, "session_id": session, "event": "session_created"}
+                    )
                 result = await client.request(
                     "session/prompt",
                     {"sessionId": session, "prompt": [{"type": "text", "text": args.prompt}]},
@@ -486,6 +507,7 @@ class GrokACPAdapter:
                         "agent": args.agent,
                         "adapter": "grok_acp",
                         "session_id": session,
+                        "session_resumed": resume_session is not None,
                         "stop_reason": stop,
                         "local_tools": local_tools,
                         "mcp_servers_enabled": bridge_enabled,
@@ -602,7 +624,7 @@ class AgentManager:
             and not separate_managed
             and config.kind != "opencode_http"
         ):
-            if owned_resume_session is not None or handoff_reply:
+            if owned_resume_session is not None or handoff_reply or args.resume_session:
                 raise BridgeError(
                     "visible_owned_resume_unsupported",
                     "A provider-owned managed resume cannot replace the assigned visible "
@@ -634,15 +656,37 @@ class AgentManager:
                 "agent_tools_denied",
                 "Local agent tools require explicit operator and principal permission",
             )
+        if args.resume_session and owned_resume_session is not None:
+            raise BridgeError(
+                "agent_resume_unsupported", "A turn cannot resume two different sessions"
+            )
+        resume_session = args.resume_session
+        if resume_session is not None:
+            if config.kind == "codex":
+                owned_resume_session = resume_session
+            elif config.kind in {"grok_acp", "opencode_acp", "opencode", "opencode_http"}:
+                pass
+            else:
+                raise BridgeError(
+                    "agent_resume_unsupported",
+                    "This adapter cannot resume a provider session",
+                )
         if (owned_resume_session is not None or handoff_reply) and config.kind != "codex":
             raise BridgeError(
                 "agent_resume_unsupported", "Owned workflow continuation requires Codex"
             )
-        extra = (
-            {"owned_resume_session": owned_resume_session, "handoff_reply": handoff_reply}
-            if owned_resume_session is not None or handoff_reply
-            else {}
-        )
+        extra = {}
+        if owned_resume_session is not None or handoff_reply:
+            extra.update(
+                {"owned_resume_session": owned_resume_session, "handoff_reply": handoff_reply}
+            )
+        if resume_session is not None and config.kind in {
+            "grok_acp",
+            "opencode_acp",
+            "opencode",
+            "opencode_http",
+        }:
+            extra["resume_session"] = resume_session
         try:
             async with asyncio.timeout(args.timeout):
                 if full_access and config.kind in {
@@ -651,6 +695,11 @@ class AgentManager:
                     "claude_code",
                     "copilot_cli",
                 }:
+                    if resume_session is not None:
+                        raise BridgeError(
+                            "agent_resume_unsupported",
+                            "Full-access execution cannot resume a text session",
+                        )
                     from kirabridge.agent_manager.full_access import FullAccessAdapter
 
                     return await FullAccessAdapter(

@@ -28,7 +28,9 @@ class OpenCodeACPAdapter:
     def __init__(self, terminal):
         self.terminal = terminal
 
-    async def execute(self, task, args, config, roots, running, progress) -> dict:
+    async def execute(
+        self, task, args, config, roots, running, progress, *, resume_session=None
+    ) -> dict:
         if not config.executable:
             raise BridgeError("agent_config", "OpenCode executable must be configured explicitly")
         if not config.model or not _MODEL.fullmatch(config.model):
@@ -92,13 +94,33 @@ class OpenCodeACPAdapter:
                             {"methodId": "cached_token", "_meta": {"headless": True}},
                             args.timeout,
                         )
-                    new = await client.request(
-                        "session/new", {"cwd": args.cwd, "mcpServers": []}, args.timeout
-                    )
-                    session = client.bind_session(new.get("sessionId"))
-                    await progress(
-                        {"agent": args.agent, "session_id": session, "event": "session_created"}
-                    )
+                    if resume_session is not None:
+                        session = client.bind_session(resume_session)
+                        await client.request(
+                            "session/load",
+                            {"sessionId": session, "cwd": args.cwd, "mcpServers": []},
+                            args.timeout,
+                        )
+                        client.reset_text()
+                        await progress(
+                            {
+                                "agent": args.agent,
+                                "session_id": session,
+                                "event": "session_resumed",
+                            }
+                        )
+                    else:
+                        new = await client.request(
+                            "session/new", {"cwd": args.cwd, "mcpServers": []}, args.timeout
+                        )
+                        session = client.bind_session(new.get("sessionId"))
+                        await progress(
+                            {
+                                "agent": args.agent,
+                                "session_id": session,
+                                "event": "session_created",
+                            }
+                        )
                     result = await client.request(
                         "session/prompt",
                         {"sessionId": session, "prompt": [{"type": "text", "text": args.prompt}]},
@@ -125,6 +147,7 @@ class OpenCodeACPAdapter:
                             "agent": args.agent,
                             "adapter": "opencode_acp",
                             "session_id": session,
+                            "session_resumed": resume_session is not None,
                             "stop_reason": stop,
                             "local_tools_enabled": False,
                             "mcp_servers_enabled": False,

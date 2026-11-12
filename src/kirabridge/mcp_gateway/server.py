@@ -22,6 +22,8 @@ from kirabridge.team_manager.models import (
     TeamCreate,
     TeamMessageSend,
     TeamRoleSet,
+    TeamSessionClear,
+    TeamSessionGet,
     TeamWorkClaim,
     TeamWorkComplete,
     TeamWorkCreate,
@@ -1478,6 +1480,20 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
     def team_context(team_id: str, ctx: Context) -> dict[str, Any]:
         """Bounded current team context, recent results and this member's pending messages."""
         return safe(lambda: bridge.teams.context(identity(ctx), team_id))
+
+    @server.tool(annotations=read)
+    def team_session_get(team_id: str, ctx: Context, member: str | None = None) -> dict[str, Any]:
+        """Read the proven provider session bound to a team member; coordinators may inspect."""
+        return safe(
+            lambda: bridge.teams.session(
+                identity(ctx), TeamSessionGet(team_id=team_id, member=member)
+            )
+        )
+
+    @server.tool(annotations=write)
+    def team_session_clear(request: TeamSessionClear, ctx: Context) -> dict[str, Any]:
+        """Forget a bound session so the next turn starts fresh; never replays a turn."""
+        return safe(lambda: bridge.teams.clear_session(identity(ctx), request))
 
     @server.tool(annotations=write)
     def team_set_role(request: TeamRoleSet, ctx: Context) -> dict[str, Any]:

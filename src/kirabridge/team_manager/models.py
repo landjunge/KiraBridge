@@ -66,3 +66,14 @@ class TeamWorkReprocess(Input):
     core_task_id: str = Field(min_length=1, max_length=128)
     expected_result_sha256: str = Field(pattern=r"^[a-f0-9]{64}$")
     idempotency_key: str = Field(min_length=1, max_length=128)
+
+
+class TeamSessionGet(Input):
+    team_id: str = Field(min_length=1, max_length=128)
+    member: str | None = Field(default=None, min_length=1, max_length=80)
+
+
+class TeamSessionClear(Input):
+    team_id: str = Field(min_length=1, max_length=128)
+    member: str | None = Field(default=None, min_length=1, max_length=80)
+    idempotency_key: str = Field(min_length=1, max_length=128)

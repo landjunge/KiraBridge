@@ -42,6 +42,8 @@ class Server:
         path = request.url.path
         if path == "/session" and request.method == "POST":
             return httpx.Response(200, json={"id": "ses_test"})
+        if path == "/session/ses_test" and request.method == "GET":
+            return httpx.Response(200, json={"id": "ses_test"})
         if path.endswith("/prompt_async"):
             return httpx.Response(204)
         if path == "/session/status":
@@ -73,7 +75,9 @@ def config(**overrides):
     return AgentConfig(**values)
 
 
-async def execute(tmp_path, server, *, agent_config=None, local_tools=False, timeout=3.0):
+async def execute(
+    tmp_path, server, *, agent_config=None, local_tools=False, timeout=3.0, resume_session=None
+):
     running, progress = [], []
 
     async def on_running(value):
@@ -96,6 +100,7 @@ async def execute(tmp_path, server, *, agent_config=None, local_tools=False, tim
         [str(tmp_path)],
         on_running,
         on_progress,
+        resume_session=resume_session,
     )
     return result, running, progress
 
@@ -240,3 +245,38 @@ def test_only_a_credential_free_loopback_server_url_is_accepted():
 def test_server_fields_are_rejected_for_other_kinds():
     with pytest.raises(ValueError):
         AgentConfig(kind="opencode", model="opencode/test", server_url="http://127.0.0.1:1")
+
+
+async def test_resume_reuses_the_exact_server_session_without_creating_another(tmp_path):
+    server = Server()
+    result, _, progress = await execute(tmp_path, server, resume_session="ses_test")
+    assert result["success"] and result["text"] == "Harmless answer"
+    assert result["evidence"]["session_id"] == "ses_test"
+    assert result["evidence"]["session_resumed"] is True
+    assert not [r for r in server.requests if r.method == "POST" and r.url.path == "/session"]
+    assert [r for r in server.requests if r.method == "GET" and r.url.path == "/session/ses_test"]
+    assert server.body("POST", "/prompt_async")["parts"] == [
+        {"type": "text", "text": "Answer without tools"}
+    ]
+    assert progress[0] == {
+        "agent": "opencode_http",
+        "session_id": "ses_test",
+        "event": "session_resumed",
+    }
+
+
+async def test_unknown_resumed_session_is_not_recreated(tmp_path):
+    server = Server()
+    server.handler_original = server.handler
+
+    def missing(request):
+        if request.url.path == "/session/ses_missing":
+            return httpx.Response(404)
+        return server.handler_original(request)
+
+    server.handler = missing
+
+    with pytest.raises(UncertainExecution) as caught:
+        await execute(tmp_path, server, resume_session="ses_missing")
+    assert caught.value.code == "session_unknown"
+    assert not [r for r in server.requests if r.method == "POST" and r.url.path == "/session"]

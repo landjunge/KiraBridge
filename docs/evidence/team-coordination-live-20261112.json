@@ -1,0 +1,139 @@
+{
+  "round1": {
+    "codex": {
+      "state": "completed",
+      "result": "CODEX_ROUND1_OK",
+      "error": null,
+      "resume_session": null,
+      "session_id": "01a1ce40-2fa9-7ee3-8681-adfbe04b9143"
+    },
+    "grok": {
+      "state": "completed",
+      "result": "GROK_ROUND1_OK",
+      "error": null,
+      "resume_session": null,
+      "session_id": "01a1ce40-3468-71b0-9892-b8e75d6e4e05"
+    },
+    "opencode": {
+      "state": "completed",
+      "result": "OPENCODE_ROUND1_OK",
+      "error": null,
+      "resume_session": null,
+      "session_id": "ses_e31bfd1fcffeyqpttLxt7gL8NX"
+    }
+  },
+  "sessions_after_round1": {
+    "codex": {
+      "session": {
+        "team_id": "live-team-1794461670",
+        "principal": "codex",
+        "agent": "codex",
+        "adapter": "codex",
+        "session_id": "01a1ce40-2fa9-7ee3-8681-adfbe04b9143",
+        "cwd": "/private/var/folders/v1/z7b9nf2s7879dvxxbzy7bqv00000gn/T/opencode/live-team/codex",
+        "state": "idle",
+        "work_id": "tw-7ddac270b2c547b49d6ee46b1ca38e66",
+        "created": 1794461677.262901,
+        "updated": 1794461687.9473321
+      }
+    },
+    "grok": {
+      "session": {
+        "team_id": "live-team-1794461670",
+        "principal": "grok",
+        "agent": "grok",
+        "adapter": "grok_acp",
+        "session_id": "01a1ce40-3468-71b0-9892-b8e75d6e4e05",
+        "cwd": "/private/var/folders/v1/z7b9nf2s7879dvxxbzy7bqv00000gn/T/opencode/live-team/grok",
+        "state": "idle",
+        "work_id": "tw-8dbf93830fe44cabbbb7e7c33e7c624e",
+        "created": 1794461677.4981918,
+        "updated": 1794461687.740443
+      }
+    },
+    "opencode": {
+      "session": {
+        "team_id": "live-team-1794461670",
+        "principal": "opencode",
+        "agent": "opencode",
+        "adapter": "opencode_http",
+        "session_id": "ses_e31bfd1fcffeyqpttLxt7gL8NX",
+        "cwd": "/private/var/folders/v1/z7b9nf2s7879dvxxbzy7bqv00000gn/T/opencode/live-team/opencode",
+        "state": "idle",
+        "work_id": "tw-5100fe793b2842d8afcd2c6bc211de63",
+        "created": 1794461675.994109,
+        "updated": 1794461677.765571
+      }
+    }
+  },
+  "round2": {
+    "codex": {
+      "state": "completed",
+      "result": "CODEX_ROUND2_OK",
+      "error": null,
+      "resume_session": "01a1ce40-2fa9-7ee3-8681-adfbe04b9143",
+      "session_resumed": true,
+      "session_id": "01a1ce40-2fa9-7ee3-8681-adfbe04b9143"
+    },
+    "grok": {
+      "state": "completed",
+      "result": "GROK_ROUND2_OK",
+      "error": null,
+      "resume_session": "01a1ce40-3468-71b0-9892-b8e75d6e4e05",
+      "session_resumed": true,
+      "session_id": "01a1ce40-3468-71b0-9892-b8e75d6e4e05"
+    },
+    "opencode": {
+      "state": "completed",
+      "result": "OPENCODE_ROUND2_OK",
+      "error": null,
+      "resume_session": "ses_e31bfd1fcffeyqpttLxt7gL8NX",
+      "session_resumed": true,
+      "session_id": "ses_e31bfd1fcffeyqpttLxt7gL8NX"
+    }
+  },
+  "sessions_after_round2": {
+    "codex": {
+      "session": {
+        "team_id": "live-team-1794461670",
+        "principal": "codex",
+        "agent": "codex",
+        "adapter": "codex",
+        "session_id": "01a1ce40-2fa9-7ee3-8681-adfbe04b9143",
+        "cwd": "/private/var/folders/v1/z7b9nf2s7879dvxxbzy7bqv00000gn/T/opencode/live-team/codex",
+        "state": "idle",
+        "work_id": "tw-1c113d23fe8044b8b233b0f1557554b0",
+        "created": 1794461677.262901,
+        "updated": 1794461707.7403939
+      }
+    },
+    "grok": {
+      "session": {
+        "team_id": "live-team-1794461670",
+        "principal": "grok",
+        "agent": "grok",
+        "adapter": "grok_acp",
+        "session_id": "01a1ce40-3468-71b0-9892-b8e75d6e4e05",
+        "cwd": "/private/var/folders/v1/z7b9nf2s7879dvxxbzy7bqv00000gn/T/opencode/live-team/grok",
+        "state": "idle",
+        "work_id": "tw-915525e1a8de46c7be8d0df2814e3422",
+        "created": 1794461677.4981918,
+        "updated": 1794461703.814236
+      }
+    },
+    "opencode": {
+      "session": {
+        "team_id": "live-team-1794461670",
+        "principal": "opencode",
+        "agent": "opencode",
+        "adapter": "opencode_http",
+        "session_id": "ses_e31bfd1fcffeyqpttLxt7gL8NX",
+        "cwd": "/private/var/folders/v1/z7b9nf2s7879dvxxbzy7bqv00000gn/T/opencode/live-team/opencode",
+        "state": "idle",
+        "work_id": "tw-82b0bb0f9b0c4ad5afe2af290bf1d52a",
+        "created": 1794461675.994109,
+        "updated": 1794461696.182016
+      }
+    }
+  }
+}

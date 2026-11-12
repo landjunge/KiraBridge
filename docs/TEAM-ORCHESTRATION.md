@@ -339,3 +339,48 @@ automatically. Roles do not widen operating-system or provider permissions;
 installed CLIs still need working accounts/models. A reported result is distinct
 from independently observed execution evidence. After a missing browser response,
 refresh first; the pending operation retains its idempotency key.
+
+## Sitzungen und Wiederaufnahme
+
+Ein automatischer Teamauftrag wird als begrenzter, eigener Agentendurchgang
+ausgeführt. Nach einem belegten nativen Turn merkt sich die Bridge die
+Provider-Sitzung des Bearbeiters (Codex-Thread, Grok-ACP-Sitzung oder
+OpenCode-Sitzung) zusammen mit Agent, Arbeitsverzeichnis und letztem Auftrag.
+Ein späterer Auftrag an denselben Bearbeiter setzt diese Sitzung fort, sofern
+Agent und Verzeichnis unverändert sind.
+
+- **Codex** wird über `codex exec resume <thread-id>` fortgesetzt.
+- **Grok** und **OpenCode ACP** werden über `session/load` mit genau der
+  gespeicherten Sitzungskennung fortgesetzt; eine abweichende Sitzungskennung
+  wird verworfen.
+- **OpenCode HTTP** verwendet die vorhandene Sitzung über die lokale
+  Server-API weiter und prüft vor dem Prompt, dass sie noch existiert.
+
+Die Bindung ist kein globaler Kontext und keine Rechteerweiterung. Sie wird nur
+für versiegelte Teamaufträge verwendet; direkte `agent.execute`-Aufträge starten
+weiterhin eine frische Sitzung. Ein nicht belegter oder abweichender Turn wird
+nicht automatisch wiederholt. Nach einem Neustart des Bridges bleiben
+Sitzungsbindung, Teamaufträge und bereits belegte Ergebnisse in der lokalen
+Datenbank erhalten; ein laufender Core-Auftrag wird nur beobachtet, nie mit
+einem neuen Prompt wiederholt.
+
+`team_session_get(team_id, member)` liest die belegte Sitzung des eigenen
+Mitglieds; Eigentümer und Koordinator dürfen mit `member="*"` alle lesen.
+`team_session_clear(request)` vergisst eine Bindung. Der nächste Auftrag startet
+dann eine neue Sitzung, ohne den alten Verlauf zu übernehmen. Löschen ist
+idempotent und löst keinen Modellaufruf aus.
+
+Die CLI spiegelt dieselben Operationen:
+
+```text
+kirabridge team session kirabridge-team
+kirabridge team session-clear kirabridge-team codex --key clear-codex-001
+```
+
+Der Live-Nachweis `docs/evidence/team-coordination-live-20261112.json` wurde mit
+einem getrennten Test-Bridge-Prozess (Port 58991, eigenes Datenverzeichnis),
+einem lokalen OpenCode-Server mit DeepSeek V4 Pro sowie echten Codex- und
+Grok-ACP-Sitzungen erzeugt. Runde 1 lief parallel; zwischen Runde 1 und Runde 2
+wurde der Bridge-Prozess beendet und neu gestartet. Alle drei Bearbeiter setzten
+ihre exakt gespeicherte Sitzung fort. Tokens, Prompts mit Geheimnissen und rohe
+Provider-Ausgaben sind nicht Teil des Belegs.
