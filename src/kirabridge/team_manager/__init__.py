@@ -497,7 +497,13 @@ class TeamManager:
                 return
         generation = self._generation(work["team_id"], work["assignee"])
         bound = work.get("session_generation")
-        if bound is not None and bound != generation:
+        if bound is None:
+            # A work claimed before session generations existed cannot be proven
+            # to belong to the current clear boundary; after any clear it must
+            # be rejected rather than silently assuming the current generation.
+            if generation > 0:
+                return
+        elif bound != generation:
             # A clear happened after this work was claimed; never resurrect.
             return
         if existing is not None and existing["state"] == "cleared":
@@ -508,14 +514,24 @@ class TeamManager:
                 # A turn still running before the explicit clear must never
                 # resurrect the tombstoned session.
                 return
+        # Owner compare-and-swap, independent of the provider session id: an
+        # older work must never replace a newer owner's slot, even when the two
+        # works used different fresh sessions.
         if (
             existing is not None
-            and existing["session_id"] == session_id
+            and existing["work_id"] is not None
             and existing["work_id"] != work["id"]
         ):
-            # A stale callback from an earlier work that shares this session;
-            # only the current owner may change its state.
-            return
+            owner = self.store.db.execute(
+                "SELECT seq FROM team_work WHERE id=?", (existing["work_id"],)
+            ).fetchone()
+            owner_seq = owner["seq"] if owner else None
+            if (
+                owner_seq is not None
+                and isinstance(work.get("seq"), int)
+                and work["seq"] < owner_seq
+            ):
+                return
         if existing is not None and existing["session_id"] != session_id:
             if work.get("resume_session"):
                 # A requested resume must keep its exact identity. The adapter

@@ -9,13 +9,20 @@ from kirabridge.bridge_core.config import AgentConfig
 from kirabridge.bridge_core.models import AgentInput, BridgeError, UncertainExecution
 
 
+def user(ident="user_0", text="Answer without tools"):
+    return {
+        "info": {"id": ident, "sessionID": "ses_test", "role": "user", "time": {"created": 0}},
+        "parts": [{"type": "text", "text": text}],
+    }
+
+
 def assistant(text="Harmless answer", *, completed=True, finish="stop", error=None):
     info = {
         "id": "msg_1",
         "sessionID": "ses_test",
         "role": "assistant",
         "time": {"created": 1, **({"completed": 2} if completed else {})},
-        "parentID": "msg_0",
+        "parentID": "user_0",
         "modelID": "deepseek-flash",
         "providerID": "deepseek",
         "mode": "build",
@@ -35,9 +42,11 @@ class Server:
     def __init__(self, statuses=("busy", "idle"), message=None):
         self.requests = []
         self.statuses = list(statuses)
+        self.user = user()
         self.message = message or assistant()
         # Idle baseline: the pre-prompt message list starts at a stable id.
         self.message["info"]["id"] = "msg_0"
+        self.message["info"]["parentID"] = "user_0"
         self._turns = 0
 
     def handler(self, request):
@@ -48,11 +57,12 @@ class Server:
         if path == "/session/ses_test" and request.method == "GET":
             return httpx.Response(200, json={"id": "ses_test"})
         if path.endswith("/prompt_async"):
-            # A new turn appends a new assistant message with a new id and a new
-            # user prompt as its parent.
+            # A new turn appends a new user prompt and a new assistant message
+            # whose parent is exactly that prompt.
             self._turns += 1
+            self.user["info"]["id"] = f"user_{self._turns}"
             self.message["info"]["id"] = f"msg_{self._turns}"
-            self.message["info"]["parentID"] = f"prompt_{self._turns}"
+            self.message["info"]["parentID"] = f"user_{self._turns}"
             return httpx.Response(204)
         if path == "/session/status":
             status = self.statuses.pop(0) if len(self.statuses) > 1 else self.statuses[0]
@@ -61,7 +71,7 @@ class Server:
                 body.update(attempt=1, message="provider retry", next=1)
             return httpx.Response(200, json={"ses_test": body})
         if path.endswith("/message"):
-            return httpx.Response(200, json=[self.message])
+            return httpx.Response(200, json=[self.user, self.message])
         return httpx.Response(404)
 
     def body(self, method, suffix):
@@ -321,8 +331,10 @@ async def test_foreign_parent_response_is_not_accepted(tmp_path):
     def foreign_parent(request):
         if request.url.path.endswith("/prompt_async"):
             server._turns += 1
-            server.message["info"]["id"] = f"msg_{server._turns}"
-            # parentID stays the baseline: the assistant replied to a foreign prompt.
+            server.user["info"]["id"] = f"user_{server._turns}"  # our prompt admitted
+            server.message["info"]["id"] = f"msg_{server._turns}"  # new assistant
+            # The assistant replies to a foreign prompt, not the one we admitted.
+            server.message["info"]["parentID"] = "user_foreign"
             return httpx.Response(204)
         return original(request)
 

@@ -157,6 +157,18 @@ class OpenCodeHTTPAdapter:
                 return info, [part for part in parts or [] if isinstance(part, dict)]
         return None, []
 
+    @staticmethod
+    def _admitted_user_id(messages: list[dict[str, Any]], prior_ids: set[str]) -> str | None:
+        """Return the id of the user prompt admitted after the pre-prompt snapshot."""
+        for item in messages:
+            info = item.get("info")
+            if not isinstance(info, dict) or info.get("role") != "user":
+                continue
+            ident = info.get("id")
+            if isinstance(ident, str) and ident not in prior_ids:
+                return ident
+        return None
+
     async def execute(
         self, task, args, config, roots, running, progress, *, resume_session=None, **extra
     ) -> dict:
@@ -225,13 +237,17 @@ class OpenCodeHTTPAdapter:
                     {"agent": args.agent, "session_id": session, "event": "session_created"}
                 )
 
-            # Snapshot the newest assistant message before admitting the prompt, so
-            # a completed idle baseline from a previous turn can never be mistaken
-            # for this turn's new response. A genuine new turn must then differ in
-            # id and parentID and still belong to the exact bound session.
-            prior, _ = self._last_assistant(await self._messages(client, session, directory))
+            # Snapshot the message ids before admitting our prompt. A genuine new
+            # turn must produce a new assistant message whose parentID is exactly
+            # the user prompt we admitted, and still belong to the bound session.
+            before = await self._messages(client, session, directory)
+            prior_ids = {
+                item.get("info", {}).get("id")
+                for item in before
+                if isinstance(item.get("info"), dict) and isinstance(item["info"].get("id"), str)
+            }
+            prior, _ = self._last_assistant(before)
             prior_id = prior.get("id") if prior is not None else None
-            prior_parent = prior.get("parentID") if prior is not None else None
 
             await self._request(
                 client,
@@ -266,15 +282,13 @@ class OpenCodeHTTPAdapter:
                 elif kind == "idle" and started:
                     break
                 elif kind == "idle":
-                    message, _ = self._last_assistant(
+                    candidate, _ = self._last_assistant(
                         await self._messages(client, session, directory)
                     )
                     if (
-                        message is not None
-                        and _completed(message)
-                        and message.get("sessionID") == session
-                        and message.get("id") != prior_id
-                        and message.get("parentID") != prior_parent
+                        candidate is not None
+                        and _completed(candidate)
+                        and candidate.get("id") != prior_id
                     ):
                         break
                 remaining = deadline - time.monotonic()
@@ -284,15 +298,18 @@ class OpenCodeHTTPAdapter:
                     )
                 await asyncio.sleep(min(self._poll_interval, remaining))
 
-            message, parts = self._last_assistant(await self._messages(client, session, directory))
+            messages = await self._messages(client, session, directory)
+            message, parts = self._last_assistant(messages)
+            admitted_id = self._admitted_user_id(messages, prior_ids)
             if (
                 message is None
                 or message.get("sessionID") != session
                 or message.get("id") == prior_id
-                or message.get("parentID") == prior_parent
+                or admitted_id is None
+                or message.get("parentID") != admitted_id
             ):
-                # Only a new assistant message for the bound session proves this
-                # turn; a foreign or unchanged message is not this turn's result.
+                # Only a new assistant message for the bound session, whose parent
+                # is exactly the prompt we admitted, is this turn's result.
                 raise UncertainExecution(
                     "agent_unconfirmed", "No new OpenCode turn response observed"
                 )

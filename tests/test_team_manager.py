@@ -1129,3 +1129,37 @@ def test_authorize_execution_rejects_a_changed_adapter_after_claim(domain):
     with pytest.raises(BridgeError) as error:
         domain.authorize_execution(domain.store.get(task_id, "codex"))
     assert error.value.code == "team_task_conflict"
+
+
+def test_older_fresh_callback_cannot_replace_a_newer_slot(domain):
+    domain.config.team.workers["codex"].execution_scope = "separate_managed_session"
+    w0 = domain.delegate("local", work(idempotency_key="w0"))
+    domain.record_session({**w0, "state": "completed"}, {"session_id": "s1", "adapter": "codex"})
+    # A second fresh work supersedes with a different session id.
+    w1 = domain.delegate("local", work(idempotency_key="w1"))
+    domain.record_session({**w1, "state": "completed"}, {"session_id": "s2", "adapter": "codex"})
+    assert domain.session("codex", session_request())["session"]["session_id"] == "s2"
+    # A late callback from the older fresh work must not overwrite the newer slot.
+    domain.record_session({**w0, "state": "completed"}, {"session_id": "s1", "adapter": "codex"})
+    assert domain.session("codex", session_request())["session"]["session_id"] == "s2"
+
+
+def test_unbound_legacy_work_is_rejected_after_clear(domain):
+    domain.config.team.workers["codex"].execution_scope = "separate_managed_session"
+    # Two clears establish a generation boundary beyond the legacy work's NULL.
+    domain.clear_session("codex", TeamSessionClear(team_id="test-team", idempotency_key="clear-1"))
+    domain.clear_session("codex", TeamSessionClear(team_id="test-team", idempotency_key="clear-2"))
+    # A new run (bound to generation 2) records a fresh session.
+    w_new = domain.delegate("local", work(idempotency_key="w-new"))
+    domain.record_session(
+        {**w_new, "state": "completed", "session_generation": 2},
+        {"session_id": "s-new", "adapter": "codex"},
+    )
+    assert domain.session("codex", session_request())["session"]["session_id"] == "s-new"
+    # An unbound legacy work (session_generation NULL) must not reactivate the slot.
+    w_legacy = domain.delegate("local", work(idempotency_key="w-legacy"))
+    domain.record_session(
+        {**w_legacy, "state": "completed"},
+        {"session_id": "s-legacy", "adapter": "codex"},
+    )
+    assert domain.session("codex", session_request())["session"]["session_id"] == "s-new"
