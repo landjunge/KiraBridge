@@ -96,6 +96,7 @@ SESSION = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]{0,255}$")
 # store. OpenCode CLI/ACP use an isolated per-task XDG profile and have no
 # persisted session store, so they are excluded.
 RESUME_ADAPTERS = {"codex", "grok_acp", "opencode_http"}
+TRACKED_SESSION_ADAPTERS = RESUME_ADAPTERS | {"qwen_acp"}
 
 
 def _bounded_text(text, limit):
@@ -439,6 +440,13 @@ class TeamManager:
             or worker.execution_scope != "separate_managed_session"
         ):
             return None
+        if self._worker_adapter(worker) == "qwen_acp":
+            prior = self._session_row(work["team_id"], work["assignee"])
+            if prior is not None and prior["state"] in {"active", "unknown"}:
+                raise BridgeError(
+                    "agent_session_unknown",
+                    "Resolve the original Qwen task; no fresh prompt or resume",
+                )
         if self._worker_adapter(worker) not in RESUME_ADAPTERS:
             # The adapter cannot resume through the durable store; leave the
             # follow-up a fresh session instead of handing it a doomed resume id.
@@ -476,9 +484,8 @@ class TeamManager:
         adapter = native.get("adapter")
         if not isinstance(adapter, str) or not ERROR.fullmatch(adapter):
             adapter = self._worker_adapter(worker)
-        if adapter not in RESUME_ADAPTERS:
-            # No durable resume is possible for this adapter; never store a
-            # session a later follow-up would be handed but could not resume.
+        if adapter not in TRACKED_SESSION_ADAPTERS:
+            # Only verified provider identities enter the existing session ledger.
             return
         if work["state"] in {"processing_result", "completed"}:
             state = "idle"
@@ -1336,7 +1343,10 @@ class TeamManager:
             core_task.get("principal") != work["assignee"]
             or core_task.get("operation") != "agent.execute"
             or args.get("agent") != worker.agent
-            or args.get("local_tools", False)
+            or args.get("local_tools", False) != worker.local_tools
+            or args.get("mcp_grants", []) != [g.model_dump() for g in worker.mcp_grants]
+            or args.get("mcp_operations", []) != worker.mcp_operations
+            or args.get("mcp_read_roots", []) != worker.mcp_read_roots
             or Path(args.get("cwd", "")).expanduser().absolute()
             != Path(worker.cwd).expanduser().absolute()
             or not isinstance(args.get("timeout"), int | float)

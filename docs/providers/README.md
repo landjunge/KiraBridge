@@ -16,6 +16,8 @@ Die Tabelle beschreibt die lokal geprüften Versionen. Sie behauptet keine
 Kompatibilität mit jeder künftigen CLI-Version. Die verlinkten Anbieterberichte
 enthalten offizielle Quellen und die jeweils tatsächlich überprüften Grenzen.
 
+Die spätere [Qwen-ACP-/MCP-Quellintegration](QWEN.md) hat ein eigenes, auftragsgebundenes Werkzeugprofil und konfigurierbare Budgets. Die folgenden Aussagen zu den vier isolierten Textadaptern gelten weiterhin für deren jeweilige Profile.
+
 ## Bedienung
 
 Der Betreiber ergänzt die gewünschten `[agents.<name>]`-Abschnitte und trägt

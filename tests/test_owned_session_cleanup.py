@@ -226,6 +226,8 @@ def test_session_census_refuses_unknown_or_protected_members_without_signals(mon
     with pytest.raises(UncertainExecution) as error:
         platform._session_members(child, platform._OwnedSession(sid, own_uid))
     assert error.value.code == "process_cleanup_unknown"
+    assert error.value.cleanup_diagnostic["phase"] == "owned_session_census"
+    assert error.value.cleanup_diagnostic["cause_type"] == "ValueError"
 
 
 @pytest.mark.parametrize(

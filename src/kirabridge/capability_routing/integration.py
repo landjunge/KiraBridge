@@ -113,7 +113,7 @@ class RoutedAdapter:
         ):
             raise self.rejected("Original agent profile does not allow writing")
         if profile.read_only and (
-            config.bridge_tools
+            (config.bridge_tools and self.cli != "qwen")
             or args.local_tools
             or (self.cli == "codex" and config.sandbox_mode != "read-only")
         ):
@@ -127,10 +127,15 @@ class RoutedAdapter:
             raise self.rejected("Selected CLI needs its own authorized worker identity")
         if decision["access_kind"] != "subscription":
             raise self.rejected("Managed routing currently supports existing subscriptions only")
+        if self.cli == "qwen" and config.qwen_auth_type != "qwen-subscription":
+            raise self.rejected("Qwen routing cannot change the existing authentication selection")
         selected = config.model_copy(
             update={
                 "model": decision["model"],
-                "executable": effort_shim(decision, self.guard.runtime.state_dir),
+                "executable": decision["executable"]
+                if self.cli == "qwen"
+                else effort_shim(decision, self.guard.runtime.state_dir),
+                **({"qwen_reasoning_effort": decision["effort"]} if self.cli == "qwen" else {}),
                 "api_key_env": config.api_key_env
                 if self.authorize is not None and config.kind == "grok_structured"
                 else "",
@@ -145,7 +150,8 @@ class RoutedAdapter:
 
             def before_spawn():
                 # Finish shim file I/O before the final live authority check.
-                effort_shim(decision, self.guard.runtime.state_dir)
+                if self.cli != "qwen":
+                    effort_shim(decision, self.guard.runtime.state_dir)
                 self.authorize(task, args, profile, decision)
 
             before_spawn()
@@ -198,13 +204,18 @@ def new_routed_manager(
             raise RoutingError("Managed routing requires live sealed-task authorization")
         # Keep the complete legacy adapter inventory and the manager's visible
         # branch. The trusted profile builder rejects an unsupported routed worker.
-        for kind, cli in (("codex", "codex"), ("grok_acp", "grok"), ("grok_structured", "grok")):
+        for kind, cli in (
+            ("codex", "codex"),
+            ("grok_acp", "grok"),
+            ("grok_structured", "grok"),
+            ("qwen_acp", "qwen"),
+        ):
             manager.adapters[kind] = adapter_type(
                 manager.adapters[kind], cli, guard, profiles, authorize=authorize, optional=True
             )
         return manager
     # Unsupported routes must not bypass routing on this opt-in manager.
-    manager.adapters = {kind: manager.adapters[kind] for kind in ("codex", "grok_acp")}
-    for kind, cli in (("codex", "codex"), ("grok_acp", "grok")):
+    manager.adapters = {kind: manager.adapters[kind] for kind in ("codex", "grok_acp", "qwen_acp")}
+    for kind, cli in (("codex", "codex"), ("grok_acp", "grok"), ("qwen_acp", "qwen")):
         manager.adapters[kind] = RoutedAdapter(manager.adapters[kind], cli, guard, profiles)
     return manager

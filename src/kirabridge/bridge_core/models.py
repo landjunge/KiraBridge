@@ -5,7 +5,7 @@ import json
 from enum import StrEnum
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, model_serializer, model_validator
 
 
 class NativeFailureEvidence(BaseModel):
@@ -156,7 +156,25 @@ class ProcessInput(Input):
     task_id: str
 
 
+class AgentToolGrant(Input):
+    tool: str = Field(pattern=r"^[A-Za-z][A-Za-z0-9_-]{0,127}$")
+    arguments: dict[str, Any] = Field(default_factory=dict)
+    calls: int = Field(default=1, ge=1, le=4096)
+
+
 class AgentInput(Input):
+    mcp_grants: list[AgentToolGrant] = Field(default_factory=list, max_length=32)
+    mcp_read_roots: list[str] = Field(default_factory=list, max_length=512)
+    mcp_operations: list[str] = Field(default_factory=list, max_length=32)
+
+    @model_serializer(mode="wrap")
+    def omit_unused_mcp(self, handler):
+        value = handler(self)
+        for key in ("mcp_grants", "mcp_operations", "mcp_read_roots"):
+            if not getattr(self, key):
+                value.pop(key, None)
+        return value
+
     local_tools: bool = False
     wait_for_reply: bool = True
     agent: str = Field(pattern=r"^[a-z][a-z0-9_-]{0,40}$")

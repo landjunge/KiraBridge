@@ -121,7 +121,7 @@ def _session_members(process, pin):
             ["/bin/ps", "-axo", "pid=,uid=,pgid=,stat="],
             capture_output=True,
             text=True,
-            timeout=0.5,
+            timeout=getattr(process, "_kirabridge_census_timeout", 0.5),
             check=False,
         )
         if result.returncode or result.stderr or len(result.stdout) > 2 * 1024 * 1024:
@@ -168,9 +168,17 @@ def _session_members(process, pin):
             raise ValueError("Unconfirmed session/group ownership")
         return members
     except (OSError, ValueError, subprocess.TimeoutExpired) as error:
-        raise UncertainExecution(
+        failure = UncertainExecution(
             "process_cleanup_unknown", "Owned process session cannot be confirmed"
-        ) from error
+        )
+        failure.cleanup_diagnostic = {
+            "phase": "owned_session_census",
+            "cause_type": type(error).__name__,
+            "errno": getattr(error, "errno", None),
+            # ValueError messages above are fixed internal labels, never argv/data.
+            "reason": str(error) if isinstance(error, ValueError) else None,
+        }
+        raise failure from error
 
 
 async def _owned_session_groups(process, pin):
@@ -405,9 +413,16 @@ async def _reap_worker_process(process) -> None:
     reaping.result()
 
 
-async def reap_process(process, *, process_group=True) -> None:
+async def reap_process(
+    process, *, process_group=True, cleanup_timeout=5, census_timeout=0.5
+) -> None:
     """Call only after other stream readers stop; drain pipes to avoid transport leaks."""
     import asyncio
+
+    if not 0 < cleanup_timeout <= 30 or not 0 < census_timeout <= 5:
+        raise ValueError("Invalid process cleanup timeout")
+    if census_timeout != 0.5:
+        process._kirabridge_census_timeout = census_timeout
 
     if not process_group:
         return await _reap_worker_process(process)
@@ -424,7 +439,7 @@ async def reap_process(process, *, process_group=True) -> None:
             asyncio.create_task(discard(process.stderr)),
         ]
         try:
-            async with asyncio.timeout(5):
+            async with asyncio.timeout(cleanup_timeout):
                 if process.stdin is not None:
                     process.stdin.close()
                     try:

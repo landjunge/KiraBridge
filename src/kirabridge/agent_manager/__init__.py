@@ -18,6 +18,7 @@ from kirabridge.agent_manager.grok_structured import GrokStructuredAdapter
 from kirabridge.agent_manager.opencode import OpenCodeAdapter
 from kirabridge.agent_manager.opencode_acp import OpenCodeACPAdapter
 from kirabridge.agent_manager.opencode_http import OpenCodeHTTPAdapter
+from kirabridge.agent_manager.qwen_acp import QwenACPAdapter
 from kirabridge.bridge_core.config import AgentConfig, Config
 from kirabridge.bridge_core.models import AgentInput, BridgeError, TerminalInput, UncertainExecution
 from kirabridge.filesystem_manager import PathScope
@@ -536,6 +537,7 @@ class AgentManager:
             "codex": CodexAdapter(terminal, config),
             "grok_api": GrokAPIAdapter(),
             "grok_acp": GrokACPAdapter(terminal, config),
+            "qwen_acp": QwenACPAdapter(terminal, config),
             "grok_structured": GrokStructuredAdapter(terminal),
             "opencode": OpenCodeAdapter(terminal),
             "opencode_acp": OpenCodeACPAdapter(terminal),
@@ -582,6 +584,19 @@ class AgentManager:
                         }
                         if config.kind
                         in {"opencode", "opencode_http", "gemini_cli", "claude_code", "copilot_cli"}
+                        else {}
+                    ),
+                    **(
+                        {
+                            "execution_mode": "task_scoped_mcp"
+                            if config.bridge_tools
+                            else "isolated_text_only",
+                            "supports_local_tools": config.allow_local_tools
+                            and config.bridge_tools,
+                            "supports_owned_resume": False,
+                            "mcp_tools": config.qwen_mcp_tools,
+                        }
+                        if config.kind == "qwen_acp"
                         else {}
                     ),
                     "executable_runnable": bool(
@@ -648,7 +663,7 @@ class AgentManager:
         if full_access and config.kind in {"grok_acp", "opencode_http"}:
             args = args.model_copy(update={"local_tools": True})
         if args.local_tools and (
-            (config.kind != "grok_acp" and not full_access)
+            (config.kind not in {"grok_acp", "qwen_acp"} and not full_access)
             or not config.allow_local_tools
             or "agent.local_tools" not in principal.capabilities
         ):

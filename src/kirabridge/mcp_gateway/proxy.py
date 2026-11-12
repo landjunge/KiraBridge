@@ -13,7 +13,10 @@ from mcp.types import CallToolResult, TextContent, Tool, ToolAnnotations
 from kirabridge.bridge_core.models import BridgeError, digest
 from kirabridge.local_runtime import connection_observer, peer
 from kirabridge.mcp_gateway.client import MCPClientPool
-from kirabridge.mcp_gateway.schema_validation import SchemaValidatorCache
+from kirabridge.mcp_gateway.schema_validation import (
+    SchemaValidatorCache,
+    explicit_scalar_const_types,
+)
 from kirabridge.mcp_gateway.timing import ToolSpan, instrument_server
 
 SCHEMA_CACHE_SECONDS = 30.0
@@ -178,7 +181,7 @@ def dynamic_call_arguments(item, arguments):
     return {"name": item["name"], **arguments}
 
 
-async def connect_stdio(config, principal):
+async def connect_stdio(config, principal, *, task_policy=None):
     async with MCPClientPool(observer=connection_observer(config, principal)) as pool:
         await pool.connect(peer(config, principal))
         connection = DaemonConnection(pool, peer(config, principal))
@@ -306,7 +309,11 @@ async def connect_stdio(config, principal):
             downstream.add(server.request_context.session)
             baseline = list(await connection.list_tools())
             known = {tool.name for tool in baseline}
-            discovered = await dynamic_catalog()
+            discovered = (
+                await dynamic_catalog()
+                if task_policy is None or any(name.startswith("td_") for name in task_policy.tools)
+                else {}
+            )
             for name, item in discovered.items():
                 if name in known:
                     continue
@@ -328,13 +335,25 @@ async def connect_stdio(config, principal):
                     )
                 )
             await changed()
-            return baseline
+            return (
+                [
+                    tool.model_copy(
+                        update={"inputSchema": explicit_scalar_const_types(tool.inputSchema)}
+                    )
+                    for tool in baseline
+                    if task_policy.permits_tool(tool)
+                ]
+                if task_policy
+                else baseline
+            )
 
         @server.call_tool(validate_input=False)
         async def call_tool(name, arguments):
             try:
                 downstream.add(server.request_context.session)
                 definition = await server._get_cached_tool_definition(name)
+                if task_policy is not None:
+                    await task_policy.authorize(connection, name, arguments, definition=definition)
                 if definition is not None:
                     try:
                         input_validators.validate(arguments or {}, definition.inputSchema)
@@ -377,6 +396,8 @@ async def connect_stdio(config, principal):
                             content=[TextContent(type="text", text=json.dumps(data))],
                             structuredContent=data,
                         )
+                    if task_policy is not None:
+                        task_policy.observe_result(name, arguments, result)
                     await changed()
                     return result
                 result = await connection.call_tool(name, arguments)
@@ -401,7 +422,8 @@ async def connect_stdio(config, principal):
                     try:
                         # Reads only; a failed/uncertain mutation is never retried.
                         # call_tool already refreshes the catalog and revision.
-                        await connection.poll_health()
+                        if task_policy is None:
+                            await connection.poll_health()
                         await changed()
                     except Exception:
                         pass  # The next explicit call reports its connection error.
