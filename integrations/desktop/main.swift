@@ -17,9 +17,9 @@ struct DesktopBootstrapFailure: LocalizedError {
 }
 
 enum DesktopBootstrap {
-    static func run(executable: URL, arguments: [String], environment: [String: String],
-                    timeout: TimeInterval = 60, maxStdoutBytes: Int = 65536,
-                    maxStderrBytes: Int = 65536) throws -> Data {
+    static func runCapture(executable: URL, arguments: [String], environment: [String: String],
+                           timeout: TimeInterval = 60, maxStdoutBytes: Int = 65536,
+                           maxStderrBytes: Int = 65536) throws -> (status: Int32, data: Data) {
         guard timeout.isFinite, timeout > 0, timeout <= 60,
               maxStdoutBytes > 0, maxStdoutBytes <= 1024 * 1024,
               maxStderrBytes > 0, maxStderrBytes <= 1024 * 1024 else {
@@ -76,10 +76,7 @@ enum DesktopBootstrap {
             }
             if !task.isRunning && ended.allSatisfy({ $0 }) {
                 task.waitUntilExit()
-                guard task.terminationStatus == 0 else {
-                    throw DesktopBootstrapFailure(kind: .processFailed, cleanupConfirmed: true)
-                }
-                return data
+                return (task.terminationStatus, data)
             }
             var ready = descriptors.enumerated().map { index, fd in
                 pollfd(fd: ended[index] ? -1 : fd,
@@ -110,6 +107,18 @@ enum DesktopBootstrap {
                 }
             }
         }
+    }
+
+    static func run(executable: URL, arguments: [String], environment: [String: String],
+                    timeout: TimeInterval = 60, maxStdoutBytes: Int = 65536,
+                    maxStderrBytes: Int = 65536) throws -> Data {
+        let (status, data) = try runCapture(executable: executable, arguments: arguments,
+            environment: environment, timeout: timeout, maxStdoutBytes: maxStdoutBytes,
+            maxStderrBytes: maxStderrBytes)
+        guard status == 0 else {
+            throw DesktopBootstrapFailure(kind: .processFailed, cleanupConfirmed: true)
+        }
+        return data
     }
 }
 
@@ -197,7 +206,7 @@ final class DesktopOpenRequests {
 import Cocoa
 import WebKit
 
-final class KiraBridgeApp: NSObject, NSApplicationDelegate, WKUIDelegate, WKNavigationDelegate {
+final class KiraBridgeApp: NSObject, NSApplicationDelegate, WKUIDelegate, WKNavigationDelegate, WKScriptMessageHandler {
     /// The full release version (for example 0.8.0rc41); the bundle short version is numeric only.
     @objc func showAbout(_ sender: Any?) {
         let release = Bundle.main.object(forInfoDictionaryKey: "KiraBridgeVersion") as? String
@@ -213,6 +222,86 @@ final class KiraBridgeApp: NSObject, NSApplicationDelegate, WKUIDelegate, WKNavi
     var bootstrapCleanupUnknown = false
     var navigationPolicy = DesktopNavigationPolicy()
     let openRequests = DesktopOpenRequests()
+
+    /// The five catalog IDs; the web may only ever hand one of these across.
+    private static let familyCatalogIDs: Set<String> = [
+        "kirabridge", "threaddesk", "4allpass", "tollgate", "agent-authority",
+    ]
+
+    /// Catalog-ID-only bridge. The renderer passes exactly one catalog ID and
+    /// receives one of focused/failed/uncertain/missing/opened; it never passes
+    /// a URL, argv, PID or shell text.
+    private static let familyBridgeScript = """
+    (() => {
+      window.__kbFamilyCallbacks = {};
+      window.__kbFamilySwitch = (appId) => new Promise((resolve) => {
+        const id = (typeof crypto !== "undefined" && crypto.randomUUID)
+          ? crypto.randomUUID() : String(Date.now()) + "-" + String(Math.random());
+        window.__kbFamilyCallbacks[id] = resolve;
+        window.webkit.messageHandlers.familySwitch.postMessage({ id: id, appId: String(appId) });
+      });
+    })();
+    """
+
+    func userContentController(_ userContentController: WKUserContentController,
+                               didReceive message: WKScriptMessage) {
+        guard message.name == "familySwitch",
+              let body = message.body as? [String: Any],
+              let id = body["id"] as? String,
+              let appId = body["appId"] as? String,
+              Self.familyCatalogIDs.contains(appId) else {
+            return
+        }
+        performFamilySwitch(id: id, appId: appId)
+    }
+
+    func performFamilySwitch(id: String, appId: String) {
+        let home = FileManager.default.homeDirectoryForCurrentUser
+        let cli = home.appendingPathComponent(".local/bin/kirabridge")
+        let pid = ProcessInfo.processInfo.processIdentifier
+        let arguments = ["--principal", "local", "family", "switch", appId,
+                         "--source-pid", String(pid)]
+        var environment = ProcessInfo.processInfo.environment
+        environment["KIRABRIDGE_CONSOLE_EMBED"] = "1"
+        DispatchQueue.global().async {
+            let outcome: String
+            do {
+                let result = try DesktopBootstrap.runCapture(executable: cli,
+                    arguments: arguments, environment: environment, timeout: 30)
+                outcome = Self.familyOutcome(status: result.status, data: result.data, appId: appId)
+            } catch {
+                outcome = "uncertain"
+            }
+            DispatchQueue.main.async {
+                self.replyFamilySwitch(id: id, outcome: outcome)
+            }
+        }
+    }
+
+    static func familyOutcome(status: Int32, data: Data, appId: String) -> String {
+        guard let value = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let success = value["success"] as? Bool else {
+            return "uncertain"
+        }
+        if success {
+            let active = value["active_product"] as? String
+            return active == appId ? "focused" : "uncertain"
+        }
+        if let unknown = value["execution_outcome_unknown"] as? Bool {
+            return unknown ? "uncertain" : "failed"
+        }
+        return "failed"
+    }
+
+    func replyFamilySwitch(id: String, outcome: String) {
+        guard let mainView else { return }
+        let idJson = String(data: (try? JSONSerialization.data(withJSONObject: id)) ?? Data(),
+                            encoding: .utf8) ?? "\"\""
+        let outcomeJson = String(data: (try? JSONSerialization.data(withJSONObject: outcome)) ?? Data(),
+                                 encoding: .utf8) ?? "\"\""
+        let script = "window.__kbFamilyCallbacks && window.__kbFamilyCallbacks[\(idJson)] && window.__kbFamilyCallbacks[\(idJson)](\(outcomeJson));"
+        mainView.evaluateJavaScript(script, completionHandler: nil)
+    }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.regular)
@@ -246,7 +335,14 @@ final class KiraBridgeApp: NSObject, NSApplicationDelegate, WKUIDelegate, WKNavi
 
     func makeWindow(title: String, width: CGFloat, height: CGFloat, suppliedConfiguration: WKWebViewConfiguration? = nil) -> WKWebView {
         let configuration = suppliedConfiguration ?? WKWebViewConfiguration()
-        if suppliedConfiguration == nil { configuration.websiteDataStore = .default() }
+        if suppliedConfiguration == nil {
+            configuration.websiteDataStore = .default()
+            // Only the main console window bridges the catalog-ID family switch.
+            configuration.userContentController.add(self, name: "familySwitch")
+            configuration.userContentController.addUserScript(
+                WKUserScript(source: Self.familyBridgeScript, injectionTime: .atDocumentStart,
+                             forMainFrameOnly: true))
+        }
         configuration.applicationNameForUserAgent = "KiraBridgeDesktop"
         let view = WKWebView(frame: .zero, configuration: configuration)
         view.uiDelegate = self
