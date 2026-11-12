@@ -490,8 +490,15 @@ class TeamManager:
         session_id = native.get("session_id")
         if not isinstance(session_id, str) or not SESSION.fullmatch(session_id):
             # A terminal non-completed turn keeps its proven identity even when
-            # recovered evidence no longer carries a fresh session id.
-            if state == "unknown" and existing is not None and existing["state"] == "active":
+            # recovered evidence no longer carries a fresh session id. Only the
+            # current owner's reservation may be converted; a foreign work with
+            # no session id must not adopt the slot's identity.
+            if (
+                state == "unknown"
+                and existing is not None
+                and existing["state"] == "active"
+                and existing["work_id"] == work["id"]
+            ):
                 session_id = existing["session_id"]
             else:
                 return

@@ -57,12 +57,14 @@ class Server:
         if path == "/session/ses_test" and request.method == "GET":
             return httpx.Response(200, json={"id": "ses_test"})
         if path.endswith("/prompt_async"):
-            # A new turn appends a new user prompt and a new assistant message
-            # whose parent is exactly that prompt.
+            # A new turn admits the client-assigned messageID as the user prompt
+            # and appends a new assistant message whose parent is exactly it.
             self._turns += 1
-            self.user["info"]["id"] = f"user_{self._turns}"
+            body = json.loads(request.content) if request.content else {}
+            message_id = body.get("messageID", f"user_{self._turns}")
+            self.user["info"]["id"] = message_id
             self.message["info"]["id"] = f"msg_{self._turns}"
-            self.message["info"]["parentID"] = f"user_{self._turns}"
+            self.message["info"]["parentID"] = message_id
             return httpx.Response(204)
         if path == "/session/status":
             status = self.statuses.pop(0) if len(self.statuses) > 1 else self.statuses[0]
@@ -331,14 +333,36 @@ async def test_foreign_parent_response_is_not_accepted(tmp_path):
     def foreign_parent(request):
         if request.url.path.endswith("/prompt_async"):
             server._turns += 1
-            server.user["info"]["id"] = f"user_{server._turns}"  # our prompt admitted
+            body = json.loads(request.content) if request.content else {}
+            server.user["info"]["id"] = body.get("messageID", "user_1")  # our prompt admitted
             server.message["info"]["id"] = f"msg_{server._turns}"  # new assistant
-            # The assistant replies to a foreign prompt, not the one we admitted.
+            # The assistant replies to a foreign prompt, not the messageID we sent.
             server.message["info"]["parentID"] = "user_foreign"
             return httpx.Response(204)
         return original(request)
 
     server.handler = foreign_parent
+    with pytest.raises(UncertainExecution) as caught:
+        await execute(tmp_path, server)
+    assert caught.value.code == "agent_unconfirmed"
+
+
+async def test_foreign_prompt_and_answer_are_not_accepted(tmp_path):
+    server = Server()
+    original = server.handler
+
+    def foreign_turn(request):
+        if request.url.path.endswith("/prompt_async"):
+            server._turns += 1
+            # A foreign client also admits a prompt whose user+assistant pair is
+            # self-consistent, but its parent is not our assigned messageID.
+            server.user["info"]["id"] = "user_foreign"
+            server.message["info"]["id"] = f"msg_{server._turns}"
+            server.message["info"]["parentID"] = "user_foreign"
+            return httpx.Response(204)
+        return original(request)
+
+    server.handler = foreign_turn
     with pytest.raises(UncertainExecution) as caught:
         await execute(tmp_path, server)
     assert caught.value.code == "agent_unconfirmed"

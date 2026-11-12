@@ -7,6 +7,7 @@ import os
 import time
 from pathlib import Path
 from typing import Any
+from uuid import uuid4
 
 import httpx
 
@@ -157,18 +158,6 @@ class OpenCodeHTTPAdapter:
                 return info, [part for part in parts or [] if isinstance(part, dict)]
         return None, []
 
-    @staticmethod
-    def _admitted_user_id(messages: list[dict[str, Any]], prior_ids: set[str]) -> str | None:
-        """Return the id of the user prompt admitted after the pre-prompt snapshot."""
-        for item in messages:
-            info = item.get("info")
-            if not isinstance(info, dict) or info.get("role") != "user":
-                continue
-            ident = info.get("id")
-            if isinstance(ident, str) and ident not in prior_ids:
-                return ident
-        return None
-
     async def execute(
         self, task, args, config, roots, running, progress, *, resume_session=None, **extra
     ) -> dict:
@@ -237,17 +226,13 @@ class OpenCodeHTTPAdapter:
                     {"agent": args.agent, "session_id": session, "event": "session_created"}
                 )
 
-            # Snapshot the message ids before admitting our prompt. A genuine new
-            # turn must produce a new assistant message whose parentID is exactly
-            # the user prompt we admitted, and still belong to the bound session.
+            # Snapshot the newest assistant message before admitting our prompt. A
+            # genuine new turn must produce a new assistant message whose parentID
+            # is exactly the messageID we assign to our own prompt.
             before = await self._messages(client, session, directory)
-            prior_ids = {
-                item.get("info", {}).get("id")
-                for item in before
-                if isinstance(item.get("info"), dict) and isinstance(item["info"].get("id"), str)
-            }
             prior, _ = self._last_assistant(before)
             prior_id = prior.get("id") if prior is not None else None
+            message_id = uuid4().hex
 
             await self._request(
                 client,
@@ -255,6 +240,7 @@ class OpenCodeHTTPAdapter:
                 f"/session/{session}/prompt_async",
                 params={"directory": directory},
                 body={
+                    "messageID": message_id,
                     "model": model,
                     "parts": [{"type": "text", "text": args.prompt}],
                 },
@@ -298,18 +284,15 @@ class OpenCodeHTTPAdapter:
                     )
                 await asyncio.sleep(min(self._poll_interval, remaining))
 
-            messages = await self._messages(client, session, directory)
-            message, parts = self._last_assistant(messages)
-            admitted_id = self._admitted_user_id(messages, prior_ids)
+            message, parts = self._last_assistant(await self._messages(client, session, directory))
             if (
                 message is None
                 or message.get("sessionID") != session
                 or message.get("id") == prior_id
-                or admitted_id is None
-                or message.get("parentID") != admitted_id
+                or message.get("parentID") != message_id
             ):
                 # Only a new assistant message for the bound session, whose parent
-                # is exactly the prompt we admitted, is this turn's result.
+                # is exactly our assigned prompt, is this turn's result.
                 raise UncertainExecution(
                     "agent_unconfirmed", "No new OpenCode turn response observed"
                 )

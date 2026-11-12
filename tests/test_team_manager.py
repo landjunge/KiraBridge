@@ -1163,3 +1163,17 @@ def test_unbound_legacy_work_is_rejected_after_clear(domain):
         {"session_id": "s-legacy", "adapter": "codex"},
     )
     assert domain.session("codex", session_request())["session"]["session_id"] == "s-new"
+
+
+def test_unknown_foreign_job_without_session_id_cannot_adopt_the_slot(domain):
+    domain.config.team.workers["codex"].execution_scope = "separate_managed_session"
+    w1 = domain.delegate("local", work(idempotency_key="w1"))
+    domain.record_session({**w1, "state": "active"}, {"session_id": "s1", "adapter": "codex"})
+    # A newer fresh work fails without any session id while w1 is still active.
+    w2 = domain.delegate("local", work(idempotency_key="w2"))
+    domain.record_session({**w2, "state": "unknown"}, {})
+    # The slot must remain w1's reservation with its session identity intact.
+    row = domain._session_row("test-team", "codex")
+    assert row["session_id"] == "s1"
+    assert row["work_id"] == w1["id"]
+    assert row["state"] == "active"
