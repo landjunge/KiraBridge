@@ -3,6 +3,7 @@
 import asyncio
 import json
 import time
+from copy import deepcopy
 
 from jsonschema import ValidationError
 from mcp.server.lowlevel import NotificationOptions, Server
@@ -149,12 +150,17 @@ def dynamic_input_schema(item):
     """Mutation envelopes keep the peer schema intact and cannot collide with its fields."""
     if not item.get("requires_operation_id", False):
         return item["inputSchema"]
+    schema = item["inputSchema"]
+    if schema.get("$id") in (None, "", "#"):
+        # Keep peer-root pointers rooted at the peer, not this host envelope.
+        schema = deepcopy(schema)
+        schema["$id"] = "urn:kirabridge:threaddesk-input:" + digest(schema)
     return {
         "type": "object",
         "additionalProperties": False,
         "properties": {
             "operation_id": {"type": "string", "pattern": "^[A-Za-z0-9_-]{1,128}$"},
-            "arguments": item["inputSchema"],
+            "arguments": schema,
         },
         "required": ["operation_id", "arguments"],
     }

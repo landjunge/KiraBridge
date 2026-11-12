@@ -60,6 +60,8 @@ Teamaufträge merken sich außerdem die belegte Provider-Sitzung des Bearbeiters
 
 ThreadDesk ergänzt diesen Weg um Projekte und Arbeitsstände; weitere Werkzeuge der Familie sollen im gemeinsamen Sprachablauf zusammenwirken. Die Werkzeuge bleiben eigenständig, und ihre tatsächliche Integration wird nicht mit dem Entwicklungsziel verwechselt.
 
+Der ausdrücklich aktivierte ThreadDesk-Werkzeugproxy unterstützt im Entwicklungsstand begrenzte JSON-Schema-2020-12-Verweise innerhalb des gelieferten Schemas, einschließlich eingebetteter Fachschemas. Er lädt keine Schemas aus dem Netzwerk oder von Datenträgern nach; zyklische, mehrdeutige und nicht unterstützte Schemas bleiben ausgeschlossen. Bestehende Werkzeugrechte und Operationsquittungen gelten weiter. Siehe [Proxy-Vertrag](docs/DYNAMIC-THREADDESK-PROXY.md).
+
 **Verifizierter Laufzeitstand (11. November 2026):** Auf dem Intel-Mac läuft **KiraBridge 0.8.0rc48** (`48c635137b4b`), direkt über den laufenden KiraBridge-Dienst und das veröffentlichte macOS-Pre-Release `v0.8.0rc48` geprüft. Das separat veröffentlichte Debian-/Linux-Archiv ist weiterhin **0.8.0rc41** (`350d368`). **Installierte Version, Quellstand und veröffentlichte Downloads sind unterschiedliche Nachweise.**
 
 **Veröffentlichter macOS-Intel-Download:** [0.8.0rc36](https://github.com/landjunge/KiraBridge/releases/tag/v0.8.0rc36) · 4. November 2026 · Vorabversion.

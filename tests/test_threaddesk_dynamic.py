@@ -106,6 +106,187 @@ async def test_discovery_and_call_use_live_catalog_and_validate_schema(monkeypat
     assert bridge.threaddesk.pool.call.await_count == 1
 
 
+async def test_embedded_domain_refs_keep_scope_and_validate_before_peer(monkeypatch, config):
+    # ThreadDesk 869a38970bac services/mcp_commands.py:input_schema embeds the
+    # domain's own $id and lifts revision fields by referring into that resource.
+    domain_id = "urn:threaddesk:mcp-command:" + "a" * 64
+    schema = {
+        "type": "object",
+        "additionalProperties": False,
+        "$defs": {"Identifier": {"const": "outer"}},
+        "properties": {
+            "workspace_id": {"type": "string"},
+            "arguments": {
+                "$id": domain_id,
+                "type": "object",
+                "additionalProperties": False,
+                "$defs": {"Identifier": {"type": "string", "pattern": "^inner$"}},
+                "properties": {
+                    "id": {"$ref": "#/$defs/Identifier"},
+                    "expected_revision": {"type": "integer", "minimum": 0},
+                },
+                "required": ["id"],
+            },
+            "expected_revision": {"$ref": domain_id + "#/properties/expected_revision"},
+        },
+        "required": ["workspace_id", "arguments", "expected_revision"],
+    }
+    bridge, listing = bridge_fixture(monkeypatch, config)
+    listing.tools = [tool("scoped_read", schema=schema)]
+    assert (await catalog(bridge, "local"))["tools"][0]["inputSchema"] == schema
+    arguments = {"workspace_id": "local", "arguments": {"id": "inner"}, "expected_revision": 2}
+    await read(bridge, "local", "scoped_read", arguments)
+    bridge.threaddesk.pool.call.assert_awaited_once_with("threaddesk", "scoped_read", arguments)
+    for invalid in (
+        {**arguments, "arguments": {"id": "outer"}},
+        {**arguments, "expected_revision": "2"},
+        {**arguments, "expected_revision": -1},
+    ):
+        with pytest.raises(BridgeError, match="Arguments do not match"):
+            await read(bridge, "local", "scoped_read", invalid)
+    assert bridge.threaddesk.pool.call.await_count == 1
+
+
+@pytest.mark.parametrize(
+    "schema",
+    [
+        {"type": "object", "properties": {"x": {"$ref": "https://example.invalid/schema"}}},
+        {"type": "object", "properties": {"x": {"$ref": "file:///tmp/schema.json"}}},
+        {"type": "object", "properties": {"x": {"$ref": "#/$defs/missing"}}},
+        {"type": "object", "$ref": "#"},
+        {"type": "object", "$ref": "#/const", "const": 1},
+        {"type": "object", "properties": {"x": {"$dynamicRef": "https://example.invalid/x"}}},
+        {
+            "type": "object",
+            "properties": {
+                "x": {"$schema": "http://json-schema.org/draft-04/schema#", "type": "integer"}
+            },
+        },
+        {
+            "type": "object",
+            "$defs": {
+                "old": {"$schema": "http://json-schema.org/draft-04/schema#", "allOf": [False]}
+            },
+        },
+        {
+            "type": "object",
+            "$id": "https://schemas.invalid/base/",
+            "$defs": {"one": {"$id": "item"}, "two": {"$id": "./item"}},
+        },
+        {
+            "type": "object",
+            "$defs": {
+                "one": {"$id": "urn:duplicate", "type": "integer"},
+                "two": {"$id": "urn:duplicate", "type": "string"},
+            },
+            "properties": {"x": {"$ref": "urn:duplicate"}},
+        },
+    ],
+    ids=[
+        "http",
+        "file",
+        "missing",
+        "cycle",
+        "non-schema-target",
+        "dynamic",
+        "mixed-dialect",
+        "old-dialect-boolean",
+        "uri-alias",
+        "ambiguous-resource",
+    ],
+)
+async def test_unclosed_schema_graph_never_enters_discovery_or_calls_peer(
+    monkeypatch, config, schema
+):
+    def no_network(*args, **kwargs):
+        pytest.fail("Schema validation attempted network retrieval")
+
+    monkeypatch.setattr("urllib.request.urlopen", no_network)
+    monkeypatch.setattr("jsonschema.validators.urlopen", no_network)
+    bridge, listing = bridge_fixture(monkeypatch, config)
+    listing.tools = [tool("unsafe", schema=schema)]
+    assert (await catalog(bridge, "local"))["tools"] == []
+    with pytest.raises(BridgeError):
+        await read(bridge, "local", "unsafe", {"x": 1})
+    bridge.threaddesk.pool.call.assert_not_awaited()
+
+
+async def test_reference_expansion_budget_blocks_small_exponential_graph(monkeypatch, config):
+    definitions = {"leaf": {"type": "integer"}}
+    previous = "leaf"
+    for index in range(12):
+        name = f"level{index}"
+        definitions[name] = {"allOf": [{"$ref": f"#/$defs/{previous}"}] * 2}
+        previous = name
+    schema = {
+        "type": "object",
+        "$defs": definitions,
+        "properties": {"x": {"$ref": f"#/$defs/{previous}"}},
+    }
+    bridge, listing = bridge_fixture(monkeypatch, config)
+    listing.tools = [tool("expanding", schema=schema)]
+    assert (await catalog(bridge, "local"))["tools"] == []
+    bridge.threaddesk.pool.call.assert_not_awaited()
+
+
+async def test_annotation_re_evaluation_chain_is_rejected_before_validation(monkeypatch, config):
+    definitions = {"leaf": {"type": "object"}}
+    previous = "leaf"
+    for index in range(20):
+        name = f"level{index}"
+        definitions[name] = {
+            "allOf": [{"$ref": f"#/$defs/{previous}"}],
+            "unevaluatedProperties": False,
+        }
+        previous = name
+    schema = {"type": "object", "$defs": definitions, "$ref": f"#/$defs/{previous}"}
+    bridge, listing = bridge_fixture(monkeypatch, config)
+    listing.tools = [tool("annotation_chain", schema=schema)]
+    assert (await catalog(bridge, "local"))["tools"] == []
+    bridge.threaddesk.pool.call.assert_not_awaited()
+
+
+async def test_relative_resource_names_in_disjoint_scopes_validate(monkeypatch, config):
+    schema = {
+        "type": "object",
+        "$id": "https://schemas.invalid/",
+        "properties": {
+            name: {
+                "$id": f"{name}/",
+                "type": "object",
+                "$defs": {"value": {"$id": "item", "const": name}},
+                "properties": {"value": {"$ref": "item"}},
+                "required": ["value"],
+            }
+            for name in ("one", "two")
+        },
+    }
+    bridge, listing = bridge_fixture(monkeypatch, config)
+    listing.tools = [tool("scoped_names", schema=schema)]
+    await read(bridge, "local", "scoped_names", {"one": {"value": "one"}, "two": {"value": "two"}})
+    with pytest.raises(BridgeError, match="Arguments do not match"):
+        await read(bridge, "local", "scoped_names", {"one": {"value": "two"}})
+    assert bridge.threaddesk.pool.call.await_count == 1
+
+
+@pytest.mark.parametrize("root_id", [None, "urn:root"])
+@pytest.mark.parametrize("alias_id", ["", "#"])
+async def test_empty_embedded_resource_identity_cannot_shadow_root(
+    monkeypatch, config, root_id, alias_id
+):
+    schema = {
+        "type": "object",
+        "$defs": {"alias": {"$id": alias_id, "type": "integer"}},
+        "properties": {"x": {"$ref": root_id or "#"}},
+    }
+    if root_id is not None:
+        schema["$id"] = root_id
+    bridge, listing = bridge_fixture(monkeypatch, config)
+    listing.tools = [tool("shadow_root", schema=schema)]
+    assert (await catalog(bridge, "local"))["tools"] == []
+    bridge.threaddesk.pool.call.assert_not_awaited()
+
+
 @pytest.mark.asyncio
 async def test_proxy_disabled_or_approval_required_means_no_peer_execution(monkeypatch, config):
     bridge, _ = bridge_fixture(monkeypatch, config, enabled=False)
@@ -270,12 +451,37 @@ def test_proxy_mutation_envelope_preserves_peer_operation_id_schema():
     schema = {"type": "object", "properties": {"operation_id": {"type": "integer"}}}
     item = {"name": "future_write", "inputSchema": schema, "requires_operation_id": True}
     wrapped = dynamic_input_schema(item)
-    assert wrapped["properties"]["arguments"] is schema
+    assert wrapped["properties"]["arguments"]["properties"] == schema["properties"]
+    assert "$id" not in schema
     assert wrapped["properties"]["operation_id"]["type"] == "string"
     args = {"operation_id": "kb-owned-id", "arguments": {"operation_id": 17}}
     assert dynamic_call_arguments(item, args) == {"name": "future_write", **args}
     with pytest.raises(BridgeError):
         dynamic_call_arguments(item, {"operation_id": 17})
+
+
+def test_mutation_host_schema_preserves_peer_root_references():
+    from jsonschema import ValidationError
+
+    from kirabridge.mcp_gateway.proxy import dynamic_input_schema
+    from kirabridge.mcp_gateway.schema_validation import SchemaValidatorCache
+
+    schema = {
+        "type": "object",
+        "additionalProperties": False,
+        "$defs": {"Revision": {"type": "integer", "minimum": 0}},
+        "properties": {"expected_revision": {"$ref": "#/$defs/Revision"}},
+        "required": ["expected_revision"],
+    }
+    item = {"inputSchema": schema, "requires_operation_id": True}
+    host = dynamic_input_schema(item)
+    validator = SchemaValidatorCache()
+    validator.validate({"operation_id": "op-one", "arguments": {"expected_revision": 1}}, host)
+    with pytest.raises(ValidationError):
+        validator.validate(
+            {"operation_id": "op-one", "arguments": {"expected_revision": "1"}}, host
+        )
+    assert "$id" not in schema
 
 
 @pytest.mark.parametrize("arguments", [{"id": float("nan")}, {"id": float("inf")}])

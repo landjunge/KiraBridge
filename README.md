@@ -60,6 +60,8 @@ Team assignments now also keep the proven provider session for each worker. A la
 
 ThreadDesk adds projects and work history to this workflow, while the other family tools are intended to work together through the shared voice interface. Each tool remains independent; integration plans are not presented as shipped functionality.
 
+In the development source, the opt-in ThreadDesk tool proxy accepts bounded JSON Schema 2020-12 references within the supplied schema, including embedded domain resources. References cannot load schemas from the network or disk; cyclic, ambiguous and unsupported schemas remain excluded. Existing tool permissions and operation receipts still apply. See the [proxy contract](docs/DYNAMIC-THREADDESK-PROXY.md).
+
 **Server edition:** KiraBridge also runs on Debian; server source and local macOS installation are tracked separately. A server source revision is not itself a published installer. / **Server-Version:** KiraBridge läuft auch auf Debian; Quellstand und veröffentlichte Downloads sind getrennt.
 
 **Verified runtime status (November 11, 2026):** The Intel Mac is running **KiraBridge 0.8.0rc48** (`48c635137b4b`), verified through the live KiraBridge daemon and the published macOS pre-release `v0.8.0rc48`. The separately published Debian/Linux archive is still **0.8.0rc41** (`350d368`); this is a published server package, not the installed Mac build. **Installed, repository-source, and downloadable versions must not be conflated.**
