@@ -162,6 +162,11 @@ struct DesktopNavigationPolicy {
         guard let url else { return false }
         return isConsoleOrigin(url) && url.path == "/protocol"
     }
+
+    /// The console root, which the login redirect targets; live mode replaces it.
+    func isConsoleRoot(_ url: URL) -> Bool {
+        isConsoleOrigin(url) && url.path == "/"
+    }
 }
 
 final class DesktopOpenRequests {
@@ -211,6 +216,7 @@ final class KiraBridgeApp: NSObject, NSApplicationDelegate, WKUIDelegate, WKNavi
     var mainView: WKWebView!
     var bootstrapInProgress = false
     var bootstrapCleanupUnknown = false
+    var liveMode = false
     var navigationPolicy = DesktopNavigationPolicy()
     let openRequests = DesktopOpenRequests()
 
@@ -237,9 +243,16 @@ final class KiraBridgeApp: NSObject, NSApplicationDelegate, WKUIDelegate, WKNavi
         }
         let storedWidth = (preference("window_width") as? NSNumber)?.doubleValue ?? 1120
         let storedHeight = (preference("window_height") as? NSNumber)?.doubleValue ?? 780
-        let width = storedWidth.isFinite && (820...4096).contains(storedWidth) ? storedWidth : 1120
-        let height = storedHeight.isFinite && (620...4096).contains(storedHeight) ? storedHeight : 780
-        mainView = makeWindow(title: "KiraBridge", width: width, height: height)
+        liveMode = CommandLine.arguments.contains("--live")
+        let width = liveMode
+            ? 520
+            : storedWidth.isFinite && (820...4096).contains(storedWidth) ? storedWidth : 1120
+        let height = liveMode
+            ? 680
+            : storedHeight.isFinite && (620...4096).contains(storedHeight) ? storedHeight : 780
+        mainView = makeWindow(
+            title: liveMode ? "KiraBridge Live" : "KiraBridge", width: width, height: height
+        )
         bootstrap()
         NSApp.activate(ignoringOtherApps: true)
     }
@@ -253,7 +266,7 @@ final class KiraBridgeApp: NSObject, NSApplicationDelegate, WKUIDelegate, WKNavi
         view.navigationDelegate = self
         let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: width, height: height), styleMask: [.titled, .closable, .miniaturizable, .resizable], backing: .buffered, defer: false)
         window.title = title
-        window.minSize = NSSize(width: 820, height: 620)
+        window.minSize = liveMode ? NSSize(width: 420, height: 420) : NSSize(width: 820, height: 620)
         window.contentView = view
         window.isReleasedWhenClosed = false
         window.center()
@@ -340,6 +353,18 @@ final class KiraBridgeApp: NSObject, NSApplicationDelegate, WKUIDelegate, WKNavi
     }
 
     func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction, decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
+        // Live mode: the login redirect to the console root is replaced by the
+        // compact /live monitor on the same origin (same authorized projection).
+        if liveMode, webView === mainView,
+           navigationAction.targetFrame?.isMainFrame == true,
+           let url = navigationAction.request.url,
+           navigationPolicy.isConsoleRoot(url) {
+            decisionHandler(.cancel)
+            if let live = URL(string: "/live", relativeTo: url) {
+                mainView.load(URLRequest(url: live))
+            }
+            return
+        }
         switch navigationPolicy.decision(for: navigationAction.request.url,
                                          activated: navigationAction.navigationType == .linkActivated) {
         case .external:
