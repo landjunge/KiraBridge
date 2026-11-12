@@ -48,9 +48,11 @@ class Server:
         if path == "/session/ses_test" and request.method == "GET":
             return httpx.Response(200, json={"id": "ses_test"})
         if path.endswith("/prompt_async"):
-            # A new turn appends a new assistant message with a new id.
+            # A new turn appends a new assistant message with a new id and a new
+            # user prompt as its parent.
             self._turns += 1
             self.message["info"]["id"] = f"msg_{self._turns}"
+            self.message["info"]["parentID"] = f"prompt_{self._turns}"
             return httpx.Response(204)
         if path == "/session/status":
             status = self.statuses.pop(0) if len(self.statuses) > 1 else self.statuses[0]
@@ -302,3 +304,36 @@ async def test_idle_baseline_message_is_not_reused_as_a_new_turn(tmp_path):
     with pytest.raises(UncertainExecution) as caught:
         await execute(tmp_path, server, resume_session="ses_test")
     assert caught.value.code == "agent_unconfirmed"
+
+
+async def test_foreign_session_response_is_not_accepted(tmp_path):
+    server = Server()
+    server.message["info"]["sessionID"] = "ses_foreign"
+    with pytest.raises(UncertainExecution) as caught:
+        await execute(tmp_path, server)
+    assert caught.value.code == "agent_unconfirmed"
+
+
+async def test_foreign_parent_response_is_not_accepted(tmp_path):
+    server = Server()
+    original = server.handler
+
+    def foreign_parent(request):
+        if request.url.path.endswith("/prompt_async"):
+            server._turns += 1
+            server.message["info"]["id"] = f"msg_{server._turns}"
+            # parentID stays the baseline: the assistant replied to a foreign prompt.
+            return httpx.Response(204)
+        return original(request)
+
+    server.handler = foreign_parent
+    with pytest.raises(UncertainExecution) as caught:
+        await execute(tmp_path, server)
+    assert caught.value.code == "agent_unconfirmed"
+
+
+async def test_resume_from_initial_idle_still_detects_the_new_turn(tmp_path):
+    server = Server(statuses=("idle",))
+    result, _, _ = await execute(tmp_path, server, resume_session="ses_test")
+    assert result["success"] and result["text"] == "Harmless answer"
+    assert result["evidence"]["session_resumed"] is True

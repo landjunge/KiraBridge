@@ -227,9 +227,11 @@ class OpenCodeHTTPAdapter:
 
             # Snapshot the newest assistant message before admitting the prompt, so
             # a completed idle baseline from a previous turn can never be mistaken
-            # for this turn's new response.
+            # for this turn's new response. A genuine new turn must then differ in
+            # id and parentID and still belong to the exact bound session.
             prior, _ = self._last_assistant(await self._messages(client, session, directory))
             prior_id = prior.get("id") if prior is not None else None
+            prior_parent = prior.get("parentID") if prior is not None else None
 
             await self._request(
                 client,
@@ -270,7 +272,9 @@ class OpenCodeHTTPAdapter:
                     if (
                         message is not None
                         and _completed(message)
+                        and message.get("sessionID") == session
                         and message.get("id") != prior_id
+                        and message.get("parentID") != prior_parent
                     ):
                         break
                 remaining = deadline - time.monotonic()
@@ -281,9 +285,14 @@ class OpenCodeHTTPAdapter:
                 await asyncio.sleep(min(self._poll_interval, remaining))
 
             message, parts = self._last_assistant(await self._messages(client, session, directory))
-            if message is None or message.get("id") == prior_id:
-                # Only a new assistant message proves this turn; an unchanged last
-                # message is just the idle baseline of an earlier turn.
+            if (
+                message is None
+                or message.get("sessionID") != session
+                or message.get("id") == prior_id
+                or message.get("parentID") == prior_parent
+            ):
+                # Only a new assistant message for the bound session proves this
+                # turn; a foreign or unchanged message is not this turn's result.
                 raise UncertainExecution(
                     "agent_unconfirmed", "No new OpenCode turn response observed"
                 )
