@@ -95,12 +95,12 @@ HTML = r"""<!doctype html>
 <link rel="stylesheet" href="/grok-connector.css">
 <script src="/grok-connector.js" defer></script>
 <link rel="stylesheet" href="/networkpunkt-appbar.css"><link rel="stylesheet" href="/product-header.css"><script type="module" src="/product-header.js"></script></head><body class="np-ui np-scroll"><main class="console">
-<header class="console-header"><div class="np-appbar-host" data-product-header></div><div><p class="np-meta" data-t="local">Auf diesem Mac · lokaler Zugang</p>
+<header class="console-header kb-product-header"><a class="kb-wordmark" href="/" aria-label="KiraBridge"><img src="/kirabridge-wordmark.svg" width="195" height="32" alt="KiraBridge"></a><div class="np-appbar-host" data-product-header></div><div class="kb-language" role="group" aria-label="Sprache / Language"><button type="button" data-language="de">DE</button><button type="button" data-language="en">EN</button></div><div class="kb-page-intro"><p class="np-meta" data-t="local">Auf diesem Mac · lokaler Zugang</p>
 <h1>KiraBridge · Grok App</h1><p data-t="intro">Die Grok-App einmalig verbinden und ihren Zugang prüfen.</p></div>
 <nav class="np-actions"><a class="np-button" href="/" data-t="tasks">Aufträge</a>
 <a class="np-button" href="/team">Team</a>
-<button class="np-button" type="button" data-language="de">DE</button>
-<button class="np-button" type="button" data-language="en">EN</button>
+
+
 <button class="np-button" type="button" id="refresh" data-t="refresh">Aktualisieren</button></nav></header>
 <p id="notice" class="np-notice" role="status" aria-live="polite"></p>
 <section class="mode-panel"><h2 data-t="urlTitle">1 · Verbindung in Grok eintragen</h2>

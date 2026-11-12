@@ -25,4 +25,8 @@ async def test_all_five_original_images_are_served_under_existing_console_bounda
             assert response.headers["content-type"] == "image/png"
             assert hashlib.sha256(response.content).hexdigest() == item["sha256"]
         assert (await client.get("/networkpunkt-product-header.js")).status_code == 200
+        wordmark = await client.get("/kirabridge-wordmark.svg")
+        assert wordmark.headers["content-type"] == "image/svg+xml"
+        original = assets.parents[2] / "assets/design/wordmarks/KiraBridge-dark.svg"
+        assert wordmark.content == original.read_bytes()
         assert (await client.get("/api/control/status")).status_code == 401

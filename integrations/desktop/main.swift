@@ -220,24 +220,24 @@ final class KiraBridgeApp: NSObject, NSApplicationDelegate, WKUIDelegate, WKNavi
     var mainView: WKWebView!
     var bootstrapInProgress = false
     var bootstrapCleanupUnknown = false
+    var familySwitchInProgress = false
+    var familySwitchUnknown = false
+    var mainNavigationGeneration: UInt64 = 0
     var navigationPolicy = DesktopNavigationPolicy()
     let openRequests = DesktopOpenRequests()
 
-    /// The five catalog IDs; the web may only ever hand one of these across.
-    private static let familyCatalogIDs: Set<String> = [
-        "kirabridge", "threaddesk", "4allpass", "tollgate", "agent-authority",
-    ]
-
     /// Catalog-ID-only bridge. The renderer passes exactly one catalog ID and
-    /// receives one of focused/failed/uncertain/missing/opened; it never passes
+    /// receives one of focused/failed/uncertain/missing; it never passes
     /// a URL, argv, PID or shell text.
     private static let familyBridgeScript = """
     (() => {
-      window.__kbFamilyCallbacks = {};
+      window.__kbFamilyCallbacks = Object.create(null);
       window.__kbFamilySwitch = (appId) => new Promise((resolve) => {
         const id = (typeof crypto !== "undefined" && crypto.randomUUID)
           ? crypto.randomUUID() : String(Date.now()) + "-" + String(Math.random());
-        window.__kbFamilyCallbacks[id] = resolve;
+        window.__kbFamilyCallbacks[id] = outcome => {
+          delete window.__kbFamilyCallbacks[id]; resolve(outcome);
+        };
         window.webkit.messageHandlers.familySwitch.postMessage({ id: id, appId: String(appId) });
       });
     })();
@@ -245,17 +245,41 @@ final class KiraBridgeApp: NSObject, NSApplicationDelegate, WKUIDelegate, WKNavi
 
     func userContentController(_ userContentController: WKUserContentController,
                                didReceive message: WKScriptMessage) {
+        // Only the exact main console view, its main frame and the fixed console
+        // origin may drive a family switch; subframes, popups and foreign origins
+        // are ignored (the reply is bound to this same main view).
         guard message.name == "familySwitch",
+              let view = mainView,
+              userContentController === view.configuration.userContentController,
+              message.webView === mainView,
+              !view.isLoading, Self.isConsoleURL(view.url),
+              familySwitchAdmits(sameView: message.webView === view,
+                  mainFrame: message.frameInfo.isMainFrame,
+                  scheme: message.frameInfo.securityOrigin.protocol,
+                  host: message.frameInfo.securityOrigin.host,
+                  port: message.frameInfo.securityOrigin.port, body: message.body),
               let body = message.body as? [String: Any],
               let id = body["id"] as? String,
-              let appId = body["appId"] as? String,
-              Self.familyCatalogIDs.contains(appId) else {
+              let appId = body["appId"] as? String else {
             return
         }
-        performFamilySwitch(id: id, appId: appId)
+        performFamilySwitch(id: id, appId: appId, view: view, generation: mainNavigationGeneration)
     }
 
-    func performFamilySwitch(id: String, appId: String) {
+    static func isConsoleURL(_ url: URL?) -> Bool {
+        guard let url else { return false }
+        return url.scheme == "http" && url.host == "127.0.0.1" && url.port == 8766
+            && url.user == nil && url.password == nil
+    }
+
+    func performFamilySwitch(id: String, appId: String, view: WKWebView, generation: UInt64) {
+        guard !familySwitchUnknown else {
+            replyFamilySwitch(id: id, outcome: "uncertain", view: view, generation: generation); return
+        }
+        guard !familySwitchInProgress else {
+            replyFamilySwitch(id: id, outcome: "failed", view: view, generation: generation); return
+        }
+        familySwitchInProgress = true
         let home = FileManager.default.homeDirectoryForCurrentUser
         let cli = home.appendingPathComponent(".local/bin/kirabridge")
         let pid = ProcessInfo.processInfo.processIdentifier
@@ -268,39 +292,27 @@ final class KiraBridgeApp: NSObject, NSApplicationDelegate, WKUIDelegate, WKNavi
             do {
                 let result = try DesktopBootstrap.runCapture(executable: cli,
                     arguments: arguments, environment: environment, timeout: 30)
-                outcome = Self.familyOutcome(status: result.status, data: result.data, appId: appId)
+                outcome = familySwitchOutcome(status: result.status, data: result.data, appId: appId)
             } catch {
-                outcome = "uncertain"
+                let failure = error as? DesktopBootstrapFailure
+                outcome = failure?.kind == .processFailed && failure?.cleanupConfirmed == true
+                    ? "missing" : "uncertain"
             }
             DispatchQueue.main.async {
-                self.replyFamilySwitch(id: id, outcome: outcome)
+                self.familySwitchInProgress = false
+                if outcome == "uncertain" { self.familySwitchUnknown = true }
+                self.replyFamilySwitch(id: id, outcome: outcome, view: view, generation: generation)
             }
         }
     }
 
-    static func familyOutcome(status: Int32, data: Data, appId: String) -> String {
-        guard let value = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-              let success = value["success"] as? Bool else {
-            return "uncertain"
-        }
-        if success {
-            let active = value["active_product"] as? String
-            return active == appId ? "focused" : "uncertain"
-        }
-        if let unknown = value["execution_outcome_unknown"] as? Bool {
-            return unknown ? "uncertain" : "failed"
-        }
-        return "failed"
-    }
-
-    func replyFamilySwitch(id: String, outcome: String) {
-        guard let mainView else { return }
-        let idJson = String(data: (try? JSONSerialization.data(withJSONObject: id)) ?? Data(),
-                            encoding: .utf8) ?? "\"\""
-        let outcomeJson = String(data: (try? JSONSerialization.data(withJSONObject: outcome)) ?? Data(),
-                                 encoding: .utf8) ?? "\"\""
+    func replyFamilySwitch(id: String, outcome: String, view: WKWebView, generation: UInt64) {
+        guard view === mainView, generation == mainNavigationGeneration,
+              !view.isLoading, Self.isConsoleURL(view.url) else { return }
+        let idJson = familySwitchJsonString(id)
+        let outcomeJson = familySwitchJsonString(outcome)
         let script = "window.__kbFamilyCallbacks && window.__kbFamilyCallbacks[\(idJson)] && window.__kbFamilyCallbacks[\(idJson)](\(outcomeJson));"
-        mainView.evaluateJavaScript(script, completionHandler: nil)
+        view.evaluateJavaScript(script, completionHandler: nil)
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -408,9 +420,15 @@ final class KiraBridgeApp: NSObject, NSApplicationDelegate, WKUIDelegate, WKNavi
     }
 
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
-        windows.first?.makeKeyAndOrderFront(nil)
-        bootstrap()
+        mainView?.window?.makeKeyAndOrderFront(nil)
+        // A family Reopen must preserve the owned main view and its state.
+        // Only an unfinished first login may need the existing bootstrap path.
+        if navigationPolicy.loginFile == nil && !bootstrapCleanupUnknown { bootstrap() }
         return true
+    }
+
+    func webView(_ webView: WKWebView, didStartProvisionalNavigation navigation: WKNavigation!) {
+        if webView === mainView { mainNavigationGeneration &+= 1 }
     }
 
     func application(_ sender: NSApplication, openFiles filenames: [String]) {

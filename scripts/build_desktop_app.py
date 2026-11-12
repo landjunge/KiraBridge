@@ -30,6 +30,7 @@ def build(destination=None):
     source = root / "integrations/desktop/main.swift"
     native_sources = [
         source,
+        root / "integrations/desktop/FamilySwitchLogic.swift",
         root / "integrations/desktop/SystemBridge.swift",
         root / "integrations/desktop/SystemControl.swift",
         root / "integrations/desktop/SystemServices.swift",
