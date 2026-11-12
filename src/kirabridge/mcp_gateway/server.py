@@ -347,6 +347,25 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
         return safe(action)
 
     @server.tool(annotations=read)
+    def live_status(ctx: Context) -> dict[str, Any]:
+        """Compact read-only projection of observed agent work for KiraBridge Live.
+
+        The same projection the desktop monitor shows, available even when the
+        monitor window is closed. Per entry: agent family, task id, a short
+        current step, an honest state (queued/working/waiting/blocked/unknown/
+        completed) and the observation time with stale/unknown marking. Summarise
+        it from `summary_text` (or the `agents` list); never prompts, thoughts,
+        secrets or raw logs. A present process is not confirmed facharbeit.
+        """
+
+        def action():
+            from kirabridge.live_status import project
+
+            return project(bridge, identity(ctx))
+
+        return safe(action)
+
+    @server.tool(annotations=read)
     async def read_query(query: dict[str, Any], ctx: Context) -> dict[str, Any]:
         """Direct authorized read without tasks or Events subscriptions.
 
@@ -434,7 +453,7 @@ def create_server(bridge: Bridge, *, transport: str = "stdio", principal: str = 
         fresh per call. No writes, nested batches, retries or atomic snapshots.
         Allowed: bridge_health, clipboard_info, operation_catalog, task_get,
         task_events, task_diagnose, task_list, policy_inspect, bridge_readiness,
-        agent_inventory, macos_status, live_logs, session_catalog, session_read,
+        agent_inventory, macos_status, live_logs, live_status, session_catalog, session_read,
         whiteboard_read, read_query (one non-batch query).
         JSON text results only: use the original tool for images. The cooperative
         deadline is 12s and the result budget 2 MiB; partial results are explicit.

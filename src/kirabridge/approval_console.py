@@ -88,6 +88,8 @@ class ApprovalConsole:
                 Route("/product-header.js", self.asset),
                 Route("/product-header.css", self.asset),
                 Route("/protocol.js", self.asset),
+                Route("/live.js", self.asset),
+                Route("/live.css", self.asset),
                 Route("/api/tasks", self.tasks),
                 Route("/api/tasks/{task_id}", self.task),
                 Route("/api/tasks/{task_id}/{decision}", self.decide, methods=["POST"]),

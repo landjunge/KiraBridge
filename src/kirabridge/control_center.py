@@ -21,7 +21,9 @@ class ControlCenter:
         self.seen_surfaces = set()
         self.routes = [
             Route("/protocol", self.protocol_page),
+            Route("/live", self.live_page),
             Route("/api/control/status", self.status),
+            Route("/api/control/live", self.live),
             Route("/api/control/action", self.action, methods=["POST"]),
             Route("/api/control/doctor", self.doctor, methods=["GET", "POST"]),
             Route("/api/control/permissions", self.permissions, methods=["POST"]),
@@ -80,6 +82,25 @@ class ControlCenter:
 
     async def protocol_page(self, request):
         return HTMLResponse((ASSETS / "protocol.html").read_text())
+
+    async def live_page(self, request):
+        return HTMLResponse((ASSETS / "live.html").read_text())
+
+    async def live(self, request):
+        self.authenticate(request)
+        try:
+            return JSONResponse(await self.service.live_status())
+        except BridgeError as exc:
+            return JSONResponse(
+                {"ok": False, "error": {"code": exc.code, "message": str(exc)}},
+                status_code=503,
+            )
+        except Exception as exc:
+            code = getattr(exc, "code", "unreachable")
+            return JSONResponse(
+                {"ok": False, "error": {"code": code, "message": str(exc)}},
+                status_code=503,
+            )
 
     async def protocol(self, request):
         self.authenticate(request)

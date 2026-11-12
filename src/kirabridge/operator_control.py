@@ -81,6 +81,10 @@ class OperatorControl:
     async def rpc(self, *args, **kwargs):
         return await self.daemon.call(*args, **kwargs)
 
+    async def live_status(self):
+        """Same compact projection the authorized MCP read returns."""
+        return await self.rpc("live_status", timeout=3)
+
     async def command(self, *args, **kwargs):
         return await self.platform.command(*args, **kwargs)
 
