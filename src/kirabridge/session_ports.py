@@ -49,3 +49,4 @@ class SessionPorts:
     clipboard_lock: object
     readiness: Callable | None = None
     visible_required: Callable | None = None
+    agent_started: Callable | None = None

@@ -2,13 +2,15 @@
 
 import asyncio
 import sys
+import time
 from copy import deepcopy
+from dataclasses import replace
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, Mock
 
 import pytest
 
-from kirabridge.bridge_core.models import BridgeError
+from kirabridge.bridge_core.models import BridgeError, UncertainExecution
 from kirabridge.session_manager import SessionManager, SessionOpen
 from kirabridge.session_ports import SessionPorts
 
@@ -99,3 +101,125 @@ async def test_unique_new_window_keeps_exact_handle_and_command(tmp_path, native
     native.send_confirmed.assert_awaited_once()
     assert native.send_confirmed.await_args.args[0] == selected
     authorization.window_outcome.assert_called_once_with("chatgpt", "new-window", "opened")
+
+
+async def test_interactive_agent_start_reports_bound_process_lifecycle(
+    tmp_path, native_session_platform
+):
+    shell = row()
+    agent = {
+        **shell,
+        "processes": [{"pid": 901, "ppid": shell["expected_pid"], "name": "codex"}],
+    }
+    manager, native, _ = manager_for_open(tmp_path, [shell])
+    native.catalog = AsyncMock(side_effect=[[shell], [agent]])
+    native.read = AsyncMock(return_value={"text": "Codex composer"})
+    profile = SimpleNamespace(executable=sys.executable)
+    binding = AsyncMock(return_value={"state": "bound"})
+    manager.ports = replace(
+        manager.ports,
+        agent_registry=lambda: ({"codex": profile}, {}),
+        agent_started=binding,
+    )
+    manager.agent_registry = manager.ports.agent_registry
+
+    result = await manager.open(
+        "chatgpt",
+        SessionOpen(cwd=str(tmp_path), argv=[sys.executable]),
+        task_id="codex-start",
+    )
+
+    assert result["lifecycle"] == {
+        "window": "confirmed",
+        "command": "submitted",
+        "agent_process": "started",
+        "agent_pid": 901,
+        "binding": "bound",
+        "input_readiness": "unknown",
+    }
+    binding.assert_awaited_once_with("chatgpt", "codex", {**agent, "agent_pid": 901})
+    native.send_confirmed.assert_awaited_once()
+
+
+async def test_started_agent_only_matches_the_launch_executable(tmp_path, native_session_platform):
+    manager, _, _ = manager_for_open(tmp_path, [])
+    profile = SimpleNamespace(executable=sys.executable)
+    manager.ports = replace(
+        manager.ports,
+        agent_registry=lambda: ({"codex": profile}, {}),
+    )
+    manager.agent_registry = manager.ports.agent_registry
+
+    # The executable as a data argument (not argv[0]) must never start a CLI.
+    assert manager._started_agent(["/bin/cat", sys.executable]) is None
+    assert manager._started_agent([]) is None
+    # The actual launch position is argv[0].
+    assert manager._started_agent([sys.executable, "--some-arg"]) == "codex"
+
+
+async def test_started_process_cannot_be_adopted_after_tty_identity_changes(
+    tmp_path, native_session_platform
+):
+    manager, native, _ = manager_for_open(tmp_path, [])
+    replacement = {
+        **row(window=124, pid=346),
+        "processes": [{"pid": 901, "ppid": 346, "name": "codex"}],
+    }
+    native.catalog = AsyncMock(return_value=[replacement])
+
+    with pytest.raises(BridgeError) as error:
+        await manager._confirm_started_agent(
+            "/dev/ttys004",
+            "codex",
+            "terminal:123:ttys004",
+            345,
+            set(),
+            time.monotonic() + 1,
+        )
+
+    assert error.value.code == "visible_target_changed"
+
+
+async def test_started_process_catalog_timeout_remains_unknown(tmp_path, native_session_platform):
+    manager, native, _ = manager_for_open(tmp_path, [])
+    native.catalog = AsyncMock(side_effect=asyncio.Event().wait)
+
+    started, process = await manager._confirm_started_agent(
+        "/dev/ttys004",
+        "codex",
+        "terminal:123:ttys004",
+        345,
+        set(),
+        time.monotonic() + 0.01,
+    )
+
+    assert started is None and process is None
+
+
+async def test_interactive_agent_start_unknown_process_is_not_replayed(
+    tmp_path, native_session_platform
+):
+    shell = row()
+    manager, native, _ = manager_for_open(tmp_path, [shell])
+    native.catalog = AsyncMock(return_value=[shell])
+    native.read = AsyncMock(return_value={"text": "KiraBridge visible % "})
+    manager.ports = replace(
+        manager.ports,
+        agent_registry=lambda: ({"codex": SimpleNamespace(executable=sys.executable)}, {}),
+    )
+    manager.agent_registry = manager.ports.agent_registry
+    binding = AsyncMock()
+    manager.ports = replace(manager.ports, agent_started=binding)
+    manager._confirm_started_agent = AsyncMock(return_value=(None, None))
+    with pytest.raises(UncertainExecution) as error:
+        await manager.open(
+            "chatgpt",
+            SessionOpen(cwd=str(tmp_path), argv=[sys.executable]),
+            task_id="codex-start-unknown",
+        )
+
+    assert getattr(error.value, "code", None) == "session_open_pending"
+    assert error.value.provider_error["start_evidence"]["command_submitted"] is True
+    assert error.value.provider_error["start_evidence"]["automatic_retry"] is False
+    native.send_confirmed.assert_awaited_once()
+    binding.assert_not_awaited()

@@ -128,6 +128,47 @@ async def test_dead_binding_refreshes_to_the_only_live_grok_and_survives_reopen(
         reopened.store.close()
 
 
+async def test_interactive_start_binds_only_a_proven_replacement(visible, config, monkeypatch):
+    bridge, _ = visible
+    previous = config.visible_handoffs.bindings["grok"].model_copy()
+    install_catalog(monkeypatch, bridge, [new_session()])
+
+    result = await bridge.visible_handoffs.started_binding("chatgpt", "grok", new_session())
+
+    assert result == {
+        "state": "bound",
+        "target": "grok",
+        "pane_id": NEW_PANE,
+        "expected_pid": NEW_SHELL,
+        "agent_pid": NEW_AGENT,
+    }
+    assert config.visible_handoffs.bindings["grok"].pane_id == NEW_PANE
+    assert json.loads(overlay_path(config).read_text())["grok"]["replaced_pane_id"] == (
+        previous.pane_id
+    )
+
+
+async def test_interactive_start_does_not_replace_a_still_live_binding(
+    visible, config, monkeypatch
+):
+    bridge, _ = visible
+    previous = config.visible_handoffs.bindings["grok"].model_copy()
+    old = {
+        "pane_id": previous.pane_id,
+        "expected_pid": previous.expected_pid,
+        "agent_pid": previous.agent_pid,
+        "agent_candidate": "grok",
+        "processes": [{"pid": previous.agent_pid, "name": "grok"}],
+    }
+    install_catalog(monkeypatch, bridge, [new_session(), old])
+
+    result = await bridge.visible_handoffs.started_binding("chatgpt", "grok", new_session())
+
+    assert result == {"state": "unresolved", "target": "grok"}
+    assert config.visible_handoffs.bindings["grok"] == previous
+    assert not overlay_path(config).exists()
+
+
 async def test_ambiguous_replacement_is_refused(visible, monkeypatch):
     bridge, transport = visible
     previous = bridge.config.visible_handoffs.bindings["grok"].model_copy()

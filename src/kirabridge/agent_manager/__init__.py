@@ -9,12 +9,14 @@ from typing import Protocol
 
 import httpx
 
+from kirabridge.agent_manager.acp import ACPClient
 from kirabridge.agent_manager.claude import ClaudeCodeAdapter
 from kirabridge.agent_manager.cli_support import login_identity
 from kirabridge.agent_manager.copilot import CopilotCLIAdapter
 from kirabridge.agent_manager.gemini import GeminiAdapter
 from kirabridge.agent_manager.grok_structured import GrokStructuredAdapter
 from kirabridge.agent_manager.opencode import OpenCodeAdapter
+from kirabridge.agent_manager.opencode_acp import OpenCodeACPAdapter
 from kirabridge.agent_manager.opencode_http import OpenCodeHTTPAdapter
 from kirabridge.bridge_core.config import AgentConfig, Config
 from kirabridge.bridge_core.models import AgentInput, BridgeError, TerminalInput, UncertainExecution
@@ -393,114 +395,83 @@ class GrokACPAdapter:
                 stderr=asyncio.subprocess.DEVNULL,
                 limit=1048576,
             )
-        session, started, text, counter = None, False, bytearray(), 0
+        session = None
 
-        async def send(message):
-            process.stdin.write((json.dumps(message) + "\n").encode())
-            await process.stdin.drain()
+        async def on_activity(kind):
+            await running({"agent": args.agent, "session_id": session, "event": kind})
 
-        async def request(method, params):
-            nonlocal counter, started
-            counter += 1
-            identifier = counter
-            await send({"jsonrpc": "2.0", "id": identifier, "method": method, "params": params})
-            while line := await process.stdout.readline():
-                value = json.loads(line)
-                if value.get("method") == "session/update":
-                    params = value.get("params", {})
-                    if not session or params.get("sessionId") != session:
-                        raise UncertainExecution("agent_identity", "Unexpected Grok session update")
-                    update = params.get("update", {})
-                    kind = update.get("sessionUpdate")
-                    if kind in {"agent_message_chunk", "tool_call", "agent_thought_chunk"}:
-                        if not started:
-                            started = True
-                            await running(
-                                {"agent": args.agent, "session_id": session, "event": kind}
-                            )
-                        content = update.get("content", {})
-                        if kind == "agent_message_chunk" and content.get("type") == "text":
-                            text.extend(
-                                content.get("text", "").encode()[: max(0, 65536 - len(text))]
-                            )
-                elif "method" in value and "id" in value:
-                    if value["method"] == "session/request_permission":
-                        permission = value.get("params", {})
-                        bound_permission = (
-                            bool(session)
-                            and permission.get("sessionId") == session
-                            and permission.get("toolCall", {}).get("kind")
-                            in {"read", "edit", "delete", "move", "search", "execute"}
-                        )
-                        selected = next(
-                            (
-                                option.get("optionId")
-                                for option in value.get("params", {}).get("options", [])
-                                if isinstance(option, dict)
-                                and option.get("kind") == "allow_once"
-                                and isinstance(option.get("optionId"), str)
-                            ),
-                            None,
-                        )
-                        await send(
-                            {
-                                "jsonrpc": "2.0",
-                                "id": value["id"],
-                                "result": {
-                                    "outcome": {"outcome": "selected", "optionId": selected}
-                                    if local_tools and bound_permission and selected
-                                    else {"outcome": "cancelled"}
-                                },
-                            }
-                        )
-                    else:
-                        await send(
-                            {
-                                "jsonrpc": "2.0",
-                                "id": value["id"],
-                                "error": {"code": -32601, "message": "Capability not available"},
-                            }
-                        )
-                elif value.get("id") == identifier:
-                    if "error" in value:
-                        raise UncertainExecution("agent_rpc", "Grok ACP returned an error")
-                    return value.get("result", {})
-            raise UncertainExecution("agent_disconnected", "Grok ACP disconnected")
+        async def on_request(method, params):
+            if method != "session/request_permission":
+                return None
+            bound_permission = (
+                bool(session)
+                and params.get("sessionId") == session
+                and params.get("toolCall", {}).get("kind")
+                in {"read", "edit", "delete", "move", "search", "execute"}
+            )
+            selected = next(
+                (
+                    option.get("optionId")
+                    for option in params.get("options", [])
+                    if isinstance(option, dict)
+                    and option.get("kind") == "allow_once"
+                    and isinstance(option.get("optionId"), str)
+                ),
+                None,
+            )
+            return {
+                "outcome": {
+                    "outcome": "selected",
+                    "optionId": selected,
+                }
+                if local_tools and bound_permission and selected
+                else {"outcome": "cancelled"}
+            }
+
+        client = ACPClient(process)
+        client.on_activity = on_activity
+        client.on_request = on_request
+        client.start()
 
         try:
             async with asyncio.timeout(args.timeout):
                 await progress(
                     {"agent": args.agent, "pid": process.pid, "event": "process_spawned"}
                 )
-                init = await request("initialize", {"protocolVersion": 1, "clientCapabilities": {}})
+                init = await client.request(
+                    "initialize", {"protocolVersion": 1, "clientCapabilities": {}}, args.timeout
+                )
                 if init.get("protocolVersion") != 1:
                     raise BridgeError("agent_protocol", "Unsupported ACP version")
                 methods = {item["id"] for item in init.get("authMethods", [])}
                 method = "xai.api_key" if os.environ.get(config.api_key_env) else "cached_token"
                 if method not in methods:
                     raise BridgeError("agent_auth", "No supported Grok authentication available")
-                await request("authenticate", {"methodId": method, "_meta": {"headless": True}})
+                await client.request(
+                    "authenticate", {"methodId": method, "_meta": {"headless": True}}, args.timeout
+                )
                 servers = []
                 if bridge_enabled:
                     from kirabridge.agent_manager.full_access import bridge_server
 
                     spec = bridge_server(self.bridge_config._source_path, args.agent)
                     servers = [{"name": "kirabridge", **spec, "env": []}]
-                new = await request("session/new", {"cwd": args.cwd, "mcpServers": servers})
-                session = new.get("sessionId")
-                if not isinstance(session, str) or not session:
-                    raise BridgeError("agent_protocol", "No Grok session identity")
+                new = await client.request(
+                    "session/new", {"cwd": args.cwd, "mcpServers": servers}, args.timeout
+                )
+                session = client.bind_session(new.get("sessionId"))
                 await progress(
                     {"agent": args.agent, "session_id": session, "event": "session_created"}
                 )
-                result = await request(
+                result = await client.request(
                     "session/prompt",
                     {"sessionId": session, "prompt": [{"type": "text", "text": args.prompt}]},
+                    args.timeout,
                 )
                 stop = result.get("stopReason")
                 if not stop:
                     raise UncertainExecution("agent_unconfirmed", "Grok returned no stop reason")
-                if not started:
+                if not client.started:
                     await running(
                         {
                             "agent": args.agent,
@@ -510,7 +481,7 @@ class GrokACPAdapter:
                     )
                 return {
                     "success": stop == "end_turn",
-                    "text": text.decode("utf-8", "replace"),
+                    "text": client.text,
                     "evidence": {
                         "agent": args.agent,
                         "adapter": "grok_acp",
@@ -522,11 +493,17 @@ class GrokACPAdapter:
                     "scope": "agent_turn",
                     "project_completion_verified": False,
                 }
-        except (TimeoutError, ValueError, OSError) as exc:
+        except TimeoutError:
+            await client.cancel()
+            raise UncertainExecution(
+                "agent_interrupted", "Grok execution cannot be confirmed"
+            ) from None
+        except (ValueError, OSError) as exc:
             raise UncertainExecution(
                 "agent_interrupted", "Grok execution cannot be confirmed"
             ) from exc
         finally:
+            await client.aclose()
             await reap_process(process)
 
 
@@ -539,6 +516,7 @@ class AgentManager:
             "grok_acp": GrokACPAdapter(terminal, config),
             "grok_structured": GrokStructuredAdapter(terminal),
             "opencode": OpenCodeAdapter(terminal),
+            "opencode_acp": OpenCodeACPAdapter(terminal),
             "opencode_http": OpenCodeHTTPAdapter(),
             "gemini_cli": GeminiAdapter(terminal),
             "claude_code": ClaudeCodeAdapter(terminal),

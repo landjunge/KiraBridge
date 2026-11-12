@@ -644,6 +644,45 @@ class VisibleHandoffs:
         )
         return updated, sessions
 
+    async def started_binding(self, principal, target, started):
+        """Bind a newly started CLI only after its exact live process is observed.
+
+        This reuses the existing dead-binding proof and durable refresh overlay.
+        A missing configured contract stays explicitly unbound.
+        """
+        binding = self.config.visible_handoffs.bindings.get(target)
+        if binding is None:
+            return {"state": "unbound", "target": target}
+        try:
+            current = await self.sessions.selected(
+                principal, started["pane_id"], started["expected_pid"]
+            )
+        except BridgeError:
+            return {"state": "unresolved", "target": target}
+        if not any(
+            item.get("name") == target and item.get("pid") == started.get("agent_pid")
+            for item in current.get("processes", [])
+        ):
+            return {"state": "unresolved", "target": target}
+        if self.sessions.binding_matches(current, binding, target):
+            return {"state": "unchanged", "target": target}
+        updated, _ = await self.refreshed_binding(principal, target, binding)
+        if updated == binding:
+            return {"state": "unresolved", "target": target}
+        if (
+            updated.pane_id != started["pane_id"]
+            or updated.expected_pid != started["expected_pid"]
+            or updated.agent_pid != started.get("agent_pid")
+        ):
+            return {"state": "unresolved", "target": target}
+        return {
+            "state": "bound",
+            "target": target,
+            "pane_id": updated.pane_id,
+            "expected_pid": updated.expected_pid,
+            "agent_pid": updated.agent_pid,
+        }
+
     async def _foreign_dead_reservation(self, principal, target, row, binding, observed_sessions):
         from kirabridge.bridge_core.config import VisibleTerminalBinding
 
