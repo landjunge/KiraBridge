@@ -36,6 +36,8 @@
 
 **KiraBridge ist die zentrale Verbindung der NetzwerkPunkt-Werkzeugfamilie.** Sie übersetzt berechtigte Aufträge aus ChatGPT, per Chat oder Sprache, in Aktionen auf dem eigenen Computer und verbindet die weiteren Werkzeuge miteinander. Zur Familie gehören **KiraBridge** für Verbindung und direkte Steuerung, **ThreadDesk** für Projekte, Arbeitsstände und Aufgaben, **4AllPass** für Zugänge und Schlüssel, **TollGate** für Nutzungsgrenzen und Budgets sowie **Agent Authority** für ausschließlich lesende Beobachtung und Nachweise. Jedes Werkzeug erfüllt eine eigene Aufgabe. Die gemeinsame Bedienung der gesamten Familie über natürliche Sprache ist die Vision, an der wir arbeiten. Bestehende Verbindungen, laufende Entwicklung und geplante Funktionen werden dabei ausdrücklich unterschieden.
 
+Die Entwicklungskonsole hat einen kompakten Produktheader: originale zweifarbige Wortmarke links, fünf mittige Originalicons (32 px innerhalb von 44 px Bedienflächen) und DE/EN rechts. Dekorkonturen bleiben dezent, Bedienelemente und Tastaturfokus kontrastreich. Das gemeinsame Modul ist die unveränderte Kopie **1.2.2**. Ein Icon übergibt nur seine Katalog-ID an den nativen Host; dieser ruft `kirabridge --principal local family switch TARGET --source-pid EIGENER_NATIVE_PID` direkt auf. Erst eine geprüfte JSON-Receipt bestätigt den Fokus; Öffnen bestätigt keine Peer-Verbindung. Reopen erhält die vorhandene Hauptansicht. [Quellnachweise und Grenzen](docs/FIVE-TOOL-DESIGN-20261107.md#family-header-follow-up--12-november-2026): Brokerintegration und installierte Fünf-App-Abnahme bleiben getrennt; KBLive wird durch diese UI-Änderung nicht ausgeliefert.
+
 ## Den Computer direkt bedienen
 
 **KiraBridge ist mehr als eine Brücke zu KI-Agenten im Terminal.** Die Computersteuerung gehört zu ihren Kernfunktionen: Programme öffnen oder in den Vordergrund holen, zwischen Fenstern wechseln, Text unmittelbar eingeben, Notizen schreiben und bearbeiten, einzelne Tasten drücken und Tastenkombinationen (Shortcuts) ausführen. Die direkte Tasteneingabe kann ohne Umweg über die Zwischenablage erfolgen. Je nach freigegebenen Rechten und erreichbarer Oberfläche sind auch Maus-, Fenster- und Bildschirmfunktionen nutzbar. Damit kann die KI vorhandene Programme über deren normale Bedienoberfläche steuern, ohne dass für jede einzelne Anwendung erst eine besondere KI-Schnittstelle geschaffen werden muss.
@@ -57,6 +59,8 @@ Neben der direkten Computersteuerung kann KiraBridge Aufträge an **Codex und Gr
 Der Quellstand enthält außerdem [Qwen Code 0.27.2 über ACP und auftragsgebundenes MCP](docs/providers/QWEN.md): vorhandene explizite Anmeldung, native Modell-/Denkstufenauswahl, konfigurierbare Operatorbudgets und berechtigungsgefilterte KiraBridge-Werkzeuge für Lese- oder ausdrücklich erlaubte Codingaufträge. Eine Fortsetzung benötigt die belegte eigene Sitzungsbindung; Turnabschluss und fachliche Abnahme bleiben getrennt. Produktivaktivierung und vollständige Fachabnahme stehen weiter unter den vorhandenen Gates.
 
 Der Entwicklungsquellstand enthält jetzt einen gemeinsamen ACP-Client und den Adapter `opencode_acp` für isolierte reine Textaufträge, mit Sitzungsprüfung, begrenzter Ausgabe und ausdrücklichen Ergebnissen bei Zeitüberschreitung oder Verbindungsabbruch. Der Adapter erzeugt einen eigenen Prozess; die Beobachtung derselben Sitzung in der OpenCode-App und der vollständige macOS-Ablauf müssen noch abgenommen werden. Diese Änderungen sind noch nicht in der veröffentlichten Laufzeit installiert.
+
+Ein getrennter Entwicklungsadapter `opencode_http_v2` zielt auf die `/api`-Oberfläche der installierten gemeinsamen OpenCode-2.2.7-App (Session anlegen/lesen, Prompt mit stabiler Nachrichten-ID, seitenweise Nachrichtenliste). Da V2-Assistant-Nachrichten kein `parentID`/`sessionID` tragen, ordnet er seine eigene zugelassene Anfrage kausal zu und bricht bei fremden oder mehrdeutigen Eingaben geschlossen ab. Der bisherige V1-HTTP-Pfad bleibt unverändert; es gibt keinen Protokoll- oder POST-Fallback nach unklarem Start. Dieser Adapter ist nicht installiert, seine Live-Abnahme bleibt ein eigenes Gate. Ein beobachtetes Idle-Outcome `failed` oder `interrupted` bleibt auch dann unbestätigt, wenn eine Assistentennachricht Text und `finish=stop` enthält.
 
 Teamaufträge merken sich außerdem die belegte Provider-Sitzung des Bearbeiters. Ein späterer Auftrag an denselben Bearbeiter setzt diese Sitzung nur fort, solange sie frei (idle) ist und Agent, Adapter sowie Arbeitsverzeichnis unverändert sind; eine laufende oder unbestätigte (unknown) Sitzung wird nie wiederverwendet. `team_session_get` liest die Bindung, `team_session_clear` setzt einen Tombstone, sodass ein noch laufender Turn eine gelöschte Sitzung nicht wieder anlegen kann. Die Wiederaufnahme deckt derzeit Codex, Grok ACP, versiegelte freie Qwen-ACP-Sitzungen und den getrennten nativen OpenCode-HTTP-Pfad ab; die OpenCode-CLI- und `opencode_acp`-Adapter werden für die Wiederaufnahme abgewiesen, weil ihr isoliertes Profil keinen dauerhaften Sitzungsspeicher besitzt. Die Wiederaufnahme ist auf versiegelte Teamaufträge beschränkt, überlebt einen Bridge-Neustart und wiederholt keinen bereits beanspruchten Core-Auftrag. Der Live-Nachweis mit Codex, Grok und OpenCode/DeepSeek über einen Bridge-Neustart steht in `docs/evidence/team-coordination-live-20261112.json`.
 
@@ -253,3 +257,18 @@ Der gemeinsame Header mit fünf Originalicons ist implementiert und lokal geprü
 Der [Designnachweis](docs/FIVE-TOOL-DESIGN-20261107.md) beschreibt Status-/Versionsgrenzen
 und die bestandene Browserprüfung; die installierte native App bleibt ungeprüft.
 Diese Quelllieferung belegt keinen neuen Download oder installierten Laufzeitstand.
+
+### Nativer Familienfensterwechsel (Quellstand)
+
+Die vorhandenen fünf Icon-Hosts können `kirabridge --principal local family switch
+TARGET --source-pid EIGENER_NATIVE_PID` aufrufen. Der macOS-Broker verwendet den
+installierten nativen Systemhelper und die bestehende Policy ohne Taskdatenbank.
+Vor Launch/Reopen gelten weiter die freigegebenen `roots` und State-Ausschlüsse;
+Registrierung und automatische Capabilities erweitern keinen Pfadzugriff.
+Er prüft registrierte Installation/PID/Start/UID und die tatsächliche Aufruferkette,
+überträgt äußere Fenstermaße, bestätigt den Zielfokus und verbirgt erst danach die
+anderen registrierten Familienfenster. Prozesse und UI-Zustände bleiben erhalten;
+die 4AllPass-Sperrregeln gelten weiter. UNKNOWN blockiert blinde Wiederholung;
+fehlende oder mehrdeutige Ziele bleiben Fehler. [Registrierung, JSON-ABI und
+Abnahme](docs/FAMILY-WINDOW-BROKER.md) sind von Installation und bestehenden
+Downloads getrennt.

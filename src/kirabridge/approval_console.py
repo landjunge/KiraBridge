@@ -87,6 +87,7 @@ class ApprovalConsole:
                 Route("/np-appbar-kirabridge-dark-256.png", self.asset),
                 Route("/product-header.js", self.asset),
                 Route("/product-header.css", self.asset),
+                Route("/kirabridge-wordmark.svg", self.asset),
                 Route("/protocol.js", self.asset),
                 Route("/api/tasks", self.tasks),
                 Route("/api/tasks/{task_id}", self.task),
@@ -214,7 +215,12 @@ class ApprovalConsole:
 
     async def asset(self, request: Request):
         name = request.url.path.removeprefix("/")
-        media_types = {".png": "image/png", ".json": "application/json", ".css": "text/css"}
+        media_types = {
+            ".png": "image/png",
+            ".json": "application/json",
+            ".css": "text/css",
+            ".svg": "image/svg+xml",
+        }
         media_type = media_types.get(Path(name).suffix, "application/javascript")
         return Response((ASSETS / name).read_bytes(), media_type=media_type)
 

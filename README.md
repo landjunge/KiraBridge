@@ -36,6 +36,8 @@
 
 **KiraBridge is the central connection in the NetzwerkPunkt tool family.** It turns authorized requests from ChatGPT, through chat or voice, into actions on your own computer and connects the other tools. The family consists of **KiraBridge** for connectivity and direct control, **ThreadDesk** for projects, work history and tasks, **4AllPass** for credentials and keys, **TollGate** for usage limits and budgets, and **Agent Authority** for read-only observation and evidence. Each tool has its own role. Operating the whole family through natural language is our shared development goal. Existing integrations, work in progress and planned capabilities are clearly distinguished.
 
+The development console has a compact product header: the original two-color wordmark on the left, five original app icons centered (32 px art inside 44 px targets), and German/English on the right. Decorative contours are quiet; controls and keyboard focus retain their contrast. The shared module is the unchanged **1.2.2** copy. Selecting an icon passes only its catalog ID to the native host, which calls `kirabridge --principal local family switch TARGET --source-pid OWN_NATIVE_PID` directly. Only a verified JSON receipt confirms focus; opening does not confirm a peer connection. Reopen preserves the existing main view. [Source evidence and limits](docs/FIVE-TOOL-DESIGN-20261107.md#family-header-follow-up--12-november-2026): native broker integration and installed five-app acceptance remain separate; KBLive is not delivered by this UI change.
+
 ## Directly control your computer
 
 **KiraBridge is more than a gateway to terminal AI agents.** Direct computer control is a core capability: open or focus applications, switch windows, enter text directly, write and edit notes, press individual keys and use keyboard shortcuts. Direct typing can work without relying on the clipboard. With the necessary permissions and a compatible interface, mouse, window and screen operations are also available. This allows an AI to interact with existing applications through their ordinary user interfaces, without requiring a custom AI integration for every app.
@@ -57,6 +59,8 @@ Alongside direct control, KiraBridge can pass work to **Codex and Grok** through
 The source also includes [Qwen Code 0.27.2 via ACP and task-scoped MCP](docs/providers/QWEN.md): explicit existing authentication, native model/effort selection, configurable operator budgets and policy-filtered KiraBridge tools for read or explicitly granted coding tasks. Same-session recovery requires a proven owned binding; native turn completion remains separate from project acceptance. Production activation and full task acceptance remain gated.
 
 The development source now includes a shared ACP client and an `opencode_acp` adapter for isolated text-only tasks, with session validation, bounded output and explicit timeout or disconnect results. This adapter creates its own process; observing that same session in the OpenCode app and the full macOS workflow still require acceptance. These changes have not been installed in the published runtime.
+
+A separate development adapter `opencode_http_v2` targets the installed shared OpenCode 2.2.7 app's `/api` surface (session create/get, prompt with a stable message id, paged message list). It correlates its own admitted prompt causally because V2 assistant messages carry no `parentID`/`sessionID`, and it fails closed on foreign or ambiguous inputs. The legacy V1 HTTP path stays unchanged and there is no protocol or POST fallback after an unclear start. This adapter is not installed and its live acceptance remains a separate gate. An observed idle outcome of `failed` or `interrupted` remains unconfirmed even if an assistant message has text and `finish=stop`.
 
 Team assignments also keep the proven provider session for each worker. A later assignment to the same worker resumes that session only while it is idle and for the unchanged agent, adapter and working directory; a still-running or unconfirmed (unknown) session is never reused. `team_session_get` exposes the binding and `team_session_clear` tombstones it, so a turn still in flight cannot resurrect a cleared session. Resume currently covers Codex, Grok ACP, sealed idle Qwen ACP sessions and the separate native OpenCode HTTP path; the OpenCode CLI and `opencode_acp` adapters are rejected for resume because their isolated profile has no persisted session store. Resumption is restricted to sealed team work, survives a bridge restart and never replays a claimed core task. The live acceptance with Codex, Grok and OpenCode/DeepSeek across a bridge restart is recorded in `docs/evidence/team-coordination-live-20261112.json`.
 
@@ -255,3 +259,17 @@ The shared header with five original icons is implemented and locally reviewed.
 The [design record](docs/FIVE-TOOL-DESIGN-20261107.md) describes status/version
 boundaries and passed browser checks; the installed native app remains unverified.
 This source delivery does not establish a new download or installed runtime.
+
+### Native family window switching (source)
+
+The fixed five-icon hosts can call `kirabridge --principal local family switch
+TARGET --source-pid OWN_NATIVE_PID`. The macOS broker reuses the installed native
+system helper and existing policy, without initializing the task database. It
+preserves allowed `roots` and state-directory exclusions before Launch/Reopen;
+registration and automatic capability grants cannot broaden path access. It
+checks registered installation/PID/start/UID and caller ancestry, transfers actual
+outer window bounds, confirms target focus, then hides only other registered
+family windows. Processes and UI state remain; 4AllPass lock policy is unchanged.
+Unknown effects are durably blocked from blind retry. Missing or ambiguous targets
+are errors. [Registration, exact JSON ABI and acceptance](docs/FAMILY-WINDOW-BROKER.md)
+remain separate from installation; current downloads are not changed by source.

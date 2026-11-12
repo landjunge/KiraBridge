@@ -21,7 +21,9 @@ CHILD = r"""
 import json,os,signal,sys,time
 from pathlib import Path
 mode,metadata,release=sys.argv[1:]
-if os.fork():
+forked=os.fork()
+if forked:
+    if mode=='publish_pause':os.waitpid(forked,0);os._exit(0)
     if mode=='redirect':time.sleep(.15);os._exit(0)
     time.sleep(15)
 else:
@@ -30,7 +32,14 @@ else:
     signal.signal(signal.SIGTERM,signal.SIG_IGN)
     if mode=='redirect':
         fd=os.open(os.devnull,os.O_WRONLY);os.dup2(fd,1);os.dup2(fd,2);os.close(fd)
-    Path(metadata).write_text(json.dumps({'pid':os.getpid(),'pgid':os.getpgrp(),'sid':os.getsid(0),'uid':os.getuid()}))
+    pending=Path(metadata).with_suffix('.pending')
+    if mode=='publish_pause':
+        pending.touch()
+        Path(metadata+'.publishing').touch()
+        end=time.monotonic()+3
+        while time.monotonic()<end and not Path(release).exists():time.sleep(.01)
+    pending.write_text(json.dumps({'pid':os.getpid(),'pgid':os.getpgrp(),'sid':os.getsid(0),'uid':os.getuid()}))
+    pending.replace(metadata)  # Existence now means the complete JSON has been closed.
     if mode=='group':os.write(2,b'x'*262144)
     end=time.monotonic()+12
     while time.monotonic()<end and not Path(release).exists():time.sleep(.02)
@@ -83,6 +92,45 @@ def arguments(tmp_path, mode, *, timeout=0.6):
         timeout=timeout,
         max_output=16,
     )
+
+
+async def test_child_metadata_is_not_published_during_empty_file_creation(tmp_path, owned_output):
+    manager = TerminalManager(output_store=owned_output)
+    execution = asyncio.create_task(
+        manager.execute(
+            "publish",
+            "owner",
+            arguments(tmp_path, "publish_pause", timeout=10),
+            [str(tmp_path)],
+            [sys.executable],
+            AsyncMock(),
+        )
+    )
+    reader = None
+    try:
+        async with asyncio.timeout(3):
+            while not (tmp_path / "metadata.json.publishing").exists():
+                await asyncio.sleep(0.01)
+        assert (tmp_path / "metadata.pending").read_text() == ""
+        assert not (tmp_path / "metadata.json").exists()
+        reader = asyncio.create_task(metadata(tmp_path / "metadata.json"))
+        await asyncio.sleep(0)
+        assert not reader.done()
+        (tmp_path / "exit.request").write_text("release only this fresh fixture")
+        child = await reader
+        result = await execution
+        assert child["sid"] == result["pid"] and child["pgid"] != result["pid"]
+        assert result["exit_code"] == 0 and not manager.sessions and not owned_output._writers
+        await absent(result["pid"])
+        await absent(child["pid"])
+    finally:
+        (tmp_path / "exit.request").write_text("release only this fresh fixture")
+        if reader is not None and not reader.done():
+            reader.cancel()
+            await asyncio.gather(reader, return_exceptions=True)
+        if not execution.done():
+            execution.cancel()
+        await asyncio.gather(execution, return_exceptions=True)
 
 
 @pytest.mark.parametrize("mode", ["group", "redirect"])

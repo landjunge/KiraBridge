@@ -220,7 +220,11 @@ class AgentConfig(BaseModel):
     @model_validator(mode="before")
     @classmethod
     def cli_credential_defaults(cls, value):
-        if isinstance(value, dict) and value.get("kind") == "opencode_http":
+        if (
+            isinstance(value, dict)
+            and isinstance(value.get("kind"), str)
+            and value["kind"] in {"opencode_http", "opencode_http_v2"}
+        ):
             return {
                 "server_username_env": "OPENCODE_SERVER_USERNAME",
                 "server_password_env": "OPENCODE_SERVER_PASSWORD",
@@ -268,7 +272,7 @@ class AgentConfig(BaseModel):
 
     @model_validator(mode="after")
     def opencode_server_endpoint(self):
-        if self.kind != "opencode_http":
+        if self.kind not in {"opencode_http", "opencode_http_v2"}:
             if any(
                 value is not None
                 for value in (self.server_url, self.server_username_env, self.server_password_env)

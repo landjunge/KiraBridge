@@ -17,9 +17,9 @@ struct DesktopBootstrapFailure: LocalizedError {
 }
 
 enum DesktopBootstrap {
-    static func run(executable: URL, arguments: [String], environment: [String: String],
-                    timeout: TimeInterval = 60, maxStdoutBytes: Int = 65536,
-                    maxStderrBytes: Int = 65536) throws -> Data {
+    static func runCapture(executable: URL, arguments: [String], environment: [String: String],
+                           timeout: TimeInterval = 60, maxStdoutBytes: Int = 65536,
+                           maxStderrBytes: Int = 65536) throws -> (status: Int32, data: Data) {
         guard timeout.isFinite, timeout > 0, timeout <= 60,
               maxStdoutBytes > 0, maxStdoutBytes <= 1024 * 1024,
               maxStderrBytes > 0, maxStderrBytes <= 1024 * 1024 else {
@@ -76,10 +76,7 @@ enum DesktopBootstrap {
             }
             if !task.isRunning && ended.allSatisfy({ $0 }) {
                 task.waitUntilExit()
-                guard task.terminationStatus == 0 else {
-                    throw DesktopBootstrapFailure(kind: .processFailed, cleanupConfirmed: true)
-                }
-                return data
+                return (task.terminationStatus, data)
             }
             var ready = descriptors.enumerated().map { index, fd in
                 pollfd(fd: ended[index] ? -1 : fd,
@@ -110,6 +107,18 @@ enum DesktopBootstrap {
                 }
             }
         }
+    }
+
+    static func run(executable: URL, arguments: [String], environment: [String: String],
+                    timeout: TimeInterval = 60, maxStdoutBytes: Int = 65536,
+                    maxStderrBytes: Int = 65536) throws -> Data {
+        let (status, data) = try runCapture(executable: executable, arguments: arguments,
+            environment: environment, timeout: timeout, maxStdoutBytes: maxStdoutBytes,
+            maxStderrBytes: maxStderrBytes)
+        guard status == 0 else {
+            throw DesktopBootstrapFailure(kind: .processFailed, cleanupConfirmed: true)
+        }
+        return data
     }
 }
 
@@ -197,7 +206,7 @@ final class DesktopOpenRequests {
 import Cocoa
 import WebKit
 
-final class KiraBridgeApp: NSObject, NSApplicationDelegate, WKUIDelegate, WKNavigationDelegate {
+final class KiraBridgeApp: NSObject, NSApplicationDelegate, WKUIDelegate, WKNavigationDelegate, WKScriptMessageHandler {
     /// The full release version (for example 0.8.0rc41); the bundle short version is numeric only.
     @objc func showAbout(_ sender: Any?) {
         let release = Bundle.main.object(forInfoDictionaryKey: "KiraBridgeVersion") as? String
@@ -211,8 +220,100 @@ final class KiraBridgeApp: NSObject, NSApplicationDelegate, WKUIDelegate, WKNavi
     var mainView: WKWebView!
     var bootstrapInProgress = false
     var bootstrapCleanupUnknown = false
+    var familySwitchInProgress = false
+    var familySwitchUnknown = false
+    var mainNavigationGeneration: UInt64 = 0
     var navigationPolicy = DesktopNavigationPolicy()
     let openRequests = DesktopOpenRequests()
+
+    /// Catalog-ID-only bridge. The renderer passes exactly one catalog ID and
+    /// receives one of focused/failed/uncertain/missing; it never passes
+    /// a URL, argv, PID or shell text.
+    private static let familyBridgeScript = """
+    (() => {
+      window.__kbFamilyCallbacks = Object.create(null);
+      window.__kbFamilySwitch = (appId) => new Promise((resolve) => {
+        const id = (typeof crypto !== "undefined" && crypto.randomUUID)
+          ? crypto.randomUUID() : String(Date.now()) + "-" + String(Math.random());
+        window.__kbFamilyCallbacks[id] = outcome => {
+          delete window.__kbFamilyCallbacks[id]; resolve(outcome);
+        };
+        window.webkit.messageHandlers.familySwitch.postMessage({ id: id, appId: String(appId) });
+      });
+    })();
+    """
+
+    func userContentController(_ userContentController: WKUserContentController,
+                               didReceive message: WKScriptMessage) {
+        // Only the exact main console view, its main frame and the fixed console
+        // origin may drive a family switch; subframes, popups and foreign origins
+        // are ignored (the reply is bound to this same main view).
+        guard message.name == "familySwitch",
+              let view = mainView,
+              userContentController === view.configuration.userContentController,
+              message.webView === mainView,
+              !view.isLoading, Self.isConsoleURL(view.url),
+              familySwitchAdmits(sameView: message.webView === view,
+                  mainFrame: message.frameInfo.isMainFrame,
+                  scheme: message.frameInfo.securityOrigin.protocol,
+                  host: message.frameInfo.securityOrigin.host,
+                  port: message.frameInfo.securityOrigin.port, body: message.body),
+              let body = message.body as? [String: Any],
+              let id = body["id"] as? String,
+              let appId = body["appId"] as? String else {
+            return
+        }
+        performFamilySwitch(id: id, appId: appId, view: view, generation: mainNavigationGeneration)
+    }
+
+    static func isConsoleURL(_ url: URL?) -> Bool {
+        guard let url else { return false }
+        return url.scheme == "http" && url.host == "127.0.0.1" && url.port == 8766
+            && url.user == nil && url.password == nil
+    }
+
+    func performFamilySwitch(id: String, appId: String, view: WKWebView, generation: UInt64) {
+        guard !familySwitchUnknown else {
+            replyFamilySwitch(id: id, outcome: "uncertain", view: view, generation: generation); return
+        }
+        guard !familySwitchInProgress else {
+            replyFamilySwitch(id: id, outcome: "failed", view: view, generation: generation); return
+        }
+        familySwitchInProgress = true
+        let home = FileManager.default.homeDirectoryForCurrentUser
+        let cli = home.appendingPathComponent(".local/bin/kirabridge")
+        let pid = ProcessInfo.processInfo.processIdentifier
+        let arguments = ["--principal", "local", "family", "switch", appId,
+                         "--source-pid", String(pid)]
+        var environment = ProcessInfo.processInfo.environment
+        environment["KIRABRIDGE_CONSOLE_EMBED"] = "1"
+        DispatchQueue.global().async {
+            let outcome: String
+            do {
+                let result = try DesktopBootstrap.runCapture(executable: cli,
+                    arguments: arguments, environment: environment, timeout: 30)
+                outcome = familySwitchOutcome(status: result.status, data: result.data, appId: appId)
+            } catch {
+                let failure = error as? DesktopBootstrapFailure
+                outcome = failure?.kind == .processFailed && failure?.cleanupConfirmed == true
+                    ? "missing" : "uncertain"
+            }
+            DispatchQueue.main.async {
+                self.familySwitchInProgress = false
+                if outcome == "uncertain" { self.familySwitchUnknown = true }
+                self.replyFamilySwitch(id: id, outcome: outcome, view: view, generation: generation)
+            }
+        }
+    }
+
+    func replyFamilySwitch(id: String, outcome: String, view: WKWebView, generation: UInt64) {
+        guard view === mainView, generation == mainNavigationGeneration,
+              !view.isLoading, Self.isConsoleURL(view.url) else { return }
+        let idJson = familySwitchJsonString(id)
+        let outcomeJson = familySwitchJsonString(outcome)
+        let script = "window.__kbFamilyCallbacks && window.__kbFamilyCallbacks[\(idJson)] && window.__kbFamilyCallbacks[\(idJson)](\(outcomeJson));"
+        view.evaluateJavaScript(script, completionHandler: nil)
+    }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.regular)
@@ -246,7 +347,14 @@ final class KiraBridgeApp: NSObject, NSApplicationDelegate, WKUIDelegate, WKNavi
 
     func makeWindow(title: String, width: CGFloat, height: CGFloat, suppliedConfiguration: WKWebViewConfiguration? = nil) -> WKWebView {
         let configuration = suppliedConfiguration ?? WKWebViewConfiguration()
-        if suppliedConfiguration == nil { configuration.websiteDataStore = .default() }
+        if suppliedConfiguration == nil {
+            configuration.websiteDataStore = .default()
+            // Only the main console window bridges the catalog-ID family switch.
+            configuration.userContentController.add(self, name: "familySwitch")
+            configuration.userContentController.addUserScript(
+                WKUserScript(source: Self.familyBridgeScript, injectionTime: .atDocumentStart,
+                             forMainFrameOnly: true))
+        }
         configuration.applicationNameForUserAgent = "KiraBridgeDesktop"
         let view = WKWebView(frame: .zero, configuration: configuration)
         view.uiDelegate = self
@@ -312,9 +420,15 @@ final class KiraBridgeApp: NSObject, NSApplicationDelegate, WKUIDelegate, WKNavi
     }
 
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
-        windows.first?.makeKeyAndOrderFront(nil)
-        bootstrap()
+        mainView?.window?.makeKeyAndOrderFront(nil)
+        // A family Reopen must preserve the owned main view and its state.
+        // Only an unfinished first login may need the existing bootstrap path.
+        if navigationPolicy.loginFile == nil && !bootstrapCleanupUnknown { bootstrap() }
         return true
+    }
+
+    func webView(_ webView: WKWebView, didStartProvisionalNavigation navigation: WKNavigation!) {
+        if webView === mainView { mainNavigationGeneration &+= 1 }
     }
 
     func application(_ sender: NSApplication, openFiles filenames: [String]) {

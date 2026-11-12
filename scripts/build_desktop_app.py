@@ -30,12 +30,15 @@ def build(destination=None):
     source = root / "integrations/desktop/main.swift"
     native_sources = [
         source,
+        root / "integrations/desktop/FamilySwitchLogic.swift",
         root / "integrations/desktop/SystemBridge.swift",
         root / "integrations/desktop/SystemControl.swift",
         root / "integrations/desktop/SystemServices.swift",
         root / "integrations/desktop/SystemKeyboard.swift",
         root / "integrations/desktop/SystemShortcuts.swift",
         root / "integrations/desktop/SystemSpecialKeys.swift",
+        root / "integrations/desktop/FamilyWindowBroker.swift",
+        root / "integrations/desktop/FamilyWindowNative.swift",
     ]
     binary = bundle / "Contents/MacOS/KiraBridge"
     binary.parent.mkdir(parents=True, exist_ok=True)
@@ -45,6 +48,8 @@ def build(destination=None):
             "swiftc",
             "-swift-version",
             "5",
+            "-D",
+            "FAMILY_WINDOW_BROKER",
             "-target",
             f"{platform.machine()}-apple-macosx12.0",
             "-O",
@@ -80,6 +85,17 @@ def build(destination=None):
         timeout=180,
     )
     binary.chmod(0o755)
+    # Bundle the original macOS icon from the approved design package; verify it
+    # against the pinned design checksum so a stray file is never signed in.
+    icon_source = root / "assets" / "design" / "icons" / "macos" / "KiraBridge-dark.icns"
+    icon_bytes = icon_source.read_bytes()
+    if hashlib.sha256(icon_bytes).hexdigest() != (
+        "4afd22a0a76083b1e6ea820d010162558db7e9d79e518b42bbc29db6b263cdeb"
+    ):
+        raise RuntimeError("Unexpected macOS icon bytes")
+    resources = bundle / "Contents" / "Resources"
+    resources.mkdir(parents=True, exist_ok=True)
+    (resources / "KiraBridge.icns").write_bytes(icon_bytes)
     (bundle / "Contents/Info.plist").write_bytes(
         plistlib.dumps(
             {
@@ -90,6 +106,7 @@ def build(destination=None):
                 "CFBundleVersion": "1",
                 "CFBundleShortVersionString": numeric_version.group(1),
                 "CFBundleGetInfoString": f"KiraBridge {version} ({commit[:12]})",
+                "CFBundleIconFile": "KiraBridge",
                 "KiraBridgeVersion": version,
                 "KiraBridgeSourceCommit": commit,
                 "KiraBridgeCompanionSourceSHA256": hashlib.sha256(
@@ -99,6 +116,7 @@ def build(destination=None):
                 ).hexdigest(),
                 "KiraBridgeSystemProtocol": 1,
                 "KiraBridgeKeyboardProtocol": 1,
+                "KiraBridgeFamilyWindowProtocol": 1,
                 "CFBundlePackageType": "APPL",
                 "NSHighResolutionCapable": True,
                 "LSMinimumSystemVersion": "12.0",
