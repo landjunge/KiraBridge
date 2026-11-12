@@ -297,6 +297,14 @@ async def test_failed_finish_reports_a_safe_category(tmp_path):
     assert result["evidence"]["provider_error"]["category"] == "content_filter"
 
 
+@pytest.mark.parametrize("idle_outcome", ["failed", "interrupted"])
+async def test_negative_idle_overrides_a_stop_assistant(tmp_path, idle_outcome):
+    server = Server(location=str(tmp_path), finish="stop", idle_outcome=idle_outcome)
+    with pytest.raises(UncertainExecution) as caught:
+        await execute(tmp_path, server)
+    assert caught.value.code == "agent_unconfirmed"
+
+
 async def test_multi_part_turn_returns_the_final_assistant(tmp_path):
     server = Server(location=str(tmp_path), multi_step=True, reply_text="final answer")
     result, _, _ = await execute(tmp_path, server)

@@ -369,9 +369,9 @@ class OpenCodeHTTPV2Adapter:
                     )
                 await asyncio.sleep(min(self._poll_interval, remaining))
 
+        if idle is not None and idle.get("outcome") in {"failed", "interrupted"}:
+            raise UncertainExecution("agent_unconfirmed", "OpenCode turn did not complete")
         if assistant is None:
-            if idle is not None and idle.get("outcome") in {"failed", "interrupted"}:
-                raise UncertainExecution("agent_unconfirmed", "OpenCode turn did not complete")
             raise UncertainExecution("agent_unconfirmed", "No OpenCode assistant reply observed")
         if not _assistant_done(assistant):
             raise UncertainExecution("agent_unconfirmed", "No OpenCode turn completion evidence")
