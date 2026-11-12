@@ -59,7 +59,7 @@ CREATE TABLE IF NOT EXISTS team_work (
 CREATE TABLE IF NOT EXISTS team_sessions (
  team_id TEXT NOT NULL REFERENCES teams(id), principal TEXT NOT NULL,
  agent TEXT NOT NULL, adapter TEXT NOT NULL, session_id TEXT NOT NULL,
- cwd TEXT NOT NULL, state TEXT NOT NULL, work_id TEXT,
+ cwd TEXT NOT NULL, state TEXT NOT NULL, work_id TEXT, cleared REAL,
  created REAL NOT NULL, updated REAL NOT NULL,
  PRIMARY KEY(team_id,principal)
 );
@@ -180,6 +180,11 @@ class TeamManager:
                 self.store.db.execute("ALTER TABLE team_work ADD COLUMN core_request_hash TEXT")
             if "resume_session" not in columns:
                 self.store.db.execute("ALTER TABLE team_work ADD COLUMN resume_session TEXT")
+            session_columns = {
+                row["name"] for row in self.store.db.execute("PRAGMA table_info(team_sessions)")
+            }
+            if "cleared" not in session_columns:
+                self.store.db.execute("ALTER TABLE team_sessions ADD COLUMN cleared REAL")
 
     def _principal(self, principal, capability):
         if not self.config.team.enabled:
@@ -332,7 +337,8 @@ class TeamManager:
                 "SELECT * FROM team_sessions WHERE team_id=? ORDER BY principal",
                 (request.team_id,),
             ).fetchall()
-            return {"sessions": [self._session_view(dict(row)) for row in rows]}
+            views = [self._session_view(dict(row)) for row in rows if row["state"] != "cleared"]
+            return {"sessions": views}
         member = request.member or principal
         if member != principal:
             if principal not in {team["owner"], team["coordinator"]}:
@@ -340,7 +346,10 @@ class TeamManager:
                     "team_role_denied", "Only the owner or coordinator may read another session"
                 )
         self._member(request.team_id, member)
-        return {"session": self._session_view(self._session_row(request.team_id, member))}
+        row = self._session_row(request.team_id, member)
+        if row is not None and row["state"] == "cleared":
+            row = None
+        return {"session": self._session_view(row)}
 
     def clear_session(self, principal, request: TeamSessionClear):
         self._automatic(principal)
@@ -355,9 +364,12 @@ class TeamManager:
             prior = self._previous(principal, request.team_id, "session_clear", request)
             if prior:
                 return {"cleared": False, "idempotent": True, "member": member}
+            # Tombstone instead of delete: a still-running turn must never
+            # resurrect a session that the operator explicitly cleared.
             self.store.db.execute(
-                "DELETE FROM team_sessions WHERE team_id=? AND principal=?",
-                (request.team_id, member),
+                "UPDATE team_sessions SET state='cleared', session_id='', work_id=NULL, "
+                "cleared=?, updated=? WHERE team_id=? AND principal=?",
+                (time.time(), time.time(), request.team_id, member),
             )
             self._remember(principal, request.team_id, "session_clear", request, request.team_id)
             self._event(
@@ -368,8 +380,12 @@ class TeamManager:
             )
         return {"cleared": True, "idempotent": False, "member": member}
 
+    def _worker_adapter(self, worker):
+        configured = self.config.agents.get(worker.agent)
+        return configured.kind if configured is not None else worker.agent
+
     def resume_session(self, work):
-        """Return a proven idle/active provider session for this exact worker."""
+        """Return a proven idle provider session only, reserving it exclusively."""
         continuation = getattr(self.bridge, "autonext", None)
         if continuation is not None and continuation.owns(work["id"]):
             # AutoNext owns its coordinator/verifier lifecycle and supplies its
@@ -384,10 +400,24 @@ class TeamManager:
         ):
             return None
         row = self._session_row(work["team_id"], work["assignee"])
-        if row is None or row["agent"] != worker.agent or row["cwd"] != worker.cwd:
+        if (
+            row is None
+            or row["agent"] != worker.agent
+            or row["cwd"] != worker.cwd
+            or row["adapter"] != self._worker_adapter(worker)
+        ):
             return None
-        if row["state"] not in {"active", "idle"}:
+        # Only an idle session is resumable. Active (another turn's exclusive
+        # lease), unknown (unconfirmed after a crash) and cleared (tombstone)
+        # sessions are never reused.
+        if row["state"] != "idle":
             return None
+        # Reserve exclusively so no concurrent follow-up reuses the same session.
+        self.store.db.execute(
+            "UPDATE team_sessions SET state='active', updated=? "
+            "WHERE team_id=? AND principal=? AND state='idle'",
+            (time.time(), work["team_id"], work["assignee"]),
+        )
         return row["session_id"]
 
     def record_session(self, work, native):
@@ -402,9 +432,22 @@ class TeamManager:
             return
         adapter = native.get("adapter")
         if not isinstance(adapter, str) or not ERROR.fullmatch(adapter):
-            adapter = worker.agent
-        state = "idle" if work["state"] in {"processing_result", "completed"} else "active"
+            adapter = self._worker_adapter(worker)
+        if work["state"] in {"processing_result", "completed"}:
+            state = "idle"
+        elif work["state"] in {"unknown", "failed", "cancelled", "blocked"}:
+            state = "unknown"
+        else:
+            state = "active"
         existing = self._session_row(work["team_id"], work["assignee"])
+        if existing is not None and existing["state"] == "cleared":
+            if (
+                existing.get("cleared") is not None
+                and (work.get("created", 0) or 0) < existing["cleared"]
+            ):
+                # A turn still running before the explicit clear must never
+                # resurrect the tombstoned session.
+                return
         if existing is not None and existing["session_id"] != session_id:
             if work.get("resume_session"):
                 # A requested resume must keep its exact identity. The adapter
@@ -412,20 +455,29 @@ class TeamManager:
                 return
             if work["state"] not in {"processing_result", "completed"}:
                 return
+        # Record the proven core task's cwd, never a possibly-changed config value.
+        cwd = worker.cwd
+        if work.get("core_task_id"):
+            try:
+                core = self.store.get(work["core_task_id"], work["assignee"])
+            except BridgeError:
+                core = None
+            if core and isinstance(core.get("args", {}).get("cwd"), str):
+                cwd = core["args"]["cwd"]
         now = time.time()
         self.store.db.execute(
             "INSERT INTO team_sessions(team_id,principal,agent,adapter,session_id,cwd,state,"
-            "work_id,created,updated) VALUES(?,?,?,?,?,?,?,?,?,?) "
+            "work_id,cleared,created,updated) VALUES(?,?,?,?,?,?,?,?,NULL,?,?) "
             "ON CONFLICT(team_id,principal) DO UPDATE SET agent=excluded.agent,"
             "adapter=excluded.adapter,session_id=excluded.session_id,cwd=excluded.cwd,"
-            "state=excluded.state,work_id=excluded.work_id,updated=excluded.updated",
+            "state=excluded.state,work_id=excluded.work_id,cleared=NULL,updated=excluded.updated",
             (
                 work["team_id"],
                 work["assignee"],
                 worker.agent,
                 adapter,
                 session_id,
-                worker.cwd,
+                cwd,
                 state,
                 work["id"],
                 existing["created"] if existing else now,

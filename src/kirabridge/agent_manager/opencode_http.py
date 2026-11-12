@@ -225,6 +225,12 @@ class OpenCodeHTTPAdapter:
                     {"agent": args.agent, "session_id": session, "event": "session_created"}
                 )
 
+            # Snapshot the newest assistant message before admitting the prompt, so
+            # a completed idle baseline from a previous turn can never be mistaken
+            # for this turn's new response.
+            prior, _ = self._last_assistant(await self._messages(client, session, directory))
+            prior_id = prior.get("id") if prior is not None else None
+
             await self._request(
                 client,
                 "POST",
@@ -261,7 +267,11 @@ class OpenCodeHTTPAdapter:
                     message, _ = self._last_assistant(
                         await self._messages(client, session, directory)
                     )
-                    if message is not None and _completed(message):
+                    if (
+                        message is not None
+                        and _completed(message)
+                        and message.get("id") != prior_id
+                    ):
                         break
                 remaining = deadline - time.monotonic()
                 if remaining <= 0:
@@ -271,6 +281,12 @@ class OpenCodeHTTPAdapter:
                 await asyncio.sleep(min(self._poll_interval, remaining))
 
             message, parts = self._last_assistant(await self._messages(client, session, directory))
+            if message is None or message.get("id") == prior_id:
+                # Only a new assistant message proves this turn; an unchanged last
+                # message is just the idle baseline of an earlier turn.
+                raise UncertainExecution(
+                    "agent_unconfirmed", "No new OpenCode turn response observed"
+                )
 
         if message is None:
             raise UncertainExecution("agent_unconfirmed", "No OpenCode final response observed")

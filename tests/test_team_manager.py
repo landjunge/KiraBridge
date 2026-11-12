@@ -879,15 +879,25 @@ def test_proven_worker_session_is_reused_only_for_managed_team_work(domain):
     domain.config.team.workers["codex"].execution_scope = "separate_managed_session"
     shared = domain.delegate("local", work())
     assert domain.resume_session(shared) is None
-    domain.record_session(shared, {"session_id": "codex-session-1", "adapter": "codex"})
-    assert domain.resume_session(shared) == "codex-session-1"
+    idle = {"session_id": "codex-session-1", "adapter": "codex"}
+    # A completed turn records an idle session.
+    domain.record_session({**shared, "state": "completed"}, idle)
     read = domain.session("codex", session_request())
     assert read["session"]["session_id"] == "codex-session-1"
     assert read["session"]["agent"] == "codex"
-    assert read["session"]["state"] == "active"
+    assert read["session"]["state"] == "idle"
+    # The first follow-up reserves the idle session exclusively.
+    assert domain.resume_session(shared) == "codex-session-1"
+    assert domain.session("codex", session_request())["session"]["state"] == "active"
+    # A reserved (active) session is never handed to a second follow-up.
+    assert domain.resume_session(shared) is None
+    # Non-managed execution scope never resumes.
+    domain.record_session({**shared, "state": "completed"}, idle)
     domain.config.team.workers["codex"].execution_scope = "existing_visible_terminal"
     assert domain.resume_session(shared) is None
     domain.config.team.workers["codex"].execution_scope = "separate_managed_session"
+    # A changed worker cwd never resumes a session recorded for another cwd.
+    domain.record_session({**shared, "state": "completed"}, idle)
     domain.config.team.workers["codex"].cwd = "/tmp/other"
     assert domain.resume_session(shared) is None
 
@@ -933,3 +943,72 @@ def test_resumed_session_identity_cannot_be_silently_replaced(domain):
     domain.record_session(completed, {"session_id": "codex-session-4"})
     assert domain.session("codex", session_request())["session"]["session_id"] == "codex-session-4"
     assert domain.session("codex", session_request())["session"]["state"] == "idle"
+
+
+def test_unknown_session_is_never_resumed(domain):
+    domain.config.team.workers["codex"].execution_scope = "separate_managed_session"
+    shared = domain.delegate("local", work())
+    domain.record_session(
+        {**shared, "state": "unknown"}, {"session_id": "codex-session-x", "adapter": "codex"}
+    )
+    assert domain.session("codex", session_request())["session"]["state"] == "unknown"
+    assert domain.resume_session(shared) is None
+
+
+def test_resume_rejects_a_changed_adapter(domain):
+    domain.config.team.workers["codex"].execution_scope = "separate_managed_session"
+    shared = domain.delegate("local", work())
+    domain.record_session(
+        {**shared, "state": "completed"}, {"session_id": "codex-session-1", "adapter": "codex"}
+    )
+    # The worker agent's adapter kind changes after the session was recorded.
+    domain.config.agents["codex"] = AgentConfig(kind="grok_acp")
+    assert domain.resume_session(shared) is None
+
+
+def test_cleared_session_is_never_resurrected_by_a_running_turn(domain):
+    domain.config.team.workers["codex"].execution_scope = "separate_managed_session"
+    shared = domain.delegate("local", work())
+    domain.record_session(
+        {**shared, "state": "active"}, {"session_id": "codex-session-1", "adapter": "codex"}
+    )
+    domain.clear_session(
+        "codex", TeamSessionClear(team_id="test-team", idempotency_key="clear-running")
+    )
+    assert domain.session("codex", session_request())["session"] is None
+    # The still-running turn's completion must not resurrect the tombstone.
+    domain.record_session(
+        {**shared, "state": "completed"}, {"session_id": "codex-session-1", "adapter": "codex"}
+    )
+    assert domain.session("codex", session_request())["session"] is None
+
+
+def test_recorded_session_cwd_is_the_proven_core_task_cwd(domain):
+    import json as _json
+
+    domain.config.team.workers["codex"].execution_scope = "separate_managed_session"
+    shared = domain.delegate("local", work())
+    task_id = "team-" + shared["id"]
+    now = time.time()
+    domain.store.db.execute(
+        "INSERT INTO tasks(id,principal,idem,request_hash,operation,args,state,created,updated,"
+        "attempt) VALUES(?,?,?,?,?,?,?,?,?,1)",
+        (
+            task_id,
+            "codex",
+            task_id,
+            "fixture-request-hash",
+            "agent.execute",
+            _json.dumps(
+                {"agent": "codex", "prompt": "fixture", "cwd": "/proven/core/cwd", "timeout": 2}
+            ),
+            "completed",
+            now,
+            now,
+        ),
+    )
+    domain.record_session(
+        {**shared, "state": "completed", "core_task_id": task_id},
+        {"session_id": "codex-session-1", "adapter": "codex"},
+    )
+    assert domain._session_row("test-team", "codex")["cwd"] == "/proven/core/cwd"
