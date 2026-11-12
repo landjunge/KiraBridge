@@ -879,15 +879,25 @@ def test_proven_worker_session_is_reused_only_for_managed_team_work(domain):
     domain.config.team.workers["codex"].execution_scope = "separate_managed_session"
     shared = domain.delegate("local", work())
     assert domain.resume_session(shared) is None
-    domain.record_session(shared, {"session_id": "codex-session-1", "adapter": "codex"})
-    assert domain.resume_session(shared) == "codex-session-1"
+    idle = {"session_id": "codex-session-1", "adapter": "codex"}
+    # A completed turn records an idle session.
+    domain.record_session({**shared, "state": "completed"}, idle)
     read = domain.session("codex", session_request())
     assert read["session"]["session_id"] == "codex-session-1"
     assert read["session"]["agent"] == "codex"
-    assert read["session"]["state"] == "active"
+    assert read["session"]["state"] == "idle"
+    # The first follow-up reserves the idle session exclusively.
+    assert domain.resume_session(shared) == "codex-session-1"
+    assert domain.session("codex", session_request())["session"]["state"] == "active"
+    # A reserved (active) session is never handed to a second follow-up.
+    assert domain.resume_session(shared) is None
+    # Non-managed execution scope never resumes.
+    domain.record_session({**shared, "state": "completed"}, idle)
     domain.config.team.workers["codex"].execution_scope = "existing_visible_terminal"
     assert domain.resume_session(shared) is None
     domain.config.team.workers["codex"].execution_scope = "separate_managed_session"
+    # A changed worker cwd never resumes a session recorded for another cwd.
+    domain.record_session({**shared, "state": "completed"}, idle)
     domain.config.team.workers["codex"].cwd = "/tmp/other"
     assert domain.resume_session(shared) is None
 
@@ -933,3 +943,237 @@ def test_resumed_session_identity_cannot_be_silently_replaced(domain):
     domain.record_session(completed, {"session_id": "codex-session-4"})
     assert domain.session("codex", session_request())["session"]["session_id"] == "codex-session-4"
     assert domain.session("codex", session_request())["session"]["state"] == "idle"
+
+
+def test_unknown_session_is_never_resumed(domain):
+    domain.config.team.workers["codex"].execution_scope = "separate_managed_session"
+    shared = domain.delegate("local", work())
+    domain.record_session(
+        {**shared, "state": "unknown"}, {"session_id": "codex-session-x", "adapter": "codex"}
+    )
+    assert domain.session("codex", session_request())["session"]["state"] == "unknown"
+    assert domain.resume_session(shared) is None
+
+
+def test_resume_rejects_a_changed_adapter(domain):
+    domain.config.team.workers["codex"].execution_scope = "separate_managed_session"
+    shared = domain.delegate("local", work())
+    domain.record_session(
+        {**shared, "state": "completed"}, {"session_id": "codex-session-1", "adapter": "codex"}
+    )
+    # The worker agent's adapter kind changes after the session was recorded.
+    domain.config.agents["codex"] = AgentConfig(kind="grok_acp")
+    assert domain.resume_session(shared) is None
+
+
+def test_cleared_session_is_never_resurrected_by_a_running_turn(domain):
+    domain.config.team.workers["codex"].execution_scope = "separate_managed_session"
+    shared = domain.delegate("local", work())
+    domain.record_session(
+        {**shared, "state": "active"}, {"session_id": "codex-session-1", "adapter": "codex"}
+    )
+    domain.clear_session(
+        "codex", TeamSessionClear(team_id="test-team", idempotency_key="clear-running")
+    )
+    assert domain.session("codex", session_request())["session"] is None
+    # The still-running turn's completion must not resurrect the tombstone.
+    domain.record_session(
+        {**shared, "state": "completed"}, {"session_id": "codex-session-1", "adapter": "codex"}
+    )
+    assert domain.session("codex", session_request())["session"] is None
+
+
+def test_recorded_session_cwd_is_the_proven_core_task_cwd(domain):
+    import json as _json
+
+    domain.config.team.workers["codex"].execution_scope = "separate_managed_session"
+    shared = domain.delegate("local", work())
+    task_id = "team-" + shared["id"]
+    now = time.time()
+    domain.store.db.execute(
+        "INSERT INTO tasks(id,principal,idem,request_hash,operation,args,state,created,updated,"
+        "attempt) VALUES(?,?,?,?,?,?,?,?,?,1)",
+        (
+            task_id,
+            "codex",
+            task_id,
+            "fixture-request-hash",
+            "agent.execute",
+            _json.dumps(
+                {"agent": "codex", "prompt": "fixture", "cwd": "/proven/core/cwd", "timeout": 2}
+            ),
+            "completed",
+            now,
+            now,
+        ),
+    )
+    domain.record_session(
+        {**shared, "state": "completed", "core_task_id": task_id},
+        {"session_id": "codex-session-1", "adapter": "codex"},
+    )
+    assert domain._session_row("test-team", "codex")["cwd"] == "/proven/core/cwd"
+
+
+def test_late_completion_callback_cannot_release_a_newer_reservation(domain):
+    domain.config.team.workers["codex"].execution_scope = "separate_managed_session"
+    w0 = domain.delegate("local", work(idempotency_key="w0"))
+    domain.record_session({**w0, "state": "completed"}, {"session_id": "s1", "adapter": "codex"})
+    assert domain.session("codex", session_request())["session"]["state"] == "idle"
+    # A second work reserves the idle session (owner becomes w1).
+    w1 = domain.delegate("local", work(idempotency_key="w1"))
+    assert domain.resume_session(w1) == "s1"
+    assert domain.session("codex", session_request())["session"]["state"] == "active"
+    # A stale completion callback from w0 must not release w1's reservation.
+    domain.record_session({**w0, "state": "completed"}, {"session_id": "s1", "adapter": "codex"})
+    assert domain.session("codex", session_request())["session"]["state"] == "active"
+
+
+def test_clear_before_first_record_fences_pre_clear_work(domain):
+    domain.config.team.workers["codex"].execution_scope = "separate_managed_session"
+    # Clear before any session row exists still creates a durable boundary.
+    domain.clear_session(
+        "codex", TeamSessionClear(team_id="test-team", idempotency_key="clear-early")
+    )
+    w_old = domain.delegate("local", work(idempotency_key="w-old"))
+    domain.record_session(
+        {**w_old, "state": "completed", "session_generation": 0},
+        {"session_id": "s-old", "adapter": "codex"},
+    )
+    assert domain.session("codex", session_request())["session"] is None
+    # A work claimed after the clear (generation 1) records a fresh session.
+    w_new = domain.delegate("local", work(idempotency_key="w-new"))
+    domain.record_session(
+        {**w_new, "state": "completed", "session_generation": 1},
+        {"session_id": "s-new", "adapter": "codex"},
+    )
+    assert domain.session("codex", session_request())["session"]["session_id"] == "s-new"
+
+
+def test_unknown_recovery_keeps_the_reservation_identity(domain):
+    from kirabridge.team_manager import _native_evidence
+
+    domain.config.team.workers["codex"].execution_scope = "separate_managed_session"
+    w1 = domain.delegate("local", work(idempotency_key="w1"))
+    domain.record_session({**w1, "state": "active"}, {"session_id": "s1", "adapter": "codex"})
+    # Crash recovery nests the last observation; record_session extracts it.
+    native = _native_evidence(
+        {
+            "reason": "dispatcher_restart",
+            "last_observation": {"session_id": "s1", "adapter": "codex"},
+        }
+    )
+    domain.record_session({**w1, "state": "unknown"}, native)
+    row = domain._session_row("test-team", "codex")
+    assert row["state"] == "unknown" and row["session_id"] == "s1"
+
+
+def test_unknown_recovery_without_a_fresh_session_id_keeps_identity(domain):
+    domain.config.team.workers["codex"].execution_scope = "separate_managed_session"
+    w1 = domain.delegate("local", work(idempotency_key="w1"))
+    domain.record_session({**w1, "state": "active"}, {"session_id": "s1", "adapter": "codex"})
+    domain.record_session({**w1, "state": "unknown"}, {})
+    row = domain._session_row("test-team", "codex")
+    assert row["state"] == "unknown" and row["session_id"] == "s1"
+
+
+def test_unsupported_resume_adapter_never_stores_or_resumes(domain):
+    domain.config.team.workers["codex"].execution_scope = "separate_managed_session"
+    domain.config.agents["codex"] = AgentConfig(kind="opencode_acp")
+    shared = domain.delegate("local", work())
+    domain.record_session(
+        {**shared, "state": "completed"}, {"session_id": "s1", "adapter": "opencode_acp"}
+    )
+    assert domain.session("codex", session_request())["session"] is None
+    assert domain.resume_session(shared) is None
+
+
+def test_authorize_execution_rejects_a_changed_adapter_after_claim(domain):
+    import json as _json
+
+    domain.config.team.workers["codex"].execution_scope = "separate_managed_session"
+    shared = domain.delegate("local", work(idempotency_key="w-sealed"))
+    domain.record_session(
+        {**shared, "state": "completed"}, {"session_id": "s1", "adapter": "codex"}
+    )
+    task_id = "team-" + shared["id"]
+    domain.store.db.execute(
+        "UPDATE team_work SET core_task_id=?, resume_session=? WHERE id=?",
+        (task_id, "s1", shared["id"]),
+    )
+    now = time.time()
+    domain.store.db.execute(
+        "INSERT INTO tasks(id,principal,idem,request_hash,operation,args,state,created,updated,"
+        "attempt) VALUES(?,?,?,?,?,?,?,?,?,1)",
+        (
+            task_id,
+            "codex",
+            task_id,
+            "sealed-request-hash",
+            "agent.execute",
+            _json.dumps(
+                {
+                    "agent": "codex",
+                    "prompt": "fixture",
+                    "cwd": str(domain.config.team.workers["codex"].cwd),
+                    "timeout": 2,
+                    "resume_session": "s1",
+                }
+            ),
+            "queued",
+            now,
+            now,
+        ),
+    )
+    # The adapter changes between the sealed claim and the actual execution.
+    domain.config.agents["codex"] = AgentConfig(kind="grok_acp")
+    with pytest.raises(BridgeError) as error:
+        domain.authorize_execution(domain.store.get(task_id, "codex"))
+    assert error.value.code == "team_task_conflict"
+
+
+def test_older_fresh_callback_cannot_replace_a_newer_slot(domain):
+    domain.config.team.workers["codex"].execution_scope = "separate_managed_session"
+    w0 = domain.delegate("local", work(idempotency_key="w0"))
+    domain.record_session({**w0, "state": "completed"}, {"session_id": "s1", "adapter": "codex"})
+    # A second fresh work supersedes with a different session id.
+    w1 = domain.delegate("local", work(idempotency_key="w1"))
+    domain.record_session({**w1, "state": "completed"}, {"session_id": "s2", "adapter": "codex"})
+    assert domain.session("codex", session_request())["session"]["session_id"] == "s2"
+    # A late callback from the older fresh work must not overwrite the newer slot.
+    domain.record_session({**w0, "state": "completed"}, {"session_id": "s1", "adapter": "codex"})
+    assert domain.session("codex", session_request())["session"]["session_id"] == "s2"
+
+
+def test_unbound_legacy_work_is_rejected_after_clear(domain):
+    domain.config.team.workers["codex"].execution_scope = "separate_managed_session"
+    # Two clears establish a generation boundary beyond the legacy work's NULL.
+    domain.clear_session("codex", TeamSessionClear(team_id="test-team", idempotency_key="clear-1"))
+    domain.clear_session("codex", TeamSessionClear(team_id="test-team", idempotency_key="clear-2"))
+    # A new run (bound to generation 2) records a fresh session.
+    w_new = domain.delegate("local", work(idempotency_key="w-new"))
+    domain.record_session(
+        {**w_new, "state": "completed", "session_generation": 2},
+        {"session_id": "s-new", "adapter": "codex"},
+    )
+    assert domain.session("codex", session_request())["session"]["session_id"] == "s-new"
+    # An unbound legacy work (session_generation NULL) must not reactivate the slot.
+    w_legacy = domain.delegate("local", work(idempotency_key="w-legacy"))
+    domain.record_session(
+        {**w_legacy, "state": "completed"},
+        {"session_id": "s-legacy", "adapter": "codex"},
+    )
+    assert domain.session("codex", session_request())["session"]["session_id"] == "s-new"
+
+
+def test_unknown_foreign_job_without_session_id_cannot_adopt_the_slot(domain):
+    domain.config.team.workers["codex"].execution_scope = "separate_managed_session"
+    w1 = domain.delegate("local", work(idempotency_key="w1"))
+    domain.record_session({**w1, "state": "active"}, {"session_id": "s1", "adapter": "codex"})
+    # A newer fresh work fails without any session id while w1 is still active.
+    w2 = domain.delegate("local", work(idempotency_key="w2"))
+    domain.record_session({**w2, "state": "unknown"}, {})
+    # The slot must remain w1's reservation with its session identity intact.
+    row = domain._session_row("test-team", "codex")
+    assert row["session_id"] == "s1"
+    assert row["work_id"] == w1["id"]
+    assert row["state"] == "active"

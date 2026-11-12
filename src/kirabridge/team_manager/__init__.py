@@ -53,14 +53,20 @@ CREATE TABLE IF NOT EXISTS team_work (
  title TEXT NOT NULL, body TEXT NOT NULL, parent_id TEXT REFERENCES team_work(id),
  root_id TEXT NOT NULL, depth INTEGER NOT NULL, state TEXT NOT NULL,
  core_task_id TEXT UNIQUE, core_request_hash TEXT, resume_session TEXT, result TEXT,
- evidence TEXT NOT NULL DEFAULT '{}', error TEXT,
+ evidence TEXT NOT NULL DEFAULT '{}', error TEXT, session_generation INTEGER,
  created REAL NOT NULL, claimed REAL, started REAL, finished REAL
 );
 CREATE TABLE IF NOT EXISTS team_sessions (
  team_id TEXT NOT NULL REFERENCES teams(id), principal TEXT NOT NULL,
  agent TEXT NOT NULL, adapter TEXT NOT NULL, session_id TEXT NOT NULL,
- cwd TEXT NOT NULL, state TEXT NOT NULL, work_id TEXT,
+ cwd TEXT NOT NULL, state TEXT NOT NULL, work_id TEXT, cleared REAL,
+ generation INTEGER NOT NULL DEFAULT 0,
  created REAL NOT NULL, updated REAL NOT NULL,
+ PRIMARY KEY(team_id,principal)
+);
+CREATE TABLE IF NOT EXISTS team_session_generations (
+ team_id TEXT NOT NULL REFERENCES teams(id), principal TEXT NOT NULL,
+ generation INTEGER NOT NULL DEFAULT 0,
  PRIMARY KEY(team_id,principal)
 );
 CREATE INDEX IF NOT EXISTS team_work_order ON team_work(team_id,seq);
@@ -86,6 +92,10 @@ ROLES = WRITERS | {"observer"}
 NAME = re.compile(r"^[a-z][a-z0-9_-]{0,79}$")
 ERROR = re.compile(r"^[a-z][a-z0-9_]{0,79}$")
 SESSION = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]{0,255}$")
+# Adapters whose provider session can actually be resumed through the durable
+# store. OpenCode CLI/ACP use an isolated per-task XDG profile and have no
+# persisted session store, so they are excluded.
+RESUME_ADAPTERS = {"codex", "grok_acp", "opencode_http"}
 
 
 def _bounded_text(text, limit):
@@ -121,6 +131,12 @@ def _native_evidence(value):
     """Only transport/turn facts belong in the shared view of an underlying private task."""
     if not isinstance(value, dict):
         return {}
+    # A recovered task nests its last observation; preserve the original transport
+    # facts so a crash can still bind the exact provider session identity.
+    merged = dict(value)
+    nested = value.get("last_observation")
+    if isinstance(nested, dict):
+        merged.update(nested)
     allowed = {
         "kind",
         "event",
@@ -142,7 +158,7 @@ def _native_evidence(value):
         "terminated",
         "agent_running",
     }
-    return _safe_evidence({key: item for key, item in value.items() if key in allowed})
+    return _safe_evidence({key: item for key, item in merged.items() if key in allowed})
 
 
 class TeamManager:
@@ -180,6 +196,20 @@ class TeamManager:
                 self.store.db.execute("ALTER TABLE team_work ADD COLUMN core_request_hash TEXT")
             if "resume_session" not in columns:
                 self.store.db.execute("ALTER TABLE team_work ADD COLUMN resume_session TEXT")
+            session_columns = {
+                row["name"] for row in self.store.db.execute("PRAGMA table_info(team_sessions)")
+            }
+            if "cleared" not in session_columns:
+                self.store.db.execute("ALTER TABLE team_sessions ADD COLUMN cleared REAL")
+            if "generation" not in session_columns:
+                self.store.db.execute(
+                    "ALTER TABLE team_sessions ADD COLUMN generation INTEGER NOT NULL DEFAULT 0"
+                )
+            work_columns = {
+                row["name"] for row in self.store.db.execute("PRAGMA table_info(team_work)")
+            }
+            if "session_generation" not in work_columns:
+                self.store.db.execute("ALTER TABLE team_work ADD COLUMN session_generation INTEGER")
 
     def _principal(self, principal, capability):
         if not self.config.team.enabled:
@@ -332,7 +362,8 @@ class TeamManager:
                 "SELECT * FROM team_sessions WHERE team_id=? ORDER BY principal",
                 (request.team_id,),
             ).fetchall()
-            return {"sessions": [self._session_view(dict(row)) for row in rows]}
+            views = [self._session_view(dict(row)) for row in rows if row["state"] != "cleared"]
+            return {"sessions": views}
         member = request.member or principal
         if member != principal:
             if principal not in {team["owner"], team["coordinator"]}:
@@ -340,7 +371,10 @@ class TeamManager:
                     "team_role_denied", "Only the owner or coordinator may read another session"
                 )
         self._member(request.team_id, member)
-        return {"session": self._session_view(self._session_row(request.team_id, member))}
+        row = self._session_row(request.team_id, member)
+        if row is not None and row["state"] == "cleared":
+            row = None
+        return {"session": self._session_view(row)}
 
     def clear_session(self, principal, request: TeamSessionClear):
         self._automatic(principal)
@@ -355,9 +389,20 @@ class TeamManager:
             prior = self._previous(principal, request.team_id, "session_clear", request)
             if prior:
                 return {"cleared": False, "idempotent": True, "member": member}
+            # Durable clear boundary: the generation bump is independent of any
+            # current session row, so a slot without a first record is also fenced.
             self.store.db.execute(
-                "DELETE FROM team_sessions WHERE team_id=? AND principal=?",
+                "INSERT INTO team_session_generations(team_id, principal, generation) "
+                "VALUES(?, ?, 1) "
+                "ON CONFLICT(team_id, principal) DO UPDATE SET generation = generation + 1",
                 (request.team_id, member),
+            )
+            # Tombstone instead of delete: a still-running turn must never
+            # resurrect a session that the operator explicitly cleared.
+            self.store.db.execute(
+                "UPDATE team_sessions SET state='cleared', session_id='', work_id=NULL, "
+                "cleared=?, generation=generation+1, updated=? WHERE team_id=? AND principal=?",
+                (time.time(), time.time(), request.team_id, member),
             )
             self._remember(principal, request.team_id, "session_clear", request, request.team_id)
             self._event(
@@ -368,8 +413,19 @@ class TeamManager:
             )
         return {"cleared": True, "idempotent": False, "member": member}
 
+    def _worker_adapter(self, worker):
+        configured = self.config.agents.get(worker.agent)
+        return configured.kind if configured is not None else worker.agent
+
+    def _generation(self, team_id, principal):
+        row = self.store.db.execute(
+            "SELECT generation FROM team_session_generations WHERE team_id=? AND principal=?",
+            (team_id, principal),
+        ).fetchone()
+        return row["generation"] if row else 0
+
     def resume_session(self, work):
-        """Return a proven idle/active provider session for this exact worker."""
+        """Return a proven idle provider session only, reserving it exclusively."""
         continuation = getattr(self.bridge, "autonext", None)
         if continuation is not None and continuation.owns(work["id"]):
             # AutoNext owns its coordinator/verifier lifecycle and supplies its
@@ -383,28 +439,106 @@ class TeamManager:
             or worker.execution_scope != "separate_managed_session"
         ):
             return None
+        if self._worker_adapter(worker) not in RESUME_ADAPTERS:
+            # The adapter cannot resume through the durable store; leave the
+            # follow-up a fresh session instead of handing it a doomed resume id.
+            return None
         row = self._session_row(work["team_id"], work["assignee"])
-        if row is None or row["agent"] != worker.agent or row["cwd"] != worker.cwd:
+        if (
+            row is None
+            or row["agent"] != worker.agent
+            or row["cwd"] != worker.cwd
+            or row["adapter"] != self._worker_adapter(worker)
+        ):
             return None
-        if row["state"] not in {"active", "idle"}:
+        # Only an idle session is resumable. Active (another turn's exclusive
+        # lease), unknown (unconfirmed after a crash) and cleared (tombstone)
+        # sessions are never reused.
+        if row["state"] != "idle":
             return None
+        generation = self._generation(work["team_id"], work["assignee"])
+        # Reserve exclusively, bound to this exact work and the current clear
+        # generation, so no concurrent or stale callback can claim the session.
+        self.store.db.execute(
+            "UPDATE team_sessions SET state='active', work_id=?, generation=?, updated=? "
+            "WHERE team_id=? AND principal=? AND state='idle'",
+            (work["id"], generation, time.time(), work["team_id"], work["assignee"]),
+        )
         return row["session_id"]
 
     def record_session(self, work, native):
         """Remember a provider session only from bounded native turn evidence."""
         if not isinstance(native, dict):
-            return
-        session_id = native.get("session_id")
-        if not isinstance(session_id, str) or not SESSION.fullmatch(session_id):
-            return
+            native = {}
         worker = self.config.team.workers.get(work["assignee"])
         if worker is None or not worker.agent or not worker.cwd:
             return
         adapter = native.get("adapter")
         if not isinstance(adapter, str) or not ERROR.fullmatch(adapter):
-            adapter = worker.agent
-        state = "idle" if work["state"] in {"processing_result", "completed"} else "active"
+            adapter = self._worker_adapter(worker)
+        if adapter not in RESUME_ADAPTERS:
+            # No durable resume is possible for this adapter; never store a
+            # session a later follow-up would be handed but could not resume.
+            return
+        if work["state"] in {"processing_result", "completed"}:
+            state = "idle"
+        elif work["state"] in {"unknown", "failed", "cancelled", "blocked"}:
+            state = "unknown"
+        else:
+            state = "active"
         existing = self._session_row(work["team_id"], work["assignee"])
+        session_id = native.get("session_id")
+        if not isinstance(session_id, str) or not SESSION.fullmatch(session_id):
+            # A terminal non-completed turn keeps its proven identity even when
+            # recovered evidence no longer carries a fresh session id. Only the
+            # current owner's reservation may be converted; a foreign work with
+            # no session id must not adopt the slot's identity.
+            if (
+                state == "unknown"
+                and existing is not None
+                and existing["state"] == "active"
+                and existing["work_id"] == work["id"]
+            ):
+                session_id = existing["session_id"]
+            else:
+                return
+        generation = self._generation(work["team_id"], work["assignee"])
+        bound = work.get("session_generation")
+        if bound is None:
+            # A work claimed before session generations existed cannot be proven
+            # to belong to the current clear boundary; after any clear it must
+            # be rejected rather than silently assuming the current generation.
+            if generation > 0:
+                return
+        elif bound != generation:
+            # A clear happened after this work was claimed; never resurrect.
+            return
+        if existing is not None and existing["state"] == "cleared":
+            if (
+                existing.get("cleared") is not None
+                and (work.get("created", 0) or 0) < existing["cleared"]
+            ):
+                # A turn still running before the explicit clear must never
+                # resurrect the tombstoned session.
+                return
+        # Owner compare-and-swap, independent of the provider session id: an
+        # older work must never replace a newer owner's slot, even when the two
+        # works used different fresh sessions.
+        if (
+            existing is not None
+            and existing["work_id"] is not None
+            and existing["work_id"] != work["id"]
+        ):
+            owner = self.store.db.execute(
+                "SELECT seq FROM team_work WHERE id=?", (existing["work_id"],)
+            ).fetchone()
+            owner_seq = owner["seq"] if owner else None
+            if (
+                owner_seq is not None
+                and isinstance(work.get("seq"), int)
+                and work["seq"] < owner_seq
+            ):
+                return
         if existing is not None and existing["session_id"] != session_id:
             if work.get("resume_session"):
                 # A requested resume must keep its exact identity. The adapter
@@ -412,22 +546,33 @@ class TeamManager:
                 return
             if work["state"] not in {"processing_result", "completed"}:
                 return
+        # Record the proven core task's cwd, never a possibly-changed config value.
+        cwd = worker.cwd
+        if work.get("core_task_id"):
+            try:
+                core = self.store.get(work["core_task_id"], work["assignee"])
+            except BridgeError:
+                core = None
+            if core and isinstance(core.get("args", {}).get("cwd"), str):
+                cwd = core["args"]["cwd"]
         now = time.time()
         self.store.db.execute(
             "INSERT INTO team_sessions(team_id,principal,agent,adapter,session_id,cwd,state,"
-            "work_id,created,updated) VALUES(?,?,?,?,?,?,?,?,?,?) "
+            "work_id,cleared,generation,created,updated) VALUES(?,?,?,?,?,?,?,?,NULL,?,?,?) "
             "ON CONFLICT(team_id,principal) DO UPDATE SET agent=excluded.agent,"
             "adapter=excluded.adapter,session_id=excluded.session_id,cwd=excluded.cwd,"
-            "state=excluded.state,work_id=excluded.work_id,updated=excluded.updated",
+            "state=excluded.state,work_id=excluded.work_id,cleared=NULL,"
+            "generation=excluded.generation,updated=excluded.updated",
             (
                 work["team_id"],
                 work["assignee"],
                 worker.agent,
                 adapter,
                 session_id,
-                worker.cwd,
+                cwd,
                 state,
                 work["id"],
+                generation,
                 existing["created"] if existing else now,
                 now,
             ),
@@ -1137,10 +1282,11 @@ class TeamManager:
                 return None
             core_id = "team-" + work["id"]
             resume_session = self.resume_session(work)
+            generation = self._generation(work["team_id"], work["assignee"])
             self.store.db.execute(
                 "UPDATE team_work SET state='dispatching',core_task_id=?,claimed=?,"
-                "resume_session=? WHERE id=?",
-                (core_id, time.time(), resume_session, work_id),
+                "resume_session=?,session_generation=? WHERE id=?",
+                (core_id, time.time(), resume_session, generation, work_id),
             )
             self._event(
                 work["team_id"],
@@ -1209,6 +1355,7 @@ class TeamManager:
                 or stored["session_id"] != resume_session
                 or stored["agent"] != worker.agent
                 or stored["cwd"] != worker.cwd
+                or stored["adapter"] != self._worker_adapter(worker)
             ):
                 raise BridgeError(
                     "team_task_conflict", "Linked task does not match the proven worker session"

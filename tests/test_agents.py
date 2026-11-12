@@ -290,3 +290,49 @@ async def test_opencode_http_bypasses_the_visible_handoff_route(tmp_path):
     )
     assert result["text"] == "ok"
     assert visible.called is False
+
+
+async def test_opencode_cli_and_acp_resume_is_rejected_before_any_adapter_call(tmp_path):
+    from types import SimpleNamespace
+    from unittest.mock import AsyncMock
+
+    from kirabridge.agent_manager import AgentManager
+    from kirabridge.bridge_core.config import AgentConfig, Config
+    from kirabridge.bridge_core.models import AgentInput, BridgeError
+    from kirabridge.terminal_manager import TerminalManager
+
+    manager = AgentManager(Config(), TerminalManager())
+    manager.config.visible_handoffs.enabled = False
+
+    class NeverRun:
+        interface_version = "1"
+
+        async def execute(self, *args, **kwargs):
+            raise AssertionError("adapter must not run for a rejected resume")
+
+    for kind in ("opencode", "opencode_acp"):
+        manager.adapters[kind] = NeverRun()
+        manager.config.agents["opencode-worker"] = AgentConfig(
+            kind=kind, model="deepseek/deepseek-flash", executable="/usr/bin/env"
+        )
+        principal = SimpleNamespace(
+            agents=["opencode-worker"],
+            permission_level=None,
+            roots=[str(tmp_path)],
+            capabilities=[],
+        )
+        with pytest.raises(BridgeError) as caught:
+            await manager.execute(
+                {"id": "task-1", "principal": "local"},
+                AgentInput(
+                    agent="opencode-worker",
+                    prompt="hello",
+                    cwd=str(tmp_path),
+                    timeout=1,
+                    resume_session="saved-session",
+                ),
+                principal,
+                AsyncMock(),
+                AsyncMock(),
+            )
+        assert caught.value.code == "agent_resume_unsupported"

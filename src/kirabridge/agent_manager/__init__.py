@@ -664,8 +664,14 @@ class AgentManager:
         if resume_session is not None:
             if config.kind == "codex":
                 owned_resume_session = resume_session
-            elif config.kind in {"grok_acp", "opencode_acp", "opencode", "opencode_http"}:
+            elif config.kind in {"grok_acp", "opencode_http"}:
                 pass
+            elif config.kind in {"opencode", "opencode_acp"}:
+                raise BridgeError(
+                    "agent_resume_unsupported",
+                    "OpenCode CLI/ACP resume has no persisted session store in the "
+                    "isolated profile",
+                )
             else:
                 raise BridgeError(
                     "agent_resume_unsupported",

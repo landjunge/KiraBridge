@@ -9,13 +9,20 @@ from kirabridge.bridge_core.config import AgentConfig
 from kirabridge.bridge_core.models import AgentInput, BridgeError, UncertainExecution
 
 
+def user(ident="user_0", text="Answer without tools"):
+    return {
+        "info": {"id": ident, "sessionID": "ses_test", "role": "user", "time": {"created": 0}},
+        "parts": [{"type": "text", "text": text}],
+    }
+
+
 def assistant(text="Harmless answer", *, completed=True, finish="stop", error=None):
     info = {
         "id": "msg_1",
         "sessionID": "ses_test",
         "role": "assistant",
         "time": {"created": 1, **({"completed": 2} if completed else {})},
-        "parentID": "msg_0",
+        "parentID": "user_0",
         "modelID": "deepseek-flash",
         "providerID": "deepseek",
         "mode": "build",
@@ -35,7 +42,12 @@ class Server:
     def __init__(self, statuses=("busy", "idle"), message=None):
         self.requests = []
         self.statuses = list(statuses)
+        self.user = user()
         self.message = message or assistant()
+        # Idle baseline: the pre-prompt message list starts at a stable id.
+        self.message["info"]["id"] = "msg_0"
+        self.message["info"]["parentID"] = "user_0"
+        self._turns = 0
 
     def handler(self, request):
         self.requests.append(request)
@@ -45,6 +57,17 @@ class Server:
         if path == "/session/ses_test" and request.method == "GET":
             return httpx.Response(200, json={"id": "ses_test"})
         if path.endswith("/prompt_async"):
+            # A new turn admits the client-assigned messageID as the user prompt
+            # and appends a new assistant message whose parent is exactly it.
+            self._turns += 1
+            body = json.loads(request.content) if request.content else {}
+            message_id = body.get("messageID", "")
+            if not isinstance(message_id, str) or not message_id.startswith("msg"):
+                # Mirror the real V1 MessageID schema: reject arbitrary ids.
+                return httpx.Response(400, json={"error": "invalid messageID"})
+            self.user["info"]["id"] = message_id
+            self.message["info"]["id"] = f"msg_{self._turns}"
+            self.message["info"]["parentID"] = message_id
             return httpx.Response(204)
         if path == "/session/status":
             status = self.statuses.pop(0) if len(self.statuses) > 1 else self.statuses[0]
@@ -53,7 +76,7 @@ class Server:
                 body.update(attempt=1, message="provider retry", next=1)
             return httpx.Response(200, json={"ses_test": body})
         if path.endswith("/message"):
-            return httpx.Response(200, json=[self.message])
+            return httpx.Response(200, json=[self.user, self.message])
         return httpx.Response(404)
 
     def body(self, method, suffix):
@@ -280,3 +303,84 @@ async def test_unknown_resumed_session_is_not_recreated(tmp_path):
         await execute(tmp_path, server, resume_session="ses_missing")
     assert caught.value.code == "session_unknown"
     assert not [r for r in server.requests if r.method == "POST" and r.url.path == "/session"]
+
+
+async def test_idle_baseline_message_is_not_reused_as_a_new_turn(tmp_path):
+    server = Server()
+    original = server.handler
+
+    def stale(request):
+        if request.url.path.endswith("/prompt_async"):
+            # A resumed idle session that produces no new assistant message.
+            return httpx.Response(204)
+        return original(request)
+
+    server.handler = stale
+    with pytest.raises(UncertainExecution) as caught:
+        await execute(tmp_path, server, resume_session="ses_test")
+    assert caught.value.code == "agent_unconfirmed"
+
+
+async def test_foreign_session_response_is_not_accepted(tmp_path):
+    server = Server()
+    server.message["info"]["sessionID"] = "ses_foreign"
+    with pytest.raises(UncertainExecution) as caught:
+        await execute(tmp_path, server)
+    assert caught.value.code == "agent_unconfirmed"
+
+
+async def test_foreign_parent_response_is_not_accepted(tmp_path):
+    server = Server()
+    original = server.handler
+
+    def foreign_parent(request):
+        if request.url.path.endswith("/prompt_async"):
+            server._turns += 1
+            body = json.loads(request.content) if request.content else {}
+            server.user["info"]["id"] = body.get("messageID", "user_1")  # our prompt admitted
+            server.message["info"]["id"] = f"msg_{server._turns}"  # new assistant
+            # The assistant replies to a foreign prompt, not the messageID we sent.
+            server.message["info"]["parentID"] = "user_foreign"
+            return httpx.Response(204)
+        return original(request)
+
+    server.handler = foreign_parent
+    with pytest.raises(UncertainExecution) as caught:
+        await execute(tmp_path, server)
+    assert caught.value.code == "agent_unconfirmed"
+
+
+async def test_foreign_prompt_and_answer_are_not_accepted(tmp_path):
+    server = Server()
+    original = server.handler
+
+    def foreign_turn(request):
+        if request.url.path.endswith("/prompt_async"):
+            server._turns += 1
+            # A foreign client also admits a prompt whose user+assistant pair is
+            # self-consistent, but its parent is not our assigned messageID.
+            server.user["info"]["id"] = "user_foreign"
+            server.message["info"]["id"] = f"msg_{server._turns}"
+            server.message["info"]["parentID"] = "user_foreign"
+            return httpx.Response(204)
+        return original(request)
+
+    server.handler = foreign_turn
+    with pytest.raises(UncertainExecution) as caught:
+        await execute(tmp_path, server)
+    assert caught.value.code == "agent_unconfirmed"
+
+
+async def test_resume_from_initial_idle_still_detects_the_new_turn(tmp_path):
+    server = Server(statuses=("idle",))
+    result, _, _ = await execute(tmp_path, server, resume_session="ses_test")
+    assert result["success"] and result["text"] == "Harmless answer"
+    assert result["evidence"]["session_resumed"] is True
+
+
+async def test_prompt_message_id_is_v1_conformant(tmp_path):
+    server = Server()
+    result, _, _ = await execute(tmp_path, server)
+    assert result["success"]
+    prompt = server.body("POST", "/prompt_async")
+    assert prompt["messageID"].startswith("msg")

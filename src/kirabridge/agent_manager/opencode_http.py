@@ -7,6 +7,7 @@ import os
 import time
 from pathlib import Path
 from typing import Any
+from uuid import uuid4
 
 import httpx
 
@@ -225,12 +226,23 @@ class OpenCodeHTTPAdapter:
                     {"agent": args.agent, "session_id": session, "event": "session_created"}
                 )
 
+            # Snapshot the newest assistant message before admitting our prompt. A
+            # genuine new turn must produce a new assistant message whose parentID
+            # is exactly the messageID we assign to our own prompt.
+            before = await self._messages(client, session, directory)
+            prior, _ = self._last_assistant(before)
+            prior_id = prior.get("id") if prior is not None else None
+            # V1 message ids must start with "msg" (MessageID schema); the exact
+            # id stays with this attempt and is matched by the assistant parentID.
+            message_id = "msg_" + uuid4().hex
+
             await self._request(
                 client,
                 "POST",
                 f"/session/{session}/prompt_async",
                 params={"directory": directory},
                 body={
+                    "messageID": message_id,
                     "model": model,
                     "parts": [{"type": "text", "text": args.prompt}],
                 },
@@ -258,10 +270,14 @@ class OpenCodeHTTPAdapter:
                 elif kind == "idle" and started:
                     break
                 elif kind == "idle":
-                    message, _ = self._last_assistant(
+                    candidate, _ = self._last_assistant(
                         await self._messages(client, session, directory)
                     )
-                    if message is not None and _completed(message):
+                    if (
+                        candidate is not None
+                        and _completed(candidate)
+                        and candidate.get("id") != prior_id
+                    ):
                         break
                 remaining = deadline - time.monotonic()
                 if remaining <= 0:
@@ -271,6 +287,17 @@ class OpenCodeHTTPAdapter:
                 await asyncio.sleep(min(self._poll_interval, remaining))
 
             message, parts = self._last_assistant(await self._messages(client, session, directory))
+            if (
+                message is None
+                or message.get("sessionID") != session
+                or message.get("id") == prior_id
+                or message.get("parentID") != message_id
+            ):
+                # Only a new assistant message for the bound session, whose parent
+                # is exactly our assigned prompt, is this turn's result.
+                raise UncertainExecution(
+                    "agent_unconfirmed", "No new OpenCode turn response observed"
+                )
 
         if message is None:
             raise UncertainExecution("agent_unconfirmed", "No OpenCode final response observed")
