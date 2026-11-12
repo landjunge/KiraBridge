@@ -218,6 +218,44 @@ Gezielte Tests mit einem lokalen HTTP-Mock prüfen Sitzungsanlage, Basic-Auth,
 Prompt-Übergabe, Statuswechsel, Fehlerkategorien, Zeitlimit und Pfadgrenzen;
 dabei entstehen keine Modell- oder API-Kosten.
 
+## Gemeinsame 2.2.7-App (`opencode_http_v2`)
+
+Stand: 12.11.2026, Entwicklungsquellstand (nicht installiert). Für die
+installierte gemeinsame OpenCode-2.2.7-App spricht der Adapter
+`opencode_http_v2` die offizielle `/api`-Oberfläche (OpenAPI-Schema,
+ursprünglich `opencode.ai/docs/openapi.json`) statt des älteren `/session`-Pfads.
+
+```toml
+[agents.opencode_http_v2]
+kind = "opencode_http_v2"
+model = "deepseek/deepseek-v4-pro"
+server_url = "http://127.0.0.1:58836"
+server_username_env = "OPENCODE_SERVER_USERNAME"
+server_password_env = "OPENCODE_SERVER_PASSWORD"
+allow_local_tools = false
+```
+
+Der Ablauf verwendet `POST /api/session` (stabile, clientvergebene Session-ID
+`ses_…`, `location.directory`, `metadata`), `POST /api/session/{id}/prompt`
+(stabile Nachrichten-ID `msg_…`, `text`, `metadata`) und `GET
+/api/session/{id}/message` mit `data`/`cursor` und `order=asc`. Die Rückgabe des
+Prompts ist die zugelassene Eingabe (`Session.Inbox.User`) und liefert die eigene
+Nachrichten-ID. V2-Assistant-Nachrichten tragen kein `parentID`/`sessionID`; die
+Antwort wird deshalb kausal über die eigene zugelassene Nachrichten-ID und die
+geordnete Timeline zugeordnet. Eine fremde Nutzereingabe zwischen eigener Anfrage
+und Antwort oder jede Mehrdeutigkeit bricht als `unknown` ab. Ein Turn ist erst
+belegt, wenn die Assistentennachricht `finish`/`time.completed` trägt (`received`
+ist nicht `completed`); eine `idle`-Nachricht markiert die Grenze.
+
+Vor jeder Wirkung wird die Arbeitsverzeichnis-/Serverinstanz-/Protokoll-/
+Sitzungs-/Besitzbindung geprüft; ein Protokoll- oder Serverwechsel ist kein
+Resume. Der bisherige V1-Adapter bleibt unverändert; es gibt keinen Protokoll-
+oder POST-Fallback nach unklarem Start. Angeforderte und tatsächlich beobachtete
+Modell-/Agent-Metadaten werden in der Evidenz getrennt ausgewiesen;
+`provider.list` wird nicht ausgegeben. Die Live-Abnahme an der realen App
+(eigener Markerauftrag mit Readback nach Bridge-Neustart) bleibt ein eigenes,
+offenes Gate.
+
 ## Offizielle Quellen
 
 - [CLI und JSON-Ausgabe](https://opencode.ai/docs/cli/)
