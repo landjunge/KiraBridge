@@ -14,9 +14,13 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from functools import lru_cache
 from typing import Any
+from urllib.parse import urljoin
 
 from jsonschema import Draft202012Validator
 from jsonschema.exceptions import SchemaError, ValidationError
+from referencing import Registry
+from referencing.exceptions import NoSuchResource, Unresolvable
+from referencing.jsonschema import DRAFT202012
 
 from kirabridge.bridge_core.models import BridgeError, TaskRequest, UncertainExecution, digest
 from kirabridge.permissions import decision
@@ -25,6 +29,8 @@ _NAME = re.compile(r"^[A-Za-z][A-Za-z0-9_-]{0,63}$")
 _MAX_TOOLS = 256
 _MAX_SCHEMA = 16384
 _MAX_ARGUMENTS = 65536
+_MAX_SCHEMA_DEPTH = 48
+_MAX_SCHEMA_NODES = 2048
 
 
 def _enabled(bridge: Any) -> bool:
@@ -54,16 +60,119 @@ def _guard(bridge: Any, principal: str, *, mutation: bool = False) -> None:
 
 
 @lru_cache(maxsize=_MAX_TOOLS * 2)
-def _valid_schema(encoded: str) -> bool:
-    """Metaschema check once per exact schema text; it cost ~1-2 s per full catalog.
+def _schema_registry(encoded: str) -> Registry | None:
+    """Accept bounded, closed schema graphs; never retrieve another resource.
 
-    The check runs on a decoded copy, so a later peer-side edit is a new key.
+    ThreadDesk embeds a domain resource with its own $id, then refers to it
+    from lifted envelope fields. Preserve that scope rather than resolving all
+    fragment pointers against the envelope. Traversal also bounds the expanded
+    reference graph, so small cyclic/exponentially repeated schemas fail closed.
     """
     try:
-        Draft202012Validator.check_schema(json.loads(encoded))
-    except SchemaError:
-        return False
-    return True
+        schema = json.loads(encoded)
+        pending = [(schema, 0)]
+        nodes = 0
+        while pending:
+            value, depth = pending.pop()
+            nodes += 1
+            if depth > _MAX_SCHEMA_DEPTH or nodes > _MAX_SCHEMA_NODES:
+                return None
+            if isinstance(value, dict):
+                pending.extend((child, depth + 1) for child in value.values())
+            elif isinstance(value, list):
+                pending.extend((child, depth + 1) for child in value)
+        Draft202012Validator.check_schema(schema)
+        # The document root also owns the empty retrieval URI, even without $id.
+        identifiers: dict[str, int] = {"": id(schema)}
+        schema_nodes: set[int] = set()
+        has_refs = False
+        has_unevaluated = False
+
+        def collect(value, base=""):
+            nonlocal has_refs, has_unevaluated
+            if isinstance(value, bool):
+                return
+            if not isinstance(value, dict):
+                raise ValueError("Reference target is not a schema")
+            if value.get("$schema", "https://json-schema.org/draft/2020-12/schema") not in {
+                "https://json-schema.org/draft/2020-12/schema",
+                "https://json-schema.org/draft/2020-12/schema#",
+            }:
+                raise ValueError("Unsupported schema dialect")
+            if {
+                "$dynamicRef",
+                "$recursiveRef",
+                "$dynamicAnchor",
+                "$recursiveAnchor",
+            } & value.keys():
+                raise ValueError("Dynamic schema references are unsupported")
+            schema_nodes.add(id(value))
+            has_refs |= "$ref" in value
+            has_unevaluated |= bool({"unevaluatedProperties", "unevaluatedItems"} & value.keys())
+            resource = DRAFT202012.create_resource(value)
+            identifier = resource.id()
+            if identifier is not None:
+                base = urljoin(base, identifier)
+                previous = identifiers.setdefault(base, id(value))
+                if previous != id(value):
+                    raise ValueError("Ambiguous schema resource identity")
+            # Inspect the declared dialect before any automatic resource parser.
+            for child in DRAFT202012.subresources_of(value):
+                collect(child, base)
+
+        collect(schema)
+        # Annotation collection can re-evaluate references exponentially even
+        # when their explicit graph is linear. These combinations are unsupported.
+        if has_refs and has_unevaluated:
+            return None
+        root = DRAFT202012.create_resource(schema)
+        # Registry's default retriever refuses I/O. Only resources embedded in
+        # this exact inputSchema become available, including ThreadDesk URNs.
+        registry = Registry().with_resource("", root).crawl()
+        nodes = 0
+
+        def visit(resource, resolver, active, depth=0, *, enter=True):
+            nonlocal nodes
+            nodes += 1
+            if depth > _MAX_SCHEMA_DEPTH or nodes > _MAX_SCHEMA_NODES:
+                raise ValueError("Schema reference budget exceeded")
+            value = resource.contents
+            if isinstance(value, bool):
+                return
+            if not isinstance(value, dict) or id(value) not in schema_nodes:
+                raise ValueError("Reference target is not a declared schema")
+            identity = id(value)
+            if identity in active:
+                raise ValueError("Cyclic schema reference")
+            if enter:
+                resolver = resolver.in_subresource(resource)
+            if "$anchor" in value and resolver.lookup("#" + value["$anchor"]).contents is not value:
+                raise ValueError("Ambiguous schema anchor")
+            active = active | {identity}
+            if "$ref" in value:
+                resolved = resolver.lookup(value["$ref"])
+                visit(
+                    DRAFT202012.create_resource(resolved.contents),
+                    resolved.resolver,
+                    active,
+                    depth + 1,
+                    enter=False,
+                )
+            for child in DRAFT202012.subresources_of(value):
+                visit(DRAFT202012.create_resource(child), resolver, active, depth + 1)
+
+        visit(root, registry.resolver(), set())
+        return registry
+    except (
+        SchemaError,
+        NoSuchResource,
+        Unresolvable,
+        TypeError,
+        ValueError,
+        AttributeError,
+        RecursionError,
+    ):
+        return None
 
 
 def _validated_tool(tool: Any) -> dict[str, Any] | None:
@@ -76,11 +185,11 @@ def _validated_tool(tool: Any) -> dict[str, Any] | None:
         return None
     try:
         encoded = json.dumps(schema, ensure_ascii=False, allow_nan=False)
-        if len(encoded.encode("utf-8")) > _MAX_SCHEMA or '"$ref"' in encoded:
+        if len(encoded.encode("utf-8")) > _MAX_SCHEMA:
             return None
-        if not _valid_schema(encoded):
+        if _schema_registry(encoded) is None:
             return None
-    except (TypeError, ValueError):
+    except (TypeError, ValueError, RecursionError):
         return None
     readonly = bool(
         annotation is not None
@@ -166,9 +275,21 @@ def _arguments(arguments: dict[str, Any]) -> None:
 
 
 def _validate(tool: dict[str, Any], arguments: dict[str, Any]) -> None:
+    registry = _schema_registry(
+        json.dumps(tool["inputSchema"], ensure_ascii=False, allow_nan=False)
+    )
+    if registry is None:
+        raise BridgeError("invalid_arguments", "ThreadDesk schema is not self-contained")
     try:
-        Draft202012Validator(tool["inputSchema"]).validate(arguments)
-    except ValidationError:
+        Draft202012Validator(tool["inputSchema"], registry=registry).validate(arguments)
+    except (
+        ValidationError,
+        Unresolvable,
+        NoSuchResource,
+        TypeError,
+        AttributeError,
+        RecursionError,
+    ):
         raise BridgeError("invalid_arguments", "Arguments do not match ThreadDesk schema") from None
 
 
