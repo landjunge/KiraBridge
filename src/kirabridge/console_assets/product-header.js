@@ -1,5 +1,8 @@
-/* KiraBridge host adapter: reuse authenticated control snapshots on every operator view. */
+/* KiraBridge host adapter: reuse authenticated control snapshots and the native
+ * family switch. Only a catalog ID crosses the web→native boundary here; no
+ * URL, argv, PID or shell is ever accepted from this renderer. */
 import {createElapsed} from "./networkpunkt-appbar-state.js";
+import {APP_CATALOG} from "./networkpunkt-appbar-catalog.js";
 import {mountProductHeader} from "./networkpunkt-product-header.js";
 let latest = null;
 const slot = document.querySelector("[data-product-header]");
@@ -12,7 +15,25 @@ function metadata(data) {
   return {state:bridge.error ? "error" : data.maintenance ? "busy" : bridge.dispatcher_active === true ? "confirmed" : bridge.dispatcher_active === false ? "disconnected" : "unknown",
     version:bridge.runtime?.version};
 }
-const header = slot ? mountProductHeader(slot, {selfId:"kirabridge", locale,
+
+/** Native family-switch bridge. The native host injects `window.__kbFamilySwitch`
+ * which accepts exactly one catalog ID and resolves to one of
+ * "focused" | "failed" | "uncertain" | "missing" | "opened".
+ * No URL/argv/PID leaves the renderer; a missing bridge is an honest "missing". */
+async function openTarget(appId) {
+  if (!APP_CATALOG.some((app) => app.id === appId)) return "failed";
+  const bridge = window.__kbFamilySwitch;
+  if (typeof bridge !== "function") return "missing";
+  try {
+    const outcome = await bridge(appId);
+    return ["focused","failed","uncertain","missing","opened"].includes(outcome)
+      ? outcome : "uncertain";
+  } catch {
+    return "uncertain";
+  }
+}
+
+const header = slot ? mountProductHeader(slot, {selfId:"kirabridge", locale, openTarget,
   readSelf:async ({signal}) => {
     if (eventSource) return !latest || latest.age() >= 8000 ? {state:"unknown"} : metadata(latest.data);
     let token;

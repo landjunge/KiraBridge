@@ -1,6 +1,6 @@
 {
   "v": 1,
-  "version": "1.1.1",
+  "version": "1.2.1",
   "designCoreVersion": "0.1",
   "files": [
     "networkpunkt.css",
@@ -17,7 +17,7 @@
     "np-appbar-tollgate-dark-256.png"
   ],
   "sourceOfTruth": "ThreadDesk; pinned local copies only",
-  "integrationStatus": "source host mounts for five products; live/native acceptance documented separately",
+  "integrationStatus": "shared renderer and catalog-ID openTarget hook; native host acceptance separate",
   "upstreamBundleVersion": "1.1.0",
-  "localPatch": "KB-DESIGN-ADAPT-KIRABRIDGE-20261107: prevent delayed native-dialog close from stealing later keyboard focus; shared component backport remains separate"
+  "preservedPatch": "KiraBridge 1.1.1 delayed dialog-close focus guard"
 }
