@@ -20,6 +20,7 @@ final class Journal: FamilyWindowJournal {
 final class Port: FamilyWindowPort {
     var apps: [String:FamilyIdentity]=[:];var views: [String:FamilyWindow]=[:]
     var active: Int32=100;var events: [String]=[];var missing=false;var ambiguous="";var modal=""
+    var hideLosesAX=false
     var focusFailure=false;var resizeRace=false;var focusRace=false;var launchFailure=false
     var frames=[FamilyRect(x:0,y:24,width:1600,height:850)]
     init() {
@@ -33,7 +34,7 @@ final class Port: FamilyWindowPort {
                        executable:"/fixture/"+p+".app/Contents/MacOS/main",installation:"stable-install")
     }
     func caller(pid: Int32,start: String?) throws -> FamilyIdentity {
-        guard let a=apps["kirabridge"],pid==a.pid,start==nil || start==a.start else { throw FamilyFailure("family_source_changed") };return a
+        guard let a=apps.values.first(where: { $0.pid==pid }),start==nil || start==a.start else { throw FamilyFailure("family_source_changed") };return a
     }
     func identity(_ product: String) throws -> FamilyIdentity? { apps[product] }
     func validate(_ app: FamilyIdentity) throws { guard apps[app.product]==app else { throw FamilyFailure("family_identity_changed") } }
@@ -45,6 +46,7 @@ final class Port: FamilyWindowPort {
         if app.product==modal { throw FamilyFailure("family_modal_or_fullscreen") }
         return views[app.product]
     }
+    func invisible(_ app: FamilyIdentity) throws -> Bool { try validate(app);return views[app.product]?.visible != true }
     func screens() throws -> [FamilyRect] { frames }
     func launch(_ product: String,check: () throws -> Void) async throws -> FamilyIdentity {
         try check();events.append("launch:"+product)
@@ -71,7 +73,8 @@ final class Port: FamilyWindowPort {
     }
     func hide(_ app: FamilyIdentity,_ w: FamilyWindow,check: () throws -> Void) async throws {
         try check();events.append("hide:"+app.product)
-        views[app.product]=FamilyWindow(token:w.token,bounds:w.bounds,visible:false)
+        if hideLosesAX { views.removeValue(forKey:app.product) }
+        else { views[app.product]=FamilyWindow(token:w.token,bounds:w.bounds,visible:false) }
     }
     func restore(_ app: FamilyIdentity,_ w: FamilyWindow,check: () throws -> Void) async throws {
         try check();events.append("restore:"+app.product);active=app.pid
@@ -122,6 +125,11 @@ struct FamilyFixture {
         _=try await FamilyWindowBroker(reopen,reopenJournal).switchTo("threaddesk",sourcePID:100,sourceStart:nil)
         try check(reopen.events.filter { $0.hasPrefix("reopen:") }.count==1,"one_reopen")
         try check(!reopen.events.contains { $0.hasPrefix("launch:") } && reopen.apps["threaddesk"]==oldPID,"reopen_preserves_process")
+        let turns=Port(),turnJournal=Journal();turns.hideLosesAX=true;let stable=turns.apps
+        _=try await FamilyWindowBroker(turns,turnJournal).switchTo("threaddesk",sourcePID:100,sourceStart:nil)
+        let secondTurn=try await FamilyWindowBroker(turns,turnJournal).switchTo("4allpass",sourcePID:101,sourceStart:nil)
+        try check(secondTurn["active_product"] as? String=="4allpass" && turns.apps==stable,"two_turns_no_ax_processes_preserved")
+        try check(turns.events.contains("reopen:4allpass") && !turns.events.contains { $0.hasPrefix("launch:") },"second_turn_reopen_without_launch")
         let input=FamilyRect(x:-1800,y:-10,width:1700,height:1000)
         let clamped=try input.clamped(to:[FamilyRect(x:-1600,y:0,width:1600,height:900),FamilyRect(x:0,y:24,width:1600,height:850)])
         try check(clamped==FamilyRect(x:-1600,y:0,width:1600,height:900),"negative_monitor_clamp")
@@ -154,6 +162,11 @@ struct FamilyFixture {
         try check(!FamilyNativePort.isRegisteredCandidate(path:source.path,regular:false,pid:31781,expectedPath:source.path,worker:getpid()),"accessory_helper_excluded")
         try check(!FamilyNativePort.isRegisteredCandidate(path:"/Applications/ThreadDesk.app",regular:true,pid:123,expectedPath:"/Users/fixture/Applications/ThreadDesk.app",worker:getpid()),"second_installation_excluded")
         try check(!FamilyNativePort.isRegisteredCandidate(path:"/System/Applications/Utilities/Terminal.app",regular:true,pid:123,expectedPath:source.path,worker:getpid()),"terminal_excluded")
+        let retained=try FamilyNativePort.retainedMainID([123]);try check(retained==123,"retained_main_identity")
+        for ids in [[Int](),[123,124],[124]] {
+            do { try FamilyNativePort.checkRetainedMain(123,ids);throw FamilyFailure("fixture_reopen_handle_adopted") }
+            catch let e as FamilyFailure { try check(e.unknown && !e.code.hasPrefix("fixture_"),"reopen_handle_refused") }
+        }
         let own=try SystemServices.kernelRecord(getpid());try check(own.uid==getuid(),"real_readonly_uid")
         let data=try JSONSerialization.data(withJSONObject:result,options:[.sortedKeys]);print(String(decoding:data,as:UTF8.self))
         print("family identity/foreign PID/missing/modal/focus/race/geometry/order/serialization passed; effects_on_real_windows=0")

@@ -76,8 +76,15 @@ a missing target is launched once by its exact application URL with
 `createsNewApplicationInstance=false`. Waits only observe; unknown launch outcomes
 never issue another launch. If the existing instance has no accessible main
 window, one exact-URL Reopen is admitted; its callback must retain the original
-PID/start/path and produce one unambiguous main window. A replaced process or
-extra window is UNKNOWN, never silently adopted or closed.
+PID/start/path and the one retained WindowServer main-window ID. No retained
+handle, ambiguous handles or a newly created window remain UNKNOWN; the broker
+does not adopt them. Host Reopen must show its owned main without rebuilding or
+reloading its state. The broker then requires one unambiguous AX main window. A replaced process or
+extra window is UNKNOWN, never silently adopted or closed. Already invisible
+registered apps may omit their AX window; the public on-screen inventory must
+prove absence before they are skipped. A new visible/ambiguous window is never
+silently adopted. The fixture covers two consecutive switches with AX windows
+absent after hiding and unchanged process identities.
 
 Bounds are the actual AX outer window rectangle in logical desktop points.
 NSScreen visibleFrame is converted from AppKit bottom-left coordinates to AX

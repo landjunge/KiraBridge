@@ -45,6 +45,7 @@ final class FamilyNativePort: FamilyWindowPort {
     let policySHA: String
     var elements: [String: AXUIElement]=[:]
     var changingGeometry=Set<String>()
+    var reopenedWindowIDs: [String:Int]=[:]
     init(home: String=NSHomeDirectory()) throws {
         registryPath=home+"/.config/kirabridge/family-windows.json"
         _=try FamilyFiles.canonical(registryPath)
@@ -156,12 +157,28 @@ final class FamilyNativePort: FamilyWindowPort {
         }
         return e
     }
+    static func retainedMainID(_ ids: [Int]) throws -> Int {
+        guard ids.count==1,ids[0]>0 else { throw FamilyFailure("family_reopen_main_unknown",unknown:true) }
+        return ids[0]
+    }
+    static func checkRetainedMain(_ expected: Int, _ current: [Int]) throws {
+        guard try retainedMainID(current)==expected else { throw FamilyFailure("family_reopen_window_changed",unknown:true) }
+    }
+    func retainedWindowIDs(_ identity: FamilyIdentity) throws -> [Int] {
+        try validate(identity)
+        guard let rows=CGWindowListCopyWindowInfo([.optionAll,.excludeDesktopElements],kCGNullWindowID) as? [[String:Any]] else {
+            throw FamilyFailure("family_inventory_unavailable")
+        }
+        return rows.filter { ($0[kCGWindowOwnerPID as String] as? Int)==Int(identity.pid) &&
+            ($0[kCGWindowLayer as String] as? Int)==0 }.compactMap { $0[kCGWindowNumber as String] as? Int }
+    }
     func window(_ identity: FamilyIdentity) throws -> FamilyWindow? {
         let app=try running(identity)
         let all=try SystemBridge.axWindows(app)
         if all.isEmpty { return nil }
         guard all.count==1 else { throw FamilyFailure("family_window_ambiguous") }
         let w=all[0]
+        if let expected=reopenedWindowIDs[identity.product] { try Self.checkRetainedMain(expected,retainedWindowIDs(identity)) }
         guard SystemBridge.attribute(w,kAXSubroleAttribute) as? String==kAXStandardWindowSubrole,
               SystemBridge.attribute(w,kAXModalAttribute) as? Bool==false,
               (SystemBridge.attribute(w,"AXSheets") as? [AXUIElement] ?? []).isEmpty,
@@ -199,6 +216,14 @@ final class FamilyNativePort: FamilyWindowPort {
         // Boolean alone is not evidence that its window disappeared on screen.
         return FamilyWindow(token:token,bounds:rect,visible:!visible.isEmpty && coherent)
     }
+    func invisible(_ identity: FamilyIdentity) throws -> Bool {
+        try validate(identity)
+        guard let rows=CGWindowListCopyWindowInfo([.optionOnScreenOnly,.excludeDesktopElements],kCGNullWindowID) as? [[String:Any]] else {
+            throw FamilyFailure("family_inventory_unavailable")
+        }
+        return !rows.contains { ($0[kCGWindowOwnerPID as String] as? Int)==Int(identity.pid) &&
+            ($0[kCGWindowLayer as String] as? Int)==0 && ($0[kCGWindowAlpha as String] as? Double ?? 1)>0 }
+    }
     func screens() throws -> [FamilyRect] {
         guard let primary=NSScreen.screens.first else { throw FamilyFailure("family_display_unavailable") }
         // AX/CG outer window coordinates are logical desktop points from the
@@ -224,6 +249,10 @@ final class FamilyNativePort: FamilyWindowPort {
     }
     func reopen(_ expected: FamilyIdentity, check: () throws -> Void) async throws {
         try validate(expected);_=try registeredBundle(expected.product)
+        // With no AX handle, require the one retained WindowServer main-window
+        // identity before Reopen. No retained/ambiguous handle means UNKNOWN,
+        // not permission to create or silently adopt a fresh document/window.
+        let retained=try Self.retainedMainID(retainedWindowIDs(expected))
         try check()
         let configuration=NSWorkspace.OpenConfiguration()
         configuration.activates=false;configuration.createsNewApplicationInstance=false
@@ -237,6 +266,8 @@ final class FamilyNativePort: FamilyWindowPort {
         // PID/start or another installation is UNKNOWN, never silently adopted.
         try validate(expected)
         guard app.processIdentifier==expected.pid else { throw FamilyFailure("family_reopen_unknown",unknown:true) }
+        try Self.checkRetainedMain(retained,retainedWindowIDs(expected))
+        reopenedWindowIDs[expected.product]=retained
     }
     func bounds(_ app: FamilyIdentity, _ window: FamilyWindow, _ rect: FamilyRect, check: () throws -> Void) throws {
         let e=try element(app,window)
@@ -271,13 +302,13 @@ final class FamilyNativePort: FamilyWindowPort {
     }
     func hide(_ identity: FamilyIdentity, _ window: FamilyWindow, check: () throws -> Void) async throws {
         let app=try running(identity);_=try element(identity,window)
-        if try self.window(identity)?.visible==false { return }
+        if try invisible(identity) { return }
         try check()
         guard app.hide() else { throw FamilyFailure("family_hide_unknown",unknown:true) }
         let deadline=ProcessInfo.processInfo.systemUptime+1
         repeat {
             try validate(identity)
-            if try self.window(identity)?.visible==false { return }
+            if try invisible(identity) { return }
             try await Task.sleep(nanoseconds:25_000_000)
         } while ProcessInfo.processInfo.systemUptime<deadline
         throw FamilyFailure("family_hide_unknown",unknown:true)

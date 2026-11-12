@@ -40,6 +40,7 @@ protocol FamilyWindowPort: AnyObject {
     func caller(pid: Int32, start: String?) throws -> FamilyIdentity
     func identity(_ product: String) throws -> FamilyIdentity?
     func window(_ app: FamilyIdentity) throws -> FamilyWindow?
+    func invisible(_ app: FamilyIdentity) throws -> Bool
     func validate(_ app: FamilyIdentity) throws
     func policy() throws
     func destination(_ product: String) throws
@@ -73,6 +74,7 @@ final class FamilyWindowBroker {
     var windows: [String: FamilyWindow]=[:]
     var attempted=false
     var displayFrames: [FamilyRect]=[]
+    var hiddenProducts=Set<String>()
     init(_ port: FamilyWindowPort, _ journal: FamilyWindowJournal) { self.port=port; self.journal=journal }
     func guardAll() throws {
         try port.policy()
@@ -83,14 +85,20 @@ final class FamilyWindowBroker {
         }
         for (product, app) in bound {
             try port.validate(app)
+            if hiddenProducts.contains(product) {
+                guard product != targetProduct,try port.invisible(app) else { throw FamilyFailure("family_window_changed") }
+                continue
+            }
             if let old=windows[product] {
-                guard let current=try port.window(app), current.token==old.token else {
+                guard let current=try port.window(app),current.token==old.token else {
                     throw FamilyFailure("family_window_changed")
                 }
             }
         }
-        if source.product != targetProduct, let current=try port.window(source),
-           !current.bounds.near(sourceWindow.bounds) { throw FamilyFailure("family_source_moved") }
+        if source.product != targetProduct && !hiddenProducts.contains(source.product),
+           let current=try port.window(source),!current.bounds.near(sourceWindow.bounds) {
+            throw FamilyFailure("family_source_moved")
+        }
     }
     var targetProduct=""
     func switchTo(_ target: String, sourcePID: Int32, sourceStart: String?) async throws -> [String: Any] {
@@ -108,6 +116,9 @@ final class FamilyWindowBroker {
         // Before starting any app, refuse ambiguous/modal windows in existing
         // registered apps. Unregistered installations/helpers are never selected.
         for (product,app) in bound {
+            if product != target && product != source.product {
+                if try port.invisible(app) { hiddenProducts.insert(product);continue }
+            }
             if let w=try port.window(app) { windows[product]=w }
             else if product != target { throw FamilyFailure("family_main_window_unavailable") }
         }
@@ -148,12 +159,15 @@ final class FamilyWindowBroker {
             }
             for other in others {
                 try guardAll()
-                try await port.hide(other,windows[other.product]!,check:guardAll)
-                guard try port.window(other)?.visible==false else { throw FamilyFailure("family_hide_unknown",unknown:true) }
+                if try port.invisible(other) { continue }
+                guard let owned=windows[other.product] else { throw FamilyFailure("family_window_changed",unknown:true) }
+                try await port.hide(other,owned,check:guardAll)
+                guard try port.invisible(other) else { throw FamilyFailure("family_hide_unknown",unknown:true) }
+                hiddenProducts.insert(other.product)
             }
             try guardAll()
             guard port.frontmost()==app.pid else { throw FamilyFailure("family_focus_unknown",unknown:true) }
-            let visible=try bound.values.filter { try port.window($0)?.visible==true }
+            let visible=try bound.values.filter { !(try port.invisible($0)) }
             guard visible.count==1,visible[0]==app,let final=try port.window(app),final.bounds.near(desired) else {
                 throw FamilyFailure("family_visibility_unknown",unknown:true)
             }
