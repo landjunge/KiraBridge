@@ -463,3 +463,167 @@ async def test_group_reaper_itself_preserves_repeated_cancellation(monkeypatch):
     with pytest.raises(asyncio.CancelledError):
         await reaping
     assert events == ["finished-own-cleanup"]
+
+
+def _census_mocks(monkeypatch, pages):
+    """Pure synthetic census pages; no child, no real signal, no production state."""
+    own_uid, sid, group, pid = os.geteuid(), 987654, 987655, 987656
+    caller = f"{os.getpid()} {own_uid} {os.getpgrp()} S\n"
+    clean = f"{pid} {own_uid} {group} S\n{caller}"
+    foreign = f"987657 {own_uid} {group} S\n"
+    conflict = f"{pid} {own_uid} {group} S\n{foreign}{caller}"
+    stdout = {"clean": clean, "conflict": conflict, "empty": ""}
+    remaining = iter([stdout[page] for page in pages])
+    monkeypatch.setattr(
+        subprocess,
+        "run",
+        lambda *a, **k: SimpleNamespace(returncode=0, stdout=next(remaining), stderr=""),
+    )
+    real_sid = os.getsid
+    monkeypatch.setattr(
+        os,
+        "getsid",
+        lambda value: real_sid(0) if value in {0, os.getpid()} else sid + (value == 987657),
+    )
+    monkeypatch.setattr(os, "getpgid", lambda value: sid if value == sid else group)
+    return sid, group, pid, own_uid
+
+
+@pytest.mark.parametrize(
+    ("pages", "stage", "leader_returncode", "sent"),
+    [
+        (["conflict"], "pre_term", None, []),
+        (["clean", "conflict"], "pre_kill", -signal.SIGTERM, [signal.SIGTERM]),
+        (
+            ["clean", "clean", "conflict"],
+            "post_kill_verify",
+            -signal.SIGKILL,
+            [signal.SIGTERM, signal.SIGKILL],
+        ),
+    ],
+)
+async def test_stop_process_census_failure_stage_matches_signal_phase(
+    monkeypatch, pages, stage, leader_returncode, sent
+):
+    # The identical ownership ValueError can arise before TERM, before KILL or
+    # after KILL; elapsed wall time proves none of these. Mocked intents only.
+    sid, group, pid, own_uid = _census_mocks(monkeypatch, pages)
+    intents = []
+
+    def mocked_killpg(value_group, value):
+        intents.append((value_group, value))
+        child.returncode = -value
+
+    monkeypatch.setattr(os, "killpg", mocked_killpg)
+    child = SimpleNamespace(
+        pid=sid,
+        returncode=None,
+        wait=AsyncMock(return_value=-signal.SIGTERM),
+        _kirabridge_owned_session=platform._OwnedSession(sid, own_uid),
+    )
+    with pytest.raises(UncertainExecution) as error:
+        await platform.stop_process(child)
+    assert error.value.code == "process_cleanup_unknown"
+    assert isinstance(error.value.__cause__, ValueError)
+    assert str(error.value.__cause__) == "Unconfirmed session/group ownership"
+    diagnostic = error.value.cleanup_diagnostic
+    assert set(diagnostic) == {
+        "phase",
+        "stage",
+        "cause_type",
+        "errno",
+        "reason",
+        "leader_returncode",
+        "ownership_conflicts",
+    }
+    assert diagnostic["phase"] == "owned_session_census"
+    assert diagnostic["stage"] == stage
+    assert diagnostic["cause_type"] == "ValueError"
+    assert diagnostic["errno"] is None
+    assert diagnostic["reason"] == "Unconfirmed session/group ownership"
+    assert diagnostic["leader_returncode"] == leader_returncode
+    assert diagnostic["ownership_conflicts"] == {
+        "owned_sid": sid,
+        "owned_uid": own_uid,
+        "count": 1,
+        "sample": [{"pid": 987657, "uid": own_uid, "pgid": group, "sid": sid + 1, "stat": "S"}],
+    }
+    assert intents == [(group, value) for value in sent]
+
+
+async def test_signal_refused_recensus_failure_is_attributed_to_recheck_stage(monkeypatch):
+    sid, group, pid, own_uid = _census_mocks(monkeypatch, ["clean", "conflict"])
+    intents = []
+
+    def refused(value_group, value):
+        intents.append((value_group, value))
+        raise PermissionError("mocked EPERM; no real signal")
+
+    monkeypatch.setattr(os, "killpg", refused)
+    child = SimpleNamespace(
+        pid=sid,
+        returncode=None,
+        wait=AsyncMock(return_value=-signal.SIGTERM),
+        _kirabridge_owned_session=platform._OwnedSession(sid, own_uid),
+    )
+    with pytest.raises(UncertainExecution) as error:
+        await platform.stop_process(child)
+    assert error.value.code == "process_cleanup_unknown"
+    assert isinstance(error.value.__cause__, ValueError)
+    assert str(error.value.__cause__) == "Unconfirmed session/group ownership"
+    assert error.value.cleanup_diagnostic["stage"] == "signal_refused_recheck"
+    assert error.value.cleanup_diagnostic["reason"] == "Unconfirmed session/group ownership"
+    assert error.value.cleanup_diagnostic["leader_returncode"] is None
+    assert error.value.cleanup_diagnostic["ownership_conflicts"]["count"] == 1
+    assert intents == [(group, signal.SIGTERM)]
+
+
+async def test_non_ownership_census_failure_has_stage_but_no_conflict_block(monkeypatch):
+    sid, group, pid, own_uid = _census_mocks(monkeypatch, ["clean", "empty"])
+    intents = []
+    monkeypatch.setattr(os, "killpg", lambda *args: intents.append(args))
+    child = SimpleNamespace(
+        pid=sid,
+        returncode=None,
+        wait=AsyncMock(return_value=-signal.SIGTERM),
+        _kirabridge_owned_session=platform._OwnedSession(sid, own_uid),
+    )
+    with pytest.raises(UncertainExecution) as error:
+        await platform.stop_process(child)
+    assert error.value.code == "process_cleanup_unknown"
+    assert isinstance(error.value.__cause__, ValueError)
+    diagnostic = error.value.cleanup_diagnostic
+    assert diagnostic["stage"] == "pre_kill"
+    assert diagnostic["reason"] == "Process census lacks its live caller anchor"
+    assert diagnostic["ownership_conflicts"] is None
+    assert intents == [(group, signal.SIGTERM)]  # No signal after the failed second census.
+
+
+def test_direct_census_call_keeps_unspecified_stage_and_bounded_conflict_sample(monkeypatch):
+    own_uid, sid, group, pid = os.geteuid(), 987654, 987655, 987656
+    foreign = "".join(f"{987657 + i} {own_uid} {group} S\n" for i in range(6))
+    stdout = f"{pid} {own_uid} {group} S\n{foreign}{os.getpid()} {own_uid} {os.getpgrp()} S\n"
+    monkeypatch.setattr(
+        subprocess, "run", lambda *a, **k: SimpleNamespace(returncode=0, stdout=stdout, stderr="")
+    )
+    real_sid = os.getsid
+    monkeypatch.setattr(
+        os,
+        "getsid",
+        lambda value: real_sid(0) if value in {0, os.getpid()} else sid + (value != pid),
+    )
+    monkeypatch.setattr(os, "getpgid", lambda value: sid if value == sid else group)
+    monkeypatch.setattr(os, "killpg", lambda *args: pytest.fail("No uncertain session signal"))
+    child = SimpleNamespace(pid=sid, returncode=None)
+    with pytest.raises(UncertainExecution) as error:
+        platform._session_members(child, platform._OwnedSession(sid, own_uid))
+    assert error.value.code == "process_cleanup_unknown"
+    assert str(error.value.__cause__) == "Unconfirmed session/group ownership"
+    diagnostic = error.value.cleanup_diagnostic
+    assert diagnostic["stage"] == "unspecified"
+    assert diagnostic["leader_returncode"] is None
+    conflicts = diagnostic["ownership_conflicts"]
+    assert conflicts["owned_sid"] == sid and conflicts["owned_uid"] == own_uid
+    assert conflicts["count"] == 6
+    assert len(conflicts["sample"]) == 4
+    assert [row["pid"] for row in conflicts["sample"]] == [987657, 987658, 987659, 987660]

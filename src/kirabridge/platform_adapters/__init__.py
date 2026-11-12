@@ -105,7 +105,7 @@ def _pin_owned_session(process) -> None:
         pass
 
 
-def _session_members(process, pin):
+def _session_members(process, pin, stage="unspecified"):
     """Bounded public metadata only; no arguments, environment or ancestry grants."""
     import subprocess
 
@@ -116,6 +116,7 @@ def _session_members(process, pin):
         or pin.uid != os.geteuid()
     ):
         raise UncertainExecution("process_cleanup_unknown", "Owned session identity changed")
+    conflicts = ()
     try:
         result = subprocess.run(
             ["/bin/ps", "-axo", "pid=,uid=,pgid=,stat="],
@@ -165,6 +166,9 @@ def _session_members(process, pin):
         # A PGID cannot legitimately span sessions. Do not signal on a partial
         # ownership observation, including a foreign-UID member of the same group.
         if any(row[1] != pin.uid or row[3] != pin.sid for row in rows if row[2] in groups):
+            conflicts = tuple(
+                row for row in rows if row[2] in groups and (row[1] != pin.uid or row[3] != pin.sid)
+            )
             raise ValueError("Unconfirmed session/group ownership")
         return members
     except (OSError, ValueError, subprocess.TimeoutExpired) as error:
@@ -173,22 +177,38 @@ def _session_members(process, pin):
         )
         failure.cleanup_diagnostic = {
             "phase": "owned_session_census",
+            "stage": stage,
             "cause_type": type(error).__name__,
             "errno": getattr(error, "errno", None),
             # ValueError messages above are fixed internal labels, never argv/data.
             "reason": str(error) if isinstance(error, ValueError) else None,
+            "leader_returncode": process.returncode,
+            "ownership_conflicts": (
+                {
+                    "owned_sid": pin.sid,
+                    "owned_uid": pin.uid,
+                    "count": len(conflicts),
+                    "sample": [
+                        {"pid": r[0], "uid": r[1], "pgid": r[2], "sid": r[3], "stat": r[4][:16]}
+                        for r in conflicts[:4]
+                    ],
+                }
+                if conflicts
+                else None
+            ),
         }
         raise failure from error
 
 
-async def _owned_session_groups(process, pin):
+async def _owned_session_groups(process, pin, stage="unspecified"):
     import asyncio
 
-    return await asyncio.to_thread(_session_members, process, pin)
+    return await asyncio.to_thread(_session_members, process, pin, stage)
 
 
 async def _signal_owned_session(process, pin, value):
-    members = await _owned_session_groups(process, pin)
+    stage = "pre_term" if value == signal.SIGTERM else "pre_kill"
+    members = await _owned_session_groups(process, pin, stage)
     groups = {row[2] for row in members if not row[4].startswith("Z")}
     for group in sorted(groups):
         # No await between these final positive identity checks and the syscall.
@@ -219,7 +239,7 @@ async def _signal_owned_session(process, pin, value):
             # Darwin may refuse a group that became entirely zombie/absent.
             # Only a fresh verified observation can establish that no live member
             # still needs termination; EPERM alone never proves cleanup.
-            current = await _owned_session_groups(process, pin)
+            current = await _owned_session_groups(process, pin, "signal_refused_recheck")
             if any(row[2] == group and not row[4].startswith("Z") for row in current):
                 raise UncertainExecution(
                     "process_cleanup_unknown", "Session signal refused"
@@ -236,7 +256,8 @@ async def _stop_owned_session(process, pin, grace):
         pass
     await _signal_owned_session(process, pin, signal.SIGKILL)
     await process.wait()
-    if any(not row[4].startswith("Z") for row in await _owned_session_groups(process, pin)):
+    final = await _owned_session_groups(process, pin, "post_kill_verify")
+    if any(not row[4].startswith("Z") for row in final):
         raise UncertainExecution(
             "process_cleanup_unknown", "Owned session still has live processes"
         )
