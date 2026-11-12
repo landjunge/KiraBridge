@@ -82,8 +82,11 @@ def default_registry():
         from .claude import ClaudeCodeAdapter
         from .codex import CodexAdapter
         from .grok import GrokBuildAdapter
+        from .opencode import OpenCodeAdapter
 
-        _default = AdapterRegistry([CodexAdapter(), GrokBuildAdapter(), ClaudeCodeAdapter()])
+        _default = AdapterRegistry(
+            [CodexAdapter(), GrokBuildAdapter(), ClaudeCodeAdapter(), OpenCodeAdapter()]
+        )
     return _default
 
 

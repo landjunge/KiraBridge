@@ -51,6 +51,43 @@ def codex_input_footer_group(lines):
     )
 
 
+GROK_PLACEHOLDERS = ("Build anything",)
+
+
+def grok_input_state(view):
+    """Whether the last complete Grok box holds an empty composer.
+
+    Return True for an empty/known-placeholder composer, False for a proven
+    nonempty draft, and None when this is not a recognizable box. Grok renders
+    its empty composer with the placeholder "Build anything"; requiring the
+    complete bordered box keeps that decoration distinct from typed text.
+    """
+    lines = view.splitlines()
+    if not lines or not re.fullmatch(r" *╭[^\n]*", lines[0]):
+        return None
+    end = next(
+        (index for index, line in enumerate(lines) if index and re.fullmatch(r" *╰[^\n]*", line)),
+        None,
+    )
+    if end is None or end < 2:
+        return None
+    rows = []
+    for line in lines[1:end]:
+        stripped = line.strip()
+        if not stripped.startswith(("│", "┃")) or not stripped.endswith(("│", "┃")):
+            return None
+        rows.append(stripped[1:-1])
+    if not rows:
+        return None
+    prompt = re.fullmatch(r"\s*❯ ?(.*?)\s*", rows[0])
+    if prompt is None:
+        return None
+    if any(row.strip() for row in rows[1:]):
+        return False
+    content = prompt.group(1)
+    return not content or content in GROK_PLACEHOLDERS
+
+
 def display_text(text):
     text = text.replace("\r\n", "\n")
     text = re.sub(r"\x1b\[[0-9;:]*m", "", text)
@@ -156,10 +193,22 @@ def assess(target, raw, binding, protocol=None):
             return result("unknown", "unbound_ambiguous_activity_text")
         return result("ready", "current_empty_widget")
 
-    empty = bool(re.search(binding.ready_pattern, view))
-    base["input_empty"] = empty
-    if not empty:
-        return result("input_not_empty", "existing_input_or_unknown_widget")
+    if target == "grok":
+        # A current box with a typed draft blocks even if an older row still
+        # matches the ready pattern. An unrecognized frame is unknown, not
+        # evidence of queued text.
+        structural = grok_input_state(view)
+        if structural is False:
+            base["input_empty"] = False
+            return result("input_not_empty", "existing_input_must_not_be_overwritten")
+        empty = True if structural else bool(re.search(binding.ready_pattern, view))
+        if not empty:
+            return result("unknown", "unrecognized_grok_composer")
+    else:
+        empty = bool(re.search(binding.ready_pattern, view))
+        if not empty:
+            return result("input_not_empty", "existing_input_or_unknown_widget")
+    base["input_empty"] = True
     # The live status row sits directly above the composer. Older quotations
     # of Thinking or [stop] stay above that row and do not mean the turn is active.
     raw_prelude = text[: text.rfind("╭")].splitlines() if "╭" in text else []
