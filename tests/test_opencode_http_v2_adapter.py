@@ -42,6 +42,10 @@ class Server:
         idle_outcome="succeeded",
         foreign=False,
         never_complete=False,
+        multi_step=False,
+        tool_calls_only=False,
+        changed_id=False,
+        cursor_never_ends=False,
         page_size=None,
         model=None,
     ):
@@ -52,6 +56,10 @@ class Server:
         self.idle_outcome = idle_outcome
         self.foreign = foreign
         self.never_complete = never_complete
+        self.multi_step = multi_step
+        self.tool_calls_only = tool_calls_only
+        self.changed_id = changed_id
+        self.cursor_never_ends = cursor_never_ends
         self.page_size = page_size
         self.model = model
         self.messages = []
@@ -78,6 +86,8 @@ class Server:
         if method == "POST" and path == "/api/session":
             body = json.loads(request.content) if request.content else {}
             self.session_id = body.get("id", "ses_test")
+            if self.changed_id:
+                self.session_id = "ses_other"
             return httpx.Response(200, json={"data": self._info(body)})
         if method == "GET" and path == f"/api/session/{self.session_id}":
             return httpx.Response(
@@ -90,6 +100,22 @@ class Server:
             if self.foreign:
                 self.messages.append(user_msg("msg_foreign", "foreign prompt", created=2))
                 self.messages.append(assistant_msg("msg_foreign_a", "foreign answer", created=3))
+            elif self.multi_step:
+                self.messages.append(
+                    assistant_msg("msg_step", "tool step", created=2, finish="tool-calls")
+                )
+                self.messages.append(assistant_msg("msg_final", self.reply_text, created=3))
+                self.messages.append(idle_msg("msg_idle", self.idle_outcome, created=4))
+            elif self.tool_calls_only:
+                self.messages.append(
+                    assistant_msg(
+                        "msg_tool",
+                        "tool step",
+                        created=2,
+                        completed=2,
+                        finish="tool-calls",
+                    )
+                )
             elif self.never_complete:
                 self.messages.append(
                     assistant_msg(
@@ -121,14 +147,20 @@ class Server:
                 },
             )
         if method == "GET" and path == f"/api/session/{self.session_id}/message":
-            data = self.messages
+            order = request.url.params.get("order", "asc")
+            ordered = list(reversed(self.messages)) if order == "desc" else list(self.messages)
+            if self.cursor_never_ends:
+                return httpx.Response(
+                    200, json={"data": [], "cursor": {"next": "page-2", "previous": None}}
+                )
             if self.page_size:
                 start = self._pages_served * self.page_size
-                data = self.messages[start : start + self.page_size]
-                has_more = start + self.page_size < len(self.messages)
+                data = ordered[start : start + self.page_size]
+                has_more = start + self.page_size < len(ordered)
                 self._pages_served += 1
                 cursor = {"next": "page-2" if has_more else None, "previous": None}
             else:
+                data = ordered
                 cursor = {"next": None, "previous": None}
             return httpx.Response(200, json={"data": data, "cursor": cursor})
         return httpx.Response(404)
@@ -256,6 +288,41 @@ async def test_explicit_non_success_finish_is_failed(tmp_path):
     server = Server(location=str(tmp_path), finish="length")
     result, _, _ = await execute(tmp_path, server)
     assert not result["success"] and result["evidence"]["turn_failed"]
+
+
+async def test_failed_finish_reports_a_safe_category(tmp_path):
+    server = Server(location=str(tmp_path), finish="content-filter")
+    result, _, _ = await execute(tmp_path, server)
+    assert not result["success"]
+    assert result["evidence"]["provider_error"]["category"] == "content_filter"
+
+
+async def test_multi_part_turn_returns_the_final_assistant(tmp_path):
+    server = Server(location=str(tmp_path), multi_step=True, reply_text="final answer")
+    result, _, _ = await execute(tmp_path, server)
+    assert result["success"] and result["text"] == "final answer"
+    assert result["evidence"]["message_id"] == "msg_final"
+
+
+async def test_tool_calls_only_is_not_promoted_to_success(tmp_path):
+    server = Server(location=str(tmp_path), tool_calls_only=True)
+    with pytest.raises(UncertainExecution) as caught:
+        await execute(tmp_path, server, timeout=0.2)
+    assert caught.value.code == "agent_timeout"
+
+
+async def test_create_rejects_a_changed_session_id(tmp_path):
+    server = Server(location=str(tmp_path), changed_id=True)
+    with pytest.raises(UncertainExecution) as caught:
+        await execute(tmp_path, server)
+    assert caught.value.code == "agent_identity"
+
+
+async def test_paging_window_is_fail_closed(tmp_path):
+    server = Server(location=str(tmp_path), cursor_never_ends=True)
+    with pytest.raises(UncertainExecution) as caught:
+        await execute(tmp_path, server, timeout=0.2)
+    assert caught.value.code == "agent_unconfirmed"
 
 
 async def test_observed_model_is_reported_separately_from_requested(tmp_path):

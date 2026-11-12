@@ -24,9 +24,22 @@ from kirabridge.agent_manager.cli_support import BoundedText, bind_session
 from kirabridge.bridge_core.models import BridgeError, UncertainExecution
 from kirabridge.filesystem_manager import PathScope
 
-_FAILED_FINISH = {"length", "content-filter", "tool-calls", "error", "unknown"}
+# A final failed finish reason. "tool-calls" is an intermediate step, not a
+# terminal failure: a multi-step turn keeps going until a non-tool finish.
+_FAILED_FINISH = {"length", "content-filter", "error", "unknown"}
+_FINISH_CATEGORY = {
+    "length": "length",
+    "content-filter": "content_filter",
+    "error": "error",
+    "unknown": "unknown",
+    "tool-calls": "tool_calls",
+}
 _SESSION = re.compile(r"^ses_")
 _MESSAGE = re.compile(r"^msg_")
+# Bounded window for the reply search: the admitted prompt is the newest user
+# message, so reading the newest pages first finds it without walking the whole
+# history. Exceeding the window fails closed instead of silently timing out.
+_MESSAGE_PAGES_MAX = 4
 _ERROR_CATEGORIES = {
     "ProviderAuthError": "authentication",
     "APIError": "provider",
@@ -66,10 +79,10 @@ def _error_category(error: Any) -> str | None:
 
 
 def _assistant_done(message: dict[str, Any]) -> bool:
-    if message.get("finish") is not None:
-        return True
-    timing = message.get("time")
-    return isinstance(timing, dict) and isinstance(timing.get("completed"), (int, float))
+    """A turn ends only on a final finish reason; ``time.completed`` alone or an
+    intermediate ``tool-calls`` step is never promoted to completion."""
+    finish = message.get("finish")
+    return finish is not None and finish != "tool-calls"
 
 
 def _assistant_text(message: dict[str, Any]) -> list[str]:
@@ -198,11 +211,16 @@ class OpenCodeHTTPV2Adapter:
         return data
 
     async def _messages(self, client: httpx.AsyncClient, session: str) -> list[dict[str, Any]]:
+        """Return the recent message window in ascending order, bounded and fail-closed.
+
+        Reads newest-first so the just-admitted prompt is on the first page; a
+        bounded page ceiling that does not reach the end of history fails closed
+        instead of silently returning a truncated list and timing out.
+        """
         items: list[dict[str, Any]] = []
         cursor: str | None = None
-        pages = 0
-        while True:
-            params: dict[str, Any] = {"order": "asc", "limit": "100"}
+        for _ in range(_MESSAGE_PAGES_MAX):
+            params: dict[str, Any] = {"order": "desc", "limit": "100"}
             if cursor is not None:
                 params["cursor"] = cursor
             response = await self._request(
@@ -216,22 +234,31 @@ class OpenCodeHTTPV2Adapter:
                 raise UncertainExecution("provider_protocol", "OpenCode message data is not a list")
             items.extend(item for item in data if isinstance(item, dict))
             next_cursor = (value.get("cursor") or {}).get("next")
-            pages += 1
-            if not next_cursor or pages > 8:
+            if not next_cursor:
                 break
             cursor = next_cursor
+        else:
+            raise UncertainExecution(
+                "agent_unconfirmed",
+                "OpenCode message history exceeded the bounded read window",
+            )
+        items.reverse()
         return items
 
     @staticmethod
     def _reply_after(
         messages: list[dict[str, Any]], admitted_id: str
-    ) -> tuple[str, dict[str, Any] | None]:
-        """Locate the first relevant message after our admitted user message.
+    ) -> tuple[str, dict[str, Any] | None, dict[str, Any] | None]:
+        """Locate this turn's terminal state after our admitted user message.
 
-        Returns (kind, message): kind is "foreign", "assistant", "idle" or
-        "pending" (our user message not yet projected, or no boundary yet).
+        Returns ``(state, assistant, idle)`` where state is ``foreign`` (a real
+        user input interleaved), ``idle`` (the idle boundary, with the last
+        assistant before it), ``assistant`` (still streaming; the last assistant
+        so far) or ``pending`` (our user message not yet projected).
         """
         seen = False
+        assistant: dict[str, Any] | None = None
+        idle: dict[str, Any] | None = None
         for message in messages:
             typ = message.get("type")
             if not seen:
@@ -239,12 +266,16 @@ class OpenCodeHTTPV2Adapter:
                     seen = True
                 continue
             if typ == "user":
-                return "foreign", message
+                return "foreign", None, None
             if typ == "assistant":
-                return "assistant", message
-            if typ == "idle":
-                return "idle", message
-        return "pending", None
+                assistant = message
+            elif typ == "idle":
+                idle = message
+        if idle is not None:
+            return "idle", assistant, idle
+        if assistant is not None:
+            return "assistant", assistant, None
+        return "pending", None, None
 
     async def execute(
         self, task, args, config, roots, running, progress, *, resume_session=None, **extra
@@ -285,7 +316,16 @@ class OpenCodeHTTPV2Adapter:
             else:
                 session_id = "ses_" + uuid4().hex
                 created = await self._create(client, session_id, directory, model, task)
-                session = bind_session(None, created.get("id"))
+                returned_id = created.get("id")
+                if not isinstance(returned_id, str) or not _SESSION.match(returned_id):
+                    raise UncertainExecution(
+                        "agent_identity", "OpenCode returned an invalid session id"
+                    )
+                if returned_id != session_id:
+                    raise UncertainExecution("agent_identity", "OpenCode changed the session id")
+                session = returned_id
+                # Emitted before the prompt: the caller's durable recovery marker
+                # for this exact session, never a second independent data trace.
                 await progress(
                     {"agent": args.agent, "session_id": session, "event": "session_created"}
                 )
@@ -306,23 +346,21 @@ class OpenCodeHTTPV2Adapter:
             idle: dict[str, Any] | None = None
             while True:
                 messages = await self._messages(client, session)
-                kind, boundary = self._reply_after(messages, message_id)
-                if kind == "foreign":
+                state, assistant, idle = self._reply_after(messages, message_id)
+                if state == "foreign":
                     raise UncertainExecution(
                         "agent_unconfirmed",
                         "A foreign input interleaved before this turn's reply",
                     )
-                if kind == "assistant" and boundary is not None:
-                    assistant = boundary
-                    if not started:
-                        started = True
-                        await running(
-                            {"agent": args.agent, "session_id": session, "event": "session_busy"}
-                        )
+                if assistant is not None and not started:
+                    started = True
+                    await running(
+                        {"agent": args.agent, "session_id": session, "event": "session_busy"}
+                    )
+                if state == "assistant":
                     if _assistant_done(assistant):
                         break
-                elif kind == "idle":
-                    idle = boundary
+                elif state == "idle":
                     break
                 remaining = deadline - time.monotonic()
                 if remaining <= 0:
@@ -338,10 +376,10 @@ class OpenCodeHTTPV2Adapter:
         if not _assistant_done(assistant):
             raise UncertainExecution("agent_unconfirmed", "No OpenCode turn completion evidence")
 
-        failed = assistant.get("error") is not None
         finish = assistant.get("finish")
-        if isinstance(finish, str) and finish in _FAILED_FINISH:
-            failed = True
+        failed = assistant.get("error") is not None or (
+            isinstance(finish, str) and finish in _FAILED_FINISH
+        )
         for part in _assistant_text(assistant):
             text.append(part)
         if not failed and finish != "stop":
@@ -354,10 +392,13 @@ class OpenCodeHTTPV2Adapter:
             )
         provider_error = None
         if failed:
+            category = _error_category(assistant.get("error"))
+            if category is None and isinstance(finish, str):
+                category = _FINISH_CATEGORY.get(finish, "provider")
             provider_error = {
                 "provider": "opencode",
                 "source": "assistant_message",
-                "category": _error_category(assistant.get("error")),
+                "category": category,
             }
         return {
             "success": not failed,
