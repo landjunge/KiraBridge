@@ -119,6 +119,32 @@ def test_exact_desktop_navigation_contract(navigation_harness, url, mode, expect
 
 
 @pytest.mark.parametrize(
+    "url,mode,port,expected",
+    [
+        ("http://127.0.0.1:54321/", "automatic", "54321", "allow"),
+        ("http://127.0.0.1:54321/live", "automatic", "54321", "allow"),
+        ("http://127.0.0.1:54321/protocol?stream=1", "popup", "54321", "true"),
+        ("http://127.0.0.1:8766/", "automatic", "54321", "deny"),
+        ("http://127.0.0.1:8766/protocol", "popup", "54321", "false"),
+        ("http://127.0.0.1:8767/", "automatic", "54321", "deny"),
+        ("http://localhost:54321/", "automatic", "54321", "deny"),
+        ("https://127.0.0.1:54321/", "automatic", "54321", "deny"),
+        ("http://127.0.0.1:54321/", "automatic", "8766", "deny"),
+        ("http://user:pass@127.0.0.1:54321/", "automatic", "54321", "deny"),
+        ("https://example.invalid/", "automatic", "54321", "deny"),
+    ],
+)
+def test_isolated_origin_binds_exactly_one_loopback_port(
+    navigation_harness, url, mode, port, expected
+):
+    result = subprocess.run(
+        [str(navigation_harness), url, mode, port], capture_output=True, text=True, timeout=5
+    )
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.strip() == expected
+
+
+@pytest.mark.parametrize(
     "value,expected",
     [
         ({"login_file": "/private/custom/approval-login.html"}, "accepted"),

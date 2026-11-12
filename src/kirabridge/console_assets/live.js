@@ -48,9 +48,16 @@
     title.textContent = agent.family || "unknown";
     const step = document.createElement("span");
     step.className = "live-step";
-    const detail = [failureText(agent), agent.step, `${age(agent.age_seconds)} ago`]
-      .filter(Boolean)
-      .join(" · ");
+    const detailParts = [];
+    if (agent.uncertain) {
+      detailParts.push("Ergebnis unklar, nicht wiederholt");
+    } else {
+      const failure = failureText(agent);
+      if (failure) detailParts.push(failure);
+      if (agent.step) detailParts.push(agent.step);
+    }
+    detailParts.push(`${age(agent.age_seconds)} ago`);
+    const detail = detailParts.filter(Boolean).join(" · ");
     step.textContent = agent.state === "completed"
       ? `${detail} · keine fachliche Abnahme`
       : detail;

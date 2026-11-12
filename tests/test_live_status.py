@@ -276,6 +276,33 @@ def test_completed_durable_outcome_allows_completed_without_exit_code(bridge):
     assert row["acceptance"] == "not_evaluated"
 
 
+def test_durable_unknown_beats_a_source_error_and_stays_unknown(bridge):
+    _local(bridge)
+    # UncertainExecution settles the durable task as unknown (automatic_retry
+    # false) while the live source records an error. The proven uncertain effect
+    # wins: no confirmed failure, no retry implication.
+    _durable(bridge, "turn", state="unknown", agent="codex")
+    _open(bridge, "turn", agent="codex", transport="codex")
+    bridge.live_logs.close("turn", exit_code=1, error="UncertainExecution")
+    row = project(bridge, "local")["agents"][0]
+    assert row["state"] == "unknown" and row["uncertain"] is True
+    assert row["failure"] is None and row["acceptance"] == "not_evaluated"
+    assert row["step"] == "outcome uncertain, not retried"
+    summary = project(bridge, "local")["summary_text"]
+    assert "unknown" in summary and "uncertain" in summary
+    assert "blocked" not in summary and "exit 1" not in summary
+
+
+def test_durable_unknown_task_is_not_shown_as_working_or_failed(bridge):
+    _local(bridge)
+    _durable(bridge, "pending", state="unknown", agent="qwen")
+    row = project(bridge, "local")["agents"][0]
+    assert row["state"] == "unknown" and row["uncertain"] is True
+    assert row["step"] == "outcome uncertain, not retried"
+    assert row["failure"] is None and row["turn_ended"] is False
+    assert row["acceptance"] == "not_evaluated"
+
+
 def test_projection_states_what_it_cannot_observe(bridge):
     _local(bridge)
     coverage = project(bridge, "local")["coverage"]

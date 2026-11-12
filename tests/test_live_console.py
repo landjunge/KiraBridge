@@ -44,6 +44,8 @@ async def test_live_page_assets_and_real_projection(bridge, config, monkeypatch)
         page = await client.get("/live", headers=headers)
         assert page.status_code == 200 and "KiraBridge Live" in page.text
         assert (await client.get("/live.js", headers=headers)).status_code == 200
+        live_js = (await client.get("/live.js", headers=headers)).text
+        assert "nicht wiederholt" in live_js
         assert (await client.get("/live.css", headers=headers)).status_code == 200
         assert (await client.get("/api/control/live")).status_code == 401
         result = await client.get("/api/control/live", headers=headers)

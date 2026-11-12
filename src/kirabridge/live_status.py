@@ -141,11 +141,20 @@ def _source_row(source, now, task=None):
     age = max(0.0, now - float(source.updated))
     stale = age > STALE_SECONDS and source.state == "running"
     failure = _failure(source)
+    settled = task["state"] if task is not None else None
+    uncertain = settled == "unknown"
+    if uncertain:
+        # A proven uncertain effect (UncertainExecution or a possibly observed
+        # side effect) already settled the durable task as unknown with
+        # automatic_retry false. That evidence wins over a source-level
+        # error/failed flag: it is not a confirmed failure and must not look
+        # like one.
+        failure = None
     exit_code = source.exit_code if isinstance(source.exit_code, int) else None
     # The durable task record for the same id already holds the settled outcome:
     # success false becomes State.FAILED and an error is stored verbatim. Read
     # that evidence instead of turning a failed turn into a success.
-    if task is not None:
+    if task is not None and not uncertain:
         result = _task_result(task)
         if failure is None and task["error"]:
             failure = "error"
@@ -157,10 +166,12 @@ def _source_row(source, now, task=None):
                 exit_code = stored
                 if stored != 0 and failure is None:
                     failure = "exit_code"
-    settled = task["state"] if task is not None else None
     turn_ended = source.state in {"closed", "failed"} or settled in {"completed", "failed"}
     if stale:
         state, step = "unknown", "stale"
+    elif uncertain:
+        # Unknown stays unknown: no confirmed failure, no retry implication.
+        state, step = "unknown", "outcome uncertain, not retried"
     elif failure is not None:
         state, step = "blocked", "failed"
     elif source.state == "closed" or settled == "completed":
@@ -186,6 +197,7 @@ def _source_row(source, now, task=None):
         "acceptance": "not_evaluated",
         "exit_code": exit_code,
         "failure": failure,
+        "uncertain": uncertain,
         "observed_at": float(source.updated),
         "age_seconds": round(age, 3),
         "stale": stale,
@@ -196,10 +208,14 @@ def _source_row(source, now, task=None):
 
 def _durable_row(row, now):
     failed = row["state"] == "failed"
+    uncertain = row["state"] == "unknown"
     if row["state"] in {"queued", "accepted"}:
         state = "queued"
     elif failed:
         state = "blocked"
+    elif uncertain:
+        # An uncertain effect is not working and not a confirmed failure.
+        state = "unknown"
     else:
         state = "working"
     try:
@@ -221,6 +237,8 @@ def _durable_row(row, now):
         step = "stale"
     elif failed:
         step = "failed"
+    elif uncertain:
+        step = "outcome uncertain, not retried"
     else:
         step = None
     return {
@@ -236,6 +254,7 @@ def _durable_row(row, now):
         "acceptance": "not_evaluated",
         "exit_code": None,
         "failure": "task_error" if failed else None,
+        "uncertain": uncertain,
         "observed_at": observed,
         "age_seconds": round(age, 3),
         "stale": stale,
@@ -295,7 +314,7 @@ def project(bridge, principal, *, now=None):
             "SELECT id, principal, operation, args, agent, state, error, created, started "
             "FROM tasks "
             f"WHERE principal IN ({placeholders}) "
-            "AND state IN ('queued','accepted','running','failed') "
+            "AND state IN ('queued','accepted','running','failed','unknown') "
             "ORDER BY created DESC LIMIT ?",
             (*visible, MAX_TASKS),
         ).fetchall()
