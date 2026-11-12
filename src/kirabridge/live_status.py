@@ -7,10 +7,15 @@ a closed window never hides the read service.
 
 The caller sees their own observed work plus, only when an existing team grant
 (owner/coordinator/observer) allows a read-only cross-principal observation, the
-team's worker principals. The projection states that scope and the excluded
-principals explicitly; actual all-agent acceptance remains a separate gate.
-Steps are short human labels, not terminal output. A closed transport turn is
-labelled ``turn ended`` with ``acceptance: not_evaluated`` — never "agent work
+team's worker principals. The projection states that scope, the excluded
+principals and the source gaps explicitly; actual all-agent acceptance remains a
+separate gate.
+
+States describe the observed process or task, never the fachliche Abnahme. A
+recorded failure (exit code other than 0, a recorded error, a failed source or a
+failed durable task) is shown as blocked; a closed transport without any exit
+status is unknown, not completed. A turn that ended with exit 0 is labelled
+``turn ended`` and keeps ``acceptance: not_evaluated`` — never "agent work
 completed". Unknown or stale work is marked as such; no percentage is invented.
 """
 
@@ -77,6 +82,32 @@ def _step(entries):
     return STEP.get(kind) if isinstance(kind, str) else None
 
 
+def _failure(source):
+    """Failure evidence the existing source already recorded; never guessed.
+
+    Only the category is exposed, not the recorded error text, so an error
+    message cannot leak paths, prompts or secrets into the projection.
+    """
+    if source.error is not None:
+        return "error"
+    if isinstance(source.exit_code, int) and source.exit_code != 0:
+        return "exit_code"
+    if source.state == "failed":
+        return "failed_state"
+    return None
+
+
+def _task_result(task):
+    """The durable task result, if it is the JSON object it should be."""
+    if not isinstance(task["result"], str) or not task["result"]:
+        return None
+    try:
+        value = json.loads(task["result"])
+    except ValueError:
+        return None
+    return value if isinstance(value, dict) else None
+
+
 def observation_scope(bridge, principal):
     """The own principal plus team members this principal may observe read-only.
 
@@ -106,17 +137,42 @@ def observation_scope(bridge, principal):
     return observed, excluded
 
 
-def _source_row(source, now):
+def _source_row(source, now, task=None):
     age = max(0.0, now - float(source.updated))
     stale = age > STALE_SECONDS and source.state == "running"
-    state = "unknown" if stale else SOURCE_STATE.get(source.state, "unknown")
-    turn_ended = source.state == "closed"
-    if state == "completed":
-        step = "turn ended"
-    elif state == "blocked":
-        step = "failed"
+    failure = _failure(source)
+    exit_code = source.exit_code if isinstance(source.exit_code, int) else None
+    # The durable task record for the same id already holds the settled outcome:
+    # success false becomes State.FAILED and an error is stored verbatim. Read
+    # that evidence instead of turning a failed turn into a success.
+    if task is not None:
+        result = _task_result(task)
+        if failure is None and task["error"]:
+            failure = "error"
+        if failure is None and task["state"] == "failed":
+            failure = "unsuccessful"
+        if exit_code is None and result is not None:
+            stored = result.get("exit_code")
+            if isinstance(stored, int):
+                exit_code = stored
+                if stored != 0 and failure is None:
+                    failure = "exit_code"
+    settled = task["state"] if task is not None else None
+    turn_ended = source.state in {"closed", "failed"} or settled in {"completed", "failed"}
+    if stale:
+        state, step = "unknown", "stale"
+    elif failure is not None:
+        state, step = "blocked", "failed"
+    elif source.state == "closed" or settled == "completed":
+        if exit_code == 0 or (exit_code is None and settled == "completed"):
+            state, step = "completed", "turn ended"
+        else:
+            # Closed without any recorded exit status: the outcome is
+            # unconfirmed and is never presented as a successful completion.
+            state, step = "unknown", "turn ended, result unconfirmed"
     else:
-        step = _step(source.entries)
+        state = SOURCE_STATE.get(source.state, "unknown")
+        step = None
     return {
         "task_id": source.source_id,
         "principal": source.principal,
@@ -125,9 +181,11 @@ def _source_row(source, now):
         "transport": source.transport,
         "operation": source.operation,
         "state": state,
-        "step": step,
+        "step": step if step is not None else _step(source.entries),
         "turn_ended": turn_ended,
         "acceptance": "not_evaluated",
+        "exit_code": exit_code,
+        "failure": failure,
         "observed_at": float(source.updated),
         "age_seconds": round(age, 3),
         "stale": stale,
@@ -137,7 +195,13 @@ def _source_row(source, now):
 
 
 def _durable_row(row, now):
-    state = "queued" if row["state"] in {"queued", "accepted"} else "working"
+    failed = row["state"] == "failed"
+    if row["state"] in {"queued", "accepted"}:
+        state = "queued"
+    elif failed:
+        state = "blocked"
+    else:
+        state = "working"
     try:
         args = json.loads(row["args"]) if row["args"] else {}
     except ValueError:
@@ -151,6 +215,14 @@ def _durable_row(row, now):
     stale = state == "working" and age > STALE_SECONDS
     if stale:
         state = "unknown"
+    if state == "queued":
+        step = "queued"
+    elif stale:
+        step = "stale"
+    elif failed:
+        step = "failed"
+    else:
+        step = None
     return {
         "task_id": row["id"],
         "principal": row["principal"],
@@ -159,14 +231,29 @@ def _durable_row(row, now):
         "transport": "durable_task",
         "operation": row["operation"],
         "state": state,
-        "step": "queued" if state == "queued" else ("stale" if stale else None),
-        "turn_ended": False,
+        "step": step,
+        "turn_ended": failed,
         "acceptance": "not_evaluated",
+        "exit_code": None,
+        "failure": "task_error" if failed else None,
         "observed_at": observed,
         "age_seconds": round(age, 3),
         "stale": stale,
         "unknown": state == "unknown",
         "source": "durable_task",
+    }
+
+
+def _coverage():
+    """What this projection can and cannot see; stated, not implied."""
+    return {
+        "observed_sources": ["live_observation", "durable_task"],
+        "not_observed": "External agents that write neither a bridge live source nor a "
+        "bridge task are not observed here — for example an agent started outside "
+        "KiraBridge, an adapter without live observation, or a principal outside the "
+        "reported scope. The list shows only what the bridge actually observed.",
+        "acceptance": "This projection never derives a fachliche Abnahme. A running "
+        "process or an ended turn is not confirmed work; acceptance is a separate gate.",
     }
 
 
@@ -181,19 +268,34 @@ def project(bridge, principal, *, now=None):
     observed_at = float(now if now is not None else time.time())
     visible, excluded = observation_scope(bridge, principal)
     visible = sorted(visible)
+    live_sources = [
+        source for source in bridge.live_logs.sources.values() if source.principal in visible
+    ]
+    # Settled outcome evidence for the observed live sources, read from the
+    # existing durable task record with the same id (no new store, no inference).
+    evidence = {}
+    if live_sources:
+        ids = sorted({source.source_id for source in live_sources})
+        id_marks = ",".join("?" for _ in ids)
+        principal_marks = ",".join("?" for _ in visible)
+        for row in bridge.store.db.execute(
+            "SELECT id, state, error, result FROM tasks "
+            f"WHERE id IN ({id_marks}) AND principal IN ({principal_marks})",
+            (*ids, *visible),
+        ).fetchall():
+            evidence[row["id"]] = row
     agents = [
-        _source_row(source, observed_at)
-        for source in bridge.live_logs.sources.values()
-        if source.principal in visible
+        _source_row(source, observed_at, evidence.get(source.source_id)) for source in live_sources
     ]
     seen = {agent["task_id"] for agent in agents}
     rows = []
     if visible:
         placeholders = ",".join("?" for _ in visible)
         rows = bridge.store.db.execute(
-            "SELECT id, principal, operation, args, agent, state, created, started FROM tasks "
+            "SELECT id, principal, operation, args, agent, state, error, created, started "
+            "FROM tasks "
             f"WHERE principal IN ({placeholders}) "
-            "AND state IN ('queued','accepted','running') "
+            "AND state IN ('queued','accepted','running','failed') "
             "ORDER BY created DESC LIMIT ?",
             (*visible, MAX_TASKS),
         ).fetchall()
@@ -220,9 +322,10 @@ def project(bridge, principal, *, now=None):
         "scope": "own" if visible == [principal] else "team_observer",
         "scope_note": "own work plus team members this principal may observe read-only; "
         "excluded principals are not observed, and all-agent acceptance is a separate gate",
+        "coverage": _coverage(),
         "text_scope": "read-only live projection from the existing observation and durable "
-        "task records; not durable audit; no invented percentages; a present process or a "
-        "closed transport turn is not confirmed facharbeit",
+        "task records; not durable audit; no invented percentages; the state is a process "
+        "or task state, and a running process or an ended turn is not confirmed facharbeit",
     }
     result["summary_text"] = render_text(result)
     return result
@@ -235,7 +338,27 @@ def render_text(projection, *, limit=12):
         return "No observed agent work right now."
     lines = []
     for agent in agents:
-        step = agent.get("step") or agent["state"]
+        family = agent.get("family") or "unknown"
         stale = " (stale)" if agent.get("stale") else ""
-        lines.append(f"{agent['family']} · {agent['state']}{stale} · {step} · {agent['task_id']}")
+        task = agent["task_id"]
+        if agent.get("failure"):
+            evidence = (
+                f"exit {agent['exit_code']}"
+                if agent.get("exit_code") is not None
+                else "failure recorded"
+            )
+            lines.append(
+                f"{family} · blocked ({evidence}){stale} · {task} · "
+                "fachliche Abnahme nicht bewertet"
+            )
+        elif agent["state"] == "completed":
+            lines.append(
+                f"{family} · turn ended, process only{stale} · {task} · "
+                "fachliche Abnahme nicht bewertet"
+            )
+        elif agent["state"] == "unknown":
+            lines.append(f"{family} · unknown{stale} · {agent.get('step') or 'unknown'} · {task}")
+        else:
+            step = agent.get("step") or agent["state"]
+            lines.append(f"{family} · {agent['state']}{stale} · {step} · {task}")
     return "\n".join(lines)

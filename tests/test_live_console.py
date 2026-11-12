@@ -62,3 +62,27 @@ async def test_console_live_endpoint_denies_without_the_capability(bridge, confi
         denied = await client.get("/api/control/live", headers=headers)
         assert denied.status_code == 503
         assert denied.json()["error"]["code"] == "forbidden"
+
+
+async def test_page_separates_turn_end_from_acceptance_and_names_gaps(bridge, config, monkeypatch):
+    app, headers = _app(bridge, config, monkeypatch)
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url=ORIGIN) as client:
+        page = await client.get("/live", headers=headers)
+        assert "keine bestätigte Facharbeit" in page.text
+        assert "Fachliche Abnahme: nicht bewertet" in page.text
+        assert 'id="live-gap"' in page.text
+
+
+async def test_endpoint_shows_a_nonzero_exit_as_blocked_not_completed(bridge, config, monkeypatch):
+    app, headers = _app(bridge, config, monkeypatch)
+    bridge.live_logs.open("bad", "local", operation="agent.execute", agent="codex")
+    bridge.live_logs.close("bad", exit_code=2)
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url=ORIGIN) as client:
+        result = await client.get("/api/control/live", headers=headers)
+        agent = result.json()["agents"][0]
+        assert agent["state"] == "blocked" and agent["exit_code"] == 2
+        assert agent["failure"] == "exit_code" and agent["acceptance"] == "not_evaluated"
+        assert result.json()["coverage"]["observed_sources"] == [
+            "live_observation",
+            "durable_task",
+        ]

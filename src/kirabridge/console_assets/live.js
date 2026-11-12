@@ -1,10 +1,20 @@
 /* KiraBridge Live: read-only poll of the same compact projection the MCP read
- * returns. It shows only family/state/step/task/time — never prompts or logs. */
+ * returns. It shows only family/process state/step/task/time — never prompts or
+ * logs — and never presents a process or turn end as a fachliche Abnahme. */
 (() => {
   const list = document.getElementById("live-list");
   const observed = document.getElementById("live-observed");
   const hint = document.getElementById("live-hint");
   let timer = null;
+
+  const STATE_LABEL = {
+    queued: "eingereiht",
+    working: "arbeitet",
+    waiting: "wartet",
+    blocked: "Fehlschlag",
+    unknown: "unbekannt",
+    completed: "Turn beendet",
+  };
 
   function token() {
     try { return localStorage.getItem("kirabridge.session") || ""; } catch { return ""; }
@@ -15,6 +25,12 @@
     if (seconds < 90) return `${Math.round(seconds)}s`;
     if (seconds < 5400) return `${Math.round(seconds / 60)}min`;
     return `${Math.round(seconds / 3600)}h`;
+  }
+
+  function failureText(agent) {
+    if (!agent.failure) return "";
+    if (Number.isInteger(agent.exit_code)) return `Fehlschlag, exit ${agent.exit_code}`;
+    return "Fehlschlag gemeldet";
   }
 
   function row(agent) {
@@ -32,11 +48,16 @@
     title.textContent = agent.family || "unknown";
     const step = document.createElement("span");
     step.className = "live-step";
-    step.textContent = `${agent.step || agent.state || "unknown"} · ${age(agent.age_seconds)} ago`;
+    const detail = [failureText(agent), agent.step, `${age(agent.age_seconds)} ago`]
+      .filter(Boolean)
+      .join(" · ");
+    step.textContent = agent.state === "completed"
+      ? `${detail} · keine fachliche Abnahme`
+      : detail;
     main.append(title, step);
     const state = document.createElement("span");
     state.className = "live-state";
-    state.textContent = agent.state || "unknown";
+    state.textContent = STATE_LABEL[agent.state] || agent.state || "unbekannt";
     if (agent.stale) {
       const stale = document.createElement("span");
       stale.className = "live-stale";
@@ -81,7 +102,12 @@
       scope.textContent =
         `Beobachtet: ${(value.observed_principals || []).join(", ")}` +
         (excluded.length ? ` · nicht beobachtet: ${excluded.join(", ")}` : "") +
-        ` · ${value.text_scope || "nur lesende Live-Anzeige."}`;
+        ` · ${value.scope_note || "nur lesende Live-Anzeige."}`;
+    }
+    const gap = document.getElementById("live-gap");
+    if (gap) {
+      const coverage = value.coverage || {};
+      gap.textContent = `${coverage.not_observed || ""} ${coverage.acceptance || ""}`.trim();
     }
   }
 

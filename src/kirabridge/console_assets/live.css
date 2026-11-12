@@ -29,5 +29,7 @@
 .live-row[data-state="unknown"] .live-state { color: #e4be70; }
 .live-row[data-state="completed"] .live-state { color: #7bdaa7; }
 .live-stale { font-size: 10px; color: #e4be70; margin-left: 6px; }
+.live-note { margin: 0; font-size: 11px; line-height: 1.5; color: var(--np-muted, #afb6c1); }
 .live-scope { margin: 4px 0 0; font-size: 11px; line-height: 1.5; color: var(--np-muted, #afb6c1); }
+.live-gap { margin: 0; font-size: 11px; line-height: 1.5; color: var(--np-muted, #afb6c1); }
 .live-empty { font-size: 13px; color: var(--np-muted, #afb6c1); padding: 12px 0; }

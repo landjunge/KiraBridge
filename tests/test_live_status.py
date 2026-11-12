@@ -20,11 +20,21 @@ def _open(bridge, source_id, principal="local", **kw):
     bridge.live_logs.open(source_id, principal, operation="agent.execute", **kw)
 
 
-def _durable(bridge, task_id, *, principal="local", state="queued", agent="opencode", age=0.0):
+def _durable(
+    bridge,
+    task_id,
+    *,
+    principal="local",
+    state="queued",
+    agent="opencode",
+    age=0.0,
+    error=None,
+    result=None,
+):
     created = time.time() - age
     bridge.store.db.execute(
         "INSERT INTO tasks(id,principal,idem,request_hash,operation,args,agent,state,"
-        "created,updated,attempt) VALUES(?,?,?,?,?,?,?,?,?,?,1)",
+        "created,updated,attempt,error,result) VALUES(?,?,?,?,?,?,?,?,?,?,1,?,?)",
         (
             task_id,
             principal,
@@ -36,6 +46,8 @@ def _durable(bridge, task_id, *, principal="local", state="queued", agent="openc
             state,
             created,
             created,
+            error,
+            json.dumps(result) if result is not None else None,
         ),
     )
 
@@ -170,3 +182,106 @@ def test_projection_is_bounded(bridge):
         _open(bridge, f"t{index}", agent="codex")
     result = project(bridge, "local")
     assert result["count"] == MAX_AGENTS and result["truncated"] is True
+
+
+def test_nonzero_exit_code_is_blocked_never_completed(bridge):
+    _local(bridge)
+    _open(bridge, "bad", agent="codex", transport="codex")
+    bridge.live_logs.close("bad", exit_code=1)
+    row = project(bridge, "local")["agents"][0]
+    # exit != 0 comes from the existing source and must not read as success.
+    assert row["state"] == "blocked"
+    assert row["failure"] == "exit_code" and row["exit_code"] == 1
+    assert row["step"] == "failed"
+    assert row["turn_ended"] is True and row["acceptance"] == "not_evaluated"
+    summary = project(bridge, "local")["summary_text"]
+    assert "blocked" in summary and "exit 1" in summary
+    assert "completed" not in summary
+
+
+def test_recorded_error_is_blocked_even_with_exit_zero(bridge):
+    _local(bridge)
+    _open(bridge, "err", agent="grok")
+    bridge.live_logs.close("err", exit_code=0, error="approval_denied")
+    row = project(bridge, "local")["agents"][0]
+    # A recorded error wins over an exit code that would otherwise look clean.
+    assert row["state"] == "blocked" and row["failure"] == "error"
+    # The recorded error text itself is not exposed.
+    assert "approval_denied" not in json.dumps(project(bridge, "local"))
+
+
+def test_closed_without_exit_status_is_unknown_not_completed(bridge):
+    _local(bridge)
+    _open(bridge, "bare", agent="qwen")
+    bridge.live_logs.close("bare")
+    row = project(bridge, "local")["agents"][0]
+    assert row["state"] == "unknown" and row["unknown"] is True
+    assert row["step"] == "turn ended, result unconfirmed"
+    assert row["exit_code"] is None and row["failure"] is None
+    assert row["turn_ended"] is True and row["acceptance"] == "not_evaluated"
+
+
+def test_exit_zero_completed_keeps_process_and_acceptance_separate(bridge):
+    _local(bridge)
+    _open(bridge, "ok", agent="codex")
+    bridge.live_logs.close("ok", exit_code=0)
+    row = project(bridge, "local")["agents"][0]
+    assert row["state"] == "completed" and row["step"] == "turn ended"
+    assert row["exit_code"] == 0 and row["failure"] is None
+    assert row["acceptance"] == "not_evaluated" and row["turn_ended"] is True
+    summary = project(bridge, "local")["summary_text"]
+    # Process/turn end and fachliche Abnahme are stated separately.
+    assert "turn ended, process only" in summary
+    assert "fachliche Abnahme nicht bewertet" in summary
+    assert "completed" not in summary
+
+
+def test_failed_durable_task_is_blocked(bridge):
+    _local(bridge)
+    _durable(bridge, "failed-1", state="failed", agent="opencode", error="exec_spawn_failed")
+    row = project(bridge, "local")["agents"][0]
+    assert row["state"] == "blocked" and row["failure"] == "task_error"
+    assert row["step"] == "failed" and row["acceptance"] == "not_evaluated"
+    assert "exec_spawn_failed" not in json.dumps(project(bridge, "local"))
+
+
+def test_success_false_durable_outcome_overrides_a_clean_exit_code(bridge):
+    _local(bridge)
+    _durable(
+        bridge,
+        "turn",
+        state="failed",
+        agent="codex",
+        result={"success": False, "exit_code": 0},
+    )
+    _open(bridge, "turn", agent="codex")
+    bridge.live_logs.close("turn", exit_code=0)
+    row = project(bridge, "local")["agents"][0]
+    # success false is already settled in the durable task (state failed); a
+    # clean exit code must not turn it into a success-like display.
+    assert row["state"] == "blocked" and row["failure"] == "unsuccessful"
+    assert row["turn_ended"] is True and row["acceptance"] == "not_evaluated"
+    assert "blocked" in project(bridge, "local")["summary_text"]
+
+
+def test_completed_durable_outcome_allows_completed_without_exit_code(bridge):
+    _local(bridge)
+    _durable(bridge, "turn", state="completed", agent="grok", result={"success": True})
+    _open(bridge, "turn", agent="grok")
+    bridge.live_logs.close("turn")
+    row = project(bridge, "local")["agents"][0]
+    # The durable record settled as completed, so the transport end is a
+    # process completion — still not a fachliche Abnahme.
+    assert row["state"] == "completed" and row["step"] == "turn ended"
+    assert row["acceptance"] == "not_evaluated"
+
+
+def test_projection_states_what_it_cannot_observe(bridge):
+    _local(bridge)
+    coverage = project(bridge, "local")["coverage"]
+    assert coverage["observed_sources"] == ["live_observation", "durable_task"]
+    assert "are not observed here" in coverage["not_observed"]
+    assert "never derives a fachliche Abnahme" in coverage["acceptance"]
+    # Scope stays honest: no widening beyond own principal without a team role.
+    assert project(bridge, "local")["excluded_principals"] == []
+    assert project(bridge, "local")["scope"] == "own"
