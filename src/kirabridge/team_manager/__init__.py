@@ -370,6 +370,11 @@ class TeamManager:
 
     def resume_session(self, work):
         """Return a proven idle/active provider session for this exact worker."""
+        continuation = getattr(self.bridge, "autonext", None)
+        if continuation is not None and continuation.owns(work["id"]):
+            # AutoNext owns its coordinator/verifier lifecycle and supplies its
+            # own turn contract; ordinary team follow-ups use the session store.
+            return None
         worker = self.config.team.workers.get(work["assignee"])
         if (
             worker is None
